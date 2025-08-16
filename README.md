@@ -20,7 +20,7 @@ GraphDone reimagines project management as a collaborative graph where work flow
 - 🎯 **Spherical priority model** - Ideas migrate from periphery to center based on community validation
 - 💰 **Accessible pricing** - $5/user/month with full-featured free tier
 
-[Read our full philosophy](./philosophy.md)
+[Read our full philosophy](./docs/philosophy.md)
 
 ## How GraphDone Works: A Visual Deep Dive
 

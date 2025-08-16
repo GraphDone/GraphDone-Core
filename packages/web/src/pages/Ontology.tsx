@@ -111,22 +111,22 @@ export function Ontology() {
 
   const getColorClasses = (color: string) => {
     const colorMap: Record<string, string> = {
-      blue: 'bg-blue-100 text-blue-800 border-blue-200',
-      green: 'bg-green-100 text-green-800 border-green-200',
-      purple: 'bg-purple-100 text-purple-800 border-purple-200',
-      orange: 'bg-orange-100 text-orange-800 border-orange-200',
+      blue: 'bg-blue-900 text-blue-300 border-blue-700',
+      green: 'bg-green-900 text-green-300 border-green-700',
+      purple: 'bg-purple-900 text-purple-300 border-purple-700',
+      orange: 'bg-orange-900 text-orange-300 border-orange-700',
     };
-    return colorMap[color] || 'bg-gray-100 text-gray-800 border-gray-200';
+    return colorMap[color] || 'bg-gray-700 text-gray-300 border-gray-600';
   };
 
   return (
     <div className="h-screen flex flex-col">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
+      <div className="bg-gray-900 border-b border-gray-700 px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Ontology</h1>
-            <p className="text-sm text-gray-500 mt-1">
+            <h1 className="text-2xl font-bold text-gray-100">Ontology</h1>
+            <p className="text-sm text-gray-400 mt-1">
               Define node types, relationships, and schemas for {currentGraph?.name || 'your graphs'}
             </p>
           </div>
@@ -152,15 +152,15 @@ export function Ontology() {
       </div>
 
       {/* Tabs */}
-      <div className="bg-white border-b border-gray-200">
+      <div className="bg-gray-900 border-b border-gray-700">
         <div className="px-6">
           <nav className="flex space-x-8">
             <button
               onClick={() => setActiveTab('types')}
               className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                 activeTab === 'types'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'border-green-500 text-green-400'
+                  : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-600'
               }`}
             >
               <Brain className="h-4 w-4 inline mr-2" />
@@ -170,8 +170,8 @@ export function Ontology() {
               onClick={() => setActiveTab('relationships')}
               className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                 activeTab === 'relationships'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'border-green-500 text-green-400'
+                  : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-600'
               }`}
             >
               Relationships
@@ -180,8 +180,8 @@ export function Ontology() {
               onClick={() => setActiveTab('templates')}
               className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                 activeTab === 'templates'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'border-green-500 text-green-400'
+                  : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-600'
               }`}
             >
               Templates
@@ -203,11 +203,11 @@ export function Ontology() {
                   placeholder="Search node types..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-600 rounded-lg text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-green-500 focus:border-transparent"
                 />
               </div>
               
-              <div className="text-sm text-gray-500">
+              <div className="text-sm text-gray-400">
                 {filteredTypes.length} types
               </div>
             </div>
@@ -215,19 +215,19 @@ export function Ontology() {
             {/* Node Types Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredTypes.map((nodeType) => (
-                <div key={nodeType.id} className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
+                <div key={nodeType.id} className="bg-gray-800 border border-gray-700 rounded-lg p-6 hover:shadow-lg transition-shadow">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center space-x-3">
                       <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg border ${getColorClasses(nodeType.color)}`}>
                         {nodeType.icon}
                       </div>
                       <div>
-                        <h3 className="font-semibold text-gray-900">{nodeType.name}</h3>
-                        <div className="flex items-center space-x-2 text-xs text-gray-500">
+                        <h3 className="font-semibold text-gray-100">{nodeType.name}</h3>
+                        <div className="flex items-center space-x-2 text-xs text-gray-400">
                           {nodeType.isBuiltIn ? (
-                            <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded">Built-in</span>
+                            <span className="bg-gray-700 text-gray-300 px-2 py-1 rounded">Built-in</span>
                           ) : (
-                            <span className="bg-blue-100 text-blue-600 px-2 py-1 rounded">Custom</span>
+                            <span className="bg-green-900 text-green-300 px-2 py-1 rounded">Custom</span>
                           )}
                           <span>{nodeType.usageCount} used</span>
                         </div>
@@ -235,18 +235,18 @@ export function Ontology() {
                     </div>
 
                     <div className="flex items-center space-x-1">
-                      <button className="p-2 text-gray-400 hover:text-gray-600 transition-colors">
+                      <button className="p-2 text-gray-400 hover:text-gray-300 transition-colors">
                         <Eye className="h-4 w-4" />
                       </button>
                       {!nodeType.isBuiltIn && (
                         <>
-                          <button className="p-2 text-gray-400 hover:text-gray-600 transition-colors">
+                          <button className="p-2 text-gray-400 hover:text-gray-300 transition-colors">
                             <Copy className="h-4 w-4" />
                           </button>
-                          <button className="p-2 text-gray-400 hover:text-gray-600 transition-colors">
+                          <button className="p-2 text-gray-400 hover:text-gray-300 transition-colors">
                             <Edit3 className="h-4 w-4" />
                           </button>
-                          <button className="p-2 text-gray-400 hover:text-red-600 transition-colors">
+                          <button className="p-2 text-gray-400 hover:text-red-400 transition-colors">
                             <Trash2 className="h-4 w-4" />
                           </button>
                         </>
@@ -254,24 +254,24 @@ export function Ontology() {
                     </div>
                   </div>
 
-                  <p className="text-gray-600 text-sm mb-4">{nodeType.description}</p>
+                  <p className="text-gray-300 text-sm mb-4">{nodeType.description}</p>
 
                   <div className="space-y-2">
-                    <h4 className="text-sm font-medium text-gray-900">Fields ({nodeType.fields.length})</h4>
+                    <h4 className="text-sm font-medium text-gray-100">Fields ({nodeType.fields.length})</h4>
                     <div className="space-y-1">
                       {nodeType.fields.slice(0, 3).map((field) => (
                         <div key={field.id} className="flex items-center justify-between text-xs">
-                          <span className="text-gray-600">
+                          <span className="text-gray-300">
                             {field.name}
-                            {field.required && <span className="text-red-500 ml-1">*</span>}
+                            {field.required && <span className="text-red-400 ml-1">*</span>}
                           </span>
-                          <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                          <span className="bg-gray-700 text-gray-300 px-2 py-1 rounded">
                             {field.type}
                           </span>
                         </div>
                       ))}
                       {nodeType.fields.length > 3 && (
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-gray-400">
                           +{nodeType.fields.length - 3} more fields
                         </div>
                       )}
@@ -286,8 +286,8 @@ export function Ontology() {
         {activeTab === 'relationships' && (
           <div className="p-6">
             <div className="text-center py-12">
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Relationship Types</h3>
-              <p className="text-gray-500 mb-4">
+              <h3 className="text-lg font-medium text-gray-100 mb-2">Relationship Types</h3>
+              <p className="text-gray-400 mb-4">
                 Define how different node types can connect to each other
               </p>
               <button className="btn btn-primary">
@@ -301,8 +301,8 @@ export function Ontology() {
         {activeTab === 'templates' && (
           <div className="p-6">
             <div className="text-center py-12">
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Node Templates</h3>
-              <p className="text-gray-500 mb-4">
+              <h3 className="text-lg font-medium text-gray-100 mb-2">Node Templates</h3>
+              <p className="text-gray-400 mb-4">
                 Pre-configured node templates for common patterns
               </p>
               <button className="btn btn-primary">

@@ -47,11 +47,11 @@ export function Analytics() {
   return (
     <div className="h-screen flex flex-col">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
+      <div className="bg-gray-900 border-b border-gray-700 px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Analytics</h1>
-            <p className="text-sm text-gray-500 mt-1">
+            <h1 className="text-2xl font-bold text-gray-100">Analytics</h1>
+            <p className="text-sm text-gray-400 mt-1">
               Democratic prioritization insights for {currentGraph?.name || 'your graphs'}
             </p>
           </div>
@@ -60,7 +60,7 @@ export function Analytics() {
             <select
               value={timeRange}
               onChange={(e) => setTimeRange(e.target.value as any)}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-100 focus:ring-2 focus:ring-green-500 focus:border-transparent"
             >
               <option value="day">Last 24 Hours</option>
               <option value="week">Last Week</option>
@@ -72,15 +72,15 @@ export function Analytics() {
       </div>
 
       {/* Tabs */}
-      <div className="bg-white border-b border-gray-200">
+      <div className="bg-gray-900 border-b border-gray-700">
         <div className="px-6">
           <nav className="flex space-x-8">
             <button
               onClick={() => setActiveTab('overview')}
               className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                 activeTab === 'overview'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'border-green-500 text-green-400'
+                  : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-600'
               }`}
             >
               <Activity className="h-4 w-4 inline mr-2" />
@@ -90,8 +90,8 @@ export function Analytics() {
               onClick={() => setActiveTab('priority')}
               className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                 activeTab === 'priority'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'border-green-500 text-green-400'
+                  : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-600'
               }`}
             >
               <Target className="h-4 w-4 inline mr-2" />
@@ -101,8 +101,8 @@ export function Analytics() {
               onClick={() => setActiveTab('collaboration')}
               className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                 activeTab === 'collaboration'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'border-green-500 text-green-400'
+                  : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-600'
               }`}
             >
               <Users className="h-4 w-4 inline mr-2" />
@@ -112,8 +112,8 @@ export function Analytics() {
               onClick={() => setActiveTab('insights')}
               className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                 activeTab === 'insights'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'border-green-500 text-green-400'
+                  : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-600'
               }`}
             >
               <TrendingUp className="h-4 w-4 inline mr-2" />
@@ -130,69 +130,69 @@ export function Analytics() {
             <div className="space-y-6">
               {/* Key Metrics */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div className="bg-white border border-gray-200 rounded-lg p-6">
+                <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-gray-600">Total Nodes</p>
-                      <p className="text-3xl font-bold text-gray-900">{mockMetrics.totalNodes}</p>
-                      <p className="text-sm text-green-600">+12 this week</p>
+                      <p className="text-sm text-gray-400">Total Nodes</p>
+                      <p className="text-3xl font-bold text-gray-100">{mockMetrics.totalNodes}</p>
+                      <p className="text-sm text-green-400">+12 this week</p>
                     </div>
-                    <Target className="h-12 w-12 text-blue-600" />
+                    <Target className="h-12 w-12 text-green-400" />
                   </div>
                 </div>
 
-                <div className="bg-white border border-gray-200 rounded-lg p-6">
+                <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-gray-600">Avg Priority</p>
-                      <p className="text-3xl font-bold text-gray-900">{Math.round(mockMetrics.avgPriority * 100)}%</p>
-                      <p className="text-sm text-green-600">+5% this week</p>
+                      <p className="text-sm text-gray-400">Avg Priority</p>
+                      <p className="text-3xl font-bold text-gray-100">{Math.round(mockMetrics.avgPriority * 100)}%</p>
+                      <p className="text-sm text-green-400">+5% this week</p>
                     </div>
-                    <TrendingUp className="h-12 w-12 text-green-600" />
+                    <TrendingUp className="h-12 w-12 text-green-400" />
                   </div>
                 </div>
 
-                <div className="bg-white border border-gray-200 rounded-lg p-6">
+                <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-gray-600">Participation</p>
-                      <p className="text-3xl font-bold text-gray-900">{Math.round(mockMetrics.participationRate * 100)}%</p>
-                      <p className="text-sm text-blue-600">Team engagement</p>
+                      <p className="text-sm text-gray-400">Participation</p>
+                      <p className="text-3xl font-bold text-gray-100">{Math.round(mockMetrics.participationRate * 100)}%</p>
+                      <p className="text-sm text-green-400">Team engagement</p>
                     </div>
-                    <Users className="h-12 w-12 text-purple-600" />
+                    <Users className="h-12 w-12 text-green-400" />
                   </div>
                 </div>
               </div>
 
               {/* Top Priority Nodes */}
-              <div className="bg-white border border-gray-200 rounded-lg">
-                <div className="p-6 border-b border-gray-200">
-                  <h3 className="text-lg font-semibold text-gray-900">Top Priority Nodes</h3>
-                  <p className="text-sm text-gray-500">Based on community voting</p>
+              <div className="bg-gray-800 border border-gray-700 rounded-lg">
+                <div className="p-6 border-b border-gray-700">
+                  <h3 className="text-lg font-semibold text-gray-100">Top Priority Nodes</h3>
+                  <p className="text-sm text-gray-400">Based on community voting</p>
                 </div>
-                <div className="divide-y divide-gray-200">
+                <div className="divide-y divide-gray-700">
                   {topNodes.map((node, index) => (
                     <div key={node.id} className="p-6 flex items-center justify-between">
                       <div className="flex items-center space-x-4">
-                        <div className="w-8 h-8 bg-blue-100 text-blue-800 rounded-full flex items-center justify-center text-sm font-medium">
+                        <div className="w-8 h-8 bg-green-900 text-green-300 rounded-full flex items-center justify-center text-sm font-medium">
                           {index + 1}
                         </div>
                         <div>
-                          <h4 className="font-medium text-gray-900">{node.title}</h4>
-                          <div className="flex items-center space-x-3 text-sm text-gray-500">
+                          <h4 className="font-medium text-gray-100">{node.title}</h4>
+                          <div className="flex items-center space-x-3 text-sm text-gray-400">
                             <span>{node.votes} votes</span>
                             <span>•</span>
                             <div className="flex items-center">
                               {node.trend === 'up' ? (
                                 <TrendingUp className="h-3 w-3 text-green-500 mr-1" />
                               ) : node.trend === 'down' ? (
-                                <TrendingUp className="h-3 w-3 text-red-500 mr-1 rotate-180" />
+                                <TrendingUp className="h-3 w-3 text-red-400 mr-1 rotate-180" />
                               ) : (
-                                <div className="w-3 h-3 bg-gray-300 rounded-full mr-1" />
+                                <div className="w-3 h-3 bg-gray-400 rounded-full mr-1" />
                               )}
                               <span className={
-                                node.trend === 'up' ? 'text-green-600' :
-                                node.trend === 'down' ? 'text-red-600' : 'text-gray-500'
+                                node.trend === 'up' ? 'text-green-400' :
+                                node.trend === 'down' ? 'text-red-400' : 'text-gray-400'
                               }>
                                 {node.trend}
                               </span>
@@ -201,12 +201,12 @@ export function Analytics() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="text-lg font-semibold text-gray-900">
+                        <div className="text-lg font-semibold text-gray-100">
                           {Math.round(node.priority * 100)}%
                         </div>
-                        <div className="w-24 h-2 bg-gray-200 rounded-full mt-1">
+                        <div className="w-24 h-2 bg-gray-600 rounded-full mt-1">
                           <div 
-                            className="h-2 bg-blue-600 rounded-full"
+                            className="h-2 bg-green-500 rounded-full"
                             style={{ width: `${node.priority * 100}%` }}
                           />
                         </div>
@@ -221,12 +221,12 @@ export function Analytics() {
           {activeTab === 'priority' && (
             <div className="space-y-6">
               {/* Priority Trends Chart Placeholder */}
-              <div className="bg-white border border-gray-200 rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Priority Trends</h3>
-                <div className="h-64 bg-gray-50 rounded-lg flex items-center justify-center">
+              <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-gray-100 mb-4">Priority Trends</h3>
+                <div className="h-64 bg-gray-700 rounded-lg flex items-center justify-center">
                   <div className="text-center">
                     <TrendingUp className="h-12 w-12 mx-auto text-gray-400 mb-2" />
-                    <p className="text-gray-500">Priority trends chart</p>
+                    <p className="text-gray-300">Priority trends chart</p>
                     <p className="text-sm text-gray-400">Shows how community priorities change over time</p>
                   </div>
                 </div>
@@ -234,19 +234,19 @@ export function Analytics() {
 
               {/* Voting Activity */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-white border border-gray-200 rounded-lg p-6">
-                  <h4 className="font-medium text-gray-900 mb-4">Recent Voting Activity</h4>
+                <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
+                  <h4 className="font-medium text-gray-100 mb-4">Recent Voting Activity</h4>
                   <div className="space-y-3">
                     {priorityTrends.slice(-5).map((trend, index) => (
                       <div key={index} className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600">
+                        <span className="text-sm text-gray-400">
                           {new Date(trend.date).toLocaleDateString()}
                         </span>
                         <div className="flex items-center space-x-2">
-                          <span className="text-sm text-gray-900">{trend.votes} votes</span>
-                          <div className="w-16 h-2 bg-gray-200 rounded-full">
+                          <span className="text-sm text-gray-100">{trend.votes} votes</span>
+                          <div className="w-16 h-2 bg-gray-600 rounded-full">
                             <div 
-                              className="h-2 bg-blue-600 rounded-full"
+                              className="h-2 bg-green-500 rounded-full"
                               style={{ width: `${trend.avgPriority * 100}%` }}
                             />
                           </div>
@@ -256,17 +256,17 @@ export function Analytics() {
                   </div>
                 </div>
 
-                <div className="bg-white border border-gray-200 rounded-lg p-6">
-                  <h4 className="font-medium text-gray-900 mb-4">Democratic Indicators</h4>
+                <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
+                  <h4 className="font-medium text-gray-100 mb-4">Democratic Indicators</h4>
                   <div className="space-y-4">
                     <div>
                       <div className="flex justify-between text-sm mb-1">
-                        <span className="text-gray-600">Consensus Score</span>
-                        <span className="text-gray-900">{Math.round(mockMetrics.consensusScore * 100)}%</span>
+                        <span className="text-gray-400">Consensus Score</span>
+                        <span className="text-gray-100">{Math.round(mockMetrics.consensusScore * 100)}%</span>
                       </div>
-                      <div className="w-full h-2 bg-gray-200 rounded-full">
+                      <div className="w-full h-2 bg-gray-600 rounded-full">
                         <div 
-                          className="h-2 bg-green-600 rounded-full"
+                          className="h-2 bg-green-500 rounded-full"
                           style={{ width: `${mockMetrics.consensusScore * 100}%` }}
                         />
                       </div>
@@ -274,19 +274,19 @@ export function Analytics() {
 
                     <div>
                       <div className="flex justify-between text-sm mb-1">
-                        <span className="text-gray-600">Participation Rate</span>
-                        <span className="text-gray-900">{Math.round(mockMetrics.participationRate * 100)}%</span>
+                        <span className="text-gray-400">Participation Rate</span>
+                        <span className="text-gray-100">{Math.round(mockMetrics.participationRate * 100)}%</span>
                       </div>
-                      <div className="w-full h-2 bg-gray-200 rounded-full">
+                      <div className="w-full h-2 bg-gray-600 rounded-full">
                         <div 
-                          className="h-2 bg-blue-600 rounded-full"
+                          className="h-2 bg-green-500 rounded-full"
                           style={{ width: `${mockMetrics.participationRate * 100}%` }}
                         />
                       </div>
                     </div>
 
-                    <div className="pt-2 border-t border-gray-200">
-                      <p className="text-xs text-gray-500">
+                    <div className="pt-2 border-t border-gray-600">
+                      <p className="text-xs text-gray-400">
                         High consensus and participation indicate healthy democratic prioritization
                       </p>
                     </div>
@@ -299,32 +299,32 @@ export function Analytics() {
           {activeTab === 'collaboration' && (
             <div className="space-y-6">
               {/* Team Collaboration Stats */}
-              <div className="bg-white border border-gray-200 rounded-lg">
-                <div className="p-6 border-b border-gray-200">
-                  <h3 className="text-lg font-semibold text-gray-900">Team Collaboration</h3>
-                  <p className="text-sm text-gray-500">Individual contributions and consensus building</p>
+              <div className="bg-gray-800 border border-gray-700 rounded-lg">
+                <div className="p-6 border-b border-gray-700">
+                  <h3 className="text-lg font-semibold text-gray-100">Team Collaboration</h3>
+                  <p className="text-sm text-gray-400">Individual contributions and consensus building</p>
                 </div>
-                <div className="divide-y divide-gray-200">
+                <div className="divide-y divide-gray-700">
                   {collaborationData.map((user, index) => (
                     <div key={index} className="p-6">
                       <div className="flex items-center justify-between mb-3">
-                        <h4 className="font-medium text-gray-900">{user.user}</h4>
-                        <span className="text-sm text-gray-500">Consensus: {Math.round(user.consensus * 100)}%</span>
+                        <h4 className="font-medium text-gray-100">{user.user}</h4>
+                        <span className="text-sm text-gray-400">Consensus: {Math.round(user.consensus * 100)}%</span>
                       </div>
                       <div className="grid grid-cols-3 gap-4 text-sm">
                         <div>
-                          <span className="text-gray-600">Contributions</span>
-                          <div className="font-medium text-gray-900">{user.contributions}</div>
+                          <span className="text-gray-400">Contributions</span>
+                          <div className="font-medium text-gray-100">{user.contributions}</div>
                         </div>
                         <div>
-                          <span className="text-gray-600">Votes Cast</span>
-                          <div className="font-medium text-gray-900">{user.votes}</div>
+                          <span className="text-gray-400">Votes Cast</span>
+                          <div className="font-medium text-gray-100">{user.votes}</div>
                         </div>
                         <div>
-                          <span className="text-gray-600">Consensus</span>
-                          <div className="w-full h-2 bg-gray-200 rounded-full mt-1">
+                          <span className="text-gray-400">Consensus</span>
+                          <div className="w-full h-2 bg-gray-600 rounded-full mt-1">
                             <div 
-                              className="h-2 bg-purple-600 rounded-full"
+                              className="h-2 bg-green-500 rounded-full"
                               style={{ width: `${user.consensus * 100}%` }}
                             />
                           </div>
@@ -341,11 +341,11 @@ export function Analytics() {
             <div className="space-y-6">
               <div className="text-center py-12">
                 <TrendingUp className="h-16 w-16 mx-auto text-gray-300 mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">AI-Generated Insights</h3>
-                <p className="text-gray-500 mb-4">
+                <h3 className="text-lg font-medium text-gray-100 mb-2">AI-Generated Insights</h3>
+                <p className="text-gray-400 mb-4">
                   Coming soon: Intelligent analysis of your team's collaboration patterns
                 </p>
-                <ul className="text-sm text-gray-600 space-y-1 max-w-md mx-auto">
+                <ul className="text-sm text-gray-300 space-y-1 max-w-md mx-auto">
                   <li>• Priority conflict detection</li>
                   <li>• Collaboration bottleneck identification</li>
                   <li>• Optimal resource allocation suggestions</li>

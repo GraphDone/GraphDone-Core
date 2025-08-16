@@ -33,18 +33,18 @@ export function GraphManagement() {
 
   const getGraphTypeColor = (type: Graph['type']) => {
     switch (type) {
-      case 'PROJECT': return 'text-blue-600 bg-blue-50 border-blue-200';
-      case 'WORKSPACE': return 'text-purple-600 bg-purple-50 border-purple-200';
-      case 'SUBGRAPH': return 'text-green-600 bg-green-50 border-green-200';
-      case 'TEMPLATE': return 'text-orange-600 bg-orange-50 border-orange-200';
-      default: return 'text-gray-600 bg-gray-50 border-gray-200';
+      case 'PROJECT': return 'text-green-400 bg-green-900 border-green-700';
+      case 'WORKSPACE': return 'text-purple-400 bg-purple-900 border-purple-700';
+      case 'SUBGRAPH': return 'text-blue-400 bg-blue-900 border-blue-700';
+      case 'TEMPLATE': return 'text-orange-400 bg-orange-900 border-orange-700';
+      default: return 'text-gray-400 bg-gray-700 border-gray-600';
     }
   };
 
   const getPermissionIcon = (graph: Graph) => {
-    if (canDeleteGraph(graph.id)) return <Crown className="h-4 w-4 text-yellow-600" />;
-    if (canEditGraph(graph.id)) return <Edit3 className="h-4 w-4 text-blue-600" />;
-    return <Eye className="h-4 w-4 text-gray-600" />;
+    if (canDeleteGraph(graph.id)) return <Crown className="h-4 w-4 text-yellow-400" />;
+    if (canEditGraph(graph.id)) return <Edit3 className="h-4 w-4 text-green-400" />;
+    return <Eye className="h-4 w-4 text-gray-400" />;
   };
 
   const toggleExpanded = (graphId: string) => {
@@ -83,8 +83,8 @@ export function GraphManagement() {
       return (
         <div key={graph.id} className="space-y-2">
           <div 
-            className={`p-4 border rounded-lg transition-all ${
-              isSelected ? 'border-blue-300 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+            className={`p-4 bg-gray-800 border rounded-lg transition-all ${
+              isSelected ? 'border-green-500 bg-green-900' : 'border-gray-700 hover:border-gray-600'
             }`}
             style={{ marginLeft: `${depth * 24}px` }}
           >
@@ -94,13 +94,13 @@ export function GraphManagement() {
                   type="checkbox"
                   checked={isSelected}
                   onChange={() => toggleSelected(graph.id)}
-                  className="h-4 w-4 text-blue-600 rounded border-gray-300"
+                  className="h-4 w-4 text-green-500 rounded border-gray-500 bg-gray-700"
                 />
                 
                 {hasChildren && (
                   <button
                     onClick={() => toggleExpanded(graph.id)}
-                    className="p-1 hover:bg-gray-200 rounded"
+                    className="p-1 hover:bg-gray-600 rounded"
                   >
                     {isExpanded ? (
                       <FolderOpen className="h-4 w-4 text-gray-600" />
@@ -116,23 +116,23 @@ export function GraphManagement() {
                 
                 <div className="flex-1">
                   <div className="flex items-center space-x-2">
-                    <h3 className="text-lg font-semibold text-gray-900">{fullGraph.name}</h3>
+                    <h3 className="text-lg font-semibold text-gray-100">{fullGraph.name}</h3>
                     <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getGraphTypeColor(fullGraph.type)}`}>
                       {fullGraph.type}
                     </span>
                     {fullGraph.isShared ? (
-                      <Share2 className="h-4 w-4 text-blue-500" />
+                      <Share2 className="h-4 w-4 text-green-400" />
                     ) : (
-                      <Lock className="h-4 w-4 text-gray-400" />
+                      <Lock className="h-4 w-4 text-gray-500" />
                     )}
                     {getPermissionIcon(fullGraph)}
                   </div>
                   
                   {fullGraph.description && (
-                    <p className="text-gray-600 mt-1">{fullGraph.description}</p>
+                    <p className="text-gray-300 mt-1">{fullGraph.description}</p>
                   )}
                   
-                  <div className="flex items-center space-x-4 mt-2 text-sm text-gray-500">
+                  <div className="flex items-center space-x-4 mt-2 text-sm text-gray-400">
                     <div className="flex items-center space-x-1">
                       <Activity className="h-4 w-4" />
                       <span>{fullGraph.nodeCount} nodes</span>
@@ -152,7 +152,7 @@ export function GraphManagement() {
               <div className="flex items-center space-x-2">
                 <button
                   onClick={() => selectGraph(graph.id)}
-                  className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                  className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
                 >
                   Open
                 </button>
@@ -160,23 +160,23 @@ export function GraphManagement() {
                 <div className="flex items-center space-x-1">
                   {canEditGraph(graph.id) && (
                     <>
-                      <button className="p-2 text-gray-400 hover:text-gray-600 transition-colors">
+                      <button className="p-2 text-gray-400 hover:text-gray-300 transition-colors">
                         <Copy className="h-4 w-4" />
                       </button>
-                      <button className="p-2 text-gray-400 hover:text-gray-600 transition-colors">
+                      <button className="p-2 text-gray-400 hover:text-gray-300 transition-colors">
                         <Move className="h-4 w-4" />
                       </button>
                     </>
                   )}
                   
                   {canShareGraph(graph.id) && (
-                    <button className="p-2 text-gray-400 hover:text-blue-600 transition-colors">
+                    <button className="p-2 text-gray-400 hover:text-green-400 transition-colors">
                       <Share2 className="h-4 w-4" />
                     </button>
                   )}
                   
                   {canDeleteGraph(graph.id) && (
-                    <button className="p-2 text-gray-400 hover:text-red-600 transition-colors">
+                    <button className="p-2 text-gray-400 hover:text-red-400 transition-colors">
                       <Trash2 className="h-4 w-4" />
                     </button>
                   )}
@@ -202,8 +202,8 @@ export function GraphManagement() {
       return (
         <div 
           key={graph.id}
-          className={`p-4 border rounded-lg transition-all ${
-            isSelected ? 'border-blue-300 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+          className={`p-4 bg-gray-800 border rounded-lg transition-all ${
+            isSelected ? 'border-green-500 bg-green-900' : 'border-gray-700 hover:border-gray-600'
           }`}
         >
           <div className="flex items-center justify-between">
@@ -212,7 +212,7 @@ export function GraphManagement() {
                 type="checkbox"
                 checked={isSelected}
                 onChange={() => toggleSelected(graph.id)}
-                className="h-4 w-4 text-blue-600 rounded border-gray-300"
+                className="h-4 w-4 text-green-500 rounded border-gray-500 bg-gray-700"
               />
               
               <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-sm font-medium ${getGraphTypeColor(graph.type)}`}>
@@ -221,28 +221,28 @@ export function GraphManagement() {
               
               <div className="flex-1">
                 <div className="flex items-center space-x-2">
-                  <h3 className="text-lg font-semibold text-gray-900">{graph.name}</h3>
+                  <h3 className="text-lg font-semibold text-gray-100">{graph.name}</h3>
                   <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getGraphTypeColor(graph.type)}`}>
                     {graph.type}
                   </span>
                   {graph.parentGraphId && (
-                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                    <span className="text-xs text-gray-300 bg-gray-700 px-2 py-1 rounded">
                       Subgraph
                     </span>
                   )}
                   {graph.isShared ? (
-                    <Share2 className="h-4 w-4 text-blue-500" />
+                    <Share2 className="h-4 w-4 text-green-400" />
                   ) : (
-                    <Lock className="h-4 w-4 text-gray-400" />
+                    <Lock className="h-4 w-4 text-gray-500" />
                   )}
                   {getPermissionIcon(graph)}
                 </div>
                 
                 {graph.description && (
-                  <p className="text-gray-600 mt-1">{graph.description}</p>
+                  <p className="text-gray-300 mt-1">{graph.description}</p>
                 )}
                 
-                <div className="flex items-center space-x-4 mt-2 text-sm text-gray-500">
+                <div className="flex items-center space-x-4 mt-2 text-sm text-gray-400">
                   <div className="flex items-center space-x-1">
                     <Activity className="h-4 w-4" />
                     <span>{graph.nodeCount} nodes</span>
@@ -256,7 +256,7 @@ export function GraphManagement() {
                     <span>{new Date(graph.updatedAt).toLocaleDateString()}</span>
                   </div>
                   {graph.path.length > 0 && (
-                    <div className="text-blue-600">
+                    <div className="text-green-400">
                       Depth: {graph.depth}
                     </div>
                   )}
@@ -267,7 +267,7 @@ export function GraphManagement() {
             <div className="flex items-center space-x-2">
               <button
                 onClick={() => selectGraph(graph.id)}
-                className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
               >
                 Open
               </button>
@@ -275,23 +275,23 @@ export function GraphManagement() {
               <div className="flex items-center space-x-1">
                 {canEditGraph(graph.id) && (
                   <>
-                    <button className="p-2 text-gray-400 hover:text-gray-600 transition-colors">
+                    <button className="p-2 text-gray-400 hover:text-gray-300 transition-colors">
                       <Copy className="h-4 w-4" />
                     </button>
-                    <button className="p-2 text-gray-400 hover:text-gray-600 transition-colors">
+                    <button className="p-2 text-gray-400 hover:text-gray-300 transition-colors">
                       <Move className="h-4 w-4" />
                     </button>
                   </>
                 )}
                 
                 {canShareGraph(graph.id) && (
-                  <button className="p-2 text-gray-400 hover:text-blue-600 transition-colors">
+                  <button className="p-2 text-gray-400 hover:text-green-400 transition-colors">
                     <Share2 className="h-4 w-4" />
                   </button>
                 )}
                 
                 {canDeleteGraph(graph.id) && (
-                  <button className="p-2 text-gray-400 hover:text-red-600 transition-colors">
+                  <button className="p-2 text-gray-400 hover:text-red-400 transition-colors">
                     <Trash2 className="h-4 w-4" />
                   </button>
                 )}
@@ -306,20 +306,20 @@ export function GraphManagement() {
   return (
     <div className="h-screen flex flex-col">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
+      <div className="bg-gray-900 border-b border-gray-700 px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Graph Management</h1>
-            <p className="text-sm text-gray-500 mt-1">
+            <h1 className="text-2xl font-bold text-gray-100">Graph Management</h1>
+            <p className="text-sm text-gray-400 mt-1">
               {currentTeam ? `${currentTeam.name} • ${availableGraphs.length} graphs` : 'Manage your graphs and hierarchies'}
             </p>
           </div>
           
           <div className="flex items-center space-x-3">
             {selectedGraphs.size > 0 && (
-              <div className="flex items-center space-x-2 px-3 py-2 bg-blue-50 rounded-lg">
-                <span className="text-sm text-blue-800">{selectedGraphs.size} selected</span>
-                <button className="text-blue-600 hover:text-blue-800">
+              <div className="flex items-center space-x-2 px-3 py-2 bg-green-900 rounded-lg">
+                <span className="text-sm text-green-300">{selectedGraphs.size} selected</span>
+                <button className="text-green-400 hover:text-green-300">
                   <Trash2 className="h-4 w-4" />
                 </button>
               </div>
@@ -337,7 +337,7 @@ export function GraphManagement() {
       </div>
 
       {/* Filters and controls */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
+      <div className="bg-gray-900 border-b border-gray-700 px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <div className="flex-1 relative">
@@ -347,7 +347,7 @@ export function GraphManagement() {
                 placeholder="Search graphs..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-600 rounded-lg text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-green-500 focus:border-transparent"
               />
             </div>
             
@@ -356,7 +356,7 @@ export function GraphManagement() {
               <select
                 value={filterType}
                 onChange={(e) => setFilterType(e.target.value as any)}
-                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-100 focus:ring-2 focus:ring-green-500 focus:border-transparent"
               >
                 <option value="all">All Types</option>
                 <option value="PROJECT">Projects</option>
@@ -368,14 +368,14 @@ export function GraphManagement() {
           </div>
           
           <div className="flex items-center space-x-2">
-            <span className="text-sm text-gray-500">View:</span>
-            <div className="flex bg-gray-100 rounded-lg p-1">
+            <span className="text-sm text-gray-400">View:</span>
+            <div className="flex bg-gray-700 rounded-lg p-1">
               <button
                 onClick={() => setViewMode('hierarchy')}
                 className={`px-3 py-1 text-sm rounded transition-colors ${
                   viewMode === 'hierarchy' 
-                    ? 'bg-white text-gray-900 shadow' 
-                    : 'text-gray-600 hover:text-gray-900'
+                    ? 'bg-gray-600 text-gray-100 shadow' 
+                    : 'text-gray-400 hover:text-gray-200'
                 }`}
               >
                 Hierarchy
@@ -384,8 +384,8 @@ export function GraphManagement() {
                 onClick={() => setViewMode('list')}
                 className={`px-3 py-1 text-sm rounded transition-colors ${
                   viewMode === 'list' 
-                    ? 'bg-white text-gray-900 shadow' 
-                    : 'text-gray-600 hover:text-gray-900'
+                    ? 'bg-gray-600 text-gray-100 shadow' 
+                    : 'text-gray-400 hover:text-gray-200'
                 }`}
               >
                 List
@@ -401,8 +401,8 @@ export function GraphManagement() {
           {availableGraphs.length === 0 ? (
             <div className="text-center py-12">
               <Folder className="h-16 w-16 mx-auto text-gray-300 mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No graphs yet</h3>
-              <p className="text-gray-500 mb-4">Create your first graph to get started with GraphDone</p>
+              <h3 className="text-lg font-medium text-gray-100 mb-2">No graphs yet</h3>
+              <p className="text-gray-400 mb-4">Create your first graph to get started with GraphDone</p>
               <button className="btn btn-primary">
                 <Plus className="h-4 w-4 mr-2" />
                 Create First Graph
@@ -411,8 +411,8 @@ export function GraphManagement() {
           ) : filteredGraphs.length === 0 ? (
             <div className="text-center py-12">
               <Search className="h-16 w-16 mx-auto text-gray-300 mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No matching graphs</h3>
-              <p className="text-gray-500">Try adjusting your search or filter criteria</p>
+              <h3 className="text-lg font-medium text-gray-100 mb-2">No matching graphs</h3>
+              <p className="text-gray-400">Try adjusting your search or filter criteria</p>
             </div>
           ) : (
             <div className="space-y-4">

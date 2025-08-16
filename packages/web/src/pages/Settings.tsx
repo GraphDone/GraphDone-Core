@@ -27,11 +27,11 @@ export function Settings() {
   return (
     <div className="h-screen flex flex-col">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
+      <div className="bg-gray-900 border-b border-gray-700 px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-            <p className="text-sm text-gray-500 mt-1">
+            <h1 className="text-2xl font-bold text-gray-100">Settings</h1>
+            <p className="text-sm text-gray-400 mt-1">
               Customize your GraphDone experience
             </p>
           </div>
@@ -63,57 +63,57 @@ export function Settings() {
         <div className="max-w-4xl mx-auto px-6 py-8">
           <div className="space-y-8">
             {/* Graph Visualization */}
-            <div className="card p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Graph Visualization</h2>
+            <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
+              <h2 className="text-lg font-semibold text-gray-100 mb-4">Graph Visualization</h2>
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <label className="text-sm font-medium text-gray-700">Auto-layout</label>
-                    <p className="text-sm text-gray-500">Automatically arrange nodes for optimal viewing</p>
+                    <label className="text-sm font-medium text-gray-300">Auto-layout</label>
+                    <p className="text-sm text-gray-400">Automatically arrange nodes for optimal viewing</p>
                   </div>
                   <input
                     type="checkbox"
                     checked={settings.autoLayout}
                     onChange={(e) => setSettings(prev => ({ ...prev, autoLayout: e.target.checked }))}
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    className="h-4 w-4 text-green-500 focus:ring-green-500 border-gray-500 bg-gray-700 rounded"
                   />
                 </div>
                 
                 <div className="flex items-center justify-between">
                   <div>
-                    <label className="text-sm font-medium text-gray-700">Priority Indicators</label>
-                    <p className="text-sm text-gray-500">Show visual priority indicators on nodes</p>
+                    <label className="text-sm font-medium text-gray-300">Priority Indicators</label>
+                    <p className="text-sm text-gray-400">Show visual priority indicators on nodes</p>
                   </div>
                   <input
                     type="checkbox"
                     checked={settings.showPriorityIndicators}
                     onChange={(e) => setSettings(prev => ({ ...prev, showPriorityIndicators: e.target.checked }))}
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    className="h-4 w-4 text-green-500 focus:ring-green-500 border-gray-500 bg-gray-700 rounded"
                   />
                 </div>
                 
                 <div className="flex items-center justify-between">
                   <div>
-                    <label className="text-sm font-medium text-gray-700">Animations</label>
-                    <p className="text-sm text-gray-500">Enable smooth transitions and animations</p>
+                    <label className="text-sm font-medium text-gray-300">Animations</label>
+                    <p className="text-sm text-gray-400">Enable smooth transitions and animations</p>
                   </div>
                   <input
                     type="checkbox"
                     checked={settings.enableAnimations}
                     onChange={(e) => setSettings(prev => ({ ...prev, enableAnimations: e.target.checked }))}
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    className="h-4 w-4 text-green-500 focus:ring-green-500 border-gray-500 bg-gray-700 rounded"
                   />
                 </div>
                 
                 <div className="flex items-center justify-between">
                   <div>
-                    <label className="text-sm font-medium text-gray-700">Default View Mode</label>
-                    <p className="text-sm text-gray-500">Choose how the graph is displayed by default</p>
+                    <label className="text-sm font-medium text-gray-300">Default View Mode</label>
+                    <p className="text-sm text-gray-400">Choose how the graph is displayed by default</p>
                   </div>
                   <select
                     value={settings.defaultViewMode}
                     onChange={(e) => setSettings(prev => ({ ...prev, defaultViewMode: e.target.value }))}
-                    className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-100 focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   >
                     <option value="3d">3D Spherical</option>
                     <option value="2d">2D Network</option>
@@ -124,18 +124,18 @@ export function Settings() {
             </div>
 
             {/* Appearance */}
-            <div className="card p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Appearance</h2>
+            <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
+              <h2 className="text-lg font-semibold text-gray-100 mb-4">Appearance</h2>
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <label className="text-sm font-medium text-gray-700">Theme</label>
-                    <p className="text-sm text-gray-500">Choose your preferred color scheme</p>
+                    <label className="text-sm font-medium text-gray-300">Theme</label>
+                    <p className="text-sm text-gray-400">Choose your preferred color scheme</p>
                   </div>
                   <select
                     value={settings.theme}
                     onChange={(e) => setSettings(prev => ({ ...prev, theme: e.target.value }))}
-                    className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-100 focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   >
                     <option value="light">Light</option>
                     <option value="dark">Dark</option>
@@ -146,20 +146,20 @@ export function Settings() {
             </div>
 
             {/* About */}
-            <div className="card p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">About GraphDone</h2>
+            <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
+              <h2 className="text-lg font-semibold text-gray-100 mb-4">About GraphDone</h2>
               <div className="space-y-3">
                 <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Version</span>
-                  <span className="text-sm font-mono text-gray-900">0.1.0-alpha</span>
+                  <span className="text-sm text-gray-400">Version</span>
+                  <span className="text-sm font-mono text-gray-100">0.1.0-alpha</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">License</span>
-                  <span className="text-sm text-gray-900">MIT</span>
+                  <span className="text-sm text-gray-400">License</span>
+                  <span className="text-sm text-gray-100">MIT</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Philosophy</span>
-                  <span className="text-sm text-gray-900">For teams who think differently</span>
+                  <span className="text-sm text-gray-400">Philosophy</span>
+                  <span className="text-sm text-gray-100">For teams who think differently</span>
                 </div>
               </div>
             </div>

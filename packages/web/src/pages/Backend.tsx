@@ -146,11 +146,11 @@ export function Backend() {
   return (
     <div className="h-screen flex flex-col">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
+      <div className="bg-gray-900 border-b border-gray-700 px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Backend Status</h1>
-            <p className="text-sm text-gray-500 mt-1">
+            <h1 className="text-2xl font-bold text-gray-100">Backend Status</h1>
+            <p className="text-sm text-gray-400 mt-1">
               System architecture and service health monitoring
             </p>
           </div>
@@ -182,78 +182,78 @@ export function Backend() {
           <div className="space-y-8">
             
             {/* System Overview */}
-            <div className="card p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-6">System Architecture</h2>
+            <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
+              <h2 className="text-lg font-semibold text-gray-100 mb-6">System Architecture</h2>
               
               {/* Architecture Diagram */}
-              <div className="bg-gray-50 rounded-lg p-6">
+              <div className="bg-gray-700 rounded-lg p-6">
                 <svg viewBox="0 0 800 500" className="w-full h-96">
                   {/* Client Layer */}
                   <g>
-                    <rect x="50" y="50" width="700" height="80" fill="#e3f2fd" stroke="#1976d2" strokeWidth="2" rx="8" />
-                    <text x="400" y="75" textAnchor="middle" className="fill-blue-800 text-sm font-semibold">Client Layer</text>
+                    <rect x="50" y="50" width="700" height="80" fill="#1e3a8a" stroke="#3b82f6" strokeWidth="2" rx="8" />
+                    <text x="400" y="75" textAnchor="middle" className="fill-blue-200 text-sm font-semibold">Client Layer</text>
                     
-                    <rect x="80" y="90" width="150" height="30" fill="#bbdefb" stroke="#1976d2" rx="4" />
-                    <text x="155" y="110" textAnchor="middle" className="fill-blue-800 text-xs">Web Application</text>
+                    <rect x="80" y="90" width="150" height="30" fill="#1e40af" stroke="#3b82f6" rx="4" />
+                    <text x="155" y="110" textAnchor="middle" className="fill-blue-200 text-xs">Web Application</text>
                     
-                    <rect x="250" y="90" width="150" height="30" fill="#bbdefb" stroke="#1976d2" rx="4" />
-                    <text x="325" y="110" textAnchor="middle" className="fill-blue-800 text-xs">Mobile App (Planned)</text>
+                    <rect x="250" y="90" width="150" height="30" fill="#1e40af" stroke="#3b82f6" rx="4" />
+                    <text x="325" y="110" textAnchor="middle" className="fill-blue-200 text-xs">Mobile App (Planned)</text>
                     
-                    <rect x="420" y="90" width="150" height="30" fill="#bbdefb" stroke="#1976d2" rx="4" />
-                    <text x="495" y="110" textAnchor="middle" className="fill-blue-800 text-xs">AI Agent SDK (Planned)</text>
+                    <rect x="420" y="90" width="150" height="30" fill="#1e40af" stroke="#3b82f6" rx="4" />
+                    <text x="495" y="110" textAnchor="middle" className="fill-blue-200 text-xs">AI Agent SDK (Planned)</text>
                   </g>
 
                   {/* API Layer */}
                   <g>
-                    <rect x="50" y="180" width="700" height="80" fill="#e8f5e8" stroke="#388e3c" strokeWidth="2" rx="8" />
-                    <text x="400" y="205" textAnchor="middle" className="fill-green-800 text-sm font-semibold">API Layer</text>
+                    <rect x="50" y="180" width="700" height="80" fill="#14532d" stroke="#10b981" strokeWidth="2" rx="8" />
+                    <text x="400" y="205" textAnchor="middle" className="fill-green-200 text-sm font-semibold">API Layer</text>
                     
-                    <rect x="100" y="220" width="180" height="30" fill="#c8e6c9" stroke="#388e3c" rx="4" />
-                    <text x="190" y="240" textAnchor="middle" className="fill-green-800 text-xs">GraphQL Server</text>
+                    <rect x="100" y="220" width="180" height="30" fill="#166534" stroke="#10b981" rx="4" />
+                    <text x="190" y="240" textAnchor="middle" className="fill-green-200 text-xs">GraphQL Server</text>
                     
-                    <rect x="310" y="220" width="180" height="30" fill="#c8e6c9" stroke="#388e3c" rx="4" />
-                    <text x="400" y="240" textAnchor="middle" className="fill-green-800 text-xs">WebSocket Server</text>
+                    <rect x="310" y="220" width="180" height="30" fill="#166534" stroke="#10b981" rx="4" />
+                    <text x="400" y="240" textAnchor="middle" className="fill-green-200 text-xs">WebSocket Server</text>
                     
-                    <rect x="520" y="220" width="150" height="30" fill="#c8e6c9" stroke="#388e3c" rx="4" />
-                    <text x="595" y="240" textAnchor="middle" className="fill-green-800 text-xs">Health Check</text>
+                    <rect x="520" y="220" width="150" height="30" fill="#166534" stroke="#10b981" rx="4" />
+                    <text x="595" y="240" textAnchor="middle" className="fill-green-200 text-xs">Health Check</text>
                   </g>
 
                   {/* Business Logic */}
                   <g>
-                    <rect x="50" y="310" width="700" height="80" fill="#fff3e0" stroke="#f57c00" strokeWidth="2" rx="8" />
-                    <text x="400" y="335" textAnchor="middle" className="fill-orange-800 text-sm font-semibold">Business Logic</text>
+                    <rect x="50" y="310" width="700" height="80" fill="#9a3412" stroke="#f97316" strokeWidth="2" rx="8" />
+                    <text x="400" y="335" textAnchor="middle" className="fill-orange-200 text-sm font-semibold">Business Logic</text>
                     
-                    <rect x="100" y="350" width="150" height="30" fill="#ffcc02" stroke="#f57c00" rx="4" />
-                    <text x="175" y="370" textAnchor="middle" className="fill-orange-800 text-xs">Graph Engine</text>
+                    <rect x="100" y="350" width="150" height="30" fill="#c2410c" stroke="#f97316" rx="4" />
+                    <text x="175" y="370" textAnchor="middle" className="fill-orange-200 text-xs">Graph Engine</text>
                     
-                    <rect x="270" y="350" width="150" height="30" fill="#ffcc02" stroke="#f57c00" rx="4" />
-                    <text x="345" y="370" textAnchor="middle" className="fill-orange-800 text-xs">Priority Calculator</text>
+                    <rect x="270" y="350" width="150" height="30" fill="#c2410c" stroke="#f97316" rx="4" />
+                    <text x="345" y="370" textAnchor="middle" className="fill-orange-200 text-xs">Priority Calculator</text>
                     
-                    <rect x="440" y="350" width="150" height="30" fill="#ffcc02" stroke="#f57c00" rx="4" />
-                    <text x="515" y="370" textAnchor="middle" className="fill-orange-800 text-xs">Graph Algorithms</text>
+                    <rect x="440" y="350" width="150" height="30" fill="#c2410c" stroke="#f97316" rx="4" />
+                    <text x="515" y="370" textAnchor="middle" className="fill-orange-200 text-xs">Graph Algorithms</text>
                   </g>
 
                   {/* Data Layer */}
                   <g>
-                    <rect x="50" y="420" width="700" height="60" fill="#fce4ec" stroke="#c2185b" strokeWidth="2" rx="8" />
-                    <text x="400" y="440" textAnchor="middle" className="fill-pink-800 text-sm font-semibold">Data Layer</text>
+                    <rect x="50" y="420" width="700" height="60" fill="#881337" stroke="#ec4899" strokeWidth="2" rx="8" />
+                    <text x="400" y="440" textAnchor="middle" className="fill-pink-200 text-sm font-semibold">Data Layer</text>
                     
-                    <rect x="150" y="450" width="150" height="25" fill="#f8bbd9" stroke="#c2185b" rx="4" />
-                    <text x="225" y="467" textAnchor="middle" className="fill-pink-800 text-xs">PostgreSQL</text>
+                    <rect x="150" y="450" width="150" height="25" fill="#9d174d" stroke="#ec4899" rx="4" />
+                    <text x="225" y="467" textAnchor="middle" className="fill-pink-200 text-xs">PostgreSQL</text>
                     
-                    <rect x="350" y="450" width="150" height="25" fill="#f8bbd9" stroke="#c2185b" rx="4" />
-                    <text x="425" y="467" textAnchor="middle" className="fill-pink-800 text-xs">Redis Cache</text>
+                    <rect x="350" y="450" width="150" height="25" fill="#9d174d" stroke="#ec4899" rx="4" />
+                    <text x="425" y="467" textAnchor="middle" className="fill-pink-200 text-xs">Redis Cache</text>
                   </g>
 
                   {/* Connection Lines */}
-                  <line x1="400" y1="130" x2="400" y2="180" stroke="#666" strokeWidth="2" markerEnd="url(#arrowhead)" />
-                  <line x1="400" y1="260" x2="400" y2="310" stroke="#666" strokeWidth="2" markerEnd="url(#arrowhead)" />
-                  <line x1="400" y1="390" x2="400" y2="420" stroke="#666" strokeWidth="2" markerEnd="url(#arrowhead)" />
+                  <line x1="400" y1="130" x2="400" y2="180" stroke="#d1d5db" strokeWidth="2" markerEnd="url(#arrowhead)" />
+                  <line x1="400" y1="260" x2="400" y2="310" stroke="#d1d5db" strokeWidth="2" markerEnd="url(#arrowhead)" />
+                  <line x1="400" y1="390" x2="400" y2="420" stroke="#d1d5db" strokeWidth="2" markerEnd="url(#arrowhead)" />
 
                   {/* Arrow marker */}
                   <defs>
                     <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
-                      <polygon points="0 0, 10 3.5, 0 7" fill="#666" />
+                      <polygon points="0 0, 10 3.5, 0 7" fill="#d1d5db" />
                     </marker>
                   </defs>
                 </svg>
@@ -261,25 +261,25 @@ export function Backend() {
             </div>
 
             {/* Service Status Grid */}
-            <div className="card p-6">
+            <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-lg font-semibold text-gray-900">Service Status</h2>
-                <div className="text-sm text-gray-500">
+                <h2 className="text-lg font-semibold text-gray-100">Service Status</h2>
+                <div className="text-sm text-gray-400">
                   Last updated: {lastUpdate.toLocaleTimeString()}
                 </div>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {systemHealth.services.map((service) => (
-                  <div key={service.name} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                  <div key={service.name} className="bg-gray-700 border border-gray-600 rounded-lg p-4 hover:shadow-lg transition-shadow">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center space-x-3">
-                        <div className="text-gray-600">
+                        <div className="text-gray-300">
                           {getServiceIcon(service.name)}
                         </div>
                         <div>
-                          <h3 className="text-sm font-medium text-gray-900">{service.name}</h3>
-                          <p className="text-xs text-gray-500 mt-1">{service.description}</p>
+                          <h3 className="text-sm font-medium text-gray-100">{service.name}</h3>
+                          <p className="text-xs text-gray-400 mt-1">{service.description}</p>
                         </div>
                       </div>
                       {getStatusIcon(service.status)}
@@ -287,7 +287,7 @@ export function Backend() {
                     
                     <div className="space-y-2">
                       <div className="flex justify-between text-xs">
-                        <span className="text-gray-500">Status:</span>
+                        <span className="text-gray-400">Status:</span>
                         <span className={`font-medium capitalize ${getStatusColor(service.status)}`}>
                           {service.status}
                         </span>
@@ -295,22 +295,22 @@ export function Backend() {
                       
                       {service.responseTime && (
                         <div className="flex justify-between text-xs">
-                          <span className="text-gray-500">Response:</span>
-                          <span className="text-gray-900">{service.responseTime}ms</span>
+                          <span className="text-gray-400">Response:</span>
+                          <span className="text-gray-100">{service.responseTime}ms</span>
                         </div>
                       )}
                       
                       <div className="flex justify-between text-xs">
-                        <span className="text-gray-500">Checked:</span>
-                        <span className="text-gray-900">{service.lastChecked.toLocaleTimeString()}</span>
+                        <span className="text-gray-400">Checked:</span>
+                        <span className="text-gray-100">{service.lastChecked.toLocaleTimeString()}</span>
                       </div>
                       
                       {service.dependencies && (
-                        <div className="mt-3 pt-3 border-t border-gray-100">
-                          <span className="text-xs text-gray-500">Dependencies:</span>
+                        <div className="mt-3 pt-3 border-t border-gray-600">
+                          <span className="text-xs text-gray-400">Dependencies:</span>
                           <div className="mt-1">
                             {service.dependencies.map((dep) => (
-                              <span key={dep} className="inline-block bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded mr-1 mb-1">
+                              <span key={dep} className="inline-block bg-gray-600 text-gray-300 text-xs px-2 py-1 rounded mr-1 mb-1">
                                 {dep}
                               </span>
                             ))}
@@ -325,43 +325,43 @@ export function Backend() {
 
             {/* System Metrics */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="card p-4">
+              <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-600">Uptime</p>
-                    <p className="text-2xl font-bold text-gray-900">99.9%</p>
+                    <p className="text-sm text-gray-400">Uptime</p>
+                    <p className="text-2xl font-bold text-gray-100">99.9%</p>
                   </div>
-                  <CheckCircle className="h-8 w-8 text-green-600" />
+                  <CheckCircle className="h-8 w-8 text-green-400" />
                 </div>
               </div>
               
-              <div className="card p-4">
+              <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-600">Avg Response</p>
-                    <p className="text-2xl font-bold text-gray-900">45ms</p>
+                    <p className="text-sm text-gray-400">Avg Response</p>
+                    <p className="text-2xl font-bold text-gray-100">45ms</p>
                   </div>
-                  <Activity className="h-8 w-8 text-blue-600" />
+                  <Activity className="h-8 w-8 text-green-400" />
                 </div>
               </div>
               
-              <div className="card p-4">
+              <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-600">Active Nodes</p>
-                    <p className="text-2xl font-bold text-gray-900">1,247</p>
+                    <p className="text-sm text-gray-400">Active Nodes</p>
+                    <p className="text-2xl font-bold text-gray-100">1,247</p>
                   </div>
-                  <Server className="h-8 w-8 text-purple-600" />
+                  <Server className="h-8 w-8 text-green-400" />
                 </div>
               </div>
               
-              <div className="card p-4">
+              <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-600">DB Connections</p>
-                    <p className="text-2xl font-bold text-gray-900">23/100</p>
+                    <p className="text-sm text-gray-400">DB Connections</p>
+                    <p className="text-2xl font-bold text-gray-100">23/100</p>
                   </div>
-                  <Database className="h-8 w-8 text-orange-600" />
+                  <Database className="h-8 w-8 text-green-400" />
                 </div>
               </div>
             </div>
