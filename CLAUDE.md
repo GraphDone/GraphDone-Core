@@ -44,8 +44,8 @@ The project has a fully implemented monorepo structure with these commands:
 
 ```bash
 # Quick setup (recommended)
-./setup.sh                    # Complete environment setup
-./run.sh                      # Start all development servers
+./tools/setup.sh                    # Complete environment setup
+./tools/run.sh                      # Start all development servers
 
 # Manual setup
 npm install                   # Install dependencies
@@ -65,7 +65,7 @@ npm run db:migrate            # Run Prisma migrations
 npm run db:seed               # Seed database with test data
 
 # Docker development
-docker-compose -f docker-compose.dev.yml up  # With hot reload
+docker-compose -f deployment/docker-compose.dev.yml up  # With hot reload
 docker-compose up             # Production-like environment
 ```
 
@@ -103,21 +103,21 @@ When implementing features:
 
 ```bash
 # Initial setup
-./setup.sh                    # Set up development environment
-./run.sh                      # Start development servers
-./test.sh                     # Run test suite with linting and type checking
-./build.sh                    # Build all packages
-./deploy.sh                   # Deploy to staging/production
-./document.sh                 # Generate and deploy documentation
+./tools/setup.sh                    # Set up development environment
+./tools/run.sh                      # Start development servers
+./tools/test.sh                     # Run test suite with linting and type checking
+./tools/build.sh                    # Build all packages
+./tools/deploy.sh                   # Deploy to staging/production
+./tools/document.sh                 # Generate and deploy documentation
 
 # Docker development
-./run.sh --docker-dev         # Start with Docker (development)
-./run.sh --docker             # Start with Docker (production)
+./tools/run.sh --docker-dev         # Start with Docker (development)
+./tools/run.sh --docker             # Start with Docker (production)
 
 # Package-specific testing
-./test.sh --package core      # Test specific package
-./test.sh --coverage          # Run with coverage report
-./test.sh --watch             # Run in watch mode
+./tools/test.sh --package core      # Test specific package
+./tools/test.sh --coverage          # Run with coverage report
+./tools/test.sh --watch             # Run in watch mode
 
 # Turbo commands (alternative)
 npm run dev                   # Start all development servers
@@ -151,8 +151,8 @@ npm run typecheck             # Type check all packages
 
 🎯 **Ready for Development:**
 All foundation pieces are in place. To continue development:
-1. Run `./setup.sh` to initialize the development environment
-2. Use `./run.sh` to start development servers
+1. Run `./tools/setup.sh` to initialize the development environment
+2. Use `./tools/run.sh` to start development servers
 3. Access the working application at http://localhost:3000
 4. Use GraphQL Playground at http://localhost:4000/graphql
 5. Begin implementing specific features using the established patterns

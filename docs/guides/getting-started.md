@@ -23,7 +23,7 @@ git clone https://github.com/your-org/graphdone.git
 cd graphdone
 
 # Run setup script
-./setup.sh
+./tools/setup.sh
 ```
 
 The setup script will:
@@ -60,7 +60,7 @@ npm run build
 Start the development servers:
 
 ```bash
-./run.sh
+./tools/run.sh
 ```
 
 This will start:

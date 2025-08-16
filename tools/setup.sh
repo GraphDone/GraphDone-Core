@@ -47,7 +47,7 @@ fi
 
 # Start database
 echo "🐘 Starting PostgreSQL database..."
-docker-compose up -d postgres redis
+docker-compose -f deployment/docker-compose.yml up -d postgres redis
 
 # Wait for database to be ready
 echo "⏳ Waiting for database to be ready..."

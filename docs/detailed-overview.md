@@ -275,7 +275,7 @@ graphdone/
 │   └── deployment/        # Deployment guides
 ├── scripts/               # Development and deployment scripts
 ├── .github/workflows/     # CI/CD pipelines
-└── docker-compose.yml    # Development environment
+└── deployment/           # Docker and deployment files
 ```
 
 ## Technology Stack & Implementation
@@ -480,7 +480,7 @@ GraphDone includes a comprehensive setup script that handles all prerequisites a
 # Clone and setup
 git clone https://github.com/your-org/graphdone.git
 cd graphdone
-./setup.sh
+./tools/setup.sh
 ```
 
 The setup script will:
@@ -495,19 +495,19 @@ The setup script will:
 
 ```mermaid
 graph LR
-    START[./setup.sh] --> DEV[./run.sh]
-    DEV --> TEST[./test.sh]
-    TEST --> BUILD[./build.sh]
-    BUILD --> DEPLOY[./deploy.sh]
+    START[./tools/setup.sh] --> DEV[./tools/run.sh]
+    DEV --> TEST[./tools/test.sh]
+    TEST --> BUILD[./tools/build.sh]
+    BUILD --> DEPLOY[./tools/deploy.sh]
     
     DEV -.-> CODE[Code Changes]
     CODE -.-> DEV
     
     subgraph "Available Commands"
-        RUN1[./run.sh --docker-dev]
-        RUN2[./test.sh --coverage]
-        RUN3[./test.sh --package core]
-        BUILD1[./build.sh --production]
+        RUN1[./tools/run.sh --docker-dev]
+        RUN2[./tools/test.sh --coverage]
+        RUN3[./tools/test.sh --package core]
+        BUILD1[./tools/build.sh --production]
     end
 ```
 
@@ -515,7 +515,7 @@ graph LR
 
 Start all development servers:
 ```bash
-./run.sh
+./tools/run.sh
 ```
 
 This provides:
@@ -550,10 +550,10 @@ For containerized development:
 
 ```bash
 # Full Docker development environment
-./run.sh --docker-dev
+./tools/run.sh --docker-dev
 
 # Production-like environment
-./run.sh --docker
+./tools/run.sh --docker
 
 # Individual service testing
 docker-compose up -d postgres  # Database only
@@ -666,8 +666,8 @@ agent.subscribe('node.priorityChanged', async (node) => {
 # Get started in 30 seconds
 git clone https://github.com/your-org/graphdone.git
 cd graphdone
-./setup.sh
-./run.sh
+./tools/setup.sh
+./tools/run.sh
 ```
 
 Visit http://localhost:3000 to see the working application!
@@ -710,16 +710,16 @@ GraphDone is built for and by teams who think differently. We welcome contributi
 ### 🔧 **Development Workflow**
 ```bash
 # Set up development environment
-./setup.sh
+./tools/setup.sh
 
 # Make your changes
 git checkout -b feature/your-improvement
 
 # Test your changes
-./test.sh --coverage
+./tools/test.sh --coverage
 
 # Build and verify
-./build.sh
+./tools/build.sh
 
 # Submit your contribution
 git push origin feature/your-improvement

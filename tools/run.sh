@@ -51,9 +51,9 @@ case $MODE in
         echo "📦 Starting development servers..."
         
         # Check if database is running
-        if ! docker-compose ps postgres | grep -q "Up"; then
+        if ! docker-compose -f deployment/docker-compose.yml ps postgres | grep -q "Up"; then
             echo "🐘 Starting database..."
-            docker-compose up -d postgres redis
+            docker-compose -f deployment/docker-compose.yml up -d postgres redis
             echo "⏳ Waiting for database..."
             sleep 5
         fi
@@ -73,11 +73,11 @@ case $MODE in
         
     "docker")
         echo "🐳 Starting with Docker (production)..."
-        docker-compose up --build
+        docker-compose -f deployment/docker-compose.yml up --build
         ;;
         
     "docker-dev")
         echo "🐳 Starting with Docker (development)..."
-        docker-compose -f docker-compose.dev.yml up --build
+        docker-compose -f deployment/docker-compose.dev.yml up --build
         ;;
 esac

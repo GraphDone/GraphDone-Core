@@ -49,8 +49,8 @@ GraphDone is built on the belief that:
 ```bash
 git clone https://github.com/your-org/graphdone.git
 cd graphdone
-./setup.sh
-./run.sh
+./tools/setup.sh
+./tools/run.sh
 ```
 
 Visit http://localhost:3000 to see the working application!
@@ -96,7 +96,7 @@ GraphDone is built for and by teams who think differently. We welcome contributi
 - Performance for large graphs
 
 **Get Started:**
-1. Run `./setup.sh && ./run.sh` to see the system working
+1. Run `./tools/setup.sh && ./tools/run.sh` to see the system working
 2. Read our [philosophy](./docs/philosophy.md) and [architecture](./docs/guides/architecture-overview.md)
 3. Pick an area that excites you and matches your skills
 4. Join discussions in GitHub Issues and pull requests

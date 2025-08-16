@@ -8,17 +8,17 @@ This guide covers various deployment options for GraphDone, from local developme
 
 ### Development (Local)
 ```bash
-./run.sh
+./tools/run.sh
 ```
 
 ### Development (Docker)
 ```bash
-./run.sh --docker-dev
+./tools/run.sh --docker-dev
 ```
 
 ### Production (Docker)
 ```bash
-./run.sh --docker
+./tools/run.sh --docker
 ```
 
 ## Environment Variables
