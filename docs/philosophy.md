@@ -64,18 +64,18 @@ GraphDone treats AI agents as first-class collaborators in the work graph. Human
 - **Anonymous contribution**: Reduce social pressure while maintaining quality through peer review
 - **Background opportunities**: Even low-priority ideas get resources and visibility
 
-## The Spherical Model
+## The Multi-Level Graph Model
 
-GraphDone organizes work in a spherical coordinate system where priority determines distance from center:
+GraphDone organizes work as interconnected graphs at different levels of detail where priority determines visibility and resource allocation:
 
-- **Center**: Highest priority outcomes with full resource allocation
-- **Inner spheres**: Important work with substantial support
-- **Outer spheres**: Experimental and background projects with idle resources
-- **Periphery**: New ideas and personal initiatives with minimal but real support
+- **Strategic Level**: High-level goals and vision with maximum visibility
+- **Project Level**: Major initiatives and features with substantial resources
+- **Feature Level**: Specific capabilities and components with focused attention
+- **Task Level**: Individual work items with targeted effort
 
-Ideas migrate inward through demonstrated value and community support. This creates a natural innovation pipeline where breakthrough concepts can prove themselves organically rather than requiring initial executive buy-in.
+Ideas gain visibility and resources through demonstrated value and community support. This creates a natural innovation pipeline where breakthrough concepts can prove themselves organically rather than requiring initial executive buy-in.
 
-Executives and managers influence the system by placing "priority flags" that create gravity wells, but they don't control the entire structure. Individual contributors can always establish their own small gravity wells on the periphery.
+Executives and managers influence the system by setting strategic priorities that cascade through the levels, but they don't control the entire structure. Individual contributors can always create new nodes at any level and let the community validate their importance.
 
 ## Technology Philosophy
 

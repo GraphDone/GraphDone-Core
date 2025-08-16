@@ -17,7 +17,7 @@ GraphDone reimagines project management as a collaborative graph where work flow
 - 📱 **Mobile-first design** - Touch-friendly interface for distributed teams
 - 🤖 **AI agent integration** - Humans and AI coordinate as peers through the same interface
 - 🗳️ **Democratic prioritization** - Anonymous rating system lets good ideas rise organically
-- 🎯 **Spherical priority model** - Ideas migrate from periphery to center based on community validation
+- 🎯 **Hierarchical graph navigation** - Browse from high-level goals down to detailed tasks with dynamic levels of detail
 - 🌍 **Open source** - MIT licensed with no vendor lock-in
 
 ## How GraphDone Differs from Traditional PM Tools
@@ -26,7 +26,7 @@ GraphDone reimagines project management as a collaborative graph where work flow
 |----------------|-----------|
 | Hierarchical task assignment | Natural dependency flows |
 | Manager-driven priorities | Democratic community validation |
-| Linear project timelines | Spherical priority space |
+| Linear project timelines | Multi-level graph navigation |
 | Human-only collaboration | Human + AI peer collaboration |
 | Top-down resource allocation | Priority-based resource migration |
 | Rigid organizational structure | Emergent network coordination |
@@ -68,8 +68,8 @@ Visit http://localhost:3000 to see the working application!
 ### Graph Structure
 Work is modeled as interconnected **nodes** (outcomes, tasks, milestones) connected by **edges** (dependencies, relationships). Contributors—both human and AI—participate as first-class citizens in this graph.
 
-### Spherical Priority Model  
-Items exist in 3D space where priority determines distance from center. High-priority work gets full resources at the center, while experimental ideas start at the periphery with minimal resources, migrating inward as they prove value.
+### Multi-Level Graph Navigation
+Work is organized in interconnected graphs at different levels of detail. Browse from strategic goals at the top level down through projects, features, and individual tasks. The system dynamically shows the appropriate level of detail based on what you're exploring.
 
 ### Democratic Prioritization
 Anyone can propose ideas and assign personal priority. The community validates through anonymous rating. Ideas that gain support naturally migrate toward higher priority and more resources—no executive approval required.

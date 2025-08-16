@@ -36,41 +36,53 @@ graph TD
     end
 ```
 
-### The Spherical Priority Model
+### Multi-Level Graph Navigation
 
-Work items exist in a 3D spherical space where priority determines distance from center. This creates natural resource allocation and visibility.
+Work is organized as interconnected graphs at different levels of detail. Users can navigate from high-level strategic goals down through projects and features to individual tasks, with the system dynamically showing appropriate detail levels.
 
 ```mermaid
 graph TD
-    subgraph "Spherical Priority Space"
-        CENTER[🎯 Center<br/>Highest Priority<br/>Full Resources]
-        
-        subgraph "Inner Sphere"
-            I1[Critical Feature A]
-            I2[Security Fix]
-            I3[Performance Issue]
-        end
-        
-        subgraph "Middle Sphere"
-            M1[New Feature B]
-            M2[Code Refactor]
-            M3[Documentation]
-        end
-        
-        subgraph "Outer Sphere"
-            O1[Research Project]
-            O2[Future Ideas]
-            O3[Experiments]
-        end
-        
-        CENTER --- I1
-        CENTER --- I2
-        CENTER --- I3
-        I1 -.-> M1
-        I2 -.-> M2
-        M1 -.-> O1
-        M2 -.-> O2
+    subgraph "Strategic Level"
+        S1[Company Goals]
+        S2[Product Vision]
+        S3[Market Expansion]
     end
+    
+    subgraph "Project Level"
+        P1[User Authentication]
+        P2[Mobile App]
+        P3[Analytics Dashboard]
+        P4[API Platform]
+    end
+    
+    subgraph "Feature Level"
+        F1[Login System]
+        F2[Registration Flow]
+        F3[Touch Interface]
+        F4[Offline Mode]
+    end
+    
+    subgraph "Task Level"
+        T1[OAuth Integration]
+        T2[Password Reset]
+        T3[Gesture Recognition]
+        T4[Data Sync]
+    end
+    
+    S1 --> P1
+    S1 --> P4
+    S2 --> P2
+    S3 --> P3
+    
+    P1 --> F1
+    P1 --> F2
+    P2 --> F3
+    P2 --> F4
+    
+    F1 --> T1
+    F2 --> T2
+    F3 --> T3
+    F4 --> T4
 ```
 
 ### Democratic Prioritization Process
@@ -141,7 +153,7 @@ graph LR
 
 ### Multi-Dimensional Priority System
 
-Each node has three priority dimensions that combine into a computed priority determining its position in the sphere.
+Each node has three priority dimensions that combine into a computed priority determining its visibility and resource allocation across the graph hierarchy.
 
 ```mermaid
 graph TB
@@ -155,17 +167,15 @@ graph TB
         C --> CALC
         
         CALC --> CP[Computed Priority<br/>0.0 - 1.0]
-        CP --> R[Radius = 1 - Priority]
-        
-        R --> POS[Spherical Position<br/>radius, theta, phi]
+        CP --> VIS[Graph Visibility<br/>& Resource Allocation]
     end
     
     subgraph "Resource Allocation"
-        POS --> RA{Priority Level}
-        RA -->|0.8 - 1.0| FR[Full Resources<br/>Dedicated team]
-        RA -->|0.5 - 0.8| SR[Substantial Resources<br/>Regular attention]
-        RA -->|0.2 - 0.5| LR[Limited Resources<br/>Background work]
-        RA -->|0.0 - 0.2| MR[Minimal Resources<br/>Idle cycles only]
+        VIS --> RA{Priority Level}
+        RA -->|0.8 - 1.0| FR[High Visibility<br/>Full resources<br/>Featured in overview]
+        RA -->|0.5 - 0.8| SR[Standard Visibility<br/>Regular resources<br/>Shown in project view]
+        RA -->|0.2 - 0.5| LR[Lower Visibility<br/>Background resources<br/>Detailed view only]
+        RA -->|0.0 - 0.2| MR[Minimal Visibility<br/>Idle cycles<br/>Hidden by default]
     end
 ```
 
@@ -339,7 +349,7 @@ classDiagram
         +type: NodeType
         +title: string
         +priority: Priority
-        +position: SphericalCoordinate
+        +position: GraphPosition
         +status: NodeStatus
         +contributors: ContributorId[]
         +dependencies: NodeId[]
@@ -361,7 +371,7 @@ classDiagram
         -communityWeight: 0.3
         +calculate(priority) Priority
         +migratePriority(current, boost) Priority
-        +calculateRadiusFromPriority(priority) number
+        +calculateVisibilityFromPriority(priority) number
     }
     
     Graph --> Node
@@ -393,14 +403,14 @@ sequenceDiagram
     
     GQL->>GRAPH: Process priority update
     GRAPH->>GRAPH: Recalculate priorities
-    GRAPH->>GRAPH: Update spherical positions
+    GRAPH->>GRAPH: Update graph positions
     GRAPH->>DB: Persist changes
     
     GRAPH->>WS: Broadcast priorityChanged event
     WS->>UI1: Confirm update
     WS->>UI2: Real-time priority update
     
-    Note over UI2: Node smoothly<br/>migrates to new position
+    Note over UI2: Node updates visibility<br/>and position in graph
 ```
 
 ### GraphQL Schema Architecture
@@ -413,7 +423,7 @@ erDiagram
     Node ||--o{ Edge : "source"
     Node ||--o{ Edge : "target"
     Node ||--|| Priority : "has"
-    Node ||--|| SphericalCoordinate : "positioned_at"
+    Node ||--|| GraphPosition : "positioned_at"
     
     Contributor ||--o{ NodeContributor : "participates"
     
@@ -435,10 +445,11 @@ erDiagram
         float computed
     }
     
-    SphericalCoordinate {
-        float radius
-        float theta
-        float phi
+    GraphPosition {
+        float x
+        float y
+        int level
+        string parentId
     }
     
     Edge {
@@ -581,13 +592,13 @@ graph TB
 ### Graph Structure
 - **Nodes**: Outcomes, tasks, milestones, contributors (human and AI)
 - **Edges**: Dependencies, relationships, priorities
-- **Coordinates**: 3D spherical positioning based on priority and connections
+- **Hierarchy**: Multi-level positioning with dynamic levels of detail
 
 ### Priority System
 - **Executive flags**: Strategic priority signals from leadership
 - **Individual priority**: Personal background priority assignment
 - **Democratic weighting**: Anonymous community rating and boosting
-- **Migration algorithms**: Ideas move toward center based on validation
+- **Migration algorithms**: Ideas gain visibility and resources based on validation
 
 ### Agent Integration
 - **Graph API**: Agents read/write graph state through standard endpoints
@@ -604,7 +615,7 @@ type Node {
   type: NodeType!
   title: String!
   description: String
-  position: SphericalCoordinate!
+  position: GraphPosition!
   priority: Priority!
   contributors: [Contributor!]!
   dependencies: [Node!]!
