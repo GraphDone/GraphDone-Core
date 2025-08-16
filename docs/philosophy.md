@@ -108,7 +108,7 @@ Everything in GraphDone operates through APIs:
 
 We believe in building a sustainable business that serves users rather than extracting maximum value:
 
-- **Affordable pricing**: $5/user/month makes adoption accessible to most teams
+- **Open source foundation**: Core functionality remains free and accessible
 - **No feature hostage-taking**: Core functionality always remains free
 - **Value-aligned services**: Paid tiers enhance rather than replace free capabilities
 - **Community-driven development**: User needs guide feature priorities over profit maximization
