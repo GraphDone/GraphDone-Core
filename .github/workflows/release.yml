@@ -1,0 +1,225 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., 1.0.0)'
+        required: true
+        type: string
+      prerelease:
+        description: 'Is this a pre-release?'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  NODE_VERSION: '18'
+
+jobs:
+  validate:
+    name: Validate Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate version format
+        run: |
+          if [[ ! "${{ github.event.inputs.version }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+.*$ ]]; then
+            echo "❌ Invalid version format: ${{ github.event.inputs.version }}"
+            echo "Expected format: X.Y.Z or X.Y.Z-suffix"
+            exit 1
+          fi
+
+      - name: Check if tag exists
+        run: |
+          if git rev-parse "v${{ github.event.inputs.version }}" >/dev/null 2>&1; then
+            echo "❌ Tag v${{ github.event.inputs.version }} already exists"
+            exit 1
+          fi
+
+  test:
+    name: Run Full Test Suite
+    runs-on: ubuntu-latest
+    needs: validate
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: graphdone_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linting
+        run: npm run lint
+
+      - name: Run type checking
+        run: npm run typecheck
+
+      - name: Run tests
+        run: npm run test
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/graphdone_test
+
+      - name: Build packages
+        run: npm run build
+
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: test
+    outputs:
+      release-id: ${{ steps.create-release.outputs.id }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Update version in package.json files
+        run: |
+          # Update root package.json
+          npm version ${{ github.event.inputs.version }} --no-git-tag-version
+          
+          # Update package versions in all packages
+          for package in packages/*/package.json; do
+            npm version ${{ github.event.inputs.version }} --no-git-tag-version --prefix $(dirname $package)
+          done
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Simple changelog generation - in practice, you might use conventional-changelog
+          echo "## What's Changed" > RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          
+          # Get commits since last tag
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -n "$LAST_TAG" ]; then
+            git log --pretty=format:"* %s (%an)" $LAST_TAG..HEAD >> RELEASE_NOTES.md
+          else
+            git log --pretty=format:"* %s (%an)" >> RELEASE_NOTES.md
+          fi
+          
+          echo "" >> RELEASE_NOTES.md
+          echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/$LAST_TAG...v${{ github.event.inputs.version }}" >> RELEASE_NOTES.md
+
+      - name: Build release artifacts
+        run: npm run build
+
+      - name: Create distribution packages
+        run: |
+          mkdir -p dist
+          
+          # Create source archive
+          git archive --format=tar.gz --prefix=graphdone-${{ github.event.inputs.version }}/ HEAD > dist/graphdone-${{ github.event.inputs.version }}-source.tar.gz
+          
+          # Package built artifacts
+          tar -czf dist/graphdone-${{ github.event.inputs.version }}-dist.tar.gz packages/*/dist
+
+      - name: Commit version changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add package.json packages/*/package.json
+          git commit -m "chore: bump version to ${{ github.event.inputs.version }}"
+          git tag -a "v${{ github.event.inputs.version }}" -m "Release v${{ github.event.inputs.version }}"
+
+      - name: Push changes
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          tags: true
+
+      - name: Create GitHub Release
+        id: create-release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ github.event.inputs.version }}
+          release_name: Release v${{ github.event.inputs.version }}
+          body_path: RELEASE_NOTES.md
+          draft: false
+          prerelease: ${{ github.event.inputs.prerelease }}
+
+      - name: Upload source archive
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create-release.outputs.upload_url }}
+          asset_path: ./dist/graphdone-${{ github.event.inputs.version }}-source.tar.gz
+          asset_name: graphdone-${{ github.event.inputs.version }}-source.tar.gz
+          asset_content_type: application/gzip
+
+      - name: Upload distribution archive
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create-release.outputs.upload_url }}
+          asset_path: ./dist/graphdone-${{ github.event.inputs.version }}-dist.tar.gz
+          asset_name: graphdone-${{ github.event.inputs.version }}-dist.tar.gz
+          asset_content_type: application/gzip
+
+  deploy-release:
+    name: Deploy Release
+    runs-on: ubuntu-latest
+    needs: create-release
+    environment:
+      name: production
+      url: https://graphdone.app
+    steps:
+      - name: Trigger production deployment
+        run: |
+          echo "🚀 Triggering production deployment for v${{ github.event.inputs.version }}"
+          # This would trigger your production deployment pipeline
+          # For example, dispatching to your CD system or cloud provider
+
+  notify-release:
+    name: Notify Release
+    runs-on: ubuntu-latest
+    needs: [create-release, deploy-release]
+    if: always()
+    steps:
+      - name: Notify success
+        if: needs.create-release.result == 'success' && needs.deploy-release.result == 'success'
+        run: |
+          echo "🎉 Release v${{ github.event.inputs.version }} created and deployed successfully!"
+          # Add notification logic here (Slack, Discord, email, etc.)
+
+      - name: Notify failure
+        if: needs.create-release.result == 'failure' || needs.deploy-release.result == 'failure'
+        run: |
+          echo "❌ Release v${{ github.event.inputs.version }} failed!"
+          # Add failure notification logic here
