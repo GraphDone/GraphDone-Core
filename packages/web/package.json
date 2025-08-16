@@ -1,0 +1,56 @@
+{
+  "name": "@graphdone/web",
+  "version": "0.1.0-alpha",
+  "description": "React web application for GraphDone",
+  "type": "module",
+  "scripts": {
+    "dev": "npm run kill-port && vite",
+    "dev:force": "vite",
+    "kill-port": "lsof -ti:${PORT:-3000} | xargs -r kill || true",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "test": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src --ext .ts,.tsx",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist coverage node_modules/.vite"
+  },
+  "dependencies": {
+    "@apollo/client": "^3.8.0",
+    "@graphdone/core": "*",
+    "@types/d3": "^7.4.0",
+    "d3": "^7.8.0",
+    "graphql": "^16.8.0",
+    "lucide-react": "^0.294.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.20.0",
+    "tailwindcss": "^3.3.0",
+    "zustand": "^4.4.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.33.0",
+    "@testing-library/jest-dom": "^6.0.0",
+    "@testing-library/react": "^14.0.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@typescript-eslint/eslint-plugin": "^8.39.1",
+    "@typescript-eslint/parser": "^8.39.1",
+    "@vitejs/plugin-react": "^4.1.0",
+    "@vitest/coverage-v8": "^1.0.0",
+    "autoprefixer": "^10.4.0",
+    "eslint": "^9.33.0",
+    "eslint-plugin-react": "^7.33.0",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "globals": "^16.3.0",
+    "jsdom": "^23.0.0",
+    "postcss": "^8.4.0",
+    "vite": "^5.0.0",
+    "vitest": "^1.0.0"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "license": "MIT"
+}

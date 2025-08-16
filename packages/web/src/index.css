@@ -1,0 +1,132 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+  
+  body {
+    @apply bg-gray-900 text-gray-100;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply px-4 py-2 rounded-lg font-medium transition-colors;
+  }
+  
+  .btn-primary {
+    @apply bg-green-600 text-white hover:bg-green-700 border border-green-500/30;
+  }
+  
+  .btn-secondary {
+    @apply bg-gray-700 text-gray-300 hover:bg-gray-600 border border-gray-600;
+  }
+  
+  .card {
+    @apply bg-white rounded-lg border border-gray-200 shadow-sm;
+  }
+}
+
+/* Graph visualization styles */
+.graph-container {
+  @apply w-full h-full overflow-hidden;
+}
+
+.node {
+  @apply cursor-pointer transition-all duration-200;
+}
+
+.node:hover {
+  @apply opacity-90;
+}
+
+.node-circle {
+  @apply stroke-2 stroke-current;
+}
+
+.node-text {
+  @apply text-xs font-medium text-center pointer-events-none text-white;
+}
+
+.node-label-bright {
+  fill: #ffffff !important;
+  color: #ffffff !important;
+}
+
+/* Force all SVG text in graph visualization to be white */
+.graph-container text {
+  fill: #ffffff !important;
+  color: #ffffff !important;
+}
+
+.graph-container svg text {
+  fill: #ffffff !important;
+  color: #ffffff !important;
+}
+
+/* Specifically target node labels */
+svg text.node-label-bright {
+  fill: #ffffff !important;
+  color: #ffffff !important;
+  stroke: #000000 !important;
+  stroke-width: 3px !important;
+}
+
+/* Override any potential Tailwind text color classes */
+.graph-container svg text,
+.graph-container text {
+  @apply !text-white;
+  fill: #ffffff !important;
+  color: #ffffff !important;
+}
+
+/* Nuclear option - force all text in SVG to be white */
+svg text {
+  fill: #ffffff !important;
+  color: #ffffff !important;
+}
+
+/* Force all text elements regardless of specificity */
+* text {
+  fill: #ffffff !important;
+  color: #ffffff !important;
+}
+
+/* HTML node labels - guaranteed white text */
+.node-labels-container .node-label {
+  color: #ffffff !important;
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.8) !important;
+  font-weight: 700 !important;
+}
+
+.edge {
+  @apply stroke-current opacity-60;
+}
+
+.edge-dependency {
+  @apply stroke-blue-500;
+}
+
+.edge-blocks {
+  @apply stroke-red-500;
+}
+
+.edge-relates {
+  @apply stroke-gray-400;
+}
+
+/* Priority indicator styles */
+.priority-high {
+  @apply text-red-600;
+}
+
+.priority-medium {
+  @apply text-yellow-600;
+}
+
+.priority-low {
+  @apply text-green-600;
+}
