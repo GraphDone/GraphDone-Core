@@ -1,0 +1,129 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Node {
+  id            String            @id @default(uuid())
+  type          NodeType
+  title         String
+  description   String?
+  positionX     Float             @default(0)
+  positionY     Float             @default(0)
+  positionZ     Float             @default(0)
+  radius        Float             @default(1)
+  theta         Float             @default(0)
+  phi           Float             @default(0)
+  priorityExec  Float             @default(0)
+  priorityIndiv Float             @default(0)
+  priorityComm  Float             @default(0)
+  priorityComp  Float             @default(0)
+  status        NodeStatus        @default(PROPOSED)
+  metadata      Json?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  // Self-referential relationships for dependencies
+  dependencies  NodeDependency[]  @relation("NodeDependencies")
+  dependents    NodeDependency[]  @relation("NodeDependents")
+  
+  // Node contributors
+  contributors  NodeContributor[]
+  
+  // Edges where this node is source or target
+  sourceEdges   Edge[]            @relation("SourceNode")
+  targetEdges   Edge[]            @relation("TargetNode")
+
+  @@map("nodes")
+}
+
+model Edge {
+  id        String    @id @default(uuid())
+  sourceId  String
+  targetId  String
+  type      EdgeType
+  weight    Float     @default(1.0)
+  metadata  Json?
+  createdAt DateTime  @default(now())
+
+  source    Node      @relation("SourceNode", fields: [sourceId], references: [id], onDelete: Cascade)
+  target    Node      @relation("TargetNode", fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceId, targetId, type])
+  @@map("edges")
+}
+
+model NodeDependency {
+  id           String @id @default(uuid())
+  nodeId       String
+  dependencyId String
+
+  node         Node   @relation("NodeDependencies", fields: [nodeId], references: [id], onDelete: Cascade)
+  dependency   Node   @relation("NodeDependents", fields: [dependencyId], references: [id], onDelete: Cascade)
+
+  @@unique([nodeId, dependencyId])
+  @@map("node_dependencies")
+}
+
+model Contributor {
+  id           String              @id @default(uuid())
+  type         ContributorType
+  name         String
+  email        String?             @unique
+  avatarUrl    String?
+  capabilities Json?
+  metadata     Json?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  // Contributor nodes
+  nodes        NodeContributor[]
+
+  @@map("contributors")
+}
+
+model NodeContributor {
+  id            String      @id @default(uuid())
+  nodeId        String
+  contributorId String
+  role          String?     @default("contributor")
+  addedAt       DateTime    @default(now())
+
+  node          Node        @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+  contributor   Contributor @relation(fields: [contributorId], references: [id], onDelete: Cascade)
+
+  @@unique([nodeId, contributorId])
+  @@map("node_contributors")
+}
+
+enum NodeType {
+  OUTCOME
+  TASK
+  MILESTONE
+  IDEA
+}
+
+enum NodeStatus {
+  PROPOSED
+  ACTIVE
+  IN_PROGRESS
+  BLOCKED
+  COMPLETED
+  ARCHIVED
+}
+
+enum EdgeType {
+  DEPENDENCY
+  BLOCKS
+  RELATES_TO
+  CONTAINS
+}
+
+enum ContributorType {
+  HUMAN
+  AI_AGENT
+}

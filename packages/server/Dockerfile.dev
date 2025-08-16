@@ -1,0 +1,18 @@
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Install dependencies
+RUN npm install -g nodemon tsx
+
+# Copy package files first for better caching
+COPY package.json turbo.json ./
+RUN npm ci
+
+# Create packages directory structure
+RUN mkdir -p packages/core packages/server
+
+EXPOSE 4000
+
+# Development command will be overridden by docker-compose
+CMD ["npm", "run", "dev"]
