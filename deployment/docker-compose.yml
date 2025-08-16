@@ -11,7 +11,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+      - ../scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U graphdone"]
       interval: 10s
@@ -32,7 +32,7 @@ services:
 
   server:
     build:
-      context: .
+      context: ..
       dockerfile: packages/server/Dockerfile
     environment:
       - NODE_ENV=production
@@ -47,7 +47,7 @@ services:
       redis:
         condition: service_healthy
     volumes:
-      - ./packages/server/.env:/app/.env
+      - ../packages/server/.env:/app/.env
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
       interval: 30s
@@ -56,7 +56,7 @@ services:
 
   web:
     build:
-      context: .
+      context: ..
       dockerfile: packages/web/Dockerfile
     environment:
       - VITE_GRAPHQL_URL=http://localhost:4000/graphql
@@ -66,7 +66,7 @@ services:
     depends_on:
       - server
     volumes:
-      - ./packages/web/.env:/app/.env
+      - ../packages/web/.env:/app/.env
 
 volumes:
   postgres_data:
