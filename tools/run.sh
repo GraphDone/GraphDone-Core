@@ -47,8 +47,8 @@ cleanup() {
     fi
     
     # Clean up any processes on our ports
-    lsof -ti:3000 | xargs -r kill -9 2>/dev/null || true
-    lsof -ti:4000 | xargs -r kill -9 2>/dev/null || true
+    lsof -ti:3127 | xargs -r kill -9 2>/dev/null || true
+    lsof -ti:4127 | xargs -r kill -9 2>/dev/null || true
     
     echo "✅ Cleanup complete"
     exit 0
@@ -149,9 +149,9 @@ case $MODE in
         fi
         
         # Clean up any hanging processes on our ports
-        echo "🧹 Cleaning up any processes on ports 3000 and 4000..."
-        lsof -ti:3000 | xargs -r kill -9 2>/dev/null || true
-        lsof -ti:4000 | xargs -r kill -9 2>/dev/null || true
+        echo "🧹 Cleaning up any processes on ports 3127 and 4127..."
+        lsof -ti:3127 | xargs -r kill -9 2>/dev/null || true
+        lsof -ti:4127 | xargs -r kill -9 2>/dev/null || true
         sleep 1
         
         # Start development servers
@@ -167,12 +167,12 @@ case $MODE in
             local server_ready=false
             
             # Check if web server is responding
-            if curl -s http://localhost:3000 > /dev/null 2>&1; then
+            if curl -s http://localhost:3127 > /dev/null 2>&1; then
                 web_ready=true
             fi
             
             # Check if GraphQL server is responding
-            if curl -s http://localhost:4000/health > /dev/null 2>&1; then
+            if curl -s http://localhost:4127/health > /dev/null 2>&1; then
                 server_ready=true
             fi
             
@@ -204,9 +204,9 @@ case $MODE in
         echo "║                    🎉 GraphDone is Ready! 🎉                   ║"
         echo "║                                                                ║"
         echo "║  📍 Access your application:                                   ║"
-        echo "║     🌐 Web App:      http://localhost:3000                     ║"
-        echo "║     🔌 GraphQL API:  http://localhost:4000/graphql             ║"
-        echo "║     🩺 Health Check: http://localhost:4000/health              ║"
+        echo "║     🌐 Web App:      http://localhost:3127                     ║"
+        echo "║     🔌 GraphQL API:  http://localhost:4127/graphql             ║"
+        echo "║     🩺 Health Check: http://localhost:4127/health              ║"
         echo "║                                                                ║"
         echo "║  💡 Tips:                                                      ║"
         echo "║     • Press Ctrl+C to stop all services                        ║"

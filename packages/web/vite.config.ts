@@ -11,11 +11,11 @@ export default defineConfig({
     }
   },
   server: {
-    port: Number(process.env.PORT) || 3000,
+    port: Number(process.env.PORT) || 3127,
     strictPort: true, // Exit if port is already in use instead of trying next available
     proxy: {
       '/graphql': {
-        target: 'http://localhost:4000',
+        target: 'http://localhost:4127',
         changeOrigin: true
       }
     }

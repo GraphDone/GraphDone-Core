@@ -28,8 +28,8 @@ kill_port() {
 }
 
 # Clean up GraphDone ports
-kill_port 3000  # Web server
-kill_port 4000  # GraphQL API
+kill_port 3127  # Web server
+kill_port 4127  # GraphQL API
 
 # Also kill any npm/node processes that might be hanging
 echo "🔄 Cleaning up any hanging npm/node processes..."

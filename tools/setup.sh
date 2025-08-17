@@ -175,11 +175,11 @@ if [ ! -f "packages/server/.env" ]; then
 DATABASE_URL="postgresql://graphdone:graphdone_password@localhost:5432/graphdone"
 
 # Server
-PORT=4000
+PORT=4127
 NODE_ENV=development
 
 # CORS
-CORS_ORIGIN="http://localhost:3000"
+CORS_ORIGIN="http://localhost:3127"
 
 # Redis
 REDIS_URL="redis://localhost:6379"
@@ -193,8 +193,8 @@ if [ ! -f "packages/web/.env" ]; then
     echo "📄 Creating packages/web/.env with default values"
     cat > packages/web/.env << 'EOF'
 # GraphQL API URLs
-VITE_GRAPHQL_URL=http://localhost:4000/graphql
-VITE_GRAPHQL_WS_URL=ws://localhost:4000/graphql
+VITE_GRAPHQL_URL=http://localhost:4127/graphql
+VITE_GRAPHQL_WS_URL=ws://localhost:4127/graphql
 
 # Environment
 VITE_NODE_ENV=development
@@ -256,8 +256,8 @@ echo "  npm run test             # Run tests"
 echo "  npm run docker:dev       # Start with Docker"
 echo ""
 echo "🌐 URLs:"
-echo "  Web app:      http://localhost:3000"
-echo "  GraphQL API:  http://localhost:4000/graphql"
+echo "  Web app:      http://localhost:3127"
+echo "  GraphQL API:  http://localhost:4127/graphql"
 echo "  Database:     postgresql://graphdone:graphdone_password@localhost:5432/graphdone"
 echo ""
 echo "💡 If you get 'command not found' errors, restart your terminal and try again."
