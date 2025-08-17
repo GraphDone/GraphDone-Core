@@ -4,6 +4,38 @@
 
 set -e
 
+# Function to ensure Node.js is available
+ensure_nodejs() {
+    # If node/npm not found, try to source nvm
+    if ! command -v node &> /dev/null || ! command -v npm &> /dev/null; then
+        echo "⚠️  Node.js/npm not found in PATH, attempting to load from nvm..."
+        
+        # Try to load nvm
+        export NVM_DIR="$HOME/.nvm"
+        if [ -s "$NVM_DIR/nvm.sh" ]; then
+            source "$NVM_DIR/nvm.sh"
+            if [ -s "$NVM_DIR/bash_completion" ]; then
+                source "$NVM_DIR/bash_completion"
+            fi
+            
+            # Use the latest installed version or 18
+            if nvm list | grep -q "v18"; then
+                nvm use 18
+            else
+                nvm use node
+            fi
+            
+            echo "✅ Loaded Node.js from nvm: $(node --version)"
+        else
+            echo "❌ Node.js not found and nvm not available."
+            echo "Please restart your terminal or run:"
+            echo "  source ~/.bashrc  # or ~/.zshrc"
+            echo "  ./tools/run.sh"
+            exit 1
+        fi
+    fi
+}
+
 # Default mode
 MODE="dev"
 
@@ -50,6 +82,9 @@ case $MODE in
     "dev")
         echo "📦 Starting development servers..."
         
+        # Ensure Node.js is available
+        ensure_nodejs
+        
         # Check if environment files exist
         if [ ! -f "packages/server/.env" ] || [ ! -f "packages/web/.env" ]; then
             echo "⚠️  Environment files missing. Running setup first..."
@@ -85,9 +120,9 @@ case $MODE in
             
             # Generate Prisma client and run migrations if needed
             echo "🔧 Generating Prisma client..."
-            cd packages/server && npx prisma generate && cd ../..
+            (cd packages/server && npx prisma generate)
             echo "🗄️  Running database migrations..."
-            cd packages/server && npm run db:migrate && cd ../..
+            (cd packages/server && npm run db:migrate)
         else
             echo "✅ Database is already running"
         fi
