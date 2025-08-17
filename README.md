@@ -114,6 +114,12 @@ newgrp docker
 ./start             # Try starting again
 ```
 
+**Cannot Find Module Errors?**
+```bash
+./tools/fix-workspace.sh  # Fix workspace dependencies
+./start                   # Try starting again
+```
+
 ## Core Concepts
 
 ### Graph Structure

@@ -237,6 +237,17 @@ echo "🧹 Cleaning build cache..."
 (cd packages/core && rm -f tsconfig.tsbuildinfo)
 (cd packages/server && rm -f tsconfig.tsbuildinfo)
 (cd packages/web && rm -f tsconfig.tsbuildinfo)
+
+# Ensure workspace dependencies are properly linked
+echo "🔗 Ensuring workspace dependencies are linked..."
+npm install
+
+# Build core package first to ensure it's available for other packages
+echo "📦 Building core package..."
+(cd packages/core && npm run build)
+
+# Build all packages
+echo "🏗️  Building all packages..."
 npm run build
 
 echo "✅ Setup complete!"
