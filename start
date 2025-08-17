@@ -206,12 +206,10 @@ cmd_dev() {
             npm install
         fi
         log_info "  • Rebuilding core package"
-        log_info "  • Generating Prisma client"
         log_info "  • Ensuring workspace links"
         
         npm install
         (cd packages/core && npm run build)
-        (cd packages/server && npx prisma generate)
         
         if [ -f "packages/core/dist/index.js" ] && [ -L "node_modules/@graphdone/core" ]; then
             log_success "✅ Workspace repair complete!"
