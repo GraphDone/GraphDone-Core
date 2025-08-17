@@ -51,211 +51,382 @@ export interface MockEdge {
 // Mock project management data
 export const mockProjectNodes: MockNode[] = [
   {
-    id: 'node-1',
+    id: 'epic-1',
     title: 'User Authentication System',
-    description: 'Implement secure user login and registration',
+    description: 'Complete user authentication and authorization system',
     type: 'EPIC',
     status: 'IN_PROGRESS',
     priority: { executive: 0.9, individual: 0.8, community: 0.85, computed: 0.85 },
     position: { x: 0, y: 0, z: 0 },
     assignee: 'Alice Johnson',
-    estimatedHours: 40,
-    actualHours: 25,
-    dueDate: '2024-04-15',
+    estimatedHours: 120,
+    actualHours: 80,
+    dueDate: '2025-09-30',
     tags: ['security', 'backend', 'critical'],
-    createdAt: '2024-03-01T10:00:00Z',
-    updatedAt: '2024-03-20T15:30:00Z'
+    createdAt: '2025-08-01T10:00:00Z',
+    updatedAt: '2025-08-17T15:30:00Z'
   },
   {
-    id: 'node-2',
-    title: 'Login API Endpoint',
-    description: 'REST API for user authentication',
-    type: 'TASK',
+    id: 'feature-1',
+    title: 'Login & Registration',
+    description: 'Basic login and user registration functionality',
+    type: 'FEATURE',
     status: 'COMPLETED',
     priority: { executive: 0.8, individual: 0.9, community: 0.7, computed: 0.8 },
     position: { x: -200, y: -100, z: 0 },
     assignee: 'Bob Smith',
-    estimatedHours: 8,
-    actualHours: 6,
-    tags: ['api', 'backend'],
-    createdAt: '2024-03-02T09:00:00Z',
-    updatedAt: '2024-03-15T11:20:00Z'
+    estimatedHours: 40,
+    actualHours: 38,
+    dueDate: '2025-08-25',
+    tags: ['auth', 'frontend', 'backend'],
+    createdAt: '2025-08-05T09:00:00Z',
+    updatedAt: '2025-08-25T11:20:00Z'
   },
   {
-    id: 'node-3',
-    title: 'Registration Form UI',
-    description: 'User-friendly registration interface',
-    type: 'TASK',
-    status: 'IN_PROGRESS',
-    priority: { executive: 0.6, individual: 0.8, community: 0.75, computed: 0.72 },
-    position: { x: 200, y: -100, z: 0 },
-    assignee: 'Carol Davis',
-    estimatedHours: 12,
-    actualHours: 8,
-    tags: ['ui', 'frontend'],
-    createdAt: '2024-03-03T14:00:00Z',
-    updatedAt: '2024-03-19T16:45:00Z'
-  },
-  {
-    id: 'node-4',
-    title: 'Password Reset Flow',
-    description: 'Allow users to reset forgotten passwords',
-    type: 'FEATURE',
-    status: 'PLANNED',
-    priority: { executive: 0.5, individual: 0.6, community: 0.65, computed: 0.58 },
-    position: { x: 0, y: 150, z: 0 },
-    estimatedHours: 16,
-    tags: ['security', 'feature'],
-    createdAt: '2024-03-05T11:00:00Z',
-    updatedAt: '2024-03-15T13:10:00Z'
-  },
-  {
-    id: 'node-5',
-    title: 'Database Schema',
-    description: 'User and session tables design',
+    id: 'task-1',
+    title: 'Database Schema Design',
+    description: 'Design user and session tables with security considerations',
     type: 'TASK',
     status: 'COMPLETED',
     priority: { executive: 0.9, individual: 0.7, community: 0.8, computed: 0.8 },
     position: { x: -300, y: 0, z: 0 },
     assignee: 'David Wilson',
-    estimatedHours: 6,
-    actualHours: 4,
+    estimatedHours: 16,
+    actualHours: 14,
+    dueDate: '2025-08-15',
     tags: ['database', 'infrastructure'],
-    createdAt: '2024-02-28T08:00:00Z',
-    updatedAt: '2024-03-10T10:30:00Z'
+    createdAt: '2025-08-01T08:00:00Z',
+    updatedAt: '2025-08-15T10:30:00Z'
   },
   {
-    id: 'node-6',
+    id: 'task-2',
+    title: 'Frontend Login Components',
+    description: 'React components for login and registration forms',
+    type: 'TASK',
+    status: 'IN_PROGRESS',
+    priority: { executive: 0.6, individual: 0.8, community: 0.75, computed: 0.72 },
+    position: { x: 200, y: -100, z: 0 },
+    assignee: 'Carol Davis',
+    estimatedHours: 24,
+    actualHours: 16,
+    dueDate: '2025-09-05',
+    tags: ['ui', 'frontend', 'react'],
+    createdAt: '2025-08-10T14:00:00Z',
+    updatedAt: '2025-08-17T16:45:00Z'
+  },
+  {
+    id: 'feature-2',
+    title: 'Password Reset System',
+    description: 'Email-based password reset with secure tokens',
+    type: 'FEATURE',
+    status: 'PLANNED',
+    priority: { executive: 0.5, individual: 0.6, community: 0.65, computed: 0.58 },
+    position: { x: 0, y: 150, z: 0 },
+    assignee: 'Bob Smith',
+    estimatedHours: 32,
+    dueDate: '2025-09-20',
+    tags: ['security', 'email', 'tokens'],
+    createdAt: '2025-08-05T11:00:00Z',
+    updatedAt: '2025-08-15T13:10:00Z'
+  },
+  {
+    id: 'epic-2',
+    title: 'E-commerce Platform',
+    description: 'Complete online shopping platform with cart and checkout',
+    type: 'EPIC',
+    status: 'PLANNED',
+    priority: { executive: 0.85, individual: 0.9, community: 0.8, computed: 0.85 },
+    position: { x: 400, y: 0, z: 0 },
+    assignee: 'Emma Rodriguez',
+    estimatedHours: 200,
+    dueDate: '2025-12-15',
+    tags: ['ecommerce', 'shopping', 'payments'],
+    createdAt: '2025-08-01T10:00:00Z',
+    updatedAt: '2025-08-17T15:30:00Z'
+  },
+  {
+    id: 'feature-3',
+    title: 'Product Catalog',
+    description: 'Product browsing, search, and filtering functionality',
+    type: 'FEATURE',
+    status: 'IN_PROGRESS',
+    priority: { executive: 0.7, individual: 0.8, community: 0.75, computed: 0.75 },
+    position: { x: 300, y: -200, z: 0 },
+    assignee: 'Michael Chen',
+    estimatedHours: 48,
+    actualHours: 12,
+    dueDate: '2025-10-15',
+    tags: ['catalog', 'search', 'frontend'],
+    createdAt: '2025-08-15T09:00:00Z',
+    updatedAt: '2025-08-17T14:20:00Z'
+  },
+  {
+    id: 'feature-4',
+    title: 'Shopping Cart & Checkout',
+    description: 'Add to cart, modify quantities, and secure checkout process',
+    type: 'FEATURE',
+    status: 'PROPOSED',
+    priority: { executive: 0.8, individual: 0.7, community: 0.75, computed: 0.75 },
+    position: { x: 500, y: -100, z: 0 },
+    estimatedHours: 64,
+    dueDate: '2025-11-30',
+    tags: ['cart', 'checkout', 'payments'],
+    createdAt: '2025-08-01T10:00:00Z',
+    updatedAt: '2025-08-17T15:30:00Z'
+  },
+  {
+    id: 'task-3',
+    title: 'Payment Gateway Integration',
+    description: 'Integrate Stripe for secure payment processing',
+    type: 'TASK',
+    status: 'PLANNED',
+    priority: { executive: 0.9, individual: 0.8, community: 0.85, computed: 0.85 },
+    position: { x: 450, y: 100, z: 0 },
+    assignee: 'Sarah Kim',
+    estimatedHours: 40,
+    dueDate: '2025-11-15',
+    tags: ['payments', 'stripe', 'security'],
+    createdAt: '2025-08-10T11:00:00Z',
+    updatedAt: '2025-08-17T09:30:00Z'
+  },
+  {
+    id: 'task-4',
     title: 'Security Testing',
-    description: 'Penetration testing and vulnerability assessment',
+    description: 'Comprehensive security audit and penetration testing',
     type: 'TASK',
     status: 'PLANNED',
     priority: { executive: 0.8, individual: 0.5, community: 0.7, computed: 0.67 },
     position: { x: 300, y: 100, z: 0 },
-    estimatedHours: 20,
-    tags: ['testing', 'security'],
-    createdAt: '2024-03-10T15:00:00Z',
-    updatedAt: '2024-03-18T09:15:00Z'
+    assignee: 'Alex Thompson',
+    estimatedHours: 32,
+    dueDate: '2025-10-30',
+    tags: ['testing', 'security', 'audit'],
+    createdAt: '2025-08-10T15:00:00Z',
+    updatedAt: '2025-08-17T09:15:00Z'
   },
   {
-    id: 'node-7',
-    title: 'Launch Milestone',
-    description: 'Authentication system ready for production',
+    id: 'milestone-1',
+    title: 'Authentication MVP Launch',
+    description: 'Basic authentication system ready for production',
     type: 'MILESTONE',
-    status: 'PROPOSED',
+    status: 'PLANNED',
     priority: { executive: 0.95, individual: 0.8, community: 0.9, computed: 0.88 },
     position: { x: 0, y: 300, z: 0 },
-    dueDate: '2024-04-30',
-    tags: ['milestone', 'launch'],
-    createdAt: '2024-03-01T10:00:00Z',
-    updatedAt: '2024-03-20T15:30:00Z'
+    dueDate: '2025-09-30',
+    tags: ['milestone', 'launch', 'mvp'],
+    createdAt: '2025-08-01T10:00:00Z',
+    updatedAt: '2025-08-17T15:30:00Z'
   },
   {
-    id: 'node-8',
-    title: 'Login Bug Fix',
-    description: 'Fix session timeout issue',
+    id: 'milestone-2',
+    title: 'E-commerce Beta Release',
+    description: 'Full e-commerce platform ready for beta testing',
+    type: 'MILESTONE',
+    status: 'PROPOSED',
+    priority: { executive: 0.9, individual: 0.8, community: 0.85, computed: 0.85 },
+    position: { x: 400, y: 300, z: 0 },
+    dueDate: '2025-12-15',
+    tags: ['milestone', 'beta', 'ecommerce'],
+    createdAt: '2025-08-01T10:00:00Z',
+    updatedAt: '2025-08-17T15:30:00Z'
+  },
+  {
+    id: 'bug-1',
+    title: 'Session Timeout Issue',
+    description: 'Users getting logged out unexpectedly',
     type: 'BUG',
-    status: 'BLOCKED',
+    status: 'IN_PROGRESS',
     priority: { executive: 0.7, individual: 0.9, community: 0.8, computed: 0.8 },
     position: { x: 100, y: 50, z: 0 },
     assignee: 'Alice Johnson',
-    estimatedHours: 4,
-    tags: ['bug', 'urgent'],
-    createdAt: '2024-03-18T14:00:00Z',
-    updatedAt: '2024-03-20T10:00:00Z'
+    estimatedHours: 8,
+    actualHours: 3,
+    dueDate: '2025-08-25',
+    tags: ['bug', 'urgent', 'session'],
+    createdAt: '2025-08-16T14:00:00Z',
+    updatedAt: '2025-08-17T10:00:00Z'
+  },
+  {
+    id: 'epic-3',
+    title: 'Mobile App Development',
+    description: 'React Native mobile app for iOS and Android',
+    type: 'EPIC',
+    status: 'PROPOSED',
+    priority: { executive: 0.6, individual: 0.7, community: 0.65, computed: 0.65 },
+    position: { x: -400, y: 200, z: 0 },
+    estimatedHours: 300,
+    dueDate: '2026-03-31',
+    tags: ['mobile', 'react-native', 'ios', 'android'],
+    createdAt: '2025-08-01T10:00:00Z',
+    updatedAt: '2025-08-17T15:30:00Z'
   }
 ];
 
 export const mockProjectEdges: MockEdge[] = [
+  // Database schema must be completed before any auth features
   {
     id: 'edge-1',
-    source: 'node-1',
-    target: 'node-2',
-    type: 'PART_OF',
-    strength: 0.9,
-    description: 'Login API is part of the auth system',
-    createdAt: '2024-03-02T09:00:00Z'
+    source: 'task-1',
+    target: 'feature-1',
+    type: 'DEPENDS_ON',
+    strength: 1.0,
+    description: 'Login features need database schema',
+    createdAt: '2025-08-01T09:00:00Z'
   },
   {
     id: 'edge-2',
-    source: 'node-1',
-    target: 'node-3',
-    type: 'PART_OF',
-    strength: 0.8,
-    description: 'Registration UI is part of the auth system',
-    createdAt: '2024-03-03T14:00:00Z'
-  },
-  {
-    id: 'edge-3',
-    source: 'node-5',
-    target: 'node-2',
+    source: 'task-1',
+    target: 'feature-2',
     type: 'DEPENDS_ON',
     strength: 1.0,
-    description: 'Login API needs database schema',
-    createdAt: '2024-03-02T09:00:00Z'
+    description: 'Password reset needs database schema',
+    createdAt: '2025-08-01T09:00:00Z'
+  },
+  // Auth epic contains login and password reset features
+  {
+    id: 'edge-3',
+    source: 'feature-1',
+    target: 'epic-1',
+    type: 'PART_OF',
+    strength: 0.9,
+    description: 'Login is part of auth system',
+    createdAt: '2025-08-01T10:00:00Z'
   },
   {
     id: 'edge-4',
-    source: 'node-2',
-    target: 'node-3',
-    type: 'ENABLES',
-    strength: 0.7,
-    description: 'Registration UI can use login API patterns',
-    createdAt: '2024-03-03T14:00:00Z'
+    source: 'feature-2',
+    target: 'epic-1',
+    type: 'PART_OF',
+    strength: 0.8,
+    description: 'Password reset is part of auth system',
+    createdAt: '2025-08-01T10:00:00Z'
   },
   {
     id: 'edge-5',
-    source: 'node-1',
-    target: 'node-4',
-    type: 'ENABLES',
-    strength: 0.6,
-    description: 'Auth system enables password reset',
-    createdAt: '2024-03-05T11:00:00Z'
+    source: 'task-2',
+    target: 'epic-1',
+    type: 'PART_OF',
+    strength: 0.7,
+    description: 'Frontend components part of auth system',
+    createdAt: '2025-08-10T14:00:00Z'
   },
+  // Frontend depends on completed login feature
   {
     id: 'edge-6',
-    source: 'node-1',
-    target: 'node-6',
+    source: 'feature-1',
+    target: 'task-2',
     type: 'DEPENDS_ON',
     strength: 0.8,
-    description: 'Security testing depends on auth implementation',
-    createdAt: '2024-03-10T15:00:00Z'
+    description: 'Frontend components need login API',
+    createdAt: '2025-08-10T14:00:00Z'
   },
+  // Bug blocking login reliability
   {
     id: 'edge-7',
-    source: 'node-6',
-    target: 'node-7',
-    type: 'DEPENDS_ON',
-    strength: 0.9,
-    description: 'Launch depends on security testing',
-    createdAt: '2024-03-10T15:00:00Z'
-  },
-  {
-    id: 'edge-8',
-    source: 'node-1',
-    target: 'node-7',
-    type: 'DEPENDS_ON',
-    strength: 1.0,
-    description: 'Launch depends on auth system completion',
-    createdAt: '2024-03-01T10:00:00Z'
-  },
-  {
-    id: 'edge-9',
-    source: 'node-2',
-    target: 'node-8',
+    source: 'bug-1',
+    target: 'feature-1',
     type: 'BLOCKS',
     strength: 0.9,
-    description: 'Login bug blocks API reliability',
-    createdAt: '2024-03-18T14:00:00Z'
+    description: 'Session bug affects login reliability',
+    createdAt: '2025-08-16T14:00:00Z'
+  },
+  // Auth system must be complete before milestone
+  {
+    id: 'edge-8',
+    source: 'epic-1',
+    target: 'milestone-1',
+    type: 'DEPENDS_ON',
+    strength: 1.0,
+    description: 'MVP launch needs auth system',
+    createdAt: '2025-08-01T10:00:00Z'
+  },
+  // E-commerce features and dependencies
+  {
+    id: 'edge-9',
+    source: 'feature-3',
+    target: 'epic-2',
+    type: 'PART_OF',
+    strength: 0.9,
+    description: 'Product catalog part of e-commerce',
+    createdAt: '2025-08-15T09:00:00Z'
   },
   {
     id: 'edge-10',
-    source: 'node-3',
-    target: 'node-4',
-    type: 'PARALLEL_WITH',
-    strength: 0.5,
-    description: 'Registration and password reset can be developed in parallel',
-    createdAt: '2024-03-05T11:00:00Z'
+    source: 'feature-4',
+    target: 'epic-2',
+    type: 'PART_OF',
+    strength: 0.9,
+    description: 'Shopping cart part of e-commerce',
+    createdAt: '2025-08-01T10:00:00Z'
+  },
+  {
+    id: 'edge-11',
+    source: 'task-3',
+    target: 'epic-2',
+    type: 'PART_OF',
+    strength: 0.8,
+    description: 'Payment integration part of e-commerce',
+    createdAt: '2025-08-10T11:00:00Z'
+  },
+  // Catalog must be ready before checkout
+  {
+    id: 'edge-12',
+    source: 'feature-3',
+    target: 'feature-4',
+    type: 'DEPENDS_ON',
+    strength: 0.8,
+    description: 'Checkout needs product catalog',
+    createdAt: '2025-08-15T09:00:00Z'
+  },
+  // Payment gateway needed for checkout
+  {
+    id: 'edge-13',
+    source: 'task-3',
+    target: 'feature-4',
+    type: 'DEPENDS_ON',
+    strength: 1.0,
+    description: 'Checkout needs payment processing',
+    createdAt: '2025-08-10T11:00:00Z'
+  },
+  // Auth system needed for e-commerce (user accounts)
+  {
+    id: 'edge-14',
+    source: 'epic-1',
+    target: 'epic-2',
+    type: 'DEPENDS_ON',
+    strength: 0.7,
+    description: 'E-commerce needs user authentication',
+    createdAt: '2025-08-01T10:00:00Z'
+  },
+  // Security testing before e-commerce launch
+  {
+    id: 'edge-15',
+    source: 'task-4',
+    target: 'epic-2',
+    type: 'VALIDATES',
+    strength: 0.8,
+    description: 'Security testing validates e-commerce',
+    createdAt: '2025-08-10T15:00:00Z'
+  },
+  // E-commerce completion needed for beta milestone
+  {
+    id: 'edge-16',
+    source: 'epic-2',
+    target: 'milestone-2',
+    type: 'DEPENDS_ON',
+    strength: 1.0,
+    description: 'Beta release needs e-commerce platform',
+    createdAt: '2025-08-01T10:00:00Z'
+  },
+  // Security testing blocks beta release
+  {
+    id: 'edge-17',
+    source: 'task-4',
+    target: 'milestone-2',
+    type: 'DEPENDS_ON',
+    strength: 0.9,
+    description: 'Beta release needs security validation',
+    createdAt: '2025-08-10T15:00:00Z'
   }
 ];
 
