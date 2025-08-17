@@ -208,6 +208,29 @@ case $MODE in
             elapsed=$((elapsed + 2))
         done
         
+        # Check if database has data, if not, seed it
+        if check_services; then
+            echo "🌱 Checking database data..."
+            
+            # Check if database is empty by trying to get work items count
+            work_items_count=$(curl -s -X POST http://localhost:4127/graphql \
+                -H "Content-Type: application/json" \
+                -d '{"query":"{ workItems { id } }"}' \
+                | grep -o '"workItems":\[[^]]*\]' \
+                | grep -o '\[.*\]' \
+                | grep -o ',' \
+                | wc -l 2>/dev/null || echo "0")
+            
+            # If no work items found, seed the database
+            if [ "$work_items_count" -eq 0 ] 2>/dev/null; then
+                echo "📊 No data found. Seeding database with sample data..."
+                (cd packages/server && npm run db:seed) || echo "⚠️  Database seeding failed, continuing anyway..."
+                echo "✅ Database seeded!"
+            else
+                echo "✅ Database already has data"
+            fi
+        fi
+        
         # Show status box
         echo ""
         echo -e "\033[0;32m"

@@ -162,20 +162,33 @@ cmd_dev() {
     # Check if setup is needed
     setup_needed=false
     workspace_repair_needed=false
+    dependencies_needed=false
     
     if [ ! -f "packages/server/.env" ] || [ ! -f "packages/web/.env" ]; then
         setup_needed=true
     fi
     
-    if [ ! -f "packages/core/dist/index.js" ] || [ ! -L "node_modules/@graphdone/core" ] || [ ! -f "node_modules/.prisma/client/index.js" ]; then
+    if [ ! -f "packages/core/dist/index.js" ] || [ ! -L "node_modules/@graphdone/core" ]; then
         workspace_repair_needed=true
+    fi
+    
+    # Check for critical dependencies
+    if [ ! -d "node_modules" ] || [ ! -d "node_modules/neo4j-driver" ] || [ ! -d "node_modules/@neo4j/graphql" ] || [ ! -d "node_modules/@playwright/test" ]; then
+        dependencies_needed=true
+    fi
+    
+    # Install dependencies if needed
+    if [ "$dependencies_needed" = true ]; then
+        log_warning "📦 Missing dependencies detected..."
+        log_info "Installing all project dependencies..."
+        npm install
+        log_success "✅ Dependencies installed!"
     fi
     
     # Run setup if needed
     if [ "$setup_needed" = true ]; then
         log_warning "🔧 First time setup detected..."
         log_info "Running initial setup (this may take a few minutes):"
-        log_info "  • Installing dependencies"
         log_info "  • Setting up environment variables"
         log_info "  • Starting database"
         log_info "  • Running migrations"
@@ -184,9 +197,14 @@ cmd_dev() {
         ./tools/setup.sh
         log_success "✅ Setup complete!"
         
-    elif [ "$workspace_repair_needed" = true ]; then
+    elif [ "$workspace_repair_needed" = true ] || [ "$dependencies_needed" = true ]; then
         log_warning "🔧 Workspace dependencies need repair..."
         log_info "Fixing workspace dependencies:"
+        
+        if [ "$dependencies_needed" = true ]; then
+            log_info "  • Installing missing dependencies"
+            npm install
+        fi
         log_info "  • Rebuilding core package"
         log_info "  • Generating Prisma client"
         log_info "  • Ensuring workspace links"
