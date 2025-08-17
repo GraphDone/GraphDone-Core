@@ -108,6 +108,12 @@ newgrp docker
 ./start  # Will offer to install Node.js 18 automatically
 ```
 
+**Port Already in Use?**
+```bash
+./tools/cleanup.sh  # Kill any hanging processes
+./start             # Try starting again
+```
+
 ## Core Concepts
 
 ### Graph Structure
