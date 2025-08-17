@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "npm run kill-port && vite",
     "dev:force": "vite",
-    "kill-port": "lsof -ti:${PORT:-3000} | xargs -r kill || true",
+    "kill-port": "lsof -ti:${PORT:-3000} | xargs -r kill -9 || true",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest",

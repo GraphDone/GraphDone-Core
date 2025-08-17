@@ -36,6 +36,27 @@ ensure_nodejs() {
     fi
 }
 
+# Function to clean up processes and handle shutdown
+cleanup() {
+    echo ""
+    echo "🛑 Shutting down GraphDone..."
+    
+    # Kill development servers
+    if [ -n "$DEV_PID" ]; then
+        kill $DEV_PID 2>/dev/null || true
+    fi
+    
+    # Clean up any processes on our ports
+    lsof -ti:3000 | xargs -r kill -9 2>/dev/null || true
+    lsof -ti:4000 | xargs -r kill -9 2>/dev/null || true
+    
+    echo "✅ Cleanup complete"
+    exit 0
+}
+
+# Set up signal handlers for clean shutdown
+trap cleanup SIGINT SIGTERM
+
 # Default mode
 MODE="dev"
 
@@ -126,6 +147,12 @@ case $MODE in
         else
             echo "✅ Database is already running"
         fi
+        
+        # Clean up any hanging processes on our ports
+        echo "🧹 Cleaning up any processes on ports 3000 and 4000..."
+        lsof -ti:3000 | xargs -r kill -9 2>/dev/null || true
+        lsof -ti:4000 | xargs -r kill -9 2>/dev/null || true
+        sleep 1
         
         # Start development servers
         echo "🚀 Starting development servers..."
