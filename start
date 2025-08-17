@@ -74,7 +74,7 @@ if [ ! -f "packages/server/.env" ] || [ ! -f "packages/web/.env" ]; then
 fi
 
 # Check if workspace dependencies are broken
-if [ ! -f "packages/core/dist/index.js" ] || [ ! -L "node_modules/@graphdone/core" ]; then
+if [ ! -f "packages/core/dist/index.js" ] || [ ! -L "node_modules/@graphdone/core" ] || [ ! -f "node_modules/.prisma/client/index.js" ]; then
     workspace_repair_needed=true
 fi
 
@@ -100,6 +100,7 @@ elif [ "$workspace_repair_needed" = true ]; then
     echo ""
     echo -e "${BLUE}Fixing workspace dependencies:${NC}"
     echo "  • Rebuilding core package"
+    echo "  • Generating Prisma client"
     echo "  • Ensuring workspace links"
     echo ""
     
@@ -109,6 +110,9 @@ elif [ "$workspace_repair_needed" = true ]; then
     
     echo -e "${CYAN}🏗️  Building core package...${NC}"
     (cd packages/core && npm run build)
+    
+    echo -e "${CYAN}🔧 Generating Prisma client...${NC}"
+    (cd packages/server && npx prisma generate)
     
     # Verify the fix worked
     if [ -f "packages/core/dist/index.js" ] && [ -L "node_modules/@graphdone/core" ]; then
