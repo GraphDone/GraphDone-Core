@@ -154,6 +154,10 @@ case $MODE in
         lsof -ti:4127 | xargs -r kill -9 2>/dev/null || true
         sleep 1
         
+        # Ensure core package is built for workspace dependencies
+        echo "🔧 Building core package for workspace dependencies..."
+        (cd packages/core && npm run build)
+        
         # Start development servers
         echo "🚀 Starting development servers..."
         
