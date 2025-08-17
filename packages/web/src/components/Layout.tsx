@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Globe, Brain, Bot, BarChart3, Settings, Menu, Server } from 'lucide-react';
+import { Brain, Bot, BarChart3, Settings, Menu, Server } from 'lucide-react';
 import { UserSelector } from './UserSelector';
 import { GraphSelector } from './GraphSelector';
 import { useAuth } from '../contexts/AuthContext';
@@ -36,6 +36,7 @@ export function Layout({ children }: LayoutProps) {
             >
               <Menu className="h-6 w-6" aria-hidden="true" />
             </button>
+            <img src="/favicon.svg" alt="GraphDone" className="h-8 w-8" />
             <h1 className="ml-3 text-xl font-bold text-green-400">GraphDone</h1>
           </div>
         </div>
@@ -52,7 +53,7 @@ export function Layout({ children }: LayoutProps) {
           <div className="flex flex-col h-full">
             {/* Logo */}
             <div className="flex items-center h-16 px-6 border-b border-gray-700">
-              <Globe className="h-8 w-8 text-green-400" />
+              <img src="/favicon.svg" alt="GraphDone" className="h-8 w-8" />
               <span className="ml-3 text-xl font-bold text-green-300">GraphDone</span>
             </div>
 

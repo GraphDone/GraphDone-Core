@@ -37,8 +37,8 @@ export function Backend() {
           status: 'healthy',
           responseTime: 45,
           lastChecked: new Date(),
-          description: 'Apollo Server handling GraphQL queries and mutations',
-          dependencies: ['PostgreSQL Database', 'Redis Cache']
+          description: 'Apollo Server with @neo4j/graphql auto-generated resolvers',
+          dependencies: ['Neo4j Database', 'Redis Cache']
         },
         {
           name: 'WebSocket Server',
@@ -49,11 +49,11 @@ export function Backend() {
           dependencies: ['GraphQL API Server']
         },
         {
-          name: 'PostgreSQL Database',
+          name: 'Neo4j Database',
           status: 'healthy',
           responseTime: 8,
           lastChecked: new Date(),
-          description: 'Primary database storing graph nodes and relationships'
+          description: 'Native graph database with Cypher queries and APOC plugins'
         },
         {
           name: 'Redis Cache',
@@ -239,7 +239,7 @@ export function Backend() {
                     <text x="400" y="440" textAnchor="middle" className="fill-pink-200 text-sm font-semibold">Data Layer</text>
                     
                     <rect x="150" y="450" width="150" height="25" fill="#9d174d" stroke="#ec4899" rx="4" />
-                    <text x="225" y="467" textAnchor="middle" className="fill-pink-200 text-xs">PostgreSQL</text>
+                    <text x="225" y="467" textAnchor="middle" className="fill-pink-200 text-xs">Neo4j</text>
                     
                     <rect x="350" y="450" width="150" height="25" fill="#9d174d" stroke="#ec4899" rx="4" />
                     <text x="425" y="467" textAnchor="middle" className="fill-pink-200 text-xs">Redis Cache</text>

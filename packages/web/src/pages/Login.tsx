@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Network, Users, ArrowRight } from 'lucide-react';
+import { Users, ArrowRight } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { User, Team } from '../types/auth';
 
@@ -37,7 +37,7 @@ export function Login() {
         {/* Header */}
         <div className="text-center mb-8">
           <div className="flex items-center justify-center mb-4">
-            <Network className="h-12 w-12 text-blue-600" />
+            <img src="/favicon.svg" alt="GraphDone" className="h-12 w-12" />
             <span className="ml-3 text-3xl font-bold text-gray-100">GraphDone</span>
           </div>
           <h1 className="text-2xl font-bold text-gray-100 mb-2">Welcome Back</h1>
