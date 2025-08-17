@@ -17,12 +17,13 @@ GraphDone is a graph-native project management system that reimagines work coord
 
 ### Technology Stack
 - **Frontend**: React 18 with TypeScript, React Native for mobile, D3.js for graph visualization
-- **Backend**: Node.js with TypeScript, GraphQL with Apollo Server, PostgreSQL with graph extensions
+- **Backend**: Node.js with TypeScript, GraphQL with Apollo Server, Neo4j with @neo4j/graphql
 - **State Management**: Zustand
 - **Styling**: Tailwind CSS
 - **Build Tool**: Vite
 - **Real-time**: WebSocket subscriptions
 - **Infrastructure**: Docker, Kubernetes, GitHub Actions for CI/CD
+- **Testing**: Playwright for E2E testing, Vitest for unit tests
 
 ### Project Structure (Implemented)
 ```
@@ -61,8 +62,7 @@ npm run typecheck             # Type check all packages
 npm run build                 # Build all packages
 
 # Database operations
-npm run db:migrate            # Run Prisma migrations
-npm run db:seed               # Seed database with test data
+npm run db:seed               # Seed Neo4j database with test data
 
 # Docker development
 docker-compose -f deployment/docker-compose.dev.yml up  # With hot reload
@@ -132,32 +132,34 @@ npm run typecheck             # Type check all packages
 ✅ **Completed:**
 - Monorepo structure with Turbo for build orchestration
 - Core graph engine with Node, Edge, Priority calculation, and full graph operations
-- GraphQL API server with comprehensive schema and resolvers
-- React web application with D3.js graph visualization
+- Neo4j integration with @neo4j/graphql auto-generated resolvers
+- GraphQL API server with comprehensive schema and WebSocket subscriptions
+- React web application with D3.js graph visualization and user-friendly error handling
 - TypeScript configuration across all packages
-- Vitest testing infrastructure with sample tests
-- Docker development and production configurations
-- Development scripts for setup, running, testing, building, and deployment
+- Playwright and Vitest testing infrastructure with E2E tests
+- Docker development and production configurations with Neo4j 5.15-community
+- Enhanced development scripts with automatic dependency management
 - GitHub Actions CI/CD workflows for testing, building, and deployment
-- Comprehensive documentation structure
+- Comprehensive documentation structure and branding (favicon, logos)
 
 🏗️ **Architecture Implemented:**
 - `packages/core/` - Graph engine with priority calculation, node/edge management, path finding, cycle detection
-- `packages/server/` - GraphQL API with Prisma database schema, Apollo Server, WebSocket subscriptions
-- `packages/web/` - React app with Vite, Tailwind CSS, D3.js visualization, GraphQL client
-- Docker configurations for development and production
+- `packages/server/` - GraphQL API with Neo4j schema, Apollo Server with @neo4j/graphql, WebSocket subscriptions
+- `packages/web/` - React app with Vite, Tailwind CSS, D3.js visualization, Apollo Client, enhanced error handling
+- Docker configurations for development and production with Neo4j 5.15-community
 - Kubernetes-ready manifests (planned in deployment docs)
 - Full CI/CD pipeline with testing, security scanning, and deployment
+- Production deployment verified on remote server (scuba@triptofan)
 
 🎯 **Ready for Development:**
 All foundation pieces are in place. To continue development:
-1. Run `./tools/setup.sh` to initialize the development environment
-2. Use `./tools/run.sh` to start development servers
-3. Access the working application at http://localhost:3000
-4. Use GraphQL Playground at http://localhost:4000/graphql
+1. Run `./start` to initialize the development environment automatically
+2. Access the working application at http://localhost:3127
+3. Use GraphQL Playground at http://localhost:4127/graphql
+4. Backend status at http://localhost:3127/backend shows Neo4j architecture
 5. Begin implementing specific features using the established patterns
-6. Add more comprehensive tests using the Vitest setup
-7. Enhance the GraphQL schema and resolvers as needed
+6. Add more comprehensive tests using the Playwright and Vitest setup
+7. Enhance the Neo4j schema and GraphQL resolvers as needed
 
 ## Core Architecture
 
@@ -179,17 +181,17 @@ Key files:
 ### GraphQL API (`packages/server/`)
 Apollo Server with real-time subscriptions:
 
-- **Database**: PostgreSQL with Prisma ORM
-- **Schema**: Comprehensive GraphQL schema matching core types
-- **Resolvers**: CRUD operations for nodes, edges, contributors
+- **Database**: Neo4j 5.15-community with APOC plugins
+- **Schema**: Auto-generated GraphQL schema with @neo4j/graphql
+- **Resolvers**: Automatically generated from Neo4j schema
 - **Subscriptions**: Real-time WebSocket updates
 - **Health Check**: `/health` endpoint for monitoring
 
 Key files:
 - `packages/server/src/index.ts` - Apollo Server setup with WebSocket support
-- `packages/server/src/schema/index.ts` - GraphQL type definitions
-- `packages/server/src/resolvers/` - GraphQL resolvers
-- `packages/server/prisma/schema.prisma` - Database schema
+- `packages/server/src/schema/neo4j-schema.ts` - Neo4j GraphQL schema definitions
+- `packages/server/src/scripts/seed.ts` - Database seeding script
+- `packages/server/src/context.ts` - GraphQL context with Neo4j driver
 
 ### Web Application (`packages/web/`)
 React app with D3.js visualization:
@@ -229,17 +231,16 @@ Current test files:
 
 ## Database Schema
 
-PostgreSQL with these main tables:
-- **Node**: Graph nodes with spherical coordinates and priorities
-- **Edge**: Connections between nodes with types and weights
+Neo4j with these main node types and relationships:
+- **WorkItem**: Graph nodes with spherical coordinates and priorities  
+- **Edge**: Connections between nodes with types (DEPENDS_ON, BLOCKS, etc.)
 - **Contributor**: Users and AI agents in the system
-- **NodeContributor**: Many-to-many relationship
+- **WORKS_ON**: Relationships between contributors and work items
 
 Key database operations:
 ```bash
-npm run db:migrate    # Apply schema changes
-npm run db:seed       # Add test data
-npm run db:studio     # Open Prisma Studio GUI
+npm run db:seed       # Add test data with 32 work items and relationships
+# Access Neo4j Browser at http://localhost:7474 (neo4j/graphdone_password)
 ```
 
 ## Package-Specific Commands
@@ -260,9 +261,8 @@ cd packages/server
 npm run dev          # Start with hot reload (tsx)
 npm run build        # Build TypeScript
 npm run start        # Start production server
-npm run db:migrate   # Run Prisma migrations
-npm run db:seed      # Seed test data
-npm run db:studio    # Open Prisma Studio
+npm run db:seed      # Seed Neo4j database with test data
+# Neo4j Browser available at http://localhost:7474
 ```
 
 ### Web Package (`packages/web/`)
