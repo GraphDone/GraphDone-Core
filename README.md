@@ -48,7 +48,7 @@ GraphDone is built on the belief that:
 
 GraphDone requires:
 - **Node.js 18+** - JavaScript runtime (our setup script can install this automatically)
-- **Docker** - For running PostgreSQL database ([Install Docker](https://docs.docker.com/get-docker/))
+- **Docker** - For running Neo4j graph database ([Install Docker](https://docs.docker.com/get-docker/))
 - **Git** - For version control (usually pre-installed)
 
 ### One Command to Rule Them All
@@ -61,11 +61,12 @@ cd GraphDone-Core
 
 That's it! The script will automatically:
 - Check prerequisites and offer to install Node.js if needed
-- Install all dependencies
-- Set up your environment  
-- Start the database
+- Install all dependencies including Neo4j drivers and Playwright for testing
+- Set up your environment with proper Neo4j configuration
+- Start Neo4j database with APOC plugins
 - Build the packages
 - Launch the development servers
+- Seed the database with sample data if empty
 
 Visit **http://localhost:3127** when you see the "GraphDone is Ready!" message.
 
@@ -74,21 +75,26 @@ Visit **http://localhost:3127** when you see the "GraphDone is Ready!" message.
 ### What You Get
 
 - 🌐 **Web Application**: http://localhost:3127 - Full graph visualization and collaboration interface
-- 🔗 **GraphQL API**: http://localhost:4127/graphql - Complete backend with real-time subscriptions  
+- 🔗 **GraphQL API**: http://localhost:4127/graphql - Auto-generated resolvers with @neo4j/graphql  
 - 🩺 **Health Check**: http://localhost:4127/health - Service status monitoring
-- 🗄️ **Database**: PostgreSQL with graph-optimized schema
+- 🗄️ **Database**: Neo4j 5.15-community with APOC plugins for native graph storage
 - 🐳 **Docker Setup**: Development and production containers ready to go
 - 🧪 **Testing**: Comprehensive test suite with coverage reporting
 
 ### Alternative Quick Commands
 
 ```bash
-# Minimal launcher (less verbose)
-./launch.sh
+# Quick start without full setup checks
+./start quick
 
 # Manual control (advanced users)
 ./tools/setup.sh  # One-time setup
 ./tools/run.sh    # Start development servers
+
+# Other commands
+./start clean     # Clean and restart fresh
+./start status    # Check system status
+./start stop      # Stop all services
 ```
 
 ### Troubleshooting
@@ -116,9 +122,14 @@ newgrp docker
 
 **Cannot Find Module Errors?**
 ```bash
-./tools/fix-workspace.sh  # Fix workspace dependencies
-./start                   # Try starting again
+./start  # Script will automatically detect and install missing dependencies
 ```
+
+**Service Connection Issues?**
+The app now provides user-friendly error messages instead of technical errors. If you see connection issues:
+- Check that `./start` completed successfully
+- Visit http://localhost:4127/health to verify the server is running
+- The error UI will guide you through common troubleshooting steps
 
 ## Core Concepts
 
