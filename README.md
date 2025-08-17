@@ -44,24 +44,42 @@ GraphDone is built on the belief that:
 
 ## Quick Start
 
-### One-Command Setup
+### One Command to Rule Them All
 
 ```bash
-git clone https://github.com/your-org/graphdone.git
-cd graphdone
-./tools/setup.sh
-./tools/run.sh
+git clone https://github.com/GraphDone/GraphDone-Core.git
+cd GraphDone-Core
+./start
 ```
 
-Visit http://localhost:3000 to see the working application!
+That's it! The script will automatically:
+- Install all dependencies
+- Set up your environment  
+- Start the database
+- Build the packages
+- Launch the development servers
+
+Visit **http://localhost:3000** when you see the "GraphDone is Ready!" message.
 
 ### What You Get
 
-- 🌐 **Web Application**: Full graph visualization and collaboration interface
-- 🔗 **GraphQL API**: Complete backend with real-time subscriptions  
+- 🌐 **Web Application**: http://localhost:3000 - Full graph visualization and collaboration interface
+- 🔗 **GraphQL API**: http://localhost:4000/graphql - Complete backend with real-time subscriptions  
+- 🩺 **Health Check**: http://localhost:4000/health - Service status monitoring
 - 🗄️ **Database**: PostgreSQL with graph-optimized schema
-- 🐳 **Docker Setup**: Development and production containers
+- 🐳 **Docker Setup**: Development and production containers ready to go
 - 🧪 **Testing**: Comprehensive test suite with coverage reporting
+
+### Alternative Quick Commands
+
+```bash
+# Minimal launcher (less verbose)
+./launch.sh
+
+# Manual control (advanced users)
+./tools/setup.sh  # One-time setup
+./tools/run.sh    # Start development servers
+```
 
 ## Core Concepts
 
@@ -96,7 +114,7 @@ GraphDone is built for and by teams who think differently. We welcome contributi
 - Performance for large graphs
 
 **Get Started:**
-1. Run `./tools/setup.sh && ./tools/run.sh` to see the system working
+1. Run `./start` to see the system working locally
 2. Read our [philosophy](./docs/philosophy.md) and [architecture](./docs/guides/architecture-overview.md)
 3. Pick an area that excites you and matches your skills
 4. Join discussions in GitHub Issues and pull requests
