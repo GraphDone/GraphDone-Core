@@ -21,12 +21,18 @@ install_nodejs() {
     else
         echo "📥 Installing nvm (Node Version Manager) first..."
         curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
-        source "$HOME/.nvm/nvm.sh"
+        export NVM_DIR="$HOME/.nvm"
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+        [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
         nvm install 18
         nvm use 18
     fi
     
+    # Update PATH to include node and npm
+    export PATH="$HOME/.nvm/versions/node/$(nvm current)/bin:$PATH"
     echo "✅ Node.js 18 installed successfully!"
+    echo "📍 Node.js location: $(which node)"
+    echo "📍 npm location: $(which npm)"
 }
 
 # Enhanced prerequisite checking with helpful installation guidance
@@ -38,6 +44,7 @@ check_nodejs() {
         read -r response
         if [[ "$response" =~ ^[Yy]$ ]]; then
             install_nodejs
+            NODE_INSTALLED=1
         else
             echo ""
             echo "📋 Please install Node.js 18+ manually using one of these methods:"
@@ -70,6 +77,7 @@ check_nodejs() {
         read -r response
         if [[ "$response" =~ ^[Yy]$ ]]; then
             install_nodejs
+            NODE_INSTALLED=1
         else
             echo "Please upgrade Node.js to version 18 or higher and run setup again."
             exit 1
@@ -233,6 +241,15 @@ npm run build
 
 echo "✅ Setup complete!"
 echo ""
+
+# Check if Node.js was just installed and might need a shell restart
+if [ -n "$NODE_INSTALLED" ]; then
+    echo "🔄 Node.js was just installed. You may need to restart your terminal or run:"
+    echo "   source ~/.bashrc  # or ~/.zshrc"
+    echo "   source ~/.nvm/nvm.sh"
+    echo ""
+fi
+
 echo "🎯 Quick start commands:"
 echo "  npm run dev              # Start development servers"
 echo "  npm run test             # Run tests"
@@ -242,3 +259,5 @@ echo "🌐 URLs:"
 echo "  Web app:      http://localhost:3000"
 echo "  GraphQL API:  http://localhost:4000/graphql"
 echo "  Database:     postgresql://graphdone:graphdone_password@localhost:5432/graphdone"
+echo ""
+echo "💡 If you get 'command not found' errors, restart your terminal and try again."

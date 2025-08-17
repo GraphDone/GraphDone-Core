@@ -53,4 +53,11 @@ echo -e "${BLUE}🚀 Starting GraphDone development environment...${NC}"
 echo ""
 
 # Start the development environment
-./tools/run.sh
+if ! ./tools/run.sh; then
+    echo ""
+    echo -e "${YELLOW}⚠️  If you see 'command not found' errors:${NC}"
+    echo "   1. Restart your terminal"
+    echo "   2. Or run: source ~/.bashrc (or ~/.zshrc)"
+    echo "   3. Then try: ./start again"
+    echo ""
+fi
