@@ -44,6 +44,13 @@ GraphDone is built on the belief that:
 
 ## Quick Start
 
+### Prerequisites
+
+GraphDone requires:
+- **Node.js 18+** - JavaScript runtime (our setup script can install this automatically)
+- **Docker** - For running PostgreSQL database ([Install Docker](https://docs.docker.com/get-docker/))
+- **Git** - For version control (usually pre-installed)
+
 ### One Command to Rule Them All
 
 ```bash
@@ -53,6 +60,7 @@ cd GraphDone-Core
 ```
 
 That's it! The script will automatically:
+- Check prerequisites and offer to install Node.js if needed
 - Install all dependencies
 - Set up your environment  
 - Start the database
@@ -60,6 +68,8 @@ That's it! The script will automatically:
 - Launch the development servers
 
 Visit **http://localhost:3000** when you see the "GraphDone is Ready!" message.
+
+> 💡 **Don't have Node.js?** No problem! The setup script will detect this and offer to install Node.js 18 for you using nvm (Node Version Manager).
 
 ### What You Get
 

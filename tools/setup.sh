@@ -2,32 +2,123 @@
 
 # GraphDone Development Setup Script
 
-set -e
-
 echo "🚀 Setting up GraphDone development environment..."
 
-# Check for required tools
+# Function to install Node.js using Node Version Manager (nvm)
+install_nodejs() {
+    echo "🔧 Installing Node.js 18..."
+    
+    # Check if nvm is available
+    if command -v nvm &> /dev/null; then
+        echo "📦 Using existing nvm to install Node.js..."
+        nvm install 18
+        nvm use 18
+    elif [ -f "$HOME/.nvm/nvm.sh" ]; then
+        echo "📦 Loading nvm and installing Node.js..."
+        source "$HOME/.nvm/nvm.sh"
+        nvm install 18
+        nvm use 18
+    else
+        echo "📥 Installing nvm (Node Version Manager) first..."
+        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+        source "$HOME/.nvm/nvm.sh"
+        nvm install 18
+        nvm use 18
+    fi
+    
+    echo "✅ Node.js 18 installed successfully!"
+}
+
+# Enhanced prerequisite checking with helpful installation guidance
+check_nodejs() {
+    if ! command -v node &> /dev/null; then
+        echo "❌ Node.js is required but not installed."
+        echo ""
+        echo "🚀 Would you like to install Node.js 18 automatically? (y/n)"
+        read -r response
+        if [[ "$response" =~ ^[Yy]$ ]]; then
+            install_nodejs
+        else
+            echo ""
+            echo "📋 Please install Node.js 18+ manually using one of these methods:"
+            echo ""
+            echo "🔹 Using Node Version Manager (nvm) - RECOMMENDED:"
+            echo "   curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash"
+            echo "   source ~/.nvm/nvm.sh"
+            echo "   nvm install 18"
+            echo "   nvm use 18"
+            echo ""
+            echo "🔹 Download from official website:"
+            echo "   https://nodejs.org/en/download/"
+            echo ""
+            echo "🔹 Using package managers:"
+            echo "   • Ubuntu/Debian: sudo apt update && sudo apt install nodejs npm"
+            echo "   • macOS (Homebrew): brew install node"
+            echo "   • Windows (Chocolatey): choco install nodejs"
+            echo ""
+            echo "Then run this setup script again: ./tools/setup.sh"
+            exit 1
+        fi
+    fi
+    
+    # Check Node.js version
+    NODE_VERSION=$(node --version | cut -d'v' -f2 | cut -d'.' -f1)
+    if [ "$NODE_VERSION" -lt 18 ]; then
+        echo "❌ Node.js 18+ is required. Current version: $(node --version)"
+        echo ""
+        echo "🚀 Would you like to upgrade to Node.js 18 automatically? (y/n)"
+        read -r response
+        if [[ "$response" =~ ^[Yy]$ ]]; then
+            install_nodejs
+        else
+            echo "Please upgrade Node.js to version 18 or higher and run setup again."
+            exit 1
+        fi
+    fi
+}
+
 check_command() {
-    if ! command -v $1 &> /dev/null; then
-        echo "❌ $1 is required but not installed. Please install it first."
+    local cmd=$1
+    local install_guide=$2
+    
+    if ! command -v $cmd &> /dev/null; then
+        echo "❌ $cmd is required but not installed."
+        if [ -n "$install_guide" ]; then
+            echo ""
+            echo "📋 Installation guide:"
+            echo "$install_guide"
+        fi
+        echo ""
         exit 1
     fi
 }
 
 echo "📋 Checking prerequisites..."
-check_command node
-check_command npm
-check_command docker
-check_command docker-compose
 
-# Check Node.js version
-NODE_VERSION=$(node --version | cut -d'v' -f2 | cut -d'.' -f1)
-if [ "$NODE_VERSION" -lt 18 ]; then
-    echo "❌ Node.js 18+ is required. Current version: $(node --version)"
+# Check Node.js with automatic installation option
+check_nodejs
+
+# Check npm (should be available with Node.js)
+if ! command -v npm &> /dev/null; then
+    echo "❌ npm is required but not found. This usually comes with Node.js."
+    echo "Please reinstall Node.js or install npm separately."
     exit 1
 fi
 
+# Check Docker with installation guidance
+check_command docker "🔹 Ubuntu/Debian: https://docs.docker.com/engine/install/ubuntu/
+🔹 macOS: https://docs.docker.com/desktop/mac/install/
+🔹 Windows: https://docs.docker.com/desktop/windows/install/"
+
+# Check Docker Compose with installation guidance  
+check_command docker-compose "🔹 Install with: sudo apt install docker-compose
+🔹 Or use Docker Compose V2: docker compose
+🔹 Guide: https://docs.docker.com/compose/install/"
+
 echo "✅ Prerequisites check passed"
+
+# Re-enable strict error handling after interactive prompts
+set -e
 
 # Install dependencies
 echo "📦 Installing dependencies..."
