@@ -30,8 +30,21 @@ echo -e "${NC}"
 echo -e "${CYAN}Welcome to GraphDone! This script will get you up and running quickly.${NC}"
 echo ""
 
-# Check if this is the first run
+# Check if setup or workspace repair is needed
+setup_needed=false
+workspace_repair_needed=false
+
 if [ ! -f "packages/server/.env" ] || [ ! -f "packages/web/.env" ]; then
+    setup_needed=true
+fi
+
+# Check if workspace dependencies are broken
+if [ ! -f "packages/core/dist/index.js" ] || [ ! -L "node_modules/@graphdone/core" ]; then
+    workspace_repair_needed=true
+fi
+
+# Run setup if needed
+if [ "$setup_needed" = true ]; then
     echo -e "${YELLOW}🔧 First time setup detected...${NC}"
     echo ""
     echo -e "${BLUE}Running initial setup (this may take a few minutes):${NC}"
@@ -47,6 +60,32 @@ if [ ! -f "packages/server/.env" ] || [ ! -f "packages/web/.env" ]; then
     echo ""
     echo -e "${GREEN}✅ Setup complete!${NC}"
     echo ""
+elif [ "$workspace_repair_needed" = true ]; then
+    echo -e "${YELLOW}🔧 Workspace dependencies need repair...${NC}"
+    echo ""
+    echo -e "${BLUE}Fixing workspace dependencies:${NC}"
+    echo "  • Rebuilding core package"
+    echo "  • Ensuring workspace links"
+    echo ""
+    
+    # Quick workspace repair (less aggressive than full setup)
+    echo -e "${CYAN}📦 Installing dependencies...${NC}"
+    npm install
+    
+    echo -e "${CYAN}🏗️  Building core package...${NC}"
+    (cd packages/core && npm run build)
+    
+    # Verify the fix worked
+    if [ -f "packages/core/dist/index.js" ] && [ -L "node_modules/@graphdone/core" ]; then
+        echo ""
+        echo -e "${GREEN}✅ Workspace repair complete!${NC}"
+        echo ""
+    else
+        echo ""
+        echo -e "${RED}❌ Workspace repair failed. Running full setup...${NC}"
+        echo ""
+        ./tools/setup.sh
+    fi
 fi
 
 echo -e "${BLUE}🚀 Starting GraphDone development environment...${NC}"
