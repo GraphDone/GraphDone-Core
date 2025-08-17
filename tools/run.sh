@@ -154,9 +154,23 @@ case $MODE in
         lsof -ti:4127 | xargs -r kill -9 2>/dev/null || true
         sleep 1
         
-        # Ensure core package is built for workspace dependencies
-        echo "🔧 Building core package for workspace dependencies..."
-        (cd packages/core && npm run build)
+        # Ensure workspace dependencies are properly set up
+        echo "🔧 Ensuring workspace dependencies are ready..."
+        
+        # Check if core package dist exists, if not run full setup
+        if [ ! -f "packages/core/dist/index.js" ]; then
+            echo "⚠️  Core package not built. Running workspace setup..."
+            npm install
+            (cd packages/core && npm run build)
+        else
+            echo "✅ Core package already built"
+        fi
+        
+        # Double-check that workspace links are working
+        if [ ! -L "node_modules/@graphdone/core" ]; then
+            echo "⚠️  Workspace links missing. Reinstalling dependencies..."
+            npm install
+        fi
         
         # Start development servers
         echo "🚀 Starting development servers..."
