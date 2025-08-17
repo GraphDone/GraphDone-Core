@@ -57,3 +57,10 @@ logs/
 # Cache
 .cache/
 .parcel-cache/
+
+# TypeScript
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# Prisma
+prisma/dev.db

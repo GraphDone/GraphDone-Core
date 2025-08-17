@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
+import { hostname } from 'os';
 
 export default defineConfig({
   plugins: [react()],
@@ -11,11 +12,13 @@ export default defineConfig({
     }
   },
   server: {
-    port: Number(process.env.PORT) || 3000,
+    host: '0.0.0.0', // Listen on all interfaces for external access
+    port: Number(process.env.PORT) || 3127,
     strictPort: true, // Exit if port is already in use instead of trying next available
+    allowedHosts: ['localhost', hostname(), '*.local', '.tailscale'], // Auto-detect hostname + common patterns
     proxy: {
       '/graphql': {
-        target: 'http://localhost:4000',
+        target: 'http://localhost:4127',
         changeOrigin: true
       }
     }
