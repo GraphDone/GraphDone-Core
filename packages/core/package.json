@@ -14,7 +14,8 @@
     "clean": "rm -rf dist coverage"
   },
   "dependencies": {
-    "uuid": "^9.0.1"
+    "uuid": "^9.0.1",
+    "neo4j-driver": "^5.15.0"
   },
   "devDependencies": {
     "@types/uuid": "^9.0.7",
