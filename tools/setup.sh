@@ -36,13 +36,36 @@ npm install
 # Set up environment variables
 echo "🔧 Setting up environment variables..."
 if [ ! -f "packages/server/.env" ]; then
-    cp packages/server/.env.example packages/server/.env
-    echo "📄 Created packages/server/.env from example"
+    echo "📄 Creating packages/server/.env with default values"
+    cat > packages/server/.env << 'EOF'
+# Database
+DATABASE_URL="postgresql://graphdone:graphdone_password@localhost:5432/graphdone"
+
+# Server
+PORT=4000
+NODE_ENV=development
+
+# CORS
+CORS_ORIGIN="http://localhost:3000"
+
+# Redis
+REDIS_URL="redis://localhost:6379"
+
+# JWT Secret (change in production)
+JWT_SECRET="your-super-secret-jwt-key-change-in-production"
+EOF
 fi
 
 if [ ! -f "packages/web/.env" ]; then
-    cp packages/web/.env.example packages/web/.env
-    echo "📄 Created packages/web/.env from example"
+    echo "📄 Creating packages/web/.env with default values"
+    cat > packages/web/.env << 'EOF'
+# GraphQL API URLs
+VITE_GRAPHQL_URL=http://localhost:4000/graphql
+VITE_GRAPHQL_WS_URL=ws://localhost:4000/graphql
+
+# Environment
+VITE_NODE_ENV=development
+EOF
 fi
 
 # Start database
@@ -51,14 +74,25 @@ docker-compose -f deployment/docker-compose.yml up -d postgres redis
 
 # Wait for database to be ready
 echo "⏳ Waiting for database to be ready..."
-sleep 10
+until docker-compose -f deployment/docker-compose.yml exec -T postgres pg_isready -U graphdone 2>/dev/null; do
+    echo "⏳ Database not ready yet, waiting..."
+    sleep 2
+done
+echo "✅ Database is ready!"
 
-# Run database migrations
+# Generate Prisma client and run migrations
+echo "🔧 Generating Prisma client..."
+cd packages/server && npx prisma generate && cd ../..
 echo "🗄️  Running database migrations..."
 cd packages/server && npm run db:migrate && cd ../..
 
-# Build packages
+# Build packages in correct order (Turbo handles dependencies)
 echo "🏗️  Building packages..."
+# Clean any stale build cache that might prevent proper compilation
+echo "🧹 Cleaning build cache..."
+(cd packages/core && rm -f tsconfig.tsbuildinfo)
+(cd packages/server && rm -f tsconfig.tsbuildinfo)
+(cd packages/web && rm -f tsconfig.tsbuildinfo)
 npm run build
 
 echo "✅ Setup complete!"
