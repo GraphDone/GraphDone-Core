@@ -126,26 +126,20 @@ case $MODE in
         fi
         
         # Check if database is running
-        echo "🔍 Checking database status..."
-        if ! ${DOCKER_SUDO}docker-compose -f deployment/docker-compose.yml ps postgres 2>/dev/null | grep -q "Up"; then
-            echo "🐘 Starting database..."
-            ${DOCKER_SUDO}docker-compose -f deployment/docker-compose.yml up -d postgres redis
-            echo "⏳ Waiting for database to be ready..."
+        echo "🔍 Checking Neo4j status..."
+        if ! ${DOCKER_SUDO}docker-compose -f deployment/docker-compose.yml ps neo4j 2>/dev/null | grep -q "Up"; then
+            echo "🗄️  Starting Neo4j database..."
+            ${DOCKER_SUDO}docker-compose -f deployment/docker-compose.yml up -d neo4j redis
+            echo "⏳ Waiting for Neo4j to be ready..."
             
-            # Wait for PostgreSQL to be ready
-            until ${DOCKER_SUDO}docker-compose -f deployment/docker-compose.yml exec -T postgres pg_isready -U graphdone 2>/dev/null; do
-                echo "⏳ Database not ready yet, waiting..."
-                sleep 2
+            # Wait for Neo4j to be ready
+            until ${DOCKER_SUDO}docker-compose -f deployment/docker-compose.yml exec -T neo4j cypher-shell -u neo4j -p graphdone_password "RETURN 1" 2>/dev/null; do
+                echo "⏳ Neo4j not ready yet, waiting..."
+                sleep 3
             done
-            echo "✅ Database is ready!"
-            
-            # Generate Prisma client and run migrations if needed
-            echo "🔧 Generating Prisma client..."
-            (cd packages/server && npx prisma generate)
-            echo "🗄️  Running database migrations..."
-            (cd packages/server && npm run db:migrate)
+            echo "✅ Neo4j is ready!"
         else
-            echo "✅ Database is already running"
+            echo "✅ Neo4j is already running"
         fi
         
         # Clean up any hanging processes on our ports
