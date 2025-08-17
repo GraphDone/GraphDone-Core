@@ -1,0 +1,56 @@
+#!/bin/bash
+
+# GraphDone Quick Launcher
+# The easiest way to get GraphDone running
+
+set -e
+
+# Colors for better output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
+# Clear screen for a clean start
+clear
+
+echo -e "${PURPLE}"
+echo "╔══════════════════════════════════════════════════════════════╗"
+echo "║                                                              ║"
+echo "║                     🌐 GraphDone 🌐                          ║"
+echo "║                                                              ║"
+echo "║           Graph-native project management system             ║"
+echo "║                                                              ║"
+echo "╚══════════════════════════════════════════════════════════════╝"
+echo -e "${NC}"
+
+echo -e "${CYAN}Welcome to GraphDone! This script will get you up and running quickly.${NC}"
+echo ""
+
+# Check if this is the first run
+if [ ! -f "packages/server/.env" ] || [ ! -f "packages/web/.env" ]; then
+    echo -e "${YELLOW}🔧 First time setup detected...${NC}"
+    echo ""
+    echo -e "${BLUE}Running initial setup (this may take a few minutes):${NC}"
+    echo "  • Installing dependencies"
+    echo "  • Setting up environment variables"
+    echo "  • Starting database"
+    echo "  • Running migrations"
+    echo "  • Building packages"
+    echo ""
+    
+    ./tools/setup.sh
+    
+    echo ""
+    echo -e "${GREEN}✅ Setup complete!${NC}"
+    echo ""
+fi
+
+echo -e "${BLUE}🚀 Starting GraphDone development environment...${NC}"
+echo ""
+
+# Start the development environment
+./tools/run.sh
