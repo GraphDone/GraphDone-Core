@@ -91,6 +91,23 @@ Visit **http://localhost:3000** when you see the "GraphDone is Ready!" message.
 ./tools/run.sh    # Start development servers
 ```
 
+### Troubleshooting
+
+**Docker Permission Denied?**
+```bash
+# Fix Docker permissions (then restart terminal)
+sudo usermod -aG docker $USER
+newgrp docker
+
+# Or run the setup with sudo assistance
+./start  # Will offer to use sudo automatically
+```
+
+**Node.js Missing?**
+```bash
+./start  # Will offer to install Node.js 18 automatically
+```
+
 ## Core Concepts
 
 ### Graph Structure
