@@ -3,9 +3,9 @@ services:
     image: neo4j:5.15-community
     environment:
       NEO4J_AUTH: neo4j/graphdone_password
-      NEO4J_PLUGINS: '["graph-data-science"]'
-      NEO4J_dbms_security_procedures_unrestricted: "gds.*"
-      NEO4J_dbms_security_procedures_allowlist: "gds.*"
+      NEO4J_PLUGINS: '["graph-data-science", "apoc"]'
+      NEO4J_dbms_security_procedures_unrestricted: "gds.*,apoc.*"
+      NEO4J_dbms_security_procedures_allowlist: "gds.*,apoc.*"
     ports:
       - "7474:7474"  # HTTP
       - "7687:7687"  # Bolt
