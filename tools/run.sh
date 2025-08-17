@@ -56,15 +56,28 @@ case $MODE in
             ./tools/setup.sh
         fi
         
+        # Check if we need sudo for Docker (detect from previous setup)
+        DOCKER_SUDO=""
+        if ! docker ps &> /dev/null; then
+            echo "⚠️  Docker permission issue detected. Trying with sudo..."
+            if sudo docker ps &> /dev/null; then
+                DOCKER_SUDO="sudo "
+                echo "✅ Using sudo for Docker commands"
+            else
+                echo "❌ Docker not working even with sudo. Please check Docker installation."
+                exit 1
+            fi
+        fi
+        
         # Check if database is running
         echo "🔍 Checking database status..."
-        if ! docker-compose -f deployment/docker-compose.yml ps postgres 2>/dev/null | grep -q "Up"; then
+        if ! ${DOCKER_SUDO}docker-compose -f deployment/docker-compose.yml ps postgres 2>/dev/null | grep -q "Up"; then
             echo "🐘 Starting database..."
-            docker-compose -f deployment/docker-compose.yml up -d postgres redis
+            ${DOCKER_SUDO}docker-compose -f deployment/docker-compose.yml up -d postgres redis
             echo "⏳ Waiting for database to be ready..."
             
             # Wait for PostgreSQL to be ready
-            until docker-compose -f deployment/docker-compose.yml exec -T postgres pg_isready -U graphdone 2>/dev/null; do
+            until ${DOCKER_SUDO}docker-compose -f deployment/docker-compose.yml exec -T postgres pg_isready -U graphdone 2>/dev/null; do
                 echo "⏳ Database not ready yet, waiting..."
                 sleep 2
             done

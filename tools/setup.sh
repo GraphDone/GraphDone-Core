@@ -110,10 +110,44 @@ check_command docker "🔹 Ubuntu/Debian: https://docs.docker.com/engine/install
 🔹 macOS: https://docs.docker.com/desktop/mac/install/
 🔹 Windows: https://docs.docker.com/desktop/windows/install/"
 
+# Check Docker permissions
+check_docker_permissions() {
+    if ! docker ps &> /dev/null; then
+        echo "❌ Docker permission denied. This usually means your user needs to be added to the docker group."
+        echo ""
+        echo "🔧 To fix this issue, run these commands:"
+        echo "   sudo usermod -aG docker \$USER"
+        echo "   newgrp docker"
+        echo ""
+        echo "🔄 Or restart your terminal/computer after running:"
+        echo "   sudo usermod -aG docker \$USER"
+        echo ""
+        echo "⚡ Quick fix for this session (requires password):"
+        echo "   We can run Docker commands with sudo for now"
+        echo ""
+        echo "🚀 Would you like to continue with sudo for this setup? (y/n)"
+        read -r response
+        if [[ "$response" =~ ^[Yy]$ ]]; then
+            export DOCKER_SUDO=1
+            echo "✅ Will use sudo for Docker commands in this session"
+        else
+            echo ""
+            echo "Please fix Docker permissions and run setup again:"
+            echo "  sudo usermod -aG docker \$USER"
+            echo "  newgrp docker"
+            echo "  ./tools/setup.sh"
+            exit 1
+        fi
+    fi
+}
+
 # Check Docker Compose with installation guidance  
 check_command docker-compose "🔹 Install with: sudo apt install docker-compose
 🔹 Or use Docker Compose V2: docker compose
 🔹 Guide: https://docs.docker.com/compose/install/"
+
+# Check Docker permissions
+check_docker_permissions
 
 echo "✅ Prerequisites check passed"
 
@@ -161,14 +195,25 @@ fi
 
 # Start database
 echo "🐘 Starting PostgreSQL database..."
-docker-compose -f deployment/docker-compose.yml up -d postgres redis
+if [ "$DOCKER_SUDO" = "1" ]; then
+    sudo docker-compose -f deployment/docker-compose.yml up -d postgres redis
+else
+    docker-compose -f deployment/docker-compose.yml up -d postgres redis
+fi
 
 # Wait for database to be ready
 echo "⏳ Waiting for database to be ready..."
-until docker-compose -f deployment/docker-compose.yml exec -T postgres pg_isready -U graphdone 2>/dev/null; do
-    echo "⏳ Database not ready yet, waiting..."
-    sleep 2
-done
+if [ "$DOCKER_SUDO" = "1" ]; then
+    until sudo docker-compose -f deployment/docker-compose.yml exec -T postgres pg_isready -U graphdone 2>/dev/null; do
+        echo "⏳ Database not ready yet, waiting..."
+        sleep 2
+    done
+else
+    until docker-compose -f deployment/docker-compose.yml exec -T postgres pg_isready -U graphdone 2>/dev/null; do
+        echo "⏳ Database not ready yet, waiting..."
+        sleep 2
+    done
+fi
 echo "✅ Database is ready!"
 
 # Generate Prisma client and run migrations
