@@ -545,9 +545,73 @@ export function InteractiveGraphVisualization() {
   }
 
   if (error || edgesError) {
+    // Determine user-friendly error message based on error type
+    const getErrorMessage = (err: any) => {
+      if (!err) return "Unknown error occurred";
+      
+      const message = err.message || err.toString();
+      
+      // Network/connection errors
+      if (message.includes('NetworkError') || message.includes('fetch')) {
+        return "Cannot connect to GraphDone server. Please check if the server is running at http://localhost:4127";
+      }
+      
+      // GraphQL/Database errors
+      if (message.includes('Cannot return null for non-nullable')) {
+        return "Database schema issue detected. Please restart the server or reseed the database.";
+      }
+      
+      if (message.includes('Neo4j')) {
+        return "Database connection failed. Please ensure Neo4j is running and properly configured.";
+      }
+      
+      if (message.includes('Enum') && message.includes('cannot represent')) {
+        return "Data format error. Please check that your database schema matches the application version.";
+      }
+      
+      // Authentication/permission errors
+      if (message.includes('unauthorized') || message.includes('Unauthorized')) {
+        return "Authentication failed. Please check your database credentials.";
+      }
+      
+      // Generic GraphQL errors
+      if (message.includes('GraphQL')) {
+        return "Server communication error. Please check server logs for details.";
+      }
+      
+      // Fallback with original message for debugging
+      return `Server error: ${message}`;
+    };
+
+    const errorMessage = getErrorMessage(error || edgesError);
+    const isNetworkError = errorMessage.includes('Cannot connect');
+    
     return (
-      <div className="graph-container relative w-full h-full bg-gray-900 flex items-center justify-center">
-        <div className="text-red-300">Error loading graph: {error?.message || edgesError?.message}</div>
+      <div className="graph-container relative w-full h-full bg-gray-900 flex items-center justify-center p-8">
+        <div className="max-w-lg text-center">
+          <div className="text-red-400 text-xl mb-4">
+            {isNetworkError ? '🔌' : '⚠️'} Connection Error
+          </div>
+          <div className="text-red-300 mb-6 leading-relaxed">
+            {errorMessage}
+          </div>
+          
+          {isNetworkError && (
+            <div className="text-gray-400 text-sm space-y-2">
+              <div>💡 <strong>Quick fixes:</strong></div>
+              <div>• Run <code className="bg-gray-800 px-2 py-1 rounded">./start</code> to start the server</div>
+              <div>• Check if port 4127 is available</div>
+              <div>• Verify Neo4j database is running</div>
+            </div>
+          )}
+          
+          <button 
+            onClick={() => window.location.reload()} 
+            className="mt-6 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+          >
+            🔄 Retry Connection
+          </button>
+        </div>
       </div>
     );
   }
