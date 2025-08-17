@@ -1,0 +1,32 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle for app icon -->
+  <circle cx="50" cy="50" r="48" fill="#4f46e5" stroke="none"/>
+  
+  <!-- Graph nodes -->
+  <circle cx="30" cy="35" r="4" fill="#fbbf24" opacity="0.9"/>
+  <circle cx="70" cy="35" r="4" fill="#fbbf24" opacity="0.9"/>
+  <circle cx="50" cy="25" r="5" fill="#10b981" opacity="1"/>
+  <circle cx="25" cy="65" r="4" fill="#f59e0b" opacity="0.8"/>
+  <circle cx="75" cy="65" r="4" fill="#f59e0b" opacity="0.8"/>
+  <circle cx="50" cy="75" r="4" fill="#6b7280" opacity="0.7"/>
+  
+  <!-- Central outcome node (largest) -->
+  <circle cx="50" cy="50" r="7" fill="#ffffff" stroke="#4f46e5" stroke-width="2"/>
+  
+  <!-- Connection lines -->
+  <line x1="30" y1="35" x2="50" y2="50" stroke="#e5e7eb" stroke-width="2" opacity="0.6"/>
+  <line x1="70" y1="35" x2="50" y2="50" stroke="#e5e7eb" stroke-width="2" opacity="0.6"/>
+  <line x1="50" y1="25" x2="50" y2="50" stroke="#e5e7eb" stroke-width="2" opacity="0.8"/>
+  <line x1="50" y1="50" x2="25" y2="65" stroke="#e5e7eb" stroke-width="2" opacity="0.6"/>
+  <line x1="50" y1="50" x2="75" y2="65" stroke="#e5e7eb" stroke-width="2" opacity="0.6"/>
+  <line x1="50" y1="50" x2="50" y2="75" stroke="#e5e7eb" stroke-width="2" opacity="0.4"/>
+  
+  <!-- Subtle gradient overlay for depth -->
+  <defs>
+    <radialGradient id="depth" cx="40%" cy="30%">
+      <stop offset="0%" style="stop-color:white;stop-opacity:0.2" />
+      <stop offset="100%" style="stop-color:white;stop-opacity:0" />
+    </radialGradient>
+  </defs>
+  <circle cx="50" cy="50" r="48" fill="url(#depth)" stroke="none"/>
+</svg>
