@@ -50,16 +50,100 @@ case $MODE in
     "dev")
         echo "📦 Starting development servers..."
         
+        # Check if environment files exist
+        if [ ! -f "packages/server/.env" ] || [ ! -f "packages/web/.env" ]; then
+            echo "⚠️  Environment files missing. Running setup first..."
+            ./tools/setup.sh
+        fi
+        
         # Check if database is running
-        if ! docker-compose -f deployment/docker-compose.yml ps postgres | grep -q "Up"; then
+        echo "🔍 Checking database status..."
+        if ! docker-compose -f deployment/docker-compose.yml ps postgres 2>/dev/null | grep -q "Up"; then
             echo "🐘 Starting database..."
             docker-compose -f deployment/docker-compose.yml up -d postgres redis
-            echo "⏳ Waiting for database..."
-            sleep 5
+            echo "⏳ Waiting for database to be ready..."
+            
+            # Wait for PostgreSQL to be ready
+            until docker-compose -f deployment/docker-compose.yml exec -T postgres pg_isready -U graphdone 2>/dev/null; do
+                echo "⏳ Database not ready yet, waiting..."
+                sleep 2
+            done
+            echo "✅ Database is ready!"
+            
+            # Generate Prisma client and run migrations if needed
+            echo "🔧 Generating Prisma client..."
+            cd packages/server && npx prisma generate && cd ../..
+            echo "🗄️  Running database migrations..."
+            cd packages/server && npm run db:migrate && cd ../..
+        else
+            echo "✅ Database is already running"
         fi
         
         # Start development servers
-        npm run dev
+        echo "🚀 Starting development servers..."
+        
+        # Start dev servers in background and monitor for readiness
+        npm run dev &
+        DEV_PID=$!
+        
+        # Function to check if services are ready
+        check_services() {
+            local web_ready=false
+            local server_ready=false
+            
+            # Check if web server is responding
+            if curl -s http://localhost:3000 > /dev/null 2>&1; then
+                web_ready=true
+            fi
+            
+            # Check if GraphQL server is responding
+            if curl -s http://localhost:4000/health > /dev/null 2>&1; then
+                server_ready=true
+            fi
+            
+            if [ "$web_ready" = true ] && [ "$server_ready" = true ]; then
+                return 0
+            else
+                return 1
+            fi
+        }
+        
+        # Wait for services to be ready (max 60 seconds)
+        echo "⏳ Waiting for services to start..."
+        timeout=60
+        elapsed=0
+        
+        while [ $elapsed -lt $timeout ]; do
+            if check_services; then
+                break
+            fi
+            sleep 2
+            elapsed=$((elapsed + 2))
+        done
+        
+        # Show status box
+        echo ""
+        echo -e "\033[0;32m"
+        echo "╔════════════════════════════════════════════════════════════════╗"
+        echo "║                                                                ║"
+        echo "║                    🎉 GraphDone is Ready! 🎉                   ║"
+        echo "║                                                                ║"
+        echo "║  📍 Access your application:                                   ║"
+        echo "║     🌐 Web App:      http://localhost:3000                     ║"
+        echo "║     🔌 GraphQL API:  http://localhost:4000/graphql             ║"
+        echo "║     🩺 Health Check: http://localhost:4000/health              ║"
+        echo "║                                                                ║"
+        echo "║  💡 Tips:                                                      ║"
+        echo "║     • Press Ctrl+C to stop all services                        ║"
+        echo "║     • Check logs above for any issues                          ║"
+        echo "║     • Visit the web app to start using GraphDone               ║"
+        echo "║                                                                ║"
+        echo "╚════════════════════════════════════════════════════════════════╝"
+        echo -e "\033[0m"
+        echo ""
+        
+        # Wait for the background process
+        wait $DEV_PID
         ;;
         
     "prod")
