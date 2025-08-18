@@ -3,13 +3,32 @@ import { getMainDefinition } from '@apollo/client/utilities';
 import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
 import { createClient } from 'graphql-ws';
 
+// Dynamically construct GraphQL URLs based on current host
+const getGraphQLUrl = () => {
+  if (import.meta.env.VITE_GRAPHQL_URL) {
+    return import.meta.env.VITE_GRAPHQL_URL;
+  }
+  // Use same hostname but port 4127 for GraphQL
+  const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
+  return `${protocol}//${window.location.hostname}:4127/graphql`;
+};
+
+const getWebSocketUrl = () => {
+  if (import.meta.env.VITE_GRAPHQL_WS_URL) {
+    return import.meta.env.VITE_GRAPHQL_WS_URL;
+  }
+  // Use same hostname but port 4127 for WebSocket
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${protocol}//${window.location.hostname}:4127/graphql`;
+};
+
 const httpLink = createHttpLink({
-  uri: import.meta.env.VITE_GRAPHQL_URL || '/graphql',
+  uri: getGraphQLUrl(),
 });
 
 const wsLink = new GraphQLWsLink(
   createClient({
-    url: import.meta.env.VITE_GRAPHQL_WS_URL || `ws://${window.location.host}/graphql`,
+    url: getWebSocketUrl(),
   })
 );
 
