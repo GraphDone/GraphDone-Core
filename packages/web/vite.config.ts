@@ -12,7 +12,7 @@ export default defineConfig({
     }
   },
   server: {
-    host: 'localhost', // Use localhost for development stability
+    host: '0.0.0.0', // Allow external connections
     port: Number(process.env.PORT) || 3127,
     strictPort: true, // Exit if port is already in use instead of trying next available
     allowedHosts: ['localhost', hostname(), '*.local', '.tailscale'], // Auto-detect hostname + common patterns
