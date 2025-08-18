@@ -3,10 +3,172 @@ import { gql } from 'graphql-tag';
 export const typeDefs = gql`
   # Enums
   enum NodeType {
+    # Legacy types (for backward compatibility)
     OUTCOME
-    TASK
+    
+    # Strategic Planning
+    EPIC
+    INITIATIVE
+    THEME
+    OBJECTIVE
+    GOAL
     MILESTONE
+    ROADMAP_ITEM
+    PORTFOLIO
+    PROGRAM
+    PROJECT
+    CAMPAIGN
+    
+    # Development Work
+    STORY
+    USER_STORY
+    FEATURE
+    ENHANCEMENT
+    TASK
+    SUBTASK
+    SPIKE
+    RESEARCH
+    PRODUCT_BACKLOG_ITEM
+    WORK_ITEM
+    TICKET
+    
+    # Quality & Issues
+    BUG
+    DEFECT
+    INCIDENT
+    HOTFIX
+    REGRESSION
+    ISSUE
+    PROBLEM
+    ERROR
+    VULNERABILITY
+    
+    # Operations & Maintenance
+    CHORE
+    MAINTENANCE
+    DEPLOYMENT
+    RELEASE
+    INFRASTRUCTURE
+    DEVOPS
+    AUTOMATION
+    MONITORING
+    BACKUP
+    SECURITY
+    
+    # Documentation & Knowledge
+    DOCUMENTATION
+    SPECIFICATION
+    REQUIREMENT
+    DESIGN
+    ARCHITECTURE
+    WIKI
+    GUIDE
+    TUTORIAL
+    MANUAL
+    POLICY
+    PROCEDURE
+    
+    # Process & Improvement
+    IMPROVEMENT
+    OPTIMIZATION
+    REFACTORING
+    TECHNICAL_DEBT
+    PROCESS_IMPROVEMENT
+    WORKFLOW
+    AUTOMATION_REQUEST
+    
+    # Planning & Analysis
+    ANALYSIS
+    INVESTIGATION
+    PROPOSAL
     IDEA
+    CONCEPT
+    FEASIBILITY_STUDY
+    MARKET_RESEARCH
+    COMPETITIVE_ANALYSIS
+    
+    # Testing & Validation
+    TEST
+    TEST_CASE
+    TEST_PLAN
+    TEST_SUITE
+    VALIDATION
+    REVIEW
+    CODE_REVIEW
+    DESIGN_REVIEW
+    QA
+    UAT
+    ACCEPTANCE_TEST
+    
+    # Business & Sales
+    LEAD
+    OPPORTUNITY
+    QUOTE
+    CONTRACT
+    DEAL
+    ACCOUNT
+    CUSTOMER_REQUEST
+    
+    # Marketing & Content
+    CONTENT
+    BLOG_POST
+    SOCIAL_MEDIA
+    EMAIL_CAMPAIGN
+    ADVERTISEMENT
+    BRAND_ASSET
+    
+    # Events & Activities
+    EVENT
+    MEETING
+    WORKSHOP
+    CONFERENCE
+    WEBINAR
+    PRESENTATION
+    DEMO
+    
+    # Support & Training
+    SUPPORT
+    TRAINING
+    ONBOARDING
+    KNOWLEDGE_TRANSFER
+    HELP_DESK
+    FAQ
+    
+    # Finance & Legal
+    BUDGET
+    INVOICE
+    EXPENSE
+    LEGAL_REVIEW
+    COMPLIANCE
+    AUDIT
+    
+    # HR & People
+    RECRUITMENT
+    INTERVIEW
+    PERFORMANCE_REVIEW
+    TEAM_BUILDING
+    VACATION_REQUEST
+    
+    # Creative & Design
+    CREATIVE_BRIEF
+    MOCKUP
+    PROTOTYPE
+    WIREFRAME
+    BRAND_DESIGN
+    UX_RESEARCH
+    UI_DESIGN
+    
+    # Custom & Miscellaneous
+    CUSTOM
+    NOTE
+    REMINDER
+    ACTION_ITEM
+    FOLLOW_UP
+    DECISION
+    RISK
+    DEPENDENCY
+    BLOCKER
+    QUESTION
   }
 
   enum NodeStatus {
@@ -48,6 +210,8 @@ export const typeDefs = gql`
     priorityComm: Float! @default(value: 0.0)
     priorityComp: Float! @default(value: 0.0)
     status: NodeStatus! @default(value: PROPOSED)
+    dueDate: DateTime
+    assignedTo: String
     metadata: String # JSON as string
     
     # Data isolation fields
