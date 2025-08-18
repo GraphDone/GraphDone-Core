@@ -8,6 +8,7 @@ set -e
 COVERAGE=false
 WATCH=false
 PACKAGE=""
+E2E=false
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -24,6 +25,10 @@ while [[ $# -gt 0 ]]; do
             PACKAGE="$2"
             shift 2
             ;;
+        --e2e|-e)
+            E2E=true
+            shift
+            ;;
         --help|-h)
             echo "GraphDone Test Runner"
             echo ""
@@ -33,6 +38,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --coverage, -c          Run tests with coverage report"
             echo "  --watch, -w             Run tests in watch mode"
             echo "  --package PKG, -p PKG   Run tests for specific package (core, server, web)"
+            echo "  --e2e, -e               Run end-to-end tests with Playwright"
             echo "  --help, -h              Show this help message"
             echo ""
             echo "Examples:"
@@ -40,6 +46,7 @@ while [[ $# -gt 0 ]]; do
             echo "  ./test.sh --coverage         # Run with coverage"
             echo "  ./test.sh --package core     # Test only core package"
             echo "  ./test.sh --watch            # Run in watch mode"
+            echo "  ./test.sh --e2e              # Run end-to-end tests"
             exit 0
             ;;
         *)
@@ -92,6 +99,12 @@ npm run typecheck
 # Run tests
 echo "🧪 Running tests..."
 eval $TEST_CMD
+
+# Run e2e tests if requested
+if [ "$E2E" = true ]; then
+    echo "🌐 Running end-to-end tests..."
+    npm run test:e2e
+fi
 
 echo "✅ All tests completed!"
 

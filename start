@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# GraphDone Quick Launcher
-# The easiest way to get GraphDone running
+# GraphDone - Single Entry Point
+# The main launcher for all GraphDone operations
 
 set -e
 
@@ -12,28 +12,122 @@ BLUE='\033[0;34m'
 YELLOW='\033[1;33m'
 PURPLE='\033[0;35m'
 CYAN='\033[0;36m'
+BOLD='\033[1m'
 NC='\033[0m' # No Color
 
-# Clear screen for a clean start
-clear
+# Default values
+COMMAND=""
+SKIP_BANNER=false
+QUIET=false
 
-echo -e "${PURPLE}"
-echo "╔══════════════════════════════════════════════════════════════╗"
-echo "║                                                              ║"
-echo "║                     🌐 GraphDone 🌐                          ║"
-echo "║                                                              ║"
-echo "║           Graph-native project management system             ║"
-echo "║                                                              ║"
-echo "╚══════════════════════════════════════════════════════════════╝"
-echo -e "${NC}"
+# Help function
+show_help() {
+    echo -e "${BOLD}GraphDone${NC} - Graph-native project management system"
+    echo ""
+    echo -e "${BOLD}USAGE:${NC}"
+    echo "  ./start [COMMAND] [OPTIONS]"
+    echo ""
+    echo -e "${BOLD}COMMANDS:${NC}"
+    echo -e "  ${CYAN}dev${NC}           Start development environment (default)"
+    echo -e "  ${CYAN}quick${NC}         Quick start without full setup checks"
+    echo -e "  ${CYAN}clean${NC}         Clean build artifacts and restart fresh"
+    echo -e "  ${CYAN}setup${NC}         Run initial setup only"
+    echo -e "  ${CYAN}test${NC}          Run test suite"
+    echo -e "  ${CYAN}build${NC}        Build all packages"
+    echo -e "  ${CYAN}deploy${NC}       Deploy to production"
+    echo -e "  ${CYAN}stop${NC}         Stop all running services"
+    echo -e "  ${CYAN}status${NC}       Check system status"
+    echo ""
+    echo -e "${BOLD}OPTIONS:${NC}"
+    echo -e "  ${YELLOW}--help, -h${NC}    Show this help message"
+    echo -e "  ${YELLOW}--quiet, -q${NC}   Suppress banner and verbose output"
+    echo -e "  ${YELLOW}--no-banner${NC}   Skip the GraphDone banner"
+    echo ""
+    echo -e "${BOLD}EXAMPLES:${NC}"
+    echo -e "  ${GREEN}./start${NC}              # Start development environment"
+    echo -e "  ${GREEN}./start quick${NC}        # Quick start"
+    echo -e "  ${GREEN}./start clean${NC}        # Clean and restart"
+    echo -e "  ${GREEN}./start test --quiet${NC}  # Run tests quietly"
+    echo ""
+    echo -e "${BOLD}DEVELOPMENT:${NC}"
+    echo -e "  ${CYAN}Web UI:${NC}       http://localhost:3127"
+    echo -e "  ${CYAN}GraphQL:${NC}     http://localhost:4127/graphql"
+    echo -e "  ${CYAN}Database:${NC}    http://localhost:7474 (Neo4j Browser)"
+}
 
-# Function to ensure Node.js is available (same as in run.sh)
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        -q|--quiet)
+            QUIET=true
+            SKIP_BANNER=true
+            shift
+            ;;
+        --no-banner)
+            SKIP_BANNER=true
+            shift
+            ;;
+        dev|quick|clean|setup|test|build|deploy|stop|status)
+            COMMAND="$1"
+            shift
+            ;;
+        *)
+            echo -e "${RED}❌ Unknown option or command: $1${NC}"
+            echo "Use './start --help' for usage information."
+            exit 1
+            ;;
+    esac
+done
+
+# Default command
+if [ -z "$COMMAND" ]; then
+    COMMAND="dev"
+fi
+
+# Show banner unless skipped
+show_banner() {
+    if [ "$SKIP_BANNER" = false ]; then
+        clear
+        echo -e "${PURPLE}"
+        echo "╔══════════════════════════════════════════════════════════════╗"
+        echo "║                                                              ║"
+        echo "║                     🌐 GraphDone 🌐                          ║"
+        echo "║                                                              ║"
+        echo "║           Graph-native project management system             ║"
+        echo "║                                                              ║"
+        echo "╚══════════════════════════════════════════════════════════════╝"
+        echo -e "${NC}"
+    fi
+}
+
+# Logging functions
+log_info() {
+    if [ "$QUIET" = false ]; then
+        echo -e "${CYAN}$1${NC}"
+    fi
+}
+
+log_success() {
+    echo -e "${GREEN}$1${NC}"
+}
+
+log_warning() {
+    echo -e "${YELLOW}$1${NC}"
+}
+
+log_error() {
+    echo -e "${RED}$1${NC}"
+}
+
+# Function to ensure Node.js is available
 ensure_nodejs() {
-    # If node/npm not found, try to source nvm
     if ! command -v node &> /dev/null || ! command -v npm &> /dev/null; then
-        echo -e "${YELLOW}⚠️  Node.js/npm not found in PATH, attempting to load from nvm...${NC}"
+        log_warning "⚠️  Node.js/npm not found in PATH, attempting to load from nvm..."
         
-        # Try to load nvm
         export NVM_DIR="$HOME/.nvm"
         if [ -s "$NVM_DIR/nvm.sh" ]; then
             source "$NVM_DIR/nvm.sh"
@@ -41,16 +135,15 @@ ensure_nodejs() {
                 source "$NVM_DIR/bash_completion"
             fi
             
-            # Use the latest installed version or 18
             if nvm list | grep -q "v18"; then
                 nvm use 18
             else
                 nvm use node
             fi
             
-            echo -e "${GREEN}✅ Loaded Node.js from nvm: $(node --version)${NC}"
+            log_success "✅ Loaded Node.js from nvm: $(node --version)"
         else
-            echo -e "${RED}❌ Node.js not found and nvm not available.${NC}"
+            log_error "❌ Node.js not found and nvm not available."
             echo "Please restart your terminal or run:"
             echo "  source ~/.bashrc  # or ~/.zshrc"
             echo "  ./start"
@@ -59,83 +152,205 @@ ensure_nodejs() {
     fi
 }
 
-echo -e "${CYAN}Welcome to GraphDone! This script will get you up and running quickly.${NC}"
-echo ""
-
-# Ensure Node.js is available
-ensure_nodejs
-
-# Check if setup or workspace repair is needed
-setup_needed=false
-workspace_repair_needed=false
-
-if [ ! -f "packages/server/.env" ] || [ ! -f "packages/web/.env" ]; then
-    setup_needed=true
-fi
-
-# Check if workspace dependencies are broken
-if [ ! -f "packages/core/dist/index.js" ] || [ ! -L "node_modules/@graphdone/core" ] || [ ! -f "node_modules/.prisma/client/index.js" ]; then
-    workspace_repair_needed=true
-fi
-
-# Run setup if needed
-if [ "$setup_needed" = true ]; then
-    echo -e "${YELLOW}🔧 First time setup detected...${NC}"
-    echo ""
-    echo -e "${BLUE}Running initial setup (this may take a few minutes):${NC}"
-    echo "  • Installing dependencies"
-    echo "  • Setting up environment variables"
-    echo "  • Starting database"
-    echo "  • Running migrations"
-    echo "  • Building packages"
-    echo ""
+# Command implementations
+cmd_dev() {
+    show_banner
+    log_info "Welcome to GraphDone! Starting development environment..."
     
-    ./tools/setup.sh
+    ensure_nodejs
     
-    echo ""
-    echo -e "${GREEN}✅ Setup complete!${NC}"
-    echo ""
-elif [ "$workspace_repair_needed" = true ]; then
-    echo -e "${YELLOW}🔧 Workspace dependencies need repair...${NC}"
-    echo ""
-    echo -e "${BLUE}Fixing workspace dependencies:${NC}"
-    echo "  • Rebuilding core package"
-    echo "  • Generating Prisma client"
-    echo "  • Ensuring workspace links"
-    echo ""
+    # Check if setup is needed
+    setup_needed=false
+    workspace_repair_needed=false
+    dependencies_needed=false
     
-    # Quick workspace repair (less aggressive than full setup)
-    echo -e "${CYAN}📦 Installing dependencies...${NC}"
-    npm install
-    
-    echo -e "${CYAN}🏗️  Building core package...${NC}"
-    (cd packages/core && npm run build)
-    
-    echo -e "${CYAN}🔧 Generating Prisma client...${NC}"
-    (cd packages/server && npx prisma generate)
-    
-    # Verify the fix worked
-    if [ -f "packages/core/dist/index.js" ] && [ -L "node_modules/@graphdone/core" ]; then
-        echo ""
-        echo -e "${GREEN}✅ Workspace repair complete!${NC}"
-        echo ""
-    else
-        echo ""
-        echo -e "${RED}❌ Workspace repair failed. Running full setup...${NC}"
-        echo ""
-        ./tools/setup.sh
+    if [ ! -f "packages/server/.env" ] || [ ! -f "packages/web/.env" ]; then
+        setup_needed=true
     fi
-fi
+    
+    if [ ! -f "packages/core/dist/index.js" ] || [ ! -L "node_modules/@graphdone/core" ]; then
+        workspace_repair_needed=true
+    fi
+    
+    # Check for critical dependencies
+    if [ ! -d "node_modules" ] || [ ! -d "node_modules/neo4j-driver" ] || [ ! -d "node_modules/@neo4j/graphql" ] || [ ! -d "node_modules/@playwright/test" ]; then
+        dependencies_needed=true
+    fi
+    
+    # Install dependencies if needed
+    if [ "$dependencies_needed" = true ]; then
+        log_warning "📦 Missing dependencies detected..."
+        log_info "Installing all project dependencies..."
+        npm install
+        log_success "✅ Dependencies installed!"
+    fi
+    
+    # Run setup if needed
+    if [ "$setup_needed" = true ]; then
+        log_warning "🔧 First time setup detected..."
+        log_info "Running initial setup (this may take a few minutes):"
+        log_info "  • Setting up environment variables"
+        log_info "  • Starting database"
+        log_info "  • Running migrations"
+        log_info "  • Building packages"
+        
+        ./tools/setup.sh
+        log_success "✅ Setup complete!"
+        
+    elif [ "$workspace_repair_needed" = true ] || [ "$dependencies_needed" = true ]; then
+        log_warning "🔧 Workspace dependencies need repair..."
+        log_info "Fixing workspace dependencies:"
+        
+        if [ "$dependencies_needed" = true ]; then
+            log_info "  • Installing missing dependencies"
+            npm install
+        fi
+        log_info "  • Rebuilding core package"
+        log_info "  • Ensuring workspace links"
+        
+        npm install
+        (cd packages/core && npm run build)
+        
+        if [ -f "packages/core/dist/index.js" ] && [ -L "node_modules/@graphdone/core" ]; then
+            log_success "✅ Workspace repair complete!"
+        else
+            log_error "❌ Workspace repair failed. Running full setup..."
+            ./tools/setup.sh
+        fi
+    fi
+    
+    log_info "🚀 Starting GraphDone development environment..."
+    ./tools/run.sh
+}
 
-echo -e "${BLUE}🚀 Starting GraphDone development environment...${NC}"
-echo ""
+cmd_quick() {
+    show_banner
+    log_info "🏃 Quick start - minimal checks..."
+    ensure_nodejs
+    ./tools/run.sh
+}
 
-# Start the development environment
-if ! ./tools/run.sh; then
+cmd_clean() {
+    show_banner
+    log_info "🧹 Cleaning build artifacts and restarting fresh..."
+    ensure_nodejs
+    ./tools/cleanup.sh
+    ./tools/setup.sh
+    ./tools/run.sh
+}
+
+cmd_setup() {
+    show_banner
+    log_info "🔧 Running initial setup..."
+    ensure_nodejs
+    ./tools/setup.sh
+    log_success "✅ Setup complete! Run './start' to start development environment."
+}
+
+cmd_test() {
+    show_banner
+    log_info "🧪 Running test suite..."
+    ensure_nodejs
+    ./tools/test.sh
+}
+
+cmd_build() {
+    show_banner
+    log_info "🏗️  Building all packages..."
+    ensure_nodejs
+    ./tools/build.sh
+}
+
+cmd_deploy() {
+    show_banner
+    log_info "🚀 Deploying to production..."
+    ensure_nodejs
+    ./tools/deploy.sh
+}
+
+cmd_stop() {
+    log_info "🛑 Stopping all services..."
+    docker-compose -f deployment/docker-compose.yml down 2>/dev/null || true
+    docker-compose -f deployment/docker-compose.dev.yml down 2>/dev/null || true
+    pkill -f "npm run dev" 2>/dev/null || true
+    log_success "✅ All services stopped"
+}
+
+cmd_status() {
+    log_info "📊 Checking system status..."
+    
     echo ""
-    echo -e "${YELLOW}⚠️  If you see 'command not found' errors:${NC}"
-    echo "   1. Restart your terminal"
-    echo "   2. Or run: source ~/.bashrc (or ~/.zshrc)"
-    echo "   3. Then try: ./start again"
+    echo -e "${BOLD}System Status:${NC}"
+    
+    # Check Node.js
+    if command -v node &> /dev/null; then
+        echo -e "  ${GREEN}✅${NC} Node.js: $(node --version)"
+    else
+        echo -e "  ${RED}❌${NC} Node.js: Not found"
+    fi
+    
+    # Check Docker
+    if command -v docker &> /dev/null; then
+        echo -e "  ${GREEN}✅${NC} Docker: $(docker --version | cut -d' ' -f3 | cut -d',' -f1)"
+    else
+        echo -e "  ${RED}❌${NC} Docker: Not found"
+    fi
+    
+    # Check services
     echo ""
-fi
+    echo -e "${BOLD}Services:${NC}"
+    
+    if curl -s http://localhost:3127 >/dev/null 2>&1; then
+        echo -e "  ${GREEN}✅${NC} Web UI: http://localhost:3127"
+    else
+        echo -e "  ${RED}❌${NC} Web UI: Not running"
+    fi
+    
+    if curl -s http://localhost:4127/graphql >/dev/null 2>&1; then
+        echo -e "  ${GREEN}✅${NC} GraphQL API: http://localhost:4127/graphql"
+    else
+        echo -e "  ${RED}❌${NC} GraphQL API: Not running"
+    fi
+    
+    if curl -s http://localhost:7474 >/dev/null 2>&1; then
+        echo -e "  ${GREEN}✅${NC} Neo4j Database: http://localhost:7474"
+    else
+        echo -e "  ${RED}❌${NC} Neo4j Database: Not running"
+    fi
+}
+
+# Execute the command
+case $COMMAND in
+    dev)
+        cmd_dev
+        ;;
+    quick)
+        cmd_quick
+        ;;
+    clean)
+        cmd_clean
+        ;;
+    setup)
+        cmd_setup
+        ;;
+    test)
+        cmd_test
+        ;;
+    build)
+        cmd_build
+        ;;
+    deploy)
+        cmd_deploy
+        ;;
+    stop)
+        cmd_stop
+        ;;
+    status)
+        cmd_status
+        ;;
+    *)
+        log_error "❌ Unknown command: $COMMAND"
+        echo "Use './start --help' for usage information."
+        exit 1
+        ;;
+esac

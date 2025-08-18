@@ -171,8 +171,10 @@ echo "🔧 Setting up environment variables..."
 if [ ! -f "packages/server/.env" ]; then
     echo "📄 Creating packages/server/.env with default values"
     cat > packages/server/.env << 'EOF'
-# Database
-DATABASE_URL="postgresql://graphdone:graphdone_password@localhost:5432/graphdone"
+# Neo4j Database
+NEO4J_URI="bolt://localhost:7687"
+NEO4J_USER="neo4j"
+NEO4J_PASSWORD="graphdone_password"
 
 # Server
 PORT=4127
@@ -202,33 +204,29 @@ EOF
 fi
 
 # Start database
-echo "🐘 Starting PostgreSQL database..."
+echo "🗄️  Starting Neo4j database..."
 if [ "$DOCKER_SUDO" = "1" ]; then
-    sudo docker-compose -f deployment/docker-compose.yml up -d postgres redis
+    sudo docker-compose -f deployment/docker-compose.yml up -d neo4j redis
 else
-    docker-compose -f deployment/docker-compose.yml up -d postgres redis
+    docker-compose -f deployment/docker-compose.yml up -d neo4j redis
 fi
 
 # Wait for database to be ready
-echo "⏳ Waiting for database to be ready..."
+echo "⏳ Waiting for Neo4j to be ready..."
 if [ "$DOCKER_SUDO" = "1" ]; then
-    until sudo docker-compose -f deployment/docker-compose.yml exec -T postgres pg_isready -U graphdone 2>/dev/null; do
-        echo "⏳ Database not ready yet, waiting..."
-        sleep 2
+    until sudo docker-compose -f deployment/docker-compose.yml exec -T neo4j cypher-shell -u neo4j -p graphdone_password "RETURN 1" 2>/dev/null; do
+        echo "⏳ Neo4j not ready yet, waiting..."
+        sleep 3
     done
 else
-    until docker-compose -f deployment/docker-compose.yml exec -T postgres pg_isready -U graphdone 2>/dev/null; do
-        echo "⏳ Database not ready yet, waiting..."
-        sleep 2
+    until docker-compose -f deployment/docker-compose.yml exec -T neo4j cypher-shell -u neo4j -p graphdone_password "RETURN 1" 2>/dev/null; do
+        echo "⏳ Neo4j not ready yet, waiting..."
+        sleep 3
     done
 fi
-echo "✅ Database is ready!"
+echo "✅ Neo4j is ready!"
 
-# Generate Prisma client and run migrations
-echo "🔧 Generating Prisma client..."
-cd packages/server && npx prisma generate && cd ../..
-echo "🗄️  Running database migrations..."
-cd packages/server && npm run db:migrate && cd ../..
+# Neo4j database is ready for use - no migrations needed
 
 # Build packages in correct order (Turbo handles dependencies)
 echo "🏗️  Building packages..."
@@ -269,6 +267,7 @@ echo ""
 echo "🌐 URLs:"
 echo "  Web app:      http://localhost:3127"
 echo "  GraphQL API:  http://localhost:4127/graphql"
-echo "  Database:     postgresql://graphdone:graphdone_password@localhost:5432/graphdone"
+echo "  Neo4j DB:     bolt://localhost:7687 (neo4j/graphdone_password)"
+echo "  Neo4j Browser: http://localhost:7474"
 echo ""
 echo "💡 If you get 'command not found' errors, restart your terminal and try again."
