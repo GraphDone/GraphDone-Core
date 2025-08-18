@@ -539,7 +539,11 @@ export function InteractiveGraphVisualization() {
   if (loading || edgesLoading) {
     return (
       <div className="graph-container relative w-full h-full bg-gray-900 flex items-center justify-center">
-        <div className="text-green-300">Loading graph data...</div>
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="text-green-300 text-lg font-medium">Loading graph data...</div>
+          <div className="text-gray-400 text-sm mt-2">Connecting to database...</div>
+        </div>
       </div>
     );
   }
@@ -587,29 +591,46 @@ export function InteractiveGraphVisualization() {
     const isNetworkError = errorMessage.includes('Cannot connect');
     
     return (
-      <div className="graph-container relative w-full h-full bg-gray-900 flex items-center justify-center p-8">
-        <div className="max-w-lg text-center">
-          <div className="text-red-400 text-xl mb-4">
-            {isNetworkError ? '🔌' : '⚠️'} Connection Error
-          </div>
-          <div className="text-red-300 mb-6 leading-relaxed">
-            {errorMessage}
-          </div>
-          
-          {isNetworkError && (
-            <div className="text-gray-400 text-sm space-y-2">
-              <div>💡 <strong>Quick fixes:</strong></div>
-              <div>• Run <code className="bg-gray-800 px-2 py-1 rounded">./start</code> to start the server</div>
-              <div>• Check if port 4127 is available</div>
-              <div>• Verify Neo4j database is running</div>
+      <div ref={containerRef} className="graph-container relative w-full h-full bg-gray-900">
+        <svg ref={svgRef} className="w-full h-full" style={{ background: 'radial-gradient(circle at center, #1f2937 0%, #111827 100%)' }}>
+          {/* Error message centered in SVG */}
+          <foreignObject x="20%" y="30%" width="60%" height="40%">
+            <div className="w-full h-full flex items-center justify-center p-4">
+              <div className="max-w-lg text-center bg-gray-800/80 backdrop-blur-sm rounded-lg p-6 border border-red-500/30">
+                <div className="text-red-400 text-xl mb-4">
+                  {isNetworkError ? '🔌' : '⚠️'} Connection Error
+                </div>
+                <div className="text-red-300 mb-6 leading-relaxed">
+                  {errorMessage}
+                </div>
+                
+                {isNetworkError && (
+                  <div className="text-gray-400 text-sm space-y-2">
+                    <div>💡 <strong>Quick fixes:</strong></div>
+                    <div>• Run <code className="bg-gray-800 px-2 py-1 rounded">./start</code> to start the server</div>
+                    <div>• Check if port 4127 is available</div>
+                    <div>• Verify Neo4j database is running</div>
+                  </div>
+                )}
+                
+                <button 
+                  onClick={() => window.location.reload()} 
+                  className="mt-6 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+                >
+                  🔄 Retry Connection
+                </button>
+              </div>
             </div>
-          )}
-          
-          <button 
-            onClick={() => window.location.reload()} 
-            className="mt-6 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
-          >
-            🔄 Retry Connection
+          </foreignObject>
+        </svg>
+        
+        {/* Maintain same structure as full render */}
+        <div className="absolute top-4 left-4 z-40 opacity-50">
+          <button className="bg-gray-800/90 backdrop-blur-sm border border-gray-600 rounded-lg px-3 py-2 shadow-md">
+            <div className="flex items-center space-x-2">
+              <div className="w-2 h-2 bg-red-400 rounded-full" />
+              <span className="text-sm font-medium text-red-400">Error</span>
+            </div>
           </button>
         </div>
       </div>

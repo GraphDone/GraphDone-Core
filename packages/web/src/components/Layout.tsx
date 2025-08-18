@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Brain, Bot, BarChart3, Settings, Menu, Server } from 'lucide-react';
+import { Brain, Bot, BarChart3, Settings, Menu, Server, Globe } from 'lucide-react';
 import { UserSelector } from './UserSelector';
 import { GraphSelector } from './GraphSelector';
 import { useAuth } from '../contexts/AuthContext';

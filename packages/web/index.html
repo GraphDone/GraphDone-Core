@@ -11,7 +11,43 @@
     <meta name="description" content="Project management for teams who think differently. Coordinate through dependencies and outcomes, not hierarchies and assignments." />
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Static loading screen that matches the app design to prevent flash -->
+      <div style="min-height: 100vh; background: linear-gradient(135deg, #1f2937 0%, #111827 50%, #1f2937 100%); display: flex; align-items: center; justify-content: center; padding: 1rem;">
+        <div style="max-width: 64rem; width: 100%;">
+          <div style="text-align: center; margin-bottom: 2rem;">
+            <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 1rem;">
+              <img src="/favicon.svg" alt="GraphDone Logo" style="height: 3rem; width: 3rem;" />
+              <span style="margin-left: 0.75rem; font-size: 1.875rem; font-weight: bold; color: #f3f4f6;">GraphDone</span>
+            </div>
+            <div style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; color: #d1d5db;">
+              <div style="width: 0.5rem; height: 0.5rem; background: #10b981; border-radius: 50%; animation: pulse 2s infinite;"></div>
+              <span>Loading...</span>
+            </div>
+          </div>
+          
+          <!-- Placeholder structure matching login page -->
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 2rem; opacity: 0.3;">
+            <div style="background: #374151; border: 1px solid #4b5563; border-radius: 0.5rem; padding: 1.5rem; height: 16rem;"></div>
+            <div style="background: #374151; border: 1px solid #4b5563; border-radius: 0.5rem; padding: 1.5rem; height: 16rem;"></div>
+            <div style="background: #374151; border: 1px solid #4b5563; border-radius: 0.5rem; padding: 1.5rem; height: 16rem;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
+    
+    <style>
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+      }
+      
+      @media (max-width: 1024px) {
+        div[style*="grid-template-columns"] {
+          grid-template-columns: 1fr !important;
+        }
+      }
+    </style>
   </body>
 </html>
