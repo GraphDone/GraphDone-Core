@@ -235,7 +235,7 @@ export const mockProjectNodes: MockNode[] = [
     title: 'Session Timeout Issue',
     description: 'Users getting logged out unexpectedly',
     type: 'BUG',
-    status: 'IN_PROGRESS',
+    status: 'BLOCKED',
     priority: { executive: 0.7, individual: 0.9, community: 0.8, computed: 0.8 },
     position: { x: 100, y: 50, z: 0 },
     assignee: 'Alice Johnson',
@@ -245,6 +245,22 @@ export const mockProjectNodes: MockNode[] = [
     tags: ['bug', 'urgent', 'session'],
     createdAt: '2025-08-16T14:00:00Z',
     updatedAt: '2025-08-17T10:00:00Z'
+  },
+  {
+    id: 'task-5',
+    title: 'API Rate Limiting',
+    description: 'Implement rate limiting for API endpoints',
+    type: 'TASK',
+    status: 'BLOCKED',
+    priority: { executive: 0.6, individual: 0.7, community: 0.65, computed: 0.65 },
+    position: { x: 150, y: 200, z: 0 },
+    assignee: 'Michael Chen',
+    estimatedHours: 20,
+    actualHours: 5,
+    dueDate: '2025-09-10',
+    tags: ['api', 'security', 'backend'],
+    createdAt: '2025-08-12T09:00:00Z',
+    updatedAt: '2025-08-17T14:00:00Z'
   },
   {
     id: 'epic-3',

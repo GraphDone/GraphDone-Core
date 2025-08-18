@@ -55,6 +55,9 @@ export function ListView() {
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('All Types');
   const [statusFilter, setStatusFilter] = useState('All Statuses');
+  const [assigneeFilter, setAssigneeFilter] = useState('All Assignees');
+  const [priorityFilter, setPriorityFilter] = useState('All Priorities');
+  const [tagFilter, setTagFilter] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown when clicking outside
@@ -69,47 +72,107 @@ export function ListView() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Get unique values for filter options
+  const uniqueAssignees = useMemo(() => {
+    const assignees = mockProjectNodes
+      .map(node => node.assignee)
+      .filter(assignee => assignee)
+      .filter((assignee, index, arr) => arr.indexOf(assignee) === index)
+      .sort();
+    return assignees;
+  }, []);
+
+  const uniqueTags = useMemo(() => {
+    const tags = mockProjectNodes
+      .flatMap(node => node.tags)
+      .filter((tag, index, arr) => arr.indexOf(tag) === index)
+      .sort();
+    return tags;
+  }, []);
+
   // Filter nodes based on search and filters
   const filteredNodes = useMemo(() => {
     let filtered = mockProjectNodes;
     
+    // Text search across multiple fields
     if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
       filtered = filtered.filter(node =>
-        node.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        node.description?.toLowerCase().includes(searchTerm.toLowerCase())
+        node.title.toLowerCase().includes(searchLower) ||
+        node.description?.toLowerCase().includes(searchLower) ||
+        node.type.toLowerCase().includes(searchLower) ||
+        node.status.toLowerCase().includes(searchLower) ||
+        node.assignee?.toLowerCase().includes(searchLower) ||
+        node.tags.some(tag => tag.toLowerCase().includes(searchLower)) ||
+        node.id.toLowerCase().includes(searchLower) ||
+        (node.dueDate && new Date(node.dueDate).toLocaleDateString().includes(searchLower))
       );
     }
 
+    // Type filter
     if (typeFilter !== 'All Types') {
       filtered = filtered.filter(node => node.type === typeFilter);
     }
 
+    // Status filter
     if (statusFilter !== 'All Statuses') {
       filtered = filtered.filter(node => node.status === statusFilter);
     }
 
+    // Assignee filter
+    if (assigneeFilter !== 'All Assignees') {
+      if (assigneeFilter === 'Unassigned') {
+        filtered = filtered.filter(node => !node.assignee);
+      } else {
+        filtered = filtered.filter(node => node.assignee === assigneeFilter);
+      }
+    }
+
+    // Priority filter
+    if (priorityFilter !== 'All Priorities') {
+      filtered = filtered.filter(node => {
+        const priority = node.priority.computed;
+        switch (priorityFilter) {
+          case 'Critical': return priority >= 0.8;
+          case 'High': return priority >= 0.6 && priority < 0.8;
+          case 'Medium': return priority >= 0.4 && priority < 0.6;
+          case 'Low': return priority >= 0.2 && priority < 0.4;
+          case 'Minimal': return priority < 0.2;
+          default: return true;
+        }
+      });
+    }
+
+    // Tag filter
+    if (tagFilter) {
+      filtered = filtered.filter(node =>
+        node.tags.some(tag => tag.toLowerCase().includes(tagFilter.toLowerCase()))
+      );
+    }
+
     return filtered;
-  }, [searchTerm, typeFilter, statusFilter]);
+  }, [searchTerm, typeFilter, statusFilter, assigneeFilter, priorityFilter, tagFilter]);
 
   // Calculate statistics
   const stats = useMemo(() => {
-    const total = mockProjectNodes.length;
-    const completed = mockProjectNodes.filter(node => node.status === 'COMPLETED').length;
-    const inProgress = mockProjectNodes.filter(node => node.status === 'IN_PROGRESS').length;
-    const blocked = mockProjectNodes.filter(node => node.status === 'BLOCKED').length;
-    const planned = mockProjectNodes.filter(node => node.status === 'PLANNED').length;
+    const total = filteredNodes.length;
+    const completed = filteredNodes.filter(node => node.status === 'COMPLETED').length;
+    const inProgress = filteredNodes.filter(node => node.status === 'IN_PROGRESS').length;
+    const blocked = filteredNodes.filter(node => node.status === 'BLOCKED').length;
+    const planned = filteredNodes.filter(node => node.status === 'PLANNED').length;
+    const proposed = filteredNodes.filter(node => node.status === 'PROPOSED').length;
 
-    const typeStats = mockProjectNodes.reduce((acc, node) => {
+    const typeStats = filteredNodes.reduce((acc, node) => {
       acc[node.type] = (acc[node.type] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
 
     const priorityStats = {
-      critical: mockProjectNodes.filter(node => node.priority.computed >= 0.8).length,
-      high: mockProjectNodes.filter(node => node.priority.computed >= 0.6 && node.priority.computed < 0.8).length,
-      moderate: mockProjectNodes.filter(node => node.priority.computed >= 0.4 && node.priority.computed < 0.6).length,
-      low: mockProjectNodes.filter(node => node.priority.computed >= 0.2 && node.priority.computed < 0.4).length,
-      minimal: mockProjectNodes.filter(node => node.priority.computed < 0.2).length
+      critical: filteredNodes.filter(node => node.priority.computed >= 0.8).length,
+      high: filteredNodes.filter(node => node.priority.computed >= 0.6 && node.priority.computed < 0.8).length,
+      moderate: filteredNodes.filter(node => node.priority.computed >= 0.4 && node.priority.computed < 0.6).length,
+      low: filteredNodes.filter(node => node.priority.computed >= 0.2 && node.priority.computed < 0.4).length,
+      minimal: filteredNodes.filter(node => node.priority.computed < 0.2).length
     };
 
     return {
@@ -118,10 +181,11 @@ export function ListView() {
       inProgress,
       blocked,
       planned,
+      proposed,
       typeStats,
       priorityStats
     };
-  }, []);
+  }, [filteredNodes]);
 
   // Helper functions
   const getNodeTypeColor = (type: string) => {
@@ -436,7 +500,8 @@ export function ListView() {
 
   // Pie Chart Component
   const PieChart = ({ data, title }: { data: Array<{label: string, value: number, color: string}>, title: string }) => {
-    const total = data.reduce((sum, item) => sum + item.value, 0);
+    const filteredData = data.filter(item => item.value > 0);
+    const total = filteredData.reduce((sum, item) => sum + item.value, 0);
     let cumulativePercentage = 0;
 
     const createPath = (percentage: number, startPercentage: number) => {
@@ -452,12 +517,26 @@ export function ListView() {
       return `M 50 50 L ${startX} ${startY} A 40 40 0 ${largeArcFlag} 1 ${endX} ${endY} Z`;
     };
 
+    if (total === 0) {
+      return (
+        <div className="bg-gray-800 rounded-lg p-4 pl-2 border border-gray-700">
+          <h3 className="text-lg font-semibold text-white mb-4 text-center">{title}</h3>
+          <div className="flex items-center justify-center h-48">
+            <div className="text-center">
+              <div className="text-gray-400 text-sm mb-2">No data to display</div>
+              <div className="text-gray-500 text-xs">Try adjusting your filters</div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="bg-gray-800 rounded-lg p-4 pl-2 border border-gray-700">
         <h3 className="text-lg font-semibold text-white mb-4 text-center">{title}</h3>
         <div className="flex items-center space-x-0">
           <svg width="220" height="220" viewBox="0 0 100 100" className="flex-shrink-0">
-            {data.map((item, index) => {
+            {filteredData.map((item, index) => {
               const percentage = (item.value / total) * 100;
               const path = createPath(percentage, cumulativePercentage);
               const currentCumulative = cumulativePercentage;
@@ -476,7 +555,7 @@ export function ListView() {
             })}
           </svg>
           <div className="space-y-2">
-            {data.map((item, index) => (
+            {filteredData.map((item, index) => (
               <div key={index} className="flex items-center space-x-2">
                 <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>
                 <span className="text-sm text-gray-300">{item.label}</span>
@@ -491,13 +570,29 @@ export function ListView() {
 
   // Bar Chart Component
   const BarChart = ({ data, title }: { data: Array<{label: string, value: number, color: string}>, title: string }) => {
-    const maxValue = Math.max(...data.map(item => item.value));
+    const filteredData = data.filter(item => item.value > 0);
+    const maxValue = filteredData.length > 0 ? Math.max(...filteredData.map(item => item.value)) : 0;
+    const total = filteredData.reduce((sum, item) => sum + item.value, 0);
+
+    if (filteredData.length === 0) {
+      return (
+        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+          <h3 className="text-lg font-semibold text-white mb-4">{title}</h3>
+          <div className="flex items-center justify-center h-48">
+            <div className="text-center">
+              <div className="text-gray-400 text-sm mb-2">No data to display</div>
+              <div className="text-gray-500 text-xs">Try adjusting your filters</div>
+            </div>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
         <h3 className="text-lg font-semibold text-white mb-4">{title}</h3>
         <div className="space-y-3">
-          {data.map((item, index) => (
+          {filteredData.map((item, index) => (
             <div key={index} className="space-y-1">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-300">{item.label}</span>
@@ -601,12 +696,12 @@ export function ListView() {
           <div className="flex items-center">
             <div className="flex-shrink-0">
               <div className="w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">{mockProjectNodes.filter(n => n.status === 'PROPOSED').length}</span>
+                <span className="text-white font-bold text-sm">{stats.proposed}</span>
               </div>
             </div>
             <div className="ml-4">
               <div className="text-sm font-medium text-gray-300">Proposed</div>
-              <div className="text-2xl font-bold text-purple-400">{mockProjectNodes.filter(n => n.status === 'PROPOSED').length}</div>
+              <div className="text-2xl font-bold text-purple-400">{stats.proposed}</div>
             </div>
           </div>
         </div>
@@ -622,7 +717,7 @@ export function ListView() {
             { label: 'In Progress', value: stats.inProgress, color: '#3b82f6' },
             { label: 'Blocked', value: stats.blocked, color: '#ef4444' },
             { label: 'Planned', value: stats.planned, color: '#f59e0b' },
-            { label: 'Proposed', value: mockProjectNodes.filter(n => n.status === 'PROPOSED').length, color: '#8b5cf6' }
+            { label: 'Proposed', value: stats.proposed, color: '#8b5cf6' }
           ]}
         />
 
@@ -738,43 +833,140 @@ export function ListView() {
           </div>
 
           {/* Search and Filters */}
-          <div className="flex items-center space-x-4">
-            <div className="flex-1 relative max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search nodes..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-white placeholder-gray-400"
-              />
+          <div className="space-y-4">
+            {/* Primary Search Row */}
+            <div className="flex items-center space-x-4">
+              <div className="flex-1 relative max-w-md">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search across all fields..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-white placeholder-gray-400"
+                />
+              </div>
+              
+              {/* Quick Clear Button */}
+              {(searchTerm || typeFilter !== 'All Types' || statusFilter !== 'All Statuses' || assigneeFilter !== 'All Assignees' || priorityFilter !== 'All Priorities' || tagFilter) && (
+                <button
+                  onClick={() => {
+                    setSearchTerm('');
+                    setTypeFilter('All Types');
+                    setStatusFilter('All Statuses');
+                    setAssigneeFilter('All Assignees');
+                    setPriorityFilter('All Priorities');
+                    setTagFilter('');
+                  }}
+                  className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-sm rounded-lg transition-colors"
+                >
+                  Clear All
+                </button>
+              )}
             </div>
-            
-            <select
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
-              className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
-            >
-              <option value="All Types">All Types</option>
-              <option value="EPIC">EPIC</option>
-              <option value="FEATURE">FEATURE</option>
-              <option value="TASK">TASK</option>
-              <option value="BUG">BUG</option>
-              <option value="MILESTONE">MILESTONE</option>
-            </select>
-            
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
-            >
-              <option value="All Statuses">All Statuses</option>
-              <option value="COMPLETED">COMPLETED</option>
-              <option value="IN_PROGRESS">IN_PROGRESS</option>
-              <option value="BLOCKED">BLOCKED</option>
-              <option value="PLANNED">PLANNED</option>
-              <option value="PROPOSED">PROPOSED</option>
-            </select>
+
+            {/* Advanced Filters Row */}
+            <div className="flex items-center space-x-3 flex-wrap gap-y-2">
+              <select
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+                className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              >
+                <option value="All Types">All Types</option>
+                <option value="EPIC">EPIC</option>
+                <option value="FEATURE">FEATURE</option>
+                <option value="TASK">TASK</option>
+                <option value="BUG">BUG</option>
+                <option value="MILESTONE">MILESTONE</option>
+              </select>
+              
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              >
+                <option value="All Statuses">All Statuses</option>
+                <option value="COMPLETED">COMPLETED</option>
+                <option value="IN_PROGRESS">IN PROGRESS</option>
+                <option value="BLOCKED">BLOCKED</option>
+                <option value="PLANNED">PLANNED</option>
+                <option value="PROPOSED">PROPOSED</option>
+              </select>
+
+              <select
+                value={assigneeFilter}
+                onChange={(e) => setAssigneeFilter(e.target.value)}
+                className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              >
+                <option value="All Assignees">All Assignees</option>
+                <option value="Unassigned">Unassigned</option>
+                {uniqueAssignees.map(assignee => (
+                  <option key={assignee} value={assignee}>{assignee}</option>
+                ))}
+              </select>
+
+              <select
+                value={priorityFilter}
+                onChange={(e) => setPriorityFilter(e.target.value)}
+                className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              >
+                <option value="All Priorities">All Priorities</option>
+                <option value="Critical">Critical Priority (80–100%)</option>
+                <option value="High">High Priority (60–79%)</option>
+                <option value="Medium">Moderate Priority (40–59%)</option>
+                <option value="Low">Low Priority (20–39%)</option>
+                <option value="Minimal">Minimal Priority (0–19%)</option>
+              </select>
+
+              <div className="relative">
+                <Tag className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Filter by tag..."
+                  value={tagFilter}
+                  onChange={(e) => setTagFilter(e.target.value)}
+                  className="pl-10 pr-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-white placeholder-gray-400 text-sm w-40"
+                />
+              </div>
+            </div>
+
+            {/* Active Filters Summary */}
+            {(searchTerm || typeFilter !== 'All Types' || statusFilter !== 'All Statuses' || assigneeFilter !== 'All Assignees' || priorityFilter !== 'All Priorities' || tagFilter) && (
+              <div className="flex items-center space-x-2 text-sm">
+                <span className="text-gray-400">Active filters:</span>
+                {searchTerm && (
+                  <span className="px-2 py-1 bg-green-900/30 text-green-300 rounded border border-green-500/30">
+                    Search: "{searchTerm}"
+                  </span>
+                )}
+                {typeFilter !== 'All Types' && (
+                  <span className="px-2 py-1 bg-blue-900/30 text-blue-300 rounded border border-blue-500/30">
+                    Type: {typeFilter}
+                  </span>
+                )}
+                {statusFilter !== 'All Statuses' && (
+                  <span className="px-2 py-1 bg-purple-900/30 text-purple-300 rounded border border-purple-500/30">
+                    Status: {statusFilter}
+                  </span>
+                )}
+                {assigneeFilter !== 'All Assignees' && (
+                  <span className="px-2 py-1 bg-yellow-900/30 text-yellow-300 rounded border border-yellow-500/30">
+                    Assignee: {assigneeFilter}
+                  </span>
+                )}
+                {priorityFilter !== 'All Priorities' && (
+                  <span className="px-2 py-1 bg-orange-900/30 text-orange-300 rounded border border-orange-500/30">
+                    Priority: {priorityFilter}
+                  </span>
+                )}
+                {tagFilter && (
+                  <span className="px-2 py-1 bg-pink-900/30 text-pink-300 rounded border border-pink-500/30">
+                    Tag: "{tagFilter}"
+                  </span>
+                )}
+                <span className="text-gray-500">({filteredNodes.length} results)</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -799,13 +991,13 @@ export function ListView() {
               <div className="flex justify-between items-center mb-2">
                 <span className="text-sm text-gray-300">Overall Progress</span>
                 <span className="text-sm font-medium text-green-400">
-                  {Math.round((stats.completed / stats.total) * 100)}%
+                  {stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}%
                 </span>
               </div>
               <div className="w-full bg-gray-700 rounded-full h-2">
                 <div 
                   className="bg-green-500 h-2 rounded-full transition-all duration-300"
-                  style={{ width: `${(stats.completed / stats.total) * 100}%` }}
+                  style={{ width: `${stats.total > 0 ? (stats.completed / stats.total) * 100 : 0}%` }}
                 ></div>
               </div>
             </div>
@@ -828,7 +1020,7 @@ export function ListView() {
                 </div>
                 <div className="text-right">
                   <div className="text-lg font-bold text-green-400">{stats.completed}</div>
-                  <div className="text-xs text-gray-500">{Math.round((stats.completed / stats.total) * 100)}%</div>
+                  <div className="text-xs text-gray-500">{stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}%</div>
                 </div>
               </div>
 
@@ -838,7 +1030,7 @@ export function ListView() {
                 </div>
                 <div className="text-right">
                   <div className="text-lg font-bold text-blue-400">{stats.inProgress}</div>
-                  <div className="text-xs text-gray-500">{Math.round((stats.inProgress / stats.total) * 100)}%</div>
+                  <div className="text-xs text-gray-500">{stats.total > 0 ? Math.round((stats.inProgress / stats.total) * 100) : 0}%</div>
                 </div>
               </div>
 
@@ -848,7 +1040,7 @@ export function ListView() {
                 </div>
                 <div className="text-right">
                   <div className="text-lg font-bold text-red-400">{stats.blocked}</div>
-                  <div className="text-xs text-gray-500">{Math.round((stats.blocked / stats.total) * 100)}%</div>
+                  <div className="text-xs text-gray-500">{stats.total > 0 ? Math.round((stats.blocked / stats.total) * 100) : 0}%</div>
                 </div>
               </div>
 
@@ -858,7 +1050,7 @@ export function ListView() {
                 </div>
                 <div className="text-right">
                   <div className="text-lg font-bold text-yellow-400">{stats.planned}</div>
-                  <div className="text-xs text-gray-500">{Math.round((stats.planned / stats.total) * 100)}%</div>
+                  <div className="text-xs text-gray-500">{stats.total > 0 ? Math.round((stats.planned / stats.total) * 100) : 0}%</div>
                 </div>
               </div>
 
@@ -867,8 +1059,8 @@ export function ListView() {
                   <span className="text-sm text-gray-300">💡 Proposed</span>
                 </div>
                 <div className="text-right">
-                  <div className="text-lg font-bold text-purple-400">{mockProjectNodes.filter(n => n.status === 'PROPOSED').length}</div>
-                  <div className="text-xs text-gray-500">{Math.round((mockProjectNodes.filter(n => n.status === 'PROPOSED').length / stats.total) * 100)}%</div>
+                  <div className="text-lg font-bold text-purple-400">{stats.proposed}</div>
+                  <div className="text-xs text-gray-500">{stats.total > 0 ? Math.round((stats.proposed / stats.total) * 100) : 0}%</div>
                 </div>
               </div>
             </div>
@@ -878,24 +1070,43 @@ export function ListView() {
           <div>
             <h3 className="text-lg font-semibold text-white mb-4">Node Types</h3>
             <div className="space-y-3">
-              {Object.entries(stats.typeStats).map(([type, count]) => (
-                <div key={type} className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${getNodeTypeColor(type)}`}>
-                      {type}
-                    </span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-white font-medium">{count}</span>
-                    <div className="w-16 h-2 bg-gray-700 rounded-full">
-                      <div 
-                        className="h-2 bg-green-500 rounded-full" 
-                        style={{ width: `${(count / stats.total) * 100}%` }}
-                      ></div>
+              {Object.entries(stats.typeStats).length > 0 ? (
+                Object.entries(stats.typeStats).map(([type, count]) => (
+                  <div key={type} className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${getNodeTypeColor(type)}`}>
+                        {type}
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-white font-medium">{count}</span>
+                      <div className="w-16 h-2 bg-gray-700 rounded-full">
+                        <div 
+                          className="h-2 bg-green-500 rounded-full" 
+                          style={{ width: `${stats.total > 0 ? (count / stats.total) * 100 : 0}%` }}
+                        ></div>
+                      </div>
                     </div>
                   </div>
+                ))
+              ) : (
+                <div className="text-center py-4">
+                  <div className="text-gray-400 text-sm">No items match current filters</div>
+                  <button 
+                    onClick={() => {
+                      setSearchTerm('');
+                      setTypeFilter('All Types');
+                      setStatusFilter('All Statuses');
+                      setAssigneeFilter('All Assignees');
+                      setPriorityFilter('All Priorities');
+                      setTagFilter('');
+                    }}
+                    className="text-green-400 text-sm hover:text-green-300 mt-2"
+                  >
+                    Clear all filters
+                  </button>
                 </div>
-              ))}
+              )}
             </div>
           </div>
 
@@ -912,7 +1123,7 @@ export function ListView() {
                   <div className="w-16 h-2 bg-gray-700 rounded-full">
                     <div 
                       className="h-2 bg-red-500 rounded-full" 
-                      style={{ width: `${(stats.priorityStats.critical / stats.total) * 100}%` }}
+                      style={{ width: `${stats.total > 0 ? (stats.priorityStats.critical / stats.total) * 100 : 0}%` }}
                     ></div>
                   </div>
                 </div>
@@ -927,7 +1138,7 @@ export function ListView() {
                   <div className="w-16 h-2 bg-gray-700 rounded-full">
                     <div 
                       className="h-2 bg-orange-500 rounded-full" 
-                      style={{ width: `${(stats.priorityStats.high / stats.total) * 100}%` }}
+                      style={{ width: `${stats.total > 0 ? (stats.priorityStats.high / stats.total) * 100 : 0}%` }}
                     ></div>
                   </div>
                 </div>
@@ -942,7 +1153,7 @@ export function ListView() {
                   <div className="w-16 h-2 bg-gray-700 rounded-full">
                     <div 
                       className="h-2 bg-yellow-500 rounded-full" 
-                      style={{ width: `${(stats.priorityStats.moderate / stats.total) * 100}%` }}
+                      style={{ width: `${stats.total > 0 ? (stats.priorityStats.moderate / stats.total) * 100 : 0}%` }}
                     ></div>
                   </div>
                 </div>
@@ -957,7 +1168,7 @@ export function ListView() {
                   <div className="w-16 h-2 bg-gray-700 rounded-full">
                     <div 
                       className="h-2 bg-blue-500 rounded-full" 
-                      style={{ width: `${(stats.priorityStats.low / stats.total) * 100}%` }}
+                      style={{ width: `${stats.total > 0 ? (stats.priorityStats.low / stats.total) * 100 : 0}%` }}
                     ></div>
                   </div>
                 </div>
@@ -972,7 +1183,7 @@ export function ListView() {
                   <div className="w-16 h-2 bg-gray-700 rounded-full">
                     <div 
                       className="h-2 bg-green-500 rounded-full" 
-                      style={{ width: `${(stats.priorityStats.minimal / stats.total) * 100}%` }}
+                      style={{ width: `${stats.total > 0 ? (stats.priorityStats.minimal / stats.total) * 100 : 0}%` }}
                     ></div>
                   </div>
                 </div>
