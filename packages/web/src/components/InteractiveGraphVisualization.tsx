@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import * as d3 from 'd3';
-import { Link2, Edit3, Trash2, Eye } from 'lucide-react';
+import { Link2, Edit3, Trash2, Eye, AlertTriangle, AlertCircle } from 'lucide-react';
 import { useQuery } from '@apollo/client';
 import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
 import { GET_WORK_ITEMS, GET_EDGES } from '../lib/queries';
 import { relationshipTypeInfo, RelationshipType } from '../types/projectData';
+import { validateGraphData, getValidationSummary, ValidationResult } from '../utils/graphDataValidation';
 
 interface WorkItem {
   id: string;
@@ -91,6 +92,8 @@ export function InteractiveGraphVisualization() {
   const [connectionSource, setConnectionSource] = useState<string | null>(null);
   const [selectedRelationType, setSelectedRelationType] = useState<RelationshipType>('DEPENDS_ON');
   const [showGraphSwitcher, setShowGraphSwitcher] = useState(false);
+  const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
+  const [showDataHealth, setShowDataHealth] = useState(false);
 
   // ALL HOOK CALLS MUST BE AT THE TOP
   // Close menus when clicking outside
@@ -122,7 +125,7 @@ export function InteractiveGraphVisualization() {
         // In a real app, this would create the edge in the backend
         
         // Update visualization
-        workItemEdges.push(newEdge);
+        validatedEdges.push(newEdge);
         initializeVisualization();
       }
       
@@ -188,8 +191,29 @@ export function InteractiveGraphVisualization() {
     }
   });
 
+  // Validate and sanitize data before D3 processing
+  const currentValidationResult = validateGraphData(workItems, workItemEdges);
+  
+  // Update validation state
+  useEffect(() => {
+    setValidationResult(currentValidationResult);
+    
+    // Log validation issues if any
+    if (currentValidationResult && (currentValidationResult.errors.length > 0 || currentValidationResult.warnings.length > 0)) {
+      console.warn('Graph validation issues:', {
+        errors: currentValidationResult.errors,
+        warnings: currentValidationResult.warnings,
+        stats: currentValidationResult.stats
+      });
+    }
+  }, [currentValidationResult.errors.length, currentValidationResult.warnings.length]);
+
+  // Use only validated nodes and edges for rendering
+  const validatedNodes = currentValidationResult.validNodes;
+  const validatedEdges = currentValidationResult.validEdges;
+
   // Convert work items to format expected by D3
-  const nodes = workItems.map(item => ({
+  const nodes = validatedNodes.map(item => ({
     ...item,
     x: item.positionX,
     y: item.positionY,
@@ -205,7 +229,7 @@ export function InteractiveGraphVisualization() {
   const initializeVisualization = useCallback(() => {
     if (!svgRef.current || !containerRef.current || nodes.length === 0) return;
 
-    console.log('Initializing visualization with', nodes.length, 'nodes and', workItemEdges.length, 'edges');
+    console.log('Initializing visualization with', nodes.length, 'nodes and', validatedEdges.length, 'edges');
 
     const container = containerRef.current;
     const svg = d3.select(svgRef.current);
@@ -240,7 +264,7 @@ export function InteractiveGraphVisualization() {
 
     // Simple 2D force simulation
     const simulation = d3.forceSimulation(nodes as any)
-      .force('link', d3.forceLink(workItemEdges)
+      .force('link', d3.forceLink(validatedEdges)
         .id((d: any) => d.id)
         .distance(120)
         .strength(0.3)
@@ -266,7 +290,7 @@ export function InteractiveGraphVisualization() {
     const linkElements = g.append('g')
       .attr('class', 'edges-group')
       .selectAll('.edge')
-      .data(workItemEdges)
+      .data(validatedEdges)
       .enter()
       .append('line')
       .attr('class', 'edge')
@@ -447,7 +471,7 @@ export function InteractiveGraphVisualization() {
     const arrowElements = g.append('g')
       .attr('class', 'arrows-group')
       .selectAll('.arrow')
-      .data(workItemEdges)
+      .data(validatedEdges)
       .enter()
       .append('path')
       .attr('class', 'arrow')
@@ -516,7 +540,7 @@ export function InteractiveGraphVisualization() {
     });
 
     console.log('✅ Visualization initialized with', nodes.length, 'nodes');
-  }, [nodes, workItemEdges]); // Remove handleNodeClick from dependencies to prevent constant re-initialization
+  }, [nodes, validatedEdges]); // Remove handleNodeClick from dependencies to prevent constant re-initialization
 
   // Initialization effect - NOW with access to nodes data
   useEffect(() => {
@@ -533,7 +557,7 @@ export function InteractiveGraphVisualization() {
 
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, [nodes.length, workItemEdges.length]); // Only re-initialize when data changes, not on every render
+  }, [nodes.length, validatedEdges.length]); // Only re-initialize when data changes, not on every render
 
   // Early returns AFTER all hooks are called
   if (loading || edgesLoading) {
@@ -749,6 +773,92 @@ export function InteractiveGraphVisualization() {
           </div>
         )}
       </div>
+
+      {/* Data Health Indicator */}
+      {validationResult && (validationResult.errors.length > 0 || validationResult.warnings.length > 0) && (
+        <div className="absolute top-4 right-4 z-40">
+          <button 
+            onClick={() => setShowDataHealth(!showDataHealth)}
+            className="bg-yellow-600/90 backdrop-blur-sm border border-yellow-500 rounded-lg px-3 py-2 shadow-md hover:bg-yellow-500 transition-all duration-200"
+            data-testid="data-health-indicator"
+          >
+            <div className="flex items-center space-x-2">
+              <AlertTriangle className="w-4 h-4 text-yellow-100" />
+              <span className="text-sm font-medium text-yellow-100">Data Issues</span>
+              <span className="text-xs bg-yellow-500 text-yellow-900 rounded-full px-2 py-0.5">
+                {validationResult.errors.length + validationResult.warnings.length}
+              </span>
+            </div>
+          </button>
+          
+          {/* Data Health Dashboard */}
+          {showDataHealth && (
+            <div className="absolute top-full right-0 mt-2 w-96 bg-gray-800/95 backdrop-blur-sm border border-gray-600 rounded-lg shadow-xl z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+              <div className="p-4 border-b border-gray-600" data-testid="validation-summary">
+                <h3 className="text-sm font-medium text-yellow-300 mb-2">Data Health Summary</h3>
+                <p className="text-xs text-gray-400 mb-3">{getValidationSummary(validationResult)}</p>
+                
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div className="bg-green-900/30 border border-green-500/30 rounded p-2">
+                    <div className="text-green-300 font-medium">Valid Data</div>
+                    <div className="text-green-100">{validationResult.stats.validNodes} nodes, {validationResult.stats.validEdges} edges</div>
+                  </div>
+                  <div className="bg-red-900/30 border border-red-500/30 rounded p-2">
+                    <div className="text-red-300 font-medium">Invalid Data</div>
+                    <div className="text-red-100">{validationResult.stats.invalidNodes} nodes, {validationResult.stats.invalidEdges} edges</div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Errors Section */}
+              {validationResult.errors.length > 0 && (
+                <div className="p-4 border-b border-gray-600">
+                  <h4 className="text-sm font-medium text-red-300 mb-2 flex items-center">
+                    <AlertCircle className="w-4 h-4 mr-2" />
+                    Errors ({validationResult.errors.length})
+                  </h4>
+                  <div className="max-h-32 overflow-y-auto space-y-2">
+                    {validationResult.errors.slice(0, 5).map((error, index) => (
+                      <div key={index} className="text-xs bg-red-900/20 border border-red-500/30 rounded p-2">
+                        <div className="text-red-200 font-medium">{error.message}</div>
+                        {error.suggestion && (
+                          <div className="text-red-300 mt-1">💡 {error.suggestion}</div>
+                        )}
+                      </div>
+                    ))}
+                    {validationResult.errors.length > 5 && (
+                      <div className="text-xs text-gray-400 text-center">... and {validationResult.errors.length - 5} more errors</div>
+                    )}
+                  </div>
+                </div>
+              )}
+              
+              {/* Warnings Section */}
+              {validationResult.warnings.length > 0 && (
+                <div className="p-4">
+                  <h4 className="text-sm font-medium text-yellow-300 mb-2 flex items-center">
+                    <AlertTriangle className="w-4 h-4 mr-2" />
+                    Warnings ({validationResult.warnings.length})
+                  </h4>
+                  <div className="max-h-32 overflow-y-auto space-y-2">
+                    {validationResult.warnings.slice(0, 3).map((warning, index) => (
+                      <div key={index} className="text-xs bg-yellow-900/20 border border-yellow-500/30 rounded p-2">
+                        <div className="text-yellow-200 font-medium">{warning.message}</div>
+                        {warning.suggestion && (
+                          <div className="text-yellow-300 mt-1">💡 {warning.suggestion}</div>
+                        )}
+                      </div>
+                    ))}
+                    {validationResult.warnings.length > 3 && (
+                      <div className="text-xs text-gray-400 text-center">... and {validationResult.warnings.length - 3} more warnings</div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Graph Controls */}
       <div className="absolute bottom-4 right-4 space-y-2">        
