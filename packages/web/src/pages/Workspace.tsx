@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Plus, Zap, RotateCcw, Share2, Users, Filter } from 'lucide-react';
-import { InteractiveGraphVisualization } from '../components/InteractiveGraphVisualization';
+import { SafeGraphVisualization } from '../components/SafeGraphVisualization';
 import { CreateNodeModal } from '../components/CreateNodeModal';
 import { ListView } from '../components/ListView';
 import { TimelineView } from '../components/TimelineView';
@@ -166,7 +166,7 @@ export function Workspace() {
             </div>
           </div>
         ) : viewMode === 'graph' ? (
-          <InteractiveGraphVisualization />
+          <SafeGraphVisualization />
         ) : viewMode === 'list' ? (
           <ListView />
         ) : (
