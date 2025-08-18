@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-GraphDone is a graph-native project management system that reimagines work coordination through dependencies and democratic prioritization rather than hierarchical assignments. The project is in active development (v0.2.0-alpha) with core architecture implemented and working foundation.
+GraphDone is a graph-native project management system that reimagines work coordination through dependencies and democratic prioritization rather than hierarchical assignments. The project is in active development (v0.2.1-alpha) with core architecture implemented and working foundation.
 
 ## Core Philosophy
 

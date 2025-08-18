@@ -1,6 +1,6 @@
 # GraphDone
 
-> Project management for teams who think differently. Coordinate through dependencies and outcomes, not hierarchies and assignments.
+> Project management for teams who think differently. Coordinate through dependencies and outcomes, not hierarchies and top-down control.
 
 ![GraphDone UI Screenshot](./docs/graphdone_ui.png)
 
@@ -24,7 +24,7 @@ GraphDone reimagines project management as a collaborative graph where work flow
 
 | Traditional PM | GraphDone |
 |----------------|-----------|
-| Hierarchical task assignment | Natural dependency flows |
+| Hierarchical task control | Natural dependency flows |
 | Manager-driven priorities | Democratic community validation |
 | Linear project timelines | Multi-level graph navigation |
 | Human-only collaboration | Human + AI peer collaboration |
