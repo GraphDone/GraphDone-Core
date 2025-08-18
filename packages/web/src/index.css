@@ -188,3 +188,32 @@ svg text {
 .scrollbar-gray::-webkit-scrollbar-corner {
   background: #374151;
 }
+
+/* Thicker gray scrollbar for timeline */
+.scrollbar-gray-thick {
+  scrollbar-width: auto;
+  scrollbar-color: #6b7280 #374151;
+}
+
+.scrollbar-gray-thick::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+.scrollbar-gray-thick::-webkit-scrollbar-track {
+  background: #374151;
+  border-radius: 6px;
+}
+
+.scrollbar-gray-thick::-webkit-scrollbar-thumb {
+  background: #6b7280;
+  border-radius: 6px;
+}
+
+.scrollbar-gray-thick::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+.scrollbar-gray-thick::-webkit-scrollbar-corner {
+  background: #374151;
+}

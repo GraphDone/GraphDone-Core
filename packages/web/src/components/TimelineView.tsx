@@ -61,6 +61,7 @@ export function TimelineView() {
   const [activityTimeRange, setActivityTimeRange] = useState<string>('week');
   const [isTimeDropdownOpen, setIsTimeDropdownOpen] = useState(false);
   const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(1);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const timeDropdownRef = useRef<HTMLDivElement>(null);
   const typeDropdownRef = useRef<HTMLDivElement>(null);
@@ -191,13 +192,25 @@ export function TimelineView() {
         {/* Timeline Controls */}
         <div className="bg-gray-800 border-b border-gray-700 px-6 py-3 flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <button className="p-2 bg-gray-700 rounded hover:bg-gray-600 transition-colors" title="Zoom In">
+            <button 
+              onClick={() => setZoomLevel(prev => Math.min(prev * 1.5, 3))}
+              className="p-2 bg-gray-700 rounded hover:bg-gray-600 transition-colors" 
+              title="Zoom In"
+            >
               <ZoomIn className="h-4 w-4 text-gray-300" />
             </button>
-            <button className="p-2 bg-gray-700 rounded hover:bg-gray-600 transition-colors" title="Zoom Out">
+            <button 
+              onClick={() => setZoomLevel(prev => Math.max(prev / 1.5, 0.5))}
+              className="p-2 bg-gray-700 rounded hover:bg-gray-600 transition-colors" 
+              title="Zoom Out"
+            >
               <ZoomOut className="h-4 w-4 text-gray-300" />
             </button>
-            <button className="p-2 bg-gray-700 rounded hover:bg-gray-600 transition-colors" title="Fit to Screen">
+            <button 
+              onClick={() => setZoomLevel(1)}
+              className="p-2 bg-gray-700 rounded hover:bg-gray-600 transition-colors" 
+              title="Fit to Screen"
+            >
               <Maximize2 className="h-4 w-4 text-gray-300" />
             </button>
           </div>
@@ -227,8 +240,8 @@ export function TimelineView() {
         </div>
 
         {/* Timeline Grid */}
-        <div className="flex-1 overflow-auto">
-          <div className="min-w-[1200px]">
+        <div className="flex-1 overflow-auto scrollbar-gray">
+          <div className="min-w-[1200px]" style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top left' }}>
             {/* Enhanced Month Headers */}
             <div className="bg-gray-700 border-b border-gray-600 sticky top-0 z-10">
               <div className="flex">
@@ -989,7 +1002,7 @@ export function TimelineView() {
     );
   };
 
-  // Enhanced Activity Feed View
+  // Enhanced Activity Feed View  
   const renderActivityView = () => {
     // Generate enhanced activities from nodes
     const activities = filteredNodes.flatMap(node => {
@@ -1179,9 +1192,6 @@ export function TimelineView() {
                                   }`}>{range.label}</div>
                                   <div className="text-xs text-gray-400 mt-0.5">{range.description}</div>
                                 </div>
-                                {activityTimeRange === range.id && (
-                                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                                )}
                               </div>
                             </button>
                           ))}
@@ -1276,9 +1286,6 @@ export function TimelineView() {
                                   </div>
                                   <div className="text-xs text-gray-400 mt-0.5">{category.description}</div>
                                 </div>
-                                {activityFilter === category.id && (
-                                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                                )}
                               </div>
                             </button>
                           ))}

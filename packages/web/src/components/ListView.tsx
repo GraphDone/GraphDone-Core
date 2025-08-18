@@ -272,7 +272,7 @@ export function ListView() {
                   </div>
                 </div>
                 
-                <div className="p-4 space-y-3 max-h-[calc(100vh-300px)] overflow-y-auto">
+                <div className="p-4 space-y-3">
                   {nodes.map((node) => (
                     <div
                       key={node.id}
@@ -292,6 +292,7 @@ export function ListView() {
                           <span className="text-gray-300 text-base">{node.assignee}</span>
                         </div>
                       )}
+                      
                       
                       <div className={`${config.dotColor} w-2 h-2 rounded-full mt-2`}></div>
                     </div>
