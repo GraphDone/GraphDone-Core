@@ -18,6 +18,8 @@ export const GET_WORK_ITEMS = gql`
       priorityIndiv
       priorityComm
       priorityComp
+      dueDate
+      assignedTo
       teamId
       userId
       contributors {
@@ -91,6 +93,8 @@ export const GET_WORK_ITEM_BY_ID = gql`
       priorityIndiv
       priorityComm
       priorityComp
+      dueDate
+      assignedTo
       contributors {
         id
         name
@@ -131,6 +135,8 @@ export const CREATE_WORK_ITEM = gql`
         priorityIndiv
         priorityComm
         priorityComp
+        dueDate
+        assignedTo
         createdAt
       }
     }
@@ -155,6 +161,8 @@ export const UPDATE_WORK_ITEM = gql`
       priorityIndiv
       priorityComm
       priorityComp
+      dueDate
+      assignedTo
       updatedAt
     }
   }
