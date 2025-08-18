@@ -631,7 +631,7 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                 className={`px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors ${
                   !isFormValid 
                     ? 'bg-gray-400 cursor-not-allowed' 
-                    : 'bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 dark:bg-blue-500 dark:hover:bg-blue-600 dark:disabled:bg-blue-400'
+                    : 'bg-green-600 hover:bg-green-700 disabled:bg-green-400 dark:bg-green-500 dark:hover:bg-green-600 dark:disabled:bg-green-400'
                 }`}
               >
                 {creatingWorkItem ? 'Creating...' : (parentNodeId ? 'Create & Connect' : 'Create Node')}

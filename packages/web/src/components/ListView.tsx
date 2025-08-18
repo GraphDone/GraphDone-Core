@@ -7,10 +7,10 @@ import {
   BarChart3, 
   Circle,
   Table,
-  Tag,
   Edit,
   Trash2,
-  MoreHorizontal
+  MoreHorizontal,
+  Tag
 } from 'lucide-react';
 import { useGraph } from '../contexts/GraphContext';
 import { mockProjectNodes, MockNode } from '../types/projectData';
@@ -62,7 +62,6 @@ export function ListView() {
   const [statusFilter, setStatusFilter] = useState('All Statuses');
   const [contributorFilter, setContributorFilter] = useState('All Contributors');
   const [priorityFilter, setPriorityFilter] = useState('All Priorities');
-  const [tagFilter, setTagFilter] = useState('');
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedNode, setSelectedNode] = useState<MockNode | null>(null);
@@ -168,15 +167,8 @@ export function ListView() {
       });
     }
 
-    // Tag filter
-    if (tagFilter) {
-      filtered = filtered.filter(node =>
-        node.tags.some(tag => tag.toLowerCase().includes(tagFilter.toLowerCase()))
-      );
-    }
-
     return filtered;
-  }, [searchTerm, typeFilter, statusFilter, contributorFilter, priorityFilter, tagFilter]);
+  }, [searchTerm, typeFilter, statusFilter, contributorFilter, priorityFilter]);
 
   // Calculate statistics
   const stats = useMemo(() => {
@@ -213,6 +205,14 @@ export function ListView() {
   }, [filteredNodes]);
 
   // Helper functions
+  const formatLabel = (label: string) => {
+    // Convert SNAKE_CASE to Proper Case
+    return label
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+  };
+
   const getNodeTypeColor = (type: string) => {
     switch (type) {
       case 'EPIC': return 'bg-purple-500 text-white';
@@ -251,7 +251,7 @@ export function ListView() {
         >
           <div className="flex items-start justify-between mb-3">
             <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${getNodeTypeColor(node.type)}`}>
-              {node.type}
+              {formatLabel(node.type)}
             </span>
             <div className={`w-3 h-3 rounded-full ${getPriorityIndicator(node.priority.computed)}`}></div>
           </div>
@@ -274,7 +274,7 @@ export function ListView() {
           
           <div className={`mt-2 text-sm ${getStatusColor(node.status)}`}>
             <Circle className="h-3 w-3 inline mr-1" />
-            {node.status.replace('_', ' ')}
+            {formatLabel(node.status)}
           </div>
         </div>
       ))}
@@ -369,7 +369,7 @@ export function ListView() {
                     >
                       <div className="flex items-start justify-between mb-2">
                         <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${getNodeTypeColor(node.type)}`}>
-                          {node.type}
+                          {formatLabel(node.type)}
                         </span>
                         <div className={`w-3 h-3 rounded-full ${getPriorityIndicator(node.priority.computed)}`}></div>
                       </div>
@@ -460,7 +460,7 @@ export function ListView() {
                   </td>
                   <td className="pl-2 pr-3 py-10">
                     <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getNodeTypeColor(node.type)} shadow-sm`}>
-                      {node.type}
+                      {formatLabel(node.type)}
                     </span>
                   </td>
                   <td className="pl-3 pr-3 py-10">
@@ -473,7 +473,7 @@ export function ListView() {
                         'bg-purple-400'
                       }`}></div>
                       <span className={`text-sm font-medium ${getStatusColor(node.status)}`}>
-                        {node.status.replace('_', ' ')}
+                        {formatLabel(node.status)}
                       </span>
                     </div>
                   </td>
@@ -775,7 +775,7 @@ export function ListView() {
         <BarChart 
           title="Task Types"
           data={Object.entries(stats.typeStats).map(([type, count]) => ({
-            label: type,
+            label: formatLabel(type),
             value: count,
             color: type === 'EPIC' ? '#3b82f6' : 
                    type === 'FEATURE' ? '#3b82f6' :
@@ -793,11 +793,11 @@ export function ListView() {
           {filteredNodes.slice(0, 5).map((node) => (
             <div key={node.id} className="flex items-center space-x-3 p-3 bg-gray-700 rounded-lg">
               <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${getNodeTypeColor(node.type)}`}>
-                {node.type}
+                {formatLabel(node.type)}
               </span>
               <div className="flex-1">
                 <div className="text-sm font-medium text-white">{node.title}</div>
-                <div className={`text-xs ${getStatusColor(node.status)}`}>{node.status}</div>
+                <div className={`text-xs ${getStatusColor(node.status)}`}>{formatLabel(node.status)}</div>
               </div>
               <div className={`w-3 h-3 rounded-full ${getPriorityIndicator(node.priority.computed)}`}></div>
             </div>
@@ -898,15 +898,14 @@ export function ListView() {
               </div>
               
               {/* Quick Clear Button */}
-              {(searchTerm || typeFilter !== 'All Types' || statusFilter !== 'All Statuses' || contributorFilter !== 'All Contributors' || priorityFilter !== 'All Priorities' || tagFilter) && (
+              {(searchTerm || typeFilter !== 'All Types' || statusFilter !== 'All Statuses' || contributorFilter !== 'All Contributors' || priorityFilter !== 'All Priorities') && (
                 <button
                   onClick={() => {
                     setSearchTerm('');
                     setTypeFilter('All Types');
                     setStatusFilter('All Statuses');
-                    setAssigneeFilter('All Assignees');
+                    setContributorFilter('All Contributors');
                     setPriorityFilter('All Priorities');
-                    setTagFilter('');
                   }}
                   className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-sm rounded-lg transition-colors"
                 >
@@ -923,11 +922,11 @@ export function ListView() {
                 className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
               >
                 <option value="All Types">All Types</option>
-                <option value="EPIC">EPIC</option>
-                <option value="FEATURE">FEATURE</option>
-                <option value="TASK">TASK</option>
-                <option value="BUG">BUG</option>
-                <option value="MILESTONE">MILESTONE</option>
+                <option value="EPIC">Epic</option>
+                <option value="FEATURE">Feature</option>
+                <option value="TASK">Task</option>
+                <option value="BUG">Bug</option>
+                <option value="MILESTONE">Milestone</option>
               </select>
               
               <select
@@ -936,11 +935,11 @@ export function ListView() {
                 className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
               >
                 <option value="All Statuses">All Statuses</option>
-                <option value="COMPLETED">COMPLETED</option>
-                <option value="IN_PROGRESS">IN PROGRESS</option>
-                <option value="BLOCKED">BLOCKED</option>
-                <option value="PLANNED">PLANNED</option>
-                <option value="PROPOSED">PROPOSED</option>
+                <option value="COMPLETED">Completed</option>
+                <option value="IN_PROGRESS">In Progress</option>
+                <option value="BLOCKED">Blocked</option>
+                <option value="PLANNED">Planned</option>
+                <option value="PROPOSED">Proposed</option>
               </select>
 
               <select
@@ -961,27 +960,16 @@ export function ListView() {
                 className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
               >
                 <option value="All Priorities">All Priorities</option>
-                <option value="Critical">Critical Priority (80–100%)</option>
-                <option value="High">High Priority (60–79%)</option>
-                <option value="Medium">Moderate Priority (40–59%)</option>
-                <option value="Low">Low Priority (20–39%)</option>
-                <option value="Minimal">Minimal Priority (0–19%)</option>
+                <option value="Critical">Critical Priority</option>
+                <option value="High">High Priority</option>
+                <option value="Medium">Moderate Priority</option>
+                <option value="Low">Low Priority</option>
+                <option value="Minimal">Minimal Priority</option>
               </select>
-
-              <div className="relative">
-                <Tag className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Filter by tag..."
-                  value={tagFilter}
-                  onChange={(e) => setTagFilter(e.target.value)}
-                  className="pl-10 pr-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-white placeholder-gray-400 text-sm w-40"
-                />
-              </div>
             </div>
 
             {/* Active Filters Summary */}
-            {(searchTerm || typeFilter !== 'All Types' || statusFilter !== 'All Statuses' || contributorFilter !== 'All Contributors' || priorityFilter !== 'All Priorities' || tagFilter) && (
+            {(searchTerm || typeFilter !== 'All Types' || statusFilter !== 'All Statuses' || contributorFilter !== 'All Contributors' || priorityFilter !== 'All Priorities') && (
               <div className="flex items-center space-x-2 text-sm">
                 <span className="text-gray-400">Active filters:</span>
                 {searchTerm && (
@@ -1001,17 +989,12 @@ export function ListView() {
                 )}
                 {contributorFilter !== 'All Contributors' && (
                   <span className="px-2 py-1 bg-yellow-900/30 text-yellow-300 rounded border border-yellow-500/30">
-                    Contributor: {contributorFilter}
+                    Contributor: {contributorFilter === 'Unassigned' ? 'Available' : contributorFilter}
                   </span>
                 )}
                 {priorityFilter !== 'All Priorities' && (
                   <span className="px-2 py-1 bg-orange-900/30 text-orange-300 rounded border border-orange-500/30">
                     Priority: {priorityFilter}
-                  </span>
-                )}
-                {tagFilter && (
-                  <span className="px-2 py-1 bg-pink-900/30 text-pink-300 rounded border border-pink-500/30">
-                    Tag: "{tagFilter}"
                   </span>
                 )}
                 <span className="text-gray-500">({filteredNodes.length} results)</span>
@@ -1125,7 +1108,7 @@ export function ListView() {
                   <div key={type} className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
                       <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${getNodeTypeColor(type)}`}>
-                        {type}
+                        {formatLabel(type)}
                       </span>
                     </div>
                     <div className="flex items-center space-x-2">
@@ -1147,9 +1130,8 @@ export function ListView() {
                       setSearchTerm('');
                       setTypeFilter('All Types');
                       setStatusFilter('All Statuses');
-                      setAssigneeFilter('All Assignees');
+                      setContributorFilter('All Contributors');
                       setPriorityFilter('All Priorities');
-                      setTagFilter('');
                     }}
                     className="text-green-400 text-sm hover:text-green-300 mt-2"
                   >
