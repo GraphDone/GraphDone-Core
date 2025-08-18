@@ -76,7 +76,7 @@ async function startServer() {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
-  httpServer.listen(PORT, '0.0.0.0', () => {
+  httpServer.listen(PORT, () => {
     console.log(`🚀 GraphQL server ready at http://localhost:${PORT}/graphql`);
     console.log(`🔌 WebSocket server ready at ws://localhost:${PORT}/graphql`);
   });
