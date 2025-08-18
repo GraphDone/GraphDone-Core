@@ -3,24 +3,24 @@ export type EdgeId = string;
 export type ContributorId = string;
 
 export enum NodeType {
-  OUTCOME = 'outcome',
-  TASK = 'task',
-  MILESTONE = 'milestone',
-  IDEA = 'idea'
+  OUTCOME = 'OUTCOME',
+  TASK = 'TASK',
+  MILESTONE = 'MILESTONE',
+  IDEA = 'IDEA'
 }
 
 export enum NodeStatus {
-  PROPOSED = 'proposed',
-  ACTIVE = 'active',
-  IN_PROGRESS = 'in_progress',
-  BLOCKED = 'blocked',
-  COMPLETED = 'completed',
-  ARCHIVED = 'archived'
+  PROPOSED = 'PROPOSED',
+  ACTIVE = 'ACTIVE',
+  IN_PROGRESS = 'IN_PROGRESS',
+  BLOCKED = 'BLOCKED',
+  COMPLETED = 'COMPLETED',
+  ARCHIVED = 'ARCHIVED'
 }
 
 export enum ContributorType {
-  HUMAN = 'human',
-  AI_AGENT = 'ai_agent'
+  HUMAN = 'HUMAN',
+  AI_AGENT = 'AI_AGENT'
 }
 
 export interface SphericalCoordinate {
@@ -76,8 +76,8 @@ export interface GraphEdge {
 }
 
 export enum EdgeType {
-  DEPENDENCY = 'dependency',
-  BLOCKS = 'blocks',
-  RELATES_TO = 'relates_to',
-  CONTAINS = 'contains'
+  DEPENDENCY = 'DEPENDENCY',
+  BLOCKS = 'BLOCKS',
+  RELATES_TO = 'RELATES_TO',
+  CONTAINS = 'CONTAINS'
 }

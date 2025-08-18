@@ -7,6 +7,14 @@ node_modules/
 coverage/
 *.lcov
 .nyc_output
+test-results/
+test-artifacts/
+playwright-report/
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
 
 # Production
 build/
