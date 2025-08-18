@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import * as d3 from 'd3';
-import { Link2, Edit3, Trash2, Eye, Clock, User, Tag } from 'lucide-react';
+import { Link2, Edit3, Trash2, Eye, Clock, User, Tag, Plus, Minus } from 'lucide-react';
 import { useGraph } from '../contexts/GraphContext';
 import { mockProjectNodes, mockProjectEdges, relationshipTypeInfo, MockNode, MockEdge, RelationshipType } from '../types/projectData';
 
@@ -20,6 +20,7 @@ export function InteractiveGraphVisualization() {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const graphSwitcherRef = useRef<HTMLDivElement>(null);
+  const zoomBehaviorRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
   const { currentGraph, availableGraphs, selectGraph } = useGraph();
   
   const [nodeMenu, setNodeMenu] = useState<NodeMenuState>({ node: null, position: { x: 0, y: 0 }, visible: false });
@@ -253,6 +254,7 @@ export function InteractiveGraphVisualization() {
     const zoom = d3.zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.1, 4]);
 
+    zoomBehaviorRef.current = zoom;
     svg.call(zoom);
 
     const g = svg.append('g');
@@ -730,57 +732,7 @@ export function InteractiveGraphVisualization() {
       updateHtmlLabels();
     });
 
-    // Add zoom controls
-    const zoomControls = svg.append('g')
-      .attr('class', 'zoom-controls')
-      .attr('transform', 'translate(20, 20)');
-
-    const zoomIn = zoomControls.append('g')
-      .attr('class', 'zoom-button')
-      .style('cursor', 'pointer')
-      .on('click', () => {
-        svg.transition().duration(300).call(zoom.scaleBy, 1.5);
-      });
-
-    zoomIn.append('rect')
-      .attr('width', 30)
-      .attr('height', 30)
-      .attr('fill', '#374151')
-      .attr('stroke', '#6b7280')
-      .attr('rx', 4);
-
-    zoomIn.append('text')
-      .attr('x', 15)
-      .attr('y', 20)
-      .attr('text-anchor', 'middle')
-      .attr('font-size', '16px')
-      .attr('font-weight', 'bold')
-      .attr('fill', 'white')
-      .text('+');
-
-    const zoomOut = zoomControls.append('g')
-      .attr('class', 'zoom-button')
-      .attr('transform', 'translate(0, 35)')
-      .style('cursor', 'pointer')
-      .on('click', () => {
-        svg.transition().duration(300).call(zoom.scaleBy, 0.67);
-      });
-
-    zoomOut.append('rect')
-      .attr('width', 30)
-      .attr('height', 30)
-      .attr('fill', '#374151')
-      .attr('stroke', '#6b7280')
-      .attr('rx', 4);
-
-    zoomOut.append('text')
-      .attr('x', 15)
-      .attr('y', 20)
-      .attr('text-anchor', 'middle')
-      .attr('font-size', '16px')
-      .attr('font-weight', 'bold')
-      .attr('fill', 'white')
-      .text('−');
+    // Zoom controls are now handled by React components
 
   }, [handleNodeClick, handleEdgeClick]);
 
@@ -892,6 +844,34 @@ export function InteractiveGraphVisualization() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* Zoom Controls - Top Right */}
+      <div className="absolute top-4 right-4 z-40 flex space-x-2">
+        <button
+          onClick={() => {
+            if (zoomBehaviorRef.current && svgRef.current) {
+              const svg = d3.select(svgRef.current);
+              svg.transition().duration(300).call(zoomBehaviorRef.current.scaleBy, 1.5);
+            }
+          }}
+          className="flex items-center justify-center w-8 h-8 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors border border-gray-600"
+          title="Zoom In"
+        >
+          <Plus className="h-4 w-4" />
+        </button>
+        <button
+          onClick={() => {
+            if (zoomBehaviorRef.current && svgRef.current) {
+              const svg = d3.select(svgRef.current);
+              svg.transition().duration(300).call(zoomBehaviorRef.current.scaleBy, 0.67);
+            }
+          }}
+          className="flex items-center justify-center w-8 h-8 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors border border-gray-600"
+          title="Zoom Out"
+        >
+          <Minus className="h-4 w-4" />
+        </button>
       </div>
 
       {/* Graph Controls */}
