@@ -7,10 +7,15 @@ import {
   BarChart3, 
   Circle,
   Table,
-  Tag
+  Tag,
+  Edit,
+  Trash2,
+  MoreHorizontal
 } from 'lucide-react';
 import { useGraph } from '../contexts/GraphContext';
 import { mockProjectNodes, MockNode } from '../types/projectData';
+import { EditNodeModal } from './EditNodeModal';
+import { DeleteNodeModal } from './DeleteNodeModal';
 
 type ViewType = 'dashboard' | 'cards' | 'kanban' | 'table';
 
@@ -58,6 +63,9 @@ export function ListView() {
   const [contributorFilter, setContributorFilter] = useState('All Contributors');
   const [priorityFilter, setPriorityFilter] = useState('All Priorities');
   const [tagFilter, setTagFilter] = useState('');
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [selectedNode, setSelectedNode] = useState<MockNode | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown when clicking outside
@@ -71,6 +79,23 @@ export function ListView() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Modal handlers
+  const handleEditNode = (node: MockNode) => {
+    setSelectedNode(node);
+    setShowEditModal(true);
+  };
+
+  const handleDeleteNode = (node: MockNode) => {
+    setSelectedNode(node);
+    setShowDeleteModal(true);
+  };
+
+  const handleCloseModals = () => {
+    setShowEditModal(false);
+    setShowDeleteModal(false);
+    setSelectedNode(null);
+  };
 
   // Get unique values for filter options
   const uniqueContributors = useMemo(() => {
@@ -403,9 +428,10 @@ export function ListView() {
                 <th className="pr-4 py-12 text-left text-sm font-semibold text-gray-300 tracking-wider" style={{ paddingLeft: '80px' }}>Task</th>
                 <th className="pl-2 pr-3 py-10 text-left text-sm font-semibold text-gray-300 tracking-wider">Type</th>
                 <th className="pl-3 pr-3 py-10 text-left text-sm font-semibold text-gray-300 tracking-wider">Status</th>
-                <th className="pl-3 pr-6 py-10 text-left text-sm font-semibold text-gray-300 tracking-wider">Assignee</th>
+                <th className="pl-3 pr-6 py-10 text-left text-sm font-semibold text-gray-300 tracking-wider">Contributor</th>
                 <th className="pl-6 pr-6 py-10 text-left text-sm font-semibold text-gray-300 tracking-wider">Priority</th>
                 <th className="pl-6 pr-6 py-10 text-left text-sm font-semibold text-gray-300 tracking-wider whitespace-nowrap">Due Date</th>
+                <th className="pl-6 pr-6 py-10 text-left text-sm font-semibold text-gray-300 tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-700">
@@ -488,6 +514,30 @@ export function ListView() {
                         <span className="text-gray-500">No date</span>
                       }
                     </span>
+                  </td>
+                  <td className="pl-6 pr-6 py-10">
+                    <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEditNode(node);
+                        }}
+                        className="p-1 text-gray-400 hover:text-blue-400 transition-colors"
+                        title="Edit node"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteNode(node);
+                        }}
+                        className="p-1 text-gray-400 hover:text-red-400 transition-colors"
+                        title="Delete node"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -1192,6 +1242,26 @@ export function ListView() {
           </div>
         </div>
       </div>
+
+      {/* Edit Node Modal */}
+      {showEditModal && selectedNode && (
+        <EditNodeModal
+          isOpen={showEditModal}
+          onClose={handleCloseModals}
+          node={selectedNode}
+        />
+      )}
+
+      {/* Delete Node Modal */}
+      {showDeleteModal && selectedNode && (
+        <DeleteNodeModal
+          isOpen={showDeleteModal}
+          onClose={handleCloseModals}
+          nodeId={selectedNode.id}
+          nodeTitle={selectedNode.title}
+          nodeType={selectedNode.type}
+        />
+      )}
     </div>
   );
 }
