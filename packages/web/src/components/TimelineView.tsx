@@ -1547,7 +1547,29 @@ export function TimelineView() {
           </div>
           
           <div className="text-sm text-gray-400">
-            {filteredNodes.length} of {mockProjectNodes.length} items
+            <div className="bg-gray-750 rounded-lg p-4 border border-gray-600">
+              <h3 className="text-lg font-semibold text-white mb-3">Project Overview</h3>
+              
+              {/* Progress Bar */}
+              <div className="mb-3">
+                <div className="flex items-center justify-between text-sm text-gray-400 mb-2">
+                  <span>Overall Progress</span>
+                  <span>{Math.round((filteredNodes.filter(node => node.status === 'COMPLETED').length / filteredNodes.length) * 100)}%</span>
+                </div>
+                <div className="w-full bg-gray-600 rounded-full h-2 overflow-hidden">
+                  <div 
+                    className="bg-green-500 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${(filteredNodes.filter(node => node.status === 'COMPLETED').length / filteredNodes.length) * 100}%` }}
+                  ></div>
+                </div>
+              </div>
+              
+              {/* Task Count */}
+              <div className="text-center">
+                <div className="text-2xl font-bold text-white">{filteredNodes.length}</div>
+                <div className="text-sm text-gray-400">Total Tasks</div>
+              </div>
+            </div>
           </div>
         </div>
 
