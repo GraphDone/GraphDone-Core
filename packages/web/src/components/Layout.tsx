@@ -15,12 +15,12 @@ export function Layout({ children }: LayoutProps) {
   const { currentTeam } = useAuth();
 
   const navigation = [
-    { name: 'Workspace', href: '/', icon: Globe, description: 'Main graph visualization and work area' },
-    { name: 'Ontology', href: '/ontology', icon: Brain, description: 'Node types, schemas, and templates' },
-    { name: 'Agents', href: '/agents', icon: Bot, description: 'AI agent collaboration and management' },
-    { name: 'Analytics', href: '/analytics', icon: BarChart3, description: 'Democratic prioritization insights' },
-    { name: 'Settings', href: '/settings', icon: Settings, description: 'User and team preferences' },
-    { name: 'System', href: '/backend', icon: Server, description: 'Backend status and admin tools' },
+    { name: 'Workspace', href: '/', icon: Globe, description: 'Main work' },
+    { name: 'Ontology', href: '/ontology', icon: Brain, description: 'Node schemas' },
+    { name: 'Agents', href: '/agents', icon: Bot, description: 'AI collaboration' },
+    { name: 'Analytics', href: '/analytics', icon: BarChart3, description: 'Priority insights' },
+    { name: 'Settings', href: '/settings', icon: Settings, description: 'User preferences' },
+    { name: 'System', href: '/backend', icon: Server, description: 'Backend status' },
   ];
 
   return (

@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Plus, Zap, RotateCcw, Share2, Users, Filter } from 'lucide-react';
 import { InteractiveGraphVisualization } from '../components/InteractiveGraphVisualization';
 import { CreateNodeModal } from '../components/CreateNodeModal';
+import { ListView } from '../components/ListView';
+import { TimelineView } from '../components/TimelineView';
 import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -166,19 +168,9 @@ export function Workspace() {
         ) : viewMode === 'graph' ? (
           <InteractiveGraphVisualization />
         ) : viewMode === 'list' ? (
-          <div className="h-full overflow-auto p-6">
-            <div className="text-center py-12">
-              <h3 className="text-lg font-medium text-gray-900 mb-2">List View</h3>
-              <p className="text-gray-500">Detailed list view coming soon...</p>
-            </div>
-          </div>
+          <ListView />
         ) : (
-          <div className="h-full overflow-auto p-6">
-            <div className="text-center py-12">
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Timeline View</h3>
-              <p className="text-gray-500">Timeline view for project progress coming soon...</p>
-            </div>
-          </div>
+          <TimelineView />
         )}
       </div>
 
