@@ -145,7 +145,7 @@ if [ "$BUILD_DOCS" = true ]; then
     </ul>
     
     <footer style="margin-top: 60px; padding: 30px 0; border-top: 1px solid #eee; text-align: center; color: #666;">
-        <p>GraphDone v0.2.0-alpha - For teams who think differently</p>
+        <p>GraphDone v0.2.1-alpha - For teams who think differently</p>
     </footer>
 </body>
 </html>

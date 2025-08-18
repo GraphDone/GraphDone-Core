@@ -314,8 +314,8 @@ export function TimelineView() {
                               {node.title}
                             </span>
                           </div>
-                          {node.assignee && (
-                            <div className="text-xs text-gray-400 mt-1">{node.assignee}</div>
+                          {node.contributor && (
+                            <div className="text-xs text-gray-400 mt-1">{node.contributor}</div>
                           )}
                         </div>
                         
@@ -376,7 +376,7 @@ export function TimelineView() {
                                   left: `${position.left}%`,
                                   width: `${Math.max(position.width, 2)}%`
                                 }}
-                                title={`${node.title}\n${position.startDate.toLocaleDateString()} - ${position.endDate.toLocaleDateString()}\n${position.duration} days\nProgress: ${node.actualHours && node.estimatedHours ? Math.round((node.actualHours / node.estimatedHours) * 100) : 0}%\nAssignee: ${node.assignee || 'Unassigned'}`}
+                                title={`${node.title}\n${position.startDate.toLocaleDateString()} - ${position.endDate.toLocaleDateString()}\n${position.duration} days\nProgress: ${node.actualHours && node.estimatedHours ? Math.round((node.actualHours / node.estimatedHours) * 100) : 0}%\nContributor: ${node.contributor || 'Available'}`}
                               >
                                 {/* Enhanced Priority Indicator */}
                                 <div className={`w-3 h-3 rounded-full mr-2 ${getPriorityIndicator(node.priority.computed)} ring-2 ring-white shadow-md flex-shrink-0`}></div>
@@ -794,7 +794,7 @@ export function TimelineView() {
                             node.status === 'PLANNED' ? 'bg-orange-900/30 border-orange-500 hover:bg-orange-900/50' :
                             'bg-gray-700 border-gray-500 hover:bg-gray-600'
                           }`}
-                          title={`${node.title}\nType: ${node.type}\nStatus: ${node.status}\nAssignee: ${node.assignee || 'Unassigned'}\nPriority: ${Math.round(node.priority.computed * 100)}%`}
+                          title={`${node.title}\nType: ${node.type}\nStatus: ${node.status}\nContributor: ${node.contributor || 'Available'}\nPriority: ${Math.round(node.priority.computed * 100)}%`}
                         >
                           <div className="flex items-center space-x-2 mb-1">
                             <div className={`w-2 h-2 rounded-full flex-shrink-0 ${getPriorityIndicator(node.priority.computed)}`}></div>
@@ -805,9 +805,9 @@ export function TimelineView() {
                           <div className="text-white font-medium leading-tight">
                             {node.title.length > 25 ? `${node.title.substring(0, 25)}...` : node.title}
                           </div>
-                          {node.assignee && (
+                          {node.contributor && (
                             <div className="text-gray-400 mt-1 text-xs">
-                              {node.assignee.split(' ')[0]}
+                              {node.contributor.split(' ')[0]}
                             </div>
                           )}
                         </div>
@@ -902,14 +902,14 @@ export function TimelineView() {
                         <span className="ml-2">{node.status.replace('_', ' ')}</span>
                       </div>
                       
-                      {node.assignee && (
+                      {node.contributor && (
                         <div className="flex items-center text-xs text-gray-400">
                           <div className="w-4 h-4 bg-gray-600 rounded-full flex items-center justify-center mr-2">
                             <span className="text-xs font-medium text-white">
-                              {node.assignee.split(' ').map(n => n[0]).join('')}
+                              {node.contributor.split(' ').map(n => n[0]).join('')}
                             </span>
                           </div>
-                          <span>{node.assignee}</span>
+                          <span>{node.contributor}</span>
                         </div>
                       )}
                       
@@ -1011,7 +1011,7 @@ export function TimelineView() {
         action: 'created',
         title: `Created ${node.type.toLowerCase()}`,
         description: node.title,
-        user: node.assignee || 'System',
+        user: node.contributor || 'System',
         timestamp: node.createdAt,
         node: node,
         icon: <Plus className="h-4 w-4" />,
@@ -1027,7 +1027,7 @@ export function TimelineView() {
         action: 'updated status',
         title: `Status changed to ${node.status.replace('_', ' ').toLowerCase()}`,
         description: node.title,
-        user: node.assignee || 'System',
+        user: node.contributor || 'System',
         timestamp: node.updatedAt,
         node: node,
         icon: getStatusIcon(node.status),
@@ -1037,20 +1037,20 @@ export function TimelineView() {
         details: `From planned to ${node.status.replace('_', ' ').toLowerCase()}`
       });
       
-      // Assignment activity
-      if (node.assignee) {
+      // Contribution activity
+      if (node.contributor) {
         baseActivities.push({
           id: `${node.id}-assigned`,
           type: 'assigned',
-          action: 'assigned',
-          title: `Assigned to ${node.assignee}`,
+          action: 'picked-up',
+          title: `Picked up by ${node.contributor}`,
           description: node.title,
           user: 'System',
           timestamp: node.updatedAt,
           node: node,
           icon: <User className="h-4 w-4" />,
           priority: 'normal',
-          category: 'assignment',
+          category: 'contribution',
           color: 'bg-purple-600'
         });
       }
@@ -1063,7 +1063,7 @@ export function TimelineView() {
           action: 'logged time',
           title: `Logged ${node.actualHours}h of work`,
           description: node.title,
-          user: node.assignee || 'System',
+          user: node.contributor || 'System',
           timestamp: node.updatedAt,
           node: node,
           icon: <Clock className="h-4 w-4" />,
@@ -1209,7 +1209,7 @@ export function TimelineView() {
                         {activityFilter === 'all' ? `All (${activityStats.total})` :
                          activityFilter === 'content' ? `Created (${activityStats.content || 0})` :
                          activityFilter === 'status' ? `Status (${activityStats.status || 0})` :
-                         activityFilter === 'assignment' ? `Assigned (${activityStats.assignment || 0})` :
+                         activityFilter === 'contribution' ? `Picked up (${activityStats.contribution || 0})` :
                          `Progress (${activityStats.progress || 0})`}
                       </span>
                       <ChevronDown className={`h-4 w-4 transition-transform ${isTypeDropdownOpen ? 'rotate-180' : ''}`} />
@@ -1241,10 +1241,10 @@ export function TimelineView() {
                               color: 'bg-blue-500'
                             },
                             { 
-                              id: 'assignment', 
-                              label: 'Assigned', 
-                              count: activityStats.assignment || 0, 
-                              description: 'Assignment activities',
+                              id: 'contribution', 
+                              label: 'Picked up', 
+                              count: activityStats.contribution || 0, 
+                              description: 'Contribution activities',
                               color: 'bg-purple-500'
                             },
                             { 
@@ -1300,7 +1300,7 @@ export function TimelineView() {
                 </div>
                 <div className="flex items-center space-x-2">
                   <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
-                  <span className="text-gray-300 font-medium">{activityStats.assignment || 0} assignments</span>
+                  <span className="text-gray-300 font-medium">{activityStats.contribution || 0} contributions</span>
                 </div>
                 <div className="flex items-center space-x-2">
                   <div className="w-3 h-3 bg-green-500 rounded-full"></div>
@@ -1403,8 +1403,8 @@ export function TimelineView() {
                                       {getStatusIcon(activity.node.status)}
                                       <span className="font-medium">{activity.node.status.replace('_', ' ')}</span>
                                     </div>
-                                    {activity.node.assignee && (
-                                      <span>Assignee: <span className="text-white font-medium">{activity.node.assignee}</span></span>
+                                    {activity.node.contributor && (
+                                      <span>Assignee: <span className="text-white font-medium">{activity.node.contributor}</span></span>
                                     )}
                                     {activity.node.priority && (
                                       <span>Priority: <span className="text-white font-medium">{Math.round(activity.node.priority.computed * 100)}%</span></span>

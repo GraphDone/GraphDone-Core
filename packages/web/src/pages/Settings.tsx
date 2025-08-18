@@ -151,7 +151,7 @@ export function Settings() {
               <div className="space-y-3">
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-400">Version</span>
-                  <span className="text-sm font-mono text-gray-100">0.2.0-alpha</span>
+                  <span className="text-sm font-mono text-gray-100">0.2.1-alpha</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-400">License</span>
