@@ -55,7 +55,7 @@ export function ListView() {
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('All Types');
   const [statusFilter, setStatusFilter] = useState('All Statuses');
-  const [assigneeFilter, setAssigneeFilter] = useState('All Assignees');
+  const [contributorFilter, setContributorFilter] = useState('All Contributors');
   const [priorityFilter, setPriorityFilter] = useState('All Priorities');
   const [tagFilter, setTagFilter] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -73,13 +73,13 @@ export function ListView() {
   }, []);
 
   // Get unique values for filter options
-  const uniqueAssignees = useMemo(() => {
-    const assignees = mockProjectNodes
-      .map(node => node.assignee)
-      .filter(assignee => assignee)
-      .filter((assignee, index, arr) => arr.indexOf(assignee) === index)
+  const uniqueContributors = useMemo(() => {
+    const contributors = mockProjectNodes
+      .map(node => node.contributor)
+      .filter(contributor => contributor)
+      .filter((contributor, index, arr) => arr.indexOf(contributor) === index)
       .sort();
-    return assignees;
+    return contributors;
   }, []);
 
   const uniqueTags = useMemo(() => {
@@ -238,12 +238,12 @@ export function ListView() {
           )}
           
           <div className="flex items-center justify-between">
-            {node.assignee ? (
+            {node.contributor ? (
               <div className="flex items-center space-x-2">
-                <span className="text-gray-300 text-sm">{node.assignee}</span>
+                <span className="text-gray-300 text-sm">{node.contributor}</span>
               </div>
             ) : (
-              <span className="text-gray-500 text-sm">Unassigned</span>
+              <span className="text-gray-500 text-sm">Available</span>
             )}
           </div>
           
@@ -351,9 +351,9 @@ export function ListView() {
                       
                       <h4 className="text-white font-medium mb-2 line-clamp-2 text-base">{node.title}</h4>
                       
-                      {node.assignee && (
+                      {node.contributor && (
                         <div className="flex items-center space-x-2">
-                          <span className="text-gray-300 text-base">{node.assignee}</span>
+                          <span className="text-gray-300 text-base">{node.contributor}</span>
                         </div>
                       )}
                       
@@ -370,24 +370,24 @@ export function ListView() {
     );
   };
 
-  // Helper function to get assignee avatar
-  const getAssigneeAvatar = (assignee?: string) => {
-    if (!assignee) return null;
+  // Helper function to get contributor avatar
+  const getContributorAvatar = (contributor?: string) => {
+    if (!contributor) return null;
     
     // Generate avatar color based on name
     const colors = [
       'bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-pink-500', 
       'bg-indigo-500', 'bg-red-500', 'bg-yellow-500', 'bg-teal-500'
     ];
-    const colorIndex = assignee.length % colors.length;
-    const initials = assignee.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    const colorIndex = contributor.length % colors.length;
+    const initials = contributor.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
     
     return (
       <div className="flex items-center space-x-2">
         <div className={`w-8 h-8 rounded-full ${colors[colorIndex]} flex items-center justify-center text-white text-xs font-medium`}>
           {initials}
         </div>
-        <span className="text-gray-300 text-sm">{assignee}</span>
+        <span className="text-gray-300 text-sm">{contributor}</span>
       </div>
     );
   };
@@ -452,14 +452,14 @@ export function ListView() {
                     </div>
                   </td>
                   <td className="pl-3 pr-6 py-10">
-                    {node.assignee ? (
-                      getAssigneeAvatar(node.assignee)
+                    {node.contributor ? (
+                      getContributorAvatar(node.contributor)
                     ) : (
                       <div className="flex items-center space-x-2">
                         <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center">
                           <span className="text-gray-400 text-xs">?</span>
                         </div>
-                        <span className="text-gray-500 text-sm">Unassigned</span>
+                        <span className="text-gray-500 text-sm">Available</span>
                       </div>
                     )}
                   </td>
@@ -848,7 +848,7 @@ export function ListView() {
               </div>
               
               {/* Quick Clear Button */}
-              {(searchTerm || typeFilter !== 'All Types' || statusFilter !== 'All Statuses' || assigneeFilter !== 'All Assignees' || priorityFilter !== 'All Priorities' || tagFilter) && (
+              {(searchTerm || typeFilter !== 'All Types' || statusFilter !== 'All Statuses' || contributorFilter !== 'All Contributors' || priorityFilter !== 'All Priorities' || tagFilter) && (
                 <button
                   onClick={() => {
                     setSearchTerm('');
@@ -894,14 +894,14 @@ export function ListView() {
               </select>
 
               <select
-                value={assigneeFilter}
-                onChange={(e) => setAssigneeFilter(e.target.value)}
+                value={contributorFilter}
+                onChange={(e) => setContributorFilter(e.target.value)}
                 className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
               >
-                <option value="All Assignees">All Assignees</option>
-                <option value="Unassigned">Unassigned</option>
-                {uniqueAssignees.map(assignee => (
-                  <option key={assignee} value={assignee}>{assignee}</option>
+                <option value="All Contributors">All Contributors</option>
+                <option value="Unassigned">Available</option>
+                {uniqueContributors.map(contributor => (
+                  <option key={contributor} value={contributor}>{contributor}</option>
                 ))}
               </select>
 
@@ -931,7 +931,7 @@ export function ListView() {
             </div>
 
             {/* Active Filters Summary */}
-            {(searchTerm || typeFilter !== 'All Types' || statusFilter !== 'All Statuses' || assigneeFilter !== 'All Assignees' || priorityFilter !== 'All Priorities' || tagFilter) && (
+            {(searchTerm || typeFilter !== 'All Types' || statusFilter !== 'All Statuses' || contributorFilter !== 'All Contributors' || priorityFilter !== 'All Priorities' || tagFilter) && (
               <div className="flex items-center space-x-2 text-sm">
                 <span className="text-gray-400">Active filters:</span>
                 {searchTerm && (
@@ -949,9 +949,9 @@ export function ListView() {
                     Status: {statusFilter}
                   </span>
                 )}
-                {assigneeFilter !== 'All Assignees' && (
+                {contributorFilter !== 'All Contributors' && (
                   <span className="px-2 py-1 bg-yellow-900/30 text-yellow-300 rounded border border-yellow-500/30">
-                    Assignee: {assigneeFilter}
+                    Contributor: {contributorFilter}
                   </span>
                 )}
                 {priorityFilter !== 'All Priorities' && (

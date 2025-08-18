@@ -107,7 +107,7 @@ export function Layout({ children }: LayoutProps) {
                 </div>
               )}
               <p className="text-xs text-gray-400">
-                v0.2.0-alpha
+                v0.2.1-alpha
               </p>
               <p className="text-xs text-gray-500 mt-1">
                 For teams who think differently

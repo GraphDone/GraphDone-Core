@@ -197,7 +197,7 @@ async function seed() {
     console.log(`✅ Created ${contributors.length} contributors`);
     
     // Connect some contributors to work items
-    const assignments = [
+    const contributions = [
       { contributorId: 'contrib-1', workItemId: 'wi-1' },
       { contributorId: 'contrib-1', workItemId: 'wi-5' },
       { contributorId: 'contrib-2', workItemId: 'wi-6' },
@@ -206,15 +206,15 @@ async function seed() {
       { contributorId: 'contrib-5', workItemId: 'wi-9' }
     ];
     
-    for (const assignment of assignments) {
+    for (const contribution of contributions) {
       await session.run(
         `MATCH (c:Contributor {id: $contributorId})
          MATCH (w:WorkItem {id: $workItemId})
          CREATE (c)-[:CONTRIBUTES_TO]->(w)`,
-        assignment
+        contribution
       );
     }
-    console.log(`✅ Created ${assignments.length} contributor assignments`);
+    console.log(`✅ Created ${contributions.length} contributor connections`);
     
     console.log('🎉 Database seeding completed successfully!');
     
