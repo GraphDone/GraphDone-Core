@@ -102,7 +102,7 @@ export function ListView() {
         node.description?.toLowerCase().includes(searchLower) ||
         node.type.toLowerCase().includes(searchLower) ||
         node.status.toLowerCase().includes(searchLower) ||
-        node.assignee?.toLowerCase().includes(searchLower) ||
+        node.contributor?.toLowerCase().includes(searchLower) ||
         node.tags.some(tag => tag.toLowerCase().includes(searchLower)) ||
         node.id.toLowerCase().includes(searchLower) ||
         (node.dueDate && new Date(node.dueDate).toLocaleDateString().includes(searchLower))
@@ -119,12 +119,12 @@ export function ListView() {
       filtered = filtered.filter(node => node.status === statusFilter);
     }
 
-    // Assignee filter
-    if (assigneeFilter !== 'All Assignees') {
-      if (assigneeFilter === 'Unassigned') {
-        filtered = filtered.filter(node => !node.assignee);
+    // Contributor filter
+    if (contributorFilter !== 'All Contributors') {
+      if (contributorFilter === 'Unassigned') {
+        filtered = filtered.filter(node => !node.contributor);
       } else {
-        filtered = filtered.filter(node => node.assignee === assigneeFilter);
+        filtered = filtered.filter(node => node.contributor === contributorFilter);
       }
     }
 
@@ -151,7 +151,7 @@ export function ListView() {
     }
 
     return filtered;
-  }, [searchTerm, typeFilter, statusFilter, assigneeFilter, priorityFilter, tagFilter]);
+  }, [searchTerm, typeFilter, statusFilter, contributorFilter, priorityFilter, tagFilter]);
 
   // Calculate statistics
   const stats = useMemo(() => {
