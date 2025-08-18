@@ -19,6 +19,7 @@ interface EdgeMenuState {
 export function InteractiveGraphVisualization() {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const graphSwitcherRef = useRef<HTMLDivElement>(null);
   const { currentGraph, availableGraphs, selectGraph } = useGraph();
   
   const [nodeMenu, setNodeMenu] = useState<NodeMenuState>({ node: null, position: { x: 0, y: 0 }, visible: false });
@@ -794,17 +795,36 @@ export function InteractiveGraphVisualization() {
     return () => window.removeEventListener('resize', handleResize);
   }, [initializeVisualization]);
 
+  // Close graph switcher when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (graphSwitcherRef.current && !graphSwitcherRef.current.contains(event.target as Node)) {
+        setShowGraphSwitcher(false);
+      }
+    };
+
+    if (showGraphSwitcher) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showGraphSwitcher]);
+
   return (
     <div ref={containerRef} className="graph-container relative w-full h-full bg-gray-900">
-      <svg ref={svgRef} className="w-full h-full" style={{ background: 'radial-gradient(circle at center, #1f2937 0%, #111827 100%)' }} />
+      <svg 
+        ref={svgRef} 
+        className="w-full h-full" 
+        style={{ background: 'radial-gradient(circle at center, #1f2937 0%, #111827 100%)' }}
+        onClick={() => setShowGraphSwitcher(false)}
+      />
       
       {/* Graph Switcher Trigger */}
       <div 
+        ref={graphSwitcherRef}
         className="absolute top-4 left-4 z-40"
-        onMouseEnter={() => setShowGraphSwitcher(true)}
-        onMouseLeave={() => setShowGraphSwitcher(false)}
       >
         <button 
+          onClick={() => setShowGraphSwitcher(!showGraphSwitcher)}
           className="bg-gray-800/90 backdrop-blur-sm border border-gray-600 rounded-lg px-3 py-2 shadow-md hover:bg-gray-700 transition-all duration-200"
         >
           <div className="flex items-center space-x-2">
@@ -825,7 +845,7 @@ export function InteractiveGraphVisualization() {
               <h3 className="text-sm font-medium text-green-300">Switch Graph</h3>
               <p className="text-xs text-gray-400 mt-1">Select a different graph to visualize</p>
             </div>
-            <div className="max-h-64 overflow-y-auto">
+            <div className="max-h-64 overflow-y-auto scrollbar-gray">
               {availableGraphs.map((graph) => (
                 <button
                   key={graph.id}

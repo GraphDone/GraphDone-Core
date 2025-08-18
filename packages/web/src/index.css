@@ -160,3 +160,31 @@ svg text {
 .scrollbar-dark::-webkit-scrollbar-corner {
   background: #1f2937;
 }
+
+/* Custom gray scrollbar for dropdowns */
+.scrollbar-gray {
+  scrollbar-width: thin;
+  scrollbar-color: #6b7280 #374151;
+}
+
+.scrollbar-gray::-webkit-scrollbar {
+  width: 8px;
+}
+
+.scrollbar-gray::-webkit-scrollbar-track {
+  background: #374151;
+  border-radius: 4px;
+}
+
+.scrollbar-gray::-webkit-scrollbar-thumb {
+  background: #6b7280;
+  border-radius: 4px;
+}
+
+.scrollbar-gray::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+.scrollbar-gray::-webkit-scrollbar-corner {
+  background: #374151;
+}
