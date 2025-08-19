@@ -376,7 +376,7 @@ export function InteractiveGraphVisualization() {
       })
       .attr('fill', (d: WorkItem) => {
         switch (d.type) {
-          case 'EPIC': return '#8b5cf6';
+          case 'EPIC': return '#a855f7';
           case 'FEATURE': return '#3b82f6';
           case 'TASK': return '#10b981';
           case 'BUG': return '#ef4444';
@@ -666,7 +666,7 @@ export function InteractiveGraphVisualization() {
 
   const getNodeColor = (node: WorkItem) => {
     switch (node.type) {
-      case 'EPIC': return '#8b5cf6';
+      case 'EPIC': return '#a855f7';
       case 'FEATURE': return '#3b82f6';
       case 'TASK': return '#10b981';
       case 'BUG': return '#ef4444';
@@ -683,7 +683,7 @@ export function InteractiveGraphVisualization() {
       case 'IN_PROGRESS': return '#3b82f6';
       case 'BLOCKED': return '#ef4444';
       case 'PLANNED': return '#f59e0b';
-      case 'PROPOSED': return '#8b5cf6';
+      case 'PROPOSED': return '#a855f7';
       case 'CANCELLED': return '#6b7280';
       default: return '#6b7280';
     }

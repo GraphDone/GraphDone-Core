@@ -155,7 +155,7 @@ export function TimelineView() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'PROPOSED': return 'text-blue-400';
-      case 'PLANNED': return 'text-violet-400';
+      case 'PLANNED': return 'text-purple-400';
       case 'IN_PROGRESS': return 'text-yellow-400';
       case 'COMPLETED': return 'text-green-400';
       case 'BLOCKED': return 'text-red-400';
@@ -413,7 +413,7 @@ export function TimelineView() {
                               <div
                                 className={`absolute h-8 rounded-lg cursor-pointer hover:opacity-95 transition-all hover:shadow-xl hover:scale-105 flex items-center px-2 border-l-4 group overflow-hidden ${
                                   node.status === 'PROPOSED' ? 'bg-gradient-to-r from-blue-600 to-blue-500 border-blue-400 shadow-blue-500/20' :
-                                  node.status === 'PLANNED' ? 'bg-gradient-to-r from-violet-600 to-violet-500 border-violet-400 shadow-violet-500/20' :
+                                  node.status === 'PLANNED' ? 'bg-gradient-to-r from-purple-600 to-purple-500 border-purple-400 shadow-purple-500/20' :
                                   node.status === 'IN_PROGRESS' ? 'bg-gradient-to-r from-yellow-600 to-yellow-500 border-yellow-400 shadow-yellow-500/20' :
                                   node.status === 'COMPLETED' ? 'bg-gradient-to-r from-green-600 to-green-500 border-green-400 shadow-green-500/20' :
                                   node.status === 'BLOCKED' ? 'bg-gradient-to-r from-red-600 to-red-500 border-red-400 shadow-red-500/20' :
@@ -564,8 +564,8 @@ export function TimelineView() {
                         <span className="text-yellow-400">{stats.IN_PROGRESS || 0} active</span>
                       </div>
                       <div className="flex items-center space-x-1">
-                        <div className="w-2 h-2 bg-violet-500 rounded-full"></div>
-                        <span className="text-violet-400">{stats.PLANNED || 0} planned</span>
+                        <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                        <span className="text-purple-400">{stats.PLANNED || 0} planned</span>
                       </div>
                       {stats.BLOCKED > 0 && (
                         <div className="flex items-center space-x-1">
@@ -821,7 +821,7 @@ export function TimelineView() {
                           nodesByDate[dayData.day].some(n => n.status === 'BLOCKED') ? 'bg-red-500' :
                           nodesByDate[dayData.day].some(n => n.status === 'IN_PROGRESS') ? 'bg-yellow-500' :
                           nodesByDate[dayData.day].every(n => n.status === 'COMPLETED') ? 'bg-green-500' :
-                          'bg-violet-500'
+                          'bg-purple-500'
                         }`}></div>
                         <span className="text-xs text-gray-400">{nodesByDate[dayData.day].length}</span>
                       </div>
@@ -836,7 +836,7 @@ export function TimelineView() {
                           key={node.id}
                           className={`text-xs p-2 rounded-lg border-l-3 cursor-pointer transition-all duration-200 group-hover:shadow-md ${
                             node.status === 'PROPOSED' ? 'bg-blue-900/30 border-blue-500 hover:bg-blue-900/50' :
-                            node.status === 'PLANNED' ? 'bg-violet-900/30 border-violet-500 hover:bg-violet-900/50' :
+                            node.status === 'PLANNED' ? 'bg-purple-900/30 border-purple-500 hover:bg-purple-900/50' :
                             node.status === 'IN_PROGRESS' ? 'bg-yellow-900/30 border-yellow-500 hover:bg-yellow-900/50' :
                             node.status === 'COMPLETED' ? 'bg-green-900/30 border-green-500 hover:bg-green-900/50' :
                             node.status === 'BLOCKED' ? 'bg-red-900/30 border-red-500 hover:bg-red-900/50' :
@@ -1023,7 +1023,7 @@ export function TimelineView() {
                           <div className="text-xs text-gray-400">Proposed</div>
                         </div>
                         <div>
-                          <div className="text-lg font-bold text-violet-400">{backlogStats.PLANNED || 0}</div>
+                          <div className="text-lg font-bold text-purple-400">{backlogStats.PLANNED || 0}</div>
                           <div className="text-xs text-gray-400">Planned</div>
                         </div>
                         <div>
