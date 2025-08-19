@@ -273,7 +273,7 @@ export function ListView() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'PROPOSED': return 'text-blue-400';
-      case 'PLANNED': return 'text-violet-400';
+      case 'PLANNED': return 'text-purple-400';
       case 'IN_PROGRESS': return 'text-yellow-400';
       case 'COMPLETED': return 'text-green-400';
       case 'BLOCKED': return 'text-red-400';
@@ -343,11 +343,11 @@ export function ListView() {
       'PLANNED': { 
         label: 'Planned', 
         icon: '📋', 
-        color: 'bg-violet-500',
+        color: 'bg-purple-500',
         bgColor: 'bg-gray-750',
-        textColor: 'text-violet-400',
+        textColor: 'text-purple-400',
         borderColor: 'border-gray-600',
-        dotColor: 'bg-violet-400'
+        dotColor: 'bg-purple-400'
       },
       'IN_PROGRESS': { 
         label: 'In Progress', 
@@ -513,7 +513,7 @@ export function ListView() {
                     <div className="flex items-center whitespace-nowrap">
                       <div className={`w-2 h-2 rounded-full mr-2 ${
                         node.status === 'PROPOSED' ? 'bg-blue-400' :
-                        node.status === 'PLANNED' ? 'bg-violet-400' :
+                        node.status === 'PLANNED' ? 'bg-purple-400' :
                         node.status === 'IN_PROGRESS' ? 'bg-yellow-400' :
                         node.status === 'COMPLETED' ? 'bg-green-400' :
                         node.status === 'BLOCKED' ? 'bg-red-400' :
@@ -778,13 +778,13 @@ export function ListView() {
         <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <div className="w-8 h-8 bg-violet-500 rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-sm">{stats.planned}</span>
               </div>
             </div>
             <div className="ml-4">
               <div className="text-sm font-medium text-gray-300">Planned</div>
-              <div className="text-2xl font-bold text-violet-400">{stats.planned}</div>
+              <div className="text-2xl font-bold text-purple-400">{stats.planned}</div>
             </div>
           </div>
         </div>
@@ -811,7 +811,7 @@ export function ListView() {
           title="Status Distribution"
           data={[
             { label: 'Proposed', value: stats.proposed, color: '#3b82f6' },
-            { label: 'Planned', value: stats.planned, color: '#8b5cf6' },
+            { label: 'Planned', value: stats.planned, color: '#a855f7' },
             { label: 'In Progress', value: stats.inProgress, color: '#eab308' },
             { label: 'Completed', value: stats.completed, color: '#10b981' },
             { label: 'Blocked', value: stats.blocked, color: '#ef4444' }
@@ -1175,7 +1175,7 @@ export function ListView() {
                   <span className="text-sm text-gray-300">📋 Planned</span>
                 </div>
                 <div className="text-right">
-                  <div className="text-lg font-bold text-violet-400">{stats.planned}</div>
+                  <div className="text-lg font-bold text-purple-400">{stats.planned}</div>
                   <div className="text-xs text-gray-500">{stats.total > 0 ? Math.round((stats.planned / stats.total) * 100) : 0}%</div>
                 </div>
               </div>
