@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import * as d3 from 'd3';
-import { Link2, Edit3, Trash2, Eye, AlertTriangle, AlertCircle } from 'lucide-react';
+import { Link2, Edit3, Trash2, AlertTriangle, AlertCircle } from 'lucide-react';
 import { useQuery } from '@apollo/client';
 import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
 import { GET_WORK_ITEMS, GET_EDGES } from '../lib/queries';
 import { relationshipTypeInfo, RelationshipType } from '../types/projectData';
 import { validateGraphData, getValidationSummary, ValidationResult } from '../utils/graphDataValidation';
+import { EditNodeModal } from './EditNodeModal';
 
 interface WorkItem {
   id: string;
@@ -94,6 +95,8 @@ export function InteractiveGraphVisualization() {
   const [showGraphSwitcher, setShowGraphSwitcher] = useState(false);
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
   const [showDataHealth, setShowDataHealth] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedNode, setSelectedNode] = useState<WorkItem | null>(null);
 
   // ALL HOOK CALLS MUST BE AT THE TOP
   // Close menus when clicking outside
@@ -692,6 +695,17 @@ export function InteractiveGraphVisualization() {
     setNodeMenu(prev => ({ ...prev, visible: false }));
   };
 
+  const handleEditNode = (node: WorkItem) => {
+    setSelectedNode(node);
+    setShowEditModal(true);
+    setNodeMenu(prev => ({ ...prev, visible: false }));
+  };
+
+  const handleCloseEditModal = () => {
+    setShowEditModal(false);
+    setSelectedNode(null);
+  };
+
   // Layout and edge systems removed to fix TypeScript unused variable warnings
 
   return (
@@ -968,8 +982,11 @@ export function InteractiveGraphVisualization() {
               <Link2 className="h-4 w-4 mr-3" />
               Add Connected Item
             </button>
-            <button className="w-full flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700">
-              <Eye className="h-4 w-4 mr-3" />
+            <button 
+              onClick={() => handleEditNode(nodeMenu.node!)}
+              className="w-full flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
+            >
+              <Edit3 className="h-4 w-4 mr-3" />
               Edit Details
             </button>
             <button className="w-full flex items-center px-4 py-2 text-sm text-red-400 hover:bg-red-900/50">
@@ -1048,6 +1065,15 @@ export function InteractiveGraphVisualization() {
           </div>
         </div>
       </div>
+
+      {/* Edit Node Modal */}
+      {showEditModal && selectedNode && (
+        <EditNodeModal
+          isOpen={showEditModal}
+          onClose={handleCloseEditModal}
+          node={selectedNode}
+        />
+      )}
     </div>
   );
 }

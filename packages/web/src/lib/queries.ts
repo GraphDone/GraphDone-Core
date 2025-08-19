@@ -144,26 +144,28 @@ export const CREATE_WORK_ITEM = gql`
 `;
 
 export const UPDATE_WORK_ITEM = gql`
-  mutation UpdateWorkItem($id: ID!, $input: WorkItemUpdateInput!) {
-    updateWorkItem(id: $id, input: $input) {
-      id
-      type
-      title
-      description
-      status
-      positionX
-      positionY
-      positionZ
-      radius
-      theta
-      phi
-      priorityExec
-      priorityIndiv
-      priorityComm
-      priorityComp
-      dueDate
-      assignedTo
-      updatedAt
+  mutation UpdateWorkItems($where: WorkItemWhere!, $update: WorkItemUpdateInput!) {
+    updateWorkItems(where: $where, update: $update) {
+      workItems {
+        id
+        type
+        title
+        description
+        status
+        positionX
+        positionY
+        positionZ
+        radius
+        theta
+        phi
+        priorityExec
+        priorityIndiv
+        priorityComm
+        priorityComp
+        dueDate
+        assignedTo
+        updatedAt
+      }
     }
   }
 `;

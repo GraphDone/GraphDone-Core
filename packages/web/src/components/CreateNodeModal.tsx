@@ -342,6 +342,31 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                 placeholder="Select category..."
               />
             </div>
+
+            <div>
+              <label htmlFor="status" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Status
+              </label>
+              <select
+                id="status"
+                value={formData.status}
+                onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
+                className={`w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent font-medium ${
+                  formData.status === 'PROPOSED' ? 'text-blue-600 dark:text-blue-400' :
+                  formData.status === 'PLANNED' ? 'text-violet-600 dark:text-violet-400' :
+                  formData.status === 'IN_PROGRESS' ? 'text-yellow-600 dark:text-yellow-400' :
+                  formData.status === 'COMPLETED' ? 'text-green-600 dark:text-green-400' :
+                  formData.status === 'BLOCKED' ? 'text-red-600 dark:text-red-400' :
+                  'text-gray-900 dark:text-white'
+                }`}
+              >
+                <option value="PROPOSED" className="text-blue-600">Proposed</option>
+                <option value="PLANNED" className="text-violet-600">Planned</option>
+                <option value="IN_PROGRESS" className="text-yellow-600">In Progress</option>
+                <option value="COMPLETED" className="text-green-600">Completed</option>
+                <option value="BLOCKED" className="text-red-600">Blocked</option>
+              </select>
+            </div>
             
             <div>
               <label htmlFor="description" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
