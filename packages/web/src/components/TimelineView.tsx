@@ -97,22 +97,68 @@ export function TimelineView() {
   // Helper functions
   const getNodeTypeColor = (type: string) => {
     switch (type) {
+      // Strategic Planning
       case 'EPIC': return 'bg-purple-500 text-white';
-      case 'FEATURE': return 'bg-blue-500 text-white';
-      case 'TASK': return 'bg-green-500 text-white';
-      case 'BUG': return 'bg-red-500 text-white';
+      case 'PROJECT': return 'bg-purple-600 text-white';
       case 'MILESTONE': return 'bg-yellow-500 text-black';
+      case 'GOAL': return 'bg-purple-400 text-white';
+      
+      // Development Work  
+      case 'STORY': return 'bg-blue-500 text-white';
+      case 'FEATURE': return 'bg-blue-600 text-white';
+      case 'TASK': return 'bg-green-500 text-white';
+      case 'RESEARCH': return 'bg-blue-400 text-white';
+      
+      // Quality & Issues
+      case 'BUG': return 'bg-red-500 text-white';
+      case 'ISSUE': return 'bg-red-400 text-white';
+      case 'HOTFIX': return 'bg-red-600 text-white';
+      
+      // Operations & Maintenance
+      case 'MAINTENANCE': return 'bg-orange-500 text-white';
+      case 'DEPLOYMENT': return 'bg-orange-600 text-white';
+      case 'MONITORING': return 'bg-orange-400 text-white';
+      
+      // Documentation
+      case 'DOCUMENTATION': return 'bg-indigo-500 text-white';
+      case 'SPECIFICATION': return 'bg-indigo-600 text-white';
+      case 'GUIDE': return 'bg-indigo-400 text-white';
+      
+      // Testing & Validation
+      case 'TEST': return 'bg-emerald-500 text-white';
+      case 'REVIEW': return 'bg-emerald-600 text-white';
+      case 'QA': return 'bg-emerald-400 text-white';
+      
+      // Business & Sales
+      case 'LEAD': return 'bg-teal-500 text-white';
+      case 'OPPORTUNITY': return 'bg-teal-600 text-white';
+      case 'CONTRACT': return 'bg-teal-400 text-white';
+      
+      // Creative & Design
+      case 'MOCKUP': return 'bg-pink-500 text-white';
+      case 'PROTOTYPE': return 'bg-pink-600 text-white';
+      case 'UI_DESIGN': return 'bg-pink-400 text-white';
+      
+      // Support & Training
+      case 'SUPPORT': return 'bg-cyan-500 text-white';
+      case 'TRAINING': return 'bg-cyan-600 text-white';
+      
+      // Other
+      case 'NOTE': return 'bg-slate-500 text-white';
+      case 'ACTION_ITEM': return 'bg-slate-600 text-white';
+      case 'DECISION': return 'bg-slate-400 text-white';
+      
       default: return 'bg-gray-500 text-white';
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
+      case 'PROPOSED': return 'text-blue-400';
+      case 'PLANNED': return 'text-violet-400';
+      case 'IN_PROGRESS': return 'text-yellow-400';
       case 'COMPLETED': return 'text-green-400';
-      case 'IN_PROGRESS': return 'text-blue-400';
       case 'BLOCKED': return 'text-red-400';
-      case 'PLANNED': return 'text-yellow-400';
-      case 'PROPOSED': return 'text-purple-400';
       default: return 'text-gray-400';
     }
   };
@@ -366,10 +412,11 @@ export function TimelineView() {
                             ) : (
                               <div
                                 className={`absolute h-8 rounded-lg cursor-pointer hover:opacity-95 transition-all hover:shadow-xl hover:scale-105 flex items-center px-2 border-l-4 group overflow-hidden ${
+                                  node.status === 'PROPOSED' ? 'bg-gradient-to-r from-blue-600 to-blue-500 border-blue-400 shadow-blue-500/20' :
+                                  node.status === 'PLANNED' ? 'bg-gradient-to-r from-violet-600 to-violet-500 border-violet-400 shadow-violet-500/20' :
+                                  node.status === 'IN_PROGRESS' ? 'bg-gradient-to-r from-yellow-600 to-yellow-500 border-yellow-400 shadow-yellow-500/20' :
                                   node.status === 'COMPLETED' ? 'bg-gradient-to-r from-green-600 to-green-500 border-green-400 shadow-green-500/20' :
-                                  node.status === 'IN_PROGRESS' ? 'bg-gradient-to-r from-blue-600 to-blue-500 border-blue-400 shadow-blue-500/20' :
                                   node.status === 'BLOCKED' ? 'bg-gradient-to-r from-red-600 to-red-500 border-red-400 shadow-red-500/20' :
-                                  node.status === 'PLANNED' ? 'bg-gradient-to-r from-orange-600 to-orange-500 border-orange-400 shadow-orange-500/20' :
                                   'bg-gradient-to-r from-gray-600 to-gray-500 border-gray-400 shadow-gray-500/20'
                                 } shadow-lg`}
                                 style={{
@@ -513,12 +560,12 @@ export function TimelineView() {
                         <span className="text-green-400">{stats.COMPLETED || 0} done</span>
                       </div>
                       <div className="flex items-center space-x-1">
-                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                        <span className="text-blue-400">{stats.IN_PROGRESS || 0} active</span>
+                        <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                        <span className="text-yellow-400">{stats.IN_PROGRESS || 0} active</span>
                       </div>
                       <div className="flex items-center space-x-1">
-                        <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                        <span className="text-orange-400">{stats.PLANNED || 0} planned</span>
+                        <div className="w-2 h-2 bg-violet-500 rounded-full"></div>
+                        <span className="text-violet-400">{stats.PLANNED || 0} planned</span>
                       </div>
                       {stats.BLOCKED > 0 && (
                         <div className="flex items-center space-x-1">
@@ -772,9 +819,9 @@ export function TimelineView() {
                       <div className="flex items-center space-x-1">
                         <div className={`w-2 h-2 rounded-full ${
                           nodesByDate[dayData.day].some(n => n.status === 'BLOCKED') ? 'bg-red-500' :
-                          nodesByDate[dayData.day].some(n => n.status === 'IN_PROGRESS') ? 'bg-blue-500' :
+                          nodesByDate[dayData.day].some(n => n.status === 'IN_PROGRESS') ? 'bg-yellow-500' :
                           nodesByDate[dayData.day].every(n => n.status === 'COMPLETED') ? 'bg-green-500' :
-                          'bg-yellow-500'
+                          'bg-violet-500'
                         }`}></div>
                         <span className="text-xs text-gray-400">{nodesByDate[dayData.day].length}</span>
                       </div>
@@ -788,10 +835,11 @@ export function TimelineView() {
                         <div
                           key={node.id}
                           className={`text-xs p-2 rounded-lg border-l-3 cursor-pointer transition-all duration-200 group-hover:shadow-md ${
+                            node.status === 'PROPOSED' ? 'bg-blue-900/30 border-blue-500 hover:bg-blue-900/50' :
+                            node.status === 'PLANNED' ? 'bg-violet-900/30 border-violet-500 hover:bg-violet-900/50' :
+                            node.status === 'IN_PROGRESS' ? 'bg-yellow-900/30 border-yellow-500 hover:bg-yellow-900/50' :
                             node.status === 'COMPLETED' ? 'bg-green-900/30 border-green-500 hover:bg-green-900/50' :
-                            node.status === 'IN_PROGRESS' ? 'bg-blue-900/30 border-blue-500 hover:bg-blue-900/50' :
                             node.status === 'BLOCKED' ? 'bg-red-900/30 border-red-500 hover:bg-red-900/50' :
-                            node.status === 'PLANNED' ? 'bg-orange-900/30 border-orange-500 hover:bg-orange-900/50' :
                             'bg-gray-700 border-gray-500 hover:bg-gray-600'
                           }`}
                           title={`${node.title}\nType: ${node.type}\nStatus: ${node.status}\nContributor: ${node.contributor || 'Available'}\nPriority: ${Math.round(node.priority.computed * 100)}%`}
@@ -971,15 +1019,15 @@ export function TimelineView() {
                     return (
                       <>
                         <div>
-                          <div className="text-lg font-bold text-green-400">{backlogStats.PROPOSED || 0}</div>
+                          <div className="text-lg font-bold text-blue-400">{backlogStats.PROPOSED || 0}</div>
                           <div className="text-xs text-gray-400">Proposed</div>
                         </div>
                         <div>
-                          <div className="text-lg font-bold text-orange-400">{backlogStats.PLANNED || 0}</div>
+                          <div className="text-lg font-bold text-violet-400">{backlogStats.PLANNED || 0}</div>
                           <div className="text-xs text-gray-400">Planned</div>
                         </div>
                         <div>
-                          <div className="text-lg font-bold text-blue-400">{backlogStats.IN_PROGRESS || 0}</div>
+                          <div className="text-lg font-bold text-yellow-400">{backlogStats.IN_PROGRESS || 0}</div>
                           <div className="text-xs text-gray-400">In Progress</div>
                         </div>
                         <div>
