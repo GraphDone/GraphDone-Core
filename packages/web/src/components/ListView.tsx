@@ -215,22 +215,68 @@ export function ListView() {
 
   const getNodeTypeColor = (type: string) => {
     switch (type) {
+      // Strategic Planning
       case 'EPIC': return 'bg-purple-500 text-white';
-      case 'FEATURE': return 'bg-blue-500 text-white';
-      case 'TASK': return 'bg-green-500 text-white';
-      case 'BUG': return 'bg-red-500 text-white';
+      case 'PROJECT': return 'bg-purple-600 text-white';
       case 'MILESTONE': return 'bg-yellow-500 text-black';
+      case 'GOAL': return 'bg-purple-400 text-white';
+      
+      // Development Work  
+      case 'STORY': return 'bg-blue-500 text-white';
+      case 'FEATURE': return 'bg-blue-600 text-white';
+      case 'TASK': return 'bg-green-500 text-white';
+      case 'RESEARCH': return 'bg-blue-400 text-white';
+      
+      // Quality & Issues
+      case 'BUG': return 'bg-red-500 text-white';
+      case 'ISSUE': return 'bg-red-400 text-white';
+      case 'HOTFIX': return 'bg-red-600 text-white';
+      
+      // Operations & Maintenance
+      case 'MAINTENANCE': return 'bg-orange-500 text-white';
+      case 'DEPLOYMENT': return 'bg-orange-600 text-white';
+      case 'MONITORING': return 'bg-orange-400 text-white';
+      
+      // Documentation
+      case 'DOCUMENTATION': return 'bg-indigo-500 text-white';
+      case 'SPECIFICATION': return 'bg-indigo-600 text-white';
+      case 'GUIDE': return 'bg-indigo-400 text-white';
+      
+      // Testing & Validation
+      case 'TEST': return 'bg-emerald-500 text-white';
+      case 'REVIEW': return 'bg-emerald-600 text-white';
+      case 'QA': return 'bg-emerald-400 text-white';
+      
+      // Business & Sales
+      case 'LEAD': return 'bg-teal-500 text-white';
+      case 'OPPORTUNITY': return 'bg-teal-600 text-white';
+      case 'CONTRACT': return 'bg-teal-400 text-white';
+      
+      // Creative & Design
+      case 'MOCKUP': return 'bg-pink-500 text-white';
+      case 'PROTOTYPE': return 'bg-pink-600 text-white';
+      case 'UI_DESIGN': return 'bg-pink-400 text-white';
+      
+      // Support & Training
+      case 'SUPPORT': return 'bg-cyan-500 text-white';
+      case 'TRAINING': return 'bg-cyan-600 text-white';
+      
+      // Other
+      case 'NOTE': return 'bg-slate-500 text-white';
+      case 'ACTION_ITEM': return 'bg-slate-600 text-white';
+      case 'DECISION': return 'bg-slate-400 text-white';
+      
       default: return 'bg-gray-500 text-white';
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
+      case 'PROPOSED': return 'text-blue-400';
+      case 'PLANNED': return 'text-violet-400';
+      case 'IN_PROGRESS': return 'text-yellow-400';
       case 'COMPLETED': return 'text-green-400';
-      case 'IN_PROGRESS': return 'text-blue-400';
       case 'BLOCKED': return 'text-red-400';
-      case 'PLANNED': return 'text-yellow-400';
-      case 'PROPOSED': return 'text-purple-400';
       default: return 'text-gray-400';
     }
   };
@@ -288,29 +334,29 @@ export function ListView() {
       'PROPOSED': { 
         label: 'Proposed', 
         icon: '💡', 
-        color: 'bg-slate-500',
-        bgColor: 'bg-gray-750',
-        textColor: 'text-slate-400',
-        borderColor: 'border-gray-600',
-        dotColor: 'bg-slate-400'
-      },
-      'PLANNED': { 
-        label: 'Planned', 
-        icon: '📋', 
         color: 'bg-blue-500',
         bgColor: 'bg-gray-750',
         textColor: 'text-blue-400',
         borderColor: 'border-gray-600',
         dotColor: 'bg-blue-400'
       },
+      'PLANNED': { 
+        label: 'Planned', 
+        icon: '📋', 
+        color: 'bg-violet-500',
+        bgColor: 'bg-gray-750',
+        textColor: 'text-violet-400',
+        borderColor: 'border-gray-600',
+        dotColor: 'bg-violet-400'
+      },
       'IN_PROGRESS': { 
         label: 'In Progress', 
         icon: '⚡', 
-        color: 'bg-amber-500',
+        color: 'bg-yellow-500',
         bgColor: 'bg-gray-750',
-        textColor: 'text-amber-400',
+        textColor: 'text-yellow-400',
         borderColor: 'border-gray-600',
-        dotColor: 'bg-amber-400'
+        dotColor: 'bg-yellow-400'
       },
       'BLOCKED': { 
         label: 'Blocked', 
@@ -324,11 +370,11 @@ export function ListView() {
       'COMPLETED': { 
         label: 'Completed', 
         icon: '✅', 
-        color: 'bg-emerald-500',
+        color: 'bg-green-500',
         bgColor: 'bg-gray-750',
-        textColor: 'text-emerald-400',
+        textColor: 'text-green-400',
         borderColor: 'border-gray-600',
-        dotColor: 'bg-emerald-400'
+        dotColor: 'bg-green-400'
       }
     };
 
@@ -466,11 +512,12 @@ export function ListView() {
                   <td className="pl-3 pr-3 py-10">
                     <div className="flex items-center whitespace-nowrap">
                       <div className={`w-2 h-2 rounded-full mr-2 ${
+                        node.status === 'PROPOSED' ? 'bg-blue-400' :
+                        node.status === 'PLANNED' ? 'bg-violet-400' :
+                        node.status === 'IN_PROGRESS' ? 'bg-yellow-400' :
                         node.status === 'COMPLETED' ? 'bg-green-400' :
-                        node.status === 'IN_PROGRESS' ? 'bg-blue-400' :
                         node.status === 'BLOCKED' ? 'bg-red-400' :
-                        node.status === 'PLANNED' ? 'bg-yellow-400' :
-                        'bg-purple-400'
+                        'bg-gray-400'
                       }`}></div>
                       <span className={`text-sm font-medium ${getStatusColor(node.status)}`}>
                         {formatLabel(node.status)}
@@ -700,13 +747,13 @@ export function ListView() {
         <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-yellow-500 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-sm">{stats.inProgress}</span>
               </div>
             </div>
             <div className="ml-4">
               <div className="text-sm font-medium text-gray-300">In Progress</div>
-              <div className="text-2xl font-bold text-blue-400">{stats.inProgress}</div>
+              <div className="text-2xl font-bold text-yellow-400">{stats.inProgress}</div>
             </div>
           </div>
         </div>
@@ -731,13 +778,13 @@ export function ListView() {
         <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <div className="w-8 h-8 bg-yellow-500 rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-violet-500 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-sm">{stats.planned}</span>
               </div>
             </div>
             <div className="ml-4">
               <div className="text-sm font-medium text-gray-300">Planned</div>
-              <div className="text-2xl font-bold text-yellow-400">{stats.planned}</div>
+              <div className="text-2xl font-bold text-violet-400">{stats.planned}</div>
             </div>
           </div>
         </div>
@@ -745,13 +792,13 @@ export function ListView() {
         <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <div className="w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-sm">{stats.proposed}</span>
               </div>
             </div>
             <div className="ml-4">
               <div className="text-sm font-medium text-gray-300">Proposed</div>
-              <div className="text-2xl font-bold text-purple-400">{stats.proposed}</div>
+              <div className="text-2xl font-bold text-blue-400">{stats.proposed}</div>
             </div>
           </div>
         </div>
@@ -763,11 +810,11 @@ export function ListView() {
         <PieChart 
           title="Status Distribution"
           data={[
+            { label: 'Proposed', value: stats.proposed, color: '#3b82f6' },
+            { label: 'Planned', value: stats.planned, color: '#8b5cf6' },
+            { label: 'In Progress', value: stats.inProgress, color: '#eab308' },
             { label: 'Completed', value: stats.completed, color: '#10b981' },
-            { label: 'In Progress', value: stats.inProgress, color: '#3b82f6' },
-            { label: 'Blocked', value: stats.blocked, color: '#ef4444' },
-            { label: 'Planned', value: stats.planned, color: '#f59e0b' },
-            { label: 'Proposed', value: stats.proposed, color: '#8b5cf6' }
+            { label: 'Blocked', value: stats.blocked, color: '#ef4444' }
           ]}
         />
 
@@ -922,11 +969,77 @@ export function ListView() {
                 className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
               >
                 <option value="All Types">All Types</option>
-                <option value="EPIC">Epic</option>
-                <option value="FEATURE">Feature</option>
-                <option value="TASK">Task</option>
-                <option value="BUG">Bug</option>
-                <option value="MILESTONE">Milestone</option>
+                
+                {/* Strategic Planning */}
+                <optgroup label="🎯 Strategic Planning">
+                  <option value="EPIC">Epic</option>
+                  <option value="PROJECT">Project</option>
+                  <option value="MILESTONE">Milestone</option>
+                  <option value="GOAL">Goal</option>
+                </optgroup>
+                
+                {/* Development Work */}
+                <optgroup label="⚡ Development Work">
+                  <option value="STORY">Story</option>
+                  <option value="FEATURE">Feature</option>
+                  <option value="TASK">Task</option>
+                  <option value="RESEARCH">Research</option>
+                </optgroup>
+                
+                {/* Quality & Issues */}
+                <optgroup label="🔍 Quality & Issues">
+                  <option value="BUG">Bug</option>
+                  <option value="ISSUE">Issue</option>
+                  <option value="HOTFIX">Hotfix</option>
+                </optgroup>
+                
+                {/* Operations & Maintenance */}
+                <optgroup label="🔧 Operations & Maintenance">
+                  <option value="MAINTENANCE">Maintenance</option>
+                  <option value="DEPLOYMENT">Deployment</option>
+                  <option value="MONITORING">Monitoring</option>
+                </optgroup>
+                
+                {/* Documentation */}
+                <optgroup label="📋 Documentation">
+                  <option value="DOCUMENTATION">Documentation</option>
+                  <option value="SPECIFICATION">Specification</option>
+                  <option value="GUIDE">Guide</option>
+                </optgroup>
+                
+                {/* Testing & Validation */}
+                <optgroup label="✅ Testing & Validation">
+                  <option value="TEST">Test</option>
+                  <option value="REVIEW">Review</option>
+                  <option value="QA">QA</option>
+                </optgroup>
+                
+                {/* Business & Sales */}
+                <optgroup label="💼 Business & Sales">
+                  <option value="LEAD">Lead</option>
+                  <option value="OPPORTUNITY">Opportunity</option>
+                  <option value="CONTRACT">Contract</option>
+                </optgroup>
+                
+                {/* Creative & Design */}
+                <optgroup label="🎨 Creative & Design">
+                  <option value="MOCKUP">Mockup</option>
+                  <option value="PROTOTYPE">Prototype</option>
+                  <option value="UI_DESIGN">UI Design</option>
+                </optgroup>
+                
+                {/* Support & Training */}
+                <optgroup label="🎓 Support & Training">
+                  <option value="SUPPORT">Support</option>
+                  <option value="TRAINING">Training</option>
+                </optgroup>
+                
+                {/* Other */}
+                <optgroup label="🔧 Other">
+                  <option value="NOTE">Note</option>
+                  <option value="ACTION_ITEM">Action Item</option>
+                  <option value="DECISION">Decision</option>
+                </optgroup>
               </select>
               
               <select
@@ -1049,11 +1162,21 @@ export function ListView() {
             <div className="space-y-3">
               <div className="flex items-center justify-between p-2 rounded hover:bg-gray-700 transition-colors">
                 <div className="flex items-center space-x-3">
-                  <span className="text-sm text-gray-300">✅ Completed</span>
+                  <span className="text-sm text-gray-300">💡 Proposed</span>
                 </div>
                 <div className="text-right">
-                  <div className="text-lg font-bold text-green-400">{stats.completed}</div>
-                  <div className="text-xs text-gray-500">{stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}%</div>
+                  <div className="text-lg font-bold text-blue-400">{stats.proposed}</div>
+                  <div className="text-xs text-gray-500">{stats.total > 0 ? Math.round((stats.proposed / stats.total) * 100) : 0}%</div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between p-2 rounded hover:bg-gray-700 transition-colors">
+                <div className="flex items-center space-x-3">
+                  <span className="text-sm text-gray-300">📋 Planned</span>
+                </div>
+                <div className="text-right">
+                  <div className="text-lg font-bold text-violet-400">{stats.planned}</div>
+                  <div className="text-xs text-gray-500">{stats.total > 0 ? Math.round((stats.planned / stats.total) * 100) : 0}%</div>
                 </div>
               </div>
 
@@ -1062,7 +1185,7 @@ export function ListView() {
                   <span className="text-sm text-gray-300">⚡ In Progress</span>
                 </div>
                 <div className="text-right">
-                  <div className="text-lg font-bold text-blue-400">{stats.inProgress}</div>
+                  <div className="text-lg font-bold text-yellow-400">{stats.inProgress}</div>
                   <div className="text-xs text-gray-500">{stats.total > 0 ? Math.round((stats.inProgress / stats.total) * 100) : 0}%</div>
                 </div>
               </div>
@@ -1079,21 +1202,11 @@ export function ListView() {
 
               <div className="flex items-center justify-between p-2 rounded hover:bg-gray-700 transition-colors">
                 <div className="flex items-center space-x-3">
-                  <span className="text-sm text-gray-300">📋 Planned</span>
+                  <span className="text-sm text-gray-300">✅ Completed</span>
                 </div>
                 <div className="text-right">
-                  <div className="text-lg font-bold text-yellow-400">{stats.planned}</div>
-                  <div className="text-xs text-gray-500">{stats.total > 0 ? Math.round((stats.planned / stats.total) * 100) : 0}%</div>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between p-2 rounded hover:bg-gray-700 transition-colors">
-                <div className="flex items-center space-x-3">
-                  <span className="text-sm text-gray-300">💡 Proposed</span>
-                </div>
-                <div className="text-right">
-                  <div className="text-lg font-bold text-purple-400">{stats.proposed}</div>
-                  <div className="text-xs text-gray-500">{stats.total > 0 ? Math.round((stats.proposed / stats.total) * 100) : 0}%</div>
+                  <div className="text-lg font-bold text-green-400">{stats.completed}</div>
+                  <div className="text-xs text-gray-500">{stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}%</div>
                 </div>
               </div>
             </div>
