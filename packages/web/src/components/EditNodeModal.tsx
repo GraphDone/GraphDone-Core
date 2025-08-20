@@ -247,11 +247,11 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
             {/* Contributor and Due Date Row */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label htmlFor="assignedTo" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label htmlFor="contributorId" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Contributor
                 </label>
                 <select
-                  id="assignedTo"
+                  id="contributorId"
                   value={formData.assignedTo}
                   onChange={(e) => setFormData(prev => ({ ...prev, assignedTo: e.target.value }))}
                   className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -414,7 +414,19 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                     'accent-green-500'
                   }`}
                 />
-                <div className="text-xs text-gray-500 dark:text-gray-400 text-center">{formData.priorityExec.toFixed(1)}</div>
+                <div className={`text-xs text-center font-medium ${
+                  formData.priorityExec >= 0.8 ? 'text-red-500' :
+                  formData.priorityExec >= 0.6 ? 'text-orange-500' :
+                  formData.priorityExec >= 0.4 ? 'text-yellow-500' :
+                  formData.priorityExec >= 0.2 ? 'text-blue-500' :
+                  'text-green-500'
+                }`}>
+                  {formData.priorityExec >= 0.8 ? '🔴 Critical' :
+                   formData.priorityExec >= 0.6 ? '🟠 High' :
+                   formData.priorityExec >= 0.4 ? '🟡 Moderate' :
+                   formData.priorityExec >= 0.2 ? '🔵 Low' :
+                   '🟢 Minimal'} ({formData.priorityExec})
+                </div>
               </div>
               
               <div>
@@ -439,7 +451,19 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                     'accent-green-500'
                   }`}
                 />
-                <div className="text-xs text-gray-500 dark:text-gray-400 text-center">{formData.priorityIndiv.toFixed(1)}</div>
+                <div className={`text-xs text-center font-medium ${
+                  formData.priorityIndiv >= 0.8 ? 'text-red-500' :
+                  formData.priorityIndiv >= 0.6 ? 'text-orange-500' :
+                  formData.priorityIndiv >= 0.4 ? 'text-yellow-500' :
+                  formData.priorityIndiv >= 0.2 ? 'text-blue-500' :
+                  'text-green-500'
+                }`}>
+                  {formData.priorityIndiv >= 0.8 ? '🔴 Critical' :
+                   formData.priorityIndiv >= 0.6 ? '🟠 High' :
+                   formData.priorityIndiv >= 0.4 ? '🟡 Moderate' :
+                   formData.priorityIndiv >= 0.2 ? '🔵 Low' :
+                   '🟢 Minimal'} ({formData.priorityIndiv})
+                </div>
               </div>
               
               <div>
@@ -464,7 +488,19 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                     'accent-green-500'
                   }`}
                 />
-                <div className="text-xs text-gray-500 dark:text-gray-400 text-center">{formData.priorityComm.toFixed(1)}</div>
+                <div className={`text-xs text-center font-medium ${
+                  formData.priorityComm >= 0.8 ? 'text-red-500' :
+                  formData.priorityComm >= 0.6 ? 'text-orange-500' :
+                  formData.priorityComm >= 0.4 ? 'text-yellow-500' :
+                  formData.priorityComm >= 0.2 ? 'text-blue-500' :
+                  'text-green-500'
+                }`}>
+                  {formData.priorityComm >= 0.8 ? '🔴 Critical' :
+                   formData.priorityComm >= 0.6 ? '🟠 High' :
+                   formData.priorityComm >= 0.4 ? '🟡 Moderate' :
+                   formData.priorityComm >= 0.2 ? '🔵 Low' :
+                   '🟢 Minimal'} ({formData.priorityComm})
+                </div>
               </div>
             </div>
             
