@@ -193,6 +193,50 @@ export const typeDefs = gql`
     AI_AGENT
   }
 
+  enum GraphType {
+    PROJECT
+    WORKSPACE
+    SUBGRAPH
+    TEMPLATE
+  }
+
+  enum GraphStatus {
+    DRAFT
+    ACTIVE
+    ARCHIVED
+    DELETED
+  }
+
+  # Graph entity - represents a graph/workspace/project
+  type Graph {
+    id: ID! @id
+    name: String!
+    description: String
+    type: GraphType!
+    status: GraphStatus! @default(value: DRAFT)
+    parentGraphId: String
+    teamId: String! @default(value: "default-team")
+    createdBy: String!
+    depth: Int! @default(value: 0)
+    path: [String!]
+    isShared: Boolean! @default(value: false)
+    nodeCount: Int! @default(value: 0)
+    edgeCount: Int! @default(value: 0)
+    contributorCount: Int! @default(value: 0)
+    lastActivity: DateTime
+    settings: String # JSON as string for graph settings
+    permissions: String # JSON as string for permissions
+    shareSettings: String # JSON as string for share settings
+    
+    createdAt: DateTime! @timestamp(operations: [CREATE])
+    updatedAt: DateTime! @timestamp
+    
+    # Relationships
+    workItems: [WorkItem!]! @relationship(type: "BELONGS_TO", direction: IN)
+    subgraphs: [Graph!]! @relationship(type: "PARENT_OF", direction: OUT)
+    parentGraph: Graph @relationship(type: "PARENT_OF", direction: IN)
+  }
+
   # WorkItem entity - represents work items in the graph
   type WorkItem {
     id: ID! @id
@@ -222,6 +266,7 @@ export const typeDefs = gql`
     updatedAt: DateTime! @timestamp
 
     # Relationships
+    graph: Graph @relationship(type: "BELONGS_TO", direction: OUT)
     dependencies: [WorkItem!]! @relationship(type: "DEPENDS_ON", direction: OUT)
     dependents: [WorkItem!]! @relationship(type: "DEPENDS_ON", direction: IN)
     contributors: [Contributor!]! @relationship(type: "CONTRIBUTES_TO", direction: IN)
@@ -272,6 +317,9 @@ export const typeDefs = gql`
   # Neo4j GraphQL will auto-generate Query and Mutation types
 
   type Subscription {
+    graphCreated: Graph!
+    graphUpdated: Graph!
+    graphDeleted: ID!
     workItemCreated: WorkItem!
     workItemUpdated: WorkItem!
     workItemDeleted: ID!
