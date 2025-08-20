@@ -8,6 +8,7 @@ import { GET_WORK_ITEMS, GET_EDGES } from '../lib/queries';
 import { relationshipTypeInfo, RelationshipType } from '../types/projectData';
 import { validateGraphData, getValidationSummary, ValidationResult } from '../utils/graphDataValidation';
 import { EditNodeModal } from './EditNodeModal';
+import { DeleteNodeModal } from './DeleteNodeModal';
 
 interface WorkItem {
   id: string;
@@ -96,6 +97,7 @@ export function InteractiveGraphVisualization() {
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
   const [showDataHealth, setShowDataHealth] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedNode, setSelectedNode] = useState<WorkItem | null>(null);
 
   // ALL HOOK CALLS MUST BE AT THE TOP
@@ -706,6 +708,17 @@ export function InteractiveGraphVisualization() {
     setSelectedNode(null);
   };
 
+  const handleDeleteNode = (node: WorkItem) => {
+    setSelectedNode(node);
+    setShowDeleteModal(true);
+    setNodeMenu(prev => ({ ...prev, visible: false }));
+  };
+
+  const handleCloseDeleteModal = () => {
+    setShowDeleteModal(false);
+    setSelectedNode(null);
+  };
+
   // Layout and edge systems removed to fix TypeScript unused variable warnings
 
   return (
@@ -989,7 +1002,10 @@ export function InteractiveGraphVisualization() {
               <Edit3 className="h-4 w-4 mr-3" />
               Edit Details
             </button>
-            <button className="w-full flex items-center px-4 py-2 text-sm text-red-400 hover:bg-red-900/50">
+            <button 
+              onClick={() => handleDeleteNode(nodeMenu.node!)}
+              className="w-full flex items-center px-4 py-2 text-sm text-red-400 hover:bg-red-900/50"
+            >
               <Trash2 className="h-4 w-4 mr-3" />
               Delete Node
             </button>
@@ -1072,6 +1088,17 @@ export function InteractiveGraphVisualization() {
           isOpen={showEditModal}
           onClose={handleCloseEditModal}
           node={selectedNode}
+        />
+      )}
+
+      {/* Delete Node Modal */}
+      {showDeleteModal && selectedNode && (
+        <DeleteNodeModal
+          isOpen={showDeleteModal}
+          onClose={handleCloseDeleteModal}
+          nodeId={selectedNode.id}
+          nodeTitle={selectedNode.title}
+          nodeType={selectedNode.type}
         />
       )}
     </div>
