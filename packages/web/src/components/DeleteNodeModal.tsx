@@ -3,6 +3,7 @@ import { useMutation } from '@apollo/client';
 import { X, Trash2, AlertTriangle } from 'lucide-react';
 import { DELETE_WORK_ITEM, GET_WORK_ITEMS } from '../lib/queries';
 import { useAuth } from '../contexts/AuthContext';
+import { useNotifications } from '../contexts/NotificationContext';
 
 interface DeleteNodeModalProps {
   isOpen: boolean;
@@ -14,6 +15,7 @@ interface DeleteNodeModalProps {
 
 export function DeleteNodeModal({ isOpen, onClose, nodeId, nodeTitle, nodeType }: DeleteNodeModalProps) {
   const { currentTeam } = useAuth();
+  const { showSuccess, showError } = useNotifications();
   
   const [deleteWorkItem, { loading: deletingNode }] = useMutation(DELETE_WORK_ITEM, {
     refetchQueries: [{ 
@@ -31,13 +33,38 @@ export function DeleteNodeModal({ isOpen, onClose, nodeId, nodeTitle, nodeType }
       console.log('Deleting node with id:', nodeId);
       
       await deleteWorkItem({
-        variables: { id: nodeId }
+        variables: { 
+          where: { id: nodeId }
+        }
       });
 
+      showSuccess(
+        'Node Deleted Successfully!',
+        `"${nodeTitle}" has been permanently removed from the graph and all connected relationships have been cleaned up.`
+      );
+      
       console.log('Node deleted successfully');
       onClose();
     } catch (error) {
       console.error('Error deleting node:', error);
+      
+      // Determine user-friendly error message
+      let errorMessage = 'Please try again.';
+      if (error && typeof error === 'object' && 'message' in error) {
+        const message = String(error.message);
+        if (message.includes('NetworkError') || message.includes('fetch')) {
+          errorMessage = 'Cannot connect to server. Please check your connection.';
+        } else if (message.includes('Neo4j') || message.includes('database')) {
+          errorMessage = 'Database error occurred. Please contact support.';
+        } else if (message.includes('not found')) {
+          errorMessage = 'Node no longer exists in the database.';
+        }
+      }
+      
+      showError(
+        'Failed to Delete Node',
+        errorMessage
+      );
     }
   };
 
