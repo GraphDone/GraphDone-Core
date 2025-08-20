@@ -171,8 +171,11 @@ export const UPDATE_WORK_ITEM = gql`
 `;
 
 export const DELETE_WORK_ITEM = gql`
-  mutation DeleteWorkItem($id: ID!) {
-    deleteWorkItem(id: $id)
+  mutation DeleteWorkItems($where: WorkItemWhere!) {
+    deleteWorkItems(where: $where) {
+      nodesDeleted
+      relationshipsDeleted
+    }
   }
 `;
 
