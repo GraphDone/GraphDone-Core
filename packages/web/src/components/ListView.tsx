@@ -10,7 +10,18 @@ import {
   Edit,
   Trash2,
   MoreHorizontal,
-  Tag
+  Tag,
+  CheckCircle,
+  Clock,
+  Play,
+  AlertCircle,
+  Lightbulb,
+  Zap,
+  Triangle,
+  Minus,
+  ArrowDown,
+  Flame,
+  Dot
 } from 'lucide-react';
 import { useGraph } from '../contexts/GraphContext';
 import { mockProjectNodes, MockNode } from '../types/projectData';
@@ -145,7 +156,7 @@ export function ListView() {
 
     // Contributor filter
     if (contributorFilter !== 'All Contributors') {
-      if (contributorFilter === 'Unassigned') {
+      if (contributorFilter === 'Available') {
         filtered = filtered.filter(node => !node.contributor);
       } else {
         filtered = filtered.filter(node => node.contributor === contributorFilter);
@@ -287,40 +298,179 @@ export function ListView() {
     return 'bg-green-500';
   };
 
+
   // Card View
   const renderCardView = () => (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 p-6">
       {filteredNodes.map((node) => (
         <div
           key={node.id}
-          className="bg-gray-700 rounded-lg p-4 hover:bg-gray-600 transition-colors cursor-pointer border border-gray-600"
+          className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm hover:shadow-md dark:shadow-md dark:hover:shadow-lg transition-shadow duration-200 cursor-pointer border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 group"
         >
-          <div className="flex items-start justify-between mb-3">
-            <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${getNodeTypeColor(node.type)}`}>
+          <div className="flex items-start justify-between mb-4">
+            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold shadow-sm ${getNodeTypeColor(node.type)}`}>
               {formatLabel(node.type)}
             </span>
-            <div className={`w-3 h-3 rounded-full ${getPriorityIndicator(node.priority.computed)}`}></div>
+            <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleEditNode(node);
+                }}
+                className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/30 text-blue-600 dark:text-blue-400 transition-colors"
+                title="Edit node"
+              >
+                <Edit className="h-4 w-4" />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeleteNode(node);
+                }}
+                className="flex items-center justify-center w-8 h-8 rounded-full bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 transition-colors"
+                title="Delete node"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
           </div>
           
-          <h3 className="text-white font-medium mb-2 line-clamp-2">{node.title}</h3>
+          <h3 className="text-gray-900 dark:text-white font-semibold mb-3 line-clamp-2 text-lg leading-tight">{node.title}</h3>
           
           {node.description && (
-            <p className="text-gray-400 text-sm mb-3 line-clamp-2">{node.description}</p>
+            <p className="text-gray-600 dark:text-gray-400 text-sm mb-4 line-clamp-2 leading-relaxed">{node.description}</p>
           )}
-          
-          <div className="flex items-center justify-between">
-            {node.contributor ? (
-              <div className="flex items-center space-x-2">
-                <span className="text-gray-300 text-sm">{node.contributor}</span>
+
+          {/* Priority and Due Date */}
+          <div className="mb-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Priority</span>
+              <span className="text-xs font-medium text-gray-600 dark:text-gray-400 mr-6">Due Date</span>
+            </div>
+            <div className="flex items-center justify-between">
+              {/* Priority - Left Side */}
+              <div className="flex items-center space-x-3">
+                <div className="flex items-center relative">
+                  <div className="w-3 h-12 bg-gray-300 dark:bg-gray-600 rounded overflow-hidden flex flex-col justify-end relative">
+                    <div className={`w-full transition-all duration-300 ${
+                      node.priority.computed >= 0.8 ? 'bg-red-500' :
+                      node.priority.computed >= 0.6 ? 'bg-orange-500' :
+                      node.priority.computed >= 0.4 ? 'bg-yellow-500' :
+                      node.priority.computed >= 0.2 ? 'bg-blue-500' : 'bg-green-500'
+                    }`} style={{ height: `${Math.max(node.priority.computed * 100, 8)}%` }}></div>
+                  </div>
+                </div>
+                <div className="flex flex-col">
+                  <span className={`text-sm font-semibold ${
+                    node.priority.computed >= 0.8 ? 'text-red-500' :
+                    node.priority.computed >= 0.6 ? 'text-orange-500' :
+                    node.priority.computed >= 0.4 ? 'text-yellow-500' :
+                    node.priority.computed >= 0.2 ? 'text-blue-500' : 'text-green-500'
+                  }`}>
+                    {Math.round(node.priority.computed * 100)}%
+                  </span>
+                  <span className={`text-xs font-medium ${
+                    node.priority.computed >= 0.8 ? 'text-red-500' :
+                    node.priority.computed >= 0.6 ? 'text-orange-500' :
+                    node.priority.computed >= 0.4 ? 'text-yellow-500' :
+                    node.priority.computed >= 0.2 ? 'text-blue-500' :
+                    'text-green-500'
+                  }`}>
+                    {node.priority.computed >= 0.8 ? 'Critical' :
+                     node.priority.computed >= 0.6 ? 'High' :
+                     node.priority.computed >= 0.4 ? 'Medium' :
+                     node.priority.computed >= 0.2 ? 'Low' : 'Minimal'}
+                  </span>
+                </div>
               </div>
-            ) : (
-              <span className="text-gray-500 text-sm">Available</span>
-            )}
+
+              {/* Due Date - Right Side */}
+              <div className="flex flex-col items-start justify-center mr-2">
+                {node.dueDate ? (
+                  <div className="space-y-1 text-left">
+                    <div className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-md shadow-sm ${
+                      new Date(node.dueDate) < new Date() 
+                        ? 'bg-red-100 text-red-800 border border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800' 
+                        : new Date(node.dueDate).getTime() - new Date().getTime() < 7 * 24 * 60 * 60 * 1000 
+                          ? 'bg-amber-100 text-amber-800 border border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800' 
+                          : 'bg-blue-100 text-blue-800 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800'
+                    }`}>
+                      {new Date(node.dueDate).toLocaleDateString('en-US', { 
+                        month: 'short', 
+                        day: 'numeric',
+                        year: 'numeric'
+                      })}
+                    </div>
+                    <div className={`text-xs font-medium ${
+                      new Date(node.dueDate) < new Date() 
+                        ? 'text-red-600 dark:text-red-400' 
+                        : new Date(node.dueDate).getTime() - new Date().getTime() < 7 * 24 * 60 * 60 * 1000 
+                          ? 'text-amber-600 dark:text-amber-400' 
+                          : 'text-blue-600 dark:text-blue-400'
+                    }`}>
+                      {(() => {
+                        const today = new Date();
+                        const due = new Date(node.dueDate);
+                        const diffTime = due.getTime() - today.getTime();
+                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                        
+                        if (diffDays < 0) {
+                          return `${Math.abs(diffDays)}d overdue`;
+                        } else if (diffDays === 0) {
+                          return 'Due today';
+                        } else if (diffDays === 1) {
+                          return 'Due tomorrow';
+                        } else if (diffDays <= 7) {
+                          return `${diffDays}d remaining`;
+                        } else {
+                          return `${diffDays}d remaining`;
+                        }
+                      })()}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="inline-flex items-center px-2 py-1 bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-400 text-xs font-medium rounded-md">
+                    No date
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
           
-          <div className={`mt-2 text-sm ${getStatusColor(node.status)}`}>
-            <Circle className="h-3 w-3 inline mr-1" />
-            {formatLabel(node.status)}
+          {/* Footer */}
+          <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-600">
+            {/* Contributor */}
+            <div className="flex items-center">
+              {node.contributor ? (
+                getContributorAvatar(node.contributor)
+              ) : (
+                <div className="flex items-center space-x-2">
+                  <div className="w-7 h-7 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center border-2 border-white dark:border-gray-700 shadow-sm">
+                    <span className="text-gray-500 dark:text-gray-400 text-xs font-medium">?</span>
+                  </div>
+                  <span className="text-gray-600 dark:text-gray-400 text-sm font-medium">Available</span>
+                </div>
+              )}
+            </div>
+            
+            {/* Status */}
+            <div className={`flex items-center space-x-2 px-3 py-1.5 rounded-full text-sm font-medium border shadow-sm ${
+              node.status === 'PROPOSED' ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-400' :
+              node.status === 'PLANNED' ? 'bg-purple-50 border-purple-200 text-purple-700 dark:bg-purple-900/20 dark:border-purple-800 dark:text-purple-400' :
+              node.status === 'IN_PROGRESS' ? 'bg-yellow-50 border-yellow-200 text-yellow-700 dark:bg-yellow-900/20 dark:border-yellow-800 dark:text-yellow-400' :
+              node.status === 'COMPLETED' ? 'bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400' :
+              node.status === 'BLOCKED' ? 'bg-red-50 border-red-200 text-red-700 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400' :
+              'bg-gray-50 border-gray-200 text-gray-700 dark:bg-gray-900/20 dark:border-gray-800 dark:text-gray-400'
+            }`}>
+              <div>
+                {node.status === 'PROPOSED' && <Lightbulb className="h-4 w-4" />}
+                {node.status === 'PLANNED' && <Clock className="h-4 w-4" />}
+                {node.status === 'IN_PROGRESS' && <Play className="h-4 w-4" />}
+                {node.status === 'COMPLETED' && <CheckCircle className="h-4 w-4" />}
+                {node.status === 'BLOCKED' && <AlertCircle className="h-4 w-4" />}
+              </div>
+              <span>{formatLabel(node.status)}</span>
+            </div>
           </div>
         </div>
       ))}
@@ -333,7 +483,7 @@ export function ListView() {
     const statusConfig = {
       'PROPOSED': { 
         label: 'Proposed', 
-        icon: '💡', 
+        icon: <Lightbulb className="h-4 w-4 text-blue-400" />, 
         color: 'bg-blue-500',
         bgColor: 'bg-gray-750',
         textColor: 'text-blue-400',
@@ -342,7 +492,7 @@ export function ListView() {
       },
       'PLANNED': { 
         label: 'Planned', 
-        icon: '📋', 
+        icon: <Clock className="h-4 w-4 text-purple-400" />, 
         color: 'bg-purple-500',
         bgColor: 'bg-gray-750',
         textColor: 'text-purple-400',
@@ -351,7 +501,7 @@ export function ListView() {
       },
       'IN_PROGRESS': { 
         label: 'In Progress', 
-        icon: '⚡', 
+        icon: <Play className="h-4 w-4 text-yellow-400" />, 
         color: 'bg-yellow-500',
         bgColor: 'bg-gray-750',
         textColor: 'text-yellow-400',
@@ -360,7 +510,7 @@ export function ListView() {
       },
       'BLOCKED': { 
         label: 'Blocked', 
-        icon: '🚫', 
+        icon: <AlertCircle className="h-4 w-4 text-red-400" />, 
         color: 'bg-red-500',
         bgColor: 'bg-gray-750',
         textColor: 'text-red-400',
@@ -369,7 +519,7 @@ export function ListView() {
       },
       'COMPLETED': { 
         label: 'Completed', 
-        icon: '✅', 
+        icon: <CheckCircle className="h-4 w-4 text-green-400" />, 
         color: 'bg-green-500',
         bgColor: 'bg-gray-750',
         textColor: 'text-green-400',
@@ -403,7 +553,7 @@ export function ListView() {
                         <p className="text-sm text-gray-400">{nodes.length} {nodes.length === 1 ? 'task' : 'tasks'}</p>
                       </div>
                     </div>
-                    <span className="text-lg">{config.icon}</span>
+                    <div className="text-white">{config.icon}</div>
                   </div>
                 </div>
                 
@@ -411,25 +561,118 @@ export function ListView() {
                   {nodes.map((node) => (
                     <div
                       key={node.id}
-                      className="bg-gray-700 rounded-lg p-3 hover:bg-gray-600 transition-colors cursor-pointer border border-gray-600"
+                      className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm hover:shadow-md dark:shadow-md dark:hover:shadow-lg transition-shadow duration-200 cursor-pointer border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 group"
                     >
                       <div className="flex items-start justify-between mb-2">
                         <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${getNodeTypeColor(node.type)}`}>
                           {formatLabel(node.type)}
                         </span>
-                        <div className={`w-3 h-3 rounded-full ${getPriorityIndicator(node.priority.computed)}`}></div>
+                        
+                        {/* Action buttons - appear on hover */}
+                        <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditNode(node);
+                            }}
+                            className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/30 text-blue-600 dark:text-blue-400 transition-colors"
+                            title="Edit node"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteNode(node);
+                            }}
+                            className="flex items-center justify-center w-8 h-8 rounded-full bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 transition-colors"
+                            title="Delete node"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
                       </div>
                       
-                      <h4 className="text-white font-medium mb-2 line-clamp-2 text-base">{node.title}</h4>
+                      <h4 className="text-gray-900 dark:text-white font-medium mb-2 line-clamp-2 text-base">{node.title}</h4>
                       
-                      {node.contributor && (
-                        <div className="flex items-center space-x-2">
-                          <span className="text-gray-300 text-base">{node.contributor}</span>
+                      {/* Priority and Due Date */}
+                      <div className="mb-3 flex items-start justify-between">
+                        {/* Priority - Left Side */}
+                        <div className="flex items-center relative">
+                          <div className="w-4 h-12 bg-gray-600 rounded overflow-hidden flex flex-col justify-end relative">
+                            <div className={`w-full transition-all duration-300 ${
+                              node.priority.computed >= 0.8 ? 'bg-red-500' :
+                              node.priority.computed >= 0.6 ? 'bg-orange-500' :
+                              node.priority.computed >= 0.4 ? 'bg-yellow-500' :
+                              node.priority.computed >= 0.2 ? 'bg-blue-500' : 'bg-green-500'
+                            }`} style={{ height: `${Math.max(node.priority.computed * 100, 5)}%` }}></div>
+                          </div>
+                          <span className={`absolute text-xs font-bold left-6 ml-1 ${
+                            node.priority.computed >= 0.8 ? 'text-red-500' :
+                            node.priority.computed >= 0.6 ? 'text-orange-500' :
+                            node.priority.computed >= 0.4 ? 'text-yellow-500' :
+                            node.priority.computed >= 0.2 ? 'text-blue-500' : 'text-green-500'
+                          }`} style={{ 
+                            bottom: `${Math.max(node.priority.computed * 100, 5)}%`,
+                            transform: 'translateY(50%)'
+                          }}>
+                            {Math.round(node.priority.computed * 100)}%
+                          </span>
                         </div>
-                      )}
+
+                        {/* Due Date - Right Side */}
+                        <div className="flex flex-col items-start">
+                          {node.dueDate ? (
+                            <div className="space-y-1 text-left">
+                              <div className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded border transition-colors ${
+                                new Date(node.dueDate) < new Date() 
+                                  ? 'bg-red-50 border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400' 
+                                  : new Date(node.dueDate).getTime() - new Date().getTime() < 7 * 24 * 60 * 60 * 1000 
+                                    ? 'bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-400' 
+                                    : 'bg-blue-100 text-blue-800 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800'
+                              }`}>
+                                {new Date(node.dueDate).toLocaleDateString('en-US', { 
+                                  month: 'short', 
+                                  day: 'numeric',
+                                  year: 'numeric'
+                                })}
+                              </div>
+                              <div className={`text-xs font-medium ${
+                                new Date(node.dueDate) < new Date() 
+                                  ? 'text-red-600 dark:text-red-400' 
+                                  : new Date(node.dueDate).getTime() - new Date().getTime() < 7 * 24 * 60 * 60 * 1000 
+                                    ? 'text-amber-600 dark:text-amber-400' 
+                                    : 'text-blue-600 dark:text-blue-400'
+                              }`}>
+                                {(() => {
+                                  const today = new Date();
+                                  const due = new Date(node.dueDate);
+                                  const diffTime = due.getTime() - today.getTime();
+                                  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                                  
+                                  if (diffDays < 0) {
+                                    return `${Math.abs(diffDays)} ${Math.abs(diffDays) === 1 ? 'day' : 'days'} overdue`;
+                                  } else if (diffDays === 0) {
+                                    return 'Due today';
+                                  } else if (diffDays === 1) {
+                                    return 'Due tomorrow';
+                                  } else if (diffDays <= 7) {
+                                    return `${diffDays} days remaining`;
+                                  } else {
+                                    return `${diffDays} days remaining`;
+                                  }
+                                })()}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="inline-flex items-center px-2 py-1 bg-gray-100 border border-gray-200 text-gray-600 text-xs font-medium rounded dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400">
+                              No due date
+                            </div>
+                          )}
+                        </div>
+                      </div>
                       
-                      
-                      <div className={`${config.dotColor} w-2 h-2 rounded-full mt-2`}></div>
+                      {node.contributor && getContributorAvatar(node.contributor)}
                     </div>
                   ))}
                 </div>
@@ -441,21 +684,28 @@ export function ListView() {
     );
   };
 
+  // Consistent contributor color function (matches TimelineView)
+  const getContributorColor = (name: string) => {
+    const colors = [
+      'bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-pink-500',
+      'bg-indigo-500', 'bg-yellow-500', 'bg-red-500', 'bg-teal-500',
+      'bg-orange-500', 'bg-cyan-500', 'bg-emerald-500', 'bg-violet-500'
+    ];
+    
+    // Generate consistent color based on name (same as TimelineView)
+    const hash = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    return colors[hash % colors.length];
+  };
+
   // Helper function to get contributor avatar
   const getContributorAvatar = (contributor?: string) => {
     if (!contributor) return null;
     
-    // Generate avatar color based on name
-    const colors = [
-      'bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-pink-500', 
-      'bg-indigo-500', 'bg-red-500', 'bg-yellow-500', 'bg-teal-500'
-    ];
-    const colorIndex = contributor.length % colors.length;
     const initials = contributor.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
     
     return (
       <div className="flex items-center space-x-2">
-        <div className={`w-8 h-8 rounded-full ${colors[colorIndex]} flex items-center justify-center text-white text-xs font-medium`}>
+        <div className={`w-8 h-8 rounded-full ${getContributorColor(contributor)} flex items-center justify-center text-white text-xs font-medium`}>
           {initials}
         </div>
         <span className="text-gray-300 text-sm">{contributor}</span>
@@ -477,7 +727,6 @@ export function ListView() {
                 <th className="pl-3 pr-6 py-10 text-left text-sm font-semibold text-gray-300 tracking-wider">Contributor</th>
                 <th className="pl-6 pr-6 py-10 text-left text-sm font-semibold text-gray-300 tracking-wider">Priority</th>
                 <th className="pl-6 pr-6 py-10 text-left text-sm font-semibold text-gray-300 tracking-wider whitespace-nowrap">Due Date</th>
-                <th className="pl-6 pr-6 py-10 text-left text-sm font-semibold text-gray-300 tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-700">
@@ -485,7 +734,32 @@ export function ListView() {
                 <tr key={node.id} className="hover:bg-gray-750 transition-colors cursor-pointer group">
                   <td className="pl-6 pr-4 py-12">
                     <div className="space-y-3">
-                      <div className="text-white font-medium text-base leading-snug">{node.title}</div>
+                      <div className="flex items-start justify-between">
+                        <div className="text-white font-medium text-base leading-snug flex-1">{node.title}</div>
+                        {/* Action buttons - appear on hover */}
+                        <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity ml-3">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditNode(node);
+                            }}
+                            className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/30 text-blue-600 dark:text-blue-400 transition-colors"
+                            title="Edit node"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteNode(node);
+                            }}
+                            className="flex items-center justify-center w-8 h-8 rounded-full bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 transition-colors"
+                            title="Delete node"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
                       {node.description && (
                         <div className="text-gray-400 text-sm leading-relaxed line-clamp-3">{node.description}</div>
                       )}
@@ -511,14 +785,20 @@ export function ListView() {
                   </td>
                   <td className="pl-3 pr-3 py-10">
                     <div className="flex items-center whitespace-nowrap">
-                      <div className={`w-2 h-2 rounded-full mr-2 ${
-                        node.status === 'PROPOSED' ? 'bg-blue-400' :
-                        node.status === 'PLANNED' ? 'bg-purple-400' :
-                        node.status === 'IN_PROGRESS' ? 'bg-yellow-400' :
-                        node.status === 'COMPLETED' ? 'bg-green-400' :
-                        node.status === 'BLOCKED' ? 'bg-red-400' :
-                        'bg-gray-400'
-                      }`}></div>
+                      <div className={`mr-2 ${
+                        node.status === 'PROPOSED' ? 'text-blue-400' :
+                        node.status === 'PLANNED' ? 'text-purple-400' :
+                        node.status === 'IN_PROGRESS' ? 'text-yellow-400' :
+                        node.status === 'COMPLETED' ? 'text-green-400' :
+                        node.status === 'BLOCKED' ? 'text-red-400' :
+                        'text-gray-400'
+                      }`}>
+                        {node.status === 'PROPOSED' && <Lightbulb className="h-4 w-4" />}
+                        {node.status === 'PLANNED' && <Clock className="h-4 w-4" />}
+                        {node.status === 'IN_PROGRESS' && <Play className="h-4 w-4" />}
+                        {node.status === 'COMPLETED' && <CheckCircle className="h-4 w-4" />}
+                        {node.status === 'BLOCKED' && <AlertCircle className="h-4 w-4" />}
+                      </div>
                       <span className={`text-sm font-medium ${getStatusColor(node.status)}`}>
                         {formatLabel(node.status)}
                       </span>
@@ -537,10 +817,10 @@ export function ListView() {
                     )}
                   </td>
                   <td className="pl-6 pr-6 py-10">
-                    <div className="flex items-center w-full">
-                      <div className="flex-1 h-4 bg-gray-600 rounded-full overflow-hidden border border-gray-500">
+                    <div className="flex items-center w-full relative">
+                      <div className="w-4 h-16 bg-gray-600 rounded overflow-hidden flex flex-col justify-end relative">
                         <div 
-                          className={`h-full transition-all duration-300 ${
+                          className={`w-full transition-all duration-300 ${
                             node.priority.computed >= 0.8 ? 'bg-red-500' :
                             node.priority.computed >= 0.6 ? 'bg-orange-500' :
                             node.priority.computed >= 0.4 ? 'bg-yellow-500' :
@@ -548,43 +828,80 @@ export function ListView() {
                             'bg-green-500'
                           }`}
                           style={{ 
-                            width: `${Math.max(node.priority.computed * 100, 2)}%`,
-                            borderRadius: node.priority.computed >= 1 ? '9999px' : '9999px 0 0 9999px'
+                            height: `${Math.max(node.priority.computed * 100, 5)}%`
                           }}
                         ></div>
                       </div>
+                      <span 
+                        className={`absolute text-xs font-bold left-6 ml-1 ${
+                          node.priority.computed >= 0.8 ? 'text-red-500' :
+                          node.priority.computed >= 0.6 ? 'text-orange-500' :
+                          node.priority.computed >= 0.4 ? 'text-yellow-500' :
+                          node.priority.computed >= 0.2 ? 'text-blue-500' :
+                          'text-green-500'
+                        }`}
+                        style={{ 
+                          bottom: `${Math.max(node.priority.computed * 100, 5)}%`,
+                          transform: 'translateY(50%)'
+                        }}
+                      >
+                        {Math.round(node.priority.computed * 100)}%
+                      </span>
                     </div>
                   </td>
                   <td className="pl-6 pr-6 py-10">
-                    <span className="text-sm text-gray-300 whitespace-nowrap">
-                      {node.dueDate ? new Date(node.dueDate).toLocaleDateString() : 
-                        <span className="text-gray-500">No date</span>
-                      }
-                    </span>
-                  </td>
-                  <td className="pl-6 pr-6 py-10">
-                    <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEditNode(node);
-                        }}
-                        className="p-1 text-gray-400 hover:text-blue-400 transition-colors"
-                        title="Edit node"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteNode(node);
-                        }}
-                        className="p-1 text-gray-400 hover:text-red-400 transition-colors"
-                        title="Delete node"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
+                    {node.dueDate ? (
+                      <div className="space-y-1">
+                        <div className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
+                          new Date(node.dueDate) < new Date() 
+                            ? 'bg-red-50 border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400' 
+                            : new Date(node.dueDate).getTime() - new Date().getTime() < 7 * 24 * 60 * 60 * 1000 
+                              ? 'bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-400' 
+                              : 'bg-blue-100 text-blue-800 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800'
+                        }`}>
+                          {new Date(node.dueDate).toLocaleDateString('en-US', { 
+                            month: 'short', 
+                            day: 'numeric',
+                            year: 'numeric'
+                          })}
+                        </div>
+                        <div className={`text-xs font-medium ${
+                          new Date(node.dueDate) < new Date() 
+                            ? 'text-red-600 dark:text-red-400' 
+                            : new Date(node.dueDate).getTime() - new Date().getTime() < 7 * 24 * 60 * 60 * 1000 
+                              ? 'text-amber-600 dark:text-amber-400' 
+                              : 'text-blue-600 dark:text-blue-400'
+                        }`}>
+                          {(() => {
+                            const today = new Date();
+                            const due = new Date(node.dueDate);
+                            const diffTime = due.getTime() - today.getTime();
+                            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                            
+                            if (diffDays < 0) {
+                              return `${Math.abs(diffDays)} ${Math.abs(diffDays) === 1 ? 'day' : 'days'} overdue`;
+                            } else if (diffDays === 0) {
+                              return 'Due today';
+                            } else if (diffDays === 1) {
+                              return 'Due tomorrow';
+                            } else if (diffDays <= 7) {
+                              return `${diffDays} days remaining`;
+                            } else {
+                              return `${diffDays} days remaining`;
+                            }
+                          })()}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-1">
+                        <div className="inline-flex items-center px-3 py-2 bg-gray-100 border border-gray-200 text-gray-600 text-sm font-medium rounded-lg dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400">
+                          No due date
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          Schedule recommended
+                        </div>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -844,7 +1161,16 @@ export function ListView() {
               </span>
               <div className="flex-1">
                 <div className="text-sm font-medium text-white">{node.title}</div>
-                <div className={`text-xs ${getStatusColor(node.status)}`}>{formatLabel(node.status)}</div>
+                <div className={`text-xs flex items-center ${getStatusColor(node.status)}`}>
+                  <div className="mr-1">
+                    {node.status === 'PROPOSED' && <Lightbulb className="h-3 w-3" />}
+                    {node.status === 'PLANNED' && <Clock className="h-3 w-3" />}
+                    {node.status === 'IN_PROGRESS' && <Play className="h-3 w-3" />}
+                    {node.status === 'COMPLETED' && <CheckCircle className="h-3 w-3" />}
+                    {node.status === 'BLOCKED' && <AlertCircle className="h-3 w-3" />}
+                  </div>
+                  {formatLabel(node.status)}
+                </div>
               </div>
               <div className={`w-3 h-3 rounded-full ${getPriorityIndicator(node.priority.computed)}`}></div>
             </div>
@@ -1061,7 +1387,7 @@ export function ListView() {
                 className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
               >
                 <option value="All Contributors">All Contributors</option>
-                <option value="Unassigned">Available</option>
+                <option value="Available">Available</option>
                 {uniqueContributors.map(contributor => (
                   <option key={contributor} value={contributor}>{contributor}</option>
                 ))}
@@ -1102,7 +1428,7 @@ export function ListView() {
                 )}
                 {contributorFilter !== 'All Contributors' && (
                   <span className="px-2 py-1 bg-yellow-900/30 text-yellow-300 rounded border border-yellow-500/30">
-                    Contributor: {contributorFilter === 'Unassigned' ? 'Available' : contributorFilter}
+                    Contributor: {contributorFilter === 'Available' ? 'Available' : contributorFilter}
                   </span>
                 )}
                 {priorityFilter !== 'All Priorities' && (
@@ -1162,7 +1488,10 @@ export function ListView() {
             <div className="space-y-3">
               <div className="flex items-center justify-between p-2 rounded hover:bg-gray-700 transition-colors">
                 <div className="flex items-center space-x-3">
-                  <span className="text-sm text-gray-300">💡 Proposed</span>
+                  <div className="flex items-center space-x-2">
+                    <Lightbulb className="h-4 w-4 text-blue-400" />
+                    <span className="text-sm text-gray-300">Proposed</span>
+                  </div>
                 </div>
                 <div className="text-right">
                   <div className="text-lg font-bold text-blue-400">{stats.proposed}</div>
@@ -1172,7 +1501,10 @@ export function ListView() {
 
               <div className="flex items-center justify-between p-2 rounded hover:bg-gray-700 transition-colors">
                 <div className="flex items-center space-x-3">
-                  <span className="text-sm text-gray-300">📋 Planned</span>
+                  <div className="flex items-center space-x-2">
+                    <Clock className="h-4 w-4 text-purple-400" />
+                    <span className="text-sm text-gray-300">Planned</span>
+                  </div>
                 </div>
                 <div className="text-right">
                   <div className="text-lg font-bold text-purple-400">{stats.planned}</div>
@@ -1182,7 +1514,10 @@ export function ListView() {
 
               <div className="flex items-center justify-between p-2 rounded hover:bg-gray-700 transition-colors">
                 <div className="flex items-center space-x-3">
-                  <span className="text-sm text-gray-300">⚡ In Progress</span>
+                  <div className="flex items-center space-x-2">
+                    <Play className="h-4 w-4 text-yellow-400" />
+                    <span className="text-sm text-gray-300">In Progress</span>
+                  </div>
                 </div>
                 <div className="text-right">
                   <div className="text-lg font-bold text-yellow-400">{stats.inProgress}</div>
@@ -1192,7 +1527,10 @@ export function ListView() {
 
               <div className="flex items-center justify-between p-2 rounded hover:bg-gray-700 transition-colors">
                 <div className="flex items-center space-x-3">
-                  <span className="text-sm text-gray-300">🚫 Blocked</span>
+                  <div className="flex items-center space-x-2">
+                    <AlertCircle className="h-4 w-4 text-red-400" />
+                    <span className="text-sm text-gray-300">Blocked</span>
+                  </div>
                 </div>
                 <div className="text-right">
                   <div className="text-lg font-bold text-red-400">{stats.blocked}</div>
@@ -1202,7 +1540,10 @@ export function ListView() {
 
               <div className="flex items-center justify-between p-2 rounded hover:bg-gray-700 transition-colors">
                 <div className="flex items-center space-x-3">
-                  <span className="text-sm text-gray-300">✅ Completed</span>
+                  <div className="flex items-center space-x-2">
+                    <CheckCircle className="h-4 w-4 text-green-400" />
+                    <span className="text-sm text-gray-300">Completed</span>
+                  </div>
                 </div>
                 <div className="text-right">
                   <div className="text-lg font-bold text-green-400">{stats.completed}</div>
@@ -1257,11 +1598,14 @@ export function ListView() {
 
           {/* Priority Distribution */}
           <div>
-            <h3 className="text-lg font-semibold text-white mb-4">Priority Distribution</h3>
+            <h3 className="text-lg font-semibold text-white mb-4 ml-2">Priority Distribution</h3>
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <span className="text-gray-300">🔴 Critical Priority</span>
+                  <div className="flex items-center space-x-2">
+                    <Flame className="h-4 w-4 text-red-400" />
+                    <span className="text-gray-300">Critical</span>
+                  </div>
                 </div>
                 <div className="flex items-center space-x-2">
                   <span className="text-white font-medium">{stats.priorityStats.critical}</span>
@@ -1276,7 +1620,10 @@ export function ListView() {
               
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <span className="text-gray-300">🟠 High Priority</span>
+                  <div className="flex items-center space-x-2">
+                    <Zap className="h-4 w-4 text-orange-400" />
+                    <span className="text-gray-300">High</span>
+                  </div>
                 </div>
                 <div className="flex items-center space-x-2">
                   <span className="text-white font-medium">{stats.priorityStats.high}</span>
@@ -1291,7 +1638,10 @@ export function ListView() {
               
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <span className="text-gray-300">🟡 Moderate Priority</span>
+                  <div className="flex items-center space-x-2">
+                    <Triangle className="h-4 w-4 text-yellow-400" />
+                    <span className="text-gray-300">Moderate</span>
+                  </div>
                 </div>
                 <div className="flex items-center space-x-2">
                   <span className="text-white font-medium">{stats.priorityStats.moderate}</span>
@@ -1306,7 +1656,10 @@ export function ListView() {
               
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <span className="text-gray-300">🔵 Low Priority</span>
+                  <div className="flex items-center space-x-2">
+                    <Circle className="h-4 w-4 text-blue-400" />
+                    <span className="text-gray-300">Low</span>
+                  </div>
                 </div>
                 <div className="flex items-center space-x-2">
                   <span className="text-white font-medium">{stats.priorityStats.low}</span>
@@ -1321,7 +1674,10 @@ export function ListView() {
               
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <span className="text-gray-300">🟢 Minimal Priority</span>
+                  <div className="flex items-center space-x-2">
+                    <ArrowDown className="h-4 w-4 text-green-400" />
+                    <span className="text-gray-300">Minimal</span>
+                  </div>
                 </div>
                 <div className="flex items-center space-x-2">
                   <span className="text-white font-medium">{stats.priorityStats.minimal}</span>

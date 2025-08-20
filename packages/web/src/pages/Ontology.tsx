@@ -65,7 +65,7 @@ export function Ontology() {
         { id: 'title', name: 'Title', type: 'text', required: true },
         { id: 'description', name: 'Description', type: 'text', required: false },
         { id: 'estimatedHours', name: 'Estimated Hours', type: 'number', required: false },
-        { id: 'assignee', name: 'Assignee', type: 'reference', required: false, referenceType: 'user' }
+        { id: 'contributor', name: 'Contributor', type: 'reference', required: false, referenceType: 'user' }
       ]
     },
     {
