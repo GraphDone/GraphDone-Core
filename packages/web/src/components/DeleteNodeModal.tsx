@@ -1,4 +1,3 @@
-import React from 'react';
 import { useMutation } from '@apollo/client';
 import { X, Trash2, AlertTriangle } from 'lucide-react';
 import { DELETE_WORK_ITEM, GET_WORK_ITEMS } from '../lib/queries';
@@ -30,8 +29,6 @@ export function DeleteNodeModal({ isOpen, onClose, nodeId, nodeTitle, nodeType }
 
   const handleDelete = async () => {
     try {
-      console.log('Deleting node with id:', nodeId);
-      
       await deleteWorkItem({
         variables: { 
           where: { id: nodeId }
@@ -43,10 +40,8 @@ export function DeleteNodeModal({ isOpen, onClose, nodeId, nodeTitle, nodeType }
         `"${nodeTitle}" has been permanently removed from the graph and all connected relationships have been cleaned up.`
       );
       
-      console.log('Node deleted successfully');
       onClose();
     } catch (error) {
-      console.error('Error deleting node:', error);
       
       // Determine user-friendly error message
       let errorMessage = 'Please try again.';
