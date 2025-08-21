@@ -1,16 +1,16 @@
 {
   "name": "@graphdone/web",
-  "version": "0.1.0-alpha",
+  "version": "0.2.1-alpha",
   "description": "React web application for GraphDone",
   "type": "module",
   "scripts": {
     "dev": "npm run kill-port && vite",
     "dev:force": "vite",
-    "kill-port": "lsof -ti:${PORT:-3000} | xargs -r kill || true",
+    "kill-port": "lsof -ti:${PORT:-3127} | xargs -r kill -9 || true",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test": "vitest",
-    "test:coverage": "vitest run --coverage",
+    "test": "vitest --run --reporter=verbose --passWithNoTests",
+    "test:coverage": "vitest run --coverage --passWithNoTests",
     "lint": "eslint src --ext .ts,.tsx",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist coverage node_modules/.vite"
@@ -30,6 +30,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.33.0",
+    "@playwright/test": "^1.54.2",
     "@testing-library/jest-dom": "^6.0.0",
     "@testing-library/react": "^14.0.0",
     "@types/react": "^18.2.0",

@@ -39,8 +39,49 @@
   @apply cursor-pointer transition-all duration-200;
 }
 
-.node:hover {
-  @apply opacity-90;
+/* Selected node stays solid and visible */
+.node-selected {
+  opacity: 1 !important;
+  stroke-width: 2.5 !important;
+  filter: drop-shadow(0 0 8px currentColor);
+}
+
+/* Expanding ring animation */
+.expanding-ring {
+  animation: ring-expand 1.5s ease-out infinite;
+  transform-origin: center;
+  pointer-events: none;
+}
+
+@keyframes ring-expand {
+  0% {
+    r: 20;
+    stroke-opacity: 0.6;
+    stroke-width: 3;
+  }
+  100% {
+    r: 40;
+    stroke-opacity: 0;
+    stroke-width: 1;
+    filter: blur(2px);
+  }
+}
+
+.node:hover circle {
+  filter: drop-shadow(0 0 6px currentColor);
+  stroke-width: 2.5;
+  transform: scale(1.05);
+  transition: all 0.2s ease-in-out;
+}
+
+/* Style for completed nodes */
+.node .completion-indicator {
+  filter: drop-shadow(0 0 3px rgba(16, 185, 129, 0.5));
+}
+
+/* Text in completed nodes should be slightly dimmed */
+.node text {
+  transition: opacity 0.3s ease;
 }
 
 .node-circle {
@@ -56,13 +97,13 @@
   color: #ffffff !important;
 }
 
-/* Force all SVG text in graph visualization to be white */
-.graph-container text {
+/* Force all SVG text in graph visualization to be white - but NOT completion indicators */
+.graph-container text:not(.completion-indicator) {
   fill: #ffffff !important;
   color: #ffffff !important;
 }
 
-.graph-container svg text {
+.graph-container svg text:not(.completion-indicator) {
   fill: #ffffff !important;
   color: #ffffff !important;
 }
@@ -75,22 +116,22 @@ svg text.node-label-bright {
   stroke-width: 3px !important;
 }
 
-/* Override any potential Tailwind text color classes */
-.graph-container svg text,
-.graph-container text {
+/* Override any potential Tailwind text color classes - but NOT completion indicators */
+.graph-container svg text:not(.completion-indicator),
+.graph-container text:not(.completion-indicator) {
   @apply !text-white;
   fill: #ffffff !important;
   color: #ffffff !important;
 }
 
-/* Nuclear option - force all text in SVG to be white */
-svg text {
+/* Force all text in SVG to be white - but NOT completion indicators */
+svg text:not(.completion-indicator) {
   fill: #ffffff !important;
   color: #ffffff !important;
 }
 
-/* Force all text elements regardless of specificity */
-* text {
+/* Force text elements to be white - but NOT completion indicators */
+* text:not(.completion-indicator) {
   fill: #ffffff !important;
   color: #ffffff !important;
 }

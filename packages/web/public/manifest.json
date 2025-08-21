@@ -1,0 +1,21 @@
+{
+  "name": "GraphDone",
+  "short_name": "GraphDone",
+  "description": "Graph-native project management system",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#6366f1",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any"
+    },
+    {
+      "src": "/logo-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    }
+  ]
+}

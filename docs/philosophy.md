@@ -18,7 +18,7 @@ GraphDone visualizes work as it actually exists: a network of interconnected out
 
 ### People Contribute Best When They Choose How
 
-High-quality contributors are driven by intrinsic motivation - curiosity, mastery, purpose, and peer recognition. External pressure, arbitrary deadlines, and top-down assignments often reduce both quality and satisfaction.
+High-quality contributors are driven by intrinsic motivation - curiosity, mastery, purpose, and peer recognition. External pressure, arbitrary deadlines, and top-down directives often reduce both quality and satisfaction.
 
 Our graph-based approach lets people see what needs doing and choose their engagement path. Work becomes exploration rather than obligation.
 
@@ -143,6 +143,6 @@ We envision a world where:
 
 GraphDone is our contribution to this future - a tool that respects how people actually think, work, and collaborate while providing the coordination benefits of modern project management.
 
-From todo lists to todone lists. From assignments to explorations. From control to connection.
+From todo lists to todone lists. From directives to explorations. From control to connection.
 
 This is project management for people who think differently, built by people who think differently, in service of a more inclusive and effective future of work.

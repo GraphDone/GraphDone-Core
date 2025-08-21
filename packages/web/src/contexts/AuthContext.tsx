@@ -75,6 +75,7 @@ interface AuthProviderProps {
 export function AuthProvider({ children }: AuthProviderProps) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [currentTeam, setCurrentTeam] = useState<Team | null>(null);
+  const [isInitializing, setIsInitializing] = useState(true);
 
   // Load saved user from localStorage on mount
   useEffect(() => {
@@ -87,6 +88,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setCurrentTeam(team || null);
       }
     }
+    setIsInitializing(false);
   }, []);
 
   const login = (user: User) => {
@@ -131,7 +133,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     logout,
     switchUser,
     switchTeam,
-    isAuthenticated: !!currentUser
+    isAuthenticated: !!currentUser,
+    isInitializing
   };
 
   return (

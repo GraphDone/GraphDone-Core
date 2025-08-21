@@ -1,45 +1,98 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
+import { useQuery } from '@apollo/client';
 import * as d3 from 'd3';
+import { Plus, Link } from 'lucide-react';
+import { GET_WORK_ITEMS, GET_EDGES } from '../lib/queries';
+import { CreateNodeModal } from './CreateNodeModal';
 
-interface Node {
+interface WorkItem {
   id: string;
   title: string;
   type: string;
-  priority: number;
+  priorityComp: number;
+  positionX: number;
+  positionY: number;
+  positionZ: number;
+  status: string;
   x?: number;
   y?: number;
-  z?: number;
+  dependencies?: WorkItem[];
 }
 
 interface Edge {
-  source: string;
-  target: string;
+  id: string;
+  source: {
+    id: string;
+    title: string;
+    type: string;
+  };
+  target: {
+    id: string;
+    title: string;
+    type: string;
+  };
   type: string;
+  weight: number;
+}
+
+interface NodeMenuState {
+  workItem: WorkItem | null;
+  position: { x: number; y: number };
+  visible: boolean;
 }
 
 export function GraphVisualization() {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [nodeMenu, setNodeMenu] = useState<NodeMenuState>({ workItem: null, position: { x: 0, y: 0 }, visible: false });
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | undefined>();
+  const [clickPosition, setClickPosition] = useState<{ x: number; y: number; z: number } | undefined>();
+  
+  // Store stable positions for nodes to prevent re-randomization
+  const nodePositionsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+  
+  // Store the current positioned nodes for access in click handlers
+  const currentNodesRef = useRef<WorkItem[]>([]);
 
-  // Sample data for POC
-  const sampleNodes: Node[] = [
-    { id: '1', title: 'Core Architecture', type: 'outcome', priority: 0.9 },
-    { id: '2', title: 'User Authentication', type: 'task', priority: 0.7 },
-    { id: '3', title: 'Graph Visualization', type: 'task', priority: 0.8 },
-    { id: '4', title: 'API Design', type: 'milestone', priority: 0.6 },
-    { id: '5', title: 'Mobile Support', type: 'idea', priority: 0.3 },
-  ];
+  const { data: workItemsData, loading: workItemsLoading } = useQuery(GET_WORK_ITEMS, {
+    variables: {
+      options: { limit: 100 }
+    }
+  });
 
-  const sampleEdges: Edge[] = [
-    { source: '1', target: '2', type: 'dependency' },
-    { source: '1', target: '3', type: 'dependency' },
-    { source: '2', target: '4', type: 'dependency' },
-    { source: '3', target: '4', type: 'dependency' },
-    { source: '4', target: '5', type: 'relates_to' },
-  ];
+  const { data: edgesData, loading: edgesLoading } = useQuery(GET_EDGES);
+
+  const workItems: WorkItem[] = workItemsData?.workItems || [];
+  const edges: Edge[] = edgesData?.edges || [];
+  
+  // Convert dependency relationships to edges for visualization
+  const dependencyEdges: Edge[] = workItems.flatMap(item => 
+    (item.dependencies || []).map((dep: any) => ({
+      id: `dep-${item.id}-${dep.id}`,
+      type: 'DEPENDENCY',
+      weight: 1.0,
+      source: dep,
+      target: item
+    }))
+  );
+  
+  // Combine actual edges with dependency edges
+  const allEdges = [...edges, ...dependencyEdges];
+  const loading = workItemsLoading || edgesLoading;
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => {
+      setNodeMenu(prev => ({ ...prev, visible: false }));
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
 
   useEffect(() => {
-    if (!svgRef.current || !containerRef.current) return;
+    if (!svgRef.current || !containerRef.current || loading) return;
 
     const container = containerRef.current;
     const svg = d3.select(svgRef.current);
@@ -66,43 +119,83 @@ export function GraphVisualization() {
 
     svg.call(zoom);
 
-    // Create scales for priority-based positioning (spherical model)
-    const radiusScale = d3.scaleLinear()
-      .domain([0, 1])
-      .range([50, Math.min(width, height) / 3]);
-
-    // Position nodes in spherical model
-    const positionedNodes = sampleNodes.map((node, i) => {
-      const radius = radiusScale(1 - node.priority); // Higher priority = closer to center
-      const angle = (i / sampleNodes.length) * 2 * Math.PI;
-      
-      return {
-        ...node,
-        x: width / 2 + radius * Math.cos(angle),
-        y: height / 2 + radius * Math.sin(angle),
-      };
+    // Handle background clicks to create floating nodes
+    svg.on('click', (event) => {
+      if (event.target === svg.node()) {
+        const [x, y] = d3.pointer(event, svg.node());
+        setClickPosition({ x, y, z: 0 });
+        setSelectedNodeId(undefined);
+        setShowCreateModal(true);
+      }
     });
 
-    // Create links
+    if (workItems.length === 0) {
+      // Show empty state
+      mainGroup.append('text')
+        .attr('x', width / 2)
+        .attr('y', height / 2)
+        .attr('text-anchor', 'middle')
+        .attr('class', 'text-gray-500 dark:text-gray-400')
+        .style('font-size', '18px')
+        .text('No work items yet. Click anywhere to create one!');
+      return;
+    }
+
+    // Position nodes using stored positions or default layout
+    const positionedNodes = workItems.map((item) => {
+      // Check if we have a stable position for this node
+      let x, y;
+      
+      if (item.positionX !== null && item.positionX !== undefined && 
+          item.positionY !== null && item.positionY !== undefined) {
+        // Use database-stored position
+        x = item.positionX;
+        y = item.positionY;
+      } else if (nodePositionsRef.current.has(item.id)) {
+        // Use previously calculated position
+        const stored = nodePositionsRef.current.get(item.id)!;
+        x = stored.x;
+        y = stored.y;
+      } else {
+        // Generate new random position only for truly new nodes
+        x = width / 2 + (Math.random() - 0.5) * 200;
+        y = height / 2 + (Math.random() - 0.5) * 200;
+        // Store this position for future renders
+        nodePositionsRef.current.set(item.id, { x, y });
+      }
+      
+      return {
+        ...item,
+        x,
+        y,
+      };
+    });
+    
+    // Store positioned nodes for access in click handlers
+    currentNodesRef.current = positionedNodes;
+
+    // Create links  
     mainGroup.selectAll('.edge')
-      .data(sampleEdges)
+      .data(allEdges)
       .enter().append('line')
       .attr('class', d => `edge edge-${d.type}`)
-      .attr('stroke-width', 2)
+      .attr('stroke', '#6b7280')
+      .attr('stroke-width', d => Math.max(1, d.weight * 3))
+      .attr('opacity', 0.6)
       .attr('x1', d => {
-        const source = positionedNodes.find(n => n.id === d.source);
+        const source = positionedNodes.find(n => n.id === d.source.id);
         return source?.x || 0;
       })
       .attr('y1', d => {
-        const source = positionedNodes.find(n => n.id === d.source);
+        const source = positionedNodes.find(n => n.id === d.source.id);
         return source?.y || 0;
       })
       .attr('x2', d => {
-        const target = positionedNodes.find(n => n.id === d.target);
+        const target = positionedNodes.find(n => n.id === d.target.id);
         return target?.x || 0;
       })
       .attr('y2', d => {
-        const target = positionedNodes.find(n => n.id === d.target);
+        const target = positionedNodes.find(n => n.id === d.target.id);
         return target?.y || 0;
       });
 
@@ -116,18 +209,34 @@ export function GraphVisualization() {
     // Add node circles
     nodeGroup.append('circle')
       .attr('class', 'node-circle')
-      .attr('r', d => 8 + d.priority * 12) // Size based on priority
+      .attr('r', d => 15 + (d.priorityComp || 0) * 15) // Size based on priority
       .attr('fill', d => {
         const colors = {
-          outcome: '#3b82f6',
-          task: '#10b981',
-          milestone: '#f59e0b',
-          idea: '#8b5cf6'
+          OUTCOME: '#3b82f6',
+          TASK: '#10b981',
+          MILESTONE: '#f59e0b',
+          IDEA: '#a855f7'
         };
         return colors[d.type as keyof typeof colors] || '#6b7280';
       })
       .attr('stroke', '#fff')
-      .attr('stroke-width', 2);
+      .attr('stroke-width', 2)
+      .style('cursor', 'pointer')
+      .on('click', (event, d) => {
+        event.stopPropagation();
+        
+        // Don't open node menu if create modal is already open
+        if (showCreateModal) {
+          return;
+        }
+        
+        const [x, y] = d3.pointer(event, document.body);
+        setNodeMenu({
+          workItem: d,
+          position: { x, y },
+          visible: true
+        });
+      });
 
     // Add node labels
     nodeGroup.append('text')
@@ -137,7 +246,8 @@ export function GraphVisualization() {
       .text(d => d.title)
       .style('font-size', '12px')
       .style('font-weight', '500')
-      .style('fill', '#374151');
+      .style('fill', '#374151')
+      .style('pointer-events', 'none'); // Prevent text from blocking click events
 
     // Add priority indicators
     nodeGroup.append('circle')
@@ -145,8 +255,8 @@ export function GraphVisualization() {
       .attr('r', 3)
       .attr('cy', 15)
       .attr('fill', d => {
-        if (d.priority > 0.7) return '#dc2626';
-        if (d.priority > 0.4) return '#d97706';
+        if (d.priorityComp > 0.7) return '#dc2626';
+        if (d.priorityComp > 0.4) return '#d97706';
         return '#059669';
       });
 
@@ -156,16 +266,13 @@ export function GraphVisualization() {
         d3.select(this).select('circle.node-circle')
           .transition()
           .duration(200)
-          .attr('r', (8 + d.priority * 12) * 1.2);
+          .attr('r', (15 + (d.priorityComp || 0) * 15) * 1.2);
       })
       .on('mouseleave', function(_event, d) {
         d3.select(this).select('circle.node-circle')
           .transition()
           .duration(200)
-          .attr('r', 8 + d.priority * 12);
-      })
-      .on('click', function(_event, _d) {
-        // Handle node click interaction
+          .attr('r', 15 + (d.priorityComp || 0) * 15);
       });
 
     // Center the view
@@ -193,50 +300,116 @@ export function GraphVisualization() {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
 
-  }, []);
+  }, [workItems, allEdges, loading]);
 
   return (
-    <div ref={containerRef} className="graph-container">
+    <div ref={containerRef} className="graph-container relative">
       <svg ref={svgRef} className="w-full h-full" />
       
       {/* Legend */}
-      <div className="absolute top-4 right-4 bg-white rounded-lg shadow-lg border border-gray-200 p-4">
-        <h3 className="text-sm font-semibold text-gray-900 mb-3">Node Types</h3>
+      <div className="absolute top-4 right-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-4">
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Node Types</h3>
         <div className="space-y-2">
           <div className="flex items-center space-x-2">
             <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-            <span className="text-xs text-gray-600">Outcome</span>
+            <span className="text-xs text-gray-600 dark:text-gray-300">Outcome</span>
           </div>
           <div className="flex items-center space-x-2">
             <div className="w-3 h-3 rounded-full bg-green-500"></div>
-            <span className="text-xs text-gray-600">Task</span>
+            <span className="text-xs text-gray-600 dark:text-gray-300">Task</span>
           </div>
           <div className="flex items-center space-x-2">
             <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-            <span className="text-xs text-gray-600">Milestone</span>
+            <span className="text-xs text-gray-600 dark:text-gray-300">Milestone</span>
           </div>
           <div className="flex items-center space-x-2">
             <div className="w-3 h-3 rounded-full bg-purple-500"></div>
-            <span className="text-xs text-gray-600">Idea</span>
+            <span className="text-xs text-gray-600 dark:text-gray-300">Idea</span>
           </div>
         </div>
         
-        <h3 className="text-sm font-semibold text-gray-900 mt-4 mb-3">Priority</h3>
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-white mt-4 mb-3">Priority</h3>
         <div className="space-y-2">
           <div className="flex items-center space-x-2">
             <div className="w-3 h-3 rounded-full bg-red-600"></div>
-            <span className="text-xs text-gray-600">High (0.7+)</span>
+            <span className="text-xs text-gray-600 dark:text-gray-300">High (0.7+)</span>
           </div>
           <div className="flex items-center space-x-2">
             <div className="w-3 h-3 rounded-full bg-yellow-600"></div>
-            <span className="text-xs text-gray-600">Medium (0.4-0.7)</span>
+            <span className="text-xs text-gray-600 dark:text-gray-300">Medium (0.4-0.7)</span>
           </div>
           <div className="flex items-center space-x-2">
             <div className="w-3 h-3 rounded-full bg-green-600"></div>
-            <span className="text-xs text-gray-600">Low (0-0.4)</span>
+            <span className="text-xs text-gray-600 dark:text-gray-300">Low (0-0.4)</span>
           </div>
         </div>
       </div>
+      
+      {/* Node interaction menu */}
+      {nodeMenu.visible && nodeMenu.workItem && (
+        <div 
+          className="absolute z-50 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-2 min-w-[180px]"
+          style={{
+            left: nodeMenu.position.x,
+            top: nodeMenu.position.y,
+            transform: 'translate(-50%, -100%)'
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700">
+            <div className="text-sm font-medium text-gray-900 dark:text-white">{nodeMenu.workItem.title}</div>
+            <div className="text-xs text-gray-500 dark:text-gray-400">{nodeMenu.workItem.type}</div>
+          </div>
+          <button
+            onClick={() => {
+              setSelectedNodeId(nodeMenu.workItem?.id);
+              
+              // Set position near the clicked node for the new connected item
+              if (nodeMenu.workItem) {
+                const nodePosition = currentNodesRef.current.find(n => n.id === nodeMenu.workItem?.id);
+                if (nodePosition && nodePosition.x && nodePosition.y) {
+                  setClickPosition({
+                    x: nodePosition.x + 100, // Offset to the right of the parent node
+                    y: nodePosition.y + 50,  // Slight vertical offset
+                    z: 0
+                  });
+                }
+              }
+              
+              setShowCreateModal(true);
+              setNodeMenu(prev => ({ ...prev, visible: false }));
+            }}
+            className="w-full flex items-center px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Connected Item
+          </button>
+          <button
+            onClick={() => {
+              // TODO: Add edit functionality
+              setNodeMenu(prev => ({ ...prev, visible: false }));
+            }}
+            className="w-full flex items-center px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          >
+            <Link className="h-4 w-4 mr-2" />
+            Edit Details
+          </button>
+        </div>
+      )}
+      
+      {/* Create Node Modal */}
+      {showCreateModal && (
+        <CreateNodeModal
+          isOpen={showCreateModal}
+          onClose={() => {
+            setShowCreateModal(false);
+            setSelectedNodeId(undefined);
+            setClickPosition(undefined);
+          }}
+          parentNodeId={selectedNodeId}
+          position={clickPosition}
+        />
+      )}
     </div>
   );
 }
