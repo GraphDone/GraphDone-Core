@@ -168,7 +168,7 @@ export function TimelineView() {
       case 'PLANNED': return 'text-purple-400';
       case 'IN_PROGRESS': return 'text-yellow-400';
       case 'COMPLETED': return 'text-green-400';
-      case 'BLOCKED': return 'text-red-400';
+      case 'BLOCKED': return 'text-red-600';
       default: return 'text-gray-400';
     }
   };
@@ -176,8 +176,8 @@ export function TimelineView() {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'PROPOSED': return <Lightbulb className="h-4 w-4" />;
-      case 'PLANNED': return <Clock className="h-4 w-4" />;
-      case 'IN_PROGRESS': return <Play className="h-4 w-4" />;
+      case 'PLANNED': return <CalendarIcon className="h-4 w-4" />;
+      case 'IN_PROGRESS': return <Clock className="h-4 w-4" />;
       case 'COMPLETED': return <CheckCircle className="h-4 w-4" />;
       case 'BLOCKED': return <AlertCircle className="h-4 w-4" />;
       default: return <Circle className="h-4 w-4" />;
@@ -505,7 +505,7 @@ export function TimelineView() {
                                 
                                 // Calculate dependency line style based on type
                                 const lineStyle = {
-                                  DEPENDS_ON: { color: '#ef4444', dasharray: '6 3', width: 2, opacity: 0.7 },
+                                  DEPENDS_ON: { color: '#dc2626', dasharray: '6 3', width: 2, opacity: 0.7 },
                                   BLOCKS: { color: '#dc2626', dasharray: '4 4', width: 2.5, opacity: 0.8 },
                                   ENABLES: { color: '#3b82f6', dasharray: '8 2', width: 1.5, opacity: 0.6 }
                                 }[edge.type] || { color: '#6b7280', dasharray: '2 2', width: 1, opacity: 0.4 };
@@ -604,7 +604,7 @@ export function TimelineView() {
                       {stats.BLOCKED > 0 && (
                         <div className="flex items-center space-x-1">
                           <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                          <span className="text-red-400">{stats.BLOCKED} blocked</span>
+                          <span className="text-red-600">{stats.BLOCKED} blocked</span>
                         </div>
                       )}
                       <div className="text-gray-400">
@@ -1217,7 +1217,7 @@ export function TimelineView() {
                 <p className="text-gray-400">
                   {displayedActivities.length} of {filteredActivities.length} activities across {Object.keys(groupedActivities).length} days
                   {activityStats.highPriority > 0 && (
-                    <span className="ml-2 px-2 py-1 bg-red-900/30 text-red-400 rounded text-sm">
+                    <span className="ml-2 px-2 py-1 bg-red-900/30 text-red-600 rounded text-sm">
                       {activityStats.highPriority} high priority
                     </span>
                   )}
@@ -1536,7 +1536,11 @@ export function TimelineView() {
                                     <div className="flex items-center space-x-2">
                                       <span className="text-gray-400 text-sm">Due Date:</span>
                                       <span className="text-gray-300 text-sm">
-                                        {activity.node.dueDate ? new Date(activity.node.dueDate).toLocaleDateString() : 
+                                        {activity.node.dueDate ? new Date(activity.node.dueDate).toLocaleDateString('en-US', { 
+                                          month: 'short', 
+                                          day: 'numeric',
+                                          year: 'numeric'
+                                        }) : 
                                           <span className="text-gray-500">No date</span>
                                         }
                                       </span>

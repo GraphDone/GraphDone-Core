@@ -16,12 +16,18 @@ import {
   Play,
   AlertCircle,
   Lightbulb,
+  Calendar,
   Zap,
   Triangle,
   Minus,
   ArrowDown,
   Flame,
-  Dot
+  Dot,
+  Layers,
+  Sparkles,
+  ListTodo,
+  Trophy,
+  AlertTriangle
 } from 'lucide-react';
 import { useGraph } from '../contexts/GraphContext';
 import { mockProjectNodes, MockNode } from '../types/projectData';
@@ -76,13 +82,66 @@ export function ListView() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedNode, setSelectedNode] = useState<MockNode | null>(null);
+  const [showAllRecentTasks, setShowAllRecentTasks] = useState(false);
+  const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
+  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
+  const [isPriorityDropdownOpen, setIsPriorityDropdownOpen] = useState(false);
+  const [isContributorDropdownOpen, setIsContributorDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const typeDropdownRef = useRef<HTMLDivElement>(null);
+  const statusDropdownRef = useRef<HTMLDivElement>(null);
+  const priorityDropdownRef = useRef<HTMLDivElement>(null);
+  const contributorDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Type options with icons
+  const typeOptions = [
+    { value: 'All Types', label: 'All Types', icon: null, color: 'text-gray-400' },
+    { value: 'EPIC', label: 'Epic', icon: <Layers className="h-4 w-4" />, color: 'text-purple-600' },
+    { value: 'FEATURE', label: 'Feature', icon: <Sparkles className="h-4 w-4" />, color: 'text-blue-600' },
+    { value: 'TASK', label: 'Task', icon: <ListTodo className="h-4 w-4" />, color: 'text-green-600' },
+    { value: 'BUG', label: 'Bug', icon: <AlertTriangle className="h-4 w-4" />, color: 'text-red-600' },
+    { value: 'MILESTONE', label: 'Milestone', icon: <Trophy className="h-4 w-4" />, color: 'text-orange-600' }
+  ];
+
+  // Status options with icons
+  const statusOptions = [
+    { value: 'All Statuses', label: 'All Statuses', icon: null, color: 'text-gray-400' },
+    { value: 'PROPOSED', label: 'Proposed', icon: <Lightbulb className="h-4 w-4" />, color: 'text-blue-600' },
+    { value: 'PLANNED', label: 'Planned', icon: <Calendar className="h-4 w-4" />, color: 'text-purple-600' },
+    { value: 'IN_PROGRESS', label: 'In Progress', icon: <Clock className="h-4 w-4" />, color: 'text-yellow-600' },
+    { value: 'COMPLETED', label: 'Completed', icon: <CheckCircle className="h-4 w-4" />, color: 'text-green-600' },
+    { value: 'BLOCKED', label: 'Blocked', icon: <AlertCircle className="h-4 w-4" />, color: 'text-red-600' }
+  ];
+
+  // Priority options with icons
+  const priorityOptions = [
+    { value: 'All Priorities', label: 'All Priorities', icon: null, color: 'text-gray-400' },
+    { value: 'Critical', label: 'Critical Priority', icon: <Flame className="h-4 w-4" />, color: 'text-red-600' },
+    { value: 'High', label: 'High Priority', icon: <Zap className="h-4 w-4" />, color: 'text-orange-600' },
+    { value: 'Moderate', label: 'Moderate Priority', icon: <Triangle className="h-4 w-4" />, color: 'text-yellow-600' },
+    { value: 'Low', label: 'Low Priority', icon: <Circle className="h-4 w-4" />, color: 'text-blue-600' },
+    { value: 'Minimal', label: 'Minimal Priority', icon: <ArrowDown className="h-4 w-4" />, color: 'text-green-600' }
+  ];
+
+
 
   // Close dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsViewDropdownOpen(false);
+      }
+      if (typeDropdownRef.current && !typeDropdownRef.current.contains(event.target as Node)) {
+        setIsTypeDropdownOpen(false);
+      }
+      if (statusDropdownRef.current && !statusDropdownRef.current.contains(event.target as Node)) {
+        setIsStatusDropdownOpen(false);
+      }
+      if (priorityDropdownRef.current && !priorityDropdownRef.current.contains(event.target as Node)) {
+        setIsPriorityDropdownOpen(false);
+      }
+      if (contributorDropdownRef.current && !contributorDropdownRef.current.contains(event.target as Node)) {
+        setIsContributorDropdownOpen(false);
       }
     }
 
@@ -116,6 +175,16 @@ export function ListView() {
       .sort();
     return contributors;
   }, []);
+
+  // Contributor options without icons
+  const contributorOptions = useMemo(() => [
+    { value: 'All Contributors', label: 'All Contributors' },
+    { value: 'Available', label: 'Available', color: 'text-orange-400' },
+    ...uniqueContributors.map(contributor => ({
+      value: contributor,
+      label: contributor
+    }))
+  ], [uniqueContributors]);
 
   const uniqueTags = useMemo(() => {
     const tags = mockProjectNodes
@@ -287,7 +356,7 @@ export function ListView() {
       case 'PLANNED': return 'text-purple-400';
       case 'IN_PROGRESS': return 'text-yellow-400';
       case 'COMPLETED': return 'text-green-400';
-      case 'BLOCKED': return 'text-red-400';
+      case 'BLOCKED': return 'text-red-600';
       default: return 'text-gray-400';
     }
   };
@@ -464,8 +533,8 @@ export function ListView() {
             }`}>
               <div>
                 {node.status === 'PROPOSED' && <Lightbulb className="h-4 w-4" />}
-                {node.status === 'PLANNED' && <Clock className="h-4 w-4" />}
-                {node.status === 'IN_PROGRESS' && <Play className="h-4 w-4" />}
+                {node.status === 'PLANNED' && <Calendar className="h-4 w-4" />}
+                {node.status === 'IN_PROGRESS' && <Clock className="h-4 w-4" />}
                 {node.status === 'COMPLETED' && <CheckCircle className="h-4 w-4" />}
                 {node.status === 'BLOCKED' && <AlertCircle className="h-4 w-4" />}
               </div>
@@ -510,10 +579,10 @@ export function ListView() {
       },
       'BLOCKED': { 
         label: 'Blocked', 
-        icon: <AlertCircle className="h-4 w-4 text-red-400" />, 
+        icon: <AlertCircle className="h-4 w-4 text-red-600" />, 
         color: 'bg-red-500',
         bgColor: 'bg-gray-750',
-        textColor: 'text-red-400',
+        textColor: 'text-red-600',
         borderColor: 'border-gray-600',
         dotColor: 'bg-red-400'
       },
@@ -790,12 +859,12 @@ export function ListView() {
                         node.status === 'PLANNED' ? 'text-purple-400' :
                         node.status === 'IN_PROGRESS' ? 'text-yellow-400' :
                         node.status === 'COMPLETED' ? 'text-green-400' :
-                        node.status === 'BLOCKED' ? 'text-red-400' :
+                        node.status === 'BLOCKED' ? 'text-red-600' :
                         'text-gray-400'
                       }`}>
                         {node.status === 'PROPOSED' && <Lightbulb className="h-4 w-4" />}
-                        {node.status === 'PLANNED' && <Clock className="h-4 w-4" />}
-                        {node.status === 'IN_PROGRESS' && <Play className="h-4 w-4" />}
+                        {node.status === 'PLANNED' && <Calendar className="h-4 w-4" />}
+                        {node.status === 'IN_PROGRESS' && <Clock className="h-4 w-4" />}
                         {node.status === 'COMPLETED' && <CheckCircle className="h-4 w-4" />}
                         {node.status === 'BLOCKED' && <AlertCircle className="h-4 w-4" />}
                       </div>
@@ -1081,13 +1150,13 @@ export function ListView() {
         <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <div className="w-8 h-8 bg-red-500 rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-sm">{stats.blocked}</span>
               </div>
             </div>
             <div className="ml-4">
               <div className="text-sm font-medium text-gray-300">Blocked</div>
-              <div className="text-2xl font-bold text-red-400">{stats.blocked}</div>
+              <div className="text-2xl font-bold text-red-600">{stats.blocked}</div>
             </div>
           </div>
         </div>
@@ -1131,7 +1200,7 @@ export function ListView() {
             { label: 'Planned', value: stats.planned, color: '#a855f7' },
             { label: 'In Progress', value: stats.inProgress, color: '#eab308' },
             { label: 'Completed', value: stats.completed, color: '#10b981' },
-            { label: 'Blocked', value: stats.blocked, color: '#ef4444' }
+            { label: 'Blocked', value: stats.blocked, color: '#dc2626' }
           ]}
         />
 
@@ -1144,38 +1213,126 @@ export function ListView() {
             color: type === 'EPIC' ? '#3b82f6' : 
                    type === 'FEATURE' ? '#3b82f6' :
                    type === 'TASK' ? '#10b981' :
-                   type === 'BUG' ? '#ef4444' :
+                   type === 'BUG' ? '#dc2626' :
                    type === 'MILESTONE' ? '#f59e0b' : '#6b7280'
           }))}
         />
       </div>
 
       {/* Recent Activity */}
-      <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-        <h3 className="text-lg font-semibold text-white mb-4">Recent Tasks</h3>
+      <div className="bg-gray-800 rounded-xl p-6 border border-gray-700/50 shadow-lg">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-xl font-semibold text-white">Recent Tasks</h3>
+          <div className="text-xs text-gray-400 bg-gray-700/50 px-3 py-1 rounded-full">
+            {filteredNodes.length} items
+          </div>
+        </div>
         <div className="space-y-3">
-          {filteredNodes.slice(0, 5).map((node) => (
-            <div key={node.id} className="flex items-center space-x-3 p-3 bg-gray-700 rounded-lg">
-              <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${getNodeTypeColor(node.type)}`}>
-                {formatLabel(node.type)}
-              </span>
-              <div className="flex-1">
-                <div className="text-sm font-medium text-white">{node.title}</div>
-                <div className={`text-xs flex items-center ${getStatusColor(node.status)}`}>
-                  <div className="mr-1">
-                    {node.status === 'PROPOSED' && <Lightbulb className="h-3 w-3" />}
-                    {node.status === 'PLANNED' && <Clock className="h-3 w-3" />}
-                    {node.status === 'IN_PROGRESS' && <Play className="h-3 w-3" />}
-                    {node.status === 'COMPLETED' && <CheckCircle className="h-3 w-3" />}
-                    {node.status === 'BLOCKED' && <AlertCircle className="h-3 w-3" />}
-                  </div>
-                  {formatLabel(node.status)}
+          {filteredNodes.slice(0, showAllRecentTasks ? filteredNodes.length : 5).map((node, index) => (
+            <div key={node.id} className="group flex items-center space-x-4 p-4 hover:bg-gray-750/70 rounded-xl transition-all duration-200 cursor-pointer border border-transparent hover:border-gray-600/30">
+              {/* Type Icon */}
+              <div className="flex-shrink-0">
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center border ${
+                  node.type === 'EPIC' ? 'text-purple-600 bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-700' :
+                  node.type === 'FEATURE' ? 'text-blue-600 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700' :
+                  node.type === 'TASK' ? 'text-green-600 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700' :
+                  node.type === 'BUG' ? 'text-red-600 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700' :
+                  node.type === 'MILESTONE' ? 'text-orange-600 bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-700' :
+                  'text-gray-600 bg-gray-50 dark:bg-gray-900/20 border-gray-200 dark:border-gray-700'
+                }`}>
+                  {node.type === 'EPIC' && <Layers className="h-4 w-4" />}
+                  {node.type === 'FEATURE' && <Sparkles className="h-4 w-4" />}
+                  {node.type === 'TASK' && <ListTodo className="h-4 w-4" />}
+                  {node.type === 'BUG' && <AlertTriangle className="h-4 w-4" />}
+                  {node.type === 'MILESTONE' && <Trophy className="h-4 w-4" />}
                 </div>
               </div>
-              <div className={`w-3 h-3 rounded-full ${getPriorityIndicator(node.priority.computed)}`}></div>
+
+              {/* Content */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center space-x-2 mb-1">
+                  <span className={`inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-md text-xs font-semibold border ${
+                    node.type === 'EPIC' ? 'text-purple-600 bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-700' :
+                    node.type === 'FEATURE' ? 'text-blue-600 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700' :
+                    node.type === 'TASK' ? 'text-green-600 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700' :
+                    node.type === 'BUG' ? 'text-red-600 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700' :
+                    node.type === 'MILESTONE' ? 'text-orange-600 bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-700' :
+                    'text-gray-600 bg-gray-50 dark:bg-gray-900/20 border-gray-200 dark:border-gray-700'
+                  }`}>
+                    {node.type === 'EPIC' && <Layers className="h-3 w-3" />}
+                    {node.type === 'FEATURE' && <Sparkles className="h-3 w-3" />}
+                    {node.type === 'TASK' && <ListTodo className="h-3 w-3" />}
+                    {node.type === 'BUG' && <AlertTriangle className="h-3 w-3" />}
+                    {node.type === 'MILESTONE' && <Trophy className="h-3 w-3" />}
+                    <span>{formatLabel(node.type)}</span>
+                  </span>
+                </div>
+                <div className="text-sm font-semibold text-white mb-1 truncate group-hover:text-blue-300 transition-colors">
+                  {node.title}
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className={`text-xs flex items-center space-x-2 ${
+                    node.status === 'PROPOSED' ? 'text-blue-600' :
+                    node.status === 'PLANNED' ? 'text-purple-600' :
+                    node.status === 'IN_PROGRESS' ? 'text-yellow-600' :
+                    node.status === 'COMPLETED' ? 'text-green-600' :
+                    node.status === 'BLOCKED' ? 'text-red-600' :
+                    'text-gray-600'
+                  }`}>
+                    {node.status === 'PROPOSED' && <Lightbulb className="h-3 w-3" />}
+                    {node.status === 'PLANNED' && <Calendar className="h-3 w-3" />}
+                    {node.status === 'IN_PROGRESS' && <Clock className="h-3 w-3" />}
+                    {node.status === 'COMPLETED' && <CheckCircle className="h-3 w-3" />}
+                    {node.status === 'BLOCKED' && <AlertCircle className="h-3 w-3" />}
+                    <span className="font-medium">{formatLabel(node.status)}</span>
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {(() => {
+                      const now = new Date();
+                      const createdDate = node.createdAt ? new Date(node.createdAt) : new Date(now.getTime() - Math.random() * 24 * 60 * 60 * 1000);
+                      const diffMs = now.getTime() - createdDate.getTime();
+                      const diffMins = Math.floor(diffMs / (1000 * 60));
+                      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+                      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+                      const diffWeeks = Math.floor(diffDays / 7);
+                      const diffMonths = Math.floor(diffDays / 30);
+                      
+                      if (diffMins < 1) return 'just now';
+                      if (diffMins < 60) return `${diffMins}m ago`;
+                      if (diffHours < 24) return `${diffHours}h ago`;
+                      if (diffDays < 7) return `${diffDays}d ago`;
+                      if (diffWeeks < 4) return `${diffWeeks}w ago`;
+                      return `${diffMonths}mo ago`;
+                    })()}
+                  </div>
+                </div>
+              </div>
+
+              {/* Index */}
+              <div className="flex-shrink-0">
+                <div className="text-xs text-gray-500 font-medium bg-gray-700/50 px-2 py-1 rounded-md min-w-[1.5rem] text-center">
+                  #{index + 1}
+                </div>
+              </div>
             </div>
           ))}
         </div>
+        
+        {filteredNodes.length > 5 && (
+          <div className="mt-6 pt-4 border-t border-gray-700/50">
+            <button 
+              onClick={() => setShowAllRecentTasks(!showAllRecentTasks)}
+              className="w-full text-sm text-gray-300 hover:text-white font-medium flex items-center justify-center space-x-2 py-3 rounded-lg hover:bg-gray-700/50 transition-all duration-200"
+            >
+              <span>
+                {showAllRecentTasks 
+                  ? 'Show less tasks' 
+                  : `View ${filteredNodes.length - 5} more tasks`}
+              </span>
+              <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${showAllRecentTasks ? 'rotate-180' : ''}`} />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1289,156 +1446,277 @@ export function ListView() {
 
             {/* Advanced Filters Row */}
             <div className="flex items-center space-x-3 flex-wrap gap-y-2">
-              <select
-                value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value)}
-                className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              >
-                <option value="All Types">All Types</option>
-                
-                {/* Strategic Planning */}
-                <optgroup label="🎯 Strategic Planning">
-                  <option value="EPIC">Epic</option>
-                  <option value="PROJECT">Project</option>
-                  <option value="MILESTONE">Milestone</option>
-                  <option value="GOAL">Goal</option>
-                </optgroup>
-                
-                {/* Development Work */}
-                <optgroup label="⚡ Development Work">
-                  <option value="STORY">Story</option>
-                  <option value="FEATURE">Feature</option>
-                  <option value="TASK">Task</option>
-                  <option value="RESEARCH">Research</option>
-                </optgroup>
-                
-                {/* Quality & Issues */}
-                <optgroup label="🔍 Quality & Issues">
-                  <option value="BUG">Bug</option>
-                  <option value="ISSUE">Issue</option>
-                  <option value="HOTFIX">Hotfix</option>
-                </optgroup>
-                
-                {/* Operations & Maintenance */}
-                <optgroup label="🔧 Operations & Maintenance">
-                  <option value="MAINTENANCE">Maintenance</option>
-                  <option value="DEPLOYMENT">Deployment</option>
-                  <option value="MONITORING">Monitoring</option>
-                </optgroup>
-                
-                {/* Documentation */}
-                <optgroup label="📋 Documentation">
-                  <option value="DOCUMENTATION">Documentation</option>
-                  <option value="SPECIFICATION">Specification</option>
-                  <option value="GUIDE">Guide</option>
-                </optgroup>
-                
-                {/* Testing & Validation */}
-                <optgroup label="✅ Testing & Validation">
-                  <option value="TEST">Test</option>
-                  <option value="REVIEW">Review</option>
-                  <option value="QA">QA</option>
-                </optgroup>
-                
-                {/* Business & Sales */}
-                <optgroup label="💼 Business & Sales">
-                  <option value="LEAD">Lead</option>
-                  <option value="OPPORTUNITY">Opportunity</option>
-                  <option value="CONTRACT">Contract</option>
-                </optgroup>
-                
-                {/* Creative & Design */}
-                <optgroup label="🎨 Creative & Design">
-                  <option value="MOCKUP">Mockup</option>
-                  <option value="PROTOTYPE">Prototype</option>
-                  <option value="UI_DESIGN">UI Design</option>
-                </optgroup>
-                
-                {/* Support & Training */}
-                <optgroup label="🎓 Support & Training">
-                  <option value="SUPPORT">Support</option>
-                  <option value="TRAINING">Training</option>
-                </optgroup>
-                
-                {/* Other */}
-                <optgroup label="🔧 Other">
-                  <option value="NOTE">Note</option>
-                  <option value="ACTION_ITEM">Action Item</option>
-                  <option value="DECISION">Decision</option>
-                </optgroup>
-              </select>
+              <div className="relative" ref={typeDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsTypeDropdownOpen(!isTypeDropdownOpen)}
+                  className="flex items-center justify-between px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent hover:border-gray-500 transition-all duration-200 min-w-[140px]"
+                >
+                  <div className="flex items-center space-x-2">
+                    {(() => {
+                      const selectedType = typeOptions.find(option => option.value === typeFilter);
+                      return selectedType ? (
+                        <>
+                          {selectedType.icon && (
+                            <div className={`${selectedType.color}`}>
+                              {selectedType.icon}
+                            </div>
+                          )}
+                          <span className="font-medium">{selectedType.label}</span>
+                        </>
+                      ) : (
+                        <span className="font-medium">All Types</span>
+                      );
+                    })()}
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-gray-400 transition-all duration-200 ${isTypeDropdownOpen ? 'rotate-180 text-green-500' : ''}`} />
+                </button>
+
+                {isTypeDropdownOpen && (
+                  <div className="absolute top-full left-0 mt-2 w-full bg-gray-700 border border-gray-600 rounded-lg shadow-2xl z-50 max-h-80 overflow-y-auto">
+                    <div className="p-2">
+                      {typeOptions.map((option, index) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => {
+                            setTypeFilter(option.value);
+                            setIsTypeDropdownOpen(false);
+                          }}
+                          className={`w-full px-3 py-2 text-left hover:bg-green-900/20 transition-all duration-200 rounded-lg group ${
+                            typeFilter === option.value 
+                              ? 'bg-green-900/30 ring-1 ring-green-500/30' 
+                              : 'hover:shadow-sm'
+                          } ${index !== 0 ? 'mt-1' : ''}`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-2">
+                              {option.icon && (
+                                <div className={`${option.color}`}>
+                                  {option.icon}
+                                </div>
+                              )}
+                              <span className={`font-medium text-sm ${
+                                typeFilter === option.value 
+                                  ? 'text-green-300' 
+                                  : 'text-white'
+                              }`}>
+                                {option.label}
+                              </span>
+                            </div>
+                            {typeFilter === option.value && (
+                              <div className="w-4 h-4 bg-green-600 text-white rounded-full flex items-center justify-center text-xs flex-shrink-0">
+                                ✓
+                              </div>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
               
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              >
-                <option value="All Statuses">All Statuses</option>
-                <option value="COMPLETED">Completed</option>
-                <option value="IN_PROGRESS">In Progress</option>
-                <option value="BLOCKED">Blocked</option>
-                <option value="PLANNED">Planned</option>
-                <option value="PROPOSED">Proposed</option>
-              </select>
+              <div className="relative" ref={statusDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
+                  className="flex items-center justify-between px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent hover:border-gray-500 transition-all duration-200 min-w-[140px]"
+                >
+                  <div className="flex items-center space-x-2">
+                    {(() => {
+                      const selectedStatus = statusOptions.find(option => option.value === statusFilter);
+                      return selectedStatus ? (
+                        <>
+                          {selectedStatus.icon && (
+                            <div className={`${selectedStatus.color}`}>
+                              {selectedStatus.icon}
+                            </div>
+                          )}
+                          <span className="font-medium">{selectedStatus.label}</span>
+                        </>
+                      ) : (
+                        <span className="font-medium">All Statuses</span>
+                      );
+                    })()}
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-gray-400 transition-all duration-200 ${isStatusDropdownOpen ? 'rotate-180 text-green-500' : ''}`} />
+                </button>
 
-              <select
-                value={contributorFilter}
-                onChange={(e) => setContributorFilter(e.target.value)}
-                className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              >
-                <option value="All Contributors">All Contributors</option>
-                <option value="Available">Available</option>
-                {uniqueContributors.map(contributor => (
-                  <option key={contributor} value={contributor}>{contributor}</option>
-                ))}
-              </select>
+                {isStatusDropdownOpen && (
+                  <div className="absolute top-full left-0 mt-2 w-full bg-gray-700 border border-gray-600 rounded-lg shadow-2xl z-50 max-h-80 overflow-y-auto">
+                    <div className="p-2">
+                      {statusOptions.map((option, index) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => {
+                            setStatusFilter(option.value);
+                            setIsStatusDropdownOpen(false);
+                          }}
+                          className={`w-full px-3 py-2 text-left hover:bg-green-900/20 transition-all duration-200 rounded-lg group ${
+                            statusFilter === option.value 
+                              ? 'bg-green-900/30 ring-1 ring-green-500/30' 
+                              : 'hover:shadow-sm'
+                          } ${index !== 0 ? 'mt-1' : ''}`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-2">
+                              {option.icon && (
+                                <div className={`${option.color}`}>
+                                  {option.icon}
+                                </div>
+                              )}
+                              <span className={`font-medium text-sm ${
+                                statusFilter === option.value 
+                                  ? 'text-green-300' 
+                                  : 'text-white'
+                              }`}>
+                                {option.label}
+                              </span>
+                            </div>
+                            {statusFilter === option.value && (
+                              <div className="w-4 h-4 bg-green-600 text-white rounded-full flex items-center justify-center text-xs flex-shrink-0">
+                                ✓
+                              </div>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
 
-              <select
-                value={priorityFilter}
-                onChange={(e) => setPriorityFilter(e.target.value)}
-                className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              >
-                <option value="All Priorities">All Priorities</option>
-                <option value="Critical">Critical Priority</option>
-                <option value="High">High Priority</option>
-                <option value="Medium">Moderate Priority</option>
-                <option value="Low">Low Priority</option>
-                <option value="Minimal">Minimal Priority</option>
-              </select>
+              <div className="relative" ref={contributorDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsContributorDropdownOpen(!isContributorDropdownOpen)}
+                  className="flex items-center justify-between px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent hover:border-gray-500 transition-all duration-200 min-w-[160px]"
+                >
+                  <div className="flex items-center space-x-2">
+                    {(() => {
+                      const selectedContributor = contributorOptions.find(option => option.value === contributorFilter);
+                      return selectedContributor ? (
+                        <span className={`font-medium ${selectedContributor.color || 'text-white'}`}>{selectedContributor.label}</span>
+                      ) : (
+                        <span className="font-medium">All Contributors</span>
+                      );
+                    })()}
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-gray-400 transition-all duration-200 ${isContributorDropdownOpen ? 'rotate-180 text-green-500' : ''}`} />
+                </button>
+
+                {isContributorDropdownOpen && (
+                  <div className="absolute top-full left-0 mt-2 w-full bg-gray-700 border border-gray-600 rounded-lg shadow-2xl z-50 max-h-80 overflow-y-auto">
+                    <div className="p-2">
+                      {contributorOptions.map((option, index) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => {
+                            setContributorFilter(option.value);
+                            setIsContributorDropdownOpen(false);
+                          }}
+                          className={`w-full px-3 py-2 text-left hover:bg-green-900/20 transition-all duration-200 rounded-lg group ${
+                            contributorFilter === option.value 
+                              ? 'bg-green-900/30 ring-1 ring-green-500/30' 
+                              : 'hover:shadow-sm'
+                          } ${index !== 0 ? 'mt-1' : ''}`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className={`font-medium text-sm ${
+                              contributorFilter === option.value 
+                                ? 'text-green-300' 
+                                : option.color || 'text-white'
+                            }`}>
+                              {option.label}
+                            </span>
+                            {contributorFilter === option.value && (
+                              <div className="w-4 h-4 bg-green-600 text-white rounded-full flex items-center justify-center text-xs flex-shrink-0">
+                                ✓
+                              </div>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="relative" ref={priorityDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsPriorityDropdownOpen(!isPriorityDropdownOpen)}
+                  className="flex items-center justify-between px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent hover:border-gray-500 transition-all duration-200 min-w-[160px]"
+                >
+                  <div className="flex items-center space-x-2">
+                    {(() => {
+                      const selectedPriority = priorityOptions.find(option => option.value === priorityFilter);
+                      return selectedPriority ? (
+                        <>
+                          {selectedPriority.icon && (
+                            <div className={`${selectedPriority.color}`}>
+                              {selectedPriority.icon}
+                            </div>
+                          )}
+                          <span className="font-medium">{selectedPriority.label}</span>
+                        </>
+                      ) : (
+                        <span className="font-medium">All Priorities</span>
+                      );
+                    })()}
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-gray-400 transition-all duration-200 ${isPriorityDropdownOpen ? 'rotate-180 text-green-500' : ''}`} />
+                </button>
+
+                {isPriorityDropdownOpen && (
+                  <div className="absolute top-full left-0 mt-2 w-full bg-gray-700 border border-gray-600 rounded-lg shadow-2xl z-50 max-h-80 overflow-y-auto">
+                    <div className="p-2">
+                      {priorityOptions.map((option, index) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => {
+                            setPriorityFilter(option.value);
+                            setIsPriorityDropdownOpen(false);
+                          }}
+                          className={`w-full px-3 py-2 text-left hover:bg-green-900/20 transition-all duration-200 rounded-lg group ${
+                            priorityFilter === option.value 
+                              ? 'bg-green-900/30 ring-1 ring-green-500/30' 
+                              : 'hover:shadow-sm'
+                          } ${index !== 0 ? 'mt-1' : ''}`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-2">
+                              {option.icon && (
+                                <div className={`${option.color}`}>
+                                  {option.icon}
+                                </div>
+                              )}
+                              <span className={`font-medium text-sm ${
+                                priorityFilter === option.value 
+                                  ? 'text-green-300' 
+                                  : 'text-white'
+                              }`}>
+                                {option.label}
+                              </span>
+                            </div>
+                            {priorityFilter === option.value && (
+                              <div className="w-4 h-4 bg-green-600 text-white rounded-full flex items-center justify-center text-xs flex-shrink-0">
+                                ✓
+                              </div>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
-            {/* Active Filters Summary */}
-            {(searchTerm || typeFilter !== 'All Types' || statusFilter !== 'All Statuses' || contributorFilter !== 'All Contributors' || priorityFilter !== 'All Priorities') && (
-              <div className="flex items-center space-x-2 text-sm">
-                <span className="text-gray-400">Active filters:</span>
-                {searchTerm && (
-                  <span className="px-2 py-1 bg-green-900/30 text-green-300 rounded border border-green-500/30">
-                    Search: "{searchTerm}"
-                  </span>
-                )}
-                {typeFilter !== 'All Types' && (
-                  <span className="px-2 py-1 bg-blue-900/30 text-blue-300 rounded border border-blue-500/30">
-                    Type: {typeFilter}
-                  </span>
-                )}
-                {statusFilter !== 'All Statuses' && (
-                  <span className="px-2 py-1 bg-purple-900/30 text-purple-300 rounded border border-purple-500/30">
-                    Status: {statusFilter}
-                  </span>
-                )}
-                {contributorFilter !== 'All Contributors' && (
-                  <span className="px-2 py-1 bg-yellow-900/30 text-yellow-300 rounded border border-yellow-500/30">
-                    Contributor: {contributorFilter === 'Available' ? 'Available' : contributorFilter}
-                  </span>
-                )}
-                {priorityFilter !== 'All Priorities' && (
-                  <span className="px-2 py-1 bg-orange-900/30 text-orange-300 rounded border border-orange-500/30">
-                    Priority: {priorityFilter}
-                  </span>
-                )}
-                <span className="text-gray-500">({filteredNodes.length} results)</span>
-              </div>
-            )}
           </div>
         </div>
 
@@ -1485,11 +1763,13 @@ export function ListView() {
           <div className="bg-gray-750 rounded-lg p-6 border border-gray-600">
             <h3 className="text-xl font-semibold text-white mb-6">Task Status</h3>
             
-            <div className="space-y-3">
+            <div className="space-y-2">
               <div className="flex items-center justify-between p-2 rounded hover:bg-gray-700 transition-colors">
                 <div className="flex items-center space-x-3">
                   <div className="flex items-center space-x-2">
-                    <Lightbulb className="h-4 w-4 text-blue-400" />
+                    <div className="text-blue-600 text-lg">
+                      <Lightbulb className="h-4 w-4" />
+                    </div>
                     <span className="text-sm text-gray-300">Proposed</span>
                   </div>
                 </div>
@@ -1502,7 +1782,9 @@ export function ListView() {
               <div className="flex items-center justify-between p-2 rounded hover:bg-gray-700 transition-colors">
                 <div className="flex items-center space-x-3">
                   <div className="flex items-center space-x-2">
-                    <Clock className="h-4 w-4 text-purple-400" />
+                    <div className="text-purple-600 text-lg">
+                      <Calendar className="h-4 w-4" />
+                    </div>
                     <span className="text-sm text-gray-300">Planned</span>
                   </div>
                 </div>
@@ -1515,7 +1797,9 @@ export function ListView() {
               <div className="flex items-center justify-between p-2 rounded hover:bg-gray-700 transition-colors">
                 <div className="flex items-center space-x-3">
                   <div className="flex items-center space-x-2">
-                    <Play className="h-4 w-4 text-yellow-400" />
+                    <div className="text-yellow-600 text-lg">
+                      <Clock className="h-4 w-4" />
+                    </div>
                     <span className="text-sm text-gray-300">In Progress</span>
                   </div>
                 </div>
@@ -1528,12 +1812,14 @@ export function ListView() {
               <div className="flex items-center justify-between p-2 rounded hover:bg-gray-700 transition-colors">
                 <div className="flex items-center space-x-3">
                   <div className="flex items-center space-x-2">
-                    <AlertCircle className="h-4 w-4 text-red-400" />
+                    <div className="text-red-600 text-lg">
+                      <AlertCircle className="h-4 w-4" />
+                    </div>
                     <span className="text-sm text-gray-300">Blocked</span>
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-lg font-bold text-red-400">{stats.blocked}</div>
+                  <div className="text-lg font-bold text-red-600">{stats.blocked}</div>
                   <div className="text-xs text-gray-500">{stats.total > 0 ? Math.round((stats.blocked / stats.total) * 100) : 0}%</div>
                 </div>
               </div>
@@ -1541,7 +1827,9 @@ export function ListView() {
               <div className="flex items-center justify-between p-2 rounded hover:bg-gray-700 transition-colors">
                 <div className="flex items-center space-x-3">
                   <div className="flex items-center space-x-2">
-                    <CheckCircle className="h-4 w-4 text-green-400" />
+                    <div className="text-green-600 text-lg">
+                      <CheckCircle className="h-4 w-4" />
+                    </div>
                     <span className="text-sm text-gray-300">Completed</span>
                   </div>
                 </div>

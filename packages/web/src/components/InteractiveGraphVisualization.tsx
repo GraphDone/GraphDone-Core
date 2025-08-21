@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import * as d3 from 'd3';
-import { Link2, Edit3, Trash2, AlertTriangle, AlertCircle } from 'lucide-react';
+import { Link2, Edit3, Trash2, AlertTriangle, AlertCircle, Layers, Sparkles, ListTodo, Trophy } from 'lucide-react';
 import { useQuery } from '@apollo/client';
 import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -302,7 +302,7 @@ export function InteractiveGraphVisualization() {
       .attr('stroke', (d: WorkItemEdge) => {
         switch (d.type) {
           case 'DEPENDS_ON': return '#10b981';
-          case 'BLOCKS': return '#ef4444';
+          case 'BLOCKS': return '#dc2626';
           case 'RELATES_TO': return '#3b82f6';
           case 'PART_OF': return '#f59e0b';
           default: return '#6b7280';
@@ -316,7 +316,7 @@ export function InteractiveGraphVisualization() {
     
     // Create different arrowhead colors for each edge type
     const edgeTypes = ['DEPENDS_ON', 'BLOCKS', 'RELATES_TO', 'PART_OF'];
-    const edgeColors = ['#10b981', '#ef4444', '#3b82f6', '#f59e0b'];
+    const edgeColors = ['#10b981', '#dc2626', '#3b82f6', '#f59e0b'];
     
     edgeTypes.forEach((type, index) => {
       defs.append('marker')
@@ -381,7 +381,7 @@ export function InteractiveGraphVisualization() {
           case 'EPIC': return '#a855f7';
           case 'FEATURE': return '#3b82f6';
           case 'TASK': return '#10b981';
-          case 'BUG': return '#ef4444';
+          case 'BUG': return '#dc2626';
           case 'MILESTONE': return '#f59e0b';
           case 'OUTCOME': return '#6366f1';
           case 'IDEA': return '#f97316';
@@ -484,7 +484,7 @@ export function InteractiveGraphVisualization() {
       .attr('fill', (d: WorkItemEdge) => {
         switch (d.type) {
           case 'DEPENDS_ON': return '#10b981';
-          case 'BLOCKS': return '#ef4444';
+          case 'BLOCKS': return '#dc2626';
           case 'RELATES_TO': return '#3b82f6';
           case 'PART_OF': return '#f59e0b';
           default: return '#6b7280';
@@ -493,7 +493,7 @@ export function InteractiveGraphVisualization() {
       .attr('stroke', (d: WorkItemEdge) => {
         switch (d.type) {
           case 'DEPENDS_ON': return '#10b981';
-          case 'BLOCKS': return '#ef4444';
+          case 'BLOCKS': return '#dc2626';
           case 'RELATES_TO': return '#3b82f6';
           case 'PART_OF': return '#f59e0b';
           default: return '#6b7280';
@@ -671,7 +671,7 @@ export function InteractiveGraphVisualization() {
       case 'EPIC': return '#a855f7';
       case 'FEATURE': return '#3b82f6';
       case 'TASK': return '#10b981';
-      case 'BUG': return '#ef4444';
+      case 'BUG': return '#dc2626';
       case 'MILESTONE': return '#f59e0b';
       case 'OUTCOME': return '#6366f1';
       case 'IDEA': return '#f97316';
@@ -683,7 +683,7 @@ export function InteractiveGraphVisualization() {
     switch (status) {
       case 'COMPLETED': return '#22c55e';
       case 'IN_PROGRESS': return '#3b82f6';
-      case 'BLOCKED': return '#ef4444';
+      case 'BLOCKED': return '#dc2626';
       case 'PLANNED': return '#f59e0b';
       case 'PROPOSED': return '#a855f7';
       case 'CANCELLED': return '#6b7280';
@@ -1060,19 +1060,19 @@ export function InteractiveGraphVisualization() {
         <div className="text-sm font-medium text-green-400 mb-2">Node Types</div>
         <div className="space-y-1 text-xs text-gray-300">
           <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 rounded-full bg-purple-500" />
+            <Layers className="w-3 h-3 text-purple-500" />
             <span>Epic</span>
-            <div className="w-3 h-3 rounded-full bg-blue-500 ml-auto" />
+            <Sparkles className="w-3 h-3 text-blue-500 ml-auto" />
             <span>Feature</span>
           </div>
           <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 rounded-full bg-green-500" />
+            <ListTodo className="w-3 h-3 text-green-500" />
             <span>Task</span>
-            <div className="w-3 h-3 rounded-full bg-red-500 ml-auto" />
+            <AlertTriangle className="w-3 h-3 text-red-500 ml-auto" />
             <span>Bug</span>
           </div>
           <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 rounded-full bg-yellow-500" />
+            <Trophy className="w-3 h-3 text-yellow-500" />
             <span>Milestone</span>
           </div>
           <div className="border-t border-gray-200 pt-2 mt-2">
