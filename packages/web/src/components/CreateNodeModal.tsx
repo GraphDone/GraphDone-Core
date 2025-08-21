@@ -1,10 +1,10 @@
 import React from 'react';
 import { useMutation } from '@apollo/client';
-import { X, Link } from 'lucide-react';
+import { X, Link, Lightbulb, Calendar, Clock, CheckCircle, AlertCircle, ChevronDown, Flame, Zap, Triangle, Circle, ArrowDown } from 'lucide-react';
 import { CREATE_WORK_ITEM, GET_WORK_ITEMS } from '../lib/queries';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
-import { NodeCategorySelector } from './NodeCategorySelector';
+import { NodeTypeSelector } from './NodeCategorySelector';
 
 interface CreateNodeModalProps {
   isOpen: boolean;
@@ -30,109 +30,34 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
     dueDate: ''
   });
 
-  const [selectedCategory, setSelectedCategory] = React.useState('');
+  const [isStatusOpen, setIsStatusOpen] = React.useState(false);
+  const statusDropdownRef = React.useRef<HTMLDivElement>(null);
 
-  // Check if all required fields are filled
-  const isFormValid = formData.title.trim() !== '' && formData.type !== '' && selectedCategory !== '';
+  // Status options with icons
+  const statusOptions = [
+    { value: 'PROPOSED', label: 'Proposed', icon: <Lightbulb className="h-4 w-4" />, color: 'text-blue-600' },
+    { value: 'PLANNED', label: 'Planned', icon: <Calendar className="h-4 w-4" />, color: 'text-purple-600' },
+    { value: 'IN_PROGRESS', label: 'In Progress', icon: <Clock className="h-4 w-4" />, color: 'text-yellow-600' },
+    { value: 'COMPLETED', label: 'Completed', icon: <CheckCircle className="h-4 w-4" />, color: 'text-green-600' },
+    { value: 'BLOCKED', label: 'Blocked', icon: <AlertCircle className="h-4 w-4" />, color: 'text-red-600' }
+  ];
 
-  // Close dropdown when clicking outside
+  // Close status dropdown when clicking outside
   React.useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        // Optional: Close the dropdown overlay when clicking outside
-        // setSelectedCategory('');
+      if (statusDropdownRef.current && !statusDropdownRef.current.contains(event.target as Node)) {
+        setIsStatusOpen(false);
       }
     }
 
-    if (selectedCategory) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }
-  }, [selectedCategory]);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
-  const nodeCategories = {
-    'Strategic Planning': {
-      emoji: '🎯',
-      types: [
-        { value: 'EPIC', label: 'Epic', description: 'Large initiative spanning multiple deliverables' },
-        { value: 'PROJECT', label: 'Project', description: 'Temporary endeavor with specific deliverables' },
-        { value: 'MILESTONE', label: 'Milestone', description: 'Key project checkpoint' },
-        { value: 'GOAL', label: 'Goal', description: 'Target outcome or achievement' }
-      ]
-    },
-    'Development Work': {
-      emoji: '⚡',
-      types: [
-        { value: 'STORY', label: 'Story', description: 'General work item or requirement' },
-        { value: 'FEATURE', label: 'Feature', description: 'New functionality or capability' },
-        { value: 'TASK', label: 'Task', description: 'Specific work item to be completed' },
-        { value: 'RESEARCH', label: 'Research', description: 'Information gathering and analysis' }
-      ]
-    },
-    'Quality & Issues': {
-      emoji: '🔍',
-      types: [
-        { value: 'BUG', label: 'Bug', description: 'Software defect requiring resolution' },
-        { value: 'ISSUE', label: 'Issue', description: 'General problem or concern' },
-        { value: 'HOTFIX', label: 'Hotfix', description: 'Urgent fix for critical issue' }
-      ]
-    },
-    'Operations & Maintenance': {
-      emoji: '🔧',
-      types: [
-        { value: 'MAINTENANCE', label: 'Maintenance', description: 'System upkeep and care' },
-        { value: 'DEPLOYMENT', label: 'Deployment', description: 'Software release or rollout' },
-        { value: 'MONITORING', label: 'Monitoring', description: 'System observation and alerting' }
-      ]
-    },
-    'Documentation': {
-      emoji: '📋',
-      types: [
-        { value: 'DOCUMENTATION', label: 'Documentation', description: 'Technical or process documentation' },
-        { value: 'SPECIFICATION', label: 'Specification', description: 'Detailed requirements document' },
-        { value: 'GUIDE', label: 'Guide', description: 'How-to or instructional content' }
-      ]
-    },
-    'Testing & Validation': {
-      emoji: '✅',
-      types: [
-        { value: 'TEST', label: 'Test', description: 'General testing activity' },
-        { value: 'REVIEW', label: 'Review', description: 'General review activity' },
-        { value: 'QA', label: 'QA', description: 'Quality assurance activity' }
-      ]
-    },
-    'Business & Sales': {
-      emoji: '💼',
-      types: [
-        { value: 'LEAD', label: 'Lead', description: 'Potential customer or prospect' },
-        { value: 'OPPORTUNITY', label: 'Opportunity', description: 'Sales opportunity or deal' },
-        { value: 'CONTRACT', label: 'Contract', description: 'Legal agreement or proposal' }
-      ]
-    },
-    'Creative & Design': {
-      emoji: '🎨',
-      types: [
-        { value: 'MOCKUP', label: 'Mockup', description: 'Visual design representation' },
-        { value: 'PROTOTYPE', label: 'Prototype', description: 'Working model or proof of concept' },
-        { value: 'UI_DESIGN', label: 'UI Design', description: 'User interface design work' }
-      ]
-    },
-    'Support & Training': {
-      emoji: '🎓',
-      types: [
-        { value: 'SUPPORT', label: 'Support', description: 'Customer or user assistance' },
-        { value: 'TRAINING', label: 'Training', description: 'Learning and development activity' }
-      ]
-    },
-    'Other': {
-      emoji: '🔧',
-      types: [
-        { value: 'NOTE', label: 'Note', description: 'General note or observation' },
-        { value: 'ACTION_ITEM', label: 'Action Item', description: 'Specific action to be taken' },
-        { value: 'DECISION', label: 'Decision', description: 'Choice or determination to be made' }
-      ]
-    }
-  };
+
+  // Check if all required fields are filled
+  const isFormValid = formData.title.trim() !== '' && formData.type !== '';
+
 
   const [createWorkItem, { loading: creatingWorkItem }] = useMutation(CREATE_WORK_ITEM, {
     refetchQueries: [{ 
@@ -184,11 +109,6 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate that both category and type are selected
-    if (!selectedCategory) {
-      showError('Validation Error', 'Please select a category first.');
-      return;
-    }
     
     if (!formData.type) {
       showError('Validation Error', 'Please select a node type.');
@@ -257,7 +177,6 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
           assignedTo: '',
           dueDate: ''
         });
-        setSelectedCategory('');
       }
     } catch (error) {
       console.error('Error creating work item:', error);
@@ -330,42 +249,83 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                 Node Type *
               </label>
               
-              <NodeCategorySelector
-                selectedCategory={selectedCategory}
+              <NodeTypeSelector
                 selectedType={formData.type}
-                onCategoryChange={(category) => {
-                  setSelectedCategory(category);
-                  setFormData(prev => ({ ...prev, type: '' }));
-                }}
                 onTypeChange={(type) => setFormData(prev => ({ ...prev, type }))}
-                showTypeSelection={true}
-                placeholder="Select category..."
+                placeholder="Select node type..."
               />
             </div>
 
             <div>
-              <label htmlFor="status" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Status
               </label>
-              <select
-                id="status"
-                value={formData.status}
-                onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
-                className={`w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent font-medium ${
-                  formData.status === 'PROPOSED' ? 'text-blue-600 dark:text-blue-400' :
-                  formData.status === 'PLANNED' ? 'text-purple-600 dark:text-purple-400' :
-                  formData.status === 'IN_PROGRESS' ? 'text-yellow-600 dark:text-yellow-400' :
-                  formData.status === 'COMPLETED' ? 'text-green-600 dark:text-green-400' :
-                  formData.status === 'BLOCKED' ? 'text-red-600 dark:text-red-400' :
-                  'text-gray-900 dark:text-white'
-                }`}
-              >
-                <option value="PROPOSED" className="text-blue-600">Proposed</option>
-                <option value="PLANNED" className="text-purple-600">Planned</option>
-                <option value="IN_PROGRESS" className="text-yellow-600">In Progress</option>
-                <option value="COMPLETED" className="text-green-600">Completed</option>
-                <option value="BLOCKED" className="text-red-600">Blocked</option>
-              </select>
+              <div className="relative" ref={statusDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsStatusOpen(!isStatusOpen)}
+                  className="w-full flex items-center justify-between px-4 py-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm"
+                >
+                  <div className="flex items-center space-x-3">
+                    {(() => {
+                      const selectedStatus = statusOptions.find(option => option.value === formData.status);
+                      return selectedStatus ? (
+                        <>
+                          <div className={`${selectedStatus.color} text-lg`}>
+                            {selectedStatus.icon}
+                          </div>
+                          <span className="font-semibold text-gray-900 dark:text-gray-100">{selectedStatus.label}</span>
+                        </>
+                      ) : (
+                        <span className="text-gray-600 dark:text-gray-300 font-medium">Select status...</span>
+                      );
+                    })()}
+                  </div>
+                  <ChevronDown className={`h-5 w-5 text-gray-400 transition-all duration-200 ${isStatusOpen ? 'rotate-180 text-blue-500' : ''}`} />
+                </button>
+
+                {isStatusOpen && (
+                  <div className="absolute top-full left-0 mt-2 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-50 max-h-80 overflow-y-auto backdrop-blur-sm">
+                    <div className="p-2">
+                      {statusOptions.map((option, index) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => {
+                            setFormData(prev => ({ ...prev, status: option.value }));
+                            setIsStatusOpen(false);
+                          }}
+                          className={`w-full px-3 py-3 text-left hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all duration-200 rounded-lg group ${
+                            formData.status === option.value 
+                              ? 'bg-blue-50 dark:bg-blue-900/30 ring-1 ring-blue-200 dark:ring-blue-700' 
+                              : 'hover:shadow-sm'
+                          } ${index !== 0 ? 'mt-1' : ''}`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-3">
+                              <div className={`${option.color} text-lg`}>
+                                {option.icon}
+                              </div>
+                              <span className={`font-semibold ${
+                                formData.status === option.value 
+                                  ? 'text-blue-700 dark:text-blue-300' 
+                                  : 'text-gray-900 dark:text-gray-100'
+                              }`}>
+                                {option.label}
+                              </span>
+                            </div>
+                            {formData.status === option.value && (
+                              <div className="w-5 h-5 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs ml-2 flex-shrink-0 shadow-sm">
+                                ✓
+                              </div>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
             
             <div>
@@ -421,9 +381,9 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Priority Distribution</label>
               
               {/* Professional Priority Guide */}
-              <div className="bg-gray-800 dark:bg-gray-750 border border-gray-600 dark:border-gray-600 rounded-xl p-4 mb-4 shadow-sm">
+              <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 mb-4 shadow-sm">
                 <div className="mb-3">
-                  <div className="text-sm font-semibold text-gray-300">Priority Level</div>
+                  <div className="text-sm font-semibold text-gray-700 dark:text-gray-300">Priority Level</div>
                 </div>
                 
                 <div className="space-y-3">
@@ -439,13 +399,13 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                           priorityComm: 0.9
                         }));
                       }}
-                      className="bg-gray-700 rounded-lg p-2 border border-red-500/30 text-center hover:shadow-sm hover:bg-gray-600 transition-all cursor-pointer"
+                      className="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 border border-red-500/30 text-center hover:shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600 transition-all cursor-pointer"
                     >
                       <div className="flex items-center justify-center space-x-1 mb-1">
-                        <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                        <Flame className="w-3 h-3 text-red-500" />
                         <div className="text-red-400 font-bold text-xs">Critical</div>
                       </div>
-                      <div className="text-xs font-mono text-gray-400">0.80 - 1.00</div>
+                      <div className="text-xs font-mono text-gray-400">80% - 100%</div>
                     </button>
                     
                     <button
@@ -458,13 +418,13 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                           priorityComm: 0.7
                         }));
                       }}
-                      className="bg-gray-700 rounded-lg p-2 border border-orange-500/30 text-center hover:shadow-sm hover:bg-gray-600 transition-all cursor-pointer"
+                      className="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 border border-orange-500/30 text-center hover:shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600 transition-all cursor-pointer"
                     >
                       <div className="flex items-center justify-center space-x-1 mb-1">
-                        <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
+                        <Zap className="w-3 h-3 text-orange-500" />
                         <div className="text-orange-400 font-bold text-xs">High</div>
                       </div>
-                      <div className="text-xs font-mono text-gray-400">0.60 - 0.79</div>
+                      <div className="text-xs font-mono text-gray-400">60% - 79%</div>
                     </button>
                     
                     <button
@@ -477,13 +437,13 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                           priorityComm: 0.5
                         }));
                       }}
-                      className="bg-gray-700 rounded-lg p-2 border border-yellow-500/30 text-center hover:shadow-sm hover:bg-gray-600 transition-all cursor-pointer"
+                      className="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 border border-yellow-500/30 text-center hover:shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600 transition-all cursor-pointer"
                     >
                       <div className="flex items-center justify-center space-x-1 mb-1">
-                        <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                        <Triangle className="w-3 h-3 text-yellow-500" />
                         <div className="text-yellow-400 font-bold text-xs">Moderate</div>
                       </div>
-                      <div className="text-xs font-mono text-gray-400">0.40 - 0.59</div>
+                      <div className="text-xs font-mono text-gray-400">40% - 59%</div>
                     </button>
                   </div>
                   
@@ -499,13 +459,13 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                           priorityComm: 0.3
                         }));
                       }}
-                      className="bg-gray-700 rounded-lg p-2 border border-blue-500/30 text-center hover:shadow-sm hover:bg-gray-600 transition-all cursor-pointer"
+                      className="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 border border-blue-500/30 text-center hover:shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600 transition-all cursor-pointer"
                     >
                       <div className="flex items-center justify-center space-x-1 mb-1">
-                        <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                        <Circle className="w-3 h-3 text-blue-500" />
                         <div className="text-blue-400 font-bold text-xs">Low</div>
                       </div>
-                      <div className="text-xs font-mono text-gray-400">0.20 - 0.39</div>
+                      <div className="text-xs font-mono text-gray-400">20% - 39%</div>
                     </button>
                     
                     <button
@@ -518,13 +478,13 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                           priorityComm: 0.1
                         }));
                       }}
-                      className="bg-gray-700 rounded-lg p-2 border border-green-500/30 text-center hover:shadow-sm hover:bg-gray-600 transition-all cursor-pointer"
+                      className="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 border border-green-500/30 text-center hover:shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600 transition-all cursor-pointer"
                     >
                       <div className="flex items-center justify-center space-x-1 mb-1">
-                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                        <ArrowDown className="w-3 h-3 text-green-500" />
                         <div className="text-green-400 font-bold text-xs">Minimal</div>
                       </div>
-                      <div className="text-xs font-mono text-gray-400">0.00 - 0.19</div>
+                      <div className="text-xs font-mono text-gray-400">0% - 19%</div>
                     </button>
                   </div>
                 </div>
@@ -559,11 +519,17 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                   formData.priorityExec >= 0.2 ? 'text-blue-500' :
                   'text-green-500'
                 }`}>
-                  {formData.priorityExec >= 0.8 ? '🔴 Critical' :
-                   formData.priorityExec >= 0.6 ? '🟠 High' :
-                   formData.priorityExec >= 0.4 ? '🟡 Moderate' :
-                   formData.priorityExec >= 0.2 ? '🔵 Low' :
-                   '🟢 Minimal'} ({formData.priorityExec})
+                  {formData.priorityExec >= 0.8 ? (
+                    <><Flame className="h-3 w-3 inline mr-1" />Critical</>
+                  ) : formData.priorityExec >= 0.6 ? (
+                    <><Zap className="h-3 w-3 inline mr-1" />High</>
+                  ) : formData.priorityExec >= 0.4 ? (
+                    <><Triangle className="h-3 w-3 inline mr-1" />Moderate</>
+                  ) : formData.priorityExec >= 0.2 ? (
+                    <><Circle className="h-3 w-3 inline mr-1" />Low</>
+                  ) : (
+                    <><ArrowDown className="h-3 w-3 inline mr-1" />Minimal</>
+                  )} ({Math.round(formData.priorityExec * 100)}%)
                 </div>
               </div>
               
@@ -596,11 +562,17 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                   formData.priorityIndiv >= 0.2 ? 'text-blue-500' :
                   'text-green-500'
                 }`}>
-                  {formData.priorityIndiv >= 0.8 ? '🔴 Critical' :
-                   formData.priorityIndiv >= 0.6 ? '🟠 High' :
-                   formData.priorityIndiv >= 0.4 ? '🟡 Moderate' :
-                   formData.priorityIndiv >= 0.2 ? '🔵 Low' :
-                   '🟢 Minimal'} ({formData.priorityIndiv})
+                  {formData.priorityIndiv >= 0.8 ? (
+                    <><Flame className="h-3 w-3 inline mr-1" />Critical</>
+                  ) : formData.priorityIndiv >= 0.6 ? (
+                    <><Zap className="h-3 w-3 inline mr-1" />High</>
+                  ) : formData.priorityIndiv >= 0.4 ? (
+                    <><Triangle className="h-3 w-3 inline mr-1" />Moderate</>
+                  ) : formData.priorityIndiv >= 0.2 ? (
+                    <><Circle className="h-3 w-3 inline mr-1" />Low</>
+                  ) : (
+                    <><ArrowDown className="h-3 w-3 inline mr-1" />Minimal</>
+                  )} ({Math.round(formData.priorityIndiv * 100)}%)
                 </div>
               </div>
               
@@ -633,11 +605,17 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                   formData.priorityComm >= 0.2 ? 'text-blue-500' :
                   'text-green-500'
                 }`}>
-                  {formData.priorityComm >= 0.8 ? '🔴 Critical' :
-                   formData.priorityComm >= 0.6 ? '🟠 High' :
-                   formData.priorityComm >= 0.4 ? '🟡 Moderate' :
-                   formData.priorityComm >= 0.2 ? '🔵 Low' :
-                   '🟢 Minimal'} ({formData.priorityComm})
+                  {formData.priorityComm >= 0.8 ? (
+                    <><Flame className="h-3 w-3 inline mr-1" />Critical</>
+                  ) : formData.priorityComm >= 0.6 ? (
+                    <><Zap className="h-3 w-3 inline mr-1" />High</>
+                  ) : formData.priorityComm >= 0.4 ? (
+                    <><Triangle className="h-3 w-3 inline mr-1" />Moderate</>
+                  ) : formData.priorityComm >= 0.2 ? (
+                    <><Circle className="h-3 w-3 inline mr-1" />Low</>
+                  ) : (
+                    <><ArrowDown className="h-3 w-3 inline mr-1" />Minimal</>
+                  )} ({Math.round(formData.priorityComm * 100)}%)
                 </div>
               </div>
             </div>
