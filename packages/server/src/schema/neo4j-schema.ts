@@ -182,9 +182,19 @@ export const typeDefs = gql`
   }
 
   enum EdgeType {
-    DEPENDENCY
+    DEPENDS_ON
     BLOCKS
+    ENABLES
     RELATES_TO
+    PART_OF
+    FOLLOWS
+    PARALLEL_WITH
+    DUPLICATES
+    CONFLICTS_WITH
+    VALIDATES
+    
+    # Legacy support (deprecated)
+    DEPENDENCY
     CONTAINS
   }
 

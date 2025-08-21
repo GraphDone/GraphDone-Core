@@ -28,6 +28,16 @@
   .card {
     @apply bg-white rounded-lg border border-gray-200 shadow-sm;
   }
+
+  /* Text wrapping in table cells while preserving original table size */
+  .table-text-content {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    white-space: normal;
+    hyphens: auto;
+    max-width: 300px; /* Reasonable width constraint for text wrapping */
+  }
 }
 
 /* Graph visualization styles */
