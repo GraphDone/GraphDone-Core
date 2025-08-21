@@ -1,32 +1,41 @@
 import React from 'react';
 import { useMutation } from '@apollo/client';
-import { X, Link, Lightbulb, Calendar, Clock, CheckCircle, AlertCircle, ChevronDown, Flame, Zap, Triangle, Circle, ArrowDown } from 'lucide-react';
-import { CREATE_WORK_ITEM, GET_WORK_ITEMS } from '../lib/queries';
+import { X, Edit, Save, Lightbulb, Calendar, Clock, CheckCircle, AlertCircle, ChevronDown, Flame, Zap, Triangle, Circle, ArrowDown } from 'lucide-react';
+import { UPDATE_WORK_ITEM, GET_WORK_ITEMS } from '../lib/queries';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { NodeTypeSelector } from './NodeCategorySelector';
 
-interface CreateNodeModalProps {
+interface EditNodeModalProps {
   isOpen: boolean;
   onClose: () => void;
-  parentNodeId?: string; // If provided, creates a connection to this node
-  position?: { x: number; y: number; z: number }; // Position for floating nodes
+  node: {
+    id: string;
+    title: string;
+    description?: string;
+    type: string;
+    status: string;
+    priorityExec: number;
+    priorityIndiv: number;
+    priorityComm: number;
+  };
 }
 
-export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: CreateNodeModalProps) {
-  const { currentUser, currentTeam } = useAuth();
+export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
+  const { currentTeam } = useAuth();
   const { showSuccess, showError } = useNotifications();
   
+  
   const [formData, setFormData] = React.useState({
-    title: '',
-    description: '',
-    type: '',
-    priorityExec: 0,
-    priorityIndiv: 0,
-    priorityComm: 0,
-    status: 'PROPOSED',
+    title: node.title,
+    description: node.description || '',
+    type: node.type,
+    status: node.status,
+    priorityExec: node.priorityExec || 0,
+    priorityIndiv: node.priorityIndiv || 0,
+    priorityComm: node.priorityComm || 0,
     assignedTo: '',
-    dueDate: ''
+    dueDate: '',
   });
 
   const [isStatusOpen, setIsStatusOpen] = React.useState(false);
@@ -52,13 +61,11 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-
+  
   // Check if all required fields are filled
   const isFormValid = formData.title.trim() !== '' && formData.type !== '';
 
-
-  const [createWorkItem, { loading: creatingWorkItem }] = useMutation(CREATE_WORK_ITEM, {
+  const [updateWorkItem, { loading: updatingNode }] = useMutation(UPDATE_WORK_ITEM, {
     refetchQueries: [{ 
       query: GET_WORK_ITEMS,
       variables: {
@@ -67,47 +74,26 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
         }
       }
     }],
-    awaitRefetchQueries: true,
-    update: (cache, { data }) => {
-      // Update Apollo cache for immediate UI refresh
-      if (data?.createWorkItems?.workItems) {
-        const newNode = data.createWorkItems.workItems[0];
-        
-        // Update existing cached query
-        const existingData = cache.readQuery({
-          query: GET_WORK_ITEMS,
-          variables: {
-            where: {
-              teamId: currentTeam?.id || 'default-team'
-            }
-          }
-        });
-        
-        if (existingData) {
-          cache.writeQuery({
-            query: GET_WORK_ITEMS,
-            variables: {
-              where: {
-                teamId: currentTeam?.id || 'default-team'
-              }
-            },
-            data: {
-              workItems: [newNode, ...existingData.workItems]
-            }
-          });
-        }
-      }
-    }
   });
 
-  // Note: Edge creation temporarily disabled - will be implemented later
-  // const [createEdge] = useMutation(CREATE_EDGE, {
-  //   refetchQueries: [{ query: GET_WORK_ITEMS }],
-  // });
+  React.useEffect(() => {
+    if (isOpen) {
+      setFormData({
+        title: node.title,
+        description: node.description || '',
+        type: node.type,
+        status: node.status,
+        priorityExec: node.priorityExec || 0,
+        priorityIndiv: node.priorityIndiv || 0,
+        priorityComm: node.priorityComm || 0,
+        assignedTo: '',
+        dueDate: '',
+      });
+    }
+  }, [isOpen, node]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     
     if (!formData.type) {
       showError('Validation Error', 'Please select a node type.');
@@ -128,59 +114,35 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
         dueDate: formData.dueDate || undefined,
       };
       
-      const workItemInput = {
+      const updateInput = {
         ...cleanFormData,
-        positionX: position?.x || (400 + Math.random() * 200),
-        positionY: position?.y || (300 + Math.random() * 200),
-        positionZ: position?.z || 0,
-        radius: 1.0,
-        theta: 0.0,
-        phi: 0.0,
         priorityComp: (formData.priorityExec + formData.priorityIndiv + formData.priorityComm) / 3,
-        
-        // Data isolation - assign to current team and user
-        teamId: currentTeam?.id || 'default-team',
-        userId: currentUser?.id || 'default-user',
-        
-        // If parentNodeId is provided, create a dependency relationship
-        ...(parentNodeId && {
-          dependencies: {
-            connect: {
-              where: { node: { id: parentNodeId } }
-            }
-          }
-        })
       };
 
-      const result = await createWorkItem({
-        variables: { input: [workItemInput] }
+      console.log('Updating node with input:', updateInput);
+      
+      const result = await updateWorkItem({
+        variables: { 
+          where: { id: node.id },
+          update: updateInput
+        }
       });
 
-      if (result.data?.createWorkItems?.workItems?.[0]) {
-        const createdNode = result.data.createWorkItems.workItems[0];
+      if (result.data?.updateWorkItems?.workItems?.[0]) {
+        const updatedNode = result.data.updateWorkItems.workItems[0];
         
         showSuccess(
-          'Node Created Successfully!',
-          `"${createdNode.title}" has been added to your workspace and is now visible in all views.`
+          'Node Updated Successfully!',
+          `"${updatedNode.title}" has been updated and changes are now visible in all views.`
         );
 
         onClose();
-        setFormData({
-          title: '',
-          description: '',
-          type: '',
-          priorityExec: 0,
-          priorityIndiv: 0,
-          priorityComm: 0,
-          status: 'PROPOSED',
-          assignedTo: '',
-          dueDate: ''
-        });
       }
     } catch (error) {
+      console.error('Error updating node:', error);
       
       // Show more specific error message if available
-      let errorMessage = 'There was an error creating the node. Please try again or contact support if the problem persists.';
+      let errorMessage = 'There was an error updating the node. Please try again or contact support if the problem persists.';
       if (error instanceof Error) {
         errorMessage = error.message;
       } else if (typeof error === 'object' && error !== null && 'message' in error) {
@@ -188,7 +150,7 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
       }
       
       showError(
-        'Failed to Create Node',
+        'Failed to Update Node',
         errorMessage
       );
     }
@@ -204,10 +166,10 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
         <div className="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full">
           <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center space-x-2">
+              <Edit className="h-5 w-5 text-blue-500" />
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {parentNodeId ? 'Add Connected Node' : 'Create New Node'}
+                Edit Node
               </h2>
-              {parentNodeId && <Link className="h-4 w-4 text-blue-500" />}
             </div>
             <button
               onClick={onClose}
@@ -218,14 +180,6 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
           </div>
           
           <form onSubmit={handleSubmit} className="p-6 space-y-4">
-            {parentNodeId && (
-              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-4">
-                <p className="text-sm text-blue-800 dark:text-blue-200">
-                  This node will be connected as a dependency to the selected node.
-                </p>
-              </div>
-            )}
-            
             <div>
               <label htmlFor="title" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Title *
@@ -627,14 +581,15 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
               </button>
               <button
                 type="submit"
-                disabled={creatingWorkItem || !isFormValid}
-                className={`px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors ${
+                disabled={updatingNode || !isFormValid}
+                className={`px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors flex items-center space-x-2 ${
                   !isFormValid 
                     ? 'bg-gray-400 cursor-not-allowed' 
                     : 'bg-green-600 hover:bg-green-700 disabled:bg-green-400 dark:bg-green-500 dark:hover:bg-green-600 dark:disabled:bg-green-400'
                 }`}
               >
-                {creatingWorkItem ? 'Creating...' : (parentNodeId ? 'Create & Connect' : 'Create Node')}
+                <Save className="h-4 w-4" />
+                <span>{updatingNode ? 'Updating...' : 'Update Node'}</span>
               </button>
             </div>
           </form>

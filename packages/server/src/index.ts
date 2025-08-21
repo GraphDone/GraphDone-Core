@@ -10,7 +10,7 @@ import dotenv from 'dotenv';
 import neo4j from 'neo4j-driver';
 import { Neo4jGraphQL } from '@neo4j/graphql';
 
-import { typeDefs } from './schema/neo4j-schema';
+import { typeDefs } from './schema/neo4j-schema.js';
 
 dotenv.config();
 
