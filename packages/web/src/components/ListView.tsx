@@ -9,7 +9,6 @@ import {
   Table,
   Edit,
   Trash2,
-  MoreHorizontal,
   Tag,
   CheckCircle,
   Clock,
@@ -19,10 +18,8 @@ import {
   Calendar,
   Zap,
   Triangle,
-  Minus,
   ArrowDown,
   Flame,
-  Dot,
   Layers,
   Sparkles,
   ListTodo,
@@ -186,13 +183,6 @@ export function ListView() {
     }))
   ], [uniqueContributors]);
 
-  const uniqueTags = useMemo(() => {
-    const tags = mockProjectNodes
-      .flatMap(node => node.tags)
-      .filter((tag, index, arr) => arr.indexOf(tag) === index)
-      .sort();
-    return tags;
-  }, []);
 
   // Filter nodes based on search and filters
   const filteredNodes = useMemo(() => {
@@ -361,11 +351,6 @@ export function ListView() {
     }
   };
 
-  const getPriorityIndicator = (priority: number) => {
-    if (priority > 0.7) return 'bg-red-500';
-    if (priority > 0.4) return 'bg-yellow-500';
-    return 'bg-green-500';
-  };
 
 
   // Card View
@@ -1022,7 +1007,6 @@ export function ListView() {
             {filteredData.map((item, index) => {
               const percentage = (item.value / total) * 100;
               const path = createPath(percentage, cumulativePercentage);
-              const currentCumulative = cumulativePercentage;
               cumulativePercentage += percentage;
               
               return (
@@ -1055,8 +1039,6 @@ export function ListView() {
   const BarChart = ({ data, title }: { data: Array<{label: string, value: number, color: string}>, title: string }) => {
     const filteredData = data.filter(item => item.value > 0);
     const maxValue = filteredData.length > 0 ? Math.max(...filteredData.map(item => item.value)) : 0;
-    const total = filteredData.reduce((sum, item) => sum + item.value, 0);
-
     if (filteredData.length === 0) {
       return (
         <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">

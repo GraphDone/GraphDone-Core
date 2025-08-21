@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
-import { ChevronDown, Plus, Folder, FolderOpen, Share2, Lock, Eye, Edit3, Crown } from 'lucide-react';
+import { ChevronDown, Plus, Folder, FolderOpen, Share2, Eye, Edit3, Crown } from 'lucide-react';
 import { useGraph } from '../contexts/GraphContext';
-import { GraphHierarchy } from '../types/graph';
 import { CreateGraphModal } from './CreateGraphModal';
 
 export function GraphSelector() {
