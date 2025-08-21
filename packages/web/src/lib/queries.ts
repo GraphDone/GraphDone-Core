@@ -18,6 +18,8 @@ export const GET_WORK_ITEMS = gql`
       priorityIndiv
       priorityComm
       priorityComp
+      dueDate
+      assignedTo
       teamId
       userId
       contributors {
@@ -91,6 +93,8 @@ export const GET_WORK_ITEM_BY_ID = gql`
       priorityIndiv
       priorityComm
       priorityComp
+      dueDate
+      assignedTo
       contributors {
         id
         name
@@ -131,6 +135,8 @@ export const CREATE_WORK_ITEM = gql`
         priorityIndiv
         priorityComm
         priorityComp
+        dueDate
+        assignedTo
         createdAt
       }
     }
@@ -138,31 +144,38 @@ export const CREATE_WORK_ITEM = gql`
 `;
 
 export const UPDATE_WORK_ITEM = gql`
-  mutation UpdateWorkItem($id: ID!, $input: WorkItemUpdateInput!) {
-    updateWorkItem(id: $id, input: $input) {
-      id
-      type
-      title
-      description
-      status
-      positionX
-      positionY
-      positionZ
-      radius
-      theta
-      phi
-      priorityExec
-      priorityIndiv
-      priorityComm
-      priorityComp
-      updatedAt
+  mutation UpdateWorkItems($where: WorkItemWhere!, $update: WorkItemUpdateInput!) {
+    updateWorkItems(where: $where, update: $update) {
+      workItems {
+        id
+        type
+        title
+        description
+        status
+        positionX
+        positionY
+        positionZ
+        radius
+        theta
+        phi
+        priorityExec
+        priorityIndiv
+        priorityComm
+        priorityComp
+        dueDate
+        assignedTo
+        updatedAt
+      }
     }
   }
 `;
 
 export const DELETE_WORK_ITEM = gql`
-  mutation DeleteWorkItem($id: ID!) {
-    deleteWorkItem(id: $id)
+  mutation DeleteWorkItems($where: WorkItemWhere!) {
+    deleteWorkItems(where: $where) {
+      nodesDeleted
+      relationshipsDeleted
+    }
   }
 `;
 

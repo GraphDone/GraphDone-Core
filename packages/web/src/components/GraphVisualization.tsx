@@ -215,7 +215,7 @@ export function GraphVisualization() {
           OUTCOME: '#3b82f6',
           TASK: '#10b981',
           MILESTONE: '#f59e0b',
-          IDEA: '#8b5cf6'
+          IDEA: '#a855f7'
         };
         return colors[d.type as keyof typeof colors] || '#6b7280';
       })
