@@ -15,7 +15,6 @@ import {
   ZoomIn,
   ZoomOut,
   Maximize2,
-  Play,
   Lightbulb
 } from 'lucide-react';
 import { useGraph } from '../contexts/GraphContext';
@@ -223,7 +222,6 @@ export function TimelineView() {
     
     // Enhanced month calculation with weeks
     const getWeeksInMonth = (year: number, month: number) => {
-      const firstDay = new Date(year, month, 1);
       const lastDay = new Date(year, month + 1, 0);
       const totalDaysInMonth = lastDay.getDate();
       return Math.ceil(totalDaysInMonth / 7);
@@ -653,7 +651,6 @@ export function TimelineView() {
     // Enhanced calendar days with previous/next month context
     const calendarDays = [];
     const prevMonth = new Date(currentYear, currentMonth - 1, 0);
-    const nextMonth = new Date(currentYear, currentMonth + 1, 1);
     
     // Previous month's trailing days
     for (let i = startingDayOfWeek - 1; i >= 0; i--) {
