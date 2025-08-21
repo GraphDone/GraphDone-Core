@@ -16,7 +16,6 @@ interface CreateNodeModalProps {
 export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: CreateNodeModalProps) {
   const { currentUser, currentTeam } = useAuth();
   const { showSuccess, showError } = useNotifications();
-  const dropdownRef = React.useRef<HTMLDivElement>(null);
   
   const [formData, setFormData] = React.useState({
     title: '',
@@ -179,8 +178,6 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
         });
       }
     } catch (error) {
-      console.error('Error creating work item:', error);
-      console.error('Work item input:', workItemInput);
       
       // Show more specific error message if available
       let errorMessage = 'There was an error creating the node. Please try again or contact support if the problem persists.';
