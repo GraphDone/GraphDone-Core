@@ -9,10 +9,8 @@ import {
   Table,
   Edit,
   Trash2,
-  Tag,
   CheckCircle,
   Clock,
-  Play,
   AlertCircle,
   Lightbulb,
   Calendar,
@@ -26,10 +24,32 @@ import {
   Trophy,
   AlertTriangle
 } from 'lucide-react';
+import { useQuery } from '@apollo/client';
+import { useAuth } from '../contexts/AuthContext';
 import { useGraph } from '../contexts/GraphContext';
-import { mockProjectNodes, MockNode } from '../types/projectData';
+import { GET_WORK_ITEMS } from '../lib/queries';
 import { EditNodeModal } from './EditNodeModal';
 import { DeleteNodeModal } from './DeleteNodeModal';
+
+// WorkItem interface matching GraphQL schema
+interface WorkItem {
+  id: string;
+  title: string;
+  description?: string;
+  type: string;
+  status: string;
+  priorityExec: number;
+  priorityIndiv: number;
+  priorityComm: number;
+  priorityComp: number;
+  assignedTo?: string;
+  dueDate?: string;
+  createdAt: string;
+  updatedAt: string;
+  contributors?: Array<{ id: string; name: string; type: string; }>;
+  dependencies?: Array<{ id: string; title: string; }>;
+  dependents?: Array<{ id: string; title: string; }>;
+}
 
 type ViewType = 'dashboard' | 'cards' | 'kanban' | 'table';
 
@@ -69,6 +89,21 @@ const viewOptions: ViewOption[] = [
 
 export function ListView() {
   const { currentGraph } = useGraph();
+  const { currentTeam } = useAuth();
+  
+  // Fetch real work items from GraphQL
+  const { data, loading, error, refetch } = useQuery(GET_WORK_ITEMS, {
+    variables: {
+      where: {
+        teamId: currentTeam?.id || 'team-1'
+      }
+    },
+    fetchPolicy: 'cache-and-network'  // Use cache first, then update from network
+  });
+  
+  const workItems: WorkItem[] = data?.workItems || [];
+  
+  
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
   const [isViewDropdownOpen, setIsViewDropdownOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -78,7 +113,7 @@ export function ListView() {
   const [priorityFilter, setPriorityFilter] = useState('All Priorities');
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [selectedNode, setSelectedNode] = useState<MockNode | null>(null);
+  const [selectedNode, setSelectedNode] = useState<WorkItem | null>(null);
   const [showAllRecentTasks, setShowAllRecentTasks] = useState(false);
   const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
@@ -146,25 +181,25 @@ export function ListView() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Transform MockNode to EditNode format
-  const transformNodeForEdit = (node: MockNode) => ({
+  // Transform WorkItem to EditNode format
+  const transformNodeForEdit = (node: WorkItem) => ({
     id: node.id,
     title: node.title,
     description: node.description,
     type: node.type,
     status: node.status,
-    priorityExec: node.priority.executive,
-    priorityIndiv: node.priority.individual,
-    priorityComm: node.priority.community,
+    priorityExec: node.priorityExec,
+    priorityIndiv: node.priorityIndiv,
+    priorityComm: node.priorityComm,
   });
 
   // Modal handlers
-  const handleEditNode = (node: MockNode) => {
+  const handleEditNode = (node: WorkItem) => {
     setSelectedNode(node);
     setShowEditModal(true);
   };
 
-  const handleDeleteNode = (node: MockNode) => {
+  const handleDeleteNode = (node: WorkItem) => {
     setSelectedNode(node);
     setShowDeleteModal(true);
   };
@@ -177,13 +212,14 @@ export function ListView() {
 
   // Get unique values for filter options
   const uniqueContributors = useMemo(() => {
-    const contributors = mockProjectNodes
-      .map(node => node.contributor)
-      .filter(contributor => contributor)
+    const contributors = workItems
+      .map(node => node.assignedTo)
+      .filter(contributor => contributor && typeof contributor === 'string' && contributor.trim().length > 0)
       .filter((contributor, index, arr) => arr.indexOf(contributor) === index)
       .sort();
+    
     return contributors;
-  }, []);
+  }, [workItems]);
 
   // Contributor options without icons
   const contributorOptions = useMemo(() => [
@@ -198,7 +234,7 @@ export function ListView() {
 
   // Filter nodes based on search and filters
   const filteredNodes = useMemo(() => {
-    let filtered = mockProjectNodes;
+    let filtered = workItems;
     
     // Text search across multiple fields
     if (searchTerm) {
@@ -208,8 +244,7 @@ export function ListView() {
         node.description?.toLowerCase().includes(searchLower) ||
         node.type.toLowerCase().includes(searchLower) ||
         node.status.toLowerCase().includes(searchLower) ||
-        node.contributor?.toLowerCase().includes(searchLower) ||
-        node.tags.some(tag => tag.toLowerCase().includes(searchLower)) ||
+        node.assignedTo?.toLowerCase().includes(searchLower) ||
         node.id.toLowerCase().includes(searchLower) ||
         (node.dueDate && new Date(node.dueDate).toLocaleDateString().includes(searchLower))
       );
@@ -228,16 +263,16 @@ export function ListView() {
     // Contributor filter
     if (contributorFilter !== 'All Contributors') {
       if (contributorFilter === 'Available') {
-        filtered = filtered.filter(node => !node.contributor);
+        filtered = filtered.filter(node => !node.assignedTo);
       } else {
-        filtered = filtered.filter(node => node.contributor === contributorFilter);
+        filtered = filtered.filter(node => node.assignedTo === contributorFilter);
       }
     }
 
     // Priority filter
     if (priorityFilter !== 'All Priorities') {
       filtered = filtered.filter(node => {
-        const priority = node.priority.computed;
+        const priority = node.priorityComp || node.priorityExec;
         switch (priorityFilter) {
           case 'Critical': return priority >= 0.8;
           case 'High': return priority >= 0.6 && priority < 0.8;
@@ -250,7 +285,7 @@ export function ListView() {
     }
 
     return filtered;
-  }, [searchTerm, typeFilter, statusFilter, contributorFilter, priorityFilter]);
+  }, [workItems, searchTerm, typeFilter, statusFilter, contributorFilter, priorityFilter]);
 
   // Calculate statistics
   const stats = useMemo(() => {
@@ -267,11 +302,11 @@ export function ListView() {
     }, {} as Record<string, number>);
 
     const priorityStats = {
-      critical: filteredNodes.filter(node => node.priority.computed >= 0.8).length,
-      high: filteredNodes.filter(node => node.priority.computed >= 0.6 && node.priority.computed < 0.8).length,
-      moderate: filteredNodes.filter(node => node.priority.computed >= 0.4 && node.priority.computed < 0.6).length,
-      low: filteredNodes.filter(node => node.priority.computed >= 0.2 && node.priority.computed < 0.4).length,
-      minimal: filteredNodes.filter(node => node.priority.computed < 0.2).length
+      critical: filteredNodes.filter(node => (node.priorityComp || node.priorityExec) >= 0.8).length,
+      high: filteredNodes.filter(node => (node.priorityComp || node.priorityExec) >= 0.6 && (node.priorityComp || node.priorityExec) < 0.8).length,
+      moderate: filteredNodes.filter(node => (node.priorityComp || node.priorityExec) >= 0.4 && (node.priorityComp || node.priorityExec) < 0.6).length,
+      low: filteredNodes.filter(node => (node.priorityComp || node.priorityExec) >= 0.2 && (node.priorityComp || node.priorityExec) < 0.4).length,
+      minimal: filteredNodes.filter(node => (node.priorityComp || node.priorityExec) < 0.2).length
     };
 
     return {
@@ -287,6 +322,10 @@ export function ListView() {
   }, [filteredNodes]);
 
   // Helper functions
+  const getNodePriority = (node: WorkItem) => {
+    return node.priorityComp || node.priorityExec || 0;
+  };
+
   const formatLabel = (label: string) => {
     // Convert SNAKE_CASE to Proper Case
     return label
@@ -401,17 +440,16 @@ export function ListView() {
             </div>
           </div>
           
-          <h3 className="text-gray-900 dark:text-white font-semibold mb-3 line-clamp-2 text-lg leading-tight">{node.title}</h3>
+          <h3 className="text-gray-900 dark:text-white font-semibold mb-3 text-lg leading-tight break-words">{node.title}</h3>
           
           {node.description && (
-            <p className="text-gray-600 dark:text-gray-400 text-sm mb-4 line-clamp-2 leading-relaxed">{node.description}</p>
+            <p className="text-gray-600 dark:text-gray-400 text-sm mb-4 leading-relaxed break-words">{node.description}</p>
           )}
 
           {/* Priority and Due Date */}
           <div className="mb-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Priority</span>
-              <span className="text-xs font-medium text-gray-600 dark:text-gray-400 mr-6">Due Date</span>
             </div>
             <div className="flex items-center justify-between">
               {/* Priority - Left Side */}
@@ -419,38 +457,37 @@ export function ListView() {
                 <div className="flex items-center relative">
                   <div className="w-3 h-12 bg-gray-300 dark:bg-gray-600 rounded overflow-hidden flex flex-col justify-end relative">
                     <div className={`w-full transition-all duration-300 ${
-                      node.priority.computed >= 0.8 ? 'bg-red-500' :
-                      node.priority.computed >= 0.6 ? 'bg-orange-500' :
-                      node.priority.computed >= 0.4 ? 'bg-yellow-500' :
-                      node.priority.computed >= 0.2 ? 'bg-blue-500' : 'bg-green-500'
-                    }`} style={{ height: `${Math.max(node.priority.computed * 100, 8)}%` }}></div>
+                      getNodePriority(node) >= 0.8 ? 'bg-red-500' :
+                      getNodePriority(node) >= 0.6 ? 'bg-orange-500' :
+                      getNodePriority(node) >= 0.4 ? 'bg-yellow-500' :
+                      getNodePriority(node) >= 0.2 ? 'bg-blue-500' : 'bg-green-500'
+                    }`} style={{ height: `${Math.max(getNodePriority(node) * 100, 8)}%` }}></div>
                   </div>
                 </div>
                 <div className="flex flex-col">
                   <span className={`text-sm font-semibold ${
-                    node.priority.computed >= 0.8 ? 'text-red-500' :
-                    node.priority.computed >= 0.6 ? 'text-orange-500' :
-                    node.priority.computed >= 0.4 ? 'text-yellow-500' :
-                    node.priority.computed >= 0.2 ? 'text-blue-500' : 'text-green-500'
+                    getNodePriority(node) >= 0.8 ? 'text-red-500' :
+                    getNodePriority(node) >= 0.6 ? 'text-orange-500' :
+                    getNodePriority(node) >= 0.4 ? 'text-yellow-500' :
+                    getNodePriority(node) >= 0.2 ? 'text-blue-500' : 'text-green-500'
                   }`}>
-                    {Math.round(node.priority.computed * 100)}%
+                    {Math.round(getNodePriority(node) * 100)}%
                   </span>
                   <span className={`text-xs font-medium ${
-                    node.priority.computed >= 0.8 ? 'text-red-500' :
-                    node.priority.computed >= 0.6 ? 'text-orange-500' :
-                    node.priority.computed >= 0.4 ? 'text-yellow-500' :
-                    node.priority.computed >= 0.2 ? 'text-blue-500' :
+                    getNodePriority(node) >= 0.8 ? 'text-red-500' :
+                    getNodePriority(node) >= 0.6 ? 'text-orange-500' :
+                    getNodePriority(node) >= 0.4 ? 'text-yellow-500' :
+                    getNodePriority(node) >= 0.2 ? 'text-blue-500' :
                     'text-green-500'
                   }`}>
-                    {node.priority.computed >= 0.8 ? 'Critical' :
-                     node.priority.computed >= 0.6 ? 'High' :
-                     node.priority.computed >= 0.4 ? 'Medium' :
-                     node.priority.computed >= 0.2 ? 'Low' : 'Minimal'}
+                    {getNodePriority(node) >= 0.8 ? 'Critical' :
+                     getNodePriority(node) >= 0.6 ? 'High' :
+                     getNodePriority(node) >= 0.4 ? 'Medium' :
+                     getNodePriority(node) >= 0.2 ? 'Low' : 'Minimal'}
                   </span>
                 </div>
               </div>
 
-              {/* Due Date - Right Side */}
               <div className="flex flex-col items-start justify-center mr-2">
                 {node.dueDate ? (
                   <div className="space-y-1 text-left">
@@ -495,8 +532,13 @@ export function ListView() {
                     </div>
                   </div>
                 ) : (
-                  <div className="inline-flex items-center px-2 py-1 bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-400 text-xs font-medium rounded-md">
-                    No date
+                  <div className="space-y-1 text-left">
+                    <div className="inline-flex items-center px-2 py-1 bg-gray-100 border border-gray-200 text-gray-600 text-xs font-medium rounded-md dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400">
+                      No due date
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                      Schedule recommended
+                    </div>
                   </div>
                 )}
               </div>
@@ -507,8 +549,8 @@ export function ListView() {
           <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-600">
             {/* Contributor */}
             <div className="flex items-center">
-              {node.contributor ? (
-                getContributorAvatar(node.contributor)
+              {node.assignedTo ? (
+                getContributorAvatar(node.assignedTo)
               ) : (
                 <div className="flex items-center space-x-2">
                   <div className="w-7 h-7 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center border-2 border-white dark:border-gray-700 shadow-sm">
@@ -558,7 +600,7 @@ export function ListView() {
       },
       'PLANNED': { 
         label: 'Planned', 
-        icon: <Clock className="h-4 w-4 text-purple-400" />, 
+        icon: <Calendar className="h-4 w-4 text-purple-400" />, 
         color: 'bg-purple-500',
         bgColor: 'bg-gray-750',
         textColor: 'text-purple-400',
@@ -567,7 +609,7 @@ export function ListView() {
       },
       'IN_PROGRESS': { 
         label: 'In Progress', 
-        icon: <Play className="h-4 w-4 text-yellow-400" />, 
+        icon: <Clock className="h-4 w-4 text-yellow-400" />, 
         color: 'bg-yellow-500',
         bgColor: 'bg-gray-750',
         textColor: 'text-yellow-400',
@@ -597,7 +639,7 @@ export function ListView() {
     const nodesByStatus = statuses.reduce((acc, status) => {
       acc[status] = filteredNodes.filter(node => node.status === status);
       return acc;
-    }, {} as Record<string, MockNode[]>);
+    }, {} as Record<string, WorkItem[]>);
 
     return (
       <div className="flex space-x-4 p-6 overflow-x-auto h-full">
@@ -641,7 +683,7 @@ export function ListView() {
                               e.stopPropagation();
                               handleEditNode(node);
                             }}
-                            className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/30 text-blue-600 dark:text-blue-400 transition-colors"
+                            className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/30 text-blue-600 dark:text-blue-400 transition-colors"
                             title="Edit node"
                           >
                             <Edit className="h-4 w-4" />
@@ -659,7 +701,14 @@ export function ListView() {
                         </div>
                       </div>
                       
-                      <h4 className="text-gray-900 dark:text-white font-medium mb-2 line-clamp-2 text-base">{node.title}</h4>
+                      <h4 className="text-gray-900 dark:text-white font-medium mb-2 text-base break-words">{node.title}</h4>
+                      
+                      {/* Description */}
+                      {node.description && (
+                        <p className="text-gray-600 dark:text-gray-400 text-sm mb-3 break-words">
+                          {node.description}
+                        </p>
+                      )}
                       
                       {/* Priority and Due Date */}
                       <div className="mb-3 flex items-start justify-between">
@@ -667,22 +716,22 @@ export function ListView() {
                         <div className="flex items-center relative">
                           <div className="w-4 h-12 bg-gray-600 rounded overflow-hidden flex flex-col justify-end relative">
                             <div className={`w-full transition-all duration-300 ${
-                              node.priority.computed >= 0.8 ? 'bg-red-500' :
-                              node.priority.computed >= 0.6 ? 'bg-orange-500' :
-                              node.priority.computed >= 0.4 ? 'bg-yellow-500' :
-                              node.priority.computed >= 0.2 ? 'bg-blue-500' : 'bg-green-500'
-                            }`} style={{ height: `${Math.max(node.priority.computed * 100, 5)}%` }}></div>
+                              getNodePriority(node) >= 0.8 ? 'bg-red-500' :
+                              getNodePriority(node) >= 0.6 ? 'bg-orange-500' :
+                              getNodePriority(node) >= 0.4 ? 'bg-yellow-500' :
+                              getNodePriority(node) >= 0.2 ? 'bg-blue-500' : 'bg-green-500'
+                            }`} style={{ height: `${Math.max(getNodePriority(node) * 100, 5)}%` }}></div>
                           </div>
                           <span className={`absolute text-xs font-bold left-6 ml-1 ${
-                            node.priority.computed >= 0.8 ? 'text-red-500' :
-                            node.priority.computed >= 0.6 ? 'text-orange-500' :
-                            node.priority.computed >= 0.4 ? 'text-yellow-500' :
-                            node.priority.computed >= 0.2 ? 'text-blue-500' : 'text-green-500'
+                            getNodePriority(node) >= 0.8 ? 'text-red-500' :
+                            getNodePriority(node) >= 0.6 ? 'text-orange-500' :
+                            getNodePriority(node) >= 0.4 ? 'text-yellow-500' :
+                            getNodePriority(node) >= 0.2 ? 'text-blue-500' : 'text-green-500'
                           }`} style={{ 
-                            bottom: `${Math.max(node.priority.computed * 100, 5)}%`,
+                            bottom: `${Math.max(getNodePriority(node) * 100, 5)}%`,
                             transform: 'translateY(50%)'
                           }}>
-                            {Math.round(node.priority.computed * 100)}%
+                            {Math.round(getNodePriority(node) * 100)}%
                           </span>
                         </div>
 
@@ -731,14 +780,19 @@ export function ListView() {
                               </div>
                             </div>
                           ) : (
-                            <div className="inline-flex items-center px-2 py-1 bg-gray-100 border border-gray-200 text-gray-600 text-xs font-medium rounded dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400">
-                              No due date
+                            <div className="space-y-1 text-left">
+                              <div className="inline-flex items-center px-2 py-1 bg-gray-100 border border-gray-200 text-gray-600 text-xs font-medium rounded dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400">
+                                No due date
+                              </div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400">
+                                Schedule recommended
+                              </div>
                             </div>
                           )}
                         </div>
                       </div>
                       
-                      {node.contributor && getContributorAvatar(node.contributor)}
+                      {node.assignedTo && getContributorAvatar(node.assignedTo)}
                     </div>
                   ))}
                 </div>
@@ -797,11 +851,11 @@ export function ListView() {
             </thead>
             <tbody className="divide-y divide-gray-700">
               {filteredNodes.map((node) => (
-                <tr key={node.id} className="hover:bg-gray-750 transition-colors cursor-pointer group">
-                  <td className="pl-6 pr-4 py-12">
+                <tr key={node.id} className="hover:bg-gray-750 transition-colors cursor-pointer group dynamic-table-row">
+                  <td className="pl-6 pr-4 py-12 dynamic-table-cell">
                     <div className="space-y-3">
                       <div className="flex items-start justify-between">
-                        <div className="text-white font-medium text-base leading-snug flex-1">{node.title}</div>
+                        <div className="text-white font-medium text-base flex-1 table-text-content min-w-0">{node.title}</div>
                         {/* Action buttons - appear on hover */}
                         <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity ml-3">
                           <button
@@ -809,7 +863,7 @@ export function ListView() {
                               e.stopPropagation();
                               handleEditNode(node);
                             }}
-                            className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/30 text-blue-600 dark:text-blue-400 transition-colors"
+                            className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/30 text-blue-600 dark:text-blue-400 transition-colors"
                             title="Edit node"
                           >
                             <Edit className="h-4 w-4" />
@@ -827,8 +881,9 @@ export function ListView() {
                         </div>
                       </div>
                       {node.description && (
-                        <div className="text-gray-400 text-sm leading-relaxed line-clamp-3">{node.description}</div>
+                        <div className="text-gray-400 text-sm table-text-content min-w-0">{node.description}</div>
                       )}
+                      {/* Tags not available in WorkItem schema - commented out for now
                       {node.tags && node.tags.length > 0 && (
                         <div className="flex gap-1.5 overflow-x-auto">
                           {node.tags.map((tag, index) => (
@@ -841,15 +896,15 @@ export function ListView() {
                             </span>
                           ))}
                         </div>
-                      )}
+                      )} */}
                     </div>
                   </td>
-                  <td className="pl-2 pr-3 py-10">
+                  <td className="pl-2 pr-3 py-10 dynamic-table-cell">
                     <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getNodeTypeColor(node.type)} shadow-sm`}>
                       {formatLabel(node.type)}
                     </span>
                   </td>
-                  <td className="pl-3 pr-3 py-10">
+                  <td className="pl-3 pr-3 py-10 dynamic-table-cell">
                     <div className="flex items-center whitespace-nowrap">
                       <div className={`mr-2 ${
                         node.status === 'PROPOSED' ? 'text-blue-400' :
@@ -870,9 +925,9 @@ export function ListView() {
                       </span>
                     </div>
                   </td>
-                  <td className="pl-3 pr-6 py-10">
-                    {node.contributor ? (
-                      getContributorAvatar(node.contributor)
+                  <td className="pl-3 pr-6 py-10 dynamic-table-cell">
+                    {node.assignedTo ? (
+                      getContributorAvatar(node.assignedTo)
                     ) : (
                       <div className="flex items-center space-x-2">
                         <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center">
@@ -882,40 +937,40 @@ export function ListView() {
                       </div>
                     )}
                   </td>
-                  <td className="pl-6 pr-6 py-10">
+                  <td className="pl-6 pr-6 py-10 dynamic-table-cell">
                     <div className="flex items-center w-full relative">
                       <div className="w-4 h-16 bg-gray-600 rounded overflow-hidden flex flex-col justify-end relative">
                         <div 
                           className={`w-full transition-all duration-300 ${
-                            node.priority.computed >= 0.8 ? 'bg-red-500' :
-                            node.priority.computed >= 0.6 ? 'bg-orange-500' :
-                            node.priority.computed >= 0.4 ? 'bg-yellow-500' :
-                            node.priority.computed >= 0.2 ? 'bg-blue-500' :
+                            getNodePriority(node) >= 0.8 ? 'bg-red-500' :
+                            getNodePriority(node) >= 0.6 ? 'bg-orange-500' :
+                            getNodePriority(node) >= 0.4 ? 'bg-yellow-500' :
+                            getNodePriority(node) >= 0.2 ? 'bg-blue-500' :
                             'bg-green-500'
                           }`}
                           style={{ 
-                            height: `${Math.max(node.priority.computed * 100, 5)}%`
+                            height: `${Math.max(getNodePriority(node) * 100, 5)}%`
                           }}
                         ></div>
                       </div>
                       <span 
                         className={`absolute text-xs font-bold left-6 ml-1 ${
-                          node.priority.computed >= 0.8 ? 'text-red-500' :
-                          node.priority.computed >= 0.6 ? 'text-orange-500' :
-                          node.priority.computed >= 0.4 ? 'text-yellow-500' :
-                          node.priority.computed >= 0.2 ? 'text-blue-500' :
+                          getNodePriority(node) >= 0.8 ? 'text-red-500' :
+                          getNodePriority(node) >= 0.6 ? 'text-orange-500' :
+                          getNodePriority(node) >= 0.4 ? 'text-yellow-500' :
+                          getNodePriority(node) >= 0.2 ? 'text-blue-500' :
                           'text-green-500'
                         }`}
                         style={{ 
-                          bottom: `${Math.max(node.priority.computed * 100, 5)}%`,
+                          bottom: `${Math.max(getNodePriority(node) * 100, 5)}%`,
                           transform: 'translateY(50%)'
                         }}
                       >
-                        {Math.round(node.priority.computed * 100)}%
+                        {Math.round(getNodePriority(node) * 100)}%
                       </span>
                     </div>
                   </td>
-                  <td className="pl-6 pr-6 py-10">
+                  <td className="pl-6 pr-6 py-10 dynamic-table-cell">
                     {node.dueDate ? (
                       <div className="space-y-1">
                         <div className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
@@ -1334,6 +1389,36 @@ export function ListView() {
 
   const currentViewOption = viewOptions.find(option => option.id === currentView)!;
 
+  // Show loading state while fetching data
+  if (loading && !data) {
+    return (
+      <div className="h-full flex items-center justify-center bg-gray-900">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mx-auto mb-4"></div>
+          <p className="text-gray-400">Loading work items...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state if data fetch failed
+  if (error) {
+    return (
+      <div className="h-full flex items-center justify-center bg-gray-900">
+        <div className="text-center">
+          <p className="text-red-400 mb-4">Error loading work items</p>
+          <p className="text-gray-400 text-sm mb-4">{error.message}</p>
+          <button
+            onClick={() => refetch()}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (!currentGraph) {
     return (
       <div className="h-full flex items-center justify-center bg-gray-900">
@@ -1473,7 +1558,9 @@ export function ListView() {
                         <button
                           key={option.value}
                           type="button"
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
                             setTypeFilter(option.value);
                             setIsTypeDropdownOpen(false);
                           }}
@@ -1606,9 +1693,11 @@ export function ListView() {
                     <div className="p-2">
                       {contributorOptions.map((option, index) => (
                         <button
-                          key={option.value}
+                          key={option.value || `option-${index}`}
                           type="button"
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
                             setContributorFilter(option.value || '');
                             setIsContributorDropdownOpen(false);
                           }}

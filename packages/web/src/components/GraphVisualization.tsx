@@ -8,6 +8,7 @@ import { CreateNodeModal } from './CreateNodeModal';
 interface WorkItem {
   id: string;
   title: string;
+  description?: string;
   type: string;
   priorityComp: number;
   positionX: number;
@@ -58,13 +59,21 @@ export function GraphVisualization() {
   const { data: workItemsData, loading: workItemsLoading } = useQuery(GET_WORK_ITEMS, {
     variables: {
       options: { limit: 100 }
-    }
+    },
+    fetchPolicy: 'cache-and-network',  // Use cache first, then fetch from network for updates
+    notifyOnNetworkStatusChange: true,
+    errorPolicy: 'all'
   });
 
-  const { data: edgesData, loading: edgesLoading } = useQuery(GET_EDGES);
+  const { data: edgesData, loading: edgesLoading } = useQuery(GET_EDGES, {
+    fetchPolicy: 'cache-and-network',
+    notifyOnNetworkStatusChange: true
+  });
 
   const workItems: WorkItem[] = workItemsData?.workItems || [];
   const edges: Edge[] = edgesData?.edges || [];
+  
+  
   
   // Convert dependency relationships to edges for visualization
   const dependencyEdges: Edge[] = workItems.flatMap(item => 
@@ -306,6 +315,14 @@ export function GraphVisualization() {
     <div ref={containerRef} className="graph-container relative">
       <svg ref={svgRef} className="w-full h-full" />
       
+      {/* Auto-refresh indicator */}
+      {loading && (
+        <div className="absolute top-4 left-4 bg-blue-500 text-white px-3 py-1 rounded-full text-xs font-medium flex items-center space-x-2">
+          <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+          <span>Auto-refreshing...</span>
+        </div>
+      )}
+      
       {/* Legend */}
       <div className="absolute top-4 right-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-4">
         <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Node Types</h3>
@@ -357,8 +374,15 @@ export function GraphVisualization() {
           onClick={(e) => e.stopPropagation()}
         >
           <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700">
-            <div className="text-sm font-medium text-gray-900 dark:text-white">{nodeMenu.workItem.title}</div>
+            <div className="text-sm font-medium text-gray-900 dark:text-white max-w-[200px] truncate" title={nodeMenu.workItem.title}>
+              {nodeMenu.workItem.title}
+            </div>
             <div className="text-xs text-gray-500 dark:text-gray-400">{nodeMenu.workItem.type}</div>
+            {nodeMenu.workItem.description && (
+              <div className="text-xs text-gray-600 dark:text-gray-300 mt-1 max-w-[200px] truncate" title={nodeMenu.workItem.description}>
+                {nodeMenu.workItem.description}
+              </div>
+            )}
           </div>
           <button
             onClick={() => {

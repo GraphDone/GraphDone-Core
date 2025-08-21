@@ -17,23 +17,41 @@ export function DeleteNodeModal({ isOpen, onClose, nodeId, nodeTitle, nodeType }
   const { showSuccess, showError } = useNotifications();
   
   const [deleteWorkItem, { loading: deletingNode }] = useMutation(DELETE_WORK_ITEM, {
-    refetchQueries: [{ 
-      query: GET_WORK_ITEMS,
-      variables: {
-        where: {
-          teamId: currentTeam?.id || 'default-team'
+    refetchQueries: [
+      { 
+        query: GET_WORK_ITEMS,
+        variables: {
+          options: { limit: 100 }
+        }
+      },
+      { 
+        query: GET_WORK_ITEMS,
+        variables: {
+          where: {
+            teamId: currentTeam?.id || 'team-1'
+          }
         }
       }
-    }],
+    ],
+    awaitRefetchQueries: true,
+    update: (cache, { data }) => {
+      if (data?.deleteWorkItems?.nodesDeleted > 0) {
+        // Evict all workItems queries to ensure complete refresh across all views
+        cache.evict({ fieldName: 'workItems' });
+        cache.gc();
+      }
+    }
   });
 
   const handleDelete = async () => {
     try {
+      
       await deleteWorkItem({
         variables: { 
           where: { id: nodeId }
         }
       });
+      
 
       showSuccess(
         'Node Deleted Successfully!',

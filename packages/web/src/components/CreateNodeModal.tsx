@@ -59,42 +59,78 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
 
 
   const [createWorkItem, { loading: creatingWorkItem }] = useMutation(CREATE_WORK_ITEM, {
-    refetchQueries: [{ 
-      query: GET_WORK_ITEMS,
-      variables: {
-        where: {
-          teamId: currentTeam?.id || 'default-team'
+    refetchQueries: [
+      { 
+        query: GET_WORK_ITEMS,
+        variables: {
+          options: { limit: 100 }
+        }
+      },
+      { 
+        query: GET_WORK_ITEMS,
+        variables: {
+          where: {
+            teamId: currentTeam?.id || 'team-1'
+          }
         }
       }
-    }],
+    ],
     awaitRefetchQueries: true,
     update: (cache, { data }) => {
       // Update Apollo cache for immediate UI refresh
       if (data?.createWorkItems?.workItems) {
         const newNode = data.createWorkItems.workItems[0];
         
-        // Update existing cached query
-        const existingData = cache.readQuery({
-          query: GET_WORK_ITEMS,
-          variables: {
-            where: {
-              teamId: currentTeam?.id || 'default-team'
+        // Update cache for GraphVisualization (no team filter)
+        try {
+          const graphData = cache.readQuery({
+            query: GET_WORK_ITEMS,
+            variables: {
+              options: { limit: 100 }
             }
+          }) as { workItems: any[] } | null;
+          
+          if (graphData) {
+            cache.writeQuery({
+              query: GET_WORK_ITEMS,
+              variables: {
+                options: { limit: 100 }
+              },
+              data: {
+                workItems: [newNode, ...graphData.workItems]
+              }
+            });
           }
-        }) as { workItems: any[] } | null;
-        
-        if (existingData) {
-          cache.writeQuery({
+        } catch {
+          // Silently fail if cache read fails
+        }
+
+        // Update cache for ListView (with team filter)
+        try {
+          const listData = cache.readQuery({
             query: GET_WORK_ITEMS,
             variables: {
               where: {
-                teamId: currentTeam?.id || 'default-team'
+                teamId: currentTeam?.id || 'team-1'
               }
-            },
-            data: {
-              workItems: [newNode, ...existingData.workItems]
             }
-          });
+          }) as { workItems: any[] } | null;
+          
+          if (listData) {
+            cache.writeQuery({
+              query: GET_WORK_ITEMS,
+              variables: {
+                where: {
+                  teamId: currentTeam?.id || 'team-1'
+                }
+              },
+              data: {
+                workItems: [newNode, ...listData.workItems]
+              }
+            });
+          }
+        } catch {
+          // Silently fail if cache read fails
         }
       }
     }
