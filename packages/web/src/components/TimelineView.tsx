@@ -502,11 +502,19 @@ export function TimelineView() {
                                 const targetPosition = getNodePosition(targetNode);
                                 
                                 // Calculate dependency line style based on type
-                                const lineStyle = {
+                                const lineStyleMap = {
                                   DEPENDS_ON: { color: '#dc2626', dasharray: '6 3', width: 2, opacity: 0.7 },
                                   BLOCKS: { color: '#dc2626', dasharray: '4 4', width: 2.5, opacity: 0.8 },
-                                  ENABLES: { color: '#3b82f6', dasharray: '8 2', width: 1.5, opacity: 0.6 }
-                                }[edge.type] || { color: '#6b7280', dasharray: '2 2', width: 1, opacity: 0.4 };
+                                  ENABLES: { color: '#3b82f6', dasharray: '8 2', width: 1.5, opacity: 0.6 },
+                                  RELATES_TO: { color: '#6b7280', dasharray: '2 2', width: 1, opacity: 0.4 },
+                                  PART_OF: { color: '#059669', dasharray: '6 3', width: 2, opacity: 0.7 },
+                                  FOLLOWS: { color: '#7c3aed', dasharray: '6 3', width: 2, opacity: 0.6 },
+                                  PARALLEL_WITH: { color: '#0891b2', dasharray: '2 2', width: 1, opacity: 0.4 },
+                                  DUPLICATES: { color: '#ea580c', dasharray: '4 4', width: 2, opacity: 0.5 },
+                                  CONFLICTS_WITH: { color: '#be123c', dasharray: '4 4', width: 2.5, opacity: 0.8 },
+                                  VALIDATES: { color: '#16a34a', dasharray: '2 2', width: 1, opacity: 0.6 }
+                                } as const;
+                                const lineStyle = lineStyleMap[edge.type as keyof typeof lineStyleMap] || { color: '#6b7280', dasharray: '2 2', width: 1, opacity: 0.4 };
                                 
                                 // Calculate arrow positions
                                 const sourceX = position.left + position.width;
@@ -1427,7 +1435,7 @@ export function TimelineView() {
                       </div>
                       <div className="flex-1 h-px bg-gray-600"></div>
                       <div className="text-xs text-gray-400">
-                        {new Date(date) >= new Date().setDate(new Date().getDate() - 1) ? 'Recent' : 'Historical'}
+                        {new Date(date) >= new Date(new Date().setDate(new Date().getDate() - 1)) ? 'Recent' : 'Historical'}
                       </div>
                     </div>
                     

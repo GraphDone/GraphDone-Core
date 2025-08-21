@@ -4,7 +4,7 @@ test.describe('GraphQL API Health Tests', () => {
   const baseUrl = 'http://localhost:4127/graphql';
   const healthUrl = 'http://localhost:4127/health';
 
-  test('Server health endpoint responds correctly', async () => {
+  test('@core Server health endpoint responds correctly', async () => {
     const response = await fetch(healthUrl);
     expect(response.ok).toBeTruthy();
     

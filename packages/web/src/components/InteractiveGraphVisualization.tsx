@@ -723,7 +723,7 @@ export function InteractiveGraphVisualization() {
       d3.selectAll('.node-selected').classed('node-selected', false);
       
       // Add pulsating glow to clicked node
-      d3.select(event.currentTarget)
+      d3.select(event.currentTarget as SVGElement)
         .select('circle')
         .classed('node-selected', true);
       

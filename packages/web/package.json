@@ -9,7 +9,7 @@
     "kill-port": "lsof -ti:${PORT:-3127} | xargs -r kill -9 || true",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test": "vitest",
+    "test": "vitest --run --reporter=verbose --passWithNoTests",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint src --ext .ts,.tsx",
     "typecheck": "tsc --noEmit",
