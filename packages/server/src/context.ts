@@ -1,9 +1,9 @@
-import { PrismaClient } from '@prisma/client';
-import { Graph } from '@graphdone/core';
+import { Driver } from 'neo4j-driver';
+import { Neo4jGraph } from '@graphdone/core';
 
 export interface Context {
-  prisma: PrismaClient;
-  graph: Graph;
+  driver: Driver;
+  neo4jGraph: Neo4jGraph;
   user?: {
     id: string;
     email: string;
@@ -11,39 +11,13 @@ export interface Context {
   };
 }
 
-const prisma = new PrismaClient({
-  log: process.env.NODE_ENV === 'development' ? ['query', 'info', 'warn', 'error'] : ['error'],
-});
-
-const graph = new Graph();
-
-export async function createContext({ req }: { req: any }): Promise<Context> {
-  const authHeader = req.headers.authorization;
-  let user = undefined;
+export async function createContext({ driver }: { driver: Driver }): Promise<Context> {
+  const neo4jGraph = new Neo4jGraph(driver);
   
-  if (authHeader) {
-    try {
-      user = await validateToken(authHeader);
-    } catch (error) {
-      console.warn('Invalid auth token:', error);
-    }
-  }
-
   return {
-    prisma,
-    graph,
-    user,
+    driver,
+    neo4jGraph,
+    user: undefined, // TODO: Implement authentication
   };
 }
 
-async function validateToken(authHeader: string) {
-  // TODO: Implement real token validation
-  // For now, just return a demo user
-  authHeader.replace('Bearer ', ''); // Extract token when implemented
-  
-  return {
-    id: 'demo-user',
-    email: 'demo@example.com',
-    name: 'Demo User',
-  };
-}

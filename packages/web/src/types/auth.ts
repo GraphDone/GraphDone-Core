@@ -24,4 +24,5 @@ export interface AuthContextType {
   switchUser: (userId: string) => void;
   switchTeam: (teamId: string) => void;
   isAuthenticated: boolean;
+  isInitializing: boolean;
 }

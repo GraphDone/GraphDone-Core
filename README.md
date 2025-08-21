@@ -1,6 +1,6 @@
 # GraphDone
 
-> Project management for teams who think differently. Coordinate through dependencies and outcomes, not hierarchies and assignments.
+> Project management for teams who think differently. Coordinate through dependencies and outcomes, not hierarchies and top-down control.
 
 ![GraphDone UI Screenshot](./docs/graphdone_ui.png)
 
@@ -24,7 +24,7 @@ GraphDone reimagines project management as a collaborative graph where work flow
 
 | Traditional PM | GraphDone |
 |----------------|-----------|
-| Hierarchical task assignment | Natural dependency flows |
+| Hierarchical task control | Natural dependency flows |
 | Manager-driven priorities | Democratic community validation |
 | Linear project timelines | Multi-level graph navigation |
 | Human-only collaboration | Human + AI peer collaboration |
@@ -44,24 +44,92 @@ GraphDone is built on the belief that:
 
 ## Quick Start
 
-### One-Command Setup
+### Prerequisites
+
+GraphDone requires:
+- **Node.js 18+** - JavaScript runtime (our setup script can install this automatically)
+- **Docker** - For running Neo4j graph database ([Install Docker](https://docs.docker.com/get-docker/))
+- **Git** - For version control (usually pre-installed)
+
+### One Command to Rule Them All
 
 ```bash
-git clone https://github.com/your-org/graphdone.git
-cd graphdone
-./tools/setup.sh
-./tools/run.sh
+git clone https://github.com/GraphDone/GraphDone-Core.git
+cd GraphDone-Core
+./start
 ```
 
-Visit http://localhost:3000 to see the working application!
+That's it! The script will automatically:
+- Check prerequisites and offer to install Node.js if needed
+- Install all dependencies including Neo4j drivers and Playwright for testing
+- Set up your environment with proper Neo4j configuration
+- Start Neo4j database with APOC plugins
+- Build the packages
+- Launch the development servers
+- Seed the database with sample data if empty
+
+Visit **http://localhost:3127** when you see the "GraphDone is Ready!" message.
+
+> 💡 **Don't have Node.js?** No problem! The setup script will detect this and offer to install Node.js 18 for you using nvm (Node Version Manager).
 
 ### What You Get
 
-- 🌐 **Web Application**: Full graph visualization and collaboration interface
-- 🔗 **GraphQL API**: Complete backend with real-time subscriptions  
-- 🗄️ **Database**: PostgreSQL with graph-optimized schema
-- 🐳 **Docker Setup**: Development and production containers
+- 🌐 **Web Application**: http://localhost:3127 - Full graph visualization and collaboration interface
+- 🔗 **GraphQL API**: http://localhost:4127/graphql - Auto-generated resolvers with @neo4j/graphql  
+- 🩺 **Health Check**: http://localhost:4127/health - Service status monitoring
+- 🗄️ **Database**: Neo4j 5.15-community with APOC plugins for native graph storage
+- 🐳 **Docker Setup**: Development and production containers ready to go
 - 🧪 **Testing**: Comprehensive test suite with coverage reporting
+
+### Alternative Quick Commands
+
+```bash
+# Quick start without full setup checks
+./start quick
+
+# Manual control (advanced users)
+./tools/setup.sh  # One-time setup
+./tools/run.sh    # Start development servers
+
+# Other commands
+./start clean     # Clean and restart fresh
+./start status    # Check system status
+./start stop      # Stop all services
+```
+
+### Troubleshooting
+
+**Docker Permission Denied?**
+```bash
+# Fix Docker permissions (then restart terminal)
+sudo usermod -aG docker $USER
+newgrp docker
+
+# Or run the setup with sudo assistance
+./start  # Will offer to use sudo automatically
+```
+
+**Node.js Missing?**
+```bash
+./start  # Will offer to install Node.js 18 automatically
+```
+
+**Port Already in Use?**
+```bash
+./tools/cleanup.sh  # Kill any hanging processes
+./start             # Try starting again
+```
+
+**Cannot Find Module Errors?**
+```bash
+./start  # Script will automatically detect and install missing dependencies
+```
+
+**Service Connection Issues?**
+The app now provides user-friendly error messages instead of technical errors. If you see connection issues:
+- Check that `./start` completed successfully
+- Visit http://localhost:4127/health to verify the server is running
+- The error UI will guide you through common troubleshooting steps
 
 ## Core Concepts
 
@@ -96,7 +164,7 @@ GraphDone is built for and by teams who think differently. We welcome contributi
 - Performance for large graphs
 
 **Get Started:**
-1. Run `./tools/setup.sh && ./tools/run.sh` to see the system working
+1. Run `./start` to see the system working locally
 2. Read our [philosophy](./docs/philosophy.md) and [architecture](./docs/guides/architecture-overview.md)
 3. Pick an area that excites you and matches your skills
 4. Join discussions in GitHub Issues and pull requests

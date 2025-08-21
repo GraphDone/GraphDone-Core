@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Globe, Brain, Bot, BarChart3, Settings, Menu, Server } from 'lucide-react';
+import { Brain, Bot, BarChart3, Settings, Menu, Server, Globe } from 'lucide-react';
 import { UserSelector } from './UserSelector';
 import { GraphSelector } from './GraphSelector';
 import { useAuth } from '../contexts/AuthContext';
@@ -15,12 +15,12 @@ export function Layout({ children }: LayoutProps) {
   const { currentTeam } = useAuth();
 
   const navigation = [
-    { name: 'Workspace', href: '/', icon: Globe, description: 'Main graph visualization and work area' },
-    { name: 'Ontology', href: '/ontology', icon: Brain, description: 'Node types, schemas, and templates' },
-    { name: 'Agents', href: '/agents', icon: Bot, description: 'AI agent collaboration and management' },
-    { name: 'Analytics', href: '/analytics', icon: BarChart3, description: 'Democratic prioritization insights' },
-    { name: 'Settings', href: '/settings', icon: Settings, description: 'User and team preferences' },
-    { name: 'System', href: '/backend', icon: Server, description: 'Backend status and admin tools' },
+    { name: 'Workspace', href: '/', icon: Globe, description: 'Main work' },
+    { name: 'Ontology', href: '/ontology', icon: Brain, description: 'Node schemas' },
+    { name: 'Agents', href: '/agents', icon: Bot, description: 'AI collaboration' },
+    { name: 'Analytics', href: '/analytics', icon: BarChart3, description: 'Priority insights' },
+    { name: 'Settings', href: '/settings', icon: Settings, description: 'User preferences' },
+    { name: 'System', href: '/backend', icon: Server, description: 'Backend status' },
   ];
 
   return (
@@ -52,7 +52,7 @@ export function Layout({ children }: LayoutProps) {
           <div className="flex flex-col h-full">
             {/* Logo */}
             <div className="flex items-center h-16 px-6 border-b border-gray-700">
-              <Globe className="h-8 w-8 text-green-400" />
+              <img src="/favicon.svg" alt="GraphDone Logo" className="h-8 w-8" />
               <span className="ml-3 text-xl font-bold text-green-300">GraphDone</span>
             </div>
 
@@ -107,7 +107,7 @@ export function Layout({ children }: LayoutProps) {
                 </div>
               )}
               <p className="text-xs text-gray-400">
-                v0.1.0-alpha
+                v0.2.1-alpha
               </p>
               <p className="text-xs text-gray-500 mt-1">
                 For teams who think differently
