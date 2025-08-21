@@ -146,6 +146,18 @@ export function ListView() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Transform MockNode to EditNode format
+  const transformNodeForEdit = (node: MockNode) => ({
+    id: node.id,
+    title: node.title,
+    description: node.description,
+    type: node.type,
+    status: node.status,
+    priorityExec: node.priority.executive,
+    priorityIndiv: node.priority.individual,
+    priorityComm: node.priority.community,
+  });
+
   // Modal handlers
   const handleEditNode = (node: MockNode) => {
     setSelectedNode(node);
@@ -1580,7 +1592,7 @@ export function ListView() {
                     {(() => {
                       const selectedContributor = contributorOptions.find(option => option.value === contributorFilter);
                       return selectedContributor ? (
-                        <span className={`font-medium ${selectedContributor.color || 'text-white'}`}>{selectedContributor.label}</span>
+                        <span className={`font-medium ${'color' in selectedContributor ? selectedContributor.color : 'text-white'}`}>{selectedContributor.label}</span>
                       ) : (
                         <span className="font-medium">All Contributors</span>
                       );
@@ -1597,7 +1609,7 @@ export function ListView() {
                           key={option.value}
                           type="button"
                           onClick={() => {
-                            setContributorFilter(option.value);
+                            setContributorFilter(option.value || '');
                             setIsContributorDropdownOpen(false);
                           }}
                           className={`w-full px-3 py-2 text-left hover:bg-green-900/20 transition-all duration-200 rounded-lg group ${
@@ -1610,7 +1622,7 @@ export function ListView() {
                             <span className={`font-medium text-sm ${
                               contributorFilter === option.value 
                                 ? 'text-green-300' 
-                                : option.color || 'text-white'
+                                : ('color' in option ? option.color : 'text-white')
                             }`}>
                               {option.label}
                             </span>
@@ -1969,7 +1981,7 @@ export function ListView() {
         <EditNodeModal
           isOpen={showEditModal}
           onClose={handleCloseModals}
-          node={selectedNode}
+          node={transformNodeForEdit(selectedNode)}
         />
       )}
 

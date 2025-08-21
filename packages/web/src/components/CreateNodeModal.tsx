@@ -81,7 +81,7 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
               teamId: currentTeam?.id || 'default-team'
             }
           }
-        });
+        }) as { workItems: any[] } | null;
         
         if (existingData) {
           cache.writeQuery({
