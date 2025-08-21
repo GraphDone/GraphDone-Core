@@ -6,18 +6,16 @@ import {
   Activity,
   Clock,
   User,
-  Tag,
   CheckCircle,
   Circle,
   AlertCircle,
   MessageSquare,
-  Edit3,
   Plus,
   GitBranch,
-  Milestone,
   ZoomIn,
   ZoomOut,
-  Maximize2
+  Maximize2,
+  Lightbulb
 } from 'lucide-react';
 import { useGraph } from '../contexts/GraphContext';
 import { mockProjectNodes, MockNode, mockProjectEdges } from '../types/projectData';
@@ -62,9 +60,20 @@ export function TimelineView() {
   const [isTimeDropdownOpen, setIsTimeDropdownOpen] = useState(false);
   const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1);
+  
+  // Activity pagination state
+  const [activitiesPerPage] = useState(10);
+  const [loadedActivitiesCount, setLoadedActivitiesCount] = useState(10);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  
   const dropdownRef = useRef<HTMLDivElement>(null);
   const timeDropdownRef = useRef<HTMLDivElement>(null);
   const typeDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setLoadedActivitiesCount(activitiesPerPage);
+  }, [activityFilter, activityTimeRange, searchTerm, activitiesPerPage]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -97,34 +106,104 @@ export function TimelineView() {
   // Helper functions
   const getNodeTypeColor = (type: string) => {
     switch (type) {
+      // Strategic Planning
       case 'EPIC': return 'bg-purple-500 text-white';
-      case 'FEATURE': return 'bg-blue-500 text-white';
-      case 'TASK': return 'bg-green-500 text-white';
-      case 'BUG': return 'bg-red-500 text-white';
+      case 'PROJECT': return 'bg-purple-600 text-white';
       case 'MILESTONE': return 'bg-yellow-500 text-black';
+      case 'GOAL': return 'bg-purple-400 text-white';
+      
+      // Development Work  
+      case 'STORY': return 'bg-blue-500 text-white';
+      case 'FEATURE': return 'bg-blue-600 text-white';
+      case 'TASK': return 'bg-green-500 text-white';
+      case 'RESEARCH': return 'bg-blue-400 text-white';
+      
+      // Quality & Issues
+      case 'BUG': return 'bg-red-500 text-white';
+      case 'ISSUE': return 'bg-red-400 text-white';
+      case 'HOTFIX': return 'bg-red-600 text-white';
+      
+      // Operations & Maintenance
+      case 'MAINTENANCE': return 'bg-orange-500 text-white';
+      case 'DEPLOYMENT': return 'bg-orange-600 text-white';
+      case 'MONITORING': return 'bg-orange-400 text-white';
+      
+      // Documentation
+      case 'DOCUMENTATION': return 'bg-indigo-500 text-white';
+      case 'SPECIFICATION': return 'bg-indigo-600 text-white';
+      case 'GUIDE': return 'bg-indigo-400 text-white';
+      
+      // Testing & Validation
+      case 'TEST': return 'bg-emerald-500 text-white';
+      case 'REVIEW': return 'bg-emerald-600 text-white';
+      case 'QA': return 'bg-emerald-400 text-white';
+      
+      // Business & Sales
+      case 'LEAD': return 'bg-teal-500 text-white';
+      case 'OPPORTUNITY': return 'bg-teal-600 text-white';
+      case 'CONTRACT': return 'bg-teal-400 text-white';
+      
+      // Creative & Design
+      case 'MOCKUP': return 'bg-pink-500 text-white';
+      case 'PROTOTYPE': return 'bg-pink-600 text-white';
+      case 'UI_DESIGN': return 'bg-pink-400 text-white';
+      
+      // Support & Training
+      case 'SUPPORT': return 'bg-cyan-500 text-white';
+      case 'TRAINING': return 'bg-cyan-600 text-white';
+      
+      // Other
+      case 'NOTE': return 'bg-slate-500 text-white';
+      case 'ACTION_ITEM': return 'bg-slate-600 text-white';
+      case 'DECISION': return 'bg-slate-400 text-white';
+      
       default: return 'bg-gray-500 text-white';
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
+      case 'PROPOSED': return 'text-blue-400';
+      case 'PLANNED': return 'text-purple-400';
+      case 'IN_PROGRESS': return 'text-yellow-400';
       case 'COMPLETED': return 'text-green-400';
-      case 'IN_PROGRESS': return 'text-blue-400';
-      case 'BLOCKED': return 'text-red-400';
-      case 'PLANNED': return 'text-yellow-400';
-      case 'PROPOSED': return 'text-purple-400';
+      case 'BLOCKED': return 'text-red-600';
       default: return 'text-gray-400';
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
+      case 'PROPOSED': return <Lightbulb className="h-4 w-4" />;
+      case 'PLANNED': return <CalendarIcon className="h-4 w-4" />;
+      case 'IN_PROGRESS': return <Clock className="h-4 w-4" />;
       case 'COMPLETED': return <CheckCircle className="h-4 w-4" />;
-      case 'IN_PROGRESS': return <Circle className="h-4 w-4 text-blue-400" />;
       case 'BLOCKED': return <AlertCircle className="h-4 w-4" />;
-      case 'PLANNED': return <Clock className="h-4 w-4" />;
       default: return <Circle className="h-4 w-4" />;
     }
+  };
+
+  const formatStatus = (status: string) => {
+    switch (status) {
+      case 'IN_PROGRESS': return 'In Progress';
+      case 'COMPLETED': return 'Completed';
+      case 'PLANNED': return 'Planned';
+      case 'PROPOSED': return 'Proposed';
+      case 'BLOCKED': return 'Blocked';
+      default: return status.replace('_', ' ');
+    }
+  };
+
+  const getContributorColor = (name: string) => {
+    const colors = [
+      'bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-pink-500',
+      'bg-indigo-500', 'bg-yellow-500', 'bg-red-500', 'bg-teal-500',
+      'bg-orange-500', 'bg-cyan-500', 'bg-emerald-500', 'bg-violet-500'
+    ];
+    
+    // Generate consistent color based on name
+    const hash = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    return colors[hash % colors.length];
   };
 
   const getPriorityIndicator = (priority: number) => {
@@ -143,7 +222,6 @@ export function TimelineView() {
     
     // Enhanced month calculation with weeks
     const getWeeksInMonth = (year: number, month: number) => {
-      const firstDay = new Date(year, month, 1);
       const lastDay = new Date(year, month + 1, 0);
       const totalDaysInMonth = lastDay.getDate();
       return Math.ceil(totalDaysInMonth / 7);
@@ -366,10 +444,11 @@ export function TimelineView() {
                             ) : (
                               <div
                                 className={`absolute h-8 rounded-lg cursor-pointer hover:opacity-95 transition-all hover:shadow-xl hover:scale-105 flex items-center px-2 border-l-4 group overflow-hidden ${
+                                  node.status === 'PROPOSED' ? 'bg-gradient-to-r from-blue-600 to-blue-500 border-blue-400 shadow-blue-500/20' :
+                                  node.status === 'PLANNED' ? 'bg-gradient-to-r from-purple-600 to-purple-500 border-purple-400 shadow-purple-500/20' :
+                                  node.status === 'IN_PROGRESS' ? 'bg-gradient-to-r from-yellow-600 to-yellow-500 border-yellow-400 shadow-yellow-500/20' :
                                   node.status === 'COMPLETED' ? 'bg-gradient-to-r from-green-600 to-green-500 border-green-400 shadow-green-500/20' :
-                                  node.status === 'IN_PROGRESS' ? 'bg-gradient-to-r from-blue-600 to-blue-500 border-blue-400 shadow-blue-500/20' :
                                   node.status === 'BLOCKED' ? 'bg-gradient-to-r from-red-600 to-red-500 border-red-400 shadow-red-500/20' :
-                                  node.status === 'PLANNED' ? 'bg-gradient-to-r from-orange-600 to-orange-500 border-orange-400 shadow-orange-500/20' :
                                   'bg-gradient-to-r from-gray-600 to-gray-500 border-gray-400 shadow-gray-500/20'
                                 } shadow-lg`}
                                 style={{
@@ -424,7 +503,7 @@ export function TimelineView() {
                                 
                                 // Calculate dependency line style based on type
                                 const lineStyle = {
-                                  DEPENDS_ON: { color: '#ef4444', dasharray: '6 3', width: 2, opacity: 0.7 },
+                                  DEPENDS_ON: { color: '#dc2626', dasharray: '6 3', width: 2, opacity: 0.7 },
                                   BLOCKS: { color: '#dc2626', dasharray: '4 4', width: 2.5, opacity: 0.8 },
                                   ENABLES: { color: '#3b82f6', dasharray: '8 2', width: 1.5, opacity: 0.6 }
                                 }[edge.type] || { color: '#6b7280', dasharray: '2 2', width: 1, opacity: 0.4 };
@@ -513,17 +592,17 @@ export function TimelineView() {
                         <span className="text-green-400">{stats.COMPLETED || 0} done</span>
                       </div>
                       <div className="flex items-center space-x-1">
-                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                        <span className="text-blue-400">{stats.IN_PROGRESS || 0} active</span>
+                        <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                        <span className="text-yellow-400">{stats.IN_PROGRESS || 0} active</span>
                       </div>
                       <div className="flex items-center space-x-1">
-                        <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                        <span className="text-orange-400">{stats.PLANNED || 0} planned</span>
+                        <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                        <span className="text-purple-400">{stats.PLANNED || 0} planned</span>
                       </div>
                       {stats.BLOCKED > 0 && (
                         <div className="flex items-center space-x-1">
                           <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                          <span className="text-red-400">{stats.BLOCKED} blocked</span>
+                          <span className="text-red-600">{stats.BLOCKED} blocked</span>
                         </div>
                       )}
                       <div className="text-gray-400">
@@ -572,7 +651,6 @@ export function TimelineView() {
     // Enhanced calendar days with previous/next month context
     const calendarDays = [];
     const prevMonth = new Date(currentYear, currentMonth - 1, 0);
-    const nextMonth = new Date(currentYear, currentMonth + 1, 1);
     
     // Previous month's trailing days
     for (let i = startingDayOfWeek - 1; i >= 0; i--) {
@@ -772,9 +850,9 @@ export function TimelineView() {
                       <div className="flex items-center space-x-1">
                         <div className={`w-2 h-2 rounded-full ${
                           nodesByDate[dayData.day].some(n => n.status === 'BLOCKED') ? 'bg-red-500' :
-                          nodesByDate[dayData.day].some(n => n.status === 'IN_PROGRESS') ? 'bg-blue-500' :
+                          nodesByDate[dayData.day].some(n => n.status === 'IN_PROGRESS') ? 'bg-yellow-500' :
                           nodesByDate[dayData.day].every(n => n.status === 'COMPLETED') ? 'bg-green-500' :
-                          'bg-yellow-500'
+                          'bg-purple-500'
                         }`}></div>
                         <span className="text-xs text-gray-400">{nodesByDate[dayData.day].length}</span>
                       </div>
@@ -788,10 +866,11 @@ export function TimelineView() {
                         <div
                           key={node.id}
                           className={`text-xs p-2 rounded-lg border-l-3 cursor-pointer transition-all duration-200 group-hover:shadow-md ${
+                            node.status === 'PROPOSED' ? 'bg-blue-900/30 border-blue-500 hover:bg-blue-900/50' :
+                            node.status === 'PLANNED' ? 'bg-purple-900/30 border-purple-500 hover:bg-purple-900/50' :
+                            node.status === 'IN_PROGRESS' ? 'bg-yellow-900/30 border-yellow-500 hover:bg-yellow-900/50' :
                             node.status === 'COMPLETED' ? 'bg-green-900/30 border-green-500 hover:bg-green-900/50' :
-                            node.status === 'IN_PROGRESS' ? 'bg-blue-900/30 border-blue-500 hover:bg-blue-900/50' :
                             node.status === 'BLOCKED' ? 'bg-red-900/30 border-red-500 hover:bg-red-900/50' :
-                            node.status === 'PLANNED' ? 'bg-orange-900/30 border-orange-500 hover:bg-orange-900/50' :
                             'bg-gray-700 border-gray-500 hover:bg-gray-600'
                           }`}
                           title={`${node.title}\nType: ${node.type}\nStatus: ${node.status}\nContributor: ${node.contributor || 'Available'}\nPriority: ${Math.round(node.priority.computed * 100)}%`}
@@ -899,12 +978,12 @@ export function TimelineView() {
                     <div className="space-y-2">
                       <div className={`flex items-center text-xs font-medium ${getStatusColor(node.status)}`}>
                         {getStatusIcon(node.status)}
-                        <span className="ml-2">{node.status.replace('_', ' ')}</span>
+                        <span className="ml-2">{formatStatus(node.status)}</span>
                       </div>
                       
                       {node.contributor && (
                         <div className="flex items-center text-xs text-gray-400">
-                          <div className="w-4 h-4 bg-gray-600 rounded-full flex items-center justify-center mr-2">
+                          <div className={`w-4 h-4 ${getContributorColor(node.contributor)} rounded-full flex items-center justify-center mr-2`}>
                             <span className="text-xs font-medium text-white">
                               {node.contributor.split(' ').map(n => n[0]).join('')}
                             </span>
@@ -971,15 +1050,15 @@ export function TimelineView() {
                     return (
                       <>
                         <div>
-                          <div className="text-lg font-bold text-green-400">{backlogStats.PROPOSED || 0}</div>
+                          <div className="text-lg font-bold text-blue-400">{backlogStats.PROPOSED || 0}</div>
                           <div className="text-xs text-gray-400">Proposed</div>
                         </div>
                         <div>
-                          <div className="text-lg font-bold text-orange-400">{backlogStats.PLANNED || 0}</div>
+                          <div className="text-lg font-bold text-purple-400">{backlogStats.PLANNED || 0}</div>
                           <div className="text-xs text-gray-400">Planned</div>
                         </div>
                         <div>
-                          <div className="text-lg font-bold text-blue-400">{backlogStats.IN_PROGRESS || 0}</div>
+                          <div className="text-lg font-bold text-yellow-400">{backlogStats.IN_PROGRESS || 0}</div>
                           <div className="text-xs text-gray-400">In Progress</div>
                         </div>
                         <div>
@@ -1025,7 +1104,7 @@ export function TimelineView() {
         id: `${node.id}-status`,
         type: 'status_change',
         action: 'updated status',
-        title: `Status changed to ${node.status.replace('_', ' ').toLowerCase()}`,
+        title: `Status changed to ${formatStatus(node.status).toLowerCase()}`,
         description: node.title,
         user: node.contributor || 'System',
         timestamp: node.updatedAt,
@@ -1034,7 +1113,7 @@ export function TimelineView() {
         priority: node.status === 'BLOCKED' ? 'high' : node.status === 'COMPLETED' ? 'high' : 'normal',
         category: 'status',
         color: 'bg-blue-600',
-        details: `From planned to ${node.status.replace('_', ' ').toLowerCase()}`
+        details: `From planned to ${formatStatus(node.status).toLowerCase()}`
       });
       
       // Contribution activity
@@ -1093,8 +1172,12 @@ export function TimelineView() {
       }
     });
 
-    // Group activities by date
-    const groupedActivities = filteredActivities.reduce((acc, activity) => {
+    // Apply pagination to filtered activities
+    const displayedActivities = filteredActivities.slice(0, loadedActivitiesCount);
+    const hasMoreActivities = filteredActivities.length > loadedActivitiesCount;
+
+    // Group displayed activities by date
+    const groupedActivities = displayedActivities.reduce((acc, activity) => {
       const date = new Date(activity.timestamp).toDateString();
       if (!acc[date]) acc[date] = [];
       acc[date].push(activity);
@@ -1109,6 +1192,17 @@ export function TimelineView() {
       return acc;
     }, { total: 0, highPriority: 0 } as any);
 
+    // Handle load more activities
+    const handleLoadMoreActivities = async () => {
+      setIsLoadingMore(true);
+      
+      // Simulate loading delay for better UX
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      setLoadedActivitiesCount(prev => prev + activitiesPerPage);
+      setIsLoadingMore(false);
+    };
+
     return (
       <div className="p-6 bg-gray-900">
         <div className="max-w-6xl mx-auto">
@@ -1118,9 +1212,9 @@ export function TimelineView() {
               <div>
                 <h2 className="text-2xl font-bold text-green-300 mb-2">Activity Feed</h2>
                 <p className="text-gray-400">
-                  {filteredActivities.length} activities across {Object.keys(groupedActivities).length} days
+                  {displayedActivities.length} of {filteredActivities.length} activities across {Object.keys(groupedActivities).length} days
                   {activityStats.highPriority > 0 && (
-                    <span className="ml-2 px-2 py-1 bg-red-900/30 text-red-400 rounded text-sm">
+                    <span className="ml-2 px-2 py-1 bg-red-900/30 text-red-600 rounded text-sm">
                       {activityStats.highPriority} high priority
                     </span>
                   )}
@@ -1401,14 +1495,53 @@ export function TimelineView() {
                                   <div className="flex items-center space-x-6 text-gray-400">
                                     <div className={`flex items-center space-x-2 ${getStatusColor(activity.node.status)}`}>
                                       {getStatusIcon(activity.node.status)}
-                                      <span className="font-medium">{activity.node.status.replace('_', ' ')}</span>
+                                      <span className="font-medium">{formatStatus(activity.node.status)}</span>
                                     </div>
                                     {activity.node.contributor && (
-                                      <span>Assignee: <span className="text-white font-medium">{activity.node.contributor}</span></span>
+                                      <div className="flex items-center space-x-2">
+                                        <div className={`w-6 h-6 rounded-full ${getContributorColor(activity.node.contributor)} flex items-center justify-center`}>
+                                          <span className="text-white text-xs font-medium">
+                                            {activity.node.contributor.split(' ').map(n => n[0]).join('')}
+                                          </span>
+                                        </div>
+                                        <span className="text-gray-300 text-sm">{activity.node.contributor}</span>
+                                      </div>
                                     )}
                                     {activity.node.priority && (
-                                      <span>Priority: <span className="text-white font-medium">{Math.round(activity.node.priority.computed * 100)}%</span></span>
+                                      <div className="flex items-center space-x-2">
+                                        <span className="text-gray-400 text-sm">Priority:</span>
+                                        <div className="flex items-center space-x-2">
+                                          <div className="w-12 h-2 bg-gray-600 rounded-full overflow-hidden">
+                                            <div 
+                                              className={`h-full transition-all duration-300 ${
+                                                activity.node.priority.computed >= 0.8 ? 'bg-red-500' :
+                                                activity.node.priority.computed >= 0.6 ? 'bg-orange-500' :
+                                                activity.node.priority.computed >= 0.4 ? 'bg-yellow-500' :
+                                                activity.node.priority.computed >= 0.2 ? 'bg-blue-500' :
+                                                'bg-green-500'
+                                              }`}
+                                              style={{ 
+                                                width: `${Math.max(activity.node.priority.computed * 100, 2)}%`,
+                                                borderRadius: activity.node.priority.computed >= 1 ? '9999px' : '9999px 0 0 9999px'
+                                              }}
+                                            ></div>
+                                          </div>
+                                          <span className="text-white font-medium text-sm min-w-[30px]">{Math.round(activity.node.priority.computed * 100)}%</span>
+                                        </div>
+                                      </div>
                                     )}
+                                    <div className="flex items-center space-x-2">
+                                      <span className="text-gray-400 text-sm">Due Date:</span>
+                                      <span className="text-gray-300 text-sm">
+                                        {activity.node.dueDate ? new Date(activity.node.dueDate).toLocaleDateString('en-US', { 
+                                          month: 'short', 
+                                          day: 'numeric',
+                                          year: 'numeric'
+                                        }) : 
+                                          <span className="text-gray-500">No date</span>
+                                        }
+                                      </span>
+                                    </div>
                                   </div>
                                   
                                   <div className="flex items-center space-x-3 text-gray-400">
@@ -1431,11 +1564,38 @@ export function TimelineView() {
                 ))}
                 
                 {/* Load More Activities */}
-                {filteredActivities.length > 20 && (
+                {hasMoreActivities && (
                   <div className="p-6 text-center border-t border-gray-700">
-                    <button className="px-6 py-3 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition-colors font-medium">
-                      Load More Activities
+                    <button 
+                      onClick={handleLoadMoreActivities}
+                      disabled={isLoadingMore}
+                      className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-green-500 disabled:cursor-not-allowed font-medium cursor-pointer flex items-center space-x-2 mx-auto transition-all duration-300"
+                    >
+                      {isLoadingMore ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          <span>Loading...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="h-4 w-4" />
+                          <span>Load More Activities</span>
+                          <span className="text-xs bg-green-800 px-2 py-1 rounded-full">
+                            {filteredActivities.length - loadedActivitiesCount} more
+                          </span>
+                        </>
+                      )}
                     </button>
+                  </div>
+                )}
+                
+                {/* End of Activities Message */}
+                {!hasMoreActivities && displayedActivities.length > 0 && (
+                  <div className="p-6 text-center border-t border-gray-700">
+                    <div className="text-gray-300 text-sm flex items-center justify-center space-x-2">
+                      <CheckCircle className="h-5 w-5 text-green-500" />
+                      <span>All activities loaded ({filteredActivities.length} total)</span>
+                    </div>
                   </div>
                 )}
               </div>

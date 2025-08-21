@@ -9,6 +9,7 @@ import { Backend } from './pages/Backend';
 import { Login } from './pages/Login';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { GraphProvider } from './contexts/GraphContext';
+import { NotificationProvider } from './contexts/NotificationContext';
 
 function AuthenticatedApp() {
   const { isAuthenticated, isInitializing } = useAuth();
@@ -45,18 +46,20 @@ function AuthenticatedApp() {
   }
 
   return (
-    <GraphProvider>
-      <Layout>
-        <Routes>
-          <Route path="/" element={<Workspace />} />
-          <Route path="/ontology" element={<Ontology />} />
-          <Route path="/agents" element={<Agents />} />
-          <Route path="/analytics" element={<Analytics />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/backend" element={<Backend />} />
-        </Routes>
-      </Layout>
-    </GraphProvider>
+    <NotificationProvider>
+      <GraphProvider>
+        <Layout>
+          <Routes>
+            <Route path="/" element={<Workspace />} />
+            <Route path="/ontology" element={<Ontology />} />
+            <Route path="/agents" element={<Agents />} />
+            <Route path="/analytics" element={<Analytics />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/backend" element={<Backend />} />
+          </Routes>
+        </Layout>
+      </GraphProvider>
+    </NotificationProvider>
   );
 }
 

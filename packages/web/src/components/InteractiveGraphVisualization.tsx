@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import * as d3 from 'd3';
-import { Link2, Edit3, Trash2, Eye, AlertTriangle, AlertCircle } from 'lucide-react';
-import { useQuery } from '@apollo/client';
+import { Link2, Edit3, Trash2, AlertTriangle, AlertCircle, Layers, Sparkles, ListTodo, Trophy } from 'lucide-react';
+import { useQuery, useMutation } from '@apollo/client';
 import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
-import { GET_WORK_ITEMS, GET_EDGES } from '../lib/queries';
+import { GET_WORK_ITEMS, GET_EDGES, CREATE_EDGE } from '../lib/queries';
 import { relationshipTypeInfo, RelationshipType } from '../types/projectData';
 import { validateGraphData, getValidationSummary, ValidationResult } from '../utils/graphDataValidation';
+import { EditNodeModal } from './EditNodeModal';
+import { DeleteNodeModal } from './DeleteNodeModal';
 
 interface WorkItem {
   id: string;
@@ -85,6 +87,14 @@ export function InteractiveGraphVisualization() {
     errorPolicy: 'all',
     skip: !currentTeam
   });
+
+  // Mutation for creating edges
+  const [createEdgeMutation] = useMutation(CREATE_EDGE, {
+    refetchQueries: [{ query: GET_EDGES, variables: { where: { teamId: currentTeam?.id || 'default-team' } } }],
+    onError: (error) => {
+      console.error('Failed to create edge:', error);
+    }
+  });
   
   const [nodeMenu, setNodeMenu] = useState<NodeMenuState>({ node: null, position: { x: 0, y: 0 }, visible: false });
   const [edgeMenu, setEdgeMenu] = useState<EdgeMenuState>({ edge: null, position: { x: 0, y: 0 }, visible: false });
@@ -94,6 +104,9 @@ export function InteractiveGraphVisualization() {
   const [showGraphSwitcher, setShowGraphSwitcher] = useState(false);
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
   const [showDataHealth, setShowDataHealth] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [selectedNode, setSelectedNode] = useState<WorkItem | null>(null);
 
   // ALL HOOK CALLS MUST BE AT THE TOP
   // Close menus when clicking outside
@@ -113,19 +126,22 @@ export function InteractiveGraphVisualization() {
     if (isConnecting && connectionSource) {
       // Complete connection
       if (connectionSource !== node.id) {
-        const newEdge: WorkItemEdge = {
-          id: `edge-${Date.now()}`,
-          source: connectionSource,
-          target: node.id,
-          type: selectedRelationType,
-          strength: 0.8,
-          description: `${selectedRelationType.toLowerCase().replace('_', ' ')} relationship`
-        };
-        
-        // In a real app, this would create the edge in the backend
-        
-        // Update visualization
-        validatedEdges.push(newEdge);
+        // Create edge in backend
+        createEdgeMutation({
+          variables: {
+            input: [{
+              type: selectedRelationType,
+              weight: 0.8,
+              source: { connect: { where: { node: { id: connectionSource } } } },
+              target: { connect: { where: { node: { id: node.id } } } },
+              teamId: currentTeam?.id || 'default-team'
+            }]
+          }
+        }).then(() => {
+          console.log('✅ Edge created successfully');
+        }).catch((error) => {
+          console.error('❌ Failed to create edge:', error);
+        });
         initializeVisualization();
       }
       
@@ -225,6 +241,86 @@ export function InteractiveGraphVisualization() {
     }
   }));
 
+  // Create hierarchical attraction links based on project structure
+  const createHierarchicalLinks = (nodes: WorkItem[]) => {
+    const hierarchyLinks: Array<{source: string, target: string, strength: number, distance: number}> = [];
+    
+    // Group nodes by type for easy lookup
+    const nodesByType: Record<string, WorkItem[]> = {};
+    nodes.forEach(node => {
+      if (!nodesByType[node.type]) {
+        nodesByType[node.type] = [];
+      }
+      nodesByType[node.type].push(node);
+    });
+    
+    // Define hierarchical relationships
+    const epics = nodesByType['EPIC'] || [];
+    const milestones = nodesByType['MILESTONE'] || [];
+    const features = nodesByType['FEATURE'] || [];
+    const tasks = nodesByType['TASK'] || [];
+    const bugs = nodesByType['BUG'] || [];
+    const outcomes = nodesByType['OUTCOME'] || [];
+    
+    // EPIC -> MILESTONE attraction (strong)
+    epics.forEach(epic => {
+      milestones.forEach(milestone => {
+        hierarchyLinks.push({
+          source: epic.id,
+          target: milestone.id,
+          strength: 0.3, // Strong attraction
+          distance: 120 // Moderate distance
+        });
+      });
+    });
+    
+    // MILESTONE -> FEATURE attraction
+    milestones.forEach(milestone => {
+      features.forEach(feature => {
+        hierarchyLinks.push({
+          source: milestone.id,
+          target: feature.id,
+          strength: 0.2,
+          distance: 100
+        });
+      });
+    });
+    
+    // FEATURE -> TASK/BUG attraction (tasks attach to features)
+    features.forEach(feature => {
+      tasks.forEach(task => {
+        hierarchyLinks.push({
+          source: feature.id,
+          target: task.id,
+          strength: 0.25, // Tasks strongly attach to features
+          distance: 80
+        });
+      });
+      bugs.forEach(bug => {
+        hierarchyLinks.push({
+          source: feature.id,
+          target: bug.id,
+          strength: 0.25, // Bugs also attach to features
+          distance: 80
+        });
+      });
+    });
+    
+    // EPIC -> OUTCOME attraction (outcomes relate to epics)
+    epics.forEach(epic => {
+      outcomes.forEach(outcome => {
+        hierarchyLinks.push({
+          source: epic.id,
+          target: outcome.id,
+          strength: 0.15,
+          distance: 140
+        });
+      });
+    });
+    
+    return hierarchyLinks;
+  };
+
   // Define initializeVisualization function with access to nodes data
   const initializeVisualization = useCallback(() => {
     if (!svgRef.current || !containerRef.current || nodes.length === 0) return;
@@ -263,15 +359,38 @@ export function InteractiveGraphVisualization() {
     });
 
     // Simple 2D force simulation
-    const simulation = d3.forceSimulation(nodes as any)
+    const simulation = d3.forceSimulation(nodes as any);
+    simulationRef.current = simulation; // Store reference for resize handling
+    
+    simulation
       .force('link', d3.forceLink(validatedEdges)
         .id((d: any) => d.id)
         .distance(120)
         .strength(0.3)
       )
       .force('charge', d3.forceManyBody()
-        .strength(-200)
-        .distanceMax(400)
+        .strength((d: any) => {
+          // Hierarchical repulsion forces
+          switch (d.type) {
+            case 'EPIC':
+              return -300; // Epics strongly repel each other
+            case 'OUTCOME': 
+              return -200; // Outcomes need space too
+            case 'MILESTONE':
+              return -80; // Milestones have moderate repulsion
+            case 'FEATURE':
+              return -100; // Features need some space
+            case 'TASK':
+              return -50; // Tasks can be closer together
+            case 'BUG':
+              return -50; // Bugs can cluster with tasks
+            case 'IDEA':
+              return -30; // Ideas cluster easily
+            default:
+              return -80; // Default moderate repulsion
+          }
+        })
+        .distanceMax(350) // Increased for epic spacing
       )
       .force('center', d3.forceCenter(centerX, centerY))
       .force('collision', d3.forceCollide()
@@ -282,6 +401,13 @@ export function InteractiveGraphVisualization() {
           return baseRadius;
         })
         .strength(0.7)
+      )
+      // Add hierarchical attraction forces (Epic->Milestone, Feature->Task, etc.)
+      .force('hierarchy', d3.forceLink()
+        .id((d: any) => d.id)
+        .links(createHierarchicalLinks(nodes))
+        .distance((d: any) => d.distance || 100)
+        .strength((d: any) => d.strength || 0.2)
       )
       .alphaTarget(0.1)
       .alphaDecay(0.01);
@@ -297,7 +423,7 @@ export function InteractiveGraphVisualization() {
       .attr('stroke', (d: WorkItemEdge) => {
         switch (d.type) {
           case 'DEPENDS_ON': return '#10b981';
-          case 'BLOCKS': return '#ef4444';
+          case 'BLOCKS': return '#dc2626';
           case 'RELATES_TO': return '#3b82f6';
           case 'PART_OF': return '#f59e0b';
           default: return '#6b7280';
@@ -311,7 +437,7 @@ export function InteractiveGraphVisualization() {
     
     // Create different arrowhead colors for each edge type
     const edgeTypes = ['DEPENDS_ON', 'BLOCKS', 'RELATES_TO', 'PART_OF'];
-    const edgeColors = ['#10b981', '#ef4444', '#3b82f6', '#f59e0b'];
+    const edgeColors = ['#10b981', '#dc2626', '#3b82f6', '#f59e0b'];
     
     edgeTypes.forEach((type, index) => {
       defs.append('marker')
@@ -343,6 +469,53 @@ export function InteractiveGraphVisualization() {
           if (!event.active) simulation.alphaTarget(0.3).restart();
           d.fx = d.x;
           d.fy = d.y;
+          
+          // Add expanding ring effect to selected node
+          const nodeGroup = d3.select(event.currentTarget);
+          nodeGroup.select('circle').classed('node-selected', true);
+          
+          // Create multiple expanding rings for effect
+          const radius = parseFloat(nodeGroup.select('circle').attr('r'));
+          const color = nodeGroup.select('circle').attr('fill');
+          
+          // Create 2-3 rings with staggered animations
+          for (let i = 0; i < 2; i++) {
+            setTimeout(() => {
+              const ring = nodeGroup.append('circle')
+                .attr('class', 'expanding-ring')
+                .attr('r', radius)
+                .attr('fill', 'none')
+                .attr('stroke', color)
+                .attr('stroke-width', 3)
+                .attr('opacity', 0.6);
+              
+              // Animate the ring expanding
+              ring.transition()
+                .duration(1500)
+                .attr('r', radius * 2.5)
+                .attr('stroke-width', 0.5)
+                .attr('opacity', 0)
+                .on('end', function() { d3.select(this).remove(); })
+                .transition()
+                .duration(0)
+                .attr('r', radius)
+                .attr('stroke-width', 3)
+                .attr('opacity', 0.6)
+                .on('end', function() {
+                  // Repeat if node is still selected
+                  if (nodeGroup.select('circle').classed('node-selected')) {
+                    d3.select(this).transition()
+                      .duration(1500)
+                      .attr('r', radius * 2.5)
+                      .attr('stroke-width', 0.5)
+                      .attr('opacity', 0)
+                      .on('end', function() { d3.select(this).remove(); });
+                  } else {
+                    d3.select(this).remove();
+                  }
+                });
+            }, i * 750); // Stagger the rings
+          }
         })
         .on('drag', (event, d: any) => {
           d.fx = event.x;
@@ -354,6 +527,11 @@ export function InteractiveGraphVisualization() {
           if (!event.active) simulation.alphaTarget(0.05);
           d.fx = null;
           d.fy = null;
+          
+          // Remove expanding ring effect
+          const nodeGroup = d3.select(event.currentTarget);
+          nodeGroup.select('circle').classed('node-selected', false);
+          nodeGroup.selectAll('.expanding-ring').remove();
         }));
 
     // Node circles - increased minimum sizes
@@ -372,23 +550,65 @@ export function InteractiveGraphVisualization() {
         }
       })
       .attr('fill', (d: WorkItem) => {
+        // Desaturate completed nodes to gray
+        if (d.status === 'COMPLETED' || d.status === 'Completed' || d.status === 'Done' || d.status === 'DONE') {
+          return '#374151'; // Dark gray for completed nodes
+        }
+        
         switch (d.type) {
-          case 'EPIC': return '#8b5cf6';
+          case 'EPIC': return '#a855f7';
           case 'FEATURE': return '#3b82f6';
           case 'TASK': return '#10b981';
-          case 'BUG': return '#ef4444';
+          case 'BUG': return '#dc2626';
           case 'MILESTONE': return '#f59e0b';
           case 'OUTCOME': return '#6366f1';
           case 'IDEA': return '#f97316';
           default: return '#6b7280';
         }
       })
-      .attr('stroke', '#ffffff')
-      .attr('stroke-width', 2);
+      .attr('stroke', (d: WorkItem) => {
+        // Use colored ring for completed nodes to show original type
+        if (d.status === 'COMPLETED' || d.status === 'Completed' || d.status === 'Done' || d.status === 'DONE') {
+          switch (d.type) {
+            case 'EPIC': return '#a855f7';
+            case 'FEATURE': return '#3b82f6';
+            case 'TASK': return '#10b981';
+            case 'BUG': return '#dc2626';
+            case 'MILESTONE': return '#f59e0b';
+            case 'OUTCOME': return '#6366f1';
+            case 'IDEA': return '#f97316';
+            default: return '#6b7280';
+          }
+        }
+        return '#ffffff'; // White stroke for active nodes
+      })
+      .attr('stroke-width', (d: WorkItem) => {
+        // Thicker stroke for completed nodes to make the type ring visible
+        if (d.status === 'COMPLETED' || d.status === 'Completed' || d.status === 'Done' || d.status === 'DONE') {
+          return 4;
+        }
+        return 2;
+      })
+      .attr('opacity', 1); // Keep all nodes fully opaque
 
-    // Add SVG text labels directly to node elements
+    // Add completion indicators (checkmarks) for completed nodes
     nodeElements.each(function(d: WorkItem) {
       const nodeGroup = d3.select(this);
+      
+      // Add checkmark for completed nodes
+      if (d.status === 'COMPLETED' || d.status === 'Completed' || d.status === 'Done' || d.status === 'DONE') {
+        nodeGroup.append('text')
+          .attr('class', 'completion-indicator')
+          .attr('text-anchor', 'middle')
+          .attr('dominant-baseline', 'central')
+          .attr('font-size', '96')
+          .attr('font-weight', '900')
+          .attr('fill', '#10b981')
+          .attr('stroke', '#10b981')
+          .attr('stroke-width', '1')
+          .attr('pointer-events', 'none')
+          .text('✓');
+      }
       const nodeRadius = d.type === 'OUTCOME' ? 42 : d.type === 'MILESTONE' ? 40 : d.type === 'TASK' ? 30 : 25;
       
       // Multi-line text wrapping function
@@ -479,7 +699,7 @@ export function InteractiveGraphVisualization() {
       .attr('fill', (d: WorkItemEdge) => {
         switch (d.type) {
           case 'DEPENDS_ON': return '#10b981';
-          case 'BLOCKS': return '#ef4444';
+          case 'BLOCKS': return '#dc2626';
           case 'RELATES_TO': return '#3b82f6';
           case 'PART_OF': return '#f59e0b';
           default: return '#6b7280';
@@ -488,17 +708,25 @@ export function InteractiveGraphVisualization() {
       .attr('stroke', (d: WorkItemEdge) => {
         switch (d.type) {
           case 'DEPENDS_ON': return '#10b981';
-          case 'BLOCKS': return '#ef4444';
+          case 'BLOCKS': return '#dc2626';
           case 'RELATES_TO': return '#3b82f6';
           case 'PART_OF': return '#f59e0b';
           default: return '#6b7280';
         }
       })
       .attr('stroke-width', 1)
-      .attr('opacity', 0.9);
+      .attr('opacity', 1);
 
     // Add click handlers to nodes
     nodeElements.on('click', (event: MouseEvent, d: WorkItem) => {
+      // Remove previous selection
+      d3.selectAll('.node-selected').classed('node-selected', false);
+      
+      // Add pulsating glow to clicked node
+      d3.select(event.currentTarget)
+        .select('circle')
+        .classed('node-selected', true);
+      
       handleNodeClick(event, d);
     });
 
@@ -540,7 +768,10 @@ export function InteractiveGraphVisualization() {
     });
 
     console.log('✅ Visualization initialized with', nodes.length, 'nodes');
-  }, [nodes, validatedEdges]); // Remove handleNodeClick from dependencies to prevent constant re-initialization
+  }, [nodes, validatedEdges, handleNodeClick]); // Include handleNodeClick to get fresh connection state
+
+  // Store simulation reference for resize handling
+  const simulationRef = useRef<d3.Simulation<any, any> | null>(null);
 
   // Initialization effect - NOW with access to nodes data
   useEffect(() => {
@@ -550,9 +781,26 @@ export function InteractiveGraphVisualization() {
     }
 
     const handleResize = () => {
-      if (nodes.length > 0) {
-        initializeVisualization();
-      }
+      if (!containerRef.current || !svgRef.current || !simulationRef.current) return;
+      
+      const container = containerRef.current;
+      const svg = d3.select(svgRef.current);
+      
+      const newWidth = container.clientWidth;
+      const newHeight = container.clientHeight;
+      const newCenterX = newWidth / 2;
+      const newCenterY = newHeight / 2;
+
+      // Update SVG dimensions
+      svg.attr('width', newWidth).attr('height', newHeight);
+      
+      // Update simulation center force with new dimensions
+      simulationRef.current
+        .force('center', d3.forceCenter(newCenterX, newCenterY))
+        .alpha(0.3) // Restart simulation with some energy
+        .restart();
+      
+      console.log('🔄 Resized visualization to', newWidth, 'x', newHeight);
     };
 
     window.addEventListener('resize', handleResize);
@@ -663,10 +911,10 @@ export function InteractiveGraphVisualization() {
 
   const getNodeColor = (node: WorkItem) => {
     switch (node.type) {
-      case 'EPIC': return '#8b5cf6';
+      case 'EPIC': return '#a855f7';
       case 'FEATURE': return '#3b82f6';
       case 'TASK': return '#10b981';
-      case 'BUG': return '#ef4444';
+      case 'BUG': return '#dc2626';
       case 'MILESTONE': return '#f59e0b';
       case 'OUTCOME': return '#6366f1';
       case 'IDEA': return '#f97316';
@@ -678,9 +926,9 @@ export function InteractiveGraphVisualization() {
     switch (status) {
       case 'COMPLETED': return '#22c55e';
       case 'IN_PROGRESS': return '#3b82f6';
-      case 'BLOCKED': return '#ef4444';
+      case 'BLOCKED': return '#dc2626';
       case 'PLANNED': return '#f59e0b';
-      case 'PROPOSED': return '#8b5cf6';
+      case 'PROPOSED': return '#a855f7';
       case 'CANCELLED': return '#6b7280';
       default: return '#6b7280';
     }
@@ -690,6 +938,28 @@ export function InteractiveGraphVisualization() {
     setConnectionSource(nodeId);
     setIsConnecting(true);
     setNodeMenu(prev => ({ ...prev, visible: false }));
+  };
+
+  const handleEditNode = (node: WorkItem) => {
+    setSelectedNode(node);
+    setShowEditModal(true);
+    setNodeMenu(prev => ({ ...prev, visible: false }));
+  };
+
+  const handleCloseEditModal = () => {
+    setShowEditModal(false);
+    setSelectedNode(null);
+  };
+
+  const handleDeleteNode = (node: WorkItem) => {
+    setSelectedNode(node);
+    setShowDeleteModal(true);
+    setNodeMenu(prev => ({ ...prev, visible: false }));
+  };
+
+  const handleCloseDeleteModal = () => {
+    setShowDeleteModal(false);
+    setSelectedNode(null);
   };
 
   // Layout and edge systems removed to fix TypeScript unused variable warnings
@@ -968,11 +1238,17 @@ export function InteractiveGraphVisualization() {
               <Link2 className="h-4 w-4 mr-3" />
               Add Connected Item
             </button>
-            <button className="w-full flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700">
-              <Eye className="h-4 w-4 mr-3" />
+            <button 
+              onClick={() => handleEditNode(nodeMenu.node!)}
+              className="w-full flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
+            >
+              <Edit3 className="h-4 w-4 mr-3" />
               Edit Details
             </button>
-            <button className="w-full flex items-center px-4 py-2 text-sm text-red-400 hover:bg-red-900/50">
+            <button 
+              onClick={() => handleDeleteNode(nodeMenu.node!)}
+              className="w-full flex items-center px-4 py-2 text-sm text-red-400 hover:bg-red-900/50"
+            >
               <Trash2 className="h-4 w-4 mr-3" />
               Delete Node
             </button>
@@ -1027,19 +1303,19 @@ export function InteractiveGraphVisualization() {
         <div className="text-sm font-medium text-green-400 mb-2">Node Types</div>
         <div className="space-y-1 text-xs text-gray-300">
           <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 rounded-full bg-purple-500" />
+            <Layers className="w-3 h-3 text-purple-500" />
             <span>Epic</span>
-            <div className="w-3 h-3 rounded-full bg-blue-500 ml-auto" />
+            <Sparkles className="w-3 h-3 text-blue-500 ml-auto" />
             <span>Feature</span>
           </div>
           <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 rounded-full bg-green-500" />
+            <ListTodo className="w-3 h-3 text-green-500" />
             <span>Task</span>
-            <div className="w-3 h-3 rounded-full bg-red-500 ml-auto" />
+            <AlertTriangle className="w-3 h-3 text-red-500 ml-auto" />
             <span>Bug</span>
           </div>
           <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 rounded-full bg-yellow-500" />
+            <Trophy className="w-3 h-3 text-yellow-500" />
             <span>Milestone</span>
           </div>
           <div className="border-t border-gray-200 pt-2 mt-2">
@@ -1048,6 +1324,26 @@ export function InteractiveGraphVisualization() {
           </div>
         </div>
       </div>
+
+      {/* Edit Node Modal */}
+      {showEditModal && selectedNode && (
+        <EditNodeModal
+          isOpen={showEditModal}
+          onClose={handleCloseEditModal}
+          node={selectedNode}
+        />
+      )}
+
+      {/* Delete Node Modal */}
+      {showDeleteModal && selectedNode && (
+        <DeleteNodeModal
+          isOpen={showDeleteModal}
+          onClose={handleCloseDeleteModal}
+          nodeId={selectedNode.id}
+          nodeTitle={selectedNode.title}
+          nodeType={selectedNode.type}
+        />
+      )}
     </div>
   );
 }

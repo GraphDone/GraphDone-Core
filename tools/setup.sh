@@ -164,7 +164,12 @@ set -e
 
 # Install dependencies
 echo "📦 Installing dependencies..."
-npm install
+
+# Smart npm install that tries standard first, then resolves conflicts
+if ! npm install 2>/dev/null; then
+    echo "  • Resolving dependency conflicts automatically..."
+    npm install --legacy-peer-deps
+fi
 
 # Set up environment variables
 echo "🔧 Setting up environment variables..."
