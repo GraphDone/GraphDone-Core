@@ -66,14 +66,33 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
   const isFormValid = formData.title.trim() !== '' && formData.type !== '';
 
   const [updateWorkItem, { loading: updatingNode }] = useMutation(UPDATE_WORK_ITEM, {
-    refetchQueries: [{ 
-      query: GET_WORK_ITEMS,
-      variables: {
-        where: {
-          teamId: currentTeam?.id || 'default-team'
-        }
+    // Smart cache updates instead of aggressive network fetching
+    refetchQueries: [
+      { 
+        query: GET_WORK_ITEMS,
+        variables: { options: { limit: 100 } }
+      },
+      { 
+        query: GET_WORK_ITEMS,
+        variables: { where: { teamId: currentTeam?.id || 'team-1' } }
       }
-    }],
+    ],
+    awaitRefetchQueries: true,
+    notifyOnNetworkStatusChange: true,
+    update: (cache, { data }) => {
+      // Force cache invalidation for immediate UI updates across all views
+      if (data?.updateWorkItems?.workItems) {
+        // Invalidate all workItems cache to force UI refresh
+        cache.evict({ fieldName: 'workItems' });
+        cache.gc();
+        
+        // Also evict root query to ensure complete refresh
+        cache.evict({ 
+          id: 'ROOT_QUERY',
+          fieldName: 'workItems'
+        });
+      }
+    }
   });
 
   React.useEffect(() => {
@@ -119,7 +138,6 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
         priorityComp: (formData.priorityExec + formData.priorityIndiv + formData.priorityComm) / 3,
       };
 
-      console.log('Updating node with input:', updateInput);
       
       const result = await updateWorkItem({
         variables: { 
@@ -137,6 +155,11 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
         );
 
         onClose();
+      } else {
+        showError(
+          'Update Failed',
+          'The node update did not return valid data. Please try again.'
+        );
       }
     } catch (error) {
       console.error('Error updating node:', error);
