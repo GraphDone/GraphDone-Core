@@ -1,0 +1,513 @@
+#!/bin/bash
+
+# GraphDone - Single Entry Point
+# The main launcher for all GraphDone operations
+
+set -e
+
+# Colors for better output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+NC='\033[0m' # No Color
+
+# Default values
+COMMAND=""
+SKIP_BANNER=false
+QUIET=false
+
+# Help function
+show_help() {
+    echo -e "${BOLD}GraphDone${NC} - Graph-native project management system"
+    echo ""
+    echo -e "${BOLD}USAGE:${NC}"
+    echo "  ./start [COMMAND] [OPTIONS]"
+    echo ""
+    echo -e "${BOLD}COMMANDS:${NC}"
+    echo -e "  ${CYAN}dev${NC}           Start development environment (default)"
+    echo -e "  ${CYAN}quick${NC}         Quick start without full setup checks"
+    echo -e "  ${CYAN}clean${NC}         Clean build artifacts and restart fresh"
+    echo -e "  ${CYAN}setup${NC}         Run initial setup only"
+    echo -e "  ${CYAN}test${NC}          Run test suite"
+    echo -e "    ${YELLOW}--unit${NC}         Run unit tests only"
+    echo -e "    ${YELLOW}--e2e${NC}          Run end-to-end tests only"
+    echo -e "    ${YELLOW}--package PKG${NC}  Test specific package (core/server/web)"
+    echo -e "    ${YELLOW}--coverage${NC}     Generate coverage report"
+    echo -e "    ${YELLOW}--report${NC}       Generate consolidated test report"
+    echo -e "  ${CYAN}build${NC}        Build all packages"
+    echo -e "  ${CYAN}deploy${NC}       Deploy to production"
+    echo -e "  ${CYAN}stop${NC}         Stop all running services"
+    echo -e "  ${CYAN}remove${NC}       Remove GraphDone completely (services, data, dependencies)"
+    echo -e "  ${CYAN}status${NC}       Check system status"
+    echo ""
+    echo -e "${BOLD}OPTIONS:${NC}"
+    echo -e "  ${YELLOW}--help, -h${NC}    Show this help message"
+    echo -e "  ${YELLOW}--quiet, -q${NC}   Suppress banner and verbose output"
+    echo -e "  ${YELLOW}--no-banner${NC}   Skip the GraphDone banner"
+    echo ""
+    echo -e "${BOLD}EXAMPLES:${NC}"
+    echo -e "  ${GREEN}./start${NC}              # Start development environment"
+    echo -e "  ${GREEN}./start quick${NC}        # Quick start"
+    echo -e "  ${GREEN}./start clean${NC}        # Clean and restart"
+    echo -e "  ${GREEN}./start test --quiet${NC}  # Run tests quietly"
+    echo -e "  ${GREEN}./start remove${NC}       # Completely remove GraphDone"
+    echo ""
+    echo -e "${BOLD}DEVELOPMENT:${NC}"
+    echo -e "  ${CYAN}Web UI:${NC}       http://localhost:3127"
+    echo -e "  ${CYAN}GraphQL:${NC}     http://localhost:4127/graphql"
+    echo -e "  ${CYAN}Database:${NC}    http://localhost:7474 (Neo4j Browser)"
+}
+
+# Parse command line arguments
+REMAINING_ARGS=()
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        -q|--quiet)
+            QUIET=true
+            SKIP_BANNER=true
+            shift
+            ;;
+        --no-banner)
+            SKIP_BANNER=true
+            shift
+            ;;
+        dev|quick|clean|setup|test|build|deploy|stop|remove|status)
+            COMMAND="$1"
+            shift
+            # Capture remaining arguments for the command
+            REMAINING_ARGS=("$@")
+            break
+            ;;
+        *)
+            echo -e "${RED}❌ Unknown option or command: $1${NC}"
+            echo "Use './start --help' for usage information."
+            exit 1
+            ;;
+    esac
+done
+
+# Default command
+if [ -z "$COMMAND" ]; then
+    COMMAND="dev"
+fi
+
+# Smart npm install function that handles peer dependency conflicts automatically
+smart_npm_install() {
+    local attempt=1
+    local max_attempts=2
+    
+    while [ $attempt -le $max_attempts ]; do
+        if [ $attempt -eq 1 ]; then
+            # First attempt: standard npm install
+            if npm install 2>/dev/null; then
+                return 0
+            fi
+        else
+            # Second attempt: handle peer dependency conflicts
+            log_info "  • Resolving dependency conflicts automatically..."
+            if npm install --legacy-peer-deps; then
+                return 0
+            fi
+        fi
+        
+        attempt=$((attempt + 1))
+    done
+    
+    log_error "❌ Failed to install dependencies after $max_attempts attempts"
+    return 1
+}
+
+# Show banner unless skipped
+show_banner() {
+    if [ "$SKIP_BANNER" = false ]; then
+        clear
+        echo -e "${PURPLE}"
+        echo "╔══════════════════════════════════════════════════════════════╗"
+        echo "║                                                              ║"
+        echo "║                     🌐 GraphDone 🌐                          ║"
+        echo "║                                                              ║"
+        echo "║           Graph-native project management system             ║"
+        echo "║                                                              ║"
+        echo "╚══════════════════════════════════════════════════════════════╝"
+        echo -e "${NC}"
+    fi
+}
+
+# Logging functions
+log_info() {
+    if [ "$QUIET" = false ]; then
+        echo -e "${CYAN}$1${NC}"
+    fi
+}
+
+log_success() {
+    echo -e "${GREEN}$1${NC}"
+}
+
+log_warning() {
+    echo -e "${YELLOW}$1${NC}"
+}
+
+log_error() {
+    echo -e "${RED}$1${NC}"
+}
+
+# Function to ensure Node.js is available
+ensure_nodejs() {
+    if ! command -v node &> /dev/null || ! command -v npm &> /dev/null; then
+        log_warning "⚠️  Node.js/npm not found in PATH, attempting to load from nvm..."
+        
+        export NVM_DIR="$HOME/.nvm"
+        if [ -s "$NVM_DIR/nvm.sh" ]; then
+            source "$NVM_DIR/nvm.sh"
+            if [ -s "$NVM_DIR/bash_completion" ]; then
+                source "$NVM_DIR/bash_completion"
+            fi
+            
+            if nvm list | grep -q "v18"; then
+                nvm use 18
+            else
+                nvm use node
+            fi
+            
+            log_success "✅ Loaded Node.js from nvm: $(node --version)"
+        else
+            log_error "❌ Node.js not found and nvm not available."
+            echo "Please restart your terminal or run:"
+            echo "  source ~/.bashrc  # or ~/.zshrc"
+            echo "  ./start"
+            exit 1
+        fi
+    fi
+}
+
+# Command implementations
+cmd_dev() {
+    show_banner
+    log_info "Welcome to GraphDone! Starting development environment..."
+    
+    ensure_nodejs
+    
+    # Check if setup is needed
+    setup_needed=false
+    workspace_repair_needed=false
+    dependencies_needed=false
+    
+    if [ ! -f "packages/server/.env" ] || [ ! -f "packages/web/.env" ]; then
+        setup_needed=true
+    fi
+    
+    if [ ! -f "packages/core/dist/index.js" ] || [ ! -L "node_modules/@graphdone/core" ]; then
+        workspace_repair_needed=true
+    fi
+    
+    # Check for critical dependencies
+    if [ ! -d "node_modules" ] || [ ! -d "node_modules/neo4j-driver" ] || [ ! -d "node_modules/@neo4j/graphql" ] || [ ! -d "node_modules/@playwright/test" ]; then
+        dependencies_needed=true
+    fi
+    
+    # Install dependencies if needed
+    if [ "$dependencies_needed" = true ]; then
+        log_warning "📦 Missing dependencies detected..."
+        log_info "Installing all project dependencies..."
+        smart_npm_install
+        log_success "✅ Dependencies installed!"
+    fi
+    
+    # Run setup if needed
+    if [ "$setup_needed" = true ]; then
+        log_warning "🔧 First time setup detected..."
+        log_info "Running initial setup (this may take a few minutes):"
+        log_info "  • Setting up environment variables"
+        log_info "  • Starting database"
+        log_info "  • Running migrations"
+        log_info "  • Building packages"
+        
+        ./tools/setup.sh
+        log_success "✅ Setup complete!"
+        
+    elif [ "$workspace_repair_needed" = true ] || [ "$dependencies_needed" = true ]; then
+        log_warning "🔧 Workspace dependencies need repair..."
+        log_info "Fixing workspace dependencies:"
+        
+        if [ "$dependencies_needed" = true ]; then
+            log_info "  • Installing missing dependencies"
+            smart_npm_install --legacy-peer-deps
+        fi
+        log_info "  • Rebuilding core package"
+        log_info "  • Ensuring workspace links"
+        
+        smart_npm_install --legacy-peer-deps
+        (cd packages/core && npm run build)
+        
+        if [ -f "packages/core/dist/index.js" ] && [ -L "node_modules/@graphdone/core" ]; then
+            log_success "✅ Workspace repair complete!"
+        else
+            log_error "❌ Workspace repair failed. Running full setup..."
+            ./tools/setup.sh
+        fi
+    fi
+    
+    log_info "🚀 Starting GraphDone development environment..."
+    ./tools/run.sh
+}
+
+cmd_quick() {
+    show_banner
+    log_info "🏃 Quick start - minimal checks..."
+    ensure_nodejs
+    ./tools/run.sh
+}
+
+cmd_clean() {
+    show_banner
+    log_info "🧹 Cleaning build artifacts and restarting fresh..."
+    ensure_nodejs
+    ./tools/cleanup.sh
+    ./tools/setup.sh
+    ./tools/run.sh
+}
+
+cmd_setup() {
+    show_banner
+    log_info "🔧 Running initial setup..."
+    ensure_nodejs
+    ./tools/setup.sh
+    log_success "✅ Setup complete! Run './start' to start development environment."
+}
+
+cmd_test() {
+    show_banner
+    log_info "🧪 Running test suite..."
+    ensure_nodejs
+    
+    # Pass all remaining arguments to test.sh
+    ./tools/test.sh "${REMAINING_ARGS[@]}"
+}
+
+cmd_build() {
+    show_banner
+    log_info "🏗️  Building all packages..."
+    ensure_nodejs
+    ./tools/build.sh
+}
+
+cmd_deploy() {
+    show_banner
+    log_info "🚀 Deploying to production..."
+    ensure_nodejs
+    ./tools/deploy.sh
+}
+
+cmd_remove() {
+    show_banner
+    log_warning "🗑️  Removing GraphDone completely..."
+    
+    # Confirm with user
+    echo -e "${YELLOW}This will remove:${NC}"
+    echo -e "  • All running GraphDone services"
+    echo -e "  • All Neo4j data and containers" 
+    echo -e "  • All build artifacts and dependencies"
+    echo -e "  • All test results and reports"
+    echo ""
+    
+    read -p "Are you sure you want to completely remove GraphDone? (yes/no): " confirm
+    if [ "$confirm" != "yes" ]; then
+        log_info "Removal cancelled."
+        exit 0
+    fi
+    
+    log_info "🛑 Stopping all services..."
+    
+    # Check and stop GraphDone services
+    local services_found=false
+    
+    # Stop Node.js processes
+    if pgrep -f "node.*3127\|node.*4127\|vite\|tsx.*watch" >/dev/null 2>&1; then
+        log_info "  • Stopping Node.js development servers..."
+        pkill -f "node.*3127" 2>/dev/null || true
+        pkill -f "node.*4127" 2>/dev/null || true
+        pkill -f "vite" 2>/dev/null || true
+        pkill -f "tsx.*watch" 2>/dev/null || true
+        services_found=true
+    fi
+    
+    # Kill processes on GraphDone ports
+    for port in 3127 4127 7474 7687; do
+        if lsof -ti:$port >/dev/null 2>&1; then
+            if [ "$services_found" = false ]; then
+                log_info "  • Stopping services on GraphDone ports..."
+                services_found=true
+            fi
+            lsof -ti:$port | xargs -r kill -9 2>/dev/null || true
+        fi
+    done
+    
+    if [ "$services_found" = false ]; then
+        log_info "  • No running GraphDone services found"
+    else
+        sleep 2  # Give processes time to stop
+        log_info "  • Services stopped"
+    fi
+    
+    log_info "🐳 Removing Docker containers and data..."
+    
+    # Stop and remove Neo4j containers
+    docker stop graphdone-neo4j 2>/dev/null || true
+    docker rm graphdone-neo4j 2>/dev/null || true
+    docker stop neo4j 2>/dev/null || true
+    docker rm neo4j 2>/dev/null || true
+    
+    # Remove Docker volumes
+    docker volume rm graphdone-neo4j-data 2>/dev/null || true
+    docker volume rm neo4j-data 2>/dev/null || true
+    
+    # Stop any docker-compose services
+    if [ -f "docker-compose.yml" ]; then
+        docker-compose down -v 2>/dev/null || true
+    fi
+    if [ -f "deployment/docker-compose.yml" ]; then
+        docker-compose -f deployment/docker-compose.yml down -v 2>/dev/null || true
+    fi
+    
+    log_info "🧹 Cleaning build artifacts..."
+    
+    # Remove build directories
+    rm -rf packages/*/dist
+    rm -rf packages/*/build
+    rm -rf .turbo
+    rm -rf coverage
+    rm -rf test-results
+    rm -rf playwright-report
+    rm -rf packages/*/coverage
+    rm -rf packages/*/test-results
+    rm -rf packages/*/playwright-report
+    rm -rf packages/*/.vite
+    rm -rf packages/*/node_modules/.cache
+    
+    # Remove TypeScript build info
+    find . -name "*.tsbuildinfo" -delete 2>/dev/null || true
+    
+    log_info "📦 Removing dependencies..."
+    
+    # Remove node_modules
+    rm -rf node_modules
+    rm -rf packages/*/node_modules
+    
+    # Remove lock files
+    rm -f package-lock.json
+    rm -f packages/*/package-lock.json
+    
+    log_info "🧪 Removing test artifacts..."
+    
+    # Remove test screenshots and artifacts
+    rm -rf test-results/
+    rm -rf screenshots/
+    rm -rf error-handling-screenshots/
+    rm -f *.png
+    rm -f test-*.js
+    
+    log_success "✅ GraphDone has been completely removed!"
+    echo ""
+    echo -e "${BOLD}To reinstall GraphDone:${NC}"
+    echo -e "  ${GREEN}./start setup${NC}    # Full setup"
+    echo -e "  ${GREEN}./start${NC}          # Start development"
+}
+
+cmd_stop() {
+    log_info "🛑 Stopping all services..."
+    docker-compose -f deployment/docker-compose.yml down 2>/dev/null || true
+    docker-compose -f deployment/docker-compose.dev.yml down 2>/dev/null || true
+    pkill -f "npm run dev" 2>/dev/null || true
+    log_success "✅ All services stopped"
+}
+
+cmd_status() {
+    log_info "📊 Checking system status..."
+    
+    echo ""
+    echo -e "${BOLD}System Status:${NC}"
+    
+    # Check Node.js
+    if command -v node &> /dev/null; then
+        echo -e "  ${GREEN}✅${NC} Node.js: $(node --version)"
+    else
+        echo -e "  ${RED}❌${NC} Node.js: Not found"
+    fi
+    
+    # Check Docker
+    if command -v docker &> /dev/null; then
+        echo -e "  ${GREEN}✅${NC} Docker: $(docker --version | cut -d' ' -f3 | cut -d',' -f1)"
+    else
+        echo -e "  ${RED}❌${NC} Docker: Not found"
+    fi
+    
+    # Check services
+    echo ""
+    echo -e "${BOLD}Services:${NC}"
+    
+    if curl -s http://localhost:3127 >/dev/null 2>&1; then
+        echo -e "  ${GREEN}✅${NC} Web UI: http://localhost:3127"
+    else
+        echo -e "  ${RED}❌${NC} Web UI: Not running"
+    fi
+    
+    if curl -s http://localhost:4127/graphql >/dev/null 2>&1; then
+        echo -e "  ${GREEN}✅${NC} GraphQL API: http://localhost:4127/graphql"
+    else
+        echo -e "  ${RED}❌${NC} GraphQL API: Not running"
+    fi
+    
+    if curl -s http://localhost:7474 >/dev/null 2>&1; then
+        echo -e "  ${GREEN}✅${NC} Neo4j Database: http://localhost:7474"
+    else
+        echo -e "  ${RED}❌${NC} Neo4j Database: Not running"
+    fi
+}
+
+# Execute the command
+case $COMMAND in
+    dev)
+        cmd_dev
+        ;;
+    quick)
+        cmd_quick
+        ;;
+    clean)
+        cmd_clean
+        ;;
+    setup)
+        cmd_setup
+        ;;
+    test)
+        cmd_test
+        ;;
+    build)
+        cmd_build
+        ;;
+    deploy)
+        cmd_deploy
+        ;;
+    stop)
+        cmd_stop
+        ;;
+    remove)
+        cmd_remove
+        ;;
+    status)
+        cmd_status
+        ;;
+    *)
+        log_error "❌ Unknown command: $COMMAND"
+        echo "Use './start --help' for usage information."
+        exit 1
+        ;;
+esac

@@ -7,24 +7,32 @@ import { WebSocketServer } from 'ws';
 import { useServer } from 'graphql-ws/lib/use/ws';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import neo4j from 'neo4j-driver';
+import { Neo4jGraphQL } from '@neo4j/graphql';
 
-import { typeDefs } from './schema';
-import { resolvers } from './resolvers';
-import { createContext } from './context';
-import { makeExecutableSchema } from '@graphql-tools/schema';
+import { typeDefs } from './schema/neo4j-schema.js';
 
 dotenv.config();
 
-const PORT = process.env.PORT || 4000;
+const PORT = Number(process.env.PORT) || 4127;
+const NEO4J_URI = process.env.NEO4J_URI || 'bolt://localhost:7687';
+const NEO4J_USER = process.env.NEO4J_USER || 'neo4j';
+const NEO4J_PASSWORD = process.env.NEO4J_PASSWORD || 'password';
 
 async function startServer() {
   const app = express();
   const httpServer = createServer(app);
 
-  const schema = makeExecutableSchema({
+  // Create Neo4j driver
+  const driver = neo4j.driver(NEO4J_URI, neo4j.auth.basic(NEO4J_USER, NEO4J_PASSWORD));
+
+  // Create Neo4jGraphQL instance
+  const neoSchema = new Neo4jGraphQL({
     typeDefs,
-    resolvers,
+    driver,
   });
+
+  const schema = await neoSchema.getSchema();
 
   const wsServer = new WebSocketServer({
     server: httpServer,
@@ -56,7 +64,11 @@ async function startServer() {
     cors<cors.CorsRequest>(),
     express.json(),
     expressMiddleware(server, {
-      context: createContext,
+      context: async () => {
+        return {
+          driver,
+        };
+      },
     })
   );
 
@@ -64,7 +76,7 @@ async function startServer() {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
-  httpServer.listen(PORT, () => {
+  httpServer.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 GraphQL server ready at http://localhost:${PORT}/graphql`);
     console.log(`🔌 WebSocket server ready at ws://localhost:${PORT}/graphql`);
   });
