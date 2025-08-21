@@ -1,4 +1,3 @@
-import React from 'react';
 import { GraphErrorBoundary } from './GraphErrorBoundary';
 import { InteractiveGraphVisualization } from './InteractiveGraphVisualization';
 
@@ -10,8 +9,8 @@ import { InteractiveGraphVisualization } from './InteractiveGraphVisualization';
 export function SafeGraphVisualization() {
   return (
     <GraphErrorBoundary
-      onError={(error, errorInfo) => {
-        console.error('Graph visualization error caught by boundary:', error, errorInfo);
+      onError={() => {
+        // Error logged by boundary for debugging
       }}
     >
       <InteractiveGraphVisualization />
