@@ -140,7 +140,7 @@ export function DeleteNodeModal({ isOpen, onClose, nodeId, nodeTitle, nodeType }
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                className="px-4 py-2 text-base font-medium text-white bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 border border-green-600 dark:border-green-500 rounded-lg transition-colors"
               >
                 Cancel
               </button>
@@ -148,7 +148,7 @@ export function DeleteNodeModal({ isOpen, onClose, nodeId, nodeTitle, nodeType }
                 type="button"
                 onClick={handleDelete}
                 disabled={deletingNode}
-                className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:bg-red-400 dark:bg-red-500 dark:hover:bg-red-600 dark:disabled:bg-red-400 rounded-lg transition-colors flex items-center space-x-2"
+                className="px-4 py-2 text-base font-medium text-white bg-red-700 hover:bg-red-800 disabled:bg-red-400 dark:bg-red-600 dark:hover:bg-red-700 dark:disabled:bg-red-400 rounded-lg transition-colors flex items-center space-x-2"
               >
                 <Trash2 className="h-4 w-4" />
                 <span>{deletingNode ? 'Deleting...' : 'Delete Node'}</span>

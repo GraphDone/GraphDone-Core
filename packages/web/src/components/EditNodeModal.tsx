@@ -1,6 +1,6 @@
 import React from 'react';
 import { useMutation } from '@apollo/client';
-import { X, Edit, Save, Lightbulb, Calendar, Clock, CheckCircle, AlertCircle, ChevronDown, Flame, Zap, Triangle, Circle, ArrowDown } from 'lucide-react';
+import { X, Edit, Save, Lightbulb, Calendar, Clock, CheckCircle, AlertCircle, ChevronDown, Flame, Zap, Triangle, Circle, ArrowDown, ClipboardList } from 'lucide-react';
 import { UPDATE_WORK_ITEM, GET_WORK_ITEMS } from '../lib/queries';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
@@ -58,11 +58,11 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
 
   // Status options with icons
   const statusOptions = [
-    { value: 'PROPOSED', label: 'Proposed', icon: <Lightbulb className="h-4 w-4" />, color: 'text-blue-600' },
-    { value: 'PLANNED', label: 'Planned', icon: <Calendar className="h-4 w-4" />, color: 'text-purple-600' },
-    { value: 'IN_PROGRESS', label: 'In Progress', icon: <Clock className="h-4 w-4" />, color: 'text-yellow-600' },
-    { value: 'COMPLETED', label: 'Completed', icon: <CheckCircle className="h-4 w-4" />, color: 'text-green-600' },
-    { value: 'BLOCKED', label: 'Blocked', icon: <AlertCircle className="h-4 w-4" />, color: 'text-red-600' }
+    { value: 'PROPOSED', label: 'Proposed', icon: <ClipboardList className="h-6 w-6" />, color: 'text-cyan-400' },
+    { value: 'PLANNED', label: 'Planned', icon: <Calendar className="h-6 w-6" />, color: 'text-purple-400' },
+    { value: 'IN_PROGRESS', label: 'In Progress', icon: <Clock className="h-6 w-6" />, color: 'text-yellow-400' },
+    { value: 'COMPLETED', label: 'Completed', icon: <CheckCircle className="h-6 w-6" />, color: 'text-green-400' },
+    { value: 'BLOCKED', label: 'Blocked', icon: <AlertCircle className="h-6 w-6" />, color: 'text-red-400' }
   ];
 
   // Close status dropdown when clicking outside
@@ -401,8 +401,8 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                       className="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 border border-red-500/30 text-center hover:shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600 transition-all cursor-pointer"
                     >
                       <div className="flex items-center justify-center space-x-1 mb-1">
-                        <Flame className="w-3 h-3 text-red-500" />
-                        <div className="text-red-400 font-bold text-xs">Critical</div>
+                        <Flame className="w-6 h-6 text-red-500" />
+                        <div className="text-red-400 font-bold text-sm">Critical</div>
                       </div>
                       <div className="text-xs font-mono text-gray-400">80% - 100%</div>
                     </button>
@@ -420,8 +420,8 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                       className="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 border border-orange-500/30 text-center hover:shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600 transition-all cursor-pointer"
                     >
                       <div className="flex items-center justify-center space-x-1 mb-1">
-                        <Zap className="w-3 h-3 text-orange-500" />
-                        <div className="text-orange-400 font-bold text-xs">High</div>
+                        <Zap className="w-6 h-6 text-orange-500" />
+                        <div className="text-orange-400 font-bold text-sm">High</div>
                       </div>
                       <div className="text-xs font-mono text-gray-400">60% - 79%</div>
                     </button>
@@ -439,8 +439,8 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                       className="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 border border-yellow-500/30 text-center hover:shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600 transition-all cursor-pointer"
                     >
                       <div className="flex items-center justify-center space-x-1 mb-1">
-                        <Triangle className="w-3 h-3 text-yellow-500" />
-                        <div className="text-yellow-400 font-bold text-xs">Moderate</div>
+                        <Triangle className="w-6 h-6 text-yellow-500" />
+                        <div className="text-yellow-400 font-bold text-sm">Moderate</div>
                       </div>
                       <div className="text-xs font-mono text-gray-400">40% - 59%</div>
                     </button>
@@ -460,8 +460,8 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                       className="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 border border-blue-500/30 text-center hover:shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600 transition-all cursor-pointer"
                     >
                       <div className="flex items-center justify-center space-x-1 mb-1">
-                        <Circle className="w-3 h-3 text-blue-500" />
-                        <div className="text-blue-400 font-bold text-xs">Low</div>
+                        <Circle className="w-6 h-6 text-blue-500" />
+                        <div className="text-blue-400 font-bold text-sm">Low</div>
                       </div>
                       <div className="text-xs font-mono text-gray-400">20% - 39%</div>
                     </button>
@@ -479,8 +479,8 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                       className="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 border border-green-500/30 text-center hover:shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600 transition-all cursor-pointer"
                     >
                       <div className="flex items-center justify-center space-x-1 mb-1">
-                        <ArrowDown className="w-3 h-3 text-green-500" />
-                        <div className="text-green-400 font-bold text-xs">Minimal</div>
+                        <ArrowDown className="w-6 h-6 text-green-500" />
+                        <div className="text-green-400 font-bold text-sm">Minimal</div>
                       </div>
                       <div className="text-xs font-mono text-gray-400">0% - 19%</div>
                     </button>
@@ -510,7 +510,7 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                     'accent-green-500'
                   }`}
                 />
-                <div className={`text-xs text-center font-medium ${
+                <div className={`text-sm text-center font-medium ${
                   formData.priorityExec >= 0.8 ? 'text-red-500' :
                   formData.priorityExec >= 0.6 ? 'text-orange-500' :
                   formData.priorityExec >= 0.4 ? 'text-yellow-500' :
@@ -518,15 +518,15 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                   'text-green-500'
                 }`}>
                   {formData.priorityExec >= 0.8 ? (
-                    <><Flame className="h-3 w-3 inline mr-1" />Critical</>
+                    <><Flame className="h-6 w-6 inline mr-1" />Critical</>
                   ) : formData.priorityExec >= 0.6 ? (
-                    <><Zap className="h-3 w-3 inline mr-1" />High</>
+                    <><Zap className="h-6 w-6 inline mr-1" />High</>
                   ) : formData.priorityExec >= 0.4 ? (
-                    <><Triangle className="h-3 w-3 inline mr-1" />Moderate</>
+                    <><Triangle className="h-6 w-6 inline mr-1" />Moderate</>
                   ) : formData.priorityExec >= 0.2 ? (
-                    <><Circle className="h-3 w-3 inline mr-1" />Low</>
+                    <><Circle className="h-6 w-6 inline mr-1" />Low</>
                   ) : (
-                    <><ArrowDown className="h-3 w-3 inline mr-1" />Minimal</>
+                    <><ArrowDown className="h-6 w-6 inline mr-1" />Minimal</>
                   )} ({Math.round(formData.priorityExec * 100)}%)
                 </div>
               </div>
@@ -553,7 +553,7 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                     'accent-green-500'
                   }`}
                 />
-                <div className={`text-xs text-center font-medium ${
+                <div className={`text-sm text-center font-medium ${
                   formData.priorityIndiv >= 0.8 ? 'text-red-500' :
                   formData.priorityIndiv >= 0.6 ? 'text-orange-500' :
                   formData.priorityIndiv >= 0.4 ? 'text-yellow-500' :
@@ -561,15 +561,15 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                   'text-green-500'
                 }`}>
                   {formData.priorityIndiv >= 0.8 ? (
-                    <><Flame className="h-3 w-3 inline mr-1" />Critical</>
+                    <><Flame className="h-6 w-6 inline mr-1" />Critical</>
                   ) : formData.priorityIndiv >= 0.6 ? (
-                    <><Zap className="h-3 w-3 inline mr-1" />High</>
+                    <><Zap className="h-6 w-6 inline mr-1" />High</>
                   ) : formData.priorityIndiv >= 0.4 ? (
-                    <><Triangle className="h-3 w-3 inline mr-1" />Moderate</>
+                    <><Triangle className="h-6 w-6 inline mr-1" />Moderate</>
                   ) : formData.priorityIndiv >= 0.2 ? (
-                    <><Circle className="h-3 w-3 inline mr-1" />Low</>
+                    <><Circle className="h-6 w-6 inline mr-1" />Low</>
                   ) : (
-                    <><ArrowDown className="h-3 w-3 inline mr-1" />Minimal</>
+                    <><ArrowDown className="h-6 w-6 inline mr-1" />Minimal</>
                   )} ({Math.round(formData.priorityIndiv * 100)}%)
                 </div>
               </div>
@@ -596,7 +596,7 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                     'accent-green-500'
                   }`}
                 />
-                <div className={`text-xs text-center font-medium ${
+                <div className={`text-sm text-center font-medium ${
                   formData.priorityComm >= 0.8 ? 'text-red-500' :
                   formData.priorityComm >= 0.6 ? 'text-orange-500' :
                   formData.priorityComm >= 0.4 ? 'text-yellow-500' :
@@ -604,15 +604,15 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                   'text-green-500'
                 }`}>
                   {formData.priorityComm >= 0.8 ? (
-                    <><Flame className="h-3 w-3 inline mr-1" />Critical</>
+                    <><Flame className="h-6 w-6 inline mr-1" />Critical</>
                   ) : formData.priorityComm >= 0.6 ? (
-                    <><Zap className="h-3 w-3 inline mr-1" />High</>
+                    <><Zap className="h-6 w-6 inline mr-1" />High</>
                   ) : formData.priorityComm >= 0.4 ? (
-                    <><Triangle className="h-3 w-3 inline mr-1" />Moderate</>
+                    <><Triangle className="h-6 w-6 inline mr-1" />Moderate</>
                   ) : formData.priorityComm >= 0.2 ? (
-                    <><Circle className="h-3 w-3 inline mr-1" />Low</>
+                    <><Circle className="h-6 w-6 inline mr-1" />Low</>
                   ) : (
-                    <><ArrowDown className="h-3 w-3 inline mr-1" />Minimal</>
+                    <><ArrowDown className="h-6 w-6 inline mr-1" />Minimal</>
                   )} ({Math.round(formData.priorityComm * 100)}%)
                 </div>
               </div>
@@ -622,21 +622,21 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                className="px-4 py-2 text-base font-medium text-white bg-red-600 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 border border-red-600 dark:border-red-500 rounded-lg transition-colors"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={updatingNode || !isFormValid}
-                className={`px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors flex items-center space-x-2 ${
+                className={`px-4 py-2 text-base font-medium text-white rounded-lg transition-colors flex items-center space-x-2 ${
                   !isFormValid 
                     ? 'bg-gray-400 cursor-not-allowed' 
                     : 'bg-green-600 hover:bg-green-700 disabled:bg-green-400 dark:bg-green-500 dark:hover:bg-green-600 dark:disabled:bg-green-400'
                 }`}
               >
-                <Save className="h-4 w-4" />
-                <span>{updatingNode ? 'Updating...' : 'Update Node'}</span>
+                <Save className="h-5 w-5" />
+                <span>{updatingNode ? 'Updating' : 'Update Node'}</span>
               </button>
             </div>
           </form>
