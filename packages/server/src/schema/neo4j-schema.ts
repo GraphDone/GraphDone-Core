@@ -266,6 +266,7 @@ export const typeDefs = gql`
     status: NodeStatus! @default(value: PROPOSED)
     dueDate: DateTime
     assignedTo: String
+    tags: [String!]
     metadata: String # JSON as string
     
     # Data isolation fields

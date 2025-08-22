@@ -5,6 +5,7 @@ import { CREATE_WORK_ITEM, GET_WORK_ITEMS } from '../lib/queries';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { NodeTypeSelector } from './NodeCategorySelector';
+import { TagInput } from './TagInput';
 
 interface CreateNodeModalProps {
   isOpen: boolean;
@@ -26,7 +27,8 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
     priorityComm: 0,
     status: 'PROPOSED',
     assignedTo: '',
-    dueDate: ''
+    dueDate: '',
+    tags: [] as string[]
   });
 
   const [isStatusOpen, setIsStatusOpen] = React.useState(false);
@@ -162,6 +164,7 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
         priorityComm: formData.priorityComm,
         assignedTo: formData.assignedTo || undefined,
         dueDate: formData.dueDate || undefined,
+        tags: formData.tags || [],
       };
       
       const workItemInput = {
@@ -210,7 +213,8 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
           priorityComm: 0,
           status: 'PROPOSED',
           assignedTo: '',
-          dueDate: ''
+          dueDate: '',
+          tags: []
         });
       }
     } catch (error) {
@@ -372,6 +376,18 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                 onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                 className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="Describe the node..."
+              />
+            </div>
+
+            {/* Tags */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Tags
+              </label>
+              <TagInput
+                tags={formData.tags}
+                onChange={(tags) => setFormData(prev => ({ ...prev, tags }))}
+                maxTags={5}
               />
             </div>
 

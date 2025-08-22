@@ -5,6 +5,7 @@ import { UPDATE_WORK_ITEM, GET_WORK_ITEMS } from '../lib/queries';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { NodeTypeSelector } from './NodeCategorySelector';
+import { TagInput } from './TagInput';
 
 interface EditNodeModalProps {
   isOpen: boolean;
@@ -18,6 +19,9 @@ interface EditNodeModalProps {
     priorityExec: number;
     priorityIndiv: number;
     priorityComm: number;
+    tags?: string[];
+    dueDate?: string;
+    assignedTo?: string;
   };
 }
 
@@ -25,6 +29,16 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
   const { currentTeam } = useAuth();
   const { showSuccess, showError } = useNotifications();
   
+  // Helper function to format DateTime to date string (YYYY-MM-DD)
+  const formatDateForInput = (dateTime?: string) => {
+    if (!dateTime) return '';
+    try {
+      const date = new Date(dateTime);
+      return date.toISOString().split('T')[0]; // Extract YYYY-MM-DD part
+    } catch {
+      return '';
+    }
+  };
   
   const [formData, setFormData] = React.useState({
     title: node.title,
@@ -34,8 +48,9 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
     priorityExec: node.priorityExec || 0,
     priorityIndiv: node.priorityIndiv || 0,
     priorityComm: node.priorityComm || 0,
-    assignedTo: '',
-    dueDate: '',
+    assignedTo: node.assignedTo || '',
+    dueDate: formatDateForInput(node.dueDate),
+    tags: node.tags || [],
   });
 
   const [isStatusOpen, setIsStatusOpen] = React.useState(false);
@@ -105,8 +120,9 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
         priorityExec: node.priorityExec || 0,
         priorityIndiv: node.priorityIndiv || 0,
         priorityComm: node.priorityComm || 0,
-        assignedTo: '',
-        dueDate: '',
+        assignedTo: node.assignedTo || '',
+        dueDate: formatDateForInput(node.dueDate),
+        tags: node.tags || [],
       });
     }
   }, [isOpen, node]);
@@ -131,6 +147,7 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
         priorityComm: formData.priorityComm,
         assignedTo: formData.assignedTo || undefined,
         dueDate: formData.dueDate || undefined,
+        tags: formData.tags || [],
       };
       
       const updateInput = {
@@ -316,7 +333,17 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
               />
             </div>
 
-            {/* Contributor and Due Date Row */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Tags
+              </label>
+              <TagInput
+                tags={formData.tags}
+                onChange={(tags) => setFormData(prev => ({ ...prev, tags }))}
+                maxTags={5}
+              />
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label htmlFor="contributorId" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -354,14 +381,12 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
             <div className="space-y-3">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Priority Distribution</label>
               
-              {/* Professional Priority Guide */}
               <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 mb-4 shadow-sm">
                 <div className="mb-3">
                   <div className="text-sm font-semibold text-gray-700 dark:text-gray-300">Priority Level</div>
                 </div>
                 
                 <div className="space-y-3">
-                  {/* First Row - 3 items */}
                   <div className="grid grid-cols-3 gap-3">
                     <button
                       type="button"
@@ -421,7 +446,6 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                     </button>
                   </div>
                   
-                  {/* Second Row - 2 items centered */}
                   <div className="grid grid-cols-2 gap-3 max-w-sm mx-auto">
                     <button
                       type="button"

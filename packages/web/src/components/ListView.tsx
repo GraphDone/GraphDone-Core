@@ -30,6 +30,7 @@ import { useGraph } from '../contexts/GraphContext';
 import { GET_WORK_ITEMS } from '../lib/queries';
 import { EditNodeModal } from './EditNodeModal';
 import { DeleteNodeModal } from './DeleteNodeModal';
+import { TagDisplay } from './TagDisplay';
 
 // WorkItem interface matching GraphQL schema
 interface WorkItem {
@@ -44,6 +45,7 @@ interface WorkItem {
   priorityComp: number;
   assignedTo?: string;
   dueDate?: string;
+  tags?: string[];
   createdAt: string;
   updatedAt: string;
   contributors?: Array<{ id: string; name: string; type: string; }>;
@@ -157,6 +159,7 @@ export function ListView() {
 
 
 
+
   // Close dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -191,6 +194,9 @@ export function ListView() {
     priorityExec: node.priorityExec,
     priorityIndiv: node.priorityIndiv,
     priorityComm: node.priorityComm,
+    tags: node.tags || [],
+    dueDate: node.dueDate || '',
+    assignedTo: node.assignedTo || '',
   });
 
   // Modal handlers
@@ -283,6 +289,7 @@ export function ListView() {
         }
       });
     }
+
 
     return filtered;
   }, [workItems, searchTerm, typeFilter, statusFilter, contributorFilter, priorityFilter]);
@@ -407,7 +414,13 @@ export function ListView() {
   // Card View
   const renderCardView = () => (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 p-6">
-      {filteredNodes.map((node) => (
+      {[...filteredNodes]
+        .sort((a, b) => {
+          const dateA = new Date(a.updatedAt || a.createdAt).getTime();
+          const dateB = new Date(b.updatedAt || b.createdAt).getTime();
+          return dateB - dateA; // Most recent first
+        })
+        .map((node) => (
         <div
           key={node.id}
           className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm hover:shadow-md dark:shadow-md dark:hover:shadow-lg transition-shadow duration-200 cursor-pointer border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 group"
@@ -445,6 +458,9 @@ export function ListView() {
           {node.description && (
             <p className="text-gray-600 dark:text-gray-400 text-sm mb-4 leading-relaxed break-words">{node.description}</p>
           )}
+
+          {/* Tags */}
+          <TagDisplay tags={node.tags} className="mb-4" />
 
           {/* Priority and Due Date */}
           <div className="mb-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
@@ -666,7 +682,13 @@ export function ListView() {
                 </div>
                 
                 <div className="p-4 space-y-3">
-                  {nodes.map((node) => (
+                  {[...nodes]
+                    .sort((a, b) => {
+                      const dateA = new Date(a.updatedAt || a.createdAt).getTime();
+                      const dateB = new Date(b.updatedAt || b.createdAt).getTime();
+                      return dateB - dateA; // Most recent first
+                    })
+                    .map((node) => (
                     <div
                       key={node.id}
                       className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm hover:shadow-md dark:shadow-md dark:hover:shadow-lg transition-shadow duration-200 cursor-pointer border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 group"
@@ -709,6 +731,9 @@ export function ListView() {
                           {node.description}
                         </p>
                       )}
+
+                      {/* Tags */}
+                      <TagDisplay tags={node.tags} className="mb-3" compact />
                       
                       {/* Priority and Due Date */}
                       <div className="mb-3 flex items-start justify-between">
@@ -850,7 +875,13 @@ export function ListView() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-700">
-              {filteredNodes.map((node) => (
+              {[...filteredNodes]
+                .sort((a, b) => {
+                  const dateA = new Date(a.updatedAt || a.createdAt).getTime();
+                  const dateB = new Date(b.updatedAt || b.createdAt).getTime();
+                  return dateB - dateA; // Most recent first
+                })
+                .map((node) => (
                 <tr key={node.id} className="hover:bg-gray-750 transition-colors cursor-pointer group dynamic-table-row">
                   <td className="pl-6 pr-4 py-12 dynamic-table-cell">
                     <div className="space-y-3">
@@ -883,7 +914,9 @@ export function ListView() {
                       {node.description && (
                         <div className="text-gray-400 text-sm table-text-content min-w-0">{node.description}</div>
                       )}
-                      {/* Tags not available in WorkItem schema - commented out for now
+                      {/* Tags */}
+                      <TagDisplay tags={node.tags} className="mt-2" compact />
+                      {/* Old tag implementation - removed
                       {node.tags && node.tags.length > 0 && (
                         <div className="flex gap-1.5 overflow-x-auto">
                           {node.tags.map((tag, index) => (
@@ -1277,7 +1310,14 @@ export function ListView() {
           </div>
         </div>
         <div className="space-y-3">
-          {filteredNodes.slice(0, showAllRecentTasks ? filteredNodes.length : 5).map((node, index) => (
+          {[...filteredNodes]
+            .sort((a, b) => {
+              const dateA = new Date(a.updatedAt || a.createdAt).getTime();
+              const dateB = new Date(b.updatedAt || b.createdAt).getTime();
+              return dateB - dateA; // Most recent first
+            })
+            .slice(0, showAllRecentTasks ? filteredNodes.length : 5)
+            .map((node, index) => (
             <div key={node.id} className="group flex items-center space-x-4 p-4 hover:bg-gray-750/70 rounded-xl transition-all duration-200 cursor-pointer border border-transparent hover:border-gray-600/30">
               {/* Type Icon */}
               <div className="flex-shrink-0">
@@ -1319,6 +1359,8 @@ export function ListView() {
                 <div className="text-sm font-semibold text-white mb-1 truncate group-hover:text-blue-300 transition-colors">
                   {node.title}
                 </div>
+                {/* Tags */}
+                <TagDisplay tags={node.tags} className="mb-2" compact />
                 <div className="flex items-center justify-between">
                   <div className={`text-xs flex items-center space-x-2 ${
                     node.status === 'PROPOSED' ? 'text-blue-600' :
@@ -1338,8 +1380,10 @@ export function ListView() {
                   <div className="text-xs text-gray-500">
                     {(() => {
                       const now = new Date();
-                      const createdDate = node.createdAt ? new Date(node.createdAt) : new Date(now.getTime() - Math.random() * 24 * 60 * 60 * 1000);
-                      const diffMs = now.getTime() - createdDate.getTime();
+                      const lastActivity = node.updatedAt ? new Date(node.updatedAt) : 
+                                          node.createdAt ? new Date(node.createdAt) : 
+                                          new Date(now.getTime() - Math.random() * 24 * 60 * 60 * 1000);
+                      const diffMs = now.getTime() - lastActivity.getTime();
                       const diffMins = Math.floor(diffMs / (1000 * 60));
                       const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
                       const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
@@ -1371,14 +1415,16 @@ export function ListView() {
           <div className="mt-6 pt-4 border-t border-gray-700/50">
             <button 
               onClick={() => setShowAllRecentTasks(!showAllRecentTasks)}
-              className="w-full text-sm text-gray-300 hover:text-white font-medium flex items-center justify-center space-x-2 py-3 rounded-lg hover:bg-gray-700/50 transition-all duration-200"
+              className="w-full text-sm font-medium flex items-center justify-center py-3 rounded-lg hover:bg-gray-700/50 transition-all duration-200"
             >
-              <span>
-                {showAllRecentTasks 
-                  ? 'Show less tasks' 
-                  : `View ${filteredNodes.length - 5} more tasks`}
+              <span className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-md transition-all duration-200 flex items-center space-x-2">
+                <span>
+                  {showAllRecentTasks 
+                    ? 'Show less tasks' 
+                    : `View ${filteredNodes.length - 5} more tasks`}
+                </span>
+                <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${showAllRecentTasks ? 'rotate-180' : ''}`} />
               </span>
-              <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${showAllRecentTasks ? 'rotate-180' : ''}`} />
             </button>
           </div>
         )}
@@ -1499,7 +1545,7 @@ export function ListView() {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Search across all fields..."
+                  placeholder="Search nodes"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-white placeholder-gray-400"
@@ -1798,6 +1844,7 @@ export function ListView() {
                   </div>
                 )}
               </div>
+
             </div>
 
           </div>
@@ -1957,7 +2004,7 @@ export function ListView() {
                       setStatusFilter('All Statuses');
                       setContributorFilter('All Contributors');
                       setPriorityFilter('All Priorities');
-                    }}
+                      }}
                     className="text-green-400 text-sm hover:text-green-300 mt-2"
                   >
                     Clear all filters

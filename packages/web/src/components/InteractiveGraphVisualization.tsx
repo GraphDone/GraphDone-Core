@@ -25,6 +25,9 @@ interface WorkItem {
   priorityComp: number;
   teamId: string;
   userId: string;
+  tags?: string[];
+  dueDate?: string;
+  assignedTo?: string;
   dependencies?: WorkItem[];
   dependents?: WorkItem[];
   priority?: {
