@@ -97,6 +97,7 @@ async function seed() {
           priorityIndiv: $priorityIndiv,
           priorityComm: $priorityComm,
           priorityComp: $priorityComp,
+          tags: $tags,
           createdAt: datetime(),
           updatedAt: datetime()
         })`,
@@ -108,7 +109,8 @@ async function seed() {
           priorityExec: Math.random(),
           priorityIndiv: Math.random(),
           priorityComm: Math.random(),
-          priorityComp: Math.random()
+          priorityComp: Math.random(),
+          tags: []
         }
       );
     }
