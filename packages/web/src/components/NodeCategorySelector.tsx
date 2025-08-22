@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronDown, Layers, Sparkles, ListTodo, AlertTriangle, Trophy, Target, Lightbulb, Microscope, Crosshair, Focus } from 'lucide-react';
+import { ChevronDown, Layers, Sparkles, ListTodo, AlertTriangle, Trophy, Target, Lightbulb, Microscope } from 'lucide-react';
 
 interface NodeType {
   value: string;
