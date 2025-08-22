@@ -573,7 +573,7 @@ export function ListView() {
         label: 'Proposed', 
         icon: <ClipboardList className="h-4 w-4 text-cyan-400" />, 
         color: 'bg-cyan-500',
-        bgColor: 'bg-gray-750',
+        bgColor: 'bg-gray-700',
         textColor: 'text-cyan-400',
         borderColor: 'border-gray-600',
         dotColor: 'bg-cyan-400'
@@ -582,7 +582,7 @@ export function ListView() {
         label: 'Planned', 
         icon: <Calendar className="h-4 w-4 text-purple-400" />, 
         color: 'bg-purple-500',
-        bgColor: 'bg-gray-750',
+        bgColor: 'bg-gray-700',
         textColor: 'text-purple-400',
         borderColor: 'border-gray-600',
         dotColor: 'bg-purple-400'
@@ -591,7 +591,7 @@ export function ListView() {
         label: 'In Progress', 
         icon: <Clock className="h-4 w-4 text-yellow-400" />, 
         color: 'bg-yellow-500',
-        bgColor: 'bg-gray-750',
+        bgColor: 'bg-gray-700',
         textColor: 'text-yellow-400',
         borderColor: 'border-gray-600',
         dotColor: 'bg-yellow-400'
@@ -600,7 +600,7 @@ export function ListView() {
         label: 'Blocked', 
         icon: <AlertCircle className="h-4 w-4 text-red-600" />, 
         color: 'bg-red-500',
-        bgColor: 'bg-gray-750',
+        bgColor: 'bg-gray-700',
         textColor: 'text-red-600',
         borderColor: 'border-gray-600',
         dotColor: 'bg-red-400'
@@ -609,7 +609,7 @@ export function ListView() {
         label: 'Completed', 
         icon: <CheckCircle className="h-4 w-4 text-green-400" />, 
         color: 'bg-green-500',
-        bgColor: 'bg-gray-750',
+        bgColor: 'bg-gray-700',
         textColor: 'text-green-400',
         borderColor: 'border-gray-600',
         dotColor: 'bg-green-400'
@@ -828,7 +828,7 @@ export function ListView() {
       <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden max-w-full">
         <div className="overflow-x-auto max-w-full">
           <table className="w-max min-w-full">
-            <thead className="bg-gray-750 border-b border-gray-700">
+            <thead className="bg-gray-700 border-b border-gray-700">
               <tr>
                 <th className="pr-4 py-12 text-left text-sm font-semibold text-gray-300 tracking-wider" style={{ paddingLeft: '80px' }}>Task</th>
                 <th className="pl-2 pr-3 py-10 text-left text-sm font-semibold text-gray-300 tracking-wider">Type</th>
@@ -846,9 +846,9 @@ export function ListView() {
                   return dateB - dateA; // Most recent first
                 })
                 .map((node) => (
-                <tr key={node.id} className="hover:bg-gray-750 transition-colors cursor-pointer group dynamic-table-row">
+                <tr key={node.id} className="hover:bg-gray-700 transition-colors cursor-pointer group dynamic-table-row">
                   <td className="pl-6 pr-4 py-12 dynamic-table-cell">
-                    <div className="space-y-3">
+                    <div className="space-y-6">
                       <div className="flex items-start justify-between">
                         <div className="text-white font-medium text-base flex-1 table-text-content min-w-0">{node.title}</div>
                         {/* Action buttons - appear on hover */}
@@ -1282,7 +1282,7 @@ export function ListView() {
             })
             .slice(0, showAllRecentTasks ? filteredNodes.length : 5)
             .map((node, index) => (
-            <div key={node.id} className="group flex items-center space-x-4 p-4 hover:bg-gray-750/70 rounded-xl transition-all duration-200 cursor-pointer border border-transparent hover:border-gray-600/30">
+            <div key={node.id} className="group flex items-center space-x-4 p-4 hover:bg-gray-700/70 rounded-xl transition-all duration-200 cursor-pointer border border-transparent hover:border-gray-600/30">
               {/* Type Icon */}
               <div className="flex-shrink-0">
                 <div className={`w-10 h-10 rounded-lg flex items-center justify-center border ${
@@ -1312,11 +1312,11 @@ export function ListView() {
                     node.type === 'MILESTONE' ? 'text-orange-600 bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-700' :
                     'text-gray-600 bg-gray-50 dark:bg-gray-900/20 border-gray-200 dark:border-gray-700'
                   }`}>
-                    {node.type === 'EPIC' && <Layers className="h-3 w-3" />}
-                    {node.type === 'FEATURE' && <Sparkles className="h-3 w-3" />}
-                    {node.type === 'TASK' && <ListTodo className="h-3 w-3" />}
-                    {node.type === 'BUG' && <AlertTriangle className="h-3 w-3" />}
-                    {node.type === 'MILESTONE' && <Trophy className="h-3 w-3" />}
+                    {node.type === 'EPIC' && <Layers className="h-4 w-4" />}
+                    {node.type === 'FEATURE' && <Sparkles className="h-4 w-4" />}
+                    {node.type === 'TASK' && <ListTodo className="h-4 w-4" />}
+                    {node.type === 'BUG' && <AlertTriangle className="h-4 w-4" />}
+                    {node.type === 'MILESTONE' && <Trophy className="h-4 w-4" />}
                     <span>{formatLabel(node.type)}</span>
                   </span>
                 </div>
@@ -1334,11 +1334,11 @@ export function ListView() {
                     node.status === 'BLOCKED' ? 'text-red-400' :
                     'text-gray-400'
                   }`}>
-                    {node.status === 'PROPOSED' && <ClipboardList className="h-3 w-3" />}
-                    {node.status === 'PLANNED' && <Calendar className="h-3 w-3" />}
-                    {node.status === 'IN_PROGRESS' && <Clock className="h-3 w-3" />}
-                    {node.status === 'COMPLETED' && <CheckCircle className="h-3 w-3" />}
-                    {node.status === 'BLOCKED' && <AlertCircle className="h-3 w-3" />}
+                    {node.status === 'PROPOSED' && <ClipboardList className="h-4 w-4" />}
+                    {node.status === 'PLANNED' && <Calendar className="h-4 w-4" />}
+                    {node.status === 'IN_PROGRESS' && <Clock className="h-4 w-4" />}
+                    {node.status === 'COMPLETED' && <CheckCircle className="h-4 w-4" />}
+                    {node.status === 'BLOCKED' && <AlertCircle className="h-4 w-4" />}
                     <span className="font-medium">{formatLabel(node.status)}</span>
                   </div>
                   <div className="text-xs text-gray-500">
@@ -1827,7 +1827,7 @@ export function ListView() {
       <div className="w-80 bg-gray-800 border-l border-gray-700 p-6">
         <div className="space-y-6">
           {/* Project Overview */}
-          <div className="bg-gray-750 rounded-lg p-10 border border-gray-600">
+          <div className="bg-gray-800 rounded-lg p-10 border border-gray-600">
             <h3 className="text-2xl font-semibold text-white mb-7">Project Overview</h3>
             
             {/* Progress Bar */}
@@ -1854,134 +1854,107 @@ export function ListView() {
           </div>
 
           {/* Status Breakdown */}
-          <div className="bg-gray-750 rounded-lg p-6 border border-gray-600">
+          <div className="bg-gray-800 rounded-lg p-6 border border-gray-600">
             <h3 className="text-xl font-semibold text-white mb-6">Task Status</h3>
             
-            <div className="space-y-2">
-              <div className="flex items-center justify-between p-2 rounded hover:bg-gray-700 transition-colors">
-                <div className="flex items-center space-x-3">
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
                   <div className="flex items-center space-x-2">
-                    <div className="text-cyan-400 text-lg">
-                      <ClipboardList className="h-4 w-4" />
-                    </div>
-                    <span className="text-sm text-gray-300">Proposed</span>
+                    <ClipboardList className="h-6 w-6 text-cyan-500" />
+                    <span className="text-gray-300">Proposed</span>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-lg font-bold text-cyan-400">{stats.proposed}</div>
-                  <div className="text-xs text-gray-500">{stats.total > 0 ? Math.round((stats.proposed / stats.total) * 100) : 0}%</div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-white font-medium">{stats.proposed}</span>
+                  <div className="w-16 h-2 bg-gray-700 rounded-full">
+                    <div 
+                      className="h-2 bg-cyan-500 rounded-full" 
+                      style={{ width: `${stats.total > 0 ? (stats.proposed / stats.total) * 100 : 0}%` }}
+                    ></div>
+                  </div>
                 </div>
               </div>
-
-              <div className="flex items-center justify-between p-2 rounded hover:bg-gray-700 transition-colors">
-                <div className="flex items-center space-x-3">
+              
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
                   <div className="flex items-center space-x-2">
-                    <div className="text-purple-400 text-lg">
-                      <Calendar className="h-4 w-4" />
-                    </div>
-                    <span className="text-sm text-gray-300">Planned</span>
+                    <Calendar className="h-6 w-6 text-purple-500" />
+                    <span className="text-gray-300">Planned</span>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-lg font-bold text-purple-400">{stats.planned}</div>
-                  <div className="text-xs text-gray-500">{stats.total > 0 ? Math.round((stats.planned / stats.total) * 100) : 0}%</div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-white font-medium">{stats.planned}</span>
+                  <div className="w-16 h-2 bg-gray-700 rounded-full">
+                    <div 
+                      className="h-2 bg-purple-500 rounded-full" 
+                      style={{ width: `${stats.total > 0 ? (stats.planned / stats.total) * 100 : 0}%` }}
+                    ></div>
+                  </div>
                 </div>
               </div>
-
-              <div className="flex items-center justify-between p-2 rounded hover:bg-gray-700 transition-colors">
-                <div className="flex items-center space-x-3">
+              
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
                   <div className="flex items-center space-x-2">
-                    <div className="text-yellow-400 text-lg">
-                      <Clock className="h-4 w-4" />
-                    </div>
-                    <span className="text-sm text-gray-300">In Progress</span>
+                    <Clock className="h-6 w-6 text-yellow-500" />
+                    <span className="text-gray-300">In Progress</span>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-lg font-bold text-yellow-400">{stats.inProgress}</div>
-                  <div className="text-xs text-gray-500">{stats.total > 0 ? Math.round((stats.inProgress / stats.total) * 100) : 0}%</div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-white font-medium">{stats.inProgress}</span>
+                  <div className="w-16 h-2 bg-gray-700 rounded-full">
+                    <div 
+                      className="h-2 bg-yellow-500 rounded-full" 
+                      style={{ width: `${stats.total > 0 ? (stats.inProgress / stats.total) * 100 : 0}%` }}
+                    ></div>
+                  </div>
                 </div>
               </div>
-
-              <div className="flex items-center justify-between p-2 rounded hover:bg-gray-700 transition-colors">
-                <div className="flex items-center space-x-3">
+              
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
                   <div className="flex items-center space-x-2">
-                    <div className="text-red-400 text-lg">
-                      <AlertCircle className="h-4 w-4" />
-                    </div>
-                    <span className="text-sm text-gray-300">Blocked</span>
+                    <AlertCircle className="h-6 w-6 text-red-500" />
+                    <span className="text-gray-300">Blocked</span>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-lg font-bold text-red-400">{stats.blocked}</div>
-                  <div className="text-xs text-gray-500">{stats.total > 0 ? Math.round((stats.blocked / stats.total) * 100) : 0}%</div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-white font-medium">{stats.blocked}</span>
+                  <div className="w-16 h-2 bg-gray-700 rounded-full">
+                    <div 
+                      className="h-2 bg-red-500 rounded-full" 
+                      style={{ width: `${stats.total > 0 ? (stats.blocked / stats.total) * 100 : 0}%` }}
+                    ></div>
+                  </div>
                 </div>
               </div>
-
-              <div className="flex items-center justify-between p-2 rounded hover:bg-gray-700 transition-colors">
-                <div className="flex items-center space-x-3">
+              
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
                   <div className="flex items-center space-x-2">
-                    <div className="text-green-400 text-lg">
-                      <CheckCircle className="h-4 w-4" />
-                    </div>
-                    <span className="text-sm text-gray-300">Completed</span>
+                    <CheckCircle className="h-6 w-6 text-green-500" />
+                    <span className="text-gray-300">Completed</span>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-lg font-bold text-green-400">{stats.completed}</div>
-                  <div className="text-xs text-gray-500">{stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}%</div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-white font-medium">{stats.completed}</span>
+                  <div className="w-16 h-2 bg-gray-700 rounded-full">
+                    <div 
+                      className="h-2 bg-green-500 rounded-full" 
+                      style={{ width: `${stats.total > 0 ? (stats.completed / stats.total) * 100 : 0}%` }}
+                    ></div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Node Types */}
-          <div>
-            <h3 className="text-lg font-semibold text-white mb-4">Node Types</h3>
-            <div className="space-y-3">
-              {Object.entries(stats.typeStats).length > 0 ? (
-                Object.entries(stats.typeStats).map(([type, count]) => (
-                  <div key={type} className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${getNodeTypeColor(type)}`}>
-                        {formatLabel(type)}
-                      </span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-white font-medium">{count}</span>
-                      <div className="w-16 h-2 bg-gray-700 rounded-full">
-                        <div 
-                          className="h-2 bg-green-500 rounded-full" 
-                          style={{ width: `${stats.total > 0 ? (count / stats.total) * 100 : 0}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="text-center py-4">
-                  <div className="text-gray-400 text-sm">No items match current filters</div>
-                  <button 
-                    onClick={() => {
-                      setSearchTerm('');
-                      setTypeFilter('All Types');
-                      setStatusFilter('All Statuses');
-                      setContributorFilter('All Contributors');
-                      setPriorityFilter('All Priorities');
-                      }}
-                    className="text-green-400 text-sm hover:text-green-300 mt-2"
-                  >
-                    Clear all filters
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
 
           {/* Priority Distribution */}
-          <div>
-            <h3 className="text-lg font-semibold text-white mb-4 ml-2">Priority Distribution</h3>
-            <div className="space-y-3">
+          <div className="bg-gray-800 rounded-lg p-6 border border-gray-600">
+            <h3 className="text-xl font-semibold text-white mb-6">Priority Distribution</h3>
+            <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   <div className="flex items-center space-x-2">
@@ -2071,6 +2044,68 @@ export function ListView() {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* Node Types */}
+          <div className="bg-gray-800 rounded-lg p-6 border border-gray-600">
+            <h3 className="text-xl font-semibold text-white mb-6">Node Types</h3>
+            <div className="space-y-6">
+              {(() => {
+                // Define all possible node types in order
+                const allNodeTypes = [
+                  'EPIC', 'MILESTONE', 'OUTCOME', 'FEATURE', 
+                  'TASK', 'BUG', 'IDEA', 'RESEARCH'
+                ];
+                
+                return allNodeTypes.map((type) => {
+                  const count = stats.typeStats[type] || 0;
+                  return (
+                  <div key={type} className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-2">
+                        {(() => {
+                          const iconProps = "h-6 w-6";
+                          switch(type) {
+                            case 'EPIC': return <Layers className={`${iconProps} text-purple-500`} />;
+                            case 'MILESTONE': return <Trophy className={`${iconProps} text-orange-500`} />;
+                            case 'OUTCOME': return <Target className={`${iconProps} text-indigo-500`} />;
+                            case 'FEATURE': return <Sparkles className={`${iconProps} text-blue-500`} />;
+                            case 'TASK': return <ListTodo className={`${iconProps} text-green-500`} />;
+                            case 'BUG': return <AlertTriangle className={`${iconProps} text-red-500`} />;
+                            case 'IDEA': return <Lightbulb className={`${iconProps} text-yellow-500`} />;
+                            case 'RESEARCH': return <Microscope className={`${iconProps} text-teal-500`} />;
+                            default: return <Circle className={`${iconProps} text-gray-500`} />;
+                          }
+                        })()}
+                        <span className="text-gray-300">{formatLabel(type)}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-white font-medium">{count}</span>
+                      <div className="w-16 h-2 bg-gray-700 rounded-full">
+                        <div 
+                          className={`h-2 rounded-full ${(() => {
+                            switch(type) {
+                              case 'EPIC': return 'bg-purple-500';
+                              case 'MILESTONE': return 'bg-orange-500';
+                              case 'OUTCOME': return 'bg-indigo-500';
+                              case 'FEATURE': return 'bg-blue-500';
+                              case 'TASK': return 'bg-green-500';
+                              case 'BUG': return 'bg-red-500';
+                              case 'IDEA': return 'bg-yellow-500';
+                              case 'RESEARCH': return 'bg-teal-500';
+                              default: return 'bg-gray-500';
+                            }
+                          })()}`}
+                          style={{ width: `${stats.total > 0 ? (count / stats.total) * 100 : 0}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  </div>
+                );
+                });
+              })()}
             </div>
           </div>
         </div>
