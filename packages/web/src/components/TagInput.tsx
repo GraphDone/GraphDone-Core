@@ -19,13 +19,16 @@ export function TagInput({
   const [inputValue, setInputValue] = useState('');
   const [isInputFocused, setIsInputFocused] = useState(false);
 
-  // High contrast color schemes for better visibility
+  // Professional darker colors for better contrast
   const tagColors = [
-    { bg: 'bg-blue-500 dark:bg-blue-600', border: 'border-blue-600 dark:border-blue-500', text: 'text-white' },
-    { bg: 'bg-green-500 dark:bg-green-600', border: 'border-green-600 dark:border-green-500', text: 'text-white' },
-    { bg: 'bg-purple-500 dark:bg-purple-600', border: 'border-purple-600 dark:border-purple-500', text: 'text-white' },
-    { bg: 'bg-orange-500 dark:bg-orange-600', border: 'border-orange-600 dark:border-orange-500', text: 'text-white' },
-    { bg: 'bg-pink-500 dark:bg-pink-600', border: 'border-pink-600 dark:border-pink-500', text: 'text-white' },
+    { bg: 'bg-emerald-600', border: 'border-emerald-500', text: 'text-white' },
+    { bg: 'bg-violet-600', border: 'border-violet-500', text: 'text-white' },
+    { bg: 'bg-cyan-600', border: 'border-cyan-500', text: 'text-white' },
+    { bg: 'bg-amber-600', border: 'border-amber-500', text: 'text-white' },
+    { bg: 'bg-rose-600', border: 'border-rose-500', text: 'text-white' },
+    { bg: 'bg-lime-600', border: 'border-lime-500', text: 'text-white' },
+    { bg: 'bg-blue-600', border: 'border-blue-500', text: 'text-white' },
+    { bg: 'bg-purple-600', border: 'border-purple-500', text: 'text-white' },
   ];
 
   const getTagColor = (index: number) => {
@@ -122,7 +125,7 @@ export function TagInput({
               onKeyDown={handleKeyDown}
               onFocus={() => setIsInputFocused(true)}
               onBlur={() => setIsInputFocused(false)}
-              placeholder={tags.length === 0 ? placeholder : "Continue typing..."}
+              placeholder={tags.length === 0 ? placeholder : "Continue typing"}
               className="flex-1 outline-none bg-transparent text-gray-900 dark:text-white text-sm min-w-0"
               maxLength={100}
             />

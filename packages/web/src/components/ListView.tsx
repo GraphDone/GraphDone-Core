@@ -22,7 +22,10 @@ import {
   Sparkles,
   ListTodo,
   Trophy,
-  AlertTriangle
+  AlertTriangle,
+  Target,
+  Microscope,
+  ClipboardList
 } from 'lucide-react';
 import { useQuery } from '@apollo/client';
 import { useAuth } from '../contexts/AuthContext';
@@ -130,31 +133,34 @@ export function ListView() {
   // Type options with icons
   const typeOptions = [
     { value: 'All Types', label: 'All Types', icon: null, color: 'text-gray-400' },
-    { value: 'EPIC', label: 'Epic', icon: <Layers className="h-4 w-4" />, color: 'text-purple-600' },
-    { value: 'FEATURE', label: 'Feature', icon: <Sparkles className="h-4 w-4" />, color: 'text-blue-600' },
-    { value: 'TASK', label: 'Task', icon: <ListTodo className="h-4 w-4" />, color: 'text-green-600' },
-    { value: 'BUG', label: 'Bug', icon: <AlertTriangle className="h-4 w-4" />, color: 'text-red-600' },
-    { value: 'MILESTONE', label: 'Milestone', icon: <Trophy className="h-4 w-4" />, color: 'text-orange-600' }
+    { value: 'EPIC', label: 'Epic', icon: <Layers className="h-6 w-6" />, color: 'text-fuchsia-400' },
+    { value: 'MILESTONE', label: 'Milestone', icon: <Trophy className="h-6 w-6" />, color: 'text-orange-400' },
+    { value: 'OUTCOME', label: 'Outcome', icon: <Target className="h-6 w-6" />, color: 'text-indigo-400' },
+    { value: 'FEATURE', label: 'Feature', icon: <Sparkles className="h-6 w-6" />, color: 'text-sky-400' },
+    { value: 'TASK', label: 'Task', icon: <ListTodo className="h-6 w-6" />, color: 'text-green-400' },
+    { value: 'BUG', label: 'Bug', icon: <AlertTriangle className="h-6 w-6" />, color: 'text-red-400' },
+    { value: 'IDEA', label: 'Idea', icon: <Lightbulb className="h-6 w-6" />, color: 'text-yellow-300' },
+    { value: 'RESEARCH', label: 'Research', icon: <Microscope className="h-6 w-6" />, color: 'text-teal-400' }
   ];
 
   // Status options with icons
   const statusOptions = [
     { value: 'All Statuses', label: 'All Statuses', icon: null, color: 'text-gray-400' },
-    { value: 'PROPOSED', label: 'Proposed', icon: <Lightbulb className="h-4 w-4" />, color: 'text-blue-600' },
-    { value: 'PLANNED', label: 'Planned', icon: <Calendar className="h-4 w-4" />, color: 'text-purple-600' },
-    { value: 'IN_PROGRESS', label: 'In Progress', icon: <Clock className="h-4 w-4" />, color: 'text-yellow-600' },
-    { value: 'COMPLETED', label: 'Completed', icon: <CheckCircle className="h-4 w-4" />, color: 'text-green-600' },
-    { value: 'BLOCKED', label: 'Blocked', icon: <AlertCircle className="h-4 w-4" />, color: 'text-red-600' }
+    { value: 'PROPOSED', label: 'Proposed', icon: <ClipboardList className="h-6 w-6" />, color: 'text-cyan-400' },
+    { value: 'PLANNED', label: 'Planned', icon: <Calendar className="h-6 w-6" />, color: 'text-purple-400' },
+    { value: 'IN_PROGRESS', label: 'In Progress', icon: <Clock className="h-6 w-6" />, color: 'text-yellow-400' },
+    { value: 'COMPLETED', label: 'Completed', icon: <CheckCircle className="h-6 w-6" />, color: 'text-green-400' },
+    { value: 'BLOCKED', label: 'Blocked', icon: <AlertCircle className="h-6 w-6" />, color: 'text-red-400' }
   ];
 
   // Priority options with icons
   const priorityOptions = [
     { value: 'All Priorities', label: 'All Priorities', icon: null, color: 'text-gray-400' },
-    { value: 'Critical', label: 'Critical Priority', icon: <Flame className="h-4 w-4" />, color: 'text-red-600' },
-    { value: 'High', label: 'High Priority', icon: <Zap className="h-4 w-4" />, color: 'text-orange-600' },
-    { value: 'Moderate', label: 'Moderate Priority', icon: <Triangle className="h-4 w-4" />, color: 'text-yellow-600' },
-    { value: 'Low', label: 'Low Priority', icon: <Circle className="h-4 w-4" />, color: 'text-blue-600' },
-    { value: 'Minimal', label: 'Minimal Priority', icon: <ArrowDown className="h-4 w-4" />, color: 'text-green-600' }
+    { value: 'Critical', label: 'Critical', icon: <Flame className="h-6 w-6" />, color: 'text-red-500' },
+    { value: 'High', label: 'High', icon: <Zap className="h-6 w-6" />, color: 'text-orange-500' },
+    { value: 'Moderate', label: 'Moderate', icon: <Triangle className="h-6 w-6" />, color: 'text-yellow-500' },
+    { value: 'Low', label: 'Low', icon: <Circle className="h-6 w-6" />, color: 'text-blue-500' },
+    { value: 'Minimal', label: 'Minimal', icon: <ArrowDown className="h-6 w-6" />, color: 'text-green-500' }
   ];
 
 
@@ -343,56 +349,14 @@ export function ListView() {
 
   const getNodeTypeColor = (type: string) => {
     switch (type) {
-      // Strategic Planning
       case 'EPIC': return 'bg-purple-500 text-white';
-      case 'PROJECT': return 'bg-purple-600 text-white';
-      case 'MILESTONE': return 'bg-yellow-500 text-black';
-      case 'GOAL': return 'bg-purple-400 text-white';
-      
-      // Development Work  
-      case 'STORY': return 'bg-blue-500 text-white';
       case 'FEATURE': return 'bg-blue-600 text-white';
       case 'TASK': return 'bg-green-500 text-white';
-      case 'RESEARCH': return 'bg-blue-400 text-white';
-      
-      // Quality & Issues
       case 'BUG': return 'bg-red-500 text-white';
-      case 'ISSUE': return 'bg-red-400 text-white';
-      case 'HOTFIX': return 'bg-red-600 text-white';
-      
-      // Operations & Maintenance
-      case 'MAINTENANCE': return 'bg-orange-500 text-white';
-      case 'DEPLOYMENT': return 'bg-orange-600 text-white';
-      case 'MONITORING': return 'bg-orange-400 text-white';
-      
-      // Documentation
-      case 'DOCUMENTATION': return 'bg-indigo-500 text-white';
-      case 'SPECIFICATION': return 'bg-indigo-600 text-white';
-      case 'GUIDE': return 'bg-indigo-400 text-white';
-      
-      // Testing & Validation
-      case 'TEST': return 'bg-emerald-500 text-white';
-      case 'REVIEW': return 'bg-emerald-600 text-white';
-      case 'QA': return 'bg-emerald-400 text-white';
-      
-      // Business & Sales
-      case 'LEAD': return 'bg-teal-500 text-white';
-      case 'OPPORTUNITY': return 'bg-teal-600 text-white';
-      case 'CONTRACT': return 'bg-teal-400 text-white';
-      
-      // Creative & Design
-      case 'MOCKUP': return 'bg-pink-500 text-white';
-      case 'PROTOTYPE': return 'bg-pink-600 text-white';
-      case 'UI_DESIGN': return 'bg-pink-400 text-white';
-      
-      // Support & Training
-      case 'SUPPORT': return 'bg-cyan-500 text-white';
-      case 'TRAINING': return 'bg-cyan-600 text-white';
-      
-      // Other
-      case 'NOTE': return 'bg-slate-500 text-white';
-      case 'ACTION_ITEM': return 'bg-slate-600 text-white';
-      case 'DECISION': return 'bg-slate-400 text-white';
+      case 'MILESTONE': return 'bg-orange-500 text-black';
+      case 'IDEA': return 'bg-yellow-500 text-white';
+      case 'OUTCOME': return 'bg-indigo-500 text-white';
+      case 'RESEARCH': return 'bg-teal-500 text-white';
       
       default: return 'bg-gray-500 text-white';
     }
@@ -400,11 +364,11 @@ export function ListView() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'PROPOSED': return 'text-blue-400';
+      case 'PROPOSED': return 'text-cyan-400';
       case 'PLANNED': return 'text-purple-400';
       case 'IN_PROGRESS': return 'text-yellow-400';
       case 'COMPLETED': return 'text-green-400';
-      case 'BLOCKED': return 'text-red-600';
+      case 'BLOCKED': return 'text-red-400';
       default: return 'text-gray-400';
     }
   };
@@ -579,7 +543,7 @@ export function ListView() {
             
             {/* Status */}
             <div className={`flex items-center space-x-2 px-3 py-1.5 rounded-full text-sm font-medium border shadow-sm ${
-              node.status === 'PROPOSED' ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-400' :
+              node.status === 'PROPOSED' ? 'bg-cyan-50 border-cyan-200 text-cyan-700 dark:bg-cyan-900/20 dark:border-cyan-800 dark:text-cyan-400' :
               node.status === 'PLANNED' ? 'bg-purple-50 border-purple-200 text-purple-700 dark:bg-purple-900/20 dark:border-purple-800 dark:text-purple-400' :
               node.status === 'IN_PROGRESS' ? 'bg-yellow-50 border-yellow-200 text-yellow-700 dark:bg-yellow-900/20 dark:border-yellow-800 dark:text-yellow-400' :
               node.status === 'COMPLETED' ? 'bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400' :
@@ -587,7 +551,7 @@ export function ListView() {
               'bg-gray-50 border-gray-200 text-gray-700 dark:bg-gray-900/20 dark:border-gray-800 dark:text-gray-400'
             }`}>
               <div>
-                {node.status === 'PROPOSED' && <Lightbulb className="h-4 w-4" />}
+                {node.status === 'PROPOSED' && <ClipboardList className="h-4 w-4" />}
                 {node.status === 'PLANNED' && <Calendar className="h-4 w-4" />}
                 {node.status === 'IN_PROGRESS' && <Clock className="h-4 w-4" />}
                 {node.status === 'COMPLETED' && <CheckCircle className="h-4 w-4" />}
@@ -607,12 +571,12 @@ export function ListView() {
     const statusConfig = {
       'PROPOSED': { 
         label: 'Proposed', 
-        icon: <Lightbulb className="h-4 w-4 text-blue-400" />, 
-        color: 'bg-blue-500',
+        icon: <ClipboardList className="h-4 w-4 text-cyan-400" />, 
+        color: 'bg-cyan-500',
         bgColor: 'bg-gray-750',
-        textColor: 'text-blue-400',
+        textColor: 'text-cyan-400',
         borderColor: 'border-gray-600',
-        dotColor: 'bg-blue-400'
+        dotColor: 'bg-cyan-400'
       },
       'PLANNED': { 
         label: 'Planned', 
@@ -940,14 +904,14 @@ export function ListView() {
                   <td className="pl-3 pr-3 py-10 dynamic-table-cell">
                     <div className="flex items-center whitespace-nowrap">
                       <div className={`mr-2 ${
-                        node.status === 'PROPOSED' ? 'text-blue-400' :
+                        node.status === 'PROPOSED' ? 'text-cyan-400' :
                         node.status === 'PLANNED' ? 'text-purple-400' :
                         node.status === 'IN_PROGRESS' ? 'text-yellow-400' :
                         node.status === 'COMPLETED' ? 'text-green-400' :
-                        node.status === 'BLOCKED' ? 'text-red-600' :
+                        node.status === 'BLOCKED' ? 'text-red-400' :
                         'text-gray-400'
                       }`}>
-                        {node.status === 'PROPOSED' && <Lightbulb className="h-4 w-4" />}
+                        {node.status === 'PROPOSED' && <ClipboardList className="h-4 w-4" />}
                         {node.status === 'PLANNED' && <Calendar className="h-4 w-4" />}
                         {node.status === 'IN_PROGRESS' && <Clock className="h-4 w-4" />}
                         {node.status === 'COMPLETED' && <CheckCircle className="h-4 w-4" />}
@@ -1363,14 +1327,14 @@ export function ListView() {
                 <TagDisplay tags={node.tags} className="mb-2" compact />
                 <div className="flex items-center justify-between">
                   <div className={`text-xs flex items-center space-x-2 ${
-                    node.status === 'PROPOSED' ? 'text-blue-600' :
-                    node.status === 'PLANNED' ? 'text-purple-600' :
-                    node.status === 'IN_PROGRESS' ? 'text-yellow-600' :
-                    node.status === 'COMPLETED' ? 'text-green-600' :
-                    node.status === 'BLOCKED' ? 'text-red-600' :
-                    'text-gray-600'
+                    node.status === 'PROPOSED' ? 'text-cyan-400' :
+                    node.status === 'PLANNED' ? 'text-purple-400' :
+                    node.status === 'IN_PROGRESS' ? 'text-yellow-400' :
+                    node.status === 'COMPLETED' ? 'text-green-400' :
+                    node.status === 'BLOCKED' ? 'text-red-400' :
+                    'text-gray-400'
                   }`}>
-                    {node.status === 'PROPOSED' && <Lightbulb className="h-3 w-3" />}
+                    {node.status === 'PROPOSED' && <ClipboardList className="h-3 w-3" />}
                     {node.status === 'PLANNED' && <Calendar className="h-3 w-3" />}
                     {node.status === 'IN_PROGRESS' && <Clock className="h-3 w-3" />}
                     {node.status === 'COMPLETED' && <CheckCircle className="h-3 w-3" />}
@@ -1570,12 +1534,12 @@ export function ListView() {
             </div>
 
             {/* Advanced Filters Row */}
-            <div className="flex items-center space-x-3 flex-wrap gap-y-2">
+            <div className="flex items-center space-x-8 flex-wrap gap-y-2">
               <div className="relative" ref={typeDropdownRef}>
                 <button
                   type="button"
                   onClick={() => setIsTypeDropdownOpen(!isTypeDropdownOpen)}
-                  className="flex items-center justify-between px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent hover:border-gray-500 transition-all duration-200 min-w-[140px]"
+                  className="flex items-center justify-between px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent hover:border-gray-500 transition-all duration-200 min-w-[160px]"
                 >
                   <div className="flex items-center space-x-2">
                     {(() => {
@@ -1648,7 +1612,7 @@ export function ListView() {
                 <button
                   type="button"
                   onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
-                  className="flex items-center justify-between px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent hover:border-gray-500 transition-all duration-200 min-w-[140px]"
+                  className="flex items-center justify-between px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent hover:border-gray-500 transition-all duration-200 min-w-[150px]"
                 >
                   <div className="flex items-center space-x-2">
                     {(() => {
@@ -1719,7 +1683,7 @@ export function ListView() {
                 <button
                   type="button"
                   onClick={() => setIsContributorDropdownOpen(!isContributorDropdownOpen)}
-                  className="flex items-center justify-between px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent hover:border-gray-500 transition-all duration-200 min-w-[160px]"
+                  className="flex items-center justify-between px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent hover:border-gray-500 transition-all duration-200 min-w-[180px]"
                 >
                   <div className="flex items-center space-x-2">
                     {(() => {
@@ -1778,7 +1742,7 @@ export function ListView() {
                 <button
                   type="button"
                   onClick={() => setIsPriorityDropdownOpen(!isPriorityDropdownOpen)}
-                  className="flex items-center justify-between px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent hover:border-gray-500 transition-all duration-200 min-w-[160px]"
+                  className="flex items-center justify-between px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent hover:border-gray-500 transition-all duration-200 min-w-[140px]"
                 >
                   <div className="flex items-center space-x-2">
                     {(() => {
@@ -1897,14 +1861,14 @@ export function ListView() {
               <div className="flex items-center justify-between p-2 rounded hover:bg-gray-700 transition-colors">
                 <div className="flex items-center space-x-3">
                   <div className="flex items-center space-x-2">
-                    <div className="text-blue-600 text-lg">
-                      <Lightbulb className="h-4 w-4" />
+                    <div className="text-cyan-400 text-lg">
+                      <ClipboardList className="h-4 w-4" />
                     </div>
                     <span className="text-sm text-gray-300">Proposed</span>
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-lg font-bold text-blue-400">{stats.proposed}</div>
+                  <div className="text-lg font-bold text-cyan-400">{stats.proposed}</div>
                   <div className="text-xs text-gray-500">{stats.total > 0 ? Math.round((stats.proposed / stats.total) * 100) : 0}%</div>
                 </div>
               </div>
@@ -1912,7 +1876,7 @@ export function ListView() {
               <div className="flex items-center justify-between p-2 rounded hover:bg-gray-700 transition-colors">
                 <div className="flex items-center space-x-3">
                   <div className="flex items-center space-x-2">
-                    <div className="text-purple-600 text-lg">
+                    <div className="text-purple-400 text-lg">
                       <Calendar className="h-4 w-4" />
                     </div>
                     <span className="text-sm text-gray-300">Planned</span>
@@ -1927,7 +1891,7 @@ export function ListView() {
               <div className="flex items-center justify-between p-2 rounded hover:bg-gray-700 transition-colors">
                 <div className="flex items-center space-x-3">
                   <div className="flex items-center space-x-2">
-                    <div className="text-yellow-600 text-lg">
+                    <div className="text-yellow-400 text-lg">
                       <Clock className="h-4 w-4" />
                     </div>
                     <span className="text-sm text-gray-300">In Progress</span>
@@ -1942,14 +1906,14 @@ export function ListView() {
               <div className="flex items-center justify-between p-2 rounded hover:bg-gray-700 transition-colors">
                 <div className="flex items-center space-x-3">
                   <div className="flex items-center space-x-2">
-                    <div className="text-red-600 text-lg">
+                    <div className="text-red-400 text-lg">
                       <AlertCircle className="h-4 w-4" />
                     </div>
                     <span className="text-sm text-gray-300">Blocked</span>
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-lg font-bold text-red-600">{stats.blocked}</div>
+                  <div className="text-lg font-bold text-red-400">{stats.blocked}</div>
                   <div className="text-xs text-gray-500">{stats.total > 0 ? Math.round((stats.blocked / stats.total) * 100) : 0}%</div>
                 </div>
               </div>
@@ -1957,7 +1921,7 @@ export function ListView() {
               <div className="flex items-center justify-between p-2 rounded hover:bg-gray-700 transition-colors">
                 <div className="flex items-center space-x-3">
                   <div className="flex items-center space-x-2">
-                    <div className="text-green-600 text-lg">
+                    <div className="text-green-400 text-lg">
                       <CheckCircle className="h-4 w-4" />
                     </div>
                     <span className="text-sm text-gray-300">Completed</span>
@@ -2021,7 +1985,7 @@ export function ListView() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   <div className="flex items-center space-x-2">
-                    <Flame className="h-4 w-4 text-red-400" />
+                    <Flame className="h-6 w-6 text-red-500" />
                     <span className="text-gray-300">Critical</span>
                   </div>
                 </div>
@@ -2039,7 +2003,7 @@ export function ListView() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   <div className="flex items-center space-x-2">
-                    <Zap className="h-4 w-4 text-orange-400" />
+                    <Zap className="h-6 w-6 text-orange-500" />
                     <span className="text-gray-300">High</span>
                   </div>
                 </div>
@@ -2057,7 +2021,7 @@ export function ListView() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   <div className="flex items-center space-x-2">
-                    <Triangle className="h-4 w-4 text-yellow-400" />
+                    <Triangle className="h-6 w-6 text-yellow-500" />
                     <span className="text-gray-300">Moderate</span>
                   </div>
                 </div>
@@ -2075,7 +2039,7 @@ export function ListView() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   <div className="flex items-center space-x-2">
-                    <Circle className="h-4 w-4 text-blue-400" />
+                    <Circle className="h-6 w-6 text-blue-500" />
                     <span className="text-gray-300">Low</span>
                   </div>
                 </div>
@@ -2093,7 +2057,7 @@ export function ListView() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   <div className="flex items-center space-x-2">
-                    <ArrowDown className="h-4 w-4 text-green-400" />
+                    <ArrowDown className="h-6 w-6 text-green-500" />
                     <span className="text-gray-300">Minimal</span>
                   </div>
                 </div>
