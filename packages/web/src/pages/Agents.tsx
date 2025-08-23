@@ -1,7 +1,11 @@
 import { useState } from 'react';
-import { Plus, Bot, Activity, Settings, Play, Pause, Trash2, Eye } from 'lucide-react';
+import { Plus, Bot, Activity, Settings, Play, Pause, Trash2, Eye, Server } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
+import { AgentSettingsModal } from '../components/AgentSettingsModal';
+import { McpServerCard } from '../components/McpServerCard';
+import { useMcpServers } from '../hooks/useMcpServers';
 
 interface Agent {
   id: string;
@@ -20,6 +24,8 @@ export function Agents() {
   const { currentGraph } = useGraph();
   const { } = useAuth();
   const [activeTab, setActiveTab] = useState<'active' | 'available' | 'marketplace'>('active');
+  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+  const { mcpServers, isLoading: mcpLoading, refreshMcpServers } = useMcpServers();
 
   // Mock agents
   const mockAgents: Agent[] = [
@@ -96,25 +102,39 @@ export function Agents() {
     (agent.connectedGraphs.includes(currentGraph?.id || '') || agent.owner === 'system')
   );
 
+  const activeMcpServers = mcpServers.filter(server => 
+    server.status === 'active' || server.status === 'unknown'
+  );
+
+  const totalActiveCount = activeAgents.length + activeMcpServers.length;
+
   return (
     <div className="h-screen flex flex-col">
       {/* Header */}
       <div className="bg-gray-900 border-b border-gray-700 px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-100">AI Agents</h1>
+            <h1 className="text-2xl font-bold text-gray-100">AI & Agents</h1>
             <p className="text-sm text-gray-400 mt-1">
-              Collaborate with AI agents as peers in your work graph
+              Collaborate with AI agents and configure MCP servers for your work graph
             </p>
+            <Link 
+              to="/mcp-status" 
+              className="inline-flex items-center mt-2 text-xs text-blue-400 hover:text-blue-300 transition-colors"
+            >
+              <Server className="w-3 h-3 mr-1" />
+              View MCP Server Health Status →
+            </Link>
           </div>
           
           <div className="flex items-center space-x-3">
             <button
               type="button"
+              onClick={() => setSettingsModalOpen(true)}
               className="btn btn-secondary"
             >
               <Settings className="h-4 w-4 mr-2" />
-              Agent Settings
+              AI & Agent Settings
             </button>
             
             <button
@@ -141,7 +161,7 @@ export function Agents() {
               }`}
             >
               <Activity className="h-4 w-4 inline mr-2" />
-              Active ({activeAgents.length})
+              Active ({totalActiveCount})
             </button>
             <button
               onClick={() => setActiveTab('available')}
@@ -177,13 +197,50 @@ export function Agents() {
                 <div className="bg-green-900 border border-green-700 rounded-lg p-4">
                   <h3 className="font-medium text-green-300 mb-2">Current Graph: {currentGraph.name}</h3>
                   <p className="text-green-400 text-sm">
-                    Agents shown below are active in this graph or available system-wide.
+                    AI agents and MCP servers shown below are active in this graph or available system-wide.
                   </p>
                 </div>
               )}
 
-              {/* Active Agents */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* MCP Servers Section */}
+              {activeMcpServers.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-medium text-gray-100 flex items-center">
+                      <Server className="h-5 w-5 mr-2 text-blue-400" />
+                      MCP Servers ({activeMcpServers.length})
+                    </h3>
+                    <button
+                      onClick={refreshMcpServers}
+                      className="text-sm text-gray-400 hover:text-gray-300 transition-colors"
+                      disabled={mcpLoading}
+                    >
+                      {mcpLoading ? 'Refreshing...' : 'Refresh Status'}
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                    {activeMcpServers.map((server) => (
+                      <McpServerCard
+                        key={server.id}
+                        server={server}
+                        onRefresh={refreshMcpServers}
+                        isRefreshing={mcpLoading}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* AI Agents Section */}
+              {activeAgents.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-medium text-gray-100 flex items-center">
+                      <Bot className="h-5 w-5 mr-2 text-green-400" />
+                      AI Agents ({activeAgents.length})
+                    </h3>
+                  </div>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {activeAgents.map((agent) => (
                   <div key={agent.id} className="bg-gray-800 border border-gray-700 rounded-lg p-6">
                     <div className="flex items-center justify-between mb-4">
@@ -251,23 +308,35 @@ export function Agents() {
                       </div>
                     </div>
                   </div>
-                ))}
-              </div>
+                  ))}
+                  </div>
+                </div>
+              )}
 
-              {activeAgents.length === 0 && (
+              {/* Empty State */}
+              {totalActiveCount === 0 && (
                 <div className="text-center py-12">
                   <Bot className="h-16 w-16 mx-auto text-gray-300 mb-4" />
-                  <h3 className="text-lg font-medium text-gray-100 mb-2">No Active Agents</h3>
+                  <h3 className="text-lg font-medium text-gray-100 mb-2">No Active AI Agents or MCP Servers</h3>
                   <p className="text-gray-400 mb-4">
                     {currentGraph 
-                      ? `No agents are currently active in "${currentGraph.name}"`
-                      : 'Select a graph to see active agents'
+                      ? `No AI agents or MCP servers are currently active in "${currentGraph.name}"`
+                      : 'Select a graph to see active agents and MCP servers'
                     }
                   </p>
-                  <button className="btn btn-primary">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Activate Agent
-                  </button>
+                  <div className="flex justify-center space-x-3">
+                    <button className="btn btn-primary">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Activate Agent
+                    </button>
+                    <button 
+                      onClick={() => setSettingsModalOpen(true)}
+                      className="btn btn-secondary"
+                    >
+                      <Server className="h-4 w-4 mr-2" />
+                      Setup MCP Server
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -324,6 +393,12 @@ export function Agents() {
           )}
         </div>
       </div>
+
+      {/* Settings Modal */}
+      <AgentSettingsModal 
+        isOpen={settingsModalOpen}
+        onClose={() => setSettingsModalOpen(false)}
+      />
     </div>
   );
 }

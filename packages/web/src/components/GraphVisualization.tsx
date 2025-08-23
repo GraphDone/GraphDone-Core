@@ -66,6 +66,14 @@ export function GraphVisualization() {
   const workItems: WorkItem[] = workItemsData?.workItems || [];
   const edges: Edge[] = edgesData?.edges || [];
   
+  // Debug logging
+  console.log('GraphVisualization Debug:', {
+    loading: workItemsLoading,
+    error: workItemsData,
+    workItemsCount: workItems.length,
+    workItems: workItems
+  });
+  
   // Convert dependency relationships to edges for visualization
   const dependencyEdges: Edge[] = workItems.flatMap(item => 
     (item.dependencies || []).map((dep: any) => ({

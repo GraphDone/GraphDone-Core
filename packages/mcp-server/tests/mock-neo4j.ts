@@ -261,7 +261,7 @@ export function createMockDriver(): Driver {
           records: [createMockRecord({
             n: { 
               properties: { 
-                id: 'test-node-id', 
+                id: params?.id || `test-node-${Date.now()}-${Math.random()}`, // Use actual ID parameter
                 title: params?.title || 'Test Node',
                 description: params?.description || '',
                 type: params?.type || 'TASK',
