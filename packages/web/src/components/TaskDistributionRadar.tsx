@@ -162,6 +162,7 @@ export function TaskDistributionRadar({ className = '', showLegend = true }: Tas
                 width={500}
                 height={500}
                 margin={80}
+                radarColor="#8B4513"
               />
             </div>
           </div>

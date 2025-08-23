@@ -23,7 +23,7 @@ interface PriorityDistributionRadarProps {
 export function PriorityDistributionRadar({ className = '', showLegend = true }: PriorityDistributionRadarProps) {
   const { currentGraph } = useGraph();
   const [zoomLevel, setZoomLevel] = useState(1);
-  const { data: priorityData, loading, error } = useQuery(GET_PRIORITY_DISTRIBUTION, {
+  const { data: queryData, loading, error } = useQuery(GET_PRIORITY_DISTRIBUTION, {
     variables: { graphId: currentGraph?.id },
     skip: !currentGraph?.id
   });
@@ -41,7 +41,7 @@ export function PriorityDistributionRadar({ className = '', showLegend = true }:
   };
 
   const radarData = useMemo(() => {
-    if (!priorityData?.workItems) return [];
+    if (!queryData?.workItems) return [];
 
     // Calculate priority levels based on composite priority
     const priorityCounts = {
@@ -52,7 +52,7 @@ export function PriorityDistributionRadar({ className = '', showLegend = true }:
       minimal: 0
     };
 
-    priorityData.workItems.forEach((item: any) => {
+    queryData.workItems.forEach((item: any) => {
       // Calculate composite priority (average of all priorities)
       const compositePriority = (
         (item.priorityExec || 0) + 
@@ -79,8 +79,8 @@ export function PriorityDistributionRadar({ className = '', showLegend = true }:
       { axis: 'Critical', value: priorityCounts.critical, color: '#ef4444' },
       { axis: 'High', value: priorityCounts.high, color: '#f97316' },
       { axis: 'Moderate', value: priorityCounts.moderate, color: '#eab308' },
-      { axis: 'Low', value: priorityCounts.low, color: '#22c55e' },
-      { axis: 'Minimal', value: priorityCounts.minimal, color: '#6b7280' }
+      { axis: 'Low', value: priorityCounts.low, color: '#3b82f6' },
+      { axis: 'Minimal', value: priorityCounts.minimal, color: '#22c55e' }
     ].filter(item => item.value > 0); // Only show priorities with tasks
 
     const maxValue = Math.max(...priorityData.map(item => item.value), 1);
@@ -89,7 +89,7 @@ export function PriorityDistributionRadar({ className = '', showLegend = true }:
       ...item,
       maxValue: maxValue
     }));
-  }, [priorityData]);
+  }, [queryData]);
 
   if (loading) {
     return (
@@ -99,7 +99,7 @@ export function PriorityDistributionRadar({ className = '', showLegend = true }:
     );
   }
 
-  if (error || !priorityData) {
+  if (error || !queryData) {
     return (
       <div className={`${className} flex items-center justify-center h-64 text-gray-400`}>
         <p>Unable to load priority distribution data</p>
@@ -164,6 +164,7 @@ export function PriorityDistributionRadar({ className = '', showLegend = true }:
                 width={500}
                 height={500}
                 margin={80}
+                radarColor="#8A2BE2"
               />
             </div>
           </div>
@@ -178,8 +179,8 @@ export function PriorityDistributionRadar({ className = '', showLegend = true }:
                     case 'Critical': return <Flame className="h-5 w-5" style={{ color: item.color || '#ef4444' }} />;
                     case 'High': return <Zap className="h-5 w-5" style={{ color: item.color || '#f97316' }} />;
                     case 'Moderate': return <Triangle className="h-5 w-5" style={{ color: item.color || '#eab308' }} />;
-                    case 'Low': return <Circle className="h-5 w-5" style={{ color: item.color || '#22c55e' }} />;
-                    case 'Minimal': return <ArrowDown className="h-5 w-5" style={{ color: item.color || '#6b7280' }} />;
+                    case 'Low': return <Circle className="h-5 w-5" style={{ color: item.color || '#3b82f6' }} />;
+                    case 'Minimal': return <ArrowDown className="h-5 w-5" style={{ color: item.color || '#22c55e' }} />;
                     default: return <div className="w-4 h-4 rounded-full" style={{ backgroundColor: item.color || '#4ade80' }}></div>;
                   }
                 };
