@@ -21,6 +21,16 @@ import {
   CapacityAnalysis,
   WorkloadPredictions
 } from '../types/graph.js';
+import {
+  sanitizeString,
+  sanitizeNodeId,
+  sanitizeMetadata,
+  sanitizeNodeType,
+  sanitizeNodeStatus,
+  sanitizePriority,
+  validateBulkOperation,
+  validateMemoryUsage
+} from '../utils/sanitizer.js';
 
 export interface PaginationInfo {
   total_count: number;
@@ -403,14 +413,23 @@ export class GraphService {
 
   async createNode(args: CreateNodeArgs) {
     return this.withSession(async (session) => {
-      const {
-        title = 'Untitled Node',
-        description = '',
-        type = 'TASK',
-        status = 'PROPOSED',
-        contributor_ids = [],
-        metadata = {}
-      } = args;
+      // Validate memory usage before processing
+      validateMemoryUsage(args, 10); // 10MB limit
+      
+      // Sanitize and validate all inputs
+      const title = sanitizeString(args.title || 'Untitled Node', 500);
+      const description = sanitizeString(args.description || '', 2000);
+      const type = sanitizeNodeType(args.type || 'TASK');
+      const status = sanitizeNodeStatus(args.status || 'PROPOSED');
+      const contributor_ids = Array.isArray(args.contributor_ids) ? 
+        args.contributor_ids.map(id => sanitizeNodeId(id)).slice(0, 50) : // Limit contributors
+        [];
+      const metadata = sanitizeMetadata(args.metadata || {});
+      
+      // Validate bulk operation if multiple contributors
+      if (contributor_ids.length > 0) {
+        validateBulkOperation(contributor_ids.length, 50);
+      }
 
       const id = `node_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       const now = new Date().toISOString();
@@ -474,40 +493,50 @@ export class GraphService {
 
   async updateNode(args: UpdateNodeArgs) {
     return this.withSession(async (session) => {
+      // Validate memory usage before processing
+      validateMemoryUsage(args, 10); // 10MB limit
+      
       const { node_id, ...updates } = args;
       
       if (!node_id) {
         return {
           content: [{
             type: 'text',
-            text: 'node_id is required for updating a node'
+            text: JSON.stringify({ error: 'node_id is required for updating a node' })
           }],
           isError: true
         };
       }
       
+      // Sanitize node ID
+      const sanitizedNodeId = sanitizeNodeId(node_id);
+      
       // Build the SET clause dynamically based on provided fields
       const setClause: string[] = ['n.updatedAt = $now'];
       const params: Neo4jParams = { 
-        node_id, 
+        node_id: sanitizedNodeId, 
         now: new Date().toISOString() 
       };
 
       if (updates.title !== undefined) {
         setClause.push('n.title = $title');
-        params.title = updates.title;
+        params.title = sanitizeString(updates.title, 500);
       }
       if (updates.description !== undefined) {
         setClause.push('n.description = $description');
-        params.description = updates.description;
+        params.description = sanitizeString(updates.description, 2000);
       }
       if (updates.status !== undefined) {
         setClause.push('n.status = $status');
-        params.status = updates.status;
+        params.status = sanitizeNodeStatus(updates.status);
+      }
+      if (updates.type !== undefined) {
+        setClause.push('n.type = $type');
+        params.type = sanitizeNodeType(updates.type);
       }
       if (updates.metadata !== undefined) {
         setClause.push('n.metadata = $metadata');
-        params.metadata = JSON.stringify(updates.metadata);
+        params.metadata = JSON.stringify(sanitizeMetadata(updates.metadata));
       }
 
       const query = `
@@ -717,9 +746,12 @@ export class GraphService {
     return this.withSession(async (session) => {
       const { node_id, relationships_limit = 20, relationships_offset = 0 } = args;
       
-      // Ensure all numeric values are properly converted to integers
-      const relationshipsLimitInt = typeof relationships_limit === 'number' ? Math.floor(relationships_limit) : parseInt(String(relationships_limit), 10) || 20;
-      const relationshipsOffsetInt = typeof relationships_offset === 'number' ? Math.floor(relationships_offset) : parseInt(String(relationships_offset), 10) || 0;
+      // Sanitize node ID input
+      const sanitizedNodeId = sanitizeNodeId(node_id);
+      
+      // Ensure all numeric values are properly converted to integers with limits
+      const relationshipsLimitInt = Math.min(Math.max(1, Math.floor(Number(relationships_limit) || 20)), 100); // Max 100 relationships
+      const relationshipsOffsetInt = Math.max(0, Math.floor(Number(relationships_offset) || 0));
 
       // First get the node and basic info
       const nodeQuery = `
@@ -746,11 +778,11 @@ export class GraphService {
         LIMIT $relationships_limit
       `;
 
-      // Execute queries
-      const nodeResult = await session.run(nodeQuery, { node_id });
-      const relCountResult = await session.run(relCountQuery, { node_id });
+      // Execute queries with sanitized node ID
+      const nodeResult = await session.run(nodeQuery, { node_id: sanitizedNodeId });
+      const relCountResult = await session.run(relCountQuery, { node_id: sanitizedNodeId });
       const relationshipsResult = await session.run(relationshipsQuery, { 
-        node_id, 
+        node_id: sanitizedNodeId, 
         relationships_offset: int(relationshipsOffsetInt),
         relationships_limit: int(relationshipsLimitInt)
       });
@@ -761,7 +793,7 @@ export class GraphService {
             type: 'text',
             text: JSON.stringify({
               error: 'Node not found',
-              node_id
+              node_id: sanitizedNodeId
             }, null, 2)
           }],
           isError: true
@@ -986,22 +1018,34 @@ export class GraphService {
         recalculate_computed = true 
       } = args;
 
+      // Sanitize node ID
+      const sanitizedNodeId = sanitizeNodeId(node_id);
+
       const updates: string[] = [];
-      const params: Neo4jParams = { node_id };
+      const params: Neo4jParams = { node_id: sanitizedNodeId };
 
       if (priority_executive !== undefined) {
-        updates.push('n.priorityExec = $priority_executive');
-        params.priority_executive = Math.max(0, Math.min(1, priority_executive));
+        const sanitizedPriority = sanitizePriority(priority_executive);
+        if (sanitizedPriority !== null) {
+          updates.push('n.priorityExec = $priority_executive');
+          params.priority_executive = sanitizedPriority;
+        }
       }
 
       if (priority_individual !== undefined) {
-        updates.push('n.priorityIndiv = $priority_individual');
-        params.priority_individual = Math.max(0, Math.min(1, priority_individual));
+        const sanitizedPriority = sanitizePriority(priority_individual);
+        if (sanitizedPriority !== null) {
+          updates.push('n.priorityIndiv = $priority_individual');
+          params.priority_individual = sanitizedPriority;
+        }
       }
 
       if (priority_community !== undefined) {
-        updates.push('n.priorityComm = $priority_community');
-        params.priority_community = Math.max(0, Math.min(1, priority_community));
+        const sanitizedPriority = sanitizePriority(priority_community);
+        if (sanitizedPriority !== null) {
+          updates.push('n.priorityComm = $priority_community');
+          params.priority_community = sanitizedPriority;
+        }
       }
 
       if (recalculate_computed) {
