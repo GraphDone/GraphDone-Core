@@ -15,7 +15,7 @@ export function sanitizeHTML(input: string): string {
   // First decode URL encoding to prevent bypass attacks
   try {
     sanitized = decodeURIComponent(sanitized);
-  } catch (e) {
+  } catch {
     // If decoding fails, continue with original (probably malformed URL encoding)
   }
   

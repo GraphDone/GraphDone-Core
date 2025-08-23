@@ -33,9 +33,6 @@ import {
 } from '../utils/sanitizer.js';
 import {
   generateUniqueNodeId,
-  generateUniqueEdgeId,
-  generateUniqueGraphId,
-  validateIdFormat,
   detectIdCollisions
 } from '../utils/id-generator.js';
 import { electCoordinator } from '../utils/leader-election.js';
