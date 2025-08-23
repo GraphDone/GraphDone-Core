@@ -119,7 +119,6 @@ export function ListView() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedNode, setSelectedNode] = useState<WorkItem | null>(null);
-  const [showAllRecentTasks, setShowAllRecentTasks] = useState(false);
   const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const [isPriorityDropdownOpen, setIsPriorityDropdownOpen] = useState(false);
@@ -138,7 +137,7 @@ export function ListView() {
     { value: 'OUTCOME', label: 'Outcome', icon: <Target className="h-6 w-6" />, color: 'text-indigo-400' },
     { value: 'FEATURE', label: 'Feature', icon: <Sparkles className="h-6 w-6" />, color: 'text-sky-400' },
     { value: 'TASK', label: 'Task', icon: <ListTodo className="h-6 w-6" />, color: 'text-green-400' },
-    { value: 'BUG', label: 'Bug', icon: <AlertTriangle className="h-6 w-6" />, color: 'text-red-400' },
+    { value: 'BUG', label: 'Bug', icon: <AlertTriangle className="h-6 w-6" />, color: 'text-red-500' },
     { value: 'IDEA', label: 'Idea', icon: <Lightbulb className="h-6 w-6" />, color: 'text-yellow-300' },
     { value: 'RESEARCH', label: 'Research', icon: <Microscope className="h-6 w-6" />, color: 'text-teal-400' }
   ];
@@ -150,7 +149,7 @@ export function ListView() {
     { value: 'PLANNED', label: 'Planned', icon: <Calendar className="h-6 w-6" />, color: 'text-purple-400' },
     { value: 'IN_PROGRESS', label: 'In Progress', icon: <Clock className="h-6 w-6" />, color: 'text-yellow-400' },
     { value: 'COMPLETED', label: 'Completed', icon: <CheckCircle className="h-6 w-6" />, color: 'text-green-400' },
-    { value: 'BLOCKED', label: 'Blocked', icon: <AlertCircle className="h-6 w-6" />, color: 'text-red-400' }
+    { value: 'BLOCKED', label: 'Blocked', icon: <AlertCircle className="h-6 w-6" />, color: 'text-red-500' }
   ];
 
   // Priority options with icons
@@ -362,13 +361,14 @@ export function ListView() {
     }
   };
 
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'PROPOSED': return 'text-cyan-400';
       case 'PLANNED': return 'text-purple-400';
       case 'IN_PROGRESS': return 'text-yellow-400';
       case 'COMPLETED': return 'text-green-400';
-      case 'BLOCKED': return 'text-red-400';
+      case 'BLOCKED': return 'text-red-500';
       default: return 'text-gray-400';
     }
   };
@@ -391,7 +391,15 @@ export function ListView() {
         >
           <div className="flex items-start justify-between mb-4">
             <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold shadow-sm ${getNodeTypeColor(node.type)}`}>
-              {formatLabel(node.type)}
+              {node.type === 'EPIC' && <Layers className="w-3 h-3" />}
+              {node.type === 'MILESTONE' && <Trophy className="w-3 h-3" />}
+              {node.type === 'OUTCOME' && <Target className="w-3 h-3" />}
+              {node.type === 'FEATURE' && <Sparkles className="w-3 h-3" />}
+              {node.type === 'TASK' && <ListTodo className="w-3 h-3" />}
+              {node.type === 'BUG' && <AlertTriangle className="w-3 h-3" />}
+              {node.type === 'IDEA' && <Lightbulb className="w-3 h-3" />}
+              {node.type === 'RESEARCH' && <Microscope className="w-3 h-3" />}
+              <span className="ml-1">{formatLabel(node.type)}</span>
             </span>
             <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
               <button
@@ -659,7 +667,15 @@ export function ListView() {
                     >
                       <div className="flex items-start justify-between mb-2">
                         <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${getNodeTypeColor(node.type)}`}>
-                          {formatLabel(node.type)}
+                          {node.type === 'EPIC' && <Layers className="w-3 h-3" />}
+                          {node.type === 'MILESTONE' && <Trophy className="w-3 h-3" />}
+                          {node.type === 'OUTCOME' && <Target className="w-3 h-3" />}
+                          {node.type === 'FEATURE' && <Sparkles className="w-3 h-3" />}
+                          {node.type === 'TASK' && <ListTodo className="w-3 h-3" />}
+                          {node.type === 'BUG' && <AlertTriangle className="w-3 h-3" />}
+                          {node.type === 'IDEA' && <Lightbulb className="w-3 h-3" />}
+                          {node.type === 'RESEARCH' && <Microscope className="w-3 h-3" />}
+                          <span className="ml-1">{formatLabel(node.type)}</span>
                         </span>
                         
                         {/* Action buttons - appear on hover */}
@@ -898,7 +914,15 @@ export function ListView() {
                   </td>
                   <td className="pl-2 pr-3 py-10 dynamic-table-cell">
                     <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getNodeTypeColor(node.type)} shadow-sm`}>
-                      {formatLabel(node.type)}
+                      {node.type === 'EPIC' && <Layers className="w-3 h-3" />}
+                      {node.type === 'MILESTONE' && <Trophy className="w-3 h-3" />}
+                      {node.type === 'OUTCOME' && <Target className="w-3 h-3" />}
+                      {node.type === 'FEATURE' && <Sparkles className="w-3 h-3" />}
+                      {node.type === 'TASK' && <ListTodo className="w-3 h-3" />}
+                      {node.type === 'BUG' && <AlertTriangle className="w-3 h-3" />}
+                      {node.type === 'IDEA' && <Lightbulb className="w-3 h-3" />}
+                      {node.type === 'RESEARCH' && <Microscope className="w-3 h-3" />}
+                      <span className="ml-1">{formatLabel(node.type)}</span>
                     </span>
                   </td>
                   <td className="pl-3 pr-3 py-10 dynamic-table-cell">
@@ -908,7 +932,7 @@ export function ListView() {
                         node.status === 'PLANNED' ? 'text-purple-400' :
                         node.status === 'IN_PROGRESS' ? 'text-yellow-400' :
                         node.status === 'COMPLETED' ? 'text-green-400' :
-                        node.status === 'BLOCKED' ? 'text-red-400' :
+                        node.status === 'BLOCKED' ? 'text-red-500' :
                         'text-gray-400'
                       }`}>
                         {node.status === 'PROPOSED' && <ClipboardList className="h-4 w-4" />}
@@ -1036,6 +1060,53 @@ export function ListView() {
     const total = filteredData.reduce((sum, item) => sum + item.value, 0);
     let cumulativePercentage = 0;
 
+    // Calculate label positions to avoid overlaps
+    const calculateLabelPositions = () => {
+      let tempCumulative = 0;
+      const positions = [];
+      
+      for (let i = 0; i < filteredData.length; i++) {
+        const percentage = (filteredData[i].value / total) * 100;
+        const midAngle = (tempCumulative + percentage / 2) * 3.6 - 90;
+        
+        // Keep radius constant for all labels - optimal distance from pie edge
+        const labelRadius = 44;
+        
+        // Check for potential overlaps and adjust
+        let adjustedAngle = midAngle;
+        const minAngleDiff = 25; // Minimum angle difference between labels
+        
+        // Check against previous labels
+        for (let j = 0; j < positions.length; j++) {
+          const angleDiff = Math.abs(adjustedAngle - positions[j].angle);
+          if (angleDiff < minAngleDiff && angleDiff > 0) {
+            // Adjust angle to avoid overlap
+            if (i % 2 === 0) {
+              adjustedAngle += minAngleDiff - angleDiff + 5;
+            } else {
+              adjustedAngle -= minAngleDiff - angleDiff + 5;
+            }
+          }
+        }
+        
+        const labelX = 50 + labelRadius * Math.cos(adjustedAngle * Math.PI / 180);
+        const labelY = 50 + labelRadius * Math.sin(adjustedAngle * Math.PI / 180);
+        
+        positions.push({
+          angle: adjustedAngle,
+          x: labelX,
+          y: labelY,
+          radius: labelRadius
+        });
+        
+        tempCumulative += percentage;
+      }
+      
+      return positions;
+    };
+    
+    const labelPositions = calculateLabelPositions();
+
     const createPath = (percentage: number, startPercentage: number) => {
       const startAngle = startPercentage * 3.6 - 90;
       const endAngle = (startPercentage + percentage) * 3.6 - 90;
@@ -1064,36 +1135,126 @@ export function ListView() {
     }
 
     return (
-      <div className="bg-gray-800 rounded-lg p-4 pl-2 border border-gray-700">
-        <h3 className="text-lg font-semibold text-white mb-4 text-center">{title}</h3>
-        <div className="flex items-center space-x-0">
-          <svg width="220" height="220" viewBox="0 0 100 100" className="flex-shrink-0">
+      <div className="bg-gray-800 rounded-lg p-8 border border-gray-700 min-h-[400px] min-w-[400px]">
+        <h3 className="text-xl font-semibold text-white mb-2 text-center">{title}</h3>
+        <div className="flex flex-col items-center">
+          <svg width="300" height="300" viewBox="0 0 100 100" className="mt-4 mb-4">
             {filteredData.map((item, index) => {
               const percentage = (item.value / total) * 100;
               const path = createPath(percentage, cumulativePercentage);
+              
+              // Use pre-calculated dynamic positions
+              const position = labelPositions[index];
+              const labelX = position.x;
+              const labelY = position.y;
+              
               cumulativePercentage += percentage;
               
               return (
-                <path
-                  key={index}
-                  d={path}
-                  fill={item.color}
-                  stroke="#374151"
-                  strokeWidth="0.5"
-                  className="hover:opacity-80 transition-opacity"
-                />
+                <g key={index}>
+                  <path
+                    d={path}
+                    fill={item.color}
+                    stroke="#374151"
+                    strokeWidth="0.5"
+                    className="hover:opacity-80 transition-opacity"
+                  />
+                </g>
               );
             })}
           </svg>
-          <div className="space-y-2">
-            {filteredData.map((item, index) => (
-              <div key={index} className="flex items-center space-x-2">
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>
-                <span className="text-sm text-gray-300">{item.label}</span>
-                <span className="text-sm font-medium text-white">{item.value}</span>
+          {/* Legend section */}
+          {title === 'Priority Distribution' ? (
+            <div className="space-y-2">
+              {/* First row - 3 items */}
+              <div className="grid grid-cols-3 gap-2 justify-items-center">
+                {filteredData.slice(0, 3).map((item, index) => {
+                  const getIconAndColor = (label: string) => {
+                    switch(label) {
+                      case 'Critical': return { icon: <Flame className="h-4 w-4 text-red-500" />, color: 'text-red-500' };
+                      case 'High': return { icon: <Zap className="h-4 w-4 text-orange-500" />, color: 'text-orange-400' };
+                      case 'Moderate': return { icon: <Triangle className="h-4 w-4 text-yellow-500" />, color: 'text-yellow-400' };
+                      case 'Low': return { icon: <Circle className="h-4 w-4 text-blue-500" />, color: 'text-blue-400' };
+                      case 'Minimal': return { icon: <ArrowDown className="h-4 w-4 text-green-500" />, color: 'text-green-400' };
+                      default: return { icon: <Circle className="h-4 w-4" style={{ color: item.color }} />, color: 'text-gray-300' };
+                    }
+                  };
+                  const { icon, color } = getIconAndColor(item.label);
+                  return (
+                    <div key={index} className="flex items-center space-x-2">
+                      {icon}
+                      <span className={`text-xs font-medium ${color}`}>{item.label}</span>
+                    </div>
+                  );
+                })}
               </div>
-            ))}
-          </div>
+              {/* Second row - remaining items centered */}
+              {filteredData.length > 3 && (
+                <div className="flex justify-center gap-x-4">
+                  {filteredData.slice(3).map((item, index) => {
+                    const getIconAndColor = (label: string) => {
+                      switch(label) {
+                        case 'Critical': return { icon: <Flame className="h-4 w-4 text-red-500" />, color: 'text-red-500' };
+                        case 'High': return { icon: <Zap className="h-4 w-4 text-orange-500" />, color: 'text-orange-400' };
+                        case 'Moderate': return { icon: <Triangle className="h-4 w-4 text-yellow-500" />, color: 'text-yellow-400' };
+                        case 'Low': return { icon: <Circle className="h-4 w-4 text-blue-500" />, color: 'text-blue-400' };
+                        case 'Minimal': return { icon: <ArrowDown className="h-4 w-4 text-green-500" />, color: 'text-green-400' };
+                        default: return { icon: <Circle className="h-4 w-4" style={{ color: item.color }} />, color: 'text-gray-300' };
+                      }
+                    };
+                    const { icon, color } = getIconAndColor(item.label);
+                    return (
+                      <div key={index + 3} className="flex items-center space-x-2">
+                        {icon}
+                        <span className={`text-xs font-medium ${color}`}>{item.label}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-wrap justify-center gap-x-4 gap-y-2">
+              {filteredData.map((item, index) => {
+                // Map labels to icons and colors
+                const getIconAndColor = (label: string) => {
+                  switch(label) {
+                    // Status Distribution
+                    case 'Proposed': return { icon: <ClipboardList className="h-4 w-4 text-cyan-500" />, color: 'text-cyan-400' };
+                    case 'Planned': return { icon: <Calendar className="h-4 w-4 text-purple-500" />, color: 'text-purple-400' };
+                    case 'In Progress': return { icon: <Clock className="h-4 w-4 text-yellow-500" />, color: 'text-yellow-400' };
+                    case 'Completed': return { icon: <CheckCircle className="h-4 w-4 text-green-500" />, color: 'text-green-400' };
+                    case 'Blocked': return { icon: <AlertCircle className="h-4 w-4 text-red-500" />, color: 'text-red-500' };
+                    
+                    // Node Types: Epic, Milestone, Outcome, Feature, Task, Bug, Idea, Research
+                    case 'Epic': return { icon: <Layers className="h-4 w-4 text-purple-500" />, color: 'text-purple-400' };
+                    case 'Milestone': return { icon: <Trophy className="h-4 w-4 text-orange-500" />, color: 'text-orange-400' };
+                    case 'Outcome': return { icon: <Target className="h-4 w-4 text-indigo-500" />, color: 'text-indigo-400' };
+                    case 'Feature': return { icon: <Sparkles className="h-4 w-4 text-blue-500" />, color: 'text-blue-400' };
+                    case 'Task': return { icon: <ListTodo className="h-4 w-4 text-green-500" />, color: 'text-green-400' };
+                    case 'Bug': return { icon: <AlertTriangle className="h-4 w-4 text-red-500" />, color: 'text-red-500' };
+                    case 'Idea': return { icon: <Lightbulb className="h-4 w-4 text-yellow-500" />, color: 'text-yellow-400' };
+                    case 'Research': return { icon: <Microscope className="h-4 w-4 text-teal-500" />, color: 'text-teal-400' };
+                    
+                    default: return { icon: <Circle className="h-4 w-4" style={{ color: item.color }} />, color: 'text-gray-300' };
+                  }
+                };
+                
+                const { icon, color } = getIconAndColor(item.label);
+                return (
+                  <div key={index} className="flex items-center space-x-2">
+                    {icon}
+                    <span className={`text-xs font-medium ${color}`}>{item.label}</span>
+                    {title === "Task Description" && (
+                      <span className="text-xs font-medium text-white bg-gray-600 px-2 py-1 rounded-md">
+                        {item.value}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -1151,13 +1312,11 @@ export function ListView() {
         <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">{stats.total}</span>
-              </div>
+              <BarChart3 className="h-10 w-10 text-lime-500" />
             </div>
             <div className="ml-4">
-              <div className="text-sm font-medium text-gray-300">Total Tasks</div>
-              <div className="text-2xl font-bold text-white">{stats.total}</div>
+              <div className="text-base font-medium text-gray-300">Total Tasks</div>
+              <div className="text-3xl font-bold text-lime-400">{stats.total}</div>
             </div>
           </div>
         </div>
@@ -1165,9 +1324,7 @@ export function ListView() {
         <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">{stats.completed}</span>
-              </div>
+              <CheckCircle className="h-8 w-8 text-green-500" />
             </div>
             <div className="ml-4">
               <div className="text-sm font-medium text-gray-300">Completed</div>
@@ -1179,9 +1336,7 @@ export function ListView() {
         <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <div className="w-8 h-8 bg-yellow-500 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">{stats.inProgress}</span>
-              </div>
+              <Clock className="h-8 w-8 text-yellow-500" />
             </div>
             <div className="ml-4">
               <div className="text-sm font-medium text-gray-300">In Progress</div>
@@ -1196,13 +1351,11 @@ export function ListView() {
         <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">{stats.blocked}</span>
-              </div>
+              <AlertCircle className="h-8 w-8 text-red-500" />
             </div>
             <div className="ml-4">
               <div className="text-sm font-medium text-gray-300">Blocked</div>
-              <div className="text-2xl font-bold text-red-600">{stats.blocked}</div>
+              <div className="text-2xl font-bold text-red-500">{stats.blocked}</div>
             </div>
           </div>
         </div>
@@ -1210,9 +1363,7 @@ export function ListView() {
         <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <div className="w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">{stats.planned}</span>
-              </div>
+              <Calendar className="h-8 w-8 text-purple-500" />
             </div>
             <div className="ml-4">
               <div className="text-sm font-medium text-gray-300">Planned</div>
@@ -1224,174 +1375,66 @@ export function ListView() {
         <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">{stats.proposed}</span>
-              </div>
+              <ClipboardList className="h-8 w-8 text-cyan-500" />
             </div>
             <div className="ml-4">
               <div className="text-sm font-medium text-gray-300">Proposed</div>
-              <div className="text-2xl font-bold text-blue-400">{stats.proposed}</div>
+              <div className="text-2xl font-bold text-cyan-400">{stats.proposed}</div>
             </div>
           </div>
         </div>
       </div>
 
       {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Status Distribution Pie Chart */}
-        <PieChart 
-          title="Status Distribution"
-          data={[
-            { label: 'Proposed', value: stats.proposed, color: '#3b82f6' },
-            { label: 'Planned', value: stats.planned, color: '#a855f7' },
-            { label: 'In Progress', value: stats.inProgress, color: '#eab308' },
-            { label: 'Completed', value: stats.completed, color: '#10b981' },
-            { label: 'Blocked', value: stats.blocked, color: '#dc2626' }
-          ]}
-        />
+      <div className="space-y-8">
+        {/* First Row - Status and Priority */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <PieChart 
+            title="Status Distribution"
+            data={[
+              { label: 'Proposed', value: stats.proposed, color: '#06b6d4' },
+              { label: 'Planned', value: stats.planned, color: '#a855f7' },
+              { label: 'In Progress', value: stats.inProgress, color: '#eab308' },
+              { label: 'Completed', value: stats.completed, color: '#10b981' },
+              { label: 'Blocked', value: stats.blocked, color: '#ef4444' }
+            ]}
+          />
 
-        {/* Task Types Bar Chart */}
-        <BarChart 
-          title="Task Types"
-          data={Object.entries(stats.typeStats).map(([type, count]) => ({
-            label: formatLabel(type),
-            value: count,
-            color: type === 'EPIC' ? '#3b82f6' : 
-                   type === 'FEATURE' ? '#3b82f6' :
-                   type === 'TASK' ? '#10b981' :
-                   type === 'BUG' ? '#dc2626' :
-                   type === 'MILESTONE' ? '#f59e0b' : '#6b7280'
-          }))}
-        />
-      </div>
+          <PieChart 
+            title="Priority Distribution"
+            data={[
+              { label: 'Critical', value: stats.priorityStats.critical, color: '#ef4444' },
+              { label: 'High', value: stats.priorityStats.high, color: '#f97316' },
+              { label: 'Moderate', value: stats.priorityStats.moderate, color: '#eab308' },
+              { label: 'Low', value: stats.priorityStats.low, color: '#3b82f6' },
+              { label: 'Minimal', value: stats.priorityStats.minimal, color: '#10b981' }
+            ]}
+          />
+        </div>
 
-      {/* Recent Activity */}
-      <div className="bg-gray-800 rounded-xl p-6 border border-gray-700/50 shadow-lg">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-xl font-semibold text-white">Recent Tasks</h3>
-          <div className="text-xs text-gray-400 bg-gray-700/50 px-3 py-1 rounded-full">
-            {filteredNodes.length} items
+        {/* Second Row - Node Distribution (centered) */}
+        <div className="flex justify-center">
+          <div className="w-full lg:w-1/2">
+            <PieChart 
+              title="Node Distribution"
+              data={Object.entries(stats.typeStats)
+                .filter(([type, count]) => count > 0)
+                .map(([type, count]) => ({
+                  label: formatLabel(type),
+                  value: count,
+                  color: type === 'EPIC' ? '#8b5cf6' : 
+                         type === 'MILESTONE' ? '#f97316' :
+                         type === 'OUTCOME' ? '#6366f1' :
+                         type === 'FEATURE' ? '#3b82f6' :
+                         type === 'TASK' ? '#10b981' :
+                         type === 'BUG' ? '#ef4444' :
+                         type === 'IDEA' ? '#eab308' :
+                         type === 'RESEARCH' ? '#14b8a6' : '#6b7280'
+                }))}
+            />
           </div>
         </div>
-        <div className="space-y-3">
-          {[...filteredNodes]
-            .sort((a, b) => {
-              const dateA = new Date(a.updatedAt || a.createdAt).getTime();
-              const dateB = new Date(b.updatedAt || b.createdAt).getTime();
-              return dateB - dateA; // Most recent first
-            })
-            .slice(0, showAllRecentTasks ? filteredNodes.length : 5)
-            .map((node, index) => (
-            <div key={node.id} className="group flex items-center space-x-4 p-4 hover:bg-gray-700/70 rounded-xl transition-all duration-200 cursor-pointer border border-transparent hover:border-gray-600/30">
-              {/* Type Icon */}
-              <div className="flex-shrink-0">
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center border ${
-                  node.type === 'EPIC' ? 'text-purple-600 bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-700' :
-                  node.type === 'FEATURE' ? 'text-blue-600 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700' :
-                  node.type === 'TASK' ? 'text-green-600 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700' :
-                  node.type === 'BUG' ? 'text-red-600 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700' :
-                  node.type === 'MILESTONE' ? 'text-orange-600 bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-700' :
-                  'text-gray-600 bg-gray-50 dark:bg-gray-900/20 border-gray-200 dark:border-gray-700'
-                }`}>
-                  {node.type === 'EPIC' && <Layers className="h-4 w-4" />}
-                  {node.type === 'FEATURE' && <Sparkles className="h-4 w-4" />}
-                  {node.type === 'TASK' && <ListTodo className="h-4 w-4" />}
-                  {node.type === 'BUG' && <AlertTriangle className="h-4 w-4" />}
-                  {node.type === 'MILESTONE' && <Trophy className="h-4 w-4" />}
-                </div>
-              </div>
 
-              {/* Content */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center space-x-2 mb-1">
-                  <span className={`inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-md text-xs font-semibold border ${
-                    node.type === 'EPIC' ? 'text-purple-600 bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-700' :
-                    node.type === 'FEATURE' ? 'text-blue-600 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700' :
-                    node.type === 'TASK' ? 'text-green-600 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700' :
-                    node.type === 'BUG' ? 'text-red-600 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700' :
-                    node.type === 'MILESTONE' ? 'text-orange-600 bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-700' :
-                    'text-gray-600 bg-gray-50 dark:bg-gray-900/20 border-gray-200 dark:border-gray-700'
-                  }`}>
-                    {node.type === 'EPIC' && <Layers className="h-4 w-4" />}
-                    {node.type === 'FEATURE' && <Sparkles className="h-4 w-4" />}
-                    {node.type === 'TASK' && <ListTodo className="h-4 w-4" />}
-                    {node.type === 'BUG' && <AlertTriangle className="h-4 w-4" />}
-                    {node.type === 'MILESTONE' && <Trophy className="h-4 w-4" />}
-                    <span>{formatLabel(node.type)}</span>
-                  </span>
-                </div>
-                <div className="text-sm font-semibold text-white mb-1 truncate group-hover:text-blue-300 transition-colors">
-                  {node.title}
-                </div>
-                {/* Tags */}
-                <TagDisplay tags={node.tags} className="mb-2" compact />
-                <div className="flex items-center justify-between">
-                  <div className={`text-xs flex items-center space-x-2 ${
-                    node.status === 'PROPOSED' ? 'text-cyan-400' :
-                    node.status === 'PLANNED' ? 'text-purple-400' :
-                    node.status === 'IN_PROGRESS' ? 'text-yellow-400' :
-                    node.status === 'COMPLETED' ? 'text-green-400' :
-                    node.status === 'BLOCKED' ? 'text-red-400' :
-                    'text-gray-400'
-                  }`}>
-                    {node.status === 'PROPOSED' && <ClipboardList className="h-4 w-4" />}
-                    {node.status === 'PLANNED' && <Calendar className="h-4 w-4" />}
-                    {node.status === 'IN_PROGRESS' && <Clock className="h-4 w-4" />}
-                    {node.status === 'COMPLETED' && <CheckCircle className="h-4 w-4" />}
-                    {node.status === 'BLOCKED' && <AlertCircle className="h-4 w-4" />}
-                    <span className="font-medium">{formatLabel(node.status)}</span>
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    {(() => {
-                      const now = new Date();
-                      const lastActivity = node.updatedAt ? new Date(node.updatedAt) : 
-                                          node.createdAt ? new Date(node.createdAt) : 
-                                          new Date(now.getTime() - Math.random() * 24 * 60 * 60 * 1000);
-                      const diffMs = now.getTime() - lastActivity.getTime();
-                      const diffMins = Math.floor(diffMs / (1000 * 60));
-                      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-                      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-                      const diffWeeks = Math.floor(diffDays / 7);
-                      const diffMonths = Math.floor(diffDays / 30);
-                      
-                      if (diffMins < 1) return 'just now';
-                      if (diffMins < 60) return `${diffMins}m ago`;
-                      if (diffHours < 24) return `${diffHours}h ago`;
-                      if (diffDays < 7) return `${diffDays}d ago`;
-                      if (diffWeeks < 4) return `${diffWeeks}w ago`;
-                      return `${diffMonths}mo ago`;
-                    })()}
-                  </div>
-                </div>
-              </div>
-
-              {/* Index */}
-              <div className="flex-shrink-0">
-                <div className="text-xs text-gray-500 font-medium bg-gray-700/50 px-2 py-1 rounded-md min-w-[1.5rem] text-center">
-                  #{index + 1}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-        
-        {filteredNodes.length > 5 && (
-          <div className="mt-6 pt-4 border-t border-gray-700/50">
-            <button 
-              onClick={() => setShowAllRecentTasks(!showAllRecentTasks)}
-              className="w-full text-sm font-medium flex items-center justify-center py-3 rounded-lg hover:bg-gray-700/50 transition-all duration-200"
-            >
-              <span className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-md transition-all duration-200 flex items-center space-x-2">
-                <span>
-                  {showAllRecentTasks 
-                    ? 'Show less tasks' 
-                    : `View ${filteredNodes.length - 5} more tasks`}
-                </span>
-                <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${showAllRecentTasks ? 'rotate-180' : ''}`} />
-              </span>
-            </button>
-          </div>
-        )}
       </div>
     </div>
   );

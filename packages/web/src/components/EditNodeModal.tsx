@@ -62,7 +62,7 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
     { value: 'PLANNED', label: 'Planned', icon: <Calendar className="h-6 w-6" />, color: 'text-purple-400' },
     { value: 'IN_PROGRESS', label: 'In Progress', icon: <Clock className="h-6 w-6" />, color: 'text-yellow-400' },
     { value: 'COMPLETED', label: 'Completed', icon: <CheckCircle className="h-6 w-6" />, color: 'text-green-400' },
-    { value: 'BLOCKED', label: 'Blocked', icon: <AlertCircle className="h-6 w-6" />, color: 'text-red-400' }
+    { value: 'BLOCKED', label: 'Blocked', icon: <AlertCircle className="h-6 w-6" />, color: 'text-red-500' }
   ];
 
   // Close status dropdown when clicking outside
@@ -402,7 +402,7 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                     >
                       <div className="flex items-center justify-center space-x-1 mb-1">
                         <Flame className="w-6 h-6 text-red-500" />
-                        <div className="text-red-400 font-bold text-sm">Critical</div>
+                        <div className="text-red-500 font-bold text-sm">Critical</div>
                       </div>
                       <div className="text-xs font-mono text-gray-400">80% - 100%</div>
                     </button>

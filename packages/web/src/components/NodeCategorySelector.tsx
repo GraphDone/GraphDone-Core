@@ -79,7 +79,7 @@ const nodeTypes: NodeType[] = [
     description: 'Software defect requiring resolution', 
     emoji: '🐛',
     icon: <AlertTriangle className="h-6 w-6" />,
-    color: 'text-red-400',
+    color: 'text-red-500',
     bgColor: 'bg-red-50 dark:bg-red-900/20',
     borderColor: 'border-red-200 dark:border-red-700'
   },
