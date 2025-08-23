@@ -1,13 +1,14 @@
 import { useState } from 'react';
-import { TrendingUp, Users, Target, Activity } from 'lucide-react';
+import { TrendingUp, Users, Target, Activity, PieChart } from 'lucide-react';
 import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
+import { TaskDistributionRadar } from '../components/TaskDistributionRadar';
 
 export function Analytics() {
   const { currentGraph } = useGraph();
   const { } = useAuth();
   const [timeRange, setTimeRange] = useState<'day' | 'week' | 'month' | 'quarter'>('week');
-  const [activeTab, setActiveTab] = useState<'overview' | 'priority' | 'collaboration' | 'insights'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'priority' | 'collaboration' | 'distribution' | 'insights'>('overview');
 
   // Mock analytics data
   const mockMetrics = {
@@ -107,6 +108,17 @@ export function Analytics() {
             >
               <Users className="h-4 w-4 inline mr-2" />
               Collaboration
+            </button>
+            <button
+              onClick={() => setActiveTab('distribution')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === 'distribution'
+                  ? 'border-green-500 text-green-400'
+                  : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-600'
+              }`}
+            >
+              <PieChart className="h-4 w-4 inline mr-2" />
+              Distribution
             </button>
             <button
               onClick={() => setActiveTab('insights')}
@@ -334,6 +346,12 @@ export function Analytics() {
                   ))}
                 </div>
               </div>
+            </div>
+          )}
+
+          {activeTab === 'distribution' && (
+            <div className="space-y-6">
+              <TaskDistributionRadar />
             </div>
           )}
 
