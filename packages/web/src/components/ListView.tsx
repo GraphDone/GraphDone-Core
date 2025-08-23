@@ -25,7 +25,10 @@ import {
   AlertTriangle,
   Target,
   Microscope,
-  ClipboardList
+  ClipboardList,
+  RotateCcw,
+  ZoomIn,
+  ZoomOut
 } from 'lucide-react';
 import { useQuery } from '@apollo/client';
 import { useAuth } from '../contexts/AuthContext';
@@ -1056,9 +1059,22 @@ export function ListView() {
 
   // Pie Chart Component
   const PieChart = ({ data, title }: { data: Array<{label: string, value: number, color: string}>, title: string }) => {
+    const [zoomLevel, setZoomLevel] = useState(1);
     const filteredData = data.filter(item => item.value > 0);
     const total = filteredData.reduce((sum, item) => sum + item.value, 0);
     let cumulativePercentage = 0;
+    
+    const handleZoomIn = () => {
+      setZoomLevel(prev => Math.min(prev + 0.1, 2));
+    };
+    
+    const handleZoomOut = () => {
+      setZoomLevel(prev => Math.max(prev - 0.1, 0.5));
+    };
+
+    const handleResetLayout = () => {
+      setZoomLevel(1);
+    };
 
     // Calculate label positions to avoid overlaps
     const calculateLabelPositions = () => {
@@ -1135,11 +1151,54 @@ export function ListView() {
     }
 
     return (
-      <div className="bg-gray-800 rounded-lg p-8 border border-gray-700 min-h-[400px] min-w-[400px]">
+      <div className="bg-black rounded-lg p-8 border border-gray-700 min-h-[600px] min-w-[600px] relative">
         <h3 className="text-xl font-semibold text-white mb-2 text-center">{title}</h3>
+        
+        {/* Zoom Controls */}
+        <div className="absolute top-8 right-8 flex flex-col items-center space-y-2">
+          <div className="flex space-x-1">
+            <button
+              onClick={handleZoomOut}
+              className="w-10 h-10 bg-gray-700 hover:bg-gray-600 text-white rounded-lg flex items-center justify-center text-xl font-bold transition-colors"
+              title="Zoom Out"
+            >
+              −
+            </button>
+            <button
+              onClick={handleZoomIn}
+              className="w-10 h-10 bg-gray-700 hover:bg-gray-600 text-white rounded-lg flex items-center justify-center text-xl font-bold transition-colors"
+              title="Zoom In"
+            >
+              +
+            </button>
+          </div>
+          <div className="text-xs text-gray-400 text-center mb-2">
+            {(zoomLevel * 100).toFixed(0)}%
+          </div>
+          <button
+            onClick={handleResetLayout}
+            className="flex items-center space-x-1 px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs transition-colors"
+            title="Reset Layout"
+          >
+            <RotateCcw className="h-3 w-3" />
+            <span>Reset</span>
+          </button>
+        </div>
+        
         <div className="flex flex-col items-center">
-          <svg width="300" height="300" viewBox="0 0 100 100" className="mt-4 mb-4">
-            {filteredData.map((item, index) => {
+          <div className="overflow-hidden" style={{ width: '400px', height: '400px' }}>
+            <svg 
+              width="400" 
+              height="400" 
+              viewBox="0 0 100 100" 
+              className="mt-4 mb-16"
+              style={{ 
+                transform: `scale(${zoomLevel})`,
+                transformOrigin: 'center',
+                transition: 'transform 0.3s ease'
+              }}
+            >
+              {filteredData.map((item, index) => {
               const percentage = (item.value / total) * 100;
               const path = createPath(percentage, cumulativePercentage);
               
@@ -1162,99 +1221,165 @@ export function ListView() {
                 </g>
               );
             })}
-          </svg>
+            </svg>
+          </div>
           {/* Legend section */}
-          {title === 'Priority Distribution' ? (
-            <div className="space-y-2">
-              {/* First row - 3 items */}
-              <div className="grid grid-cols-3 gap-2 justify-items-center">
-                {filteredData.slice(0, 3).map((item, index) => {
-                  const getIconAndColor = (label: string) => {
-                    switch(label) {
-                      case 'Critical': return { icon: <Flame className="h-4 w-4 text-red-500" />, color: 'text-red-500' };
-                      case 'High': return { icon: <Zap className="h-4 w-4 text-orange-500" />, color: 'text-orange-400' };
-                      case 'Moderate': return { icon: <Triangle className="h-4 w-4 text-yellow-500" />, color: 'text-yellow-400' };
-                      case 'Low': return { icon: <Circle className="h-4 w-4 text-blue-500" />, color: 'text-blue-400' };
-                      case 'Minimal': return { icon: <ArrowDown className="h-4 w-4 text-green-500" />, color: 'text-green-400' };
-                      default: return { icon: <Circle className="h-4 w-4" style={{ color: item.color }} />, color: 'text-gray-300' };
-                    }
-                  };
-                  const { icon, color } = getIconAndColor(item.label);
-                  return (
-                    <div key={index} className="flex items-center space-x-2">
-                      {icon}
-                      <span className={`text-xs font-medium ${color}`}>{item.label}</span>
-                    </div>
-                  );
-                })}
-              </div>
-              {/* Second row - remaining items centered */}
-              {filteredData.length > 3 && (
-                <div className="flex justify-center gap-x-4">
-                  {filteredData.slice(3).map((item, index) => {
-                    const getIconAndColor = (label: string) => {
-                      switch(label) {
-                        case 'Critical': return { icon: <Flame className="h-4 w-4 text-red-500" />, color: 'text-red-500' };
-                        case 'High': return { icon: <Zap className="h-4 w-4 text-orange-500" />, color: 'text-orange-400' };
-                        case 'Moderate': return { icon: <Triangle className="h-4 w-4 text-yellow-500" />, color: 'text-yellow-400' };
-                        case 'Low': return { icon: <Circle className="h-4 w-4 text-blue-500" />, color: 'text-blue-400' };
-                        case 'Minimal': return { icon: <ArrowDown className="h-4 w-4 text-green-500" />, color: 'text-green-400' };
-                        default: return { icon: <Circle className="h-4 w-4" style={{ color: item.color }} />, color: 'text-gray-300' };
-                      }
-                    };
-                    const { icon, color } = getIconAndColor(item.label);
-                    return (
-                      <div key={index + 3} className="flex items-center space-x-2">
-                        {icon}
-                        <span className={`text-xs font-medium ${color}`}>{item.label}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="flex flex-wrap justify-center gap-x-4 gap-y-2">
-              {filteredData.map((item, index) => {
-                // Map labels to icons and colors
-                const getIconAndColor = (label: string) => {
-                  switch(label) {
-                    // Status Distribution
-                    case 'Proposed': return { icon: <ClipboardList className="h-4 w-4 text-cyan-500" />, color: 'text-cyan-400' };
-                    case 'Planned': return { icon: <Calendar className="h-4 w-4 text-purple-500" />, color: 'text-purple-400' };
-                    case 'In Progress': return { icon: <Clock className="h-4 w-4 text-yellow-500" />, color: 'text-yellow-400' };
-                    case 'Completed': return { icon: <CheckCircle className="h-4 w-4 text-green-500" />, color: 'text-green-400' };
-                    case 'Blocked': return { icon: <AlertCircle className="h-4 w-4 text-red-500" />, color: 'text-red-500' };
-                    
-                    // Node Types: Epic, Milestone, Outcome, Feature, Task, Bug, Idea, Research
-                    case 'Epic': return { icon: <Layers className="h-4 w-4 text-purple-500" />, color: 'text-purple-400' };
-                    case 'Milestone': return { icon: <Trophy className="h-4 w-4 text-orange-500" />, color: 'text-orange-400' };
-                    case 'Outcome': return { icon: <Target className="h-4 w-4 text-indigo-500" />, color: 'text-indigo-400' };
-                    case 'Feature': return { icon: <Sparkles className="h-4 w-4 text-blue-500" />, color: 'text-blue-400' };
-                    case 'Task': return { icon: <ListTodo className="h-4 w-4 text-green-500" />, color: 'text-green-400' };
-                    case 'Bug': return { icon: <AlertTriangle className="h-4 w-4 text-red-500" />, color: 'text-red-500' };
-                    case 'Idea': return { icon: <Lightbulb className="h-4 w-4 text-yellow-500" />, color: 'text-yellow-400' };
-                    case 'Research': return { icon: <Microscope className="h-4 w-4 text-teal-500" />, color: 'text-teal-400' };
-                    
-                    default: return { icon: <Circle className="h-4 w-4" style={{ color: item.color }} />, color: 'text-gray-300' };
-                  }
-                };
-                
-                const { icon, color } = getIconAndColor(item.label);
-                return (
-                  <div key={index} className="flex items-center space-x-2">
-                    {icon}
-                    <span className={`text-xs font-medium ${color}`}>{item.label}</span>
-                    {title === "Task Description" && (
-                      <span className="text-xs font-medium text-white bg-gray-600 px-2 py-1 rounded-md">
-                        {item.value}
-                      </span>
-                    )}
+          <div className="mt-8">
+          {(() => {
+            // Determine chart type based on data labels
+            const isStatusChart = filteredData.some(item => ['Proposed', 'Planned', 'In Progress', 'Completed', 'Blocked'].includes(item.label));
+            const isPriorityChart = filteredData.some(item => ['Critical', 'High', 'Moderate', 'Low', 'Minimal'].includes(item.label));
+            
+            if (isStatusChart) {
+              // Status Distribution - 2 lines with icons
+              return (
+                <div className="space-y-3">
+                  {/* First row - 3 items */}
+                  <div className="flex justify-center gap-x-6">
+                    {filteredData.slice(0, 3).map((item, index) => {
+                      const percentage = ((item.value / total) * 100).toFixed(1);
+                      const getIcon = (label: string) => {
+                        switch(label) {
+                          case 'Proposed': return <ClipboardList className="h-4 w-4" style={{ color: item.color }} />;
+                          case 'Planned': return <Calendar className="h-4 w-4" style={{ color: item.color }} />;
+                          case 'In Progress': return <Clock className="h-4 w-4" style={{ color: item.color }} />;
+                          case 'Completed': return <CheckCircle className="h-4 w-4" style={{ color: item.color }} />;
+                          case 'Blocked': return <AlertCircle className="h-4 w-4" style={{ color: item.color }} />;
+                          default: return <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>;
+                        }
+                      };
+                      return (
+                        <div key={index} className="flex items-center space-x-2">
+                          {getIcon(item.label)}
+                          <span className="text-sm font-medium text-gray-300">{item.label}</span>
+                          <span className="text-sm font-medium text-gray-400">({percentage}%)</span>
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
-            </div>
-          )}
+                  {/* Second row - remaining items */}
+                  {filteredData.length > 3 && (
+                    <div className="flex justify-center gap-x-6">
+                      {filteredData.slice(3).map((item, index) => {
+                        const percentage = ((item.value / total) * 100).toFixed(1);
+                        const getIcon = (label: string) => {
+                          switch(label) {
+                            case 'Proposed': return <ClipboardList className="h-4 w-4" style={{ color: item.color }} />;
+                            case 'Planned': return <Calendar className="h-4 w-4" style={{ color: item.color }} />;
+                            case 'In Progress': return <Clock className="h-4 w-4" style={{ color: item.color }} />;
+                            case 'Completed': return <CheckCircle className="h-4 w-4" style={{ color: item.color }} />;
+                            case 'Blocked': return <AlertCircle className="h-4 w-4" style={{ color: item.color }} />;
+                            default: return <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>;
+                          }
+                        };
+                        return (
+                          <div key={index + 3} className="flex items-center space-x-2">
+                            {getIcon(item.label)}
+                            <span className="text-sm font-medium text-gray-300">{item.label}</span>
+                            <span className="text-sm font-medium text-gray-400">({percentage}%)</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            } else if (isPriorityChart) {
+              // Priority Distribution - 2 lines layout with icons
+              return (
+                <div className="space-y-3">
+                  {/* First row - 3 items */}
+                  <div className="flex justify-center gap-x-6">
+                    {filteredData.slice(0, 3).map((item, index) => {
+                      const percentage = ((item.value / total) * 100).toFixed(1);
+                      const getIcon = (label: string) => {
+                        switch(label) {
+                          case 'Critical': return <Flame className="h-4 w-4" style={{ color: item.color }} />;
+                          case 'High': return <Zap className="h-4 w-4" style={{ color: item.color }} />;
+                          case 'Moderate': return <Triangle className="h-4 w-4" style={{ color: item.color }} />;
+                          case 'Low': return <Circle className="h-4 w-4" style={{ color: item.color }} />;
+                          case 'Minimal': return <ArrowDown className="h-4 w-4" style={{ color: item.color }} />;
+                          default: return <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>;
+                        }
+                      };
+                      return (
+                        <div key={index} className="flex items-center space-x-2">
+                          {getIcon(item.label)}
+                          <span className="text-sm font-medium text-gray-300">{item.label}</span>
+                          <span className="text-sm font-medium text-gray-400">({percentage}%)</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {/* Second row - remaining items */}
+                  {filteredData.length > 3 && (
+                    <div className="flex justify-center gap-x-6">
+                      {filteredData.slice(3).map((item, index) => {
+                        const percentage = ((item.value / total) * 100).toFixed(1);
+                        const getIcon = (label: string) => {
+                          switch(label) {
+                            case 'Critical': return <Flame className="h-4 w-4" style={{ color: item.color }} />;
+                            case 'High': return <Zap className="h-4 w-4" style={{ color: item.color }} />;
+                            case 'Moderate': return <Triangle className="h-4 w-4" style={{ color: item.color }} />;
+                            case 'Low': return <Circle className="h-4 w-4" style={{ color: item.color }} />;
+                            case 'Minimal': return <ArrowDown className="h-4 w-4" style={{ color: item.color }} />;
+                            default: return <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>;
+                          }
+                        };
+                        return (
+                          <div key={index + 3} className="flex items-center space-x-2">
+                            {getIcon(item.label)}
+                            <span className="text-sm font-medium text-gray-300">{item.label}</span>
+                            <span className="text-sm font-medium text-gray-400">({percentage}%)</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            } else {
+              // Node Distribution - 3 items per line layout
+              const itemsPerRow = 3;
+              const rows = [];
+              for (let i = 0; i < filteredData.length; i += itemsPerRow) {
+                rows.push(filteredData.slice(i, i + itemsPerRow));
+              }
+              
+              return (
+                <div className="space-y-3">
+                  {rows.map((row, rowIndex) => (
+                    <div key={rowIndex} className="flex justify-center gap-x-6">
+                      {row.map((item, index) => {
+                        const percentage = ((item.value / total) * 100).toFixed(1);
+                        const getIcon = (label: string) => {
+                          switch(label) {
+                            case 'Epic': return <Layers className="h-4 w-4" style={{ color: item.color }} />;
+                            case 'Milestone': return <Trophy className="h-4 w-4" style={{ color: item.color }} />;
+                            case 'Outcome': return <Target className="h-4 w-4" style={{ color: item.color }} />;
+                            case 'Feature': return <Sparkles className="h-4 w-4" style={{ color: item.color }} />;
+                            case 'Task': return <ListTodo className="h-4 w-4" style={{ color: item.color }} />;
+                            case 'Bug': return <AlertTriangle className="h-4 w-4" style={{ color: item.color }} />;
+                            case 'Idea': return <Lightbulb className="h-4 w-4" style={{ color: item.color }} />;
+                            case 'Research': return <Microscope className="h-4 w-4" style={{ color: item.color }} />;
+                            default: return <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>;
+                          }
+                        };
+                        return (
+                          <div key={rowIndex * itemsPerRow + index} className="flex items-center space-x-2">
+                            {getIcon(item.label)}
+                            <span className="text-sm font-medium text-gray-300">{item.label}</span>
+                            <span className="text-sm font-medium text-gray-400">({percentage}%)</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+              );
+            }
+          })()}
+          </div>
         </div>
       </div>
     );
@@ -1387,49 +1512,64 @@ export function ListView() {
 
       {/* Charts Section */}
       <div className="space-y-8">
-        {/* First Row - Status and Priority */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <PieChart 
-            title="Status Distribution"
-            data={[
-              { label: 'Proposed', value: stats.proposed, color: '#06b6d4' },
-              { label: 'Planned', value: stats.planned, color: '#a855f7' },
-              { label: 'In Progress', value: stats.inProgress, color: '#eab308' },
-              { label: 'Completed', value: stats.completed, color: '#10b981' },
-              { label: 'Blocked', value: stats.blocked, color: '#ef4444' }
-            ]}
-          />
-
-          <PieChart 
-            title="Priority Distribution"
-            data={[
-              { label: 'Critical', value: stats.priorityStats.critical, color: '#ef4444' },
-              { label: 'High', value: stats.priorityStats.high, color: '#f97316' },
-              { label: 'Moderate', value: stats.priorityStats.moderate, color: '#eab308' },
-              { label: 'Low', value: stats.priorityStats.low, color: '#3b82f6' },
-              { label: 'Minimal', value: stats.priorityStats.minimal, color: '#10b981' }
-            ]}
-          />
+        {/* Charts Header */}
+        <div className="mb-6 text-center">
+          <h2 className="text-2xl font-bold text-white">Analytics Dashboard</h2>
+        </div>
+        
+        {/* First Row - Status Distribution */}
+        <div className="flex flex-col items-center">
+          <h2 className="text-2xl font-bold text-white mb-4">Status Distribution</h2>
+          <div className="w-full max-w-[600px]">
+            <PieChart 
+              title=""
+              data={[
+                { label: 'Proposed', value: stats.proposed, color: '#22d3ee' },
+                { label: 'Planned', value: stats.planned, color: '#c084fc' },
+                { label: 'In Progress', value: stats.inProgress, color: '#facc15' },
+                { label: 'Completed', value: stats.completed, color: '#4ade80' },
+                { label: 'Blocked', value: stats.blocked, color: '#ef4444' }
+              ]}
+            />
+          </div>
         </div>
 
-        {/* Second Row - Node Distribution (centered) */}
-        <div className="flex justify-center">
-          <div className="w-full lg:w-1/2">
+        {/* Second Row - Priority Distribution */}
+        <div className="flex flex-col items-center">
+          <h2 className="text-2xl font-bold text-white mb-4">Priority Distribution</h2>
+          <div className="w-full max-w-[600px]">
             <PieChart 
-              title="Node Distribution"
+              title=""
+              data={[
+                { label: 'Critical', value: stats.priorityStats.critical, color: '#ef4444' },
+                { label: 'High', value: stats.priorityStats.high, color: '#f97316' },
+                { label: 'Moderate', value: stats.priorityStats.moderate, color: '#eab308' },
+                { label: 'Low', value: stats.priorityStats.low, color: '#3b82f6' },
+                { label: 'Minimal', value: stats.priorityStats.minimal, color: '#22c55e' }
+              ]}
+            />
+          </div>
+        </div>
+
+        {/* Third Row - Node Distribution */}
+        <div className="flex flex-col items-center">
+          <h2 className="text-2xl font-bold text-white mb-4">Node Distribution</h2>
+          <div className="w-full max-w-[600px]">
+            <PieChart 
+              title=""
               data={Object.entries(stats.typeStats)
                 .filter(([type, count]) => count > 0)
                 .map(([type, count]) => ({
                   label: formatLabel(type),
                   value: count,
-                  color: type === 'EPIC' ? '#8b5cf6' : 
-                         type === 'MILESTONE' ? '#f97316' :
-                         type === 'OUTCOME' ? '#6366f1' :
-                         type === 'FEATURE' ? '#3b82f6' :
-                         type === 'TASK' ? '#10b981' :
+                  color: type === 'EPIC' ? '#c084fc' : 
+                         type === 'MILESTONE' ? '#fb923c' :
+                         type === 'OUTCOME' ? '#818cf8' :
+                         type === 'FEATURE' ? '#38bdf8' :
+                         type === 'TASK' ? '#4ade80' :
                          type === 'BUG' ? '#ef4444' :
-                         type === 'IDEA' ? '#eab308' :
-                         type === 'RESEARCH' ? '#14b8a6' : '#6b7280'
+                         type === 'IDEA' ? '#fde047' :
+                         type === 'RESEARCH' ? '#2dd4bf' : '#6b7280'
                 }))}
             />
           </div>

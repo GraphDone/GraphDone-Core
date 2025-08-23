@@ -283,9 +283,10 @@ export function GraphProvider({ children }: GraphProviderProps) {
       if (!currentGraph && parsedGraphs.length > 0) {
         setCurrentGraph(parsedGraphs[0]);
       }
-    } else if (currentTeam && !isLoading) {
-      // Use mock data if no graphs in database
-      const teamGraphs = createMockGraphs(currentTeam.id);
+    } else if (!isLoading) {
+      // Use mock data if no graphs in database - use currentTeam.id or fallback to team-1
+      const teamId = currentTeam?.id || 'team-1';
+      const teamGraphs = createMockGraphs(teamId);
       setAvailableGraphs(teamGraphs);
       
       if (!currentGraph && teamGraphs.length > 0) {
