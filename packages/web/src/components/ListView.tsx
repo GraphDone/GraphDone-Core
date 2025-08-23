@@ -1193,8 +1193,8 @@ export function ListView() {
               }}
             >
               <svg 
-                width="500" 
-                height="500" 
+                width="350" 
+                height="350" 
                 viewBox="0 0 100 100"
               >
               {filteredData.map((item, index) => {
@@ -1223,12 +1223,12 @@ export function ListView() {
           </div>
         </div>
         {/* Legend section */}
-        <div className="mt-6">
+        <div className="mt-4">
           {(() => {
             // Determine chart type and set appropriate grid
             const isPriorityChart = filteredData.some(item => ['Critical', 'High', 'Moderate', 'Low', 'Minimal'].includes(item.label));
             const isStatusChart = filteredData.some(item => ['Proposed', 'Planned', 'In Progress', 'Completed', 'Blocked'].includes(item.label));
-            const gridCols = (isPriorityChart || isStatusChart) ? "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-3" : "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3";
+            const gridCols = (isPriorityChart || isStatusChart) ? "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-2" : "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2";
             
             return (
               <div className={gridCols}>
@@ -1259,14 +1259,14 @@ export function ListView() {
               };
               
               return (
-                <div key={index} className="bg-gray-700 rounded p-3">
-                  <div className="flex items-center mb-2">
+                <div key={index} className="bg-gray-700 hover:bg-gray-650 rounded p-2 transition-all duration-200 hover:scale-105 hover:shadow-lg border border-gray-600 hover:border-gray-500">
+                  <div className="flex items-center mb-1">
                     {getIcon(item.label)}
-                    <span className="text-gray-200 text-base ml-2">{item.label}</span>
+                    <span className="text-gray-200 text-sm ml-2">{item.label}</span>
                   </div>
                   <div className="text-right">
-                    <span className="text-xl font-bold text-white">{item.value}</span>
-                    <span className="text-base text-gray-400 ml-1">({percentage}%)</span>
+                    <span className="text-lg font-bold text-white">{item.value}</span>
+                    <span className="text-sm text-gray-400 ml-1">({percentage}%)</span>
                   </div>
                 </div>
                   );
@@ -1404,99 +1404,128 @@ export function ListView() {
         </div>
       </div>
 
-      {/* Charts Section */}
-      <div className="space-y-8">
-        {/* Charts Header */}
-        <div className="mb-6 text-center">
-          <h2 className="text-2xl font-bold text-white">Analytics Dashboard</h2>
-        </div>
-        
-        {/* First Row - Status Distribution */}
-        <div className="flex flex-col items-center">
-          <h2 className="text-2xl font-bold text-white mb-4">Status Distribution</h2>
-          <div className="w-full">
-            <PieChart 
-              title=""
-              data={[
-                { label: 'Proposed', value: stats.proposed, color: '#22d3ee' },
-                { label: 'Planned', value: stats.planned, color: '#c084fc' },
-                { label: 'In Progress', value: stats.inProgress, color: '#facc15' },
-                { label: 'Completed', value: stats.completed, color: '#4ade80' },
-                { label: 'Blocked', value: stats.blocked, color: '#ef4444' }
-              ]}
-            />
+      {/* Analytics Dashboard */}
+      <div className="space-y-8 relative">
+        {/* Dashboard Header */}
+        <div className="text-center relative">
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-blue-500/10 to-transparent rounded-lg"></div>
+          <div className="relative py-4">
+            <h2 className="text-2xl font-bold mb-1" style={{ color: 'gold' }}>Analytics Dashboard</h2>
+            <p className="text-sm font-medium" style={{ color: 'mediumspringgreen' }}>Project metrics and distributions</p>
           </div>
         </div>
 
-        {/* Second Row - Priority Distribution */}
-        <div className="flex flex-col items-center">
-          <h2 className="text-2xl font-bold text-white mb-4">Priority Distribution</h2>
-          <div className="w-full">
-            <PieChart 
-              title=""
-              data={[
-                { label: 'Critical', value: stats.priorityStats.critical, color: '#ef4444' },
-                { label: 'High', value: stats.priorityStats.high, color: '#f97316' },
-                { label: 'Moderate', value: stats.priorityStats.moderate, color: '#eab308' },
-                { label: 'Low', value: stats.priorityStats.low, color: '#3b82f6' },
-                { label: 'Minimal', value: stats.priorityStats.minimal, color: '#22c55e' }
-              ]}
-            />
+        {/* Pie Charts Container */}
+        <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-600 rounded-lg p-6 shadow-xl hover:shadow-2xl transition-all duration-300 hover:border-gray-500">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-lg font-semibold" style={{ color: '#00FFFF' }}>Distribution Overview</h3>
+              <p className="text-xs" style={{ color: '#FF6B35' }}>Statistical breakdown by status, priority, and type</p>
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse shadow-lg shadow-blue-500/50"></div>
+              <span className="text-xs text-gray-300 font-medium">Pie Charts</span>
+            </div>
           </div>
-        </div>
+          
+          <div className="space-y-8">
+            {/* Status Distribution */}
+            <div className="flex flex-col items-center">
+              <h4 className="text-base font-semibold text-white mb-4 tracking-wide">Status Distribution</h4>
+              <div className="w-full">
+                <PieChart 
+                  title=""
+                  data={[
+                    { label: 'Proposed', value: stats.proposed, color: '#22d3ee' },
+                    { label: 'Planned', value: stats.planned, color: '#c084fc' },
+                    { label: 'In Progress', value: stats.inProgress, color: '#facc15' },
+                    { label: 'Completed', value: stats.completed, color: '#4ade80' },
+                    { label: 'Blocked', value: stats.blocked, color: '#ef4444' }
+                  ]}
+                />
+              </div>
+            </div>
 
-        {/* Third Row - Node Distribution */}
-        <div className="flex flex-col items-center">
-          <h2 className="text-2xl font-bold text-white mb-4">Node Distribution</h2>
-          <div className="w-full">
-            <PieChart 
-              title=""
-              data={Object.entries(stats.typeStats)
-                .filter(([, count]) => count > 0)
-                .map(([type, count]) => ({
-                  label: formatLabel(type),
-                  value: count,
-                  color: type === 'EPIC' ? '#c084fc' : 
-                         type === 'MILESTONE' ? '#fb923c' :
-                         type === 'OUTCOME' ? '#818cf8' :
-                         type === 'FEATURE' ? '#38bdf8' :
-                         type === 'TASK' ? '#4ade80' :
-                         type === 'BUG' ? '#ef4444' :
-                         type === 'IDEA' ? '#fde047' :
-                         type === 'RESEARCH' ? '#2dd4bf' : '#6b7280'
-                }))}
-            />
-          </div>
-        </div>
+            {/* Priority Distribution */}
+            <div className="flex flex-col items-center">
+              <h4 className="text-base font-semibold text-white mb-4 tracking-wide">Priority Distribution</h4>
+              <div className="w-full">
+                <PieChart 
+                  title=""
+                  data={[
+                    { label: 'Critical', value: stats.priorityStats.critical, color: '#ef4444' },
+                    { label: 'High', value: stats.priorityStats.high, color: '#f97316' },
+                    { label: 'Moderate', value: stats.priorityStats.moderate, color: '#eab308' },
+                    { label: 'Low', value: stats.priorityStats.low, color: '#3b82f6' },
+                    { label: 'Minimal', value: stats.priorityStats.minimal, color: '#22c55e' }
+                  ]}
+                />
+              </div>
+            </div>
 
-        {/* First Radar Row - Task Distribution Radar */}
-        <div className="mt-12">
-          <div className="flex flex-col items-center">
-            <h2 className="text-2xl font-bold text-white mb-4">Task Category Distribution</h2>
-            <div className="w-full">
-              <TaskDistributionRadar showLegend={false} />
+            {/* Node Distribution */}
+            <div className="flex flex-col items-center">
+              <h4 className="text-base font-semibold text-white mb-4 tracking-wide">Node Distribution</h4>
+              <div className="w-full">
+                <PieChart 
+                  title=""
+                  data={Object.entries(stats.typeStats)
+                    .filter(([, count]) => count > 0)
+                    .map(([type, count]) => ({
+                      label: formatLabel(type),
+                      value: count,
+                      color: type === 'EPIC' ? '#c084fc' : 
+                             type === 'MILESTONE' ? '#fb923c' :
+                             type === 'OUTCOME' ? '#818cf8' :
+                             type === 'FEATURE' ? '#38bdf8' :
+                             type === 'TASK' ? '#4ade80' :
+                             type === 'BUG' ? '#ef4444' :
+                             type === 'IDEA' ? '#fde047' :
+                             type === 'RESEARCH' ? '#2dd4bf' : '#6b7280'
+                    }))}
+                />
+              </div>
             </div>
           </div>
         </div>
 
-      </div>
-      
-      {/* Second Radar Row - Priority Distribution Radar */}
-      <div className="mt-12">
-        <div className="flex flex-col items-center">
-          <h2 className="text-2xl font-bold text-white mb-4">Priority Category Distribution</h2>
-          <div className="w-full">
-            <PriorityDistributionRadar showLegend={false} />
+        {/* Radar Charts Container */}
+        <div className="bg-gradient-to-br from-gray-900 to-gray-800 border border-gray-600 rounded-lg p-6 shadow-xl hover:shadow-2xl transition-all duration-300 hover:border-gray-500">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-lg font-semibold" style={{ color: 'hotpink' }}>Radar Analysis</h3>
+              <p className="text-xs" style={{ color: 'goldenrod' }}>Multi-dimensional data patterns</p>
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-lg shadow-green-500/50"></div>
+              <span className="text-xs text-gray-300 font-medium">Radar Charts</span>
+            </div>
           </div>
-        </div>
-      </div>
-      
-      {/* Third Radar Row - Node Distribution Radar */}
-      <div className="mt-12">
-        <div className="flex flex-col items-center">
-          <h2 className="text-2xl font-bold text-white mb-4">Node Category Distribution</h2>
-          <div className="w-full">
-            <NodeDistributionRadar showLegend={false} />
+
+          <div className="space-y-8">
+            {/* Task Category Distribution Radar */}
+            <div className="flex flex-col items-center">
+              <h4 className="text-base font-semibold text-white mb-4 tracking-wide">Task Category Distribution</h4>
+              <div className="w-full">
+                <TaskDistributionRadar showLegend={false} />
+              </div>
+            </div>
+
+            {/* Priority Category Distribution Radar */}
+            <div className="flex flex-col items-center">
+              <h4 className="text-base font-semibold text-white mb-4 tracking-wide">Priority Category Distribution</h4>
+              <div className="w-full">
+                <PriorityDistributionRadar showLegend={false} />
+              </div>
+            </div>
+
+            {/* Node Category Distribution Radar */}
+            <div className="flex flex-col items-center">
+              <h4 className="text-base font-semibold text-white mb-4 tracking-wide">Node Category Distribution</h4>
+              <div className="w-full">
+                <NodeDistributionRadar showLegend={false} />
+              </div>
+            </div>
           </div>
         </div>
       </div>
