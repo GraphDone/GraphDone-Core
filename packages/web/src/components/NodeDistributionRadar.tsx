@@ -1,29 +1,26 @@
 import { useMemo, useState } from 'react';
-import { ZoomIn, ZoomOut, RotateCcw, Flame, Zap, Triangle, Circle, ArrowDown } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCcw, Layers, Trophy, Target, Sparkles, ListTodo, AlertTriangle, Lightbulb, Microscope } from 'lucide-react';
 import { RadarChart } from './RadarChart';
 import { useGraph } from '../contexts/GraphContext';
 import { useQuery, gql } from '@apollo/client';
 
-const GET_PRIORITY_DISTRIBUTION = gql`
-  query GetPriorityDistribution($graphId: ID) {
+const GET_NODE_DISTRIBUTION = gql`
+  query GetNodeDistribution($graphId: ID) {
     workItems(where: { graph: { id: $graphId } }) {
-      priorityExec
-      priorityIndiv
-      priorityComm
-      priorityComp
+      type
     }
   }
 `;
 
-interface PriorityDistributionRadarProps {
+interface NodeDistributionRadarProps {
   className?: string;
   showLegend?: boolean;
 }
 
-export function PriorityDistributionRadar({ className = '', showLegend = true }: PriorityDistributionRadarProps) {
+export function NodeDistributionRadar({ className = '', showLegend = true }: NodeDistributionRadarProps) {
   const { currentGraph } = useGraph();
   const [zoomLevel, setZoomLevel] = useState(1);
-  const { data: queryData, loading, error } = useQuery(GET_PRIORITY_DISTRIBUTION, {
+  const { data: queryData, loading, error } = useQuery(GET_NODE_DISTRIBUTION, {
     variables: { graphId: currentGraph?.id },
     skip: !currentGraph?.id
   });
@@ -43,49 +40,50 @@ export function PriorityDistributionRadar({ className = '', showLegend = true }:
   const radarData = useMemo(() => {
     if (!queryData?.workItems) return [];
 
-    // Calculate priority levels based on composite priority
-    const priorityCounts = {
-      critical: 0,
-      high: 0,
-      moderate: 0,
-      low: 0,
-      minimal: 0
-    };
+    // Count nodes by type
+    const typeCounts: { [key: string]: number } = {};
 
     queryData.workItems.forEach((item: any) => {
-      // Calculate composite priority (average of all priorities)
-      const compositePriority = (
-        (item.priorityExec || 0) + 
-        (item.priorityIndiv || 0) + 
-        (item.priorityComm || 0) + 
-        (item.priorityComp || 0)
-      ) / 4;
-
-      if (compositePriority >= 0.8) {
-        priorityCounts.critical++;
-      } else if (compositePriority >= 0.6) {
-        priorityCounts.high++;
-      } else if (compositePriority >= 0.4) {
-        priorityCounts.moderate++;
-      } else if (compositePriority >= 0.2) {
-        priorityCounts.low++;
-      } else {
-        priorityCounts.minimal++;
-      }
+      const type = item.type;
+      typeCounts[type] = (typeCounts[type] || 0) + 1;
     });
 
-    // Priority colors matching the pie chart
-    const priorityData = [
-      { axis: 'Critical', value: priorityCounts.critical, color: '#ef4444' },
-      { axis: 'High', value: priorityCounts.high, color: '#f97316' },
-      { axis: 'Moderate', value: priorityCounts.moderate, color: '#eab308' },
-      { axis: 'Low', value: priorityCounts.low, color: '#3b82f6' },
-      { axis: 'Minimal', value: priorityCounts.minimal, color: '#22c55e' }
-    ].filter(item => item.value > 0); // Only show priorities with tasks
+    // Format label function
+    const formatLabel = (type: string) => {
+      switch(type) {
+        case 'EPIC': return 'Epic';
+        case 'MILESTONE': return 'Milestone';
+        case 'OUTCOME': return 'Outcome';
+        case 'FEATURE': return 'Feature';
+        case 'TASK': return 'Task';
+        case 'BUG': return 'Bug';
+        case 'IDEA': return 'Idea';
+        case 'RESEARCH': return 'Research';
+        default: return type.charAt(0) + type.slice(1).toLowerCase();
+      }
+    };
 
-    const maxValue = Math.max(...priorityData.map(item => item.value), 1);
+    // Node type colors and order matching the pie chart exactly
+    const typeOrder = ['EPIC', 'MILESTONE', 'OUTCOME', 'FEATURE', 'TASK', 'BUG', 'IDEA', 'RESEARCH'];
     
-    return priorityData.map(item => ({
+    const nodeTypeData = typeOrder
+      .filter(type => typeCounts[type] > 0)
+      .map(type => ({
+        axis: formatLabel(type),
+        value: typeCounts[type],
+        color: type === 'EPIC' ? '#c084fc' : 
+               type === 'MILESTONE' ? '#fb923c' :
+               type === 'OUTCOME' ? '#818cf8' :
+               type === 'FEATURE' ? '#38bdf8' :
+               type === 'TASK' ? '#4ade80' :
+               type === 'BUG' ? '#ef4444' :
+               type === 'IDEA' ? '#fde047' :
+               type === 'RESEARCH' ? '#2dd4bf' : '#6b7280'
+      }));
+
+    const maxValue = Math.max(...nodeTypeData.map(item => item.value), 1);
+    
+    return nodeTypeData.map(item => ({
       ...item,
       maxValue: maxValue
     }));
@@ -102,7 +100,7 @@ export function PriorityDistributionRadar({ className = '', showLegend = true }:
   if (error || !queryData) {
     return (
       <div className={`${className} flex items-center justify-center h-64 text-gray-400`}>
-        <p>Unable to load priority distribution data</p>
+        <p>Unable to load node distribution data</p>
       </div>
     );
   }
@@ -111,7 +109,7 @@ export function PriorityDistributionRadar({ className = '', showLegend = true }:
     return (
       <div className={`${className} flex items-center justify-center h-64 text-gray-400`}>
         <div className="text-center">
-          <p className="mb-2">No priority data found</p>
+          <p className="mb-2">No node data found</p>
           <p className="text-sm">Create some work items to see the distribution</p>
         </div>
       </div>
@@ -120,10 +118,10 @@ export function PriorityDistributionRadar({ className = '', showLegend = true }:
 
   return (
     <div className={className}>
-      {/* Priority Distribution */}
+      {/* Node Distribution */}
       <div className="bg-gray-800 border border-gray-600 rounded-lg p-6">
         <div className="mb-4">
-          <h3 className="text-lg font-semibold text-white mb-2">Priority Distribution</h3>
+          <h3 className="text-lg font-semibold text-white mb-2">Node Distribution</h3>
         </div>
         <div className="relative">
           {/* Zoom Controls */}
@@ -164,24 +162,27 @@ export function PriorityDistributionRadar({ className = '', showLegend = true }:
                 width={500}
                 height={500}
                 margin={80}
-                radarColor="#8A2BE2"
+                radarColor="#CD5C5C"
               />
             </div>
           </div>
         </div>
         {showLegend && (
           <div className="mt-6">
-            <h4 className="text-sm font-semibold text-gray-300 mb-3">Priority Breakdown</h4>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-3">
+            <h4 className="text-sm font-semibold text-gray-300 mb-3">Node Type Breakdown</h4>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
               {radarData.map((item, index) => {
                 const getIcon = (axis: string) => {
                   switch(axis) {
-                    case 'Critical': return <Flame className="h-5 w-5" style={{ color: item.color || '#ef4444' }} />;
-                    case 'High': return <Zap className="h-5 w-5" style={{ color: item.color || '#f97316' }} />;
-                    case 'Moderate': return <Triangle className="h-5 w-5" style={{ color: item.color || '#eab308' }} />;
-                    case 'Low': return <Circle className="h-5 w-5" style={{ color: item.color || '#3b82f6' }} />;
-                    case 'Minimal': return <ArrowDown className="h-5 w-5" style={{ color: item.color || '#22c55e' }} />;
-                    default: return <div className="w-4 h-4 rounded-full" style={{ backgroundColor: item.color || '#4ade80' }}></div>;
+                    case 'Epic': return <Layers className="h-5 w-5" style={{ color: item.color || '#c084fc' }} />;
+                    case 'Milestone': return <Trophy className="h-5 w-5" style={{ color: item.color || '#fb923c' }} />;
+                    case 'Outcome': return <Target className="h-5 w-5" style={{ color: item.color || '#818cf8' }} />;
+                    case 'Feature': return <Sparkles className="h-5 w-5" style={{ color: item.color || '#38bdf8' }} />;
+                    case 'Task': return <ListTodo className="h-5 w-5" style={{ color: item.color || '#4ade80' }} />;
+                    case 'Bug': return <AlertTriangle className="h-5 w-5" style={{ color: item.color || '#ef4444' }} />;
+                    case 'Idea': return <Lightbulb className="h-5 w-5" style={{ color: item.color || '#fde047' }} />;
+                    case 'Research': return <Microscope className="h-5 w-5" style={{ color: item.color || '#2dd4bf' }} />;
+                    default: return <div className="w-4 h-4 rounded-full" style={{ backgroundColor: item.color || '#6b7280' }}></div>;
                   }
                 };
                 
@@ -193,7 +194,7 @@ export function PriorityDistributionRadar({ className = '', showLegend = true }:
                     </div>
                     <div className="text-right">
                       <span className="text-xl font-bold text-white">{item.value}</span>
-                      <span className="text-base text-gray-400 ml-1">tasks</span>
+                      <span className="text-base text-gray-400 ml-1">nodes</span>
                     </div>
                   </div>
                 );

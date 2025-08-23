@@ -6,6 +6,7 @@ interface RadarDataPoint {
   value: number;
   maxValue: number;
   color?: string;
+  icon?: React.ReactNode;
 }
 
 interface RadarChartProps {
@@ -15,6 +16,7 @@ interface RadarChartProps {
   margin?: number;
   levels?: number;
   className?: string;
+  radarColor?: string;
 }
 
 export function RadarChart({
@@ -23,7 +25,8 @@ export function RadarChart({
   height = 300,
   margin = 50,
   levels = 5,
-  className = ''
+  className = '',
+  radarColor = 'rgb(156, 163, 175)'
 }: RadarChartProps) {
   const svgRef = useRef<SVGSVGElement>(null);
 
@@ -131,12 +134,16 @@ export function RadarChart({
       })
       .curve(d3.curveLinearClosed);
 
-    // Add the radar area
+    // Add the radar area with custom color
+    const fillColor = radarColor.startsWith('rgb') 
+      ? radarColor.replace('rgb(', 'rgba(').replace(')', ', 0.1)')
+      : `${radarColor}33`; // Add alpha for hex colors
+      
     g.append('path')
       .datum(data)
       .attr('d', radarLine)
-      .attr('fill', 'rgba(128, 128, 0, 0.2)')
-      .attr('stroke', '#808000')
+      .attr('fill', fillColor)
+      .attr('stroke', radarColor)
       .attr('stroke-width', 2);
 
     // Add data points with status-based colors
