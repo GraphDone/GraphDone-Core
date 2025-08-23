@@ -9,7 +9,7 @@ let sequenceCounter = 0;
 const MAX_SEQUENCE = 999999; // Reset after this to prevent overflow
 
 // Process start time to ensure uniqueness across restarts
-const PROCESS_START_TIME = Date.now();
+// const PROCESS_START_TIME = Date.now();
 
 // Machine ID based on environment (or generate random one)
 const MACHINE_ID = process.env.MACHINE_ID || randomBytes(3).toString('hex');

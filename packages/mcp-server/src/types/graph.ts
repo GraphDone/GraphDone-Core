@@ -71,10 +71,7 @@ export interface GraphFilters {
   offset?: number;
 }
 
-// Neo4j response types
-export interface Neo4jInteger {
-  toNumber(): number;
-}
+// Neo4j response types (using imported Neo4jInteger from driver)
 
 export interface Neo4jDateTime {
   toString(): string;
@@ -96,6 +93,7 @@ export interface MCPContent {
 
 export interface MCPResponse {
   content: MCPContent[];
+  isError?: boolean;
 }
 
 // Neo4j parameter types - using Neo4jValue for type safety
@@ -204,4 +202,120 @@ export interface WorkloadPredictions {
   completion_trends?: string;
   bottleneck_predictions?: unknown[];
   capacity_recommendations?: unknown[];
+}
+
+// MCP Interface Args - exported for index.ts
+export interface UpdatePrioritiesArgs {
+  node_id: string;
+  priority_executive?: number;
+  priority_individual?: number;
+  priority_community?: number;
+  recalculate_computed?: boolean;
+}
+
+export interface BulkUpdatePrioritiesArgs {
+  updates: Array<{
+    node_id: string;
+    priority_executive?: number;
+    priority_individual?: number;
+    priority_community?: number;
+  }>;
+  recalculate_all?: boolean;
+}
+
+export interface GetPriorityInsightsArgs {
+  filters?: {
+    min_priority?: number;
+    priority_type?: 'executive' | 'individual' | 'community' | 'computed';
+    node_types?: string[];
+    status?: string[];
+  };
+  include_statistics?: boolean;
+  include_trends?: boolean;
+}
+
+export interface GetContributorPrioritiesArgs {
+  contributor_id: string;
+  priority_type?: 'all' | 'executive' | 'individual' | 'community' | 'composite';
+  status_filter?: NodeStatus[];
+  limit?: number;
+  include_dependencies?: boolean;
+}
+
+export interface GetContributorWorkloadArgs {
+  contributor_id: string;
+  include_type_distribution?: boolean;
+  include_priority_distribution?: boolean;
+  include_projects?: boolean;
+  include_timeline?: boolean;
+  time_window_days?: number;
+}
+
+export interface GetCollaborationNetworkArgs {
+  focus_contributor?: string;
+  project_scope?: string;
+  time_window_days?: number;
+  collaboration_strength?: 'all' | 'strong' | 'moderate' | 'weak';
+  include_network_metrics?: boolean;
+  include_recommendations?: boolean;
+}
+
+export interface BulkOperationsArgs {
+  operations: Array<{
+    type: 'create_node' | 'update_node' | 'create_edge' | 'delete_edge';
+    params: Record<string, unknown>;
+  }>;
+  transaction?: boolean;
+  rollback_on_error?: boolean;
+}
+
+export interface CreateGraphArgs {
+  name: string;
+  description?: string;
+  type?: GraphType;
+  settings?: GraphSettings;
+  parentGraphId?: string;
+  teamId?: string;
+  isShared?: boolean;
+}
+
+export interface ListGraphsArgs {
+  type?: GraphType;
+  status?: GraphStatus;
+  teamId?: string;
+  isShared?: boolean;
+  limit?: number;
+  offset?: number;
+}
+
+export interface GetGraphDetailsArgs {
+  graphId: string;
+}
+
+export interface UpdateGraphArgs {
+  graphId: string;
+  name?: string;
+  description?: string;
+  type?: GraphType;
+  settings?: GraphSettings;
+  isShared?: boolean;
+  status?: GraphStatus;
+}
+
+export interface DeleteGraphArgs {
+  graphId: string;
+  force?: boolean;
+}
+
+export interface ArchiveGraphArgs {
+  graphId: string;
+  reason?: string;
+}
+
+export interface CloneGraphArgs {
+  sourceGraphId: string;
+  newName: string;
+  includeNodes?: boolean;
+  includeEdges?: boolean;
+  newTeamId?: string;
 }
