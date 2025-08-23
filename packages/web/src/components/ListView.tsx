@@ -1152,53 +1152,49 @@ export function ListView() {
     }
 
     return (
-      <div className="bg-black rounded-lg p-8 border border-gray-700 min-h-[600px] min-w-[600px] relative">
-        <h3 className="text-xl font-semibold text-white mb-2 text-center">{title}</h3>
-        
-        {/* Zoom Controls */}
-        <div className="absolute top-8 right-8 flex flex-col items-center space-y-2">
-          <div className="flex space-x-1">
+      <div className="bg-gray-800 border border-gray-600 rounded-lg p-6">
+        <div className="mb-4">
+          <h3 className="text-lg font-semibold text-white mb-2">{title}</h3>
+        </div>
+        <div className="relative">
+          {/* Zoom Controls */}
+          <div className="absolute top-4 right-4 flex flex-col gap-2 z-10">
             <button
               onClick={handleZoomOut}
-              className="w-10 h-10 bg-gray-700 hover:bg-gray-600 text-white rounded-lg flex items-center justify-center text-xl font-bold transition-colors"
+              className="p-2 bg-gray-600 hover:bg-gray-500 text-white rounded"
               title="Zoom Out"
             >
-              −
+              <ZoomOut className="h-4 w-4" />
             </button>
             <button
               onClick={handleZoomIn}
-              className="w-10 h-10 bg-gray-700 hover:bg-gray-600 text-white rounded-lg flex items-center justify-center text-xl font-bold transition-colors"
+              className="p-2 bg-gray-600 hover:bg-gray-500 text-white rounded"
               title="Zoom In"
             >
-              +
+              <ZoomIn className="h-4 w-4" />
+            </button>
+            <button
+              onClick={handleResetLayout}
+              className="p-2 bg-gray-600 hover:bg-gray-500 text-white rounded"
+              title="Reset Zoom"
+            >
+              <RotateCcw className="h-4 w-4" />
             </button>
           </div>
-          <div className="text-xs text-gray-400 text-center mb-2">
-            {(zoomLevel * 100).toFixed(0)}%
-          </div>
-          <button
-            onClick={handleResetLayout}
-            className="flex items-center space-x-1 px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs transition-colors"
-            title="Reset Layout"
-          >
-            <RotateCcw className="h-3 w-3" />
-            <span>Reset</span>
-          </button>
-        </div>
         
-        <div className="flex flex-col items-center">
-          <div className="overflow-hidden" style={{ width: '400px', height: '400px' }}>
-            <svg 
-              width="400" 
-              height="400" 
-              viewBox="0 0 100 100" 
-              className="mt-4 mb-16"
+          <div className="flex justify-center">
+            <div 
               style={{ 
                 transform: `scale(${zoomLevel})`,
                 transformOrigin: 'center',
-                transition: 'transform 0.3s ease'
+                transition: 'transform 0.2s ease-in-out'
               }}
             >
+              <svg 
+                width="500" 
+                height="500" 
+                viewBox="0 0 100 100"
+              >
               {filteredData.map((item, index) => {
               const percentage = (item.value / total) * 100;
               const path = createPath(percentage, cumulativePercentage);
@@ -1222,165 +1218,62 @@ export function ListView() {
                 </g>
               );
             })}
-            </svg>
+              </svg>
+            </div>
           </div>
-          {/* Legend section */}
-          <div className="mt-8">
+        </div>
+        {/* Legend section */}
+        <div className="mt-6">
           {(() => {
-            // Determine chart type based on data labels
-            const isStatusChart = filteredData.some(item => ['Proposed', 'Planned', 'In Progress', 'Completed', 'Blocked'].includes(item.label));
+            // Determine chart type and set appropriate grid
             const isPriorityChart = filteredData.some(item => ['Critical', 'High', 'Moderate', 'Low', 'Minimal'].includes(item.label));
+            const isStatusChart = filteredData.some(item => ['Proposed', 'Planned', 'In Progress', 'Completed', 'Blocked'].includes(item.label));
+            const gridCols = (isPriorityChart || isStatusChart) ? "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-3" : "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3";
             
-            if (isStatusChart) {
-              // Status Distribution - 2 lines with icons
-              return (
-                <div className="space-y-3">
-                  {/* First row - 3 items */}
-                  <div className="flex justify-center gap-x-6">
-                    {filteredData.slice(0, 3).map((item, index) => {
-                      const percentage = ((item.value / total) * 100).toFixed(1);
-                      const getIcon = (label: string) => {
-                        switch(label) {
-                          case 'Proposed': return <ClipboardList className="h-4 w-4" style={{ color: item.color }} />;
-                          case 'Planned': return <Calendar className="h-4 w-4" style={{ color: item.color }} />;
-                          case 'In Progress': return <Clock className="h-4 w-4" style={{ color: item.color }} />;
-                          case 'Completed': return <CheckCircle className="h-4 w-4" style={{ color: item.color }} />;
-                          case 'Blocked': return <AlertCircle className="h-4 w-4" style={{ color: item.color }} />;
-                          default: return <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>;
-                        }
-                      };
-                      return (
-                        <div key={index} className="flex items-center space-x-2">
-                          {getIcon(item.label)}
-                          <span className="text-sm font-medium text-gray-300">{item.label}</span>
-                          <span className="text-sm font-medium text-gray-400">({percentage}%)</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  {/* Second row - remaining items */}
-                  {filteredData.length > 3 && (
-                    <div className="flex justify-center gap-x-6">
-                      {filteredData.slice(3).map((item, index) => {
-                        const percentage = ((item.value / total) * 100).toFixed(1);
-                        const getIcon = (label: string) => {
-                          switch(label) {
-                            case 'Proposed': return <ClipboardList className="h-4 w-4" style={{ color: item.color }} />;
-                            case 'Planned': return <Calendar className="h-4 w-4" style={{ color: item.color }} />;
-                            case 'In Progress': return <Clock className="h-4 w-4" style={{ color: item.color }} />;
-                            case 'Completed': return <CheckCircle className="h-4 w-4" style={{ color: item.color }} />;
-                            case 'Blocked': return <AlertCircle className="h-4 w-4" style={{ color: item.color }} />;
-                            default: return <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>;
-                          }
-                        };
-                        return (
-                          <div key={index + 3} className="flex items-center space-x-2">
-                            {getIcon(item.label)}
-                            <span className="text-sm font-medium text-gray-300">{item.label}</span>
-                            <span className="text-sm font-medium text-gray-400">({percentage}%)</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            } else if (isPriorityChart) {
-              // Priority Distribution - 2 lines layout with icons
-              return (
-                <div className="space-y-3">
-                  {/* First row - 3 items */}
-                  <div className="flex justify-center gap-x-6">
-                    {filteredData.slice(0, 3).map((item, index) => {
-                      const percentage = ((item.value / total) * 100).toFixed(1);
-                      const getIcon = (label: string) => {
-                        switch(label) {
-                          case 'Critical': return <Flame className="h-4 w-4" style={{ color: item.color }} />;
-                          case 'High': return <Zap className="h-4 w-4" style={{ color: item.color }} />;
-                          case 'Moderate': return <Triangle className="h-4 w-4" style={{ color: item.color }} />;
-                          case 'Low': return <Circle className="h-4 w-4" style={{ color: item.color }} />;
-                          case 'Minimal': return <ArrowDown className="h-4 w-4" style={{ color: item.color }} />;
-                          default: return <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>;
-                        }
-                      };
-                      return (
-                        <div key={index} className="flex items-center space-x-2">
-                          {getIcon(item.label)}
-                          <span className="text-sm font-medium text-gray-300">{item.label}</span>
-                          <span className="text-sm font-medium text-gray-400">({percentage}%)</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  {/* Second row - remaining items */}
-                  {filteredData.length > 3 && (
-                    <div className="flex justify-center gap-x-6">
-                      {filteredData.slice(3).map((item, index) => {
-                        const percentage = ((item.value / total) * 100).toFixed(1);
-                        const getIcon = (label: string) => {
-                          switch(label) {
-                            case 'Critical': return <Flame className="h-4 w-4" style={{ color: item.color }} />;
-                            case 'High': return <Zap className="h-4 w-4" style={{ color: item.color }} />;
-                            case 'Moderate': return <Triangle className="h-4 w-4" style={{ color: item.color }} />;
-                            case 'Low': return <Circle className="h-4 w-4" style={{ color: item.color }} />;
-                            case 'Minimal': return <ArrowDown className="h-4 w-4" style={{ color: item.color }} />;
-                            default: return <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>;
-                          }
-                        };
-                        return (
-                          <div key={index + 3} className="flex items-center space-x-2">
-                            {getIcon(item.label)}
-                            <span className="text-sm font-medium text-gray-300">{item.label}</span>
-                            <span className="text-sm font-medium text-gray-400">({percentage}%)</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            } else {
-              // Node Distribution - 3 items per line layout
-              const itemsPerRow = 3;
-              const rows = [];
-              for (let i = 0; i < filteredData.length; i += itemsPerRow) {
-                rows.push(filteredData.slice(i, i + itemsPerRow));
-              }
+            return (
+              <div className={gridCols}>
+                {filteredData.map((item, index) => {
+                  const percentage = ((item.value / total) * 100).toFixed(1);
+                  const getIcon = (label: string) => {
+                switch(label) {
+                  case 'Proposed': return <ClipboardList className="h-5 w-5" style={{ color: item.color }} />;
+                  case 'Planned': return <Calendar className="h-5 w-5" style={{ color: item.color }} />;
+                  case 'In Progress': return <Clock className="h-5 w-5" style={{ color: item.color }} />;
+                  case 'Completed': return <CheckCircle className="h-5 w-5" style={{ color: item.color }} />;
+                  case 'Blocked': return <AlertCircle className="h-5 w-5" style={{ color: item.color }} />;
+                  case 'Critical': return <Flame className="h-5 w-5" style={{ color: item.color }} />;
+                  case 'High': return <Zap className="h-5 w-5" style={{ color: item.color }} />;
+                  case 'Moderate': return <Triangle className="h-5 w-5" style={{ color: item.color }} />;
+                  case 'Low': return <Circle className="h-5 w-5" style={{ color: item.color }} />;
+                  case 'Minimal': return <ArrowDown className="h-5 w-5" style={{ color: item.color }} />;
+                  case 'Epic': return <Layers className="h-5 w-5" style={{ color: item.color }} />;
+                  case 'Milestone': return <Trophy className="h-5 w-5" style={{ color: item.color }} />;
+                  case 'Outcome': return <Target className="h-5 w-5" style={{ color: item.color }} />;
+                  case 'Feature': return <Sparkles className="h-5 w-5" style={{ color: item.color }} />;
+                  case 'Task': return <ListTodo className="h-5 w-5" style={{ color: item.color }} />;
+                  case 'Bug': return <AlertTriangle className="h-5 w-5" style={{ color: item.color }} />;
+                  case 'Idea': return <Lightbulb className="h-5 w-5" style={{ color: item.color }} />;
+                  case 'Research': return <Microscope className="h-5 w-5" style={{ color: item.color }} />;
+                  default: return <div className="w-4 h-4 rounded-full" style={{ backgroundColor: item.color }}></div>;
+                }
+              };
               
               return (
-                <div className="space-y-3">
-                  {rows.map((row, rowIndex) => (
-                    <div key={rowIndex} className="flex justify-center gap-x-6">
-                      {row.map((item, index) => {
-                        const percentage = ((item.value / total) * 100).toFixed(1);
-                        const getIcon = (label: string) => {
-                          switch(label) {
-                            case 'Epic': return <Layers className="h-4 w-4" style={{ color: item.color }} />;
-                            case 'Milestone': return <Trophy className="h-4 w-4" style={{ color: item.color }} />;
-                            case 'Outcome': return <Target className="h-4 w-4" style={{ color: item.color }} />;
-                            case 'Feature': return <Sparkles className="h-4 w-4" style={{ color: item.color }} />;
-                            case 'Task': return <ListTodo className="h-4 w-4" style={{ color: item.color }} />;
-                            case 'Bug': return <AlertTriangle className="h-4 w-4" style={{ color: item.color }} />;
-                            case 'Idea': return <Lightbulb className="h-4 w-4" style={{ color: item.color }} />;
-                            case 'Research': return <Microscope className="h-4 w-4" style={{ color: item.color }} />;
-                            default: return <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>;
-                          }
-                        };
-                        return (
-                          <div key={rowIndex * itemsPerRow + index} className="flex items-center space-x-2">
-                            {getIcon(item.label)}
-                            <span className="text-sm font-medium text-gray-300">{item.label}</span>
-                            <span className="text-sm font-medium text-gray-400">({percentage}%)</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ))}
+                <div key={index} className="bg-gray-700 rounded p-3">
+                  <div className="flex items-center mb-2">
+                    {getIcon(item.label)}
+                    <span className="text-gray-200 text-base ml-2">{item.label}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xl font-bold text-white">{item.value}</span>
+                    <span className="text-base text-gray-400 ml-1">({percentage}%)</span>
+                  </div>
                 </div>
-              );
-            }
+                  );
+                })}
+              </div>
+            );
           })()}
-          </div>
         </div>
       </div>
     );
@@ -1521,7 +1414,7 @@ export function ListView() {
         {/* First Row - Status Distribution */}
         <div className="flex flex-col items-center">
           <h2 className="text-2xl font-bold text-white mb-4">Status Distribution</h2>
-          <div className="w-full max-w-[600px]">
+          <div className="w-full">
             <PieChart 
               title=""
               data={[
@@ -1538,7 +1431,7 @@ export function ListView() {
         {/* Second Row - Priority Distribution */}
         <div className="flex flex-col items-center">
           <h2 className="text-2xl font-bold text-white mb-4">Priority Distribution</h2>
-          <div className="w-full max-w-[600px]">
+          <div className="w-full">
             <PieChart 
               title=""
               data={[
@@ -1555,7 +1448,7 @@ export function ListView() {
         {/* Third Row - Node Distribution */}
         <div className="flex flex-col items-center">
           <h2 className="text-2xl font-bold text-white mb-4">Node Distribution</h2>
-          <div className="w-full max-w-[600px]">
+          <div className="w-full">
             <PieChart 
               title=""
               data={Object.entries(stats.typeStats)

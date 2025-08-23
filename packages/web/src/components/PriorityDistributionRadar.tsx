@@ -1,27 +1,29 @@
 import { useMemo, useState } from 'react';
-import { ZoomIn, ZoomOut, RotateCcw, ClipboardList, Calendar, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCcw, Flame, Zap, Triangle, Circle, ArrowDown } from 'lucide-react';
 import { RadarChart } from './RadarChart';
 import { useGraph } from '../contexts/GraphContext';
 import { useQuery, gql } from '@apollo/client';
 
-const GET_TASK_DISTRIBUTION = gql`
-  query GetTaskDistribution($graphId: ID) {
+const GET_PRIORITY_DISTRIBUTION = gql`
+  query GetPriorityDistribution($graphId: ID) {
     workItems(where: { graph: { id: $graphId } }) {
-      type
-      status
+      priorityExec
+      priorityIndiv
+      priorityComm
+      priorityComp
     }
   }
 `;
 
-interface TaskDistributionRadarProps {
+interface PriorityDistributionRadarProps {
   className?: string;
   showLegend?: boolean;
 }
 
-export function TaskDistributionRadar({ className = '', showLegend = true }: TaskDistributionRadarProps) {
+export function PriorityDistributionRadar({ className = '', showLegend = true }: PriorityDistributionRadarProps) {
   const { currentGraph } = useGraph();
   const [zoomLevel, setZoomLevel] = useState(1);
-  const { data: taskData, loading, error } = useQuery(GET_TASK_DISTRIBUTION, {
+  const { data: priorityData, loading, error } = useQuery(GET_PRIORITY_DISTRIBUTION, {
     variables: { graphId: currentGraph?.id },
     skip: !currentGraph?.id
   });
@@ -39,55 +41,55 @@ export function TaskDistributionRadar({ className = '', showLegend = true }: Tas
   };
 
   const radarData = useMemo(() => {
-    if (!taskData?.workItems) return [];
+    if (!priorityData?.workItems) return [];
 
-    // Count tasks by status using the same logic as ListView
-    const statusCounts = {
-      proposed: 0,
-      planned: 0,
-      inProgress: 0,
-      blocked: 0,
-      completed: 0
+    // Calculate priority levels based on composite priority
+    const priorityCounts = {
+      critical: 0,
+      high: 0,
+      moderate: 0,
+      low: 0,
+      minimal: 0
     };
 
-    taskData.workItems.forEach((item: any) => {
-      switch(item.status) {
-        case 'PROPOSED':
-          statusCounts.proposed++;
-          break;
-        case 'PLANNED':
-          statusCounts.planned++;
-          break;
-        case 'IN_PROGRESS':
-        case 'ACTIVE':
-          statusCounts.inProgress++;
-          break;
-        case 'BLOCKED':
-          statusCounts.blocked++;
-          break;
-        case 'COMPLETED':
-          statusCounts.completed++;
-          break;
+    priorityData.workItems.forEach((item: any) => {
+      // Calculate composite priority (average of all priorities)
+      const compositePriority = (
+        (item.priorityExec || 0) + 
+        (item.priorityIndiv || 0) + 
+        (item.priorityComm || 0) + 
+        (item.priorityComp || 0)
+      ) / 4;
+
+      if (compositePriority >= 0.8) {
+        priorityCounts.critical++;
+      } else if (compositePriority >= 0.6) {
+        priorityCounts.high++;
+      } else if (compositePriority >= 0.4) {
+        priorityCounts.moderate++;
+      } else if (compositePriority >= 0.2) {
+        priorityCounts.low++;
+      } else {
+        priorityCounts.minimal++;
       }
     });
 
-    // Status colors matching the pie chart
-    const statusData = [
-      { axis: 'Proposed', value: statusCounts.proposed, color: '#22d3ee' },
-      { axis: 'Planned', value: statusCounts.planned, color: '#c084fc' },
-      { axis: 'In Progress', value: statusCounts.inProgress, color: '#facc15' },
-      { axis: 'Completed', value: statusCounts.completed, color: '#4ade80' },
-      { axis: 'Blocked', value: statusCounts.blocked, color: '#ef4444' }
-    ].filter(item => item.value > 0); // Only show statuses with tasks
+    // Priority colors matching the pie chart
+    const priorityData = [
+      { axis: 'Critical', value: priorityCounts.critical, color: '#ef4444' },
+      { axis: 'High', value: priorityCounts.high, color: '#f97316' },
+      { axis: 'Moderate', value: priorityCounts.moderate, color: '#eab308' },
+      { axis: 'Low', value: priorityCounts.low, color: '#22c55e' },
+      { axis: 'Minimal', value: priorityCounts.minimal, color: '#6b7280' }
+    ].filter(item => item.value > 0); // Only show priorities with tasks
 
-    const maxValue = Math.max(...statusData.map(item => item.value), 1);
+    const maxValue = Math.max(...priorityData.map(item => item.value), 1);
     
-    return statusData.map(item => ({
+    return priorityData.map(item => ({
       ...item,
       maxValue: maxValue
     }));
-  }, [taskData]);
-
+  }, [priorityData]);
 
   if (loading) {
     return (
@@ -97,10 +99,10 @@ export function TaskDistributionRadar({ className = '', showLegend = true }: Tas
     );
   }
 
-  if (error || !taskData) {
+  if (error || !priorityData) {
     return (
       <div className={`${className} flex items-center justify-center h-64 text-gray-400`}>
-        <p>Unable to load task distribution data</p>
+        <p>Unable to load priority distribution data</p>
       </div>
     );
   }
@@ -109,7 +111,7 @@ export function TaskDistributionRadar({ className = '', showLegend = true }: Tas
     return (
       <div className={`${className} flex items-center justify-center h-64 text-gray-400`}>
         <div className="text-center">
-          <p className="mb-2">No tasks found</p>
+          <p className="mb-2">No priority data found</p>
           <p className="text-sm">Create some work items to see the distribution</p>
         </div>
       </div>
@@ -118,10 +120,10 @@ export function TaskDistributionRadar({ className = '', showLegend = true }: Tas
 
   return (
     <div className={className}>
-      {/* Task Status Distribution */}
+      {/* Priority Distribution */}
       <div className="bg-gray-800 border border-gray-600 rounded-lg p-6">
         <div className="mb-4">
-          <h3 className="text-lg font-semibold text-white mb-2">Task Status Distribution</h3>
+          <h3 className="text-lg font-semibold text-white mb-2">Priority Distribution</h3>
         </div>
         <div className="relative">
           {/* Zoom Controls */}
@@ -168,16 +170,16 @@ export function TaskDistributionRadar({ className = '', showLegend = true }: Tas
         </div>
         {showLegend && (
           <div className="mt-6">
-            <h4 className="text-sm font-semibold text-gray-300 mb-3">Status Breakdown</h4>
+            <h4 className="text-sm font-semibold text-gray-300 mb-3">Priority Breakdown</h4>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-3">
               {radarData.map((item, index) => {
                 const getIcon = (axis: string) => {
                   switch(axis) {
-                    case 'Proposed': return <ClipboardList className="h-5 w-5" style={{ color: item.color || '#22d3ee' }} />;
-                    case 'Planned': return <Calendar className="h-5 w-5" style={{ color: item.color || '#c084fc' }} />;
-                    case 'In Progress': return <Clock className="h-5 w-5" style={{ color: item.color || '#facc15' }} />;
-                    case 'Completed': return <CheckCircle className="h-5 w-5" style={{ color: item.color || '#4ade80' }} />;
-                    case 'Blocked': return <AlertCircle className="h-5 w-5" style={{ color: item.color || '#ef4444' }} />;
+                    case 'Critical': return <Flame className="h-5 w-5" style={{ color: item.color || '#ef4444' }} />;
+                    case 'High': return <Zap className="h-5 w-5" style={{ color: item.color || '#f97316' }} />;
+                    case 'Moderate': return <Triangle className="h-5 w-5" style={{ color: item.color || '#eab308' }} />;
+                    case 'Low': return <Circle className="h-5 w-5" style={{ color: item.color || '#22c55e' }} />;
+                    case 'Minimal': return <ArrowDown className="h-5 w-5" style={{ color: item.color || '#6b7280' }} />;
                     default: return <div className="w-4 h-4 rounded-full" style={{ backgroundColor: item.color || '#4ade80' }}></div>;
                   }
                 };
