@@ -24,7 +24,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --legacy-peer-deps
 
       - name: Run ESLint
         run: npm run lint
@@ -59,6 +59,22 @@ jobs:
         ports:
           - 6379:6379
 
+      neo4j:
+        image: neo4j:5.15-community
+        env:
+          NEO4J_AUTH: neo4j/graphdone_test_password
+          NEO4J_PLUGINS: '["graph-data-science", "apoc"]'
+          NEO4J_dbms_security_procedures_unrestricted: "gds.*,apoc.*"
+          NEO4J_dbms_security_procedures_allowlist: "gds.*,apoc.*"
+        options: >-
+          --health-cmd "cypher-shell -u neo4j -p graphdone_test_password 'RETURN 1'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+        ports:
+          - 7474:7474
+          - 7687:7687
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -70,12 +86,15 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --legacy-peer-deps
 
       - name: Run tests with coverage
         run: npm run test:coverage
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/graphdone_test
+          NEO4J_URI: bolt://localhost:7687
+          NEO4J_USER: neo4j
+          NEO4J_PASSWORD: graphdone_test_password
 
       - name: Upload coverage reports
         uses: codecov/codecov-action@v3
@@ -84,10 +103,26 @@ jobs:
           flags: unittests
           fail_ci_if_error: false
 
-  build:
-    name: Build
+  mcp-server-test:
+    name: MCP Server Integration Tests
     runs-on: ubuntu-latest
-    needs: [lint-and-typecheck, test]
+    services:
+      neo4j:
+        image: neo4j:5.15-community
+        env:
+          NEO4J_AUTH: neo4j/graphdone_test_password
+          NEO4J_PLUGINS: '["graph-data-science", "apoc"]'
+          NEO4J_dbms_security_procedures_unrestricted: "gds.*,apoc.*"
+          NEO4J_dbms_security_procedures_allowlist: "gds.*,apoc.*"
+        options: >-
+          --health-cmd "cypher-shell -u neo4j -p graphdone_test_password 'RETURN 1'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+        ports:
+          - 7687:7687
+          - 7474:7474
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -99,7 +134,88 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --legacy-peer-deps
+
+      - name: Build MCP server
+        run: npm run build --workspace=@graphdone/mcp-server
+
+      - name: Run MCP server unit tests
+        run: npm run test --workspace=@graphdone/mcp-server
+        env:
+          NEO4J_URI: bolt://localhost:7687
+          NEO4J_USER: neo4j
+          NEO4J_PASSWORD: graphdone_test_password
+
+      - name: Run MCP server with health check
+        run: |
+          # Start MCP server in background
+          npm run start --workspace=@graphdone/mcp-server &
+          MCP_PID=$!
+          
+          # Wait for server to start
+          sleep 10
+          
+          # Test health endpoint
+          curl -f http://localhost:3128/health || (echo "Health check failed" && exit 1)
+          
+          # Test status endpoint
+          curl -f http://localhost:3128/status || (echo "Status check failed" && exit 1)
+          
+          # Verify capabilities count (should be 29 - 22 original + 7 graph management)
+          CAPABILITIES_COUNT=$(curl -s http://localhost:3128/health | jq '.capabilities | length')
+          if [ "$CAPABILITIES_COUNT" -ne 29 ]; then
+            echo "Expected 29 capabilities, got $CAPABILITIES_COUNT"
+            exit 1
+          fi
+          
+          # Clean up
+          kill $MCP_PID || true
+        env:
+          NEO4J_URI: bolt://localhost:7687
+          NEO4J_USER: neo4j
+          NEO4J_PASSWORD: graphdone_test_password
+
+      - name: Test garbage input resilience
+        run: |
+          # Run specific garbage input tests
+          npm run test --workspace=@graphdone/mcp-server -- garbage-input.test.ts
+        env:
+          NEO4J_URI: bolt://localhost:7687
+          NEO4J_USER: neo4j
+          NEO4J_PASSWORD: graphdone_test_password
+
+      - name: Run mock validation tests
+        run: |
+          # Run mock vs real database comparison tests
+          npm run test --workspace=@graphdone/mcp-server -- mock-validation.test.ts
+        env:
+          NEO4J_URI: bolt://localhost:7687
+          NEO4J_USER: neo4j
+          NEO4J_PASSWORD: graphdone_test_password
+
+      - name: Upload MCP test coverage
+        uses: codecov/codecov-action@v3
+        with:
+          directory: ./packages/mcp-server/coverage
+          flags: mcp-server
+          fail_ci_if_error: false
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: [lint-and-typecheck, test, mcp-server-test]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
 
       - name: Build packages
         run: npm run build
@@ -116,7 +232,7 @@ jobs:
   docker-build:
     name: Docker Build
     runs-on: ubuntu-latest
-    needs: [lint-and-typecheck, test]
+    needs: [lint-and-typecheck, test, mcp-server-test]
     if: github.event_name == 'push'
     steps:
       - name: Checkout code
@@ -157,7 +273,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --legacy-peer-deps
 
       - name: Run npm audit
         run: npm audit --audit-level=high

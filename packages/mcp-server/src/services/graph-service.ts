@@ -31,6 +31,13 @@ import {
   validateBulkOperation,
   validateMemoryUsage
 } from '../utils/sanitizer.js';
+import {
+  generateUniqueNodeId,
+  generateUniqueEdgeId,
+  generateUniqueGraphId,
+  validateIdFormat,
+  detectIdCollisions
+} from '../utils/id-generator.js';
 
 export interface PaginationInfo {
   total_count: number;
@@ -431,7 +438,8 @@ export class GraphService {
         validateBulkOperation(contributor_ids.length, 50);
       }
 
-      const id = `node_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      // Generate truly unique ID to prevent race conditions
+      const id = generateUniqueNodeId();
       const now = new Date().toISOString();
 
       const query = `
@@ -466,7 +474,13 @@ export class GraphService {
       };
 
       const result = await session.run(query, params);
-      const node = result.records[0].get('n').properties;
+      const rawNode = result.records[0].get('n').properties;
+      
+      // Parse metadata back from JSON string for data integrity
+      const node = {
+        ...rawNode,
+        metadata: rawNode.metadata ? JSON.parse(rawNode.metadata) : {}
+      };
 
       // Create relationships to contributors if specified
       if (contributor_ids.length > 0) {
@@ -557,7 +571,13 @@ export class GraphService {
         };
       }
 
-      const node = result.records[0].get('n').properties;
+      const rawNode = result.records[0].get('n').properties;
+      
+      // Parse metadata back from JSON string for data integrity
+      const node = {
+        ...rawNode,
+        metadata: rawNode.metadata ? JSON.parse(rawNode.metadata) : {}
+      };
 
       // Update contributor relationships if specified
       if (updates.contributor_ids !== undefined) {
@@ -801,8 +821,14 @@ export class GraphService {
       }
 
       const nodeRecord = nodeResult.records[0];
-      const node = nodeRecord.get('n').properties;
+      const rawNode = nodeRecord.get('n').properties;
       const contributors = nodeRecord.get('contributors').map((c: Neo4jContributor) => c.properties);
+      
+      // Parse metadata back from JSON string to object for data integrity
+      const node = {
+        ...rawNode,
+        metadata: rawNode.metadata ? JSON.parse(rawNode.metadata) : {}
+      };
       
       const totalRelationships = relCountResult.records[0]?.get('totalRelationships').toNumber() || 0;
       
@@ -1085,7 +1111,13 @@ export class GraphService {
         };
       }
 
-      const updatedNode = result.records[0].get('n').properties;
+      const rawUpdatedNode = result.records[0].get('n').properties;
+      
+      // Parse metadata back from JSON string for data integrity
+      const updatedNode = {
+        ...rawUpdatedNode,
+        metadata: rawUpdatedNode.metadata ? JSON.parse(rawUpdatedNode.metadata) : {}
+      };
 
       return {
         content: [{
@@ -1760,6 +1792,33 @@ export class GraphService {
         };
       }
 
+      // Validate bulk operation limits
+      validateBulkOperation(operations.length, 100);
+
+      // Check for ID collisions in create operations
+      const createNodeIds: string[] = [];
+      operations.forEach(op => {
+        if (op.type === 'create_node' && op.params?.id) {
+          createNodeIds.push(op.params.id);
+        }
+      });
+
+      if (createNodeIds.length > 0) {
+        const collisions = detectIdCollisions(createNodeIds);
+        if (collisions.length > 0) {
+          return {
+            content: [{
+              type: 'text',
+              text: JSON.stringify({
+                error: `ID collisions detected in bulk operation`,
+                collisions
+              }, null, 2)
+            }],
+            isError: true
+          };
+        }
+      }
+
       const results = [];
       let successCount = 0;
       let errorCount = 0;
@@ -1882,7 +1941,8 @@ export class GraphService {
       metadata = {}
     } = params;
 
-    const id = `node_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // Generate truly unique ID to prevent race conditions
+    const id = generateUniqueNodeId();
     const now = new Date().toISOString();
 
     const query = `
