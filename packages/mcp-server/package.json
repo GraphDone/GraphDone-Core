@@ -15,11 +15,20 @@
     "test:chaos:comprehensive": "vitest --run tests/comprehensive-chaos.test.ts",
     "test:chaos:real": "vitest --run tests/real-chaos-testing.test.ts",
     "test:chaos:multi": "vitest --run tests/multi-perspective-chaos.test.ts",
+    "test:chaos:distributed": "vitest --run tests/distributed-systems-chaos.test.ts",
+    "test:chaos:concurrency": "vitest --run tests/concurrency-chaos.test.ts",
+    "test:chaos:filesystem": "vitest --run tests/filesystem-io-chaos.test.ts",
+    "test:chaos:network": "vitest --run tests/network-protocol-chaos.test.ts",
+    "test:chaos:performance": "vitest --run tests/performance-chaos.test.ts",
+    "test:chaos:resources": "vitest --run tests/resource-exhaustion-chaos.test.ts",
+    "test:chaos:all": "npm run test:chaos:real && npm run test:chaos:multi && npm run test:chaos:distributed && npm run test:chaos:concurrency && npm run test:chaos:filesystem && npm run test:chaos:network && npm run test:chaos:performance && npm run test:chaos:resources",
     "chaos": "./scripts/chaos-test.sh",
     "lint": "eslint src --ext .ts",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist coverage",
-    "ci:full": "npm run lint && npm run typecheck && npm run test && npm run test:chaos:real"
+    "ci:full": "npm run lint && npm run typecheck && npm run test && npm run test:chaos:all",
+    "ci:security": "npm run test:chaos:multi && npm run test:chaos:network && npm run test:chaos:resources",
+    "ci:performance": "npm run test:chaos:performance && npm run test:chaos:concurrency && npm run test:chaos:distributed"
   },
   "dependencies": {
     "@graphdone/core": "*",
