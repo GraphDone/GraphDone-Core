@@ -20,6 +20,14 @@ export default defineConfig({
       '/graphql': {
         target: 'http://localhost:4127',
         changeOrigin: true
+      },
+      '/health': {
+        target: 'http://localhost:4127',
+        changeOrigin: true
+      },
+      '/mcp': {
+        target: 'http://localhost:4127',
+        changeOrigin: true
       }
     }
   },

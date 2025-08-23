@@ -280,7 +280,8 @@ describe('Resource Exhaustion Chaos Testing', () => {
                     }
                     return candidates;
                   })
-                };
+                }
+              };
               
               return service.createNode(data);
             }
@@ -303,7 +304,8 @@ describe('Resource Exhaustion Chaos Testing', () => {
                       computed: Math.pow(i + j, 3) 
                     }))
                   ).sort((a, b) => a[0].computed - b[0].computed)
-                };
+                }
+              };
               
               return service.createNode(data);
             }
@@ -327,7 +329,8 @@ describe('Resource Exhaustion Chaos Testing', () => {
                     ),
                     complexity_bomb: 'a'.repeat(10000) + 'b'
                   }
-                };
+                }
+              };
               
               return service.createNode(data);
             }
