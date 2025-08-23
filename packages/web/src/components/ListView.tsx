@@ -33,6 +33,7 @@ import {
 import { useQuery } from '@apollo/client';
 import { useAuth } from '../contexts/AuthContext';
 import { useGraph } from '../contexts/GraphContext';
+import { TaskDistributionRadar } from './TaskDistributionRadar';
 import { GET_WORK_ITEMS } from '../lib/queries';
 import { EditNodeModal } from './EditNodeModal';
 import { DeleteNodeModal } from './DeleteNodeModal';
@@ -1576,6 +1577,17 @@ export function ListView() {
         </div>
 
       </div>
+      
+      {/* Fourth Row - Task Distribution Radar */}
+      <div className="mt-12">
+        <div className="flex flex-col items-center">
+          <h2 className="text-2xl font-bold text-white mb-4">Task Category Distribution</h2>
+          <div className="w-full">
+            <TaskDistributionRadar showLegend={false} />
+          </div>
+        </div>
+      </div>
+
     </div>
   );
 
