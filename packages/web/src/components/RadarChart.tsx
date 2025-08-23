@@ -55,7 +55,7 @@ export function RadarChart({
         .attr('fill', 'none')
         .attr('stroke', 'white')
         .attr('stroke-width', 1)
-        .attr('opacity', 0.2);
+        .attr('opacity', 0.35);
     }
 
     // Create the axis lines
