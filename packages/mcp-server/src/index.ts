@@ -10,6 +10,7 @@ import {
 import neo4j from 'neo4j-driver';
 import { GraphService } from './services/graph-service.js';
 import { startHealthServer, recordAccess, recordClientConnection } from './health-server.js';
+import { startMemoryMonitoring, checkMemoryUsage } from './utils/memory-monitor.js';
 import {
   UpdatePrioritiesArgs,
   BulkUpdatePrioritiesArgs,
@@ -690,6 +691,9 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
   
+  // Check memory usage before processing request
+  checkMemoryUsage();
+  
   // Record MCP server access
   recordAccess();
 
@@ -811,6 +815,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 async function main() {
   try {
     console.error('Initializing GraphDone MCP Server...');
+    
+    // Start memory monitoring first for security
+    startMemoryMonitoring();
+    
     await initializeDatabase();
     
     // Start health check server
