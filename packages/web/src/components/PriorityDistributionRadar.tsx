@@ -130,22 +130,31 @@ export function PriorityDistributionRadar({ className = '', showLegend = true }:
           <div className="absolute top-4 right-4 flex flex-col gap-2 z-10">
             <button
               onClick={handleZoomIn}
-              className="p-2 bg-gray-600 hover:bg-gray-500 text-white rounded"
+              className="p-2 text-white rounded shadow-lg transition-all duration-200"
+              style={{ backgroundColor: '#228B22', boxShadow: '0 4px 6px rgba(34, 139, 34, 0.25)' }}
               title="Zoom In"
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#32CD32'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#228B22'}
             >
               <ZoomIn className="h-4 w-4" />
             </button>
             <button
               onClick={handleZoomOut}
-              className="p-2 bg-gray-600 hover:bg-gray-500 text-white rounded"
+              className="p-2 text-white rounded shadow-lg transition-all duration-200"
+              style={{ backgroundColor: '#DC143C', boxShadow: '0 4px 6px rgba(220, 20, 60, 0.25)' }}
               title="Zoom Out"
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#FF6347'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#DC143C'}
             >
               <ZoomOut className="h-4 w-4" />
             </button>
             <button
               onClick={handleReset}
-              className="p-2 bg-gray-600 hover:bg-gray-500 text-white rounded"
+              className="p-2 text-white rounded shadow-lg transition-all duration-200"
+              style={{ backgroundColor: '#4682B4', boxShadow: '0 4px 6px rgba(70, 130, 180, 0.25)' }}
               title="Reset Zoom"
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#5A9BD4'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#4682B4'}
             >
               <RotateCcw className="h-4 w-4" />
             </button>
