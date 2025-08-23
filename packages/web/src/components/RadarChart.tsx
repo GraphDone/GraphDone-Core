@@ -135,8 +135,8 @@ export function RadarChart({
     g.append('path')
       .datum(data)
       .attr('d', radarLine)
-      .attr('fill', 'rgba(156, 163, 175, 0.1)')
-      .attr('stroke', 'rgb(156, 163, 175)')
+      .attr('fill', 'rgba(128, 128, 0, 0.2)')
+      .attr('stroke', '#808000')
       .attr('stroke-width', 2);
 
     // Add data points with status-based colors

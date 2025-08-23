@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCcw, ClipboardList, Calendar, Clock, CheckCircle, AlertCircle } from 'lucide-react';
 import { RadarChart } from './RadarChart';
 import { useGraph } from '../contexts/GraphContext';
 import { useQuery, gql } from '@apollo/client';
@@ -169,22 +169,32 @@ export function TaskDistributionRadar({ className = '', showLegend = true }: Tas
         {showLegend && (
           <div className="mt-6">
             <h4 className="text-sm font-semibold text-gray-300 mb-3">Status Breakdown</h4>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-              {radarData.map((item, index) => (
-                <div key={index} className="bg-gray-700 rounded p-3">
-                  <div className="flex items-center mb-2">
-                    <div 
-                      className="w-3 h-3 rounded-full mr-2" 
-                      style={{ backgroundColor: item.color || '#4ade80' }}
-                    />
-                    <span className="text-gray-200 text-xs">{item.axis}</span>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-3">
+              {radarData.map((item, index) => {
+                const getIcon = (axis: string) => {
+                  switch(axis) {
+                    case 'Proposed': return <ClipboardList className="h-5 w-5" style={{ color: item.color || '#22d3ee' }} />;
+                    case 'Planned': return <Calendar className="h-5 w-5" style={{ color: item.color || '#c084fc' }} />;
+                    case 'In Progress': return <Clock className="h-5 w-5" style={{ color: item.color || '#facc15' }} />;
+                    case 'Completed': return <CheckCircle className="h-5 w-5" style={{ color: item.color || '#4ade80' }} />;
+                    case 'Blocked': return <AlertCircle className="h-5 w-5" style={{ color: item.color || '#ef4444' }} />;
+                    default: return <div className="w-4 h-4 rounded-full" style={{ backgroundColor: item.color || '#4ade80' }}></div>;
+                  }
+                };
+                
+                return (
+                  <div key={index} className="bg-gray-700 rounded p-3">
+                    <div className="flex items-center mb-2">
+                      {getIcon(item.axis)}
+                      <span className="text-gray-200 text-base ml-2">{item.axis}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xl font-bold text-white">{item.value}</span>
+                      <span className="text-base text-gray-400 ml-1">tasks</span>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <span className="text-xl font-bold text-white">{item.value}</span>
-                    <span className="text-xs text-gray-400 ml-1">tasks</span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
