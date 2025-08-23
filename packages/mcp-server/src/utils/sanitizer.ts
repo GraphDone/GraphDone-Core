@@ -10,7 +10,28 @@ export function sanitizeHTML(input: string): string {
     return '';
   }
 
-  return input
+  let sanitized = input;
+  
+  // First decode URL encoding to prevent bypass attacks
+  try {
+    sanitized = decodeURIComponent(sanitized);
+  } catch (e) {
+    // If decoding fails, continue with original (probably malformed URL encoding)
+  }
+  
+  // Then decode HTML entities to prevent bypass attacks
+  sanitized = sanitized
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#x27;/g, "'")
+    .replace(/&#x2F;/g, '/')
+    .replace(/&#x5C;/g, '\\')
+    .replace(/&apos;/g, "'");
+  
+  return sanitized
     // Remove script tags and content, but preserve safe text
     .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '[SCRIPT_REMOVED]')
     .replace(/<script[^>]*>/gi, '[SCRIPT_REMOVED]')
