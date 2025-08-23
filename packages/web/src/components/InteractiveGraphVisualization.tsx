@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import * as d3 from 'd3';
-import { Link2, Edit3, Trash2, AlertTriangle, AlertCircle, Layers, Sparkles, ListTodo, Trophy } from 'lucide-react';
+import { Link2, Edit3, Trash2, AlertTriangle, AlertCircle, Layers, Sparkles, ListTodo, Trophy, Target, Lightbulb, Microscope } from 'lucide-react';
 import { useQuery, useMutation } from '@apollo/client';
 import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -25,6 +25,9 @@ interface WorkItem {
   priorityComp: number;
   teamId: string;
   userId: string;
+  tags?: string[];
+  dueDate?: string;
+  assignedTo?: string;
   dependencies?: WorkItem[];
   dependents?: WorkItem[];
   priority?: {
@@ -1243,7 +1246,7 @@ export function InteractiveGraphVisualization() {
               className="w-full flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
             >
               <Edit3 className="h-4 w-4 mr-3" />
-              Edit Details
+              Edit Node Details
             </button>
             <button 
               onClick={() => handleDeleteNode(nodeMenu.node!)}
@@ -1299,28 +1302,49 @@ export function InteractiveGraphVisualization() {
       )}
 
       {/* Legend */}
-      <div className="absolute bottom-4 left-4 bg-gray-800/90 border border-gray-600 rounded-lg shadow-lg p-3 max-w-xs backdrop-blur-sm">
-        <div className="text-sm font-medium text-green-400 mb-2">Node Types</div>
-        <div className="space-y-1 text-xs text-gray-300">
-          <div className="flex items-center space-x-2">
-            <Layers className="w-3 h-3 text-purple-500" />
+      <div className="absolute bottom-4 left-4 bg-gray-800/90 border border-gray-600 rounded-lg shadow-lg p-1 w-72 backdrop-blur-sm">
+        <div className="text-base font-medium text-green-400 mb-2 text-center">Node Types</div>
+        <div className="grid grid-cols-2 grid-rows-4 gap-x-4 gap-y-3 text-base text-gray-300">
+          <div className="flex items-center space-x-3">
+            <Layers className="w-5 h-5 text-purple-500" />
             <span>Epic</span>
-            <Sparkles className="w-3 h-3 text-blue-500 ml-auto" />
-            <span>Feature</span>
           </div>
-          <div className="flex items-center space-x-2">
-            <ListTodo className="w-3 h-3 text-green-500" />
+          <div className="flex items-center space-x-3">
+            <ListTodo className="w-5 h-5 text-green-500" />
             <span>Task</span>
-            <AlertTriangle className="w-3 h-3 text-red-500 ml-auto" />
-            <span>Bug</span>
           </div>
-          <div className="flex items-center space-x-2">
-            <Trophy className="w-3 h-3 text-yellow-500" />
+          <div className="flex items-center space-x-3">
+            <Trophy className="w-5 h-5 text-orange-500" />
             <span>Milestone</span>
           </div>
-          <div className="border-t border-gray-200 pt-2 mt-2">
-            <div className="text-xs text-gray-500 mb-1">Click node for menu • Drag to move</div>
-            <div className="text-xs text-gray-500">Scroll to zoom • Click edge for options</div>
+          <div className="flex items-center space-x-3">
+            <AlertTriangle className="w-5 h-5 text-red-500" />
+            <span>Bug</span>
+          </div>
+          <div className="flex items-center space-x-3">
+            <Target className="w-5 h-5 text-indigo-500" />
+            <span>Outcome</span>
+          </div>
+          <div className="flex items-center space-x-3">
+            <Lightbulb className="w-5 h-5 text-yellow-500" />
+            <span>Idea</span>
+          </div>
+          <div className="flex items-center space-x-3">
+            <Sparkles className="w-5 h-5 text-blue-500" />
+            <span>Feature</span>
+          </div>
+          <div className="flex items-center space-x-3">
+            <Microscope className="w-5 h-5 text-teal-500" />
+            <span>Research</span>
+          </div>
+        </div>
+        <hr className="border-gray-600 mt-3" />
+        <div className="pt-3">
+          <div className="text-sm text-gray-500 opacity-75 w-full leading-relaxed text-left">
+            • Select nodes to access menu<br/>
+            • Drag to reposition<br/>
+            • Scroll for zoom<br/>
+            • Select edges for options
           </div>
         </div>
       </div>

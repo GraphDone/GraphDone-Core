@@ -97,6 +97,7 @@ async function seed() {
           priorityIndiv: $priorityIndiv,
           priorityComm: $priorityComm,
           priorityComp: $priorityComp,
+          tags: $tags,
           createdAt: datetime(),
           updatedAt: datetime()
         })`,
@@ -108,7 +109,8 @@ async function seed() {
           priorityExec: Math.random(),
           priorityIndiv: Math.random(),
           priorityComm: Math.random(),
-          priorityComp: Math.random()
+          priorityComp: Math.random(),
+          tags: []
         }
       );
     }
@@ -116,12 +118,12 @@ async function seed() {
     
     // Create edges (relationships between work items)
     const edges = [
-      { source: 'wi-1', target: 'wi-2', type: 'DEPENDENCY' },
-      { source: 'wi-2', target: 'wi-3', type: 'DEPENDENCY' },
-      { source: 'wi-5', target: 'wi-6', type: 'CONTAINS' },
-      { source: 'wi-5', target: 'wi-7', type: 'CONTAINS' },
-      { source: 'wi-5', target: 'wi-8', type: 'CONTAINS' },
-      { source: 'wi-12', target: 'wi-5', type: 'DEPENDENCY' }
+      { source: 'wi-1', target: 'wi-2', type: 'DEPENDS_ON' },
+      { source: 'wi-2', target: 'wi-3', type: 'DEPENDS_ON' },
+      { source: 'wi-5', target: 'wi-6', type: 'PART_OF' },
+      { source: 'wi-5', target: 'wi-7', type: 'PART_OF' },
+      { source: 'wi-5', target: 'wi-8', type: 'PART_OF' },
+      { source: 'wi-12', target: 'wi-5', type: 'DEPENDS_ON' }
     ];
     
     for (const edge of edges) {
