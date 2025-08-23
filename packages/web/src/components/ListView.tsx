@@ -34,6 +34,8 @@ import { useQuery } from '@apollo/client';
 import { useAuth } from '../contexts/AuthContext';
 import { useGraph } from '../contexts/GraphContext';
 import { TaskDistributionRadar } from './TaskDistributionRadar';
+import { PriorityDistributionRadar } from './PriorityDistributionRadar';
+import { NodeDistributionRadar } from './NodeDistributionRadar';
 import { GET_WORK_ITEMS } from '../lib/queries';
 import { EditNodeModal } from './EditNodeModal';
 import { DeleteNodeModal } from './DeleteNodeModal';
@@ -1200,9 +1202,7 @@ export function ListView() {
               const path = createPath(percentage, cumulativePercentage);
               
               // Use pre-calculated dynamic positions
-              const position = labelPositions[index];
-              const labelX = position.x;
-              const labelY = position.y;
+              // const position = labelPositions[index];
               
               cumulativePercentage += percentage;
               
@@ -1452,7 +1452,7 @@ export function ListView() {
             <PieChart 
               title=""
               data={Object.entries(stats.typeStats)
-                .filter(([type, count]) => count > 0)
+                .filter(([, count]) => count > 0)
                 .map(([type, count]) => ({
                   label: formatLabel(type),
                   value: count,
@@ -1469,14 +1469,34 @@ export function ListView() {
           </div>
         </div>
 
+        {/* First Radar Row - Task Distribution Radar */}
+        <div className="mt-12">
+          <div className="flex flex-col items-center">
+            <h2 className="text-2xl font-bold text-white mb-4">Task Category Distribution</h2>
+            <div className="w-full">
+              <TaskDistributionRadar showLegend={false} />
+            </div>
+          </div>
+        </div>
+
       </div>
       
-      {/* Fourth Row - Task Distribution Radar */}
+      {/* Second Radar Row - Priority Distribution Radar */}
       <div className="mt-12">
         <div className="flex flex-col items-center">
-          <h2 className="text-2xl font-bold text-white mb-4">Task Category Distribution</h2>
+          <h2 className="text-2xl font-bold text-white mb-4">Priority Category Distribution</h2>
           <div className="w-full">
-            <TaskDistributionRadar showLegend={false} />
+            <PriorityDistributionRadar showLegend={false} />
+          </div>
+        </div>
+      </div>
+      
+      {/* Third Radar Row - Node Distribution Radar */}
+      <div className="mt-12">
+        <div className="flex flex-col items-center">
+          <h2 className="text-2xl font-bold text-white mb-4">Node Category Distribution</h2>
+          <div className="w-full">
+            <NodeDistributionRadar showLegend={false} />
           </div>
         </div>
       </div>
