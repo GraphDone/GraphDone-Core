@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState } from 'react';
 import { useQuery } from '@apollo/client';
 import * as d3 from 'd3';
-import { Plus, Link, Edit } from 'lucide-react';
+import { Plus, Edit } from 'lucide-react';
 import { GET_WORK_ITEMS, GET_EDGES } from '../lib/queries';
 import { CreateNodeModal } from './CreateNodeModal';
 import { EditNodeModal } from './EditNodeModal';
