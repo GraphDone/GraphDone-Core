@@ -1,0 +1,47 @@
+{
+  "name": "@graphdone/mcp-server",
+  "version": "0.2.1-alpha",
+  "description": "MCP server for GraphDone graph operations",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "echo 'MCP server should be started by Claude Code, not npm run dev. Use npm run dev:mcp to start manually.'",
+    "dev:start": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "test": "vitest --run",
+    "test:coverage": "vitest run --coverage", 
+    "test:chaos": "vitest --run tests/chaos-testing.test.ts",
+    "test:chaos:comprehensive": "vitest --run tests/comprehensive-chaos.test.ts",
+    "test:chaos:real": "vitest --run tests/real-chaos-testing.test.ts",
+    "test:chaos:multi": "vitest --run tests/multi-perspective-chaos.test.ts",
+    "chaos": "./scripts/chaos-test.sh",
+    "lint": "eslint src --ext .ts",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist coverage",
+    "ci:full": "npm run lint && npm run typecheck && npm run test && npm run test:chaos:real"
+  },
+  "dependencies": {
+    "@graphdone/core": "*",
+    "@modelcontextprotocol/sdk": "^0.5.0",
+    "neo4j-driver": "^5.15.0",
+    "dotenv": "^16.3.0",
+    "zod": "^3.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@typescript-eslint/eslint-plugin": "^8.39.1",
+    "@typescript-eslint/parser": "^8.39.1",
+    "@vitest/coverage-v8": "^1.0.0",
+    "eslint": "^9.33.0",
+    "globals": "^16.3.0",
+    "tsx": "^4.6.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "license": "MIT"
+}
