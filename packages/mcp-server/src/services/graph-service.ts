@@ -38,6 +38,10 @@ import {
   validateIdFormat,
   detectIdCollisions
 } from '../utils/id-generator.js';
+import { electCoordinator } from '../utils/leader-election.js';
+import { withCPUThrottling, isSystemUnderStress } from '../utils/cpu-monitor.js';
+import { withConnectionPoolLimit } from '../utils/connection-pool.js';
+import { withReadConsistency, withWriteConsistency } from '../utils/consistency-manager.js';
 
 export interface PaginationInfo {
   total_count: number;
@@ -213,12 +217,28 @@ export class GraphService {
   constructor(private driver: Driver) {}
 
   private async withSession<T>(work: (session: Session) => Promise<T>): Promise<T> {
-    const session = this.driver.session();
-    try {
-      return await work(session);
-    } finally {
-      await session.close();
+    // Check system stress before expensive operations
+    const stressCheck = isSystemUnderStress();
+    if (stressCheck.stressed) {
+      throw new Error(
+        `System under CPU stress - operation blocked. ` +
+        `CPU: ${stressCheck.metrics.current.toFixed(1)}% current, ` +
+        `${stressCheck.metrics.average.toFixed(1)}% avg, ` +
+        `${stressCheck.metrics.peak.toFixed(1)}% peak, ` +
+        `trend: ${stressCheck.metrics.trend}`
+      );
     }
+    
+    return await withCPUThrottling(async () => {
+      return await withConnectionPoolLimit(async () => {
+        const session = this.driver.session();
+        try {
+          return await work(session);
+        } finally {
+          await session.close();
+        }
+      }, 'Neo4j session');
+    }, 'GraphService operation');
   }
 
   private createPaginationInfo(totalCount: number, limit: number, offset: number): PaginationInfo {
@@ -362,7 +382,7 @@ export class GraphService {
       let totalCount = 0;
       if (query_type !== 'dependencies') {
         const countResult = await session.run(countQuery, params);
-        totalCount = countResult.records[0]?.get('total').toNumber() || 0;
+        totalCount = countResult.records[0]?.get('total')?.toNumber?.() || 0;
       }
 
       const result = await session.run(query, params);
@@ -438,9 +458,17 @@ export class GraphService {
         validateBulkOperation(contributor_ids.length, 50);
       }
 
+      // Handle coordinator node creation with leader election
+      if (metadata && typeof metadata === 'object' && 'role' in metadata && metadata.role === 'coordinator') {
+        return this.createCoordinatorNode(args, session);
+      }
+
       // Generate truly unique ID to prevent race conditions
       const id = generateUniqueNodeId();
       const now = new Date().toISOString();
+      
+      // Use write consistency to prevent read-after-write issues
+      return await withWriteConsistency(id, 'CREATE', async () => {
 
       const query = `
         CREATE (n:WorkItem {
@@ -493,16 +521,189 @@ export class GraphService {
         }
       }
 
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              message: 'Node created successfully',
+              node
+            }, null, 2)
+          }]
+        };
+      }, 'createNode');
+    });
+  }
+
+  /**
+   * Create coordinator node with proper leader election to prevent split-brain scenarios
+   */
+  private async createCoordinatorNode(args: CreateNodeArgs, session: Session): Promise<MCPResponse> {
+    const metadata = args.metadata as any;
+    
+    if (!metadata.candidateId || !metadata.timestamp || metadata.priority === undefined) {
       return {
         content: [{
           type: 'text',
           text: JSON.stringify({
-            message: 'Node created successfully',
-            node
+            error: 'Coordinator nodes require candidateId, timestamp, and priority in metadata'
+          })
+        }],
+        isError: true
+      };
+    }
+    
+    // Check if coordinator already exists
+    const existingQuery = `
+      MATCH (n:WorkItem {title: 'System Coordinator'})
+      WHERE EXISTS(n.metadata) AND n.metadata CONTAINS 'coordinator'
+      RETURN n, n.metadata as metadata
+      LIMIT 1
+    `;
+    
+    const existingResult = await session.run(existingQuery);
+    
+    if (existingResult.records.length > 0) {
+      const existing = existingResult.records[0].get('n').properties;
+      const existingMeta = existing.metadata ? JSON.parse(existing.metadata) : {};
+      
+      // Use leader election to determine if this candidate can supersede existing coordinator
+      const candidates = [
+        {
+          id: existingMeta.candidateId || 'existing-coordinator',
+          timestamp: existingMeta.timestamp || Date.now() - 10000,
+          priority: existingMeta.priority || 0.5
+        },
+        {
+          id: metadata.candidateId,
+          timestamp: metadata.timestamp,
+          priority: metadata.priority
+        }
+      ];
+      
+      const winner = await electCoordinator(candidates, 'system-coordinator');
+      
+      if (winner !== metadata.candidateId) {
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              error: `Coordinator election failed. Winner: ${winner}, attempted: ${metadata.candidateId}`,
+              leader: winner,
+              candidates: candidates
+            })
+          }],
+          isError: true
+        };
+      }
+      
+      // This candidate won, update existing coordinator
+      const updateQuery = `
+        MATCH (n:WorkItem {title: 'System Coordinator'})
+        SET n.metadata = $metadata,
+            n.updatedAt = $now
+        RETURN n
+      `;
+      
+      const updateResult = await session.run(updateQuery, {
+        metadata: JSON.stringify(metadata),
+        now: new Date().toISOString()
+      });
+      
+      const updatedNode = updateResult.records[0].get('n').properties;
+      const node = { 
+        ...updatedNode, 
+        metadata: updatedNode.metadata ? JSON.parse(updatedNode.metadata) : {} 
+      };
+      
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify({
+            message: 'Coordinator updated through election',
+            node,
+            election_winner: winner
           }, null, 2)
         }]
       };
+    }
+    
+    // No existing coordinator, create new one
+    // Still run election in case multiple candidates are trying simultaneously
+    const candidate = {
+      id: metadata.candidateId,
+      timestamp: metadata.timestamp,
+      priority: metadata.priority
+    };
+    
+    const winner = await electCoordinator([candidate], 'system-coordinator');
+    
+    if (winner !== candidate.id) {
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify({
+            error: `Failed to become coordinator in single-candidate election`,
+            candidate: candidate.id
+          })
+        }],
+        isError: true
+      };
+    }
+    
+    // Create the coordinator node
+    const id = generateUniqueNodeId();
+    const now = new Date().toISOString();
+    
+    const query = `
+      CREATE (n:WorkItem {
+        id: $id,
+        title: $title,
+        description: $description,
+        type: $type,
+        status: $status,
+        metadata: $metadata,
+        createdAt: $now,
+        updatedAt: $now
+      })
+      RETURN n
+    `;
+    
+    const result = await session.run(query, {
+      id,
+      title: sanitizeString(args.title || 'System Coordinator', 500),
+      description: sanitizeString(args.description || '', 2000),
+      type: 'MILESTONE',
+      status: 'ACTIVE',
+      metadata: JSON.stringify(metadata),
+      now
     });
+    
+    if (result.records.length === 0) {
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify({ error: 'Failed to create coordinator node' })
+        }],
+        isError: true
+      };
+    }
+    
+    const rawNode = result.records[0].get('n').properties;
+    const node = { 
+      ...rawNode, 
+      metadata: rawNode.metadata ? JSON.parse(rawNode.metadata) : {} 
+    };
+    
+    return {
+      content: [{
+        type: 'text',
+        text: JSON.stringify({
+          message: 'Coordinator node created successfully',
+          node,
+          election_winner: winner
+        }, null, 2)
+      }]
+    };
   }
 
   async updateNode(args: UpdateNodeArgs) {
@@ -525,7 +726,10 @@ export class GraphService {
       // Sanitize node ID
       const sanitizedNodeId = sanitizeNodeId(node_id);
       
-      // Build the SET clause dynamically based on provided fields
+      // Use write consistency to prevent read-after-write issues
+      return await withWriteConsistency(sanitizedNodeId, 'UPDATE', async () => {
+      
+        // Build the SET clause dynamically based on provided fields
       const setClause: string[] = ['n.updatedAt = $now'];
       const params: Neo4jParams = { 
         node_id: sanitizedNodeId, 
@@ -597,15 +801,16 @@ export class GraphService {
         }
       }
 
-      return {
-        content: [{
-          type: 'text',
-          text: JSON.stringify({
-            message: 'Node updated successfully',
-            node
-          }, null, 2)
-        }]
-      };
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              message: 'Node updated successfully',
+              node
+            }, null, 2)
+          }]
+        };
+      }, 'updateNode');
     });
   }
 
@@ -632,7 +837,7 @@ export class GraphService {
         };
       }
 
-      const relationshipCount = checkResult.records[0].get('relationshipCount').toNumber();
+      const relationshipCount = checkResult.records[0]?.get('relationshipCount')?.toNumber?.() || 0;
 
       // Delete the node and all its relationships
       const deleteQuery = `
@@ -769,7 +974,10 @@ export class GraphService {
       // Sanitize node ID input
       const sanitizedNodeId = sanitizeNodeId(node_id);
       
-      // Ensure all numeric values are properly converted to integers with limits
+      // Use read consistency to prevent stale reads
+      return await withReadConsistency(sanitizedNodeId, async () => {
+      
+        // Ensure all numeric values are properly converted to integers with limits
       const relationshipsLimitInt = Math.min(Math.max(1, Math.floor(Number(relationships_limit) || 20)), 100); // Max 100 relationships
       const relationshipsOffsetInt = Math.max(0, Math.floor(Number(relationships_offset) || 0));
 
@@ -830,7 +1038,7 @@ export class GraphService {
         metadata: rawNode.metadata ? JSON.parse(rawNode.metadata) : {}
       };
       
-      const totalRelationships = relCountResult.records[0]?.get('totalRelationships').toNumber() || 0;
+      const totalRelationships = relCountResult.records[0]?.get('totalRelationships')?.toNumber?.() || 0;
       
       const relationships = relationshipsResult.records.map(record => {
         const rel = record.get('rel');
@@ -879,7 +1087,8 @@ export class GraphService {
             }
           }, null, 2)
         }]
-      };
+        };
+      }, 'getNodeDetails');
     });
   }
 
@@ -908,7 +1117,7 @@ export class GraphService {
 
       // Get total count first
       const countResult = await session.run(countQuery, { start_id, end_id });
-      const totalCount = countResult.records[0]?.get('total').toNumber() || 0;
+      const totalCount = countResult.records[0]?.get('total')?.toNumber?.() || 0;
 
       const result = await session.run(query, { 
         start_id, 
@@ -935,7 +1144,7 @@ export class GraphService {
 
       const paths = result.records.map(record => {
         const path = record.get('path');
-        const pathLength = record.get('pathLength').toNumber();
+        const pathLength = record.get('pathLength')?.toNumber?.() || 0;
         
         const nodes = path.segments.map((segment: Neo4jPathSegment, index: number) => {
           if (index === 0) {
@@ -995,7 +1204,7 @@ export class GraphService {
 
       // Get total count first
       const countResult = await session.run(countQuery);
-      const totalCount = countResult.records[0]?.get('total').toNumber() || 0;
+      const totalCount = countResult.records[0]?.get('total')?.toNumber?.() || 0;
 
       const result = await session.run(query, { 
         offset: int(offset), 
@@ -1004,7 +1213,7 @@ export class GraphService {
       
       const cycles = result.records.map(record => {
         const path = record.get('path');
-        const cycleLength = record.get('cycleLength').toNumber();
+        const cycleLength = record.get('cycleLength')?.toNumber?.() || 0;
         
         const nodes = path.segments.map((segment: Neo4jPathSegment, index: number) => {
           if (index === 0) {

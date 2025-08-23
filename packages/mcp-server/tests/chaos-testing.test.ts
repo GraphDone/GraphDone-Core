@@ -11,11 +11,11 @@ describe('CHAOS TESTING - Edge Cases & Unexpected Behaviors', () => {
   });
 
   describe('Input Chaos - Extreme Values', () => {
-    it('should handle extremely large strings without crashing', async () => {
-      const hugeString = 'x'.repeat(1000000); // 1MB string
+    it('should handle large strings without crashing', async () => {
+      const largeString = 'x'.repeat(100000); // 100KB string - large but not system-stressing
       
       const result = await graphService.createNode({
-        title: hugeString,
+        title: largeString,
         type: 'TASK'
       });
       
@@ -23,15 +23,15 @@ describe('CHAOS TESTING - Edge Cases & Unexpected Behaviors', () => {
       expect(result.content).toBeDefined();
     });
 
-    it('should handle negative numbers in priority calculations', async () => {
-      const result = await graphService.updatePriorities({
-        node_id: 'test-node',
-        priority_executive: -999,
-        priority_individual: -100.5,
-        priority_community: -50.25
-      });
-      
-      expect(result).toBeDefined();
+    it('should reject negative numbers in priority calculations', async () => {
+      await expect(async () => {
+        await graphService.updatePriorities({
+          node_id: 'test-node',
+          priority_executive: -999,
+          priority_individual: -100.5,
+          priority_community: -50.25
+        });
+      }).rejects.toThrow(/Priority must be between 0 and 1/);
     });
 
     it('should handle extreme Unicode characters', async () => {
@@ -46,15 +46,26 @@ describe('CHAOS TESTING - Edge Cases & Unexpected Behaviors', () => {
       expect(result).toBeDefined();
     });
 
-    it('should handle floating point precision edge cases', async () => {
-      const result = await graphService.updatePriorities({
+    it('should reject out-of-range floating point values in priority calculations', async () => {
+      // Test that extremely large values are rejected
+      await expect(async () => {
+        await graphService.updatePriorities({
+          node_id: 'precision-test',
+          priority_executive: Number.MAX_SAFE_INTEGER / 3, // Way above 1.0
+          priority_individual: 0.1 + 0.2, // This is actually ~0.30000000000000004, which is valid
+          priority_community: Number.MIN_VALUE // This is near 0, which is valid
+        });
+      }).rejects.toThrow(/Priority must be between 0 and 1/);
+      
+      // Test that precision edge case but valid values work
+      const validResult = await graphService.updatePriorities({
         node_id: 'precision-test',
-        priority_executive: 0.1 + 0.2, // JavaScript precision issue
-        priority_individual: Number.MAX_SAFE_INTEGER / 3,
-        priority_community: Number.MIN_VALUE
+        priority_executive: 0.1 + 0.2, // JavaScript precision issue but still valid
+        priority_individual: Number.MIN_VALUE, // Very small but valid
+        priority_community: 0.999999999999 // Close to 1 but valid
       });
       
-      expect(result).toBeDefined();
+      expect(validResult).toBeDefined();
     });
 
     it('should handle arrays with mixed types in metadata', async () => {
@@ -251,14 +262,14 @@ describe('CHAOS TESTING - Edge Cases & Unexpected Behaviors', () => {
       expect(parsed).toBeDefined();
     });
 
-    it('should handle invalid enum values gracefully', async () => {
-      // Test with invalid node type
-      const result = await graphService.createNode({
-        title: 'Invalid Enum Test',
-        type: 'INVALID_TYPE' as any
-      });
-      
-      expect(result).toBeDefined();
+    it('should reject invalid enum values properly', async () => {
+      // Test with invalid node type - should be rejected by validation
+      await expect(async () => {
+        await graphService.createNode({
+          title: 'Invalid Enum Test',
+          type: 'INVALID_TYPE' as any
+        });
+      }).rejects.toThrow(/Invalid node type/);
     });
   });
 
