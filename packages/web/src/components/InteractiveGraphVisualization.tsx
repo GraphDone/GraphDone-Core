@@ -1246,7 +1246,7 @@ export function InteractiveGraphVisualization() {
               className="w-full flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
             >
               <Edit3 className="h-4 w-4 mr-3" />
-              Edit Details
+              Edit Node Details
             </button>
             <button 
               onClick={() => handleDeleteNode(nodeMenu.node!)}

@@ -453,7 +453,7 @@ export function GraphVisualization() {
             className="w-full flex items-center px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
           >
             <Edit className="h-4 w-4 mr-2" />
-            Edit Details
+            Edit Node Details
           </button>
         </div>
       )}
