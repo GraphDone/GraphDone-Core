@@ -19,9 +19,6 @@ import {
   Triangle,
   ArrowDown,
   Flame,
-  TrendingUp,
-  Briefcase,
-  Activity,
   Layers,
   Sparkles,
   ListTodo,
@@ -1095,52 +1092,7 @@ export function ListView() {
       setZoomLevel(1);
     };
 
-    // Calculate label positions to avoid overlaps
-    const calculateLabelPositions = () => {
-      let tempCumulative = 0;
-      const positions = [];
-      
-      for (let i = 0; i < filteredData.length; i++) {
-        const percentage = (filteredData[i].value / total) * 100;
-        const midAngle = (tempCumulative + percentage / 2) * 3.6 - 90;
-        
-        // Keep radius constant for all labels - optimal distance from pie edge
-        const labelRadius = 44;
-        
-        // Check for potential overlaps and adjust
-        let adjustedAngle = midAngle;
-        const minAngleDiff = 25; // Minimum angle difference between labels
-        
-        // Check against previous labels
-        for (let j = 0; j < positions.length; j++) {
-          const angleDiff = Math.abs(adjustedAngle - positions[j].angle);
-          if (angleDiff < minAngleDiff && angleDiff > 0) {
-            // Adjust angle to avoid overlap
-            if (i % 2 === 0) {
-              adjustedAngle += minAngleDiff - angleDiff + 5;
-            } else {
-              adjustedAngle -= minAngleDiff - angleDiff + 5;
-            }
-          }
-        }
-        
-        const labelX = 50 + labelRadius * Math.cos(adjustedAngle * Math.PI / 180);
-        const labelY = 50 + labelRadius * Math.sin(adjustedAngle * Math.PI / 180);
-        
-        positions.push({
-          angle: adjustedAngle,
-          x: labelX,
-          y: labelY,
-          radius: labelRadius
-        });
-        
-        tempCumulative += percentage;
-      }
-      
-      return positions;
-    };
     
-    const labelPositions = calculateLabelPositions();
 
     const createPath = (percentage: number, startPercentage: number) => {
       const startAngle = startPercentage * 3.6 - 90;
@@ -1304,49 +1256,6 @@ export function ListView() {
     );
   };
 
-  // Bar Chart Component
-  const BarChart = ({ data, title }: { data: Array<{label: string, value: number, color: string}>, title: string }) => {
-    const filteredData = data.filter(item => item.value > 0);
-    const maxValue = filteredData.length > 0 ? Math.max(...filteredData.map(item => item.value)) : 0;
-    if (filteredData.length === 0) {
-      return (
-        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-          <h3 className="text-lg font-semibold text-white mb-4">{title}</h3>
-          <div className="flex items-center justify-center h-48">
-            <div className="text-center">
-              <div className="text-gray-400 text-sm mb-2">No data to display</div>
-              <div className="text-gray-500 text-xs">Try adjusting your filters</div>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-        <h3 className="text-lg font-semibold text-white mb-4">{title}</h3>
-        <div className="space-y-3">
-          {filteredData.map((item, index) => (
-            <div key={index} className="space-y-1">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-300">{item.label}</span>
-                <span className="text-sm font-medium text-white">{item.value}</span>
-              </div>
-              <div className="w-full bg-gray-700 rounded-full h-3 overflow-hidden">
-                <div 
-                  className="h-full rounded-full transition-all duration-500 ease-out"
-                  style={{ 
-                    width: `${(item.value / maxValue) * 100}%`,
-                    backgroundColor: item.color
-                  }}
-                ></div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
 
   // Dashboard View
   const renderDashboardView = () => (
