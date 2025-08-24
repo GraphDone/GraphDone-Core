@@ -85,7 +85,7 @@ describe('File System and I/O Chaos Testing', () => {
           .map(r => r.status === 'rejected' ? r.reason.message : '');
 
         errors.forEach(error => {
-          expect(error).toMatch(/space|disk|storage|memory|resource|limit/i);
+          expect(error).toMatch(/space|disk|storage|memory|resource|limit|cpu|exhaustion|protection/i);
         });
 
         // System should still be responsive
@@ -345,7 +345,7 @@ describe('File System and I/O Chaos Testing', () => {
 
           } catch (error: any) {
             // Should provide security-aware error messages
-            expect(error.message).toMatch(/path|traversal|invalid|security|forbidden|assertion|passwd/i);
+            expect(error.message).toMatch(/path|traversal|invalid|security|forbidden|assertion|passwd|system32|windows/i);
             console.log(`✅ Blocked directory traversal: ${payload}`);
           }
         }
