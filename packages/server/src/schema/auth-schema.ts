@@ -11,6 +11,12 @@ export const authTypeDefs = gql`
     message: String!
   }
 
+  type PasswordResetResponse {
+    success: Boolean!
+    tempPassword: String
+    message: String!
+  }
+
   input SignupInput {
     email: String!
     username: String!
@@ -40,6 +46,18 @@ export const authTypeDefs = gql`
     newPassword: String!
   }
 
+  input CreateUserInput {
+    email: String!
+    username: String!
+    name: String!
+    password: String!
+    role: UserRole!
+  }
+
+  type SystemSettings {
+    allowAnonymousGuest: Boolean!
+  }
+
   type Query {
     # Get current user from JWT token
     me: User
@@ -52,12 +70,16 @@ export const authTypeDefs = gql`
     
     # Verify email token
     verifyEmailToken(token: String!): MessageResponse!
+    
+    # Get public system settings
+    systemSettings: SystemSettings!
   }
 
   type Mutation {
     # Authentication mutations
     signup(input: SignupInput!): AuthPayload!
     login(input: LoginInput!): AuthPayload!
+    guestLogin: AuthPayload!
     logout: MessageResponse!
     refreshToken: AuthPayload!
     
@@ -80,5 +102,17 @@ export const authTypeDefs = gql`
     
     # Role management (for PATH_KEEPER and GRAPH_MASTER)
     updateUserRole(userId: String!, role: UserRole!): User!
+    
+    # Admin password reset (for GRAPH_MASTER only)
+    resetUserPassword(userId: String!): PasswordResetResponse!
+    
+    # Admin user deletion (for GRAPH_MASTER only)
+    deleteUser(userId: String!): MessageResponse!
+    
+    # Admin user creation (for GRAPH_MASTER only)
+    createUser(input: CreateUserInput!): User!
+    
+    # Admin user status update (for GRAPH_MASTER only)
+    updateUserStatus(userId: String!, isActive: Boolean!): User!
   }
 `;
