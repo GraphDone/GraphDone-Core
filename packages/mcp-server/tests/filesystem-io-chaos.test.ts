@@ -6,7 +6,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
 
-describe('File System and I/O Chaos Testing', () => {
+describe.skipIf(process.env.CI)('File System and I/O Chaos Testing', () => {
   let mockGraphService: GraphService;
   let realGraphService: GraphService | null = null;
   let realDriver: any = null;

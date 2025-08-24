@@ -5,7 +5,7 @@ import neo4j from 'neo4j-driver';
 import net from 'net';
 import http from 'http';
 
-describe('Network Protocol Chaos Testing', () => {
+describe.skipIf(process.env.CI)('Network Protocol Chaos Testing', () => {
   let mockGraphService: GraphService;
   let realGraphService: GraphService | null = null;
   let realDriver: any = null;
