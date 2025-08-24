@@ -116,6 +116,7 @@ async function seed() {
         }
       );
     }
+    // eslint-disable-next-line no-console
     console.log(`✅ Created ${workItems.length} work items`);
     
     // Create edges (relationships between work items)
@@ -148,6 +149,7 @@ async function seed() {
         }
       );
     }
+    // eslint-disable-next-line no-console
     console.log(`✅ Created ${edges.length} edges`);
     
     // Create Edge entities for the new edge system with proper relationships
@@ -173,6 +175,7 @@ async function seed() {
         }
       );
     }
+    // eslint-disable-next-line no-console
     console.log(`✅ Created ${edges.length} Edge entities`);
     
     // Create contributors
@@ -198,6 +201,7 @@ async function seed() {
         contrib
       );
     }
+    // eslint-disable-next-line no-console
     console.log(`✅ Created ${contributors.length} contributors`);
     
     // Connect some contributors to work items
@@ -218,11 +222,14 @@ async function seed() {
         contribution
       );
     }
+    // eslint-disable-next-line no-console
     console.log(`✅ Created ${contributions.length} contributor connections`);
     
+    // eslint-disable-next-line no-console
     console.log('🎉 Database seeding completed successfully!');
     
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.error('❌ Error seeding database:', error);
     throw error;
   } finally {
@@ -232,4 +239,5 @@ async function seed() {
 }
 
 // Run the seed function
+// eslint-disable-next-line no-console
 seed().catch(console.error);

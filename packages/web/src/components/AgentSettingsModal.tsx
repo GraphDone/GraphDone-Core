@@ -148,6 +148,7 @@ echo "Setup complete!"
       // that runs the setup script. For now, we'll show instructions.
       alert('To run setup automatically, use the terminal command:\n\n./scripts/setup-mcp.sh\n\nThis will automatically configure the MCP server using the claude mcp command.');
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.error('Setup command failed:', error);
     }
   };
@@ -163,7 +164,7 @@ echo "Setup complete!"
           };
         }
         return acc;
-      }, {} as Record<string, any>)
+      }, {} as Record<string, { command: string; args: string[]; env: Record<string, string> }>)
     };
     return JSON.stringify(config, null, 2);
   };

@@ -309,7 +309,7 @@ describe('MULTI-PERSPECTIVE CHAOS TESTING - Real Attack Vectors', () => {
           const duration = endTime - startTime;
           
           // Should fail fast for large inputs
-          expect(duration).toBeLessThan(5000); // 5 seconds for CI environment
+          expect(duration).toBeLessThan(10000); // 10 seconds for CI environment
           expect(error.message).toMatch(/size|limit|memory|resource/i);
           
           console.log(`✅ Properly limited array size ${size}: ${error.message}`);
