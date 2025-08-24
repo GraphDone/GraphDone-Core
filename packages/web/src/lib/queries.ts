@@ -20,6 +20,7 @@ export const GET_WORK_ITEMS = gql`
       priorityComp
       dueDate
       assignedTo
+      tags
       teamId
       userId
       contributors {
@@ -95,6 +96,7 @@ export const GET_WORK_ITEM_BY_ID = gql`
       priorityComp
       dueDate
       assignedTo
+      tags
       contributors {
         id
         name
@@ -137,6 +139,7 @@ export const CREATE_WORK_ITEM = gql`
         priorityComp
         dueDate
         assignedTo
+        tags
         createdAt
       }
     }
@@ -164,6 +167,7 @@ export const UPDATE_WORK_ITEM = gql`
         priorityComp
         dueDate
         assignedTo
+        tags
         updatedAt
       }
     }
@@ -208,13 +212,22 @@ export const SUBSCRIBE_TO_WORK_ITEM_CHANGES = gql`
       id
       type
       title
+      description
+      status
       positionX
       positionY
       positionZ
       radius
       theta
       phi
+      priorityExec
+      priorityIndiv
+      priorityComm
       priorityComp
+      dueDate
+      assignedTo
+      tags
+      updatedAt
     }
   }
 `;
