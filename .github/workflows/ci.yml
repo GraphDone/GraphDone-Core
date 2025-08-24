@@ -153,9 +153,9 @@ jobs:
           flags: server
           fail_ci_if_error: false
 
-  # Web package tests (lightweight, no external services needed)
+  # Web package build (no tests exist yet, just build validation)
   test-web:
-    name: Web Package Tests
+    name: Web Package Build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -170,18 +170,15 @@ jobs:
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
-      - name: Build web package
+      - name: Build web package (validates TypeScript and bundling)
         run: npm run build --workspace=@graphdone/web
 
-      - name: Test web package
-        run: npm run test:coverage --workspace=@graphdone/web
-
-      - name: Upload web coverage
-        uses: codecov/codecov-action@v3
-        with:
-          directory: ./packages/web/coverage
-          flags: web
-          fail_ci_if_error: false
+      # TODO: Add actual web package tests
+      - name: Web tests placeholder
+        run: |
+          echo "⚠️ Web package tests not implemented yet"
+          echo "TODO: Add React component tests, integration tests"
+          echo "Build validation passed - TypeScript compilation successful"
 
   # MCP server tests (includes input validation and security tests)
   test-mcp-server:
@@ -285,15 +282,33 @@ jobs:
   ci-success:
     name: CI Success
     runs-on: ubuntu-latest
-    needs: [build]
+    needs: [lint-and-typecheck, security-scan, test-core, test-server, test-web, test-mcp-server]
     if: always()
     steps:
       - name: Check overall status
         run: |
-          if [ "${{ needs.build.result }}" == "success" ]; then
-            echo "✅ All CI jobs completed successfully!"
-            echo "Ready for deployment pipeline (when enabled)"
+          # Check if all required jobs passed
+          LINT_STATUS="${{ needs.lint-and-typecheck.result }}"
+          SECURITY_STATUS="${{ needs.security-scan.result }}"
+          CORE_STATUS="${{ needs.test-core.result }}"
+          SERVER_STATUS="${{ needs.test-server.result }}"
+          WEB_STATUS="${{ needs.test-web.result }}"
+          MCP_STATUS="${{ needs.test-mcp-server.result }}"
+          
+          echo "📊 CI Pipeline Results:"
+          echo "- Lint & TypeCheck: $LINT_STATUS"
+          echo "- Security Scan: $SECURITY_STATUS" 
+          echo "- Core Tests: $CORE_STATUS"
+          echo "- Server Tests: $SERVER_STATUS"
+          echo "- Web Build: $WEB_STATUS"
+          echo "- MCP Tests: $MCP_STATUS"
+          
+          if [[ "$LINT_STATUS" == "success" && "$CORE_STATUS" == "success" && 
+                "$SERVER_STATUS" == "success" && "$WEB_STATUS" == "success" && 
+                "$MCP_STATUS" == "success" ]]; then
+            echo "✅ All essential CI jobs completed successfully!"
+            echo "Note: Security scan failures don't block CI (continue-on-error)"
           else
-            echo "❌ CI pipeline failed"
+            echo "❌ CI pipeline failed - check individual job results above"
             exit 1
           fi
