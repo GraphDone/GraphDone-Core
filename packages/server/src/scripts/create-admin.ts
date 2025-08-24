@@ -28,7 +28,7 @@ async function createAdmin() {
     const adminId = uuidv4();
     const passwordHash = await bcrypt.hash('admin123', 10);
     
-    const result = await session.run(
+    await session.run(
       `CREATE (u:User {
         id: $adminId,
         email: 'admin@graphdone.local',
