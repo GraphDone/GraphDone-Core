@@ -75,7 +75,15 @@ async function startServer() {
 
   // Enhanced health check endpoint that checks all services
   app.get('/health', async (_req, res) => {
-    const health: any = {
+    const health: {
+      status: string;
+      timestamp: string;
+      services: {
+        graphql: { status: string; port: number };
+        neo4j: { status: string; uri: string; error?: string };
+        mcp: { status: string; port: number; capabilities: string[]; version?: string; uptime?: number; lastAccessed?: string; error?: string };
+      };
+    } = {
       status: 'healthy',
       timestamp: new Date().toISOString(),
       services: {
@@ -103,7 +111,7 @@ async function startServer() {
       health.services.neo4j.status = 'healthy';
     } catch (error) {
       health.services.neo4j.status = 'unhealthy';
-      (health.services.neo4j as any).error = error instanceof Error ? error.message : 'Connection failed';
+      health.services.neo4j.error = error instanceof Error ? error.message : 'Connection failed';
       health.status = 'degraded';
     }
 
@@ -120,7 +128,7 @@ async function startServer() {
       clearTimeout(timeoutId);
       
       if (response.ok) {
-        const mcpHealth: any = await response.json();
+        const mcpHealth = await response.json() as { version?: string; uptime?: number; capabilities?: string[]; lastAccessed?: string };
         health.services.mcp.status = 'healthy';
         health.services.mcp.version = mcpHealth.version;
         health.services.mcp.uptime = mcpHealth.uptime;
@@ -132,7 +140,7 @@ async function startServer() {
       }
     } catch (error) {
       health.services.mcp.status = 'offline';
-      (health.services.mcp as any).error = error instanceof Error ? error.message : 'Connection failed';
+      health.services.mcp.error = error instanceof Error ? error.message : 'Connection failed';
       // Don't mark overall health as degraded if MCP is just offline
     }
 
@@ -153,7 +161,7 @@ async function startServer() {
       clearTimeout(timeoutId);
       
       if (response.ok) {
-        const mcpStatus: any = await response.json();
+        const mcpStatus = await response.json() as Record<string, unknown>;
         res.json({
           connected: true,
           ...mcpStatus
@@ -173,12 +181,15 @@ async function startServer() {
   });
 
   httpServer.listen(PORT, '0.0.0.0', () => {
+    // eslint-disable-next-line no-console
     console.log(`🚀 GraphQL server ready at http://localhost:${PORT}/graphql`);
+    // eslint-disable-next-line no-console
     console.log(`🔌 WebSocket server ready at ws://localhost:${PORT}/graphql`);
   });
 }
 
 startServer().catch((error) => {
+  // eslint-disable-next-line no-console
   console.error('Failed to start server:', error);
   process.exit(1);
 });

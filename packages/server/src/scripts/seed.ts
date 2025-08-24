@@ -17,10 +17,12 @@ async function seed() {
   const session = driver.session();
   
   try {
+    // eslint-disable-next-line no-console
     console.log('🌱 Starting Neo4j database seeding...');
     
     // Clear existing data
     await session.run('MATCH (n) DETACH DELETE n');
+    // eslint-disable-next-line no-console
     console.log('✨ Cleared existing data');
     
     // Create work items with proper team IDs

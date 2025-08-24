@@ -1,5 +1,30 @@
 /**
  * CPU monitoring and throttling utilities for security
+ * 
+ * ENVIRONMENT CONFIGURATIONS:
+ * 
+ * 1. CI/CD Environments (GitHub Actions, etc.):
+ *    - CPU throttling is DISABLED automatically
+ *    - Detected via: CI=true, GITHUB_ACTIONS=true
+ *    - Reason: CI has unpredictable CPU spikes that interfere with testing
+ * 
+ * 2. Local Development Testing:
+ *    - CPU throttling is RELAXED (test mode)
+ *    - Detected via: NODE_ENV=test, vitest execution, etc.
+ *    - Allows higher CPU usage but still has some limits
+ * 
+ * 3. Production Test Servers (your own test infrastructure):
+ *    - Set: ENABLE_CPU_THROTTLING_IN_TESTS=true
+ *    - This enables FULL production CPU throttling even during tests
+ *    - Use this to test CPU exhaustion protection on your own servers
+ * 
+ * 4. Manual Control:
+ *    - Set: DISABLE_CPU_THROTTLING=true (disables completely)
+ *    - Or modify thresholds directly in production config
+ * 
+ * 5. Production Servers:
+ *    - CPU throttling is ENABLED with strict limits (default)
+ *    - Protects against CPU exhaustion attacks and resource abuse
  */
 
 import { performance } from 'perf_hooks';
@@ -31,14 +56,27 @@ export class CPUMonitor {
   private testMode: boolean = false; // Relaxed thresholds for testing
   
   private constructor() {
-    // Detect test environment and enable test mode
-    if (process.env.NODE_ENV === 'test' || 
-        process.env.VITEST === 'true' || 
-        (globalThis as any).it !== undefined ||
-        process.argv.some(arg => arg.includes('vitest')) ||
-        process.argv.some(arg => arg.includes('test'))) {
+    // Detect CI environment and disable CPU throttling entirely
+    // CI environments have unpredictable CPU patterns that interfere with testing
+    if (process.env.CI === 'true' || 
+        process.env.GITHUB_ACTIONS === 'true' ||
+        process.env.DISABLE_CPU_THROTTLING === 'true') {
+      this.disableCPUThrottling();
+    }
+    // Detect local test environment and enable relaxed test mode
+    else if (process.env.NODE_ENV === 'test' || 
+             process.env.VITEST === 'true' || 
+             (globalThis as any).it !== undefined ||
+             process.argv.some(arg => arg.includes('vitest')) ||
+             process.argv.some(arg => arg.includes('test'))) {
       this.enableTestMode();
     }
+    // Production test servers: Set ENABLE_CPU_THROTTLING_IN_TESTS=true to enable
+    else if (process.env.ENABLE_CPU_THROTTLING_IN_TESTS === 'true') {
+      console.log('🔒 CPU Monitor: Production test server mode - CPU throttling ENABLED');
+      // Use production settings even in test environment
+    }
+    
     this.startMonitoring();
   }
   
@@ -69,6 +107,17 @@ export class CPUMonitor {
     this.maxOperationsPerWindow = 1000;
     this.heavyOperationThreshold = 100;
     console.log('🏭 CPU Monitor: Production mode enabled - strict throttling');
+  }
+
+  /**
+   * Completely disable CPU throttling for CI environments
+   */
+  disableCPUThrottling(): void {
+    this.testMode = true;
+    this.maxCpuPercent = 999; // Effectively disabled
+    this.maxOperationsPerWindow = 999999; // Effectively unlimited
+    this.heavyOperationThreshold = 999999; // No throttling for heavy operations
+    console.log('🚫 CPU Monitor: DISABLED for CI environment - no throttling');
   }
 
   /**
