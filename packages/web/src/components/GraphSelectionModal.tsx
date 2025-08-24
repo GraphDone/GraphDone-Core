@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Folder, Plus } from 'lucide-react';
+import { X, Folder, FolderOpen, Plus, FileText } from 'lucide-react';
 import { useGraph } from '../contexts/GraphContext';
 import { CreateGraphModal } from './CreateGraphModal';
 
@@ -11,6 +11,22 @@ interface GraphSelectionModalProps {
 export function GraphSelectionModal({ isOpen, onClose }: GraphSelectionModalProps) {
   const { availableGraphs, selectGraph } = useGraph();
   const [showCreateModal, setShowCreateModal] = useState(false);
+
+  // Function to get icon based on graph type - matches CreateGraphModal exactly
+  const getGraphTypeIcon = (type?: string) => {
+    switch (type) {
+      case 'PROJECT':
+        return <Folder className="h-5 w-5 text-blue-400" />;
+      case 'WORKSPACE':
+        return <FolderOpen className="h-5 w-5 text-purple-400" />;
+      case 'SUBGRAPH':
+        return <Plus className="h-5 w-5 text-green-400" />;
+      case 'TEMPLATE':
+        return <FileText className="h-5 w-5 text-orange-400" />;
+      default:
+        return <Plus className="h-5 w-5 text-gray-400" />;
+    }
+  };
 
   const handleGraphSelect = async (graphId: string) => {
     await selectGraph(graphId);
@@ -71,7 +87,7 @@ export function GraphSelectionModal({ isOpen, onClose }: GraphSelectionModalProp
                         graph.type === 'SUBGRAPH' ? 'bg-green-600/20 text-green-400' :
                         'bg-orange-600/20 text-orange-400'
                       }`}>
-                        <Folder className="h-5 w-5" />
+                        {getGraphTypeIcon(graph.type)}
                       </div>
                     </div>
                     

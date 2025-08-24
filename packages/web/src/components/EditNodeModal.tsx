@@ -105,7 +105,7 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
       },
       { 
         query: GET_WORK_ITEMS,
-        variables: { where: { teamId: currentTeam?.id || 'team-1' } }
+        variables: { where: { graph: { teamId: currentTeam?.id || 'team-1' } } }
       }
     ],
     awaitRefetchQueries: true,

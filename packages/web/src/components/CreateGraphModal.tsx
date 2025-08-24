@@ -155,7 +155,7 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
+    <div className="fixed inset-0 z-[9999] overflow-y-auto" style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0}}>
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
         {/* Backdrop */}
         <div 
