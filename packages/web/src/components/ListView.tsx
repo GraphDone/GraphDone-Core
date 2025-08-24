@@ -301,7 +301,7 @@ export function ListView() {
       if (contributorFilter === 'Available') {
         filtered = filtered.filter(node => !node.assignedTo);
       } else {
-        filtered = filtered.filter(node => node.assignedTo === contributorFilter);
+        filtered = filtered.filter(node => node.assignedTo?.name === contributorFilter);
       }
     }
 
@@ -557,7 +557,7 @@ export function ListView() {
             {/* Contributor */}
             <div className="flex items-center">
               {node.assignedTo ? (
-                getContributorAvatar(node.assignedTo)
+                getContributorAvatar(node.assignedTo.name)
               ) : (
                 <div className="flex items-center space-x-2">
                   <div className="w-7 h-7 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center border-2 border-white dark:border-gray-700 shadow-sm">
@@ -815,7 +815,7 @@ export function ListView() {
                       {/* Contributor */}
                       <div className="mt-3 flex items-center">
                         {node.assignedTo ? (
-                          getContributorAvatar(node.assignedTo)
+                          getContributorAvatar(node.assignedTo.name)
                         ) : (
                           <div className="flex items-center space-x-2">
                             <div className="w-7 h-7 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center border-2 border-white dark:border-gray-700 shadow-sm">
@@ -975,7 +975,7 @@ export function ListView() {
                   </td>
                   <td className="pl-3 pr-6 py-10 dynamic-table-cell">
                     {node.assignedTo ? (
-                      getContributorAvatar(node.assignedTo)
+                      getContributorAvatar(node.assignedTo.name)
                     ) : (
                       <div className="flex items-center space-x-2">
                         <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center">
