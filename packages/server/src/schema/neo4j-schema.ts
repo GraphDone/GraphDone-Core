@@ -285,6 +285,10 @@ export const typeDefs = gql`
     type: GraphType!
     status: GraphStatus! @default(value: DRAFT)
     parentGraphId: String
+    teamId: String # Team ID for backwards compatibility
+    createdBy: String # Creator ID for backwards compatibility  
+    tags: [String!] # Tags for organization
+    defaultRole: String # Default role for team members
     depth: Int! @default(value: 0)
     path: [String!]
     isShared: Boolean! @default(value: false)
@@ -299,8 +303,8 @@ export const typeDefs = gql`
     createdAt: DateTime! @timestamp(operations: [CREATE])
     updatedAt: DateTime! @timestamp
     
-    # Relationships
-    creator: User! @relationship(type: "CREATED", direction: IN)
+    # Relationships (optional for backwards compatibility)
+    creator: User @relationship(type: "CREATED", direction: IN)
     team: Team @relationship(type: "OWNS_GRAPH", direction: IN)
     workItems: [WorkItem!]! @relationship(type: "BELONGS_TO", direction: IN)
     subgraphs: [Graph!]! @relationship(type: "PARENT_OF", direction: OUT)
