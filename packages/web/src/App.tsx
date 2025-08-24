@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { Workspace } from './pages/Workspace';
 import { Ontology } from './pages/Ontology';
@@ -6,7 +6,9 @@ import { Agents } from './pages/Agents';
 import { Analytics } from './pages/Analytics';
 import { Settings } from './pages/Settings';
 import { Backend } from './pages/Backend';
-import { Login } from './pages/Login';
+// import { Login } from './pages/Login';
+import { LoginForm } from './pages/LoginForm';
+import { Signup } from './pages/Signup';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { GraphProvider } from './contexts/GraphContext';
 import { NotificationProvider } from './contexts/NotificationContext';
@@ -42,7 +44,14 @@ function AuthenticatedApp() {
   }
 
   if (!isAuthenticated) {
-    return <Login />;
+    return (
+      <Routes>
+        <Route path="/" element={<LoginForm />} />
+        <Route path="/login" element={<LoginForm />} />
+        <Route path="/signup" element={<Signup />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    );
   }
 
   return (

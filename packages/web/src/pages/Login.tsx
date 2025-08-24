@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Users, ArrowRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { User, Team } from '../types/auth';
 
@@ -184,6 +185,16 @@ export function Login() {
             <span className="mr-2">⚡</span>
             Demo Mode: This is a placeholder authentication system for development
           </div>
+        </div>
+
+        {/* Signup Link */}
+        <div className="mt-6 text-center">
+          <p className="text-gray-300">
+            Don't have an account?{' '}
+            <Link to="/signup" className="text-green-400 hover:text-green-300 font-medium">
+              Create one now
+            </Link>
+          </p>
         </div>
       </div>
     </div>
