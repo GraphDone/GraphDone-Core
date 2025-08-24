@@ -39,13 +39,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (data.me) {
         setCurrentUser(data.me);
         setCurrentTeam(data.me.team);
+      } else {
+        // ME query returned null, clear stale data
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('currentUser');
+        setCurrentUser(null);
+        setCurrentTeam(null);
       }
       setIsInitializing(false);
     },
-    onError: () => {
+    onError: (error) => {
       // Token is invalid, clear it
       localStorage.removeItem('authToken');
       localStorage.removeItem('currentUser');
+      setCurrentUser(null);
+      setCurrentTeam(null);
       setIsInitializing(false);
     }
   });

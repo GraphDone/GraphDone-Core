@@ -11,7 +11,7 @@ import {
 
 const GraphContext = createContext<GraphContextType | undefined>(undefined);
 
-// No mock data - using only real GraphQL data
+// Using only real GraphQL data from Neo4j database
 
 interface GraphProviderProps {
   children: ReactNode;
@@ -23,10 +23,11 @@ export function GraphProvider({ children }: GraphProviderProps) {
   const [availableGraphs, setAvailableGraphs] = useState<Graph[]>([]);
   const [isCreating, setIsCreating] = useState(false);
 
+
   // GraphQL operations
-  const { data: graphsData, loading: isLoading } = useQuery(GET_GRAPHS, {
-    variables: { teamId: currentTeam?.id || 'default-team' },
-    skip: !currentTeam,
+  const { data: graphsData, loading: isLoading, error: graphsError } = useQuery(GET_GRAPHS, {
+    variables: { teamId: currentTeam?.id || '' },
+    skip: !currentTeam, // Only query when we have a valid team
   });
 
   const [createGraphMutation] = useMutation(CREATE_GRAPH);
@@ -96,9 +97,17 @@ export function GraphProvider({ children }: GraphProviderProps) {
       }));
       setAvailableGraphs(parsedGraphs);
       
-      // Auto-select first graph if none selected
+      // Try to restore previously selected graph from localStorage
+      const storedGraphId = localStorage.getItem('currentGraphId');
+      let graphToSelect = null;
+      
+      if (storedGraphId) {
+        graphToSelect = parsedGraphs.find(g => g.id === storedGraphId);
+      }
+      
+      // Auto-select first graph if none selected or stored graph not found
       if (!currentGraph && parsedGraphs.length > 0) {
-        setCurrentGraph(parsedGraphs[0]);
+        setCurrentGraph(graphToSelect || parsedGraphs[0]);
       }
     } else if (!isLoading) {
       // No graphs available - clear state
@@ -127,15 +136,13 @@ export function GraphProvider({ children }: GraphProviderProps) {
 
   const createGraph = async (input: CreateGraphInput): Promise<Graph> => {
     setIsCreating(true);
-    console.log('=== CREATE GRAPH CALLED ===');
-    console.log('Input received from UI:', input);
     
     try {
       // Pass exactly what the UI sends - let GraphQL handle it
       const graphInput = {
         ...input,  // This includes: name, description, type, status, teamId, tags, defaultRole, isShared
         parentGraphId: input.parentGraphId || null,
-        createdBy: input.createdBy || currentUser?.id || 'contrib-1',
+        createdBy: input.createdBy || currentUser?.id || '',
         depth: input.parentGraphId ? getGraphDepth(input.parentGraphId) + 1 : 0,
         path: input.parentGraphId ? [...getGraphPathIds(input.parentGraphId), input.parentGraphId] : [],
         nodeCount: 0,
@@ -143,8 +150,8 @@ export function GraphProvider({ children }: GraphProviderProps) {
         contributorCount: 1,
         lastActivity: new Date().toISOString(),
         permissions: JSON.stringify({
-          owner: input.createdBy || currentUser?.id || 'contrib-1',
-          admins: [input.createdBy || currentUser?.id || 'contrib-1'],
+          owner: input.createdBy || currentUser?.id || '',
+          admins: [input.createdBy || currentUser?.id || ''].filter(Boolean),
           editors: [],
           viewers: [],
           teamPermission: input.defaultRole === 'GraphMaster' ? 'ADMIN' : 
@@ -167,9 +174,6 @@ export function GraphProvider({ children }: GraphProviderProps) {
         })
       };
 
-      console.log('=== SENDING TO GRAPHQL ===');
-      console.log('GraphQL input:', JSON.stringify(graphInput, null, 2));
-      
       const { data } = await createGraphMutation({
         variables: { input: graphInput }
       });
@@ -302,8 +306,8 @@ export function GraphProvider({ children }: GraphProviderProps) {
   };
 
   const joinSharedGraph = async (_shareLink: string): Promise<Graph> => {
-    // Simulate API call to join shared graph
-    throw new Error('Not implemented in demo');
+    // TODO: Implement shared graph joining functionality
+    throw new Error('Shared graph joining not yet implemented');
   };
 
   const getGraphPathIds = (graphId: string): string[] => {
@@ -404,10 +408,11 @@ function buildHierarchy(graph: Graph, allGraphs: Graph[]): GraphHierarchy {
   };
 }
 
-function getPermissionLevel(_graph: Graph): 'OWNER' | 'ADMIN' | 'EDIT' | 'VIEW' {
-  // This would normally check against current user
-  // For demo purposes, returning mock values
-  return 'EDIT';
+function getPermissionLevel(graph: Graph): 'OWNER' | 'ADMIN' | 'EDIT' | 'VIEW' {
+  // TODO: Implement real permission checking based on current user
+  // For now, return basic permission level
+  return graph.permissions?.teamPermission === 'ADMIN' ? 'ADMIN' :
+         graph.permissions?.teamPermission === 'EDIT' ? 'EDIT' : 'VIEW';
 }
 
 export function useGraph() {
