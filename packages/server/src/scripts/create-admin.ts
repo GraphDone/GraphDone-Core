@@ -16,7 +16,7 @@ async function createAdmin() {
   try {
     // Check if admin already exists
     const existingAdmin = await session.run(
-      `MATCH (u:User {role: 'GRAPH_MASTER'}) RETURN u LIMIT 1`
+      `MATCH (u:User {role: 'ADMIN'}) RETURN u LIMIT 1`
     );
 
     if (existingAdmin.records.length > 0) {
@@ -24,32 +24,50 @@ async function createAdmin() {
       return;
     }
 
+    // Create default team first
+    const teamId = 'team-1';
+    await session.run(
+      `CREATE (t:Team {
+        id: $teamId,
+        name: 'GraphDone Team',
+        description: 'Default GraphDone team for graph management',
+        memberCount: 1,
+        createdAt: datetime(),
+        updatedAt: datetime()
+      })
+      RETURN t`,
+      { teamId }
+    );
+
     // Create admin user
     const adminId = uuidv4();
     const passwordHash = await bcrypt.hash('admin123', 10);
     
     await session.run(
-      `CREATE (u:User {
+      `MATCH (t:Team {id: $teamId})
+       CREATE (u:User {
         id: $adminId,
         email: 'admin@graphdone.local',
         username: 'admin',
         passwordHash: $passwordHash,
-        name: 'Graph Master Admin',
-        role: 'GRAPH_MASTER',
+        name: 'System Administrator',
+        role: 'ADMIN',
         isActive: true,
         isEmailVerified: true,
         createdAt: datetime(),
         updatedAt: datetime()
       })
+      CREATE (u)-[:MEMBER_OF]->(t)
       RETURN u`,
-      { adminId, passwordHash }
+      { adminId, passwordHash, teamId }
     );
 
-    console.log('✅ Admin user created successfully!');
+    console.log('✅ Admin user and team created successfully!');
+    console.log('👥 Team: GraphDone Team (team-1)');
     console.log('📧 Email: admin@graphdone.local');
     console.log('🔑 Password: admin123');
-    console.log('👑 Role: GRAPH_MASTER');
-    console.log('\nNow you can login and promote other users!');
+    console.log('👑 Role: ADMIN');
+    console.log('\nYou can now login and access the Admin panel!');
 
   } catch (error) {
     console.error('❌ Error creating admin:', error);
