@@ -53,6 +53,22 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
     tags: node.tags || [],
   });
 
+  // Update formData when node prop changes (for real-time updates)
+  React.useEffect(() => {
+    setFormData({
+      title: node.title,
+      description: node.description || '',
+      type: node.type,
+      status: node.status,
+      priorityExec: node.priorityExec || 0,
+      priorityIndiv: node.priorityIndiv || 0,
+      priorityComm: node.priorityComm || 0,
+      assignedTo: node.assignedTo || '',
+      dueDate: formatDateForInput(node.dueDate),
+      tags: node.tags || [],
+    });
+  }, [node]);
+
   const [isStatusOpen, setIsStatusOpen] = React.useState(false);
   const statusDropdownRef = React.useRef<HTMLDivElement>(null);
 
@@ -110,22 +126,6 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
     }
   });
 
-  React.useEffect(() => {
-    if (isOpen) {
-      setFormData({
-        title: node.title,
-        description: node.description || '',
-        type: node.type,
-        status: node.status,
-        priorityExec: node.priorityExec || 0,
-        priorityIndiv: node.priorityIndiv || 0,
-        priorityComm: node.priorityComm || 0,
-        assignedTo: node.assignedTo || '',
-        dueDate: formatDateForInput(node.dueDate),
-        tags: node.tags || [],
-      });
-    }
-  }, [isOpen, node]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -179,7 +179,9 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
         );
       }
     } catch (error) {
-      console.error('Error updating node:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error updating node:', error);
+      }
       
       // Show more specific error message if available
       let errorMessage = 'There was an error updating the node. Please try again or contact support if the problem persists.';

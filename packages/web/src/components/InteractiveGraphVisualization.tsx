@@ -95,7 +95,9 @@ export function InteractiveGraphVisualization() {
   const [createEdgeMutation] = useMutation(CREATE_EDGE, {
     refetchQueries: [{ query: GET_EDGES, variables: { where: { teamId: currentTeam?.id || 'default-team' } } }],
     onError: (error) => {
-      console.error('Failed to create edge:', error);
+      if (import.meta.env.DEV) {
+        console.error('Failed to create edge:', error);
+      }
     }
   });
   
@@ -141,9 +143,13 @@ export function InteractiveGraphVisualization() {
             }]
           }
         }).then(() => {
-          console.log('✅ Edge created successfully');
+          if (import.meta.env.DEV) {
+            console.log('✅ Edge created successfully');
+          }
         }).catch((error) => {
-          console.error('❌ Failed to create edge:', error);
+          if (import.meta.env.DEV) {
+            console.error('❌ Failed to create edge:', error);
+          }
         });
         initializeVisualization();
       }
@@ -219,11 +225,13 @@ export function InteractiveGraphVisualization() {
     
     // Log validation issues if any
     if (currentValidationResult && (currentValidationResult.errors.length > 0 || currentValidationResult.warnings.length > 0)) {
-      console.warn('Graph validation issues:', {
-        errors: currentValidationResult.errors,
-        warnings: currentValidationResult.warnings,
-        stats: currentValidationResult.stats
-      });
+      if (import.meta.env.DEV) {
+        console.warn('Graph validation issues:', {
+          errors: currentValidationResult.errors,
+          warnings: currentValidationResult.warnings,
+          stats: currentValidationResult.stats
+        });
+      }
     }
   }, [currentValidationResult.errors.length, currentValidationResult.warnings.length]);
 
@@ -328,7 +336,9 @@ export function InteractiveGraphVisualization() {
   const initializeVisualization = useCallback(() => {
     if (!svgRef.current || !containerRef.current || nodes.length === 0) return;
 
-    console.log('Initializing visualization with', nodes.length, 'nodes and', validatedEdges.length, 'edges');
+    if (import.meta.env.DEV) {
+      console.log('Initializing visualization with', nodes.length, 'nodes and', validatedEdges.length, 'edges');
+    }
 
     const container = containerRef.current;
     const svg = d3.select(svgRef.current);
@@ -770,7 +780,9 @@ export function InteractiveGraphVisualization() {
       g.attr('transform', event.transform);
     });
 
-    console.log('✅ Visualization initialized with', nodes.length, 'nodes');
+    if (import.meta.env.DEV) {
+      console.log('✅ Visualization initialized with', nodes.length, 'nodes');
+    }
   }, [nodes, validatedEdges, handleNodeClick]); // Include handleNodeClick to get fresh connection state
 
   // Store simulation reference for resize handling
@@ -779,7 +791,9 @@ export function InteractiveGraphVisualization() {
   // Initialization effect - NOW with access to nodes data
   useEffect(() => {
     if (nodes.length > 0) {
-      console.log('useEffect: Initializing visualization with', nodes.length, 'nodes');
+      if (import.meta.env.DEV) {
+        console.log('useEffect: Initializing visualization with', nodes.length, 'nodes');
+      }
       initializeVisualization();
     }
 
@@ -803,7 +817,9 @@ export function InteractiveGraphVisualization() {
         .alpha(0.3) // Restart simulation with some energy
         .restart();
       
-      console.log('🔄 Resized visualization to', newWidth, 'x', newHeight);
+      if (import.meta.env.DEV) {
+        console.log('🔄 Resized visualization to', newWidth, 'x', newHeight);
+      }
     };
 
     window.addEventListener('resize', handleResize);

@@ -7,6 +7,7 @@ import { Analytics } from './pages/Analytics';
 import { Settings } from './pages/Settings';
 import { Backend } from './pages/Backend';
 import { Login } from './pages/Login';
+import { GraphVisualization } from './components/GraphVisualization';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { GraphProvider } from './contexts/GraphContext';
 import { NotificationProvider } from './contexts/NotificationContext';
@@ -51,6 +52,7 @@ function AuthenticatedApp() {
         <Layout>
           <Routes>
             <Route path="/" element={<Workspace />} />
+            <Route path="/graph" element={<div className="h-screen"><GraphVisualization /></div>} />
             <Route path="/ontology" element={<Ontology />} />
             <Route path="/agents" element={<Agents />} />
             <Route path="/analytics" element={<Analytics />} />
