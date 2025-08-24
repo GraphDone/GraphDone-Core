@@ -94,7 +94,7 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
       await createGraph(formData as CreateGraphInput);
       onClose();
       resetForm();
-    } catch (_error) {
+    } catch {
       // Handle error silently for now
     }
   };

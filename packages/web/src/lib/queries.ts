@@ -212,13 +212,22 @@ export const SUBSCRIBE_TO_WORK_ITEM_CHANGES = gql`
       id
       type
       title
+      description
+      status
       positionX
       positionY
       positionZ
       radius
       theta
       phi
+      priorityExec
+      priorityIndiv
+      priorityComm
       priorityComp
+      dueDate
+      assignedTo
+      tags
+      updatedAt
     }
   }
 `;
