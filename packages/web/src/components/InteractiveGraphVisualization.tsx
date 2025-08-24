@@ -780,7 +780,9 @@ export function InteractiveGraphVisualization() {
       g.attr('transform', event.transform);
     });
 
-    console.log('✅ Visualization initialized with', nodes.length, 'nodes');
+    if (import.meta.env.DEV) {
+      console.log('✅ Visualization initialized with', nodes.length, 'nodes');
+    }
   }, [nodes, validatedEdges, handleNodeClick]); // Include handleNodeClick to get fresh connection state
 
   // Store simulation reference for resize handling
@@ -789,7 +791,9 @@ export function InteractiveGraphVisualization() {
   // Initialization effect - NOW with access to nodes data
   useEffect(() => {
     if (nodes.length > 0) {
-      console.log('useEffect: Initializing visualization with', nodes.length, 'nodes');
+      if (import.meta.env.DEV) {
+        console.log('useEffect: Initializing visualization with', nodes.length, 'nodes');
+      }
       initializeVisualization();
     }
 
@@ -813,7 +817,9 @@ export function InteractiveGraphVisualization() {
         .alpha(0.3) // Restart simulation with some energy
         .restart();
       
-      console.log('🔄 Resized visualization to', newWidth, 'x', newHeight);
+      if (import.meta.env.DEV) {
+        console.log('🔄 Resized visualization to', newWidth, 'x', newHeight);
+      }
     };
 
     window.addEventListener('resize', handleResize);
