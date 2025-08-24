@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Plus, Bot, Activity, Settings, Play, Pause, Trash2, Eye, Server } from 'lucide-react';
-import { Link } from 'react-router-dom';
 import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
 import { AgentSettingsModal } from '../components/AgentSettingsModal';
