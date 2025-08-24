@@ -68,6 +68,7 @@ export interface UpdateNodeArgs {
   node_id?: string;
   title?: string;
   description?: string;
+  type?: NodeType;
   status?: NodeStatus;
   contributor_ids?: string[];
   metadata?: NodeMetadata;
