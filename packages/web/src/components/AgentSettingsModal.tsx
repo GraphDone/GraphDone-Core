@@ -175,7 +175,9 @@ echo "Setup complete!"
       setCopiedConfig(true);
       setTimeout(() => setCopiedConfig(false), 2000);
     } catch (err) {
-      console.error('Failed to copy config:', err);
+      if (import.meta.env.DEV) {
+        console.error('Failed to copy config:', err);
+      }
     }
   };
 
@@ -218,7 +220,9 @@ echo "Setup complete!"
       }, {} as Record<string, string>);
       updateMcpServer(id, { env });
     } catch (err) {
-      console.error('Invalid environment format:', err);
+      if (import.meta.env.DEV) {
+        console.error('Invalid environment format:', err);
+      }
     }
   };
 

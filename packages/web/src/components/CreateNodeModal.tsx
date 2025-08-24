@@ -7,6 +7,24 @@ import { useNotifications } from '../contexts/NotificationContext';
 import { NodeTypeSelector } from './NodeCategorySelector';
 import { TagInput } from './TagInput';
 
+interface WorkItem {
+  id: string;
+  title: string;
+  description?: string;
+  type: string;
+  status: string;
+  priorityExec: number;
+  priorityIndiv: number;
+  priorityComm: number;
+  priorityComp: number;
+  assignedTo?: string;
+  dueDate?: string;
+  tags?: string[];
+  createdAt: string;
+  updatedAt: string;
+  contributors?: Array<{ id: string; name: string; type: string; }>;
+}
+
 interface CreateNodeModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -90,7 +108,7 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
             variables: {
               options: { limit: 100 }
             }
-          }) as { workItems: any[] } | null;
+          }) as { workItems: WorkItem[] } | null;
           
           if (graphData) {
             cache.writeQuery({
@@ -116,7 +134,7 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                 teamId: currentTeam?.id || 'team-1'
               }
             }
-          }) as { workItems: any[] } | null;
+          }) as { workItems: WorkItem[] } | null;
           
           if (listData) {
             cache.writeQuery({
