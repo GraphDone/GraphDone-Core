@@ -25,7 +25,7 @@ concurrency:
 
 jobs:
   chaos-testing:
-    name: Chaos Testing - Edge Cases & Resilience
+    name: 🔥 Malformed Input & Resource Stress Tests (Node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
     
     strategy:
@@ -52,41 +52,41 @@ jobs:
           --health-retries 10
     
     steps:
-      - name: Checkout code
+      - name: 📦 Checkout repository code
         uses: actions/checkout@v4
       
-      - name: Setup Node.js ${{ matrix.node-version }}
+      - name: 🟢 Setup Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
       
-      - name: Install dependencies
+      - name: 📥 Install project dependencies
         run: |
           npm ci
           cd packages/mcp-server
           npm ci
       
-      - name: Wait for Neo4j to be ready
+      - name: ⏳ Wait for Neo4j database to be ready
         run: |
           timeout 300 bash -c 'until curl -f -s -I http://localhost:7474; do echo "Waiting for Neo4j..."; sleep 5; done'
           echo "Neo4j is ready!"
       
-      - name: Verify Neo4j connection
+      - name: 🔌 Verify Neo4j database connection
         run: |
           curl -u neo4j:graphdone_password \
             -H "Content-Type: application/json" \
             -d '{"statements":[{"statement":"RETURN 1 as test"}]}' \
             http://localhost:7474/db/neo4j/tx/commit
       
-      - name: Run standard tests first
+      - name: ✅ Run standard lint, typecheck, and unit tests
         working-directory: packages/mcp-server
         run: |
           npm run lint
           npm run typecheck
           npm run test
       
-      - name: Set chaos testing intensity
+      - name: ⚙️ Configure chaos testing intensity and parameters
         id: chaos-config
         run: |
           INTENSITY="${{ github.event.inputs.intensity || 'normal' }}"
@@ -110,7 +110,7 @@ jobs:
               ;;
           esac
       
-      - name: Run Chaos Testing Suite
+      - name: 🔥 Execute chaos testing suite with malformed inputs
         working-directory: packages/mcp-server
         timeout-minutes: 10
         env:
@@ -123,7 +123,7 @@ jobs:
           echo "🔥 Running chaos tests with intensity: ${{ steps.chaos-config.outputs.intensity }}"
           npm run test:chaos
       
-      - name: Run Resource Stress Test
+      - name: 🧪 Test resilience under memory and CPU pressure
         working-directory: packages/mcp-server
         timeout-minutes: 5
         run: |
@@ -138,7 +138,7 @@ jobs:
           done
           wait
       
-      - name: Run Real Database Chaos Tests
+      - name: 🗄️ Test database resilience with concurrent operations
         working-directory: packages/mcp-server
         timeout-minutes: 8
         env:
@@ -158,7 +158,7 @@ jobs:
           echo "Testing connection limits..."
           npm test -- tests/real-database-integration.test.ts
       
-      - name: Run Network Chaos Simulation
+      - name: 🌐 Simulate network timeouts and rapid requests
         working-directory: packages/mcp-server
         run: |
           echo "🌐 Simulating network chaos..."
@@ -172,7 +172,7 @@ jobs:
           done
           wait || echo "Rapid request test completed"
       
-      - name: System Resource Analysis
+      - name: 📊 Analyze system resource usage post-chaos
         if: always()
         run: |
           echo "📊 System Resource Analysis:"
@@ -186,7 +186,7 @@ jobs:
           echo "Process information:"
           ps aux --sort=-%cpu | head -10
       
-      - name: Generate Chaos Test Report
+      - name: 📋 Generate comprehensive chaos testing report
         if: always()
         working-directory: packages/mcp-server
         run: |
@@ -206,7 +206,7 @@ jobs:
           npm --version >> chaos-report.md
           echo '```' >> chaos-report.md
       
-      - name: Upload Chaos Test Results
+      - name: 📤 Upload chaos test artifacts and coverage reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -217,13 +217,13 @@ jobs:
           retention-days: 30
   
   chaos-summary:
-    name: Chaos Testing Summary
+    name: 📊 Resilience Test Results Summary
     needs: chaos-testing
     runs-on: ubuntu-latest
     if: always()
     
     steps:
-      - name: Check chaos testing results
+      - name: 🎯 Evaluate chaos testing results across all Node.js versions
         run: |
           echo "🎯 Chaos Testing Complete!"
           echo "========================="
@@ -239,7 +239,7 @@ jobs:
             echo "CHAOS_STATUS=cancelled" >> $GITHUB_ENV
           fi
       
-      - name: Comment on PR (if applicable)
+      - name: 💬 Post chaos testing summary to pull request
         if: github.event_name == 'pull_request'
         uses: actions/github-script@v7
         with:
