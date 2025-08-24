@@ -7,29 +7,43 @@ import { WebSocketServer } from 'ws';
 import { useServer } from 'graphql-ws/lib/use/ws';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import neo4j from 'neo4j-driver';
+// OAuth imports disabled
+// import session from 'express-session';
+// import passport from 'passport';
 import { Neo4jGraphQL } from '@neo4j/graphql';
 
 import { typeDefs } from './schema/neo4j-schema.js';
+import { authTypeDefs } from './schema/auth-schema.js';
+import { authResolvers } from './resolvers/auth.js';
+import { extractUserFromToken } from './middleware/auth.js';
+import { mergeTypeDefs } from '@graphql-tools/merge';
+import { driver } from './db.js';
+// import { configurePassport } from './config/passport.js';
+// import { authRoutes } from './routes/auth.js';
 
 dotenv.config();
 
 const PORT = Number(process.env.PORT) || 4127;
-const NEO4J_URI = process.env.NEO4J_URI || 'bolt://localhost:7687';
-const NEO4J_USER = process.env.NEO4J_USER || 'neo4j';
-const NEO4J_PASSWORD = process.env.NEO4J_PASSWORD || 'password';
 
 async function startServer() {
   const app = express();
   const httpServer = createServer(app);
 
-  // Create Neo4j driver
-  const driver = neo4j.driver(NEO4J_URI, neo4j.auth.basic(NEO4J_USER, NEO4J_PASSWORD));
+  // OAuth configuration disabled
+  // configurePassport();
+  // app.use(session(...));
+  // app.use(passport.initialize());
+  // app.use(passport.session());
+  // app.use('/auth', authRoutes);
+
+  // Merge type definitions
+  const mergedTypeDefs = mergeTypeDefs([typeDefs, authTypeDefs]);
 
   // Create Neo4jGraphQL instance
   const neoSchema = new Neo4jGraphQL({
-    typeDefs,
+    typeDefs: mergedTypeDefs,
     driver,
+    resolvers: authResolvers,
   });
 
   const schema = await neoSchema.getSchema();
@@ -64,9 +78,11 @@ async function startServer() {
     cors<cors.CorsRequest>(),
     express.json(),
     expressMiddleware(server, {
-      context: async () => {
+      context: async ({ req }) => {
+        const user = extractUserFromToken(req.headers.authorization);
         return {
           driver,
+          user,
         };
       },
     })
