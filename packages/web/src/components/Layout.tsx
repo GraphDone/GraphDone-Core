@@ -4,6 +4,7 @@ import { Brain, Bot, BarChart3, Settings, Menu, Server, Globe } from 'lucide-rea
 import { UserSelector } from './UserSelector';
 import { GraphSelector } from './GraphSelector';
 import { useAuth } from '../contexts/AuthContext';
+import { McpHealthIndicator } from './McpHealthIndicator';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -17,7 +18,7 @@ export function Layout({ children }: LayoutProps) {
   const navigation = [
     { name: 'Workspace', href: '/', icon: Globe, description: 'Main work' },
     { name: 'Ontology', href: '/ontology', icon: Brain, description: 'Node schemas' },
-    { name: 'Agents', href: '/agents', icon: Bot, description: 'AI collaboration' },
+    { name: 'AI & Agents', href: '/agents', icon: Bot, description: 'AI collaboration' },
     { name: 'Analytics', href: '/analytics', icon: BarChart3, description: 'Priority insights' },
     { name: 'Settings', href: '/settings', icon: Settings, description: 'User preferences' },
     { name: 'System', href: '/backend', icon: Server, description: 'Backend status' },
@@ -98,8 +99,14 @@ export function Layout({ children }: LayoutProps) {
               <UserSelector />
             </div>
 
-            {/* Footer */}
+            {/* Footer with MCP Status */}
             <div className="p-4 border-t border-gray-700">
+              {/* MCP Health Indicator */}
+              <div className="mb-3 flex items-center justify-between">
+                <span className="text-xs text-gray-400">MCP Server</span>
+                <McpHealthIndicator showDetails={false} />
+              </div>
+              
               {currentTeam && (
                 <div className="mb-2">
                   <p className="text-xs text-gray-300 font-medium">{currentTeam.name}</p>
