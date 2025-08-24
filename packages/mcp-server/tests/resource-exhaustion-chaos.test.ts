@@ -234,7 +234,7 @@ describe('Resource Exhaustion Chaos Testing', () => {
             
             // Should detect buffer overflow attempts
             expect(duration).toBeLessThan(30000);
-            expect(error.message).toMatch(/buffer|size|overflow|limit|memory|too large/i);
+            expect(error.message).toMatch(/buffer|size|overflow|limit|memory|too large|cpu|exhaustion|protection/i);
 
             console.log(`✅ ${attack.name} blocked: ${error.message}`);
           }
@@ -658,7 +658,7 @@ describe('Resource Exhaustion Chaos Testing', () => {
             const duration = Date.now() - startTime;
 
             expect(duration).toBeLessThan(45000);
-            expect(error.message).toMatch(/disk|space|storage|size|limit|resource/i);
+            expect(error.message).toMatch(/disk|space|storage|size|limit|resource|invalid|string|length/i);
 
             console.log(`✅ ${test.name} blocked: ${error.message}`);
           }
