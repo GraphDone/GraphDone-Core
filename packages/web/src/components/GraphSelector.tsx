@@ -52,19 +52,8 @@ export function GraphSelector() {
       <div className="p-3">
         <div className="text-center text-gray-400">
           <Folder className="h-8 w-8 mx-auto mb-2 opacity-50" />
-          <p className="text-sm mb-3">No graphs available</p>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
-          >
-            Create Your First Graph
-          </button>
+          <p className="text-sm">No graphs available</p>
         </div>
-        
-        <CreateGraphModal
-          isOpen={showCreateModal}
-          onClose={() => setShowCreateModal(false)}
-        />
       </div>
     );
   }
@@ -170,15 +159,6 @@ export function GraphSelector() {
                 <div className="p-8 text-center text-gray-500">
                   <Folder className="h-8 w-8 mx-auto mb-2 opacity-50" />
                   <p className="text-sm">No graphs found</p>
-                  <button
-                    onClick={() => {
-                      setShowCreateModal(true);
-                      setIsOpen(false);
-                    }}
-                    className="mt-2 text-blue-400 hover:text-blue-300 text-sm"
-                  >
-                    Create your first graph
-                  </button>
                 </div>
               )}
             </div>
