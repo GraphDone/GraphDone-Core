@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import * as d3 from 'd3';
-import { Link2, Edit3, Trash2, AlertTriangle, AlertCircle, Layers, Sparkles, ListTodo, Trophy, Target, Lightbulb, Microscope } from 'lucide-react';
+import { Link2, Edit3, Trash2, AlertTriangle, AlertCircle, Layers, Sparkles, ListTodo, Trophy, Target, Lightbulb, Microscope, Folder, FolderOpen, Plus, FileText, Settings } from 'lucide-react';
 import { useQuery, useMutation } from '@apollo/client';
 import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -9,6 +9,10 @@ import { relationshipTypeInfo, RelationshipType } from '../types/projectData';
 import { validateGraphData, getValidationSummary, ValidationResult } from '../utils/graphDataValidation';
 import { EditNodeModal } from './EditNodeModal';
 import { DeleteNodeModal } from './DeleteNodeModal';
+import { CreateGraphModal } from './CreateGraphModal';
+import { GraphSelectionModal } from './GraphSelectionModal';
+import { UpdateGraphModal } from './UpdateGraphModal';
+import { DeleteGraphModal } from './DeleteGraphModal';
 
 interface WorkItem {
   id: string;
@@ -69,7 +73,9 @@ export function InteractiveGraphVisualization() {
   const { data: workItemsData, loading, error } = useQuery(GET_WORK_ITEMS, {
     variables: {
       where: {
-        teamId: currentTeam?.id || 'default-team',
+        graph: {
+          teamId: currentTeam?.id || 'default-team'
+        }
         // Optional: Also filter by user for additional privacy
         // userId: currentUser?.id || 'default-user'
       }
@@ -83,7 +89,11 @@ export function InteractiveGraphVisualization() {
   const { data: edgesData, loading: edgesLoading, error: edgesError } = useQuery(GET_EDGES, {
     variables: {
       where: {
-        teamId: currentTeam?.id || 'default-team'
+        source: {
+          graph: {
+            teamId: currentTeam?.id || 'default-team'
+          }
+        }
       }
     },
     pollInterval: 5000,
@@ -93,7 +103,7 @@ export function InteractiveGraphVisualization() {
 
   // Mutation for creating edges
   const [createEdgeMutation] = useMutation(CREATE_EDGE, {
-    refetchQueries: [{ query: GET_EDGES, variables: { where: { teamId: currentTeam?.id || 'default-team' } } }],
+    refetchQueries: [{ query: GET_EDGES, variables: { where: { source: { graph: { teamId: currentTeam?.id || 'default-team' } } } } }],
     onError: (error) => {
       if (import.meta.env.DEV) {
         console.error('Failed to create edge:', error);
@@ -106,12 +116,31 @@ export function InteractiveGraphVisualization() {
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionSource, setConnectionSource] = useState<string | null>(null);
   const [selectedRelationType, setSelectedRelationType] = useState<RelationshipType>('DEPENDS_ON');
-  const [showGraphSwitcher, setShowGraphSwitcher] = useState(false);
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
   const [showDataHealth, setShowDataHealth] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showCreateGraphModal, setShowCreateGraphModal] = useState(false);
+  const [showGraphSwitcher, setShowGraphSwitcher] = useState(false);
+  const [showUpdateGraphModal, setShowUpdateGraphModal] = useState(false);
+  const [showDeleteGraphModal, setShowDeleteGraphModal] = useState(false);
   const [selectedNode, setSelectedNode] = useState<WorkItem | null>(null);
+
+  // Function to get icon based on graph type - matches CreateGraphModal exactly
+  const getGraphTypeIcon = (type?: string) => {
+    switch (type) {
+      case 'PROJECT':
+        return <Folder className="h-4 w-4 text-white" />;
+      case 'WORKSPACE':
+        return <FolderOpen className="h-4 w-4 text-white" />;
+      case 'SUBGRAPH':
+        return <Plus className="h-4 w-4 text-white" />;
+      case 'TEMPLATE':
+        return <FileText className="h-4 w-4 text-white" />;
+      default:
+        return <Plus className="h-4 w-4 text-white" />;
+    }
+  };
 
   // ALL HOOK CALLS MUST BE AT THE TOP
   // Close menus when clicking outside
@@ -987,80 +1016,86 @@ export function InteractiveGraphVisualization() {
     <div ref={containerRef} className="graph-container relative w-full h-full bg-gray-900">
       <svg ref={svgRef} className="w-full h-full" style={{ background: 'radial-gradient(circle at center, #1f2937 0%, #111827 100%)' }} />
       
-      {/* Graph Switcher Trigger */}
-      <div 
-        className="absolute top-4 left-4 z-40"
-        onMouseEnter={() => setShowGraphSwitcher(true)}
-        onMouseLeave={() => setShowGraphSwitcher(false)}
-      >
-        <button 
-          className="bg-gray-800/90 backdrop-blur-sm border border-gray-600 rounded-lg px-3 py-2 shadow-md hover:bg-gray-700 transition-all duration-200"
-        >
-          <div className="flex items-center space-x-2">
-            <div className="w-2 h-2 bg-green-400 rounded-full" />
-            <span className="text-sm font-medium text-green-100">{currentGraph?.name || 'Select Graph'}</span>
-            <div className="w-3 h-3 text-gray-400">
-              <svg viewBox="0 0 12 12" fill="currentColor">
-                <path d="M3 5l3 3 3-3" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+      {/* Professional Graph Control Panel */}
+      <div className="absolute top-4 left-4 z-40">
+        <div className="bg-gray-800/95 backdrop-blur-sm border border-gray-600/60 rounded-lg shadow-xl p-4 w-64">
+          {/* Current Graph Header */}
+          <div className="flex items-center space-x-3 mb-4">
+            <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center flex-shrink-0">
+              {getGraphTypeIcon(currentGraph?.type)}
             </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-semibold text-white truncate">{currentGraph?.name || 'No Graph Selected'}</div>
+              <div className="text-xs text-gray-400">{currentGraph?.type || 'Select a graph to begin'}</div>
+            </div>
+            <div className="w-2 h-2 bg-green-400 rounded-full flex-shrink-0"></div>
           </div>
-        </button>
 
-        {/* Floating Graph Switcher */}
-        {showGraphSwitcher && (
-          <div className="absolute top-full left-0 mt-2 w-80 bg-gray-800/95 backdrop-blur-sm border border-gray-600 rounded-lg shadow-xl z-50 animate-in fade-in slide-in-from-top-2 duration-200">
-            <div className="p-3 border-b border-gray-600">
-              <h3 className="text-sm font-medium text-green-300">Switch Graph</h3>
-              <p className="text-xs text-gray-400 mt-1">Select a different graph to visualize</p>
+          {/* Graph Stats */}
+          <div className="grid grid-cols-3 gap-2 mb-4">
+            <div className="bg-gray-700/50 rounded-md p-2 text-center">
+              <div className="text-white text-lg font-medium">{nodes.length}</div>
+              <div className="text-gray-400 text-xs">Nodes</div>
             </div>
-            <div className="max-h-64 overflow-y-auto">
-              {availableGraphs.map((graph) => (
-                <button
-                  key={graph.id}
-                  onClick={() => {
-                    selectGraph(graph.id);
-                    setShowGraphSwitcher(false);
-                  }}
-                  className={`w-full text-left px-3 py-2 hover:bg-gray-700 border-b border-gray-600 last:border-b-0 transition-colors ${
-                    currentGraph?.id === graph.id ? 'bg-green-900/30 border-green-500/30' : ''
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className={`w-3 h-3 rounded-full ${
-                        graph.type === 'PROJECT' ? 'bg-blue-500' :
-                        graph.type === 'WORKSPACE' ? 'bg-purple-500' :
-                        graph.type === 'SUBGRAPH' ? 'bg-green-500' : 'bg-gray-500'
-                      }`} />
-                      <div>
-                        <div className="font-medium text-gray-200 text-sm">{graph.name}</div>
-                        <div className="text-xs text-gray-400">{graph.type}</div>
-                      </div>
-                    </div>
-                    {currentGraph?.id === graph.id && (
-                      <div className="w-4 h-4 text-green-400">
-                        <svg viewBox="0 0 16 16" fill="currentColor">
-                          <path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/>
-                        </svg>
-                      </div>
-                    )}
-                  </div>
-                  {graph.parentGraphId && (
-                    <div className="ml-6 mt-1 text-xs text-gray-400">
-                      Part of: {availableGraphs.find(g => g.id === graph.parentGraphId)?.name || 'Unknown'}
-                    </div>
-                  )}
-                </button>
-              ))}
+            <div className="bg-gray-700/50 rounded-md p-2 text-center">
+              <div className="text-white text-lg font-medium">{validatedEdges.length}</div>
+              <div className="text-gray-400 text-xs">Edges</div>
             </div>
-            <div className="p-3 border-t border-gray-600">
-              <button className="w-full text-center text-xs text-green-400 hover:text-green-300 transition-colors">
-                + Create New Graph
-              </button>
+            <div className="bg-gray-700/50 rounded-md p-2 text-center">
+              <div className="text-white text-lg font-medium">{currentGraph?.contributorCount || 0}</div>
+              <div className="text-gray-400 text-xs">Users</div>
             </div>
           </div>
-        )}
+
+          {/* Action Buttons */}
+          <div className="space-y-2">
+            {/* Create New Graph Button */}
+            <button 
+              onClick={() => setShowCreateGraphModal(true)}
+              className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2.5 px-3 rounded-md transition-colors duration-200 flex items-center justify-center space-x-2"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              <span className="text-sm">Create Graph</span>
+            </button>
+
+            {/* Switch Graph Button */}
+            <button 
+              onClick={() => setShowGraphSwitcher(true)}
+              className="w-full bg-gray-600 hover:bg-gray-700 text-gray-200 font-medium py-2.5 px-3 rounded-md transition-colors duration-200 flex items-center justify-between"
+            >
+              <div className="flex items-center space-x-2">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                </svg>
+                <span className="text-sm">Switch Graph</span>
+              </div>
+              <span className="text-xs bg-gray-500 px-2 py-1 rounded text-gray-300">{availableGraphs.length}</span>
+            </button>
+
+            {/* Update and Delete Graph Buttons */}
+            {currentGraph && (
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                <button 
+                  onClick={() => setShowUpdateGraphModal(true)}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-3 rounded-md transition-colors duration-200 flex items-center justify-center space-x-2"
+                >
+                  <Settings className="w-4 h-4" />
+                  <span className="text-sm">Edit</span>
+                </button>
+                
+                <button 
+                  onClick={() => setShowDeleteGraphModal(true)}
+                  className="bg-red-600 hover:bg-red-700 text-white font-medium py-2.5 px-3 rounded-md transition-colors duration-200 flex items-center justify-center space-x-2"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span className="text-sm">Delete</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Data Health Indicator */}
@@ -1318,39 +1353,39 @@ export function InteractiveGraphVisualization() {
       )}
 
       {/* Legend */}
-      <div className="absolute bottom-4 left-4 bg-gray-800/90 border border-gray-600 rounded-lg shadow-lg p-1 w-72 backdrop-blur-sm">
-        <div className="text-base font-medium text-green-400 mb-2 text-center">Node Types</div>
-        <div className="grid grid-cols-2 grid-rows-4 gap-x-4 gap-y-3 text-base text-gray-300">
-          <div className="flex items-center space-x-3">
-            <Layers className="w-5 h-5 text-purple-500" />
+      <div className="absolute bottom-4 left-4 bg-gray-800/95 backdrop-blur-sm border border-gray-600/60 rounded-lg shadow-xl p-4 w-64">
+        <div className="text-sm font-semibold text-white mb-3 text-center">Node Types</div>
+        <div className="grid grid-cols-2 gap-2 text-sm text-gray-300">
+          <div className="flex items-center space-x-2">
+            <Layers className="w-4 h-4 text-purple-400" />
             <span>Epic</span>
           </div>
-          <div className="flex items-center space-x-3">
-            <ListTodo className="w-5 h-5 text-green-500" />
+          <div className="flex items-center space-x-2">
+            <ListTodo className="w-4 h-4 text-green-400" />
             <span>Task</span>
           </div>
-          <div className="flex items-center space-x-3">
-            <Trophy className="w-5 h-5 text-orange-500" />
+          <div className="flex items-center space-x-2">
+            <Trophy className="w-4 h-4 text-orange-400" />
             <span>Milestone</span>
           </div>
-          <div className="flex items-center space-x-3">
-            <AlertTriangle className="w-5 h-5 text-red-500" />
+          <div className="flex items-center space-x-2">
+            <AlertTriangle className="w-4 h-4 text-red-400" />
             <span>Bug</span>
           </div>
-          <div className="flex items-center space-x-3">
-            <Target className="w-5 h-5 text-indigo-500" />
+          <div className="flex items-center space-x-2">
+            <Target className="w-4 h-4 text-indigo-400" />
             <span>Outcome</span>
           </div>
-          <div className="flex items-center space-x-3">
-            <Lightbulb className="w-5 h-5 text-yellow-500" />
+          <div className="flex items-center space-x-2">
+            <Lightbulb className="w-4 h-4 text-yellow-400" />
             <span>Idea</span>
           </div>
-          <div className="flex items-center space-x-3">
-            <Sparkles className="w-5 h-5 text-blue-500" />
+          <div className="flex items-center space-x-2">
+            <Sparkles className="w-4 h-4 text-blue-400" />
             <span>Feature</span>
           </div>
-          <div className="flex items-center space-x-3">
-            <Microscope className="w-5 h-5 text-teal-500" />
+          <div className="flex items-center space-x-2">
+            <Microscope className="w-4 h-4 text-teal-400" />
             <span>Research</span>
           </div>
         </div>
@@ -1382,6 +1417,38 @@ export function InteractiveGraphVisualization() {
           nodeId={selectedNode.id}
           nodeTitle={selectedNode.title}
           nodeType={selectedNode.type}
+        />
+      )}
+
+      {/* Create Graph Modal */}
+      {showCreateGraphModal && (
+        <CreateGraphModal
+          isOpen={showCreateGraphModal}
+          onClose={() => setShowCreateGraphModal(false)}
+        />
+      )}
+
+      {/* Graph Selection Modal */}
+      {showGraphSwitcher && (
+        <GraphSelectionModal
+          isOpen={showGraphSwitcher}
+          onClose={() => setShowGraphSwitcher(false)}
+        />
+      )}
+
+      {/* Update Graph Modal */}
+      {showUpdateGraphModal && (
+        <UpdateGraphModal
+          isOpen={showUpdateGraphModal}
+          onClose={() => setShowUpdateGraphModal(false)}
+        />
+      )}
+
+      {/* Delete Graph Modal */}
+      {showDeleteGraphModal && (
+        <DeleteGraphModal
+          isOpen={showDeleteGraphModal}
+          onClose={() => setShowDeleteGraphModal(false)}
         />
       )}
     </div>

@@ -1,13 +1,27 @@
 import { useState, useRef, useEffect } from 'react';
-import { ChevronDown, Plus, Folder, FolderOpen, Share2, Eye, Edit3, Crown } from 'lucide-react';
+import { ChevronDown, Plus, Folder, FolderOpen, FileText, Share2, Eye, Edit3, Crown } from 'lucide-react';
 import { useGraph } from '../contexts/GraphContext';
-import { CreateGraphModal } from './CreateGraphModal';
 
 export function GraphSelector() {
   const { currentGraph, graphHierarchy, selectGraph } = useGraph();
   const [isOpen, setIsOpen] = useState(false);
-  const [showCreateModal, setShowCreateModal] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Function to get icon based on graph type - matches CreateGraphModal exactly
+  const getGraphTypeIcon = (type?: string) => {
+    switch (type) {
+      case 'PROJECT':
+        return <Folder className="h-4 w-4" />;
+      case 'WORKSPACE':
+        return <FolderOpen className="h-4 w-4" />;
+      case 'SUBGRAPH':
+        return <Plus className="h-4 w-4" />;
+      case 'TEMPLATE':
+        return <FileText className="h-4 w-4" />;
+      default:
+        return <Plus className="h-4 w-4" />;
+    }
+  };
 
   // Close dropdown when clicking outside (EXACT same pattern as UserSelector)
   useEffect(() => {
@@ -51,7 +65,7 @@ export function GraphSelector() {
     return (
       <div className="p-3">
         <div className="text-center text-gray-400">
-          <Folder className="h-8 w-8 mx-auto mb-2 opacity-50" />
+          <Plus className="h-8 w-8 mx-auto mb-2 opacity-50" />
           <p className="text-sm">No graphs available</p>
         </div>
       </div>
@@ -66,8 +80,8 @@ export function GraphSelector() {
         className="flex items-center space-x-3 w-full p-3 text-left hover:bg-gray-700 rounded-lg transition-colors"
       >
         <div className="flex-shrink-0">
-          <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ${getGraphTypeColor(currentGraph.type)}`}>
-            {currentGraph.name.charAt(0).toUpperCase()}
+          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${getGraphTypeColor(currentGraph.type)}`}>
+            {getGraphTypeIcon(currentGraph.type)}
           </div>
         </div>
         
@@ -95,16 +109,6 @@ export function GraphSelector() {
             <span className="text-sm font-medium text-gray-300">Select Graph</span>
             <div className="flex items-center gap-2">
               <button
-                onClick={() => {
-                  setShowCreateModal(true);
-                  setIsOpen(false);
-                }}
-                className="p-1.5 text-green-400 hover:bg-gray-700 rounded transition-colors"
-                title="Create new graph"
-              >
-                <Plus className="h-4 w-4" />
-              </button>
-              <button
                 onClick={() => setIsOpen(false)}
                 className="p-1.5 text-gray-400 hover:bg-gray-700 rounded transition-colors"
                 title="Close"
@@ -129,13 +133,7 @@ export function GraphSelector() {
                     }`}
                   >
                     <div className="flex-shrink-0">
-                      {graph.children && graph.children.length > 0 ? (
-                        <FolderOpen className="h-4 w-4" />
-                      ) : (
-                        <div className="w-4 h-4 flex items-center justify-center">
-                          <div className="w-1.5 h-1.5 bg-gray-500 rounded-full" />
-                        </div>
-                      )}
+                      {getGraphTypeIcon(graph.type)}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
@@ -157,7 +155,7 @@ export function GraphSelector() {
                 ))
               ) : (
                 <div className="p-8 text-center text-gray-500">
-                  <Folder className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <Plus className="h-8 w-8 mx-auto mb-2 opacity-50" />
                   <p className="text-sm">No graphs found</p>
                 </div>
               )}
@@ -174,13 +172,6 @@ export function GraphSelector() {
           )}
         </div>
       )}
-
-      {/* Create Graph Modal */}
-      <CreateGraphModal
-        isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        parentGraphId={currentGraph?.id}
-      />
     </div>
   );
 }

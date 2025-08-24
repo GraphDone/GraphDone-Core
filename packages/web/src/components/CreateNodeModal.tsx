@@ -3,6 +3,7 @@ import { useMutation } from '@apollo/client';
 import { X, Link, Calendar, Clock, CheckCircle, AlertCircle, ChevronDown, Flame, Zap, Triangle, Circle, ArrowDown, ClipboardList } from 'lucide-react';
 import { CREATE_WORK_ITEM, GET_WORK_ITEMS } from '../lib/queries';
 import { useAuth } from '../contexts/AuthContext';
+import { useGraph } from '../contexts/GraphContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { NodeTypeSelector } from './NodeCategorySelector';
 import { TagInput } from './TagInput';
@@ -34,6 +35,7 @@ interface CreateNodeModalProps {
 
 export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: CreateNodeModalProps) {
   const { currentUser, currentTeam } = useAuth();
+  const { currentGraph } = useGraph();
   const { showSuccess, showError } = useNotifications();
   
   const [formData, setFormData] = React.useState({
@@ -169,6 +171,11 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
       showError('Validation Error', 'Please select a node type.');
       return;
     }
+
+    if (!currentGraph) {
+      showError('No Graph Selected', 'Please select a graph before creating work items.');
+      return;
+    }
     
     try {
       // Clean up the form data - remove empty strings and null values
@@ -195,9 +202,17 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
         phi: 0.0,
         priorityComp: (formData.priorityExec + formData.priorityIndiv + formData.priorityComm) / 3,
         
-        // Data isolation - assign to current team and user
-        teamId: currentTeam?.id || 'default-team',
-        userId: currentUser?.id || 'default-user',
+        // Relationships - connect to current user and graph
+        owner: {
+          connect: {
+            where: { node: { id: currentUser?.id } }
+          }
+        },
+        graph: {
+          connect: {
+            where: { node: { id: currentGraph?.id } }
+          }
+        },
         
         // If parentNodeId is provided, create a dependency relationship
         ...(parentNodeId && {

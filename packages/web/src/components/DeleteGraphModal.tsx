@@ -1,28 +1,22 @@
-import React, { useState, useEffect } from 'react';
-import { useMutation } from '@apollo/client';
+import React, { useState } from 'react';
 import { X, Trash2, AlertTriangle, Shield, CheckCircle } from 'lucide-react';
-import { DELETE_WORK_ITEM, GET_WORK_ITEMS } from '../lib/queries';
-import { useAuth } from '../contexts/AuthContext';
-import { useNotifications } from '../contexts/NotificationContext';
+import { useGraph } from '../contexts/GraphContext';
 
-interface DeleteNodeModalProps {
+interface DeleteGraphModalProps {
   isOpen: boolean;
   onClose: () => void;
-  nodeId: string;
-  nodeTitle: string;
-  nodeType: string;
 }
 
-export function DeleteNodeModal({ isOpen, onClose, nodeId, nodeTitle, nodeType }: DeleteNodeModalProps) {
-  const { currentTeam } = useAuth();
-  const { showSuccess, showError } = useNotifications();
+export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
+  const { currentGraph, deleteGraph } = useGraph();
+  const [loading, setLoading] = useState(false);
+  const [confirmText, setConfirmText] = useState('');
   const [step, setStep] = useState<'warning' | 'confirm'>('warning');
   const [understandRisks, setUnderstandRisks] = useState(false);
   const [confirmDeletion, setConfirmDeletion] = useState(false);
-  const [confirmText, setConfirmText] = useState('');
 
   // Reset state when modal opens/closes
-  useEffect(() => {
+  React.useEffect(() => {
     if (isOpen) {
       setStep('warning');
       setConfirmText('');
@@ -30,75 +24,24 @@ export function DeleteNodeModal({ isOpen, onClose, nodeId, nodeTitle, nodeType }
       setConfirmDeletion(false);
     }
   }, [isOpen]);
-  
-  const [deleteWorkItem, { loading: deletingNode }] = useMutation(DELETE_WORK_ITEM, {
-    refetchQueries: [
-      { 
-        query: GET_WORK_ITEMS,
-        variables: {
-          options: { limit: 100 }
-        }
-      },
-      { 
-        query: GET_WORK_ITEMS,
-        variables: {
-          where: {
-            teamId: currentTeam?.id || 'team-1'
-          }
-        }
-      }
-    ],
-    awaitRefetchQueries: true,
-    update: (cache, { data }) => {
-      if (data?.deleteWorkItems?.nodesDeleted > 0) {
-        // Evict all workItems queries to ensure complete refresh across all views
-        cache.evict({ fieldName: 'workItems' });
-        cache.gc();
-      }
-    }
-  });
+
+  if (!isOpen || !currentGraph) return null;
+
+  const isConfirmValid = confirmText === currentGraph.name;
 
   const handleDelete = async () => {
+    if (!isConfirmValid) return;
+    
+    setLoading(true);
     try {
-      
-      await deleteWorkItem({
-        variables: { 
-          where: { id: nodeId }
-        }
-      });
-      
-
-      showSuccess(
-        'Node Deleted Successfully!',
-        `"${nodeTitle}" has been permanently removed from the graph and all connected relationships have been cleaned up.`
-      );
-      
+      await deleteGraph(currentGraph.id);
       onClose();
     } catch (error) {
-      
-      // Determine user-friendly error message
-      let errorMessage = 'Please try again.';
-      if (error && typeof error === 'object' && 'message' in error) {
-        const message = String(error.message);
-        if (message.includes('NetworkError') || message.includes('fetch')) {
-          errorMessage = 'Cannot connect to server. Please check your connection.';
-        } else if (message.includes('Neo4j') || message.includes('database')) {
-          errorMessage = 'Database error occurred. Please contact support.';
-        } else if (message.includes('not found')) {
-          errorMessage = 'Node no longer exists in the database.';
-        }
-      }
-      
-      showError(
-        'Failed to Delete Node',
-        errorMessage
-      );
+      console.error('Failed to delete graph:', error);
+    } finally {
+      setLoading(false);
     }
   };
-
-  const isConfirmValid = confirmText === nodeTitle;
-
-  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-[9999] overflow-y-auto">
@@ -111,7 +54,7 @@ export function DeleteNodeModal({ isOpen, onClose, nodeId, nodeTitle, nodeType }
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <AlertTriangle className="h-5 w-5 text-red-400" />
-                <h3 className="text-lg font-semibold text-red-200">Delete Node</h3>
+                <h3 className="text-lg font-semibold text-red-200">Delete Graph</h3>
               </div>
               <button
                 onClick={onClose}
@@ -130,26 +73,11 @@ export function DeleteNodeModal({ isOpen, onClose, nodeId, nodeTitle, nodeType }
                   <Shield className="h-8 w-8 text-red-400" />
                 </div>
                 <h4 className="text-xl font-semibold text-red-200 text-center mb-2">
-                  Permanent Node Deletion
+                  Permanent Graph Deletion
                 </h4>
                 <p className="text-gray-300 text-center mb-6">
-                  You are about to permanently delete <strong className="text-white">"{nodeTitle}"</strong>
+                  You are about to permanently delete <strong className="text-white">"{currentGraph.name}"</strong>
                 </p>
-              </div>
-
-              {/* Node Info */}
-              <div className="bg-gray-700/50 border border-gray-600 rounded-lg p-4 mb-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-white">{nodeTitle}</p>
-                    <div className="flex items-center space-x-2 text-sm text-gray-400 mt-1">
-                      <span>Type:</span>
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-600 text-gray-200">
-                        {nodeType}
-                      </span>
-                    </div>
-                  </div>
-                </div>
               </div>
 
               {/* Risk Warning */}
@@ -161,23 +89,23 @@ export function DeleteNodeModal({ isOpen, onClose, nodeId, nodeTitle, nodeType }
                     <ul className="text-red-300 text-sm space-y-2">
                       <li className="flex items-center">
                         <span className="w-2 h-2 bg-red-400 rounded-full mr-3"></span>
-                        The node and all its data (description, tags, priorities)
+                        The entire graph structure and all work items
                       </li>
                       <li className="flex items-center">
                         <span className="w-2 h-2 bg-red-400 rounded-full mr-3"></span>
-                        All incoming and outgoing connections to other nodes
+                        All connections and relationships between nodes
                       </li>
                       <li className="flex items-center">
                         <span className="w-2 h-2 bg-red-400 rounded-full mr-3"></span>
-                        Historical activity logs and comments
+                        Historical data, comments, and activity logs
                       </li>
                       <li className="flex items-center">
                         <span className="w-2 h-2 bg-red-400 rounded-full mr-3"></span>
-                        Assignment and contributor relationships
+                        Any links to this graph from other graphs
                       </li>
                       <li className="flex items-center">
                         <span className="w-2 h-2 bg-red-400 rounded-full mr-3"></span>
-                        Dependencies that other nodes may have on this node
+                        Team member access and permissions
                       </li>
                     </ul>
                   </div>
@@ -194,7 +122,7 @@ export function DeleteNodeModal({ isOpen, onClose, nodeId, nodeTitle, nodeType }
                     className="mt-1 h-4 w-4 text-red-600 focus:ring-red-500 border-gray-600 rounded bg-gray-700"
                   />
                   <span className="text-gray-300 text-sm">
-                    I understand that this action cannot be undone and all node data will be permanently lost
+                    I understand that this action cannot be undone and all data will be permanently lost
                   </span>
                 </label>
                 <label className="flex items-start space-x-3 cursor-pointer">
@@ -205,7 +133,7 @@ export function DeleteNodeModal({ isOpen, onClose, nodeId, nodeTitle, nodeType }
                     className="mt-1 h-4 w-4 text-red-600 focus:ring-red-500 border-gray-600 rounded bg-gray-700"
                   />
                   <span className="text-gray-300 text-sm">
-                    I confirm that I want to delete "{nodeTitle}" and understand the consequences
+                    I confirm that I want to delete "{currentGraph.name}" and understand the consequences
                   </span>
                 </label>
               </div>
@@ -252,18 +180,18 @@ export function DeleteNodeModal({ isOpen, onClose, nodeId, nodeTitle, nodeType }
                   <span className="text-red-200 font-semibold">IRREVERSIBLE ACTION</span>
                 </div>
                 <p className="text-red-300 text-center text-sm">
-                  Once you click "Delete Forever", the node "{nodeTitle}" and all its data will be permanently destroyed.
+                  Once you click "Delete Forever", the graph "{currentGraph.name}" and all its data will be permanently destroyed.
                 </p>
               </div>
 
               {/* Confirmation Input */}
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-300 mb-2 text-center">
-                  To proceed, type the exact node title:
+                  To proceed, type the exact graph name:
                 </label>
                 <div className="text-center mb-3">
                   <span className="text-white font-mono bg-gray-700 px-3 py-1 rounded text-sm">
-                    {nodeTitle}
+                    {currentGraph.name}
                   </span>
                 </div>
                 <input
@@ -271,16 +199,16 @@ export function DeleteNodeModal({ isOpen, onClose, nodeId, nodeTitle, nodeType }
                   value={confirmText}
                   onChange={(e) => setConfirmText(e.target.value)}
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-red-500 text-center"
-                  placeholder="Type the node title here"
+                  placeholder="Type the graph name here"
                   autoFocus
                 />
-                {confirmText && confirmText !== nodeTitle && (
-                  <p className="text-red-400 text-xs mt-1 text-center">Node title doesn't match</p>
+                {confirmText && confirmText !== currentGraph.name && (
+                  <p className="text-red-400 text-xs mt-1 text-center">Graph name doesn't match</p>
                 )}
                 {isConfirmValid && (
                   <p className="text-green-400 text-xs mt-1 text-center flex items-center justify-center">
                     <CheckCircle className="w-3 h-3 mr-1" />
-                    Node title confirmed
+                    Graph name confirmed
                   </p>
                 )}
               </div>
@@ -302,11 +230,11 @@ export function DeleteNodeModal({ isOpen, onClose, nodeId, nodeTitle, nodeType }
                   </button>
                   <button
                     onClick={handleDelete}
-                    disabled={!isConfirmValid || deletingNode}
+                    disabled={!isConfirmValid || loading}
                     className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
                   >
                     <Trash2 className="w-4 h-4" />
-                    <span>{deletingNode ? 'Deleting Forever...' : 'Delete Forever'}</span>
+                    <span>{loading ? 'Deleting Forever...' : 'Delete Forever'}</span>
                   </button>
                 </div>
               </div>
