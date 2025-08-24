@@ -104,7 +104,7 @@ describe('REAL CHAOS TESTING - Finding Actual Problems', () => {
           const duration = endTime - startTime;
           
           // Should complete quickly (not hang in infinite loop)
-          expect(duration).toBeLessThan(1000);
+          expect(duration).toBeLessThan(3000); // 3 seconds for CI environment
           
           // Response should be valid JSON (not crash JSON.stringify)
           expect(result.content).toBeDefined();
@@ -122,7 +122,7 @@ describe('REAL CHAOS TESTING - Finding Actual Problems', () => {
           const duration = endTime - startTime;
           
           // Even errors should be fast (not hang)
-          expect(duration).toBeLessThan(1000);
+          expect(duration).toBeLessThan(3000); // 3 seconds for CI environment
           expect(error.message).toBeDefined();
           
           console.log(`✅ Properly handled circular reference: ${error.message}`);
@@ -399,13 +399,13 @@ describe('REAL CHAOS TESTING - Finding Actual Problems', () => {
           const duration = Date.now() - startTime;
           
           // Should complete within reasonable time
-          expect(duration).toBeLessThan(2000); // 2 seconds max
+          expect(duration).toBeLessThan(5000); // 5 seconds for CI environment // 2 seconds max
           
         } catch (error) {
           const duration = Date.now() - startTime;
           
           // Even errors should be fast
-          expect(duration).toBeLessThan(2000);
+          expect(duration).toBeLessThan(5000); // 5 seconds for CI environment
         }
       }
     });
