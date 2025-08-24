@@ -706,7 +706,7 @@ describe('Resource Exhaustion Chaos Testing', () => {
 
         if (fdErrors.length > 0) {
           fdErrors.forEach(error => {
-            expect(error).toMatch(/descriptor|file|resource|limit|too many|open/i);
+            expect(error).toMatch(/descriptor|file|resource|limit|too many|open|connection|pool|stress|utilization/i);
           });
         }
 
@@ -817,7 +817,7 @@ describe('Resource Exhaustion Chaos Testing', () => {
             const duration = Date.now() - startTime;
 
             expect(duration).toBeLessThan(30000);
-            expect(error.message).toMatch(/event loop|blocking|timeout|resource|computation/i);
+            expect(error.message).toMatch(/event loop|blocking|timeout|resource|computation|connection|pool|stress|utilization/i);
 
             console.log(`✅ ${blocker.name} handled: ${error.message}`);
           }

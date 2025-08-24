@@ -21,11 +21,27 @@ describe('REAL DATABASE INTEGRATION - Graph Management', () => {
 
     graphService = new GraphService(driver);
 
-    // Test connection
+    // Test connection with retry logic for rate limiting
     const session = driver.session();
     try {
-      await session.run('RETURN 1 as test');
-      console.log('✅ Successfully connected to real Neo4j database');
+      let retries = 0;
+      const maxRetries = 3;
+      
+      while (retries < maxRetries) {
+        try {
+          await session.run('RETURN 1 as test');
+          console.log('✅ Successfully connected to real Neo4j database');
+          break;
+        } catch (error: any) {
+          if (error.code === 'Neo.ClientError.Security.AuthenticationRateLimit' && retries < maxRetries - 1) {
+            console.log(`⏳ Rate limited, waiting before retry ${retries + 1}/${maxRetries}`);
+            await new Promise(resolve => setTimeout(resolve, 2000 * (retries + 1))); // Exponential backoff
+            retries++;
+            continue;
+          }
+          throw error;
+        }
+      }
     } catch (error) {
       console.error('❌ Failed to connect to Neo4j:', error);
       throw error;
