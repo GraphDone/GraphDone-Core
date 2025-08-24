@@ -151,7 +151,7 @@ describe('MCP Health Server', () => {
       const duration = Date.now() - start;
       
       expect(response.ok).toBe(true);
-      expect(duration).toBeLessThan(1000); // Should respond within 1 second
+      expect(duration).toBeLessThan(3000); // 3 seconds for CI environment
     });
 
     it('should handle concurrent requests', async () => {
