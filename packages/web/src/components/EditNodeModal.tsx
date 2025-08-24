@@ -179,7 +179,9 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
         );
       }
     } catch (error) {
-      console.error('Error updating node:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error updating node:', error);
+      }
       
       // Show more specific error message if available
       let errorMessage = 'There was an error updating the node. Please try again or contact support if the problem persists.';
