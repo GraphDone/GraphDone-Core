@@ -19,12 +19,181 @@ import { authResolvers } from './resolvers/auth.js';
 import { extractUserFromToken } from './middleware/auth.js';
 import { mergeTypeDefs } from '@graphql-tools/merge';
 import { driver, NEO4J_URI } from './db.js';
+import bcrypt from 'bcryptjs';
+import { v4 as uuidv4 } from 'uuid';
 // import { configurePassport } from './config/passport.js';
 // import { authRoutes } from './routes/auth.js';
 
 dotenv.config();
 
 const PORT = Number(process.env.PORT) || 4127;
+
+async function cleanupDuplicateUsers() {
+  const session = driver.session();
+  
+  try {
+    console.log('🧹 Cleaning up duplicate users...');
+    
+    // Find and remove duplicate admin users, keeping the oldest one
+    const duplicateAdmins = await session.run(`
+      MATCH (u:User {username: 'admin'})
+      WITH u
+      ORDER BY u.createdAt ASC
+      WITH collect(u) as users
+      WHERE size(users) > 1
+      UNWIND users[1..] as duplicateUser
+      DETACH DELETE duplicateUser
+      RETURN count(duplicateUser) as deletedCount
+    `);
+    
+    const adminDeletedCount = duplicateAdmins.records[0]?.get('deletedCount')?.toNumber() || 0;
+    if (adminDeletedCount > 0) {
+      console.log(`🗑️  Removed ${adminDeletedCount} duplicate admin users`);
+    }
+    
+    // Find and remove duplicate viewer users, keeping the oldest one
+    const duplicateViewers = await session.run(`
+      MATCH (u:User {username: 'viewer'})
+      WITH u
+      ORDER BY u.createdAt ASC
+      WITH collect(u) as users
+      WHERE size(users) > 1
+      UNWIND users[1..] as duplicateUser
+      DETACH DELETE duplicateUser
+      RETURN count(duplicateUser) as deletedCount
+    `);
+    
+    const viewerDeletedCount = duplicateViewers.records[0]?.get('deletedCount')?.toNumber() || 0;
+    if (viewerDeletedCount > 0) {
+      console.log(`🗑️  Removed ${viewerDeletedCount} duplicate viewer users`);
+    }
+    
+    if (adminDeletedCount === 0 && viewerDeletedCount === 0) {
+      console.log('✅ No duplicate users found');
+    }
+    
+  } catch (error) {
+    console.error('❌ Error cleaning up duplicate users:', error);
+  } finally {
+    await session.close();
+  }
+}
+
+async function ensureDefaultUsers() {
+  const session = driver.session();
+  
+  try {
+    // First, migrate existing users with old role names to new ones
+    await session.run(`
+      MATCH (u:User)
+      WHERE u.role = 'GRAPH_MASTER'
+      SET u.role = 'ADMIN'
+    `);
+    
+    await session.run(`
+      MATCH (u:User)
+      WHERE u.role = 'PATH_KEEPER'
+      SET u.role = 'USER'
+    `);
+    
+    await session.run(`
+      MATCH (u:User)
+      WHERE u.role = 'ORIGIN_NODE'
+      SET u.role = 'USER'
+    `);
+    
+    await session.run(`
+      MATCH (u:User)
+      WHERE u.role = 'CONNECTOR'
+      SET u.role = 'USER'
+    `);
+    
+    await session.run(`
+      MATCH (u:User)
+      WHERE u.role = 'NODE_WATCHER'
+      SET u.role = 'VIEWER'
+    `);
+
+    // Check if the default admin user specifically exists
+    const existingDefaultAdmin = await session.run(
+      `MATCH (u:User {username: 'admin'}) RETURN u LIMIT 1`
+    );
+
+    if (existingDefaultAdmin.records.length === 0) {
+      // Create default admin user
+      const adminId = uuidv4();
+      const adminPasswordHash = await bcrypt.hash('graphdone', 10);
+      
+      await session.run(
+        `CREATE (u:User {
+          id: $adminId,
+          email: 'admin@graphdone.local',
+          username: 'admin',
+          passwordHash: $adminPasswordHash,
+          name: 'Default Admin',
+          role: 'ADMIN',
+          isActive: true,
+          isEmailVerified: true,
+          createdAt: datetime(),
+          updatedAt: datetime()
+        })
+        RETURN u`,
+        { adminId, adminPasswordHash }
+      );
+
+      console.log('🔐 DEFAULT ADMIN USER CREATED');
+      console.log('📧 Email/Username: admin');
+      console.log('🔑 Password: graphdone');
+      console.log('👑 Role: ADMIN');
+    } else {
+      console.log('👤 Default admin user already exists (skipped creation)');
+    }
+
+    // Check if the default viewer user specifically exists  
+    const existingDefaultViewer = await session.run(
+      `MATCH (u:User {username: 'viewer'}) RETURN u LIMIT 1`
+    );
+
+    if (existingDefaultViewer.records.length === 0) {
+      // Create default view-only user
+      const viewerId = uuidv4();
+      const viewerPasswordHash = await bcrypt.hash('graphdone', 10);
+      
+      await session.run(
+        `CREATE (u:User {
+          id: $viewerId,
+          email: 'viewer@graphdone.local',
+          username: 'viewer',
+          passwordHash: $viewerPasswordHash,
+          name: 'Default Viewer',
+          role: 'VIEWER',
+          isActive: true,
+          isEmailVerified: true,
+          createdAt: datetime(),
+          updatedAt: datetime()
+        })
+        RETURN u`,
+        { viewerId, viewerPasswordHash }
+      );
+
+      console.log('👁️  DEFAULT VIEWER USER CREATED');
+      console.log('📧 Email/Username: viewer');
+      console.log('🔑 Password: graphdone');
+      console.log('👁️  Role: VIEWER (Read-only)');
+    } else {
+      console.log('👁️  Default viewer user already exists (skipped creation)');
+    }
+
+    if (existingDefaultAdmin.records.length === 0 || existingDefaultViewer.records.length === 0) {
+      console.log('⚠️  Please change the default passwords after first login!\n');
+    }
+
+  } catch (error) {
+    console.error('❌ Error creating default users:', error);
+  } finally {
+    await session.close();
+  }
+}
 
 async function startServer() {
   const app = express();
@@ -73,6 +242,12 @@ async function startServer() {
   });
 
   await server.start();
+
+  // Clean up any duplicate users first
+  await cleanupDuplicateUsers();
+  
+  // Ensure default users exist
+  await ensureDefaultUsers();
 
   app.use(
     '/graphql',
