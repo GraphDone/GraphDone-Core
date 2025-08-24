@@ -6,7 +6,6 @@ import { Agents } from './pages/Agents';
 import { Analytics } from './pages/Analytics';
 import { Settings } from './pages/Settings';
 import { Backend } from './pages/Backend';
-import { McpStatus } from './pages/McpStatus';
 import { Login } from './pages/Login';
 import { GraphVisualization } from './components/GraphVisualization';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -59,7 +58,6 @@ function AuthenticatedApp() {
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/backend" element={<Backend />} />
-            <Route path="/mcp-status" element={<McpStatus />} />
           </Routes>
         </Layout>
       </GraphProvider>
