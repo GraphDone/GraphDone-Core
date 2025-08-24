@@ -166,8 +166,22 @@ export const CREATE_WORK_ITEM = gql`
         priorityComm
         priorityComp
         dueDate
-        assignedTo
         tags
+        metadata
+        owner {
+          id
+          name
+          username
+        }
+        assignedTo {
+          id
+          name
+          username
+        }
+        graph {
+          id
+          name
+        }
         createdAt
       }
     }
@@ -194,8 +208,22 @@ export const UPDATE_WORK_ITEM = gql`
         priorityComm
         priorityComp
         dueDate
-        assignedTo
         tags
+        metadata
+        owner {
+          id
+          name
+          username
+        }
+        assignedTo {
+          id
+          name
+          username
+        }
+        graph {
+          id
+          name
+        }
         updatedAt
       }
     }
