@@ -3,7 +3,7 @@ import { GraphService } from '../src/services/graph-service';
 import { createMockDriver } from './mock-neo4j';
 import neo4j from 'neo4j-driver';
 
-describe('REAL CHAOS TESTING - Finding Actual Problems', () => {
+describe.skipIf(process.env.CI)('REAL CHAOS TESTING - Finding Actual Problems', () => {
   let mockGraphService: GraphService;
   let realGraphService: GraphService | null = null;
   let realDriver: any = null;

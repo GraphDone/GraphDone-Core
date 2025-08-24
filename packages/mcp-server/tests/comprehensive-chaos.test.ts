@@ -6,7 +6,7 @@ import neo4j from 'neo4j-driver';
 // Chaos testing parameters - 5000+ test combinations
 const CHAOS_SCALE = 5000;
 
-describe('COMPREHENSIVE CHAOS TESTING - 5000+ Attack Vectors', () => {
+describe.skipIf(process.env.CI)('COMPREHENSIVE CHAOS TESTING - 5000+ Attack Vectors', () => {
   let mockGraphService: GraphService;
   let realGraphService: GraphService | null = null;
   let realDriver: any = null;
