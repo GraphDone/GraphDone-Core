@@ -137,7 +137,7 @@ export function McpServerCard({ server, onRefresh, isRefreshing = false }: McpSe
         </div>
         
         <div className="flex items-center justify-between text-sm">
-          <span className="text-gray-400">Actions Today:</span>
+          <span className="text-gray-400">Connected Clients:</span>
           <span className="text-gray-100">{server.actionsToday}</span>
         </div>
 
