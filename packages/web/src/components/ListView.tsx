@@ -139,10 +139,6 @@ export function ListView() {
     }
   }, [workItems, showEditModal, selectedNode?.id]);
 
-  // Add manual refresh function for debugging
-  const handleRefresh = () => {
-    refetch();
-  };
   const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const [isPriorityDropdownOpen, setIsPriorityDropdownOpen] = useState(false);
