@@ -18,6 +18,9 @@ export function startHealthServer(port = 3128) {
     }
     
     if (url.pathname === '/health' && req.method === 'GET') {
+      // Count health check requests as activity
+      totalRequests++;
+      
       const healthData = {
         status: 'healthy',
         timestamp: new Date().toISOString(),
