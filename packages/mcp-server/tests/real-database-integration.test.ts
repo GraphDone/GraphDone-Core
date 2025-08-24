@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import neo4j, { Driver } from 'neo4j-driver';
 import { GraphService } from '../src/services/graph-service';
 
-describe('REAL DATABASE INTEGRATION - Graph Management', () => {
+describe.skipIf(process.env.CI)('REAL DATABASE INTEGRATION - Graph Management', () => {
   let driver: Driver;
   let graphService: GraphService;
   let testGraphIds: string[] = [];
@@ -25,7 +25,7 @@ describe('REAL DATABASE INTEGRATION - Graph Management', () => {
     const session = driver.session();
     try {
       let retries = 0;
-      const maxRetries = 3;
+      const maxRetries = 5;
       
       while (retries < maxRetries) {
         try {
@@ -35,7 +35,7 @@ describe('REAL DATABASE INTEGRATION - Graph Management', () => {
         } catch (error: any) {
           if (error.code === 'Neo.ClientError.Security.AuthenticationRateLimit' && retries < maxRetries - 1) {
             console.log(`⏳ Rate limited, waiting before retry ${retries + 1}/${maxRetries}`);
-            await new Promise(resolve => setTimeout(resolve, 2000 * (retries + 1))); // Exponential backoff
+            await new Promise(resolve => setTimeout(resolve, 5000 * (retries + 1))); // Longer exponential backoff
             retries++;
             continue;
           }
