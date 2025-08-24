@@ -41,6 +41,7 @@ import { GET_WORK_ITEMS } from '../lib/queries';
 import { EditNodeModal } from './EditNodeModal';
 import { DeleteNodeModal } from './DeleteNodeModal';
 import { TagDisplay } from './TagDisplay';
+import { AnimatedPriority } from './AnimatedPriority';
 
 // WorkItem interface matching GraphQL schema
 interface WorkItem {
@@ -110,11 +111,12 @@ export function ListView() {
         teamId: currentTeam?.id || 'team-1'
       }
     },
-    fetchPolicy: 'cache-and-network'  // Use cache first, then update from network
+    fetchPolicy: 'cache-and-network',  // Use cache first, then update from network
+    pollInterval: 5000,  // Poll every 5 seconds to catch external changes
+    errorPolicy: 'all'
   });
   
   const workItems: WorkItem[] = data?.workItems || [];
-  
   
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
   const [isViewDropdownOpen, setIsViewDropdownOpen] = useState(false);
@@ -126,6 +128,21 @@ export function ListView() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedNode, setSelectedNode] = useState<WorkItem | null>(null);
+
+  // Update selectedNode when workItems data changes and modal is open
+  useEffect(() => {
+    if (showEditModal && selectedNode) {
+      const updatedNode = workItems.find(item => item.id === selectedNode.id);
+      if (updatedNode) {
+        setSelectedNode(updatedNode);
+      }
+    }
+  }, [workItems, showEditModal, selectedNode?.id]);
+
+  // Add manual refresh function for debugging
+  const handleRefresh = () => {
+    refetch();
+  };
   const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const [isPriorityDropdownOpen, setIsPriorityDropdownOpen] = useState(false);
@@ -342,7 +359,7 @@ export function ListView() {
 
   // Helper functions
   const getNodePriority = (node: WorkItem) => {
-    return node.priorityComp || node.priorityExec || 0;
+    return node.priorityExec || 0;
   };
 
   const formatLabel = (label: string) => {
@@ -449,32 +466,26 @@ export function ListView() {
             <div className="flex items-center justify-between">
               {/* Priority - Left Side */}
               <div className="flex items-center space-x-3">
-                <div className="flex items-center relative">
-                  <div className="w-3 h-12 bg-gray-300 dark:bg-gray-600 rounded overflow-hidden flex flex-col justify-end relative">
-                    <div className={`w-full transition-all duration-300 ${
-                      getNodePriority(node) >= 0.8 ? 'bg-red-500' :
-                      getNodePriority(node) >= 0.6 ? 'bg-orange-500' :
-                      getNodePriority(node) >= 0.4 ? 'bg-yellow-500' :
-                      getNodePriority(node) >= 0.2 ? 'bg-blue-500' : 'bg-green-500'
-                    }`} style={{ height: `${Math.max(getNodePriority(node) * 100, 8)}%` }}></div>
-                  </div>
-                </div>
+                <AnimatedPriority
+                  value={getNodePriority(node)}
+                  className="text-sm font-semibold"
+                  renderBar={(animatedValue, animatedColor) => (
+                    <div className="flex items-center relative">
+                      <div className="w-3 h-12 bg-gray-300 dark:bg-gray-600 rounded overflow-hidden flex flex-col justify-end relative">
+                        <div 
+                          className="w-full transition-colors duration-300"
+                          style={{ 
+                            height: `${Math.max(animatedValue * 100, 8)}%`,
+                            backgroundColor: animatedColor
+                          }}
+                        ></div>
+                      </div>
+                    </div>
+                  )}
+                />
+                
                 <div className="flex flex-col">
-                  <span className={`text-sm font-semibold ${
-                    getNodePriority(node) >= 0.8 ? 'text-red-500' :
-                    getNodePriority(node) >= 0.6 ? 'text-orange-500' :
-                    getNodePriority(node) >= 0.4 ? 'text-yellow-500' :
-                    getNodePriority(node) >= 0.2 ? 'text-blue-500' : 'text-green-500'
-                  }`}>
-                    {Math.round(getNodePriority(node) * 100)}%
-                  </span>
-                  <span className={`text-xs font-medium ${
-                    getNodePriority(node) >= 0.8 ? 'text-red-500' :
-                    getNodePriority(node) >= 0.6 ? 'text-orange-500' :
-                    getNodePriority(node) >= 0.4 ? 'text-yellow-500' :
-                    getNodePriority(node) >= 0.2 ? 'text-blue-500' :
-                    'text-green-500'
-                  }`}>
+                  <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
                     {getNodePriority(node) >= 0.8 ? 'Critical' :
                      getNodePriority(node) >= 0.6 ? 'High' :
                      getNodePriority(node) >= 0.4 ? 'Medium' :
@@ -726,25 +737,21 @@ export function ListView() {
                       <div className="mb-3 flex items-start justify-between">
                         {/* Priority - Left Side */}
                         <div className="flex items-center relative">
-                          <div className="w-4 h-12 bg-gray-600 rounded overflow-hidden flex flex-col justify-end relative">
-                            <div className={`w-full transition-all duration-300 ${
-                              getNodePriority(node) >= 0.8 ? 'bg-red-500' :
-                              getNodePriority(node) >= 0.6 ? 'bg-orange-500' :
-                              getNodePriority(node) >= 0.4 ? 'bg-yellow-500' :
-                              getNodePriority(node) >= 0.2 ? 'bg-blue-500' : 'bg-green-500'
-                            }`} style={{ height: `${Math.max(getNodePriority(node) * 100, 5)}%` }}></div>
-                          </div>
-                          <span className={`absolute text-xs font-bold left-6 ml-1 ${
-                            getNodePriority(node) >= 0.8 ? 'text-red-500' :
-                            getNodePriority(node) >= 0.6 ? 'text-orange-500' :
-                            getNodePriority(node) >= 0.4 ? 'text-yellow-500' :
-                            getNodePriority(node) >= 0.2 ? 'text-blue-500' : 'text-green-500'
-                          }`} style={{ 
-                            bottom: `${Math.max(getNodePriority(node) * 100, 5)}%`,
-                            transform: 'translateY(50%)'
-                          }}>
-                            {Math.round(getNodePriority(node) * 100)}%
-                          </span>
+                          <AnimatedPriority
+                            value={getNodePriority(node)}
+                            className="text-xs font-bold"
+                            renderBar={(animatedValue, animatedColor) => (
+                              <div className="w-4 h-12 bg-gray-600 rounded overflow-hidden flex flex-col justify-end relative">
+                                <div 
+                                  className="w-full transition-colors duration-300"
+                                  style={{ 
+                                    height: `${Math.max(animatedValue * 100, 5)}%`,
+                                    backgroundColor: animatedColor
+                                  }}
+                                ></div>
+                              </div>
+                            )}
+                          />
                         </div>
 
                         {/* Due Date - Right Side */}
@@ -979,35 +986,21 @@ export function ListView() {
                   </td>
                   <td className="pl-6 pr-6 py-10 dynamic-table-cell">
                     <div className="flex items-center w-full relative">
-                      <div className="w-4 h-16 bg-gray-600 rounded overflow-hidden flex flex-col justify-end relative">
-                        <div 
-                          className={`w-full transition-all duration-300 ${
-                            getNodePriority(node) >= 0.8 ? 'bg-red-500' :
-                            getNodePriority(node) >= 0.6 ? 'bg-orange-500' :
-                            getNodePriority(node) >= 0.4 ? 'bg-yellow-500' :
-                            getNodePriority(node) >= 0.2 ? 'bg-blue-500' :
-                            'bg-green-500'
-                          }`}
-                          style={{ 
-                            height: `${Math.max(getNodePriority(node) * 100, 5)}%`
-                          }}
-                        ></div>
-                      </div>
-                      <span 
-                        className={`absolute text-xs font-bold left-6 ml-1 ${
-                          getNodePriority(node) >= 0.8 ? 'text-red-500' :
-                          getNodePriority(node) >= 0.6 ? 'text-orange-500' :
-                          getNodePriority(node) >= 0.4 ? 'text-yellow-500' :
-                          getNodePriority(node) >= 0.2 ? 'text-blue-500' :
-                          'text-green-500'
-                        }`}
-                        style={{ 
-                          bottom: `${Math.max(getNodePriority(node) * 100, 5)}%`,
-                          transform: 'translateY(50%)'
-                        }}
-                      >
-                        {Math.round(getNodePriority(node) * 100)}%
-                      </span>
+                      <AnimatedPriority
+                        value={getNodePriority(node)}
+                        className="text-xs font-bold"
+                        renderBar={(animatedValue, animatedColor) => (
+                          <div className="w-4 h-16 bg-gray-600 rounded overflow-hidden flex flex-col justify-end relative">
+                            <div 
+                              className="w-full transition-colors duration-300"
+                              style={{ 
+                                height: `${Math.max(animatedValue * 100, 5)}%`,
+                                backgroundColor: animatedColor
+                              }}
+                            ></div>
+                          </div>
+                        )}
+                      />
                     </div>
                   </td>
                   <td className="pl-6 pr-6 py-10 dynamic-table-cell">
