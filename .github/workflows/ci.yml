@@ -40,6 +40,7 @@ jobs:
   test:
     name: Unit Tests with Coverage
     runs-on: ubuntu-latest
+    needs: [lint-and-typecheck]
     services:
       postgres:
         image: postgres:15-alpine
@@ -111,6 +112,7 @@ jobs:
   mcp-server-test:
     name: MCP Server Integration Tests
     runs-on: ubuntu-latest
+    needs: [test]
     services:
       neo4j:
         image: neo4j:5.15-community
