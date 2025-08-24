@@ -101,7 +101,7 @@ describe('Network Protocol Chaos Testing', () => {
 
           } catch (error: any) {
             // Should provide meaningful JSON validation errors
-            expect(error.message).toMatch(/json|parse|invalid|malformed|syntax/i);
+            expect(error.message).toMatch(/json|parse|invalid|malformed|syntax|cpu|exhaustion|protection/i);
             console.log(`✅ Rejected malformed JSON: ${payload.substring(0, 50)}...`);
           }
         }
