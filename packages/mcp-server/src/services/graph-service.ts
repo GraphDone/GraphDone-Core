@@ -19,7 +19,9 @@ import {
   AnalysisResults,
   WorkloadData,
   CapacityAnalysis,
-  WorkloadPredictions
+  WorkloadPredictions,
+  GetContributorPrioritiesArgs,
+  GetContributorWorkloadArgs
 } from '../types/graph.js';
 import {
   sanitizeString,
@@ -113,7 +115,7 @@ export interface DetectCyclesArgs {
 }
 
 export interface UpdatePrioritiesArgs {
-  node_id: string;
+  node_id?: string;
   priority_executive?: number;
   priority_individual?: number;
   priority_community?: number;
@@ -121,7 +123,7 @@ export interface UpdatePrioritiesArgs {
 }
 
 export interface BulkUpdatePrioritiesArgs {
-  updates: Array<{
+  updates?: Array<{
     node_id: string;
     priority_executive?: number;
     priority_individual?: number;
@@ -154,7 +156,7 @@ export interface GetBottlenecksArgs {
 }
 
 export interface BulkOperationsArgs {
-  operations: Array<{
+  operations?: Array<{
     type: 'create_node' | 'update_node' | 'create_edge' | 'delete_edge';
     params: CreateNodeArgs | UpdateNodeArgs | CreateEdgeArgs | DeleteEdgeArgs;
   }>;
@@ -170,7 +172,7 @@ export interface GetWorkloadAnalysisArgs {
 }
 
 export interface CreateGraphArgs {
-  name: string;
+  name?: string;
   description?: string;
   type?: GraphType;
   status?: GraphStatus;
@@ -181,7 +183,7 @@ export interface CreateGraphArgs {
 }
 
 export interface UpdateGraphArgs {
-  graphId: string;
+  graphId?: string;
   name?: string;
   description?: string;
   status?: GraphStatus;
@@ -190,22 +192,22 @@ export interface UpdateGraphArgs {
 }
 
 export interface DeleteGraphArgs {
-  graphId: string;
+  graphId?: string;
   force?: boolean;
 }
 
 export interface GetGraphDetailsArgs {
-  graphId: string;
+  graphId?: string;
 }
 
 export interface ArchiveGraphArgs {
-  graphId: string;
+  graphId?: string;
   reason?: string;
 }
 
 export interface CloneGraphArgs {
-  sourceGraphId: string;
-  newName: string;
+  sourceGraphId?: string;
+  newName?: string;
   includeNodes?: boolean;
   includeEdges?: boolean;
   teamId?: string;
@@ -1555,7 +1557,7 @@ export class GraphService {
                 obj[keyStr] = typeof value?.toNumber === 'function' ? value.toNumber() : value;
               });
               return obj;
-            });
+            }) as unknown as Neo4jValue;
           }
         } catch (error) {
           results[name] = { error: error instanceof Error ? error.message : String(error) };
@@ -1722,7 +1724,7 @@ export class GraphService {
             status: record.get('status'),
             priority: record.get('priority'),
             dependent_count: record.get('dependent_count').toNumber()
-          }));
+          })) as unknown as Neo4jValue;
         } catch (error) {
           results.potential_bottlenecks = { error: error instanceof Error ? error.message : String(error) };
         }
@@ -1732,16 +1734,16 @@ export class GraphService {
       let healthScore = 1.0;
       const healthFactors = [];
 
-      if (results.priority_balance && !results.priority_balance.error) {
-        const stdDev = results.priority_balance.distribution.standard_deviation;
+      if (results.priority_balance && !(results.priority_balance as any).error) {
+        const stdDev = (results.priority_balance as any).distribution.standard_deviation;
         if (stdDev > 0.3) {
           healthScore -= 0.1;
           healthFactors.push("High priority variance detected");
         }
       }
 
-      if (results.dependency_health && !results.dependency_health.error) {
-        const depRatio = results.dependency_health.dependency_ratio;
+      if (results.dependency_health && !(results.dependency_health as any).error) {
+        const depRatio = (results.dependency_health as any).dependency_ratio;
         if (depRatio > 0.2) {
           healthScore -= 0.15;
           healthFactors.push("Too many heavily dependent nodes");
@@ -1779,8 +1781,8 @@ export class GraphService {
   private generateHealthRecommendations(results: AnalysisResults): string[] {
     const recommendations = [];
 
-    if (results.priority_balance && !results.priority_balance.error) {
-      const { distribution } = results.priority_balance;
+    if (results.priority_balance && !(results.priority_balance as any).error) {
+      const { distribution } = results.priority_balance as any;
       if (distribution.high_priority_ratio > 0.3) {
         recommendations.push("Consider reviewing high-priority items - too many items marked as high priority may indicate poor prioritization");
       }
@@ -1789,8 +1791,8 @@ export class GraphService {
       }
     }
 
-    if (results.dependency_health && !results.dependency_health.error) {
-      const { avg_dependencies_per_node, dependency_ratio } = results.dependency_health;
+    if (results.dependency_health && !(results.dependency_health as any).error) {
+      const { avg_dependencies_per_node, dependency_ratio } = results.dependency_health as any;
       if (avg_dependencies_per_node > 3) {
         recommendations.push("High average dependencies per node - consider simplifying dependencies to reduce complexity");
       }
@@ -1877,7 +1879,7 @@ export class GraphService {
             record.get('status'),
             record.get('priority')
           )
-        }));
+        })) as unknown as Neo4jValue;
       } catch (error) {
         results.high_dependency_bottlenecks = { error: error instanceof Error ? error.message : String(error) };
       }
@@ -1889,7 +1891,7 @@ export class GraphService {
           blocked_title: record.get('blocked_title'),
           blocking_items: record.get('blocking_items'),
           chain_length: record.get('blocking_items').length
-        }));
+        })) as unknown as Neo4jValue;
       } catch (error) {
         results.blocked_chains = { error: error instanceof Error ? error.message : String(error) };
       }
@@ -1950,7 +1952,7 @@ export class GraphService {
     const resolutions = [];
 
     if (Array.isArray(results.high_dependency_bottlenecks)) {
-      for (const bottleneck of results.high_dependency_bottlenecks) {
+      for (const bottleneck of results.high_dependency_bottlenecks as any[]) {
         if (bottleneck.bottleneck_severity === 'critical' || bottleneck.bottleneck_severity === 'high') {
           if (bottleneck.status === 'PROPOSED') {
             resolutions.push({
@@ -1970,7 +1972,7 @@ export class GraphService {
     }
 
     if (Array.isArray(results.blocked_chains)) {
-      for (const chain of results.blocked_chains) {
+      for (const chain of results.blocked_chains as any[]) {
         if (chain.chain_length > 1) {
           resolutions.push({
             type: 'break_dependency_chain',
@@ -2005,8 +2007,8 @@ export class GraphService {
       // Check for ID collisions in create operations
       const createNodeIds: string[] = [];
       operations.forEach(op => {
-        if (op.type === 'create_node' && op.params?.id) {
-          createNodeIds.push(op.params.id);
+        if (op.type === 'create_node' && (op.params as any)?.id) {
+          createNodeIds.push((op.params as any).id);
         }
       });
 
@@ -2037,7 +2039,7 @@ export class GraphService {
         try {
           for (const operation of operations) {
             try {
-              const result = await this.executeBulkOperation(tx, operation);
+              const result = await this.executeBulkOperation(tx, operation as { type: string; params: Record<string, Neo4jValue> });
               results.push({
                 operation_type: operation.type,
                 success: true,
@@ -2088,7 +2090,7 @@ export class GraphService {
         // Execute operations individually
         for (const operation of operations) {
           try {
-            const result = await this.executeBulkOperation(session, operation);
+            const result = await this.executeBulkOperation(session, operation as { type: string; params: Record<string, Neo4jValue> });
             results.push({
               operation_type: operation.type,
               success: true,
@@ -2122,7 +2124,7 @@ export class GraphService {
     });
   }
 
-  private async executeBulkOperation(sessionOrTx: Session, operation: { type: string; params: Record<string, Neo4jValue> }) {
+  private async executeBulkOperation(sessionOrTx: Session | any, operation: { type: string; params: Record<string, Neo4jValue> }) {
     const { type, params } = operation;
 
     switch (type) {
@@ -2349,20 +2351,21 @@ export class GraphService {
         results.contributor_workloads = Array.from(workloadMap.values());
 
         // Calculate summary statistics
-        const totalItems = results.contributor_workloads.reduce((sum: number, c: Record<string, Neo4jValue>) => sum + (c.total_items as number), 0);
-        const avgItemsPerContributor = results.contributor_workloads.length > 0 
-          ? totalItems / results.contributor_workloads.length 
+        const totalItems = (results.contributor_workloads as unknown as Record<string, Neo4jValue>[]).reduce((sum: number, c: Record<string, Neo4jValue>) => sum + (c.total_items as number), 0);
+        const workloadsArray = results.contributor_workloads as unknown as Record<string, Neo4jValue>[];
+        const avgItemsPerContributor = workloadsArray.length > 0 
+          ? totalItems / workloadsArray.length 
           : 0;
 
         results.summary = {
-          total_contributors: results.contributor_workloads.length,
+          total_contributors: workloadsArray.length,
           total_items: totalItems,
           avg_items_per_contributor: avgItemsPerContributor,
-          most_loaded_contributor: results.contributor_workloads[0]?.contributor_id,
+          most_loaded_contributor: (workloadsArray[0] as any)?.contributor_id,
           workload_distribution: {
-            heavily_loaded: results.contributor_workloads.filter((c: Record<string, Neo4jValue>) => (c.total_items as number) > avgItemsPerContributor * 1.5).length,
-            moderately_loaded: results.contributor_workloads.filter((c: Record<string, Neo4jValue>) => (c.total_items as number) >= avgItemsPerContributor * 0.5 && (c.total_items as number) <= avgItemsPerContributor * 1.5).length,
-            lightly_loaded: results.contributor_workloads.filter((c: Record<string, Neo4jValue>) => (c.total_items as number) < avgItemsPerContributor * 0.5).length
+            heavily_loaded: workloadsArray.filter((c: Record<string, Neo4jValue>) => (c.total_items as number) > avgItemsPerContributor * 1.5).length,
+            moderately_loaded: workloadsArray.filter((c: Record<string, Neo4jValue>) => (c.total_items as number) >= avgItemsPerContributor * 0.5 && (c.total_items as number) <= avgItemsPerContributor * 1.5).length,
+            lightly_loaded: workloadsArray.filter((c: Record<string, Neo4jValue>) => (c.total_items as number) < avgItemsPerContributor * 0.5).length
           }
         };
 
@@ -2372,12 +2375,12 @@ export class GraphService {
 
       // Add capacity analysis if requested
       if (include_capacity && !results.error) {
-        results.capacity_analysis = this.generateCapacityAnalysis(results.contributor_workloads);
+        results.capacity_analysis = this.generateCapacityAnalysis(results.contributor_workloads as unknown as WorkloadData[]) as unknown as Neo4jValue;
       }
 
       // Add predictions if requested
       if (include_predictions && !results.error) {
-        results.predictions = this.generateWorkloadPredictions(results.contributor_workloads);
+        results.predictions = this.generateWorkloadPredictions(results.contributor_workloads as unknown as WorkloadData[]) as unknown as Neo4jValue;
       }
 
       return {
@@ -2479,13 +2482,17 @@ export class GraphService {
   }
 
   // Contributor-Focused Methods
-  async getContributorPriorities(args: {
-    contributor_id: string;
-    limit?: number;
-    priority_type?: 'all' | 'executive' | 'individual' | 'community' | 'composite';
-    status_filter?: string[];
-    include_dependencies?: boolean;
-  }) {
+  async getContributorPriorities(args: GetContributorPrioritiesArgs) {
+    if (!args.contributor_id) {
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify({ error: 'contributor_id is required' })
+        }],
+        isError: true
+      };
+    }
+
     const limit = args.limit || 10;
     const priorityType = args.priority_type || 'composite';
     const statusFilter = args.status_filter || ['PROPOSED', 'PLANNED', 'ACTIVE', 'IN_PROGRESS', 'BLOCKED'];
@@ -2551,14 +2558,17 @@ export class GraphService {
     }
   }
 
-  async getContributorWorkload(args: {
-    contributor_id: string;
-    include_projects?: boolean;
-    include_priority_distribution?: boolean;
-    include_type_distribution?: boolean;
-    include_timeline?: boolean;
-    time_window_days?: number;
-  }) {
+  async getContributorWorkload(args: GetContributorWorkloadArgs) {
+    if (!args.contributor_id) {
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify({ error: 'contributor_id is required' })
+        }],
+        isError: true
+      };
+    }
+
     const session = this.driver.session();
     try {
       // Get basic workload stats
@@ -2709,12 +2719,22 @@ export class GraphService {
   }
 
   async getProjectTeam(args: {
-    graph_id: string;
+    graph_id?: string;
     include_roles?: boolean;
     include_collaboration?: boolean;
     include_capacity?: boolean;
     depth?: number;
   }) {
+    if (!args.graph_id) {
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify({ error: 'graph_id is required' })
+        }],
+        isError: true
+      };
+    }
+
     const session = this.driver.session();
     try {
       const query = `
@@ -2770,13 +2790,23 @@ export class GraphService {
   }
 
   async getContributorExpertise(args: {
-    contributor_id: string;
+    contributor_id?: string;
     include_work_types?: boolean;
     include_projects?: boolean;
     include_success_patterns?: boolean;
     time_window_days?: number;
     min_items_threshold?: number;
   }) {
+    if (!args.contributor_id) {
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify({ error: 'contributor_id is required' })
+        }],
+        isError: true
+      };
+    }
+
     const session = this.driver.session();
     try {
       const timeWindow = args.time_window_days || 90;
@@ -2815,22 +2845,23 @@ export class GraphService {
       
       if (args.include_work_types) {
         itemDetails.forEach((item: Record<string, Neo4jValue>) => {
-          if (!workTypeExpertise[item.type]) {
-            workTypeExpertise[item.type] = { count: 0, completed: 0, avgPriority: 0 };
+          const itemType = String(item.type);
+          if (!workTypeExpertise[itemType]) {
+            workTypeExpertise[itemType] = { count: 0, completed: 0, avgPriority: 0 };
           }
-          workTypeExpertise[item.type].count++;
+          workTypeExpertise[itemType].count = (workTypeExpertise[itemType].count as number) + 1;
           if (item.status === 'COMPLETED') {
-            workTypeExpertise[item.type].completed++;
+            workTypeExpertise[itemType].completed = (workTypeExpertise[itemType].completed as number) + 1;
           }
-          workTypeExpertise[item.type].avgPriority += item.priority;
+          workTypeExpertise[itemType].avgPriority = (workTypeExpertise[itemType].avgPriority as number) + (item.priority as number);
         });
 
         Object.keys(workTypeExpertise).forEach(type => {
           const expertise = workTypeExpertise[type];
-          expertise.avgPriority = expertise.avgPriority / expertise.count;
-          expertise.completionRate = expertise.completed / expertise.count;
-          expertise.expertiseLevel = expertise.count >= minThreshold ? 
-            (expertise.completionRate > 0.8 ? 'Expert' : 'Proficient') : 'Beginner';
+          expertise.avgPriority = (expertise.avgPriority as number) / (expertise.count as number);
+          expertise.completionRate = (expertise.completed as number) / (expertise.count as number);
+          expertise.expertiseLevel = (expertise.count as number) >= minThreshold ? 
+            ((expertise.completionRate as number) > 0.8 ? 'Expert' : 'Proficient') : 'Beginner';
         });
       }
 
