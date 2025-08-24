@@ -1,8 +1,6 @@
 name: Chaos Testing
 
 on:
-  push:
-    branches: [main, dev, dev-*]
   pull_request:
     branches: [main, dev]
   schedule:
@@ -19,6 +17,11 @@ on:
         - light
         - normal
         - aggressive
+
+# Prevent duplicate runs
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   chaos-testing:
