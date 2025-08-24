@@ -10,6 +10,7 @@ interface AnimatedPriorityProps {
 
 export function AnimatedPriority({ value, className = '', duration = 3000, style, renderBar }: AnimatedPriorityProps) {
   const [displayValue, setDisplayValue] = useState(value);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isAnimating, setIsAnimating] = useState(false);
 
   useEffect(() => {
