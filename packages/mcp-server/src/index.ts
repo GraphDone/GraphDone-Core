@@ -729,10 +729,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       // Priority Management Commands
       case 'update_priorities':
-        return await graphService.updatePriorities(args as UpdatePrioritiesArgs);
+        return await graphService.updatePriorities((args || {}) as UpdatePrioritiesArgs);
 
       case 'bulk_update_priorities':
-        return await graphService.bulkUpdatePriorities(args as BulkUpdatePrioritiesArgs);
+        return await graphService.bulkUpdatePriorities((args || {}) as BulkUpdatePrioritiesArgs);
 
       case 'get_priority_insights':
         return await graphService.getPriorityInsights(args as GetPriorityInsightsArgs);
@@ -746,26 +746,26 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       // Advanced Operations
       case 'bulk_operations':
-        return await graphService.bulkOperations(args as BulkOperationsArgs);
+        return await graphService.bulkOperations((args || {}) as BulkOperationsArgs);
 
       case 'get_workload_analysis':
         return await graphService.getWorkloadAnalysis(args as Record<string, unknown>);
 
       // Contributor-Focused Commands
       case 'get_contributor_priorities':
-        return await graphService.getContributorPriorities(args as GetContributorPrioritiesArgs);
+        return await graphService.getContributorPriorities((args || {}) as GetContributorPrioritiesArgs);
 
       case 'get_contributor_workload':
-        return await graphService.getContributorWorkload(args as GetContributorWorkloadArgs);
+        return await graphService.getContributorWorkload((args || {}) as GetContributorWorkloadArgs);
 
       case 'find_contributors_by_project':
         return await graphService.findContributorsByProject(args as Record<string, unknown>);
 
       case 'get_project_team':
-        return await graphService.getProjectTeam(args as Record<string, unknown>);
+        return await graphService.getProjectTeam(args || {});
 
       case 'get_contributor_expertise':
-        return await graphService.getContributorExpertise(args as Record<string, unknown>);
+        return await graphService.getContributorExpertise(args || {});
 
       case 'get_collaboration_network':
         return await graphService.getCollaborationNetwork(args as GetCollaborationNetworkArgs);
@@ -775,25 +775,25 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       // Graph Management Commands - Type assertions needed for MCP dynamic arguments
       case 'create_graph':
-        return await graphService.createGraph(args as CreateGraphArgs);
+        return await graphService.createGraph((args || {}) as CreateGraphArgs);
 
       case 'list_graphs':
         return await graphService.listGraphs(args as ListGraphsArgs);
 
       case 'get_graph_details':
-        return await graphService.getGraphDetails(args as GetGraphDetailsArgs);
+        return await graphService.getGraphDetails((args || {}) as GetGraphDetailsArgs);
 
       case 'update_graph':
-        return await graphService.updateGraph(args as UpdateGraphArgs);
+        return await graphService.updateGraph((args || {}) as UpdateGraphArgs);
 
       case 'delete_graph':
-        return await graphService.deleteGraph(args as DeleteGraphArgs);
+        return await graphService.deleteGraph((args || {}) as DeleteGraphArgs);
 
       case 'archive_graph':
-        return await graphService.archiveGraph(args as ArchiveGraphArgs);
+        return await graphService.archiveGraph((args || {}) as ArchiveGraphArgs);
 
       case 'clone_graph':
-        return await graphService.cloneGraph(args as CloneGraphArgs);
+        return await graphService.cloneGraph((args || {}) as CloneGraphArgs);
 
       default:
         throw new Error(`Unknown tool: ${name}`);
