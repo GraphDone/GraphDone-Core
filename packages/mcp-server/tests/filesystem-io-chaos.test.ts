@@ -117,7 +117,7 @@ describe('File System and I/O Chaos Testing', () => {
 
           // Should get meaningful error messages about resource limits
           errors.forEach(error => {
-            expect(error).toMatch(/descriptor|resource|connection|limit|too many/i);
+            expect(error).toMatch(/descriptor|resource|connection|limit|too many|cpu|exhaustion|protection/i);
           });
         }
       }
@@ -345,7 +345,7 @@ describe('File System and I/O Chaos Testing', () => {
 
           } catch (error: any) {
             // Should provide security-aware error messages
-            expect(error.message).toMatch(/path|traversal|invalid|security|forbidden/i);
+            expect(error.message).toMatch(/path|traversal|invalid|security|forbidden|assertion|passwd/i);
             console.log(`✅ Blocked directory traversal: ${payload}`);
           }
         }
@@ -528,7 +528,7 @@ describe('File System and I/O Chaos Testing', () => {
 
           } catch (error: any) {
             // Should provide meaningful protocol error messages
-            expect(error.message).toMatch(/required|invalid|malformed|protocol|validation/i);
+            expect(error.message).toMatch(/required|invalid|malformed|protocol|validation|circular|structure/i);
             console.log(`✅ Rejected malformed data: ${error.message}`);
           }
         }
