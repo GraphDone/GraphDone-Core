@@ -118,13 +118,6 @@ export function Agents() {
             <p className="text-sm text-gray-400 mt-1">
               Collaborate with AI agents and configure MCP servers for your work graph
             </p>
-            <Link 
-              to="/mcp-status" 
-              className="inline-flex items-center mt-2 text-xs text-blue-400 hover:text-blue-300 transition-colors"
-            >
-              <Server className="w-3 h-3 mr-1" />
-              View MCP Server Health Status →
-            </Link>
           </div>
           
           <div className="flex items-center space-x-3">
