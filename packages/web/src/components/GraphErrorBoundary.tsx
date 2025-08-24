@@ -32,8 +32,11 @@ export class GraphErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('Graph visualization error:', error);
-    console.error('Error details:', errorInfo);
+    // Log error in development only
+    if (import.meta.env.DEV) {
+      console.error('Graph visualization error:', error);
+      console.error('Error details:', errorInfo);
+    }
     
     this.setState({ errorInfo });
     
@@ -45,7 +48,7 @@ export class GraphErrorBoundary extends Component<Props, State> {
     // Log to error tracking service in production
     if (process.env.NODE_ENV === 'production') {
       // Send to error tracking service like Sentry
-      console.error('Production error logged:', { error, errorInfo });
+      // console.error('Production error logged:', { error, errorInfo });
     }
   }
 
@@ -217,7 +220,9 @@ export class GraphErrorBoundary extends Component<Props, State> {
                         component: 'GraphVisualization',
                         timestamp: new Date().toISOString()
                       };
-                      console.log('Error report:', errorReport);
+                      if (import.meta.env.DEV) {
+                        console.log('Error report:', errorReport);
+                      }
                       alert('Error report logged to console');
                     }}
                     className="btn btn-secondary flex items-center"
