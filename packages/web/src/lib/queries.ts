@@ -19,29 +19,40 @@ export const GET_WORK_ITEMS = gql`
       priorityComm
       priorityComp
       dueDate
-      assignedTo
       tags
-      teamId
-      userId
+      metadata
+      owner {
+        id
+        name
+        username
+      }
+      assignedTo {
+        id
+        name
+        username
+      }
+      graph {
+        id
+        name
+        team {
+          id
+          name
+        }
+      }
       contributors {
         id
         name
         type
-        teamId
       }
       dependencies {
         id
         title
         type
-        teamId
-        userId
       }
       dependents {
         id
         title
         type
-        teamId
-        userId
       }
       createdAt
       updatedAt
@@ -55,21 +66,20 @@ export const GET_EDGES = gql`
       id
       type
       weight
-      teamId
-      userId
+      createdBy {
+        id
+        name
+        username
+      }
       source {
         id
         title
         type
-        teamId
-        userId
       }
       target {
         id
         title
         type
-        teamId
-        userId
       }
       createdAt
     }
@@ -95,8 +105,26 @@ export const GET_WORK_ITEM_BY_ID = gql`
       priorityComm
       priorityComp
       dueDate
-      assignedTo
       tags
+      metadata
+      owner {
+        id
+        name
+        username
+      }
+      assignedTo {
+        id
+        name
+        username
+      }
+      graph {
+        id
+        name
+        team {
+          id
+          name
+        }
+      }
       contributors {
         id
         name
@@ -227,6 +255,81 @@ export const SUBSCRIBE_TO_WORK_ITEM_CHANGES = gql`
       dueDate
       assignedTo
       tags
+      updatedAt
+    }
+  }
+`;
+
+// User Management Queries
+export const GET_ALL_USERS = gql`
+  query GetAllUsers {
+    users {
+      id
+      email
+      username
+      name
+      role
+      isActive
+      isEmailVerified
+      deactivationDate
+      createdAt
+      updatedAt
+    }
+  }
+`;
+
+// User Management Mutations
+export const UPDATE_USER_ROLE = gql`
+  mutation UpdateUserRole($userId: ID!, $role: String!) {
+    updateUsers(where: { id: $userId }, update: { role: $role }) {
+      users {
+        id
+        role
+        updatedAt
+      }
+    }
+  }
+`;
+
+export const RESET_USER_PASSWORD = gql`
+  mutation ResetUserPassword($userId: ID!) {
+    resetUserPassword(userId: $userId) {
+      success
+      tempPassword
+      message
+    }
+  }
+`;
+
+export const DELETE_USER = gql`
+  mutation DeleteUser($userId: ID!) {
+    deleteUser(userId: $userId) {
+      success
+      message
+    }
+  }
+`;
+
+export const CREATE_USER = gql`
+  mutation CreateUser($input: CreateUserInput!) {
+    createUser(input: $input) {
+      id
+      email
+      username
+      name
+      role
+      isActive
+      isEmailVerified
+    }
+  }
+`;
+
+export const UPDATE_USER_STATUS = gql`
+  mutation UpdateUserStatus($userId: String!, $isActive: Boolean!) {
+    updateUserStatus(userId: $userId, isActive: $isActive) {
+      id
+      isActive
+      deactivationDate
       updatedAt
     }
   }

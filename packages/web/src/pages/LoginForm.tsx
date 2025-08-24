@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useMutation, gql } from '@apollo/client';
-import { Eye, EyeOff, ArrowRight, Mail, Lock } from 'lucide-react';
+import { useMutation, useQuery, gql } from '@apollo/client';
+import { Eye, EyeOff, ArrowRight, Mail, Lock, Users } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 const LOGIN_MUTATION = gql`
@@ -28,6 +28,37 @@ const LOGIN_MUTATION = gql`
   }
 `;
 
+const GUEST_LOGIN_MUTATION = gql`
+  mutation GuestLogin {
+    guestLogin {
+      token
+      user {
+        id
+        email
+        username
+        name
+        avatar
+        role
+        isActive
+        isEmailVerified
+        team {
+          id
+          name
+          description
+        }
+      }
+    }
+  }
+`;
+
+const GET_SYSTEM_SETTINGS = gql`
+  query GetSystemSettings {
+    systemSettings {
+      allowAnonymousGuest
+    }
+  }
+`;
+
 export function LoginForm() {
   const navigate = useNavigate();
   const { login: setAuthUser } = useAuth();
@@ -40,10 +71,23 @@ export function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Check if guest access is enabled
+  const { data: systemSettings } = useQuery(GET_SYSTEM_SETTINGS);
+  const isGuestEnabled = systemSettings?.systemSettings?.allowAnonymousGuest ?? true;
 
   const [login, { loading }] = useMutation(LOGIN_MUTATION, {
     onCompleted: (data) => {
       setAuthUser(data.login.user, data.login.token);
+      navigate('/');
+    },
+    onError: (error) => {
+      setErrors({ submit: error.message });
+    }
+  });
+
+  const [guestLogin, { loading: guestLoading }] = useMutation(GUEST_LOGIN_MUTATION, {
+    onCompleted: (data) => {
+      setAuthUser(data.guestLogin.user, data.guestLogin.token);
       navigate('/');
     },
     onError: (error) => {
@@ -83,6 +127,10 @@ export function LoginForm() {
     });
   };
 
+  const handleGuestLogin = async () => {
+    await guestLogin();
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
@@ -95,16 +143,6 @@ export function LoginForm() {
     }
   };
 
-  // const getRoleDisplayName = (role: string) => {
-  //   switch (role) {
-  //     case 'NODE_WATCHER': return 'Node Watcher';
-  //     case 'CONNECTOR': return 'Connector';
-  //     case 'ORIGIN_NODE': return 'Origin Node';
-  //     case 'PATH_KEEPER': return 'Path Keeper';
-  //     case 'GRAPH_MASTER': return 'Graph Master';
-  //     default: return role;
-  //   }
-  // };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4">
@@ -116,7 +154,7 @@ export function LoginForm() {
             <span className="ml-3 text-3xl font-bold text-gray-100">GraphDone</span>
           </Link>
           <h1 className="text-2xl font-bold text-gray-100 mb-2">Welcome Back</h1>
-          <p className="text-gray-300">Enter your credentials to access the graph</p>
+          <p className="text-gray-300">Enter your credentials to join the team</p>
         </div>
 
         {/* Login Form */}
@@ -200,7 +238,7 @@ export function LoginForm() {
           {/* Submit Button */}
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || guestLoading}
             className="w-full btn btn-primary flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? (
@@ -215,6 +253,55 @@ export function LoginForm() {
               </>
             )}
           </button>
+
+          {/* Guest Mode Button */}
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-600" />
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 bg-gray-800 text-gray-400">or</span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleGuestLogin}
+            disabled={!isGuestEnabled || loading || guestLoading}
+            className={`w-full btn flex items-center justify-center space-x-2 disabled:cursor-not-allowed ${
+              isGuestEnabled 
+                ? 'btn-secondary disabled:opacity-50' 
+                : 'btn-secondary opacity-50 cursor-not-allowed'
+            }`}
+            title={!isGuestEnabled ? "Guest access has been disabled by the administrator" : undefined}
+          >
+            {guestLoading ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                <span>Entering Guest Mode...</span>
+              </>
+            ) : (
+              <>
+                <Users className="h-4 w-4" />
+                <span>Continue as Guest</span>
+              </>
+            )}
+          </button>
+
+          {/* Guest Mode Info */}
+          {isGuestEnabled ? (
+            <div className="p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
+              <p className="text-xs text-blue-300 text-center">
+                <strong>Guest Mode:</strong> Explore GraphDone with read-only access. No account required.
+              </p>
+            </div>
+          ) : (
+            <div className="p-3 bg-gray-800/50 border border-gray-600 rounded-lg">
+              <p className="text-xs text-gray-400 text-center">
+                Guest access has been disabled by the system administrator.
+              </p>
+            </div>
+          )}
         </form>
 
 
@@ -228,32 +315,6 @@ export function LoginForm() {
           </p>
         </div>
 
-        {/* Role Hierarchy Information */}
-        <div className="mt-8 p-4 bg-gray-800 border border-gray-700 rounded-lg">
-          <h3 className="text-sm font-semibold text-gray-300 mb-3">Graph Roles</h3>
-          <div className="space-y-2 text-xs text-gray-400">
-            <div className="flex justify-between">
-              <span className="text-gray-300">Node Watcher</span>
-              <span>Read-only access</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-blue-300">Connector</span>
-              <span>Can work on tasks</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-green-300">Origin Node</span>
-              <span>Task creators</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-purple-300">Path Keeper</span>
-              <span>Project maintainers</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-yellow-300">Graph Master</span>
-              <span>System administrators</span>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );

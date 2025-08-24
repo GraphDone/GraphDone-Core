@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
-import { Save, RotateCcw, Users, Settings as SettingsIcon } from 'lucide-react';
-import { UserManagement } from '../components/UserManagement';
+import { Save, RotateCcw, Settings as SettingsIcon } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { CustomDropdown } from '../components/CustomDropdown';
 
 export function Settings() {
   const { currentUser } = useAuth();
-  const [activeTab, setActiveTab] = useState('app');
   const [settings, setSettings] = React.useState({
     autoLayout: true,
     showPriorityIndicators: true,
@@ -14,7 +13,6 @@ export function Settings() {
     defaultViewMode: '3d'
   });
 
-  const canManageUsers = currentUser && ['PATH_KEEPER', 'GRAPH_MASTER'].includes(currentUser.role);
 
   const handleSave = () => {
     // Save settings functionality to be implemented
@@ -42,43 +40,12 @@ export function Settings() {
             </p>
           </div>
           
-          {/* Tab Navigation */}
-          <div className="flex space-x-2">
-            <button
-              onClick={() => setActiveTab('app')}
-              className={`px-4 py-2 rounded-lg flex items-center space-x-2 ${
-                activeTab === 'app' 
-                  ? 'bg-gray-700 text-gray-100' 
-                  : 'text-gray-400 hover:text-gray-300 hover:bg-gray-800'
-              }`}
-            >
-              <SettingsIcon className="h-4 w-4" />
-              <span>App Settings</span>
-            </button>
-            
-            {canManageUsers && (
-              <button
-                onClick={() => setActiveTab('users')}
-                className={`px-4 py-2 rounded-lg flex items-center space-x-2 ${
-                  activeTab === 'users' 
-                    ? 'bg-gray-700 text-gray-100' 
-                    : 'text-gray-400 hover:text-gray-300 hover:bg-gray-800'
-                }`}
-              >
-                <Users className="h-4 w-4" />
-                <span>User Management</span>
-              </button>
-            )}
-          </div>
         </div>
       </div>
 
       {/* Content */}
       <div className="flex-1 overflow-auto">
-        {activeTab === 'users' && canManageUsers ? (
-          <UserManagement />
-        ) : (
-          <div className="max-w-4xl mx-auto px-6 py-8">
+        <div className="max-w-4xl mx-auto px-6 py-8">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-semibold text-gray-100">Application Settings</h2>
               <div className="flex items-center space-x-3">
@@ -154,28 +121,28 @@ export function Settings() {
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">Theme</label>
-                    <select
+                    <CustomDropdown
+                      options={[
+                        { value: 'light', label: 'Light' },
+                        { value: 'dark', label: 'Dark' },
+                        { value: 'auto', label: 'Auto' }
+                      ]}
                       value={settings.theme}
-                      onChange={(e) => setSettings(prev => ({ ...prev, theme: e.target.value }))}
-                      className="bg-gray-700 border border-gray-600 text-gray-100 text-sm rounded-lg focus:ring-green-500 focus:border-green-500 block w-full p-2.5"
-                    >
-                      <option value="light">Light</option>
-                      <option value="dark">Dark</option>
-                      <option value="auto">Auto</option>
-                    </select>
+                      onChange={(value) => setSettings(prev => ({ ...prev, theme: value }))}
+                    />
                   </div>
                   
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">Default View Mode</label>
-                    <select
+                    <CustomDropdown
+                      options={[
+                        { value: '2d', label: '2D View' },
+                        { value: '3d', label: '3D View' },
+                        { value: 'hybrid', label: 'Hybrid' }
+                      ]}
                       value={settings.defaultViewMode}
-                      onChange={(e) => setSettings(prev => ({ ...prev, defaultViewMode: e.target.value }))}
-                      className="bg-gray-700 border border-gray-600 text-gray-100 text-sm rounded-lg focus:ring-green-500 focus:border-green-500 block w-full p-2.5"
-                    >
-                      <option value="2d">2D View</option>
-                      <option value="3d">3D View</option>
-                      <option value="hybrid">Hybrid</option>
-                    </select>
+                      onChange={(value) => setSettings(prev => ({ ...prev, defaultViewMode: value }))}
+                    />
                   </div>
                 </div>
               </div>
@@ -190,22 +157,21 @@ export function Settings() {
                       <p className="text-sm text-gray-400">Your current access level in the graph network</p>
                     </div>
                     <span className={`inline-flex px-3 py-1 text-sm font-semibold rounded-full ${
-                      currentUser?.role === 'GRAPH_MASTER' ? 'bg-yellow-900 text-yellow-300' :
-                      currentUser?.role === 'PATH_KEEPER' ? 'bg-purple-900 text-purple-300' :
-                      currentUser?.role === 'ORIGIN_NODE' ? 'bg-green-900 text-green-300' :
-                      currentUser?.role === 'CONNECTOR' ? 'bg-blue-900 text-blue-300' :
+                      currentUser?.role === 'ADMIN' ? 'bg-yellow-900 text-yellow-300' :
+                      currentUser?.role === 'USER' ? 'bg-blue-900 text-blue-300' :
+                      currentUser?.role === 'VIEWER' ? 'bg-gray-900 text-gray-300' :
+                      currentUser?.role === 'GUEST' ? 'bg-purple-900 text-purple-300' :
                       'bg-gray-900 text-gray-300'
                     }`}>
-                      {currentUser?.role?.replace('_', ' ')}
+                      {currentUser?.role}
                     </span>
                   </div>
                   
                   <div className="text-sm text-gray-400">
-                    {currentUser?.role === 'NODE_WATCHER' && 'You have read-only access to view graphs and nodes.'}
-                    {currentUser?.role === 'CONNECTOR' && 'You can work on tasks, create edges, and update nodes.'}
-                    {currentUser?.role === 'ORIGIN_NODE' && 'You can create and own specific nodes and tasks.'}
-                    {currentUser?.role === 'PATH_KEEPER' && 'You can maintain graph structure and manage project flow.'}
-                    {currentUser?.role === 'GRAPH_MASTER' && 'You have full system access and user management capabilities.'}
+                    {currentUser?.role === 'GUEST' && 'You are in demo mode with read-only access. No account required.'}
+                    {currentUser?.role === 'VIEWER' && 'You have read-only access to view graphs and nodes.'}
+                    {currentUser?.role === 'USER' && 'You can create and work on tasks, manage nodes and edges.'}
+                    {currentUser?.role === 'ADMIN' && 'You have full system access and user management capabilities.'}
                   </div>
                 </div>
               </div>
@@ -230,7 +196,6 @@ export function Settings() {
               </div>
             </div>
           </div>
-        )}
       </div>
     </div>
   );

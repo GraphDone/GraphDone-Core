@@ -54,14 +54,17 @@ interface WorkItem {
   priorityIndiv: number;
   priorityComm: number;
   priorityComp: number;
-  assignedTo?: string;
   dueDate?: string;
   tags?: string[];
+  metadata?: string;
   createdAt: string;
   updatedAt: string;
+  owner?: { id: string; name: string; username: string; };
+  assignedTo?: { id: string; name: string; username: string; };
+  graph?: { id: string; name: string; team?: { id: string; name: string; } };
   contributors?: Array<{ id: string; name: string; type: string; }>;
-  dependencies?: Array<{ id: string; title: string; }>;
-  dependents?: Array<{ id: string; title: string; }>;
+  dependencies?: Array<{ id: string; title: string; type: string; }>;
+  dependents?: Array<{ id: string; title: string; type: string; }>;
 }
 
 type ViewType = 'dashboard' | 'cards' | 'kanban' | 'table';
@@ -107,9 +110,11 @@ export function ListView() {
   // Fetch real work items from GraphQL
   const { data, loading, error, refetch } = useQuery(GET_WORK_ITEMS, {
     variables: {
-      where: {
-        teamId: currentTeam?.id || 'team-1'
-      }
+      where: currentGraph ? {
+        graph: {
+          id: currentGraph.id
+        }
+      } : undefined
     },
     fetchPolicy: 'cache-and-network',  // Use cache first, then update from network
     pollInterval: 5000,  // Poll every 5 seconds to catch external changes
@@ -221,7 +226,7 @@ export function ListView() {
     priorityComm: node.priorityComm,
     tags: node.tags || [],
     dueDate: node.dueDate || '',
-    assignedTo: node.assignedTo || '',
+    assignedTo: node.assignedTo?.name || '',
   });
 
   // Modal handlers
@@ -244,8 +249,8 @@ export function ListView() {
   // Get unique values for filter options
   const uniqueContributors = useMemo(() => {
     const contributors = workItems
-      .map(node => node.assignedTo)
-      .filter(contributor => contributor && typeof contributor === 'string' && contributor.trim().length > 0)
+      .map(node => node.assignedTo?.name)
+      .filter(contributor => contributor && contributor.trim().length > 0)
       .filter((contributor, index, arr) => arr.indexOf(contributor) === index)
       .sort();
     
@@ -275,7 +280,7 @@ export function ListView() {
         node.description?.toLowerCase().includes(searchLower) ||
         node.type.toLowerCase().includes(searchLower) ||
         node.status.toLowerCase().includes(searchLower) ||
-        node.assignedTo?.toLowerCase().includes(searchLower) ||
+        node.assignedTo?.name?.toLowerCase().includes(searchLower) ||
         node.id.toLowerCase().includes(searchLower) ||
         (node.dueDate && new Date(node.dueDate).toLocaleDateString().includes(searchLower))
       );

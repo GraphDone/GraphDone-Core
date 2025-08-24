@@ -204,11 +204,10 @@ export const typeDefs = gql`
   }
 
   enum UserRole {
-    NODE_WATCHER    # Read-only access to view graphs and nodes
-    CONNECTOR       # Can work on tasks, create edges, update nodes
-    ORIGIN_NODE     # Creator/owner of specific nodes/tasks
-    PATH_KEEPER     # Project/graph admin - manages project structure
-    GRAPH_MASTER    # System admin - full system access and user management
+    GUEST           # Anonymous read-only access for demos (no data modification)
+    VIEWER          # Read-only access to view graphs and nodes
+    USER            # Can work on tasks, create and update nodes
+    ADMIN           # System admin - full system access and user management
   }
 
   enum GraphType {
@@ -233,9 +232,10 @@ export const typeDefs = gql`
     passwordHash: String @private  # Made optional for OAuth users
     name: String!
     avatar: String
-    role: UserRole! @default(value: NODE_WATCHER)
+    role: UserRole! @default(value: VIEWER)
     isActive: Boolean! @default(value: true)
     isEmailVerified: Boolean! @default(value: false)
+    deactivationDate: DateTime
     emailVerificationToken: String @private
     passwordResetToken: String @private
     passwordResetExpires: DateTime @private

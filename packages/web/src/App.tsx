@@ -5,6 +5,7 @@ import { Ontology } from './pages/Ontology';
 import { Agents } from './pages/Agents';
 import { Analytics } from './pages/Analytics';
 import { Settings } from './pages/Settings';
+import { Admin } from './pages/Admin';
 import { Backend } from './pages/Backend';
 import { LoginForm } from './pages/LoginForm';
 import { Signup } from './pages/Signup';
@@ -65,6 +66,7 @@ function AuthenticatedApp() {
             <Route path="/agents" element={<Agents />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/admin" element={<Admin />} />
             <Route path="/backend" element={<Backend />} />
           </Routes>
         </Layout>

@@ -46,6 +46,13 @@ function verifyToken(token: string): any {
 
 export const authResolvers = {
   Query: {
+    systemSettings: async () => {
+      // For now, return default settings - in future this could be stored in database
+      return {
+        allowAnonymousGuest: true // Default to enabled
+      };
+    },
+
     me: async (_: any, __: any, context: AuthContext) => {
       if (!context.user) {
         return null;
@@ -78,7 +85,7 @@ export const authResolvers = {
     },
 
     users: async (_: any, __: any, context: AuthContext) => {
-      if (!context.user || !['PATH_KEEPER', 'GRAPH_MASTER'].includes(context.user.role)) {
+      if (!context.user || context.user.role !== 'ADMIN') {
         throw new GraphQLError('Insufficient permissions', {
           extensions: { code: 'FORBIDDEN' }
         });
@@ -297,6 +304,27 @@ export const authResolvers = {
       } finally {
         await session.close();
       }
+    },
+
+    guestLogin: async () => {
+      // Create a temporary guest user token without storing in database
+      const guestUser = {
+        id: 'guest-' + Date.now(),
+        email: 'guest@demo.local',
+        username: 'guest',
+        name: 'Guest User',
+        role: 'GUEST',
+        isActive: true,
+        isEmailVerified: false,
+        team: null
+      };
+
+      const token = generateToken(guestUser.id, guestUser.email, guestUser.role);
+
+      return {
+        token,
+        user: guestUser
+      };
     },
 
     logout: async () => {
@@ -606,7 +634,7 @@ export const authResolvers = {
     },
 
     createTeam: async (_: any, { name, description }: any, context: AuthContext) => {
-      if (!context.user || context.user.role !== 'GRAPH_MASTER') {
+      if (!context.user || context.user.role !== 'ADMIN') {
         throw new GraphQLError('Insufficient permissions', {
           extensions: { code: 'FORBIDDEN' }
         });
@@ -649,16 +677,9 @@ export const authResolvers = {
         });
       }
 
-      // Only PATH_KEEPER and GRAPH_MASTER can change roles
-      if (!['PATH_KEEPER', 'GRAPH_MASTER'].includes(context.user.role)) {
+      // Only ADMIN can change roles
+      if (context.user.role !== 'ADMIN') {
         throw new GraphQLError('Insufficient permissions', {
-          extensions: { code: 'FORBIDDEN' }
-        });
-      }
-
-      // PATH_KEEPER cannot promote to GRAPH_MASTER
-      if (context.user.role === 'PATH_KEEPER' && role === 'GRAPH_MASTER') {
-        throw new GraphQLError('Cannot promote to GRAPH_MASTER role', {
           extensions: { code: 'FORBIDDEN' }
         });
       }
@@ -670,6 +691,220 @@ export const authResolvers = {
            SET u.role = $role, u.updatedAt = datetime()
            RETURN u`,
           { userId, role }
+        );
+
+        if (result.records.length === 0) {
+          throw new GraphQLError('User not found', {
+            extensions: { code: 'NOT_FOUND' }
+          });
+        }
+
+        const user = result.records[0].get('u').properties;
+        return {
+          ...user,
+          passwordHash: undefined
+        };
+      } finally {
+        await session.close();
+      }
+    },
+
+    resetUserPassword: async (_: any, { userId }: { userId: string }, context: AuthContext) => {
+      if (!context.user || context.user.role !== 'ADMIN') {
+        throw new GraphQLError('Only ADMIN can reset user passwords', {
+          extensions: { code: 'FORBIDDEN' }
+        });
+      }
+
+      const session = context.driver.session();
+      try {
+        // Generate a temporary password
+        const tempPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8);
+        const passwordHash = await bcrypt.hash(tempPassword, BCRYPT_ROUNDS);
+
+        const result = await session.run(
+          `MATCH (u:User {id: $userId})
+           SET u.passwordHash = $passwordHash,
+               u.mustChangePassword = true,
+               u.updatedAt = datetime()
+           RETURN u`,
+          { userId, passwordHash }
+        );
+
+        if (result.records.length === 0) {
+          throw new GraphQLError('User not found', {
+            extensions: { code: 'NOT_FOUND' }
+          });
+        }
+
+        return {
+          success: true,
+          tempPassword,
+          message: 'Password reset successfully. User must change password on next login.'
+        };
+      } finally {
+        await session.close();
+      }
+    },
+
+    deleteUser: async (_: any, { userId }: { userId: string }, context: AuthContext) => {
+      console.log('Delete user called with userId:', userId);
+      
+      if (!context.user || context.user.role !== 'ADMIN') {
+        throw new GraphQLError('Only ADMIN can delete users', {
+          extensions: { code: 'FORBIDDEN' }
+        });
+      }
+
+      const session = context.driver.session();
+      try {
+        // First, check if user exists and get their info
+        const userCheck = await session.run(
+          `MATCH (u:User {id: $userId}) RETURN u`,
+          { userId }
+        );
+
+        if (userCheck.records.length === 0) {
+          throw new GraphQLError('User not found', {
+            extensions: { code: 'NOT_FOUND' }
+          });
+        }
+
+        const userToDelete = userCheck.records[0].get('u').properties;
+
+        // Prevent deletion of the default admin if it's the only admin
+        if (userToDelete.role === 'ADMIN') {
+          const adminCount = await session.run(
+            `MATCH (u:User {role: 'ADMIN'}) RETURN count(u) as count`
+          );
+          
+          const totalAdmins = adminCount.records[0].get('count').toNumber();
+          
+          if (totalAdmins <= 1) {
+            throw new GraphQLError('Cannot delete the last admin user. At least one ADMIN must exist.', {
+              extensions: { code: 'FORBIDDEN' }
+            });
+          }
+        }
+
+        // Simple approach: detach delete but preserve work items by updating their relationships first
+        await session.run(
+          `MATCH (u:User {id: $userId})
+           // Remove user assignments but keep work items
+           OPTIONAL MATCH (u)-[:ASSIGNED_TO]->(w:WorkItem)
+           SET w.assignedTo = null
+           // Remove user as contributor but keep work items
+           OPTIONAL MATCH (u)-[c:CONTRIBUTOR_TO]->(w:WorkItem)
+           DELETE c`,
+          { userId }
+        );
+
+        // Now safely delete the user
+        const result = await session.run(
+          `MATCH (u:User {id: $userId})
+           DETACH DELETE u
+           RETURN 1 as deletedCount`,
+          { userId }
+        );
+
+        const deletedCount = result.records[0].get('deletedCount').toNumber();
+
+        if (deletedCount === 0) {
+          throw new GraphQLError('Failed to delete user', {
+            extensions: { code: 'INTERNAL_ERROR' }
+          });
+        }
+
+        return {
+          success: true,
+          message: 'User account deleted successfully. Work items and contributions have been preserved.'
+        };
+      } finally {
+        await session.close();
+      }
+    },
+
+    createUser: async (_: any, { input }: { input: any }, context: AuthContext) => {
+      if (!context.user || context.user.role !== 'ADMIN') {
+        throw new GraphQLError('Only ADMIN can create users', {
+          extensions: { code: 'FORBIDDEN' }
+        });
+      }
+
+      const { email, username, name, password, role } = input;
+      
+      const session = context.driver.session();
+      try {
+        // Check if email or username already exists
+        const existingUser = await session.run(
+          `MATCH (u:User)
+           WHERE u.email = $email OR u.username = $username
+           RETURN u`,
+          { email, username }
+        );
+
+        if (existingUser.records.length > 0) {
+          throw new GraphQLError('Email or username already exists', {
+            extensions: { code: 'BAD_USER_INPUT' }
+          });
+        }
+
+        // Create new user
+        const userId = uuidv4();
+        const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+        
+        const result = await session.run(
+          `CREATE (u:User {
+            id: $userId,
+            email: $email,
+            username: $username,
+            passwordHash: $passwordHash,
+            name: $name,
+            role: $role,
+            isActive: true,
+            isEmailVerified: false,
+            createdAt: datetime(),
+            updatedAt: datetime()
+          })
+          RETURN u`,
+          { userId, email, username, passwordHash, name, role }
+        );
+
+        const user = result.records[0].get('u').properties;
+        return {
+          ...user,
+          passwordHash: undefined // Don't return password hash
+        };
+      } finally {
+        await session.close();
+      }
+    },
+
+    updateUserStatus: async (_: any, { userId, isActive }: { userId: string, isActive: boolean }, context: AuthContext) => {
+      if (!context.user || context.user.role !== 'ADMIN') {
+        throw new GraphQLError('Only ADMIN can update user status', {
+          extensions: { code: 'FORBIDDEN' }
+        });
+      }
+
+      const session = context.driver.session();
+      try {
+        // Build the SET clause based on status
+        const setFields = ['u.isActive = $isActive', 'u.updatedAt = datetime()'];
+        const params: any = { userId, isActive };
+
+        // If deactivating, set deactivation date; if reactivating, clear it
+        if (!isActive) {
+          setFields.push('u.deactivationDate = datetime()');
+        } else {
+          setFields.push('u.deactivationDate = null');
+        }
+
+        const result = await session.run(
+          `MATCH (u:User {id: $userId})
+           SET ${setFields.join(', ')}
+           RETURN u`,
+          params
         );
 
         if (result.records.length === 0) {
