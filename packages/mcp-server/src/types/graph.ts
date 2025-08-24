@@ -206,7 +206,7 @@ export interface WorkloadPredictions {
 
 // MCP Interface Args - exported for index.ts
 export interface UpdatePrioritiesArgs {
-  node_id: string;
+  node_id?: string;
   priority_executive?: number;
   priority_individual?: number;
   priority_community?: number;
@@ -214,7 +214,7 @@ export interface UpdatePrioritiesArgs {
 }
 
 export interface BulkUpdatePrioritiesArgs {
-  updates: Array<{
+  updates?: Array<{
     node_id: string;
     priority_executive?: number;
     priority_individual?: number;
@@ -235,7 +235,7 @@ export interface GetPriorityInsightsArgs {
 }
 
 export interface GetContributorPrioritiesArgs {
-  contributor_id: string;
+  contributor_id?: string;
   priority_type?: 'all' | 'executive' | 'individual' | 'community' | 'composite';
   status_filter?: NodeStatus[];
   limit?: number;
@@ -243,7 +243,7 @@ export interface GetContributorPrioritiesArgs {
 }
 
 export interface GetContributorWorkloadArgs {
-  contributor_id: string;
+  contributor_id?: string;
   include_type_distribution?: boolean;
   include_priority_distribution?: boolean;
   include_projects?: boolean;
@@ -261,7 +261,7 @@ export interface GetCollaborationNetworkArgs {
 }
 
 export interface BulkOperationsArgs {
-  operations: Array<{
+  operations?: Array<{
     type: 'create_node' | 'update_node' | 'create_edge' | 'delete_edge';
     params: Record<string, unknown>;
   }>;
@@ -270,7 +270,7 @@ export interface BulkOperationsArgs {
 }
 
 export interface CreateGraphArgs {
-  name: string;
+  name?: string;
   description?: string;
   type?: GraphType;
   settings?: GraphSettings;
@@ -289,11 +289,11 @@ export interface ListGraphsArgs {
 }
 
 export interface GetGraphDetailsArgs {
-  graphId: string;
+  graphId?: string;
 }
 
 export interface UpdateGraphArgs {
-  graphId: string;
+  graphId?: string;
   name?: string;
   description?: string;
   type?: GraphType;
@@ -303,18 +303,18 @@ export interface UpdateGraphArgs {
 }
 
 export interface DeleteGraphArgs {
-  graphId: string;
+  graphId?: string;
   force?: boolean;
 }
 
 export interface ArchiveGraphArgs {
-  graphId: string;
+  graphId?: string;
   reason?: string;
 }
 
 export interface CloneGraphArgs {
-  sourceGraphId: string;
-  newName: string;
+  sourceGraphId?: string;
+  newName?: string;
   includeNodes?: boolean;
   includeEdges?: boolean;
   newTeamId?: string;
