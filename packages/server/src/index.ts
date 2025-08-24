@@ -18,7 +18,7 @@ import { authTypeDefs } from './schema/auth-schema.js';
 import { authResolvers } from './resolvers/auth.js';
 import { extractUserFromToken } from './middleware/auth.js';
 import { mergeTypeDefs } from '@graphql-tools/merge';
-import { driver } from './db.js';
+import { driver, NEO4J_URI } from './db.js';
 // import { configurePassport } from './config/passport.js';
 // import { authRoutes } from './routes/auth.js';
 
