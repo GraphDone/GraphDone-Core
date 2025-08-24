@@ -70,18 +70,19 @@ export function GraphVisualization() {
       options: { limit: 100 }
     },
     fetchPolicy: 'cache-and-network',  // Use cache first, then fetch from network for updates
+    pollInterval: 5000,  // Poll every 5 seconds for real-time updates
     notifyOnNetworkStatusChange: true,
     errorPolicy: 'all'
   });
 
   const { data: edgesData, loading: edgesLoading } = useQuery(GET_EDGES, {
     fetchPolicy: 'cache-and-network',
+    pollInterval: 5000,  // Also poll edges for consistency
     notifyOnNetworkStatusChange: true
   });
 
   const workItems: WorkItem[] = workItemsData?.workItems || [];
   const edges: Edge[] = edgesData?.edges || [];
-  
   
   
   // Convert dependency relationships to edges for visualization
