@@ -54,6 +54,11 @@ export function useHealthCheck(options: UseHealthCheckOptions = {}) {
   const API_BASE_URL = import.meta.env.VITE_API_URL || ''; // Use relative URLs to leverage Vite proxy
 
   const checkHealth = useCallback(async () => {
+    const timeoutId = setTimeout(() => {
+      setLoading(false);
+      setError('Health check timed out');
+    }, 10000); // 10 second timeout
+    
     try {
       setLoading(true);
       setError(null);
@@ -96,9 +101,23 @@ export function useHealthCheck(options: UseHealthCheckOptions = {}) {
 
       setLastChecked(new Date());
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Health check failed');
+      const errorMessage = err instanceof Error ? err.message : 'Health check failed';
       console.error('Health check error:', err);
+      setError(errorMessage);
+      
+      // Set fallback status when there's an error
+      setHealth({
+        status: 'unhealthy',
+        timestamp: new Date().toISOString(),
+        services: {
+          graphql: { status: 'unknown', port: 0 },
+          neo4j: { status: 'unknown', uri: '' },
+          mcp: { status: 'unknown', port: 3128, capabilities: [] }
+        }
+      });
+      setMcpStatus({ connected: false, error: errorMessage });
     } finally {
+      clearTimeout(timeoutId);
       setLoading(false);
     }
   }, [API_BASE_URL]);
