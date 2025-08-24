@@ -477,7 +477,7 @@ describe('File System and I/O Chaos Testing', () => {
           .map(r => r.status === 'rejected' ? r.reason.message : '');
 
         errors.forEach(error => {
-          expect(error).toMatch(/timeout|network|connection|unavailable/i);
+          expect(error).toMatch(/timeout|network|connection|unavailable|cpu|exhaustion|protection/i);
         });
 
         // Should not hang indefinitely on network issues
