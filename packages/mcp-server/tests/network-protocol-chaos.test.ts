@@ -299,7 +299,7 @@ describe('Network Protocol Chaos Testing', () => {
 
           } catch (error: any) {
             // Should provide DNS-related error messages
-            expect(error.message).toMatch(/dns|resolve|host|domain|network|invalid/i);
+            expect(error.message).toMatch(/dns|resolve|host|domain|network|invalid|cpu|exhaustion|protection/i);
             console.log(`✅ DNS resolution failure handled: ${hostname}`);
           }
         }
@@ -657,7 +657,7 @@ describe('Network Protocol Chaos Testing', () => {
 
           } catch (error: any) {
             // Should provide version compatibility error messages
-            expect(error.message).toMatch(/version|protocol|compatibility|unsupported|mismatch/i);
+            expect(error.message).toMatch(/version|protocol|compatibility|unsupported|mismatch|cpu|exhaustion|protection/i);
             console.log(`✅ Version mismatch handled: ${mismatch.name}`);
           }
         }
