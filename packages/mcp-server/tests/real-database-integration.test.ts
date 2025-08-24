@@ -8,10 +8,14 @@ describe('REAL DATABASE INTEGRATION - Graph Management', () => {
   let testGraphIds: string[] = [];
 
   beforeAll(async () => {
-    // Connect to REAL Neo4j database
+    // Connect to REAL Neo4j database using environment variables
+    const neo4jUri = process.env.NEO4J_URI || 'bolt://localhost:7687';
+    const neo4jUser = process.env.NEO4J_USER || process.env.NEO4J_USERNAME || 'neo4j';
+    const neo4jPassword = process.env.NEO4J_PASSWORD || 'graphdone_password';
+    
     driver = neo4j.driver(
-      'bolt://localhost:7687',
-      neo4j.auth.basic('neo4j', 'graphdone_password'),
+      neo4jUri,
+      neo4j.auth.basic(neo4jUser, neo4jPassword),
       { disableLosslessIntegers: true }
     );
 
