@@ -186,14 +186,16 @@ export const typeDefs = gql`
     BLOCKS
     ENABLES
     RELATES_TO
-    PART_OF
+    IS_PART_OF
     FOLLOWS
     PARALLEL_WITH
     DUPLICATES
     CONFLICTS_WITH
     VALIDATES
+    REFERENCES
     
     # Legacy support (deprecated)
+    PART_OF
     DEPENDENCY
     CONTAINS
   }
