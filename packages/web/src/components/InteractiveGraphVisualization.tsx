@@ -76,6 +76,7 @@ export function InteractiveGraphVisualization() {
     variables: {
       where: {
         graph: {
+          id: currentGraph?.id,
           teamId: currentTeam?.id || 'default-team'
         }
         // Optional: Also filter by user for additional privacy
@@ -84,21 +85,51 @@ export function InteractiveGraphVisualization() {
     },
     pollInterval: 5000, // Poll every 5 seconds to get updates
     errorPolicy: 'all',
-    skip: !currentTeam // Don't fetch until we have a team selected
+    skip: !currentTeam || !currentGraph // Don't fetch until we have both team and graph selected
   });
 
-  // Fetch edges from Neo4j - simplified to get all edges
+  // Fetch edges from Neo4j - filter by current graph
   const { data: edgesData, loading: edgesLoading, error: edgesError } = useQuery(GET_EDGES, {
-    variables: {}, // Fetch all edges, no filtering
+    variables: {
+      where: {
+        source: {
+          graph: {
+            id: currentGraph?.id
+          }
+        }
+      }
+    },
     pollInterval: 5000,
-    errorPolicy: 'all'
+    errorPolicy: 'all',
+    skip: !currentGraph // Don't fetch until we have a graph selected
   });
 
   // Mutation for creating edges
   const [createEdgeMutation] = useMutation(CREATE_EDGE, {
     refetchQueries: [
-      { query: GET_EDGES, variables: {} },
-      { query: GET_WORK_ITEMS, variables: { options: { limit: 100 } } }
+      { 
+        query: GET_EDGES, 
+        variables: {
+          where: {
+            source: {
+              graph: {
+                id: currentGraph?.id
+              }
+            }
+          }
+        }
+      },
+      { 
+        query: GET_WORK_ITEMS, 
+        variables: {
+          where: {
+            graph: {
+              id: currentGraph?.id,
+              teamId: currentTeam?.id || 'default-team'
+            }
+          }
+        }
+      }
     ],
     onError: (error) => {
       if (import.meta.env.DEV) {
@@ -127,11 +158,33 @@ export function InteractiveGraphVisualization() {
 
   // Additional edge operations
   const [updateEdgeMutation] = useMutation(UPDATE_EDGE, {
-    refetchQueries: [{ query: GET_EDGES, variables: { where: { source: { graph: { teamId: currentTeam?.id || 'default-team' } } } } }],
+    refetchQueries: [{ 
+      query: GET_EDGES, 
+      variables: {
+        where: {
+          source: {
+            graph: {
+              id: currentGraph?.id
+            }
+          }
+        }
+      }
+    }],
   });
 
   const [deleteEdgeMutation] = useMutation(DELETE_EDGE, {
-    refetchQueries: [{ query: GET_EDGES, variables: { where: { source: { graph: { teamId: currentTeam?.id || 'default-team' } } } } }],
+    refetchQueries: [{ 
+      query: GET_EDGES, 
+      variables: {
+        where: {
+          source: {
+            graph: {
+              id: currentGraph?.id
+            }
+          }
+        }
+      }
+    }],
   });
 
   // Function to get icon based on graph type - matches CreateGraphModal exactly
@@ -568,10 +621,13 @@ export function InteractiveGraphVisualization() {
           }
         })
         .on('drag', (event, d: any) => {
-          d.fx = event.x;
-          d.fy = event.y;
-          d.x = event.x;
-          d.y = event.y;
+          // Get node radius
+          const nodeRadius = 30;
+          // Constrain to container bounds
+          d.fx = Math.max(nodeRadius, Math.min(width - nodeRadius, event.x));
+          d.fy = Math.max(nodeRadius, Math.min(height - nodeRadius, event.y));
+          d.x = d.fx;
+          d.y = d.fy;
         })
         .on('end', (event, d: any) => {
           if (!event.active) simulation.alphaTarget(0.05);
@@ -605,30 +661,34 @@ export function InteractiveGraphVisualization() {
           return '#374151'; // Dark gray for completed nodes
         }
         
-        switch (d.type) {
-          case 'EPIC': return '#a855f7';
-          case 'FEATURE': return '#3b82f6';
-          case 'TASK': return '#10b981';
-          case 'BUG': return '#dc2626';
-          case 'MILESTONE': return '#f59e0b';
-          case 'OUTCOME': return '#6366f1';
-          case 'IDEA': return '#f97316';
-          default: return '#6b7280';
-        }
+        // Lighter, more vibrant colors
+        const colors: Record<string, string> = {
+          EPIC: '#c084fc',      // purple-400
+          MILESTONE: '#fb923c', // orange-400
+          OUTCOME: '#818cf8',   // indigo-400
+          FEATURE: '#38bdf8',   // sky-400
+          TASK: '#4ade80',      // green-400
+          BUG: '#f87171',       // red-400
+          IDEA: '#fbbf24',      // yellow-400
+          RESEARCH: '#2dd4bf'   // teal-400
+        };
+        return colors[d.type] || '#6b7280';
       })
       .attr('stroke', (d: WorkItem) => {
         // Use colored ring for completed nodes to show original type
         if (d.status === 'COMPLETED' || d.status === 'Completed' || d.status === 'Done' || d.status === 'DONE') {
-          switch (d.type) {
-            case 'EPIC': return '#a855f7';
-            case 'FEATURE': return '#3b82f6';
-            case 'TASK': return '#10b981';
-            case 'BUG': return '#dc2626';
-            case 'MILESTONE': return '#f59e0b';
-            case 'OUTCOME': return '#6366f1';
-            case 'IDEA': return '#f97316';
-            default: return '#6b7280';
-          }
+          // Lighter, more vibrant colors
+          const colors: Record<string, string> = {
+            EPIC: '#c084fc',      // purple-400
+            MILESTONE: '#fb923c', // orange-400
+            OUTCOME: '#818cf8',   // indigo-400
+            FEATURE: '#38bdf8',   // sky-400
+            TASK: '#4ade80',      // green-400
+            BUG: '#f87171',       // red-400
+            IDEA: '#fbbf24',      // yellow-400
+            RESEARCH: '#2dd4bf'   // teal-400
+          };
+          return colors[d.type] || '#6b7280';
         }
         return '#ffffff'; // White stroke for active nodes
       })
@@ -804,6 +864,13 @@ export function InteractiveGraphVisualization() {
 
     // Simulation tick - ONLY update nodes, edges are handled separately
     simulation.on('tick', () => {
+      // Constrain nodes to container bounds
+      nodes.forEach((d: any) => {
+        const nodeRadius = 30;
+        d.x = Math.max(nodeRadius, Math.min(width - nodeRadius, d.x || centerX));
+        d.y = Math.max(nodeRadius, Math.min(height - nodeRadius, d.y || centerY));
+      });
+      
       // Update node positions
       nodeElements
         .attr('transform', (d: any) => `translate(${d.x || 0},${d.y || 0})`);
