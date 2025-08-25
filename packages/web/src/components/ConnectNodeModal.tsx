@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Link2, Search, CheckCircle, ArrowRight, Target, ExternalLink, Filter, ChevronDown } from 'lucide-react';
+import { X, Link2, Search, CheckCircle, ArrowRight, Target, ExternalLink, Filter, ChevronDown, CircleCheck } from 'lucide-react';
 import { useQuery, useMutation } from '@apollo/client';
 import { GET_WORK_ITEMS, CREATE_EDGE, GET_EDGES } from '../lib/queries';
 import { useAuth } from '../contexts/AuthContext';
@@ -484,7 +484,7 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode }: ConnectNodeMod
                       
                       return (
                         <div className="inline-flex items-center space-x-1 px-2 py-1 bg-blue-500/10 rounded-md border border-blue-400/20">
-                          <Target className="h-3 w-3 text-blue-400" />
+                          <CircleCheck className="h-3 w-3 text-blue-400" />
                           <span className="text-blue-300 font-medium text-xs">
                             {isAllSelected ? `All ${selectedCount}` : selectedCount} node{selectedCount !== 1 ? 's' : ''} selected to connect
                           </span>
