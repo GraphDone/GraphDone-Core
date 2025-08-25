@@ -151,7 +151,9 @@ export function Layout({ children }: LayoutProps) {
               {currentTeam && (
                 <div className="mb-2">
                   <p className="text-xs text-gray-300 font-medium">{currentTeam.name}</p>
-                  <p className="text-xs text-gray-500">{currentTeam.memberCount} members</p>
+                  <p className="text-xs text-gray-500">
+                    {currentTeam.memberCount || 0} members
+                  </p>
                 </div>
               )}
               <p className="text-xs text-gray-400">
