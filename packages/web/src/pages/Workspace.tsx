@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Plus, Zap, RotateCcw, Share2, Users, Filter } from 'lucide-react';
+import { useQuery } from '@apollo/client';
 import { SafeGraphVisualization } from '../components/SafeGraphVisualization';
 import { CreateNodeModal } from '../components/CreateNodeModal';
 import { CreateGraphModal } from '../components/CreateGraphModal';
@@ -8,6 +9,7 @@ import { ListView } from '../components/ListView';
 import { TimelineView } from '../components/TimelineView';
 import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
+import { GET_WORK_ITEMS, GET_EDGES } from '../lib/queries';
 
 export function Workspace() {
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -16,6 +18,37 @@ export function Workspace() {
   const [viewMode, setViewMode] = useState<'graph' | 'list' | 'timeline'>('graph');
   const { currentGraph } = useGraph();
   const { currentTeam, currentUser } = useAuth();
+
+  // Get real-time counts for header display
+  const { data: workItemsData } = useQuery(GET_WORK_ITEMS, {
+    variables: {
+      where: {
+        graph: {
+          id: currentGraph?.id,
+          teamId: currentTeam?.id || 'default-team'
+        }
+      }
+    },
+    skip: !currentGraph || !currentTeam,
+    pollInterval: 5000
+  });
+
+  const { data: edgesData } = useQuery(GET_EDGES, {
+    variables: {
+      where: {
+        source: {
+          graph: {
+            id: currentGraph?.id
+          }
+        }
+      }
+    },
+    skip: !currentGraph,
+    pollInterval: 5000
+  });
+
+  const actualNodeCount = workItemsData?.workItems?.length || 0;
+  const actualEdgeCount = edgesData?.edges?.length || 0;
 
   const canEdit = currentGraph && currentUser; // Simplified for demo
 
@@ -38,9 +71,9 @@ export function Workspace() {
                 )}
                 {currentGraph && (
                   <>
-                    <span>{currentGraph.nodeCount} nodes</span>
+                    <span>{actualNodeCount} node{actualNodeCount !== 1 ? 's' : ''}</span>
                     <span>•</span>
-                    <span>{currentGraph.edgeCount} connections</span>
+                    <span>{actualEdgeCount} connection{actualEdgeCount !== 1 ? 's' : ''}</span>
                     <span>•</span>
                     <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
                       currentGraph.type === 'PROJECT' ? 'bg-blue-100 text-blue-800' :

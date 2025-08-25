@@ -1,11 +1,47 @@
 import { useState, useRef, useEffect } from 'react';
 import { ChevronDown, Plus, Folder, FolderOpen, FileText, Share2, Eye, Edit3, Crown } from 'lucide-react';
+import { useQuery } from '@apollo/client';
 import { useGraph } from '../contexts/GraphContext';
+import { useAuth } from '../contexts/AuthContext';
+import { GET_WORK_ITEMS, GET_EDGES } from '../lib/queries';
 
 export function GraphSelector() {
   const { currentGraph, graphHierarchy, selectGraph } = useGraph();
+  const { currentTeam } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Get real-time counts for current graph
+  const { data: workItemsData } = useQuery(GET_WORK_ITEMS, {
+    variables: {
+      where: {
+        graph: {
+          id: currentGraph?.id,
+          teamId: currentTeam?.id || 'default-team'
+        }
+      }
+    },
+    skip: !currentGraph || !currentTeam,
+    pollInterval: 5000
+  });
+
+  const { data: edgesData } = useQuery(GET_EDGES, {
+    variables: {
+      where: {
+        source: {
+          graph: {
+            id: currentGraph?.id
+          }
+        }
+      }
+    },
+    skip: !currentGraph,
+    pollInterval: 5000
+  });
+
+  const actualNodeCount = workItemsData?.workItems?.length || 0;
+  const actualEdgeCount = edgesData?.edges?.length || 0;
 
   // Function to get icon based on graph type - matches CreateGraphModal exactly
   const getGraphTypeIcon = (type?: string) => {
@@ -90,11 +126,22 @@ export function GraphSelector() {
             {currentGraph.name}
           </div>
           <div className="flex items-center gap-2 text-xs text-gray-400">
-            <span className={`px-1.5 py-0.5 rounded ${getGraphTypeColor(currentGraph.type)}`}>
-              {currentGraph.type}
-            </span>
-            <span>{currentGraph.nodeCount} nodes</span>
-            {currentGraph.isShared && <Share2 className="h-3 w-3" />}
+            <span>{actualNodeCount} node{actualNodeCount !== 1 ? 's' : ''}, {actualEdgeCount} connection{actualEdgeCount !== 1 ? 's' : ''}</span>
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowDetails(!showDetails);
+              }}
+              className="hover:text-green-400 transition-colors p-0.5 rounded"
+              title="Graph details"
+            >
+              <Eye className="h-3 w-3" />
+            </button>
+            {showDetails && (
+              <span className="text-xs bg-gray-800 border border-gray-600 rounded px-2 py-1">
+                {currentGraph.type}{currentGraph.isShared && ' • Shared'}
+              </span>
+            )}
           </div>
         </div>
         
@@ -142,10 +189,8 @@ export function GraphSelector() {
                         {getPermissionIcon(graph.permissions)}
                       </div>
                       <div className="flex items-center gap-2 text-xs text-gray-400">
-                        <span className={`px-1.5 py-0.5 rounded ${getGraphTypeColor(graph.type)}`}>
-                          {graph.type}
-                        </span>
-                        <span>{graph.nodeCount} nodes</span>
+                        <span>{graph.id === currentGraph.id ? actualNodeCount : (graph.nodeCount || 0)} node{(graph.id === currentGraph.id ? actualNodeCount : (graph.nodeCount || 0)) !== 1 ? 's' : ''}, {graph.id === currentGraph.id ? actualEdgeCount : (graph.edgeCount || 0)} connection{(graph.id === currentGraph.id ? actualEdgeCount : (graph.edgeCount || 0)) !== 1 ? 's' : ''}</span>
+                        <Eye className="h-3 w-3 opacity-50" title={`${graph.type}${graph.isShared ? ' • Shared' : ''}`} />
                       </div>
                     </div>
                     {graph.id === currentGraph.id && (
