@@ -1,11 +1,13 @@
 import React from 'react';
 import { useMutation } from '@apollo/client';
 import { X, Link, Calendar, Clock, CheckCircle, AlertCircle, ChevronDown, Flame, Zap, Triangle, Circle, ArrowDown, ClipboardList } from 'lucide-react';
-import { CREATE_WORK_ITEM, GET_WORK_ITEMS } from '../lib/queries';
+import { CREATE_WORK_ITEM, GET_WORK_ITEMS, GET_EDGES, CREATE_EDGE } from '../lib/queries';
 import { useAuth } from '../contexts/AuthContext';
+import { useGraph } from '../contexts/GraphContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { NodeTypeSelector } from './NodeCategorySelector';
 import { TagInput } from './TagInput';
+import { RELATIONSHIP_TYPES, getRelationshipIcon } from '../lib/connectionUtils';
 
 interface WorkItem {
   id: string;
@@ -32,8 +34,10 @@ interface CreateNodeModalProps {
   position?: { x: number; y: number; z: number }; // Position for floating nodes
 }
 
+
 export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: CreateNodeModalProps) {
   const { currentUser, currentTeam } = useAuth();
+  const { currentGraph } = useGraph();
   const { showSuccess, showError } = useNotifications();
   
   const [formData, setFormData] = React.useState({
@@ -48,6 +52,8 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
     dueDate: '',
     tags: [] as string[]
   });
+
+  const [selectedRelationType, setSelectedRelationType] = React.useState('DEPENDS_ON');
 
   const [isStatusOpen, setIsStatusOpen] = React.useState(false);
   const statusDropdownRef = React.useRef<HTMLDivElement>(null);
@@ -80,12 +86,14 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
 
   const [createWorkItem, { loading: creatingWorkItem }] = useMutation(CREATE_WORK_ITEM, {
     refetchQueries: [
+      // Refetch work items for graph visualization
       { 
         query: GET_WORK_ITEMS,
         variables: {
           options: { limit: 100 }
         }
       },
+      // Refetch work items for list view
       { 
         query: GET_WORK_ITEMS,
         variables: {
@@ -93,7 +101,26 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
             teamId: currentTeam?.id || 'team-1'
           }
         }
-      }
+      },
+      // Refetch all edges if creating a connected node
+      ...(parentNodeId ? [
+        { 
+          query: GET_EDGES,
+          variables: {}
+        },
+        // Also refetch edges for the parent node specifically
+        { 
+          query: GET_EDGES,
+          variables: {
+            where: {
+              OR: [
+                { source: { id: parentNodeId } },
+                { target: { id: parentNodeId } }
+              ]
+            }
+          }
+        }
+      ] : [])
     ],
     awaitRefetchQueries: true,
     update: (cache, { data }) => {
@@ -156,10 +183,13 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
     }
   });
 
-  // Note: Edge creation temporarily disabled - will be implemented later
-  // const [createEdge] = useMutation(CREATE_EDGE, {
-  //   refetchQueries: [{ query: GET_WORK_ITEMS }],
-  // });
+  // Edge creation mutation for connected nodes
+  const [createEdge] = useMutation(CREATE_EDGE, {
+    refetchQueries: [
+      { query: GET_EDGES, variables: {} },
+      { query: GET_WORK_ITEMS, variables: { options: { limit: 100 } } }
+    ]
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -167,6 +197,11 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
     
     if (!formData.type) {
       showError('Validation Error', 'Please select a node type.');
+      return;
+    }
+
+    if (!currentGraph) {
+      showError('No Graph Selected', 'Please select a graph before creating work items.');
       return;
     }
     
@@ -195,9 +230,17 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
         phi: 0.0,
         priorityComp: (formData.priorityExec + formData.priorityIndiv + formData.priorityComm) / 3,
         
-        // Data isolation - assign to current team and user
-        teamId: currentTeam?.id || 'default-team',
-        userId: currentUser?.id || 'default-user',
+        // Relationships - connect to current user and graph
+        owner: {
+          connect: {
+            where: { node: { id: currentUser?.id } }
+          }
+        },
+        graph: {
+          connect: {
+            where: { node: { id: currentGraph?.id } }
+          }
+        },
         
         // If parentNodeId is provided, create a dependency relationship
         ...(parentNodeId && {
@@ -216,10 +259,38 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
       if (result.data?.createWorkItems?.workItems?.[0]) {
         const createdNode = result.data.createWorkItems.workItems[0];
         
-        showSuccess(
-          'Node Created Successfully!',
-          `"${createdNode.title}" has been added to your workspace and is now visible in all views.`
-        );
+        // If parentNodeId exists, also create an Edge entity for the connection
+        if (parentNodeId) {
+          try {
+            await createEdge({
+              variables: {
+                input: [{
+                  type: selectedRelationType,
+                  weight: 0.8,
+                  source: { connect: { where: { node: { id: createdNode.id } } } },
+                  target: { connect: { where: { node: { id: parentNodeId } } } }
+                }]
+              }
+            });
+            
+            const relationshipLabel = RELATIONSHIP_TYPES.find(r => r.type === selectedRelationType)?.label || selectedRelationType;
+            showSuccess(
+              'Node Created and Connected Successfully!',
+              `"${createdNode.title}" has been created with a "${relationshipLabel}" relationship.`
+            );
+          } catch (edgeError) {
+            console.error('Failed to create edge:', edgeError);
+            showSuccess(
+              'Node Created Successfully!',
+              `"${createdNode.title}" has been created but the connection failed. You can connect it manually.`
+            );
+          }
+        } else {
+          showSuccess(
+            'Node Created Successfully!',
+            `"${createdNode.title}" has been added to your workspace and is now visible in all views.`
+          );
+        }
 
         onClose();
         setFormData({
@@ -234,6 +305,7 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
           dueDate: '',
           tags: []
         });
+        setSelectedRelationType('DEPENDS_ON');
       }
     } catch (error) {
       
@@ -255,54 +327,108 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
+    <div className="fixed inset-0 z-50 overflow-y-auto backdrop-blur-sm">
       <div className="flex items-center justify-center min-h-screen px-4">
-        <div className="fixed inset-0 bg-black bg-opacity-75 dark:bg-black dark:bg-opacity-80" onClick={onClose} />
+        <div className="fixed inset-0 bg-gradient-to-br from-gray-900/80 via-slate-900/90 to-gray-900/80 transition-all duration-300" onClick={onClose} />
         
-        <div className="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full">
-          <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-            <div className="flex items-center space-x-2">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {parentNodeId ? 'Add Connected Node' : 'Create New Node'}
-              </h2>
-              {parentNodeId && <Link className="h-4 w-4 text-blue-500" />}
+        <div className="relative bg-gradient-to-br from-gray-800 via-gray-800 to-gray-900 rounded-2xl shadow-2xl border border-gray-700/50 max-w-lg w-full transform transition-all duration-300">
+          <div className="bg-gradient-to-r from-emerald-900/30 via-green-800/25 to-teal-900/30 px-6 py-5 border-b border-green-600/20 backdrop-blur-sm rounded-t-2xl">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="p-2 rounded-xl bg-emerald-500/20 border border-emerald-400/30">
+                  {parentNodeId ? <Link className="h-6 w-6 text-emerald-400" /> : <ClipboardList className="h-6 w-6 text-emerald-400" />}
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold bg-gradient-to-r from-emerald-200 to-green-100 bg-clip-text text-transparent">
+                    {parentNodeId ? 'Create & Connect Node' : 'Create New Node'}
+                  </h2>
+                  <p className="text-sm text-gray-300 mt-1">
+                    {parentNodeId ? 'Add a new node with automatic connection' : 'Build your graph with a new work item'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={onClose}
+                className="p-2 rounded-xl text-gray-400 hover:text-gray-200 hover:bg-gray-700/50 transition-all duration-200"
+              >
+                <X className="h-5 w-5" />
+              </button>
             </div>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 dark:text-gray-300 dark:hover:text-gray-100 transition-colors"
-            >
-              <X className="h-5 w-5" />
-            </button>
           </div>
           
-          <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <form onSubmit={handleSubmit} className="p-6 space-y-6 bg-gradient-to-br from-gray-800/30 to-gray-900/40">
             {parentNodeId && (
-              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-4">
-                <p className="text-sm text-blue-800 dark:text-blue-200">
-                  This node will be connected as a dependency to the selected node.
-                </p>
+              <div className="space-y-5 mb-6">
+                <div className="bg-gradient-to-r from-blue-900/20 via-indigo-900/15 to-blue-800/20 border border-blue-600/30 rounded-xl p-4 backdrop-blur-sm">
+                  <div className="flex items-center space-x-3 mb-3">
+                    <div className="h-2 w-2 bg-blue-400 rounded-full"></div>
+                    <p className="text-sm font-semibold text-blue-200">Connection Setup</p>
+                  </div>
+                  <p className="text-sm text-blue-100 leading-relaxed">
+                    A new node will be created and automatically connected with your selected relationship type.
+                  </p>
+                </div>
+                
+                <div>
+                  <div className="flex items-center space-x-2 mb-4">
+                    <div className="h-1.5 w-1.5 bg-emerald-400 rounded-full"></div>
+                    <label className="text-sm font-bold text-gray-100 tracking-wide">
+                      Relationship Type *
+                    </label>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    {RELATIONSHIP_TYPES.map((relation) => (
+                      <button
+                        key={relation.type}
+                        type="button"
+                        onClick={() => setSelectedRelationType(relation.type)}
+                        className={`p-4 rounded-xl text-left transition-all duration-200 border group ${
+                          selectedRelationType === relation.type
+                            ? 'bg-gradient-to-br from-blue-600/20 via-blue-700/25 to-blue-800/20 border-blue-400/50 shadow-lg shadow-blue-500/10'
+                            : 'bg-gradient-to-br from-gray-700/30 to-gray-800/30 hover:from-gray-600/40 hover:to-gray-700/40 border-gray-600/30 hover:border-gray-500/50 hover:shadow-md'
+                        }`}
+                      >
+                        <div className="flex items-center space-x-2 mb-1">
+                          {getRelationshipIcon(relation.icon, `h-5 w-5 ${selectedRelationType === relation.type ? 'text-blue-400' : relation.color}`)}
+                          <span className={`font-medium text-sm ${selectedRelationType === relation.type ? 'text-blue-400' : relation.color}`}>
+                            {relation.label}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-400">
+                          {relation.description}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             )}
             
             <div>
-              <label htmlFor="title" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Title *
-              </label>
+              <div className="flex items-center space-x-2 mb-3">
+                <div className="h-1.5 w-1.5 bg-green-400 rounded-full"></div>
+                <label htmlFor="title" className="text-sm font-bold text-gray-100 tracking-wide">
+                  Title *
+                </label>
+              </div>
               <input
                 type="text"
                 id="title"
                 required
                 value={formData.title}
                 onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter node title"
+                className="w-full border border-gray-600/50 bg-gray-800 text-white rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-400/70 transition-all duration-200 placeholder-gray-400"
+                placeholder="Enter a descriptive title for your node"
               />
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Node Type *
-              </label>
+              <div className="flex items-center space-x-2 mb-3">
+                <div className="h-1.5 w-1.5 bg-purple-400 rounded-full"></div>
+                <label className="text-sm font-bold text-gray-100 tracking-wide">
+                  Node Type *
+                </label>
+              </div>
               
               <NodeTypeSelector
                 selectedType={formData.type}
@@ -312,9 +438,12 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Status
-              </label>
+              <div className="flex items-center space-x-2 mb-3">
+                <div className="h-1.5 w-1.5 bg-orange-400 rounded-full"></div>
+                <label className="text-sm font-bold text-gray-100 tracking-wide">
+                  Status
+                </label>
+              </div>
               <div className="relative" ref={statusDropdownRef}>
                 <button
                   type="button"
@@ -687,24 +816,25 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
               </div>
             </div>
             
-            <div className="flex justify-end space-x-3 pt-4">
+            <div className="flex justify-end space-x-4 pt-6 border-t border-gray-600/50 mt-6">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 text-base font-medium text-white bg-red-600 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 border border-red-600 dark:border-red-500 rounded-lg transition-colors"
+                className="px-6 py-3 text-gray-300 bg-gradient-to-r from-gray-700/50 to-gray-800/50 border border-gray-600/50 rounded-xl hover:from-gray-600/60 hover:to-gray-700/60 hover:border-gray-500/60 transition-all duration-200 font-medium"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={creatingWorkItem || !isFormValid}
-                className={`px-4 py-2 text-base font-medium text-white rounded-lg transition-colors ${
+                className={`px-8 py-3 text-white rounded-xl transition-all duration-200 flex items-center space-x-3 font-semibold shadow-lg disabled:shadow-none ${
                   !isFormValid 
-                    ? 'bg-gray-400 cursor-not-allowed' 
-                    : 'bg-green-600 hover:bg-green-700 disabled:bg-green-400 dark:bg-green-500 dark:hover:bg-green-600 dark:disabled:bg-green-400'
+                    ? 'bg-gray-600/50 cursor-not-allowed opacity-50' 
+                    : 'bg-gradient-to-r from-emerald-600 to-green-700 hover:from-emerald-500 hover:to-green-600 shadow-emerald-500/20'
                 }`}
               >
-                {creatingWorkItem ? 'Creating' : (parentNodeId ? 'Create & Connect' : 'Create Node')}
+                <ClipboardList className="w-5 h-5" />
+                <span>{creatingWorkItem ? 'Creating...' : (parentNodeId ? 'Create & Connect' : 'Create Node')}</span>
               </button>
             </div>
           </form>

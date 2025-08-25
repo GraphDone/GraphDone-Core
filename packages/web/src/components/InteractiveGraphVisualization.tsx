@@ -1,14 +1,20 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import * as d3 from 'd3';
-import { Link2, Edit3, Trash2, AlertTriangle, AlertCircle, Layers, Sparkles, ListTodo, Trophy, Target, Lightbulb, Microscope } from 'lucide-react';
+import { Link2, Edit3, Trash2, AlertTriangle, AlertCircle, Layers, Sparkles, ListTodo, Trophy, Target, Lightbulb, Microscope, Folder, FolderOpen, Plus, FileText, Settings } from 'lucide-react';
 import { useQuery, useMutation } from '@apollo/client';
 import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
-import { GET_WORK_ITEMS, GET_EDGES, CREATE_EDGE } from '../lib/queries';
+import { GET_WORK_ITEMS, GET_EDGES, CREATE_EDGE, UPDATE_EDGE, DELETE_EDGE } from '../lib/queries';
 import { relationshipTypeInfo, RelationshipType } from '../types/projectData';
 import { validateGraphData, getValidationSummary, ValidationResult } from '../utils/graphDataValidation';
 import { EditNodeModal } from './EditNodeModal';
 import { DeleteNodeModal } from './DeleteNodeModal';
+import { CreateNodeModal } from './CreateNodeModal';
+import { CreateGraphModal } from './CreateGraphModal';
+import { GraphSelectionModal } from './GraphSelectionModal';
+import { UpdateGraphModal } from './UpdateGraphModal';
+import { DeleteGraphModal } from './DeleteGraphModal';
+import { ConnectNodeModal } from './ConnectNodeModal';
 
 interface WorkItem {
   id: string;
@@ -69,31 +75,62 @@ export function InteractiveGraphVisualization() {
   const { data: workItemsData, loading, error } = useQuery(GET_WORK_ITEMS, {
     variables: {
       where: {
-        teamId: currentTeam?.id || 'default-team',
+        graph: {
+          id: currentGraph?.id,
+          teamId: currentTeam?.id || 'default-team'
+        }
         // Optional: Also filter by user for additional privacy
         // userId: currentUser?.id || 'default-user'
       }
     },
     pollInterval: 5000, // Poll every 5 seconds to get updates
     errorPolicy: 'all',
-    skip: !currentTeam // Don't fetch until we have a team selected
+    skip: !currentTeam || !currentGraph // Don't fetch until we have both team and graph selected
   });
 
-  // Fetch edges from Neo4j
+  // Fetch edges from Neo4j - filter by current graph
   const { data: edgesData, loading: edgesLoading, error: edgesError } = useQuery(GET_EDGES, {
     variables: {
       where: {
-        teamId: currentTeam?.id || 'default-team'
+        source: {
+          graph: {
+            id: currentGraph?.id
+          }
+        }
       }
     },
     pollInterval: 5000,
     errorPolicy: 'all',
-    skip: !currentTeam
+    skip: !currentGraph // Don't fetch until we have a graph selected
   });
 
   // Mutation for creating edges
   const [createEdgeMutation] = useMutation(CREATE_EDGE, {
-    refetchQueries: [{ query: GET_EDGES, variables: { where: { teamId: currentTeam?.id || 'default-team' } } }],
+    refetchQueries: [
+      { 
+        query: GET_EDGES, 
+        variables: {
+          where: {
+            source: {
+              graph: {
+                id: currentGraph?.id
+              }
+            }
+          }
+        }
+      },
+      { 
+        query: GET_WORK_ITEMS, 
+        variables: {
+          where: {
+            graph: {
+              id: currentGraph?.id,
+              teamId: currentTeam?.id || 'default-team'
+            }
+          }
+        }
+      }
+    ],
     onError: (error) => {
       if (import.meta.env.DEV) {
         console.error('Failed to create edge:', error);
@@ -106,12 +143,65 @@ export function InteractiveGraphVisualization() {
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionSource, setConnectionSource] = useState<string | null>(null);
   const [selectedRelationType, setSelectedRelationType] = useState<RelationshipType>('DEPENDS_ON');
-  const [showGraphSwitcher, setShowGraphSwitcher] = useState(false);
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
   const [showDataHealth, setShowDataHealth] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showCreateNodeModal, setShowCreateNodeModal] = useState(false);
+  const [showConnectModal, setShowConnectModal] = useState(false);
+  const [showCreateGraphModal, setShowCreateGraphModal] = useState(false);
+  const [showGraphSwitcher, setShowGraphSwitcher] = useState(false);
+  const [showUpdateGraphModal, setShowUpdateGraphModal] = useState(false);
+  const [showDeleteGraphModal, setShowDeleteGraphModal] = useState(false);
   const [selectedNode, setSelectedNode] = useState<WorkItem | null>(null);
+  const [createNodePosition, setCreateNodePosition] = useState<{ x: number; y: number; z: number } | undefined>(undefined);
+
+  // Additional edge operations
+  const [updateEdgeMutation] = useMutation(UPDATE_EDGE, {
+    refetchQueries: [{ 
+      query: GET_EDGES, 
+      variables: {
+        where: {
+          source: {
+            graph: {
+              id: currentGraph?.id
+            }
+          }
+        }
+      }
+    }],
+  });
+
+  const [deleteEdgeMutation] = useMutation(DELETE_EDGE, {
+    refetchQueries: [{ 
+      query: GET_EDGES, 
+      variables: {
+        where: {
+          source: {
+            graph: {
+              id: currentGraph?.id
+            }
+          }
+        }
+      }
+    }],
+  });
+
+  // Function to get icon based on graph type - matches CreateGraphModal exactly
+  const getGraphTypeIcon = (type?: string) => {
+    switch (type) {
+      case 'PROJECT':
+        return <Folder className="h-4 w-4 text-white" />;
+      case 'WORKSPACE':
+        return <FolderOpen className="h-4 w-4 text-white" />;
+      case 'SUBGRAPH':
+        return <Plus className="h-4 w-4 text-white" />;
+      case 'TEMPLATE':
+        return <FileText className="h-4 w-4 text-white" />;
+      default:
+        return <Plus className="h-4 w-4 text-white" />;
+    }
+  };
 
   // ALL HOOK CALLS MUST BE AT THE TOP
   // Close menus when clicking outside
@@ -531,10 +621,13 @@ export function InteractiveGraphVisualization() {
           }
         })
         .on('drag', (event, d: any) => {
-          d.fx = event.x;
-          d.fy = event.y;
-          d.x = event.x;
-          d.y = event.y;
+          // Get node radius
+          const nodeRadius = 30;
+          // Constrain to container bounds
+          d.fx = Math.max(nodeRadius, Math.min(width - nodeRadius, event.x));
+          d.fy = Math.max(nodeRadius, Math.min(height - nodeRadius, event.y));
+          d.x = d.fx;
+          d.y = d.fy;
         })
         .on('end', (event, d: any) => {
           if (!event.active) simulation.alphaTarget(0.05);
@@ -568,30 +661,34 @@ export function InteractiveGraphVisualization() {
           return '#374151'; // Dark gray for completed nodes
         }
         
-        switch (d.type) {
-          case 'EPIC': return '#a855f7';
-          case 'FEATURE': return '#3b82f6';
-          case 'TASK': return '#10b981';
-          case 'BUG': return '#dc2626';
-          case 'MILESTONE': return '#f59e0b';
-          case 'OUTCOME': return '#6366f1';
-          case 'IDEA': return '#f97316';
-          default: return '#6b7280';
-        }
+        // Lighter, more vibrant colors
+        const colors: Record<string, string> = {
+          EPIC: '#c084fc',      // purple-400
+          MILESTONE: '#fb923c', // orange-400
+          OUTCOME: '#818cf8',   // indigo-400
+          FEATURE: '#38bdf8',   // sky-400
+          TASK: '#4ade80',      // green-400
+          BUG: '#f87171',       // red-400
+          IDEA: '#fbbf24',      // yellow-400
+          RESEARCH: '#2dd4bf'   // teal-400
+        };
+        return colors[d.type] || '#6b7280';
       })
       .attr('stroke', (d: WorkItem) => {
         // Use colored ring for completed nodes to show original type
         if (d.status === 'COMPLETED' || d.status === 'Completed' || d.status === 'Done' || d.status === 'DONE') {
-          switch (d.type) {
-            case 'EPIC': return '#a855f7';
-            case 'FEATURE': return '#3b82f6';
-            case 'TASK': return '#10b981';
-            case 'BUG': return '#dc2626';
-            case 'MILESTONE': return '#f59e0b';
-            case 'OUTCOME': return '#6366f1';
-            case 'IDEA': return '#f97316';
-            default: return '#6b7280';
-          }
+          // Lighter, more vibrant colors
+          const colors: Record<string, string> = {
+            EPIC: '#c084fc',      // purple-400
+            MILESTONE: '#fb923c', // orange-400
+            OUTCOME: '#818cf8',   // indigo-400
+            FEATURE: '#38bdf8',   // sky-400
+            TASK: '#4ade80',      // green-400
+            BUG: '#f87171',       // red-400
+            IDEA: '#fbbf24',      // yellow-400
+            RESEARCH: '#2dd4bf'   // teal-400
+          };
+          return colors[d.type] || '#6b7280';
         }
         return '#ffffff'; // White stroke for active nodes
       })
@@ -767,6 +864,13 @@ export function InteractiveGraphVisualization() {
 
     // Simulation tick - ONLY update nodes, edges are handled separately
     simulation.on('tick', () => {
+      // Constrain nodes to container bounds
+      nodes.forEach((d: any) => {
+        const nodeRadius = 30;
+        d.x = Math.max(nodeRadius, Math.min(width - nodeRadius, d.x || centerX));
+        d.y = Math.max(nodeRadius, Math.min(height - nodeRadius, d.y || centerY));
+      });
+      
       // Update node positions
       nodeElements
         .attr('transform', (d: any) => `translate(${d.x || 0},${d.y || 0})`);
@@ -981,86 +1085,155 @@ export function InteractiveGraphVisualization() {
     setSelectedNode(null);
   };
 
+  const handleCreateConnectedNode = (node: WorkItem, event: any) => {
+    console.log('Creating connected node from parent:', node);
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (rect) {
+      setCreateNodePosition({
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top,
+        z: 0
+      });
+    }
+    setSelectedNode(node);
+    setShowCreateNodeModal(true);
+    setNodeMenu(prev => ({ ...prev, visible: false }));
+  };
+
+  const handleConnectToExistingNodes = (node: WorkItem) => {
+    console.log('Connect to existing clicked for node:', node);
+    console.log('Setting showConnectModal to true');
+    setSelectedNode(node);
+    setShowConnectModal(true);
+    setNodeMenu(prev => ({ ...prev, visible: false }));
+  };
+
+  const handleCloseCreateNodeModal = () => {
+    setShowCreateNodeModal(false);
+    setSelectedNode(null);
+    setCreateNodePosition(undefined);
+  };
+
+  const handleCloseConnectModal = () => {
+    setShowConnectModal(false);
+    setSelectedNode(null);
+  };
+
+  const handleEditEdge = (edge: WorkItemEdge) => {
+    // For now, just allow changing the relationship type
+    const sourceTitle = typeof edge.source === 'string' ? edge.source : edge.source?.title || 'Unknown';
+    const targetTitle = typeof edge.target === 'string' ? edge.target : edge.target?.title || 'Unknown';
+    const newType = prompt(`Change relationship type for "${sourceTitle}" → "${targetTitle}". Current: ${edge.type}`, edge.type);
+    if (newType && newType !== edge.type) {
+      updateEdgeMutation({
+        variables: {
+          where: { id: edge.id },
+          update: { type: newType }
+        }
+      });
+    }
+    setEdgeMenu(prev => ({ ...prev, visible: false }));
+  };
+
+  const handleDeleteEdge = (edge: WorkItemEdge) => {
+    const sourceTitle = typeof edge.source === 'string' ? edge.source : edge.source?.title || 'Unknown';
+    const targetTitle = typeof edge.target === 'string' ? edge.target : edge.target?.title || 'Unknown';
+    if (confirm(`Are you sure you want to delete the ${edge.type.toLowerCase()} relationship between "${sourceTitle}" and "${targetTitle}"?`)) {
+      deleteEdgeMutation({
+        variables: {
+          where: { id: edge.id }
+        }
+      });
+    }
+    setEdgeMenu(prev => ({ ...prev, visible: false }));
+  };
+
   // Layout and edge systems removed to fix TypeScript unused variable warnings
 
   return (
     <div ref={containerRef} className="graph-container relative w-full h-full bg-gray-900">
       <svg ref={svgRef} className="w-full h-full" style={{ background: 'radial-gradient(circle at center, #1f2937 0%, #111827 100%)' }} />
       
-      {/* Graph Switcher Trigger */}
-      <div 
-        className="absolute top-4 left-4 z-40"
-        onMouseEnter={() => setShowGraphSwitcher(true)}
-        onMouseLeave={() => setShowGraphSwitcher(false)}
-      >
-        <button 
-          className="bg-gray-800/90 backdrop-blur-sm border border-gray-600 rounded-lg px-3 py-2 shadow-md hover:bg-gray-700 transition-all duration-200"
-        >
-          <div className="flex items-center space-x-2">
-            <div className="w-2 h-2 bg-green-400 rounded-full" />
-            <span className="text-sm font-medium text-green-100">{currentGraph?.name || 'Select Graph'}</span>
-            <div className="w-3 h-3 text-gray-400">
-              <svg viewBox="0 0 12 12" fill="currentColor">
-                <path d="M3 5l3 3 3-3" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+      {/* Professional Graph Control Panel */}
+      <div className="absolute top-4 left-4 z-40">
+        <div className="bg-gray-800/95 backdrop-blur-sm border border-gray-600/60 rounded-lg shadow-xl p-4 w-64">
+          {/* Current Graph Header */}
+          <div className="flex items-center space-x-3 mb-4">
+            <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center flex-shrink-0">
+              {getGraphTypeIcon(currentGraph?.type)}
             </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-semibold text-white truncate">{currentGraph?.name || 'No Graph Selected'}</div>
+              <div className="text-xs text-gray-400">{currentGraph?.type || 'Select a graph to begin'}</div>
+            </div>
+            <div className="w-2 h-2 bg-green-400 rounded-full flex-shrink-0"></div>
           </div>
-        </button>
 
-        {/* Floating Graph Switcher */}
-        {showGraphSwitcher && (
-          <div className="absolute top-full left-0 mt-2 w-80 bg-gray-800/95 backdrop-blur-sm border border-gray-600 rounded-lg shadow-xl z-50 animate-in fade-in slide-in-from-top-2 duration-200">
-            <div className="p-3 border-b border-gray-600">
-              <h3 className="text-sm font-medium text-green-300">Switch Graph</h3>
-              <p className="text-xs text-gray-400 mt-1">Select a different graph to visualize</p>
+          {/* Graph Stats */}
+          <div className="grid grid-cols-3 gap-2 mb-4">
+            <div className="bg-gray-700/50 rounded-md p-2 text-center">
+              <div className="text-white text-lg font-medium">{nodes.length}</div>
+              <div className="text-gray-400 text-xs">Nodes</div>
             </div>
-            <div className="max-h-64 overflow-y-auto">
-              {availableGraphs.map((graph) => (
-                <button
-                  key={graph.id}
-                  onClick={() => {
-                    selectGraph(graph.id);
-                    setShowGraphSwitcher(false);
-                  }}
-                  className={`w-full text-left px-3 py-2 hover:bg-gray-700 border-b border-gray-600 last:border-b-0 transition-colors ${
-                    currentGraph?.id === graph.id ? 'bg-green-900/30 border-green-500/30' : ''
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className={`w-3 h-3 rounded-full ${
-                        graph.type === 'PROJECT' ? 'bg-blue-500' :
-                        graph.type === 'WORKSPACE' ? 'bg-purple-500' :
-                        graph.type === 'SUBGRAPH' ? 'bg-green-500' : 'bg-gray-500'
-                      }`} />
-                      <div>
-                        <div className="font-medium text-gray-200 text-sm">{graph.name}</div>
-                        <div className="text-xs text-gray-400">{graph.type}</div>
-                      </div>
-                    </div>
-                    {currentGraph?.id === graph.id && (
-                      <div className="w-4 h-4 text-green-400">
-                        <svg viewBox="0 0 16 16" fill="currentColor">
-                          <path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/>
-                        </svg>
-                      </div>
-                    )}
-                  </div>
-                  {graph.parentGraphId && (
-                    <div className="ml-6 mt-1 text-xs text-gray-400">
-                      Part of: {availableGraphs.find(g => g.id === graph.parentGraphId)?.name || 'Unknown'}
-                    </div>
-                  )}
-                </button>
-              ))}
+            <div className="bg-gray-700/50 rounded-md p-2 text-center">
+              <div className="text-white text-lg font-medium">{validatedEdges.length}</div>
+              <div className="text-gray-400 text-xs">Edges</div>
             </div>
-            <div className="p-3 border-t border-gray-600">
-              <button className="w-full text-center text-xs text-green-400 hover:text-green-300 transition-colors">
-                + Create New Graph
-              </button>
+            <div className="bg-gray-700/50 rounded-md p-2 text-center">
+              <div className="text-white text-lg font-medium">{currentGraph?.contributorCount || 0}</div>
+              <div className="text-gray-400 text-xs">Users</div>
             </div>
           </div>
-        )}
+
+          {/* Action Buttons */}
+          <div className="space-y-2">
+            {/* Create New Graph Button */}
+            <button 
+              onClick={() => setShowCreateGraphModal(true)}
+              className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2.5 px-3 rounded-md transition-colors duration-200 flex items-center justify-center space-x-2"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              <span className="text-sm">Create Graph</span>
+            </button>
+
+            {/* Switch Graph Button */}
+            <button 
+              onClick={() => setShowGraphSwitcher(true)}
+              className="w-full bg-gray-600 hover:bg-gray-700 text-gray-200 font-medium py-2.5 px-3 rounded-md transition-colors duration-200 flex items-center justify-between"
+            >
+              <div className="flex items-center space-x-2">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                </svg>
+                <span className="text-sm">Switch Graph</span>
+              </div>
+              <span className="text-xs bg-gray-500 px-2 py-1 rounded text-gray-300">{availableGraphs.length}</span>
+            </button>
+
+            {/* Update and Delete Graph Buttons */}
+            {currentGraph && (
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                <button 
+                  onClick={() => setShowUpdateGraphModal(true)}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-3 rounded-md transition-colors duration-200 flex items-center justify-center space-x-2"
+                >
+                  <Settings className="w-4 h-4" />
+                  <span className="text-sm">Edit</span>
+                </button>
+                
+                <button 
+                  onClick={() => setShowDeleteGraphModal(true)}
+                  className="bg-red-600 hover:bg-red-700 text-white font-medium py-2.5 px-3 rounded-md transition-colors duration-200 flex items-center justify-center space-x-2"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span className="text-sm">Delete</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Data Health Indicator */}
@@ -1251,12 +1424,26 @@ export function InteractiveGraphVisualization() {
           {/* Actions */}
           <div className="py-1">
             <button
-              onClick={() => startConnection(nodeMenu.node!.id)}
+              onClick={(e) => handleCreateConnectedNode(nodeMenu.node!, e)}
               className="w-full flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
             >
-              <Link2 className="h-4 w-4 mr-3" />
-              Add Connected Item
+              <Plus className="h-4 w-4 mr-3 flex-shrink-0" />
+              <div className="text-left">
+                <div className="font-medium">Create New & Connect</div>
+                <div className="text-xs text-gray-400 mt-0.5">Add a new node linked to this one</div>
+              </div>
             </button>
+            <button
+              onClick={() => handleConnectToExistingNodes(nodeMenu.node!)}
+              className="w-full flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
+            >
+              <Link2 className="h-4 w-4 mr-3 flex-shrink-0" />
+              <div className="text-left">
+                <div className="font-medium">Connect to Existing Nodes</div>
+                <div className="text-xs text-gray-400 mt-0.5">Link this to other nodes in graph</div>
+              </div>
+            </button>
+            <div className="border-t border-gray-600 my-1"></div>
             <button 
               onClick={() => handleEditNode(nodeMenu.node!)}
               className="w-full flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
@@ -1305,11 +1492,17 @@ export function InteractiveGraphVisualization() {
             </div>
           </div>
           <div className="py-1">
-            <button className="w-full flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700">
+            <button 
+              onClick={() => handleEditEdge(edgeMenu.edge!)}
+              className="w-full flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
+            >
               <Edit3 className="h-4 w-4 mr-3" />
               Edit Relationship
             </button>
-            <button className="w-full flex items-center px-4 py-2 text-sm text-red-400 hover:bg-red-900/50">
+            <button 
+              onClick={() => handleDeleteEdge(edgeMenu.edge!)}
+              className="w-full flex items-center px-4 py-2 text-sm text-red-400 hover:bg-red-900/50"
+            >
               <Trash2 className="h-4 w-4 mr-3" />
               Delete Relationship
             </button>
@@ -1318,39 +1511,39 @@ export function InteractiveGraphVisualization() {
       )}
 
       {/* Legend */}
-      <div className="absolute bottom-4 left-4 bg-gray-800/90 border border-gray-600 rounded-lg shadow-lg p-1 w-72 backdrop-blur-sm">
-        <div className="text-base font-medium text-green-400 mb-2 text-center">Node Types</div>
-        <div className="grid grid-cols-2 grid-rows-4 gap-x-4 gap-y-3 text-base text-gray-300">
-          <div className="flex items-center space-x-3">
-            <Layers className="w-5 h-5 text-purple-500" />
+      <div className="absolute bottom-4 left-4 bg-gray-800/95 backdrop-blur-sm border border-gray-600/60 rounded-lg shadow-xl p-4 w-64">
+        <div className="text-sm font-semibold text-white mb-3 text-center">Node Types</div>
+        <div className="grid grid-cols-2 gap-2 text-sm text-gray-300">
+          <div className="flex items-center space-x-2">
+            <Layers className="w-4 h-4 text-purple-400" />
             <span>Epic</span>
           </div>
-          <div className="flex items-center space-x-3">
-            <ListTodo className="w-5 h-5 text-green-500" />
+          <div className="flex items-center space-x-2">
+            <ListTodo className="w-4 h-4 text-green-400" />
             <span>Task</span>
           </div>
-          <div className="flex items-center space-x-3">
-            <Trophy className="w-5 h-5 text-orange-500" />
+          <div className="flex items-center space-x-2">
+            <Trophy className="w-4 h-4 text-orange-400" />
             <span>Milestone</span>
           </div>
-          <div className="flex items-center space-x-3">
-            <AlertTriangle className="w-5 h-5 text-red-500" />
+          <div className="flex items-center space-x-2">
+            <AlertTriangle className="w-4 h-4 text-red-400" />
             <span>Bug</span>
           </div>
-          <div className="flex items-center space-x-3">
-            <Target className="w-5 h-5 text-indigo-500" />
+          <div className="flex items-center space-x-2">
+            <Target className="w-4 h-4 text-indigo-400" />
             <span>Outcome</span>
           </div>
-          <div className="flex items-center space-x-3">
-            <Lightbulb className="w-5 h-5 text-yellow-500" />
+          <div className="flex items-center space-x-2">
+            <Lightbulb className="w-4 h-4 text-yellow-400" />
             <span>Idea</span>
           </div>
-          <div className="flex items-center space-x-3">
-            <Sparkles className="w-5 h-5 text-blue-500" />
+          <div className="flex items-center space-x-2">
+            <Sparkles className="w-4 h-4 text-blue-400" />
             <span>Feature</span>
           </div>
-          <div className="flex items-center space-x-3">
-            <Microscope className="w-5 h-5 text-teal-500" />
+          <div className="flex items-center space-x-2">
+            <Microscope className="w-4 h-4 text-teal-400" />
             <span>Research</span>
           </div>
         </div>
@@ -1384,6 +1577,64 @@ export function InteractiveGraphVisualization() {
           nodeType={selectedNode.type}
         />
       )}
+
+      {/* Create Graph Modal */}
+      {showCreateGraphModal && (
+        <CreateGraphModal
+          isOpen={showCreateGraphModal}
+          onClose={() => setShowCreateGraphModal(false)}
+        />
+      )}
+
+      {/* Graph Selection Modal */}
+      {showGraphSwitcher && (
+        <GraphSelectionModal
+          isOpen={showGraphSwitcher}
+          onClose={() => setShowGraphSwitcher(false)}
+        />
+      )}
+
+      {/* Update Graph Modal */}
+      {showUpdateGraphModal && (
+        <UpdateGraphModal
+          isOpen={showUpdateGraphModal}
+          onClose={() => setShowUpdateGraphModal(false)}
+        />
+      )}
+
+      {/* Delete Graph Modal */}
+      {showDeleteGraphModal && (
+        <DeleteGraphModal
+          isOpen={showDeleteGraphModal}
+          onClose={() => setShowDeleteGraphModal(false)}
+        />
+      )}
+
+      {/* Create Node Modal */}
+      {showCreateNodeModal && selectedNode && (
+        <CreateNodeModal
+          isOpen={showCreateNodeModal}
+          onClose={handleCloseCreateNodeModal}
+          parentNodeId={selectedNode.id}
+          position={createNodePosition}
+        />
+      )}
+
+      {/* Connect Node Modal */}
+      {showConnectModal && selectedNode && (
+        <ConnectNodeModal
+          isOpen={showConnectModal}
+          onClose={handleCloseConnectModal}
+          sourceNode={{
+            id: selectedNode.id,
+            title: selectedNode.title,
+            type: selectedNode.type
+          }}
+        />
+      )}
+      
+      {/* Debug info */}
+      {console.log('Modal states:', { showConnectModal, selectedNode: selectedNode?.title })}
     </div>
   );
 }

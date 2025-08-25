@@ -1,6 +1,6 @@
 import { gql } from '@apollo/client';
 
-// Queries
+// Queries - Simplified to debug 400 error
 export const GET_GRAPHS = gql`
   query GetGraphs($teamId: String!) {
     graphs(where: { teamId: $teamId }) {
@@ -24,21 +24,6 @@ export const GET_GRAPHS = gql`
       shareSettings
       createdAt
       updatedAt
-      workItems {
-        id
-        title
-        type
-        status
-      }
-      subgraphs {
-        id
-        name
-        type
-      }
-      parentGraph {
-        id
-        name
-      }
     }
   }
 `;
