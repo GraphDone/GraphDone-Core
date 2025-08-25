@@ -4,15 +4,17 @@ import { Link2, Edit3, Trash2, AlertTriangle, AlertCircle, Layers, Sparkles, Lis
 import { useQuery, useMutation } from '@apollo/client';
 import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
-import { GET_WORK_ITEMS, GET_EDGES, CREATE_EDGE } from '../lib/queries';
+import { GET_WORK_ITEMS, GET_EDGES, CREATE_EDGE, UPDATE_EDGE, DELETE_EDGE } from '../lib/queries';
 import { relationshipTypeInfo, RelationshipType } from '../types/projectData';
 import { validateGraphData, getValidationSummary, ValidationResult } from '../utils/graphDataValidation';
 import { EditNodeModal } from './EditNodeModal';
 import { DeleteNodeModal } from './DeleteNodeModal';
+import { CreateNodeModal } from './CreateNodeModal';
 import { CreateGraphModal } from './CreateGraphModal';
 import { GraphSelectionModal } from './GraphSelectionModal';
 import { UpdateGraphModal } from './UpdateGraphModal';
 import { DeleteGraphModal } from './DeleteGraphModal';
+import { ConnectNodeModal } from './ConnectNodeModal';
 
 interface WorkItem {
   id: string;
@@ -85,25 +87,19 @@ export function InteractiveGraphVisualization() {
     skip: !currentTeam // Don't fetch until we have a team selected
   });
 
-  // Fetch edges from Neo4j
+  // Fetch edges from Neo4j - simplified to get all edges
   const { data: edgesData, loading: edgesLoading, error: edgesError } = useQuery(GET_EDGES, {
-    variables: {
-      where: {
-        source: {
-          graph: {
-            teamId: currentTeam?.id || 'default-team'
-          }
-        }
-      }
-    },
+    variables: {}, // Fetch all edges, no filtering
     pollInterval: 5000,
-    errorPolicy: 'all',
-    skip: !currentTeam
+    errorPolicy: 'all'
   });
 
   // Mutation for creating edges
   const [createEdgeMutation] = useMutation(CREATE_EDGE, {
-    refetchQueries: [{ query: GET_EDGES, variables: { where: { source: { graph: { teamId: currentTeam?.id || 'default-team' } } } } }],
+    refetchQueries: [
+      { query: GET_EDGES, variables: {} },
+      { query: GET_WORK_ITEMS, variables: { options: { limit: 100 } } }
+    ],
     onError: (error) => {
       if (import.meta.env.DEV) {
         console.error('Failed to create edge:', error);
@@ -120,11 +116,23 @@ export function InteractiveGraphVisualization() {
   const [showDataHealth, setShowDataHealth] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showCreateNodeModal, setShowCreateNodeModal] = useState(false);
+  const [showConnectModal, setShowConnectModal] = useState(false);
   const [showCreateGraphModal, setShowCreateGraphModal] = useState(false);
   const [showGraphSwitcher, setShowGraphSwitcher] = useState(false);
   const [showUpdateGraphModal, setShowUpdateGraphModal] = useState(false);
   const [showDeleteGraphModal, setShowDeleteGraphModal] = useState(false);
   const [selectedNode, setSelectedNode] = useState<WorkItem | null>(null);
+  const [createNodePosition, setCreateNodePosition] = useState<{ x: number; y: number; z: number } | undefined>(undefined);
+
+  // Additional edge operations
+  const [updateEdgeMutation] = useMutation(UPDATE_EDGE, {
+    refetchQueries: [{ query: GET_EDGES, variables: { where: { source: { graph: { teamId: currentTeam?.id || 'default-team' } } } } }],
+  });
+
+  const [deleteEdgeMutation] = useMutation(DELETE_EDGE, {
+    refetchQueries: [{ query: GET_EDGES, variables: { where: { source: { graph: { teamId: currentTeam?.id || 'default-team' } } } } }],
+  });
 
   // Function to get icon based on graph type - matches CreateGraphModal exactly
   const getGraphTypeIcon = (type?: string) => {
@@ -1010,6 +1018,69 @@ export function InteractiveGraphVisualization() {
     setSelectedNode(null);
   };
 
+  const handleCreateConnectedNode = (node: WorkItem, event: any) => {
+    console.log('Creating connected node from parent:', node);
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (rect) {
+      setCreateNodePosition({
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top,
+        z: 0
+      });
+    }
+    setSelectedNode(node);
+    setShowCreateNodeModal(true);
+    setNodeMenu(prev => ({ ...prev, visible: false }));
+  };
+
+  const handleConnectToExistingNodes = (node: WorkItem) => {
+    console.log('Connect to existing clicked for node:', node);
+    console.log('Setting showConnectModal to true');
+    setSelectedNode(node);
+    setShowConnectModal(true);
+    setNodeMenu(prev => ({ ...prev, visible: false }));
+  };
+
+  const handleCloseCreateNodeModal = () => {
+    setShowCreateNodeModal(false);
+    setSelectedNode(null);
+    setCreateNodePosition(undefined);
+  };
+
+  const handleCloseConnectModal = () => {
+    setShowConnectModal(false);
+    setSelectedNode(null);
+  };
+
+  const handleEditEdge = (edge: WorkItemEdge) => {
+    // For now, just allow changing the relationship type
+    const sourceTitle = typeof edge.source === 'string' ? edge.source : edge.source?.title || 'Unknown';
+    const targetTitle = typeof edge.target === 'string' ? edge.target : edge.target?.title || 'Unknown';
+    const newType = prompt(`Change relationship type for "${sourceTitle}" → "${targetTitle}". Current: ${edge.type}`, edge.type);
+    if (newType && newType !== edge.type) {
+      updateEdgeMutation({
+        variables: {
+          where: { id: edge.id },
+          update: { type: newType }
+        }
+      });
+    }
+    setEdgeMenu(prev => ({ ...prev, visible: false }));
+  };
+
+  const handleDeleteEdge = (edge: WorkItemEdge) => {
+    const sourceTitle = typeof edge.source === 'string' ? edge.source : edge.source?.title || 'Unknown';
+    const targetTitle = typeof edge.target === 'string' ? edge.target : edge.target?.title || 'Unknown';
+    if (confirm(`Are you sure you want to delete the ${edge.type.toLowerCase()} relationship between "${sourceTitle}" and "${targetTitle}"?`)) {
+      deleteEdgeMutation({
+        variables: {
+          where: { id: edge.id }
+        }
+      });
+    }
+    setEdgeMenu(prev => ({ ...prev, visible: false }));
+  };
+
   // Layout and edge systems removed to fix TypeScript unused variable warnings
 
   return (
@@ -1286,12 +1357,26 @@ export function InteractiveGraphVisualization() {
           {/* Actions */}
           <div className="py-1">
             <button
-              onClick={() => startConnection(nodeMenu.node!.id)}
+              onClick={(e) => handleCreateConnectedNode(nodeMenu.node!, e)}
               className="w-full flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
             >
-              <Link2 className="h-4 w-4 mr-3" />
-              Add Connected Item
+              <Plus className="h-4 w-4 mr-3 flex-shrink-0" />
+              <div className="text-left">
+                <div className="font-medium">Create New & Connect</div>
+                <div className="text-xs text-gray-400 mt-0.5">Add a new node linked to this one</div>
+              </div>
             </button>
+            <button
+              onClick={() => handleConnectToExistingNodes(nodeMenu.node!)}
+              className="w-full flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
+            >
+              <Link2 className="h-4 w-4 mr-3 flex-shrink-0" />
+              <div className="text-left">
+                <div className="font-medium">Connect to Existing Nodes</div>
+                <div className="text-xs text-gray-400 mt-0.5">Link this to other nodes in graph</div>
+              </div>
+            </button>
+            <div className="border-t border-gray-600 my-1"></div>
             <button 
               onClick={() => handleEditNode(nodeMenu.node!)}
               className="w-full flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
@@ -1340,11 +1425,17 @@ export function InteractiveGraphVisualization() {
             </div>
           </div>
           <div className="py-1">
-            <button className="w-full flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700">
+            <button 
+              onClick={() => handleEditEdge(edgeMenu.edge!)}
+              className="w-full flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
+            >
               <Edit3 className="h-4 w-4 mr-3" />
               Edit Relationship
             </button>
-            <button className="w-full flex items-center px-4 py-2 text-sm text-red-400 hover:bg-red-900/50">
+            <button 
+              onClick={() => handleDeleteEdge(edgeMenu.edge!)}
+              className="w-full flex items-center px-4 py-2 text-sm text-red-400 hover:bg-red-900/50"
+            >
               <Trash2 className="h-4 w-4 mr-3" />
               Delete Relationship
             </button>
@@ -1451,6 +1542,32 @@ export function InteractiveGraphVisualization() {
           onClose={() => setShowDeleteGraphModal(false)}
         />
       )}
+
+      {/* Create Node Modal */}
+      {showCreateNodeModal && selectedNode && (
+        <CreateNodeModal
+          isOpen={showCreateNodeModal}
+          onClose={handleCloseCreateNodeModal}
+          parentNodeId={selectedNode.id}
+          position={createNodePosition}
+        />
+      )}
+
+      {/* Connect Node Modal */}
+      {showConnectModal && selectedNode && (
+        <ConnectNodeModal
+          isOpen={showConnectModal}
+          onClose={handleCloseConnectModal}
+          sourceNode={{
+            id: selectedNode.id,
+            title: selectedNode.title,
+            type: selectedNode.type
+          }}
+        />
+      )}
+      
+      {/* Debug info */}
+      {console.log('Modal states:', { showConnectModal, selectedNode: selectedNode?.title })}
     </div>
   );
 }

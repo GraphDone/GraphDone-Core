@@ -363,6 +363,37 @@ export const UPDATE_USER_STATUS = gql`
   }
 `;
 
+// Edge management mutations
+export const UPDATE_EDGE = gql`
+  mutation UpdateEdges($where: EdgeWhere!, $update: EdgeUpdateInput!) {
+    updateEdges(where: $where, update: $update) {
+      edges {
+        id
+        type
+        weight
+        source {
+          id
+          title
+          type
+        }
+        target {
+          id
+          title
+          type
+        }
+      }
+    }
+  }
+`;
+
+export const DELETE_EDGE = gql`
+  mutation DeleteEdges($where: EdgeWhere!) {
+    deleteEdges(where: $where) {
+      nodesDeleted
+    }
+  }
+`;
+
 // Backward compatibility exports
 export const GET_NODES = GET_WORK_ITEMS;
 export const GET_NODE_BY_ID = GET_WORK_ITEM_BY_ID;
