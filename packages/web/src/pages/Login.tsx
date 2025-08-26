@@ -11,7 +11,7 @@ export function Login() {
 
   const handleUserSelect = (user: User) => {
     setSelectedUser(user);
-    const userTeam = availableTeams.find(t => t.id === user.teamId);
+    const userTeam = availableTeams.find(t => t.id === user.team?.id);
     setSelectedTeam(userTeam || null);
   };
 
@@ -30,7 +30,7 @@ export function Login() {
     }
   };
 
-  const teamUsers = selectedTeam ? availableUsers.filter(u => u.teamId === selectedTeam.id) : [];
+  const teamUsers = selectedTeam ? availableUsers.filter(u => u.team?.id === selectedTeam.id) : [];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4">

@@ -101,7 +101,7 @@ export function GraphProvider({ children }: GraphProviderProps) {
       let graphToSelect = null;
       
       if (storedGraphId) {
-        graphToSelect = parsedGraphs.find(g => g.id === storedGraphId);
+        graphToSelect = parsedGraphs.find((g: Graph) => g.id === storedGraphId);
       }
       
       // Auto-select first graph if none selected or stored graph not found
@@ -270,6 +270,7 @@ export function GraphProvider({ children }: GraphProviderProps) {
       type: originalGraph.type,
       parentGraphId: originalGraph.parentGraphId,
       teamId: originalGraph.teamId,
+      createdBy: currentUser?.id || '',
       copyFromGraphId: graphId
     });
   };
@@ -405,6 +406,7 @@ function buildHierarchy(graph: Graph, allGraphs: Graph[]): GraphHierarchy {
     type: graph.type,
     children,
     nodeCount: graph.nodeCount,
+    edgeCount: graph.edgeCount,
     isShared: graph.isShared,
     permissions: getPermissionLevel(graph)
   };
