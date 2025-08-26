@@ -75,11 +75,10 @@ export function UpdateGraphModal({ isOpen, onClose }: UpdateGraphModalProps) {
   ];
 
   const roleOptions = [
-    { value: 'NodeWatcher', label: 'Node Watcher', description: 'Can view and track node progress' },
-    { value: 'Connector', label: 'Connector', description: 'Can create connections between nodes' },
-    { value: 'OriginNode', label: 'Origin Node', description: 'Can create and manage core nodes' },
-    { value: 'PathKeeper', label: 'Path Keeper', description: 'Can manage workflows and paths' },
-    { value: 'GraphMaster', label: 'Graph Master', description: 'Full control over the graph' }
+    { value: 'GUEST', label: 'Guest', description: 'Anonymous demo access (read-only)' },
+    { value: 'VIEWER', label: 'Viewer', description: 'Can view graphs and nodes (read-only)' },
+    { value: 'USER', label: 'User', description: 'Can create and work on tasks' },
+    { value: 'ADMIN', label: 'Admin', description: 'Full system administration access' }
   ];
 
   // Tag handling functions (same as CreateGraphModal)
