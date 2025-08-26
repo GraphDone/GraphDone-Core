@@ -65,12 +65,12 @@ export function GraphVisualization() {
   // Store the current positioned nodes for access in click handlers
   const currentNodesRef = useRef<WorkItem[]>([]);
 
-  const { data: workItemsData, loading: workItemsLoading } = useQuery(GET_WORK_ITEMS, {
+  const { data: workItemsData, loading: workItemsLoading, error: workItemsError } = useQuery(GET_WORK_ITEMS, {
     variables: {
       options: { limit: 100 }
     },
-    fetchPolicy: 'cache-and-network',  // Use cache first, then fetch from network for updates
-    pollInterval: 5000,  // Poll every 5 seconds for real-time updates
+    fetchPolicy: 'cache-and-network',
+    pollInterval: 5000,
     notifyOnNetworkStatusChange: true,
     errorPolicy: 'all'
   });
@@ -230,17 +230,18 @@ export function GraphVisualization() {
       .attr('class', 'node-circle')
       .attr('r', d => 15 + (d.priorityComp || 0) * 15) // Size based on priority
       .attr('fill', d => {
-        const colors = {
-          EPIC: '#8b5cf6',
-          FEATURE: '#3b82f6', 
-          TASK: '#10b981',
-          BUG: '#ef4444',
-          MILESTONE: '#f59e0b',
-          OUTCOME: '#6366f1',
-          IDEA: '#eab308',
-          RESEARCH: '#14b8a6'
+        // Lighter, more vibrant colors
+        const colors: Record<string, string> = {
+          EPIC: '#c084fc',      // purple-400
+          MILESTONE: '#fb923c', // orange-400
+          OUTCOME: '#818cf8',   // indigo-400
+          FEATURE: '#38bdf8',   // sky-400
+          TASK: '#4ade80',      // green-400
+          BUG: '#f87171',       // red-400
+          IDEA: '#fbbf24',      // yellow-400
+          RESEARCH: '#2dd4bf'   // teal-400
         };
-        return colors[d.type as keyof typeof colors] || '#6b7280';
+        return colors[d.type] || '#6b7280';
       })
       .attr('stroke', '#fff')
       .attr('stroke-width', 2)
