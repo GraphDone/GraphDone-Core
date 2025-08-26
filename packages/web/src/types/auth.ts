@@ -4,7 +4,7 @@ export interface User {
   email: string;
   username: string;
   avatar?: string;
-  role: 'NODE_WATCHER' | 'CONNECTOR' | 'ORIGIN_NODE' | 'PATH_KEEPER' | 'GRAPH_MASTER';
+  role: 'GUEST' | 'VIEWER' | 'USER' | 'ADMIN';
   isActive: boolean;
   isEmailVerified: boolean;
   lastLogin?: string;
@@ -17,6 +17,7 @@ export interface Team {
   description?: string;
   logo?: string;
   isActive: boolean;
+  memberCount?: number;
 }
 
 export interface AuthContextType {

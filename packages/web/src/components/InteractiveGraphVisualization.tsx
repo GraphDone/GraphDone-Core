@@ -5,7 +5,7 @@ import { useQuery, useMutation } from '@apollo/client';
 import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
 import { GET_WORK_ITEMS, GET_EDGES, CREATE_EDGE, UPDATE_EDGE, DELETE_EDGE } from '../lib/queries';
-import { relationshipTypeInfo, RelationshipType } from '../types/projectData';
+import { relationshipTypeInfo } from '../types/projectData';
 import { validateGraphData, getValidationSummary, ValidationResult } from '../utils/graphDataValidation';
 import { EditNodeModal } from './EditNodeModal';
 import { DeleteNodeModal } from './DeleteNodeModal';
@@ -17,42 +17,7 @@ import { DeleteGraphModal } from './DeleteGraphModal';
 import { ConnectNodeModal } from './ConnectNodeModal';
 import { NodeDetailsModal } from './NodeDetailsModal';
 
-interface WorkItem {
-  id: string;
-  title: string;
-  description?: string;
-  type: string;
-  status: string;
-  positionX: number;
-  positionY: number;
-  positionZ?: number;
-  priorityExec: number;
-  priorityIndiv: number;
-  priorityComm: number;
-  priorityComp: number;
-  teamId: string;
-  userId: string;
-  tags?: string[];
-  dueDate?: string;
-  assignedTo?: string;
-  dependencies?: WorkItem[];
-  dependents?: WorkItem[];
-  priority?: {
-    executive: number;
-    individual: number;
-    community: number;
-    computed: number;
-  };
-}
-
-interface WorkItemEdge {
-  id: string;
-  source: string;
-  target: string;
-  type: RelationshipType;
-  strength?: number;
-  description?: string;
-}
+import { WorkItem, WorkItemEdge, RelationshipType } from '../types/graph';
 
 interface NodeMenuState {
   node: WorkItem | null;
@@ -774,8 +739,9 @@ export function InteractiveGraphVisualization() {
       .attr('cx', (d: WorkItem) => getNodeDimensions(d).width / 2 - 8)
       .attr('cy', (d: WorkItem) => getNodeDimensions(d).height / 2 - 8)
       .attr('fill', (d: WorkItem) => {
-        if (d.priorityComp > 0.7) return '#dc2626'; // High priority - red
-        if (d.priorityComp > 0.4) return '#d97706'; // Medium priority - orange
+        const priority = d.priorityComp || 0;
+        if (priority > 0.7) return '#dc2626'; // High priority - red
+        if (priority > 0.4) return '#d97706'; // Medium priority - orange
         return '#059669'; // Low priority - green
       })
       .attr('stroke', '#ffffff')
@@ -1472,7 +1438,7 @@ export function InteractiveGraphVisualization() {
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div>
                 <span className="text-gray-400">Priority:</span>
-                <span className="ml-1 font-medium">{Math.round((nodeMenu.node.priority?.computed || nodeMenu.node.priorityComp) * 100)}%</span>
+                <span className="ml-1 font-medium">{Math.round((nodeMenu.node?.priority?.computed || nodeMenu.node?.priorityComp || 0) * 100)}%</span>
               </div>
             </div>
           </div>
@@ -1712,9 +1678,6 @@ export function InteractiveGraphVisualization() {
           }}
         />
       )}
-      
-      {/* Debug info */}
-      {console.log('Modal states:', { showConnectModal, selectedNode: selectedNode?.title })}
     </div>
   );
 }
