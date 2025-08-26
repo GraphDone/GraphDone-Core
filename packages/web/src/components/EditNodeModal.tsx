@@ -6,23 +6,12 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { NodeTypeSelector } from './NodeCategorySelector';
 import { TagInput } from './TagInput';
+import { WorkItem } from '../types/graph';
 
 interface EditNodeModalProps {
   isOpen: boolean;
   onClose: () => void;
-  node: {
-    id: string;
-    title: string;
-    description?: string;
-    type: string;
-    status: string;
-    priorityExec: number;
-    priorityIndiv: number;
-    priorityComm: number;
-    tags?: string[];
-    dueDate?: string;
-    assignedTo?: string;
-  };
+  node: WorkItem;
 }
 
 export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
@@ -48,7 +37,7 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
     priorityExec: node.priorityExec || 0,
     priorityIndiv: node.priorityIndiv || 0,
     priorityComm: node.priorityComm || 0,
-    assignedTo: node.assignedTo || '',
+    assignedTo: typeof node.assignedTo === 'string' ? node.assignedTo : (node.assignedTo?.id || ''),
     dueDate: formatDateForInput(node.dueDate),
     tags: node.tags || [],
   });
@@ -63,7 +52,7 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
       priorityExec: node.priorityExec || 0,
       priorityIndiv: node.priorityIndiv || 0,
       priorityComm: node.priorityComm || 0,
-      assignedTo: node.assignedTo || '',
+      assignedTo: typeof node.assignedTo === 'string' ? node.assignedTo : (node.assignedTo?.id || ''),
       dueDate: formatDateForInput(node.dueDate),
       tags: node.tags || [],
     });
