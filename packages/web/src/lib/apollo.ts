@@ -1,4 +1,6 @@
-import { ApolloClient, InMemoryCache, createHttpLink, split } from '@apollo/client';
+import { ApolloClient, InMemoryCache, createHttpLink, split, from } from '@apollo/client';
+import { setContext } from '@apollo/client/link/context';
+import { onError } from '@apollo/client/link/error';
 import { getMainDefinition } from '@apollo/client/utilities';
 import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
 import { createClient } from 'graphql-ws';
@@ -26,9 +28,51 @@ const httpLink = createHttpLink({
   uri: getGraphQLUrl(),
 });
 
+const authLink = setContext((_, { headers }) => {
+  const token = localStorage.getItem('authToken');
+  return {
+    headers: {
+      ...headers,
+      authorization: token ? `Bearer ${token}` : '',
+    }
+  };
+});
+
+const errorLink = onError(({ graphQLErrors, networkError, operation, forward }) => {
+  if (graphQLErrors) {
+    for (const error of graphQLErrors) {
+      // Check for authentication errors
+      if (error.extensions?.code === 'UNAUTHENTICATED' || 
+          error.message.includes('Invalid token') ||
+          error.message.includes('Unauthorized')) {
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('currentUser');
+        // Don't reload immediately - let auth context handle it
+        return;
+      }
+    }
+  }
+
+  if (networkError) {
+    // Handle 401/403 network errors
+    if ('statusCode' in networkError && (networkError.statusCode === 401 || networkError.statusCode === 403)) {
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('currentUser');
+      // Don't reload immediately - let auth context handle it
+      return;
+    }
+  }
+});
+
 const wsLink = new GraphQLWsLink(
   createClient({
     url: getWebSocketUrl(),
+    connectionParams: () => {
+      const token = localStorage.getItem('authToken');
+      return {
+        authorization: token ? `Bearer ${token}` : '',
+      };
+    },
   })
 );
 
@@ -41,7 +85,7 @@ const splitLink = split(
     );
   },
   wsLink,
-  httpLink
+  from([errorLink, authLink, httpLink])
 );
 
 export const apolloClient = new ApolloClient({
