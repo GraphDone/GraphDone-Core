@@ -5,10 +5,29 @@
 @layer base {
   html {
     font-family: 'Inter', system-ui, sans-serif;
+    scroll-behavior: smooth;
   }
   
   body {
     @apply bg-gray-900 text-gray-100;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #374151;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #6B7280;
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #9CA3AF;
   }
 }
 
@@ -27,6 +46,16 @@
   
   .card {
     @apply bg-white rounded-lg border border-gray-200 shadow-sm;
+  }
+
+  /* Text wrapping in table cells while preserving original table size */
+  .table-text-content {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    white-space: normal;
+    hyphens: auto;
+    max-width: 300px; /* Reasonable width constraint for text wrapping */
   }
 }
 
@@ -170,4 +199,55 @@ svg text:not(.completion-indicator) {
 
 .priority-low {
   @apply text-green-600;
+}
+
+/* Dark theme date picker styling */
+input[type="date"] {
+  color-scheme: dark;
+}
+
+/* WebKit/Chromium browsers */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  background-color: #374151;
+  border-radius: 4px;
+  border: 1px solid #4b5563;
+  padding: 2px;
+  cursor: pointer;
+  filter: invert(1);
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  background-color: #4b5563;
+  border-color: #6b7280;
+}
+
+/* Firefox */
+input[type="date"]::-moz-calendar-picker-indicator {
+  background-color: #374151;
+  border-radius: 4px;
+  border: 1px solid #4b5563;
+  padding: 2px;
+  cursor: pointer;
+}
+
+/* Dark theme for the actual calendar popup */
+@supports (color-scheme: dark) {
+  input[type="date"] {
+    color-scheme: dark;
+  }
+}
+
+/* Force dark theme on date inputs in dark mode */
+.dark input[type="date"],
+html.dark input[type="date"],
+input[type="date"].dark-theme {
+  color-scheme: dark;
+  background-color: #374151;
+  border-color: #4b5563;
+  color: #f9fafb;
+}
+
+/* Additional styling for better contrast */
+input[type="date"]:focus {
+  color-scheme: dark;
 }

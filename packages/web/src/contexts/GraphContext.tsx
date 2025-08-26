@@ -11,208 +11,7 @@ import {
 
 const GraphContext = createContext<GraphContextType | undefined>(undefined);
 
-// Mock graphs for demonstration
-const createMockGraphs = (teamId: string): Graph[] => [
-  {
-    id: 'graph-1',
-    name: 'Product Roadmap 2024',
-    description: 'Main product development roadmap and feature planning',
-    type: 'PROJECT',
-    status: 'ACTIVE',
-    teamId,
-    createdBy: 'user-1',
-    createdAt: '2024-01-15T10:00:00Z',
-    updatedAt: '2024-03-20T15:30:00Z',
-    depth: 0,
-    path: [],
-    permissions: {
-      owner: 'user-1',
-      admins: ['user-1'],
-      editors: ['user-2', 'user-3'],
-      viewers: ['user-4'],
-      teamPermission: 'VIEW'
-    },
-    isShared: true,
-    shareSettings: {
-      isPublic: false,
-      allowTeamAccess: true,
-      allowCopying: true,
-      allowForking: false
-    },
-    nodeCount: 45,
-    edgeCount: 67,
-    contributorCount: 8,
-    lastActivity: '2024-03-20T15:30:00Z',
-    settings: {
-      theme: 'light',
-      layout: 'force',
-      showPriorities: true,
-      showDependencies: true,
-      autoLayout: true,
-      zoomLevel: 1.0
-    }
-  },
-  {
-    id: 'graph-2',
-    name: 'Authentication System',
-    description: 'User authentication and authorization subsystem',
-    type: 'SUBGRAPH',
-    status: 'ACTIVE',
-    parentGraphId: 'graph-1',
-    teamId,
-    createdBy: 'user-2',
-    createdAt: '2024-02-01T09:00:00Z',
-    updatedAt: '2024-03-18T11:20:00Z',
-    depth: 1,
-    path: ['graph-1'],
-    permissions: {
-      owner: 'user-2',
-      admins: ['user-2'],
-      editors: ['user-1', 'user-3'],
-      viewers: [],
-      teamPermission: 'EDIT'
-    },
-    isShared: false,
-    shareSettings: {
-      isPublic: false,
-      allowTeamAccess: true,
-      allowCopying: false,
-      allowForking: false
-    },
-    nodeCount: 12,
-    edgeCount: 18,
-    contributorCount: 3,
-    lastActivity: '2024-03-18T11:20:00Z',
-    settings: {
-      theme: 'light',
-      layout: 'hierarchical',
-      showPriorities: true,
-      showDependencies: true,
-      autoLayout: false,
-      zoomLevel: 1.2
-    }
-  },
-  {
-    id: 'graph-3',
-    name: 'UI Components Library',
-    description: 'Reusable UI components and design system',
-    type: 'SUBGRAPH',
-    status: 'ACTIVE',
-    parentGraphId: 'graph-1',
-    teamId,
-    createdBy: 'user-3',
-    createdAt: '2024-02-10T14:00:00Z',
-    updatedAt: '2024-03-19T16:45:00Z',
-    depth: 1,
-    path: ['graph-1'],
-    permissions: {
-      owner: 'user-3',
-      admins: ['user-3'],
-      editors: ['user-1', 'user-2'],
-      viewers: ['user-4'],
-      teamPermission: 'VIEW'
-    },
-    isShared: true,
-    shareSettings: {
-      isPublic: true,
-      allowTeamAccess: true,
-      allowCopying: true,
-      allowForking: true,
-      shareLink: 'https://graphdone.com/share/ui-components-abc123'
-    },
-    nodeCount: 28,
-    edgeCount: 34,
-    contributorCount: 5,
-    lastActivity: '2024-03-19T16:45:00Z',
-    settings: {
-      theme: 'light',
-      layout: 'grid',
-      showPriorities: false,
-      showDependencies: true,
-      autoLayout: true,
-      zoomLevel: 0.8
-    }
-  },
-  {
-    id: 'graph-4',
-    name: 'Research Ideas',
-    description: 'Experimental features and research initiatives',
-    type: 'WORKSPACE',
-    status: 'ACTIVE',
-    teamId,
-    createdBy: 'user-1',
-    createdAt: '2024-01-20T11:00:00Z',
-    updatedAt: '2024-03-15T13:10:00Z',
-    depth: 0,
-    path: [],
-    permissions: {
-      owner: 'user-1',
-      admins: ['user-1', 'user-5'],
-      editors: ['user-2'],
-      viewers: [],
-      teamPermission: 'NONE'
-    },
-    isShared: false,
-    shareSettings: {
-      isPublic: false,
-      allowTeamAccess: false,
-      allowCopying: false,
-      allowForking: false
-    },
-    nodeCount: 23,
-    edgeCount: 15,
-    contributorCount: 3,
-    lastActivity: '2024-03-15T13:10:00Z',
-    settings: {
-      theme: 'dark',
-      layout: 'force',
-      showPriorities: true,
-      showDependencies: false,
-      autoLayout: true,
-      zoomLevel: 1.1
-    }
-  },
-  {
-    id: 'graph-5',
-    name: 'Login Components',
-    description: 'Login, signup, and password reset components',
-    type: 'SUBGRAPH',
-    status: 'ACTIVE',
-    parentGraphId: 'graph-2',
-    teamId,
-    createdBy: 'user-2',
-    createdAt: '2024-02-15T10:30:00Z',
-    updatedAt: '2024-03-17T09:15:00Z',
-    depth: 2,
-    path: ['graph-1', 'graph-2'],
-    permissions: {
-      owner: 'user-2',
-      admins: ['user-2'],
-      editors: ['user-1'],
-      viewers: ['user-3'],
-      teamPermission: 'VIEW'
-    },
-    isShared: false,
-    shareSettings: {
-      isPublic: false,
-      allowTeamAccess: true,
-      allowCopying: false,
-      allowForking: false
-    },
-    nodeCount: 8,
-    edgeCount: 12,
-    contributorCount: 2,
-    lastActivity: '2024-03-17T09:15:00Z',
-    settings: {
-      theme: 'light',
-      layout: 'hierarchical',
-      showPriorities: true,
-      showDependencies: true,
-      autoLayout: true,
-      zoomLevel: 1.0
-    }
-  }
-];
+// Using only real GraphQL data from Neo4j database
 
 interface GraphProviderProps {
   children: ReactNode;
@@ -224,10 +23,10 @@ export function GraphProvider({ children }: GraphProviderProps) {
   const [availableGraphs, setAvailableGraphs] = useState<Graph[]>([]);
   const [isCreating, setIsCreating] = useState(false);
 
-  // GraphQL operations
-  const { data: graphsData, loading: isLoading } = useQuery(GET_GRAPHS, {
-    variables: { teamId: currentTeam?.id || 'default-team' },
-    skip: !currentTeam,
+
+  // GraphQL operations - Now loads all graphs without team filter
+  const { data: graphsData, loading: isLoading, error: graphsError } = useQuery(GET_GRAPHS, {
+    skip: false, // Always query graphs
   });
 
   const [createGraphMutation] = useMutation(CREATE_GRAPH);
@@ -267,32 +66,57 @@ export function GraphProvider({ children }: GraphProviderProps) {
   //   }
   // });
 
-  // Load graphs from GraphQL response or use mock data as fallback
+  // Load graphs from GraphQL response only
   useEffect(() => {
     if (graphsData?.graphs && graphsData.graphs.length > 0) {
       // Parse JSON strings in settings, permissions, shareSettings
       const parsedGraphs = graphsData.graphs.map((g: any) => ({
         ...g,
-        settings: g.settings ? JSON.parse(g.settings) : undefined,
-        permissions: g.permissions ? JSON.parse(g.permissions) : undefined,
-        shareSettings: g.shareSettings ? JSON.parse(g.shareSettings) : undefined,
+        settings: g.settings ? JSON.parse(g.settings) : {
+          theme: 'light',
+          layout: 'force',
+          showPriorities: true,
+          showDependencies: true,
+          autoLayout: true,
+          zoomLevel: 1.0
+        },
+        permissions: g.permissions ? JSON.parse(g.permissions) : {
+          owner: currentUser?.id || 'unknown',
+          admins: [currentUser?.id || 'unknown'],
+          editors: [],
+          viewers: [],
+          teamPermission: 'VIEW'
+        },
+        shareSettings: g.shareSettings ? JSON.parse(g.shareSettings) : {
+          isPublic: false,
+          allowTeamAccess: true,
+          allowCopying: false,
+          allowForking: false
+        },
       }));
       setAvailableGraphs(parsedGraphs);
       
-      // Auto-select first graph if none selected
-      if (!currentGraph && parsedGraphs.length > 0) {
-        setCurrentGraph(parsedGraphs[0]);
-      }
-    } else if (currentTeam && !isLoading) {
-      // Use mock data if no graphs in database
-      const teamGraphs = createMockGraphs(currentTeam.id);
-      setAvailableGraphs(teamGraphs);
+      // Try to restore previously selected graph from localStorage
+      const storedGraphId = localStorage.getItem('currentGraphId');
+      let graphToSelect = null;
       
-      if (!currentGraph && teamGraphs.length > 0) {
-        setCurrentGraph(teamGraphs[0]);
+      if (storedGraphId) {
+        graphToSelect = parsedGraphs.find((g: Graph) => g.id === storedGraphId);
       }
+      
+      // Auto-select first graph if none selected or stored graph not found
+      if (!currentGraph && parsedGraphs.length > 0) {
+        const selectedGraph = graphToSelect || parsedGraphs[0];
+        setCurrentGraph(selectedGraph);
+        // Save to localStorage for persistence
+        localStorage.setItem('currentGraphId', selectedGraph.id);
+      }
+    } else if (!isLoading) {
+      // No graphs available - clear state
+      setAvailableGraphs([]);
+      setCurrentGraph(null);
     }
-  }, [graphsData, currentTeam, isLoading]);
+  }, [graphsData, currentTeam, currentUser, isLoading]);
 
   // Build graph hierarchy
   const graphHierarchy: GraphHierarchy[] = availableGraphs
@@ -314,29 +138,27 @@ export function GraphProvider({ children }: GraphProviderProps) {
 
   const createGraph = async (input: CreateGraphInput): Promise<Graph> => {
     setIsCreating(true);
+    
     try {
-      // Prepare the graph input for GraphQL
+      // Pass exactly what the UI sends - let GraphQL handle it
       const graphInput = {
-        name: input.name,
-        description: input.description || '',
-        type: input.type,
-        status: 'DRAFT',
+        ...input,  // This includes: name, description, type, status, teamId, tags, defaultRole, isShared
         parentGraphId: input.parentGraphId || null,
-        teamId: input.teamId,
-        createdBy: currentUser!.id,
+        createdBy: input.createdBy || currentUser?.id || '',
         depth: input.parentGraphId ? getGraphDepth(input.parentGraphId) + 1 : 0,
         path: input.parentGraphId ? [...getGraphPathIds(input.parentGraphId), input.parentGraphId] : [],
-        isShared: false,
         nodeCount: 0,
         edgeCount: 0,
         contributorCount: 1,
         lastActivity: new Date().toISOString(),
         permissions: JSON.stringify({
-          owner: currentUser!.id,
-          admins: [currentUser!.id],
+          owner: input.createdBy || currentUser?.id || '',
+          admins: [input.createdBy || currentUser?.id || ''].filter(Boolean),
           editors: [],
           viewers: [],
-          teamPermission: 'VIEW'
+          teamPermission: input.defaultRole === 'ADMIN' ? 'ADMIN' : 
+                         input.defaultRole === 'USER' ? 'EDIT' : 
+                         'VIEW'
         }),
         shareSettings: JSON.stringify({
           isPublic: false,
@@ -374,51 +196,7 @@ export function GraphProvider({ children }: GraphProviderProps) {
       throw new Error('Failed to create graph');
     } catch (error) {
       console.error('Error creating graph:', error);
-      // Fallback to mock creation if GraphQL fails
-      const newGraph: Graph = {
-        id: `graph-${Date.now()}`,
-        name: input.name,
-        description: input.description,
-        type: input.type,
-        status: 'DRAFT',
-        parentGraphId: input.parentGraphId,
-        teamId: input.teamId,
-        createdBy: currentUser!.id,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        depth: input.parentGraphId ? getGraphDepth(input.parentGraphId) + 1 : 0,
-        path: input.parentGraphId ? [...getGraphPathIds(input.parentGraphId), input.parentGraphId] : [],
-        permissions: {
-          owner: currentUser!.id,
-          admins: [currentUser!.id],
-          editors: [],
-          viewers: [],
-          teamPermission: 'VIEW'
-        },
-        isShared: false,
-        shareSettings: {
-          isPublic: false,
-          allowTeamAccess: true,
-          allowCopying: false,
-          allowForking: false
-        },
-        nodeCount: 0,
-        edgeCount: 0,
-        contributorCount: 1,
-        lastActivity: new Date().toISOString(),
-        settings: {
-          theme: 'light',
-          layout: 'force',
-          showPriorities: true,
-          showDependencies: true,
-          autoLayout: true,
-          zoomLevel: 1.0
-        }
-      };
-
-      setAvailableGraphs(prev => [...prev, newGraph]);
-      setCurrentGraph(newGraph);
-      return newGraph;
+      throw error; // Don't fallback to local creation, let the error bubble up
     } finally {
       setIsCreating(false);
     }
@@ -461,19 +239,7 @@ export function GraphProvider({ children }: GraphProviderProps) {
       throw new Error('Failed to update graph');
     } catch (error) {
       console.error('Error updating graph:', error);
-      // Fallback to local update
-      const updatedGraph = {
-        ...graph,
-        ...updates,
-        updatedAt: new Date().toISOString()
-      };
-
-      setAvailableGraphs(prev => prev.map(g => g.id === graphId ? updatedGraph : g));
-      if (currentGraph?.id === graphId) {
-        setCurrentGraph(updatedGraph);
-      }
-
-      return updatedGraph;
+      throw error; // Don't fallback to local update, let the error bubble up
     }
   };
 
@@ -490,12 +256,7 @@ export function GraphProvider({ children }: GraphProviderProps) {
       }
     } catch (error) {
       console.error('Error deleting graph:', error);
-      // Fallback to local deletion
-      setAvailableGraphs(prev => prev.filter(g => g.id !== graphId));
-      if (currentGraph?.id === graphId) {
-        const remaining = availableGraphs.filter(g => g.id !== graphId);
-        setCurrentGraph(remaining.length > 0 ? remaining[0] : null);
-      }
+      throw error; // Don't fallback to local deletion, let the error bubble up
     }
   };
 
@@ -509,6 +270,7 @@ export function GraphProvider({ children }: GraphProviderProps) {
       type: originalGraph.type,
       parentGraphId: originalGraph.parentGraphId,
       teamId: originalGraph.teamId,
+      createdBy: currentUser?.id || '',
       copyFromGraphId: graphId
     });
   };
@@ -547,8 +309,8 @@ export function GraphProvider({ children }: GraphProviderProps) {
   };
 
   const joinSharedGraph = async (_shareLink: string): Promise<Graph> => {
-    // Simulate API call to join shared graph
-    throw new Error('Not implemented in demo');
+    // TODO: Implement shared graph joining functionality
+    throw new Error('Shared graph joining not yet implemented');
   };
 
   const getGraphPathIds = (graphId: string): string[] => {
@@ -599,10 +361,8 @@ export function GraphProvider({ children }: GraphProviderProps) {
   };
 
   const refreshGraphs = async (): Promise<void> => {
-    if (currentTeam) {
-      const teamGraphs = createMockGraphs(currentTeam.id);
-      setAvailableGraphs(teamGraphs);
-    }
+    // Refresh will be handled by GraphQL refetch
+    // No manual refresh needed as we're using real data only
   };
 
   const value: GraphContextType = {
@@ -646,15 +406,17 @@ function buildHierarchy(graph: Graph, allGraphs: Graph[]): GraphHierarchy {
     type: graph.type,
     children,
     nodeCount: graph.nodeCount,
+    edgeCount: graph.edgeCount,
     isShared: graph.isShared,
     permissions: getPermissionLevel(graph)
   };
 }
 
-function getPermissionLevel(_graph: Graph): 'OWNER' | 'ADMIN' | 'EDIT' | 'VIEW' {
-  // This would normally check against current user
-  // For demo purposes, returning mock values
-  return 'EDIT';
+function getPermissionLevel(graph: Graph): 'OWNER' | 'ADMIN' | 'EDIT' | 'VIEW' {
+  // TODO: Implement real permission checking based on current user
+  // For now, return basic permission level
+  return graph.permissions?.teamPermission === 'ADMIN' ? 'ADMIN' :
+         graph.permissions?.teamPermission === 'EDIT' ? 'EDIT' : 'VIEW';
 }
 
 export function useGraph() {
