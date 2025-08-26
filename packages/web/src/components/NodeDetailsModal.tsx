@@ -17,7 +17,7 @@ interface WorkItem {
     id: string;
     name: string;
     username: string;
-  };
+  } | string;
   owner?: {
     id: string;
     name: string;
@@ -25,6 +25,20 @@ interface WorkItem {
   };
   createdAt?: string;
   updatedAt?: string;
+  // Additional fields that may exist in InteractiveGraphVisualization's WorkItem
+  positionX?: number;
+  positionY?: number;
+  positionZ?: number;
+  teamId?: string;
+  userId?: string;
+  dependencies?: WorkItem[];
+  dependents?: WorkItem[];
+  priority?: {
+    executive: number;
+    individual: number;
+    community: number;
+    computed: number;
+  };
 }
 
 interface NodeDetailsModalProps {
@@ -175,8 +189,14 @@ export function NodeDetailsModal({ isOpen, onClose, node, onEdit }: NodeDetailsM
                   <User className="h-4 w-4 mr-2" />
                   Assigned To
                 </h3>
-                <div className="text-gray-300">{node.assignedTo.name}</div>
-                <div className="text-gray-500 text-sm">@{node.assignedTo.username}</div>
+                {typeof node.assignedTo === 'string' ? (
+                  <div className="text-gray-300">{node.assignedTo}</div>
+                ) : (
+                  <>
+                    <div className="text-gray-300">{node.assignedTo.name}</div>
+                    <div className="text-gray-500 text-sm">@{node.assignedTo.username}</div>
+                  </>
+                )}
               </div>
             )}
 
