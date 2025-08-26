@@ -197,7 +197,7 @@ export function GraphSelectionModal({ isOpen, onClose }: GraphSelectionModalProp
             {availableGraphs.length > 0 ? (
               <div className="p-4">
                 <div className="max-h-80 overflow-y-auto space-y-2" style={{scrollbarWidth: 'none', msOverflowStyle: 'none'}}>
-                  <style jsx>{`
+                  <style>{`
                     div::-webkit-scrollbar {
                       display: none;
                     }
