@@ -408,10 +408,10 @@ export function Signup() {
 
         {/* Role Information */}
         <div className="mt-8 p-4 bg-gray-800 border border-gray-700 rounded-lg">
-          <h3 className="text-sm font-semibold text-gray-300 mb-2">Your Journey Begins as a Node Watcher</h3>
+          <h3 className="text-sm font-semibold text-gray-300 mb-2">Your Journey Begins as a Viewer</h3>
           <p className="text-xs text-gray-400">
             All new members start with read-only access. As you contribute and demonstrate value,
-            the community may elevate your role to Connector, Origin Node, or even Path Keeper.
+            the community may elevate your role to User or even Admin.
           </p>
         </div>
       </div>
