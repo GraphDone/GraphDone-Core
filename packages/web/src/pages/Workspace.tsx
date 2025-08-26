@@ -21,30 +21,31 @@ export function Workspace() {
 
   // Get real-time counts for header display
   const { data: workItemsData } = useQuery(GET_WORK_ITEMS, {
-    variables: {
+    variables: currentGraph ? {
       where: {
         graph: {
-          id: currentGraph?.id,
-          teamId: currentTeam?.id || 'default-team'
+          id: currentGraph.id
         }
       }
-    },
-    skip: !currentGraph || !currentTeam,
-    pollInterval: 5000
+    } : {},
+    skip: !currentGraph,
+    pollInterval: 5000,
+    fetchPolicy: 'cache-and-network'
   });
 
   const { data: edgesData } = useQuery(GET_EDGES, {
-    variables: {
+    variables: currentGraph ? {
       where: {
         source: {
           graph: {
-            id: currentGraph?.id
+            id: currentGraph.id
           }
         }
       }
-    },
+    } : {},
     skip: !currentGraph,
-    pollInterval: 5000
+    pollInterval: 5000,
+    fetchPolicy: 'cache-and-network'
   });
 
   const actualNodeCount = workItemsData?.workItems?.length || 0;
@@ -59,7 +60,7 @@ export function Workspace() {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <div>
-              <h1 className="text-2xl font-bold text-green-300">
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-emerald-400 via-green-300 to-blue-400 bg-clip-text text-transparent">
                 {currentGraph?.name || 'Select a Graph'}
               </h1>
               <div className="flex items-center space-x-2 text-sm text-gray-400 mt-1">
@@ -75,19 +76,22 @@ export function Workspace() {
                     <span>•</span>
                     <span>{actualEdgeCount} connection{actualEdgeCount !== 1 ? 's' : ''}</span>
                     <span>•</span>
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                      currentGraph.type === 'PROJECT' ? 'bg-blue-100 text-blue-800' :
-                      currentGraph.type === 'WORKSPACE' ? 'bg-purple-100 text-purple-800' :
-                      currentGraph.type === 'SUBGRAPH' ? 'bg-green-100 text-green-800' :
-                      'bg-gray-100 text-gray-800'
+                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border shadow-sm ${
+                      currentGraph.type === 'PROJECT' ? 'bg-blue-500/20 text-blue-300 border-blue-400/30' :
+                      currentGraph.type === 'WORKSPACE' ? 'bg-purple-500/20 text-purple-300 border-purple-400/30' :
+                      currentGraph.type === 'SUBGRAPH' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400/30' :
+                      currentGraph.type === 'TEMPLATE' ? 'bg-amber-500/20 text-amber-300 border-amber-400/30' :
+                      'bg-slate-500/20 text-slate-300 border-slate-400/30'
                     }`}>
                       {currentGraph.type}
                     </span>
                     {currentGraph.isShared && (
                       <>
                         <span>•</span>
-                        <Share2 className="h-3 w-3 text-blue-500" />
-                        <span>Shared</span>
+                        <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30 shadow-sm">
+                          <Share2 className="h-3 w-3" />
+                          <span className="text-xs font-medium">Shared</span>
+                        </div>
                       </>
                     )}
                   </>

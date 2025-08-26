@@ -71,37 +71,34 @@ export function InteractiveGraphVisualization() {
   const { currentGraph, availableGraphs, selectGraph } = useGraph();
   const { currentTeam } = useAuth();
   
-  // Fetch work items from Neo4j with team/user filtering for data isolation
-  const { data: workItemsData, loading, error } = useQuery(GET_WORK_ITEMS, {
-    variables: {
+  const { data: workItemsData, loading, error, refetch } = useQuery(GET_WORK_ITEMS, {
+    variables: currentGraph ? {
       where: {
         graph: {
-          id: currentGraph?.id,
-          teamId: currentTeam?.id || 'default-team'
+          id: currentGraph.id
         }
-        // Optional: Also filter by user for additional privacy
-        // userId: currentUser?.id || 'default-user'
       }
-    },
-    pollInterval: 5000, // Poll every 5 seconds to get updates
+    } : {},
+    fetchPolicy: 'cache-and-network',
+    pollInterval: 5000,
     errorPolicy: 'all',
-    skip: !currentTeam || !currentGraph // Don't fetch until we have both team and graph selected
+    skip: !currentGraph
   });
 
-  // Fetch edges from Neo4j - filter by current graph
-  const { data: edgesData, loading: edgesLoading, error: edgesError } = useQuery(GET_EDGES, {
-    variables: {
+  const { data: edgesData, loading: edgesLoading, error: edgesError, refetch: refetchEdges } = useQuery(GET_EDGES, {
+    variables: currentGraph ? {
       where: {
         source: {
           graph: {
-            id: currentGraph?.id
+            id: currentGraph.id
           }
         }
       }
-    },
+    } : {},
+    fetchPolicy: 'cache-and-network',
     pollInterval: 5000,
     errorPolicy: 'all',
-    skip: !currentGraph // Don't fetch until we have a graph selected
+    skip: !currentGraph
   });
 
   // Mutation for creating edges
@@ -121,14 +118,13 @@ export function InteractiveGraphVisualization() {
       },
       { 
         query: GET_WORK_ITEMS, 
-        variables: {
+        variables: currentGraph ? {
           where: {
             graph: {
-              id: currentGraph?.id,
-              teamId: currentTeam?.id || 'default-team'
+              id: currentGraph.id
             }
           }
-        }
+        } : {}
       }
     ],
     onError: (error) => {
@@ -187,7 +183,6 @@ export function InteractiveGraphVisualization() {
     }],
   });
 
-  // Function to get icon based on graph type - matches CreateGraphModal exactly
   const getGraphTypeIcon = (type?: string) => {
     switch (type) {
       case 'PROJECT':
@@ -203,7 +198,6 @@ export function InteractiveGraphVisualization() {
     }
   };
 
-  // ALL HOOK CALLS MUST BE AT THE TOP
   // Close menus when clicking outside
   useEffect(() => {
     const handleClickOutside = () => {
@@ -229,7 +223,6 @@ export function InteractiveGraphVisualization() {
               weight: 0.8,
               source: { connect: { where: { node: { id: connectionSource } } } },
               target: { connect: { where: { node: { id: node.id } } } },
-              teamId: currentTeam?.id || 'default-team'
             }]
           }
         }).then(() => {
@@ -264,12 +257,16 @@ export function InteractiveGraphVisualization() {
 
   // Remove unused handleEdgeClick to fix TypeScript warning
 
-  // initializeVisualization function defined after data processing
-
-  // Process work items data after all hooks are called
   const workItems: WorkItem[] = workItemsData?.workItems || [];
   
-  // Process edges from Neo4j database
+  // Refetch data when graph changes
+  useEffect(() => {
+    if (currentGraph) {
+      refetch();
+      refetchEdges();
+    }
+  }, [currentGraph?.id, refetch, refetchEdges]);
+  
   const workItemEdges: WorkItemEdge[] = [];
   
   // Add edges from Neo4j Edge entities
@@ -313,23 +310,12 @@ export function InteractiveGraphVisualization() {
   useEffect(() => {
     setValidationResult(currentValidationResult);
     
-    // Log validation issues if any
-    if (currentValidationResult && (currentValidationResult.errors.length > 0 || currentValidationResult.warnings.length > 0)) {
-      if (import.meta.env.DEV) {
-        console.warn('Graph validation issues:', {
-          errors: currentValidationResult.errors,
-          warnings: currentValidationResult.warnings,
-          stats: currentValidationResult.stats
-        });
-      }
-    }
   }, [currentValidationResult.errors.length, currentValidationResult.warnings.length]);
 
-  // Use only validated nodes and edges for rendering
   const validatedNodes = currentValidationResult.validNodes;
   const validatedEdges = currentValidationResult.validEdges;
+  
 
-  // Convert work items to format expected by D3
   const nodes = validatedNodes.map(item => ({
     ...item,
     x: item.positionX,
@@ -892,12 +878,9 @@ export function InteractiveGraphVisualization() {
   // Store simulation reference for resize handling
   const simulationRef = useRef<d3.Simulation<any, any> | null>(null);
 
-  // Initialization effect - NOW with access to nodes data
+  // Initialization effect
   useEffect(() => {
     if (nodes.length > 0) {
-      if (import.meta.env.DEV) {
-        console.log('useEffect: Initializing visualization with', nodes.length, 'nodes');
-      }
       initializeVisualization();
     }
 
@@ -920,17 +903,12 @@ export function InteractiveGraphVisualization() {
         .force('center', d3.forceCenter(newCenterX, newCenterY))
         .alpha(0.3) // Restart simulation with some energy
         .restart();
-      
-      if (import.meta.env.DEV) {
-        console.log('🔄 Resized visualization to', newWidth, 'x', newHeight);
-      }
     };
 
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, [nodes.length, validatedEdges.length]); // Only re-initialize when data changes, not on every render
 
-  // Early returns AFTER all hooks are called
   if (loading || edgesLoading) {
     return (
       <div className="graph-container relative w-full h-full bg-gray-900 flex items-center justify-center">
@@ -1148,13 +1126,12 @@ export function InteractiveGraphVisualization() {
     setEdgeMenu(prev => ({ ...prev, visible: false }));
   };
 
-  // Layout and edge systems removed to fix TypeScript unused variable warnings
 
   return (
     <div ref={containerRef} className="graph-container relative w-full h-full bg-gray-900">
       <svg ref={svgRef} className="w-full h-full" style={{ background: 'radial-gradient(circle at center, #1f2937 0%, #111827 100%)' }} />
       
-      {/* Professional Graph Control Panel */}
+      {/* Graph Control Panel */}
       <div className="absolute top-4 left-4 z-40">
         <div className="bg-gray-800/95 backdrop-blur-sm border border-gray-600/60 rounded-lg shadow-xl p-4 w-64">
           {/* Current Graph Header */}
@@ -1201,7 +1178,7 @@ export function InteractiveGraphVisualization() {
             {/* Switch Graph Button */}
             <button 
               onClick={() => setShowGraphSwitcher(true)}
-              className="w-full bg-gray-600 hover:bg-gray-700 text-gray-200 font-medium py-2.5 px-3 rounded-md transition-colors duration-200 flex items-center justify-between"
+              className="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-2.5 px-3 rounded-lg transition-colors flex items-center justify-between"
             >
               <div className="flex items-center space-x-2">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1209,7 +1186,7 @@ export function InteractiveGraphVisualization() {
                 </svg>
                 <span className="text-sm">Switch Graph</span>
               </div>
-              <span className="text-xs bg-gray-500 px-2 py-1 rounded text-gray-300">{availableGraphs.length}</span>
+              <span className="text-xs bg-white px-2 py-1 rounded-full text-yellow-700 font-bold shadow-md">{availableGraphs.length}</span>
             </button>
 
             {/* Update and Delete Graph Buttons */}

@@ -65,12 +65,12 @@ export function GraphVisualization() {
   // Store the current positioned nodes for access in click handlers
   const currentNodesRef = useRef<WorkItem[]>([]);
 
-  const { data: workItemsData, loading: workItemsLoading } = useQuery(GET_WORK_ITEMS, {
+  const { data: workItemsData, loading: workItemsLoading, error: workItemsError } = useQuery(GET_WORK_ITEMS, {
     variables: {
       options: { limit: 100 }
     },
-    fetchPolicy: 'cache-and-network',  // Use cache first, then fetch from network for updates
-    pollInterval: 5000,  // Poll every 5 seconds for real-time updates
+    fetchPolicy: 'cache-and-network',
+    pollInterval: 5000,
     notifyOnNetworkStatusChange: true,
     errorPolicy: 'all'
   });
