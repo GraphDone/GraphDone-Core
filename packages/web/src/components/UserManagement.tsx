@@ -212,15 +212,15 @@ export function UserManagement() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <button className="btn btn-secondary">
             <Users className="h-4 w-4 mr-2" />
-            Promote to Connector
+            Promote to User
           </button>
           <button className="btn btn-secondary">
             <UserCheck className="h-4 w-4 mr-2" />
-            Grant Origin Node
+            Grant Viewer Access
           </button>
           <button className="btn btn-secondary">
             <Settings className="h-4 w-4 mr-2" />
-            Make Path Keeper
+            Make Admin
           </button>
         </div>
       </div>
