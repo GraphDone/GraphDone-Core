@@ -1,19 +1,27 @@
 import { useRef, useEffect, useState } from 'react';
 import { useQuery } from '@apollo/client';
 import * as d3 from 'd3';
-import { Plus, Link } from 'lucide-react';
+import { Plus, Edit } from 'lucide-react';
 import { GET_WORK_ITEMS, GET_EDGES } from '../lib/queries';
 import { CreateNodeModal } from './CreateNodeModal';
+import { EditNodeModal } from './EditNodeModal';
 
 interface WorkItem {
   id: string;
   title: string;
+  description?: string;
   type: string;
+  status: string;
   priorityComp: number;
+  priorityExec: number;
+  priorityIndiv: number;
+  priorityComm: number;
+  tags?: string[];
+  dueDate?: string;
+  assignedTo?: string;
   positionX: number;
   positionY: number;
   positionZ: number;
-  status: string;
   x?: number;
   y?: number;
   dependencies?: WorkItem[];
@@ -46,7 +54,9 @@ export function GraphVisualization() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [nodeMenu, setNodeMenu] = useState<NodeMenuState>({ workItem: null, position: { x: 0, y: 0 }, visible: false });
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [selectedNodeId, setSelectedNodeId] = useState<string | undefined>();
+  const [selectedNodeForEdit, setSelectedNodeForEdit] = useState<WorkItem | null>(null);
   const [clickPosition, setClickPosition] = useState<{ x: number; y: number; z: number } | undefined>();
   
   // Store stable positions for nodes to prevent re-randomization
@@ -55,16 +65,25 @@ export function GraphVisualization() {
   // Store the current positioned nodes for access in click handlers
   const currentNodesRef = useRef<WorkItem[]>([]);
 
-  const { data: workItemsData, loading: workItemsLoading } = useQuery(GET_WORK_ITEMS, {
+  const { data: workItemsData, loading: workItemsLoading, error: workItemsError } = useQuery(GET_WORK_ITEMS, {
     variables: {
       options: { limit: 100 }
-    }
+    },
+    fetchPolicy: 'cache-and-network',
+    pollInterval: 5000,
+    notifyOnNetworkStatusChange: true,
+    errorPolicy: 'all'
   });
 
-  const { data: edgesData, loading: edgesLoading } = useQuery(GET_EDGES);
+  const { data: edgesData, loading: edgesLoading } = useQuery(GET_EDGES, {
+    fetchPolicy: 'cache-and-network',
+    pollInterval: 5000,  // Also poll edges for consistency
+    notifyOnNetworkStatusChange: true
+  });
 
   const workItems: WorkItem[] = workItemsData?.workItems || [];
   const edges: Edge[] = edgesData?.edges || [];
+  
   
   // Convert dependency relationships to edges for visualization
   const dependencyEdges: Edge[] = workItems.flatMap(item => 
@@ -211,13 +230,18 @@ export function GraphVisualization() {
       .attr('class', 'node-circle')
       .attr('r', d => 15 + (d.priorityComp || 0) * 15) // Size based on priority
       .attr('fill', d => {
-        const colors = {
-          OUTCOME: '#3b82f6',
-          TASK: '#10b981',
-          MILESTONE: '#f59e0b',
-          IDEA: '#a855f7'
+        // Lighter, more vibrant colors
+        const colors: Record<string, string> = {
+          EPIC: '#c084fc',      // purple-400
+          MILESTONE: '#fb923c', // orange-400
+          OUTCOME: '#818cf8',   // indigo-400
+          FEATURE: '#38bdf8',   // sky-400
+          TASK: '#4ade80',      // green-400
+          BUG: '#f87171',       // red-400
+          IDEA: '#fbbf24',      // yellow-400
+          RESEARCH: '#2dd4bf'   // teal-400
         };
-        return colors[d.type as keyof typeof colors] || '#6b7280';
+        return colors[d.type] || '#6b7280';
       })
       .attr('stroke', '#fff')
       .attr('stroke-width', 2)
@@ -306,25 +330,49 @@ export function GraphVisualization() {
     <div ref={containerRef} className="graph-container relative">
       <svg ref={svgRef} className="w-full h-full" />
       
+      {/* Auto-refresh indicator */}
+      {loading && (
+        <div className="absolute top-4 left-4 bg-blue-500 text-white px-3 py-1 rounded-full text-xs font-medium flex items-center space-x-2">
+          <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+          <span>Auto-refreshing...</span>
+        </div>
+      )}
+      
       {/* Legend */}
-      <div className="absolute top-4 right-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-4">
+      <div className="absolute top-20 left-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-4">
         <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Node Types</h3>
-        <div className="space-y-2">
+        <div className="space-y-1">
           <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-            <span className="text-xs text-gray-600 dark:text-gray-300">Outcome</span>
+            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#8b5cf6' }}></div>
+            <span className="text-xs text-gray-600 dark:text-gray-300">Epic</span>
           </div>
           <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 rounded-full bg-green-500"></div>
-            <span className="text-xs text-gray-600 dark:text-gray-300">Task</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#f59e0b' }}></div>
             <span className="text-xs text-gray-600 dark:text-gray-300">Milestone</span>
           </div>
           <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 rounded-full bg-purple-500"></div>
+            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#6366f1' }}></div>
+            <span className="text-xs text-gray-600 dark:text-gray-300">Outcome</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#3b82f6' }}></div>
+            <span className="text-xs text-gray-600 dark:text-gray-300">Feature</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#10b981' }}></div>
+            <span className="text-xs text-gray-600 dark:text-gray-300">Task</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#ef4444' }}></div>
+            <span className="text-xs text-gray-600 dark:text-gray-300">Bug</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#eab308' }}></div>
             <span className="text-xs text-gray-600 dark:text-gray-300">Idea</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#14b8a6' }}></div>
+            <span className="text-xs text-gray-600 dark:text-gray-300">Research</span>
           </div>
         </div>
         
@@ -343,6 +391,13 @@ export function GraphVisualization() {
             <span className="text-xs text-gray-600 dark:text-gray-300">Low (0-0.4)</span>
           </div>
         </div>
+        
+        <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-600">
+          <div className="space-y-1 text-xs text-gray-500 dark:text-gray-400">
+            <div>Click node for menu • Drag to move</div>
+            <div>Scroll to zoom • Click edge for options</div>
+          </div>
+        </div>
       </div>
       
       {/* Node interaction menu */}
@@ -357,8 +412,15 @@ export function GraphVisualization() {
           onClick={(e) => e.stopPropagation()}
         >
           <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700">
-            <div className="text-sm font-medium text-gray-900 dark:text-white">{nodeMenu.workItem.title}</div>
+            <div className="text-sm font-medium text-gray-900 dark:text-white max-w-[200px] truncate" title={nodeMenu.workItem.title}>
+              {nodeMenu.workItem.title}
+            </div>
             <div className="text-xs text-gray-500 dark:text-gray-400">{nodeMenu.workItem.type}</div>
+            {nodeMenu.workItem.description && (
+              <div className="text-xs text-gray-600 dark:text-gray-300 mt-1 max-w-[200px] truncate" title={nodeMenu.workItem.description}>
+                {nodeMenu.workItem.description}
+              </div>
+            )}
           </div>
           <button
             onClick={() => {
@@ -386,13 +448,14 @@ export function GraphVisualization() {
           </button>
           <button
             onClick={() => {
-              // TODO: Add edit functionality
+              setSelectedNodeForEdit(nodeMenu.workItem);
+              setShowEditModal(true);
               setNodeMenu(prev => ({ ...prev, visible: false }));
             }}
             className="w-full flex items-center px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
           >
-            <Link className="h-4 w-4 mr-2" />
-            Edit Details
+            <Edit className="h-4 w-4 mr-2" />
+            Edit Node Details
           </button>
         </div>
       )}
@@ -408,6 +471,18 @@ export function GraphVisualization() {
           }}
           parentNodeId={selectedNodeId}
           position={clickPosition}
+        />
+      )}
+      
+      {/* Edit Node Modal */}
+      {showEditModal && selectedNodeForEdit && (
+        <EditNodeModal
+          isOpen={showEditModal}
+          onClose={() => {
+            setShowEditModal(false);
+            setSelectedNodeForEdit(null);
+          }}
+          node={selectedNodeForEdit}
         />
       )}
     </div>
