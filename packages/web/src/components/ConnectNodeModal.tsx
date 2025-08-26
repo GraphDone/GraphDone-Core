@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { X, Link2, Search, CheckCircle, ArrowRight, Target, ExternalLink, Filter, ChevronDown, CheckCircle2 } from 'lucide-react';
+import { X, Link2, Search, CheckCircle, ArrowRight, Target, ExternalLink, Filter, ChevronDown, CheckCircle2, Trash2 } from 'lucide-react';
 import { useQuery, useMutation } from '@apollo/client';
-import { GET_WORK_ITEMS, CREATE_EDGE, GET_EDGES } from '../lib/queries';
+import { GET_WORK_ITEMS, CREATE_EDGE, GET_EDGES, DELETE_EDGE } from '../lib/queries';
 import { useAuth } from '../contexts/AuthContext';
 import { useGraph } from '../contexts/GraphContext';
 import { useNotifications } from '../contexts/NotificationContext';
@@ -118,6 +118,34 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode }: ConnectNodeMod
             teamId: currentTeam?.id || 'team-1'
           }
         }
+      }
+    ],
+    awaitRefetchQueries: true
+  });
+
+  const [deleteEdgeMutation, { loading: deletingConnection }] = useMutation(DELETE_EDGE, {
+    refetchQueries: [
+      // Refetch edges for the source node
+      { 
+        query: GET_EDGES,
+        variables: {
+          where: {
+            OR: [
+              { source: { id: sourceNode.id } },
+              { target: { id: sourceNode.id } }
+            ]
+          }
+        }
+      },
+      // Refetch all edges for graph visualization
+      { 
+        query: GET_EDGES,
+        variables: {}
+      },
+      // Refetch work items
+      { 
+        query: GET_WORK_ITEMS, 
+        variables: { options: { limit: 100 } }
       }
     ],
     awaitRefetchQueries: true
@@ -281,6 +309,37 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode }: ConnectNodeMod
       }
       
       showError('Failed to Create Connections', errorMessage);
+    }
+  };
+
+  const handleDisconnectEdge = async (connectionId: string, connectedNodeTitle: string, relationshipType: string) => {
+    try {
+      console.log('Disconnecting edge:', { connectionId, connectedNodeTitle, relationshipType });
+      
+      await deleteEdgeMutation({
+        variables: {
+          where: { id: connectionId }
+        }
+      });
+
+      showSuccess(
+        'Connection Removed Successfully!',
+        `Disconnected "${sourceNode.title}" from "${connectedNodeTitle}"`
+      );
+
+    } catch (error: any) {
+      console.error('Failed to disconnect:', error);
+      
+      let errorMessage = 'Please try again or contact support.';
+      if (error.graphQLErrors && error.graphQLErrors.length > 0) {
+        errorMessage = error.graphQLErrors[0].message;
+      } else if (error.networkError) {
+        errorMessage = 'Network error. Please check your connection.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      showError('Failed to Remove Connection', errorMessage);
     }
   };
 
@@ -675,6 +734,22 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode }: ConnectNodeMod
                                   <span className="text-gray-200 font-medium text-xs max-w-16 truncate">{connection.connectedNode.title}</span>
                                 </div>
                               </div>
+                              
+                              {/* Disconnect Button - Only show for Edge entities (not WorkItem dependencies) */}
+                              {connection.id.startsWith('edge-') || (!connection.id.startsWith('workitem-')) ? (
+                                <button
+                                  onClick={() => handleDisconnectEdge(connection.id, connection.connectedNode.title, connection.type)}
+                                  disabled={deletingConnection}
+                                  className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-2 rounded-lg bg-red-500/20 hover:bg-red-500/30 border border-red-400/30 hover:border-red-400/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  title={`Disconnect ${relationshipType?.label || connection.type} relationship`}
+                                >
+                                  <Trash2 className="h-3 w-3 text-red-400" />
+                                </button>
+                              ) : (
+                                <div className="text-xs text-gray-500 px-2 py-1 rounded bg-gray-600/20 border border-gray-600/30">
+                                  Legacy
+                                </div>
+                              )}
                             </div>
                           );
                         })}
@@ -808,7 +883,7 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode }: ConnectNodeMod
                               </div>
                               <span className="text-gray-400">•</span>
                               <span className="text-gray-300 font-medium">{node.type}</span>
-                              {node.priorityComp && (
+                              {(node.priorityComp !== undefined && node.priorityComp !== null) && (
                                 <>
                                   <span className="text-gray-400">•</span>
                                   <span className="text-emerald-300 font-medium">{Math.round(node.priorityComp * 100)}%</span>
@@ -842,13 +917,14 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode }: ConnectNodeMod
                 </button>
                 <button
                   onClick={handleCreateConnections}
-                  disabled={selectedNodes.size === 0 || creatingConnection || isRelationshipDisabled(selectedRelationType)}
+                  disabled={selectedNodes.size === 0 || creatingConnection || deletingConnection || isRelationshipDisabled(selectedRelationType)}
                   className="px-8 py-3 bg-gradient-to-r from-emerald-600 to-green-700 hover:from-emerald-500 hover:to-green-600 text-white rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-3 font-semibold shadow-lg shadow-emerald-500/20 disabled:shadow-none"
                   title={isRelationshipDisabled(selectedRelationType) ? 'This relationship already exists between the selected nodes' : ''}
                 >
                   <Link2 className="w-5 h-5" />
                   <span>
                     {creatingConnection ? 'Connecting...' : 
+                     deletingConnection ? 'Removing connection...' :
                      isRelationshipDisabled(selectedRelationType) ? 'Already Connected' :
                      `Connect ${selectedNodes.size} Node${selectedNodes.size !== 1 ? 's' : ''}`}
                   </span>
