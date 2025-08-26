@@ -17,10 +17,12 @@ async function seed() {
   const session = driver.session();
   
   try {
+    // eslint-disable-next-line no-console
     console.log('🌱 Starting Neo4j database seeding...');
     
     // Clear existing data
     await session.run('MATCH (n) DETACH DELETE n');
+    // eslint-disable-next-line no-console
     console.log('✨ Cleared existing data');
     
     // Create work items with proper team IDs
@@ -97,6 +99,7 @@ async function seed() {
           priorityIndiv: $priorityIndiv,
           priorityComm: $priorityComm,
           priorityComp: $priorityComp,
+          tags: $tags,
           createdAt: datetime(),
           updatedAt: datetime()
         })`,
@@ -108,20 +111,22 @@ async function seed() {
           priorityExec: Math.random(),
           priorityIndiv: Math.random(),
           priorityComm: Math.random(),
-          priorityComp: Math.random()
+          priorityComp: Math.random(),
+          tags: []
         }
       );
     }
+    // eslint-disable-next-line no-console
     console.log(`✅ Created ${workItems.length} work items`);
     
     // Create edges (relationships between work items)
     const edges = [
-      { source: 'wi-1', target: 'wi-2', type: 'DEPENDENCY' },
-      { source: 'wi-2', target: 'wi-3', type: 'DEPENDENCY' },
-      { source: 'wi-5', target: 'wi-6', type: 'CONTAINS' },
-      { source: 'wi-5', target: 'wi-7', type: 'CONTAINS' },
-      { source: 'wi-5', target: 'wi-8', type: 'CONTAINS' },
-      { source: 'wi-12', target: 'wi-5', type: 'DEPENDENCY' }
+      { source: 'wi-1', target: 'wi-2', type: 'DEPENDS_ON' },
+      { source: 'wi-2', target: 'wi-3', type: 'DEPENDS_ON' },
+      { source: 'wi-5', target: 'wi-6', type: 'PART_OF' },
+      { source: 'wi-5', target: 'wi-7', type: 'PART_OF' },
+      { source: 'wi-5', target: 'wi-8', type: 'PART_OF' },
+      { source: 'wi-12', target: 'wi-5', type: 'DEPENDS_ON' }
     ];
     
     for (const edge of edges) {
@@ -144,6 +149,7 @@ async function seed() {
         }
       );
     }
+    // eslint-disable-next-line no-console
     console.log(`✅ Created ${edges.length} edges`);
     
     // Create Edge entities for the new edge system with proper relationships
@@ -169,6 +175,7 @@ async function seed() {
         }
       );
     }
+    // eslint-disable-next-line no-console
     console.log(`✅ Created ${edges.length} Edge entities`);
     
     // Create contributors
@@ -194,6 +201,7 @@ async function seed() {
         contrib
       );
     }
+    // eslint-disable-next-line no-console
     console.log(`✅ Created ${contributors.length} contributors`);
     
     // Connect some contributors to work items
@@ -214,11 +222,14 @@ async function seed() {
         contribution
       );
     }
+    // eslint-disable-next-line no-console
     console.log(`✅ Created ${contributions.length} contributor connections`);
     
+    // eslint-disable-next-line no-console
     console.log('🎉 Database seeding completed successfully!');
     
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.error('❌ Error seeding database:', error);
     throw error;
   } finally {
@@ -228,4 +239,5 @@ async function seed() {
 }
 
 // Run the seed function
+// eslint-disable-next-line no-console
 seed().catch(console.error);

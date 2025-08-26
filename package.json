@@ -9,6 +9,7 @@
   ],
   "scripts": {
     "dev": "turbo run dev",
+    "dev:mcp": "npm run dev:start -w @graphdone/mcp-server",
     "build": "turbo run build",
     "test": "turbo run test && npm run test:e2e:core",
     "test:unit": "turbo run test",

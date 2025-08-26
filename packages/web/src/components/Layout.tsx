@@ -1,9 +1,10 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Brain, Bot, BarChart3, Settings, Menu, Server, Globe } from 'lucide-react';
+import { Brain, Bot, BarChart3, Settings, Menu, Server, Globe, Shield, Users } from 'lucide-react';
 import { UserSelector } from './UserSelector';
 import { GraphSelector } from './GraphSelector';
 import { useAuth } from '../contexts/AuthContext';
+import { McpHealthIndicator } from './McpHealthIndicator';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -12,15 +13,16 @@ interface LayoutProps {
 export function Layout({ children }: LayoutProps) {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
-  const { currentTeam } = useAuth();
+  const { currentTeam, currentUser } = useAuth();
 
   const navigation = [
     { name: 'Workspace', href: '/', icon: Globe, description: 'Main work' },
     { name: 'Ontology', href: '/ontology', icon: Brain, description: 'Node schemas' },
-    { name: 'Agents', href: '/agents', icon: Bot, description: 'AI collaboration' },
+    { name: 'AI & Agents', href: '/agents', icon: Bot, description: 'AI collaboration' },
     { name: 'Analytics', href: '/analytics', icon: BarChart3, description: 'Priority insights' },
     { name: 'Settings', href: '/settings', icon: Settings, description: 'User preferences' },
-    { name: 'System', href: '/backend', icon: Server, description: 'Backend status' },
+    { name: 'Admin', href: '/admin', icon: Shield, description: 'System administration', restricted: currentUser?.role !== 'ADMIN' },
+    { name: 'System', href: '/backend', icon: Server, description: 'Backend status', restricted: currentUser?.role === 'VIEWER' || currentUser?.role === 'GUEST' },
   ];
 
   return (
@@ -61,6 +63,31 @@ export function Layout({ children }: LayoutProps) {
               {navigation.map((item) => {
                 const Icon = item.icon;
                 const isActive = location.pathname === item.href;
+                const isRestricted = item.restricted;
+                
+                if (isRestricted) {
+                  const restrictionMessage = item.name === 'Admin' 
+                    ? 'Admin access required'
+                    : item.name === 'System' 
+                    ? 'User or Admin access required'
+                    : 'Access restricted';
+                  
+                  return (
+                    <div
+                      key={item.name}
+                      className="flex items-center px-3 py-3 rounded-lg transition-colors group cursor-not-allowed opacity-50"
+                      title={`${item.description} (${restrictionMessage})`}
+                    >
+                      <Icon className="h-5 w-5 mr-3 flex-shrink-0 text-gray-500" />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-gray-500">{item.name}</div>
+                        <div className="text-xs text-gray-600 truncate">
+                          {restrictionMessage}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
                 
                 return (
                   <Link
@@ -93,17 +120,40 @@ export function Layout({ children }: LayoutProps) {
               <GraphSelector />
             </div>
 
+            {/* Guest Mode Indicator */}
+            {currentUser?.role === 'GUEST' && (
+              <div className="border-t border-gray-700 p-4">
+                <div className="bg-purple-900/30 border border-purple-500/30 rounded-lg p-3">
+                  <div className="flex items-center space-x-2">
+                    <Users className="h-4 w-4 text-purple-400" />
+                    <span className="text-sm font-medium text-purple-300">Guest Mode</span>
+                  </div>
+                  <p className="text-xs text-purple-200 mt-1">
+                    Read-only demo access. Create an account to save your work.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* User Selector */}
             <div className="border-t border-gray-700">
               <UserSelector />
             </div>
 
-            {/* Footer */}
+            {/* Footer with MCP Status */}
             <div className="p-4 border-t border-gray-700">
+              {/* MCP Health Indicator */}
+              <div className="mb-3 flex items-center justify-between">
+                <span className="text-xs text-gray-400">MCP Server</span>
+                <McpHealthIndicator showDetails={false} />
+              </div>
+              
               {currentTeam && (
                 <div className="mb-2">
                   <p className="text-xs text-gray-300 font-medium">{currentTeam.name}</p>
-                  <p className="text-xs text-gray-500">{currentTeam.memberCount} members</p>
+                  <p className="text-xs text-gray-500">
+                    {currentTeam.memberCount || 0} members
+                  </p>
                 </div>
               )}
               <p className="text-xs text-gray-400">

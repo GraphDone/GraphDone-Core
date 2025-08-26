@@ -1,48 +1,23 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import * as d3 from 'd3';
-import { Link2, Edit3, Trash2, AlertTriangle, AlertCircle, Layers, Sparkles, ListTodo, Trophy } from 'lucide-react';
+import { Link2, Edit3, Trash2, AlertTriangle, AlertCircle, Layers, Sparkles, ListTodo, Trophy, Target, Lightbulb, Microscope, Folder, FolderOpen, Plus, FileText, Settings } from 'lucide-react';
 import { useQuery, useMutation } from '@apollo/client';
 import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
-import { GET_WORK_ITEMS, GET_EDGES, CREATE_EDGE } from '../lib/queries';
-import { relationshipTypeInfo, RelationshipType } from '../types/projectData';
+import { GET_WORK_ITEMS, GET_EDGES, CREATE_EDGE, UPDATE_EDGE, DELETE_EDGE } from '../lib/queries';
+import { relationshipTypeInfo } from '../types/projectData';
 import { validateGraphData, getValidationSummary, ValidationResult } from '../utils/graphDataValidation';
 import { EditNodeModal } from './EditNodeModal';
 import { DeleteNodeModal } from './DeleteNodeModal';
+import { CreateNodeModal } from './CreateNodeModal';
+import { CreateGraphModal } from './CreateGraphModal';
+import { GraphSelectionModal } from './GraphSelectionModal';
+import { UpdateGraphModal } from './UpdateGraphModal';
+import { DeleteGraphModal } from './DeleteGraphModal';
+import { ConnectNodeModal } from './ConnectNodeModal';
+import { NodeDetailsModal } from './NodeDetailsModal';
 
-interface WorkItem {
-  id: string;
-  title: string;
-  description?: string;
-  type: string;
-  status: string;
-  positionX: number;
-  positionY: number;
-  positionZ?: number;
-  priorityExec: number;
-  priorityIndiv: number;
-  priorityComm: number;
-  priorityComp: number;
-  teamId: string;
-  userId: string;
-  dependencies?: WorkItem[];
-  dependents?: WorkItem[];
-  priority?: {
-    executive: number;
-    individual: number;
-    community: number;
-    computed: number;
-  };
-}
-
-interface WorkItemEdge {
-  id: string;
-  source: string;
-  target: string;
-  type: RelationshipType;
-  strength?: number;
-  description?: string;
-}
+import { WorkItem, WorkItemEdge, RelationshipType } from '../types/graph';
 
 interface NodeMenuState {
   node: WorkItem | null;
@@ -59,40 +34,69 @@ interface EdgeMenuState {
 export function InteractiveGraphVisualization() {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const { currentGraph, availableGraphs, selectGraph } = useGraph();
-  const { currentTeam } = useAuth();
+  const { currentGraph, availableGraphs } = useGraph();
+  const { } = useAuth();
   
-  // Fetch work items from Neo4j with team/user filtering for data isolation
-  const { data: workItemsData, loading, error } = useQuery(GET_WORK_ITEMS, {
-    variables: {
+  const { data: workItemsData, loading, error, refetch } = useQuery(GET_WORK_ITEMS, {
+    variables: currentGraph ? {
       where: {
-        teamId: currentTeam?.id || 'default-team',
-        // Optional: Also filter by user for additional privacy
-        // userId: currentUser?.id || 'default-user'
+        graph: {
+          id: currentGraph.id
+        }
       }
-    },
-    pollInterval: 5000, // Poll every 5 seconds to get updates
-    errorPolicy: 'all',
-    skip: !currentTeam // Don't fetch until we have a team selected
-  });
-
-  // Fetch edges from Neo4j
-  const { data: edgesData, loading: edgesLoading, error: edgesError } = useQuery(GET_EDGES, {
-    variables: {
-      where: {
-        teamId: currentTeam?.id || 'default-team'
-      }
-    },
+    } : {},
+    fetchPolicy: 'cache-and-network',
     pollInterval: 5000,
     errorPolicy: 'all',
-    skip: !currentTeam
+    skip: !currentGraph
+  });
+
+  const { data: edgesData, loading: edgesLoading, error: edgesError, refetch: refetchEdges } = useQuery(GET_EDGES, {
+    variables: currentGraph ? {
+      where: {
+        source: {
+          graph: {
+            id: currentGraph.id
+          }
+        }
+      }
+    } : {},
+    fetchPolicy: 'cache-and-network',
+    pollInterval: 5000,
+    errorPolicy: 'all',
+    skip: !currentGraph
   });
 
   // Mutation for creating edges
   const [createEdgeMutation] = useMutation(CREATE_EDGE, {
-    refetchQueries: [{ query: GET_EDGES, variables: { where: { teamId: currentTeam?.id || 'default-team' } } }],
+    refetchQueries: [
+      { 
+        query: GET_EDGES, 
+        variables: {
+          where: {
+            source: {
+              graph: {
+                id: currentGraph?.id
+              }
+            }
+          }
+        }
+      },
+      { 
+        query: GET_WORK_ITEMS, 
+        variables: currentGraph ? {
+          where: {
+            graph: {
+              id: currentGraph.id
+            }
+          }
+        } : {}
+      }
+    ],
     onError: (error) => {
-      console.error('Failed to create edge:', error);
+      if (import.meta.env.DEV) {
+        console.error('Failed to create edge:', error);
+      }
     }
   });
   
@@ -101,14 +105,67 @@ export function InteractiveGraphVisualization() {
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionSource, setConnectionSource] = useState<string | null>(null);
   const [selectedRelationType, setSelectedRelationType] = useState<RelationshipType>('DEPENDS_ON');
-  const [showGraphSwitcher, setShowGraphSwitcher] = useState(false);
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
   const [showDataHealth, setShowDataHealth] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showCreateNodeModal, setShowCreateNodeModal] = useState(false);
+  const [showNodeDetailsModal, setShowNodeDetailsModal] = useState(false);
+  const [showConnectModal, setShowConnectModal] = useState(false);
+  const [showCreateGraphModal, setShowCreateGraphModal] = useState(false);
+  const [showGraphSwitcher, setShowGraphSwitcher] = useState(false);
+  const [showUpdateGraphModal, setShowUpdateGraphModal] = useState(false);
+  const [showDeleteGraphModal, setShowDeleteGraphModal] = useState(false);
   const [selectedNode, setSelectedNode] = useState<WorkItem | null>(null);
+  const [createNodePosition, setCreateNodePosition] = useState<{ x: number; y: number; z: number } | undefined>(undefined);
 
-  // ALL HOOK CALLS MUST BE AT THE TOP
+  // Additional edge operations
+  const [updateEdgeMutation] = useMutation(UPDATE_EDGE, {
+    refetchQueries: [{ 
+      query: GET_EDGES, 
+      variables: {
+        where: {
+          source: {
+            graph: {
+              id: currentGraph?.id
+            }
+          }
+        }
+      }
+    }],
+  });
+
+  const [deleteEdgeMutation] = useMutation(DELETE_EDGE, {
+    refetchQueries: [{ 
+      query: GET_EDGES, 
+      variables: {
+        where: {
+          source: {
+            graph: {
+              id: currentGraph?.id
+            }
+          }
+        }
+      }
+    }],
+  });
+
+  const getGraphTypeIcon = (type?: string) => {
+    switch (type) {
+      case 'PROJECT':
+        return <Folder className="h-4 w-4 text-white" />;
+      case 'WORKSPACE':
+        return <FolderOpen className="h-4 w-4 text-white" />;
+      case 'SUBGRAPH':
+        return <Plus className="h-4 w-4 text-white" />;
+      case 'TEMPLATE':
+        return <FileText className="h-4 w-4 text-white" />;
+      default:
+        return <Plus className="h-4 w-4 text-white" />;
+    }
+  };
+
+
   // Close menus when clicking outside
   useEffect(() => {
     const handleClickOutside = () => {
@@ -134,13 +191,16 @@ export function InteractiveGraphVisualization() {
               weight: 0.8,
               source: { connect: { where: { node: { id: connectionSource } } } },
               target: { connect: { where: { node: { id: node.id } } } },
-              teamId: currentTeam?.id || 'default-team'
             }]
           }
         }).then(() => {
-          console.log('✅ Edge created successfully');
+          if (import.meta.env.DEV) {
+            console.log('✅ Edge created successfully');
+          }
         }).catch((error) => {
-          console.error('❌ Failed to create edge:', error);
+          if (import.meta.env.DEV) {
+            console.error('❌ Failed to create edge:', error);
+          }
         });
         initializeVisualization();
       }
@@ -165,12 +225,16 @@ export function InteractiveGraphVisualization() {
 
   // Remove unused handleEdgeClick to fix TypeScript warning
 
-  // initializeVisualization function defined after data processing
-
-  // Process work items data after all hooks are called
   const workItems: WorkItem[] = workItemsData?.workItems || [];
   
-  // Process edges from Neo4j database
+  // Refetch data when graph changes
+  useEffect(() => {
+    if (currentGraph) {
+      refetch();
+      refetchEdges();
+    }
+  }, [currentGraph?.id, refetch, refetchEdges]);
+  
   const workItemEdges: WorkItemEdge[] = [];
   
   // Add edges from Neo4j Edge entities
@@ -214,21 +278,12 @@ export function InteractiveGraphVisualization() {
   useEffect(() => {
     setValidationResult(currentValidationResult);
     
-    // Log validation issues if any
-    if (currentValidationResult && (currentValidationResult.errors.length > 0 || currentValidationResult.warnings.length > 0)) {
-      console.warn('Graph validation issues:', {
-        errors: currentValidationResult.errors,
-        warnings: currentValidationResult.warnings,
-        stats: currentValidationResult.stats
-      });
-    }
   }, [currentValidationResult.errors.length, currentValidationResult.warnings.length]);
 
-  // Use only validated nodes and edges for rendering
   const validatedNodes = currentValidationResult.validNodes;
   const validatedEdges = currentValidationResult.validEdges;
+  
 
-  // Convert work items to format expected by D3
   const nodes = validatedNodes.map(item => ({
     ...item,
     x: item.positionX,
@@ -325,7 +380,9 @@ export function InteractiveGraphVisualization() {
   const initializeVisualization = useCallback(() => {
     if (!svgRef.current || !containerRef.current || nodes.length === 0) return;
 
-    console.log('Initializing visualization with', nodes.length, 'nodes and', validatedEdges.length, 'edges');
+    if (import.meta.env.DEV) {
+      console.log('Initializing visualization with', nodes.length, 'nodes and', validatedEdges.length, 'edges');
+    }
 
     const container = containerRef.current;
     const svg = d3.select(svgRef.current);
@@ -365,52 +422,52 @@ export function InteractiveGraphVisualization() {
     simulation
       .force('link', d3.forceLink(validatedEdges)
         .id((d: any) => d.id)
-        .distance(120)
-        .strength(0.3)
+        .distance(180) // Increased minimum edge distance
+        .strength(0.15) // Reduced strength for less aggressive pulling
       )
       .force('charge', d3.forceManyBody()
         .strength((d: any) => {
-          // Hierarchical repulsion forces
+          // Reduced repulsion forces for more stable positioning
           switch (d.type) {
             case 'EPIC':
-              return -300; // Epics strongly repel each other
+              return -150; // Reduced from -300
             case 'OUTCOME': 
-              return -200; // Outcomes need space too
+              return -120; // Reduced from -200
             case 'MILESTONE':
-              return -80; // Milestones have moderate repulsion
+              return -60; // Reduced from -80
             case 'FEATURE':
-              return -100; // Features need some space
+              return -70; // Reduced from -100
             case 'TASK':
-              return -50; // Tasks can be closer together
+              return -40; // Reduced from -50
             case 'BUG':
-              return -50; // Bugs can cluster with tasks
+              return -40; // Reduced from -50
             case 'IDEA':
-              return -30; // Ideas cluster easily
+              return -25; // Reduced from -30
             default:
-              return -80; // Default moderate repulsion
+              return -50; // Reduced from -80
           }
         })
-        .distanceMax(350) // Increased for epic spacing
+        .distanceMax(400) // Increased max distance for gentler forces
       )
-      .force('center', d3.forceCenter(centerX, centerY))
+      .force('center', d3.forceCenter(centerX, centerY).strength(0.05)) // Much weaker centering force
       .force('collision', d3.forceCollide()
         .radius((d: any) => {
-          const baseRadius = d.type === 'EPIC' ? 60 : 
-                            d.type === 'MILESTONE' ? 52 : 
-                            d.type === 'FEATURE' ? 48 : 42;
+          const baseRadius = d.type === 'EPIC' ? 80 : // Increased collision radius
+                            d.type === 'MILESTONE' ? 70 : 
+                            d.type === 'FEATURE' ? 65 : 60;
           return baseRadius;
         })
-        .strength(0.7)
+        .strength(0.5) // Reduced collision strength
       )
       // Add hierarchical attraction forces (Epic->Milestone, Feature->Task, etc.)
       .force('hierarchy', d3.forceLink()
         .id((d: any) => d.id)
         .links(createHierarchicalLinks(nodes))
-        .distance((d: any) => d.distance || 100)
-        .strength((d: any) => d.strength || 0.2)
+        .distance((d: any) => d.distance || 140) // Increased hierarchical distance
+        .strength((d: any) => d.strength || 0.1) // Reduced hierarchical strength
       )
-      .alphaTarget(0.1)
-      .alphaDecay(0.01);
+      .alphaTarget(0.05) // Lower alpha target for calmer simulation
+      .alphaDecay(0.02); // Faster decay to settle sooner
 
     // Create edges FIRST (so they render under nodes)
     const linkElements = g.append('g')
@@ -466,7 +523,7 @@ export function InteractiveGraphVisualization() {
       .style('cursor', 'pointer')
       .call(d3.drag<any, any>()
         .on('start', (event, d: any) => {
-          if (!event.active) simulation.alphaTarget(0.3).restart();
+          if (!event.active) simulation.alphaTarget(0.1).restart(); // Gentler restart
           d.fx = d.x;
           d.fy = d.y;
           
@@ -518,15 +575,21 @@ export function InteractiveGraphVisualization() {
           }
         })
         .on('drag', (event, d: any) => {
-          d.fx = event.x;
-          d.fy = event.y;
-          d.x = event.x;
-          d.y = event.y;
+          // Get node radius
+          const nodeRadius = 30;
+          // Constrain to container bounds
+          d.fx = Math.max(nodeRadius, Math.min(width - nodeRadius, event.x));
+          d.fy = Math.max(nodeRadius, Math.min(height - nodeRadius, event.y));
+          d.x = d.fx;
+          d.y = d.fy;
         })
         .on('end', (event, d: any) => {
-          if (!event.active) simulation.alphaTarget(0.05);
-          d.fx = null;
-          d.fy = null;
+          if (!event.active) simulation.alphaTarget(0.02); // Lower target for stability
+          // Don't immediately clear fixed positions - let them drift gently
+          setTimeout(() => {
+            d.fx = null;
+            d.fy = null;
+          }, 1000); // 1 second delay before releasing position
           
           // Remove expanding ring effect
           const nodeGroup = d3.select(event.currentTarget);
@@ -534,62 +597,155 @@ export function InteractiveGraphVisualization() {
           nodeGroup.selectAll('.expanding-ring').remove();
         }));
 
-    // Node circles - increased minimum sizes
-    nodeElements.append('circle')
-      .attr('class', 'node-circle')
-      .attr('r', (d: WorkItem) => {
-        switch (d.type) {
-          case 'EPIC': return 45;
-          case 'MILESTONE': return 40;
-          case 'FEATURE': return 35;
-          case 'TASK': return 30;
-          case 'BUG': return 28;
-          case 'OUTCOME': return 42;
-          case 'IDEA': return 25;
-          default: return 30;
-        }
-      })
+    // Monopoly-style rectangular nodes with colored title bars
+    const getNodeDimensions = (d: WorkItem) => {
+      switch (d.type) {
+        case 'EPIC': return { width: 140, height: 100 };
+        case 'MILESTONE': return { width: 130, height: 90 };
+        case 'FEATURE': return { width: 120, height: 85 };
+        case 'OUTCOME': return { width: 125, height: 95 };
+        case 'TASK': return { width: 110, height: 80 };
+        case 'BUG': return { width: 105, height: 75 };
+        case 'IDEA': return { width: 100, height: 70 };
+        default: return { width: 110, height: 80 };
+      }
+    };
+    
+    // Main node rectangle (dark theme background)
+    nodeElements.append('rect')
+      .attr('class', 'node-bg')
+      .attr('x', (d: WorkItem) => -getNodeDimensions(d).width / 2)
+      .attr('y', (d: WorkItem) => -getNodeDimensions(d).height / 2)
+      .attr('width', (d: WorkItem) => getNodeDimensions(d).width)
+      .attr('height', (d: WorkItem) => getNodeDimensions(d).height)
+      .attr('rx', 8)
       .attr('fill', (d: WorkItem) => {
-        // Desaturate completed nodes to gray
+        // Dim completed nodes
         if (d.status === 'COMPLETED' || d.status === 'Completed' || d.status === 'Done' || d.status === 'DONE') {
           return '#374151'; // Dark gray for completed nodes
         }
-        
-        switch (d.type) {
-          case 'EPIC': return '#a855f7';
-          case 'FEATURE': return '#3b82f6';
-          case 'TASK': return '#10b981';
-          case 'BUG': return '#dc2626';
-          case 'MILESTONE': return '#f59e0b';
-          case 'OUTCOME': return '#6366f1';
-          case 'IDEA': return '#f97316';
-          default: return '#6b7280';
-        }
+        return '#1f2937'; // Dark background consistent with theme
       })
       .attr('stroke', (d: WorkItem) => {
-        // Use colored ring for completed nodes to show original type
         if (d.status === 'COMPLETED' || d.status === 'Completed' || d.status === 'Done' || d.status === 'DONE') {
-          switch (d.type) {
-            case 'EPIC': return '#a855f7';
-            case 'FEATURE': return '#3b82f6';
-            case 'TASK': return '#10b981';
-            case 'BUG': return '#dc2626';
-            case 'MILESTONE': return '#f59e0b';
-            case 'OUTCOME': return '#6366f1';
-            case 'IDEA': return '#f97316';
-            default: return '#6b7280';
-          }
+          return '#4b5563';
         }
-        return '#ffffff'; // White stroke for active nodes
+        return '#4b5563'; // Gray border
       })
-      .attr('stroke-width', (d: WorkItem) => {
-        // Thicker stroke for completed nodes to make the type ring visible
+      .attr('stroke-width', 1.5);
+
+    // Colored title bar at top (like Monopoly property cards)
+    const titleBarHeight = 28;
+    nodeElements.append('rect')
+      .attr('class', 'node-title-bar')
+      .attr('x', (d: WorkItem) => -getNodeDimensions(d).width / 2 + 2)
+      .attr('y', (d: WorkItem) => -getNodeDimensions(d).height / 2 + 2)
+      .attr('width', (d: WorkItem) => getNodeDimensions(d).width - 4)
+      .attr('height', titleBarHeight)
+      .attr('rx', 6)
+      .attr('fill', (d: WorkItem) => {
+        // Dim completed nodes title bars
         if (d.status === 'COMPLETED' || d.status === 'Completed' || d.status === 'Done' || d.status === 'DONE') {
-          return 4;
+          return '#9ca3af'; // Gray for completed nodes
         }
-        return 2;
+        
+        const colors: Record<string, string> = {
+          EPIC: '#8B5CF6',      // purple-500
+          MILESTONE: '#F59E0B', // amber-500
+          OUTCOME: '#6366F1',   // indigo-500
+          FEATURE: '#10B981',   // emerald-500
+          TASK: '#3B82F6',      // blue-500
+          BUG: '#EF4444',       // red-500
+          IDEA: '#EAB308',      // yellow-500
+          RESEARCH: '#14B8A6'   // teal-500
+        };
+        return colors[d.type] || '#6B7280';
       })
-      .attr('opacity', 1); // Keep all nodes fully opaque
+      .attr('stroke', (d: WorkItem) => {
+        if (d.status === 'COMPLETED' || d.status === 'Completed' || d.status === 'Done' || d.status === 'DONE') {
+          return '#6b7280';
+        }
+        
+        const borderColors: Record<string, string> = {
+          EPIC: '#7C3AED',      // purple-600
+          MILESTONE: '#D97706', // amber-600
+          OUTCOME: '#4F46E5',   // indigo-600
+          FEATURE: '#059669',   // emerald-600
+          TASK: '#2563EB',      // blue-600
+          BUG: '#DC2626',       // red-600
+          IDEA: '#CA8A04',      // yellow-600
+          RESEARCH: '#0D9488'   // teal-600
+        };
+        return borderColors[d.type] || '#4B5563';
+      })
+      .attr('stroke-width', 1.5);
+
+    // Node type text in colored title bar (centered, bold and white)
+    nodeElements.append('text')
+      .attr('class', 'node-type-text')
+      .attr('x', 0)
+      .attr('y', (d: WorkItem) => -getNodeDimensions(d).height / 2 + titleBarHeight / 2 + 2)
+      .attr('text-anchor', 'middle')
+      .attr('dominant-baseline', 'middle')
+      .text((d: WorkItem) => d.type)
+      .style('font-size', '11px')
+      .style('font-weight', '700')
+      .style('fill', '#ffffff')
+      .style('pointer-events', 'none');
+
+    // Node title section - larger and cleaner
+    nodeElements.append('text')
+      .attr('class', 'node-title-text')
+      .attr('x', 0)
+      .attr('y', (d: WorkItem) => -getNodeDimensions(d).height / 2 + titleBarHeight + 22)
+      .attr('text-anchor', 'middle')
+      .attr('dominant-baseline', 'middle')
+      .text((d: WorkItem) => {
+        const maxLength = Math.floor(getNodeDimensions(d).width / 7);
+        return d.title.length > maxLength ? d.title.substring(0, maxLength - 3) + '...' : d.title;
+      })
+      .style('font-size', '14px')
+      .style('font-weight', '600')
+      .style('fill', (d: WorkItem) => {
+        const isCompleted = d.status === 'COMPLETED' || d.status === 'Completed' || d.status === 'Done' || d.status === 'DONE';
+        return isCompleted ? '#9ca3af' : '#ffffff';
+      })
+      .style('pointer-events', 'none');
+
+    // Description section - bigger and more readable
+    nodeElements.append('text')
+      .attr('class', 'node-description-text')
+      .attr('x', 0)
+      .attr('y', (d: WorkItem) => -getNodeDimensions(d).height / 2 + titleBarHeight + 42)
+      .attr('text-anchor', 'middle')
+      .attr('dominant-baseline', 'middle')
+      .text((d: WorkItem) => {
+        if (!d.description) return '';
+        const maxLength = Math.floor(getNodeDimensions(d).width / 6.5);
+        return d.description.length > maxLength ? d.description.substring(0, maxLength - 3) + '...' : d.description;
+      })
+      .style('font-size', '11px')
+      .style('font-weight', '400')
+      .style('fill', (d: WorkItem) => {
+        const isCompleted = d.status === 'COMPLETED' || d.status === 'Completed' || d.status === 'Done' || d.status === 'DONE';
+        return isCompleted ? '#6b7280' : '#d1d5db';
+      })
+      .style('pointer-events', 'none');
+
+    // Priority indicator (small dot in bottom right)
+    nodeElements.append('circle')
+      .attr('class', 'priority-indicator-dot')
+      .attr('r', 4)
+      .attr('cx', (d: WorkItem) => getNodeDimensions(d).width / 2 - 8)
+      .attr('cy', (d: WorkItem) => getNodeDimensions(d).height / 2 - 8)
+      .attr('fill', (d: WorkItem) => {
+        const priority = d.priorityComp || 0;
+        if (priority > 0.7) return '#dc2626'; // High priority - red
+        if (priority > 0.4) return '#d97706'; // Medium priority - orange
+        return '#059669'; // Low priority - green
+      })
+      .attr('stroke', '#ffffff')
+      .attr('stroke-width', 1);
 
     // Add completion indicators (checkmarks) for completed nodes
     nodeElements.each(function(d: WorkItem) {
@@ -650,8 +806,6 @@ export function InteractiveGraphVisualization() {
       const lineHeight = fontSize * 1.2;
       
       // Calculate vertical offset to center multi-line text
-      const totalHeight = lines.length * lineHeight;
-      const startY = -(totalHeight / 2) + (lineHeight / 2);
       
       // Determine text color based on node background color for contrast
       const getTextColor = (nodeType: string) => {
@@ -667,24 +821,7 @@ export function InteractiveGraphVisualization() {
         }
       };
 
-      const textColor = getTextColor(d.type);
-      const shadowColor = textColor === '#ffffff' ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.8)';
-
-      // Add text elements for each line
-      lines.forEach((line, index) => {
-        nodeGroup.append('text')
-          .attr('class', 'node-label')
-          .attr('text-anchor', 'middle')
-          .attr('dominant-baseline', 'middle')
-          .attr('y', startY + (index * lineHeight))
-          .style('font-size', `${fontSize}px`)
-          .style('font-weight', '700')
-          .style('fill', textColor)
-          .style('text-shadow', `1px 1px 2px ${shadowColor}`)
-          .style('pointer-events', 'none')
-          .style('user-select', 'none')
-          .text(line);
-      });
+      // Old text removed - using new Monopoly-style text instead
     });
 
     // Create arrow symbols for middle of edges
@@ -754,6 +891,13 @@ export function InteractiveGraphVisualization() {
 
     // Simulation tick - ONLY update nodes, edges are handled separately
     simulation.on('tick', () => {
+      // Constrain nodes to container bounds
+      nodes.forEach((d: any) => {
+        const nodeRadius = 30;
+        d.x = Math.max(nodeRadius, Math.min(width - nodeRadius, d.x || centerX));
+        d.y = Math.max(nodeRadius, Math.min(height - nodeRadius, d.y || centerY));
+      });
+      
       // Update node positions
       nodeElements
         .attr('transform', (d: any) => `translate(${d.x || 0},${d.y || 0})`);
@@ -767,16 +911,20 @@ export function InteractiveGraphVisualization() {
       g.attr('transform', event.transform);
     });
 
-    console.log('✅ Visualization initialized with', nodes.length, 'nodes');
+    // Properly restart simulation to ensure initial positioning works
+    simulation.alpha(0.8).restart();
+
+    if (import.meta.env.DEV) {
+      console.log('✅ Visualization initialized with', nodes.length, 'nodes');
+    }
   }, [nodes, validatedEdges, handleNodeClick]); // Include handleNodeClick to get fresh connection state
 
   // Store simulation reference for resize handling
   const simulationRef = useRef<d3.Simulation<any, any> | null>(null);
 
-  // Initialization effect - NOW with access to nodes data
+  // Initialization effect
   useEffect(() => {
     if (nodes.length > 0) {
-      console.log('useEffect: Initializing visualization with', nodes.length, 'nodes');
       initializeVisualization();
     }
 
@@ -799,15 +947,12 @@ export function InteractiveGraphVisualization() {
         .force('center', d3.forceCenter(newCenterX, newCenterY))
         .alpha(0.3) // Restart simulation with some energy
         .restart();
-      
-      console.log('🔄 Resized visualization to', newWidth, 'x', newHeight);
     };
 
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, [nodes.length, validatedEdges.length]); // Only re-initialize when data changes, not on every render
 
-  // Early returns AFTER all hooks are called
   if (loading || edgesLoading) {
     return (
       <div className="graph-container relative w-full h-full bg-gray-900 flex items-center justify-center">
@@ -934,9 +1079,10 @@ export function InteractiveGraphVisualization() {
     }
   };
 
-  const startConnection = (nodeId: string) => {
-    setConnectionSource(nodeId);
-    setIsConnecting(true);
+
+  const handleViewNodeDetails = (node: WorkItem) => {
+    setSelectedNode(node);
+    setShowNodeDetailsModal(true);
     setNodeMenu(prev => ({ ...prev, visible: false }));
   };
 
@@ -962,86 +1108,154 @@ export function InteractiveGraphVisualization() {
     setSelectedNode(null);
   };
 
-  // Layout and edge systems removed to fix TypeScript unused variable warnings
+  const handleCreateConnectedNode = (node: WorkItem, event: any) => {
+    console.log('Creating connected node from parent:', node);
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (rect) {
+      setCreateNodePosition({
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top,
+        z: 0
+      });
+    }
+    setSelectedNode(node);
+    setShowCreateNodeModal(true);
+    setNodeMenu(prev => ({ ...prev, visible: false }));
+  };
+
+  const handleConnectToExistingNodes = (node: WorkItem) => {
+    console.log('Connect to existing clicked for node:', node);
+    console.log('Setting showConnectModal to true');
+    setSelectedNode(node);
+    setShowConnectModal(true);
+    setNodeMenu(prev => ({ ...prev, visible: false }));
+  };
+
+  const handleCloseCreateNodeModal = () => {
+    setShowCreateNodeModal(false);
+    setSelectedNode(null);
+    setCreateNodePosition(undefined);
+  };
+
+  const handleCloseConnectModal = () => {
+    setShowConnectModal(false);
+    setSelectedNode(null);
+  };
+
+  const handleEditEdge = (edge: WorkItemEdge) => {
+    // For now, just allow changing the relationship type
+    const sourceTitle = edge.source || 'Unknown';
+    const targetTitle = edge.target || 'Unknown';
+    const newType = prompt(`Change relationship type for "${sourceTitle}" → "${targetTitle}". Current: ${edge.type}`, edge.type);
+    if (newType && newType !== edge.type) {
+      updateEdgeMutation({
+        variables: {
+          where: { id: edge.id },
+          update: { type: newType }
+        }
+      });
+    }
+    setEdgeMenu(prev => ({ ...prev, visible: false }));
+  };
+
+  const handleDeleteEdge = (edge: WorkItemEdge) => {
+    const sourceTitle = edge.source || 'Unknown';
+    const targetTitle = edge.target || 'Unknown';
+    if (confirm(`Are you sure you want to delete the ${edge.type.toLowerCase()} relationship between "${sourceTitle}" and "${targetTitle}"?`)) {
+      deleteEdgeMutation({
+        variables: {
+          where: { id: edge.id }
+        }
+      });
+    }
+    setEdgeMenu(prev => ({ ...prev, visible: false }));
+  };
+
 
   return (
     <div ref={containerRef} className="graph-container relative w-full h-full bg-gray-900">
       <svg ref={svgRef} className="w-full h-full" style={{ background: 'radial-gradient(circle at center, #1f2937 0%, #111827 100%)' }} />
       
-      {/* Graph Switcher Trigger */}
-      <div 
-        className="absolute top-4 left-4 z-40"
-        onMouseEnter={() => setShowGraphSwitcher(true)}
-        onMouseLeave={() => setShowGraphSwitcher(false)}
-      >
-        <button 
-          className="bg-gray-800/90 backdrop-blur-sm border border-gray-600 rounded-lg px-3 py-2 shadow-md hover:bg-gray-700 transition-all duration-200"
-        >
-          <div className="flex items-center space-x-2">
-            <div className="w-2 h-2 bg-green-400 rounded-full" />
-            <span className="text-sm font-medium text-green-100">{currentGraph?.name || 'Select Graph'}</span>
-            <div className="w-3 h-3 text-gray-400">
-              <svg viewBox="0 0 12 12" fill="currentColor">
-                <path d="M3 5l3 3 3-3" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+      {/* Graph Control Panel */}
+      <div className="absolute top-4 left-4 z-40">
+        <div className="bg-gray-800/95 backdrop-blur-sm border border-gray-600/60 rounded-lg shadow-xl p-4 w-64">
+          {/* Current Graph Header */}
+          <div className="flex items-center space-x-3 mb-4">
+            <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center flex-shrink-0">
+              {getGraphTypeIcon(currentGraph?.type)}
             </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-semibold text-white truncate">{currentGraph?.name || 'No Graph Selected'}</div>
+              <div className="text-xs text-gray-400">{currentGraph?.type || 'Select a graph to begin'}</div>
+            </div>
+            <div className="w-2 h-2 bg-green-400 rounded-full flex-shrink-0"></div>
           </div>
-        </button>
 
-        {/* Floating Graph Switcher */}
-        {showGraphSwitcher && (
-          <div className="absolute top-full left-0 mt-2 w-80 bg-gray-800/95 backdrop-blur-sm border border-gray-600 rounded-lg shadow-xl z-50 animate-in fade-in slide-in-from-top-2 duration-200">
-            <div className="p-3 border-b border-gray-600">
-              <h3 className="text-sm font-medium text-green-300">Switch Graph</h3>
-              <p className="text-xs text-gray-400 mt-1">Select a different graph to visualize</p>
+          {/* Graph Stats */}
+          <div className="grid grid-cols-3 gap-2 mb-4">
+            <div className="bg-gray-700/50 rounded-md p-2 text-center">
+              <div className="text-white text-lg font-medium">{nodes.length}</div>
+              <div className="text-gray-400 text-xs">Nodes</div>
             </div>
-            <div className="max-h-64 overflow-y-auto">
-              {availableGraphs.map((graph) => (
-                <button
-                  key={graph.id}
-                  onClick={() => {
-                    selectGraph(graph.id);
-                    setShowGraphSwitcher(false);
-                  }}
-                  className={`w-full text-left px-3 py-2 hover:bg-gray-700 border-b border-gray-600 last:border-b-0 transition-colors ${
-                    currentGraph?.id === graph.id ? 'bg-green-900/30 border-green-500/30' : ''
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className={`w-3 h-3 rounded-full ${
-                        graph.type === 'PROJECT' ? 'bg-blue-500' :
-                        graph.type === 'WORKSPACE' ? 'bg-purple-500' :
-                        graph.type === 'SUBGRAPH' ? 'bg-green-500' : 'bg-gray-500'
-                      }`} />
-                      <div>
-                        <div className="font-medium text-gray-200 text-sm">{graph.name}</div>
-                        <div className="text-xs text-gray-400">{graph.type}</div>
-                      </div>
-                    </div>
-                    {currentGraph?.id === graph.id && (
-                      <div className="w-4 h-4 text-green-400">
-                        <svg viewBox="0 0 16 16" fill="currentColor">
-                          <path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/>
-                        </svg>
-                      </div>
-                    )}
-                  </div>
-                  {graph.parentGraphId && (
-                    <div className="ml-6 mt-1 text-xs text-gray-400">
-                      Part of: {availableGraphs.find(g => g.id === graph.parentGraphId)?.name || 'Unknown'}
-                    </div>
-                  )}
-                </button>
-              ))}
+            <div className="bg-gray-700/50 rounded-md p-2 text-center">
+              <div className="text-white text-lg font-medium">{validatedEdges.length}</div>
+              <div className="text-gray-400 text-xs">Edges</div>
             </div>
-            <div className="p-3 border-t border-gray-600">
-              <button className="w-full text-center text-xs text-green-400 hover:text-green-300 transition-colors">
-                + Create New Graph
-              </button>
+            <div className="bg-gray-700/50 rounded-md p-2 text-center">
+              <div className="text-white text-lg font-medium">{currentGraph?.contributorCount || 0}</div>
+              <div className="text-gray-400 text-xs">Users</div>
             </div>
           </div>
-        )}
+
+          {/* Action Buttons */}
+          <div className="space-y-2">
+            {/* Create New Graph Button */}
+            <button 
+              onClick={() => setShowCreateGraphModal(true)}
+              className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2.5 px-3 rounded-md transition-colors duration-200 flex items-center justify-center space-x-2"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              <span className="text-sm">Create Graph</span>
+            </button>
+
+            {/* Switch Graph Button */}
+            <button 
+              onClick={() => setShowGraphSwitcher(true)}
+              className="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-2.5 px-3 rounded-lg transition-colors flex items-center justify-between"
+            >
+              <div className="flex items-center space-x-2">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                </svg>
+                <span className="text-sm">Switch Graph</span>
+              </div>
+              <span className="text-xs bg-white px-2 py-1 rounded-full text-yellow-700 font-bold shadow-md">{availableGraphs.length}</span>
+            </button>
+
+            {/* Update and Delete Graph Buttons */}
+            {currentGraph && (
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                <button 
+                  onClick={() => setShowUpdateGraphModal(true)}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-3 rounded-md transition-colors duration-200 flex items-center justify-center space-x-2"
+                >
+                  <Settings className="w-4 h-4" />
+                  <span className="text-sm">Edit</span>
+                </button>
+                
+                <button 
+                  onClick={() => setShowDeleteGraphModal(true)}
+                  className="bg-red-600 hover:bg-red-700 text-white font-medium py-2.5 px-3 rounded-md transition-colors duration-200 flex items-center justify-center space-x-2"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span className="text-sm">Delete</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Data Health Indicator */}
@@ -1224,7 +1438,7 @@ export function InteractiveGraphVisualization() {
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div>
                 <span className="text-gray-400">Priority:</span>
-                <span className="ml-1 font-medium">{Math.round((nodeMenu.node.priority?.computed || nodeMenu.node.priorityComp) * 100)}%</span>
+                <span className="ml-1 font-medium">{Math.round((nodeMenu.node?.priority?.computed || nodeMenu.node?.priorityComp || 0) * 100)}%</span>
               </div>
             </div>
           </div>
@@ -1232,18 +1446,39 @@ export function InteractiveGraphVisualization() {
           {/* Actions */}
           <div className="py-1">
             <button
-              onClick={() => startConnection(nodeMenu.node!.id)}
+              onClick={(e) => handleCreateConnectedNode(nodeMenu.node!, e)}
               className="w-full flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
             >
-              <Link2 className="h-4 w-4 mr-3" />
-              Add Connected Item
+              <Plus className="h-4 w-4 mr-3 flex-shrink-0" />
+              <div className="text-left">
+                <div className="font-medium">Create New & Connect</div>
+                <div className="text-xs text-gray-400 mt-0.5">Add a new node linked to this one</div>
+              </div>
+            </button>
+            <button
+              onClick={() => handleConnectToExistingNodes(nodeMenu.node!)}
+              className="w-full flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
+            >
+              <Link2 className="h-4 w-4 mr-3 flex-shrink-0" />
+              <div className="text-left">
+                <div className="font-medium">Connect to Existing Nodes</div>
+                <div className="text-xs text-gray-400 mt-0.5">Link this to other nodes in graph</div>
+              </div>
+            </button>
+            <div className="border-t border-gray-600 my-1"></div>
+            <button 
+              onClick={() => handleViewNodeDetails(nodeMenu.node!)}
+              className="w-full flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
+            >
+              <FileText className="h-4 w-4 mr-3" />
+              View Details
             </button>
             <button 
               onClick={() => handleEditNode(nodeMenu.node!)}
               className="w-full flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
             >
               <Edit3 className="h-4 w-4 mr-3" />
-              Edit Details
+              Edit Node Details
             </button>
             <button 
               onClick={() => handleDeleteNode(nodeMenu.node!)}
@@ -1286,11 +1521,17 @@ export function InteractiveGraphVisualization() {
             </div>
           </div>
           <div className="py-1">
-            <button className="w-full flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700">
+            <button 
+              onClick={() => handleEditEdge(edgeMenu.edge!)}
+              className="w-full flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
+            >
               <Edit3 className="h-4 w-4 mr-3" />
               Edit Relationship
             </button>
-            <button className="w-full flex items-center px-4 py-2 text-sm text-red-400 hover:bg-red-900/50">
+            <button 
+              onClick={() => handleDeleteEdge(edgeMenu.edge!)}
+              className="w-full flex items-center px-4 py-2 text-sm text-red-400 hover:bg-red-900/50"
+            >
               <Trash2 className="h-4 w-4 mr-3" />
               Delete Relationship
             </button>
@@ -1299,31 +1540,69 @@ export function InteractiveGraphVisualization() {
       )}
 
       {/* Legend */}
-      <div className="absolute bottom-4 left-4 bg-gray-800/90 border border-gray-600 rounded-lg shadow-lg p-3 max-w-xs backdrop-blur-sm">
-        <div className="text-sm font-medium text-green-400 mb-2">Node Types</div>
-        <div className="space-y-1 text-xs text-gray-300">
+      <div className="absolute bottom-4 left-4 bg-gray-800/95 backdrop-blur-sm border border-gray-600/60 rounded-lg shadow-xl p-4 w-64">
+        <div className="text-sm font-semibold text-white mb-3 text-center">Node Types</div>
+        <div className="grid grid-cols-2 gap-2 text-sm text-gray-300">
           <div className="flex items-center space-x-2">
-            <Layers className="w-3 h-3 text-purple-500" />
+            <Layers className="w-4 h-4 text-purple-400" />
             <span>Epic</span>
-            <Sparkles className="w-3 h-3 text-blue-500 ml-auto" />
-            <span>Feature</span>
           </div>
           <div className="flex items-center space-x-2">
-            <ListTodo className="w-3 h-3 text-green-500" />
+            <ListTodo className="w-4 h-4 text-green-400" />
             <span>Task</span>
-            <AlertTriangle className="w-3 h-3 text-red-500 ml-auto" />
+          </div>
+          <div className="flex items-center space-x-2">
+            <Trophy className="w-4 h-4 text-orange-400" />
+            <span>Milestone</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <AlertTriangle className="w-4 h-4 text-red-400" />
             <span>Bug</span>
           </div>
           <div className="flex items-center space-x-2">
-            <Trophy className="w-3 h-3 text-yellow-500" />
-            <span>Milestone</span>
+            <Target className="w-4 h-4 text-indigo-400" />
+            <span>Outcome</span>
           </div>
-          <div className="border-t border-gray-200 pt-2 mt-2">
-            <div className="text-xs text-gray-500 mb-1">Click node for menu • Drag to move</div>
-            <div className="text-xs text-gray-500">Scroll to zoom • Click edge for options</div>
+          <div className="flex items-center space-x-2">
+            <Lightbulb className="w-4 h-4 text-yellow-400" />
+            <span>Idea</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Sparkles className="w-4 h-4 text-blue-400" />
+            <span>Feature</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Microscope className="w-4 h-4 text-teal-400" />
+            <span>Research</span>
+          </div>
+        </div>
+        <hr className="border-gray-600 mt-3" />
+        <div className="pt-3">
+          <div className="text-sm text-gray-500 opacity-75 w-full leading-relaxed text-left">
+            • Select nodes to access menu<br/>
+            • Drag to reposition<br/>
+            • Scroll for zoom<br/>
+            • Select edges for options
           </div>
         </div>
       </div>
+
+      {/* Node Details Modal */}
+      {showNodeDetailsModal && selectedNode && (
+        <NodeDetailsModal
+          isOpen={showNodeDetailsModal}
+          onClose={() => {
+            setShowNodeDetailsModal(false);
+            setSelectedNode(null);
+          }}
+          node={selectedNode}
+          onEdit={(node) => {
+            setShowNodeDetailsModal(false);
+            setSelectedNode(node);
+            setShowEditModal(true);
+          }}
+        />
+      )}
 
       {/* Edit Node Modal */}
       {showEditModal && selectedNode && (
@@ -1342,6 +1621,61 @@ export function InteractiveGraphVisualization() {
           nodeId={selectedNode.id}
           nodeTitle={selectedNode.title}
           nodeType={selectedNode.type}
+        />
+      )}
+
+      {/* Create Graph Modal */}
+      {showCreateGraphModal && (
+        <CreateGraphModal
+          isOpen={showCreateGraphModal}
+          onClose={() => setShowCreateGraphModal(false)}
+        />
+      )}
+
+      {/* Graph Selection Modal */}
+      {showGraphSwitcher && (
+        <GraphSelectionModal
+          isOpen={showGraphSwitcher}
+          onClose={() => setShowGraphSwitcher(false)}
+        />
+      )}
+
+      {/* Update Graph Modal */}
+      {showUpdateGraphModal && (
+        <UpdateGraphModal
+          isOpen={showUpdateGraphModal}
+          onClose={() => setShowUpdateGraphModal(false)}
+        />
+      )}
+
+      {/* Delete Graph Modal */}
+      {showDeleteGraphModal && (
+        <DeleteGraphModal
+          isOpen={showDeleteGraphModal}
+          onClose={() => setShowDeleteGraphModal(false)}
+        />
+      )}
+
+      {/* Create Node Modal */}
+      {showCreateNodeModal && selectedNode && (
+        <CreateNodeModal
+          isOpen={showCreateNodeModal}
+          onClose={handleCloseCreateNodeModal}
+          parentNodeId={selectedNode.id}
+          position={createNodePosition}
+        />
+      )}
+
+      {/* Connect Node Modal */}
+      {showConnectModal && selectedNode && (
+        <ConnectNodeModal
+          isOpen={showConnectModal}
+          onClose={handleCloseConnectModal}
+          sourceNode={{
+            id: selectedNode.id,
+            title: selectedNode.title,
+            type: selectedNode.type
+          }}
         />
       )}
     </div>
