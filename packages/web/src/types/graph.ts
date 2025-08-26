@@ -76,6 +76,10 @@ export interface CreateGraphInput {
   teamId: string;
   templateId?: string;
   copyFromGraphId?: string;
+  tags?: string[];
+  defaultRole?: string;
+  isShared?: boolean;
+  status?: 'ACTIVE' | 'ARCHIVED' | 'DRAFT';
 }
 
 export interface GraphContextType {
