@@ -69,8 +69,8 @@ interface EdgeMenuState {
 export function InteractiveGraphVisualization() {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const { currentGraph, availableGraphs, selectGraph } = useGraph();
-  const { currentTeam } = useAuth();
+  const { currentGraph, availableGraphs } = useGraph();
+  const { } = useAuth();
   
   const { data: workItemsData, loading, error, refetch } = useQuery(GET_WORK_ITEMS, {
     variables: currentGraph ? {
@@ -840,8 +840,6 @@ export function InteractiveGraphVisualization() {
       const lineHeight = fontSize * 1.2;
       
       // Calculate vertical offset to center multi-line text
-      const totalHeight = lines.length * lineHeight;
-      const startY = -(totalHeight / 2) + (lineHeight / 2);
       
       // Determine text color based on node background color for contrast
       const getTextColor = (nodeType: string) => {
@@ -856,9 +854,6 @@ export function InteractiveGraphVisualization() {
           default: return '#000000'; // Gray background - black text
         }
       };
-
-      const textColor = getTextColor(d.type);
-      const shadowColor = textColor === '#ffffff' ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.8)';
 
       // Old text removed - using new Monopoly-style text instead
     });
@@ -1118,11 +1113,6 @@ export function InteractiveGraphVisualization() {
     }
   };
 
-  const startConnection = (nodeId: string) => {
-    setConnectionSource(nodeId);
-    setIsConnecting(true);
-    setNodeMenu(prev => ({ ...prev, visible: false }));
-  };
 
   const handleViewNodeDetails = (node: WorkItem) => {
     setSelectedNode(node);
@@ -1188,8 +1178,8 @@ export function InteractiveGraphVisualization() {
 
   const handleEditEdge = (edge: WorkItemEdge) => {
     // For now, just allow changing the relationship type
-    const sourceTitle = typeof edge.source === 'string' ? edge.source : edge.source?.title || 'Unknown';
-    const targetTitle = typeof edge.target === 'string' ? edge.target : edge.target?.title || 'Unknown';
+    const sourceTitle = edge.source || 'Unknown';
+    const targetTitle = edge.target || 'Unknown';
     const newType = prompt(`Change relationship type for "${sourceTitle}" → "${targetTitle}". Current: ${edge.type}`, edge.type);
     if (newType && newType !== edge.type) {
       updateEdgeMutation({
@@ -1203,8 +1193,8 @@ export function InteractiveGraphVisualization() {
   };
 
   const handleDeleteEdge = (edge: WorkItemEdge) => {
-    const sourceTitle = typeof edge.source === 'string' ? edge.source : edge.source?.title || 'Unknown';
-    const targetTitle = typeof edge.target === 'string' ? edge.target : edge.target?.title || 'Unknown';
+    const sourceTitle = edge.source || 'Unknown';
+    const targetTitle = edge.target || 'Unknown';
     if (confirm(`Are you sure you want to delete the ${edge.type.toLowerCase()} relationship between "${sourceTitle}" and "${targetTitle}"?`)) {
       deleteEdgeMutation({
         variables: {
