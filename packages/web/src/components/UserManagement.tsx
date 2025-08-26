@@ -36,11 +36,10 @@ const UPDATE_USER_ROLE = gql`
 `;
 
 const ROLE_HIERARCHY = [
-  { value: 'NODE_WATCHER', label: 'Node Watcher', icon: Eye, color: 'text-gray-400', description: 'Read-only access' },
-  { value: 'CONNECTOR', label: 'Connector', icon: Users, color: 'text-blue-400', description: 'Can work on tasks' },
-  { value: 'ORIGIN_NODE', label: 'Origin Node', icon: UserCheck, color: 'text-green-400', description: 'Task creators' },
-  { value: 'PATH_KEEPER', label: 'Path Keeper', icon: Settings, color: 'text-purple-400', description: 'Project maintainers' },
-  { value: 'GRAPH_MASTER', label: 'Graph Master', icon: Crown, color: 'text-yellow-400', description: 'System administrators' }
+  { value: 'GUEST', label: 'Guest', icon: Eye, color: 'text-purple-400', description: 'Anonymous demo access (read-only)' },
+  { value: 'VIEWER', label: 'Viewer', icon: Eye, color: 'text-gray-400', description: 'Read-only access to graphs and nodes' },
+  { value: 'USER', label: 'User', icon: Users, color: 'text-blue-400', description: 'Can create and work on tasks' },
+  { value: 'ADMIN', label: 'Admin', icon: Crown, color: 'text-yellow-400', description: 'Full system administration access' }
 ];
 
 export function UserManagement() {
@@ -56,15 +55,15 @@ export function UserManagement() {
   });
 
   // Check if user can manage roles
-  const canManageRoles = currentUser && ['PATH_KEEPER', 'GRAPH_MASTER'].includes(currentUser.role);
-  const canPromoteToMaster = currentUser?.role === 'GRAPH_MASTER';
+  const canManageRoles = currentUser && ['ADMIN'].includes(currentUser.role);
+  const canPromoteToAdmin = currentUser?.role === 'ADMIN';
 
   if (!canManageRoles) {
     return (
       <div className="p-8 text-center">
         <Crown className="h-16 w-16 text-gray-600 mx-auto mb-4" />
         <h2 className="text-xl font-semibold text-gray-300 mb-2">Access Restricted</h2>
-        <p className="text-gray-400">You need PATH_KEEPER or GRAPH_MASTER role to manage users.</p>
+        <p className="text-gray-400">You need ADMIN role to manage users.</p>
       </div>
     );
   }
@@ -191,7 +190,7 @@ export function UserManagement() {
                             <option 
                               key={role.value} 
                               value={role.value}
-                              disabled={role.value === 'GRAPH_MASTER' && !canPromoteToMaster}
+                              disabled={role.value === 'ADMIN' && !canPromoteToAdmin}
                             >
                               {role.label}
                             </option>

@@ -193,7 +193,7 @@ export function GraphSelector() {
                       </div>
                       <div className="flex items-center gap-2 text-xs text-gray-400">
                         <span>{graph.id === currentGraph.id ? actualNodeCount : (graph.nodeCount || 0)} node{(graph.id === currentGraph.id ? actualNodeCount : (graph.nodeCount || 0)) !== 1 ? 's' : ''}, {graph.id === currentGraph.id ? actualEdgeCount : (graph.edgeCount || 0)} connection{(graph.id === currentGraph.id ? actualEdgeCount : (graph.edgeCount || 0)) !== 1 ? 's' : ''}</span>
-                        <Eye className="h-3 w-3 opacity-50" title={`${graph.type}${graph.isShared ? ' • Shared' : ''}`} />
+                        <Eye className="h-3 w-3 opacity-50" />
                       </div>
                     </div>
                     {graph.id === currentGraph.id && (

@@ -1,45 +1,6 @@
 import React from 'react';
 import { X, Calendar, Clock, User, Flag, Edit3 } from 'lucide-react';
-
-interface WorkItem {
-  id: string;
-  title: string;
-  description?: string;
-  type: string;
-  status: string;
-  priorityExec?: number;
-  priorityIndiv?: number;
-  priorityComm?: number;
-  priorityComp?: number;
-  dueDate?: string;
-  tags?: string[];
-  assignedTo?: {
-    id: string;
-    name: string;
-    username: string;
-  } | string;
-  owner?: {
-    id: string;
-    name: string;
-    username: string;
-  };
-  createdAt?: string;
-  updatedAt?: string;
-  // Additional fields that may exist in InteractiveGraphVisualization's WorkItem
-  positionX?: number;
-  positionY?: number;
-  positionZ?: number;
-  teamId?: string;
-  userId?: string;
-  dependencies?: WorkItem[];
-  dependents?: WorkItem[];
-  priority?: {
-    executive: number;
-    individual: number;
-    community: number;
-    computed: number;
-  };
-}
+import { WorkItem } from '../types/graph';
 
 interface NodeDetailsModalProps {
   isOpen: boolean;

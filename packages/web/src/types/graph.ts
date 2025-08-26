@@ -64,8 +64,70 @@ export interface GraphHierarchy {
   type: Graph['type'];
   children: GraphHierarchy[];
   nodeCount: number;
+  edgeCount: number;
   isShared: boolean;
   permissions: 'OWNER' | 'ADMIN' | 'EDIT' | 'VIEW';
+}
+
+export interface WorkItem {
+  id: string;
+  title: string;
+  description?: string;
+  type: string;
+  status: string;
+  priorityExec?: number;
+  priorityIndiv?: number;
+  priorityComm?: number;
+  priorityComp?: number;
+  dueDate?: string;
+  tags?: string[];
+  assignedTo?: {
+    id: string;
+    name: string;
+    username: string;
+  } | string;
+  owner?: {
+    id: string;
+    name: string;
+    username: string;
+  };
+  createdAt?: string;
+  updatedAt?: string;
+  // Additional fields that may exist in InteractiveGraphVisualization's WorkItem
+  positionX?: number;
+  positionY?: number;
+  positionZ?: number;
+  teamId?: string;
+  userId?: string;
+  dependencies?: WorkItem[];
+  dependents?: WorkItem[];
+  priority?: {
+    executive: number;
+    individual: number;
+    community: number;
+    computed: number;
+  };
+}
+
+export type RelationshipType = 
+  | 'DEPENDS_ON'      // This node depends on another to be completed
+  | 'BLOCKS'          // This node blocks another from starting
+  | 'ENABLES'         // This node enables another (similar to depends but softer)
+  | 'RELATES_TO'      // General relationship
+  | 'PART_OF'         // This node is a part/component of another
+  | 'FOLLOWS'         // This node should be done after another (sequence)
+  | 'PARALLEL_WITH'   // This node can be done in parallel with another
+  | 'DUPLICATES'      // This node duplicates effort of another
+  | 'CONFLICTS_WITH'  // This node conflicts with another
+  | 'VALIDATES'       // This node validates/tests another
+
+export interface WorkItemEdge {
+  id: string;
+  source: string;
+  target: string;
+  type: RelationshipType;
+  strength?: number;
+  description?: string;
 }
 
 export interface CreateGraphInput {
