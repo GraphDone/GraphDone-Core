@@ -20,7 +20,7 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
     parentGraphId,
     teamId: currentTeam?.id || 'default-team',
     tags: [],
-    defaultRole: 'NodeWatcher',
+    defaultRole: 'VIEWER',
     isShared: false,
     status: 'DRAFT'
   });
@@ -141,7 +141,7 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
       parentGraphId,
       teamId: currentTeam?.id || 'default-team',
       tags: [],
-      defaultRole: 'NodeWatcher',
+      defaultRole: 'VIEWER',
       isShared: false,
       status: 'DRAFT'
     });
@@ -569,15 +569,14 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
                     Default Role for Team Members
                   </label>
                   <select
-                    value={formData.defaultRole || 'NodeWatcher'}
+                    value={formData.defaultRole || 'VIEWER'}
                     onChange={(e) => setFormData(prev => ({ ...prev, defaultRole: e.target.value }))}
                     className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
                   >
-                    <option value="NodeWatcher">NodeWatcher - View only access</option>
-                    <option value="Connector">Connector - Can create connections between nodes</option>
-                    <option value="OriginNode">OriginNode - Can create and edit nodes</option>
-                    <option value="PathKeeper">PathKeeper - Can manage workflows and paths</option>
-                    <option value="GraphMaster">GraphMaster - Full administrative access</option>
+                    <option value="GUEST">Guest - Anonymous demo access (read-only)</option>
+                    <option value="VIEWER">Viewer - Can view graphs and nodes (read-only)</option>
+                    <option value="USER">User - Can create and work on tasks</option>
+                    <option value="ADMIN">Admin - Full system administration access</option>
                   </select>
                   <p className="text-xs text-gray-500 mt-1">Default permission level for new team members joining this graph</p>
                 </div>
@@ -649,7 +648,7 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
                       )}
                       <div className="flex justify-between">
                         <span className="text-gray-400">Default Role:</span>
-                        <span className="font-medium text-purple-300">{formData.defaultRole || 'NodeWatcher'}</span>
+                        <span className="font-medium text-purple-300">{formData.defaultRole || 'VIEWER'}</span>
                       </div>
                     </div>
                     <div className="space-y-3">

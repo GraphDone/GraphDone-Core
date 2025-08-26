@@ -156,8 +156,8 @@ export function GraphProvider({ children }: GraphProviderProps) {
           admins: [input.createdBy || currentUser?.id || ''].filter(Boolean),
           editors: [],
           viewers: [],
-          teamPermission: input.defaultRole === 'GraphMaster' ? 'ADMIN' : 
-                         input.defaultRole === 'OriginNode' || input.defaultRole === 'PathKeeper' ? 'EDIT' : 
+          teamPermission: input.defaultRole === 'ADMIN' ? 'ADMIN' : 
+                         input.defaultRole === 'USER' ? 'EDIT' : 
                          'VIEW'
         }),
         shareSettings: JSON.stringify({
