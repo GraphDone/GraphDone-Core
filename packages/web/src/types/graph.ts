@@ -9,6 +9,8 @@ export interface Graph {
   createdBy: string;
   createdAt: string;
   updatedAt: string;
+  tags?: string[];
+  defaultRole?: string;
   
   // Hierarchy
   children?: Graph[];
@@ -136,6 +138,7 @@ export interface CreateGraphInput {
   type: Graph['type'];
   parentGraphId?: string;
   teamId: string;
+  createdBy: string;
   templateId?: string;
   copyFromGraphId?: string;
   tags?: string[];

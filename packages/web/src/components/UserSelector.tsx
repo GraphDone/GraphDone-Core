@@ -46,7 +46,7 @@ export function UserSelector() {
     }
   };
 
-  const currentTeamUsers = availableUsers.filter(user => user.teamId === currentTeam?.id);
+  const currentTeamUsers = availableUsers.filter(user => user.team?.id === currentTeam?.id);
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -137,15 +137,15 @@ export function UserSelector() {
                 ))}
                 
                 {/* Other team users */}
-                {availableUsers.filter(user => user.teamId !== currentTeam?.id).length > 0 && (
+                {availableUsers.filter(user => user.team?.id !== currentTeam?.id).length > 0 && (
                   <>
                     <div className="text-xs font-medium text-gray-500 px-2 py-1 mt-3 uppercase tracking-wide border-t pt-3">
                       Other Teams
                     </div>
                     {availableUsers
-                      .filter(user => user.teamId !== currentTeam?.id)
+                      .filter(user => user.team?.id !== currentTeam?.id)
                       .map((user) => {
-                        const userTeam = availableTeams.find(t => t.id === user.teamId);
+                        const userTeam = availableTeams.find(t => t.id === user.team?.id);
                         return (
                           <button
                             key={user.id}
