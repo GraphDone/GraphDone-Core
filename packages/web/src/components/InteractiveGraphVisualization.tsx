@@ -15,6 +15,7 @@ import { GraphSelectionModal } from './GraphSelectionModal';
 import { UpdateGraphModal } from './UpdateGraphModal';
 import { DeleteGraphModal } from './DeleteGraphModal';
 import { ConnectNodeModal } from './ConnectNodeModal';
+import { NodeDetailsModal } from './NodeDetailsModal';
 
 interface WorkItem {
   id: string;
@@ -144,6 +145,7 @@ export function InteractiveGraphVisualization() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showCreateNodeModal, setShowCreateNodeModal] = useState(false);
+  const [showNodeDetailsModal, setShowNodeDetailsModal] = useState(false);
   const [showConnectModal, setShowConnectModal] = useState(false);
   const [showCreateGraphModal, setShowCreateGraphModal] = useState(false);
   const [showGraphSwitcher, setShowGraphSwitcher] = useState(false);
@@ -197,6 +199,7 @@ export function InteractiveGraphVisualization() {
         return <Plus className="h-4 w-4 text-white" />;
     }
   };
+
 
   // Close menus when clicking outside
   useEffect(() => {
@@ -454,52 +457,52 @@ export function InteractiveGraphVisualization() {
     simulation
       .force('link', d3.forceLink(validatedEdges)
         .id((d: any) => d.id)
-        .distance(120)
-        .strength(0.3)
+        .distance(180) // Increased minimum edge distance
+        .strength(0.15) // Reduced strength for less aggressive pulling
       )
       .force('charge', d3.forceManyBody()
         .strength((d: any) => {
-          // Hierarchical repulsion forces
+          // Reduced repulsion forces for more stable positioning
           switch (d.type) {
             case 'EPIC':
-              return -300; // Epics strongly repel each other
+              return -150; // Reduced from -300
             case 'OUTCOME': 
-              return -200; // Outcomes need space too
+              return -120; // Reduced from -200
             case 'MILESTONE':
-              return -80; // Milestones have moderate repulsion
+              return -60; // Reduced from -80
             case 'FEATURE':
-              return -100; // Features need some space
+              return -70; // Reduced from -100
             case 'TASK':
-              return -50; // Tasks can be closer together
+              return -40; // Reduced from -50
             case 'BUG':
-              return -50; // Bugs can cluster with tasks
+              return -40; // Reduced from -50
             case 'IDEA':
-              return -30; // Ideas cluster easily
+              return -25; // Reduced from -30
             default:
-              return -80; // Default moderate repulsion
+              return -50; // Reduced from -80
           }
         })
-        .distanceMax(350) // Increased for epic spacing
+        .distanceMax(400) // Increased max distance for gentler forces
       )
-      .force('center', d3.forceCenter(centerX, centerY))
+      .force('center', d3.forceCenter(centerX, centerY).strength(0.05)) // Much weaker centering force
       .force('collision', d3.forceCollide()
         .radius((d: any) => {
-          const baseRadius = d.type === 'EPIC' ? 60 : 
-                            d.type === 'MILESTONE' ? 52 : 
-                            d.type === 'FEATURE' ? 48 : 42;
+          const baseRadius = d.type === 'EPIC' ? 80 : // Increased collision radius
+                            d.type === 'MILESTONE' ? 70 : 
+                            d.type === 'FEATURE' ? 65 : 60;
           return baseRadius;
         })
-        .strength(0.7)
+        .strength(0.5) // Reduced collision strength
       )
       // Add hierarchical attraction forces (Epic->Milestone, Feature->Task, etc.)
       .force('hierarchy', d3.forceLink()
         .id((d: any) => d.id)
         .links(createHierarchicalLinks(nodes))
-        .distance((d: any) => d.distance || 100)
-        .strength((d: any) => d.strength || 0.2)
+        .distance((d: any) => d.distance || 140) // Increased hierarchical distance
+        .strength((d: any) => d.strength || 0.1) // Reduced hierarchical strength
       )
-      .alphaTarget(0.1)
-      .alphaDecay(0.01);
+      .alphaTarget(0.05) // Lower alpha target for calmer simulation
+      .alphaDecay(0.02); // Faster decay to settle sooner
 
     // Create edges FIRST (so they render under nodes)
     const linkElements = g.append('g')
@@ -555,7 +558,7 @@ export function InteractiveGraphVisualization() {
       .style('cursor', 'pointer')
       .call(d3.drag<any, any>()
         .on('start', (event, d: any) => {
-          if (!event.active) simulation.alphaTarget(0.3).restart();
+          if (!event.active) simulation.alphaTarget(0.1).restart(); // Gentler restart
           d.fx = d.x;
           d.fy = d.y;
           
@@ -616,9 +619,12 @@ export function InteractiveGraphVisualization() {
           d.y = d.fy;
         })
         .on('end', (event, d: any) => {
-          if (!event.active) simulation.alphaTarget(0.05);
-          d.fx = null;
-          d.fy = null;
+          if (!event.active) simulation.alphaTarget(0.02); // Lower target for stability
+          // Don't immediately clear fixed positions - let them drift gently
+          setTimeout(() => {
+            d.fx = null;
+            d.fy = null;
+          }, 1000); // 1 second delay before releasing position
           
           // Remove expanding ring effect
           const nodeGroup = d3.select(event.currentTarget);
@@ -626,66 +632,154 @@ export function InteractiveGraphVisualization() {
           nodeGroup.selectAll('.expanding-ring').remove();
         }));
 
-    // Node circles - increased minimum sizes
-    nodeElements.append('circle')
-      .attr('class', 'node-circle')
-      .attr('r', (d: WorkItem) => {
-        switch (d.type) {
-          case 'EPIC': return 45;
-          case 'MILESTONE': return 40;
-          case 'FEATURE': return 35;
-          case 'TASK': return 30;
-          case 'BUG': return 28;
-          case 'OUTCOME': return 42;
-          case 'IDEA': return 25;
-          default: return 30;
-        }
-      })
+    // Monopoly-style rectangular nodes with colored title bars
+    const getNodeDimensions = (d: WorkItem) => {
+      switch (d.type) {
+        case 'EPIC': return { width: 140, height: 100 };
+        case 'MILESTONE': return { width: 130, height: 90 };
+        case 'FEATURE': return { width: 120, height: 85 };
+        case 'OUTCOME': return { width: 125, height: 95 };
+        case 'TASK': return { width: 110, height: 80 };
+        case 'BUG': return { width: 105, height: 75 };
+        case 'IDEA': return { width: 100, height: 70 };
+        default: return { width: 110, height: 80 };
+      }
+    };
+    
+    // Main node rectangle (dark theme background)
+    nodeElements.append('rect')
+      .attr('class', 'node-bg')
+      .attr('x', (d: WorkItem) => -getNodeDimensions(d).width / 2)
+      .attr('y', (d: WorkItem) => -getNodeDimensions(d).height / 2)
+      .attr('width', (d: WorkItem) => getNodeDimensions(d).width)
+      .attr('height', (d: WorkItem) => getNodeDimensions(d).height)
+      .attr('rx', 8)
       .attr('fill', (d: WorkItem) => {
-        // Desaturate completed nodes to gray
+        // Dim completed nodes
         if (d.status === 'COMPLETED' || d.status === 'Completed' || d.status === 'Done' || d.status === 'DONE') {
           return '#374151'; // Dark gray for completed nodes
         }
-        
-        // Lighter, more vibrant colors
-        const colors: Record<string, string> = {
-          EPIC: '#c084fc',      // purple-400
-          MILESTONE: '#fb923c', // orange-400
-          OUTCOME: '#818cf8',   // indigo-400
-          FEATURE: '#38bdf8',   // sky-400
-          TASK: '#4ade80',      // green-400
-          BUG: '#f87171',       // red-400
-          IDEA: '#fbbf24',      // yellow-400
-          RESEARCH: '#2dd4bf'   // teal-400
-        };
-        return colors[d.type] || '#6b7280';
+        return '#1f2937'; // Dark background consistent with theme
       })
       .attr('stroke', (d: WorkItem) => {
-        // Use colored ring for completed nodes to show original type
         if (d.status === 'COMPLETED' || d.status === 'Completed' || d.status === 'Done' || d.status === 'DONE') {
-          // Lighter, more vibrant colors
-          const colors: Record<string, string> = {
-            EPIC: '#c084fc',      // purple-400
-            MILESTONE: '#fb923c', // orange-400
-            OUTCOME: '#818cf8',   // indigo-400
-            FEATURE: '#38bdf8',   // sky-400
-            TASK: '#4ade80',      // green-400
-            BUG: '#f87171',       // red-400
-            IDEA: '#fbbf24',      // yellow-400
-            RESEARCH: '#2dd4bf'   // teal-400
-          };
-          return colors[d.type] || '#6b7280';
+          return '#4b5563';
         }
-        return '#ffffff'; // White stroke for active nodes
+        return '#4b5563'; // Gray border
       })
-      .attr('stroke-width', (d: WorkItem) => {
-        // Thicker stroke for completed nodes to make the type ring visible
+      .attr('stroke-width', 1.5);
+
+    // Colored title bar at top (like Monopoly property cards)
+    const titleBarHeight = 28;
+    nodeElements.append('rect')
+      .attr('class', 'node-title-bar')
+      .attr('x', (d: WorkItem) => -getNodeDimensions(d).width / 2 + 2)
+      .attr('y', (d: WorkItem) => -getNodeDimensions(d).height / 2 + 2)
+      .attr('width', (d: WorkItem) => getNodeDimensions(d).width - 4)
+      .attr('height', titleBarHeight)
+      .attr('rx', 6)
+      .attr('fill', (d: WorkItem) => {
+        // Dim completed nodes title bars
         if (d.status === 'COMPLETED' || d.status === 'Completed' || d.status === 'Done' || d.status === 'DONE') {
-          return 4;
+          return '#9ca3af'; // Gray for completed nodes
         }
-        return 2;
+        
+        const colors: Record<string, string> = {
+          EPIC: '#8B5CF6',      // purple-500
+          MILESTONE: '#F59E0B', // amber-500
+          OUTCOME: '#6366F1',   // indigo-500
+          FEATURE: '#10B981',   // emerald-500
+          TASK: '#3B82F6',      // blue-500
+          BUG: '#EF4444',       // red-500
+          IDEA: '#EAB308',      // yellow-500
+          RESEARCH: '#14B8A6'   // teal-500
+        };
+        return colors[d.type] || '#6B7280';
       })
-      .attr('opacity', 1); // Keep all nodes fully opaque
+      .attr('stroke', (d: WorkItem) => {
+        if (d.status === 'COMPLETED' || d.status === 'Completed' || d.status === 'Done' || d.status === 'DONE') {
+          return '#6b7280';
+        }
+        
+        const borderColors: Record<string, string> = {
+          EPIC: '#7C3AED',      // purple-600
+          MILESTONE: '#D97706', // amber-600
+          OUTCOME: '#4F46E5',   // indigo-600
+          FEATURE: '#059669',   // emerald-600
+          TASK: '#2563EB',      // blue-600
+          BUG: '#DC2626',       // red-600
+          IDEA: '#CA8A04',      // yellow-600
+          RESEARCH: '#0D9488'   // teal-600
+        };
+        return borderColors[d.type] || '#4B5563';
+      })
+      .attr('stroke-width', 1.5);
+
+    // Node type text in colored title bar (centered, bold and white)
+    nodeElements.append('text')
+      .attr('class', 'node-type-text')
+      .attr('x', 0)
+      .attr('y', (d: WorkItem) => -getNodeDimensions(d).height / 2 + titleBarHeight / 2 + 2)
+      .attr('text-anchor', 'middle')
+      .attr('dominant-baseline', 'middle')
+      .text((d: WorkItem) => d.type)
+      .style('font-size', '11px')
+      .style('font-weight', '700')
+      .style('fill', '#ffffff')
+      .style('pointer-events', 'none');
+
+    // Node title section - larger and cleaner
+    nodeElements.append('text')
+      .attr('class', 'node-title-text')
+      .attr('x', 0)
+      .attr('y', (d: WorkItem) => -getNodeDimensions(d).height / 2 + titleBarHeight + 22)
+      .attr('text-anchor', 'middle')
+      .attr('dominant-baseline', 'middle')
+      .text((d: WorkItem) => {
+        const maxLength = Math.floor(getNodeDimensions(d).width / 7);
+        return d.title.length > maxLength ? d.title.substring(0, maxLength - 3) + '...' : d.title;
+      })
+      .style('font-size', '14px')
+      .style('font-weight', '600')
+      .style('fill', (d: WorkItem) => {
+        const isCompleted = d.status === 'COMPLETED' || d.status === 'Completed' || d.status === 'Done' || d.status === 'DONE';
+        return isCompleted ? '#9ca3af' : '#ffffff';
+      })
+      .style('pointer-events', 'none');
+
+    // Description section - bigger and more readable
+    nodeElements.append('text')
+      .attr('class', 'node-description-text')
+      .attr('x', 0)
+      .attr('y', (d: WorkItem) => -getNodeDimensions(d).height / 2 + titleBarHeight + 42)
+      .attr('text-anchor', 'middle')
+      .attr('dominant-baseline', 'middle')
+      .text((d: WorkItem) => {
+        if (!d.description) return '';
+        const maxLength = Math.floor(getNodeDimensions(d).width / 6.5);
+        return d.description.length > maxLength ? d.description.substring(0, maxLength - 3) + '...' : d.description;
+      })
+      .style('font-size', '11px')
+      .style('font-weight', '400')
+      .style('fill', (d: WorkItem) => {
+        const isCompleted = d.status === 'COMPLETED' || d.status === 'Completed' || d.status === 'Done' || d.status === 'DONE';
+        return isCompleted ? '#6b7280' : '#d1d5db';
+      })
+      .style('pointer-events', 'none');
+
+    // Priority indicator (small dot in bottom right)
+    nodeElements.append('circle')
+      .attr('class', 'priority-indicator-dot')
+      .attr('r', 4)
+      .attr('cx', (d: WorkItem) => getNodeDimensions(d).width / 2 - 8)
+      .attr('cy', (d: WorkItem) => getNodeDimensions(d).height / 2 - 8)
+      .attr('fill', (d: WorkItem) => {
+        if (d.priorityComp > 0.7) return '#dc2626'; // High priority - red
+        if (d.priorityComp > 0.4) return '#d97706'; // Medium priority - orange
+        return '#059669'; // Low priority - green
+      })
+      .attr('stroke', '#ffffff')
+      .attr('stroke-width', 1);
 
     // Add completion indicators (checkmarks) for completed nodes
     nodeElements.each(function(d: WorkItem) {
@@ -766,21 +860,7 @@ export function InteractiveGraphVisualization() {
       const textColor = getTextColor(d.type);
       const shadowColor = textColor === '#ffffff' ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.8)';
 
-      // Add text elements for each line
-      lines.forEach((line, index) => {
-        nodeGroup.append('text')
-          .attr('class', 'node-label')
-          .attr('text-anchor', 'middle')
-          .attr('dominant-baseline', 'middle')
-          .attr('y', startY + (index * lineHeight))
-          .style('font-size', `${fontSize}px`)
-          .style('font-weight', '700')
-          .style('fill', textColor)
-          .style('text-shadow', `1px 1px 2px ${shadowColor}`)
-          .style('pointer-events', 'none')
-          .style('user-select', 'none')
-          .text(line);
-      });
+      // Old text removed - using new Monopoly-style text instead
     });
 
     // Create arrow symbols for middle of edges
@@ -869,6 +949,9 @@ export function InteractiveGraphVisualization() {
     zoom.on('zoom', (event) => {
       g.attr('transform', event.transform);
     });
+
+    // Properly restart simulation to ensure initial positioning works
+    simulation.alpha(0.8).restart();
 
     if (import.meta.env.DEV) {
       console.log('✅ Visualization initialized with', nodes.length, 'nodes');
@@ -1038,6 +1121,12 @@ export function InteractiveGraphVisualization() {
   const startConnection = (nodeId: string) => {
     setConnectionSource(nodeId);
     setIsConnecting(true);
+    setNodeMenu(prev => ({ ...prev, visible: false }));
+  };
+
+  const handleViewNodeDetails = (node: WorkItem) => {
+    setSelectedNode(node);
+    setShowNodeDetailsModal(true);
     setNodeMenu(prev => ({ ...prev, visible: false }));
   };
 
@@ -1422,6 +1511,13 @@ export function InteractiveGraphVisualization() {
             </button>
             <div className="border-t border-gray-600 my-1"></div>
             <button 
+              onClick={() => handleViewNodeDetails(nodeMenu.node!)}
+              className="w-full flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
+            >
+              <FileText className="h-4 w-4 mr-3" />
+              View Details
+            </button>
+            <button 
               onClick={() => handleEditNode(nodeMenu.node!)}
               className="w-full flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
             >
@@ -1534,6 +1630,23 @@ export function InteractiveGraphVisualization() {
           </div>
         </div>
       </div>
+
+      {/* Node Details Modal */}
+      {showNodeDetailsModal && selectedNode && (
+        <NodeDetailsModal
+          isOpen={showNodeDetailsModal}
+          onClose={() => {
+            setShowNodeDetailsModal(false);
+            setSelectedNode(null);
+          }}
+          node={selectedNode}
+          onEdit={(node) => {
+            setShowNodeDetailsModal(false);
+            setSelectedNode(node);
+            setShowEditModal(true);
+          }}
+        />
+      )}
 
       {/* Edit Node Modal */}
       {showEditModal && selectedNode && (
