@@ -14,30 +14,31 @@ export function GraphSelector() {
 
   // Get real-time counts for current graph
   const { data: workItemsData } = useQuery(GET_WORK_ITEMS, {
-    variables: {
+    variables: currentGraph ? {
       where: {
         graph: {
-          id: currentGraph?.id,
-          teamId: currentTeam?.id || 'default-team'
+          id: currentGraph.id
         }
       }
-    },
-    skip: !currentGraph || !currentTeam,
-    pollInterval: 5000
+    } : {},
+    skip: !currentGraph,
+    pollInterval: 5000,
+    fetchPolicy: 'cache-and-network'
   });
 
   const { data: edgesData } = useQuery(GET_EDGES, {
-    variables: {
+    variables: currentGraph ? {
       where: {
         source: {
           graph: {
-            id: currentGraph?.id
+            id: currentGraph.id
           }
         }
       }
-    },
+    } : {},
     skip: !currentGraph,
-    pollInterval: 5000
+    pollInterval: 5000,
+    fetchPolicy: 'cache-and-network'
   });
 
   const actualNodeCount = workItemsData?.workItems?.length || 0;
@@ -79,11 +80,11 @@ export function GraphSelector() {
 
   const getGraphTypeColor = (type: string) => {
     switch (type) {
-      case 'PROJECT': return 'text-blue-300 bg-blue-900/30';
-      case 'WORKSPACE': return 'text-purple-300 bg-purple-900/30';
-      case 'SUBGRAPH': return 'text-green-300 bg-green-900/30';
-      case 'TEMPLATE': return 'text-orange-300 bg-orange-900/30';
-      default: return 'text-gray-300 bg-gray-700/30';
+      case 'PROJECT': return 'text-blue-400 bg-gradient-to-br from-blue-500/20 to-blue-600/30 border border-blue-400/20';
+      case 'WORKSPACE': return 'text-purple-400 bg-gradient-to-br from-purple-500/20 to-purple-600/30 border border-purple-400/20';
+      case 'SUBGRAPH': return 'text-emerald-400 bg-gradient-to-br from-emerald-500/20 to-emerald-600/30 border border-emerald-400/20';
+      case 'TEMPLATE': return 'text-amber-400 bg-gradient-to-br from-amber-500/20 to-amber-600/30 border border-amber-400/20';
+      default: return 'text-slate-400 bg-gradient-to-br from-slate-500/20 to-slate-600/30 border border-slate-400/20';
     }
   };
 
@@ -113,7 +114,7 @@ export function GraphSelector() {
       {/* Graph selector button (EXACT same pattern as UserSelector) */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center space-x-3 w-full p-3 text-left hover:bg-gray-700 rounded-lg transition-colors"
+        className="flex items-center space-x-3 w-full p-3 text-left hover:bg-gray-700/80 rounded-xl transition-all duration-200 hover:scale-[1.02] border border-gray-600/30 hover:border-gray-500/50 shadow-lg hover:shadow-xl backdrop-blur-sm bg-gray-800/50"
       >
         <div className="flex-shrink-0">
           <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${getGraphTypeColor(currentGraph.type)}`}>
@@ -150,10 +151,10 @@ export function GraphSelector() {
 
       {/* Dropdown menu (EXACT same pattern as UserSelector) */}
       {isOpen && (
-        <div className="absolute bottom-full left-0 right-0 mb-2 bg-gray-800 border border-gray-600 rounded-lg shadow-lg z-50 max-h-96 overflow-hidden">
+        <div className="absolute bottom-full left-0 right-0 mb-2 bg-gray-800/95 backdrop-blur-lg border border-gray-600/60 rounded-xl shadow-2xl z-50 max-h-96 overflow-hidden">
           {/* Header */}
-          <div className="flex items-center justify-between p-3 border-b border-gray-600">
-            <span className="text-sm font-medium text-gray-300">Select Graph</span>
+          <div className="flex items-center justify-between p-4 border-b border-gray-600/60 bg-gradient-to-r from-emerald-500/10 to-green-500/10 backdrop-blur-sm">
+            <span className="text-sm font-semibold bg-gradient-to-r from-emerald-400 to-green-300 bg-clip-text text-transparent">Select Graph</span>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setIsOpen(false)}
@@ -173,14 +174,16 @@ export function GraphSelector() {
                   <button
                     key={graph.id}
                     onClick={() => handleGraphSelect(graph.id)}
-                    className={`w-full flex items-center space-x-3 p-2 rounded-lg text-left transition-colors ${
+                    className={`w-full flex items-center space-x-3 p-3 rounded-xl text-left transition-all duration-200 ${
                       graph.id === currentGraph.id
-                        ? 'bg-green-900/30 text-green-300 border border-green-500/30'
-                        : 'hover:bg-gray-700 text-gray-300'
+                        ? 'bg-gradient-to-r from-emerald-500/20 to-green-500/20 text-emerald-300 border border-emerald-400/30 shadow-md'
+                        : 'hover:bg-gray-700/60 text-gray-300 hover:border-gray-600/40 border border-transparent hover:shadow-md hover:scale-[1.02]'
                     }`}
                   >
                     <div className="flex-shrink-0">
-                      {getGraphTypeIcon(graph.type)}
+                      <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${getGraphTypeColor(graph.type)}`}>
+                        {getGraphTypeIcon(graph.type)}
+                      </div>
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">

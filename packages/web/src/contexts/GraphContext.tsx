@@ -24,10 +24,9 @@ export function GraphProvider({ children }: GraphProviderProps) {
   const [isCreating, setIsCreating] = useState(false);
 
 
-  // GraphQL operations
+  // GraphQL operations - Now loads all graphs without team filter
   const { data: graphsData, loading: isLoading, error: graphsError } = useQuery(GET_GRAPHS, {
-    variables: { teamId: currentTeam?.id || '' },
-    skip: !currentTeam, // Only query when we have a valid team
+    skip: false, // Always query graphs
   });
 
   const [createGraphMutation] = useMutation(CREATE_GRAPH);
@@ -107,7 +106,10 @@ export function GraphProvider({ children }: GraphProviderProps) {
       
       // Auto-select first graph if none selected or stored graph not found
       if (!currentGraph && parsedGraphs.length > 0) {
-        setCurrentGraph(graphToSelect || parsedGraphs[0]);
+        const selectedGraph = graphToSelect || parsedGraphs[0];
+        setCurrentGraph(selectedGraph);
+        // Save to localStorage for persistence
+        localStorage.setItem('currentGraphId', selectedGraph.id);
       }
     } else if (!isLoading) {
       // No graphs available - clear state
