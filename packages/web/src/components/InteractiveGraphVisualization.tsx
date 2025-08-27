@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import * as d3 from 'd3';
-import { Link2, Edit3, Trash2, AlertTriangle, AlertCircle, Layers, Sparkles, ListTodo, Trophy, Target, Lightbulb, Microscope, Folder, FolderOpen, Plus, FileText, Settings } from 'lucide-react';
+import { Link2, Edit3, Trash2, AlertTriangle, AlertCircle, Layers, Sparkles, ListTodo, Trophy, Target, Lightbulb, Microscope, Folder, FolderOpen, Plus, FileText, Settings, Unlink } from 'lucide-react';
 import { useQuery, useMutation } from '@apollo/client';
 import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -111,6 +111,7 @@ export function InteractiveGraphVisualization() {
   const [showCreateNodeModal, setShowCreateNodeModal] = useState(false);
   const [showNodeDetailsModal, setShowNodeDetailsModal] = useState(false);
   const [showConnectModal, setShowConnectModal] = useState(false);
+  const [connectModalInitialTab, setConnectModalInitialTab] = useState<'connect' | 'disconnect'>('connect');
   const [showCreateGraphModal, setShowCreateGraphModal] = useState(false);
   const [showGraphSwitcher, setShowGraphSwitcher] = useState(false);
   const [showUpdateGraphModal, setShowUpdateGraphModal] = useState(false);
@@ -1073,8 +1074,14 @@ export function InteractiveGraphVisualization() {
       .enter()
       .append('path')
       .attr('class', 'arrow')
-      .attr('d', 'M-4,-2 L0,0 L-4,2 L-2,0 Z')
+      .attr('d', 'M-16,-8 L0,0 L-16,8 L-8,0 Z')
       .attr('fill', (d: WorkItemEdge) => {
+        // Use the source node's color for the arrow
+        const sourceNode = nodes.find(n => n.id === (typeof d.source === 'string' ? d.source : (d.source as any)?.id));
+        if (sourceNode) {
+          return getNodeColor(sourceNode);
+        }
+        // Fallback to edge type color if node not found
         switch (d.type) {
           case 'DEPENDS_ON': return '#10b981';
           case 'BLOCKS': return '#dc2626';
@@ -1084,6 +1091,12 @@ export function InteractiveGraphVisualization() {
         }
       })
       .attr('stroke', (d: WorkItemEdge) => {
+        // Use the source node's color for the arrow stroke
+        const sourceNode = nodes.find(n => n.id === (typeof d.source === 'string' ? d.source : (d.source as any)?.id));
+        if (sourceNode) {
+          return getNodeColor(sourceNode);
+        }
+        // Fallback to edge type color if node not found
         switch (d.type) {
           case 'DEPENDS_ON': return '#10b981';
           case 'BLOCKS': return '#dc2626';
@@ -1412,9 +1425,17 @@ export function InteractiveGraphVisualization() {
 
   const handleConnectToExistingNodes = (node: WorkItem) => {
     console.log('Connect to existing clicked for node:', node);
-    console.log('Setting showConnectModal to true');
     setSelectedNode(node);
+    setConnectModalInitialTab('connect'); // Open to connect tab
     setShowConnectModal(true);
+    setNodeMenu(prev => ({ ...prev, visible: false }));
+  };
+
+  const handleDisconnectNodes = (node: WorkItem) => {
+    console.log('Disconnect clicked for node:', node);
+    setSelectedNode(node);
+    setConnectModalInitialTab('disconnect'); // Open to disconnect tab
+    setShowConnectModal(true); // Use ConnectNodeModal with tab
     setNodeMenu(prev => ({ ...prev, visible: false }));
   };
 
@@ -1427,7 +1448,9 @@ export function InteractiveGraphVisualization() {
   const handleCloseConnectModal = () => {
     setShowConnectModal(false);
     setSelectedNode(null);
+    setConnectModalInitialTab('connect'); // Reset to connect tab
   };
+
 
   const handleEditEdge = (edge: WorkItemEdge) => {
     // For now, just allow changing the relationship type
@@ -1752,6 +1775,16 @@ export function InteractiveGraphVisualization() {
                 <div className="text-xs text-gray-400 mt-0.5">Link this to other nodes in graph</div>
               </div>
             </button>
+            <button
+              onClick={() => handleDisconnectNodes(nodeMenu.node!)}
+              className="w-full flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700 hover:bg-red-900/20"
+            >
+              <Unlink className="h-4 w-4 mr-3 flex-shrink-0 text-red-400" />
+              <div className="text-left">
+                <div className="font-medium">Disconnect Nodes</div>
+                <div className="text-xs text-gray-400 mt-0.5">Remove connections from this node</div>
+              </div>
+            </button>
             <div className="border-t border-gray-600 my-1"></div>
             <button 
               onClick={() => handleViewNodeDetails(nodeMenu.node!)}
@@ -1953,7 +1986,7 @@ export function InteractiveGraphVisualization() {
         />
       )}
 
-      {/* Connect Node Modal */}
+      {/* Connect Node Modal - With Connect and Disconnect Tabs */}
       {showConnectModal && selectedNode && (
         <ConnectNodeModal
           isOpen={showConnectModal}
@@ -1963,8 +1996,10 @@ export function InteractiveGraphVisualization() {
             title: selectedNode.title,
             type: selectedNode.type
           }}
+          initialTab={connectModalInitialTab}
         />
       )}
+
     </div>
   );
 }
