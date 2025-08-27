@@ -80,7 +80,7 @@ export function PriorityDistributionRadar({ className = '', showLegend = true }:
       { axis: 'High', value: priorityCounts.high, color: '#f97316' },
       { axis: 'Moderate', value: priorityCounts.moderate, color: '#eab308' },
       { axis: 'Low', value: priorityCounts.low, color: '#3b82f6' },
-      { axis: 'Minimal', value: priorityCounts.minimal, color: '#22c55e' }
+      { axis: 'Minimal', value: priorityCounts.minimal, color: '#6b7280' }
     ].filter(item => item.value > 0); // Only show priorities with tasks
 
     const maxValue = Math.max(...priorityData.map(item => item.value), 1);
@@ -189,7 +189,7 @@ export function PriorityDistributionRadar({ className = '', showLegend = true }:
                     case 'High': return <Zap className="h-5 w-5" style={{ color: item.color || '#f97316' }} />;
                     case 'Moderate': return <Triangle className="h-5 w-5" style={{ color: item.color || '#eab308' }} />;
                     case 'Low': return <Circle className="h-5 w-5" style={{ color: item.color || '#3b82f6' }} />;
-                    case 'Minimal': return <ArrowDown className="h-5 w-5" style={{ color: item.color || '#22c55e' }} />;
+                    case 'Minimal': return <ArrowDown className="h-5 w-5" style={{ color: item.color || '#6b7280' }} />;
                     default: return <div className="w-4 h-4 rounded-full" style={{ backgroundColor: item.color || '#4ade80' }}></div>;
                   }
                 };

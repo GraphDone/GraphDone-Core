@@ -12,7 +12,12 @@ interface NodeDetailsModalProps {
 export function NodeDetailsModal({ isOpen, onClose, node, onEdit }: NodeDetailsModalProps) {
   if (!isOpen || !node) return null;
 
-  const totalPriority = (node.priorityExec || 0) + (node.priorityIndiv || 0) + (node.priorityComm || 0);
+  // Use the same priority calculation as ListView for consistency
+  const getNodePriority = (node: WorkItem) => {
+    return node.priorityComp || node.priorityExec || 0;
+  };
+  
+  const totalPriority = getNodePriority(node);
 
   const getStatusColor = (status: string) => {
     switch (status.toUpperCase()) {
@@ -38,11 +43,13 @@ export function NodeDetailsModal({ isOpen, onClose, node, onEdit }: NodeDetailsM
     }
   };
 
+  // Use the same priority levels as ListView (0.0-1.0 scale)
   const getPriorityLevel = (priority: number) => {
-    if (priority >= 8) return { label: 'High', color: 'text-red-400 bg-red-400/10' };
-    if (priority >= 5) return { label: 'Medium', color: 'text-orange-400 bg-orange-400/10' };
-    if (priority >= 2) return { label: 'Low', color: 'text-yellow-400 bg-yellow-400/10' };
-    return { label: 'Very Low', color: 'text-gray-400 bg-gray-400/10' };
+    if (priority >= 0.8) return { label: 'Critical', color: 'text-red-400 bg-red-400/10', flagColor: 'text-red-400' };
+    if (priority >= 0.6) return { label: 'High', color: 'text-orange-400 bg-orange-400/10', flagColor: 'text-orange-400' };
+    if (priority >= 0.4) return { label: 'Medium', color: 'text-yellow-400 bg-yellow-400/10', flagColor: 'text-yellow-400' };
+    if (priority >= 0.2) return { label: 'Low', color: 'text-blue-400 bg-blue-400/10', flagColor: 'text-blue-400' };
+    return { label: 'Minimal', color: 'text-gray-400 bg-gray-400/10', flagColor: 'text-gray-400' };
   };
 
   const formatDate = (dateString: string) => {
@@ -121,27 +128,18 @@ export function NodeDetailsModal({ isOpen, onClose, node, onEdit }: NodeDetailsM
           {/* Details Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Priority */}
-            {totalPriority > 0 && (
-              <div>
-                <h3 className="text-sm font-medium text-gray-400 mb-2 flex items-center">
-                  <Flag className="h-4 w-4 mr-2" />
-                  Priority
-                </h3>
-                <div className="flex items-center space-x-3">
-                  <span className={`px-2 py-1 rounded-md text-xs font-medium ${priorityInfo.color}`}>
-                    {priorityInfo.label}
-                  </span>
-                  <span className="text-gray-500 text-sm">({totalPriority.toFixed(1)})</span>
-                </div>
-                {(node.priorityExec || node.priorityIndiv || node.priorityComm) && (
-                  <div className="mt-2 text-xs text-gray-500 space-y-1">
-                    {node.priorityExec && <div>Executive: {node.priorityExec}</div>}
-                    {node.priorityIndiv && <div>Individual: {node.priorityIndiv}</div>}
-                    {node.priorityComm && <div>Community: {node.priorityComm}</div>}
-                  </div>
-                )}
+            <div>
+              <h3 className="text-sm font-medium text-gray-400 mb-2 flex items-center">
+                <Flag className={`h-4 w-4 mr-2 ${priorityInfo.flagColor}`} />
+                Priority
+              </h3>
+              <div className="flex items-center space-x-3">
+                <span className={`px-2 py-1 rounded-md text-xs font-medium ${priorityInfo.color}`}>
+                  {priorityInfo.label}
+                </span>
+                <span className="text-gray-500 text-sm">({Math.round(totalPriority * 100)}%)</span>
               </div>
-            )}
+            </div>
 
             {/* Assigned To */}
             {node.assignedTo && (
