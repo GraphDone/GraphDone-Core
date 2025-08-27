@@ -20,10 +20,9 @@ export function GraphSelector() {
           id: currentGraph.id
         }
       }
-    } : {},
-    skip: !currentGraph,
-    pollInterval: 5000,
-    fetchPolicy: 'cache-and-network'
+    } : { where: {} },
+    pollInterval: currentGraph ? 5000 : 0,
+    fetchPolicy: currentGraph ? 'cache-and-network' : 'cache-only'
   });
 
   const { data: edgesData } = useQuery(GET_EDGES, {
@@ -35,10 +34,9 @@ export function GraphSelector() {
           }
         }
       }
-    } : {},
-    skip: !currentGraph,
-    pollInterval: 5000,
-    fetchPolicy: 'cache-and-network'
+    } : { where: {} },
+    pollInterval: currentGraph ? 5000 : 0,
+    fetchPolicy: currentGraph ? 'cache-and-network' : 'cache-only'
   });
 
   const actualNodeCount = workItemsData?.workItems?.length || 0;
