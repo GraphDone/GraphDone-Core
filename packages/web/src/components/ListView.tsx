@@ -184,7 +184,7 @@ export function ListView() {
     { value: 'High', label: 'High', icon: <Zap className="h-6 w-6" />, color: 'text-orange-500' },
     { value: 'Moderate', label: 'Moderate', icon: <Triangle className="h-6 w-6" />, color: 'text-yellow-500' },
     { value: 'Low', label: 'Low', icon: <Circle className="h-6 w-6" />, color: 'text-blue-500' },
-    { value: 'Minimal', label: 'Minimal', icon: <ArrowDown className="h-6 w-6" />, color: 'text-green-500' }
+    { value: 'Minimal', label: 'Minimal', icon: <ArrowDown className="h-6 w-6" />, color: 'text-gray-500' }
   ];
 
 
@@ -1395,7 +1395,7 @@ export function ListView() {
                     { label: 'High', value: stats.priorityStats.high, color: '#f97316' },
                     { label: 'Moderate', value: stats.priorityStats.moderate, color: '#eab308' },
                     { label: 'Low', value: stats.priorityStats.low, color: '#3b82f6' },
-                    { label: 'Minimal', value: stats.priorityStats.minimal, color: '#22c55e' }
+                    { label: 'Minimal', value: stats.priorityStats.minimal, color: '#6b7280' }
                   ]}
                 />
               </div>
@@ -1848,7 +1848,7 @@ export function ListView() {
                       );
                     })()}
                   </div>
-                  <ChevronDown className={`h-4 w-4 text-gray-400 transition-all duration-200 ${isPriorityDropdownOpen ? 'rotate-180 text-green-500' : ''}`} />
+                  <ChevronDown className={`h-4 w-4 text-gray-400 transition-all duration-200 ${isPriorityDropdownOpen ? 'rotate-180 text-blue-500' : ''}`} />
                 </button>
 
                 {isPriorityDropdownOpen && (
@@ -2197,7 +2197,7 @@ export function ListView() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   <div className="flex items-center space-x-2">
-                    <ArrowDown className="h-6 w-6 text-green-500" />
+                    <ArrowDown className="h-6 w-6 text-gray-500" />
                     <span className="text-gray-300">Minimal</span>
                   </div>
                 </div>
@@ -2205,7 +2205,7 @@ export function ListView() {
                   <span className="text-white font-medium">{stats.priorityStats.minimal}</span>
                   <div className="w-16 h-2 bg-gray-700 rounded-full">
                     <div 
-                      className="h-2 bg-green-500 rounded-full" 
+                      className="h-2 bg-gray-500 rounded-full" 
                       style={{ width: `${stats.total > 0 ? (stats.priorityStats.minimal / stats.total) * 100 : 0}%` }}
                     ></div>
                   </div>
