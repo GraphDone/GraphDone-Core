@@ -343,7 +343,7 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                     {parentNodeId ? 'Create & Connect Node' : 'Create New Node'}
                   </h2>
                   <p className="text-sm text-gray-300 mt-1">
-                    {parentNodeId ? 'Add a new node with automatic connection' : 'Build your graph with a new work item'}
+                    {parentNodeId ? 'Add a new node with automatic connection' : 'Add your first node to begin the journey'}
                   </p>
                 </div>
               </div>
