@@ -43,11 +43,10 @@ export function InteractiveGraphVisualization() {
           id: currentGraph.id
         }
       }
-    } : {},
-    fetchPolicy: 'cache-and-network',
-    pollInterval: 5000,
-    errorPolicy: 'all',
-    skip: !currentGraph
+    } : { where: {} },
+    fetchPolicy: currentGraph ? 'cache-and-network' : 'cache-only',
+    pollInterval: currentGraph ? 5000 : 0,
+    errorPolicy: 'all'
   });
 
   const { data: edgesData, loading: edgesLoading, error: edgesError, refetch: refetchEdges } = useQuery(GET_EDGES, {
@@ -59,11 +58,10 @@ export function InteractiveGraphVisualization() {
           }
         }
       }
-    } : {},
-    fetchPolicy: 'cache-and-network',
-    pollInterval: 5000,
-    errorPolicy: 'all',
-    skip: !currentGraph
+    } : { where: {} },
+    fetchPolicy: currentGraph ? 'cache-and-network' : 'cache-only',
+    pollInterval: currentGraph ? 5000 : 0,
+    errorPolicy: 'all'
   });
 
   // Mutation for creating edges
@@ -296,65 +294,8 @@ export function InteractiveGraphVisualization() {
     }
   }));
   
-  // Handle case where graph has no nodes
-  if (!loading && !error && nodes.length === 0) {
-    return (
-      <div ref={containerRef} className="graph-container relative w-full h-full bg-gray-900">
-        <svg ref={svgRef} className="w-full h-full" style={{ background: 'radial-gradient(circle at center, #1f2937 0%, #111827 100%)' }}>
-          {/* Empty graph message centered in SVG */}
-          <foreignObject x="20%" y="30%" width="60%" height="40%">
-            <div className="w-full h-full flex items-center justify-center p-4">
-              <div className="max-w-lg text-center bg-gray-800/80 backdrop-blur-sm rounded-lg p-6 border border-gray-600">
-                <div className="text-green-400 text-xl mb-4">
-                  🌱 Empty Graph
-                </div>
-                <div className="text-gray-300 mb-6 leading-relaxed">
-                  This graph doesn't have any nodes yet. Start by creating your first work item.
-                </div>
-                
-                <button 
-                  onClick={() => setShowCreateNodeModal(true)}
-                  className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
-                >
-                  ➕ Create First Node
-                </button>
-              </div>
-            </div>
-          </foreignObject>
-        </svg>
-        
-        {/* Keep the same structure as full render for consistent UI */}
-        <div className="absolute top-4 left-4 z-40">
-          <div className="bg-gray-800/95 backdrop-blur-sm border border-gray-600/60 rounded-lg shadow-xl p-4 w-64">
-            <div className="flex items-center space-x-3 mb-4">
-              <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center flex-shrink-0">
-                {getGraphTypeIcon(currentGraph?.type)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold text-white truncate">{currentGraph?.name || 'No Graph Selected'}</div>
-                <div className="text-xs text-gray-400">{currentGraph?.type || 'Select a graph to begin'}</div>
-              </div>
-              <div className="w-2 h-2 bg-green-400 rounded-full flex-shrink-0"></div>
-            </div>
-            <div className="grid grid-cols-3 gap-2 mb-4">
-              <div className="bg-gray-700/50 rounded-md p-2 text-center">
-                <div className="text-white text-lg font-medium">0</div>
-                <div className="text-gray-400 text-xs">Nodes</div>
-              </div>
-              <div className="bg-gray-700/50 rounded-md p-2 text-center">
-                <div className="text-white text-lg font-medium">0</div>
-                <div className="text-gray-400 text-xs">Edges</div>
-              </div>
-              <div className="bg-gray-700/50 rounded-md p-2 text-center">
-                <div className="text-white text-lg font-medium">{currentGraph?.contributorCount || 0}</div>
-                <div className="text-gray-400 text-xs">Users</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // Define whether to show empty state overlay (but don't early return)
+  const showEmptyStateOverlay = !loading && !error && nodes.length === 0;
 
   // Create hierarchical attraction links based on project structure
   const createHierarchicalLinks = (nodes: WorkItem[]) => {
@@ -436,9 +377,47 @@ export function InteractiveGraphVisualization() {
     return hierarchyLinks;
   };
 
+  // Initialize empty visualization canvas
+  const initializeEmptyVisualization = useCallback(() => {
+    if (!svgRef.current || !containerRef.current) return;
+
+    const container = containerRef.current;
+    const svg = d3.select(svgRef.current);
+    
+    // Clear previous content
+    svg.selectAll('*').remove();
+    
+    // Clear any existing HTML label containers
+    d3.select(containerRef.current).selectAll('.node-labels-container').remove();
+
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+
+    svg.attr('width', width).attr('height', height);
+    
+    // Create zoom behavior for empty canvas
+    const zoom = d3.zoom<SVGSVGElement, unknown>()
+      .scaleExtent([0.1, 3])
+      .on('zoom', (event) => {
+        const g = svg.select('g');
+        if (!g.empty()) {
+          g.attr('transform', event.transform);
+        }
+      });
+
+    svg.call(zoom);
+    const g = svg.append('g');
+  }, []);
+
   // Define initializeVisualization function with access to nodes data
   const initializeVisualization = useCallback(() => {
-    if (!svgRef.current || !containerRef.current || nodes.length === 0) return;
+    if (!svgRef.current || !containerRef.current) return;
+    
+    // Handle empty state
+    if (nodes.length === 0) {
+      initializeEmptyVisualization();
+      return;
+    }
 
     const container = containerRef.current;
     const svg = d3.select(svgRef.current);
@@ -1163,16 +1142,15 @@ export function InteractiveGraphVisualization() {
         simulation.alphaTarget(0.05);
       }, 2000);
     };
-  }, [nodes, validatedEdges, handleNodeClick]); // Include handleNodeClick to get fresh connection state
+  }, [nodes, validatedEdges, handleNodeClick, initializeEmptyVisualization]); // Include handleNodeClick to get fresh connection state
 
   // Store simulation reference for resize handling
   const simulationRef = useRef<d3.Simulation<any, any> | null>(null);
 
   // Initialization effect
   useEffect(() => {
-    if (nodes.length > 0) {
-      initializeVisualization();
-    }
+    // Always initialize visualization (handles both empty and populated states)
+    initializeVisualization();
 
     const handleResize = () => {
       if (!containerRef.current || !svgRef.current || !simulationRef.current) return;
@@ -1485,6 +1463,33 @@ export function InteractiveGraphVisualization() {
   return (
     <div ref={containerRef} className="graph-container relative w-full h-full bg-gray-900">
       <svg ref={svgRef} className="w-full h-full" style={{ background: 'radial-gradient(circle at center, #1f2937 0%, #111827 100%)' }} />
+      
+      {/* Empty State Overlay */}
+      {showEmptyStateOverlay && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="max-w-lg text-center bg-gray-800/90 backdrop-blur-sm rounded-xl p-8 border border-gray-600/50 shadow-2xl pointer-events-auto">
+            <div className="text-green-400 text-4xl mb-4">
+              🌱
+            </div>
+            <h3 className="text-2xl font-bold bg-gradient-to-r from-emerald-400 via-green-300 to-blue-400 bg-clip-text text-transparent mb-3">
+              Transform Your Vision
+            </h3>
+            <div className="text-gray-200 mb-8 leading-relaxed text-base max-w-md mx-auto">
+              Break free from rigid hierarchies. Create your first node and experience how GraphDone intelligently connects ideas, surfaces priorities, and accelerates meaningful outcomes.
+            </div>
+            
+            <button 
+              onClick={() => setShowCreateNodeModal(true)}
+              className="bg-gradient-to-r from-emerald-700 to-green-700 hover:from-emerald-600 hover:to-green-600 text-white px-8 py-4 rounded-xl font-semibold text-lg transition-all duration-300 flex items-center gap-3 mx-auto pointer-events-auto cursor-pointer shadow-lg hover:shadow-xl hover:shadow-green-500/25 transform hover:-translate-y-0.5 hover:scale-105"
+            >
+              <div className="w-5 h-5 bg-white/20 rounded-full flex items-center justify-center">
+                <Plus className="h-3 w-3" />
+              </div>
+              Create Your First Node
+            </button>
+          </div>
+        </div>
+      )}
       
       {/* Graph Control Panel */}
       <div className="absolute top-4 left-4 z-40">
@@ -1898,7 +1903,7 @@ export function InteractiveGraphVisualization() {
         </div>
         <hr className="border-gray-600 mt-3" />
         <div className="pt-3">
-          <div className="text-sm text-gray-500 opacity-75 w-full leading-relaxed text-left">
+          <div className="text-sm text-gray-500 opacity-85 w-full leading-relaxed text-left">
             • Select nodes to access menu<br/>
             • Drag to reposition<br/>
             • Scroll for zoom<br/>
@@ -1983,6 +1988,14 @@ export function InteractiveGraphVisualization() {
           onClose={handleCloseCreateNodeModal}
           parentNodeId={selectedNode.id}
           position={createNodePosition}
+        />
+      )}
+
+      {/* Create Node Modal - For Empty State */}
+      {showCreateNodeModal && !selectedNode && (
+        <CreateNodeModal
+          isOpen={showCreateNodeModal}
+          onClose={() => setShowCreateNodeModal(false)}
         />
       )}
 
