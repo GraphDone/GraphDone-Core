@@ -35,7 +35,6 @@ export function InteractiveGraphVisualization() {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const { currentGraph, availableGraphs } = useGraph();
-  const { } = useAuth();
   
   const { data: workItemsData, loading, error, refetch } = useQuery(GET_WORK_ITEMS, {
     variables: currentGraph ? {
@@ -295,6 +294,66 @@ export function InteractiveGraphVisualization() {
       computed: item.priorityComp
     }
   }));
+  
+  // Handle case where graph has no nodes
+  if (!loading && !error && nodes.length === 0) {
+    return (
+      <div ref={containerRef} className="graph-container relative w-full h-full bg-gray-900">
+        <svg ref={svgRef} className="w-full h-full" style={{ background: 'radial-gradient(circle at center, #1f2937 0%, #111827 100%)' }}>
+          {/* Empty graph message centered in SVG */}
+          <foreignObject x="20%" y="30%" width="60%" height="40%">
+            <div className="w-full h-full flex items-center justify-center p-4">
+              <div className="max-w-lg text-center bg-gray-800/80 backdrop-blur-sm rounded-lg p-6 border border-gray-600">
+                <div className="text-green-400 text-xl mb-4">
+                  🌱 Empty Graph
+                </div>
+                <div className="text-gray-300 mb-6 leading-relaxed">
+                  This graph doesn't have any nodes yet. Start by creating your first work item.
+                </div>
+                
+                <button 
+                  onClick={() => setShowCreateNodeModal(true)}
+                  className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+                >
+                  ➕ Create First Node
+                </button>
+              </div>
+            </div>
+          </foreignObject>
+        </svg>
+        
+        {/* Keep the same structure as full render for consistent UI */}
+        <div className="absolute top-4 left-4 z-40">
+          <div className="bg-gray-800/95 backdrop-blur-sm border border-gray-600/60 rounded-lg shadow-xl p-4 w-64">
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                {getGraphTypeIcon(currentGraph?.type)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold text-white truncate">{currentGraph?.name || 'No Graph Selected'}</div>
+                <div className="text-xs text-gray-400">{currentGraph?.type || 'Select a graph to begin'}</div>
+              </div>
+              <div className="w-2 h-2 bg-green-400 rounded-full flex-shrink-0"></div>
+            </div>
+            <div className="grid grid-cols-3 gap-2 mb-4">
+              <div className="bg-gray-700/50 rounded-md p-2 text-center">
+                <div className="text-white text-lg font-medium">0</div>
+                <div className="text-gray-400 text-xs">Nodes</div>
+              </div>
+              <div className="bg-gray-700/50 rounded-md p-2 text-center">
+                <div className="text-white text-lg font-medium">0</div>
+                <div className="text-gray-400 text-xs">Edges</div>
+              </div>
+              <div className="bg-gray-700/50 rounded-md p-2 text-center">
+                <div className="text-white text-lg font-medium">{currentGraph?.contributorCount || 0}</div>
+                <div className="text-gray-400 text-xs">Users</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Create hierarchical attraction links based on project structure
   const createHierarchicalLinks = (nodes: WorkItem[]) => {
@@ -323,8 +382,8 @@ export function InteractiveGraphVisualization() {
         hierarchyLinks.push({
           source: epic.id,
           target: milestone.id,
-          strength: 0.3, // Strong attraction
-          distance: 120 // Moderate distance
+          strength: 0.1, // Weaker attraction for better spacing
+          distance: 250 // Larger distance for clear edge visibility
         });
       });
     });
@@ -335,8 +394,8 @@ export function InteractiveGraphVisualization() {
         hierarchyLinks.push({
           source: milestone.id,
           target: feature.id,
-          strength: 0.2,
-          distance: 100
+          strength: 0.08,
+          distance: 220
         });
       });
     });
@@ -347,16 +406,16 @@ export function InteractiveGraphVisualization() {
         hierarchyLinks.push({
           source: feature.id,
           target: task.id,
-          strength: 0.25, // Tasks strongly attach to features
-          distance: 80
+          strength: 0.1, // Weaker attachment for better spacing
+          distance: 200
         });
       });
       bugs.forEach(bug => {
         hierarchyLinks.push({
           source: feature.id,
           target: bug.id,
-          strength: 0.25, // Bugs also attach to features
-          distance: 80
+          strength: 0.1, // Weaker attachment for better spacing
+          distance: 200
         });
       });
     });
@@ -367,8 +426,8 @@ export function InteractiveGraphVisualization() {
         hierarchyLinks.push({
           source: epic.id,
           target: outcome.id,
-          strength: 0.15,
-          distance: 140
+          strength: 0.06,
+          distance: 280
         });
       });
     });
@@ -379,10 +438,6 @@ export function InteractiveGraphVisualization() {
   // Define initializeVisualization function with access to nodes data
   const initializeVisualization = useCallback(() => {
     if (!svgRef.current || !containerRef.current || nodes.length === 0) return;
-
-    if (import.meta.env.DEV) {
-      console.log('Initializing visualization with', nodes.length, 'nodes and', validatedEdges.length, 'edges');
-    }
 
     const container = containerRef.current;
     const svg = d3.select(svgRef.current);
@@ -422,52 +477,48 @@ export function InteractiveGraphVisualization() {
     simulation
       .force('link', d3.forceLink(validatedEdges)
         .id((d: any) => d.id)
-        .distance(180) // Increased minimum edge distance
-        .strength(0.15) // Reduced strength for less aggressive pulling
+        .distance(300) // Much larger distance for better edge visibility
+        .strength(0.1) // Weaker strength to allow more spacing
       )
       .force('charge', d3.forceManyBody()
         .strength((d: any) => {
-          // Reduced repulsion forces for more stable positioning
+          // Stronger repulsion forces to maintain good spacing
           switch (d.type) {
             case 'EPIC':
-              return -150; // Reduced from -300
+              return -300; // Strong repulsion for large nodes
             case 'OUTCOME': 
-              return -120; // Reduced from -200
+              return -250; 
             case 'MILESTONE':
-              return -60; // Reduced from -80
+              return -200;
             case 'FEATURE':
-              return -70; // Reduced from -100
+              return -180;
             case 'TASK':
-              return -40; // Reduced from -50
+              return -150;
             case 'BUG':
-              return -40; // Reduced from -50
+              return -150;
             case 'IDEA':
-              return -25; // Reduced from -30
+              return -120;
             default:
-              return -50; // Reduced from -80
+              return -180;
           }
         })
-        .distanceMax(400) // Increased max distance for gentler forces
+        .distanceMax(500) // Larger max distance for better spacing
       )
       .force('center', d3.forceCenter(centerX, centerY).strength(0.05)) // Much weaker centering force
-      .force('collision', d3.forceCollide()
-        .radius((d: any) => {
-          const baseRadius = d.type === 'EPIC' ? 80 : // Increased collision radius
-                            d.type === 'MILESTONE' ? 70 : 
-                            d.type === 'FEATURE' ? 65 : 60;
-          return baseRadius;
-        })
-        .strength(0.5) // Reduced collision strength
+      .force('collision', d3.forceCollide(130) // Larger collision radius to maintain spacing
+        .strength(0.8) // Strong collision to prevent overlap
+        .iterations(2) // More iterations for better separation
       )
       // Add hierarchical attraction forces (Epic->Milestone, Feature->Task, etc.)
       .force('hierarchy', d3.forceLink()
         .id((d: any) => d.id)
         .links(createHierarchicalLinks(nodes))
-        .distance((d: any) => d.distance || 140) // Increased hierarchical distance
-        .strength((d: any) => d.strength || 0.1) // Reduced hierarchical strength
+        .distance((d: any) => d.distance || 250) // Much larger hierarchical distance
+        .strength((d: any) => d.strength || 0.05) // Very weak hierarchical strength
       )
       .alphaTarget(0.05) // Lower alpha target for calmer simulation
-      .alphaDecay(0.02); // Faster decay to settle sooner
+      .alphaDecay(0.015) // Slightly slower decay for better collision resolution
+      .velocityDecay(0.4); // Add velocity decay for smoother movement
 
     // Create edges FIRST (so they render under nodes)
     const linkElements = g.append('g')
@@ -523,56 +574,9 @@ export function InteractiveGraphVisualization() {
       .style('cursor', 'pointer')
       .call(d3.drag<any, any>()
         .on('start', (event, d: any) => {
-          if (!event.active) simulation.alphaTarget(0.1).restart(); // Gentler restart
+          if (!event.active) simulation.alphaTarget(0.2).restart();
           d.fx = d.x;
           d.fy = d.y;
-          
-          // Add expanding ring effect to selected node
-          const nodeGroup = d3.select(event.currentTarget);
-          nodeGroup.select('circle').classed('node-selected', true);
-          
-          // Create multiple expanding rings for effect
-          const radius = parseFloat(nodeGroup.select('circle').attr('r'));
-          const color = nodeGroup.select('circle').attr('fill');
-          
-          // Create 2-3 rings with staggered animations
-          for (let i = 0; i < 2; i++) {
-            setTimeout(() => {
-              const ring = nodeGroup.append('circle')
-                .attr('class', 'expanding-ring')
-                .attr('r', radius)
-                .attr('fill', 'none')
-                .attr('stroke', color)
-                .attr('stroke-width', 3)
-                .attr('opacity', 0.6);
-              
-              // Animate the ring expanding
-              ring.transition()
-                .duration(1500)
-                .attr('r', radius * 2.5)
-                .attr('stroke-width', 0.5)
-                .attr('opacity', 0)
-                .on('end', function() { d3.select(this).remove(); })
-                .transition()
-                .duration(0)
-                .attr('r', radius)
-                .attr('stroke-width', 3)
-                .attr('opacity', 0.6)
-                .on('end', function() {
-                  // Repeat if node is still selected
-                  if (nodeGroup.select('circle').classed('node-selected')) {
-                    d3.select(this).transition()
-                      .duration(1500)
-                      .attr('r', radius * 2.5)
-                      .attr('stroke-width', 0.5)
-                      .attr('opacity', 0)
-                      .on('end', function() { d3.select(this).remove(); });
-                  } else {
-                    d3.select(this).remove();
-                  }
-                });
-            }, i * 750); // Stagger the rings
-          }
         })
         .on('drag', (event, d: any) => {
           // Get node radius
@@ -584,31 +588,64 @@ export function InteractiveGraphVisualization() {
           d.y = d.fy;
         })
         .on('end', (event, d: any) => {
-          if (!event.active) simulation.alphaTarget(0.02); // Lower target for stability
-          // Don't immediately clear fixed positions - let them drift gently
+          if (!event.active) simulation.alphaTarget(0.05);
+          // Keep position fixed for a short time to allow other nodes to settle
           setTimeout(() => {
             d.fx = null;
             d.fy = null;
-          }, 1000); // 1 second delay before releasing position
-          
-          // Remove expanding ring effect
-          const nodeGroup = d3.select(event.currentTarget);
-          nodeGroup.select('circle').classed('node-selected', false);
-          nodeGroup.selectAll('.expanding-ring').remove();
+            simulation.alphaTarget(0.02);
+          }, 500);
         }));
 
     // Monopoly-style rectangular nodes with colored title bars
     const getNodeDimensions = (d: WorkItem) => {
-      switch (d.type) {
-        case 'EPIC': return { width: 140, height: 100 };
-        case 'MILESTONE': return { width: 130, height: 90 };
-        case 'FEATURE': return { width: 120, height: 85 };
-        case 'OUTCOME': return { width: 125, height: 95 };
-        case 'TASK': return { width: 110, height: 80 };
-        case 'BUG': return { width: 105, height: 75 };
-        case 'IDEA': return { width: 100, height: 70 };
-        default: return { width: 110, height: 80 };
+      // Larger base dimensions by type - increased for 3-line support
+      const baseDimensions = (() => {
+        switch (d.type) {
+          case 'EPIC': return { width: 200, height: 120 };
+          case 'MILESTONE': return { width: 190, height: 115 };
+          case 'FEATURE': return { width: 180, height: 110 };
+          case 'OUTCOME': return { width: 185, height: 115 };
+          case 'TASK': return { width: 170, height: 105 };
+          case 'BUG': return { width: 165, height: 100 };
+          case 'IDEA': return { width: 160, height: 95 };
+          default: return { width: 170, height: 105 };
+        }
+      })();
+      
+      // Use base width for consistent layout
+      const width = baseDimensions.width;
+      
+      // Calculate actual text wrapping based on word breaks - up to 3 lines
+      const maxCharsPerLine = Math.floor(width / 8); // ~8px per character for more conservative wrapping
+      const words = d.title.split(' ');
+      let lines = 1;
+      let currentLineLength = 0;
+      
+      for (const word of words) {
+        const wordLength = word.length;
+        // Check if adding this word would exceed line length
+        if (currentLineLength + wordLength + 1 > maxCharsPerLine && currentLineLength > 0) {
+          lines++;
+          currentLineLength = wordLength;
+          if (lines >= 3) break; // Maximum 3 lines
+        } else {
+          currentLineLength += wordLength + (currentLineLength > 0 ? 1 : 0); // +1 for space
+        }
       }
+      
+      lines = Math.min(lines, 3); // Maximum 3 lines
+      
+      // Calculate additional height needed for multiple lines (16px per extra line)
+      const additionalHeight = (lines - 1) * 16;
+      const finalHeight = baseDimensions.height + additionalHeight;
+      
+      return { 
+        width: width, 
+        height: finalHeight,
+        titleLines: lines,
+        maxCharsPerLine: maxCharsPerLine
+      };
     };
     
     // Main node rectangle (dark theme background)
@@ -680,7 +717,7 @@ export function InteractiveGraphVisualization() {
       })
       .attr('stroke-width', 1.5);
 
-    // Node type text in colored title bar (centered, bold and white)
+    // Node type text in colored title bar (centered)
     nodeElements.append('text')
       .attr('class', 'node-type-text')
       .attr('x', 0)
@@ -688,41 +725,124 @@ export function InteractiveGraphVisualization() {
       .attr('text-anchor', 'middle')
       .attr('dominant-baseline', 'middle')
       .text((d: WorkItem) => d.type)
-      .style('font-size', '11px')
+      .style('font-size', '13px')
       .style('font-weight', '700')
       .style('fill', '#ffffff')
       .style('pointer-events', 'none');
 
-    // Node title section - larger and cleaner
-    nodeElements.append('text')
-      .attr('class', 'node-title-text')
-      .attr('x', 0)
-      .attr('y', (d: WorkItem) => -getNodeDimensions(d).height / 2 + titleBarHeight + 22)
-      .attr('text-anchor', 'middle')
-      .attr('dominant-baseline', 'middle')
-      .text((d: WorkItem) => {
-        const maxLength = Math.floor(getNodeDimensions(d).width / 7);
-        return d.title.length > maxLength ? d.title.substring(0, maxLength - 3) + '...' : d.title;
-      })
-      .style('font-size', '14px')
-      .style('font-weight', '600')
-      .style('fill', (d: WorkItem) => {
-        const isCompleted = d.status === 'COMPLETED' || d.status === 'Completed' || d.status === 'Done' || d.status === 'DONE';
-        return isCompleted ? '#9ca3af' : '#ffffff';
-      })
-      .style('pointer-events', 'none');
+    // Node title section - with text wrapping
+    nodeElements.each(function(d: WorkItem) {
+      const nodeGroup = d3.select(this);
+      const dimensions = getNodeDimensions(d);
+      const { maxCharsPerLine } = dimensions;
+      
+      // Split title into lines with proper word wrapping - 3-line maximum
+      const words = d.title.split(' ');
+      const lines: string[] = [];
+      let currentLine = '';
+      let hasMoreText = false;
+      
+      for (let i = 0; i < words.length; i++) {
+        const word = words[i];
+        const testLine = currentLine + (currentLine ? ' ' : '') + word;
+        
+        // Check if this line would be too long
+        if (testLine.length <= maxCharsPerLine) {
+          currentLine = testLine;
+        } else {
+          // Need to wrap to next line
+          if (lines.length < 2) {
+            // Can still add another line (we allow up to 3 lines)
+            lines.push(currentLine || word); // Handle case where first word is too long
+            currentLine = currentLine ? word : '';
+          } else {
+            // Already have 2 lines, this would be fourth line - truncate
+            hasMoreText = true;
+            break;
+          }
+        }
+      }
+      
+      // Add the final line
+      if (currentLine) {
+        if (hasMoreText && lines.length === 2) {
+          // Truncate third line with ellipsis
+          const availableSpace = maxCharsPerLine - 3; // Reserve space for "..."
+          const truncated = currentLine.length > availableSpace 
+            ? currentLine.substring(0, availableSpace) + '...'
+            : currentLine + '...';
+          lines.push(truncated);
+        } else {
+          lines.push(currentLine);
+        }
+      }
+      
+      // Ensure we always have at least one line
+      if (lines.length === 0) {
+        lines.push(d.title.substring(0, maxCharsPerLine - 3) + '...');
+      }
+      
+      // Create text elements for each line
+      const startY = -dimensions.height / 2 + titleBarHeight + 18;
+      lines.forEach((line, index) => {
+        nodeGroup.append('text')
+          .attr('class', 'node-title-text')
+          .attr('x', 0)
+          .attr('y', startY + (index * 16))
+          .attr('text-anchor', 'middle')
+          .attr('dominant-baseline', 'middle')
+          .text(line)
+          .style('font-size', '14px')
+          .style('font-weight', '600')
+          .style('fill', () => {
+            const isCompleted = d.status === 'COMPLETED' || d.status === 'Completed' || d.status === 'Done' || d.status === 'DONE';
+            return isCompleted ? '#9ca3af' : '#ffffff';
+          })
+          .style('pointer-events', 'none');
+      });
+
+      // Add eye icon at bottom after title text ends
+      const titleEndY = startY + (lines.length * 16) + 8; // 8px gap after title text
+      
+      const eyeIconGroup = nodeGroup.append('g')
+        .attr('class', 'eye-icon-group')
+        .attr('transform', `translate(0, ${titleEndY})`)
+        .style('cursor', 'pointer')
+        .style('pointer-events', 'all')
+        .on('click', function(event) {
+          event.stopPropagation();
+          handleViewNodeDetails(d);
+        });
+      
+      // Eye icon at bottom center
+      eyeIconGroup.append('path')
+        .attr('class', 'eye-icon-path')
+        .attr('d', 'M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z M12 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6z')
+        .attr('fill', 'none')
+        .attr('stroke', '#ffffff')
+        .attr('stroke-width', '1')
+        .attr('stroke-linecap', 'round')
+        .attr('stroke-linejoin', 'round')
+        .attr('transform', 'translate(-12, -12) scale(0.5)')
+        .style('opacity', '0.7');
+    });
 
     // Description section - bigger and more readable
     nodeElements.append('text')
       .attr('class', 'node-description-text')
       .attr('x', 0)
-      .attr('y', (d: WorkItem) => -getNodeDimensions(d).height / 2 + titleBarHeight + 42)
+      .attr('y', (d: WorkItem) => {
+        const dimensions = getNodeDimensions(d);
+        const titleLinesHeight = dimensions.titleLines * 16;
+        return -dimensions.height / 2 + titleBarHeight + 18 + titleLinesHeight + 8;
+      })
       .attr('text-anchor', 'middle')
       .attr('dominant-baseline', 'middle')
       .text((d: WorkItem) => {
         if (!d.description) return '';
         const maxLength = Math.floor(getNodeDimensions(d).width / 6.5);
-        return d.description.length > maxLength ? d.description.substring(0, maxLength - 3) + '...' : d.description;
+        // Hide description if too long instead of truncating
+        return d.description.length > maxLength ? '' : d.description;
       })
       .style('font-size', '11px')
       .style('font-weight', '400')
@@ -732,20 +852,197 @@ export function InteractiveGraphVisualization() {
       })
       .style('pointer-events', 'none');
 
-    // Priority indicator (small dot in bottom right)
-    nodeElements.append('circle')
-      .attr('class', 'priority-indicator-dot')
-      .attr('r', 4)
-      .attr('cx', (d: WorkItem) => getNodeDimensions(d).width / 2 - 8)
-      .attr('cy', (d: WorkItem) => getNodeDimensions(d).height / 2 - 8)
-      .attr('fill', (d: WorkItem) => {
-        const priority = d.priorityComp || 0;
-        if (priority > 0.7) return '#dc2626'; // High priority - red
-        if (priority > 0.4) return '#d97706'; // Medium priority - orange
-        return '#059669'; // Low priority - green
-      })
-      .attr('stroke', '#ffffff')
-      .attr('stroke-width', 1);
+    // Status progress bar and percentage (bottom left)
+    nodeElements.each(function(d: WorkItem) {
+      const nodeGroup = d3.select(this);
+      const dimensions = getNodeDimensions(d);
+      
+      // Calculate status percentage
+      const statusPercentage = (() => {
+        switch (d.status) {
+          case 'PROPOSED': return 20;
+          case 'PLANNED': return 40;
+          case 'IN_PROGRESS': return 60;
+          case 'BLOCKED': return 80;
+          case 'COMPLETED': return 100;
+          default: return 0;
+        }
+      })();
+      
+      // Get status color
+      const statusColor = (() => {
+        switch (d.status) {
+          case 'PROPOSED': return '#06b6d4'; // cyan
+          case 'PLANNED': return '#a855f7'; // purple
+          case 'IN_PROGRESS': return '#eab308'; // yellow
+          case 'COMPLETED': return '#22c55e'; // green
+          case 'BLOCKED': return '#ef4444'; // red
+          default: return '#9ca3af'; // gray
+        }
+      })();
+      
+      const barWidth = 40;
+      const barHeight = 3;
+      const barX = -dimensions.width / 2 + 8;
+      const barY = dimensions.height / 2 - 15;
+      
+      // Status progress bar background
+      nodeGroup.append('rect')
+        .attr('class', 'status-progress-bg')
+        .attr('x', barX)
+        .attr('y', barY)
+        .attr('width', barWidth)
+        .attr('height', barHeight)
+        .attr('rx', 1.5)
+        .attr('fill', '#374151')
+        .style('pointer-events', 'none');
+      
+      // Status progress bar fill
+      nodeGroup.append('rect')
+        .attr('class', 'status-progress-fill')
+        .attr('x', barX)
+        .attr('y', barY)
+        .attr('width', (barWidth * statusPercentage) / 100)
+        .attr('height', barHeight)
+        .attr('rx', 1.5)
+        .attr('fill', statusColor)
+        .style('pointer-events', 'none');
+      
+      // Status icon (SVG) - positioned after "Status" text
+      const statusLabelX = barX + barWidth / 2 - 8;
+      const statusIconX = statusLabelX + 15; // Position after "Status" text
+      nodeGroup.append('svg')
+        .attr('class', 'status-icon-svg')
+        .attr('x', statusIconX)
+        .attr('y', barY - 22)
+        .attr('width', 10)
+        .attr('height', 10)
+        .attr('viewBox', '0 0 24 24')
+        .style('pointer-events', 'none')
+        .append('path')
+        .attr('d', getStatusIconPath(d.status))
+        .attr('fill', 'none')
+        .attr('stroke', statusColor)
+        .attr('stroke-width', '2')
+        .attr('stroke-linecap', 'round')
+        .attr('stroke-linejoin', 'round');
+
+      // Status label (above percentage)
+      nodeGroup.append('text')
+        .attr('class', 'status-label-text')
+        .attr('x', barX + barWidth / 2 - 8)
+        .attr('y', barY - 16)
+        .attr('text-anchor', 'middle')
+        .attr('dominant-baseline', 'middle')
+        .text('Status')
+        .style('font-size', '8px')
+        .style('font-weight', '400')
+        .style('fill', '#9ca3af')
+        .style('pointer-events', 'none');
+
+      // Status percentage text (above bar)
+      nodeGroup.append('text')
+        .attr('class', 'status-percentage-text')
+        .attr('x', barX + barWidth / 2)
+        .attr('y', barY - 4)
+        .attr('text-anchor', 'middle')
+        .attr('dominant-baseline', 'middle')
+        .text(`${statusPercentage}%`)
+        .style('font-size', '9px')
+        .style('font-weight', '500')
+        .style('fill', statusColor)
+        .style('pointer-events', 'none');
+    });
+
+    // Priority progress bar and percentage (bottom right)
+    nodeElements.each(function(d: WorkItem) {
+      const nodeGroup = d3.select(this);
+      const dimensions = getNodeDimensions(d);
+      
+      const priority = d.priorityComp || d.priorityExec || 0;
+      const priorityPercentage = Math.round(priority * 100);
+      
+      // Get priority color
+      const priorityColor = (() => {
+        if (priority >= 0.8) return '#ef4444'; // Critical - red
+        if (priority >= 0.6) return '#f97316'; // High - orange  
+        if (priority >= 0.4) return '#eab308'; // Medium - yellow
+        if (priority >= 0.2) return '#3b82f6'; // Low - blue
+        return '#6b7280'; // Minimal - gray
+      })();
+      
+      const barWidth = 40;
+      const barHeight = 3;
+      const barX = dimensions.width / 2 - 8 - barWidth;
+      const barY = dimensions.height / 2 - 15;
+      
+      // Priority progress bar background
+      nodeGroup.append('rect')
+        .attr('class', 'priority-progress-bg')
+        .attr('x', barX)
+        .attr('y', barY)
+        .attr('width', barWidth)
+        .attr('height', barHeight)
+        .attr('rx', 1.5)
+        .attr('fill', '#374151')
+        .style('pointer-events', 'none');
+      
+      // Priority progress bar fill
+      nodeGroup.append('rect')
+        .attr('class', 'priority-progress-fill')
+        .attr('x', barX)
+        .attr('y', barY)
+        .attr('width', (barWidth * priorityPercentage) / 100)
+        .attr('height', barHeight)
+        .attr('rx', 1.5)
+        .attr('fill', priorityColor)
+        .style('pointer-events', 'none');
+      
+      // Priority icon (SVG) - positioned after "Priority" text
+      const priorityLabelX = barX + barWidth / 2;
+      const priorityIconX = priorityLabelX + 18 - 2; // Position after "Priority" text, shifted left by 2
+      nodeGroup.append('svg')
+        .attr('class', 'priority-icon-svg')
+        .attr('x', priorityIconX)
+        .attr('y', barY - 22)
+        .attr('width', 10)
+        .attr('height', 10)
+        .attr('viewBox', '0 0 24 24')
+        .style('pointer-events', 'none')
+        .append('path')
+        .attr('d', getPriorityIconPath(priority))
+        .attr('fill', 'none')
+        .attr('stroke', priorityColor)
+        .attr('stroke-width', '2')
+        .attr('stroke-linecap', 'round')
+        .attr('stroke-linejoin', 'round');
+
+      // Priority label (above percentage)
+      nodeGroup.append('text')
+        .attr('class', 'priority-label-text')
+        .attr('x', barX + barWidth / 2)
+        .attr('y', barY - 16)
+        .attr('text-anchor', 'middle')
+        .attr('dominant-baseline', 'middle')
+        .text('Priority')
+        .style('font-size', '8px')
+        .style('font-weight', '400')
+        .style('fill', '#9ca3af')
+        .style('pointer-events', 'none');
+
+      // Priority percentage text (above bar)
+      nodeGroup.append('text')
+        .attr('class', 'priority-percentage-text')
+        .attr('x', barX + barWidth / 2)
+        .attr('y', barY - 4)
+        .attr('text-anchor', 'middle')
+        .attr('dominant-baseline', 'middle')
+        .text(`${priorityPercentage}%`)
+        .style('font-size', '9px')
+        .style('font-weight', '500')
+        .style('fill', priorityColor)
+        .style('pointer-events', 'none');
+    });
 
     // Add completion indicators (checkmarks) for completed nodes
     nodeElements.each(function(d: WorkItem) {
@@ -765,63 +1062,7 @@ export function InteractiveGraphVisualization() {
           .attr('pointer-events', 'none')
           .text('✓');
       }
-      const nodeRadius = d.type === 'OUTCOME' ? 42 : d.type === 'MILESTONE' ? 40 : d.type === 'TASK' ? 30 : 25;
       
-      // Multi-line text wrapping function
-      const wrapText = (text: string, maxChars: number) => {
-        const words = text.split(' ');
-        const lines: string[] = [];
-        let currentLine = '';
-        
-        for (const word of words) {
-          if ((currentLine + ' ' + word).length <= maxChars) {
-            currentLine = currentLine ? currentLine + ' ' + word : word;
-          } else {
-            if (currentLine) {
-              lines.push(currentLine);
-              currentLine = word;
-            } else {
-              // Single word too long, truncate it
-              lines.push(word.length > maxChars ? word.substring(0, maxChars - 3) + '...' : word);
-              currentLine = '';
-            }
-          }
-        }
-        if (currentLine) {
-          lines.push(currentLine);
-        }
-        
-        // Limit to 2 lines max
-        if (lines.length > 2) {
-          lines[1] = lines[1].substring(0, Math.max(0, maxChars - 3)) + '...';
-          return lines.slice(0, 2);
-        }
-        
-        return lines;
-      };
-      
-      const maxChars = nodeRadius > 35 ? 14 : nodeRadius > 25 ? 10 : 8;
-      const lines = wrapText(d.title, maxChars);
-      const fontSize = nodeRadius > 35 ? 12 : nodeRadius > 25 ? 10 : 9;
-      const lineHeight = fontSize * 1.2;
-      
-      // Calculate vertical offset to center multi-line text
-      
-      // Determine text color based on node background color for contrast
-      const getTextColor = (nodeType: string) => {
-        switch (nodeType) {
-          case 'EPIC': return '#ffffff'; // Purple background - white text
-          case 'FEATURE': return '#ffffff'; // Blue background - white text
-          case 'TASK': return '#000000'; // Green background - black text  
-          case 'BUG': return '#ffffff'; // Red background - white text
-          case 'MILESTONE': return '#000000'; // Yellow background - black text
-          case 'OUTCOME': return '#ffffff'; // Indigo background - white text
-          case 'IDEA': return '#000000'; // Orange background - black text
-          default: return '#000000'; // Gray background - black text
-        }
-      };
-
-      // Old text removed - using new Monopoly-style text instead
     });
 
     // Create arrow symbols for middle of edges
@@ -856,21 +1097,9 @@ export function InteractiveGraphVisualization() {
 
     // Add click handlers to nodes
     nodeElements.on('click', (event: MouseEvent, d: WorkItem) => {
-      // Remove previous selection
-      d3.selectAll('.node-selected').classed('node-selected', false);
-      
-      // Add pulsating glow to clicked node
-      d3.select(event.currentTarget as SVGElement)
-        .select('circle')
-        .classed('node-selected', true);
-      
       handleNodeClick(event, d);
     });
 
-    // TODO: Edge tracking still not working properly
-    // FIXME: Edges don't stick to node centers during drag operations
-    // ISSUE: Edge vertices lag behind or offset from actual node positions
-    // NEEDS: Complete rewrite of edge positioning system
     const updateEdgePositions = () => {
       // Update edge positions - D3 has already updated source/target with current positions
       linkElements
@@ -889,7 +1118,7 @@ export function InteractiveGraphVisualization() {
         });
     };
 
-    // Simulation tick - ONLY update nodes, edges are handled separately
+    // Simulation tick
     simulation.on('tick', () => {
       // Constrain nodes to container bounds
       nodes.forEach((d: any) => {
@@ -913,10 +1142,14 @@ export function InteractiveGraphVisualization() {
 
     // Properly restart simulation to ensure initial positioning works
     simulation.alpha(0.8).restart();
-
-    if (import.meta.env.DEV) {
-      console.log('✅ Visualization initialized with', nodes.length, 'nodes');
-    }
+    
+    // Add method to restart collision detection
+    (simulation as any).restartCollisions = () => {
+      simulation.alphaTarget(0.3).restart();
+      setTimeout(() => {
+        simulation.alphaTarget(0.05);
+      }, 2000);
+    };
   }, [nodes, validatedEdges, handleNodeClick]); // Include handleNodeClick to get fresh connection state
 
   // Store simulation reference for resize handling
@@ -952,6 +1185,24 @@ export function InteractiveGraphVisualization() {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, [nodes.length, validatedEdges.length]); // Only re-initialize when data changes, not on every render
+
+  // Handle case where no graph is selected
+  if (!currentGraph) {
+    return (
+      <div className="graph-container relative w-full h-full bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-yellow-300 text-xl mb-4">📊 No Graph Selected</div>
+          <div className="text-gray-400 text-lg font-medium mb-6">Choose a graph to start visualizing</div>
+          <button 
+            onClick={() => setShowGraphSwitcher(true)}
+            className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+          >
+            Select Graph
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (loading || edgesLoading) {
     return (
@@ -1076,6 +1327,42 @@ export function InteractiveGraphVisualization() {
       case 'PROPOSED': return '#a855f7';
       case 'CANCELLED': return '#6b7280';
       default: return '#6b7280';
+    }
+  };
+
+  // Helper function to get status icon SVG path (Lucide React icons)
+  const getStatusIconPath = (status: string) => {
+    switch (status.toUpperCase()) {
+      case 'PROPOSED': return 'M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01'; // ClipboardList
+      case 'PLANNED': return 'M8 2v4m8-4v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z'; // Calendar
+      case 'IN_PROGRESS': return 'M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8zm0-13v6l4 2'; // Clock with circle
+      case 'COMPLETED': return 'M22 11.08V12a10 10 0 1 1-5.93-9.14m4.93 0L12 9l-2 2'; // CheckCircle
+      case 'BLOCKED': return 'M12 8v4m0 4h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z'; // AlertCircle
+      default: return 'M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01';
+    }
+  };
+
+  // Helper function to get priority icon SVG path (Lucide React icons)
+  const getPriorityIconPath = (priority: number) => {
+    if (priority >= 0.8) return 'M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z'; // Flame
+    if (priority >= 0.6) return 'M13 2L3 14h9l-1 8 10-12h-9z'; // Zap  
+    if (priority >= 0.4) return 'M12 2L2 22h20z'; // Triangle
+    if (priority >= 0.2) return 'M12 22a10 10 0 1 1 10-10 10 10 0 0 1-10 10z'; // Circle
+    return 'M12 5v14m-7-7l7 7 7-7'; // ArrowDown - simpler path
+  };
+
+  // Helper function to get node type icon SVG path (exact Lucide React icons)
+  const getNodeTypeIconPath = (type: string) => {
+    switch (type.toUpperCase()) {
+      case 'EPIC': return 'm12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.84l8.58 3.9a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.84L12.83 2.18ZM22 17.65l-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65M22 12.65l-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65'; // Layers
+      case 'MILESTONE': return 'M6 9H4.5a2.5 2.5 0 0 1 0-5H6m12 5h1.5a2.5 2.5 0 0 0 0-5H18M4 15l1-1h4l2 2h2l2-2h4l1 1M8 21l4-7 4 7'; // Trophy
+      case 'OUTCOME': return 'M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 6a4 4 0 1 1 0 8 4 4 0 0 1 0-8z'; // Target
+      case 'FEATURE': return 'm9.937 15.5-.5-8.5h5.126l-.5 8.5m-4.126 0h4.126m-4.126 0c-.476 2.837-1.961 5.5-3.437 5.5-1.476 0-2.961-2.663-3.437-5.5m10.437 0c.476 2.837 1.961 5.5 3.437 5.5 1.476 0 2.961-2.663 3.437-5.5'; // Sparkles
+      case 'TASK': return 'M3 6h18M3 12h18m-9 6h9'; // ListTodo
+      case 'BUG': return 'm21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3ZM12 9v4m0 4h.01'; // AlertTriangle
+      case 'IDEA': return 'M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5M9 18h6m-5 4h4'; // Lightbulb
+      case 'RESEARCH': return 'M6 18h8M3 22h18M14 22a7 7 0 1 0 0-14h-1M9 14h.01M9 18h.01'; // Microscope
+      default: return 'M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 6a4 4 0 1 1 0 8 4 4 0 0 1 0-8z'; // Default - Target
     }
   };
 

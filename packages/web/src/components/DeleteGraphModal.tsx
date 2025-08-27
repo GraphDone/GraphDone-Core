@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Trash2, AlertTriangle, Shield, CheckCircle } from 'lucide-react';
 import { useGraph } from '../contexts/GraphContext';
+import { useNotifications } from '../contexts/NotificationContext';
 
 interface DeleteGraphModalProps {
   isOpen: boolean;
@@ -9,6 +10,7 @@ interface DeleteGraphModalProps {
 
 export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
   const { currentGraph, deleteGraph } = useGraph();
+  const { showSuccess, showError } = useNotifications();
   const [loading, setLoading] = useState(false);
   const [confirmText, setConfirmText] = useState('');
   const [step, setStep] = useState<'warning' | 'confirm'>('warning');
@@ -33,11 +35,23 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
     if (!isConfirmValid) return;
     
     setLoading(true);
+    const graphName = currentGraph.name; // Store name before deletion
     try {
       await deleteGraph(currentGraph.id);
+      
+      // Show success notification
+      showSuccess(
+        'Graph Deleted Successfully!',
+        `"${graphName}" and all its data have been permanently removed.`
+      );
+      
       onClose();
     } catch (error) {
       console.error('Failed to delete graph:', error);
+      showError(
+        'Failed to Delete Graph',
+        error instanceof Error ? error.message : 'An unexpected error occurred while deleting the graph. Please try again.'
+      );
     } finally {
       setLoading(false);
     }

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { X, Folder, FolderOpen, Plus, Copy, FileText } from 'lucide-react';
 import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useNotifications } from '../contexts/NotificationContext';
 import { CreateGraphInput } from '../types/graph';
 
 interface CreateGraphModalProps {
@@ -13,6 +14,7 @@ interface CreateGraphModalProps {
 export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraphModalProps) {
   const { currentTeam, currentUser } = useAuth();
   const { createGraph, availableGraphs, isCreating } = useGraph();
+  const { showSuccess, showError } = useNotifications();
   
   const [step, setStep] = useState<'type' | 'details' | 'template'>('type');
   const [formData, setFormData] = useState<Partial<CreateGraphInput>>({
@@ -124,11 +126,21 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
       console.log('Creating graph with data:', graphInput);
       console.log('Tags in form data:', formData.tags);
       await createGraph(graphInput as CreateGraphInput);
+      
+      // Show success notification
+      showSuccess(
+        'Graph Created Successfully!',
+        `"${formData.name}" has been created and is ready for use.`
+      );
+      
       onClose();
       resetForm();
     } catch (error) {
       console.error('Error creating graph:', error);
-      // TODO: Show user-friendly error message
+      showError(
+        'Failed to Create Graph',
+        error instanceof Error ? error.message : 'An unexpected error occurred while creating the graph. Please try again.'
+      );
     }
   };
 

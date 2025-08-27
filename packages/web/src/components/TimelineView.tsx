@@ -207,9 +207,11 @@ export function TimelineView() {
   };
 
   const getPriorityIndicator = (priority: number) => {
-    if (priority > 0.7) return 'bg-red-500';
-    if (priority > 0.4) return 'bg-yellow-500';
-    return 'bg-green-500';
+    if (priority >= 0.8) return 'bg-red-500';
+    if (priority >= 0.6) return 'bg-orange-500';
+    if (priority >= 0.4) return 'bg-yellow-500';
+    if (priority >= 0.2) return 'bg-blue-500';
+    return 'bg-gray-500';
   };
 
   // Gantt Timeline View
@@ -1526,7 +1528,7 @@ export function TimelineView() {
                                                 activity.node.priority.computed >= 0.6 ? 'bg-orange-500' :
                                                 activity.node.priority.computed >= 0.4 ? 'bg-yellow-500' :
                                                 activity.node.priority.computed >= 0.2 ? 'bg-blue-500' :
-                                                'bg-green-500'
+                                                'bg-gray-500'
                                               }`}
                                               style={{ 
                                                 width: `${Math.max(activity.node.priority.computed * 100, 2)}%`,

@@ -467,11 +467,11 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                           priorityComm: 0.1
                         }));
                       }}
-                      className="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 border border-green-500/30 text-center hover:shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600 transition-all cursor-pointer"
+                      className="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 border border-gray-500/30 text-center hover:shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600 transition-all cursor-pointer"
                     >
                       <div className="flex items-center justify-center space-x-1 mb-1">
-                        <ArrowDown className="w-6 h-6 text-green-500" />
-                        <div className="text-green-400 font-bold text-sm">Minimal</div>
+                        <ArrowDown className="w-6 h-6 text-gray-500" />
+                        <div className="text-gray-400 font-bold text-sm">Minimal</div>
                       </div>
                       <div className="text-xs font-mono text-gray-400">0% - 19%</div>
                     </button>
@@ -498,7 +498,7 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                     formData.priorityExec >= 0.6 ? 'accent-orange-500' :
                     formData.priorityExec >= 0.4 ? 'accent-yellow-500' :
                     formData.priorityExec >= 0.2 ? 'accent-blue-500' :
-                    'accent-green-500'
+                    'accent-gray-500'
                   }`}
                 />
                 <div className={`text-sm text-center font-medium ${
@@ -506,7 +506,7 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                   formData.priorityExec >= 0.6 ? 'text-orange-500' :
                   formData.priorityExec >= 0.4 ? 'text-yellow-500' :
                   formData.priorityExec >= 0.2 ? 'text-blue-500' :
-                  'text-green-500'
+                  'text-gray-500'
                 }`}>
                   {formData.priorityExec >= 0.8 ? (
                     <><Flame className="h-6 w-6 inline mr-1" />Critical</>
@@ -541,7 +541,7 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                     formData.priorityIndiv >= 0.6 ? 'accent-orange-500' :
                     formData.priorityIndiv >= 0.4 ? 'accent-yellow-500' :
                     formData.priorityIndiv >= 0.2 ? 'accent-blue-500' :
-                    'accent-green-500'
+                    'accent-gray-500'
                   }`}
                 />
                 <div className={`text-sm text-center font-medium ${
@@ -549,7 +549,7 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                   formData.priorityIndiv >= 0.6 ? 'text-orange-500' :
                   formData.priorityIndiv >= 0.4 ? 'text-yellow-500' :
                   formData.priorityIndiv >= 0.2 ? 'text-blue-500' :
-                  'text-green-500'
+                  'text-gray-500'
                 }`}>
                   {formData.priorityIndiv >= 0.8 ? (
                     <><Flame className="h-6 w-6 inline mr-1" />Critical</>
@@ -584,7 +584,7 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                     formData.priorityComm >= 0.6 ? 'accent-orange-500' :
                     formData.priorityComm >= 0.4 ? 'accent-yellow-500' :
                     formData.priorityComm >= 0.2 ? 'accent-blue-500' :
-                    'accent-green-500'
+                    'accent-gray-500'
                   }`}
                 />
                 <div className={`text-sm text-center font-medium ${
@@ -592,7 +592,7 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                   formData.priorityComm >= 0.6 ? 'text-orange-500' :
                   formData.priorityComm >= 0.4 ? 'text-yellow-500' :
                   formData.priorityComm >= 0.2 ? 'text-blue-500' :
-                  'text-green-500'
+                  'text-gray-500'
                 }`}>
                   {formData.priorityComm >= 0.8 ? (
                     <><Flame className="h-6 w-6 inline mr-1" />Critical</>
