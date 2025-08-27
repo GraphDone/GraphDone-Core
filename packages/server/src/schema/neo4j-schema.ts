@@ -344,8 +344,8 @@ export const typeDefs = gql`
     dependencies: [WorkItem!]! @relationship(type: "DEPENDS_ON", direction: OUT)
     dependents: [WorkItem!]! @relationship(type: "DEPENDS_ON", direction: IN)
     contributors: [Contributor!]! @relationship(type: "CONTRIBUTES_TO", direction: IN)
-    sourceEdges: [Edge!]! @relationship(type: "EDGE", direction: OUT)
-    targetEdges: [Edge!]! @relationship(type: "EDGE", direction: IN)
+    sourceEdges: [Edge!]! @relationship(type: "EDGE_SOURCE", direction: IN)
+    targetEdges: [Edge!]! @relationship(type: "EDGE_TARGET", direction: IN)
   }
 
   # Contributor entity - humans and AI agents (legacy - kept for AI agents)
