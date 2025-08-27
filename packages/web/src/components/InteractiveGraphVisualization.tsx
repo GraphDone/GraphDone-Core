@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import * as d3 from 'd3';
-import { Link2, Edit3, Trash2, AlertTriangle, AlertCircle, Layers, Sparkles, ListTodo, Trophy, Target, Lightbulb, Microscope, Folder, FolderOpen, Plus, FileText, Settings, Unlink } from 'lucide-react';
+import { Link2, Edit3, Trash2, AlertTriangle, AlertCircle, Layers, Sparkles, ListTodo, Trophy, Target, Lightbulb, Microscope, Folder, FolderOpen, Plus, FileText, Settings, Unlink, ClipboardList, Calendar, Clock, CheckCircle, Zap, Flame, Triangle, Circle, ArrowDown, X } from 'lucide-react';
 import { useQuery, useMutation } from '@apollo/client';
 import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -116,6 +116,7 @@ export function InteractiveGraphVisualization() {
   const [showDeleteGraphModal, setShowDeleteGraphModal] = useState(false);
   const [selectedNode, setSelectedNode] = useState<WorkItem | null>(null);
   const [createNodePosition, setCreateNodePosition] = useState<{ x: number; y: number; z: number } | undefined>(undefined);
+  const [currentTransform, setCurrentTransform] = useState({ x: 0, y: 0, scale: 1 });
 
   // Additional edge operations
   const [updateEdgeMutation] = useMutation(UPDATE_EDGE, {
@@ -169,6 +170,7 @@ export function InteractiveGraphVisualization() {
     const handleClickOutside = () => {
       setNodeMenu(prev => ({ ...prev, visible: false }));
       setEdgeMenu(prev => ({ ...prev, visible: false }));
+      setSelectedNode(null); // Clear selected node when clicking outside
     };
 
     document.addEventListener('click', handleClickOutside);
@@ -206,6 +208,9 @@ export function InteractiveGraphVisualization() {
       setIsConnecting(false);
       setConnectionSource(null);
     } else {
+      // Set selected node for the Node Actions panel
+      setSelectedNode(node);
+      
       // Show node menu
       const containerRect = containerRef.current?.getBoundingClientRect();
       if (containerRect) {
@@ -457,37 +462,39 @@ export function InteractiveGraphVisualization() {
     simulation
       .force('link', d3.forceLink(validatedEdges)
         .id((d: any) => d.id)
-        .distance(300) // Much larger distance for better edge visibility
-        .strength(0.1) // Weaker strength to allow more spacing
+        .distance(500) // Much larger distance for massive spread
+        .strength(0.05) // Weaker to allow more flexibility
       )
       .force('charge', d3.forceManyBody()
         .strength((d: any) => {
-          // Stronger repulsion forces to maintain good spacing
+          // Much stronger repulsion for maximum spread
           switch (d.type) {
             case 'EPIC':
-              return -300; // Strong repulsion for large nodes
+              return -1200; // Extreme repulsion
             case 'OUTCOME': 
-              return -250; 
+              return -1000; 
             case 'MILESTONE':
-              return -200;
+              return -900;
             case 'FEATURE':
-              return -180;
+              return -800;
             case 'TASK':
-              return -150;
+              return -700;
             case 'BUG':
-              return -150;
+              return -700;
             case 'IDEA':
-              return -120;
+              return -600;
             default:
-              return -180;
+              return -800;
           }
         })
-        .distanceMax(500) // Larger max distance for better spacing
+        .distanceMax(1500) // Much larger max distance for wider influence
       )
-      .force('center', d3.forceCenter(centerX, centerY).strength(0.05)) // Much weaker centering force
-      .force('collision', d3.forceCollide(130) // Larger collision radius to maintain spacing
-        .strength(0.8) // Strong collision to prevent overlap
-        .iterations(2) // More iterations for better separation
+      .force('center', d3.forceCenter(centerX, centerY).strength(0.01)) // Minimal centering
+      .force('x', d3.forceX(centerX).strength(0.002)) // Extremely weak horizontal centering for maximum width
+      .force('y', d3.forceY(centerY).strength(0.002)) // Extremely weak vertical centering for maximum height
+      .force('collision', d3.forceCollide(250) // Much larger collision radius for maximum spacing
+        .strength(0.95) // Very strong collision prevention
+        .iterations(5) // More iterations for better separation
       )
       // Add hierarchical attraction forces (Epic->Milestone, Feature->Task, etc.)
       .force('hierarchy', d3.forceLink()
@@ -644,12 +651,22 @@ export function InteractiveGraphVisualization() {
         return '#1f2937'; // Dark background consistent with theme
       })
       .attr('stroke', (d: WorkItem) => {
+        // Highlight selected node with bright border
+        if (selectedNode && selectedNode.id === d.id) {
+          return '#10b981'; // Bright green for selected node
+        }
         if (d.status === 'COMPLETED' || d.status === 'Completed' || d.status === 'Done' || d.status === 'DONE') {
           return '#4b5563';
         }
         return '#4b5563'; // Gray border
       })
-      .attr('stroke-width', 1.5);
+      .attr('stroke-width', (d: WorkItem) => {
+        // Thicker border for selected node
+        if (selectedNode && selectedNode.id === d.id) {
+          return 3;
+        }
+        return 1.5;
+      });
 
     // Colored title bar at top (like Monopoly property cards)
     const titleBarHeight = 28;
@@ -667,14 +684,14 @@ export function InteractiveGraphVisualization() {
         }
         
         const colors: Record<string, string> = {
-          EPIC: '#8B5CF6',      // purple-500
-          MILESTONE: '#F59E0B', // amber-500
-          OUTCOME: '#6366F1',   // indigo-500
-          FEATURE: '#10B981',   // emerald-500
-          TASK: '#3B82F6',      // blue-500
-          BUG: '#EF4444',       // red-500
-          IDEA: '#EAB308',      // yellow-500
-          RESEARCH: '#14B8A6'   // teal-500
+          EPIC: '#c084fc',      // fuchsia-400 - exact match with icon
+          MILESTONE: '#fb923c', // orange-400 - exact match with icon  
+          OUTCOME: '#818cf8',   // indigo-400 - exact match with icon
+          FEATURE: '#38bdf8',   // sky-400 - exact match with icon
+          TASK: '#4ade80',      // green-400 - exact match with icon
+          BUG: '#ef4444',       // red-500 - exact match with icon
+          IDEA: '#eab308',      // yellow-500 - exact match with icon
+          RESEARCH: '#2dd4bf'   // teal-400 - exact match with icon
         };
         return colors[d.type] || '#6B7280';
       })
@@ -684,14 +701,14 @@ export function InteractiveGraphVisualization() {
         }
         
         const borderColors: Record<string, string> = {
-          EPIC: '#7C3AED',      // purple-600
-          MILESTONE: '#D97706', // amber-600
-          OUTCOME: '#4F46E5',   // indigo-600
-          FEATURE: '#059669',   // emerald-600
-          TASK: '#2563EB',      // blue-600
-          BUG: '#DC2626',       // red-600
-          IDEA: '#CA8A04',      // yellow-600
-          RESEARCH: '#0D9488'   // teal-600
+          EPIC: '#a855f7',      // fuchsia-500 - slightly darker than bg
+          MILESTONE: '#f97316', // orange-500 - slightly darker than bg
+          OUTCOME: '#6366f1',   // indigo-500 - slightly darker than bg
+          FEATURE: '#0ea5e9',   // sky-500 - slightly darker than bg
+          TASK: '#22c55e',      // green-500 - slightly darker than bg
+          BUG: '#dc2626',       // red-600 - slightly darker than bg
+          IDEA: '#d97706',      // yellow-600 - darker border
+          RESEARCH: '#14b8a6'   // teal-500 - slightly darker than bg
         };
         return borderColors[d.type] || '#4B5563';
       })
@@ -707,7 +724,20 @@ export function InteractiveGraphVisualization() {
       .text((d: WorkItem) => d.type)
       .style('font-size', '13px')
       .style('font-weight', '700')
-      .style('fill', '#ffffff')
+      .style('fill', (d: WorkItem) => {
+        switch (d.type.toUpperCase()) {
+          case 'EPIC': return '#c084fc'; // fuchsia-400
+          case 'STORY': return '#60a5fa'; // blue-400
+          case 'TASK': return '#4ade80'; // green-400
+          case 'MILESTONE': return '#fb923c'; // orange-400
+          case 'BUG': return '#ef4444'; // red-500
+          case 'FEATURE': return '#38bdf8'; // sky-400
+          case 'OUTCOME': return '#818cf8'; // indigo-400
+          case 'IDEA': return '#eab308'; // yellow-500
+          case 'RESEARCH': return '#2dd4bf'; // teal-400
+          default: return '#ffffff';
+        }
+      })
       .style('pointer-events', 'none');
 
     // Node title section - with text wrapping
@@ -1130,6 +1160,11 @@ export function InteractiveGraphVisualization() {
     // Update zoom
     zoom.on('zoom', (event) => {
       g.attr('transform', event.transform);
+      setCurrentTransform({ 
+        x: event.transform.x, 
+        y: event.transform.y, 
+        scale: event.transform.k 
+      });
     });
 
     // Properly restart simulation to ensure initial positioning works
@@ -1298,13 +1333,14 @@ export function InteractiveGraphVisualization() {
 
   const getNodeColor = (node: WorkItem) => {
     switch (node.type) {
-      case 'EPIC': return '#a855f7';
-      case 'FEATURE': return '#3b82f6';
-      case 'TASK': return '#10b981';
-      case 'BUG': return '#dc2626';
-      case 'MILESTONE': return '#f59e0b';
-      case 'OUTCOME': return '#6366f1';
-      case 'IDEA': return '#f97316';
+      case 'EPIC': return '#c084fc';      // fuchsia-400 - matches icon
+      case 'FEATURE': return '#38bdf8';   // sky-400 - matches icon
+      case 'TASK': return '#4ade80';      // green-400 - matches icon
+      case 'BUG': return '#ef4444';       // red-500 - matches icon
+      case 'MILESTONE': return '#fb923c'; // orange-400 - matches icon
+      case 'OUTCOME': return '#818cf8';   // indigo-400 - matches icon
+      case 'IDEA': return '#eab308';      // yellow-500 - matches icon
+      case 'RESEARCH': return '#2dd4bf';  // teal-400 - matches icon
       default: return '#6b7280';
     }
   };
@@ -1461,12 +1497,12 @@ export function InteractiveGraphVisualization() {
 
 
   return (
-    <div ref={containerRef} className="graph-container relative w-full h-full bg-gray-900">
+    <div ref={containerRef} className="graph-container relative w-full bg-gray-900" style={{ height: '100vh', minHeight: '900px' }}>
       <svg ref={svgRef} className="w-full h-full" style={{ background: 'radial-gradient(circle at center, #1f2937 0%, #111827 100%)' }} />
       
       {/* Empty State Overlay */}
       {showEmptyStateOverlay && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div className="absolute inset-0 flex items-start justify-center pointer-events-none pt-16 pl-32">
           <div className="max-w-lg text-center bg-gray-800/90 backdrop-blur-sm rounded-xl p-8 border border-gray-600/50 shadow-2xl pointer-events-auto">
             <div className="text-green-400 text-4xl mb-4">
               🌱
@@ -1492,7 +1528,7 @@ export function InteractiveGraphVisualization() {
       )}
       
       {/* Graph Control Panel */}
-      <div className="absolute top-4 left-4 z-40">
+      <div className="absolute left-4 z-40" style={{ top: '20px' }}>
         <div className="bg-gray-800/95 backdrop-blur-sm border border-gray-600/60 rounded-lg shadow-xl p-4 w-64">
           {/* Current Graph Header */}
           <div className="flex items-center space-x-3 mb-4">
@@ -1532,7 +1568,7 @@ export function InteractiveGraphVisualization() {
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
               </svg>
-              <span className="text-sm">Create Graph</span>
+              <span className="text-sm">Create New Graph</span>
             </button>
 
             {/* Switch Graph Button */}
@@ -1570,6 +1606,75 @@ export function InteractiveGraphVisualization() {
               </div>
             )}
           </div>
+        </div>
+      </div>
+
+      {/* Node Actions Panel */}
+      <div className="absolute left-4 z-40" style={{ top: '340px' }}>
+        <div className="bg-gray-800/95 backdrop-blur-sm border border-gray-600/60 rounded-lg shadow-xl p-3 w-64">
+          <div className="text-sm font-semibold text-white mb-3 text-center">Node Actions</div>
+          <div className="space-y-2">
+            {/* Add New Node Button */}
+            <button
+              onClick={() => setShowCreateNodeModal(true)}
+              className="w-full bg-teal-600 hover:bg-teal-700 text-white p-3 rounded-lg transition-colors duration-200 flex items-center space-x-3"
+              title="Add New Node"
+            >
+              <Plus className="w-4 h-4" />
+              <span className="text-sm font-medium">Add New Node</span>
+            </button>
+            
+            {/* Update Node Details Button */}
+            <button
+              onClick={() => {
+                if (selectedNode) {
+                  setShowEditModal(true);
+                } else {
+                  alert('Please select a node first to update it.');
+                }
+              }}
+              className={`w-full p-3 rounded-lg transition-colors duration-200 flex items-center space-x-3 ${
+                selectedNode 
+                  ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                  : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+              }`}
+              disabled={!selectedNode}
+              title={selectedNode ? "Update Selected Node Details" : "Select a node to update"}
+            >
+              <Edit3 className="w-4 h-4" />
+              <span className="text-sm font-medium">Update Node Details</span>
+            </button>
+            
+            {/* Delete Node Button */}
+            <button
+              onClick={() => {
+                if (selectedNode) {
+                  setShowDeleteModal(true);
+                } else {
+                  alert('Please select a node first to delete it.');
+                }
+              }}
+              className={`w-full p-3 rounded-lg transition-colors duration-200 flex items-center space-x-3 ${
+                selectedNode 
+                  ? 'bg-red-600 hover:bg-red-700 text-white' 
+                  : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+              }`}
+              disabled={!selectedNode}
+              title={selectedNode ? "Delete Selected Node" : "Select a node to delete"}
+            >
+              <Trash2 className="w-4 h-4" />
+              <span className="text-sm font-medium">Delete Node</span>
+            </button>
+          </div>
+          
+          {/* Selected Node Indicator */}
+          {selectedNode && (
+            <div className="mt-3 p-2 bg-gray-700/50 rounded-lg">
+              <div className="text-xs text-gray-300 text-center">
+                Selected: <span className="text-green-400 font-medium">{selectedNode.title}</span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1722,7 +1827,7 @@ export function InteractiveGraphVisualization() {
       {/* Node Context Menu */}
       {nodeMenu.visible && nodeMenu.node && (
         <div
-          className="absolute bg-gray-800 border border-gray-600 rounded-lg shadow-lg py-2 z-50"
+          className="absolute bg-gray-800 border border-gray-600 rounded-lg shadow-lg py-2 z-50 max-h-96 overflow-y-auto"
           style={{
             left: nodeMenu.position.x,
             top: nodeMenu.position.y,
@@ -1741,19 +1846,118 @@ export function InteractiveGraphVisualization() {
             </div>
             <div className="flex items-center space-x-4 mt-1 text-xs text-gray-500">
               <span className="flex items-center">
-                <span className={`w-2 h-2 rounded-full mr-1`} style={{ backgroundColor: getStatusColor(nodeMenu.node.status) }} />
-                {nodeMenu.node.status}
+                {(() => {
+                  const status = nodeMenu.node.status.toUpperCase();
+                  const getStatusIcon = () => {
+                    switch (status) {
+                      case 'PROPOSED': return <ClipboardList className="h-3 w-3 mr-1 text-cyan-400" />;
+                      case 'PLANNED': return <Calendar className="h-3 w-3 mr-1 text-purple-400" />;
+                      case 'IN_PROGRESS': return <Clock className="h-3 w-3 mr-1 text-yellow-400" />;
+                      case 'COMPLETED': return <CheckCircle className="h-3 w-3 mr-1 text-green-400" />;
+                      case 'BLOCKED': return <AlertCircle className="h-3 w-3 mr-1 text-red-400" />;
+                      default: return <span className={`w-2 h-2 rounded-full mr-1`} style={{ backgroundColor: getStatusColor(nodeMenu.node.status) }} />;
+                    }
+                  };
+                  const getStatusBgColor = () => {
+                    switch (status) {
+                      case 'PROPOSED': return 'text-cyan-400 bg-cyan-400/10 px-2 py-0.5 rounded';
+                      case 'PLANNED': return 'text-purple-400 bg-purple-400/10 px-2 py-0.5 rounded';
+                      case 'IN_PROGRESS': return 'text-yellow-400 bg-yellow-400/10 px-2 py-0.5 rounded';
+                      case 'COMPLETED': return 'text-green-400 bg-green-400/10 px-2 py-0.5 rounded';
+                      case 'BLOCKED': return 'text-red-400 bg-red-400/10 px-2 py-0.5 rounded';
+                      default: return '';
+                    }
+                  };
+                  const formatStatus = (status: string) => {
+                    switch (status.toUpperCase()) {
+                      case 'IN_PROGRESS': return 'In Progress';
+                      case 'PROPOSED': return 'Proposed';
+                      case 'PLANNED': return 'Planned';
+                      case 'COMPLETED': return 'Completed';
+                      case 'BLOCKED': return 'Blocked';
+                      default: return status;
+                    }
+                  };
+                  return (
+                    <>
+                      {getStatusIcon()}
+                      <span className={getStatusBgColor()}>{formatStatus(nodeMenu.node.status)}</span>
+                    </>
+                  );
+                })()}
               </span>
-              <span>{nodeMenu.node.type}</span>
+              <span className="flex items-center">
+                {(() => {
+                  const getTypeIcon = () => {
+                    switch (nodeMenu.node.type) {
+                      case 'EPIC': return <Layers className="h-3 w-3 mr-1 text-fuchsia-400" />;
+                      case 'STORY': return <FileText className="h-3 w-3 mr-1 text-blue-400" />;
+                      case 'TASK': return <ListTodo className="h-3 w-3 mr-1 text-green-400" />;
+                      case 'MILESTONE': return <Trophy className="h-3 w-3 mr-1 text-orange-400" />;
+                      case 'BUG': return <AlertTriangle className="h-3 w-3 mr-1 text-red-500" />;
+                      case 'FEATURE': return <Sparkles className="h-3 w-3 mr-1 text-sky-400" />;
+                      case 'OUTCOME': return <Target className="h-3 w-3 mr-1 text-indigo-400" />;
+                      case 'IDEA': return <Lightbulb className="h-3 w-3 mr-1 text-yellow-500" />;
+                      case 'RESEARCH': return <Microscope className="h-3 w-3 mr-1 text-teal-400" />;
+                      default: return null;
+                    }
+                  };
+                  const getTypeBgColor = () => {
+                    switch (nodeMenu.node.type) {
+                      case 'EPIC': return 'text-fuchsia-400 bg-fuchsia-400/10 px-2 py-0.5 rounded';
+                      case 'STORY': return 'text-blue-400 bg-blue-400/10 px-2 py-0.5 rounded';
+                      case 'TASK': return 'text-green-400 bg-green-400/10 px-2 py-0.5 rounded';
+                      case 'MILESTONE': return 'text-orange-400 bg-orange-400/10 px-2 py-0.5 rounded';
+                      case 'BUG': return 'text-red-500 bg-red-500/10 px-2 py-0.5 rounded';
+                      case 'FEATURE': return 'text-sky-400 bg-sky-400/10 px-2 py-0.5 rounded';
+                      case 'OUTCOME': return 'text-indigo-400 bg-indigo-400/10 px-2 py-0.5 rounded';
+                      case 'IDEA': return 'text-yellow-500 bg-yellow-500/10 px-2 py-0.5 rounded';
+                      case 'RESEARCH': return 'text-teal-400 bg-teal-400/10 px-2 py-0.5 rounded';
+                      default: return '';
+                    }
+                  };
+                  return (
+                    <>
+                      {getTypeIcon()}
+                      <span className={getTypeBgColor()}>{nodeMenu.node.type}</span>
+                    </>
+                  );
+                })()}
+              </span>
             </div>
           </div>
 
           {/* Quick Stats */}
           <div className="px-4 py-2 border-b border-gray-600">
             <div className="grid grid-cols-2 gap-2 text-xs">
-              <div>
-                <span className="text-gray-400">Priority:</span>
-                <span className="ml-1 font-medium">{Math.round((nodeMenu.node?.priority?.computed || nodeMenu.node?.priorityComp || 0) * 100)}%</span>
+              <div className="flex flex-col space-y-1">
+                <div className="flex items-center">
+                  {(() => {
+                    const priority = nodeMenu.node?.priority?.computed || nodeMenu.node?.priorityComp || 0;
+                    const getPriorityIcon = () => {
+                      if (priority >= 0.8) return <Flame className="h-3 w-3 mr-1 text-red-400" />;
+                      if (priority >= 0.6) return <Zap className="h-3 w-3 mr-1 text-orange-400" />;
+                      if (priority >= 0.4) return <Triangle className="h-3 w-3 mr-1 text-yellow-400" />;
+                      if (priority >= 0.2) return <Circle className="h-3 w-3 mr-1 text-blue-400" />;
+                      return <ArrowDown className="h-3 w-3 mr-1 text-gray-400" />;
+                    };
+                    return getPriorityIcon();
+                  })()}
+                  <span className="text-gray-400">Priority:</span>
+                  <span className="ml-1 font-medium">{Math.round((nodeMenu.node?.priority?.computed || nodeMenu.node?.priorityComp || 0) * 100)}%</span>
+                </div>
+                <div className="w-full bg-gray-600 rounded-full h-1.5">
+                  <div 
+                    className={`h-1.5 rounded-full transition-all duration-300 ${
+                      (nodeMenu.node?.priority?.computed || nodeMenu.node?.priorityComp || 0) >= 0.8 ? 'bg-red-400' :
+                      (nodeMenu.node?.priority?.computed || nodeMenu.node?.priorityComp || 0) >= 0.6 ? 'bg-orange-400' :
+                      (nodeMenu.node?.priority?.computed || nodeMenu.node?.priorityComp || 0) >= 0.4 ? 'bg-yellow-400' :
+                      (nodeMenu.node?.priority?.computed || nodeMenu.node?.priorityComp || 0) >= 0.2 ? 'bg-blue-400' :
+                      'bg-gray-400'
+                    }`}
+                    style={{ width: `${Math.round((nodeMenu.node?.priority?.computed || nodeMenu.node?.priorityComp || 0) * 100)}%` }}
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -1864,8 +2068,9 @@ export function InteractiveGraphVisualization() {
         </div>
       )}
 
+
       {/* Legend */}
-      <div className="absolute bottom-4 left-4 bg-gray-800/95 backdrop-blur-sm border border-gray-600/60 rounded-lg shadow-xl p-4 w-64">
+      <div className="absolute left-4 bg-gray-800/95 backdrop-blur-sm border border-gray-600/60 rounded-lg shadow-xl p-4 w-64" style={{ top: '570px' }}>
         <div className="text-sm font-semibold text-white mb-3 text-center">Node Types</div>
         <div className="grid grid-cols-2 gap-2 text-sm text-gray-300">
           <div className="flex items-center space-x-2">

@@ -63,8 +63,12 @@ export function NodeDetailsModal({ isOpen, onClose, node, onEdit }: NodeDetailsM
   const priorityInfo = getPriorityLevel(totalPriority);
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex">
+      <div 
+        className="flex-1 cursor-pointer" 
+        onClick={onClose}
+      />
+      <div className="bg-gray-900 border-l border-gray-700 shadow-2xl w-full max-w-lg h-full overflow-y-auto animate-slide-in-right">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-700">
           <div className="flex items-center space-x-3">
