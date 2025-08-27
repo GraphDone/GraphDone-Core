@@ -91,7 +91,7 @@ const nodeTypes: NodeType[] = [
     description: 'Concept or proposal for future development', 
     emoji: '',
     icon: <Lightbulb className="h-6 w-6" />,
-    color: 'text-yellow-300',
+    color: 'text-yellow-500',
     bgColor: 'bg-yellow-50 dark:bg-yellow-900/20',
     borderColor: 'border-yellow-200 dark:border-yellow-700'
   },
