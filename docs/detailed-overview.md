@@ -478,7 +478,7 @@ GraphDone includes a comprehensive setup script that handles all prerequisites a
 
 ```bash
 # Clone and setup
-git clone https://github.com/your-org/graphdone.git
+git clone https://github.com/GraphDone/GraphDone-Core.git
 cd graphdone
 ./tools/setup.sh
 ```
@@ -664,7 +664,7 @@ agent.subscribe('node.priorityChanged', async (node) => {
 ### 🚀 **Ready for Development**
 ```bash
 # Get started in 30 seconds
-git clone https://github.com/your-org/graphdone.git
+git clone https://github.com/GraphDone/GraphDone-Core.git
 cd graphdone
 ./tools/setup.sh
 ./tools/run.sh

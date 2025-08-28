@@ -19,7 +19,7 @@ Before you begin, ensure you have the following installed:
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/graphdone.git
+git clone https://github.com/GraphDone/GraphDone-Core.git
 cd graphdone
 
 # Run setup script
@@ -37,7 +37,7 @@ The setup script will:
 
 ```bash
 # Clone and install dependencies
-git clone https://github.com/your-org/graphdone.git
+git clone https://github.com/GraphDone/GraphDone-Core.git
 cd graphdone
 npm install
 
@@ -118,7 +118,7 @@ Your node will appear in the graph visualization, positioned based on its comput
 - [Explore the Architecture](./architecture.md)
 - [Learn about AI Agent Integration](./ai-agents.md)
 - [Set up Production Deployment](../deployment/README.md)
-- [Join the Community Discussions](https://github.com/your-org/graphdone/discussions)
+- [Join the Community Discussions](https://github.com/GraphDone/GraphDone-Core/discussions)
 
 ## Common Issues
 
@@ -141,7 +141,7 @@ node --version
 
 If you encounter issues:
 1. Check the [Troubleshooting Guide](./troubleshooting.md)
-2. Search [existing issues](https://github.com/your-org/graphdone/issues)
+2. Search [existing issues](https://github.com/GraphDone/GraphDone-Core/issues)
 3. Create a new issue with detailed information
 
 Welcome to the future of collaborative work! 🚀

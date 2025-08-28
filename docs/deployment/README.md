@@ -435,6 +435,6 @@ docker-compose build --no-cache
 ## Support
 
 For deployment support:
-- [GitHub Issues](https://github.com/your-org/graphdone/issues)
+- [GitHub Issues](https://github.com/GraphDone/GraphDone-Core/issues)
 - [Community Discord](https://discord.gg/graphdone)
 - [Documentation](../README.md)
