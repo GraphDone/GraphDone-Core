@@ -2,7 +2,7 @@
 
 **AI-Generated Content Warning: This documentation contains AI-generated content. Verify information before depending on it for decision making.**
 
-Welcome to the GraphDone documentation! This directory contains comprehensive guides, API references, and examples for working with GraphDone.
+Welcome to the GraphDone documentation! This directory contains comprehensive guides, API references, and deployment information for working with GraphDone.
 
 ## 📚 Documentation Structure
 
@@ -17,12 +17,6 @@ Welcome to the GraphDone documentation! This directory contains comprehensive gu
 - Core concepts
 - Architecture overview
 - Contributing guidelines
-
-### [Examples](./examples/)
-- Integration examples
-- AI agent implementations
-- Custom visualizations
-- Deployment configurations
 
 ### [Deployment](./deployment/)
 - Docker setup
@@ -68,9 +62,8 @@ Welcome to the GraphDone documentation! This directory contains comprehensive gu
 
 ## 📞 Support
 
-- [GitHub Issues](https://github.com/your-org/graphdone/issues)
-- [Discussions](https://github.com/your-org/graphdone/discussions)
-- [Discord Community](https://discord.gg/graphdone)
+- [GitHub Issues](https://github.com/GraphDone/GraphDone-Core/issues)
+- [Discussions](https://github.com/GraphDone/GraphDone-Core/discussions)
 
 ---
 
