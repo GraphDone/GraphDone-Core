@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import * as d3 from 'd3';
-import { Link2, Edit3, Trash2, AlertTriangle, AlertCircle, Layers, Sparkles, ListTodo, Trophy, Target, Lightbulb, Microscope, Folder, FolderOpen, Plus, FileText, Settings, Unlink, ClipboardList, Calendar, Clock, CheckCircle, Zap, Flame, Triangle, Circle, ArrowDown, X } from 'lucide-react';
+import { Link2, Edit3, Trash2, AlertTriangle, AlertCircle, Layers, Sparkles, ListTodo, Trophy, Target, Lightbulb, Microscope, Folder, FolderOpen, Plus, FileText, Settings, Unlink, ClipboardList, Calendar, Clock, CheckCircle, Zap, Flame, Triangle, Circle, ArrowDown, X, GitBranch } from 'lucide-react';
 import { useQuery, useMutation } from '@apollo/client';
 import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -1609,74 +1609,6 @@ export function InteractiveGraphVisualization() {
         </div>
       </div>
 
-      {/* Node Actions Panel */}
-      <div className="absolute left-4 z-40" style={{ top: '340px' }}>
-        <div className="bg-gray-800/95 backdrop-blur-sm border border-gray-600/60 rounded-lg shadow-xl p-3 w-64">
-          <div className="text-sm font-semibold text-white mb-3 text-center">Node Actions</div>
-          <div className="space-y-2">
-            {/* Add New Node Button */}
-            <button
-              onClick={() => setShowCreateNodeModal(true)}
-              className="w-full bg-teal-600 hover:bg-teal-700 text-white p-3 rounded-lg transition-colors duration-200 flex items-center space-x-3"
-              title="Add New Node"
-            >
-              <Plus className="w-4 h-4" />
-              <span className="text-sm font-medium">Add New Node</span>
-            </button>
-            
-            {/* Update Node Details Button */}
-            <button
-              onClick={() => {
-                if (selectedNode) {
-                  setShowEditModal(true);
-                } else {
-                  alert('Please select a node first to update it.');
-                }
-              }}
-              className={`w-full p-3 rounded-lg transition-colors duration-200 flex items-center space-x-3 ${
-                selectedNode 
-                  ? 'bg-blue-600 hover:bg-blue-700 text-white' 
-                  : 'bg-gray-600 text-gray-400 cursor-not-allowed'
-              }`}
-              disabled={!selectedNode}
-              title={selectedNode ? "Update Selected Node Details" : "Select a node to update"}
-            >
-              <Edit3 className="w-4 h-4" />
-              <span className="text-sm font-medium">Update Node Details</span>
-            </button>
-            
-            {/* Delete Node Button */}
-            <button
-              onClick={() => {
-                if (selectedNode) {
-                  setShowDeleteModal(true);
-                } else {
-                  alert('Please select a node first to delete it.');
-                }
-              }}
-              className={`w-full p-3 rounded-lg transition-colors duration-200 flex items-center space-x-3 ${
-                selectedNode 
-                  ? 'bg-red-600 hover:bg-red-700 text-white' 
-                  : 'bg-gray-600 text-gray-400 cursor-not-allowed'
-              }`}
-              disabled={!selectedNode}
-              title={selectedNode ? "Delete Selected Node" : "Select a node to delete"}
-            >
-              <Trash2 className="w-4 h-4" />
-              <span className="text-sm font-medium">Delete Node</span>
-            </button>
-          </div>
-          
-          {/* Selected Node Indicator */}
-          {selectedNode && (
-            <div className="mt-3 p-2 bg-gray-700/50 rounded-lg">
-              <div className="text-xs text-gray-300 text-center">
-                Selected: <span className="text-green-400 font-medium">{selectedNode.title}</span>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
 
       {/* Data Health Indicator */}
       {validationResult && (validationResult.errors.length > 0 || validationResult.warnings.length > 0) && (
@@ -1847,7 +1779,7 @@ export function InteractiveGraphVisualization() {
             <div className="flex items-center space-x-4 mt-1 text-xs text-gray-500">
               <span className="flex items-center">
                 {(() => {
-                  const status = nodeMenu.node.status.toUpperCase();
+                  const status = nodeMenu.node?.status?.toUpperCase() || '';
                   const getStatusIcon = () => {
                     switch (status) {
                       case 'PROPOSED': return <ClipboardList className="h-3 w-3 mr-1 text-cyan-400" />;
@@ -1855,7 +1787,7 @@ export function InteractiveGraphVisualization() {
                       case 'IN_PROGRESS': return <Clock className="h-3 w-3 mr-1 text-yellow-400" />;
                       case 'COMPLETED': return <CheckCircle className="h-3 w-3 mr-1 text-green-400" />;
                       case 'BLOCKED': return <AlertCircle className="h-3 w-3 mr-1 text-red-400" />;
-                      default: return <span className={`w-2 h-2 rounded-full mr-1`} style={{ backgroundColor: getStatusColor(nodeMenu.node.status) }} />;
+                      default: return <span className={`w-2 h-2 rounded-full mr-1`} style={{ backgroundColor: getStatusColor(nodeMenu.node?.status || '') }} />;
                     }
                   };
                   const getStatusBgColor = () => {
@@ -1889,7 +1821,7 @@ export function InteractiveGraphVisualization() {
               <span className="flex items-center">
                 {(() => {
                   const getTypeIcon = () => {
-                    switch (nodeMenu.node.type) {
+                    switch (nodeMenu.node?.type) {
                       case 'EPIC': return <Layers className="h-3 w-3 mr-1 text-fuchsia-400" />;
                       case 'STORY': return <FileText className="h-3 w-3 mr-1 text-blue-400" />;
                       case 'TASK': return <ListTodo className="h-3 w-3 mr-1 text-green-400" />;
@@ -1903,7 +1835,7 @@ export function InteractiveGraphVisualization() {
                     }
                   };
                   const getTypeBgColor = () => {
-                    switch (nodeMenu.node.type) {
+                    switch (nodeMenu.node?.type) {
                       case 'EPIC': return 'text-fuchsia-400 bg-fuchsia-400/10 px-2 py-0.5 rounded';
                       case 'STORY': return 'text-blue-400 bg-blue-400/10 px-2 py-0.5 rounded';
                       case 'TASK': return 'text-green-400 bg-green-400/10 px-2 py-0.5 rounded';
@@ -1965,10 +1897,24 @@ export function InteractiveGraphVisualization() {
           {/* Actions */}
           <div className="py-1">
             <button
-              onClick={(e) => handleCreateConnectedNode(nodeMenu.node!, e)}
+              onClick={() => {
+                setShowCreateNodeModal(true);
+                setSelectedNode(null);
+                setNodeMenu(prev => ({ ...prev, visible: false }));
+              }}
               className="w-full flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
             >
               <Plus className="h-4 w-4 mr-3 flex-shrink-0" />
+              <div className="text-left">
+                <div className="font-medium">Add New Node</div>
+                <div className="text-xs text-gray-400 mt-0.5">Create a standalone node</div>
+              </div>
+            </button>
+            <button
+              onClick={(e) => handleCreateConnectedNode(nodeMenu.node!, e)}
+              className="w-full flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
+            >
+              <GitBranch className="h-4 w-4 mr-3 flex-shrink-0" />
               <div className="text-left">
                 <div className="font-medium">Create New & Connect</div>
                 <div className="text-xs text-gray-400 mt-0.5">Add a new node linked to this one</div>
@@ -2070,7 +2016,7 @@ export function InteractiveGraphVisualization() {
 
 
       {/* Legend */}
-      <div className="absolute left-4 bg-gray-800/95 backdrop-blur-sm border border-gray-600/60 rounded-lg shadow-xl p-4 w-64" style={{ top: '570px' }}>
+      <div className="absolute left-4 bg-gray-800/95 backdrop-blur-sm border border-gray-600/60 rounded-lg shadow-xl p-4 w-64" style={{ top: '340px' }}>
         <div className="text-sm font-semibold text-white mb-3 text-center">Node Types</div>
         <div className="grid grid-cols-2 gap-2 text-sm text-gray-300">
           <div className="flex items-center space-x-2">
