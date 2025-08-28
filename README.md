@@ -74,10 +74,16 @@ Visit **http://localhost:3127** when you see the "GraphDone is Ready!" message.
 
 ### What You Get
 
+**Core GraphDone Services:**
 - 🌐 **Web Application**: http://localhost:3127 - Full graph visualization and collaboration interface
 - 🔗 **GraphQL API**: http://localhost:4127/graphql - Auto-generated resolvers with @neo4j/graphql  
 - 🩺 **Health Check**: http://localhost:4127/health - Service status monitoring
 - 🗄️ **Database**: Neo4j 5.15-community with APOC plugins for native graph storage
+
+**Optional Claude Code Integration:**
+- 🤖 **MCP Server**: Separate service for Claude Code integration (see [MCP Setup](#mcp-server-setup) below)
+
+**Development Tools:**
 - 🐳 **Docker Setup**: Development and production containers ready to go
 - 🧪 **Testing**: Comprehensive test suite with coverage reporting
 
@@ -130,6 +136,109 @@ The app now provides user-friendly error messages instead of technical errors. I
 - Check that `./start` completed successfully
 - Visit http://localhost:4127/health to verify the server is running
 - The error UI will guide you through common troubleshooting steps
+
+## MCP Server Setup
+
+The **MCP (Model Context Protocol) Server** is a **separate service** that allows Claude Code to interact with your GraphDone graph through natural language. It connects directly to your Neo4j database and runs independently from the GraphDone web application.
+
+### Architecture Overview
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│ Claude Code     │◄───│ MCP Server      │◄───│ Neo4j Database  │
+│ (Your machine)  │    │ (Port 3128)     │    │ (Port 7687)     │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+                                │
+                                ▼
+                       ┌─────────────────┐
+                       │ GraphDone Web   │
+                       │ (Port 3127)     │◄──── Browser
+                       └─────────────────┘
+```
+
+### Quick MCP Setup
+
+**One-command setup:**
+```bash
+./scripts/setup-mcp.sh
+```
+
+This script will:
+- ✅ Build the MCP server automatically
+- 🔗 Configure Claude Code to use it  
+- 📋 Show you exactly what to do next
+- 🛡️ Create backups of your settings
+
+### Manual MCP Setup
+
+If automatic setup doesn't work, configure manually:
+
+```bash
+# Build MCP server
+cd packages/mcp-server
+npm run build
+
+# Add to Claude Code
+claude mcp add graphdone "$(which node)" "$(pwd)/dist/index.js" \
+  --env "NEO4J_URI=bolt://localhost:7687" \
+  --env "NEO4J_USER=neo4j" \
+  --env "NEO4J_PASSWORD=graphdone_password"
+```
+
+### Distributed Setup (Multiple Machines)
+
+**If Claude Code is on a different machine than GraphDone:**
+
+```bash
+# On your development machine with Claude Code
+claude mcp add graphdone node /path/to/mcp-server/dist/index.js \
+  --env "NEO4J_URI=bolt://192.168.1.100:7687" \
+  --env "NEO4J_USER=neo4j" \
+  --env "NEO4J_PASSWORD=graphdone_password"
+```
+
+**Multiple developers sharing one GraphDone instance:**
+```bash
+# Developer A (default port)
+claude mcp add graphdone node dist/index.js --env "MCP_HEALTH_PORT=3128"
+
+# Developer B (different port to avoid conflicts)  
+claude mcp add graphdone node dist/index.js --env "MCP_HEALTH_PORT=3129"
+```
+
+### Using the MCP Server
+
+Once configured, just talk to Claude Code naturally:
+- *"Show me all active tasks"*
+- *"Create a new epic for mobile development"*  
+- *"What's blocking the user authentication feature?"*
+- *"Add a dependency between task A and task B"*
+
+### MCP Troubleshooting
+
+**MCP server not appearing?**
+```bash
+claude mcp list  # Check if registered
+curl http://localhost:3128/health  # Test health endpoint
+```
+
+**Connection errors?**  
+```bash
+# Verify Neo4j is running
+docker-compose up -d  # Or ./start
+cypher-shell -u neo4j -p graphdone_password "RETURN 1"
+```
+
+**Port conflicts?**
+```bash
+# Check what's using port 3128
+lsof -i :3128
+
+# Use different port for additional MCP servers
+MCP_HEALTH_PORT=3129 node dist/index.js
+```
+
+> **Note:** The MCP server requires the Neo4j database to be running but is independent of the GraphDone web application. You can use Claude Code with your graph even if the web interface is offline.
 
 ## Core Concepts
 
