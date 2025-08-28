@@ -8,6 +8,12 @@ import { useNotifications } from '../contexts/NotificationContext';
 import { NodeTypeSelector } from './NodeCategorySelector';
 import { TagInput } from './TagInput';
 import { RELATIONSHIP_TYPES, getRelationshipIcon } from '../lib/connectionUtils';
+import { 
+  getStatusColor as getStatusColorScheme,
+  getTypeColor, 
+  getPriorityColor,
+  suggestSimilarNodes
+} from '../utils/nodeColorSystem';
 
 interface WorkItem {
   id: string;
@@ -58,13 +64,48 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
   const [isStatusOpen, setIsStatusOpen] = React.useState(false);
   const statusDropdownRef = React.useRef<HTMLDivElement>(null);
 
-  // Status options with icons
+  // Status options with consistent color coding
   const statusOptions = [
-    { value: 'PROPOSED', label: 'Proposed', icon: <ClipboardList className="h-6 w-6" />, color: 'text-cyan-400' },
-    { value: 'PLANNED', label: 'Planned', icon: <Calendar className="h-6 w-6" />, color: 'text-purple-400' },
-    { value: 'IN_PROGRESS', label: 'In Progress', icon: <Clock className="h-6 w-6" />, color: 'text-yellow-400' },
-    { value: 'COMPLETED', label: 'Completed', icon: <CheckCircle className="h-6 w-6" />, color: 'text-green-400' },
-    { value: 'BLOCKED', label: 'Blocked', icon: <AlertCircle className="h-6 w-6" />, color: 'text-red-500' }
+    { 
+      value: 'PROPOSED', 
+      label: 'Proposed', 
+      icon: <ClipboardList className="h-6 w-6" />, 
+      color: getStatusColorScheme('PROPOSED').text,
+      background: getStatusColorScheme('PROPOSED').background,
+      border: getStatusColorScheme('PROPOSED').border
+    },
+    { 
+      value: 'PLANNED', 
+      label: 'Planned', 
+      icon: <Calendar className="h-6 w-6" />, 
+      color: getStatusColorScheme('PLANNED').text,
+      background: getStatusColorScheme('PLANNED').background,
+      border: getStatusColorScheme('PLANNED').border
+    },
+    { 
+      value: 'IN_PROGRESS', 
+      label: 'In Progress', 
+      icon: <Clock className="h-6 w-6" />, 
+      color: getStatusColorScheme('IN_PROGRESS').text,
+      background: getStatusColorScheme('IN_PROGRESS').background,
+      border: getStatusColorScheme('IN_PROGRESS').border
+    },
+    { 
+      value: 'COMPLETED', 
+      label: 'Completed', 
+      icon: <CheckCircle className="h-6 w-6" />, 
+      color: getStatusColorScheme('COMPLETED').text,
+      background: getStatusColorScheme('COMPLETED').background,
+      border: getStatusColorScheme('COMPLETED').border
+    },
+    { 
+      value: 'BLOCKED', 
+      label: 'Blocked', 
+      icon: <AlertCircle className="h-6 w-6" />, 
+      color: getStatusColorScheme('BLOCKED').text,
+      background: getStatusColorScheme('BLOCKED').background,
+      border: getStatusColorScheme('BLOCKED').border
+    }
   ];
 
   // Close status dropdown when clicking outside
@@ -331,7 +372,7 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
       <div className="flex items-center justify-center min-h-screen px-4">
         <div className="fixed inset-0 bg-gradient-to-br from-gray-900/80 via-slate-900/90 to-gray-900/80 transition-all duration-300" onClick={onClose} />
         
-        <div className="relative bg-gradient-to-br from-gray-800 via-gray-800 to-gray-900 rounded-2xl shadow-2xl border border-gray-700/50 max-w-lg w-full transform transition-all duration-300">
+        <div className="relative bg-gradient-to-br from-gray-800 via-gray-800 to-gray-900 rounded-2xl shadow-2xl border border-gray-700/50 max-w-lg w-full transform transition-all duration-300" onClick={(e) => e.stopPropagation()}>
           <div className="bg-gradient-to-r from-emerald-900/30 via-green-800/25 to-teal-900/30 px-6 py-5 border-b border-green-600/20 backdrop-blur-sm rounded-t-2xl">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
@@ -479,10 +520,10 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                             setFormData(prev => ({ ...prev, status: option.value }));
                             setIsStatusOpen(false);
                           }}
-                          className={`w-full px-3 py-3 text-left hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all duration-200 rounded-lg group ${
+                          className={`w-full px-3 py-3 text-left transition-all duration-200 rounded-lg group ${
                             formData.status === option.value 
-                              ? 'bg-blue-50 dark:bg-blue-900/30 ring-1 ring-blue-200 dark:ring-blue-700' 
-                              : 'hover:shadow-sm'
+                              ? `${option.background} ${option.border} ring-1` 
+                              : 'hover:bg-gray-700/30 hover:shadow-sm'
                           } ${index !== 0 ? 'mt-1' : ''}`}
                         >
                           <div className="flex items-center justify-between">
@@ -492,14 +533,14 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                               </div>
                               <span className={`font-semibold ${
                                 formData.status === option.value 
-                                  ? 'text-blue-700 dark:text-blue-300' 
+                                  ? option.color 
                                   : 'text-gray-900 dark:text-gray-100'
                               }`}>
                                 {option.label}
                               </span>
                             </div>
                             {formData.status === option.value && (
-                              <div className="w-5 h-5 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs ml-2 flex-shrink-0 shadow-sm">
+                              <div className={`w-5 h-5 ${option.color} rounded-full flex items-center justify-center text-xs ml-2 flex-shrink-0 shadow-sm`}>
                                 ✓
                               </div>
                             )}
