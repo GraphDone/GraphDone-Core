@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Link2, Search, CheckCircle, ArrowRight, Target, ExternalLink, Filter, CheckCircle2, Trash2, AlertTriangle, Unlink } from 'lucide-react';
+import { X, Link2, Search, CheckCircle, ArrowRight, Target, ExternalLink, Filter, CheckCircle2, Trash2, AlertTriangle, Unlink, Clock, Calendar, ClipboardList, AlertCircle, Layers, Sparkles, ListTodo, Trophy, Lightbulb, Microscope, Flame, Zap, Triangle, Circle, ArrowDown } from 'lucide-react';
 import { useQuery, useMutation } from '@apollo/client';
 import { GET_WORK_ITEMS, CREATE_EDGE, GET_EDGES, DELETE_EDGE } from '../lib/queries';
 import { useAuth } from '../contexts/AuthContext';
@@ -18,6 +18,14 @@ import {
   detectDuplicateConnections,
   getCleanupRecommendations
 } from '../lib/connectionUtils';
+import { 
+  getStatusColor as getStatusColorScheme,
+  getTypeColor, 
+  getPriorityColor,
+  getPriorityColorByLevel,
+  suggestSimilarNodes,
+  getColorSimilarityScore
+} from '../utils/nodeColorSystem';
 
 interface ConnectNodeModalProps {
   isOpen: boolean;
@@ -52,14 +60,40 @@ const getStatusColor = (status: string): string => {
   }
 };
 
-const getNodeTypeIcon = (type: string): string => {
-  const iconMap: { [key: string]: string } = {
-    'EPIC': '🎯', 'STORY': '📖', 'TASK': '✅', 'BUG': '🐛',
-    'FEATURE': '⭐', 'ENHANCEMENT': '🚀', 'RESEARCH': '🔍',
-    'DOCUMENTATION': '📝', 'TEST': '🧪', 'REVIEW': '👀',
-    'MILESTONE': '🏁', 'GOAL': '🎯', 'OBJECTIVE': '🎪'
-  };
-  return iconMap[type] || '📋';
+// Get status icon - matching CreateNodeModal
+const getStatusIcon = (status: string, className: string = "h-3 w-3") => {
+  switch (status?.toUpperCase()) {
+    case 'PROPOSED': return <ClipboardList className={className} />;
+    case 'PLANNED': return <Calendar className={className} />;
+    case 'IN_PROGRESS': return <Clock className={className} />;
+    case 'COMPLETED': return <CheckCircle className={className} />;
+    case 'BLOCKED': return <AlertCircle className={className} />;
+    default: return <ClipboardList className={className} />;
+  }
+};
+
+// Get type icon - matching NodeTypeSelector
+const getTypeIcon = (type: string, className: string = "h-3 w-3") => {
+  switch (type?.toUpperCase()) {
+    case 'EPIC': return <Layers className={className} />;
+    case 'MILESTONE': return <Trophy className={className} />;
+    case 'OUTCOME': return <Target className={className} />;
+    case 'FEATURE': return <Sparkles className={className} />;
+    case 'TASK': return <ListTodo className={className} />;
+    case 'BUG': return <AlertTriangle className={className} />;
+    case 'IDEA': return <Lightbulb className={className} />;
+    case 'RESEARCH': return <Microscope className={className} />;
+    default: return <CheckCircle2 className={className} />;
+  }
+};
+
+// Get priority icon based on value - matching CreateNodeModal
+const getPriorityIcon = (priority: number, className: string = "h-3 w-3") => {
+  if (priority >= 0.8) return <Flame className={className} />; // Critical
+  if (priority >= 0.6) return <Zap className={className} />; // High
+  if (priority >= 0.4) return <Triangle className={className} />; // Moderate
+  if (priority >= 0.2) return <Circle className={className} />; // Low
+  return <ArrowDown className={className} />; // Minimal
 };
 
 // Separate DisconnectNodeModal Component
@@ -305,7 +339,7 @@ export function DisconnectNodeModal({ isOpen, onClose, sourceNode }: DisconnectN
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
         <div className="fixed inset-0 bg-gradient-to-br from-red-900/40 via-gray-900/60 to-red-900/40 transition-all duration-300" onClick={onClose} />
 
-        <div className="relative inline-block align-bottom bg-gradient-to-br from-gray-800 via-gray-800 to-red-900/20 rounded-2xl text-left overflow-hidden shadow-2xl border border-red-700/50 transform transition-all duration-300 hover:shadow-red-500/10 sm:my-8 sm:align-middle sm:max-w-3xl sm:w-full z-[10000]">
+        <div className="relative inline-block align-bottom bg-gradient-to-br from-gray-800 via-gray-800 to-red-900/20 rounded-2xl text-left overflow-hidden shadow-2xl border border-red-700/50 transform transition-all duration-300 hover:shadow-red-500/10 sm:my-8 sm:align-middle sm:max-w-3xl sm:w-full z-[10000]" onClick={(e) => e.stopPropagation()}>
           {/* Header */}
           <div className="bg-gradient-to-r from-red-900/30 via-orange-800/25 to-red-900/30 px-6 py-5 border-b border-red-600/20 backdrop-blur-sm">
             <div className="flex items-center justify-between">
@@ -467,11 +501,8 @@ export function DisconnectNodeModal({ isOpen, onClose, sourceNode }: DisconnectN
                                   return truncated + '…';
                                 };
                                 
-                                // Truncate relationship label if needed
-                                const relationshipMaxChars = Math.floor((relationshipWidth - 40) / charWidth);
-                                const truncatedRelationship = relationshipLabel.length > relationshipMaxChars 
-                                  ? relationshipLabel.substring(0, relationshipMaxChars - 1) + '…'
-                                  : relationshipLabel;
+                                // Show full relationship label
+                                const truncatedRelationship = relationshipLabel;
                                 
                                 return (
                                   <>
@@ -555,7 +586,7 @@ export function DisconnectNodeModal({ isOpen, onClose, sourceNode }: DisconnectN
           <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
             <div className="fixed inset-0 bg-gradient-to-br from-red-900/40 via-gray-900/60 to-red-900/40 transition-all duration-300" onClick={() => setShowDisconnectConfirmation(false)} />
 
-            <div className="relative inline-block align-bottom bg-gradient-to-br from-gray-800 via-gray-800 to-red-900/20 rounded-2xl text-left overflow-hidden shadow-2xl border border-red-700/50 transform transition-all duration-300 sm:my-8 sm:align-middle sm:max-w-md sm:w-full z-[10002]">
+            <div className="relative inline-block align-bottom bg-gradient-to-br from-gray-800 via-gray-800 to-red-900/20 rounded-2xl text-left overflow-hidden shadow-2xl border border-red-700/50 transform transition-all duration-300 sm:my-8 sm:align-middle sm:max-w-md sm:w-full z-[10002]" onClick={(e) => e.stopPropagation()}>
               {/* Header */}
               <div className="bg-gradient-to-r from-red-900/30 via-orange-800/25 to-red-900/30 px-6 py-4 border-b border-red-600/20">
                 <div className="flex items-center space-x-3">
@@ -1102,7 +1133,7 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
         <div className="fixed inset-0 bg-gradient-to-br from-gray-900/80 via-slate-900/90 to-gray-900/80 transition-all duration-300" onClick={onClose} />
 
-        <div className="relative inline-block align-bottom bg-gradient-to-br from-gray-800 via-gray-800 to-gray-900 rounded-2xl text-left overflow-hidden shadow-2xl border border-gray-700/50 transform transition-all duration-300 hover:shadow-blue-500/10 sm:my-8 sm:align-middle sm:max-w-5xl sm:w-full z-[10000]">
+        <div className="relative inline-block align-bottom bg-gradient-to-br from-gray-800 via-gray-800 to-gray-900 rounded-2xl text-left overflow-hidden shadow-2xl border border-gray-700/50 transform transition-all duration-300 hover:shadow-blue-500/10 sm:my-8 sm:align-middle sm:max-w-5xl sm:w-full z-[10000]" onClick={(e) => e.stopPropagation()}>
           {/* Header with gradient */}
           <div className="bg-gradient-to-r from-emerald-900/30 via-green-800/25 to-teal-900/30 px-6 py-5 border-b border-emerald-600/20 backdrop-blur-sm">
             <div className="flex items-center justify-between">
@@ -1791,21 +1822,49 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
                                 </span>
                               )}
                             </div>
-                            <div className="flex items-center space-x-4 text-xs">
+                            <div className="flex items-center space-x-3 text-xs">
+                              {/* Status with icon and label */}
                               <div className="flex items-center space-x-1">
-                                <span 
-                                  className="w-2 h-2 rounded-full"
-                                  style={{ backgroundColor: getStatusColor(node.status) }}
-                                />
-                                <span className="text-gray-300 font-medium">{node.status}</span>
+                                <div className={getStatusColorScheme(node.status).text}>
+                                  {getStatusIcon(node.status)}
+                                </div>
+                                <span className="text-gray-300 font-medium">
+                                  {node.status?.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())}
+                                </span>
                               </div>
-                              <span className="text-gray-400">•</span>
-                              <span className="text-gray-300 font-medium">{node.type}</span>
+                              
+                              {/* Type with icon */}
+                              <div className="flex items-center space-x-1">
+                                <div className={getTypeColor(node.type).text}>
+                                  {getTypeIcon(node.type)}
+                                </div>
+                                <span className="text-gray-300 font-medium">
+                                  {node.type?.toLowerCase().replace(/\b\w/g, l => l.toUpperCase())}
+                                </span>
+                              </div>
+                              
+                              {/* Priority with icon and progress bar */}
                               {(node.priorityComp !== undefined && node.priorityComp !== null) && (
-                                <>
-                                  <span className="text-gray-400">•</span>
-                                  <span className="text-emerald-300 font-medium">{Math.round(node.priorityComp * 100)}%</span>
-                                </>
+                                <div className="flex items-center space-x-1">
+                                  <div className={getPriorityColor(node.priorityComp).text}>
+                                    {getPriorityIcon(node.priorityComp)}
+                                  </div>
+                                  <span className="text-gray-300 font-medium">Priority</span>
+                                  <div className="flex items-center space-x-1">
+                                    <div className="w-12 h-1.5 bg-gray-700 rounded-full overflow-hidden">
+                                      <div 
+                                        className="h-full transition-all duration-300"
+                                        style={{ 
+                                          width: `${Math.round(node.priorityComp * 100)}%`,
+                                          backgroundColor: getPriorityColor(node.priorityComp).hex
+                                        }}
+                                      />
+                                    </div>
+                                    <span className={`text-xs font-medium ${getPriorityColor(node.priorityComp).text}`}>
+                                      {Math.round(node.priorityComp * 100)}%
+                                    </span>
+                                  </div>
+                                </div>
                               )}
                             </div>
                           </div>
@@ -1968,116 +2027,33 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
                             >
                               <div className="flex items-start justify-between">
                                 <div className="flex-1 min-w-0 pr-4">
-                                  {/* Disconnect Tab - EXTREME Space Utilization */}
-                                  <div ref={disconnectContainerRef} className="flex items-center space-x-2 text-sm w-full overflow-hidden whitespace-nowrap">
-                                    {(() => {
-                                      const relationshipLabel = relationshipType?.label || connection.type;
-                                      const sourceTitle = sourceNode.title;
-                                      const targetTitle = connection.connectedNode.title;
-                                      
-                                      // STABLE SPACE UTILIZATION - Fixed width calculation
-                                      const actualBoxWidth = disconnectContainerWidth > 0 ? disconnectContainerWidth : 400; // Fallback width
-                                      const charWidth = 6; // Stable character packing
-                                      const fixedElements = 60; // More conservative spacing
-                                      const relationshipMinWidth = 80; // Stable minimum for relationship
-                                      
-                                      // Calculate relationship width - give it absolute minimal space
-                                      const relationshipWidth = Math.max(
-                                        relationshipMinWidth,
-                                        Math.min(relationshipLabel.length * charWidth + 16, actualBoxWidth * 0.12) // Only 12% max for relationship
-                                      );
-                                      
-                                      // Available space for titles - use everything possible
-                                      const availableForTitles = actualBoxWidth - fixedElements - relationshipWidth;
-                                      
-                                      // EXTREME SPACE DISTRIBUTION: Maximize every pixel
-                                      const totalTitleLength = sourceTitle.length + targetTitle.length;
-                                      const sourceRatio = totalTitleLength > 0 ? sourceTitle.length / totalTitleLength : 0.5;
-                                      const targetRatio = 1 - sourceRatio;
-                                      
-                                      // Distribute space - use every available pixel
-                                      let sourceMaxWidth = Math.floor(availableForTitles * sourceRatio);
-                                      let targetMaxWidth = Math.floor(availableForTitles * targetRatio);
-                                      
-                                      // Ensure minimum widths - but prioritize space usage
-                                      const minWidth = 50; // Reduced minimum to maximize space
-                                      if (sourceMaxWidth < minWidth) {
-                                        const deficit = minWidth - sourceMaxWidth;
-                                        sourceMaxWidth = minWidth;
-                                        targetMaxWidth = Math.max(minWidth, targetMaxWidth - deficit);
+                                  {/* Connection Display */}
+                                  <div className="flex items-center space-x-2 text-sm w-full flex-wrap">
+                                    <div className="flex items-center px-2 py-1 bg-gray-600/40 rounded-md">
+                                      <span className="text-white font-semibold text-xs" title={sourceNode.title}>
+                                        {sourceNode.title}
+                                      </span>
+                                    </div>
+                                    
+                                    <ArrowRight className={`h-3 w-3 ${relationshipType?.color || 'text-gray-400'}`} />
+                                    
+                                    <div className="flex items-center space-x-1 px-2 py-1 rounded bg-gray-600/40">
+                                      {relationshipType ? 
+                                        getRelationshipIcon(relationshipType.icon, `h-2.5 w-2.5 ${relationshipType.color}`) :
+                                        getRelationshipIcon('Link2', 'h-2.5 w-2.5 text-gray-400')
                                       }
-                                      if (targetMaxWidth < minWidth) {
-                                        const deficit = minWidth - targetMaxWidth;
-                                        targetMaxWidth = minWidth;
-                                        sourceMaxWidth = Math.max(minWidth, sourceMaxWidth - deficit);
-                                      }
-                                      
-                                      // Add any remaining space back to the titles
-                                      const usedSpace = sourceMaxWidth + targetMaxWidth + relationshipWidth + fixedElements;
-                                      const remainingSpace = actualBoxWidth - usedSpace;
-                                      if (remainingSpace > 10) {
-                                        // Distribute remaining space proportionally
-                                        const extraSource = Math.floor(remainingSpace * sourceRatio);
-                                        const extraTarget = remainingSpace - extraSource;
-                                        sourceMaxWidth += extraSource;
-                                        targetMaxWidth += extraTarget;
-                                      }
-                                      
-                                      // Convert to character limits - ultra-aggressive
-                                      const sourceMaxChars = Math.floor(sourceMaxWidth / charWidth);
-                                      const targetMaxChars = Math.floor(targetMaxWidth / charWidth);
-                                      
-                                      // Smart truncation function
-                                      const smartTruncate = (title: string, maxChars: number) => {
-                                        if (title.length <= maxChars) return title;
-                                        // Try to break at word boundaries
-                                        const truncated = title.substring(0, maxChars - 1);
-                                        const lastSpace = truncated.lastIndexOf(' ');
-                                        if (lastSpace > maxChars * 0.7) { // If we can save 30% or more, break at word
-                                          return truncated.substring(0, lastSpace) + '…';
-                                        }
-                                        return truncated + '…';
-                                      };
-                                      
-                                      // Truncate relationship label if needed
-                                      const relationshipMaxChars = Math.floor((relationshipWidth - 40) / charWidth);
-                                      const truncatedRelationship = relationshipLabel.length > relationshipMaxChars 
-                                        ? relationshipLabel.substring(0, relationshipMaxChars - 1) + '…'
-                                        : relationshipLabel;
-                                      
-                                      return (
-                                        <>
-                                          {/* Source - Dynamic width based on content */}
-                                          <div className="flex items-center px-2 py-1 bg-gray-600/40 rounded-md flex-shrink-0" style={{ width: `${sourceMaxWidth}px`, minWidth: '50px' }}>
-                                            <span className="text-white font-semibold text-xs truncate" title={sourceTitle}>
-                                              {smartTruncate(sourceTitle, sourceMaxChars)}
-                                            </span>
-                                          </div>
-                                          
-                                          {/* Relationship - Dynamic width */}
-                                          <div className="flex items-center space-x-1 flex-shrink-0">
-                                            <ArrowRight className={`h-3 w-3 ${relationshipType?.color || 'text-gray-400'}`} />
-                                            <div className="flex items-center space-x-1 px-2 py-1 rounded bg-gray-600/40" style={{ width: `${relationshipWidth}px` }}>
-                                              {relationshipType ? 
-                                                getRelationshipIcon(relationshipType.icon, `h-2.5 w-2.5 ${relationshipType.color}`) :
-                                                getRelationshipIcon('Link2', 'h-2.5 w-2.5 text-gray-400')
-                                              }
-                                              <span className={`text-xs font-medium ${relationshipType?.color || 'text-gray-400'} truncate`} title={relationshipLabel}>
-                                                {truncatedRelationship}
-                                              </span>
-                                            </div>
-                                            <ArrowRight className="h-3 w-3 text-gray-400" />
-                                          </div>
-
-                                          {/* Target - Dynamic width based on content */}
-                                          <div className="flex items-center px-2 py-1 bg-gray-600/40 rounded-md flex-shrink-0" style={{ width: `${targetMaxWidth}px`, minWidth: '50px' }}>
-                                            <span className="text-gray-200 font-medium text-xs truncate" title={targetTitle}>
-                                              {smartTruncate(targetTitle, targetMaxChars)}
-                                            </span>
-                                          </div>
-                                        </>
-                                      );
-                                    })()}
+                                      <span className={`text-xs font-medium ${relationshipType?.color || 'text-gray-400'}`} title={relationshipType?.label || connection.type}>
+                                        {relationshipType?.label || connection.type}
+                                      </span>
+                                    </div>
+                                    
+                                    <ArrowRight className="h-3 w-3 text-gray-400" />
+                                    
+                                    <div className="flex items-center px-2 py-1 bg-gray-600/40 rounded-md">
+                                      <span className="text-gray-200 font-medium text-xs" title={connection.connectedNode.title}>
+                                        {connection.connectedNode.title}
+                                      </span>
+                                    </div>
                                   </div>
                                 </div>
                                 
@@ -2130,7 +2106,7 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
           <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
             <div className="fixed inset-0 bg-gradient-to-br from-red-900/40 via-gray-900/60 to-red-900/40 transition-all duration-300" onClick={() => setShowDisconnectConfirmation(false)} />
 
-            <div className="relative inline-block align-bottom bg-gradient-to-br from-gray-800 via-gray-800 to-red-900/20 rounded-2xl text-left overflow-hidden shadow-2xl border border-red-700/50 transform transition-all duration-300 sm:my-8 sm:align-middle sm:max-w-md sm:w-full z-[10002]">
+            <div className="relative inline-block align-bottom bg-gradient-to-br from-gray-800 via-gray-800 to-red-900/20 rounded-2xl text-left overflow-hidden shadow-2xl border border-red-700/50 transform transition-all duration-300 sm:my-8 sm:align-middle sm:max-w-md sm:w-full z-[10002]" onClick={(e) => e.stopPropagation()}>
               {/* Header */}
               <div className="bg-gradient-to-r from-red-900/30 via-orange-800/25 to-red-900/30 px-6 py-4 border-b border-red-600/20">
                 <div className="flex items-center space-x-3">

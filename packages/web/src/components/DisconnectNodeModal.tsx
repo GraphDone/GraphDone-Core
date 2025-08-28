@@ -294,59 +294,34 @@ export function DisconnectNodeModal({ isOpen, onClose, sourceNode }: DisconnectN
                         }`}
                       >
                         <div className="flex items-start justify-between">
-                          <div className="flex-1 min-w-0 pr-4">
-                            {/* Stable Connection Display - Fixed Width Calculation */}
-                            <div className="flex items-center space-x-2 text-sm w-full overflow-hidden whitespace-nowrap">
-                              {(() => {
-                                // STABLE approach - use fixed calculations to prevent expansion during selection
-                                const relationshipLabel = relationshipType?.label || connection.type;
+                          <div className="flex-1 pr-4">
+                            {/* Connection Display */}
+                            <div className="flex items-center space-x-2 text-sm w-full flex-wrap">
+                                <div className="flex items-center px-2 py-1 bg-gray-600/40 rounded-md">
+                                  <span className="text-white font-semibold text-xs" title={sourceNode.title}>
+                                    {sourceNode.title}
+                                  </span>
+                                </div>
                                 
-                                // STABLE calculation - don't use dynamic containerWidth that changes during selection
-                                const baseBoxWidth = 500; // Fixed reference width for stability
-                                const charWidth = 6; // Standard character width
-                                const fixedElements = 50; // Conservative spacing for arrows and padding
-                                const relationshipWidth = Math.min(relationshipLabel.length * charWidth + 20, Math.floor(baseBoxWidth * 0.15)); // Fixed 15% for relationship
-                                const availableForTitles = baseBoxWidth - fixedElements - relationshipWidth;
-                                const maxCharsPerTitle = Math.max(15, Math.floor(availableForTitles / 2 / charWidth)); // Conservative title length
+                                <ArrowRight className={`h-3 w-3 ${relationshipType?.color || 'text-gray-400'}`} />
                                 
-                                const truncateForDisconnect = (title: string) => {
-                                  if (title.length <= maxCharsPerTitle) return title;
-                                  return title.substring(0, maxCharsPerTitle - 1) + '…';
-                                };
+                                <div className="flex items-center space-x-1 px-2 py-1 rounded bg-gray-600/40">
+                                  {relationshipType ? 
+                                    getRelationshipIcon(relationshipType.icon, `h-2.5 w-2.5 ${relationshipType.color}`) :
+                                    getRelationshipIcon('Link2', 'h-2.5 w-2.5 text-gray-400')
+                                  }
+                                  <span className={`text-xs font-medium ${relationshipType?.color || 'text-gray-400'}`} title={relationshipType?.label || connection.type}>
+                                    {relationshipType?.label || connection.type}
+                                  </span>
+                                </div>
                                 
-                                return (
-                                  <>
-                                    {/* Source - Fixed width for stability */}
-                                    <div className="flex items-center px-2 py-1 bg-gray-600/40 rounded-md flex-shrink-0 min-w-0" style={{ maxWidth: '140px' }}>
-                                      <span className="text-white font-semibold text-xs truncate" title={sourceNode.title}>
-                                        {truncateForDisconnect(sourceNode.title)}
-                                      </span>
-                                    </div>
-                                    
-                                    {/* Relationship - Fixed width for stability */}
-                                    <div className="flex items-center space-x-1 flex-shrink-0">
-                                      <ArrowRight className={`h-3 w-3 ${relationshipType?.color || 'text-gray-400'}`} />
-                                      <div className="flex items-center space-x-1 px-2 py-1 rounded bg-gray-600/40" style={{ maxWidth: '100px' }}>
-                                        {relationshipType ? 
-                                          getRelationshipIcon(relationshipType.icon, `h-2.5 w-2.5 ${relationshipType.color}`) :
-                                          getRelationshipIcon('Link2', 'h-2.5 w-2.5 text-gray-400')
-                                        }
-                                        <span className={`text-xs font-medium truncate ${relationshipType?.color || 'text-gray-400'}`} title={relationshipLabel}>
-                                          {relationshipLabel.length > 12 ? relationshipLabel.substring(0, 11) + '…' : relationshipLabel}
-                                        </span>
-                                      </div>
-                                      <ArrowRight className="h-3 w-3 text-gray-400" />
-                                    </div>
-
-                                    {/* Target - Fixed width for stability */}
-                                    <div className="flex items-center px-2 py-1 bg-gray-600/40 rounded-md flex-shrink-0 min-w-0" style={{ maxWidth: '140px' }}>
-                                      <span className="text-gray-200 font-medium text-xs truncate" title={connection.connectedNode.title}>
-                                        {truncateForDisconnect(connection.connectedNode.title)}
-                                      </span>
-                                    </div>
-                                  </>
-                                );
-                              })()}
+                                <ArrowRight className="h-3 w-3 text-gray-400" />
+                                
+                                <div className="flex items-center px-2 py-1 bg-gray-600/40 rounded-md">
+                                  <span className="text-gray-200 font-medium text-xs" title={connection.connectedNode.title}>
+                                    {connection.connectedNode.title}
+                                  </span>
+                                </div>
                             </div>
                           </div>
                           
