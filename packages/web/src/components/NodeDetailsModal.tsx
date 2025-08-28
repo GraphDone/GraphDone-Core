@@ -1,5 +1,9 @@
 import React from 'react';
-import { X, Calendar, Clock, User, Flag, Edit3 } from 'lucide-react';
+import { 
+  X, Calendar, Clock, User, Flag, Edit3, 
+  Layers, Trophy, Target, Sparkles, ListTodo, AlertTriangle, Lightbulb, Microscope,
+  ClipboardList, CheckCircle, AlertCircle, Flame, Zap, Triangle, Circle, ArrowDown
+} from 'lucide-react';
 import { WorkItem } from '../types/graph';
 
 interface NodeDetailsModalProps {
@@ -22,25 +26,59 @@ export function NodeDetailsModal({ isOpen, onClose, node, onEdit }: NodeDetailsM
   const getStatusColor = (status: string) => {
     switch (status.toUpperCase()) {
       case 'COMPLETED': return 'text-green-400 bg-green-400/10';
-      case 'IN_PROGRESS': return 'text-blue-400 bg-blue-400/10';
-      case 'BLOCKED': return 'text-red-400 bg-red-400/10';
-      case 'PLANNED': return 'text-orange-400 bg-orange-400/10';
-      case 'PROPOSED': return 'text-purple-400 bg-purple-400/10';
+      case 'IN_PROGRESS': return 'text-yellow-400 bg-yellow-400/10';
+      case 'BLOCKED': return 'text-red-500 bg-red-500/10';
+      case 'PLANNED': return 'text-purple-400 bg-purple-400/10';
+      case 'PROPOSED': return 'text-cyan-400 bg-cyan-400/10';
       default: return 'text-gray-400 bg-gray-400/10';
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status.toUpperCase()) {
+      case 'PROPOSED': return <ClipboardList className="h-5 w-5 text-cyan-400" />;
+      case 'PLANNED': return <Calendar className="h-5 w-5 text-purple-400" />;
+      case 'IN_PROGRESS': return <Clock className="h-5 w-5 text-yellow-400" />;
+      case 'COMPLETED': return <CheckCircle className="h-5 w-5 text-green-400" />;
+      case 'BLOCKED': return <AlertCircle className="h-5 w-5 text-red-500" />;
+      default: return <Clock className="h-5 w-5 text-gray-400" />;
     }
   };
 
   const getTypeColor = (type: string) => {
     switch (type) {
-      case 'EPIC': return 'text-purple-400 bg-purple-400/10';
+      case 'EPIC': return 'text-fuchsia-400 bg-fuchsia-400/10';
       case 'MILESTONE': return 'text-orange-400 bg-orange-400/10';
-      case 'FEATURE': return 'text-blue-400 bg-blue-400/10';
+      case 'OUTCOME': return 'text-indigo-400 bg-indigo-400/10';
+      case 'FEATURE': return 'text-sky-400 bg-sky-400/10';
       case 'TASK': return 'text-green-400 bg-green-400/10';
-      case 'BUG': return 'text-red-400 bg-red-400/10';
-      case 'IDEA': return 'text-yellow-400 bg-yellow-400/10';
+      case 'BUG': return 'text-red-500 bg-red-500/10';
+      case 'IDEA': return 'text-yellow-500 bg-yellow-500/10';
       case 'RESEARCH': return 'text-teal-400 bg-teal-400/10';
       default: return 'text-gray-400 bg-gray-400/10';
     }
+  };
+
+  const getTypeIcon = (type: string) => {
+    switch (type) {
+      case 'EPIC': return <Layers className="h-5 w-5 text-fuchsia-400" />;
+      case 'MILESTONE': return <Trophy className="h-5 w-5 text-orange-400" />;
+      case 'OUTCOME': return <Target className="h-5 w-5 text-indigo-400" />;
+      case 'FEATURE': return <Sparkles className="h-5 w-5 text-sky-400" />;
+      case 'TASK': return <ListTodo className="h-5 w-5 text-green-400" />;
+      case 'BUG': return <AlertTriangle className="h-5 w-5 text-red-500" />;
+      case 'IDEA': return <Lightbulb className="h-5 w-5 text-yellow-500" />;
+      case 'RESEARCH': return <Microscope className="h-5 w-5 text-teal-400" />;
+      default: return <ListTodo className="h-5 w-5 text-green-400" />;
+    }
+  };
+
+  const getPriorityIcon = (priority: number) => {
+    if (priority >= 0.8) return <Flame className="h-5 w-5 text-red-400" />;
+    if (priority >= 0.6) return <Zap className="h-5 w-5 text-orange-400" />;
+    if (priority >= 0.4) return <Triangle className="h-5 w-5 text-yellow-400" />;
+    if (priority >= 0.2) return <Circle className="h-5 w-5 text-blue-400" />;
+    return <ArrowDown className="h-5 w-5 text-gray-400" />;
   };
 
   // Use the same priority levels as ListView (0.0-1.0 scale)
@@ -63,20 +101,22 @@ export function NodeDetailsModal({ isOpen, onClose, node, onEdit }: NodeDetailsM
   const priorityInfo = getPriorityLevel(totalPriority);
 
   return (
-    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div 
-        className="flex-1 cursor-pointer" 
+        className="fixed inset-0 cursor-pointer" 
         onClick={onClose}
       />
-      <div className="bg-gray-900 border-l border-gray-700 shadow-2xl w-full max-w-lg h-full overflow-y-auto animate-slide-in-right">
+      <div className="relative bg-gray-900 border border-gray-700 shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-lg animate-in fade-in zoom-in-95 duration-300">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-700">
           <div className="flex items-center space-x-3">
-            <span className={`px-2 py-1 rounded-md text-xs font-medium ${getTypeColor(node.type)}`}>
-              {node.type}
+            <span className={`flex items-center space-x-2 px-3 py-1 rounded-md text-sm font-medium ${getTypeColor(node.type)}`}>
+              {getTypeIcon(node.type)}
+              <span>{node.type}</span>
             </span>
-            <span className={`px-2 py-1 rounded-md text-xs font-medium ${getStatusColor(node.status)}`}>
-              {node.status}
+            <span className={`flex items-center space-x-2 px-3 py-1 rounded-md text-sm font-medium ${getStatusColor(node.status)}`}>
+              {getStatusIcon(node.status)}
+              <span>{node.status}</span>
             </span>
           </div>
           <div className="flex items-center space-x-2">
@@ -115,15 +155,17 @@ export function NodeDetailsModal({ isOpen, onClose, node, onEdit }: NodeDetailsM
           <div className="flex items-center space-x-4 mb-6">
             <div>
               <h3 className="text-sm font-medium text-gray-400 mb-2">Type</h3>
-              <span className={`px-3 py-1 rounded-md text-sm font-medium ${getTypeColor(node.type)}`}>
-                {node.type}
+              <span className={`flex items-center space-x-2 px-3 py-1 rounded-md text-sm font-medium ${getTypeColor(node.type)}`}>
+                {getTypeIcon(node.type)}
+                <span>{node.type}</span>
               </span>
             </div>
             {node.status && (
               <div>
                 <h3 className="text-sm font-medium text-gray-400 mb-2">Status</h3>
-                <span className={`px-3 py-1 rounded-md text-sm font-medium ${getStatusColor(node.status)}`}>
-                  {node.status.replace('_', ' ')}
+                <span className={`flex items-center space-x-2 px-3 py-1 rounded-md text-sm font-medium ${getStatusColor(node.status)}`}>
+                  {getStatusIcon(node.status)}
+                  <span>{node.status.replace('_', ' ')}</span>
                 </span>
               </div>
             )}
@@ -138,8 +180,9 @@ export function NodeDetailsModal({ isOpen, onClose, node, onEdit }: NodeDetailsM
                 Priority
               </h3>
               <div className="flex items-center space-x-3">
-                <span className={`px-2 py-1 rounded-md text-xs font-medium ${priorityInfo.color}`}>
-                  {priorityInfo.label}
+                <span className={`flex items-center space-x-2 px-3 py-1 rounded-md text-sm font-medium ${priorityInfo.color}`}>
+                  {getPriorityIcon(totalPriority)}
+                  <span>{priorityInfo.label}</span>
                 </span>
                 <span className="text-gray-500 text-sm">({Math.round(totalPriority * 100)}%)</span>
               </div>

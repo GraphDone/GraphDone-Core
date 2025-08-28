@@ -2074,8 +2074,8 @@ export function InteractiveGraphVisualization() {
           node={selectedNode}
           onEdit={(node) => {
             setShowNodeDetailsModal(false);
-            setSelectedNode(node);
             setShowEditModal(true);
+            // Don't set selectedNode again since it's already the correct node
           }}
         />
       )}
