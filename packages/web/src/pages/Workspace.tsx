@@ -1,12 +1,11 @@
 import { useState } from 'react';
-import { Plus, Zap, RotateCcw, Share2, Users, Filter } from 'lucide-react';
+import { Plus, Share2, Users, Table, Activity, Network, CreditCard, Columns, CalendarDays, GanttChartSquare, LayoutDashboard } from 'lucide-react';
 import { useQuery } from '@apollo/client';
 import { SafeGraphVisualization } from '../components/SafeGraphVisualization';
 import { CreateNodeModal } from '../components/CreateNodeModal';
 import { CreateGraphModal } from '../components/CreateGraphModal';
 import { GraphSelectionModal } from '../components/GraphSelectionModal';
-import { ListView } from '../components/ListView';
-import { TimelineView } from '../components/TimelineView';
+import ViewManager from '../components/ViewManager';
 import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
 import { GET_WORK_ITEMS, GET_EDGES } from '../lib/queries';
@@ -15,7 +14,7 @@ export function Workspace() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showCreateGraphModal, setShowCreateGraphModal] = useState(false);
   const [showGraphSelectionModal, setShowGraphSelectionModal] = useState(false);
-  const [viewMode, setViewMode] = useState<'graph' | 'list' | 'timeline'>('graph');
+  const [viewMode, setViewMode] = useState<'graph' | 'dashboard' | 'table' | 'cards' | 'kanban' | 'gantt' | 'calendar' | 'activity'>('graph');
   const { currentGraph } = useGraph();
   const { currentTeam, currentUser } = useAuth();
 
@@ -49,118 +48,183 @@ export function Workspace() {
   const actualNodeCount = workItemsData?.workItems?.length || 0;
   const actualEdgeCount = edgesData?.edges?.length || 0;
 
-  const canEdit = currentGraph && currentUser; // Simplified for demo
 
   return (
     <div className="h-screen flex flex-col">
       {/* Header with Graph Context */}
-      <div className="bg-gray-800 border-b border-gray-700 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-emerald-400 via-green-300 to-blue-400 bg-clip-text text-transparent">
-                {currentGraph?.name || 'Select a Graph'}
-              </h1>
-              <div className="flex items-center space-x-2 text-sm text-gray-400 mt-1">
-                {currentTeam && (
-                  <>
-                    <span>{currentTeam.name}</span>
-                    <span>•</span>
-                  </>
-                )}
-                {currentGraph && (
-                  <>
-                    <span>{actualNodeCount} node{actualNodeCount !== 1 ? 's' : ''}</span>
-                    <span>•</span>
-                    <span>{actualEdgeCount} connection{actualEdgeCount !== 1 ? 's' : ''}</span>
-                    <span>•</span>
-                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border shadow-sm ${
-                      currentGraph.type === 'PROJECT' ? 'bg-blue-500/20 text-blue-300 border-blue-400/30' :
-                      currentGraph.type === 'WORKSPACE' ? 'bg-purple-500/20 text-purple-300 border-purple-400/30' :
-                      currentGraph.type === 'SUBGRAPH' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400/30' :
-                      currentGraph.type === 'TEMPLATE' ? 'bg-amber-500/20 text-amber-300 border-amber-400/30' :
-                      'bg-slate-500/20 text-slate-300 border-slate-400/30'
-                    }`}>
-                      {currentGraph.type}
-                    </span>
-                    {currentGraph.isShared && (
-                      <>
-                        <span>•</span>
-                        <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30 shadow-sm">
-                          <Share2 className="h-3 w-3" />
-                          <span className="text-xs font-medium">Shared</span>
-                        </div>
-                      </>
-                    )}
-                  </>
-                )}
+      <div className="bg-gray-800 border-b border-gray-700">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            {/* Left Section: Graph Info and Navigation */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 lg:gap-8 flex-1">
+              {/* Graph Information */}
+              <div className="flex-shrink-0">
+                <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-emerald-400 via-green-300 to-blue-400 bg-clip-text text-transparent">
+                  {currentGraph?.name || 'Select a Graph'}
+                </h1>
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-gray-400 mt-1">
+                  {currentTeam && (
+                    <>
+                      <span>{currentTeam.name}</span>
+                      <span>•</span>
+                    </>
+                  )}
+                  {currentGraph && (
+                    <>
+                      <span className="whitespace-nowrap">{actualNodeCount} node{actualNodeCount !== 1 ? 's' : ''}</span>
+                      <span>•</span>
+                      <span className="whitespace-nowrap">{actualEdgeCount} connection{actualEdgeCount !== 1 ? 's' : ''}</span>
+                      <span>•</span>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border shadow-sm ${
+                        currentGraph.type === 'PROJECT' ? 'bg-blue-500/20 text-blue-300 border-blue-400/30' :
+                        currentGraph.type === 'WORKSPACE' ? 'bg-purple-500/20 text-purple-300 border-purple-400/30' :
+                        currentGraph.type === 'SUBGRAPH' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400/30' :
+                        currentGraph.type === 'TEMPLATE' ? 'bg-amber-500/20 text-amber-300 border-amber-400/30' :
+                        'bg-slate-500/20 text-slate-300 border-slate-400/30'
+                      }`}>
+                        {currentGraph.type}
+                      </span>
+                      {currentGraph.isShared && (
+                        <>
+                          <span>•</span>
+                          <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30 shadow-sm">
+                            <Share2 className="h-3 w-3" />
+                            <span className="text-xs font-medium">Shared</span>
+                          </div>
+                        </>
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
-            </div>
-          </div>
-          
-          <div className="flex items-center space-x-3">
-            {/* View Mode Selector */}
-            <div className="flex bg-gray-700 rounded-lg p-1">
+              
+              {/* All Views Selector - Responsive */}
+              <div className="flex items-center flex-1 ml-8">
+                <div className="flex bg-gray-700/50 backdrop-blur-sm rounded-lg p-2 gap-4 overflow-x-auto w-full justify-between">
               <button
                 onClick={() => setViewMode('graph')}
-                className={`px-3 py-1 text-sm rounded transition-colors ${
+                className={`px-3 py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center space-y-2 ${
                   viewMode === 'graph' 
                     ? 'bg-green-600 text-white shadow' 
                     : 'text-gray-300 hover:text-white'
                 }`}
+                title="Graph View"
               >
-                Graph
+                <Network className="h-5 w-5" />
+                <div className="text-xs text-center font-medium">
+                  <div>Graph</div>
+                </div>
               </button>
               <button
-                onClick={() => setViewMode('list')}
-                className={`px-3 py-1 text-sm rounded transition-colors ${
-                  viewMode === 'list' 
+                onClick={() => setViewMode('dashboard')}
+                className={`px-3 py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center space-y-2 ${
+                  viewMode === 'dashboard' 
                     ? 'bg-green-600 text-white shadow' 
                     : 'text-gray-300 hover:text-white'
                 }`}
+                title="Dashboard View"
               >
-                List
+                <LayoutDashboard className="h-5 w-5" />
+                <div className="text-xs text-center font-medium">
+                  <div>Dashboard</div>
+                </div>
               </button>
               <button
-                onClick={() => setViewMode('timeline')}
-                className={`px-3 py-1 text-sm rounded transition-colors ${
-                  viewMode === 'timeline' 
+                onClick={() => setViewMode('table')}
+                className={`px-3 py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center space-y-2 ${
+                  viewMode === 'table' 
                     ? 'bg-green-600 text-white shadow' 
                     : 'text-gray-300 hover:text-white'
                 }`}
+                title="Table View"
               >
-                Timeline
+                <Table className="h-5 w-5" />
+                <div className="text-xs text-center font-medium">
+                  <div>Table</div>
+                  <div>View</div>
+                </div>
               </button>
+              <button
+                onClick={() => setViewMode('cards')}
+                className={`px-3 py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center space-y-2 ${
+                  viewMode === 'cards' 
+                    ? 'bg-green-600 text-white shadow' 
+                    : 'text-gray-300 hover:text-white'
+                }`}
+                title="Card View"
+              >
+                <CreditCard className="h-5 w-5" />
+                <div className="text-xs text-center font-medium">
+                  <div>Card</div>
+                  <div>View</div>
+                </div>
+              </button>
+              <button
+                onClick={() => setViewMode('kanban')}
+                className={`px-3 py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center space-y-2 ${
+                  viewMode === 'kanban' 
+                    ? 'bg-green-600 text-white shadow' 
+                    : 'text-gray-300 hover:text-white'
+                }`}
+                title="Kanban View"
+              >
+                <Columns className="h-5 w-5" />
+                <div className="text-xs text-center font-medium">
+                  <div>Kanban</div>
+                  <div>View</div>
+                </div>
+              </button>
+              <button
+                onClick={() => setViewMode('gantt')}
+                className={`px-3 py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center space-y-2 ${
+                  viewMode === 'gantt' 
+                    ? 'bg-green-600 text-white shadow' 
+                    : 'text-gray-300 hover:text-white'
+                }`}
+                title="Gantt Chart"
+              >
+                <GanttChartSquare className="h-5 w-5" />
+                <div className="text-xs text-center font-medium">
+                  <div>Gantt</div>
+                  <div>Chart</div>
+                </div>
+              </button>
+              <button
+                onClick={() => setViewMode('calendar')}
+                className={`px-3 py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center space-y-2 ${
+                  viewMode === 'calendar' 
+                    ? 'bg-green-600 text-white shadow' 
+                    : 'text-gray-300 hover:text-white'
+                }`}
+                title="Calendar View"
+              >
+                <CalendarDays className="h-5 w-5" />
+                <div className="text-xs text-center font-medium">
+                  <div>Calendar</div>
+                  <div>View</div>
+                </div>
+              </button>
+              <button
+                onClick={() => setViewMode('activity')}
+                className={`px-3 py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center space-y-2 ${
+                  viewMode === 'activity' 
+                    ? 'bg-green-600 text-white shadow' 
+                    : 'text-gray-300 hover:text-white'
+                }`}
+                title="Activity Feed"
+              >
+                <Activity className="h-5 w-5" />
+                <div className="text-xs text-center font-medium">
+                  <div>Activity</div>
+                  <div>Feed</div>
+                </div>
+              </button>
+                </div>
+              </div>
             </div>
 
-            {/* Actions */}
-            <button
-              type="button"
-              className="btn btn-secondary"
-              disabled={!currentGraph}
-            >
-              <Filter className="h-4 w-4 mr-2" />
-              Filter
-            </button>
-
-            <button
-              type="button"
-              className="btn btn-secondary"
-              disabled={!currentGraph}
-            >
-              <RotateCcw className="h-4 w-4 mr-2" />
-              Reset View
-            </button>
-            
-            <button
-              type="button"
-              className="btn btn-secondary"
-              disabled={!currentGraph}
-            >
-              <Zap className="h-4 w-4 mr-2" />
-              Auto-layout
-            </button>
-
+            {/* Right Section: Actions */}
+            <div className="flex items-center gap-3 flex-shrink-0">
             {currentGraph?.isShared && (
               <button
                 type="button"
@@ -170,16 +234,7 @@ export function Workspace() {
                 Collaborators
               </button>
             )}
-            
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={() => setShowCreateModal(true)}
-              disabled={!canEdit || !currentGraph}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Node
-            </button>
+            </div>
           </div>
         </div>
       </div>
@@ -239,7 +294,7 @@ export function Workspace() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="text-center p-4 bg-gray-800/50 backdrop-blur-sm rounded-lg border border-gray-600/50 hover:border-green-500/50 transition-all duration-300 hover:bg-gray-700/50">
                   <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center mx-auto mb-3 shadow-lg">
-                    <Zap className="h-5 w-5 text-white" />
+                    <Plus className="h-5 w-5 text-white" />
                   </div>
                   <h3 className="font-medium text-white mb-1">Quick Start</h3>
                   <p className="text-xs text-gray-300">Create and organize efficiently</p>
@@ -265,10 +320,8 @@ export function Workspace() {
           </div>
         ) : viewMode === 'graph' ? (
           <SafeGraphVisualization />
-        ) : viewMode === 'list' ? (
-          <ListView />
         ) : (
-          <TimelineView />
+          <ViewManager viewMode={viewMode as 'dashboard' | 'table' | 'cards' | 'kanban' | 'gantt' | 'calendar' | 'activity'} />
         )}
       </div>
 
