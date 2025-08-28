@@ -207,13 +207,20 @@ export function NodeDetailsModal({ isOpen, onClose, node, onEdit }: NodeDetailsM
             )}
 
             {/* Owner */}
-            {node.owner && (
-              <div>
-                <h3 className="text-sm font-medium text-gray-400 mb-2">Owner</h3>
-                <div className="text-gray-300">{node.owner.name}</div>
-                <div className="text-gray-500 text-sm">@{node.owner.username}</div>
-              </div>
-            )}
+            <div>
+              <h3 className="text-sm font-medium text-gray-400 mb-2">Owner</h3>
+              {node.owner ? (
+                <>
+                  <div className="text-gray-300">{node.owner.name}</div>
+                  <div className="text-gray-500 text-sm">@{node.owner.username}</div>
+                </>
+              ) : (
+                <>
+                  <div className="text-gray-300">Default Admin</div>
+                  <div className="text-gray-500 text-sm">@admin</div>
+                </>
+              )}
+            </div>
 
             {/* Due Date */}
             {node.dueDate && (
