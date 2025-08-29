@@ -9,14 +9,13 @@ import {
   AlertCircle,
   Calendar,
   ClipboardList,
-  Layers,
-  Trophy,
-  Target,
-  Sparkles,
-  ListTodo,
-  AlertTriangle,
-  Lightbulb,
-  Microscope
+  WorkItemType,
+  WorkItemStatus,
+  getTypeConfig,
+  getTypeIconElement,
+  getStatusConfig,
+  getStatusIconElement,
+  WORK_ITEM_STATUSES
 } from '../constants/workItemConstants';
 import { TagDisplay } from './TagDisplay';
 import { AnimatedPriority } from './AnimatedPriority';
@@ -59,17 +58,8 @@ const formatLabel = (label: string) => {
 };
 
 const getNodeTypeColor = (type: string) => {
-  switch (type) {
-    case 'EPIC': return 'bg-purple-500 text-white';
-    case 'FEATURE': return 'bg-blue-600 text-white';
-    case 'TASK': return 'bg-green-500 text-white';
-    case 'BUG': return 'bg-red-500 text-white';
-    case 'MILESTONE': return 'bg-orange-500 text-black';
-    case 'IDEA': return 'bg-yellow-500 text-white';
-    case 'OUTCOME': return 'bg-indigo-500 text-white';
-    case 'RESEARCH': return 'bg-teal-500 text-white';
-    default: return 'bg-gray-500 text-white';
-  }
+  const config = getTypeConfig(type as WorkItemType);
+  return `${config.color} ${config.bgColor} ${config.borderColor} border`;
 };
 
 const getNodePriority = (node: WorkItem) => {
@@ -102,54 +92,7 @@ const getContributorAvatar = (contributor?: string) => {
 };
 
 const KanbanView: React.FC<KanbanViewProps> = ({ filteredNodes, handleEditNode, handleDeleteNode }) => {
-  const statuses = ['PROPOSED', 'PLANNED', 'IN_PROGRESS', 'BLOCKED', 'COMPLETED'];
-  const statusConfig = {
-    'PROPOSED': { 
-      label: 'Proposed', 
-      icon: <ClipboardList className="h-4 w-4 text-cyan-400" />, 
-      color: 'bg-cyan-500',
-      bgColor: 'bg-gray-700',
-      textColor: 'text-cyan-400',
-      borderColor: 'border-gray-600',
-      dotColor: 'bg-cyan-400'
-    },
-    'PLANNED': { 
-      label: 'Planned', 
-      icon: <Calendar className="h-4 w-4 text-purple-400" />, 
-      color: 'bg-purple-500',
-      bgColor: 'bg-gray-700',
-      textColor: 'text-purple-400',
-      borderColor: 'border-gray-600',
-      dotColor: 'bg-purple-400'
-    },
-    'IN_PROGRESS': { 
-      label: 'In Progress', 
-      icon: <Clock className="h-4 w-4 text-yellow-400" />, 
-      color: 'bg-yellow-500',
-      bgColor: 'bg-gray-700',
-      textColor: 'text-yellow-400',
-      borderColor: 'border-gray-600',
-      dotColor: 'bg-yellow-400'
-    },
-    'BLOCKED': { 
-      label: 'Blocked', 
-      icon: <AlertCircle className="h-4 w-4 text-red-600" />, 
-      color: 'bg-red-500',
-      bgColor: 'bg-gray-700',
-      textColor: 'text-red-600',
-      borderColor: 'border-gray-600',
-      dotColor: 'bg-red-400'
-    },
-    'COMPLETED': { 
-      label: 'Completed', 
-      icon: <CheckCircle className="h-4 w-4 text-green-400" />, 
-      color: 'bg-green-500',
-      bgColor: 'bg-gray-700',
-      textColor: 'text-green-400',
-      borderColor: 'border-gray-600',
-      dotColor: 'bg-green-400'
-    }
-  };
+  const statuses = Object.keys(WORK_ITEM_STATUSES) as WorkItemStatus[];
 
   const nodesByStatus = statuses.reduce((acc, status) => {
     acc[status] = filteredNodes.filter(node => node.status === status);
@@ -160,23 +103,23 @@ const KanbanView: React.FC<KanbanViewProps> = ({ filteredNodes, handleEditNode, 
     <div className="flex space-x-4 p-6 overflow-x-auto h-full">
       {statuses.map((status) => {
         const nodes = nodesByStatus[status] || [];
-        const config = statusConfig[status as keyof typeof statusConfig];
+        const config = getStatusConfig(status);
         
         return (
           <div key={status} className="flex-shrink-0 w-80">
             <div className="bg-gray-800 rounded-lg h-full">
-              <div className={`p-4 border-b ${config.borderColor}`}>
+              <div className={`p-4 border-b border-gray-600`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
-                    <div className={`${config.color} rounded-lg p-2`}>
-                      <span className="text-white text-sm font-semibold">{nodes.length}</span>
+                    <div className={`${config.bgColor} rounded-lg p-2 border ${config.borderColor}`}>
+                      <span className={`${config.color} text-sm font-semibold`}>{nodes.length}</span>
                     </div>
                     <div>
                       <h3 className="text-white font-medium text-base">{config.label}</h3>
                       <p className="text-sm text-gray-400">{nodes.length} {nodes.length === 1 ? 'task' : 'tasks'}</p>
                     </div>
                   </div>
-                  <div className="text-white">{config.icon}</div>
+                  <div className="text-white">{getStatusIconElement(status, "h-4 w-4")}</div>
                 </div>
               </div>
               
@@ -194,14 +137,7 @@ const KanbanView: React.FC<KanbanViewProps> = ({ filteredNodes, handleEditNode, 
                   >
                     <div className="flex items-start justify-between mb-2">
                       <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${getNodeTypeColor(node.type)}`}>
-                        {node.type === 'EPIC' && <Layers className="w-3 h-3" />}
-                        {node.type === 'MILESTONE' && <Trophy className="w-3 h-3" />}
-                        {node.type === 'OUTCOME' && <Target className="w-3 h-3" />}
-                        {node.type === 'FEATURE' && <Sparkles className="w-3 h-3" />}
-                        {node.type === 'TASK' && <ListTodo className="w-3 h-3" />}
-                        {node.type === 'BUG' && <AlertTriangle className="w-3 h-3" />}
-                        {node.type === 'IDEA' && <Lightbulb className="w-3 h-3" />}
-                        {node.type === 'RESEARCH' && <Microscope className="w-3 h-3" />}
+                        {getTypeIconElement(node.type as WorkItemType, "w-3 h-3")}
                         <span className="ml-1">{formatLabel(node.type)}</span>
                       </span>
                       

@@ -4,19 +4,12 @@ import {
   Trash2
 } from 'lucide-react';
 import {
-  CheckCircle,
-  Clock,
-  AlertCircle,
-  Calendar,
-  ClipboardList,
-  Layers,
-  Trophy,
-  Target,
-  Sparkles,
-  ListTodo,
-  AlertTriangle,
-  Lightbulb,
-  Microscope
+  WorkItemType,
+  WorkItemStatus,
+  getTypeConfig,
+  getStatusConfig,
+  getTypeIconElement,
+  getStatusIconElement
 } from '../constants/workItemConstants';
 import { TagDisplay } from './TagDisplay';
 import { AnimatedPriority } from './AnimatedPriority';
@@ -59,28 +52,13 @@ const formatLabel = (label: string) => {
 };
 
 const getNodeTypeColor = (type: string) => {
-  switch (type) {
-    case 'EPIC': return 'bg-purple-500 text-white';
-    case 'FEATURE': return 'bg-blue-600 text-white';
-    case 'TASK': return 'bg-green-500 text-white';
-    case 'BUG': return 'bg-red-500 text-white';
-    case 'MILESTONE': return 'bg-orange-500 text-black';
-    case 'IDEA': return 'bg-yellow-500 text-white';
-    case 'OUTCOME': return 'bg-indigo-500 text-white';
-    case 'RESEARCH': return 'bg-teal-500 text-white';
-    default: return 'bg-gray-500 text-white';
-  }
+  const config = getTypeConfig(type as WorkItemType);
+  return `${config.color} ${config.bgColor} ${config.borderColor} border`;
 };
 
 const getStatusColor = (status: string) => {
-  switch (status) {
-    case 'PROPOSED': return 'text-cyan-400';
-    case 'PLANNED': return 'text-purple-400';
-    case 'IN_PROGRESS': return 'text-yellow-400';
-    case 'COMPLETED': return 'text-green-400';
-    case 'BLOCKED': return 'text-red-500';
-    default: return 'text-gray-400';
-  }
+  const config = getStatusConfig(status as WorkItemStatus);
+  return config.color;
 };
 
 const getNodePriority = (node: WorkItem) => {
@@ -174,32 +152,14 @@ const TableView: React.FC<TableViewProps> = ({ filteredNodes, handleEditNode, ha
                   </td>
                   <td className="pl-2 pr-3 py-10 dynamic-table-cell">
                     <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getNodeTypeColor(node.type)} shadow-sm`}>
-                      {node.type === 'EPIC' && <Layers className="w-3 h-3" />}
-                      {node.type === 'MILESTONE' && <Trophy className="w-3 h-3" />}
-                      {node.type === 'OUTCOME' && <Target className="w-3 h-3" />}
-                      {node.type === 'FEATURE' && <Sparkles className="w-3 h-3" />}
-                      {node.type === 'TASK' && <ListTodo className="w-3 h-3" />}
-                      {node.type === 'BUG' && <AlertTriangle className="w-3 h-3" />}
-                      {node.type === 'IDEA' && <Lightbulb className="w-3 h-3" />}
-                      {node.type === 'RESEARCH' && <Microscope className="w-3 h-3" />}
+                      {getTypeIconElement(node.type as WorkItemType, "w-3 h-3")}
                       <span className="ml-1">{formatLabel(node.type)}</span>
                     </span>
                   </td>
                   <td className="pl-3 pr-3 py-10 dynamic-table-cell">
                     <div className="flex items-center whitespace-nowrap">
-                      <div className={`mr-2 ${
-                        node.status === 'PROPOSED' ? 'text-cyan-400' :
-                        node.status === 'PLANNED' ? 'text-purple-400' :
-                        node.status === 'IN_PROGRESS' ? 'text-yellow-400' :
-                        node.status === 'COMPLETED' ? 'text-green-400' :
-                        node.status === 'BLOCKED' ? 'text-red-500' :
-                        'text-gray-400'
-                      }`}>
-                        {node.status === 'PROPOSED' && <ClipboardList className="h-4 w-4" />}
-                        {node.status === 'PLANNED' && <Calendar className="h-4 w-4" />}
-                        {node.status === 'IN_PROGRESS' && <Clock className="h-4 w-4" />}
-                        {node.status === 'COMPLETED' && <CheckCircle className="h-4 w-4" />}
-                        {node.status === 'BLOCKED' && <AlertCircle className="h-4 w-4" />}
+                      <div className={`mr-2 ${getStatusConfig(node.status as WorkItemStatus).color}`}>
+                        {getStatusIconElement(node.status as WorkItemStatus, "h-4 w-4")}
                       </div>
                       <span className={`text-sm font-medium ${getStatusColor(node.status)}`}>
                         {formatLabel(node.status)}
