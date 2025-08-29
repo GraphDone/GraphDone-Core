@@ -121,26 +121,46 @@ export function InteractiveGraphVisualization() {
   const [showGraphPanel, setShowGraphPanel] = useState(true);
 
   // Calculate dynamic positioning for panels and minimized buttons to avoid overlap
-  const getPanelPosition = (panelType: 'graph' | 'legend') => {
-    const graphPanelHeight = 295; // Slightly increased height estimate for expanded graph panel
-    const buttonHeight = 60; // Height of minimized buttons
-    const compactSpacing = 27; // Just a bit more spacing when one panel is minimized
-    const expandedSpacing = 32; // Slightly more spacing when both panels are expanded
+  const getPanelPosition = (panelType: 'graph' | 'legend' | 'create') => {
+    const graphPanelHeight = 295; // Height of expanded graph panel
+    const legendPanelHeight = 220; // Height of expanded legend panel
+    const createPanelHeight = 80; // Height of expanded create panel
+    const buttonHeight = 48; // Height of minimized buttons (h-12 = 48px)
+    const compactSpacing = 27; // Spacing when panel is minimized
+    const expandedSpacing = 32; // Spacing when panel is expanded
     
     if (panelType === 'graph') {
       // Graph panel/button is always at top position
       return { top: '20px' };
-    } else {
-      // Legend panel/button positioning depends on graph panel state
-      if (!showGraphPanel) {
-        // If graph panel is minimized, legend moves up closer
-        return { top: `${20 + buttonHeight + compactSpacing}px` }; // Below minimized graph button
+    } else if (panelType === 'create') {
+      // Create button positioning depends only on graph panel state (comes right after it)
+      let topOffset = 20; // Start position
+      
+      if (showGraphPanel) {
+        topOffset += graphPanelHeight + expandedSpacing;
       } else {
-        // If graph panel is expanded, legend must be below it regardless of its own state
-        const spacing = showLegend ? expandedSpacing : compactSpacing; // More space if legend is expanded
-        return { top: `${20 + graphPanelHeight + spacing}px` }; // Always below expanded graph panel
+        topOffset += buttonHeight + compactSpacing;
       }
+      
+      return { top: `${topOffset}px` };
+    } else if (panelType === 'legend') {
+      // Legend panel positioning depends on graph panel AND create button states
+      let topOffset = 20; // Start position
+      
+      // Add graph panel height/button
+      if (showGraphPanel) {
+        topOffset += graphPanelHeight + expandedSpacing;
+      } else {
+        topOffset += buttonHeight + compactSpacing;
+      }
+      
+      // Add create button height (always a button)
+      topOffset += buttonHeight + compactSpacing;
+      
+      return { top: `${topOffset}px` };
     }
+    
+    return { top: '20px' };
   };
 
   // Additional edge operations
@@ -897,8 +917,8 @@ export function InteractiveGraphVisualization() {
         switch (d.status) {
           case 'PROPOSED': return 20;
           case 'PLANNED': return 40;
-          case 'IN_PROGRESS': return 60;
-          case 'BLOCKED': return 80;
+          case 'BLOCKED': return 50;
+          case 'IN_PROGRESS': return 70;
           case 'COMPLETED': return 100;
           default: return 0;
         }
@@ -1644,7 +1664,7 @@ export function InteractiveGraphVisualization() {
       ) : (
         <button
           onClick={() => setShowGraphPanel(true)}
-          className="absolute left-4 z-40 backdrop-blur-sm border-0 rounded-lg shadow-xl px-4 py-3 text-white font-semibold transition-all duration-300 flex items-center space-x-2 transform hover:scale-105"
+          className="absolute left-4 z-40 backdrop-blur-sm border-0 rounded-lg shadow-xl px-4 py-3 text-white font-semibold transition-all duration-300 flex items-center space-x-2 transform hover:scale-105 w-40 h-12"
           style={{ 
             ...getPanelPosition('graph'),
             background: 'linear-gradient(135deg, #4285f4, #0f9d58, #ea4335)',
@@ -1660,11 +1680,13 @@ export function InteractiveGraphVisualization() {
             e.currentTarget.style.boxShadow = '0 10px 25px rgba(66, 133, 244, 0.4)';
           }}
         >
-          <div className="flex items-center space-x-2">
-            <Settings className="h-4 w-4" />
-            <span className="text-sm font-medium">Graph Panel</span>
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center space-x-2">
+              <Settings className="h-4 w-4" />
+              <span className="text-sm font-medium">Graph Panel</span>
+            </div>
+            <div className="w-2 h-2 bg-green-400 rounded-full flex-shrink-0 animate-pulse"></div>
           </div>
-          <div className="w-2 h-2 bg-green-400 rounded-full flex-shrink-0 animate-pulse"></div>
         </button>
       )}
 
@@ -2072,6 +2094,32 @@ export function InteractiveGraphVisualization() {
         </div>
       )}
 
+      {/* Create Node Button */}
+      <button
+        onClick={() => setShowCreateNodeModal(true)}
+        className="absolute left-4 z-40 backdrop-blur-sm border-0 rounded-lg shadow-xl px-4 py-3 text-white font-semibold transition-all duration-300 flex items-center space-x-2 transform hover:scale-105 w-40 h-12"
+        style={{ 
+          ...getPanelPosition('create'),
+          background: 'linear-gradient(135deg, #10b981, #059669)',
+          boxShadow: '0 10px 25px rgba(16, 185, 129, 0.4)'
+        }}
+        title="Create new node"
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = 'linear-gradient(135deg, #059669, #047857)';
+          e.currentTarget.style.boxShadow = '0 15px 35px rgba(16, 185, 129, 0.6)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+          e.currentTarget.style.boxShadow = '0 10px 25px rgba(16, 185, 129, 0.4)';
+        }}
+      >
+        <div className="flex items-center justify-between w-full">
+          <div className="flex items-center space-x-2">
+            <Plus className="h-4 w-4" />
+            <span className="text-sm font-medium">Create Node</span>
+          </div>
+        </div>
+      </button>
 
       {/* Legend */}
       {showLegend ? (
@@ -2133,7 +2181,7 @@ export function InteractiveGraphVisualization() {
       ) : (
         <button
           onClick={() => setShowLegend(true)}
-          className="absolute left-4 z-40 backdrop-blur-sm border-0 rounded-lg shadow-xl px-4 py-3 text-white font-semibold transition-all duration-300 flex items-center space-x-2 transform hover:scale-105"
+          className="absolute left-4 z-40 backdrop-blur-sm border-0 rounded-lg shadow-xl px-4 py-3 text-white font-semibold transition-all duration-300 flex items-center space-x-2 transform hover:scale-105 w-40 h-12"
           style={{ 
             ...getPanelPosition('legend'),
             background: 'linear-gradient(135deg, #ec4899, #f97316)',
@@ -2149,8 +2197,12 @@ export function InteractiveGraphVisualization() {
             e.currentTarget.style.boxShadow = '0 10px 25px rgba(236, 72, 153, 0.4)';
           }}
         >
-          <FileText className="h-4 w-4" />
-          <span className="text-sm font-medium">Node Types</span>
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center space-x-2">
+              <FileText className="h-4 w-4" />
+              <span className="text-sm font-medium">Node Types</span>
+            </div>
+          </div>
         </button>
       )}
 
