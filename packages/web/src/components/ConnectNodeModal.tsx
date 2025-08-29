@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Link2, Search, CheckCircle, ArrowRight, Target, ExternalLink, Filter, CheckCircle2, Trash2, AlertTriangle, Unlink, Clock, Calendar, ClipboardList, AlertCircle, Layers, Sparkles, ListTodo, Trophy, Lightbulb, Microscope, Flame, Zap, Triangle, Circle, ArrowDown } from 'lucide-react';
+import { X, Link2, Search, CheckCircle, ArrowRight, Target, ExternalLink, Filter, CheckCircle2, Trash2, AlertTriangle, Unlink, Clock, Calendar, ClipboardList, AlertCircle, Layers, Sparkles, ListTodo, Trophy, Lightbulb, Microscope, Flame, Zap, Triangle, Circle, ArrowDown, ChevronDown } from 'lucide-react';
 import { useQuery, useMutation } from '@apollo/client';
 import { GET_WORK_ITEMS, CREATE_EDGE, GET_EDGES, DELETE_EDGE } from '../lib/queries';
 import { useAuth } from '../contexts/AuthContext';
@@ -11,6 +11,8 @@ import {
   Edge, 
   getExistingRelationships,
   relationshipExists,
+  hasAnyRelationship,
+  hasAnyRelationshipWithSelected,
   hasExistingRelationshipWithSelected,
   filterValidSelectedNodes,
   getRelationshipIcon,
@@ -673,8 +675,50 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
+  const [priorityFilter, setPriorityFilter] = useState('all');
   const [relationshipFilter, setRelationshipFilter] = useState<string[]>(RELATIONSHIP_TYPES.map(r => r.type));
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  
+  // Custom dropdown states
+  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
+  const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
+  const [isPriorityDropdownOpen, setIsPriorityDropdownOpen] = useState(false);
+  
+  // Refs for dropdown management
+  const statusDropdownRef = useRef<HTMLDivElement>(null);
+  const typeDropdownRef = useRef<HTMLDivElement>(null);
+  const priorityDropdownRef = useRef<HTMLDivElement>(null);
+  
+  // Options arrays matching table view patterns
+  const statusOptions = [
+    { value: 'all', label: 'All Status', icon: null, color: 'text-gray-400' },
+    { value: 'PROPOSED', label: 'Proposed', icon: <ClipboardList className="h-4 w-4" />, color: 'text-cyan-400' },
+    { value: 'PLANNED', label: 'Planned', icon: <Calendar className="h-4 w-4" />, color: 'text-purple-400' },
+    { value: 'IN_PROGRESS', label: 'In Progress', icon: <Clock className="h-4 w-4" />, color: 'text-yellow-400' },
+    { value: 'COMPLETED', label: 'Completed', icon: <CheckCircle className="h-4 w-4" />, color: 'text-green-400' },
+    { value: 'BLOCKED', label: 'Blocked', icon: <AlertCircle className="h-4 w-4" />, color: 'text-red-500' }
+  ];
+  
+  const typeOptions = [
+    { value: 'all', label: 'All Type', icon: null, color: 'text-gray-400' },
+    { value: 'EPIC', label: 'Epic', icon: <Layers className="h-4 w-4" />, color: 'text-fuchsia-400' },
+    { value: 'MILESTONE', label: 'Milestone', icon: <Trophy className="h-4 w-4" />, color: 'text-orange-400' },
+    { value: 'OUTCOME', label: 'Outcome', icon: <Target className="h-4 w-4" />, color: 'text-indigo-400' },
+    { value: 'FEATURE', label: 'Feature', icon: <Sparkles className="h-4 w-4" />, color: 'text-sky-400' },
+    { value: 'TASK', label: 'Task', icon: <ListTodo className="h-4 w-4" />, color: 'text-green-400' },
+    { value: 'BUG', label: 'Bug', icon: <AlertTriangle className="h-4 w-4" />, color: 'text-red-400' },
+    { value: 'IDEA', label: 'Idea', icon: <Lightbulb className="h-4 w-4" />, color: 'text-yellow-400' },
+    { value: 'RESEARCH', label: 'Research', icon: <Microscope className="h-4 w-4" />, color: 'text-blue-400' }
+  ];
+  
+  const priorityOptions = [
+    { value: 'all', label: 'All Priority', icon: null, color: 'text-gray-400' },
+    { value: 'critical', label: 'Critical', icon: <Flame className="h-4 w-4" />, color: 'text-red-400' },
+    { value: 'high', label: 'High', icon: <Zap className="h-4 w-4" />, color: 'text-orange-400' },
+    { value: 'moderate', label: 'Moderate', icon: <Triangle className="h-4 w-4" />, color: 'text-yellow-400' },
+    { value: 'low', label: 'Low', icon: <Circle className="h-4 w-4" />, color: 'text-blue-400' },
+    { value: 'minimal', label: 'Minimal', icon: <ArrowDown className="h-4 w-4" />, color: 'text-gray-400' }
+  ];
   const [duplicateWarning, setDuplicateWarning] = useState<{
     isValid: boolean;
     reason?: string;
@@ -808,6 +852,23 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isFilterOpen]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (statusDropdownRef.current && !statusDropdownRef.current.contains(event.target as Node)) {
+        setIsStatusDropdownOpen(false);
+      }
+      if (typeDropdownRef.current && !typeDropdownRef.current.contains(event.target as Node)) {
+        setIsTypeDropdownOpen(false);
+      }
+      if (priorityDropdownRef.current && !priorityDropdownRef.current.contains(event.target as Node)) {
+        setIsPriorityDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Dynamic width measurement with ResizeObserver
   useEffect(() => {
@@ -1013,13 +1074,13 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
     }
   };
   
-  // Check if a relationship type is disabled (already exists with any selected node)
+  // Check if any relationship type is disabled (any relationship already exists with selected nodes)
   const isRelationshipDisabled = (relationshipType: string) => {
     if (selectedNodes.size === 0) return false;
-    return hasExistingRelationshipWithSelected(
+    // With one-relationship-at-a-time policy, disable if ANY relationship exists
+    return hasAnyRelationshipWithSelected(
       sourceNode.id,
       Array.from(selectedNodes),
-      relationshipType,
       existingEdges,
       workItems
     );
@@ -1031,10 +1092,23 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
     
     const matchesSearch = node.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          node.type.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || node.status.toLowerCase() === statusFilter;
-    const matchesType = typeFilter === 'all' || node.type.toLowerCase() === typeFilter;
+    const matchesStatus = statusFilter === 'all' || node.status === statusFilter;
+    const matchesType = typeFilter === 'all' || node.type === typeFilter;
     
-    return matchesSearch && matchesStatus && matchesType;
+    // Priority filter logic
+    let matchesPriority = true;
+    if (priorityFilter !== 'all' && node.priorityComp !== undefined && node.priorityComp !== null) {
+      const priority = node.priorityComp;
+      switch (priorityFilter) {
+        case 'critical': matchesPriority = priority >= 0.8; break;
+        case 'high': matchesPriority = priority >= 0.6 && priority < 0.8; break;
+        case 'moderate': matchesPriority = priority >= 0.4 && priority < 0.6; break;
+        case 'low': matchesPriority = priority >= 0.2 && priority < 0.4; break;
+        case 'minimal': matchesPriority = priority < 0.2; break;
+      }
+    }
+    
+    return matchesSearch && matchesStatus && matchesType && matchesPriority;
   });
 
   const uniqueStatuses = [...new Set(workItems.map((item: WorkItem) => item.status))];
@@ -1316,7 +1390,7 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
                     {(() => {
                       const alreadyConnectedCount = workItems.filter((node: WorkItem) =>
                         node.id !== sourceNode.id &&
-                        relationshipExists(sourceNode.id, node.id, selectedRelationType, existingEdges, workItems)
+                        hasAnyRelationship(sourceNode.id, node.id, existingEdges, workItems)
                       ).length;
                       const totalNodes = workItems.filter(node => node.id !== sourceNode.id).length;
                       const isAllConnected = alreadyConnectedCount === totalNodes;
@@ -1334,7 +1408,7 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
                     {/* Ready to connect box - always show */}
                     {(() => {
                       const availableToConnect = availableNodes.filter((node: WorkItem) => 
-                        !relationshipExists(sourceNode.id, node.id, selectedRelationType, existingEdges, workItems)
+                        !hasAnyRelationship(sourceNode.id, node.id, existingEdges, workItems)
                       ).length;
                       const totalNodes = workItems.filter(node => node.id !== sourceNode.id).length;
                       const isAllAvailable = availableToConnect === totalNodes && availableToConnect > 0;
@@ -1359,7 +1433,7 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
                     {selectedNodes.size > 0 && (() => {
                       const selectedCount = selectedNodes.size;
                       const availableToConnect = availableNodes.filter((node: WorkItem) => 
-                        !relationshipExists(sourceNode.id, node.id, selectedRelationType, existingEdges, workItems)
+                        !hasAnyRelationship(sourceNode.id, node.id, existingEdges, workItems)
                       ).length;
                       const isAllSelected = selectedCount === availableToConnect;
                       
@@ -1376,11 +1450,11 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
                     {/* No nodes available message */}
                     {(() => {
                       const availableToConnect = availableNodes.filter((node: WorkItem) => 
-                        !relationshipExists(sourceNode.id, node.id, selectedRelationType, existingEdges, workItems)
+                        !hasAnyRelationship(sourceNode.id, node.id, existingEdges, workItems)
                       ).length;
                       const alreadyConnectedCount = workItems.filter((node: WorkItem) =>
                         node.id !== sourceNode.id &&
-                        relationshipExists(sourceNode.id, node.id, selectedRelationType, existingEdges, workItems)
+                        hasAnyRelationship(sourceNode.id, node.id, existingEdges, workItems)
                       ).length;
                       
                       if (availableToConnect === 0 && alreadyConnectedCount === 0) {
@@ -1728,30 +1802,225 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
                       type="text"
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      placeholder="Search nodes by title or type..."
+                      placeholder="Search nodes by title or type"
                       className="w-full pl-12 pr-4 py-3 bg-gray-800 border border-gray-600/50 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-emerald-400/70 focus:ring-2 focus:ring-emerald-500/20 transition-all duration-200"
                     />
                   </div>
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="px-4 py-3 bg-gray-800 border border-gray-600/50 rounded-xl text-white focus:outline-none focus:border-emerald-400/70 focus:ring-2 focus:ring-emerald-500/20 transition-all duration-200"
-                  >
-                    <option value="all" className="bg-gray-800 text-white">All Status</option>
-                    {uniqueStatuses.map((status: string) => (
-                      <option key={status} value={status.toLowerCase()} className="bg-gray-800 text-white">{status}</option>
-                    ))}
-                  </select>
-                  <select
-                    value={typeFilter}
-                    onChange={(e) => setTypeFilter(e.target.value)}
-                    className="px-4 py-3 bg-gray-800 border border-gray-600/50 rounded-xl text-white focus:outline-none focus:border-emerald-400/70 focus:ring-2 focus:ring-emerald-500/20 transition-all duration-200"
-                  >
-                    <option value="all" className="bg-gray-800 text-white">All Types</option>
-                    {uniqueTypes.map((type: string) => (
-                      <option key={type} value={type.toLowerCase()} className="bg-gray-800 text-white">{type}</option>
-                    ))}
-                  </select>
+                  {/* Type Filter */}
+                  <div className="relative" ref={typeDropdownRef}>
+                    <button
+                      type="button"
+                      onClick={() => setIsTypeDropdownOpen(!isTypeDropdownOpen)}
+                      className="flex items-center justify-between px-4 py-3 bg-gray-800 border border-gray-600/50 rounded-xl text-white text-sm focus:outline-none focus:border-emerald-400/70 focus:ring-2 focus:ring-emerald-500/20 transition-all duration-200 min-w-[140px]"
+                    >
+                      <div className="flex items-center space-x-2">
+                        {(() => {
+                          const selectedType = typeOptions.find(option => option.value === typeFilter);
+                          return selectedType ? (
+                            <>
+                              {selectedType.icon && (
+                                <div className={`${selectedType.color}`}>
+                                  {selectedType.icon}
+                                </div>
+                              )}
+                              <span className="font-medium">{selectedType.label}</span>
+                            </>
+                          ) : (
+                            <span className="font-medium">All Type</span>
+                          );
+                        })()}
+                      </div>
+                      <ChevronDown className={`h-4 w-4 text-gray-400 transition-all duration-200 ${isTypeDropdownOpen ? 'rotate-180 text-emerald-500' : ''}`} />
+                    </button>
+
+                    {isTypeDropdownOpen && (
+                      <div className="absolute top-full left-0 mt-2 w-full bg-gray-800 border border-gray-600/50 rounded-xl shadow-2xl z-50 max-h-80 overflow-y-auto">
+                        <div className="p-2">
+                          {typeOptions.map((option, index) => (
+                            <button
+                              key={option.value}
+                              type="button"
+                              onClick={() => {
+                                setTypeFilter(option.value);
+                                setIsTypeDropdownOpen(false);
+                              }}
+                              className={`w-full px-3 py-2 text-left hover:bg-emerald-900/20 transition-all duration-200 rounded-lg group ${
+                                typeFilter === option.value 
+                                  ? 'bg-emerald-900/30 ring-1 ring-emerald-500/30' 
+                                  : 'hover:shadow-sm'
+                              } ${index !== 0 ? 'mt-1' : ''}`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center space-x-2">
+                                  {option.icon && (
+                                    <div className={`${option.color}`}>
+                                      {option.icon}
+                                    </div>
+                                  )}
+                                  <span className={`font-medium text-sm ${
+                                    typeFilter === option.value 
+                                      ? 'text-emerald-300' 
+                                      : 'text-white'
+                                  }`}>
+                                    {option.label}
+                                  </span>
+                                </div>
+                                {typeFilter === option.value && (
+                                  <div className="w-4 h-4 bg-emerald-600 text-white rounded-full flex items-center justify-center text-xs flex-shrink-0">
+                                    ✓
+                                  </div>
+                                )}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Status Filter */}
+                  <div className="relative" ref={statusDropdownRef}>
+                    <button
+                      type="button"
+                      onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
+                      className="flex items-center justify-between px-4 py-3 bg-gray-800 border border-gray-600/50 rounded-xl text-white text-sm focus:outline-none focus:border-emerald-400/70 focus:ring-2 focus:ring-emerald-500/20 transition-all duration-200 min-w-[140px]"
+                    >
+                      <div className="flex items-center space-x-2">
+                        {(() => {
+                          const selectedStatus = statusOptions.find(option => option.value === statusFilter);
+                          return selectedStatus ? (
+                            <>
+                              {selectedStatus.icon && (
+                                <div className={`${selectedStatus.color}`}>
+                                  {selectedStatus.icon}
+                                </div>
+                              )}
+                              <span className="font-medium">{selectedStatus.label}</span>
+                            </>
+                          ) : (
+                            <span className="font-medium">All Status</span>
+                          );
+                        })()}
+                      </div>
+                      <ChevronDown className={`h-4 w-4 text-gray-400 transition-all duration-200 ${isStatusDropdownOpen ? 'rotate-180 text-emerald-500' : ''}`} />
+                    </button>
+
+                    {isStatusDropdownOpen && (
+                      <div className="absolute top-full left-0 mt-2 w-full bg-gray-800 border border-gray-600/50 rounded-xl shadow-2xl z-50 max-h-80 overflow-y-auto">
+                        <div className="p-2">
+                          {statusOptions.map((option, index) => (
+                            <button
+                              key={option.value}
+                              type="button"
+                              onClick={() => {
+                                setStatusFilter(option.value);
+                                setIsStatusDropdownOpen(false);
+                              }}
+                              className={`w-full px-3 py-2 text-left hover:bg-emerald-900/20 transition-all duration-200 rounded-lg group ${
+                                statusFilter === option.value 
+                                  ? 'bg-emerald-900/30 ring-1 ring-emerald-500/30' 
+                                  : 'hover:shadow-sm'
+                              } ${index !== 0 ? 'mt-1' : ''}`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center space-x-2">
+                                  {option.icon && (
+                                    <div className={`${option.color}`}>
+                                      {option.icon}
+                                    </div>
+                                  )}
+                                  <span className={`font-medium text-sm ${
+                                    statusFilter === option.value 
+                                      ? 'text-emerald-300' 
+                                      : 'text-white'
+                                  }`}>
+                                    {option.label}
+                                  </span>
+                                </div>
+                                {statusFilter === option.value && (
+                                  <div className="w-4 h-4 bg-emerald-600 text-white rounded-full flex items-center justify-center text-xs flex-shrink-0">
+                                    ✓
+                                  </div>
+                                )}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Priority Filter */}
+                  <div className="relative" ref={priorityDropdownRef}>
+                    <button
+                      type="button"
+                      onClick={() => setIsPriorityDropdownOpen(!isPriorityDropdownOpen)}
+                      className="flex items-center justify-between px-4 py-3 bg-gray-800 border border-gray-600/50 rounded-xl text-white text-sm focus:outline-none focus:border-emerald-400/70 focus:ring-2 focus:ring-emerald-500/20 transition-all duration-200 min-w-[140px]"
+                    >
+                      <div className="flex items-center space-x-2">
+                        {(() => {
+                          const selectedPriority = priorityOptions.find(option => option.value === priorityFilter);
+                          return selectedPriority ? (
+                            <>
+                              {selectedPriority.icon && (
+                                <div className={`${selectedPriority.color}`}>
+                                  {selectedPriority.icon}
+                                </div>
+                              )}
+                              <span className="font-medium">{selectedPriority.label}</span>
+                            </>
+                          ) : (
+                            <span className="font-medium">All Priority</span>
+                          );
+                        })()}
+                      </div>
+                      <ChevronDown className={`h-4 w-4 text-gray-400 transition-all duration-200 ${isPriorityDropdownOpen ? 'rotate-180 text-emerald-500' : ''}`} />
+                    </button>
+
+                    {isPriorityDropdownOpen && (
+                      <div className="absolute top-full left-0 mt-2 w-full bg-gray-800 border border-gray-600/50 rounded-xl shadow-2xl z-50 max-h-80 overflow-y-auto">
+                        <div className="p-2">
+                          {priorityOptions.map((option, index) => (
+                            <button
+                              key={option.value}
+                              type="button"
+                              onClick={() => {
+                                setPriorityFilter(option.value);
+                                setIsPriorityDropdownOpen(false);
+                              }}
+                              className={`w-full px-3 py-2 text-left hover:bg-emerald-900/20 transition-all duration-200 rounded-lg group ${
+                                priorityFilter === option.value 
+                                  ? 'bg-emerald-900/30 ring-1 ring-emerald-500/30' 
+                                  : 'hover:shadow-sm'
+                              } ${index !== 0 ? 'mt-1' : ''}`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center space-x-2">
+                                  {option.icon && (
+                                    <div className={`${option.color}`}>
+                                      {option.icon}
+                                    </div>
+                                  )}
+                                  <span className={`font-medium text-sm ${
+                                    priorityFilter === option.value 
+                                      ? 'text-emerald-300' 
+                                      : 'text-white'
+                                  }`}>
+                                    {option.label}
+                                  </span>
+                                </div>
+                                {priorityFilter === option.value && (
+                                  <div className="w-4 h-4 bg-emerald-600 text-white rounded-full flex items-center justify-center text-xs flex-shrink-0">
+                                    ✓
+                                  </div>
+                                )}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 
                 <div className="flex items-center justify-between p-3 bg-gray-800/30 rounded-xl border border-gray-600/30">
@@ -1760,7 +2029,7 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
                       <div className="h-2 w-2 bg-emerald-400 rounded-full"></div>
                       <span className="text-sm font-medium text-gray-300">
                         {availableNodes.filter((node: WorkItem) => 
-                          !relationshipExists(sourceNode.id, node.id, selectedRelationType, existingEdges, workItems)
+                          !hasAnyRelationship(sourceNode.id, node.id, existingEdges, workItems)
                         ).length} available
                       </span>
                     </div>
@@ -1781,11 +2050,10 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
                   <div className="text-center py-8 text-gray-400">No nodes found</div>
                 ) : (
                   availableNodes.map((node: WorkItem) => {
-                    // Check if this node already has the selected relationship type with source node
-                    const isNodeDisabled = relationshipExists(
+                    // Check if this node already has ANY relationship with source node
+                    const isNodeDisabled = hasAnyRelationship(
                       sourceNode.id, 
                       node.id, 
-                      selectedRelationType, 
                       existingEdges, 
                       workItems
                     );
@@ -1802,7 +2070,7 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
                           }
                         }}
                         disabled={isNodeDisabled}
-                        title={isNodeDisabled ? `"${selectedRelationType.replace(/_/g, ' ').toLowerCase()}" relationship already exists with this node` : ''}
+                        title={isNodeDisabled ? `A relationship already exists with this node. Only one relationship per node pair is allowed.` : ''}
                         className={`w-full p-4 rounded-xl text-left transition-all duration-200 border group ${
                           isNodeDisabled
                             ? 'bg-gray-800/30 border-gray-700/50 opacity-40 cursor-not-allowed'
@@ -1818,21 +2086,11 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
                               <p className="font-semibold text-white text-sm group-hover:text-emerald-100 transition-colors">{node.title}</p>
                               {isNodeDisabled && (
                                 <span className="text-xs bg-red-900/50 text-red-300 px-2 py-0.5 rounded-full border border-red-700/50">
-                                  Already connected
+                                  Has relationship
                                 </span>
                               )}
                             </div>
                             <div className="flex items-center space-x-3 text-xs">
-                              {/* Status with icon and label */}
-                              <div className="flex items-center space-x-1">
-                                <div className={getStatusColorScheme(node.status).text}>
-                                  {getStatusIcon(node.status)}
-                                </div>
-                                <span className="text-gray-300 font-medium">
-                                  {node.status?.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())}
-                                </span>
-                              </div>
-                              
                               {/* Type with icon */}
                               <div className="flex items-center space-x-1">
                                 <div className={getTypeColor(node.type).text}>
@@ -1840,6 +2098,16 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
                                 </div>
                                 <span className="text-gray-300 font-medium">
                                   {node.type?.toLowerCase().replace(/\b\w/g, l => l.toUpperCase())}
+                                </span>
+                              </div>
+                              
+                              {/* Status with icon and label */}
+                              <div className="flex items-center space-x-1">
+                                <div className={getStatusColorScheme(node.status).text}>
+                                  {getStatusIcon(node.status)}
+                                </div>
+                                <span className="text-gray-300 font-medium">
+                                  {node.status?.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())}
                                 </span>
                               </div>
                               
