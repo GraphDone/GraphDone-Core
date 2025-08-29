@@ -1,10 +1,13 @@
 import React from 'react';
 import { 
-  X, Calendar, Clock, User, Flag, Edit3, 
-  Layers, Trophy, Target, Sparkles, ListTodo, AlertTriangle, Lightbulb, Microscope,
-  ClipboardList, CheckCircle, AlertCircle, Flame, Zap, Triangle, Circle, ArrowDown,
+  X, User, Flag, Edit3, 
   GitBranch, ArrowRight, ArrowLeft, Ban, Link2, Folder, Split, Copy, Shield, Bookmark, Package
 } from 'lucide-react';
+import {
+  Calendar, Clock,
+  Layers, Trophy, Target, Sparkles, ListTodo, AlertTriangle, Lightbulb, Microscope,
+  ClipboardList, CheckCircle, AlertCircle, Flame, Zap, Triangle, Circle, ArrowDown
+} from '../constants/workItemConstants';
 import { WorkItem, WorkItemEdge } from '../types/graph';
 
 interface NodeDetailsModalProps {

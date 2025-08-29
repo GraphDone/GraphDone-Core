@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { X, Trash2, AlertTriangle, Shield, CheckCircle } from 'lucide-react';
+import { X, Trash2, Shield } from 'lucide-react';
+import { AlertTriangle, CheckCircle } from '../constants/workItemConstants';
 import { useGraph } from '../contexts/GraphContext';
 import { useNotifications } from '../contexts/NotificationContext';
 

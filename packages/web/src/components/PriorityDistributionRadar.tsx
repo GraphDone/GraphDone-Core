@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { ZoomIn, ZoomOut, RotateCcw, Flame, Zap, Triangle, Circle, ArrowDown } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
+import { Flame, Zap, Triangle, Circle, ArrowDown } from '../constants/workItemConstants';
 import { RadarChart } from './RadarChart';
 import { useGraph } from '../contexts/GraphContext';
 import { useQuery, gql } from '@apollo/client';

@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { Calendar, ChevronLeft, ChevronRight, Clock, CheckCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar, Clock, CheckCircle } from '../constants/workItemConstants';
 
 interface WorkItem {
   id: string;

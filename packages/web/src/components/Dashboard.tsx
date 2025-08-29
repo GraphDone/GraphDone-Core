@@ -2,14 +2,16 @@ import React, { useState } from 'react';
 import { 
   BarChart3, 
   Sigma,
+  RotateCcw,
+  ZoomIn,
+  ZoomOut
+} from 'lucide-react';
+import {
   CheckCircle,
   Clock,
   AlertCircle,
   Calendar,
   ClipboardList,
-  RotateCcw,
-  ZoomIn,
-  ZoomOut,
   Layers,
   Trophy,
   Target,
@@ -23,7 +25,7 @@ import {
   Triangle,
   Circle,
   ArrowDown
-} from 'lucide-react';
+} from '../constants/workItemConstants';
 import { TaskDistributionRadar } from './TaskDistributionRadar';
 import { PriorityDistributionRadar } from './PriorityDistributionRadar';
 import { NodeDistributionRadar } from './NodeDistributionRadar';
