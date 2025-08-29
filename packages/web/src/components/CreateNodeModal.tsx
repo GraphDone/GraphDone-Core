@@ -7,7 +7,12 @@ import { useGraph } from '../contexts/GraphContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { NodeTypeSelector } from './NodeCategorySelector';
 import { TagInput } from './TagInput';
-import { RELATIONSHIP_TYPES, getRelationshipIcon } from '../lib/connectionUtils';
+import { 
+  RELATIONSHIP_OPTIONS,
+  getRelationshipConfig,
+  getRelationshipIconElement,
+  RelationshipType
+} from '../constants/workItemConstants';
 import { 
   getStatusColor as getStatusColorScheme,
   getTypeColor, 
@@ -300,7 +305,7 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
               }
             });
             
-            const relationshipLabel = RELATIONSHIP_TYPES.find(r => r.type === selectedRelationType)?.label || selectedRelationType;
+            const relationshipLabel = getRelationshipConfig(selectedRelationType as RelationshipType).label;
             showSuccess(
               'Node Created and Connected Successfully!',
               `"${createdNode.title}" has been created with a "${relationshipLabel}" relationship.`
@@ -409,7 +414,7 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                     </label>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
-                    {RELATIONSHIP_TYPES.map((relation) => (
+                    {RELATIONSHIP_OPTIONS.map((relation) => (
                       <button
                         key={relation.type}
                         type="button"
@@ -421,7 +426,7 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                         }`}
                       >
                         <div className="flex items-center space-x-2 mb-1">
-                          {getRelationshipIcon(relation.icon, `h-5 w-5 ${selectedRelationType === relation.type ? 'text-blue-400' : relation.color}`)}
+                          {getRelationshipIconElement(relation.type, `h-5 w-5 ${selectedRelationType === relation.type ? 'text-blue-400' : ''}`)}
                           <span className={`font-medium text-sm ${selectedRelationType === relation.type ? 'text-blue-400' : relation.color}`}>
                             {relation.label}
                           </span>

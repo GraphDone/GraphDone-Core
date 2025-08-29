@@ -7,11 +7,15 @@ import { useAuth } from '../contexts/AuthContext';
 import { useGraph } from '../contexts/GraphContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { 
-  RELATIONSHIP_TYPES, 
   WorkItem, 
-  Edge, 
-  getRelationshipIcon
+  Edge
 } from '../lib/connectionUtils';
+import { 
+  RELATIONSHIP_OPTIONS,
+  getRelationshipConfig,
+  getRelationshipIconElement,
+  RelationshipType
+} from '../constants/workItemConstants';
 
 interface DisconnectNodeModalProps {
   isOpen: boolean;
@@ -125,7 +129,7 @@ export function DisconnectNodeModal({ isOpen, onClose, sourceNode }: DisconnectN
       const selectedConnectionDetails = Array.from(selectedConnections).map(connectionId => {
         const connection = existingEdges.find(edge => edge.id === connectionId);
         if (connection) {
-          const relationshipType = RELATIONSHIP_TYPES.find(r => r.type === connection.type);
+          const relationshipType = getRelationshipConfig(connection.type as RelationshipType);
           return {
             id: connectionId,
             source: connection.source.title,
@@ -281,7 +285,7 @@ export function DisconnectNodeModal({ isOpen, onClose, sourceNode }: DisconnectN
                 {/* Connections List */}
                 <div className="max-h-96 overflow-y-auto space-y-3 pr-2 mb-6">
                   {disconnectableConnections.map((connection) => {
-                    const relationshipType = RELATIONSHIP_TYPES.find(r => r.type === connection.type);
+                    const relationshipType = getRelationshipConfig(connection.type as RelationshipType);
                     const isSelected = selectedConnections.has(connection.id);
                     
                     return (
@@ -308,8 +312,8 @@ export function DisconnectNodeModal({ isOpen, onClose, sourceNode }: DisconnectN
                                 
                                 <div className="flex items-center space-x-1 px-2 py-1 rounded bg-gray-600/40 min-w-0">
                                   {relationshipType ? 
-                                    getRelationshipIcon(relationshipType.icon, `h-2.5 w-2.5 flex-shrink-0 ${relationshipType.color}`) :
-                                    getRelationshipIcon('Link2', 'h-2.5 w-2.5 flex-shrink-0 text-gray-400')
+                                    getRelationshipIconElement(relationshipType.type, `h-2.5 w-2.5 flex-shrink-0`) :
+                                    getRelationshipIconElement('RELATES_TO', 'h-2.5 w-2.5 flex-shrink-0 text-gray-400')
                                   }
                                   <span className={`text-xs font-medium whitespace-nowrap ${relationshipType?.color || 'text-gray-400'}`} title={relationshipType?.label || connection.type}>
                                     {relationshipType?.label || connection.type}
@@ -400,7 +404,7 @@ export function DisconnectNodeModal({ isOpen, onClose, sourceNode }: DisconnectN
                         {Array.from(selectedConnections).map(connectionId => {
                           const connection = existingEdges.find(edge => edge.id === connectionId);
                           if (!connection) return null;
-                          const relationshipType = RELATIONSHIP_TYPES.find(r => r.type === connection.type);
+                          const relationshipType = getRelationshipConfig(connection.type as RelationshipType);
                           return (
                             <div key={connectionId} className="flex items-center space-x-2 text-xs">
                               <div className="h-1 w-1 bg-red-400 rounded-full"></div>
