@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useQuery } from '@apollo/client';
-import { Search, X, ChevronDown, Layers, Trophy, Target, Sparkles, ListTodo, AlertTriangle, Lightbulb, Microscope, ClipboardList, Calendar, Clock, CheckCircle, AlertCircle, Flame, Zap, Triangle, Circle, ArrowDown } from 'lucide-react';
+import { Search, X, ChevronDown } from 'lucide-react';
+import { STATUS_OPTIONS, TYPE_OPTIONS, PRIORITY_OPTIONS } from '../constants/workItemConstants';
 import { useAuth } from '../contexts/AuthContext';
 import { useGraph } from '../contexts/GraphContext';
 import { GET_WORK_ITEMS } from '../lib/queries';
@@ -84,36 +85,27 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
   const workItems: WorkItem[] = data?.workItems || [];
 
 
-  // Options arrays matching ListView patterns
-  const statusOptions = [
-    { value: 'All Statuses', label: 'All Statuses', icon: null, color: 'text-gray-400' },
-    { value: 'PROPOSED', label: 'Proposed', icon: <ClipboardList className="h-6 w-6" />, color: 'text-cyan-400' },
-    { value: 'PLANNED', label: 'Planned', icon: <Calendar className="h-6 w-6" />, color: 'text-purple-400' },
-    { value: 'IN_PROGRESS', label: 'In Progress', icon: <Clock className="h-6 w-6" />, color: 'text-yellow-400' },
-    { value: 'COMPLETED', label: 'Completed', icon: <CheckCircle className="h-6 w-6" />, color: 'text-green-400' },
-    { value: 'BLOCKED', label: 'Blocked', icon: <AlertCircle className="h-6 w-6" />, color: 'text-red-500' }
-  ];
+  // Convert centralized options to ViewManager format
+  const statusOptions = STATUS_OPTIONS.map(option => ({
+    ...option,
+    value: option.value === 'all' ? 'All Statuses' : option.value,
+    label: option.value === 'all' ? 'All Statuses' : option.label,
+    icon: option.icon ? <option.icon className="h-6 w-6" /> : null
+  }));
 
-  const typeOptions = [
-    { value: 'All Types', label: 'All Types', icon: null, color: 'text-gray-400' },
-    { value: 'EPIC', label: 'Epic', icon: <Layers className="h-6 w-6" />, color: 'text-fuchsia-400' },
-    { value: 'MILESTONE', label: 'Milestone', icon: <Trophy className="h-6 w-6" />, color: 'text-orange-400' },
-    { value: 'OUTCOME', label: 'Outcome', icon: <Target className="h-6 w-6" />, color: 'text-indigo-400' },
-    { value: 'FEATURE', label: 'Feature', icon: <Sparkles className="h-6 w-6" />, color: 'text-sky-400' },
-    { value: 'TASK', label: 'Task', icon: <ListTodo className="h-6 w-6" />, color: 'text-green-400' },
-    { value: 'BUG', label: 'Bug', icon: <AlertTriangle className="h-6 w-6" />, color: 'text-red-500' },
-    { value: 'IDEA', label: 'Idea', icon: <Lightbulb className="h-6 w-6" />, color: 'text-yellow-300' },
-    { value: 'RESEARCH', label: 'Research', icon: <Microscope className="h-6 w-6" />, color: 'text-teal-400' }
-  ];
+  const typeOptions = TYPE_OPTIONS.map(option => ({
+    ...option,
+    value: option.value === 'all' ? 'All Types' : option.value,
+    label: option.value === 'all' ? 'All Types' : option.label,
+    icon: option.icon ? <option.icon className="h-6 w-6" /> : null
+  }));
 
-  const priorityOptions = [
-    { value: 'All Priorities', label: 'All Priorities', icon: null, color: 'text-gray-400' },
-    { value: 'Critical', label: 'Critical', icon: <Flame className="h-6 w-6" />, color: 'text-red-500' },
-    { value: 'High', label: 'High', icon: <Zap className="h-6 w-6" />, color: 'text-orange-500' },
-    { value: 'Moderate', label: 'Moderate', icon: <Triangle className="h-6 w-6" />, color: 'text-yellow-500' },
-    { value: 'Low', label: 'Low', icon: <Circle className="h-6 w-6" />, color: 'text-blue-500' },
-    { value: 'Minimal', label: 'Minimal', icon: <ArrowDown className="h-6 w-6" />, color: 'text-gray-500' }
-  ];
+  const priorityOptions = PRIORITY_OPTIONS.map(option => ({
+    ...option,
+    value: option.value === 'all' ? 'All Priorities' : option.label,
+    label: option.value === 'all' ? 'All Priorities' : option.label,
+    icon: option.icon ? <option.icon className="h-6 w-6" /> : null
+  }));
 
   const uniqueContributors = useMemo(() => {
     const contributors = workItems
@@ -373,78 +365,6 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
 
             {/* Filter Dropdowns */}
             <div className="flex gap-3">
-              {/* Status Filter */}
-              <div className="relative" ref={statusDropdownRef}>
-                <button
-                  type="button"
-                  onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
-                  className="flex items-center justify-between px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent hover:border-gray-500 transition-all duration-200 min-w-[150px]"
-                >
-                  <div className="flex items-center space-x-2">
-                    {(() => {
-                      const selectedStatus = statusOptions.find(option => option.value === statusFilter);
-                      return selectedStatus ? (
-                        <>
-                          {selectedStatus.icon && (
-                            <div className={`${selectedStatus.color}`}>
-                              {selectedStatus.icon}
-                            </div>
-                          )}
-                          <span className="font-medium">{selectedStatus.label}</span>
-                        </>
-                      ) : (
-                        <span className="font-medium">All Statuses</span>
-                      );
-                    })()}
-                  </div>
-                  <ChevronDown className={`h-4 w-4 text-gray-400 transition-all duration-200 ${isStatusDropdownOpen ? 'rotate-180 text-green-500' : ''}`} />
-                </button>
-
-                {isStatusDropdownOpen && (
-                  <div className="absolute top-full left-0 mt-2 w-full bg-gray-700 border border-gray-600 rounded-lg shadow-2xl z-50 max-h-80 overflow-y-auto">
-                    <div className="p-2">
-                      {statusOptions.map((option, index) => (
-                        <button
-                          key={option.value}
-                          type="button"
-                          onClick={() => {
-                            setStatusFilter(option.value);
-                            setIsStatusDropdownOpen(false);
-                          }}
-                          className={`w-full px-3 py-2 text-left hover:bg-green-900/20 transition-all duration-200 rounded-lg group ${
-                            statusFilter === option.value 
-                              ? 'bg-green-900/30 ring-1 ring-green-500/30' 
-                              : 'hover:shadow-sm'
-                          } ${index !== 0 ? 'mt-1' : ''}`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-2">
-                              {option.icon && (
-                                <div className={`${option.color}`}>
-                                  {option.icon}
-                                </div>
-                              )}
-                              <span className={`font-medium text-sm ${
-                                statusFilter === option.value 
-                                  ? 'text-green-300' 
-                                  : 'text-white'
-                              }`}>
-                                {option.label}
-                              </span>
-                            </div>
-                            {statusFilter === option.value && (
-                              <div className="w-4 h-4 bg-green-600 text-white rounded-full flex items-center justify-center text-xs flex-shrink-0">
-                                ✓
-                              </div>
-                            )}
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
               {/* Type Filter */}
               <div className="relative" ref={typeDropdownRef}>
                 <button
@@ -507,6 +427,78 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
                               </span>
                             </div>
                             {typeFilter === option.value && (
+                              <div className="w-4 h-4 bg-green-600 text-white rounded-full flex items-center justify-center text-xs flex-shrink-0">
+                                ✓
+                              </div>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Status Filter */}
+              <div className="relative" ref={statusDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
+                  className="flex items-center justify-between px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent hover:border-gray-500 transition-all duration-200 min-w-[150px]"
+                >
+                  <div className="flex items-center space-x-2">
+                    {(() => {
+                      const selectedStatus = statusOptions.find(option => option.value === statusFilter);
+                      return selectedStatus ? (
+                        <>
+                          {selectedStatus.icon && (
+                            <div className={`${selectedStatus.color}`}>
+                              {selectedStatus.icon}
+                            </div>
+                          )}
+                          <span className="font-medium">{selectedStatus.label}</span>
+                        </>
+                      ) : (
+                        <span className="font-medium">All Statuses</span>
+                      );
+                    })()}
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-gray-400 transition-all duration-200 ${isStatusDropdownOpen ? 'rotate-180 text-green-500' : ''}`} />
+                </button>
+
+                {isStatusDropdownOpen && (
+                  <div className="absolute top-full left-0 mt-2 w-full bg-gray-700 border border-gray-600 rounded-lg shadow-2xl z-50 max-h-80 overflow-y-auto">
+                    <div className="p-2">
+                      {statusOptions.map((option, index) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => {
+                            setStatusFilter(option.value);
+                            setIsStatusDropdownOpen(false);
+                          }}
+                          className={`w-full px-3 py-2 text-left hover:bg-green-900/20 transition-all duration-200 rounded-lg group ${
+                            statusFilter === option.value 
+                              ? 'bg-green-900/30 ring-1 ring-green-500/30' 
+                              : 'hover:shadow-sm'
+                          } ${index !== 0 ? 'mt-1' : ''}`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-2">
+                              {option.icon && (
+                                <div className={`${option.color}`}>
+                                  {option.icon}
+                                </div>
+                              )}
+                              <span className={`font-medium text-sm ${
+                                statusFilter === option.value 
+                                  ? 'text-green-300' 
+                                  : 'text-white'
+                              }`}>
+                                {option.label}
+                              </span>
+                            </div>
+                            {statusFilter === option.value && (
                               <div className="w-4 h-4 bg-green-600 text-white rounded-full flex items-center justify-center text-xs flex-shrink-0">
                                 ✓
                               </div>

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Unlink, ArrowRight, CheckCircle, Trash2, AlertTriangle } from 'lucide-react';
+import { X, Unlink, ArrowRight, Trash2 } from 'lucide-react';
+import { CheckCircle, AlertTriangle } from '../constants/workItemConstants';
 import { useQuery, useMutation } from '@apollo/client';
 import { GET_WORK_ITEMS, GET_EDGES, DELETE_EDGE } from '../lib/queries';
 import { useAuth } from '../contexts/AuthContext';

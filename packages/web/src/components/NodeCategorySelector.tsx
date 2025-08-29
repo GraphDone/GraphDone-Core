@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronDown, Layers, Sparkles, ListTodo, AlertTriangle, Trophy, Target, Lightbulb, Microscope } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
+import { WORK_ITEM_TYPES } from '../constants/workItemConstants';
 
 interface NodeType {
   value: string;
@@ -19,93 +20,20 @@ interface NodeTypeSelectorProps {
   className?: string;
 }
 
-const nodeTypes: NodeType[] = [
-  // Strategic Level
-  { 
-    value: 'EPIC', 
-    label: 'Epic', 
-    description: 'Large initiative spanning multiple deliverables', 
-    emoji: '🎯',
-    icon: <Layers className="h-6 w-6" />,
-    color: 'text-fuchsia-400',
-    bgColor: 'bg-fuchsia-50 dark:bg-fuchsia-900/20',
-    borderColor: 'border-fuchsia-200 dark:border-fuchsia-700'
-  },
-  { 
-    value: 'MILESTONE', 
-    label: 'Milestone', 
-    description: 'Key project checkpoint', 
-    emoji: '🏁',
-    icon: <Trophy className="h-6 w-6" />,
-    color: 'text-orange-400',
-    bgColor: 'bg-orange-50 dark:bg-orange-900/20',
-    borderColor: 'border-orange-200 dark:border-orange-700'
-  },
-  { 
-    value: 'OUTCOME', 
-    label: 'Outcome', 
-    description: 'Expected result or deliverable', 
-    emoji: '',
-    icon: <Target className="h-6 w-6" />,
-    color: 'text-indigo-400',
-    bgColor: 'bg-indigo-50 dark:bg-indigo-900/20',
-    borderColor: 'border-indigo-200 dark:border-indigo-700'
-  },
-  
-  // Development Work
-  { 
-    value: 'FEATURE', 
-    label: 'Feature', 
-    description: 'New functionality or capability', 
-    emoji: '⚡',
-    icon: <Sparkles className="h-6 w-6" />,
-    color: 'text-sky-400',
-    bgColor: 'bg-sky-50 dark:bg-sky-900/20',
-    borderColor: 'border-sky-200 dark:border-sky-700'
-  },
-  { 
-    value: 'TASK', 
-    label: 'Task', 
-    description: 'Specific work item to be completed', 
-    emoji: '📝',
-    icon: <ListTodo className="h-6 w-6" />,
-    color: 'text-green-400',
-    bgColor: 'bg-green-50 dark:bg-green-900/20',
-    borderColor: 'border-green-200 dark:border-green-700'
-  },
-  { 
-    value: 'BUG', 
-    label: 'Bug', 
-    description: 'Software defect requiring resolution', 
-    emoji: '🐛',
-    icon: <AlertTriangle className="h-6 w-6" />,
-    color: 'text-red-500',
-    bgColor: 'bg-red-50 dark:bg-red-900/20',
-    borderColor: 'border-red-200 dark:border-red-700'
-  },
-  
-  // Planning & Discovery
-  { 
-    value: 'IDEA', 
-    label: 'Idea', 
-    description: 'Concept or proposal for future development', 
-    emoji: '',
-    icon: <Lightbulb className="h-6 w-6" />,
-    color: 'text-yellow-500',
-    bgColor: 'bg-yellow-50 dark:bg-yellow-900/20',
-    borderColor: 'border-yellow-200 dark:border-yellow-700'
-  },
-  { 
-    value: 'RESEARCH', 
-    label: 'Research', 
-    description: 'Investigation or analysis work', 
-    emoji: '',
-    icon: <Microscope className="h-6 w-6" />,
-    color: 'text-teal-400',
-    bgColor: 'bg-teal-50 dark:bg-teal-900/20',
-    borderColor: 'border-teal-200 dark:border-teal-700'
-  }
-];
+// Convert centralized constants to NodeType format preserving enhanced styling
+const nodeTypes: NodeType[] = Object.values(WORK_ITEM_TYPES).map(typeConfig => {
+  const IconComponent = typeConfig.icon;
+  return {
+    value: typeConfig.value,
+    label: typeConfig.label,
+    description: typeConfig.description || '',
+    emoji: '', // Remove emojis as requested
+    icon: IconComponent ? <IconComponent className="h-6 w-6" /> : <div className="h-6 w-6" />,
+    color: typeConfig.color,
+    bgColor: `bg-${typeConfig.color.replace('text-', '')}-50 dark:bg-${typeConfig.color.replace('text-', '')}-900/20`,
+    borderColor: `border-${typeConfig.color.replace('text-', '')}-200 dark:border-${typeConfig.color.replace('text-', '')}-700`
+  };
+});
 
 export function NodeTypeSelector({
   selectedType = '',

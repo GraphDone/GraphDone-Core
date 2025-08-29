@@ -1,24 +1,12 @@
 import React from 'react';
 import { 
-  CheckCircle,
-  Clock,
-  AlertCircle,
-  Calendar,
-  ClipboardList,
-  Flame,
-  Zap,
-  Triangle,
-  Circle,
-  ArrowDown,
-  Layers,
-  Trophy,
-  Target,
-  Sparkles,
-  ListTodo,
-  AlertTriangle,
-  Lightbulb,
-  Microscope
-} from 'lucide-react';
+  WORK_ITEM_STATUSES,
+  WORK_ITEM_PRIORITIES,
+  WORK_ITEM_TYPES,
+  WorkItemStatus,
+  WorkItemType,
+  PriorityLevel
+} from '../constants/workItemConstants';
 
 interface RightSidebarProps {
   currentView: 'dashboard' | 'table' | 'cards' | 'kanban' | 'gantt' | 'calendar' | 'activity';
@@ -159,95 +147,31 @@ const RightSidebar: React.FC<RightSidebarProps> = ({ currentView, stats }) => {
           <h3 className="text-xl font-semibold text-white mb-6">Task Status</h3>
           
           <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <div className="flex items-center space-x-2">
-                  <ClipboardList className="h-6 w-6 text-cyan-500" />
-                  <span className="text-gray-300">Proposed</span>
+            {Object.entries(WORK_ITEM_STATUSES).map(([statusKey, statusConfig]) => {
+              const statusLowerKey = statusKey.toLowerCase();
+              const count = statusKey === 'IN_PROGRESS' ? stats.inProgress : stats[statusLowerKey as keyof typeof stats] as number;
+              const IconComponent = statusConfig.icon;
+              
+              return (
+                <div key={statusKey} className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-2">
+                      {IconComponent && <IconComponent className={`h-6 w-6 ${statusConfig.color}`} />}
+                      <span className="text-gray-300">{statusConfig.label}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-white font-medium">{count || 0}</span>
+                    <div className="w-16 h-2 bg-gray-700 rounded-full">
+                      <div 
+                        className={`h-2 ${statusConfig.color.replace('text-', 'bg-')} rounded-full`}
+                        style={{ width: `${stats.total > 0 ? ((count || 0) / stats.total) * 100 : 0}%` }}
+                      ></div>
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <span className="text-white font-medium">{stats.proposed}</span>
-                <div className="w-16 h-2 bg-gray-700 rounded-full">
-                  <div 
-                    className="h-2 bg-cyan-500 rounded-full" 
-                    style={{ width: `${stats.total > 0 ? (stats.proposed / stats.total) * 100 : 0}%` }}
-                  ></div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <div className="flex items-center space-x-2">
-                  <Calendar className="h-6 w-6 text-purple-500" />
-                  <span className="text-gray-300">Planned</span>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <span className="text-white font-medium">{stats.planned}</span>
-                <div className="w-16 h-2 bg-gray-700 rounded-full">
-                  <div 
-                    className="h-2 bg-purple-500 rounded-full" 
-                    style={{ width: `${stats.total > 0 ? (stats.planned / stats.total) * 100 : 0}%` }}
-                  ></div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <div className="flex items-center space-x-2">
-                  <Clock className="h-6 w-6 text-yellow-500" />
-                  <span className="text-gray-300">In Progress</span>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <span className="text-white font-medium">{stats.inProgress}</span>
-                <div className="w-16 h-2 bg-gray-700 rounded-full">
-                  <div 
-                    className="h-2 bg-yellow-500 rounded-full" 
-                    style={{ width: `${stats.total > 0 ? (stats.inProgress / stats.total) * 100 : 0}%` }}
-                  ></div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <div className="flex items-center space-x-2">
-                  <AlertCircle className="h-6 w-6 text-red-500" />
-                  <span className="text-gray-300">Blocked</span>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <span className="text-white font-medium">{stats.blocked}</span>
-                <div className="w-16 h-2 bg-gray-700 rounded-full">
-                  <div 
-                    className="h-2 bg-red-500 rounded-full" 
-                    style={{ width: `${stats.total > 0 ? (stats.blocked / stats.total) * 100 : 0}%` }}
-                  ></div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <div className="flex items-center space-x-2">
-                  <CheckCircle className="h-6 w-6 text-green-500" />
-                  <span className="text-gray-300">Completed</span>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <span className="text-white font-medium">{stats.completed}</span>
-                <div className="w-16 h-2 bg-gray-700 rounded-full">
-                  <div 
-                    className="h-2 bg-green-500 rounded-full" 
-                    style={{ width: `${stats.total > 0 ? (stats.completed / stats.total) * 100 : 0}%` }}
-                  ></div>
-                </div>
-              </div>
-            </div>
+              );
+            })}
           </div>
         </div>
 
@@ -255,95 +179,30 @@ const RightSidebar: React.FC<RightSidebarProps> = ({ currentView, stats }) => {
         <div className="bg-gray-800 rounded-lg p-6 border border-gray-600">
           <h3 className="text-xl font-semibold text-white mb-6">Priority Distribution</h3>
           <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <div className="flex items-center space-x-2">
-                  <Flame className="h-6 w-6 text-red-500" />
-                  <span className="text-gray-300">Critical</span>
+            {Object.entries(WORK_ITEM_PRIORITIES).map(([priorityKey, priorityConfig]) => {
+              const count = stats.priorityStats[priorityKey as keyof typeof stats.priorityStats];
+              const IconComponent = priorityConfig.icon;
+              
+              return (
+                <div key={priorityKey} className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-2">
+                      {IconComponent && <IconComponent className={`h-6 w-6 ${priorityConfig.color}`} />}
+                      <span className="text-gray-300">{priorityConfig.label}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-white font-medium">{count || 0}</span>
+                    <div className="w-16 h-2 bg-gray-700 rounded-full">
+                      <div 
+                        className={`h-2 ${priorityConfig.color.replace('text-', 'bg-')} rounded-full`}
+                        style={{ width: `${stats.total > 0 ? ((count || 0) / stats.total) * 100 : 0}%` }}
+                      ></div>
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <span className="text-white font-medium">{stats.priorityStats.critical}</span>
-                <div className="w-16 h-2 bg-gray-700 rounded-full">
-                  <div 
-                    className="h-2 bg-red-500 rounded-full" 
-                    style={{ width: `${stats.total > 0 ? (stats.priorityStats.critical / stats.total) * 100 : 0}%` }}
-                  ></div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <div className="flex items-center space-x-2">
-                  <Zap className="h-6 w-6 text-orange-500" />
-                  <span className="text-gray-300">High</span>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <span className="text-white font-medium">{stats.priorityStats.high}</span>
-                <div className="w-16 h-2 bg-gray-700 rounded-full">
-                  <div 
-                    className="h-2 bg-orange-500 rounded-full" 
-                    style={{ width: `${stats.total > 0 ? (stats.priorityStats.high / stats.total) * 100 : 0}%` }}
-                  ></div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <div className="flex items-center space-x-2">
-                  <Triangle className="h-6 w-6 text-yellow-500" />
-                  <span className="text-gray-300">Moderate</span>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <span className="text-white font-medium">{stats.priorityStats.moderate}</span>
-                <div className="w-16 h-2 bg-gray-700 rounded-full">
-                  <div 
-                    className="h-2 bg-yellow-500 rounded-full" 
-                    style={{ width: `${stats.total > 0 ? (stats.priorityStats.moderate / stats.total) * 100 : 0}%` }}
-                  ></div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <div className="flex items-center space-x-2">
-                  <Circle className="h-6 w-6 text-blue-500" />
-                  <span className="text-gray-300">Low</span>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <span className="text-white font-medium">{stats.priorityStats.low}</span>
-                <div className="w-16 h-2 bg-gray-700 rounded-full">
-                  <div 
-                    className="h-2 bg-blue-500 rounded-full" 
-                    style={{ width: `${stats.total > 0 ? (stats.priorityStats.low / stats.total) * 100 : 0}%` }}
-                  ></div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <div className="flex items-center space-x-2">
-                  <ArrowDown className="h-6 w-6 text-gray-500" />
-                  <span className="text-gray-300">Minimal</span>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <span className="text-white font-medium">{stats.priorityStats.minimal}</span>
-                <div className="w-16 h-2 bg-gray-700 rounded-full">
-                  <div 
-                    className="h-2 bg-gray-500 rounded-full" 
-                    style={{ width: `${stats.total > 0 ? (stats.priorityStats.minimal / stats.total) * 100 : 0}%` }}
-                  ></div>
-                </div>
-              </div>
-            </div>
+              );
+            })}
           </div>
         </div>
 
@@ -351,61 +210,30 @@ const RightSidebar: React.FC<RightSidebarProps> = ({ currentView, stats }) => {
         <div className="bg-gray-800 rounded-lg p-6 border border-gray-600">
           <h3 className="text-xl font-semibold text-white mb-6">Node Types</h3>
           <div className="space-y-6">
-            {(() => {
-              // Define all possible node types in order
-              const allNodeTypes = [
-                'EPIC', 'MILESTONE', 'OUTCOME', 'FEATURE', 
-                'TASK', 'BUG', 'IDEA', 'RESEARCH'
-              ];
+            {Object.entries(WORK_ITEM_TYPES).map(([typeKey, typeConfig]) => {
+              const count = stats.typeStats[typeKey] || 0;
+              const IconComponent = typeConfig.icon;
               
-              return allNodeTypes.map((type) => {
-                const count = stats.typeStats[type] || 0;
-                return (
-                <div key={type} className="flex items-center justify-between">
+              return (
+                <div key={typeKey} className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     <div className="flex items-center space-x-2">
-                      {(() => {
-                        const iconProps = "h-6 w-6";
-                        switch(type) {
-                          case 'EPIC': return <Layers className={`${iconProps} text-purple-500`} />;
-                          case 'MILESTONE': return <Trophy className={`${iconProps} text-orange-500`} />;
-                          case 'OUTCOME': return <Target className={`${iconProps} text-indigo-500`} />;
-                          case 'FEATURE': return <Sparkles className={`${iconProps} text-blue-500`} />;
-                          case 'TASK': return <ListTodo className={`${iconProps} text-green-500`} />;
-                          case 'BUG': return <AlertTriangle className={`${iconProps} text-red-500`} />;
-                          case 'IDEA': return <Lightbulb className={`${iconProps} text-yellow-500`} />;
-                          case 'RESEARCH': return <Microscope className={`${iconProps} text-teal-500`} />;
-                          default: return <Circle className={`${iconProps} text-gray-500`} />;
-                        }
-                      })()}
-                      <span className="text-gray-300">{formatLabel(type)}</span>
+                      {IconComponent && <IconComponent className={`h-6 w-6 ${typeConfig.color}`} />}
+                      <span className="text-gray-300">{typeConfig.label}</span>
                     </div>
                   </div>
                   <div className="flex items-center space-x-2">
                     <span className="text-white font-medium">{count}</span>
                     <div className="w-16 h-2 bg-gray-700 rounded-full">
                       <div 
-                        className={`h-2 rounded-full ${(() => {
-                          switch(type) {
-                            case 'EPIC': return 'bg-purple-500';
-                            case 'MILESTONE': return 'bg-orange-500';
-                            case 'OUTCOME': return 'bg-indigo-500';
-                            case 'FEATURE': return 'bg-blue-500';
-                            case 'TASK': return 'bg-green-500';
-                            case 'BUG': return 'bg-red-500';
-                            case 'IDEA': return 'bg-yellow-500';
-                            case 'RESEARCH': return 'bg-teal-500';
-                            default: return 'bg-gray-500';
-                          }
-                        })()}`}
+                        className={`h-2 ${typeConfig.color.replace('text-', 'bg-')} rounded-full`}
                         style={{ width: `${stats.total > 0 ? (count / stats.total) * 100 : 0}%` }}
                       ></div>
                     </div>
                   </div>
                 </div>
               );
-              });
-            })()}
+            })}
           </div>
         </div>
       </div>

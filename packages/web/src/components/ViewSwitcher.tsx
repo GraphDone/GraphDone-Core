@@ -3,9 +3,9 @@ import {
   BarChart3, 
   Table, 
   Grid3X3, 
-  Kanban,
-  Calendar
+  Kanban
 } from 'lucide-react';
+import { Calendar } from '../constants/workItemConstants';
 
 export type ViewType = 'dashboard' | 'table' | 'cards' | 'kanban' | 'timeline';
 

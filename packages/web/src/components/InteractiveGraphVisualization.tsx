@@ -1,6 +1,27 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import * as d3 from 'd3';
-import { Link2, Edit3, Trash2, AlertTriangle, AlertCircle, Layers, Sparkles, ListTodo, Trophy, Target, Lightbulb, Microscope, Folder, FolderOpen, Plus, FileText, Settings, Unlink, ClipboardList, Calendar, Clock, CheckCircle, Zap, Flame, Triangle, Circle, ArrowDown, X, GitBranch, Minus } from 'lucide-react';
+import { Link2, Edit3, Trash2, Folder, FolderOpen, Plus, FileText, Settings, Unlink, X, GitBranch, Minus } from 'lucide-react';
+import {
+  getPriorityIconElement,
+  getStatusIconElement,
+  getTypeIconElement,
+  getTypeConfig,
+  getStatusConfig,
+  getPriorityConfig,
+  WORK_ITEM_TYPES,
+  WORK_ITEM_STATUSES,
+  WORK_ITEM_PRIORITIES,
+  // Import icons from central file
+  AlertTriangle,
+  AlertCircle,
+  Layers,
+  Trophy,
+  ListTodo,
+  Target,
+  Lightbulb,
+  Sparkles,
+  Microscope
+} from '../constants/workItemConstants';
 import { useQuery, useMutation } from '@apollo/client';
 import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -1377,29 +1398,11 @@ export function InteractiveGraphVisualization() {
   }
 
   const getNodeColor = (node: WorkItem) => {
-    switch (node.type) {
-      case 'EPIC': return '#c084fc';      // fuchsia-400 - matches icon
-      case 'FEATURE': return '#38bdf8';   // sky-400 - matches icon
-      case 'TASK': return '#4ade80';      // green-400 - matches icon
-      case 'BUG': return '#ef4444';       // red-500 - matches icon
-      case 'MILESTONE': return '#fb923c'; // orange-400 - matches icon
-      case 'OUTCOME': return '#818cf8';   // indigo-400 - matches icon
-      case 'IDEA': return '#eab308';      // yellow-500 - matches icon
-      case 'RESEARCH': return '#2dd4bf';  // teal-400 - matches icon
-      default: return '#6b7280';
-    }
+    return getTypeConfig(node.type as any).hexColor;
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'COMPLETED': return '#22c55e';
-      case 'IN_PROGRESS': return '#3b82f6';
-      case 'BLOCKED': return '#dc2626';
-      case 'PLANNED': return '#f59e0b';
-      case 'PROPOSED': return '#a855f7';
-      case 'CANCELLED': return '#6b7280';
-      default: return '#6b7280';
-    }
+    return getStatusConfig(status as any).hexColor;
   };
 
   // Helper function to get status icon SVG path (Lucide React icons)
@@ -1860,16 +1863,7 @@ export function InteractiveGraphVisualization() {
               <span className="flex items-center">
                 {(() => {
                   const status = nodeMenu.node?.status?.toUpperCase() || '';
-                  const getStatusIcon = () => {
-                    switch (status) {
-                      case 'PROPOSED': return <ClipboardList className="h-3 w-3 mr-1 text-cyan-400" />;
-                      case 'PLANNED': return <Calendar className="h-3 w-3 mr-1 text-purple-400" />;
-                      case 'IN_PROGRESS': return <Clock className="h-3 w-3 mr-1 text-yellow-400" />;
-                      case 'COMPLETED': return <CheckCircle className="h-3 w-3 mr-1 text-green-400" />;
-                      case 'BLOCKED': return <AlertCircle className="h-3 w-3 mr-1 text-red-400" />;
-                      default: return <span className={`w-2 h-2 rounded-full mr-1`} style={{ backgroundColor: getStatusColor(nodeMenu.node?.status || '') }} />;
-                    }
-                  };
+                  const statusIcon = getStatusIconElement(status as any, "h-3 w-3 mr-1");
                   const getStatusBgColor = () => {
                     switch (status) {
                       case 'PROPOSED': return 'text-cyan-400 bg-cyan-400/10 px-2 py-0.5 rounded';
@@ -1892,7 +1886,7 @@ export function InteractiveGraphVisualization() {
                   };
                   return (
                     <>
-                      {getStatusIcon()}
+                      {statusIcon}
                       <span className={getStatusBgColor()}>{formatStatus(nodeMenu.node.status)}</span>
                     </>
                   );
@@ -1901,32 +1895,13 @@ export function InteractiveGraphVisualization() {
               <span className="flex items-center">
                 {(() => {
                   const getTypeIcon = () => {
-                    switch (nodeMenu.node?.type) {
-                      case 'EPIC': return <Layers className="h-3 w-3 mr-1 text-fuchsia-400" />;
-                      case 'STORY': return <FileText className="h-3 w-3 mr-1 text-blue-400" />;
-                      case 'TASK': return <ListTodo className="h-3 w-3 mr-1 text-green-400" />;
-                      case 'MILESTONE': return <Trophy className="h-3 w-3 mr-1 text-orange-400" />;
-                      case 'BUG': return <AlertTriangle className="h-3 w-3 mr-1 text-red-500" />;
-                      case 'FEATURE': return <Sparkles className="h-3 w-3 mr-1 text-sky-400" />;
-                      case 'OUTCOME': return <Target className="h-3 w-3 mr-1 text-indigo-400" />;
-                      case 'IDEA': return <Lightbulb className="h-3 w-3 mr-1 text-yellow-500" />;
-                      case 'RESEARCH': return <Microscope className="h-3 w-3 mr-1 text-teal-400" />;
-                      default: return null;
-                    }
+                    if (!nodeMenu.node?.type) return null;
+                    return getTypeIconElement(nodeMenu.node.type as any, "h-3 w-3 mr-1");
                   };
                   const getTypeBgColor = () => {
-                    switch (nodeMenu.node?.type) {
-                      case 'EPIC': return 'text-fuchsia-400 bg-fuchsia-400/10 px-2 py-0.5 rounded';
-                      case 'STORY': return 'text-blue-400 bg-blue-400/10 px-2 py-0.5 rounded';
-                      case 'TASK': return 'text-green-400 bg-green-400/10 px-2 py-0.5 rounded';
-                      case 'MILESTONE': return 'text-orange-400 bg-orange-400/10 px-2 py-0.5 rounded';
-                      case 'BUG': return 'text-red-500 bg-red-500/10 px-2 py-0.5 rounded';
-                      case 'FEATURE': return 'text-sky-400 bg-sky-400/10 px-2 py-0.5 rounded';
-                      case 'OUTCOME': return 'text-indigo-400 bg-indigo-400/10 px-2 py-0.5 rounded';
-                      case 'IDEA': return 'text-yellow-500 bg-yellow-500/10 px-2 py-0.5 rounded';
-                      case 'RESEARCH': return 'text-teal-400 bg-teal-400/10 px-2 py-0.5 rounded';
-                      default: return '';
-                    }
+                    if (!nodeMenu.node?.type) return 'text-gray-400 bg-gray-400/10 px-2 py-0.5 rounded';
+                    const typeConfig = getTypeConfig(nodeMenu.node.type as any);
+                    return `${typeConfig.color} ${typeConfig.bgColor} px-2 py-0.5 rounded`;
                   };
                   return (
                     <>
@@ -1946,14 +1921,7 @@ export function InteractiveGraphVisualization() {
                 <div className="flex items-center">
                   {(() => {
                     const priority = nodeMenu.node?.priority?.computed || nodeMenu.node?.priorityComp || 0;
-                    const getPriorityIcon = () => {
-                      if (priority >= 0.8) return <Flame className="h-3 w-3 mr-1 text-red-400" />;
-                      if (priority >= 0.6) return <Zap className="h-3 w-3 mr-1 text-orange-400" />;
-                      if (priority >= 0.4) return <Triangle className="h-3 w-3 mr-1 text-yellow-400" />;
-                      if (priority >= 0.2) return <Circle className="h-3 w-3 mr-1 text-blue-400" />;
-                      return <ArrowDown className="h-3 w-3 mr-1 text-gray-400" />;
-                    };
-                    return getPriorityIcon();
+                    return getPriorityIconElement(priority, "h-3 w-3 mr-1");
                   })()}
                   <span className="text-gray-400">Priority:</span>
                   <span className="ml-1 font-medium">{Math.round((nodeMenu.node?.priority?.computed || nodeMenu.node?.priorityComp || 0) * 100)}%</span>
@@ -2136,35 +2104,35 @@ export function InteractiveGraphVisualization() {
           </div>
           <div className="grid grid-cols-2 gap-2 text-sm text-gray-300">
             <div className="flex items-center space-x-2">
-              <Layers className="w-4 h-4 text-purple-400" />
+              {getTypeIconElement('EPIC', "w-4 h-4")}
               <span>Epic</span>
             </div>
             <div className="flex items-center space-x-2">
-              <ListTodo className="w-4 h-4 text-green-400" />
+              {getTypeIconElement('TASK', "w-4 h-4")}
               <span>Task</span>
             </div>
             <div className="flex items-center space-x-2">
-              <Trophy className="w-4 h-4 text-orange-400" />
+              {getTypeIconElement('MILESTONE', "w-4 h-4")}
               <span>Milestone</span>
             </div>
             <div className="flex items-center space-x-2">
-              <AlertTriangle className="w-4 h-4 text-red-400" />
+              {getTypeIconElement('BUG', "w-4 h-4")}
               <span>Bug</span>
             </div>
             <div className="flex items-center space-x-2">
-              <Target className="w-4 h-4 text-indigo-400" />
+              {getTypeIconElement('OUTCOME', "w-4 h-4")}
               <span>Outcome</span>
             </div>
             <div className="flex items-center space-x-2">
-              <Lightbulb className="w-4 h-4 text-yellow-400" />
+              {getTypeIconElement('IDEA', "w-4 h-4")}
               <span>Idea</span>
             </div>
             <div className="flex items-center space-x-2">
-              <Sparkles className="w-4 h-4 text-blue-400" />
+              {getTypeIconElement('FEATURE', "w-4 h-4")}
               <span>Feature</span>
             </div>
             <div className="flex items-center space-x-2">
-              <Microscope className="w-4 h-4 text-teal-400" />
+              {getTypeIconElement('RESEARCH', "w-4 h-4")}
               <span>Research</span>
             </div>
           </div>

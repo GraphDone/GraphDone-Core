@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Link2, Search, CheckCircle, ArrowRight, Target, ExternalLink, Filter, CheckCircle2, Trash2, AlertTriangle, Unlink, Clock, Calendar, ClipboardList, AlertCircle, Layers, Sparkles, ListTodo, Trophy, Lightbulb, Microscope, Flame, Zap, Triangle, Circle, ArrowDown, ChevronDown } from 'lucide-react';
+import { X, Link2, Search, CheckCircle, ArrowRight, ExternalLink, Filter, CheckCircle2, Trash2, Unlink, ChevronDown } from 'lucide-react';
 import { useQuery, useMutation } from '@apollo/client';
 import { GET_WORK_ITEMS, CREATE_EDGE, GET_EDGES, DELETE_EDGE } from '../lib/queries';
 import { useAuth } from '../contexts/AuthContext';
@@ -28,6 +28,20 @@ import {
   suggestSimilarNodes,
   getColorSimilarityScore
 } from '../utils/nodeColorSystem';
+import {
+  TYPE_OPTIONS,
+  STATUS_OPTIONS,
+  PRIORITY_OPTIONS,
+  getTypeIcon as getCentralizedTypeIcon,
+  getStatusIcon as getCentralizedStatusIcon,
+  getPriorityIcon as getCentralizedPriorityIcon,
+  getTypeColor as getCentralizedTypeColor,
+  getStatusColor as getCentralizedStatusColor,
+  getPriorityColor as getCentralizedPriorityColor,
+  // Import icons from central file
+  AlertTriangle,
+  Target
+} from '../constants/workItemConstants';
 
 interface ConnectNodeModalProps {
   isOpen: boolean;
@@ -52,50 +66,24 @@ interface DisconnectNodeModalProps {
 }
 
 
-const getStatusColor = (status: string): string => {
-  switch (status?.toLowerCase()) {
-    case 'completed': return '#22c55e';
-    case 'in_progress': return '#f59e0b';
-    case 'blocked': return '#ef4444';
-    case 'planned': return '#8b5cf6';
-    default: return '#6b7280';
-  }
+// Wrapper functions to maintain existing API while using centralized constants
+const getStatusColorHex = (status: string): string => {
+  return getCentralizedStatusColor(status as any) || '#6b7280';
 };
 
-// Get status icon - matching CreateNodeModal
-const getStatusIcon = (status: string, className: string = "h-3 w-3") => {
-  switch (status?.toUpperCase()) {
-    case 'PROPOSED': return <ClipboardList className={className} />;
-    case 'PLANNED': return <Calendar className={className} />;
-    case 'IN_PROGRESS': return <Clock className={className} />;
-    case 'COMPLETED': return <CheckCircle className={className} />;
-    case 'BLOCKED': return <AlertCircle className={className} />;
-    default: return <ClipboardList className={className} />;
-  }
+const getStatusIconElement = (status: string, className: string = "h-3 w-3") => {
+  const IconComponent = getCentralizedStatusIcon(status as any);
+  return IconComponent ? <IconComponent className={className} /> : null;
 };
 
-// Get type icon - matching NodeTypeSelector
-const getTypeIcon = (type: string, className: string = "h-3 w-3") => {
-  switch (type?.toUpperCase()) {
-    case 'EPIC': return <Layers className={className} />;
-    case 'MILESTONE': return <Trophy className={className} />;
-    case 'OUTCOME': return <Target className={className} />;
-    case 'FEATURE': return <Sparkles className={className} />;
-    case 'TASK': return <ListTodo className={className} />;
-    case 'BUG': return <AlertTriangle className={className} />;
-    case 'IDEA': return <Lightbulb className={className} />;
-    case 'RESEARCH': return <Microscope className={className} />;
-    default: return <CheckCircle2 className={className} />;
-  }
+const getTypeIconElement = (type: string, className: string = "h-3 w-3") => {
+  const IconComponent = getCentralizedTypeIcon(type as any);
+  return IconComponent ? <IconComponent className={className} /> : null;
 };
 
-// Get priority icon based on value - matching CreateNodeModal
-const getPriorityIcon = (priority: number, className: string = "h-3 w-3") => {
-  if (priority >= 0.8) return <Flame className={className} />; // Critical
-  if (priority >= 0.6) return <Zap className={className} />; // High
-  if (priority >= 0.4) return <Triangle className={className} />; // Moderate
-  if (priority >= 0.2) return <Circle className={className} />; // Low
-  return <ArrowDown className={className} />; // Minimal
+const getPriorityIconElement = (priority: number, className: string = "h-3 w-3") => {
+  const IconComponent = getCentralizedPriorityIcon(priority);
+  return IconComponent ? <IconComponent className={className} /> : null;
 };
 
 // Separate DisconnectNodeModal Component
@@ -689,36 +677,21 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
   const typeDropdownRef = useRef<HTMLDivElement>(null);
   const priorityDropdownRef = useRef<HTMLDivElement>(null);
   
-  // Options arrays matching table view patterns
-  const statusOptions = [
-    { value: 'all', label: 'All Status', icon: null, color: 'text-gray-400' },
-    { value: 'PROPOSED', label: 'Proposed', icon: <ClipboardList className="h-4 w-4" />, color: 'text-cyan-400' },
-    { value: 'PLANNED', label: 'Planned', icon: <Calendar className="h-4 w-4" />, color: 'text-purple-400' },
-    { value: 'IN_PROGRESS', label: 'In Progress', icon: <Clock className="h-4 w-4" />, color: 'text-yellow-400' },
-    { value: 'COMPLETED', label: 'Completed', icon: <CheckCircle className="h-4 w-4" />, color: 'text-green-400' },
-    { value: 'BLOCKED', label: 'Blocked', icon: <AlertCircle className="h-4 w-4" />, color: 'text-red-500' }
-  ];
+  // Use centralized options with JSX elements for dropdowns
+  const statusOptions = STATUS_OPTIONS.map(option => ({
+    ...option,
+    icon: option.icon ? <option.icon className="h-4 w-4" /> : null
+  }));
   
-  const typeOptions = [
-    { value: 'all', label: 'All Type', icon: null, color: 'text-gray-400' },
-    { value: 'EPIC', label: 'Epic', icon: <Layers className="h-4 w-4" />, color: 'text-fuchsia-400' },
-    { value: 'MILESTONE', label: 'Milestone', icon: <Trophy className="h-4 w-4" />, color: 'text-orange-400' },
-    { value: 'OUTCOME', label: 'Outcome', icon: <Target className="h-4 w-4" />, color: 'text-indigo-400' },
-    { value: 'FEATURE', label: 'Feature', icon: <Sparkles className="h-4 w-4" />, color: 'text-sky-400' },
-    { value: 'TASK', label: 'Task', icon: <ListTodo className="h-4 w-4" />, color: 'text-green-400' },
-    { value: 'BUG', label: 'Bug', icon: <AlertTriangle className="h-4 w-4" />, color: 'text-red-400' },
-    { value: 'IDEA', label: 'Idea', icon: <Lightbulb className="h-4 w-4" />, color: 'text-yellow-400' },
-    { value: 'RESEARCH', label: 'Research', icon: <Microscope className="h-4 w-4" />, color: 'text-blue-400' }
-  ];
+  const typeOptions = TYPE_OPTIONS.map(option => ({
+    ...option,
+    icon: option.icon ? <option.icon className="h-4 w-4" /> : null
+  }));
   
-  const priorityOptions = [
-    { value: 'all', label: 'All Priority', icon: null, color: 'text-gray-400' },
-    { value: 'critical', label: 'Critical', icon: <Flame className="h-4 w-4" />, color: 'text-red-400' },
-    { value: 'high', label: 'High', icon: <Zap className="h-4 w-4" />, color: 'text-orange-400' },
-    { value: 'moderate', label: 'Moderate', icon: <Triangle className="h-4 w-4" />, color: 'text-yellow-400' },
-    { value: 'low', label: 'Low', icon: <Circle className="h-4 w-4" />, color: 'text-blue-400' },
-    { value: 'minimal', label: 'Minimal', icon: <ArrowDown className="h-4 w-4" />, color: 'text-gray-400' }
-  ];
+  const priorityOptions = PRIORITY_OPTIONS.map(option => ({
+    ...option,
+    icon: option.icon ? <option.icon className="h-4 w-4" /> : null
+  }));
   const [duplicateWarning, setDuplicateWarning] = useState<{
     isValid: boolean;
     reason?: string;
@@ -2094,7 +2067,7 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
                               {/* Type with icon */}
                               <div className="flex items-center space-x-1">
                                 <div className={getTypeColor(node.type).text}>
-                                  {getTypeIcon(node.type)}
+                                  {getTypeIconElement(node.type)}
                                 </div>
                                 <span className="text-gray-300 font-medium">
                                   {node.type?.toLowerCase().replace(/\b\w/g, l => l.toUpperCase())}
@@ -2104,7 +2077,7 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
                               {/* Status with icon and label */}
                               <div className="flex items-center space-x-1">
                                 <div className={getStatusColorScheme(node.status).text}>
-                                  {getStatusIcon(node.status)}
+                                  {getStatusIconElement(node.status)}
                                 </div>
                                 <span className="text-gray-300 font-medium">
                                   {node.status?.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())}
@@ -2115,7 +2088,7 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
                               {(node.priorityComp !== undefined && node.priorityComp !== null) && (
                                 <div className="flex items-center space-x-1">
                                   <div className={getPriorityColor(node.priorityComp).text}>
-                                    {getPriorityIcon(node.priorityComp)}
+                                    {getPriorityIconElement(node.priorityComp)}
                                   </div>
                                   <span className="text-gray-300 font-medium">Priority</span>
                                   <div className="flex items-center space-x-1">
