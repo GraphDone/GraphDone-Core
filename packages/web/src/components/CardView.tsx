@@ -4,19 +4,12 @@ import {
   Trash2
 } from 'lucide-react';
 import {
-  CheckCircle,
-  Clock,
-  AlertCircle,
-  Calendar,
-  ClipboardList,
-  Layers,
-  Trophy,
-  Target,
-  Sparkles,
-  ListTodo,
-  AlertTriangle,
-  Lightbulb,
-  Microscope
+  WorkItemType,
+  WorkItemStatus,
+  getTypeConfig,
+  getStatusConfig,
+  getTypeIconElement,
+  getStatusIconElement
 } from '../constants/workItemConstants';
 import { TagDisplay } from './TagDisplay';
 import { AnimatedPriority } from './AnimatedPriority';
@@ -59,17 +52,8 @@ const formatLabel = (label: string) => {
 };
 
 const getNodeTypeColor = (type: string) => {
-  switch (type) {
-    case 'EPIC': return 'bg-purple-500 text-white';
-    case 'FEATURE': return 'bg-blue-600 text-white';
-    case 'TASK': return 'bg-green-500 text-white';
-    case 'BUG': return 'bg-red-500 text-white';
-    case 'MILESTONE': return 'bg-orange-500 text-black';
-    case 'IDEA': return 'bg-yellow-500 text-white';
-    case 'OUTCOME': return 'bg-indigo-500 text-white';
-    case 'RESEARCH': return 'bg-teal-500 text-white';
-    default: return 'bg-gray-500 text-white';
-  }
+  const config = getTypeConfig(type as WorkItemType);
+  return `${config.bgColor} ${config.color}`;
 };
 
 const getNodePriority = (node: WorkItem) => {
@@ -117,14 +101,7 @@ const CardView: React.FC<CardViewProps> = ({ filteredNodes, handleEditNode, hand
         >
           <div className="flex items-start justify-between mb-4">
             <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold shadow-sm ${getNodeTypeColor(node.type)}`}>
-              {node.type === 'EPIC' && <Layers className="w-3 h-3" />}
-              {node.type === 'MILESTONE' && <Trophy className="w-3 h-3" />}
-              {node.type === 'OUTCOME' && <Target className="w-3 h-3" />}
-              {node.type === 'FEATURE' && <Sparkles className="w-3 h-3" />}
-              {node.type === 'TASK' && <ListTodo className="w-3 h-3" />}
-              {node.type === 'BUG' && <AlertTriangle className="w-3 h-3" />}
-              {node.type === 'IDEA' && <Lightbulb className="w-3 h-3" />}
-              {node.type === 'RESEARCH' && <Microscope className="w-3 h-3" />}
+              {getTypeIconElement(node.type as WorkItemType, "w-3 h-3")}
               <span className="ml-1">{formatLabel(node.type)}</span>
             </span>
             <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -270,20 +247,12 @@ const CardView: React.FC<CardViewProps> = ({ filteredNodes, handleEditNode, hand
             </div>
             
             {/* Status */}
-            <div className={`flex items-center space-x-2 px-3 py-1.5 rounded-full text-sm font-medium border shadow-sm ${
-              node.status === 'PROPOSED' ? 'bg-cyan-50 border-cyan-200 text-cyan-700 dark:bg-cyan-900/20 dark:border-cyan-800 dark:text-cyan-400' :
-              node.status === 'PLANNED' ? 'bg-purple-50 border-purple-200 text-purple-700 dark:bg-purple-900/20 dark:border-purple-800 dark:text-purple-400' :
-              node.status === 'IN_PROGRESS' ? 'bg-yellow-50 border-yellow-200 text-yellow-700 dark:bg-yellow-900/20 dark:border-yellow-800 dark:text-yellow-400' :
-              node.status === 'COMPLETED' ? 'bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400' :
-              node.status === 'BLOCKED' ? 'bg-red-50 border-red-200 text-red-700 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400' :
-              'bg-gray-50 border-gray-200 text-gray-700 dark:bg-gray-900/20 dark:border-gray-800 dark:text-gray-400'
-            }`}>
+            <div className={`flex items-center space-x-2 px-3 py-1.5 rounded-full text-sm font-medium border shadow-sm ${(() => {
+              const config = getStatusConfig(node.status as WorkItemStatus);
+              return `${config.bgColor} ${config.borderColor} ${config.color}`;
+            })()}`}>
               <div>
-                {node.status === 'PROPOSED' && <ClipboardList className="h-4 w-4" />}
-                {node.status === 'PLANNED' && <Calendar className="h-4 w-4" />}
-                {node.status === 'IN_PROGRESS' && <Clock className="h-4 w-4" />}
-                {node.status === 'COMPLETED' && <CheckCircle className="h-4 w-4" />}
-                {node.status === 'BLOCKED' && <AlertCircle className="h-4 w-4" />}
+                {getStatusIconElement(node.status as WorkItemStatus, "h-4 w-4")}
               </div>
               <span>{formatLabel(node.status)}</span>
             </div>

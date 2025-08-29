@@ -9,7 +9,15 @@ import {
   ClipboardList, CheckCircle, AlertCircle, Flame, Zap, Triangle, Circle, ArrowDown,
   getRelationshipIconElement,
   getRelationshipConfig,
-  RelationshipType
+  RelationshipType,
+  WorkItemType,
+  WorkItemStatus,
+  getTypeConfig,
+  getStatusConfig,
+  getPriorityConfig,
+  getTypeIconElement,
+  getStatusIconElement,
+  getPriorityIconElement
 } from '../constants/workItemConstants';
 import { WorkItem, WorkItemEdge } from '../types/graph';
 
@@ -33,70 +41,35 @@ export function NodeDetailsModal({ isOpen, onClose, node, edges = [], nodes = []
   const totalPriority = getNodePriority(node);
 
   const getStatusColor = (status: string) => {
-    switch (status.toUpperCase()) {
-      case 'COMPLETED': return 'text-green-400 bg-green-400/10';
-      case 'IN_PROGRESS': return 'text-yellow-400 bg-yellow-400/10';
-      case 'BLOCKED': return 'text-red-500 bg-red-500/10';
-      case 'PLANNED': return 'text-purple-400 bg-purple-400/10';
-      case 'PROPOSED': return 'text-cyan-400 bg-cyan-400/10';
-      default: return 'text-gray-400 bg-gray-400/10';
-    }
+    const statusConfig = getStatusConfig(status as WorkItemStatus);
+    return `${statusConfig.color} ${statusConfig.bgColor}`;
   };
 
   const getStatusIcon = (status: string) => {
-    switch (status.toUpperCase()) {
-      case 'PROPOSED': return <ClipboardList className="h-5 w-5 text-cyan-400" />;
-      case 'PLANNED': return <Calendar className="h-5 w-5 text-purple-400" />;
-      case 'IN_PROGRESS': return <Clock className="h-5 w-5 text-yellow-400" />;
-      case 'COMPLETED': return <CheckCircle className="h-5 w-5 text-green-400" />;
-      case 'BLOCKED': return <AlertCircle className="h-5 w-5 text-red-500" />;
-      default: return <Clock className="h-5 w-5 text-gray-400" />;
-    }
+    return getStatusIconElement(status as WorkItemStatus, "h-5 w-5");
   };
 
   const getTypeColor = (type: string) => {
-    switch (type) {
-      case 'EPIC': return 'text-fuchsia-400 bg-fuchsia-400/10';
-      case 'MILESTONE': return 'text-orange-400 bg-orange-400/10';
-      case 'OUTCOME': return 'text-indigo-400 bg-indigo-400/10';
-      case 'FEATURE': return 'text-sky-400 bg-sky-400/10';
-      case 'TASK': return 'text-green-400 bg-green-400/10';
-      case 'BUG': return 'text-red-500 bg-red-500/10';
-      case 'IDEA': return 'text-yellow-500 bg-yellow-500/10';
-      case 'RESEARCH': return 'text-teal-400 bg-teal-400/10';
-      default: return 'text-gray-400 bg-gray-400/10';
-    }
+    const typeConfig = getTypeConfig(type as WorkItemType);
+    return `${typeConfig.color} ${typeConfig.bgColor}`;
   };
 
   const getTypeIcon = (type: string) => {
-    switch (type) {
-      case 'EPIC': return <Layers className="h-5 w-5 text-fuchsia-400" />;
-      case 'MILESTONE': return <Trophy className="h-5 w-5 text-orange-400" />;
-      case 'OUTCOME': return <Target className="h-5 w-5 text-indigo-400" />;
-      case 'FEATURE': return <Sparkles className="h-5 w-5 text-sky-400" />;
-      case 'TASK': return <ListTodo className="h-5 w-5 text-green-400" />;
-      case 'BUG': return <AlertTriangle className="h-5 w-5 text-red-500" />;
-      case 'IDEA': return <Lightbulb className="h-5 w-5 text-yellow-500" />;
-      case 'RESEARCH': return <Microscope className="h-5 w-5 text-teal-400" />;
-      default: return <ListTodo className="h-5 w-5 text-green-400" />;
-    }
+    return getTypeIconElement(type as WorkItemType, "h-5 w-5");
   };
 
   const getPriorityIcon = (priority: number) => {
-    if (priority >= 0.8) return <Flame className="h-5 w-5 text-red-400" />;
-    if (priority >= 0.6) return <Zap className="h-5 w-5 text-orange-400" />;
-    if (priority >= 0.4) return <Triangle className="h-5 w-5 text-yellow-400" />;
-    if (priority >= 0.2) return <Circle className="h-5 w-5 text-blue-400" />;
-    return <ArrowDown className="h-5 w-5 text-gray-400" />;
+    return getPriorityIconElement(priority, "h-5 w-5");
   };
 
   // Use the same priority levels as ListView (0.0-1.0 scale)
   const getPriorityLevel = (priority: number) => {
-    if (priority >= 0.8) return { label: 'Critical', color: 'text-red-400 bg-red-400/10', flagColor: 'text-red-400' };
-    if (priority >= 0.6) return { label: 'High', color: 'text-orange-400 bg-orange-400/10', flagColor: 'text-orange-400' };
-    if (priority >= 0.4) return { label: 'Medium', color: 'text-yellow-400 bg-yellow-400/10', flagColor: 'text-yellow-400' };
-    if (priority >= 0.2) return { label: 'Low', color: 'text-blue-400 bg-blue-400/10', flagColor: 'text-blue-400' };
-    return { label: 'Minimal', color: 'text-gray-400 bg-gray-400/10', flagColor: 'text-gray-400' };
+    const config = getPriorityConfig(priority);
+    return { 
+      label: config.label, 
+      color: `${config.color} ${config.bgColor}`, 
+      flagColor: config.color 
+    };
   };
 
   const formatDate = (dateString: string) => {
@@ -123,39 +96,13 @@ export function NodeDetailsModal({ isOpen, onClose, node, edges = [], nodes = []
   };
 
   const getRelationshipColor = (type: string) => {
-    const relationshipColors: Record<string, string> = {
-      'DEPENDS_ON': 'text-emerald-400 bg-emerald-400/10',
-      'BLOCKS': 'text-red-400 bg-red-400/10',
-      'ENABLES': 'text-green-400 bg-green-400/10',
-      'RELATES_TO': 'text-purple-400 bg-purple-400/10',
-      'IS_PART_OF': 'text-orange-400 bg-orange-400/10',
-      'FOLLOWS': 'text-indigo-400 bg-indigo-400/10',
-      'PARALLEL_WITH': 'text-teal-400 bg-teal-400/10',
-      'DUPLICATES': 'text-yellow-400 bg-yellow-400/10',
-      'CONFLICTS_WITH': 'text-red-500 bg-red-500/10',
-      'VALIDATES': 'text-emerald-400 bg-emerald-400/10',
-      'REFERENCES': 'text-slate-400 bg-slate-400/10',
-      'CONTAINS': 'text-blue-400 bg-blue-400/10',
-    };
-    return relationshipColors[type] || 'text-gray-400 bg-gray-400/10';
+    const config = getRelationshipConfig(type as RelationshipType);
+    return `${config.color} ${config.color.replace('text-', 'bg-')}/10`;
   };
 
   const getRelationshipDisplayName = (type: string) => {
-    const relationshipNames: Record<string, string> = {
-      'DEPENDS_ON': 'Depends On',
-      'BLOCKS': 'Blocks',
-      'ENABLES': 'Enables',
-      'RELATES_TO': 'Related To',
-      'IS_PART_OF': 'Is Part Of',
-      'FOLLOWS': 'Follows',
-      'PARALLEL_WITH': 'Parallel With',
-      'DUPLICATES': 'Duplicates',
-      'CONFLICTS_WITH': 'Conflicts With',
-      'VALIDATES': 'Validates',
-      'REFERENCES': 'References',
-      'CONTAINS': 'Contains',
-    };
-    return relationshipNames[type] || type.replace('_', ' ');
+    const config = getRelationshipConfig(type as RelationshipType);
+    return config.label;
   };
 
   const getRelationshipIcon = (type: string) => {

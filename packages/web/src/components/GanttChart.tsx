@@ -1,6 +1,6 @@
 import React from 'react';
 import { GitBranch } from 'lucide-react';
-import { Calendar, Clock, CheckCircle } from '../constants/workItemConstants';
+import { Calendar, Clock, CheckCircle, getStatusConfig, WorkItemStatus } from '../constants/workItemConstants';
 
 interface WorkItem {
   id: string;
@@ -37,14 +37,8 @@ const formatLabel = (label: string) => {
 };
 
 const getStatusColor = (status: string) => {
-  switch (status) {
-    case 'PROPOSED': return 'bg-cyan-500';
-    case 'PLANNED': return 'bg-purple-500';
-    case 'IN_PROGRESS': return 'bg-yellow-500';
-    case 'COMPLETED': return 'bg-green-500';
-    case 'BLOCKED': return 'bg-red-500';
-    default: return 'bg-gray-500';
-  }
+  const config = getStatusConfig(status as WorkItemStatus);
+  return config.bgColor;
 };
 
 const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
