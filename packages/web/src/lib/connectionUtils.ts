@@ -185,6 +185,19 @@ export function getExistingRelationships(
 }
 
 /**
+ * Check if ANY relationship already exists between two nodes
+ */
+export function hasAnyRelationship(
+  sourceId: string,
+  targetId: string,
+  edges: Edge[],
+  workItems: WorkItem[]
+): boolean {
+  const existingRelationships = getExistingRelationships(sourceId, targetId, edges, workItems);
+  return existingRelationships.length > 0;
+}
+
+/**
  * Check if a specific relationship type already exists between two nodes
  */
 export function relationshipExists(
@@ -214,6 +227,21 @@ export function getNodesWithExistingRelationship(
       relationshipExists(sourceId, node.id, relationshipType, edges, workItems)
     )
     .map(node => node.id);
+}
+
+/**
+ * Check if any of the selected nodes already have ANY relationship with source
+ * Used with one-relationship-at-a-time policy
+ */
+export function hasAnyRelationshipWithSelected(
+  sourceId: string,
+  selectedNodeIds: string[],
+  edges: Edge[],
+  workItems: WorkItem[]
+): boolean {
+  return selectedNodeIds.some(nodeId =>
+    hasAnyRelationship(sourceId, nodeId, edges, workItems)
+  );
 }
 
 /**
@@ -474,12 +502,13 @@ export function validateNewConnection(
   reason?: string;
   suggestion?: string;
 } {
-  // Check for exact duplicate
-  if (relationshipExists(sourceId, targetId, relationshipType, edges, workItems)) {
+  // Check if ANY relationship already exists (one relationship at a time policy)
+  if (hasAnyRelationship(sourceId, targetId, edges, workItems)) {
+    const existingRelationships = getExistingRelationships(sourceId, targetId, edges, workItems);
     return {
       isValid: false,
-      reason: `${relationshipType} relationship already exists between these nodes`,
-      suggestion: 'Choose a different relationship type or different target node'
+      reason: `A ${existingRelationships[0]} relationship already exists between these nodes`,
+      suggestion: 'Only one relationship is allowed per node pair. Remove the existing relationship first or choose different nodes.'
     };
   }
 

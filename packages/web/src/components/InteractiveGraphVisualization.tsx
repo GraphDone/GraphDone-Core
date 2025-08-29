@@ -565,7 +565,7 @@ export function InteractiveGraphVisualization() {
           case 'DEPENDS_ON': return '#10b981';
           case 'BLOCKS': return '#dc2626';
           case 'RELATES_TO': return '#3b82f6';
-          case 'PART_OF': return '#f59e0b';
+          case 'IS_PART_OF': return '#f59e0b';
           default: return '#6b7280';
         }
       })
@@ -576,7 +576,7 @@ export function InteractiveGraphVisualization() {
     const defs = svg.append('defs');
     
     // Create different arrowhead colors for each edge type
-    const edgeTypes = ['DEPENDS_ON', 'BLOCKS', 'RELATES_TO', 'PART_OF'];
+    const edgeTypes = ['DEPENDS_ON', 'BLOCKS', 'RELATES_TO', 'IS_PART_OF'];
     const edgeColors = ['#10b981', '#dc2626', '#3b82f6', '#f59e0b'];
     
     edgeTypes.forEach((type, index) => {
@@ -1140,7 +1140,7 @@ export function InteractiveGraphVisualization() {
           case 'DEPENDS_ON': return '#10b981';
           case 'BLOCKS': return '#dc2626';
           case 'RELATES_TO': return '#3b82f6';
-          case 'PART_OF': return '#f59e0b';
+          case 'IS_PART_OF': return '#f59e0b';
           default: return '#6b7280';
         }
       })
@@ -1155,7 +1155,7 @@ export function InteractiveGraphVisualization() {
           case 'DEPENDS_ON': return '#10b981';
           case 'BLOCKS': return '#dc2626';
           case 'RELATES_TO': return '#3b82f6';
-          case 'PART_OF': return '#f59e0b';
+          case 'IS_PART_OF': return '#f59e0b';
           default: return '#6b7280';
         }
       })

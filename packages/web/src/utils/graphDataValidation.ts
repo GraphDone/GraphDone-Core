@@ -311,8 +311,8 @@ function validateEdge(edge: any, index: number, nodeIdMap: Map<string, any>): Va
   if (edge.type) {
     const validTypes: RelationshipType[] = [
       'DEPENDS_ON', 'BLOCKS', 'ENABLES', 'RELATES_TO',
-      'PART_OF', 'FOLLOWS', 'PARALLEL_WITH', 'DUPLICATES',
-      'CONFLICTS_WITH', 'VALIDATES'
+      'IS_PART_OF', 'FOLLOWS', 'PARALLEL_WITH', 'DUPLICATES',
+      'CONFLICTS_WITH', 'VALIDATES', 'REFERENCES', 'CONTAINS'
     ];
     
     if (!validTypes.includes(edge.type)) {
