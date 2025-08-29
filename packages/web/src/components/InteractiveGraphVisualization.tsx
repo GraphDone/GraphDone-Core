@@ -118,6 +118,30 @@ export function InteractiveGraphVisualization() {
   const [createNodePosition, setCreateNodePosition] = useState<{ x: number; y: number; z: number } | undefined>(undefined);
   const [currentTransform, setCurrentTransform] = useState({ x: 0, y: 0, scale: 1 });
   const [showLegend, setShowLegend] = useState(true);
+  const [showGraphPanel, setShowGraphPanel] = useState(true);
+
+  // Calculate dynamic positioning for panels and minimized buttons to avoid overlap
+  const getPanelPosition = (panelType: 'graph' | 'legend') => {
+    const graphPanelHeight = 295; // Slightly increased height estimate for expanded graph panel
+    const buttonHeight = 60; // Height of minimized buttons
+    const compactSpacing = 27; // Just a bit more spacing when one panel is minimized
+    const expandedSpacing = 32; // Slightly more spacing when both panels are expanded
+    
+    if (panelType === 'graph') {
+      // Graph panel/button is always at top position
+      return { top: '20px' };
+    } else {
+      // Legend panel/button positioning depends on graph panel state
+      if (!showGraphPanel) {
+        // If graph panel is minimized, legend moves up closer
+        return { top: `${20 + buttonHeight + compactSpacing}px` }; // Below minimized graph button
+      } else {
+        // If graph panel is expanded, legend must be below it regardless of its own state
+        const spacing = showLegend ? expandedSpacing : compactSpacing; // More space if legend is expanded
+        return { top: `${20 + graphPanelHeight + spacing}px` }; // Always below expanded graph panel
+      }
+    }
+  };
 
   // Additional edge operations
   const [updateEdgeMutation] = useMutation(UPDATE_EDGE, {
@@ -1529,19 +1553,27 @@ export function InteractiveGraphVisualization() {
       )}
       
       {/* Graph Control Panel */}
-      <div className="absolute left-4 z-40" style={{ top: '20px' }}>
-        <div className="bg-gray-800/95 backdrop-blur-sm border border-gray-600/60 rounded-lg shadow-xl p-4 w-64">
-          {/* Current Graph Header */}
-          <div className="flex items-center space-x-3 mb-4">
-            <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center flex-shrink-0">
-              {getGraphTypeIcon(currentGraph?.type)}
+      {showGraphPanel ? (
+        <div className="absolute left-4 z-40" style={{ top: '20px' }}>
+          <div className="bg-gray-800/95 backdrop-blur-sm border border-gray-600/60 rounded-lg shadow-xl p-4 w-64">
+            {/* Current Graph Header */}
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                {getGraphTypeIcon(currentGraph?.type)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold text-white truncate">{currentGraph?.name || 'No Graph Selected'}</div>
+                <div className="text-xs text-gray-400">{currentGraph?.type || 'Select a graph to begin'}</div>
+              </div>
+              <div className="w-3 h-3 bg-green-400 rounded-full flex-shrink-0 animate-pulse"></div>
+              <button
+                onClick={() => setShowGraphPanel(false)}
+                className="p-1 rounded text-gray-400 hover:text-white hover:bg-gray-700/50 transition-colors"
+                title="Minimize graph panel"
+              >
+                <Minus className="h-4 w-4" />
+              </button>
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-semibold text-white truncate">{currentGraph?.name || 'No Graph Selected'}</div>
-              <div className="text-xs text-gray-400">{currentGraph?.type || 'Select a graph to begin'}</div>
-            </div>
-            <div className="w-2 h-2 bg-green-400 rounded-full flex-shrink-0"></div>
-          </div>
 
           {/* Graph Stats */}
           <div className="grid grid-cols-3 gap-2 mb-4">
@@ -1609,7 +1641,32 @@ export function InteractiveGraphVisualization() {
           </div>
         </div>
       </div>
-
+      ) : (
+        <button
+          onClick={() => setShowGraphPanel(true)}
+          className="absolute left-4 z-40 backdrop-blur-sm border-0 rounded-lg shadow-xl px-4 py-3 text-white font-semibold transition-all duration-300 flex items-center space-x-2 transform hover:scale-105"
+          style={{ 
+            ...getPanelPosition('graph'),
+            background: 'linear-gradient(135deg, #4285f4, #0f9d58, #ea4335)',
+            boxShadow: '0 10px 25px rgba(66, 133, 244, 0.4)'
+          }}
+          title="Show graph panel"
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'linear-gradient(135deg, #1a73e8, #137333, #d93025)';
+            e.currentTarget.style.boxShadow = '0 15px 35px rgba(66, 133, 244, 0.6)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'linear-gradient(135deg, #4285f4, #0f9d58, #ea4335)';
+            e.currentTarget.style.boxShadow = '0 10px 25px rgba(66, 133, 244, 0.4)';
+          }}
+        >
+          <div className="flex items-center space-x-2">
+            <Settings className="h-4 w-4" />
+            <span className="text-sm font-medium">Graph Panel</span>
+          </div>
+          <div className="w-2 h-2 bg-green-400 rounded-full flex-shrink-0 animate-pulse"></div>
+        </button>
+      )}
 
       {/* Data Health Indicator */}
       {validationResult && (validationResult.errors.length > 0 || validationResult.warnings.length > 0) && (
@@ -2018,7 +2075,7 @@ export function InteractiveGraphVisualization() {
 
       {/* Legend */}
       {showLegend ? (
-        <div className="absolute left-4 bg-gray-800/95 backdrop-blur-sm border border-gray-600/60 rounded-lg shadow-xl p-4 w-64" style={{ top: '340px' }}>
+        <div className="absolute left-4 bg-gray-800/95 backdrop-blur-sm border border-gray-600/60 rounded-lg shadow-xl p-4 w-64" style={getPanelPosition('legend')}>
           <div className="flex items-center justify-between mb-3">
             <div className="text-sm font-semibold text-white">Node Types</div>
             <button
@@ -2078,7 +2135,7 @@ export function InteractiveGraphVisualization() {
           onClick={() => setShowLegend(true)}
           className="absolute left-4 z-40 backdrop-blur-sm border-0 rounded-lg shadow-xl px-4 py-3 text-white font-semibold transition-all duration-300 flex items-center space-x-2 transform hover:scale-105"
           style={{ 
-            top: '340px',
+            ...getPanelPosition('legend'),
             background: 'linear-gradient(135deg, #ec4899, #f97316)',
             boxShadow: '0 10px 25px rgba(236, 72, 153, 0.4)'
           }}
