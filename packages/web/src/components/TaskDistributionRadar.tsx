@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
-import { ClipboardList, Calendar, Clock, CheckCircle, AlertCircle } from '../constants/workItemConstants';
+import { ClipboardList, Calendar, Clock, CheckCircle, AlertCircle, WORK_ITEM_STATUSES } from '../constants/workItemConstants';
 import { RadarChart } from './RadarChart';
 import { useGraph } from '../contexts/GraphContext';
 import { useQuery, gql } from '@apollo/client';

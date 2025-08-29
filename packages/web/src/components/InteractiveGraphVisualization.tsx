@@ -11,6 +11,7 @@ import {
   WORK_ITEM_TYPES,
   WORK_ITEM_STATUSES,
   WORK_ITEM_PRIORITIES,
+  WorkItemType,
   // Import icons from central file
   AlertTriangle,
   AlertCircle,
@@ -783,18 +784,8 @@ export function InteractiveGraphVisualization() {
       .style('font-size', '13px')
       .style('font-weight', '700')
       .style('fill', (d: WorkItem) => {
-        switch (d.type.toUpperCase()) {
-          case 'EPIC': return '#c084fc'; // fuchsia-400
-          case 'STORY': return '#60a5fa'; // blue-400
-          case 'TASK': return '#4ade80'; // green-400
-          case 'MILESTONE': return '#fb923c'; // orange-400
-          case 'BUG': return '#ef4444'; // red-500
-          case 'FEATURE': return '#38bdf8'; // sky-400
-          case 'OUTCOME': return '#818cf8'; // indigo-400
-          case 'IDEA': return '#eab308'; // yellow-500
-          case 'RESEARCH': return '#2dd4bf'; // teal-400
-          default: return '#ffffff';
-        }
+        const config = getTypeConfig(d.type as WorkItemType);
+        return config.hexColor;
       })
       .style('pointer-events', 'none');
 

@@ -178,7 +178,7 @@ export const typeDefs = gql`
     IN_PROGRESS
     BLOCKED
     COMPLETED
-    ARCHIVED
+    CANCELLED
   }
 
   enum EdgeType {

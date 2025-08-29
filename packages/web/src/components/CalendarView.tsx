@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { Calendar, Clock, CheckCircle } from '../constants/workItemConstants';
+import { Calendar, Clock, CheckCircle, getStatusConfig, WorkItemStatus } from '../constants/workItemConstants';
 
 interface WorkItem {
   id: string;
@@ -37,14 +37,8 @@ const formatLabel = (label: string) => {
 };
 
 const getStatusColor = (status: string) => {
-  switch (status) {
-    case 'PROPOSED': return 'bg-cyan-500 text-white';
-    case 'PLANNED': return 'bg-purple-500 text-white';
-    case 'IN_PROGRESS': return 'bg-yellow-500 text-black';
-    case 'COMPLETED': return 'bg-green-500 text-white';
-    case 'BLOCKED': return 'bg-red-500 text-white';
-    default: return 'bg-gray-500 text-white';
-  }
+  const config = getStatusConfig(status as WorkItemStatus);
+  return `${config.bgColor} ${config.color}`;
 };
 
 const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) => {
