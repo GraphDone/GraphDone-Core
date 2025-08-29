@@ -406,10 +406,6 @@ function sanitizeEdge(edge: any): any {
     sanitized.type = 'RELATES_TO';
   }
   
-  // Normalize type variations
-  if (sanitized.type === 'DEPENDS_ON') {
-    sanitized.type = 'DEPENDENCY';
-  }
   
   // Set default weight/strength
   if (sanitized.weight === undefined) sanitized.weight = 1.0;

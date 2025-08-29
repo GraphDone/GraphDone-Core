@@ -2,18 +2,21 @@ import React from 'react';
 import { 
   X, Calendar, Clock, User, Flag, Edit3, 
   Layers, Trophy, Target, Sparkles, ListTodo, AlertTriangle, Lightbulb, Microscope,
-  ClipboardList, CheckCircle, AlertCircle, Flame, Zap, Triangle, Circle, ArrowDown
+  ClipboardList, CheckCircle, AlertCircle, Flame, Zap, Triangle, Circle, ArrowDown,
+  GitBranch, ArrowRight, ArrowLeft, Ban, Link2, Folder, Split, Copy, Shield, Bookmark, Package
 } from 'lucide-react';
-import { WorkItem } from '../types/graph';
+import { WorkItem, WorkItemEdge } from '../types/graph';
 
 interface NodeDetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
   node: WorkItem | null;
+  edges?: WorkItemEdge[];
+  nodes?: WorkItem[];
   onEdit?: (node: WorkItem) => void;
 }
 
-export function NodeDetailsModal({ isOpen, onClose, node, onEdit }: NodeDetailsModalProps) {
+export function NodeDetailsModal({ isOpen, onClose, node, edges = [], nodes = [], onEdit }: NodeDetailsModalProps) {
   if (!isOpen || !node) return null;
 
   // Use the same priority calculation as ListView for consistency
@@ -100,13 +103,83 @@ export function NodeDetailsModal({ isOpen, onClose, node, onEdit }: NodeDetailsM
 
   const priorityInfo = getPriorityLevel(totalPriority);
 
+  // Get connections for this node
+  const nodeConnections = edges.filter(edge => 
+    edge.source === node.id || edge.target === node.id
+  );
+
+  const incomingConnections = nodeConnections.filter(edge => edge.target === node.id);
+  const outgoingConnections = nodeConnections.filter(edge => edge.source === node.id);
+
+
+  const getConnectedNode = (nodeId: string) => {
+    return nodes.find(n => n.id === nodeId);
+  };
+
+  const getRelationshipColor = (type: string) => {
+    const relationshipColors: Record<string, string> = {
+      'DEPENDS_ON': 'text-emerald-400 bg-emerald-400/10',
+      'BLOCKS': 'text-red-400 bg-red-400/10',
+      'ENABLES': 'text-green-400 bg-green-400/10',
+      'RELATES_TO': 'text-purple-400 bg-purple-400/10',
+      'IS_PART_OF': 'text-orange-400 bg-orange-400/10',
+      'FOLLOWS': 'text-indigo-400 bg-indigo-400/10',
+      'PARALLEL_WITH': 'text-teal-400 bg-teal-400/10',
+      'DUPLICATES': 'text-yellow-400 bg-yellow-400/10',
+      'CONFLICTS_WITH': 'text-red-500 bg-red-500/10',
+      'VALIDATES': 'text-emerald-400 bg-emerald-400/10',
+      'REFERENCES': 'text-slate-400 bg-slate-400/10',
+      'CONTAINS': 'text-blue-400 bg-blue-400/10',
+    };
+    return relationshipColors[type] || 'text-gray-400 bg-gray-400/10';
+  };
+
+  const getRelationshipDisplayName = (type: string) => {
+    const relationshipNames: Record<string, string> = {
+      'DEPENDS_ON': 'Depends On',
+      'BLOCKS': 'Blocks',
+      'ENABLES': 'Enables',
+      'RELATES_TO': 'Related To',
+      'IS_PART_OF': 'Is Part Of',
+      'FOLLOWS': 'Follows',
+      'PARALLEL_WITH': 'Parallel With',
+      'DUPLICATES': 'Duplicates',
+      'CONFLICTS_WITH': 'Conflicts With',
+      'VALIDATES': 'Validates',
+      'REFERENCES': 'References',
+      'CONTAINS': 'Contains',
+    };
+    return relationshipNames[type] || type.replace('_', ' ');
+  };
+
+  const getRelationshipIcon = (type: string) => {
+    switch (type) {
+      case 'DEPENDS_ON': return <ArrowLeft className="h-3 w-3" />;
+      case 'BLOCKS': return <Ban className="h-3 w-3" />;
+      case 'ENABLES': return <CheckCircle className="h-3 w-3" />;
+      case 'RELATES_TO': return <Link2 className="h-3 w-3" />;
+      case 'IS_PART_OF': return <Folder className="h-3 w-3" />;
+      case 'FOLLOWS': return <ArrowRight className="h-3 w-3" />;
+      case 'PARALLEL_WITH': return <Split className="h-3 w-3" />;
+      case 'DUPLICATES': return <Copy className="h-3 w-3" />;
+      case 'CONFLICTS_WITH': return <Zap className="h-3 w-3" />;
+      case 'VALIDATES': return <Shield className="h-3 w-3" />;
+      case 'REFERENCES': return <Bookmark className="h-3 w-3" />;
+      case 'CONTAINS': return <Package className="h-3 w-3" />;
+      default: return <Link2 className="h-3 w-3" />;
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div 
         className="fixed inset-0 cursor-pointer" 
         onClick={onClose}
       />
-      <div className="relative bg-gray-900 border border-gray-700 shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-lg animate-in fade-in zoom-in-95 duration-300">
+      <div 
+        className="relative bg-gray-900 border border-gray-700 shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-lg animate-in fade-in zoom-in-95 duration-300"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-700">
           <div className="flex items-center space-x-3">
@@ -270,6 +343,87 @@ export function NodeDetailsModal({ isOpen, onClose, node, onEdit }: NodeDetailsM
               </div>
             </div>
           )}
+
+          {/* Connections */}
+          <div className="mt-6">
+            <h3 className="text-sm font-medium text-gray-400 mb-4 flex items-center">
+              <GitBranch className="h-4 w-4 mr-2" />
+              Connections ({nodeConnections.length})
+            </h3>
+            
+            {nodeConnections.length === 0 ? (
+              <div className="text-center py-8">
+                <GitBranch className="h-12 w-12 text-gray-600 mx-auto mb-3" />
+                <p className="text-gray-500 text-sm">No connections yet</p>
+                <p className="text-gray-600 text-xs mt-1">Connect this node to other nodes to see relationships here</p>
+              </div>
+            ) : (
+              
+              <div className="space-y-4">
+                {/* Incoming Connections */}
+                {incomingConnections.length > 0 && (
+                  <div>
+                    <h4 className="text-xs font-medium text-gray-500 mb-2 flex items-center">
+                      <ArrowRight className="h-3 w-3 mr-1" />
+                      Incoming ({incomingConnections.length})
+                    </h4>
+                    <div className="space-y-2">
+                      {incomingConnections.map((edge) => {
+                        const connectedNode = getConnectedNode(edge.source);
+                        return (
+                          <div key={edge.id} className="flex items-center space-x-3 p-2 bg-gray-800/50 rounded-md">
+                            <div className="flex items-center space-x-2 flex-1">
+                              {connectedNode && (
+                                <span className={`flex items-center space-x-1 px-2 py-1 rounded text-xs font-medium ${getTypeColor(connectedNode.type)}`}>
+                                  {getTypeIcon(connectedNode.type)}
+                                  <span className="max-w-32 truncate">{connectedNode.title}</span>
+                                </span>
+                              )}
+                              <span className={`flex items-center space-x-1 px-2 py-1 rounded text-xs font-medium ${getRelationshipColor(edge.type)}`}>
+                                {getRelationshipIcon(edge.type)}
+                                <span>{getRelationshipDisplayName(edge.type)}</span>
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Outgoing Connections */}
+                {outgoingConnections.length > 0 && (
+                  <div>
+                    <h4 className="text-xs font-medium text-gray-500 mb-2 flex items-center">
+                      <ArrowLeft className="h-3 w-3 mr-1" />
+                      Outgoing ({outgoingConnections.length})
+                    </h4>
+                    <div className="space-y-2">
+                      {outgoingConnections.map((edge) => {
+                        const connectedNode = getConnectedNode(edge.target);
+                        return (
+                          <div key={edge.id} className="flex items-center space-x-3 p-2 bg-gray-800/50 rounded-md">
+                            <div className="flex items-center space-x-2 flex-1">
+                              {connectedNode && (
+                                <span className={`flex items-center space-x-1 px-2 py-1 rounded text-xs font-medium ${getTypeColor(connectedNode.type)}`}>
+                                  {getTypeIcon(connectedNode.type)}
+                                  <span className="max-w-32 truncate">{connectedNode.title}</span>
+                                </span>
+                              )}
+                              <span className={`flex items-center space-x-1 px-2 py-1 rounded text-xs font-medium ${getRelationshipColor(edge.type)}`}>
+                                {getRelationshipIcon(edge.type)}
+                                <span>{getRelationshipDisplayName(edge.type)}</span>
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Node ID */}
           <div className="mt-6 pt-4 border-t border-gray-700">

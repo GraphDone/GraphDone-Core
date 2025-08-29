@@ -193,10 +193,6 @@ export const typeDefs = gql`
     CONFLICTS_WITH
     VALIDATES
     REFERENCES
-    
-    # Legacy support (deprecated)
-    PART_OF
-    DEPENDENCY
     CONTAINS
   }
 
