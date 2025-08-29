@@ -1,5 +1,6 @@
 import React from 'react';
-import { GitBranch, Calendar, Clock, CheckCircle } from 'lucide-react';
+import { GitBranch } from 'lucide-react';
+import { Calendar, Clock, CheckCircle } from '../constants/workItemConstants';
 
 interface WorkItem {
   id: string;

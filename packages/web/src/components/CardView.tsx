@@ -1,7 +1,9 @@
 import React from 'react';
 import { 
   Edit,
-  Trash2,
+  Trash2
+} from 'lucide-react';
+import {
   CheckCircle,
   Clock,
   AlertCircle,
@@ -15,7 +17,7 @@ import {
   AlertTriangle,
   Lightbulb,
   Microscope
-} from 'lucide-react';
+} from '../constants/workItemConstants';
 import { TagDisplay } from './TagDisplay';
 import { AnimatedPriority } from './AnimatedPriority';
 
