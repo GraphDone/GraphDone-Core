@@ -296,29 +296,29 @@ export function DisconnectNodeModal({ isOpen, onClose, sourceNode }: DisconnectN
                         <div className="flex items-start justify-between">
                           <div className="flex-1 pr-4">
                             {/* Connection Display */}
-                            <div className="flex items-center space-x-2 text-sm w-full flex-wrap">
-                                <div className="flex items-center px-2 py-1 bg-gray-600/40 rounded-md">
-                                  <span className="text-white font-semibold text-xs" title={sourceNode.title}>
+                            <div className="flex items-center space-x-2 text-sm w-full">
+                                <div className="flex items-center px-2 py-1 bg-gray-600/40 rounded-md min-w-0 flex-shrink">
+                                  <span className="text-white font-semibold text-xs truncate" title={sourceNode.title}>
                                     {sourceNode.title}
                                   </span>
                                 </div>
                                 
-                                <ArrowRight className={`h-3 w-3 ${relationshipType?.color || 'text-gray-400'}`} />
+                                <ArrowRight className={`h-3 w-3 flex-shrink-0 ${relationshipType?.color || 'text-gray-400'}`} />
                                 
-                                <div className="flex items-center space-x-1 px-2 py-1 rounded bg-gray-600/40">
+                                <div className="flex items-center space-x-1 px-2 py-1 rounded bg-gray-600/40 min-w-0">
                                   {relationshipType ? 
-                                    getRelationshipIcon(relationshipType.icon, `h-2.5 w-2.5 ${relationshipType.color}`) :
-                                    getRelationshipIcon('Link2', 'h-2.5 w-2.5 text-gray-400')
+                                    getRelationshipIcon(relationshipType.icon, `h-2.5 w-2.5 flex-shrink-0 ${relationshipType.color}`) :
+                                    getRelationshipIcon('Link2', 'h-2.5 w-2.5 flex-shrink-0 text-gray-400')
                                   }
-                                  <span className={`text-xs font-medium ${relationshipType?.color || 'text-gray-400'}`} title={relationshipType?.label || connection.type}>
+                                  <span className={`text-xs font-medium whitespace-nowrap ${relationshipType?.color || 'text-gray-400'}`} title={relationshipType?.label || connection.type}>
                                     {relationshipType?.label || connection.type}
                                   </span>
                                 </div>
                                 
-                                <ArrowRight className="h-3 w-3 text-gray-400" />
+                                <ArrowRight className="h-3 w-3 flex-shrink-0 text-gray-400" />
                                 
-                                <div className="flex items-center px-2 py-1 bg-gray-600/40 rounded-md">
-                                  <span className="text-gray-200 font-medium text-xs" title={connection.connectedNode.title}>
+                                <div className="flex items-center px-2 py-1 bg-gray-600/40 rounded-md min-w-0 flex-shrink">
+                                  <span className="text-gray-200 font-medium text-xs truncate" title={connection.connectedNode.title}>
                                     {connection.connectedNode.title}
                                   </span>
                                 </div>

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import * as d3 from 'd3';
-import { Link2, Edit3, Trash2, AlertTriangle, AlertCircle, Layers, Sparkles, ListTodo, Trophy, Target, Lightbulb, Microscope, Folder, FolderOpen, Plus, FileText, Settings, Unlink, ClipboardList, Calendar, Clock, CheckCircle, Zap, Flame, Triangle, Circle, ArrowDown, X, GitBranch } from 'lucide-react';
+import { Link2, Edit3, Trash2, AlertTriangle, AlertCircle, Layers, Sparkles, ListTodo, Trophy, Target, Lightbulb, Microscope, Folder, FolderOpen, Plus, FileText, Settings, Unlink, ClipboardList, Calendar, Clock, CheckCircle, Zap, Flame, Triangle, Circle, ArrowDown, X, GitBranch, Minus } from 'lucide-react';
 import { useQuery, useMutation } from '@apollo/client';
 import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -117,6 +117,7 @@ export function InteractiveGraphVisualization() {
   const [selectedNode, setSelectedNode] = useState<WorkItem | null>(null);
   const [createNodePosition, setCreateNodePosition] = useState<{ x: number; y: number; z: number } | undefined>(undefined);
   const [currentTransform, setCurrentTransform] = useState({ x: 0, y: 0, scale: 1 });
+  const [showLegend, setShowLegend] = useState(true);
 
   // Additional edge operations
   const [updateEdgeMutation] = useMutation(UPDATE_EDGE, {
@@ -2016,52 +2017,85 @@ export function InteractiveGraphVisualization() {
 
 
       {/* Legend */}
-      <div className="absolute left-4 bg-gray-800/95 backdrop-blur-sm border border-gray-600/60 rounded-lg shadow-xl p-4 w-64" style={{ top: '340px' }}>
-        <div className="text-sm font-semibold text-white mb-3 text-center">Node Types</div>
-        <div className="grid grid-cols-2 gap-2 text-sm text-gray-300">
-          <div className="flex items-center space-x-2">
-            <Layers className="w-4 h-4 text-purple-400" />
-            <span>Epic</span>
+      {showLegend ? (
+        <div className="absolute left-4 bg-gray-800/95 backdrop-blur-sm border border-gray-600/60 rounded-lg shadow-xl p-4 w-64" style={{ top: '340px' }}>
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-sm font-semibold text-white">Node Types</div>
+            <button
+              onClick={() => setShowLegend(false)}
+              className="p-1 rounded text-gray-400 hover:text-white hover:bg-gray-700/50 transition-colors"
+              title="Minimize legend"
+            >
+              <Minus className="h-4 w-4" />
+            </button>
           </div>
-          <div className="flex items-center space-x-2">
-            <ListTodo className="w-4 h-4 text-green-400" />
-            <span>Task</span>
+          <div className="grid grid-cols-2 gap-2 text-sm text-gray-300">
+            <div className="flex items-center space-x-2">
+              <Layers className="w-4 h-4 text-purple-400" />
+              <span>Epic</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <ListTodo className="w-4 h-4 text-green-400" />
+              <span>Task</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Trophy className="w-4 h-4 text-orange-400" />
+              <span>Milestone</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <AlertTriangle className="w-4 h-4 text-red-400" />
+              <span>Bug</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Target className="w-4 h-4 text-indigo-400" />
+              <span>Outcome</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Lightbulb className="w-4 h-4 text-yellow-400" />
+              <span>Idea</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Sparkles className="w-4 h-4 text-blue-400" />
+              <span>Feature</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Microscope className="w-4 h-4 text-teal-400" />
+              <span>Research</span>
+            </div>
           </div>
-          <div className="flex items-center space-x-2">
-            <Trophy className="w-4 h-4 text-orange-400" />
-            <span>Milestone</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <AlertTriangle className="w-4 h-4 text-red-400" />
-            <span>Bug</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Target className="w-4 h-4 text-indigo-400" />
-            <span>Outcome</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Lightbulb className="w-4 h-4 text-yellow-400" />
-            <span>Idea</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Sparkles className="w-4 h-4 text-blue-400" />
-            <span>Feature</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Microscope className="w-4 h-4 text-teal-400" />
-            <span>Research</span>
+          <hr className="border-gray-600 mt-3" />
+          <div className="pt-3">
+            <div className="text-sm text-gray-500 opacity-85 w-full leading-relaxed text-left">
+              • Select nodes to access menu<br/>
+              • Drag to reposition<br/>
+              • Scroll for zoom<br/>
+              • Select edges for options
+            </div>
           </div>
         </div>
-        <hr className="border-gray-600 mt-3" />
-        <div className="pt-3">
-          <div className="text-sm text-gray-500 opacity-85 w-full leading-relaxed text-left">
-            • Select nodes to access menu<br/>
-            • Drag to reposition<br/>
-            • Scroll for zoom<br/>
-            • Select edges for options
-          </div>
-        </div>
-      </div>
+      ) : (
+        <button
+          onClick={() => setShowLegend(true)}
+          className="absolute left-4 z-40 backdrop-blur-sm border-0 rounded-lg shadow-xl px-4 py-3 text-white font-semibold transition-all duration-300 flex items-center space-x-2 transform hover:scale-105"
+          style={{ 
+            top: '340px',
+            background: 'linear-gradient(135deg, #ec4899, #f97316)',
+            boxShadow: '0 10px 25px rgba(236, 72, 153, 0.4)'
+          }}
+          title="Show legend"
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'linear-gradient(135deg, #f43f5e, #ec4899)';
+            e.currentTarget.style.boxShadow = '0 15px 35px rgba(244, 63, 94, 0.6)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'linear-gradient(135deg, #ec4899, #f97316)';
+            e.currentTarget.style.boxShadow = '0 10px 25px rgba(236, 72, 153, 0.4)';
+          }}
+        >
+          <FileText className="h-4 w-4" />
+          <span className="text-sm font-medium">Node Types</span>
+        </button>
+      )}
 
       {/* Node Details Modal */}
       {showNodeDetailsModal && selectedNode && (
