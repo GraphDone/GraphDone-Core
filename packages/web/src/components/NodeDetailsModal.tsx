@@ -6,7 +6,10 @@ import {
 import {
   Calendar, Clock,
   Layers, Trophy, Target, Sparkles, ListTodo, AlertTriangle, Lightbulb, Microscope,
-  ClipboardList, CheckCircle, AlertCircle, Flame, Zap, Triangle, Circle, ArrowDown
+  ClipboardList, CheckCircle, AlertCircle, Flame, Zap, Triangle, Circle, ArrowDown,
+  getRelationshipIconElement,
+  getRelationshipConfig,
+  RelationshipType
 } from '../constants/workItemConstants';
 import { WorkItem, WorkItemEdge } from '../types/graph';
 
@@ -156,21 +159,7 @@ export function NodeDetailsModal({ isOpen, onClose, node, edges = [], nodes = []
   };
 
   const getRelationshipIcon = (type: string) => {
-    switch (type) {
-      case 'DEPENDS_ON': return <ArrowLeft className="h-3 w-3" />;
-      case 'BLOCKS': return <Ban className="h-3 w-3" />;
-      case 'ENABLES': return <CheckCircle className="h-3 w-3" />;
-      case 'RELATES_TO': return <Link2 className="h-3 w-3" />;
-      case 'IS_PART_OF': return <Folder className="h-3 w-3" />;
-      case 'FOLLOWS': return <ArrowRight className="h-3 w-3" />;
-      case 'PARALLEL_WITH': return <Split className="h-3 w-3" />;
-      case 'DUPLICATES': return <Copy className="h-3 w-3" />;
-      case 'CONFLICTS_WITH': return <Zap className="h-3 w-3" />;
-      case 'VALIDATES': return <Shield className="h-3 w-3" />;
-      case 'REFERENCES': return <Bookmark className="h-3 w-3" />;
-      case 'CONTAINS': return <Package className="h-3 w-3" />;
-      default: return <Link2 className="h-3 w-3" />;
-    }
+    return getRelationshipIconElement(type as RelationshipType, "h-3 w-3");
   };
 
   return (

@@ -26,7 +26,6 @@ import { useQuery, useMutation } from '@apollo/client';
 import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
 import { GET_WORK_ITEMS, GET_EDGES, CREATE_EDGE, UPDATE_EDGE, DELETE_EDGE } from '../lib/queries';
-import { relationshipTypeInfo } from '../types/projectData';
 import { validateGraphData, getValidationSummary, ValidationResult } from '../utils/graphDataValidation';
 import { EditNodeModal } from './EditNodeModal';
 import { DeleteNodeModal } from './DeleteNodeModal';
@@ -38,7 +37,8 @@ import { DeleteGraphModal } from './DeleteGraphModal';
 import { ConnectNodeModal } from './ConnectNodeModal';
 import { NodeDetailsModal } from './NodeDetailsModal';
 
-import { WorkItem, WorkItemEdge, RelationshipType } from '../types/graph';
+import { WorkItem, WorkItemEdge } from '../types/graph';
+import { RelationshipType, RELATIONSHIP_OPTIONS, getRelationshipConfig } from '../constants/workItemConstants';
 
 interface NodeMenuState {
   node: WorkItem | null;
@@ -582,13 +582,8 @@ export function InteractiveGraphVisualization() {
       .append('line')
       .attr('class', 'edge')
       .attr('stroke', (d: WorkItemEdge) => {
-        switch (d.type) {
-          case 'DEPENDS_ON': return '#10b981';
-          case 'BLOCKS': return '#dc2626';
-          case 'RELATES_TO': return '#3b82f6';
-          case 'IS_PART_OF': return '#f59e0b';
-          default: return '#6b7280';
-        }
+        const config = getRelationshipConfig(d.type as RelationshipType);
+        return config.hexColor;
       })
       .attr('stroke-width', (d: WorkItemEdge) => (d.strength || 0.8) * 3)
       .attr('stroke-opacity', 0.7);
@@ -597,12 +592,9 @@ export function InteractiveGraphVisualization() {
     const defs = svg.append('defs');
     
     // Create different arrowhead colors for each edge type
-    const edgeTypes = ['DEPENDS_ON', 'BLOCKS', 'RELATES_TO', 'IS_PART_OF'];
-    const edgeColors = ['#10b981', '#dc2626', '#3b82f6', '#f59e0b'];
-    
-    edgeTypes.forEach((type, index) => {
+    RELATIONSHIP_OPTIONS.forEach((option) => {
       defs.append('marker')
-        .attr('id', `arrowhead-${type}`)
+        .attr('id', `arrowhead-${option.type}`)
         .attr('viewBox', '-5 -5 10 10')
         .attr('refX', 0)
         .attr('refY', 0)
@@ -611,8 +603,8 @@ export function InteractiveGraphVisualization() {
         .attr('markerHeight', 8)
         .append('path')
         .attr('d', 'M-3,-3 L0,0 L-3,3 L-1,0 Z')
-        .attr('fill', edgeColors[index])
-        .attr('stroke', edgeColors[index])
+        .attr('fill', option.hexColor)
+        .attr('stroke', option.hexColor)
         .attr('stroke-width', 1);
     });
 
@@ -1157,13 +1149,8 @@ export function InteractiveGraphVisualization() {
           return getNodeColor(sourceNode);
         }
         // Fallback to edge type color if node not found
-        switch (d.type) {
-          case 'DEPENDS_ON': return '#10b981';
-          case 'BLOCKS': return '#dc2626';
-          case 'RELATES_TO': return '#3b82f6';
-          case 'IS_PART_OF': return '#f59e0b';
-          default: return '#6b7280';
-        }
+        const config = getRelationshipConfig(d.type as RelationshipType);
+        return config.hexColor;
       })
       .attr('stroke', (d: WorkItemEdge) => {
         // Use the source node's color for the arrow stroke
@@ -1172,13 +1159,8 @@ export function InteractiveGraphVisualization() {
           return getNodeColor(sourceNode);
         }
         // Fallback to edge type color if node not found
-        switch (d.type) {
-          case 'DEPENDS_ON': return '#10b981';
-          case 'BLOCKS': return '#dc2626';
-          case 'RELATES_TO': return '#3b82f6';
-          case 'IS_PART_OF': return '#f59e0b';
-          default: return '#6b7280';
-        }
+        const config = getRelationshipConfig(d.type as RelationshipType);
+        return config.hexColor;
       })
       .attr('stroke-width', 1)
       .attr('opacity', 1);
@@ -1830,9 +1812,9 @@ export function InteractiveGraphVisualization() {
             onChange={(e) => setSelectedRelationType(e.target.value as RelationshipType)}
             className="w-full border border-gray-600 bg-gray-700 text-gray-200 rounded px-2 py-1 text-sm"
           >
-            {Object.entries(relationshipTypeInfo).map(([type, info]) => (
-              <option key={type} value={type}>
-                {type.replace('_', ' ')} - {info.description}
+            {RELATIONSHIP_OPTIONS.map((option) => (
+              <option key={option.type} value={option.type}>
+                {option.label} - {option.description}
               </option>
             ))}
           </select>
@@ -2036,8 +2018,8 @@ export function InteractiveGraphVisualization() {
               <div
                 className="w-3 h-1 mr-2"
                 style={{
-                  backgroundColor: relationshipTypeInfo[edgeMenu.edge.type].color,
-                  borderStyle: relationshipTypeInfo[edgeMenu.edge.type].style
+                  backgroundColor: getRelationshipConfig(edgeMenu.edge.type as RelationshipType).hexColor,
+                  borderStyle: 'solid'
                 }}
               />
               <span className="text-gray-300">Strength: {Math.round((edgeMenu.edge.strength || 0.8) * 100)}%</span>

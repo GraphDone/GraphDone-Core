@@ -18,7 +18,18 @@ import {
   Zap,
   Triangle,
   Circle,
-  ArrowDown
+  ArrowDown,
+  // Relationship Icons
+  ArrowLeft,
+  Ban,
+  Link2,
+  Folder,
+  ArrowRight,
+  Split,
+  Copy,
+  Shield,
+  Bookmark,
+  Package
 } from 'lucide-react';
 
 // ============================
@@ -50,7 +61,19 @@ export {
   Zap,
   Triangle,
   Circle,
-  ArrowDown
+  ArrowDown,
+  
+  // Relationship Icons
+  ArrowLeft,
+  Ban,
+  Link2,
+  Folder,
+  ArrowRight,
+  Split,
+  Copy,
+  Shield,
+  Bookmark,
+  Package
 } from 'lucide-react';
 
 // ============================
@@ -477,6 +500,190 @@ export const isValidPriorityLevel = (priority: string): priority is PriorityLeve
 };
 
 // ============================
+// RELATIONSHIP TYPES SYSTEM
+// ============================
+
+export type RelationshipType = 
+  | 'DEPENDS_ON'
+  | 'BLOCKS'
+  | 'ENABLES'
+  | 'RELATES_TO'
+  | 'IS_PART_OF'
+  | 'FOLLOWS'
+  | 'PARALLEL_WITH'
+  | 'DUPLICATES'
+  | 'CONFLICTS_WITH'
+  | 'VALIDATES'
+  | 'REFERENCES'
+  | 'CONTAINS';
+
+export interface RelationshipOption {
+  type: RelationshipType;
+  label: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string }>;
+  color: string;
+  hexColor: string;
+}
+
+export const RELATIONSHIP_TYPES: Record<RelationshipType, RelationshipOption> = {
+  DEPENDS_ON: {
+    type: 'DEPENDS_ON',
+    label: 'Depends On',
+    description: 'Source node depends on target node',
+    icon: ArrowLeft,
+    color: 'text-emerald-400',
+    hexColor: '#34d399'
+  },
+  BLOCKS: {
+    type: 'BLOCKS',
+    label: 'Blocks',
+    description: 'Source node blocks target node',
+    icon: Ban,
+    color: 'text-red-400',
+    hexColor: '#f87171'
+  },
+  ENABLES: {
+    type: 'ENABLES',
+    label: 'Enables',
+    description: 'Source node enables target node',
+    icon: CheckCircle,
+    color: 'text-green-400',
+    hexColor: '#4ade80'
+  },
+  RELATES_TO: {
+    type: 'RELATES_TO',
+    label: 'Related To',
+    description: 'Source node relates to target node',
+    icon: Link2,
+    color: 'text-purple-400',
+    hexColor: '#c084fc'
+  },
+  IS_PART_OF: {
+    type: 'IS_PART_OF',
+    label: 'Is Part Of',
+    description: 'Source node is part of target node',
+    icon: Folder,
+    color: 'text-orange-400',
+    hexColor: '#fb923c'
+  },
+  FOLLOWS: {
+    type: 'FOLLOWS',
+    label: 'Follows',
+    description: 'Source node follows target node',
+    icon: ArrowRight,
+    color: 'text-indigo-400',
+    hexColor: '#818cf8'
+  },
+  PARALLEL_WITH: {
+    type: 'PARALLEL_WITH',
+    label: 'Parallel With',
+    description: 'Source node runs parallel to target',
+    icon: Split,
+    color: 'text-teal-400',
+    hexColor: '#2dd4bf'
+  },
+  DUPLICATES: {
+    type: 'DUPLICATES',
+    label: 'Duplicates',
+    description: 'Source node duplicates target node',
+    icon: Copy,
+    color: 'text-yellow-400',
+    hexColor: '#facc15'
+  },
+  CONFLICTS_WITH: {
+    type: 'CONFLICTS_WITH',
+    label: 'Conflicts With',
+    description: 'Source node conflicts with target',
+    icon: Zap,
+    color: 'text-red-500',
+    hexColor: '#ef4444'
+  },
+  VALIDATES: {
+    type: 'VALIDATES',
+    label: 'Validates',
+    description: 'Source node validates target node',
+    icon: Shield,
+    color: 'text-emerald-400',
+    hexColor: '#34d399'
+  },
+  REFERENCES: {
+    type: 'REFERENCES',
+    label: 'References',
+    description: 'Source node references target node',
+    icon: Bookmark,
+    color: 'text-slate-400',
+    hexColor: '#94a3b8'
+  },
+  CONTAINS: {
+    type: 'CONTAINS',
+    label: 'Contains',
+    description: 'Source node contains target node',
+    icon: Package,
+    color: 'text-blue-400',
+    hexColor: '#60a5fa'
+  }
+};
+
+// ============================
+// RELATIONSHIP UTILITY FUNCTIONS
+// ============================
+
+// Get relationship configuration
+export const getRelationshipConfig = (type: RelationshipType): RelationshipOption => {
+  return RELATIONSHIP_TYPES[type] || RELATIONSHIP_TYPES.RELATES_TO;
+};
+
+// Get relationship icon component
+export const getRelationshipIcon = (type: RelationshipType): React.ComponentType<{ className?: string }> | null => {
+  return getRelationshipConfig(type).icon;
+};
+
+// Get relationship icon as JSX element with proper styling
+export const getRelationshipIconElement = (type: RelationshipType, className: string = "h-4 w-4"): React.ReactNode => {
+  const IconComponent = getRelationshipIcon(type);
+  const config = getRelationshipConfig(type);
+  const fullClassName = `${className} ${config.color}`;
+  return IconComponent ? <IconComponent className={fullClassName} /> : null;
+};
+
+// Get relationship color scheme
+export const getRelationshipColorScheme = (type: RelationshipType) => {
+  const config = getRelationshipConfig(type);
+  return {
+    text: config.color,
+    background: `${config.color.replace('text-', 'bg-')}/10`,
+    border: `border-${config.color.replace('text-', '')}/30`,
+    hex: config.hexColor
+  };
+};
+
+// Convert relationship types array for dropdown/filter usage
+export const RELATIONSHIP_OPTIONS: RelationshipOption[] = Object.values(RELATIONSHIP_TYPES);
+
+// Legacy compatibility function (matches existing connectionUtils.ts interface)
+export function getRelationshipIconLegacy(iconName: string, className: string = "h-4 w-4"): React.ReactNode {
+  // Map old string-based icon names to new system
+  const iconMap: Record<string, RelationshipType> = {
+    'ArrowLeft': 'DEPENDS_ON',
+    'Ban': 'BLOCKS',
+    'CheckCircle': 'ENABLES',
+    'Link2': 'RELATES_TO',
+    'Folder': 'IS_PART_OF',
+    'ArrowRight': 'FOLLOWS',
+    'Split': 'PARALLEL_WITH',
+    'Copy': 'DUPLICATES',
+    'Zap': 'CONFLICTS_WITH',
+    'Shield': 'VALIDATES',
+    'Bookmark': 'REFERENCES',
+    'Package': 'CONTAINS'
+  };
+  
+  const relationshipType = iconMap[iconName];
+  return relationshipType ? getRelationshipIconElement(relationshipType, className) : null;
+}
+
+// ============================
 // EXPORT DEFAULT COLLECTIONS
 // ============================
 
@@ -484,16 +691,21 @@ export default {
   TYPES: WORK_ITEM_TYPES,
   STATUSES: WORK_ITEM_STATUSES,
   PRIORITIES: WORK_ITEM_PRIORITIES,
+  RELATIONSHIPS: RELATIONSHIP_TYPES,
   TYPE_OPTIONS,
   STATUS_OPTIONS,
   PRIORITY_OPTIONS,
+  RELATIONSHIP_OPTIONS,
   getTypeConfig,
   getStatusConfig,
   getPriorityConfig,
+  getRelationshipConfig,
   getTypeColorScheme,
   getStatusColorScheme,
   getPriorityColorScheme,
+  getRelationshipColorScheme,
   getTypeIconElement,
   getStatusIconElement,
-  getPriorityIconElement
+  getPriorityIconElement,
+  getRelationshipIconElement
 };

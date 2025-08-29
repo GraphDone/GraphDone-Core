@@ -122,6 +122,8 @@ export type RelationshipType =
   | 'DUPLICATES'      // This node duplicates effort of another
   | 'CONFLICTS_WITH'  // This node conflicts with another
   | 'VALIDATES'       // This node validates/tests another
+  | 'REFERENCES'      // This node references another node
+  | 'CONTAINS'        // This node contains another node
 
 export interface WorkItemEdge {
   id: string;
