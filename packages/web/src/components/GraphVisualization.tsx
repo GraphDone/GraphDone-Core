@@ -89,7 +89,7 @@ export function GraphVisualization() {
   const dependencyEdges: Edge[] = workItems.flatMap(item => 
     (item.dependencies || []).map((dep: any) => ({
       id: `dep-${item.id}-${dep.id}`,
-      type: 'DEPENDENCY',
+      type: 'DEPENDS_ON',
       weight: 1.0,
       source: dep,
       target: item

@@ -71,7 +71,7 @@ export class Graph {
     const sourceNode = this.nodes.get(edge.source);
     const targetNode = this.nodes.get(edge.target);
     
-    if (edge.type === EdgeType.DEPENDENCY && sourceNode && targetNode) {
+    if (edge.type === EdgeType.DEPENDS_ON && sourceNode && targetNode) {
       sourceNode.addDependency(edge.target);
       targetNode.dependents.push(edge.source);
     }
@@ -88,7 +88,7 @@ export class Graph {
       sourceAdjacent.delete(edge.target);
     }
     
-    if (edge.type === EdgeType.DEPENDENCY) {
+    if (edge.type === EdgeType.DEPENDS_ON) {
       const sourceNode = this.nodes.get(edge.source);
       const targetNode = this.nodes.get(edge.target);
       

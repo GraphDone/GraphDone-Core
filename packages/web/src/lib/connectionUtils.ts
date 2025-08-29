@@ -14,7 +14,8 @@ import {
   Copy, 
   Zap, 
   Shield, 
-  Bookmark 
+  Bookmark,
+  Package
 } from 'lucide-react';
 
 // Icon mapping for relationship types
@@ -29,7 +30,8 @@ const iconMap = {
   'Copy': Copy,
   'Zap': Zap,
   'Shield': Shield,
-  'Bookmark': Bookmark
+  'Bookmark': Bookmark,
+  'Package': Package
 } as const;
 
 export function getRelationshipIcon(iconName: string, className: string = "h-4 w-4") {
@@ -132,6 +134,13 @@ export const RELATIONSHIP_TYPES = [
     description: 'Source node references target node',
     icon: 'Bookmark',
     color: 'text-slate-400'
+  },
+  {
+    type: 'CONTAINS',
+    label: 'Contains',
+    description: 'Source node contains target node',
+    icon: 'Package',
+    color: 'text-blue-400'
   }
 ];
 

@@ -2215,6 +2215,8 @@ export function InteractiveGraphVisualization() {
             setSelectedNode(null);
           }}
           node={selectedNode}
+          edges={validatedEdges}
+          nodes={validatedNodes}
           onEdit={(node) => {
             setShowNodeDetailsModal(false);
             setShowEditModal(true);
