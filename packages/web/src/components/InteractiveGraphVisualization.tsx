@@ -132,6 +132,7 @@ export function InteractiveGraphVisualization() {
   const [showNodeDetailsModal, setShowNodeDetailsModal] = useState(false);
   const [showConnectModal, setShowConnectModal] = useState(false);
   const [connectModalInitialTab, setConnectModalInitialTab] = useState<'connect' | 'disconnect'>('connect');
+  const [openedFromDeleteModal, setOpenedFromDeleteModal] = useState(false);
   const [showCreateGraphModal, setShowCreateGraphModal] = useState(false);
   const [showGraphSwitcher, setShowGraphSwitcher] = useState(false);
   const [showUpdateGraphModal, setShowUpdateGraphModal] = useState(false);
@@ -1443,6 +1444,19 @@ export function InteractiveGraphVisualization() {
     setSelectedNode(null);
   };
 
+  const handleOpenDisconnectFromDelete = () => {
+    if (!selectedNode) {
+      return;
+    }
+    
+    // Mark that this was opened from delete modal
+    setOpenedFromDeleteModal(true);
+    setSelectedNode(selectedNode); // Ensure it's set
+    setConnectModalInitialTab('disconnect');
+    setShowConnectModal(true);
+    setShowDeleteModal(false); // Close delete modal after setting up connect modal
+  };
+
   const handleCreateConnectedNode = (node: WorkItem, event: any) => {
     console.log('Creating connected node from parent:', node);
     const rect = containerRef.current?.getBoundingClientRect();
@@ -1482,9 +1496,17 @@ export function InteractiveGraphVisualization() {
 
   const handleCloseConnectModal = () => {
     setShowConnectModal(false);
-    setSelectedNode(null);
     setConnectModalInitialTab('connect'); // Reset to connect tab
+    
+    // If this was opened from delete modal, return to delete modal
+    if (openedFromDeleteModal && selectedNode) {
+      setOpenedFromDeleteModal(false);
+      setShowDeleteModal(true);
+    } else {
+      setSelectedNode(null);
+    }
   };
+
 
 
   const handleEditEdge = (edge: WorkItemEdge) => {
@@ -2183,6 +2205,7 @@ export function InteractiveGraphVisualization() {
           nodeId={selectedNode.id}
           nodeTitle={selectedNode.title}
           nodeType={selectedNode.type}
+          onOpenDisconnectModal={handleOpenDisconnectFromDelete}
         />
       )}
 
@@ -2247,8 +2270,16 @@ export function InteractiveGraphVisualization() {
             type: selectedNode.type
           }}
           initialTab={connectModalInitialTab}
+          onAllConnectionsRemoved={openedFromDeleteModal ? () => {
+            // Auto-return to delete modal when all connections removed
+            setShowConnectModal(false);
+            setOpenedFromDeleteModal(false);
+            setConnectModalInitialTab('connect');
+            setShowDeleteModal(true);
+          } : undefined}
         />
       )}
+
 
     </div>
   );
