@@ -140,8 +140,8 @@ export function InteractiveGraphVisualization() {
   const [selectedNode, setSelectedNode] = useState<WorkItem | null>(null);
   const [createNodePosition, setCreateNodePosition] = useState<{ x: number; y: number; z: number } | undefined>(undefined);
   const [currentTransform, setCurrentTransform] = useState({ x: 0, y: 0, scale: 1 });
-  const [showLegend, setShowLegend] = useState(true);
-  const [showGraphPanel, setShowGraphPanel] = useState(true);
+  const [showLegend, setShowLegend] = useState(false);
+  const [showGraphPanel, setShowGraphPanel] = useState(false);
 
   // Calculate dynamic positioning for panels and minimized buttons to avoid overlap
   const getPanelPosition = (panelType: 'graph' | 'legend' | 'create') => {
@@ -177,8 +177,10 @@ export function InteractiveGraphVisualization() {
         topOffset += buttonHeight + compactSpacing;
       }
       
-      // Add create button height (always a button)
-      topOffset += buttonHeight + compactSpacing;
+      // Add create button height (only if not in empty state)
+      if (!showEmptyStateOverlay) {
+        topOffset += buttonHeight + compactSpacing;
+      }
       
       return { top: `${topOffset}px` };
     }
@@ -2057,7 +2059,8 @@ export function InteractiveGraphVisualization() {
         </div>
       )}
 
-      {/* Create Node Button */}
+      {/* Create Node Button - Hide when no nodes exist */}
+      {!showEmptyStateOverlay && (
       <button
         onClick={() => setShowCreateNodeModal(true)}
         className="absolute left-4 z-40 backdrop-blur-sm border-0 rounded-lg shadow-xl px-4 py-3 text-white font-semibold transition-all duration-300 flex items-center space-x-2 transform hover:scale-105 w-40 h-12"
@@ -2083,6 +2086,7 @@ export function InteractiveGraphVisualization() {
           </div>
         </div>
       </button>
+      )}
 
       {/* Legend */}
       {showLegend ? (
