@@ -1457,6 +1457,7 @@ export function InteractiveGraphVisualization() {
     setShowDeleteModal(false); // Close delete modal after setting up connect modal
   };
 
+
   const handleCreateConnectedNode = (node: WorkItem, event: any) => {
     console.log('Creating connected node from parent:', node);
     const rect = containerRef.current?.getBoundingClientRect();
@@ -1646,7 +1647,6 @@ export function InteractiveGraphVisualization() {
                   <Settings className="w-4 h-4" />
                   <span className="text-sm">Edit</span>
                 </button>
-                
                 <button 
                   onClick={() => setShowDeleteGraphModal(true)}
                   className="bg-red-600 hover:bg-red-700 text-white font-medium py-2.5 px-3 rounded-md transition-colors duration-200 flex items-center justify-center space-x-2"
@@ -2240,6 +2240,7 @@ export function InteractiveGraphVisualization() {
           onClose={() => setShowDeleteGraphModal(false)}
         />
       )}
+
 
       {/* Create Node Modal */}
       {showCreateNodeModal && selectedNode && (
