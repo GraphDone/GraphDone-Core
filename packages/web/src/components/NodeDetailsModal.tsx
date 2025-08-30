@@ -128,7 +128,7 @@ export function NodeDetailsModal({ isOpen, onClose, node, edges = [], nodes = []
             </span>
             <span className={`flex items-center space-x-2 px-3 py-1 rounded-md text-sm font-medium ${getStatusColor(node.status)}`}>
               {getStatusIcon(node.status)}
-              <span>{node.status}</span>
+              <span>{node.status.replace(/_/g, ' ')}</span>
             </span>
           </div>
           <div className="flex items-center space-x-2">
@@ -177,7 +177,7 @@ export function NodeDetailsModal({ isOpen, onClose, node, edges = [], nodes = []
                 <h3 className="text-sm font-medium text-gray-400 mb-2">Status</h3>
                 <span className={`flex items-center space-x-2 px-3 py-1 rounded-md text-sm font-medium ${getStatusColor(node.status)}`}>
                   {getStatusIcon(node.status)}
-                  <span>{node.status.replace('_', ' ')}</span>
+                  <span>{node.status.replace(/_/g, ' ')}</span>
                 </span>
               </div>
             )}
@@ -191,12 +191,31 @@ export function NodeDetailsModal({ isOpen, onClose, node, edges = [], nodes = []
                 <Flag className={`h-4 w-4 mr-2 ${priorityInfo.flagColor}`} />
                 Priority
               </h3>
-              <div className="flex items-center space-x-3">
-                <span className={`flex items-center space-x-2 px-3 py-1 rounded-md text-sm font-medium ${priorityInfo.color}`}>
-                  {getPriorityIcon(totalPriority)}
-                  <span>{priorityInfo.label}</span>
-                </span>
-                <span className="text-gray-500 text-sm">({Math.round(totalPriority * 100)}%)</span>
+              <div className="space-y-3">
+                <div className="flex items-center space-x-3">
+                  <span className={`flex items-center space-x-2 px-3 py-1 rounded-md text-sm font-medium ${priorityInfo.color}`}>
+                    {getPriorityIcon(totalPriority)}
+                    <span>{priorityInfo.label}</span>
+                  </span>
+                  <span className="text-gray-500 text-sm">({Math.round(totalPriority * 100)}%)</span>
+                </div>
+                
+                {/* Simple Priority Progress Bar - matching node style */}
+                <div className="flex items-center space-x-2">
+                  <div className="relative w-32 h-1 bg-gray-700 rounded-full overflow-hidden">
+                    <div 
+                      className="absolute h-full rounded-full transition-all duration-300"
+                      style={{ 
+                        width: `${Math.round(totalPriority * 100)}%`,
+                        backgroundColor: totalPriority >= 0.8 ? '#ef4444' : // Critical - red
+                                       totalPriority >= 0.6 ? '#f97316' : // High - orange
+                                       totalPriority >= 0.4 ? '#eab308' : // Medium - yellow
+                                       totalPriority >= 0.2 ? '#3b82f6' : // Low - blue
+                                       '#6b7280' // Minimal - gray
+                      }}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 
