@@ -112,8 +112,14 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
   }, []);
 
 
-  // Check if all required fields are filled
-  const isFormValid = formData.title.trim() !== '' && formData.type !== '';
+  // Check for duplicate names
+  const existingNodes = existingNodesData?.workItems || [];
+  const isDuplicateName = existingNodes.some((node: any) => 
+    node.title.toLowerCase().trim() === formData.title.toLowerCase().trim()
+  );
+  
+  // Check if all required fields are filled and no duplicate name
+  const isFormValid = formData.title.trim() !== '' && formData.type !== '' && !isDuplicateName;
 
 
   const [createWorkItem, { loading: creatingWorkItem }] = useMutation(CREATE_WORK_ITEM, {
@@ -454,9 +460,19 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                 required
                 value={formData.title}
                 onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                className="w-full border border-gray-600/50 bg-gray-800 text-white rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-400/70 transition-all duration-200 placeholder-gray-400"
+                className={`w-full border bg-gray-800 text-white rounded-xl px-4 py-3 focus:ring-2 transition-all duration-200 placeholder-gray-400 ${
+                  isDuplicateName 
+                    ? 'border-red-500 focus:ring-red-500/50 focus:border-red-400' 
+                    : 'border-gray-600/50 focus:ring-emerald-500/50 focus:border-emerald-400/70'
+                }`}
                 placeholder="Enter a descriptive title for your node"
               />
+              {isDuplicateName && formData.title.trim() && (
+                <div className="mt-2 flex items-center space-x-2 text-red-400 text-sm">
+                  <div className="w-1 h-1 bg-red-400 rounded-full"></div>
+                  <span>A node with this name already exists. Please choose a different name.</span>
+                </div>
+              )}
             </div>
             
             <div>
