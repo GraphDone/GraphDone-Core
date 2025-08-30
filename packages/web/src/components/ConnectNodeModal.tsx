@@ -56,6 +56,7 @@ interface ConnectNodeModalProps {
     type: string;
   };
   initialTab?: 'connect' | 'disconnect';
+  onAllConnectionsRemoved?: () => void;
 }
 
 // Separate DisconnectNodeModal interface
@@ -67,6 +68,7 @@ interface DisconnectNodeModalProps {
     title: string;
     type: string;
   };
+  onAllConnectionsRemoved?: () => void;
 }
 
 
@@ -91,7 +93,7 @@ const getPriorityIconElement = (priority: number, className: string = "h-3 w-3")
 };
 
 // Separate DisconnectNodeModal Component
-export function DisconnectNodeModal({ isOpen, onClose, sourceNode }: DisconnectNodeModalProps) {
+export function DisconnectNodeModal({ isOpen, onClose, sourceNode, onAllConnectionsRemoved }: DisconnectNodeModalProps) {
   const { currentGraph } = useGraph();
   const { showSuccess, showError } = useNotifications();
   
@@ -103,7 +105,7 @@ export function DisconnectNodeModal({ isOpen, onClose, sourceNode }: DisconnectN
   const [showDisconnectConfirmation, setShowDisconnectConfirmation] = useState(false);
 
   // Query existing edges for the source node
-  const { data: edgesData, loading: loadingEdges } = useQuery(GET_EDGES, {
+  const { data: edgesData, loading: loadingEdges, refetch: refetchEdges } = useQuery(GET_EDGES, {
     variables: {
       where: {
         OR: [
@@ -289,10 +291,27 @@ export function DisconnectNodeModal({ isOpen, onClose, sourceNode }: DisconnectN
         setSelectedConnections(new Set());
         setShowDisconnectConfirmation(false);
         
-        // Graceful modal close after a brief moment
-        setTimeout(() => {
-          onClose();
-        }, 500);
+        // Check if all connections are now removed
+        // Since the query will refetch, we need to wait a moment for the data to update
+        setTimeout(async () => {
+          // Wait for GraphQL refetch to complete
+          try {
+            const { data: updatedEdgesData } = await refetchEdges();
+            const updatedConnections = updatedEdgesData?.edges || [];
+            const updatedDisconnectable = updatedConnections.filter((conn: any) => !conn.id.startsWith('workitem-'));
+            
+            if (updatedDisconnectable.length === 0 && onAllConnectionsRemoved) {
+              // All connections removed - trigger callback to return to delete modal
+              onAllConnectionsRemoved();
+            } else {
+              // Still have connections - close modal normally
+              onClose();
+            }
+          } catch (error) {
+            // If refetch fails, just close normally
+            onClose();
+          }
+        }, 200);
       }, 300);
 
     } catch (error: any) {
@@ -649,7 +668,7 @@ export function DisconnectNodeModal({ isOpen, onClose, sourceNode }: DisconnectN
   );
 }
 
-export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'connect' }: ConnectNodeModalProps) {
+export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'connect', onAllConnectionsRemoved }: ConnectNodeModalProps) {
   const { currentTeam } = useAuth();
   const { currentGraph } = useGraph();
   const { showSuccess, showError } = useNotifications();
@@ -714,7 +733,7 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
   });
 
   // Query existing edges for the source node
-  const { data: edgesData, loading: loadingEdges } = useQuery(GET_EDGES, {
+  const { data: edgesData, loading: loadingEdges, refetch: refetchEdges } = useQuery(GET_EDGES, {
     variables: {
       where: {
         OR: [
