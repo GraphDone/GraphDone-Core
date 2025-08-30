@@ -1,13 +1,14 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { useQuery, useMutation } from '@apollo/client';
+import { useQuery, useMutation, useApolloClient } from '@apollo/client';
 import { useAuth } from './AuthContext';
 import { Graph, GraphHierarchy, CreateGraphInput, GraphContextType, GraphPermissions, ShareSettings } from '../types/graph';
 import { 
   GET_GRAPHS, 
   CREATE_GRAPH, 
-  UPDATE_GRAPH, 
+  UPDATE_GRAPH,
   DELETE_GRAPH
 } from '../graphql/graph';
+import { GET_WORK_ITEMS, DELETE_WORK_ITEM } from '../lib/queries';
 
 const GraphContext = createContext<GraphContextType | undefined>(undefined);
 
@@ -19,6 +20,7 @@ interface GraphProviderProps {
 
 export function GraphProvider({ children }: GraphProviderProps) {
   const { currentUser, currentTeam } = useAuth();
+  const apolloClient = useApolloClient();
   const [currentGraph, setCurrentGraph] = useState<Graph | null>(null);
   const [availableGraphs, setAvailableGraphs] = useState<Graph[]>([]);
   const [isCreating, setIsCreating] = useState(false);
@@ -32,6 +34,7 @@ export function GraphProvider({ children }: GraphProviderProps) {
   const [createGraphMutation] = useMutation(CREATE_GRAPH);
   const [updateGraphMutation] = useMutation(UPDATE_GRAPH);
   const [deleteGraphMutation] = useMutation(DELETE_GRAPH);
+  const [deleteWorkItemMutation] = useMutation(DELETE_WORK_ITEM);
 
   // Subscriptions for real-time updates (commented out until properly implemented)
   // useSubscription(GRAPH_CREATED, {
@@ -245,10 +248,31 @@ export function GraphProvider({ children }: GraphProviderProps) {
 
   const deleteGraph = async (graphId: string): Promise<void> => {
     try {
+      // First, check if the graph contains any nodes
+      const { data: workItemsData } = await apolloClient.query({
+        query: GET_WORK_ITEMS,
+        variables: {
+          where: {
+            graph: {
+              id: graphId
+            }
+          }
+        }
+      });
+
+      const workItems = workItemsData?.workItems || [];
+      
+      // Reject deletion if graph contains nodes
+      if (workItems.length > 0) {
+        throw new Error(`Cannot delete graph: it contains ${workItems.length} node${workItems.length !== 1 ? 's' : ''}. Please delete all nodes first.`);
+      }
+
+      // Only delete the graph itself if it's empty
       await deleteGraphMutation({
         variables: { id: graphId }
       });
       
+      // Update local state
       setAvailableGraphs(prev => prev.filter(g => g.id !== graphId));
       if (currentGraph?.id === graphId) {
         const remaining = availableGraphs.filter(g => g.id !== graphId);
@@ -256,7 +280,7 @@ export function GraphProvider({ children }: GraphProviderProps) {
       }
     } catch (error) {
       console.error('Error deleting graph:', error);
-      throw error; // Don't fallback to local deletion, let the error bubble up
+      throw error;
     }
   };
 

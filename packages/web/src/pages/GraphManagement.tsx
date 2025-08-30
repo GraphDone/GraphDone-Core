@@ -3,6 +3,7 @@ import { Plus, Search, Filter, Folder, FolderOpen, Share2, Lock, Users, Edit3, T
 import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Graph, GraphHierarchy } from '../types/graph';
+import { DeleteGraphModal } from '../components/DeleteGraphModal';
 
 export function GraphManagement() {
   const { currentTeam } = useAuth();
@@ -175,11 +176,6 @@ export function GraphManagement() {
                     </button>
                   )}
                   
-                  {canDeleteGraph(graph.id) && (
-                    <button className="p-2 text-gray-400 hover:text-red-400 transition-colors">
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  )}
                 </div>
               </div>
             </div>
@@ -290,11 +286,6 @@ export function GraphManagement() {
                   </button>
                 )}
                 
-                {canDeleteGraph(graph.id) && (
-                  <button className="p-2 text-gray-400 hover:text-red-400 transition-colors">
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                )}
               </div>
             </div>
           </div>
@@ -319,9 +310,6 @@ export function GraphManagement() {
             {selectedGraphs.size > 0 && (
               <div className="flex items-center space-x-2 px-3 py-2 bg-green-900 rounded-lg">
                 <span className="text-sm text-green-300">{selectedGraphs.size} selected</span>
-                <button className="text-green-400 hover:text-green-300">
-                  <Trash2 className="h-4 w-4" />
-                </button>
               </div>
             )}
             
