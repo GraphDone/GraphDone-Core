@@ -59,10 +59,16 @@ export function Ontology() {
     createdBy: 'system',
     createdAt: '2024-01-01',
     fields: [
-      { id: 'title', name: 'Title', type: 'text' as const, required: true },
-      { id: 'description', name: 'Description', type: 'text' as const, required: false },
-      { id: 'dueDate', name: 'Due Date', type: 'date' as const, required: false },
-      { id: 'priority', name: 'Priority', type: 'select' as const, required: true, options: ['Critical', 'High', 'Medium', 'Low', 'Minimal'] }
+      { id: 'title', name: 'title', type: 'text' as const, required: true },
+      { id: 'description', name: 'description', type: 'text' as const, required: false },
+      { id: 'type', name: 'type', type: 'text' as const, required: true },
+      { id: 'status', name: 'status', type: 'text' as const, required: true },
+      { id: 'priorityExec', name: 'priorityExec', type: 'number' as const, required: false },
+      { id: 'priorityIndiv', name: 'priorityIndiv', type: 'number' as const, required: false },
+      { id: 'priorityComm', name: 'priorityComm', type: 'number' as const, required: false },
+      { id: 'assignedTo', name: 'assignedTo', type: 'text' as const, required: false },
+      { id: 'dueDate', name: 'dueDate', type: 'text' as const, required: false },
+      { id: 'tags', name: 'tags', type: 'text' as const, required: false }
     ]
   }));
 
