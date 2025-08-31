@@ -123,9 +123,9 @@ async function seed() {
     const edges = [
       { source: 'wi-1', target: 'wi-2', type: 'DEPENDS_ON' },
       { source: 'wi-2', target: 'wi-3', type: 'DEPENDS_ON' },
-      { source: 'wi-5', target: 'wi-6', type: 'PART_OF' },
-      { source: 'wi-5', target: 'wi-7', type: 'PART_OF' },
-      { source: 'wi-5', target: 'wi-8', type: 'PART_OF' },
+      { source: 'wi-5', target: 'wi-6', type: 'IS_PART_OF' },
+      { source: 'wi-5', target: 'wi-7', type: 'IS_PART_OF' },
+      { source: 'wi-5', target: 'wi-8', type: 'IS_PART_OF' },
       { source: 'wi-12', target: 'wi-5', type: 'DEPENDS_ON' }
     ];
     

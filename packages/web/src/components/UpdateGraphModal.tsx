@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, Folder, FolderOpen, Plus, FileText, Save } from 'lucide-react';
 import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useNotifications } from '../contexts/NotificationContext';
 
 interface UpdateGraphModalProps {
   isOpen: boolean;
@@ -11,6 +12,7 @@ interface UpdateGraphModalProps {
 export function UpdateGraphModal({ isOpen, onClose }: UpdateGraphModalProps) {
   const { currentGraph, updateGraph } = useGraph();
   const { currentTeam } = useAuth();
+  const { showSuccess, showError } = useNotifications();
   const [loading, setLoading] = useState(false);
   
   const [formData, setFormData] = useState({
@@ -155,9 +157,20 @@ export function UpdateGraphModal({ isOpen, onClose }: UpdateGraphModalProps) {
         status: formData.status,
         isShared: formData.isShared
       });
+      
+      // Show success notification
+      showSuccess(
+        'Graph Updated Successfully!',
+        `"${formData.name}" has been updated with your changes.`
+      );
+      
       onClose();
     } catch (error) {
       console.error('Failed to update graph:', error);
+      showError(
+        'Failed to Update Graph',
+        error instanceof Error ? error.message : 'An unexpected error occurred while updating the graph. Please try again.'
+      );
     } finally {
       setLoading(false);
     }
