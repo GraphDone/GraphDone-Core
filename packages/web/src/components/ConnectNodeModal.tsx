@@ -22,6 +22,8 @@ import {
   RELATIONSHIP_OPTIONS,
   getRelationshipConfig,
   getRelationshipIconElement,
+  getRelationshipArrow,
+  getRelationshipDescription,
   RelationshipType
 } from '../constants/workItemConstants';
 import { 
@@ -526,19 +528,15 @@ export function DisconnectNodeModal({ isOpen, onClose, sourceNode, onAllConnecti
                                       </span>
                                     </div>
                                     
-                                    {/* Relationship - Dynamic width */}
-                                    <div className="flex items-center space-x-1 flex-shrink-0">
-                                      <ArrowRight className={`h-3 w-3 ${relationshipType?.color || 'text-gray-400'}`} />
-                                      <div className="flex items-center space-x-1 px-2 py-1 rounded bg-gray-600/40" style={{ width: `${relationshipWidth}px` }}>
-                                        {relationshipType ? 
-                                          getRelationshipIconElement(relationshipType.type, `h-2.5 w-2.5`) :
-                                          getRelationshipIconElement('RELATES_TO', 'h-2.5 w-2.5 text-gray-400')
-                                        }
-                                        <span className={`text-xs font-medium ${relationshipType?.color || 'text-gray-400'} truncate`} title={relationshipLabel}>
-                                          {truncatedRelationship}
-                                        </span>
-                                      </div>
-                                      <ArrowRight className="h-3 w-3 text-gray-400" />
+                                    {/* Relationship - Adaptive display: symbol when tight, label when space allows */}
+                                    <div className="flex items-center space-x-1 px-2 py-1 rounded bg-gray-600/40 flex-shrink-0" style={{ width: `${relationshipWidth}px` }} title={getRelationshipDescription(sourceTitle, targetTitle, relationshipType?.type || 'RELATES_TO')}>
+                                      {relationshipType ? 
+                                        getRelationshipIconElement(relationshipType.type, `h-2.5 w-2.5`) :
+                                        getRelationshipIconElement('RELATES_TO', 'h-2.5 w-2.5 text-gray-400')
+                                      }
+                                      <span className={`text-xs font-medium ${relationshipType?.color || 'text-gray-400'} truncate`}>
+                                        {getRelationshipConfig(relationshipType?.type || 'RELATES_TO').label}
+                                      </span>
                                     </div>
 
                                     {/* Target - Dynamic width based on content */}
@@ -1663,19 +1661,18 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
                                         </span>
                                       </div>
                                       
-                                      {/* Relationship - Full size */}
-                                      <div className="flex items-center space-x-1 flex-shrink-0">
-                                        <ArrowRight className={`h-3 w-3 ${isOutgoing ? (relationshipType?.color || 'text-gray-400') : 'text-gray-400'}`} />
-                                        <div className="flex items-center space-x-1 px-2 py-1 rounded bg-gray-600/40">
-                                          {relationshipType ? 
-                                            getRelationshipIconElement(relationshipType.type, `h-2.5 w-2.5`) :
-                                            getRelationshipIconElement('RELATES_TO', 'h-2.5 w-2.5 text-gray-400')
-                                          }
-                                          <span className={`text-xs font-medium ${relationshipType?.color || 'text-gray-400'}`} title={`${relationshipType?.label || connection.type}${!isOutgoing ? ' (incoming)' : ''}`}>
-                                            {relationshipLabel.length > Math.floor(actualBoxWidth / 30) ? relationshipLabel.substring(0, Math.floor(actualBoxWidth / 30) - 1) + '…' : relationshipLabel}
-                                          </span>
-                                        </div>
-                                        <ArrowRight className="h-3 w-3 text-gray-400" />
+                                      {/* Relationship - Adaptive arrow with smart labeling */}
+                                      <div className="flex items-center space-x-1 px-2 py-1 rounded bg-gray-600/40 flex-shrink-0" title={getRelationshipDescription(sourceNode.title, connection.connectedNode.title, relationshipType?.type || 'RELATES_TO', !isOutgoing)}>
+                                        <span className={`text-sm ${isOutgoing ? (relationshipType?.color || 'text-gray-400') : 'text-gray-400'}`}>
+                                          {getRelationshipArrow(relationshipType?.type || 'RELATES_TO')}
+                                        </span>
+                                        {relationshipType ? 
+                                          getRelationshipIconElement(relationshipType.type, `h-2.5 w-2.5`) :
+                                          getRelationshipIconElement('RELATES_TO', 'h-2.5 w-2.5 text-gray-400')
+                                        }
+                                        <span className={`text-xs font-medium ${relationshipType?.color || 'text-gray-400'}`}>
+                                          {getRelationshipConfig(connection.type as RelationshipType).label}
+                                        </span>
                                       </div>
 
                                       {/* Target - Generous for connect */}
@@ -2299,19 +2296,18 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
                                       </span>
                                     </div>
                                     
-                                    <ArrowRight className={`h-3 w-3 ${relationshipType?.color || 'text-gray-400'}`} />
-                                    
-                                    <div className="flex items-center space-x-1 px-2 py-1 rounded bg-gray-600/40">
+                                    <div className="flex items-center space-x-1 px-2 py-1 rounded bg-gray-600/40" title={getRelationshipDescription(sourceNode.title, connection.connectedNode.title, relationshipType?.type || 'RELATES_TO')}>
+                                      <span className={`text-sm ${relationshipType?.color || 'text-gray-400'}`}>
+                                        {getRelationshipArrow(relationshipType?.type || 'RELATES_TO')}
+                                      </span>
                                       {relationshipType ? 
                                         getRelationshipIconElement(relationshipType.type, `h-2.5 w-2.5`) :
                                         getRelationshipIconElement('RELATES_TO', 'h-2.5 w-2.5 text-gray-400')
                                       }
-                                      <span className={`text-xs font-medium ${relationshipType?.color || 'text-gray-400'}`} title={relationshipType?.label || connection.type}>
-                                        {relationshipType?.label || connection.type}
+                                      <span className={`text-xs font-medium ${relationshipType?.color || 'text-gray-400'}`}>
+                                        {relationshipType?.label || 'Relates To'}
                                       </span>
                                     </div>
-                                    
-                                    <ArrowRight className="h-3 w-3 text-gray-400" />
                                     
                                     <div className="flex items-center px-2 py-1 bg-gray-600/40 rounded-md">
                                       <span className="text-gray-200 font-medium text-xs" title={connection.connectedNode.title}>
