@@ -15,7 +15,7 @@ export function Workspace() {
   const [showCreateGraphModal, setShowCreateGraphModal] = useState(false);
   const [showGraphSelectionModal, setShowGraphSelectionModal] = useState(false);
   const [viewMode, setViewMode] = useState<'graph' | 'dashboard' | 'table' | 'cards' | 'kanban' | 'gantt' | 'calendar' | 'activity'>('graph');
-  const { currentGraph } = useGraph();
+  const { currentGraph, availableGraphs } = useGraph();
   const { currentTeam, currentUser } = useAuth();
 
   // Get real-time counts for header display
@@ -255,31 +255,38 @@ export function Workspace() {
               </h1>
               
               <h2 className="text-lg font-medium text-green-300 mb-4">
-                No Graph Selected
+                {availableGraphs.length > 0 ? 'No Graph Selected' : 'No Graphs Available'}
               </h2>
               
               <p className="text-gray-300 mb-8 leading-relaxed">
-                Ready to organize your work? Choose an existing graph or create a new one to get started.
+                {availableGraphs.length > 0 
+                  ? 'Ready to organize your work? Choose an existing graph or create a new one to get started.'
+                  : 'Get started by creating your first graph to organize your work.'
+                }
               </p>
 
               {/* Action Buttons */}
               <div className="space-y-3 mb-8">
-                <button
-                  onClick={() => setShowGraphSelectionModal(true)}
-                  className="w-full px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-all duration-200 font-medium flex items-center justify-center shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
-                >
-                  <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"/>
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5a2 2 0 012-2h4a2 2 0 012 2v3H8V5z"/>
-                  </svg>
-                  Select Graph
-                </button>
+                {availableGraphs.length > 0 && (
+                  <>
+                    <button
+                      onClick={() => setShowGraphSelectionModal(true)}
+                      className="w-full px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-all duration-200 font-medium flex items-center justify-center shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                    >
+                      <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"/>
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5a2 2 0 012-2h4a2 2 0 012 2v3H8V5z"/>
+                      </svg>
+                      Select Graph
+                    </button>
 
-                <div className="flex items-center">
-                  <div className="flex-1 border-t border-gray-600"></div>
-                  <span className="px-4 text-gray-400 text-xs font-medium bg-gray-900">OR</span>
-                  <div className="flex-1 border-t border-gray-600"></div>
-                </div>
+                    <div className="flex items-center">
+                      <div className="flex-1 border-t border-gray-600"></div>
+                      <span className="px-4 text-gray-400 text-xs font-medium bg-gray-900">OR</span>
+                      <div className="flex-1 border-t border-gray-600"></div>
+                    </div>
+                  </>
+                )}
 
                 <button
                   onClick={() => setShowCreateGraphModal(true)}

@@ -96,7 +96,8 @@ export function GraphSelector() {
     }
   };
 
-  if (!currentGraph || graphHierarchy.length === 0) {
+  // Show no graphs available if we have no available graphs at all
+  if (graphHierarchy.length === 0 || !currentGraph) {
     return (
       <div className="p-3">
         <div className="text-center text-gray-400">
