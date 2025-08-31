@@ -5,7 +5,6 @@ import {
   Edit3, 
   Key, 
   Shield, 
-  CheckCircle, 
   XCircle, 
   Search,
   RotateCw,
@@ -19,6 +18,7 @@ import {
   Eye,
   Settings2
 } from 'lucide-react';
+import { CheckCircle } from '../constants/workItemConstants';
 import { GET_ALL_USERS, UPDATE_USER_ROLE, RESET_USER_PASSWORD, DELETE_USER, CREATE_USER, UPDATE_USER_STATUS } from '../lib/queries';
 import { CustomDropdown } from './CustomDropdown';
 

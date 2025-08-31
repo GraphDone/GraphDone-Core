@@ -1,13 +1,33 @@
 import React from 'react';
-import { useMutation } from '@apollo/client';
-import { X, Link, Calendar, Clock, CheckCircle, AlertCircle, ChevronDown, Flame, Zap, Triangle, Circle, ArrowDown, ClipboardList } from 'lucide-react';
+import { useMutation, useQuery } from '@apollo/client';
+import { X, Link, ChevronDown } from 'lucide-react';
 import { CREATE_WORK_ITEM, GET_WORK_ITEMS, GET_EDGES, CREATE_EDGE } from '../lib/queries';
 import { useAuth } from '../contexts/AuthContext';
 import { useGraph } from '../contexts/GraphContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { NodeTypeSelector } from './NodeCategorySelector';
 import { TagInput } from './TagInput';
-import { RELATIONSHIP_TYPES, getRelationshipIcon } from '../lib/connectionUtils';
+import { 
+  RELATIONSHIP_OPTIONS,
+  getRelationshipConfig,
+  getRelationshipIconElement,
+  RelationshipType
+} from '../constants/workItemConstants';
+import { 
+  getStatusColor as getStatusColorScheme,
+  getTypeColor, 
+  getPriorityColor,
+  suggestSimilarNodes
+} from '../utils/nodeColorSystem';
+import {
+  STATUS_OPTIONS,
+  PRIORITY_OPTIONS,
+  getPriorityIcon as getCentralizedPriorityIcon,
+  getPriorityIconElement,
+  getPriorityColor as getCentralizedPriorityColor,
+  getStatusColorScheme as getCentralizedStatusColorScheme,
+  ClipboardList
+} from '../constants/workItemConstants';
 
 interface WorkItem {
   id: string;
@@ -39,6 +59,19 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
   const { currentUser, currentTeam } = useAuth();
   const { currentGraph } = useGraph();
   const { showSuccess, showError } = useNotifications();
+
+  // Query to get existing nodes count for dynamic messaging
+  const { data: existingNodesData } = useQuery(GET_WORK_ITEMS, {
+    variables: currentGraph ? {
+      where: {
+        graph: {
+          id: currentGraph.id
+        }
+      }
+    } : { where: {} },
+    skip: !currentGraph?.id || !isOpen,
+    fetchPolicy: 'cache-first'
+  });
   
   const [formData, setFormData] = React.useState({
     title: '',
@@ -58,14 +91,13 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
   const [isStatusOpen, setIsStatusOpen] = React.useState(false);
   const statusDropdownRef = React.useRef<HTMLDivElement>(null);
 
-  // Status options with icons
-  const statusOptions = [
-    { value: 'PROPOSED', label: 'Proposed', icon: <ClipboardList className="h-6 w-6" />, color: 'text-cyan-400' },
-    { value: 'PLANNED', label: 'Planned', icon: <Calendar className="h-6 w-6" />, color: 'text-purple-400' },
-    { value: 'IN_PROGRESS', label: 'In Progress', icon: <Clock className="h-6 w-6" />, color: 'text-yellow-400' },
-    { value: 'COMPLETED', label: 'Completed', icon: <CheckCircle className="h-6 w-6" />, color: 'text-green-400' },
-    { value: 'BLOCKED', label: 'Blocked', icon: <AlertCircle className="h-6 w-6" />, color: 'text-red-500' }
-  ];
+  // Status options from centralized constants (excluding 'all' option)
+  const statusOptions = STATUS_OPTIONS.filter(option => option.value !== 'all').map(option => ({
+    ...option,
+    icon: option.icon ? <option.icon className="h-6 w-6" /> : null,
+    background: option.bgColor,
+    border: option.borderColor
+  }));
 
   // Close status dropdown when clicking outside
   React.useEffect(() => {
@@ -80,8 +112,14 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
   }, []);
 
 
-  // Check if all required fields are filled
-  const isFormValid = formData.title.trim() !== '' && formData.type !== '';
+  // Check for duplicate names
+  const existingNodes = existingNodesData?.workItems || [];
+  const isDuplicateName = existingNodes.some((node: any) => 
+    node.title.toLowerCase().trim() === formData.title.toLowerCase().trim()
+  );
+  
+  // Check if all required fields are filled and no duplicate name
+  const isFormValid = formData.title.trim() !== '' && formData.type !== '' && !isDuplicateName;
 
 
   const [createWorkItem, { loading: creatingWorkItem }] = useMutation(CREATE_WORK_ITEM, {
@@ -259,32 +297,13 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
       if (result.data?.createWorkItems?.workItems?.[0]) {
         const createdNode = result.data.createWorkItems.workItems[0];
         
-        // If parentNodeId exists, also create an Edge entity for the connection
+        // Connection is already created through the dependencies field in workItemInput
         if (parentNodeId) {
-          try {
-            await createEdge({
-              variables: {
-                input: [{
-                  type: selectedRelationType,
-                  weight: 0.8,
-                  source: { connect: { where: { node: { id: createdNode.id } } } },
-                  target: { connect: { where: { node: { id: parentNodeId } } } }
-                }]
-              }
-            });
-            
-            const relationshipLabel = RELATIONSHIP_TYPES.find(r => r.type === selectedRelationType)?.label || selectedRelationType;
-            showSuccess(
-              'Node Created and Connected Successfully!',
-              `"${createdNode.title}" has been created with a "${relationshipLabel}" relationship.`
-            );
-          } catch (edgeError) {
-            console.error('Failed to create edge:', edgeError);
-            showSuccess(
-              'Node Created Successfully!',
-              `"${createdNode.title}" has been created but the connection failed. You can connect it manually.`
-            );
-          }
+          const relationshipLabel = getRelationshipConfig(selectedRelationType as RelationshipType).label;
+          showSuccess(
+            'Node Created and Connected Successfully!',
+            `"${createdNode.title}" has been created with a "${relationshipLabel}" relationship.`
+          );
         } else {
           showSuccess(
             'Node Created Successfully!',
@@ -331,7 +350,7 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
       <div className="flex items-center justify-center min-h-screen px-4">
         <div className="fixed inset-0 bg-gradient-to-br from-gray-900/80 via-slate-900/90 to-gray-900/80 transition-all duration-300" onClick={onClose} />
         
-        <div className="relative bg-gradient-to-br from-gray-800 via-gray-800 to-gray-900 rounded-2xl shadow-2xl border border-gray-700/50 max-w-lg w-full transform transition-all duration-300">
+        <div className="relative bg-gradient-to-br from-gray-800 via-gray-800 to-gray-900 rounded-2xl shadow-2xl border border-gray-700/50 max-w-lg w-full transform transition-all duration-300" onClick={(e) => e.stopPropagation()}>
           <div className="bg-gradient-to-r from-emerald-900/30 via-green-800/25 to-teal-900/30 px-6 py-5 border-b border-green-600/20 backdrop-blur-sm rounded-t-2xl">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
@@ -343,7 +362,12 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                     {parentNodeId ? 'Create & Connect Node' : 'Create New Node'}
                   </h2>
                   <p className="text-sm text-gray-300 mt-1">
-                    {parentNodeId ? 'Add a new node with automatic connection' : 'Build your graph with a new work item'}
+                    {parentNodeId 
+                      ? 'Add a new node with automatic connection' 
+                      : existingNodesData?.workItems?.length > 0
+                        ? 'Add another node to expand your graph'
+                        : 'Add your first node to begin the journey'
+                    }
                   </p>
                 </div>
               </div>
@@ -377,7 +401,7 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                     </label>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
-                    {RELATIONSHIP_TYPES.map((relation) => (
+                    {RELATIONSHIP_OPTIONS.map((relation) => (
                       <button
                         key={relation.type}
                         type="button"
@@ -389,7 +413,7 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                         }`}
                       >
                         <div className="flex items-center space-x-2 mb-1">
-                          {getRelationshipIcon(relation.icon, `h-5 w-5 ${selectedRelationType === relation.type ? 'text-blue-400' : relation.color}`)}
+                          {getRelationshipIconElement(relation.type, `h-5 w-5 ${selectedRelationType === relation.type ? 'text-blue-400' : ''}`)}
                           <span className={`font-medium text-sm ${selectedRelationType === relation.type ? 'text-blue-400' : relation.color}`}>
                             {relation.label}
                           </span>
@@ -417,9 +441,19 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                 required
                 value={formData.title}
                 onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                className="w-full border border-gray-600/50 bg-gray-800 text-white rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-400/70 transition-all duration-200 placeholder-gray-400"
+                className={`w-full border bg-gray-800 text-white rounded-xl px-4 py-3 focus:ring-2 transition-all duration-200 placeholder-gray-400 ${
+                  isDuplicateName 
+                    ? 'border-red-500 focus:ring-red-500/50 focus:border-red-400' 
+                    : 'border-gray-600/50 focus:ring-emerald-500/50 focus:border-emerald-400/70'
+                }`}
                 placeholder="Enter a descriptive title for your node"
               />
+              {isDuplicateName && formData.title.trim() && (
+                <div className="mt-2 flex items-center space-x-2 text-red-400 text-sm">
+                  <div className="w-1 h-1 bg-red-400 rounded-full"></div>
+                  <span>A node with this name already exists. Please choose a different name.</span>
+                </div>
+              )}
             </div>
             
             <div>
@@ -479,10 +513,10 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                             setFormData(prev => ({ ...prev, status: option.value }));
                             setIsStatusOpen(false);
                           }}
-                          className={`w-full px-3 py-3 text-left hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all duration-200 rounded-lg group ${
+                          className={`w-full px-3 py-3 text-left transition-all duration-200 rounded-lg group ${
                             formData.status === option.value 
-                              ? 'bg-blue-50 dark:bg-blue-900/30 ring-1 ring-blue-200 dark:ring-blue-700' 
-                              : 'hover:shadow-sm'
+                              ? `${option.background} ${option.border} ring-1` 
+                              : 'hover:bg-gray-700/30 hover:shadow-sm'
                           } ${index !== 0 ? 'mt-1' : ''}`}
                         >
                           <div className="flex items-center justify-between">
@@ -492,14 +526,14 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                               </div>
                               <span className={`font-semibold ${
                                 formData.status === option.value 
-                                  ? 'text-blue-700 dark:text-blue-300' 
+                                  ? option.color 
                                   : 'text-gray-900 dark:text-gray-100'
                               }`}>
                                 {option.label}
                               </span>
                             </div>
                             {formData.status === option.value && (
-                              <div className="w-5 h-5 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs ml-2 flex-shrink-0 shadow-sm">
+                              <div className={`w-5 h-5 ${option.color} rounded-full flex items-center justify-center text-xs ml-2 flex-shrink-0 shadow-sm`}>
                                 ✓
                               </div>
                             )}
@@ -598,7 +632,7 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                       className="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 border border-red-500/30 text-center hover:shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600 transition-all cursor-pointer"
                     >
                       <div className="flex items-center justify-center space-x-1 mb-1">
-                        <Flame className="w-6 h-6 text-red-500" />
+                        {getPriorityIconElement(0.9, "w-6 h-6 text-red-500")}
                         <div className="text-red-500 font-bold text-sm">Critical</div>
                       </div>
                       <div className="text-xs font-mono text-gray-400">80% - 100%</div>
@@ -617,7 +651,7 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                       className="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 border border-orange-500/30 text-center hover:shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600 transition-all cursor-pointer"
                     >
                       <div className="flex items-center justify-center space-x-1 mb-1">
-                        <Zap className="w-6 h-6 text-orange-500" />
+                        {getPriorityIconElement(0.7, "w-6 h-6 text-orange-500")}
                         <div className="text-orange-400 font-bold text-sm">High</div>
                       </div>
                       <div className="text-xs font-mono text-gray-400">60% - 79%</div>
@@ -636,7 +670,7 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                       className="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 border border-yellow-500/30 text-center hover:shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600 transition-all cursor-pointer"
                     >
                       <div className="flex items-center justify-center space-x-1 mb-1">
-                        <Triangle className="w-6 h-6 text-yellow-500" />
+                        {getPriorityIconElement(0.5, "w-6 h-6 text-yellow-500")}
                         <div className="text-yellow-400 font-bold text-sm">Moderate</div>
                       </div>
                       <div className="text-xs font-mono text-gray-400">40% - 59%</div>
@@ -658,7 +692,7 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                       className="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 border border-blue-500/30 text-center hover:shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600 transition-all cursor-pointer"
                     >
                       <div className="flex items-center justify-center space-x-1 mb-1">
-                        <Circle className="w-6 h-6 text-blue-500" />
+                        {getPriorityIconElement(0.3, "w-6 h-6 text-blue-500")}
                         <div className="text-blue-400 font-bold text-sm">Low</div>
                       </div>
                       <div className="text-xs font-mono text-gray-400">20% - 39%</div>
@@ -674,11 +708,11 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                           priorityComm: 0.1
                         }));
                       }}
-                      className="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 border border-green-500/30 text-center hover:shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600 transition-all cursor-pointer"
+                      className="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 border border-gray-500/30 text-center hover:shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600 transition-all cursor-pointer"
                     >
                       <div className="flex items-center justify-center space-x-1 mb-1">
-                        <ArrowDown className="w-6 h-6 text-green-500" />
-                        <div className="text-green-400 font-bold text-sm">Minimal</div>
+                        {getPriorityIconElement(0.1, "w-6 h-6 text-gray-500")}
+                        <div className="text-gray-400 font-bold text-sm">Minimal</div>
                       </div>
                       <div className="text-xs font-mono text-gray-400">0% - 19%</div>
                     </button>
@@ -705,7 +739,7 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                     formData.priorityExec >= 0.6 ? 'accent-orange-500' :
                     formData.priorityExec >= 0.4 ? 'accent-yellow-500' :
                     formData.priorityExec >= 0.2 ? 'accent-blue-500' :
-                    'accent-green-500'
+                    'accent-gray-500'
                   }`}
                 />
                 <div className={`text-sm text-center font-medium ${
@@ -713,19 +747,19 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                   formData.priorityExec >= 0.6 ? 'text-orange-500' :
                   formData.priorityExec >= 0.4 ? 'text-yellow-500' :
                   formData.priorityExec >= 0.2 ? 'text-blue-500' :
-                  'text-green-500'
+                  'text-gray-500'
                 }`}>
-                  {formData.priorityExec >= 0.8 ? (
-                    <><Flame className="h-6 w-6 inline mr-1" />Critical</>
-                  ) : formData.priorityExec >= 0.6 ? (
-                    <><Zap className="h-6 w-6 inline mr-1" />High</>
-                  ) : formData.priorityExec >= 0.4 ? (
-                    <><Triangle className="h-6 w-6 inline mr-1" />Moderate</>
-                  ) : formData.priorityExec >= 0.2 ? (
-                    <><Circle className="h-6 w-6 inline mr-1" />Low</>
-                  ) : (
-                    <><ArrowDown className="h-6 w-6 inline mr-1" />Minimal</>
-                  )} ({Math.round(formData.priorityExec * 100)}%)
+                  {(() => {
+                    const PriorityIcon = getCentralizedPriorityIcon(formData.priorityExec);
+                    const priorityConfig = PRIORITY_OPTIONS.find(p => p.value !== 'all' && 
+                      formData.priorityExec >= p.threshold!.min && formData.priorityExec <= p.threshold!.max);
+                    return (
+                      <>
+                        {PriorityIcon && <PriorityIcon className="h-6 w-6 inline mr-1" />}
+                        {priorityConfig?.label || 'Minimal'} ({Math.round(formData.priorityExec * 100)}%)
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
               
@@ -748,7 +782,7 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                     formData.priorityIndiv >= 0.6 ? 'accent-orange-500' :
                     formData.priorityIndiv >= 0.4 ? 'accent-yellow-500' :
                     formData.priorityIndiv >= 0.2 ? 'accent-blue-500' :
-                    'accent-green-500'
+                    'accent-gray-500'
                   }`}
                 />
                 <div className={`text-sm text-center font-medium ${
@@ -756,19 +790,19 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                   formData.priorityIndiv >= 0.6 ? 'text-orange-500' :
                   formData.priorityIndiv >= 0.4 ? 'text-yellow-500' :
                   formData.priorityIndiv >= 0.2 ? 'text-blue-500' :
-                  'text-green-500'
+                  'text-gray-500'
                 }`}>
-                  {formData.priorityIndiv >= 0.8 ? (
-                    <><Flame className="h-6 w-6 inline mr-1" />Critical</>
-                  ) : formData.priorityIndiv >= 0.6 ? (
-                    <><Zap className="h-6 w-6 inline mr-1" />High</>
-                  ) : formData.priorityIndiv >= 0.4 ? (
-                    <><Triangle className="h-6 w-6 inline mr-1" />Moderate</>
-                  ) : formData.priorityIndiv >= 0.2 ? (
-                    <><Circle className="h-6 w-6 inline mr-1" />Low</>
-                  ) : (
-                    <><ArrowDown className="h-6 w-6 inline mr-1" />Minimal</>
-                  )} ({Math.round(formData.priorityIndiv * 100)}%)
+                  {(() => {
+                    const PriorityIcon = getCentralizedPriorityIcon(formData.priorityIndiv);
+                    const priorityConfig = PRIORITY_OPTIONS.find(p => p.value !== 'all' && 
+                      formData.priorityIndiv >= p.threshold!.min && formData.priorityIndiv <= p.threshold!.max);
+                    return (
+                      <>
+                        {PriorityIcon && <PriorityIcon className="h-6 w-6 inline mr-1" />}
+                        {priorityConfig?.label || 'Minimal'} ({Math.round(formData.priorityIndiv * 100)}%)
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
               
@@ -791,7 +825,7 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                     formData.priorityComm >= 0.6 ? 'accent-orange-500' :
                     formData.priorityComm >= 0.4 ? 'accent-yellow-500' :
                     formData.priorityComm >= 0.2 ? 'accent-blue-500' :
-                    'accent-green-500'
+                    'accent-gray-500'
                   }`}
                 />
                 <div className={`text-sm text-center font-medium ${
@@ -799,19 +833,19 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                   formData.priorityComm >= 0.6 ? 'text-orange-500' :
                   formData.priorityComm >= 0.4 ? 'text-yellow-500' :
                   formData.priorityComm >= 0.2 ? 'text-blue-500' :
-                  'text-green-500'
+                  'text-gray-500'
                 }`}>
-                  {formData.priorityComm >= 0.8 ? (
-                    <><Flame className="h-6 w-6 inline mr-1" />Critical</>
-                  ) : formData.priorityComm >= 0.6 ? (
-                    <><Zap className="h-6 w-6 inline mr-1" />High</>
-                  ) : formData.priorityComm >= 0.4 ? (
-                    <><Triangle className="h-6 w-6 inline mr-1" />Moderate</>
-                  ) : formData.priorityComm >= 0.2 ? (
-                    <><Circle className="h-6 w-6 inline mr-1" />Low</>
-                  ) : (
-                    <><ArrowDown className="h-6 w-6 inline mr-1" />Minimal</>
-                  )} ({Math.round(formData.priorityComm * 100)}%)
+                  {(() => {
+                    const PriorityIcon = getCentralizedPriorityIcon(formData.priorityComm);
+                    const priorityConfig = PRIORITY_OPTIONS.find(p => p.value !== 'all' && 
+                      formData.priorityComm >= p.threshold!.min && formData.priorityComm <= p.threshold!.max);
+                    return (
+                      <>
+                        {PriorityIcon && <PriorityIcon className="h-6 w-6 inline mr-1" />}
+                        {priorityConfig?.label || 'Minimal'} ({Math.round(formData.priorityComm * 100)}%)
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             </div>

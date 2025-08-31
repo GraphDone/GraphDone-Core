@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { ZoomIn, ZoomOut, RotateCcw, Layers, Trophy, Target, Sparkles, ListTodo, AlertTriangle, Lightbulb, Microscope } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
+import { Layers, Trophy, Target, Sparkles, ListTodo, AlertTriangle, Lightbulb, Microscope, WORK_ITEM_TYPES, getTypeConfig, WorkItemType } from '../constants/workItemConstants';
 import { RadarChart } from './RadarChart';
 import { useGraph } from '../contexts/GraphContext';
 import { useQuery, gql } from '@apollo/client';
@@ -48,23 +49,14 @@ export function NodeDistributionRadar({ className = '', showLegend = true }: Nod
       typeCounts[type] = (typeCounts[type] || 0) + 1;
     });
 
-    // Format label function
+    // Format label function using centralized config
     const formatLabel = (type: string) => {
-      switch(type) {
-        case 'EPIC': return 'Epic';
-        case 'MILESTONE': return 'Milestone';
-        case 'OUTCOME': return 'Outcome';
-        case 'FEATURE': return 'Feature';
-        case 'TASK': return 'Task';
-        case 'BUG': return 'Bug';
-        case 'IDEA': return 'Idea';
-        case 'RESEARCH': return 'Research';
-        default: return type.charAt(0) + type.slice(1).toLowerCase();
-      }
+      const config = getTypeConfig(type as WorkItemType);
+      return config.label;
     };
 
-    // Node type colors and order matching the pie chart exactly
-    const typeOrder = ['EPIC', 'MILESTONE', 'OUTCOME', 'FEATURE', 'TASK', 'BUG', 'IDEA', 'RESEARCH'];
+    // Node type colors and order using centralized constants
+    const typeOrder = Object.keys(WORK_ITEM_TYPES) as WorkItemType[];
     
     const nodeTypeData = typeOrder
       .filter(type => typeCounts[type] > 0)
@@ -121,7 +113,6 @@ export function NodeDistributionRadar({ className = '', showLegend = true }: Nod
       {/* Node Distribution */}
       <div className="bg-gray-800 border border-gray-600 rounded-lg p-6">
         <div className="mb-4">
-          <h3 className="text-lg font-semibold text-white mb-2">Node Distribution</h3>
         </div>
         <div className="relative">
           {/* Zoom Controls */}
