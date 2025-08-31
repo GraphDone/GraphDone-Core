@@ -14,7 +14,8 @@ import {
   Copy, 
   Zap, 
   Shield, 
-  Bookmark 
+  Bookmark,
+  Package
 } from 'lucide-react';
 
 // Icon mapping for relationship types
@@ -29,7 +30,8 @@ const iconMap = {
   'Copy': Copy,
   'Zap': Zap,
   'Shield': Shield,
-  'Bookmark': Bookmark
+  'Bookmark': Bookmark,
+  'Package': Package
 } as const;
 
 export function getRelationshipIcon(iconName: string, className: string = "h-4 w-4") {
@@ -132,6 +134,13 @@ export const RELATIONSHIP_TYPES = [
     description: 'Source node references target node',
     icon: 'Bookmark',
     color: 'text-slate-400'
+  },
+  {
+    type: 'CONTAINS',
+    label: 'Contains',
+    description: 'Source node contains target node',
+    icon: 'Package',
+    color: 'text-blue-400'
   }
 ];
 
@@ -176,6 +185,19 @@ export function getExistingRelationships(
 }
 
 /**
+ * Check if ANY relationship already exists between two nodes
+ */
+export function hasAnyRelationship(
+  sourceId: string,
+  targetId: string,
+  edges: Edge[],
+  workItems: WorkItem[]
+): boolean {
+  const existingRelationships = getExistingRelationships(sourceId, targetId, edges, workItems);
+  return existingRelationships.length > 0;
+}
+
+/**
  * Check if a specific relationship type already exists between two nodes
  */
 export function relationshipExists(
@@ -208,6 +230,21 @@ export function getNodesWithExistingRelationship(
 }
 
 /**
+ * Check if any of the selected nodes already have ANY relationship with source
+ * Used with one-relationship-at-a-time policy
+ */
+export function hasAnyRelationshipWithSelected(
+  sourceId: string,
+  selectedNodeIds: string[],
+  edges: Edge[],
+  workItems: WorkItem[]
+): boolean {
+  return selectedNodeIds.some(nodeId =>
+    hasAnyRelationship(sourceId, nodeId, edges, workItems)
+  );
+}
+
+/**
  * Check if any of the selected nodes already have the given relationship with source
  * Used to disable relationship type buttons and connect button
  */
@@ -237,4 +274,267 @@ export function filterValidSelectedNodes(
   return selectedNodeIds.filter(nodeId =>
     !relationshipExists(sourceId, nodeId, relationshipType, edges, workItems)
   );
+}
+
+/**
+ * Professional Duplicate Detection and Management System
+ */
+
+export interface DuplicateConnection {
+  id: string;
+  sourceId: string;
+  targetId: string;
+  relationshipType: string;
+  duplicateType: 'exact' | 'circular' | 'redundant';
+  conflictingWith: string[];
+  severity: 'low' | 'medium' | 'high';
+  recommendation: string;
+}
+
+/**
+ * Detect all duplicate connections in the graph
+ */
+export function detectDuplicateConnections(
+  edges: Edge[],
+  workItems: WorkItem[]
+): DuplicateConnection[] {
+  const duplicates: DuplicateConnection[] = [];
+
+  // Track all connections for analysis
+  const connectionMap = new Map<string, Array<{id: string, type: string, source: string, target: string}>>();
+
+  // Add Edge entity connections
+  edges.forEach(edge => {
+    const key = `${edge.source.id}-${edge.target.id}`;
+    const reverseKey = `${edge.target.id}-${edge.source.id}`;
+    
+    if (!connectionMap.has(key)) connectionMap.set(key, []);
+    if (!connectionMap.has(reverseKey)) connectionMap.set(reverseKey, []);
+    
+    connectionMap.get(key)!.push({
+      id: edge.id,
+      type: edge.type,
+      source: edge.source.id,
+      target: edge.target.id
+    });
+  });
+
+  // Add WorkItem dependency connections
+  workItems.forEach(workItem => {
+    workItem.dependencies?.forEach(dep => {
+      const key = `${workItem.id}-${dep.id}`;
+      if (!connectionMap.has(key)) connectionMap.set(key, []);
+      
+      connectionMap.get(key)!.push({
+        id: `workitem-${workItem.id}-${dep.id}`,
+        type: 'DEPENDS_ON',
+        source: workItem.id,
+        target: dep.id
+      });
+    });
+  });
+
+  // Analyze connections for duplicates
+  connectionMap.forEach((connections, key) => {
+    if (connections.length <= 1) return;
+
+    const [sourceId, targetId] = key.split('-');
+    const reverseKey = `${targetId}-${sourceId}`;
+    const reverseConnections = connectionMap.get(reverseKey) || [];
+
+    // Check for exact duplicates (same relationship type)
+    const typeGroups = new Map<string, Array<typeof connections[0]>>();
+    connections.forEach(conn => {
+      if (!typeGroups.has(conn.type)) typeGroups.set(conn.type, []);
+      typeGroups.get(conn.type)!.push(conn);
+    });
+
+    typeGroups.forEach((group, type) => {
+      if (group.length > 1) {
+        // Exact duplicate found
+        group.slice(1).forEach((duplicate, index) => {
+          duplicates.push({
+            id: duplicate.id,
+            sourceId,
+            targetId,
+            relationshipType: type,
+            duplicateType: 'exact',
+            conflictingWith: [group[0].id],
+            severity: 'high',
+            recommendation: `Remove duplicate ${type} relationship. Keep the original connection.`
+          });
+        });
+      }
+    });
+
+    // Check for circular relationships
+    reverseConnections.forEach(reverseConn => {
+      connections.forEach(conn => {
+        if (conn.type === reverseConn.type && isCircularRelationship(conn.type)) {
+          duplicates.push({
+            id: reverseConn.id,
+            sourceId: reverseConn.source,
+            targetId: reverseConn.target,
+            relationshipType: reverseConn.type,
+            duplicateType: 'circular',
+            conflictingWith: [conn.id],
+            severity: 'medium',
+            recommendation: `Circular ${reverseConn.type} relationship detected. Consider keeping only one direction.`
+          });
+        }
+      });
+    });
+
+    // Check for redundant relationships
+    connections.forEach(conn => {
+      const redundantTypes = getRedundantRelationshipTypes(conn.type);
+      connections.forEach(otherConn => {
+        if (conn.id !== otherConn.id && redundantTypes.includes(otherConn.type)) {
+          duplicates.push({
+            id: otherConn.id,
+            sourceId,
+            targetId,
+            relationshipType: otherConn.type,
+            duplicateType: 'redundant',
+            conflictingWith: [conn.id],
+            severity: 'low',
+            recommendation: `${otherConn.type} is redundant when ${conn.type} exists. Consider consolidating.`
+          });
+        }
+      });
+    });
+  });
+
+  return duplicates;
+}
+
+/**
+ * Check if a relationship type creates circular dependencies
+ */
+function isCircularRelationship(relationshipType: string): boolean {
+  const circularTypes = ['DEPENDS_ON', 'BLOCKS', 'FOLLOWS'];
+  return circularTypes.includes(relationshipType);
+}
+
+/**
+ * Get relationship types that are redundant with the given type
+ */
+function getRedundantRelationshipTypes(relationshipType: string): string[] {
+  const redundancyMap: Record<string, string[]> = {
+    'DEPENDS_ON': ['RELATES_TO'],
+    'BLOCKS': ['CONFLICTS_WITH'],
+    'ENABLES': ['RELATES_TO'],
+    'IS_PART_OF': ['RELATES_TO'],
+    'FOLLOWS': ['DEPENDS_ON'],
+    'VALIDATES': ['RELATES_TO']
+  };
+  
+  return redundancyMap[relationshipType] || [];
+}
+
+/**
+ * Get cleanup recommendations for duplicate connections
+ */
+export function getCleanupRecommendations(
+  duplicates: DuplicateConnection[]
+): Array<{
+  action: 'remove' | 'consolidate' | 'review';
+  priority: 'high' | 'medium' | 'low';
+  description: string;
+  affectedConnections: string[];
+}> {
+  const recommendations: Array<{
+    action: 'remove' | 'consolidate' | 'review';
+    priority: 'high' | 'medium' | 'low';
+    description: string;
+    affectedConnections: string[];
+  }> = [];
+
+  // Group duplicates by type
+  const exactDuplicates = duplicates.filter(d => d.duplicateType === 'exact');
+  const circularDuplicates = duplicates.filter(d => d.duplicateType === 'circular');
+  const redundantDuplicates = duplicates.filter(d => d.duplicateType === 'redundant');
+
+  // Exact duplicates - high priority removal
+  if (exactDuplicates.length > 0) {
+    recommendations.push({
+      action: 'remove',
+      priority: 'high',
+      description: `Remove ${exactDuplicates.length} exact duplicate connection${exactDuplicates.length > 1 ? 's' : ''}`,
+      affectedConnections: exactDuplicates.map(d => d.id)
+    });
+  }
+
+  // Circular relationships - medium priority review
+  if (circularDuplicates.length > 0) {
+    recommendations.push({
+      action: 'review',
+      priority: 'medium',
+      description: `Review ${circularDuplicates.length} circular relationship${circularDuplicates.length > 1 ? 's' : ''} - may cause dependency loops`,
+      affectedConnections: circularDuplicates.map(d => d.id)
+    });
+  }
+
+  // Redundant relationships - low priority consolidation
+  if (redundantDuplicates.length > 0) {
+    recommendations.push({
+      action: 'consolidate',
+      priority: 'low',
+      description: `Consider consolidating ${redundantDuplicates.length} redundant relationship${redundantDuplicates.length > 1 ? 's' : ''}`,
+      affectedConnections: redundantDuplicates.map(d => d.id)
+    });
+  }
+
+  return recommendations;
+}
+
+/**
+ * Validate a new connection before creation to prevent duplicates
+ */
+export function validateNewConnection(
+  sourceId: string,
+  targetId: string,
+  relationshipType: string,
+  edges: Edge[],
+  workItems: WorkItem[]
+): {
+  isValid: boolean;
+  reason?: string;
+  suggestion?: string;
+} {
+  // Check if ANY relationship already exists (one relationship at a time policy)
+  if (hasAnyRelationship(sourceId, targetId, edges, workItems)) {
+    const existingRelationships = getExistingRelationships(sourceId, targetId, edges, workItems);
+    return {
+      isValid: false,
+      reason: `A ${existingRelationships[0]} relationship already exists between these nodes`,
+      suggestion: 'Only one relationship is allowed per node pair. Remove the existing relationship first or choose different nodes.'
+    };
+  }
+
+  // Check for circular dependency
+  if (isCircularRelationship(relationshipType) && 
+      relationshipExists(targetId, sourceId, relationshipType, edges, workItems)) {
+    return {
+      isValid: false,
+      reason: `This would create a circular ${relationshipType} relationship`,
+      suggestion: 'Remove the existing reverse relationship first, or choose a different relationship type'
+    };
+  }
+
+  // Check for redundant relationship
+  const redundantTypes = getRedundantRelationshipTypes(relationshipType);
+  const existingRedundant = redundantTypes.find(type => 
+    relationshipExists(sourceId, targetId, type, edges, workItems)
+  );
+  
+  if (existingRedundant) {
+    return {
+      isValid: true, // Allow but warn
+      reason: `${relationshipType} may be redundant with existing ${existingRedundant} relationship`,
+      suggestion: `Consider whether both ${relationshipType} and ${existingRedundant} are necessary`
+    };
+  }
+
+  return { isValid: true };
 }

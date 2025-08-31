@@ -46,13 +46,13 @@ describe('Graph', () => {
       graph.addEdge({
         source: node1.id,
         target: node2.id,
-        type: EdgeType.DEPENDENCY,
+        type: EdgeType.DEPENDS_ON,
         weight: 1
       });
       graph.addEdge({
         source: node2.id,
         target: node3.id,
-        type: EdgeType.DEPENDENCY,
+        type: EdgeType.DEPENDS_ON,
         weight: 1
       });
 
@@ -126,7 +126,7 @@ describe('Graph', () => {
       const edge = graph.addEdge({
         source: node1.id,
         target: node2.id,
-        type: EdgeType.DEPENDENCY,
+        type: EdgeType.DEPENDS_ON,
         weight: 0.8
       });
 
@@ -141,7 +141,7 @@ describe('Graph', () => {
       graph.addEdge({
         source: node1.id,
         target: node2.id,
-        type: EdgeType.DEPENDENCY,
+        type: EdgeType.DEPENDS_ON,
         weight: 1
       });
 
@@ -156,7 +156,7 @@ describe('Graph', () => {
       const edge = graph.addEdge({
         source: node1.id,
         target: node2.id,
-        type: EdgeType.DEPENDENCY,
+        type: EdgeType.DEPENDS_ON,
         weight: 1
       });
 
@@ -177,7 +177,7 @@ describe('Graph', () => {
       graph.addEdge({
         source: node1.id,
         target: node2.id,
-        type: EdgeType.DEPENDENCY,
+        type: EdgeType.DEPENDS_ON,
         weight: 1
       });
       graph.addEdge({
@@ -202,13 +202,13 @@ describe('Graph', () => {
       graph.addEdge({
         source: node1.id,
         target: node2.id,
-        type: EdgeType.DEPENDENCY,
+        type: EdgeType.DEPENDS_ON,
         weight: 1
       });
       graph.addEdge({
         source: node1.id,
         target: node3.id,
-        type: EdgeType.DEPENDENCY,
+        type: EdgeType.DEPENDS_ON,
         weight: 1
       });
 
@@ -227,13 +227,13 @@ describe('Graph', () => {
       graph.addEdge({
         source: node2.id,
         target: node1.id,
-        type: EdgeType.DEPENDENCY,
+        type: EdgeType.DEPENDS_ON,
         weight: 1
       });
       graph.addEdge({
         source: node3.id,
         target: node1.id,
-        type: EdgeType.DEPENDENCY,
+        type: EdgeType.DEPENDS_ON,
         weight: 1
       });
 
@@ -253,19 +253,19 @@ describe('Graph', () => {
       graph.addEdge({
         source: node1.id,
         target: node2.id,
-        type: EdgeType.DEPENDENCY,
+        type: EdgeType.DEPENDS_ON,
         weight: 1
       });
       graph.addEdge({
         source: node2.id,
         target: node3.id,
-        type: EdgeType.DEPENDENCY,
+        type: EdgeType.DEPENDS_ON,
         weight: 1
       });
       graph.addEdge({
         source: node3.id,
         target: node4.id,
-        type: EdgeType.DEPENDENCY,
+        type: EdgeType.DEPENDS_ON,
         weight: 1
       });
 
@@ -293,19 +293,19 @@ describe('Graph', () => {
       graph.addEdge({
         source: node1.id,
         target: node2.id,
-        type: EdgeType.DEPENDENCY,
+        type: EdgeType.DEPENDS_ON,
         weight: 1
       });
       graph.addEdge({
         source: node2.id,
         target: node3.id,
-        type: EdgeType.DEPENDENCY,
+        type: EdgeType.DEPENDS_ON,
         weight: 1
       });
       graph.addEdge({
         source: node3.id,
         target: node1.id,
-        type: EdgeType.DEPENDENCY,
+        type: EdgeType.DEPENDS_ON,
         weight: 1
       });
 
@@ -323,13 +323,13 @@ describe('Graph', () => {
       graph.addEdge({
         source: node1.id,
         target: node2.id,
-        type: EdgeType.DEPENDENCY,
+        type: EdgeType.DEPENDS_ON,
         weight: 1
       });
       graph.addEdge({
         source: node2.id,
         target: node3.id,
-        type: EdgeType.DEPENDENCY,
+        type: EdgeType.DEPENDS_ON,
         weight: 1
       });
 
@@ -347,7 +347,7 @@ describe('Graph', () => {
       graph.addEdge({
         source: node1.id,
         target: node2.id,
-        type: EdgeType.DEPENDENCY,
+        type: EdgeType.DEPENDS_ON,
         weight: 1
       });
 
