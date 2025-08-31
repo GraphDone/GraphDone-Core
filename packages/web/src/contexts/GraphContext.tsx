@@ -144,8 +144,10 @@ export function GraphProvider({ children }: GraphProviderProps) {
     
     try {
       // Pass exactly what the UI sends - let GraphQL handle it
+      // Exclude templateId and copyFromGraphId as they're not supported by the current schema
+      const { templateId, copyFromGraphId, ...inputWithoutTemplate } = input;
       const graphInput = {
-        ...input,  // This includes: name, description, type, status, teamId, tags, defaultRole, isShared
+        ...inputWithoutTemplate,  // This includes: name, description, type, status, teamId, tags, defaultRole, isShared
         parentGraphId: input.parentGraphId || null,
         createdBy: input.createdBy || currentUser?.id || '',
         depth: input.parentGraphId ? getGraphDepth(input.parentGraphId) + 1 : 0,
