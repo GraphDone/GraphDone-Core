@@ -297,32 +297,13 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
       if (result.data?.createWorkItems?.workItems?.[0]) {
         const createdNode = result.data.createWorkItems.workItems[0];
         
-        // If parentNodeId exists, also create an Edge entity for the connection
+        // Connection is already created through the dependencies field in workItemInput
         if (parentNodeId) {
-          try {
-            await createEdge({
-              variables: {
-                input: [{
-                  type: selectedRelationType,
-                  weight: 0.8,
-                  source: { connect: { where: { node: { id: createdNode.id } } } },
-                  target: { connect: { where: { node: { id: parentNodeId } } } }
-                }]
-              }
-            });
-            
-            const relationshipLabel = getRelationshipConfig(selectedRelationType as RelationshipType).label;
-            showSuccess(
-              'Node Created and Connected Successfully!',
-              `"${createdNode.title}" has been created with a "${relationshipLabel}" relationship.`
-            );
-          } catch (edgeError) {
-            console.error('Failed to create edge:', edgeError);
-            showSuccess(
-              'Node Created Successfully!',
-              `"${createdNode.title}" has been created but the connection failed. You can connect it manually.`
-            );
-          }
+          const relationshipLabel = getRelationshipConfig(selectedRelationType as RelationshipType).label;
+          showSuccess(
+            'Node Created and Connected Successfully!',
+            `"${createdNode.title}" has been created with a "${relationshipLabel}" relationship.`
+          );
         } else {
           showSuccess(
             'Node Created Successfully!',
