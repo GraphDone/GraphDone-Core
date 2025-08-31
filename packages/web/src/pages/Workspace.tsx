@@ -60,7 +60,7 @@ export function Workspace() {
               {/* Graph Information */}
               <div className="flex-shrink-0">
                 <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-emerald-400 via-green-300 to-blue-400 bg-clip-text text-transparent">
-                  {currentGraph?.name || 'Select a Graph'}
+                  {currentGraph?.name || (availableGraphs.length > 0 ? 'Select a Graph' : 'Create a Graph')}
                 </h1>
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-gray-400 mt-1">
                   {currentTeam && (
@@ -100,7 +100,7 @@ export function Workspace() {
               
               {/* All Views Selector - Responsive */}
               <div className="flex items-center flex-1 ml-8">
-                <div className="flex bg-gray-700/50 backdrop-blur-sm rounded-lg p-2 gap-4 overflow-x-auto w-full justify-between">
+                <div className="flex bg-gray-700/50 backdrop-blur-sm rounded-lg p-2 gap-1 sm:gap-2 lg:gap-4 overflow-x-auto w-full min-w-0">
               <button
                 onClick={() => setViewMode('graph')}
                 className={`px-3 py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center space-y-2 ${
@@ -110,9 +110,9 @@ export function Workspace() {
                 }`}
                 title="Graph View"
               >
-                <Network className="h-5 w-5" />
+                <Network className="h-6 w-6 sm:h-8 sm:w-8 lg:h-10 lg:w-10" strokeWidth={1.5} />
                 <div className="text-xs text-center font-medium">
-                  <div>Graph</div>
+                  Graph
                 </div>
               </button>
               <button
@@ -124,9 +124,9 @@ export function Workspace() {
                 }`}
                 title="Dashboard View"
               >
-                <LayoutDashboard className="h-5 w-5" />
+                <LayoutDashboard className="h-6 w-6 sm:h-8 sm:w-8 lg:h-10 lg:w-10" strokeWidth={1.5} />
                 <div className="text-xs text-center font-medium">
-                  <div>Dashboard</div>
+                  Dashboard
                 </div>
               </button>
               <button
@@ -138,10 +138,9 @@ export function Workspace() {
                 }`}
                 title="Table View"
               >
-                <Table className="h-5 w-5" />
+                <Table className="h-6 w-6 sm:h-8 sm:w-8 lg:h-10 lg:w-10" strokeWidth={1.5} />
                 <div className="text-xs text-center font-medium">
-                  <div>Table</div>
-                  <div>View</div>
+                  Table
                 </div>
               </button>
               <button
@@ -153,10 +152,9 @@ export function Workspace() {
                 }`}
                 title="Card View"
               >
-                <CreditCard className="h-5 w-5" />
+                <CreditCard className="h-6 w-6 sm:h-8 sm:w-8 lg:h-10 lg:w-10" strokeWidth={1.5} />
                 <div className="text-xs text-center font-medium">
-                  <div>Card</div>
-                  <div>View</div>
+                  Card
                 </div>
               </button>
               <button
@@ -168,10 +166,9 @@ export function Workspace() {
                 }`}
                 title="Kanban View"
               >
-                <Columns className="h-5 w-5" />
+                <Columns className="h-6 w-6 sm:h-8 sm:w-8 lg:h-10 lg:w-10" strokeWidth={1.5} />
                 <div className="text-xs text-center font-medium">
-                  <div>Kanban</div>
-                  <div>View</div>
+                  Kanban
                 </div>
               </button>
               <button
@@ -183,10 +180,9 @@ export function Workspace() {
                 }`}
                 title="Gantt Chart"
               >
-                <GanttChartSquare className="h-5 w-5" />
+                <GanttChartSquare className="h-6 w-6 sm:h-8 sm:w-8 lg:h-10 lg:w-10" strokeWidth={1.5} />
                 <div className="text-xs text-center font-medium">
-                  <div>Gantt</div>
-                  <div>Chart</div>
+                  Gantt
                 </div>
               </button>
               <button
@@ -198,10 +194,9 @@ export function Workspace() {
                 }`}
                 title="Calendar View"
               >
-                <CalendarDays className="h-5 w-5" />
+                <CalendarDays className="h-6 w-6 sm:h-8 sm:w-8 lg:h-10 lg:w-10" strokeWidth={1.5} />
                 <div className="text-xs text-center font-medium">
-                  <div>Calendar</div>
-                  <div>View</div>
+                  Calendar
                 </div>
               </button>
               <button
@@ -213,10 +208,9 @@ export function Workspace() {
                 }`}
                 title="Activity Feed"
               >
-                <Activity className="h-5 w-5" />
+                <Activity className="h-6 w-6 sm:h-8 sm:w-8 lg:h-10 lg:w-10" strokeWidth={1.5} />
                 <div className="text-xs text-center font-medium">
-                  <div>Activity</div>
-                  <div>Feed</div>
+                  Activity
                 </div>
               </button>
                 </div>
