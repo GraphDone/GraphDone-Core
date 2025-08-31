@@ -280,14 +280,7 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
           }
         },
         
-        // If parentNodeId is provided, create a dependency relationship
-        ...(parentNodeId && {
-          dependencies: {
-            connect: {
-              where: { node: { id: parentNodeId } }
-            }
-          }
-        })
+        // Don't create automatic dependency - we'll create the proper edge type after
       };
 
       const result = await createWorkItem({
@@ -297,8 +290,16 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
       if (result.data?.createWorkItems?.workItems?.[0]) {
         const createdNode = result.data.createWorkItems.workItems[0];
         
-        // Connection is already created through the dependencies field in workItemInput
+        // If parentNodeId is provided, create the edge with the correct relationship type
         if (parentNodeId) {
+          const edgeInput = {
+            type: selectedRelationType,
+            source: { connect: { where: { node: { id: parentNodeId } } } },
+            target: { connect: { where: { node: { id: createdNode.id } } } }
+          };
+          
+          await createEdge({ variables: { input: [edgeInput] } });
+          
           const relationshipLabel = getRelationshipConfig(selectedRelationType as RelationshipType).label;
           showSuccess(
             'Node Created and Connected Successfully!',
