@@ -4,6 +4,7 @@ import { X, Trash2, AlertTriangle, Shield, CheckCircle, GitBranch } from 'lucide
 import { DELETE_WORK_ITEM, GET_WORK_ITEMS, GET_EDGES } from '../lib/queries';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
+import { getRelationshipConfig, type RelationshipType } from '../constants/workItemConstants';
 
 // Custom styles for enhanced UI
 const customStyles = `
@@ -264,7 +265,7 @@ export function DeleteNodeModal({ isOpen, onClose, nodeId, nodeTitle, nodeType, 
                         </div>
                         <div className="text-right">
                           <span className="inline-flex items-center px-3 py-1 bg-gradient-to-r from-orange-500/20 to-amber-500/20 border border-orange-400/30 rounded-full text-xs font-semibold text-orange-200 backdrop-blur-sm">
-                            {edge.type.replace('_', ' ')}
+                            {getRelationshipConfig(edge.type as RelationshipType).label}
                           </span>
                         </div>
                       </div>

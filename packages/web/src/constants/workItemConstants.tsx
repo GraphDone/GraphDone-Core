@@ -647,6 +647,32 @@ export const getRelationshipIconElement = (type: RelationshipType, className: st
   return IconComponent ? <IconComponent className={fullClassName} /> : null;
 };
 
+// Get appropriate arrow for relationship type
+export const getRelationshipArrow = (type: RelationshipType): '→' | '↔' | '—' => {
+  const bidirectionalTypes: RelationshipType[] = ['RELATES_TO', 'PARALLEL_WITH', 'CONFLICTS_WITH'];
+  const undirectedTypes: RelationshipType[] = ['DUPLICATES'];
+  
+  if (bidirectionalTypes.includes(type)) return '↔';
+  if (undirectedTypes.includes(type)) return '—';
+  return '→';
+};
+
+// Get full descriptive text for tooltip
+export const getRelationshipDescription = (
+  sourceTitle: string, 
+  targetTitle: string, 
+  type: RelationshipType, 
+  isIncoming: boolean = false
+): string => {
+  const config = getRelationshipConfig(type);
+  const arrow = getRelationshipArrow(type);
+  
+  if (isIncoming && arrow === '→') {
+    return `${targetTitle} ${config.label.toLowerCase()} ${sourceTitle}`;
+  }
+  return `${sourceTitle} ${config.label.toLowerCase()} ${targetTitle}`;
+};
+
 // Get relationship color scheme
 export const getRelationshipColorScheme = (type: RelationshipType) => {
   const config = getRelationshipConfig(type);
