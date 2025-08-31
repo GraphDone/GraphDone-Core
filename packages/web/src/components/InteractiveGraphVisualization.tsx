@@ -39,7 +39,26 @@ import { ConnectNodeModal } from './ConnectNodeModal';
 import { NodeDetailsModal } from './NodeDetailsModal';
 
 import { WorkItem, WorkItemEdge } from '../types/graph';
-import { RelationshipType, RELATIONSHIP_OPTIONS, getRelationshipConfig } from '../constants/workItemConstants';
+import { RelationshipType, RELATIONSHIP_OPTIONS, getRelationshipConfig, getRelationshipArrow } from '../constants/workItemConstants';
+
+// Helper function to get SVG path data for Lucide icons
+const getIconSVGData = (type: RelationshipType): string => {
+  const iconPaths: Record<RelationshipType, string> = {
+    'DEPENDS_ON': '<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>',  // ArrowLeft
+    'BLOCKS': '<circle cx="12" cy="12" r="10"/><path d="M6 6l12 12"/>',  // Ban
+    'ENABLES': '<path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/>',  // CheckCircle
+    'RELATES_TO': '<path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="m15 7 5 5-5 5"/><path d="m11 7 5 5-5 5"/>',  // Link2
+    'IS_PART_OF': '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',  // Folder
+    'FOLLOWS': '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',  // ArrowRight
+    'PARALLEL_WITH': '<path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3"/>',  // Split
+    'DUPLICATES': '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',  // Copy
+    'CONFLICTS_WITH': '<path d="m13 2-3 3.5a2 2 0 0 0 0 3l3 3.5a2 2 0 0 1 0 3L10 18"/><path d="M9 18h3a2 2 0 0 0 2-2v-1a2 2 0 0 1 2-2 2 2 0 0 1 2 2v1a2 2 0 0 0 2 2h3"/>',  // Zap
+    'VALIDATES': '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/>',  // Shield
+    'REFERENCES': '<path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/>',  // Bookmark
+    'CONTAINS': '<path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>'  // Package
+  };
+  return iconPaths[type] || iconPaths['RELATES_TO'];
+};
 
 interface NodeMenuState {
   node: WorkItem | null;
@@ -319,7 +338,7 @@ export function InteractiveGraphVisualization() {
         target: edge.target.id,
         type: edge.type,
         strength: edge.weight || 0.8,
-        description: `${edge.type.toLowerCase().replace('_', ' ')} relationship`
+        description: getRelationshipConfig(edge.type as RelationshipType).label
       });
     });
   }
@@ -1159,6 +1178,100 @@ export function InteractiveGraphVisualization() {
       .attr('stroke-width', 1)
       .attr('opacity', 1);
 
+    // Create edge label groups with rounded rectangles and text
+    const edgeLabelGroups = g.append('g')
+      .attr('class', 'edge-labels-group')
+      .selectAll('.edge-label-group')
+      .data(validatedEdges)
+      .enter()
+      .append('g')
+      .attr('class', 'edge-label-group')
+      .style('pointer-events', 'none');
+
+    // Add text labels first to measure their size
+    const edgeLabelElements = edgeLabelGroups
+      .append('text')
+      .attr('class', 'edge-label')
+      .attr('x', 0)
+      .attr('text-anchor', 'middle')
+      .attr('dominant-baseline', 'middle')
+      .style('font-size', '10px')
+      .style('font-weight', '600')
+      .style('fill', '#ffffff')
+      .style('pointer-events', 'none')
+      .text((d: WorkItemEdge) => {
+        const config = getRelationshipConfig(d.type as RelationshipType);
+        return config.label;
+      });
+
+    // Add icons positioned to the left of text
+    edgeLabelGroups
+      .append('foreignObject')
+      .attr('class', 'edge-label-icon')
+      .attr('width', 14)
+      .attr('height', 14)
+      .attr('x', -7) // Will be adjusted after measuring text
+      .attr('y', -7)
+      .style('pointer-events', 'none')
+      .each(function(d: WorkItemEdge) {
+        const iconData = getIconSVGData(d.type as RelationshipType);
+        d3.select(this).html(`
+          <div style="width: 14px; height: 14px; display: flex; align-items: center; justify-content: center;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              ${iconData}
+            </svg>
+          </div>
+        `);
+      });
+
+    // Add rounded rectangle backgrounds after measuring content
+    const backgroundRects = edgeLabelGroups
+      .insert('rect', ':first-child') // Insert before other elements
+      .attr('class', 'edge-label-bg')
+      .attr('rx', 8)
+      .attr('ry', 8)
+      .style('fill', (d: WorkItemEdge) => {
+        const config = getRelationshipConfig(d.type as RelationshipType);
+        return config.hexColor;
+      })
+      .style('opacity', 0.9)
+      .style('stroke', '#1f2937')
+      .style('stroke-width', 1);
+
+    // Size and position elements after text is rendered
+    setTimeout(() => {
+      edgeLabelGroups.each(function(d: WorkItemEdge) {
+        const group = d3.select(this);
+        const textElement = group.select('.edge-label').node() as SVGTextElement;
+        
+        if (textElement) {
+          const bbox = textElement.getBBox();
+          const iconWidth = 14;
+          const spacing = 6;
+          const padding = 8;
+          const totalWidth = iconWidth + spacing + bbox.width + padding;
+          const totalHeight = 20;
+          
+          // Update rectangle size and center it
+          group.select('.edge-label-bg')
+            .attr('width', totalWidth)
+            .attr('height', totalHeight)
+            .attr('x', -totalWidth / 2)
+            .attr('y', -totalHeight / 2);
+          
+          // Position icon on the left side
+          group.select('.edge-label-icon')
+            .attr('x', -totalWidth / 2 + 4)
+            .attr('y', -7);
+          
+          // Position text next to icon
+          group.select('.edge-label')
+            .attr('x', -totalWidth / 2 + iconWidth + spacing + bbox.width / 2)
+            .attr('text-anchor', 'middle');
+        }
+      });
+    }, 150);
+
     // Add click handlers to nodes
     nodeElements.on('click', (event: MouseEvent, d: WorkItem) => {
       handleNodeClick(event, d);
@@ -1179,6 +1292,28 @@ export function InteractiveGraphVisualization() {
           const midY = (d.source.y + d.target.y) / 2;
           const angle = Math.atan2(d.target.y - d.source.y, d.target.x - d.source.x) * 180 / Math.PI;
           return `translate(${midX},${midY}) rotate(${angle})`;
+        });
+
+      // Update edge label group positions to follow edge angles
+      edgeLabelGroups
+        .attr('transform', (d: any) => {
+          const midX = (d.source.x + d.target.x) / 2;
+          const midY = (d.source.y + d.target.y) / 2;
+          const angle = Math.atan2(d.target.y - d.source.y, d.target.x - d.source.x) * 180 / Math.PI;
+          
+          // Offset perpendicular to the edge
+          const offsetDistance = 25;
+          const perpAngle = (angle + 90) * Math.PI / 180;
+          const offsetX = Math.cos(perpAngle) * offsetDistance;
+          const offsetY = Math.sin(perpAngle) * offsetDistance;
+          
+          // Keep text readable by limiting rotation
+          let textRotation = angle;
+          if (angle > 90 || angle < -90) {
+            textRotation = angle + 180; // Flip text to keep it readable
+          }
+          
+          return `translate(${midX + offsetX},${midY + offsetY}) rotate(${textRotation})`;
         });
     };
 
