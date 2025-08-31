@@ -96,7 +96,7 @@ export function GraphSelector() {
     }
   };
 
-  if (!currentGraph) {
+  if (!currentGraph || graphHierarchy.length === 0) {
     return (
       <div className="p-3">
         <div className="text-center text-gray-400">
