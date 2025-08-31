@@ -89,7 +89,7 @@ export function GraphVisualization() {
   const dependencyEdges: Edge[] = workItems.flatMap(item => 
     (item.dependencies || []).map((dep: any) => ({
       id: `dep-${item.id}-${dep.id}`,
-      type: 'DEPENDENCY',
+      type: 'DEPENDS_ON',
       weight: 1.0,
       source: dep,
       target: item
@@ -445,6 +445,18 @@ export function GraphVisualization() {
           >
             <Plus className="h-4 w-4 mr-2" />
             Add Connected Item
+          </button>
+          <button
+            onClick={() => {
+              setSelectedNodeId(undefined);
+              setClickPosition(undefined);
+              setShowCreateModal(true);
+              setNodeMenu(prev => ({ ...prev, visible: false }));
+            }}
+            className="w-full flex items-center px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Node
           </button>
           <button
             onClick={() => {

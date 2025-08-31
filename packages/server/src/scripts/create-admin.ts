@@ -41,7 +41,7 @@ async function createAdmin() {
 
     // Create admin user
     const adminId = uuidv4();
-    const passwordHash = await bcrypt.hash('admin123', 10);
+    const passwordHash = await bcrypt.hash('graphdone', 10);
     
     await session.run(
       `MATCH (t:Team {id: $teamId})
@@ -65,7 +65,7 @@ async function createAdmin() {
     console.log('✅ Admin user and team created successfully!');
     console.log('👥 Team: GraphDone Team (team-1)');
     console.log('📧 Email: admin@graphdone.local');
-    console.log('🔑 Password: admin123');
+    console.log('🔑 Password: graphdone');
     console.log('👑 Role: ADMIN');
     console.log('\nYou can now login and access the Admin panel!');
 

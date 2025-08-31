@@ -1,12 +1,17 @@
 import React from 'react';
 import { useMutation } from '@apollo/client';
-import { X, Edit, Save, Calendar, Clock, CheckCircle, AlertCircle, ChevronDown, Flame, Zap, Triangle, Circle, ArrowDown, ClipboardList } from 'lucide-react';
+import { X, Edit, Save, ChevronDown } from 'lucide-react';
 import { UPDATE_WORK_ITEM, GET_WORK_ITEMS } from '../lib/queries';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { NodeTypeSelector } from './NodeCategorySelector';
 import { TagInput } from './TagInput';
 import { WorkItem } from '../types/graph';
+import {
+  STATUS_OPTIONS,
+  PRIORITY_OPTIONS,
+  getPriorityIcon as getCentralizedPriorityIcon
+} from '../constants/workItemConstants';
 
 interface EditNodeModalProps {
   isOpen: boolean;
@@ -61,14 +66,11 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
   const [isStatusOpen, setIsStatusOpen] = React.useState(false);
   const statusDropdownRef = React.useRef<HTMLDivElement>(null);
 
-  // Status options with icons
-  const statusOptions = [
-    { value: 'PROPOSED', label: 'Proposed', icon: <ClipboardList className="h-6 w-6" />, color: 'text-cyan-400' },
-    { value: 'PLANNED', label: 'Planned', icon: <Calendar className="h-6 w-6" />, color: 'text-purple-400' },
-    { value: 'IN_PROGRESS', label: 'In Progress', icon: <Clock className="h-6 w-6" />, color: 'text-yellow-400' },
-    { value: 'COMPLETED', label: 'Completed', icon: <CheckCircle className="h-6 w-6" />, color: 'text-green-400' },
-    { value: 'BLOCKED', label: 'Blocked', icon: <AlertCircle className="h-6 w-6" />, color: 'text-red-500' }
-  ];
+  // Status options from centralized constants (excluding 'all' option)
+  const statusOptions = STATUS_OPTIONS.filter(option => option.value !== 'all').map(option => ({
+    ...option,
+    icon: option.icon ? <option.icon className="h-6 w-6" /> : null
+  }));
 
   // Close status dropdown when clicking outside
   React.useEffect(() => {
@@ -194,7 +196,10 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
       <div className="flex items-center justify-center min-h-screen px-4">
         <div className="fixed inset-0 bg-black bg-opacity-75 dark:bg-black dark:bg-opacity-80" onClick={onClose} />
         
-        <div className="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full">
+        <div 
+          className="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full"
+          onClick={(e) => e.stopPropagation()}
+        >
           <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center space-x-2">
               <Edit className="h-5 w-5 text-blue-500" />
@@ -392,7 +397,10 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                       className="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 border border-red-500/30 text-center hover:shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600 transition-all cursor-pointer"
                     >
                       <div className="flex items-center justify-center space-x-1 mb-1">
-                        <Flame className="w-6 h-6 text-red-500" />
+                        {(() => {
+                          const CriticalIcon = getCentralizedPriorityIcon(0.9);
+                          return CriticalIcon ? <CriticalIcon className="w-6 h-6 text-red-500" /> : null;
+                        })()}
                         <div className="text-red-500 font-bold text-sm">Critical</div>
                       </div>
                       <div className="text-xs font-mono text-gray-400">80% - 100%</div>
@@ -411,7 +419,10 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                       className="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 border border-orange-500/30 text-center hover:shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600 transition-all cursor-pointer"
                     >
                       <div className="flex items-center justify-center space-x-1 mb-1">
-                        <Zap className="w-6 h-6 text-orange-500" />
+                        {(() => {
+                          const HighIcon = getCentralizedPriorityIcon(0.7);
+                          return HighIcon ? <HighIcon className="w-6 h-6 text-orange-500" /> : null;
+                        })()}
                         <div className="text-orange-400 font-bold text-sm">High</div>
                       </div>
                       <div className="text-xs font-mono text-gray-400">60% - 79%</div>
@@ -430,7 +441,10 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                       className="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 border border-yellow-500/30 text-center hover:shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600 transition-all cursor-pointer"
                     >
                       <div className="flex items-center justify-center space-x-1 mb-1">
-                        <Triangle className="w-6 h-6 text-yellow-500" />
+                        {(() => {
+                          const ModerateIcon = getCentralizedPriorityIcon(0.5);
+                          return ModerateIcon ? <ModerateIcon className="w-6 h-6 text-yellow-500" /> : null;
+                        })()}
                         <div className="text-yellow-400 font-bold text-sm">Moderate</div>
                       </div>
                       <div className="text-xs font-mono text-gray-400">40% - 59%</div>
@@ -451,7 +465,10 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                       className="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 border border-blue-500/30 text-center hover:shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600 transition-all cursor-pointer"
                     >
                       <div className="flex items-center justify-center space-x-1 mb-1">
-                        <Circle className="w-6 h-6 text-blue-500" />
+                        {(() => {
+                          const LowIcon = getCentralizedPriorityIcon(0.3);
+                          return LowIcon ? <LowIcon className="w-6 h-6 text-blue-500" /> : null;
+                        })()}
                         <div className="text-blue-400 font-bold text-sm">Low</div>
                       </div>
                       <div className="text-xs font-mono text-gray-400">20% - 39%</div>
@@ -467,11 +484,14 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                           priorityComm: 0.1
                         }));
                       }}
-                      className="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 border border-green-500/30 text-center hover:shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600 transition-all cursor-pointer"
+                      className="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 border border-gray-500/30 text-center hover:shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600 transition-all cursor-pointer"
                     >
                       <div className="flex items-center justify-center space-x-1 mb-1">
-                        <ArrowDown className="w-6 h-6 text-green-500" />
-                        <div className="text-green-400 font-bold text-sm">Minimal</div>
+                        {(() => {
+                          const MinimalIcon = getCentralizedPriorityIcon(0.1);
+                          return MinimalIcon ? <MinimalIcon className="w-6 h-6 text-gray-500" /> : null;
+                        })()}
+                        <div className="text-gray-400 font-bold text-sm">Minimal</div>
                       </div>
                       <div className="text-xs font-mono text-gray-400">0% - 19%</div>
                     </button>
@@ -498,7 +518,7 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                     formData.priorityExec >= 0.6 ? 'accent-orange-500' :
                     formData.priorityExec >= 0.4 ? 'accent-yellow-500' :
                     formData.priorityExec >= 0.2 ? 'accent-blue-500' :
-                    'accent-green-500'
+                    'accent-gray-500'
                   }`}
                 />
                 <div className={`text-sm text-center font-medium ${
@@ -506,19 +526,19 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                   formData.priorityExec >= 0.6 ? 'text-orange-500' :
                   formData.priorityExec >= 0.4 ? 'text-yellow-500' :
                   formData.priorityExec >= 0.2 ? 'text-blue-500' :
-                  'text-green-500'
+                  'text-gray-500'
                 }`}>
-                  {formData.priorityExec >= 0.8 ? (
-                    <><Flame className="h-6 w-6 inline mr-1" />Critical</>
-                  ) : formData.priorityExec >= 0.6 ? (
-                    <><Zap className="h-6 w-6 inline mr-1" />High</>
-                  ) : formData.priorityExec >= 0.4 ? (
-                    <><Triangle className="h-6 w-6 inline mr-1" />Moderate</>
-                  ) : formData.priorityExec >= 0.2 ? (
-                    <><Circle className="h-6 w-6 inline mr-1" />Low</>
-                  ) : (
-                    <><ArrowDown className="h-6 w-6 inline mr-1" />Minimal</>
-                  )} ({Math.round(formData.priorityExec * 100)}%)
+                  {(() => {
+                    const PriorityIcon = getCentralizedPriorityIcon(formData.priorityExec);
+                    const priorityConfig = PRIORITY_OPTIONS.find(p => p.value !== 'all' && 
+                      formData.priorityExec >= p.threshold!.min && formData.priorityExec <= p.threshold!.max);
+                    return (
+                      <>
+                        {PriorityIcon && <PriorityIcon className="h-6 w-6 inline mr-1" />}
+                        {priorityConfig?.label || 'Minimal'} ({Math.round(formData.priorityExec * 100)}%)
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
               
@@ -541,7 +561,7 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                     formData.priorityIndiv >= 0.6 ? 'accent-orange-500' :
                     formData.priorityIndiv >= 0.4 ? 'accent-yellow-500' :
                     formData.priorityIndiv >= 0.2 ? 'accent-blue-500' :
-                    'accent-green-500'
+                    'accent-gray-500'
                   }`}
                 />
                 <div className={`text-sm text-center font-medium ${
@@ -549,19 +569,19 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                   formData.priorityIndiv >= 0.6 ? 'text-orange-500' :
                   formData.priorityIndiv >= 0.4 ? 'text-yellow-500' :
                   formData.priorityIndiv >= 0.2 ? 'text-blue-500' :
-                  'text-green-500'
+                  'text-gray-500'
                 }`}>
-                  {formData.priorityIndiv >= 0.8 ? (
-                    <><Flame className="h-6 w-6 inline mr-1" />Critical</>
-                  ) : formData.priorityIndiv >= 0.6 ? (
-                    <><Zap className="h-6 w-6 inline mr-1" />High</>
-                  ) : formData.priorityIndiv >= 0.4 ? (
-                    <><Triangle className="h-6 w-6 inline mr-1" />Moderate</>
-                  ) : formData.priorityIndiv >= 0.2 ? (
-                    <><Circle className="h-6 w-6 inline mr-1" />Low</>
-                  ) : (
-                    <><ArrowDown className="h-6 w-6 inline mr-1" />Minimal</>
-                  )} ({Math.round(formData.priorityIndiv * 100)}%)
+                  {(() => {
+                    const PriorityIcon = getCentralizedPriorityIcon(formData.priorityIndiv);
+                    const priorityConfig = PRIORITY_OPTIONS.find(p => p.value !== 'all' && 
+                      formData.priorityIndiv >= p.threshold!.min && formData.priorityIndiv <= p.threshold!.max);
+                    return (
+                      <>
+                        {PriorityIcon && <PriorityIcon className="h-6 w-6 inline mr-1" />}
+                        {priorityConfig?.label || 'Minimal'} ({Math.round(formData.priorityIndiv * 100)}%)
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
               
@@ -584,7 +604,7 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                     formData.priorityComm >= 0.6 ? 'accent-orange-500' :
                     formData.priorityComm >= 0.4 ? 'accent-yellow-500' :
                     formData.priorityComm >= 0.2 ? 'accent-blue-500' :
-                    'accent-green-500'
+                    'accent-gray-500'
                   }`}
                 />
                 <div className={`text-sm text-center font-medium ${
@@ -592,19 +612,19 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                   formData.priorityComm >= 0.6 ? 'text-orange-500' :
                   formData.priorityComm >= 0.4 ? 'text-yellow-500' :
                   formData.priorityComm >= 0.2 ? 'text-blue-500' :
-                  'text-green-500'
+                  'text-gray-500'
                 }`}>
-                  {formData.priorityComm >= 0.8 ? (
-                    <><Flame className="h-6 w-6 inline mr-1" />Critical</>
-                  ) : formData.priorityComm >= 0.6 ? (
-                    <><Zap className="h-6 w-6 inline mr-1" />High</>
-                  ) : formData.priorityComm >= 0.4 ? (
-                    <><Triangle className="h-6 w-6 inline mr-1" />Moderate</>
-                  ) : formData.priorityComm >= 0.2 ? (
-                    <><Circle className="h-6 w-6 inline mr-1" />Low</>
-                  ) : (
-                    <><ArrowDown className="h-6 w-6 inline mr-1" />Minimal</>
-                  )} ({Math.round(formData.priorityComm * 100)}%)
+                  {(() => {
+                    const PriorityIcon = getCentralizedPriorityIcon(formData.priorityComm);
+                    const priorityConfig = PRIORITY_OPTIONS.find(p => p.value !== 'all' && 
+                      formData.priorityComm >= p.threshold!.min && formData.priorityComm <= p.threshold!.max);
+                    return (
+                      <>
+                        {PriorityIcon && <PriorityIcon className="h-6 w-6 inline mr-1" />}
+                        {priorityConfig?.label || 'Minimal'} ({Math.round(formData.priorityComm * 100)}%)
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             </div>

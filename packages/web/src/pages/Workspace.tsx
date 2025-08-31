@@ -1,12 +1,11 @@
 import { useState } from 'react';
-import { Plus, Zap, RotateCcw, Share2, Users, Filter } from 'lucide-react';
+import { Plus, Share2, Users, Table, Activity, Network, CreditCard, Columns, CalendarDays, GanttChartSquare, LayoutDashboard } from 'lucide-react';
 import { useQuery } from '@apollo/client';
 import { SafeGraphVisualization } from '../components/SafeGraphVisualization';
 import { CreateNodeModal } from '../components/CreateNodeModal';
 import { CreateGraphModal } from '../components/CreateGraphModal';
 import { GraphSelectionModal } from '../components/GraphSelectionModal';
-import { ListView } from '../components/ListView';
-import { TimelineView } from '../components/TimelineView';
+import ViewManager from '../components/ViewManager';
 import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
 import { GET_WORK_ITEMS, GET_EDGES } from '../lib/queries';
@@ -15,8 +14,8 @@ export function Workspace() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showCreateGraphModal, setShowCreateGraphModal] = useState(false);
   const [showGraphSelectionModal, setShowGraphSelectionModal] = useState(false);
-  const [viewMode, setViewMode] = useState<'graph' | 'list' | 'timeline'>('graph');
-  const { currentGraph } = useGraph();
+  const [viewMode, setViewMode] = useState<'graph' | 'dashboard' | 'table' | 'cards' | 'kanban' | 'gantt' | 'calendar' | 'activity'>('graph');
+  const { currentGraph, availableGraphs } = useGraph();
   const { currentTeam, currentUser } = useAuth();
 
   // Get real-time counts for header display
@@ -27,10 +26,9 @@ export function Workspace() {
           id: currentGraph.id
         }
       }
-    } : {},
-    skip: !currentGraph,
-    pollInterval: 5000,
-    fetchPolicy: 'cache-and-network'
+    } : { where: {} },
+    pollInterval: currentGraph ? 5000 : 0,
+    fetchPolicy: currentGraph ? 'cache-and-network' : 'cache-only'
   });
 
   const { data: edgesData } = useQuery(GET_EDGES, {
@@ -42,127 +40,185 @@ export function Workspace() {
           }
         }
       }
-    } : {},
-    skip: !currentGraph,
-    pollInterval: 5000,
-    fetchPolicy: 'cache-and-network'
+    } : { where: {} },
+    pollInterval: currentGraph ? 5000 : 0,
+    fetchPolicy: currentGraph ? 'cache-and-network' : 'cache-only'
   });
 
   const actualNodeCount = workItemsData?.workItems?.length || 0;
   const actualEdgeCount = edgesData?.edges?.length || 0;
 
-  const canEdit = currentGraph && currentUser; // Simplified for demo
 
   return (
     <div className="h-screen flex flex-col">
       {/* Header with Graph Context */}
-      <div className="bg-gray-800 border-b border-gray-700 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-emerald-400 via-green-300 to-blue-400 bg-clip-text text-transparent">
-                {currentGraph?.name || 'Select a Graph'}
-              </h1>
-              <div className="flex items-center space-x-2 text-sm text-gray-400 mt-1">
-                {currentTeam && (
-                  <>
-                    <span>{currentTeam.name}</span>
-                    <span>•</span>
-                  </>
-                )}
-                {currentGraph && (
-                  <>
-                    <span>{actualNodeCount} node{actualNodeCount !== 1 ? 's' : ''}</span>
-                    <span>•</span>
-                    <span>{actualEdgeCount} connection{actualEdgeCount !== 1 ? 's' : ''}</span>
-                    <span>•</span>
-                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border shadow-sm ${
-                      currentGraph.type === 'PROJECT' ? 'bg-blue-500/20 text-blue-300 border-blue-400/30' :
-                      currentGraph.type === 'WORKSPACE' ? 'bg-purple-500/20 text-purple-300 border-purple-400/30' :
-                      currentGraph.type === 'SUBGRAPH' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400/30' :
-                      currentGraph.type === 'TEMPLATE' ? 'bg-amber-500/20 text-amber-300 border-amber-400/30' :
-                      'bg-slate-500/20 text-slate-300 border-slate-400/30'
-                    }`}>
-                      {currentGraph.type}
-                    </span>
-                    {currentGraph.isShared && (
-                      <>
-                        <span>•</span>
-                        <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30 shadow-sm">
-                          <Share2 className="h-3 w-3" />
-                          <span className="text-xs font-medium">Shared</span>
-                        </div>
-                      </>
-                    )}
-                  </>
-                )}
+      <div className="bg-gray-800 border-b border-gray-700">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            {/* Left Section: Graph Info and Navigation */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 lg:gap-8 flex-1">
+              {/* Graph Information */}
+              <div className="flex-shrink-0">
+                <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-emerald-400 via-green-300 to-blue-400 bg-clip-text text-transparent">
+                  {currentGraph?.name || (availableGraphs.length > 0 ? 'Select a Graph' : 'Create a Graph')}
+                </h1>
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-gray-400 mt-1">
+                  {currentTeam && (
+                    <>
+                      <span>{currentTeam.name}</span>
+                      <span>•</span>
+                    </>
+                  )}
+                  {currentGraph && (
+                    <>
+                      <span className="whitespace-nowrap">{actualNodeCount} node{actualNodeCount !== 1 ? 's' : ''}</span>
+                      <span>•</span>
+                      <span className="whitespace-nowrap">{actualEdgeCount} connection{actualEdgeCount !== 1 ? 's' : ''}</span>
+                      <span>•</span>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border shadow-sm ${
+                        currentGraph.type === 'PROJECT' ? 'bg-blue-500/20 text-blue-300 border-blue-400/30' :
+                        currentGraph.type === 'WORKSPACE' ? 'bg-purple-500/20 text-purple-300 border-purple-400/30' :
+                        currentGraph.type === 'SUBGRAPH' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400/30' :
+                        currentGraph.type === 'TEMPLATE' ? 'bg-amber-500/20 text-amber-300 border-amber-400/30' :
+                        'bg-slate-500/20 text-slate-300 border-slate-400/30'
+                      }`}>
+                        {currentGraph.type}
+                      </span>
+                      {currentGraph.isShared && (
+                        <>
+                          <span>•</span>
+                          <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30 shadow-sm">
+                            <Share2 className="h-3 w-3" />
+                            <span className="text-xs font-medium">Shared</span>
+                          </div>
+                        </>
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
-            </div>
-          </div>
-          
-          <div className="flex items-center space-x-3">
-            {/* View Mode Selector */}
-            <div className="flex bg-gray-700 rounded-lg p-1">
+              
+              {/* All Views Selector - Responsive */}
+              <div className="flex items-center flex-1 ml-8">
+                <div className="flex bg-gray-700/50 backdrop-blur-sm rounded-lg p-2 gap-1 sm:gap-2 lg:gap-4 overflow-x-auto w-full min-w-0">
               <button
                 onClick={() => setViewMode('graph')}
-                className={`px-3 py-1 text-sm rounded transition-colors ${
+                className={`px-3 py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center space-y-2 ${
                   viewMode === 'graph' 
                     ? 'bg-green-600 text-white shadow' 
                     : 'text-gray-300 hover:text-white'
                 }`}
+                title="Graph View"
               >
-                Graph
+                <Network className="h-6 w-6 sm:h-8 sm:w-8 lg:h-10 lg:w-10" strokeWidth={1.5} />
+                <div className="text-xs text-center font-medium">
+                  Graph
+                </div>
               </button>
               <button
-                onClick={() => setViewMode('list')}
-                className={`px-3 py-1 text-sm rounded transition-colors ${
-                  viewMode === 'list' 
+                onClick={() => setViewMode('dashboard')}
+                className={`px-3 py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center space-y-2 ${
+                  viewMode === 'dashboard' 
                     ? 'bg-green-600 text-white shadow' 
                     : 'text-gray-300 hover:text-white'
                 }`}
+                title="Dashboard View"
               >
-                List
+                <LayoutDashboard className="h-6 w-6 sm:h-8 sm:w-8 lg:h-10 lg:w-10" strokeWidth={1.5} />
+                <div className="text-xs text-center font-medium">
+                  Dashboard
+                </div>
               </button>
               <button
-                onClick={() => setViewMode('timeline')}
-                className={`px-3 py-1 text-sm rounded transition-colors ${
-                  viewMode === 'timeline' 
+                onClick={() => setViewMode('table')}
+                className={`px-3 py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center space-y-2 ${
+                  viewMode === 'table' 
                     ? 'bg-green-600 text-white shadow' 
                     : 'text-gray-300 hover:text-white'
                 }`}
+                title="Table View"
               >
-                Timeline
+                <Table className="h-6 w-6 sm:h-8 sm:w-8 lg:h-10 lg:w-10" strokeWidth={1.5} />
+                <div className="text-xs text-center font-medium">
+                  Table
+                </div>
               </button>
+              <button
+                onClick={() => setViewMode('cards')}
+                className={`px-3 py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center space-y-2 ${
+                  viewMode === 'cards' 
+                    ? 'bg-green-600 text-white shadow' 
+                    : 'text-gray-300 hover:text-white'
+                }`}
+                title="Card View"
+              >
+                <CreditCard className="h-6 w-6 sm:h-8 sm:w-8 lg:h-10 lg:w-10" strokeWidth={1.5} />
+                <div className="text-xs text-center font-medium">
+                  Card
+                </div>
+              </button>
+              <button
+                onClick={() => setViewMode('kanban')}
+                className={`px-3 py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center space-y-2 ${
+                  viewMode === 'kanban' 
+                    ? 'bg-green-600 text-white shadow' 
+                    : 'text-gray-300 hover:text-white'
+                }`}
+                title="Kanban View"
+              >
+                <Columns className="h-6 w-6 sm:h-8 sm:w-8 lg:h-10 lg:w-10" strokeWidth={1.5} />
+                <div className="text-xs text-center font-medium">
+                  Kanban
+                </div>
+              </button>
+              <button
+                onClick={() => setViewMode('gantt')}
+                className={`px-3 py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center space-y-2 ${
+                  viewMode === 'gantt' 
+                    ? 'bg-green-600 text-white shadow' 
+                    : 'text-gray-300 hover:text-white'
+                }`}
+                title="Gantt Chart"
+              >
+                <GanttChartSquare className="h-6 w-6 sm:h-8 sm:w-8 lg:h-10 lg:w-10" strokeWidth={1.5} />
+                <div className="text-xs text-center font-medium">
+                  Gantt
+                </div>
+              </button>
+              <button
+                onClick={() => setViewMode('calendar')}
+                className={`px-3 py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center space-y-2 ${
+                  viewMode === 'calendar' 
+                    ? 'bg-green-600 text-white shadow' 
+                    : 'text-gray-300 hover:text-white'
+                }`}
+                title="Calendar View"
+              >
+                <CalendarDays className="h-6 w-6 sm:h-8 sm:w-8 lg:h-10 lg:w-10" strokeWidth={1.5} />
+                <div className="text-xs text-center font-medium">
+                  Calendar
+                </div>
+              </button>
+              <button
+                onClick={() => setViewMode('activity')}
+                className={`px-3 py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center space-y-2 ${
+                  viewMode === 'activity' 
+                    ? 'bg-green-600 text-white shadow' 
+                    : 'text-gray-300 hover:text-white'
+                }`}
+                title="Activity Feed"
+              >
+                <Activity className="h-6 w-6 sm:h-8 sm:w-8 lg:h-10 lg:w-10" strokeWidth={1.5} />
+                <div className="text-xs text-center font-medium">
+                  Activity
+                </div>
+              </button>
+                </div>
+              </div>
             </div>
 
-            {/* Actions */}
-            <button
-              type="button"
-              className="btn btn-secondary"
-              disabled={!currentGraph}
-            >
-              <Filter className="h-4 w-4 mr-2" />
-              Filter
-            </button>
-
-            <button
-              type="button"
-              className="btn btn-secondary"
-              disabled={!currentGraph}
-            >
-              <RotateCcw className="h-4 w-4 mr-2" />
-              Reset View
-            </button>
-            
-            <button
-              type="button"
-              className="btn btn-secondary"
-              disabled={!currentGraph}
-            >
-              <Zap className="h-4 w-4 mr-2" />
-              Auto-layout
-            </button>
-
+            {/* Right Section: Actions */}
+            <div className="flex items-center gap-3 flex-shrink-0">
             {currentGraph?.isShared && (
               <button
                 type="button"
@@ -172,16 +228,7 @@ export function Workspace() {
                 Collaborators
               </button>
             )}
-            
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={() => setShowCreateModal(true)}
-              disabled={!canEdit || !currentGraph}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Node
-            </button>
+            </div>
           </div>
         </div>
       </div>
@@ -202,31 +249,38 @@ export function Workspace() {
               </h1>
               
               <h2 className="text-lg font-medium text-green-300 mb-4">
-                No Graph Selected
+                {availableGraphs.length > 0 ? 'No Graph Selected' : 'No Graphs Available'}
               </h2>
               
               <p className="text-gray-300 mb-8 leading-relaxed">
-                Ready to organize your work? Choose an existing graph or create a new one to get started.
+                {availableGraphs.length > 0 
+                  ? 'Ready to organize your work? Choose an existing graph or create a new one to get started.'
+                  : 'Get started by creating your first graph to organize your work.'
+                }
               </p>
 
               {/* Action Buttons */}
               <div className="space-y-3 mb-8">
-                <button
-                  onClick={() => setShowGraphSelectionModal(true)}
-                  className="w-full px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-all duration-200 font-medium flex items-center justify-center shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
-                >
-                  <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"/>
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5a2 2 0 012-2h4a2 2 0 012 2v3H8V5z"/>
-                  </svg>
-                  Select Graph
-                </button>
+                {availableGraphs.length > 0 && (
+                  <>
+                    <button
+                      onClick={() => setShowGraphSelectionModal(true)}
+                      className="w-full px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-all duration-200 font-medium flex items-center justify-center shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                    >
+                      <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"/>
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5a2 2 0 012-2h4a2 2 0 012 2v3H8V5z"/>
+                      </svg>
+                      Select Graph
+                    </button>
 
-                <div className="flex items-center">
-                  <div className="flex-1 border-t border-gray-600"></div>
-                  <span className="px-4 text-gray-400 text-xs font-medium bg-gray-900">OR</span>
-                  <div className="flex-1 border-t border-gray-600"></div>
-                </div>
+                    <div className="flex items-center">
+                      <div className="flex-1 border-t border-gray-600"></div>
+                      <span className="px-4 text-gray-400 text-xs font-medium bg-gray-900">OR</span>
+                      <div className="flex-1 border-t border-gray-600"></div>
+                    </div>
+                  </>
+                )}
 
                 <button
                   onClick={() => setShowCreateGraphModal(true)}
@@ -241,7 +295,7 @@ export function Workspace() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="text-center p-4 bg-gray-800/50 backdrop-blur-sm rounded-lg border border-gray-600/50 hover:border-green-500/50 transition-all duration-300 hover:bg-gray-700/50">
                   <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center mx-auto mb-3 shadow-lg">
-                    <Zap className="h-5 w-5 text-white" />
+                    <Plus className="h-5 w-5 text-white" />
                   </div>
                   <h3 className="font-medium text-white mb-1">Quick Start</h3>
                   <p className="text-xs text-gray-300">Create and organize efficiently</p>
@@ -267,10 +321,8 @@ export function Workspace() {
           </div>
         ) : viewMode === 'graph' ? (
           <SafeGraphVisualization />
-        ) : viewMode === 'list' ? (
-          <ListView />
         ) : (
-          <TimelineView />
+          <ViewManager viewMode={viewMode as 'dashboard' | 'table' | 'cards' | 'kanban' | 'gantt' | 'calendar' | 'activity'} />
         )}
       </div>
 

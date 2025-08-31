@@ -311,8 +311,8 @@ function validateEdge(edge: any, index: number, nodeIdMap: Map<string, any>): Va
   if (edge.type) {
     const validTypes: RelationshipType[] = [
       'DEPENDS_ON', 'BLOCKS', 'ENABLES', 'RELATES_TO',
-      'PART_OF', 'FOLLOWS', 'PARALLEL_WITH', 'DUPLICATES',
-      'CONFLICTS_WITH', 'VALIDATES'
+      'IS_PART_OF', 'FOLLOWS', 'PARALLEL_WITH', 'DUPLICATES',
+      'CONFLICTS_WITH', 'VALIDATES', 'REFERENCES', 'CONTAINS'
     ];
     
     if (!validTypes.includes(edge.type)) {
@@ -406,10 +406,6 @@ function sanitizeEdge(edge: any): any {
     sanitized.type = 'RELATES_TO';
   }
   
-  // Normalize type variations
-  if (sanitized.type === 'DEPENDS_ON') {
-    sanitized.type = 'DEPENDENCY';
-  }
   
   // Set default weight/strength
   if (sanitized.weight === undefined) sanitized.weight = 1.0;

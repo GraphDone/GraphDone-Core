@@ -20,10 +20,9 @@ export function GraphSelector() {
           id: currentGraph.id
         }
       }
-    } : {},
-    skip: !currentGraph,
-    pollInterval: 5000,
-    fetchPolicy: 'cache-and-network'
+    } : { where: {} },
+    pollInterval: currentGraph ? 5000 : 0,
+    fetchPolicy: currentGraph ? 'cache-and-network' : 'cache-only'
   });
 
   const { data: edgesData } = useQuery(GET_EDGES, {
@@ -35,10 +34,9 @@ export function GraphSelector() {
           }
         }
       }
-    } : {},
-    skip: !currentGraph,
-    pollInterval: 5000,
-    fetchPolicy: 'cache-and-network'
+    } : { where: {} },
+    pollInterval: currentGraph ? 5000 : 0,
+    fetchPolicy: currentGraph ? 'cache-and-network' : 'cache-only'
   });
 
   const actualNodeCount = workItemsData?.workItems?.length || 0;
@@ -98,7 +96,8 @@ export function GraphSelector() {
     }
   };
 
-  if (!currentGraph) {
+  // Show no graphs available if we have no available graphs at all
+  if (graphHierarchy.length === 0 || !currentGraph) {
     return (
       <div className="p-3">
         <div className="text-center text-gray-400">
@@ -128,21 +127,6 @@ export function GraphSelector() {
           </div>
           <div className="flex items-center gap-2 text-xs text-gray-400">
             <span>{actualNodeCount} node{actualNodeCount !== 1 ? 's' : ''}, {actualEdgeCount} connection{actualEdgeCount !== 1 ? 's' : ''}</span>
-            <button 
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowDetails(!showDetails);
-              }}
-              className="hover:text-green-400 transition-colors p-0.5 rounded"
-              title="Graph details"
-            >
-              <Eye className="h-3 w-3" />
-            </button>
-            {showDetails && (
-              <span className="text-xs bg-gray-800 border border-gray-600 rounded px-2 py-1">
-                {currentGraph.type}{currentGraph.isShared && ' • Shared'}
-              </span>
-            )}
           </div>
         </div>
         
@@ -188,12 +172,9 @@ export function GraphSelector() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium truncate">{graph.name}</span>
-                        {graph.isShared && <Share2 className="h-3 w-3 text-blue-400" />}
-                        {getPermissionIcon(graph.permissions)}
                       </div>
                       <div className="flex items-center gap-2 text-xs text-gray-400">
                         <span>{graph.id === currentGraph.id ? actualNodeCount : (graph.nodeCount || 0)} node{(graph.id === currentGraph.id ? actualNodeCount : (graph.nodeCount || 0)) !== 1 ? 's' : ''}, {graph.id === currentGraph.id ? actualEdgeCount : (graph.edgeCount || 0)} connection{(graph.id === currentGraph.id ? actualEdgeCount : (graph.edgeCount || 0)) !== 1 ? 's' : ''}</span>
-                        <Eye className="h-3 w-3 opacity-50" />
                       </div>
                     </div>
                     {graph.id === currentGraph.id && (
