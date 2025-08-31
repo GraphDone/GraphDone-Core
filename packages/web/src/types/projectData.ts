@@ -5,12 +5,14 @@ export type RelationshipType =
   | 'BLOCKS'          // This node blocks another from starting
   | 'ENABLES'         // This node enables another (similar to depends but softer)
   | 'RELATES_TO'      // General relationship
-  | 'PART_OF'         // This node is a part/component of another
+  | 'IS_PART_OF'      // This node is a part/component of another
   | 'FOLLOWS'         // This node should be done after another (sequence)
   | 'PARALLEL_WITH'   // This node can be done in parallel with another
   | 'DUPLICATES'      // This node duplicates effort of another
   | 'CONFLICTS_WITH'  // This node conflicts with another
   | 'VALIDATES'       // This node validates/tests another
+  | 'REFERENCES'      // This node references another
+  | 'CONTAINS'        // This node contains another
 
 export interface MockNode {
   id: string;
@@ -303,7 +305,7 @@ export const mockProjectEdges: MockEdge[] = [
     id: 'edge-3',
     source: 'feature-1',
     target: 'epic-1',
-    type: 'PART_OF',
+    type: 'IS_PART_OF',
     strength: 0.9,
     description: 'Login is part of auth system',
     createdAt: '2025-08-01T10:00:00Z'
@@ -312,7 +314,7 @@ export const mockProjectEdges: MockEdge[] = [
     id: 'edge-4',
     source: 'feature-2',
     target: 'epic-1',
-    type: 'PART_OF',
+    type: 'IS_PART_OF',
     strength: 0.8,
     description: 'Password reset is part of auth system',
     createdAt: '2025-08-01T10:00:00Z'
@@ -321,7 +323,7 @@ export const mockProjectEdges: MockEdge[] = [
     id: 'edge-5',
     source: 'task-2',
     target: 'epic-1',
-    type: 'PART_OF',
+    type: 'IS_PART_OF',
     strength: 0.7,
     description: 'Frontend components part of auth system',
     createdAt: '2025-08-10T14:00:00Z'
@@ -361,7 +363,7 @@ export const mockProjectEdges: MockEdge[] = [
     id: 'edge-9',
     source: 'feature-3',
     target: 'epic-2',
-    type: 'PART_OF',
+    type: 'IS_PART_OF',
     strength: 0.9,
     description: 'Product catalog part of e-commerce',
     createdAt: '2025-08-15T09:00:00Z'
@@ -370,7 +372,7 @@ export const mockProjectEdges: MockEdge[] = [
     id: 'edge-10',
     source: 'feature-4',
     target: 'epic-2',
-    type: 'PART_OF',
+    type: 'IS_PART_OF',
     strength: 0.9,
     description: 'Shopping cart part of e-commerce',
     createdAt: '2025-08-01T10:00:00Z'
@@ -379,7 +381,7 @@ export const mockProjectEdges: MockEdge[] = [
     id: 'edge-11',
     source: 'task-3',
     target: 'epic-2',
-    type: 'PART_OF',
+    type: 'IS_PART_OF',
     strength: 0.8,
     description: 'Payment integration part of e-commerce',
     createdAt: '2025-08-10T11:00:00Z'
@@ -471,7 +473,7 @@ export const relationshipTypeInfo = {
     description: 'General relationship or similarity',
     weight: 0.3
   },
-  PART_OF: {
+  IS_PART_OF: {
     color: '#059669',
     style: 'solid',
     description: 'Component or subset of larger item',
@@ -506,5 +508,17 @@ export const relationshipTypeInfo = {
     style: 'dotted',
     description: 'Tests or validates functionality',
     weight: 0.6
+  },
+  REFERENCES: {
+    color: '#6366f1',
+    style: 'dotted',
+    description: 'References or cites another',
+    weight: 0.4
+  },
+  CONTAINS: {
+    color: '#3b82f6',
+    style: 'solid',
+    description: 'Contains or encompasses another',
+    weight: 0.7
   }
 };

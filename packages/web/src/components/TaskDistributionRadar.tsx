@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { ZoomIn, ZoomOut, RotateCcw, ClipboardList, Calendar, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
+import { ClipboardList, Calendar, Clock, CheckCircle, AlertCircle, WORK_ITEM_STATUSES } from '../constants/workItemConstants';
 import { RadarChart } from './RadarChart';
 import { useGraph } from '../contexts/GraphContext';
 import { useQuery, gql } from '@apollo/client';
@@ -121,7 +122,6 @@ export function TaskDistributionRadar({ className = '', showLegend = true }: Tas
       {/* Task Status Distribution */}
       <div className="bg-gray-800 border border-gray-600 rounded-lg p-6">
         <div className="mb-4">
-          <h3 className="text-lg font-semibold text-white mb-2">Task Status Distribution</h3>
         </div>
         <div className="relative">
           {/* Zoom Controls */}

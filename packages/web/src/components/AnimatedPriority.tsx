@@ -65,28 +65,12 @@ export function AnimatedPriority({ value, className = '', duration = 3000, style
   };
 
   const getAnimatedColor = (val: number): string => {
-    // Define color stops: green -> blue -> yellow -> orange -> red
-    const colors = [
-      { threshold: 0.0, color: '#22c55e' }, // green-500
-      { threshold: 0.2, color: '#3b82f6' }, // blue-500  
-      { threshold: 0.4, color: '#eab308' }, // yellow-500
-      { threshold: 0.6, color: '#f97316' }, // orange-500
-      { threshold: 0.8, color: '#ef4444' }  // red-500
-    ];
-
-    // Find the two colors to interpolate between
-    for (let i = 0; i < colors.length - 1; i++) {
-      if (val >= colors[i].threshold && val <= colors[i + 1].threshold) {
-        const factor = (val - colors[i].threshold) / (colors[i + 1].threshold - colors[i].threshold);
-        const color1 = hexToRgb(colors[i].color);
-        const color2 = hexToRgb(colors[i + 1].color);
-        return interpolateColor(color1, color2, factor);
-      }
-    }
-
-    // Handle edge cases
-    if (val <= 0.0) return colors[0].color;
-    return colors[colors.length - 1].color;
+    // Use discrete priority levels instead of interpolation for correct priority colors
+    if (val >= 0.8) return '#ef4444'; // Critical - red
+    if (val >= 0.6) return '#f97316'; // High - orange  
+    if (val >= 0.4) return '#eab308'; // Medium - yellow
+    if (val >= 0.2) return '#3b82f6'; // Low - blue
+    return '#6b7280'; // Minimal - gray (< 0.2)
   };
 
   const getAnimatedTextColor = (val: number): string => {

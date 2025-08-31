@@ -116,12 +116,14 @@ export type RelationshipType =
   | 'BLOCKS'          // This node blocks another from starting
   | 'ENABLES'         // This node enables another (similar to depends but softer)
   | 'RELATES_TO'      // General relationship
-  | 'PART_OF'         // This node is a part/component of another
+  | 'IS_PART_OF'      // This node is a part/component of another
   | 'FOLLOWS'         // This node should be done after another (sequence)
   | 'PARALLEL_WITH'   // This node can be done in parallel with another
   | 'DUPLICATES'      // This node duplicates effort of another
   | 'CONFLICTS_WITH'  // This node conflicts with another
   | 'VALIDATES'       // This node validates/tests another
+  | 'REFERENCES'      // This node references another node
+  | 'CONTAINS'        // This node contains another node
 
 export interface WorkItemEdge {
   id: string;
