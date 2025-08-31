@@ -50,16 +50,12 @@ interface DeleteNodeModalProps {
 export function DeleteNodeModal({ isOpen, onClose, nodeId, nodeTitle, nodeType, onOpenDisconnectModal }: DeleteNodeModalProps) {
   const { currentTeam } = useAuth();
   const { showSuccess, showError } = useNotifications();
-  const [step, setStep] = useState<'warning' | 'confirm'>('warning');
   const [understandRisks, setUnderstandRisks] = useState(false);
   const [confirmDeletion, setConfirmDeletion] = useState(false);
-  const [confirmText, setConfirmText] = useState('');
 
   // Reset state when modal opens/closes
   useEffect(() => {
     if (isOpen) {
-      setStep('warning');
-      setConfirmText('');
       setUnderstandRisks(false);
       setConfirmDeletion(false);
     }
@@ -154,7 +150,6 @@ export function DeleteNodeModal({ isOpen, onClose, nodeId, nodeTitle, nodeType, 
     }
   };
 
-  const isConfirmValid = confirmText === nodeTitle;
 
   if (!isOpen) return null;
 
@@ -315,8 +310,8 @@ export function DeleteNodeModal({ isOpen, onClose, nodeId, nodeTitle, nodeType, 
             </div>
           )}
 
-          {/* Step 1: Enhanced Warning and Risk Acknowledgment */}
-          {!loadingEdges && !hasConnections && step === 'warning' && (
+          {/* Enhanced Warning and Risk Acknowledgment */}
+          {!loadingEdges && !hasConnections && (
             <div className="p-8">
               <div className="mb-8">
                 {/* Modern danger icon with glow effect */}
@@ -457,165 +452,27 @@ export function DeleteNodeModal({ isOpen, onClose, nodeId, nodeTitle, nodeType, 
                   Cancel
                 </button>
                 <button
-                  onClick={() => setStep('confirm')}
-                  disabled={!understandRisks || !confirmDeletion}
+                  onClick={handleDelete}
+                  disabled={!understandRisks || !confirmDeletion || deletingNode}
                   className="group relative px-6 py-3 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 disabled:from-gray-600 disabled:to-gray-700 text-white font-semibold rounded-xl transition-all duration-200 transform hover:scale-[1.02] disabled:scale-100 hover:shadow-lg hover:shadow-red-500/25 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
                 >
                   <div className="absolute inset-0 bg-gradient-to-r from-red-400/20 to-red-600/20 rounded-xl blur opacity-0 group-hover:opacity-100 group-disabled:opacity-0 transition-opacity duration-200"></div>
-                  <AlertTriangle className="w-5 h-5 relative z-10" />
-                  <span className="relative z-10">Continue to Verification</span>
+                  {deletingNode ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin relative z-10"></div>
+                      <span className="relative z-10">Deleting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-5 h-5 relative z-10" />
+                      <span className="relative z-10">Delete Forever</span>
+                    </>
+                  )}
                 </button>
               </div>
             </div>
           )}
 
-          {/* Step 2: Enhanced Final Verification */}
-          {!loadingEdges && !hasConnections && step === 'confirm' && (
-            <div className="p-8">
-              <div className="mb-8">
-                {/* Enhanced danger icon with multiple animation layers */}
-                <div className="relative flex items-center justify-center w-28 h-28 mx-auto mb-6">
-                  <div className="absolute inset-0 bg-gradient-to-r from-red-500/40 to-orange-500/40 rounded-full blur-3xl animate-pulse"></div>
-                  <div className="absolute inset-4 bg-gradient-to-r from-red-400/30 to-red-600/30 rounded-full blur-xl animate-ping"></div>
-                  <div className="relative flex items-center justify-center w-20 h-20 bg-gradient-to-br from-red-500/30 to-red-700/30 border-2 border-red-400/50 rounded-full backdrop-blur-sm">
-                    <Trash2 className="h-10 w-10 text-red-400 drop-shadow-2xl" />
-                  </div>
-                </div>
-                
-                {/* Professional typography */}
-                <div className="text-center space-y-3 mb-6">
-                  <h4 className="text-lg font-semibold text-red-200">
-                    Final Verification Required
-                  </h4>
-                  <div className="space-y-2">
-                    <p className="text-sm text-gray-300">
-                      This is your last chance to cancel
-                    </p>
-                    <div className="inline-flex items-center px-3 py-2 bg-red-500/20 border border-red-400/40 rounded-lg backdrop-blur-sm">
-                      <AlertTriangle className="h-4 w-4 text-red-400 mr-2" />
-                      <span className="text-red-200 font-medium text-xs">Final Warning</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Enhanced Final Warning */}
-              <div className="relative bg-gradient-to-r from-red-900/40 via-red-800/30 to-orange-900/30 border-2 border-red-500/40 rounded-2xl p-6 mb-8 backdrop-blur-sm">
-                <div className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 rounded-full animate-ping"></div>
-                <div className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 rounded-full"></div>
-                
-                <div className="text-center space-y-4">
-                  <div className="inline-flex items-center justify-center w-16 h-16 bg-red-500/20 border-2 border-red-400/40 rounded-full mx-auto mb-4">
-                    <AlertTriangle className="h-8 w-8 text-red-400" />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <h5 className="text-base font-semibold text-red-200">
-                      Irreversible Action
-                    </h5>
-                    <p className="text-red-300 text-xs leading-relaxed max-w-md mx-auto">
-                      Once you proceed, the node <span className="font-semibold text-red-200">"{nodeTitle}"</span> and all its data will be permanently destroyed.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* GitHub-Style Verification Input */}
-              <div className="mb-8">
-                <div className="bg-gray-800/60 border border-gray-600/50 rounded-xl p-6 backdrop-blur-sm">
-                  <div className="text-center mb-4">
-                    <h5 className="text-base font-semibold text-gray-200 mb-2">
-                      Security Verification
-                    </h5>
-                    <p className="text-gray-400 text-sm">
-                      To confirm deletion, type the exact node name below
-                    </p>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <div className="text-center">
-                      <p className="text-sm text-gray-400 mb-2">Expected input:</p>
-                      <div className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-gray-700/80 to-gray-600/80 border border-gray-500/50 rounded-lg">
-                        <span className="text-white font-mono text-base font-semibold tracking-wide">
-                          {nodeTitle}
-                        </span>
-                      </div>
-                    </div>
-                    
-                    <div className="relative">
-                      <input
-                        type="text"
-                        value={confirmText}
-                        onChange={(e) => setConfirmText(e.target.value)}
-                        className="w-full px-4 py-3 bg-gray-700/80 border-2 border-gray-600/70 focus:border-red-400/70 rounded-xl text-white font-mono text-base placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-400/20 transition-all duration-200 text-center backdrop-blur-sm"
-                        placeholder="Type the node name to confirm deletion"
-                        autoFocus
-                      />
-                      
-                      {/* Dynamic feedback */}
-                      <div className="mt-3">
-                        {confirmText && confirmText !== nodeTitle && (
-                          <div className="flex items-center justify-center text-red-400 text-sm">
-                            <X className="w-4 h-4 mr-1" />
-                            Node name doesn't match
-                          </div>
-                        )}
-                        {isConfirmValid && (
-                          <div className="flex items-center justify-center text-green-400 text-sm font-medium">
-                            <CheckCircle className="w-4 h-4 mr-2" />
-                            Verification successful - deletion enabled
-                          </div>
-                        )}
-                        {!confirmText && (
-                          <div className="flex items-center justify-center text-gray-500 text-sm">
-                            <AlertTriangle className="w-4 h-4 mr-1" />
-                            Type the node name above to enable deletion
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Enhanced Final Actions */}
-              <div className="flex flex-col sm:flex-row justify-between gap-4">
-                <button
-                  onClick={() => setStep('warning')}
-                  className="px-6 py-3 text-gray-400 bg-gray-700/60 hover:bg-gray-600/60 border border-gray-600/50 hover:border-gray-500/50 font-medium rounded-xl transition-all duration-200 backdrop-blur-sm flex items-center justify-center"
-                >
-                  ← Back to Confirmations
-                </button>
-                
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <button
-                    onClick={onClose}
-                    className="px-6 py-3 text-gray-300 bg-gray-700/80 hover:bg-gray-600/80 border border-gray-600/50 hover:border-gray-500/50 font-medium rounded-xl transition-all duration-200 backdrop-blur-sm"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleDelete}
-                    disabled={!isConfirmValid || deletingNode}
-                    className="group relative px-8 py-3 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 disabled:from-gray-600 disabled:to-gray-700 text-white font-bold rounded-xl transition-all duration-300 transform hover:scale-[1.02] disabled:scale-100 hover:shadow-xl hover:shadow-red-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 min-w-[180px]"
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-r from-red-400/30 to-red-600/30 rounded-xl blur opacity-0 group-hover:opacity-100 group-disabled:opacity-0 transition-opacity duration-300"></div>
-                    {deletingNode ? (
-                      <>
-                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin relative z-10"></div>
-                        <span className="relative z-10">Deleting Forever...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Trash2 className="w-5 h-5 relative z-10" />
-                        <span className="relative z-10">Delete Forever</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       </div>
       </div>
