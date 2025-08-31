@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { ZoomIn, ZoomOut, RotateCcw, Flame, Zap, Triangle, Circle, ArrowDown } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
+import { Flame, Zap, Triangle, Circle, ArrowDown } from '../constants/workItemConstants';
 import { RadarChart } from './RadarChart';
 import { useGraph } from '../contexts/GraphContext';
 import { useQuery, gql } from '@apollo/client';
@@ -80,7 +81,7 @@ export function PriorityDistributionRadar({ className = '', showLegend = true }:
       { axis: 'High', value: priorityCounts.high, color: '#f97316' },
       { axis: 'Moderate', value: priorityCounts.moderate, color: '#eab308' },
       { axis: 'Low', value: priorityCounts.low, color: '#3b82f6' },
-      { axis: 'Minimal', value: priorityCounts.minimal, color: '#22c55e' }
+      { axis: 'Minimal', value: priorityCounts.minimal, color: '#6b7280' }
     ].filter(item => item.value > 0); // Only show priorities with tasks
 
     const maxValue = Math.max(...priorityData.map(item => item.value), 1);
@@ -123,7 +124,6 @@ export function PriorityDistributionRadar({ className = '', showLegend = true }:
       {/* Priority Distribution */}
       <div className="bg-gray-800 border border-gray-600 rounded-lg p-6">
         <div className="mb-4">
-          <h3 className="text-lg font-semibold text-white mb-2">Priority Distribution</h3>
         </div>
         <div className="relative">
           {/* Zoom Controls */}
@@ -189,7 +189,7 @@ export function PriorityDistributionRadar({ className = '', showLegend = true }:
                     case 'High': return <Zap className="h-5 w-5" style={{ color: item.color || '#f97316' }} />;
                     case 'Moderate': return <Triangle className="h-5 w-5" style={{ color: item.color || '#eab308' }} />;
                     case 'Low': return <Circle className="h-5 w-5" style={{ color: item.color || '#3b82f6' }} />;
-                    case 'Minimal': return <ArrowDown className="h-5 w-5" style={{ color: item.color || '#22c55e' }} />;
+                    case 'Minimal': return <ArrowDown className="h-5 w-5" style={{ color: item.color || '#6b7280' }} />;
                     default: return <div className="w-4 h-4 rounded-full" style={{ backgroundColor: item.color || '#4ade80' }}></div>;
                   }
                 };

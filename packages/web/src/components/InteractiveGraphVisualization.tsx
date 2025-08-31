@@ -1,11 +1,32 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import * as d3 from 'd3';
-import { Link2, Edit3, Trash2, AlertTriangle, AlertCircle, Layers, Sparkles, ListTodo, Trophy, Target, Lightbulb, Microscope, Folder, FolderOpen, Plus, FileText, Settings } from 'lucide-react';
+import { Link2, Edit3, Trash2, Folder, FolderOpen, Plus, FileText, Settings, Unlink, X, GitBranch, Minus } from 'lucide-react';
+import {
+  getPriorityIconElement,
+  getStatusIconElement,
+  getTypeIconElement,
+  getTypeConfig,
+  getStatusConfig,
+  getPriorityConfig,
+  WORK_ITEM_TYPES,
+  WORK_ITEM_STATUSES,
+  WORK_ITEM_PRIORITIES,
+  WorkItemType,
+  // Import icons from central file
+  AlertTriangle,
+  AlertCircle,
+  Layers,
+  Trophy,
+  ListTodo,
+  Target,
+  Lightbulb,
+  Sparkles,
+  Microscope
+} from '../constants/workItemConstants';
 import { useQuery, useMutation } from '@apollo/client';
 import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
 import { GET_WORK_ITEMS, GET_EDGES, CREATE_EDGE, UPDATE_EDGE, DELETE_EDGE } from '../lib/queries';
-import { relationshipTypeInfo } from '../types/projectData';
 import { validateGraphData, getValidationSummary, ValidationResult } from '../utils/graphDataValidation';
 import { EditNodeModal } from './EditNodeModal';
 import { DeleteNodeModal } from './DeleteNodeModal';
@@ -17,7 +38,8 @@ import { DeleteGraphModal } from './DeleteGraphModal';
 import { ConnectNodeModal } from './ConnectNodeModal';
 import { NodeDetailsModal } from './NodeDetailsModal';
 
-import { WorkItem, WorkItemEdge, RelationshipType } from '../types/graph';
+import { WorkItem, WorkItemEdge } from '../types/graph';
+import { RelationshipType, RELATIONSHIP_OPTIONS, getRelationshipConfig } from '../constants/workItemConstants';
 
 interface NodeMenuState {
   node: WorkItem | null;
@@ -35,7 +57,6 @@ export function InteractiveGraphVisualization() {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const { currentGraph, availableGraphs } = useGraph();
-  const { } = useAuth();
   
   const { data: workItemsData, loading, error, refetch } = useQuery(GET_WORK_ITEMS, {
     variables: currentGraph ? {
@@ -44,11 +65,10 @@ export function InteractiveGraphVisualization() {
           id: currentGraph.id
         }
       }
-    } : {},
-    fetchPolicy: 'cache-and-network',
-    pollInterval: 5000,
-    errorPolicy: 'all',
-    skip: !currentGraph
+    } : { where: {} },
+    fetchPolicy: currentGraph ? 'cache-and-network' : 'cache-only',
+    pollInterval: currentGraph ? 5000 : 0,
+    errorPolicy: 'all'
   });
 
   const { data: edgesData, loading: edgesLoading, error: edgesError, refetch: refetchEdges } = useQuery(GET_EDGES, {
@@ -60,11 +80,10 @@ export function InteractiveGraphVisualization() {
           }
         }
       }
-    } : {},
-    fetchPolicy: 'cache-and-network',
-    pollInterval: 5000,
-    errorPolicy: 'all',
-    skip: !currentGraph
+    } : { where: {} },
+    fetchPolicy: currentGraph ? 'cache-and-network' : 'cache-only',
+    pollInterval: currentGraph ? 5000 : 0,
+    errorPolicy: 'all'
   });
 
   // Mutation for creating edges
@@ -112,12 +131,62 @@ export function InteractiveGraphVisualization() {
   const [showCreateNodeModal, setShowCreateNodeModal] = useState(false);
   const [showNodeDetailsModal, setShowNodeDetailsModal] = useState(false);
   const [showConnectModal, setShowConnectModal] = useState(false);
+  const [connectModalInitialTab, setConnectModalInitialTab] = useState<'connect' | 'disconnect'>('connect');
+  const [openedFromDeleteModal, setOpenedFromDeleteModal] = useState(false);
   const [showCreateGraphModal, setShowCreateGraphModal] = useState(false);
   const [showGraphSwitcher, setShowGraphSwitcher] = useState(false);
   const [showUpdateGraphModal, setShowUpdateGraphModal] = useState(false);
   const [showDeleteGraphModal, setShowDeleteGraphModal] = useState(false);
   const [selectedNode, setSelectedNode] = useState<WorkItem | null>(null);
   const [createNodePosition, setCreateNodePosition] = useState<{ x: number; y: number; z: number } | undefined>(undefined);
+  const [currentTransform, setCurrentTransform] = useState({ x: 0, y: 0, scale: 1 });
+  const [showLegend, setShowLegend] = useState(false);
+  const [showGraphPanel, setShowGraphPanel] = useState(false);
+
+  // Calculate dynamic positioning for panels and minimized buttons to avoid overlap
+  const getPanelPosition = (panelType: 'graph' | 'legend' | 'create') => {
+    const graphPanelHeight = 295; // Height of expanded graph panel
+    const legendPanelHeight = 220; // Height of expanded legend panel
+    const createPanelHeight = 80; // Height of expanded create panel
+    const buttonHeight = 48; // Height of minimized buttons (h-12 = 48px)
+    const compactSpacing = 27; // Spacing when panel is minimized
+    const expandedSpacing = 32; // Spacing when panel is expanded
+    
+    if (panelType === 'graph') {
+      // Graph panel/button is always at top position
+      return { top: '20px' };
+    } else if (panelType === 'create') {
+      // Create button positioning depends only on graph panel state (comes right after it)
+      let topOffset = 20; // Start position
+      
+      if (showGraphPanel) {
+        topOffset += graphPanelHeight + expandedSpacing;
+      } else {
+        topOffset += buttonHeight + compactSpacing;
+      }
+      
+      return { top: `${topOffset}px` };
+    } else if (panelType === 'legend') {
+      // Legend panel positioning depends on graph panel AND create button states
+      let topOffset = 20; // Start position
+      
+      // Add graph panel height/button
+      if (showGraphPanel) {
+        topOffset += graphPanelHeight + expandedSpacing;
+      } else {
+        topOffset += buttonHeight + compactSpacing;
+      }
+      
+      // Add create button height (only if not in empty state)
+      if (!showEmptyStateOverlay) {
+        topOffset += buttonHeight + compactSpacing;
+      }
+      
+      return { top: `${topOffset}px` };
+    }
+    
+    return { top: '20px' };
+  };
 
   // Additional edge operations
   const [updateEdgeMutation] = useMutation(UPDATE_EDGE, {
@@ -171,6 +240,7 @@ export function InteractiveGraphVisualization() {
     const handleClickOutside = () => {
       setNodeMenu(prev => ({ ...prev, visible: false }));
       setEdgeMenu(prev => ({ ...prev, visible: false }));
+      setSelectedNode(null); // Clear selected node when clicking outside
     };
 
     document.addEventListener('click', handleClickOutside);
@@ -208,6 +278,9 @@ export function InteractiveGraphVisualization() {
       setIsConnecting(false);
       setConnectionSource(null);
     } else {
+      // Set selected node for the Node Actions panel
+      setSelectedNode(node);
+      
       // Show node menu
       const containerRect = containerRef.current?.getBoundingClientRect();
       if (containerRect) {
@@ -295,6 +368,9 @@ export function InteractiveGraphVisualization() {
       computed: item.priorityComp
     }
   }));
+  
+  // Define whether to show empty state overlay (but don't early return)
+  const showEmptyStateOverlay = !loading && !error && nodes.length === 0;
 
   // Create hierarchical attraction links based on project structure
   const createHierarchicalLinks = (nodes: WorkItem[]) => {
@@ -323,8 +399,8 @@ export function InteractiveGraphVisualization() {
         hierarchyLinks.push({
           source: epic.id,
           target: milestone.id,
-          strength: 0.3, // Strong attraction
-          distance: 120 // Moderate distance
+          strength: 0.1, // Weaker attraction for better spacing
+          distance: 250 // Larger distance for clear edge visibility
         });
       });
     });
@@ -335,8 +411,8 @@ export function InteractiveGraphVisualization() {
         hierarchyLinks.push({
           source: milestone.id,
           target: feature.id,
-          strength: 0.2,
-          distance: 100
+          strength: 0.08,
+          distance: 220
         });
       });
     });
@@ -347,16 +423,16 @@ export function InteractiveGraphVisualization() {
         hierarchyLinks.push({
           source: feature.id,
           target: task.id,
-          strength: 0.25, // Tasks strongly attach to features
-          distance: 80
+          strength: 0.1, // Weaker attachment for better spacing
+          distance: 200
         });
       });
       bugs.forEach(bug => {
         hierarchyLinks.push({
           source: feature.id,
           target: bug.id,
-          strength: 0.25, // Bugs also attach to features
-          distance: 80
+          strength: 0.1, // Weaker attachment for better spacing
+          distance: 200
         });
       });
     });
@@ -367,8 +443,8 @@ export function InteractiveGraphVisualization() {
         hierarchyLinks.push({
           source: epic.id,
           target: outcome.id,
-          strength: 0.15,
-          distance: 140
+          strength: 0.06,
+          distance: 280
         });
       });
     });
@@ -376,12 +452,46 @@ export function InteractiveGraphVisualization() {
     return hierarchyLinks;
   };
 
+  // Initialize empty visualization canvas
+  const initializeEmptyVisualization = useCallback(() => {
+    if (!svgRef.current || !containerRef.current) return;
+
+    const container = containerRef.current;
+    const svg = d3.select(svgRef.current);
+    
+    // Clear previous content
+    svg.selectAll('*').remove();
+    
+    // Clear any existing HTML label containers
+    d3.select(containerRef.current).selectAll('.node-labels-container').remove();
+
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+
+    svg.attr('width', width).attr('height', height);
+    
+    // Create zoom behavior for empty canvas
+    const zoom = d3.zoom<SVGSVGElement, unknown>()
+      .scaleExtent([0.1, 3])
+      .on('zoom', (event) => {
+        const g = svg.select('g');
+        if (!g.empty()) {
+          g.attr('transform', event.transform);
+        }
+      });
+
+    svg.call(zoom);
+    const g = svg.append('g');
+  }, []);
+
   // Define initializeVisualization function with access to nodes data
   const initializeVisualization = useCallback(() => {
-    if (!svgRef.current || !containerRef.current || nodes.length === 0) return;
-
-    if (import.meta.env.DEV) {
-      console.log('Initializing visualization with', nodes.length, 'nodes and', validatedEdges.length, 'edges');
+    if (!svgRef.current || !containerRef.current) return;
+    
+    // Handle empty state
+    if (nodes.length === 0) {
+      initializeEmptyVisualization();
+      return;
     }
 
     const container = containerRef.current;
@@ -422,52 +532,50 @@ export function InteractiveGraphVisualization() {
     simulation
       .force('link', d3.forceLink(validatedEdges)
         .id((d: any) => d.id)
-        .distance(180) // Increased minimum edge distance
-        .strength(0.15) // Reduced strength for less aggressive pulling
+        .distance(500) // Much larger distance for massive spread
+        .strength(0.05) // Weaker to allow more flexibility
       )
       .force('charge', d3.forceManyBody()
         .strength((d: any) => {
-          // Reduced repulsion forces for more stable positioning
+          // Much stronger repulsion for maximum spread
           switch (d.type) {
             case 'EPIC':
-              return -150; // Reduced from -300
+              return -1200; // Extreme repulsion
             case 'OUTCOME': 
-              return -120; // Reduced from -200
+              return -1000; 
             case 'MILESTONE':
-              return -60; // Reduced from -80
+              return -900;
             case 'FEATURE':
-              return -70; // Reduced from -100
+              return -800;
             case 'TASK':
-              return -40; // Reduced from -50
+              return -700;
             case 'BUG':
-              return -40; // Reduced from -50
+              return -700;
             case 'IDEA':
-              return -25; // Reduced from -30
+              return -600;
             default:
-              return -50; // Reduced from -80
+              return -800;
           }
         })
-        .distanceMax(400) // Increased max distance for gentler forces
+        .distanceMax(1500) // Much larger max distance for wider influence
       )
-      .force('center', d3.forceCenter(centerX, centerY).strength(0.05)) // Much weaker centering force
-      .force('collision', d3.forceCollide()
-        .radius((d: any) => {
-          const baseRadius = d.type === 'EPIC' ? 80 : // Increased collision radius
-                            d.type === 'MILESTONE' ? 70 : 
-                            d.type === 'FEATURE' ? 65 : 60;
-          return baseRadius;
-        })
-        .strength(0.5) // Reduced collision strength
+      .force('center', d3.forceCenter(centerX, centerY).strength(0.01)) // Minimal centering
+      .force('x', d3.forceX(centerX).strength(0.002)) // Extremely weak horizontal centering for maximum width
+      .force('y', d3.forceY(centerY).strength(0.002)) // Extremely weak vertical centering for maximum height
+      .force('collision', d3.forceCollide(250) // Much larger collision radius for maximum spacing
+        .strength(0.95) // Very strong collision prevention
+        .iterations(5) // More iterations for better separation
       )
       // Add hierarchical attraction forces (Epic->Milestone, Feature->Task, etc.)
       .force('hierarchy', d3.forceLink()
         .id((d: any) => d.id)
         .links(createHierarchicalLinks(nodes))
-        .distance((d: any) => d.distance || 140) // Increased hierarchical distance
-        .strength((d: any) => d.strength || 0.1) // Reduced hierarchical strength
+        .distance((d: any) => d.distance || 250) // Much larger hierarchical distance
+        .strength((d: any) => d.strength || 0.05) // Very weak hierarchical strength
       )
       .alphaTarget(0.05) // Lower alpha target for calmer simulation
-      .alphaDecay(0.02); // Faster decay to settle sooner
+      .alphaDecay(0.015) // Slightly slower decay for better collision resolution
+      .velocityDecay(0.4); // Add velocity decay for smoother movement
 
     // Create edges FIRST (so they render under nodes)
     const linkElements = g.append('g')
@@ -478,13 +586,8 @@ export function InteractiveGraphVisualization() {
       .append('line')
       .attr('class', 'edge')
       .attr('stroke', (d: WorkItemEdge) => {
-        switch (d.type) {
-          case 'DEPENDS_ON': return '#10b981';
-          case 'BLOCKS': return '#dc2626';
-          case 'RELATES_TO': return '#3b82f6';
-          case 'PART_OF': return '#f59e0b';
-          default: return '#6b7280';
-        }
+        const config = getRelationshipConfig(d.type as RelationshipType);
+        return config.hexColor;
       })
       .attr('stroke-width', (d: WorkItemEdge) => (d.strength || 0.8) * 3)
       .attr('stroke-opacity', 0.7);
@@ -493,12 +596,9 @@ export function InteractiveGraphVisualization() {
     const defs = svg.append('defs');
     
     // Create different arrowhead colors for each edge type
-    const edgeTypes = ['DEPENDS_ON', 'BLOCKS', 'RELATES_TO', 'PART_OF'];
-    const edgeColors = ['#10b981', '#dc2626', '#3b82f6', '#f59e0b'];
-    
-    edgeTypes.forEach((type, index) => {
+    RELATIONSHIP_OPTIONS.forEach((option) => {
       defs.append('marker')
-        .attr('id', `arrowhead-${type}`)
+        .attr('id', `arrowhead-${option.type}`)
         .attr('viewBox', '-5 -5 10 10')
         .attr('refX', 0)
         .attr('refY', 0)
@@ -507,8 +607,8 @@ export function InteractiveGraphVisualization() {
         .attr('markerHeight', 8)
         .append('path')
         .attr('d', 'M-3,-3 L0,0 L-3,3 L-1,0 Z')
-        .attr('fill', edgeColors[index])
-        .attr('stroke', edgeColors[index])
+        .attr('fill', option.hexColor)
+        .attr('stroke', option.hexColor)
         .attr('stroke-width', 1);
     });
 
@@ -523,56 +623,9 @@ export function InteractiveGraphVisualization() {
       .style('cursor', 'pointer')
       .call(d3.drag<any, any>()
         .on('start', (event, d: any) => {
-          if (!event.active) simulation.alphaTarget(0.1).restart(); // Gentler restart
+          if (!event.active) simulation.alphaTarget(0.2).restart();
           d.fx = d.x;
           d.fy = d.y;
-          
-          // Add expanding ring effect to selected node
-          const nodeGroup = d3.select(event.currentTarget);
-          nodeGroup.select('circle').classed('node-selected', true);
-          
-          // Create multiple expanding rings for effect
-          const radius = parseFloat(nodeGroup.select('circle').attr('r'));
-          const color = nodeGroup.select('circle').attr('fill');
-          
-          // Create 2-3 rings with staggered animations
-          for (let i = 0; i < 2; i++) {
-            setTimeout(() => {
-              const ring = nodeGroup.append('circle')
-                .attr('class', 'expanding-ring')
-                .attr('r', radius)
-                .attr('fill', 'none')
-                .attr('stroke', color)
-                .attr('stroke-width', 3)
-                .attr('opacity', 0.6);
-              
-              // Animate the ring expanding
-              ring.transition()
-                .duration(1500)
-                .attr('r', radius * 2.5)
-                .attr('stroke-width', 0.5)
-                .attr('opacity', 0)
-                .on('end', function() { d3.select(this).remove(); })
-                .transition()
-                .duration(0)
-                .attr('r', radius)
-                .attr('stroke-width', 3)
-                .attr('opacity', 0.6)
-                .on('end', function() {
-                  // Repeat if node is still selected
-                  if (nodeGroup.select('circle').classed('node-selected')) {
-                    d3.select(this).transition()
-                      .duration(1500)
-                      .attr('r', radius * 2.5)
-                      .attr('stroke-width', 0.5)
-                      .attr('opacity', 0)
-                      .on('end', function() { d3.select(this).remove(); });
-                  } else {
-                    d3.select(this).remove();
-                  }
-                });
-            }, i * 750); // Stagger the rings
-          }
         })
         .on('drag', (event, d: any) => {
           // Get node radius
@@ -584,31 +637,64 @@ export function InteractiveGraphVisualization() {
           d.y = d.fy;
         })
         .on('end', (event, d: any) => {
-          if (!event.active) simulation.alphaTarget(0.02); // Lower target for stability
-          // Don't immediately clear fixed positions - let them drift gently
+          if (!event.active) simulation.alphaTarget(0.05);
+          // Keep position fixed for a short time to allow other nodes to settle
           setTimeout(() => {
             d.fx = null;
             d.fy = null;
-          }, 1000); // 1 second delay before releasing position
-          
-          // Remove expanding ring effect
-          const nodeGroup = d3.select(event.currentTarget);
-          nodeGroup.select('circle').classed('node-selected', false);
-          nodeGroup.selectAll('.expanding-ring').remove();
+            simulation.alphaTarget(0.02);
+          }, 500);
         }));
 
     // Monopoly-style rectangular nodes with colored title bars
     const getNodeDimensions = (d: WorkItem) => {
-      switch (d.type) {
-        case 'EPIC': return { width: 140, height: 100 };
-        case 'MILESTONE': return { width: 130, height: 90 };
-        case 'FEATURE': return { width: 120, height: 85 };
-        case 'OUTCOME': return { width: 125, height: 95 };
-        case 'TASK': return { width: 110, height: 80 };
-        case 'BUG': return { width: 105, height: 75 };
-        case 'IDEA': return { width: 100, height: 70 };
-        default: return { width: 110, height: 80 };
+      // Larger base dimensions by type - increased for 3-line support
+      const baseDimensions = (() => {
+        switch (d.type) {
+          case 'EPIC': return { width: 200, height: 120 };
+          case 'MILESTONE': return { width: 190, height: 115 };
+          case 'FEATURE': return { width: 180, height: 110 };
+          case 'OUTCOME': return { width: 185, height: 115 };
+          case 'TASK': return { width: 170, height: 105 };
+          case 'BUG': return { width: 165, height: 100 };
+          case 'IDEA': return { width: 160, height: 95 };
+          default: return { width: 170, height: 105 };
+        }
+      })();
+      
+      // Use base width for consistent layout
+      const width = baseDimensions.width;
+      
+      // Calculate actual text wrapping based on word breaks - up to 3 lines
+      const maxCharsPerLine = Math.floor(width / 8); // ~8px per character for more conservative wrapping
+      const words = d.title.split(' ');
+      let lines = 1;
+      let currentLineLength = 0;
+      
+      for (const word of words) {
+        const wordLength = word.length;
+        // Check if adding this word would exceed line length
+        if (currentLineLength + wordLength + 1 > maxCharsPerLine && currentLineLength > 0) {
+          lines++;
+          currentLineLength = wordLength;
+          if (lines >= 3) break; // Maximum 3 lines
+        } else {
+          currentLineLength += wordLength + (currentLineLength > 0 ? 1 : 0); // +1 for space
+        }
       }
+      
+      lines = Math.min(lines, 3); // Maximum 3 lines
+      
+      // Calculate additional height needed for multiple lines (16px per extra line)
+      const additionalHeight = (lines - 1) * 16;
+      const finalHeight = baseDimensions.height + additionalHeight;
+      
+      return { 
+        width: width, 
+        height: finalHeight,
+        titleLines: lines,
+        maxCharsPerLine: maxCharsPerLine
+      };
     };
     
     // Main node rectangle (dark theme background)
@@ -627,12 +713,22 @@ export function InteractiveGraphVisualization() {
         return '#1f2937'; // Dark background consistent with theme
       })
       .attr('stroke', (d: WorkItem) => {
+        // Highlight selected node with bright border
+        if (selectedNode && selectedNode.id === d.id) {
+          return '#10b981'; // Bright green for selected node
+        }
         if (d.status === 'COMPLETED' || d.status === 'Completed' || d.status === 'Done' || d.status === 'DONE') {
           return '#4b5563';
         }
         return '#4b5563'; // Gray border
       })
-      .attr('stroke-width', 1.5);
+      .attr('stroke-width', (d: WorkItem) => {
+        // Thicker border for selected node
+        if (selectedNode && selectedNode.id === d.id) {
+          return 3;
+        }
+        return 1.5;
+      });
 
     // Colored title bar at top (like Monopoly property cards)
     const titleBarHeight = 28;
@@ -650,14 +746,14 @@ export function InteractiveGraphVisualization() {
         }
         
         const colors: Record<string, string> = {
-          EPIC: '#8B5CF6',      // purple-500
-          MILESTONE: '#F59E0B', // amber-500
-          OUTCOME: '#6366F1',   // indigo-500
-          FEATURE: '#10B981',   // emerald-500
-          TASK: '#3B82F6',      // blue-500
-          BUG: '#EF4444',       // red-500
-          IDEA: '#EAB308',      // yellow-500
-          RESEARCH: '#14B8A6'   // teal-500
+          EPIC: '#c084fc',      // fuchsia-400 - exact match with icon
+          MILESTONE: '#fb923c', // orange-400 - exact match with icon  
+          OUTCOME: '#818cf8',   // indigo-400 - exact match with icon
+          FEATURE: '#38bdf8',   // sky-400 - exact match with icon
+          TASK: '#4ade80',      // green-400 - exact match with icon
+          BUG: '#ef4444',       // red-500 - exact match with icon
+          IDEA: '#eab308',      // yellow-500 - exact match with icon
+          RESEARCH: '#2dd4bf'   // teal-400 - exact match with icon
         };
         return colors[d.type] || '#6B7280';
       })
@@ -667,20 +763,20 @@ export function InteractiveGraphVisualization() {
         }
         
         const borderColors: Record<string, string> = {
-          EPIC: '#7C3AED',      // purple-600
-          MILESTONE: '#D97706', // amber-600
-          OUTCOME: '#4F46E5',   // indigo-600
-          FEATURE: '#059669',   // emerald-600
-          TASK: '#2563EB',      // blue-600
-          BUG: '#DC2626',       // red-600
-          IDEA: '#CA8A04',      // yellow-600
-          RESEARCH: '#0D9488'   // teal-600
+          EPIC: '#a855f7',      // fuchsia-500 - slightly darker than bg
+          MILESTONE: '#f97316', // orange-500 - slightly darker than bg
+          OUTCOME: '#6366f1',   // indigo-500 - slightly darker than bg
+          FEATURE: '#0ea5e9',   // sky-500 - slightly darker than bg
+          TASK: '#22c55e',      // green-500 - slightly darker than bg
+          BUG: '#dc2626',       // red-600 - slightly darker than bg
+          IDEA: '#d97706',      // yellow-600 - darker border
+          RESEARCH: '#14b8a6'   // teal-500 - slightly darker than bg
         };
         return borderColors[d.type] || '#4B5563';
       })
       .attr('stroke-width', 1.5);
 
-    // Node type text in colored title bar (centered, bold and white)
+    // Node type text in colored title bar (centered)
     nodeElements.append('text')
       .attr('class', 'node-type-text')
       .attr('x', 0)
@@ -688,41 +784,127 @@ export function InteractiveGraphVisualization() {
       .attr('text-anchor', 'middle')
       .attr('dominant-baseline', 'middle')
       .text((d: WorkItem) => d.type)
-      .style('font-size', '11px')
+      .style('font-size', '13px')
       .style('font-weight', '700')
-      .style('fill', '#ffffff')
+      .style('fill', (d: WorkItem) => {
+        const config = getTypeConfig(d.type as WorkItemType);
+        return config.hexColor;
+      })
       .style('pointer-events', 'none');
 
-    // Node title section - larger and cleaner
-    nodeElements.append('text')
-      .attr('class', 'node-title-text')
-      .attr('x', 0)
-      .attr('y', (d: WorkItem) => -getNodeDimensions(d).height / 2 + titleBarHeight + 22)
-      .attr('text-anchor', 'middle')
-      .attr('dominant-baseline', 'middle')
-      .text((d: WorkItem) => {
-        const maxLength = Math.floor(getNodeDimensions(d).width / 7);
-        return d.title.length > maxLength ? d.title.substring(0, maxLength - 3) + '...' : d.title;
-      })
-      .style('font-size', '14px')
-      .style('font-weight', '600')
-      .style('fill', (d: WorkItem) => {
-        const isCompleted = d.status === 'COMPLETED' || d.status === 'Completed' || d.status === 'Done' || d.status === 'DONE';
-        return isCompleted ? '#9ca3af' : '#ffffff';
-      })
-      .style('pointer-events', 'none');
+    // Node title section - with text wrapping
+    nodeElements.each(function(d: WorkItem) {
+      const nodeGroup = d3.select(this);
+      const dimensions = getNodeDimensions(d);
+      const { maxCharsPerLine } = dimensions;
+      
+      // Split title into lines with proper word wrapping - 3-line maximum
+      const words = d.title.split(' ');
+      const lines: string[] = [];
+      let currentLine = '';
+      let hasMoreText = false;
+      
+      for (let i = 0; i < words.length; i++) {
+        const word = words[i];
+        const testLine = currentLine + (currentLine ? ' ' : '') + word;
+        
+        // Check if this line would be too long
+        if (testLine.length <= maxCharsPerLine) {
+          currentLine = testLine;
+        } else {
+          // Need to wrap to next line
+          if (lines.length < 2) {
+            // Can still add another line (we allow up to 3 lines)
+            lines.push(currentLine || word); // Handle case where first word is too long
+            currentLine = currentLine ? word : '';
+          } else {
+            // Already have 2 lines, this would be fourth line - truncate
+            hasMoreText = true;
+            break;
+          }
+        }
+      }
+      
+      // Add the final line
+      if (currentLine) {
+        if (hasMoreText && lines.length === 2) {
+          // Truncate third line with ellipsis
+          const availableSpace = maxCharsPerLine - 3; // Reserve space for "..."
+          const truncated = currentLine.length > availableSpace 
+            ? currentLine.substring(0, availableSpace) + '...'
+            : currentLine + '...';
+          lines.push(truncated);
+        } else {
+          lines.push(currentLine);
+        }
+      }
+      
+      // Ensure we always have at least one line
+      if (lines.length === 0) {
+        lines.push(d.title.substring(0, maxCharsPerLine - 3) + '...');
+      }
+      
+      // Create text elements for each line
+      const startY = -dimensions.height / 2 + titleBarHeight + 18;
+      lines.forEach((line, index) => {
+        nodeGroup.append('text')
+          .attr('class', 'node-title-text')
+          .attr('x', 0)
+          .attr('y', startY + (index * 16))
+          .attr('text-anchor', 'middle')
+          .attr('dominant-baseline', 'middle')
+          .text(line)
+          .style('font-size', '14px')
+          .style('font-weight', '600')
+          .style('fill', () => {
+            const isCompleted = d.status === 'COMPLETED' || d.status === 'Completed' || d.status === 'Done' || d.status === 'DONE';
+            return isCompleted ? '#9ca3af' : '#ffffff';
+          })
+          .style('pointer-events', 'none');
+      });
+
+      // Add eye icon at bottom after title text ends
+      const titleEndY = startY + (lines.length * 16) + 8; // 8px gap after title text
+      
+      const eyeIconGroup = nodeGroup.append('g')
+        .attr('class', 'eye-icon-group')
+        .attr('transform', `translate(0, ${titleEndY})`)
+        .style('cursor', 'pointer')
+        .style('pointer-events', 'all')
+        .on('click', function(event) {
+          event.stopPropagation();
+          handleViewNodeDetails(d);
+        });
+      
+      // Eye icon at bottom center
+      eyeIconGroup.append('path')
+        .attr('class', 'eye-icon-path')
+        .attr('d', 'M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z M12 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6z')
+        .attr('fill', 'none')
+        .attr('stroke', '#ffffff')
+        .attr('stroke-width', '1')
+        .attr('stroke-linecap', 'round')
+        .attr('stroke-linejoin', 'round')
+        .attr('transform', 'translate(-12, -12) scale(0.5)')
+        .style('opacity', '0.7');
+    });
 
     // Description section - bigger and more readable
     nodeElements.append('text')
       .attr('class', 'node-description-text')
       .attr('x', 0)
-      .attr('y', (d: WorkItem) => -getNodeDimensions(d).height / 2 + titleBarHeight + 42)
+      .attr('y', (d: WorkItem) => {
+        const dimensions = getNodeDimensions(d);
+        const titleLinesHeight = dimensions.titleLines * 16;
+        return -dimensions.height / 2 + titleBarHeight + 18 + titleLinesHeight + 8;
+      })
       .attr('text-anchor', 'middle')
       .attr('dominant-baseline', 'middle')
       .text((d: WorkItem) => {
         if (!d.description) return '';
         const maxLength = Math.floor(getNodeDimensions(d).width / 6.5);
-        return d.description.length > maxLength ? d.description.substring(0, maxLength - 3) + '...' : d.description;
+        // Hide description if too long instead of truncating
+        return d.description.length > maxLength ? '' : d.description;
       })
       .style('font-size', '11px')
       .style('font-weight', '400')
@@ -732,20 +914,197 @@ export function InteractiveGraphVisualization() {
       })
       .style('pointer-events', 'none');
 
-    // Priority indicator (small dot in bottom right)
-    nodeElements.append('circle')
-      .attr('class', 'priority-indicator-dot')
-      .attr('r', 4)
-      .attr('cx', (d: WorkItem) => getNodeDimensions(d).width / 2 - 8)
-      .attr('cy', (d: WorkItem) => getNodeDimensions(d).height / 2 - 8)
-      .attr('fill', (d: WorkItem) => {
-        const priority = d.priorityComp || 0;
-        if (priority > 0.7) return '#dc2626'; // High priority - red
-        if (priority > 0.4) return '#d97706'; // Medium priority - orange
-        return '#059669'; // Low priority - green
-      })
-      .attr('stroke', '#ffffff')
-      .attr('stroke-width', 1);
+    // Status progress bar and percentage (bottom left)
+    nodeElements.each(function(d: WorkItem) {
+      const nodeGroup = d3.select(this);
+      const dimensions = getNodeDimensions(d);
+      
+      // Calculate status percentage
+      const statusPercentage = (() => {
+        switch (d.status) {
+          case 'PROPOSED': return 20;
+          case 'PLANNED': return 40;
+          case 'BLOCKED': return 50;
+          case 'IN_PROGRESS': return 70;
+          case 'COMPLETED': return 100;
+          default: return 0;
+        }
+      })();
+      
+      // Get status color
+      const statusColor = (() => {
+        switch (d.status) {
+          case 'PROPOSED': return '#06b6d4'; // cyan
+          case 'PLANNED': return '#a855f7'; // purple
+          case 'IN_PROGRESS': return '#eab308'; // yellow
+          case 'COMPLETED': return '#22c55e'; // green
+          case 'BLOCKED': return '#ef4444'; // red
+          default: return '#9ca3af'; // gray
+        }
+      })();
+      
+      const barWidth = 40;
+      const barHeight = 3;
+      const barX = -dimensions.width / 2 + 8;
+      const barY = dimensions.height / 2 - 15;
+      
+      // Status progress bar background
+      nodeGroup.append('rect')
+        .attr('class', 'status-progress-bg')
+        .attr('x', barX)
+        .attr('y', barY)
+        .attr('width', barWidth)
+        .attr('height', barHeight)
+        .attr('rx', 1.5)
+        .attr('fill', '#374151')
+        .style('pointer-events', 'none');
+      
+      // Status progress bar fill
+      nodeGroup.append('rect')
+        .attr('class', 'status-progress-fill')
+        .attr('x', barX)
+        .attr('y', barY)
+        .attr('width', (barWidth * statusPercentage) / 100)
+        .attr('height', barHeight)
+        .attr('rx', 1.5)
+        .attr('fill', statusColor)
+        .style('pointer-events', 'none');
+      
+      // Status icon (SVG) - positioned after "Status" text
+      const statusLabelX = barX + barWidth / 2 - 8;
+      const statusIconX = statusLabelX + 15; // Position after "Status" text
+      nodeGroup.append('svg')
+        .attr('class', 'status-icon-svg')
+        .attr('x', statusIconX)
+        .attr('y', barY - 22)
+        .attr('width', 10)
+        .attr('height', 10)
+        .attr('viewBox', '0 0 24 24')
+        .style('pointer-events', 'none')
+        .append('path')
+        .attr('d', getStatusIconPath(d.status))
+        .attr('fill', 'none')
+        .attr('stroke', statusColor)
+        .attr('stroke-width', '2')
+        .attr('stroke-linecap', 'round')
+        .attr('stroke-linejoin', 'round');
+
+      // Status label (above percentage)
+      nodeGroup.append('text')
+        .attr('class', 'status-label-text')
+        .attr('x', barX + barWidth / 2 - 8)
+        .attr('y', barY - 16)
+        .attr('text-anchor', 'middle')
+        .attr('dominant-baseline', 'middle')
+        .text('Status')
+        .style('font-size', '8px')
+        .style('font-weight', '400')
+        .style('fill', '#9ca3af')
+        .style('pointer-events', 'none');
+
+      // Status percentage text (above bar)
+      nodeGroup.append('text')
+        .attr('class', 'status-percentage-text')
+        .attr('x', barX + barWidth / 2)
+        .attr('y', barY - 4)
+        .attr('text-anchor', 'middle')
+        .attr('dominant-baseline', 'middle')
+        .text(`${statusPercentage}%`)
+        .style('font-size', '9px')
+        .style('font-weight', '500')
+        .style('fill', statusColor)
+        .style('pointer-events', 'none');
+    });
+
+    // Priority progress bar and percentage (bottom right)
+    nodeElements.each(function(d: WorkItem) {
+      const nodeGroup = d3.select(this);
+      const dimensions = getNodeDimensions(d);
+      
+      const priority = d.priorityComp || d.priorityExec || 0;
+      const priorityPercentage = Math.round(priority * 100);
+      
+      // Get priority color
+      const priorityColor = (() => {
+        if (priority >= 0.8) return '#ef4444'; // Critical - red
+        if (priority >= 0.6) return '#f97316'; // High - orange  
+        if (priority >= 0.4) return '#eab308'; // Medium - yellow
+        if (priority >= 0.2) return '#3b82f6'; // Low - blue
+        return '#6b7280'; // Minimal - gray
+      })();
+      
+      const barWidth = 40;
+      const barHeight = 3;
+      const barX = dimensions.width / 2 - 8 - barWidth;
+      const barY = dimensions.height / 2 - 15;
+      
+      // Priority progress bar background
+      nodeGroup.append('rect')
+        .attr('class', 'priority-progress-bg')
+        .attr('x', barX)
+        .attr('y', barY)
+        .attr('width', barWidth)
+        .attr('height', barHeight)
+        .attr('rx', 1.5)
+        .attr('fill', '#374151')
+        .style('pointer-events', 'none');
+      
+      // Priority progress bar fill
+      nodeGroup.append('rect')
+        .attr('class', 'priority-progress-fill')
+        .attr('x', barX)
+        .attr('y', barY)
+        .attr('width', (barWidth * priorityPercentage) / 100)
+        .attr('height', barHeight)
+        .attr('rx', 1.5)
+        .attr('fill', priorityColor)
+        .style('pointer-events', 'none');
+      
+      // Priority icon (SVG) - positioned after "Priority" text
+      const priorityLabelX = barX + barWidth / 2;
+      const priorityIconX = priorityLabelX + 18 - 2; // Position after "Priority" text, shifted left by 2
+      nodeGroup.append('svg')
+        .attr('class', 'priority-icon-svg')
+        .attr('x', priorityIconX)
+        .attr('y', barY - 22)
+        .attr('width', 10)
+        .attr('height', 10)
+        .attr('viewBox', '0 0 24 24')
+        .style('pointer-events', 'none')
+        .append('path')
+        .attr('d', getPriorityIconPath(priority))
+        .attr('fill', 'none')
+        .attr('stroke', priorityColor)
+        .attr('stroke-width', '2')
+        .attr('stroke-linecap', 'round')
+        .attr('stroke-linejoin', 'round');
+
+      // Priority label (above percentage)
+      nodeGroup.append('text')
+        .attr('class', 'priority-label-text')
+        .attr('x', barX + barWidth / 2)
+        .attr('y', barY - 16)
+        .attr('text-anchor', 'middle')
+        .attr('dominant-baseline', 'middle')
+        .text('Priority')
+        .style('font-size', '8px')
+        .style('font-weight', '400')
+        .style('fill', '#9ca3af')
+        .style('pointer-events', 'none');
+
+      // Priority percentage text (above bar)
+      nodeGroup.append('text')
+        .attr('class', 'priority-percentage-text')
+        .attr('x', barX + barWidth / 2)
+        .attr('y', barY - 4)
+        .attr('text-anchor', 'middle')
+        .attr('dominant-baseline', 'middle')
+        .text(`${priorityPercentage}%`)
+        .style('font-size', '9px')
+        .style('font-weight', '500')
+        .style('fill', priorityColor)
+        .style('pointer-events', 'none');
+    });
 
     // Add completion indicators (checkmarks) for completed nodes
     nodeElements.each(function(d: WorkItem) {
@@ -765,63 +1124,7 @@ export function InteractiveGraphVisualization() {
           .attr('pointer-events', 'none')
           .text('✓');
       }
-      const nodeRadius = d.type === 'OUTCOME' ? 42 : d.type === 'MILESTONE' ? 40 : d.type === 'TASK' ? 30 : 25;
       
-      // Multi-line text wrapping function
-      const wrapText = (text: string, maxChars: number) => {
-        const words = text.split(' ');
-        const lines: string[] = [];
-        let currentLine = '';
-        
-        for (const word of words) {
-          if ((currentLine + ' ' + word).length <= maxChars) {
-            currentLine = currentLine ? currentLine + ' ' + word : word;
-          } else {
-            if (currentLine) {
-              lines.push(currentLine);
-              currentLine = word;
-            } else {
-              // Single word too long, truncate it
-              lines.push(word.length > maxChars ? word.substring(0, maxChars - 3) + '...' : word);
-              currentLine = '';
-            }
-          }
-        }
-        if (currentLine) {
-          lines.push(currentLine);
-        }
-        
-        // Limit to 2 lines max
-        if (lines.length > 2) {
-          lines[1] = lines[1].substring(0, Math.max(0, maxChars - 3)) + '...';
-          return lines.slice(0, 2);
-        }
-        
-        return lines;
-      };
-      
-      const maxChars = nodeRadius > 35 ? 14 : nodeRadius > 25 ? 10 : 8;
-      const lines = wrapText(d.title, maxChars);
-      const fontSize = nodeRadius > 35 ? 12 : nodeRadius > 25 ? 10 : 9;
-      const lineHeight = fontSize * 1.2;
-      
-      // Calculate vertical offset to center multi-line text
-      
-      // Determine text color based on node background color for contrast
-      const getTextColor = (nodeType: string) => {
-        switch (nodeType) {
-          case 'EPIC': return '#ffffff'; // Purple background - white text
-          case 'FEATURE': return '#ffffff'; // Blue background - white text
-          case 'TASK': return '#000000'; // Green background - black text  
-          case 'BUG': return '#ffffff'; // Red background - white text
-          case 'MILESTONE': return '#000000'; // Yellow background - black text
-          case 'OUTCOME': return '#ffffff'; // Indigo background - white text
-          case 'IDEA': return '#000000'; // Orange background - black text
-          default: return '#000000'; // Gray background - black text
-        }
-      };
-
-      // Old text removed - using new Monopoly-style text instead
     });
 
     // Create arrow symbols for middle of edges
@@ -832,45 +1135,35 @@ export function InteractiveGraphVisualization() {
       .enter()
       .append('path')
       .attr('class', 'arrow')
-      .attr('d', 'M-4,-2 L0,0 L-4,2 L-2,0 Z')
+      .attr('d', 'M-16,-8 L0,0 L-16,8 L-8,0 Z')
       .attr('fill', (d: WorkItemEdge) => {
-        switch (d.type) {
-          case 'DEPENDS_ON': return '#10b981';
-          case 'BLOCKS': return '#dc2626';
-          case 'RELATES_TO': return '#3b82f6';
-          case 'PART_OF': return '#f59e0b';
-          default: return '#6b7280';
+        // Use the source node's color for the arrow
+        const sourceNode = nodes.find(n => n.id === (typeof d.source === 'string' ? d.source : (d.source as any)?.id));
+        if (sourceNode) {
+          return getNodeColor(sourceNode);
         }
+        // Fallback to edge type color if node not found
+        const config = getRelationshipConfig(d.type as RelationshipType);
+        return config.hexColor;
       })
       .attr('stroke', (d: WorkItemEdge) => {
-        switch (d.type) {
-          case 'DEPENDS_ON': return '#10b981';
-          case 'BLOCKS': return '#dc2626';
-          case 'RELATES_TO': return '#3b82f6';
-          case 'PART_OF': return '#f59e0b';
-          default: return '#6b7280';
+        // Use the source node's color for the arrow stroke
+        const sourceNode = nodes.find(n => n.id === (typeof d.source === 'string' ? d.source : (d.source as any)?.id));
+        if (sourceNode) {
+          return getNodeColor(sourceNode);
         }
+        // Fallback to edge type color if node not found
+        const config = getRelationshipConfig(d.type as RelationshipType);
+        return config.hexColor;
       })
       .attr('stroke-width', 1)
       .attr('opacity', 1);
 
     // Add click handlers to nodes
     nodeElements.on('click', (event: MouseEvent, d: WorkItem) => {
-      // Remove previous selection
-      d3.selectAll('.node-selected').classed('node-selected', false);
-      
-      // Add pulsating glow to clicked node
-      d3.select(event.currentTarget as SVGElement)
-        .select('circle')
-        .classed('node-selected', true);
-      
       handleNodeClick(event, d);
     });
 
-    // TODO: Edge tracking still not working properly
-    // FIXME: Edges don't stick to node centers during drag operations
-    // ISSUE: Edge vertices lag behind or offset from actual node positions
-    // NEEDS: Complete rewrite of edge positioning system
     const updateEdgePositions = () => {
       // Update edge positions - D3 has already updated source/target with current positions
       linkElements
@@ -889,7 +1182,7 @@ export function InteractiveGraphVisualization() {
         });
     };
 
-    // Simulation tick - ONLY update nodes, edges are handled separately
+    // Simulation tick
     simulation.on('tick', () => {
       // Constrain nodes to container bounds
       nodes.forEach((d: any) => {
@@ -909,24 +1202,32 @@ export function InteractiveGraphVisualization() {
     // Update zoom
     zoom.on('zoom', (event) => {
       g.attr('transform', event.transform);
+      setCurrentTransform({ 
+        x: event.transform.x, 
+        y: event.transform.y, 
+        scale: event.transform.k 
+      });
     });
 
     // Properly restart simulation to ensure initial positioning works
     simulation.alpha(0.8).restart();
-
-    if (import.meta.env.DEV) {
-      console.log('✅ Visualization initialized with', nodes.length, 'nodes');
-    }
-  }, [nodes, validatedEdges, handleNodeClick]); // Include handleNodeClick to get fresh connection state
+    
+    // Add method to restart collision detection
+    (simulation as any).restartCollisions = () => {
+      simulation.alphaTarget(0.3).restart();
+      setTimeout(() => {
+        simulation.alphaTarget(0.05);
+      }, 2000);
+    };
+  }, [nodes, validatedEdges, handleNodeClick, initializeEmptyVisualization]); // Include handleNodeClick to get fresh connection state
 
   // Store simulation reference for resize handling
   const simulationRef = useRef<d3.Simulation<any, any> | null>(null);
 
   // Initialization effect
   useEffect(() => {
-    if (nodes.length > 0) {
-      initializeVisualization();
-    }
+    // Always initialize visualization (handles both empty and populated states)
+    initializeVisualization();
 
     const handleResize = () => {
       if (!containerRef.current || !svgRef.current || !simulationRef.current) return;
@@ -952,6 +1253,24 @@ export function InteractiveGraphVisualization() {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, [nodes.length, validatedEdges.length]); // Only re-initialize when data changes, not on every render
+
+  // Handle case where no graph is selected
+  if (!currentGraph) {
+    return (
+      <div className="graph-container relative w-full h-full bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-yellow-300 text-xl mb-4">📊 No Graph Selected</div>
+          <div className="text-gray-400 text-lg font-medium mb-6">Choose a graph to start visualizing</div>
+          <button 
+            onClick={() => setShowGraphSwitcher(true)}
+            className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+          >
+            Select Graph
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (loading || edgesLoading) {
     return (
@@ -1055,27 +1374,46 @@ export function InteractiveGraphVisualization() {
   }
 
   const getNodeColor = (node: WorkItem) => {
-    switch (node.type) {
-      case 'EPIC': return '#a855f7';
-      case 'FEATURE': return '#3b82f6';
-      case 'TASK': return '#10b981';
-      case 'BUG': return '#dc2626';
-      case 'MILESTONE': return '#f59e0b';
-      case 'OUTCOME': return '#6366f1';
-      case 'IDEA': return '#f97316';
-      default: return '#6b7280';
-    }
+    return getTypeConfig(node.type as any).hexColor;
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'COMPLETED': return '#22c55e';
-      case 'IN_PROGRESS': return '#3b82f6';
-      case 'BLOCKED': return '#dc2626';
-      case 'PLANNED': return '#f59e0b';
-      case 'PROPOSED': return '#a855f7';
-      case 'CANCELLED': return '#6b7280';
-      default: return '#6b7280';
+    return getStatusConfig(status as any).hexColor;
+  };
+
+  // Helper function to get status icon SVG path (Lucide React icons)
+  const getStatusIconPath = (status: string) => {
+    switch (status.toUpperCase()) {
+      case 'PROPOSED': return 'M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01'; // ClipboardList
+      case 'PLANNED': return 'M8 2v4m8-4v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z'; // Calendar
+      case 'IN_PROGRESS': return 'M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8zm0-13v6l4 2'; // Clock with circle
+      case 'COMPLETED': return 'M22 11.08V12a10 10 0 1 1-5.93-9.14m4.93 0L12 9l-2 2'; // CheckCircle
+      case 'BLOCKED': return 'M12 8v4m0 4h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z'; // AlertCircle
+      default: return 'M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01';
+    }
+  };
+
+  // Helper function to get priority icon SVG path (Lucide React icons)
+  const getPriorityIconPath = (priority: number) => {
+    if (priority >= 0.8) return 'M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z'; // Flame
+    if (priority >= 0.6) return 'M13 2L3 14h9l-1 8 10-12h-9z'; // Zap  
+    if (priority >= 0.4) return 'M12 2L2 22h20z'; // Triangle
+    if (priority >= 0.2) return 'M12 22a10 10 0 1 1 10-10 10 10 0 0 1-10 10z'; // Circle
+    return 'M12 5v14m-7-7l7 7 7-7'; // ArrowDown - simpler path
+  };
+
+  // Helper function to get node type icon SVG path (exact Lucide React icons)
+  const getNodeTypeIconPath = (type: string) => {
+    switch (type.toUpperCase()) {
+      case 'EPIC': return 'm12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.84l8.58 3.9a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.84L12.83 2.18ZM22 17.65l-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65M22 12.65l-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65'; // Layers
+      case 'MILESTONE': return 'M6 9H4.5a2.5 2.5 0 0 1 0-5H6m12 5h1.5a2.5 2.5 0 0 0 0-5H18M4 15l1-1h4l2 2h2l2-2h4l1 1M8 21l4-7 4 7'; // Trophy
+      case 'OUTCOME': return 'M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 6a4 4 0 1 1 0 8 4 4 0 0 1 0-8z'; // Target
+      case 'FEATURE': return 'm9.937 15.5-.5-8.5h5.126l-.5 8.5m-4.126 0h4.126m-4.126 0c-.476 2.837-1.961 5.5-3.437 5.5-1.476 0-2.961-2.663-3.437-5.5m10.437 0c.476 2.837 1.961 5.5 3.437 5.5 1.476 0 2.961-2.663 3.437-5.5'; // Sparkles
+      case 'TASK': return 'M3 6h18M3 12h18m-9 6h9'; // ListTodo
+      case 'BUG': return 'm21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3ZM12 9v4m0 4h.01'; // AlertTriangle
+      case 'IDEA': return 'M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5M9 18h6m-5 4h4'; // Lightbulb
+      case 'RESEARCH': return 'M6 18h8M3 22h18M14 22a7 7 0 1 0 0-14h-1M9 14h.01M9 18h.01'; // Microscope
+      default: return 'M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 6a4 4 0 1 1 0 8 4 4 0 0 1 0-8z'; // Default - Target
     }
   };
 
@@ -1108,6 +1446,20 @@ export function InteractiveGraphVisualization() {
     setSelectedNode(null);
   };
 
+  const handleOpenDisconnectFromDelete = () => {
+    if (!selectedNode) {
+      return;
+    }
+    
+    // Mark that this was opened from delete modal
+    setOpenedFromDeleteModal(true);
+    setSelectedNode(selectedNode); // Ensure it's set
+    setConnectModalInitialTab('disconnect');
+    setShowConnectModal(true);
+    setShowDeleteModal(false); // Close delete modal after setting up connect modal
+  };
+
+
   const handleCreateConnectedNode = (node: WorkItem, event: any) => {
     console.log('Creating connected node from parent:', node);
     const rect = containerRef.current?.getBoundingClientRect();
@@ -1125,9 +1477,17 @@ export function InteractiveGraphVisualization() {
 
   const handleConnectToExistingNodes = (node: WorkItem) => {
     console.log('Connect to existing clicked for node:', node);
-    console.log('Setting showConnectModal to true');
     setSelectedNode(node);
+    setConnectModalInitialTab('connect'); // Open to connect tab
     setShowConnectModal(true);
+    setNodeMenu(prev => ({ ...prev, visible: false }));
+  };
+
+  const handleDisconnectNodes = (node: WorkItem) => {
+    console.log('Disconnect clicked for node:', node);
+    setSelectedNode(node);
+    setConnectModalInitialTab('disconnect'); // Open to disconnect tab
+    setShowConnectModal(true); // Use ConnectNodeModal with tab
     setNodeMenu(prev => ({ ...prev, visible: false }));
   };
 
@@ -1139,8 +1499,18 @@ export function InteractiveGraphVisualization() {
 
   const handleCloseConnectModal = () => {
     setShowConnectModal(false);
-    setSelectedNode(null);
+    setConnectModalInitialTab('connect'); // Reset to connect tab
+    
+    // If this was opened from delete modal, return to delete modal
+    if (openedFromDeleteModal && selectedNode) {
+      setOpenedFromDeleteModal(false);
+      setShowDeleteModal(true);
+    } else {
+      setSelectedNode(null);
+    }
   };
+
+
 
   const handleEditEdge = (edge: WorkItemEdge) => {
     // For now, just allow changing the relationship type
@@ -1173,23 +1543,58 @@ export function InteractiveGraphVisualization() {
 
 
   return (
-    <div ref={containerRef} className="graph-container relative w-full h-full bg-gray-900">
+    <div ref={containerRef} className="graph-container relative w-full bg-gray-900" style={{ height: '100vh', minHeight: '900px' }}>
       <svg ref={svgRef} className="w-full h-full" style={{ background: 'radial-gradient(circle at center, #1f2937 0%, #111827 100%)' }} />
       
-      {/* Graph Control Panel */}
-      <div className="absolute top-4 left-4 z-40">
-        <div className="bg-gray-800/95 backdrop-blur-sm border border-gray-600/60 rounded-lg shadow-xl p-4 w-64">
-          {/* Current Graph Header */}
-          <div className="flex items-center space-x-3 mb-4">
-            <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center flex-shrink-0">
-              {getGraphTypeIcon(currentGraph?.type)}
+      {/* Empty State Overlay */}
+      {showEmptyStateOverlay && (
+        <div className="absolute inset-0 flex items-start justify-center pointer-events-none pt-16 pl-32">
+          <div className="max-w-lg text-center bg-gray-800/90 backdrop-blur-sm rounded-xl p-8 border border-gray-600/50 shadow-2xl pointer-events-auto">
+            <div className="text-green-400 text-4xl mb-4">
+              🌱
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-semibold text-white truncate">{currentGraph?.name || 'No Graph Selected'}</div>
-              <div className="text-xs text-gray-400">{currentGraph?.type || 'Select a graph to begin'}</div>
+            <h3 className="text-2xl font-bold bg-gradient-to-r from-emerald-400 via-green-300 to-blue-400 bg-clip-text text-transparent mb-3">
+              Transform Your Vision
+            </h3>
+            <div className="text-gray-200 mb-8 leading-relaxed text-base max-w-md mx-auto">
+              Break free from rigid hierarchies. Create your first node and experience how GraphDone intelligently connects ideas, surfaces priorities, and accelerates meaningful outcomes.
             </div>
-            <div className="w-2 h-2 bg-green-400 rounded-full flex-shrink-0"></div>
+            
+            <button 
+              onClick={() => setShowCreateNodeModal(true)}
+              className="bg-gradient-to-r from-emerald-700 to-green-700 hover:from-emerald-600 hover:to-green-600 text-white px-8 py-4 rounded-xl font-semibold text-lg transition-all duration-300 flex items-center gap-3 mx-auto pointer-events-auto cursor-pointer shadow-lg hover:shadow-xl hover:shadow-green-500/25 transform hover:-translate-y-0.5 hover:scale-105"
+            >
+              <div className="w-5 h-5 bg-white/20 rounded-full flex items-center justify-center">
+                <Plus className="h-3 w-3" />
+              </div>
+              Create Your First Node
+            </button>
           </div>
+        </div>
+      )}
+      
+      {/* Graph Control Panel */}
+      {showGraphPanel ? (
+        <div className="absolute left-4 z-40" style={{ top: '20px' }}>
+          <div className="bg-gray-800/95 backdrop-blur-sm border border-gray-600/60 rounded-lg shadow-xl p-4 w-64">
+            {/* Current Graph Header */}
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                {getGraphTypeIcon(currentGraph?.type)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold text-white truncate">{currentGraph?.name || 'No Graph Selected'}</div>
+                <div className="text-xs text-gray-400">{currentGraph?.type || 'Select a graph to begin'}</div>
+              </div>
+              <div className="w-3 h-3 bg-green-400 rounded-full flex-shrink-0 animate-pulse"></div>
+              <button
+                onClick={() => setShowGraphPanel(false)}
+                className="p-1 rounded text-gray-400 hover:text-white hover:bg-gray-700/50 transition-colors"
+                title="Minimize graph panel"
+              >
+                <Minus className="h-4 w-4" />
+              </button>
+            </div>
 
           {/* Graph Stats */}
           <div className="grid grid-cols-3 gap-2 mb-4">
@@ -1217,7 +1622,7 @@ export function InteractiveGraphVisualization() {
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
               </svg>
-              <span className="text-sm">Create Graph</span>
+              <span className="text-sm">Create New Graph</span>
             </button>
 
             {/* Switch Graph Button */}
@@ -1244,7 +1649,6 @@ export function InteractiveGraphVisualization() {
                   <Settings className="w-4 h-4" />
                   <span className="text-sm">Edit</span>
                 </button>
-                
                 <button 
                   onClick={() => setShowDeleteGraphModal(true)}
                   className="bg-red-600 hover:bg-red-700 text-white font-medium py-2.5 px-3 rounded-md transition-colors duration-200 flex items-center justify-center space-x-2"
@@ -1257,6 +1661,34 @@ export function InteractiveGraphVisualization() {
           </div>
         </div>
       </div>
+      ) : (
+        <button
+          onClick={() => setShowGraphPanel(true)}
+          className="absolute left-4 z-40 backdrop-blur-sm border-0 rounded-lg shadow-xl px-4 py-3 text-white font-semibold transition-all duration-300 flex items-center space-x-2 transform hover:scale-105 w-40 h-12"
+          style={{ 
+            ...getPanelPosition('graph'),
+            background: 'linear-gradient(135deg, #4285f4, #0f9d58, #ea4335)',
+            boxShadow: '0 10px 25px rgba(66, 133, 244, 0.4)'
+          }}
+          title="Show graph panel"
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'linear-gradient(135deg, #1a73e8, #137333, #d93025)';
+            e.currentTarget.style.boxShadow = '0 15px 35px rgba(66, 133, 244, 0.6)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'linear-gradient(135deg, #4285f4, #0f9d58, #ea4335)';
+            e.currentTarget.style.boxShadow = '0 10px 25px rgba(66, 133, 244, 0.4)';
+          }}
+        >
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center space-x-2">
+              <Settings className="h-4 w-4" />
+              <span className="text-sm font-medium">Graph Panel</span>
+            </div>
+            <div className="w-2 h-2 bg-green-400 rounded-full flex-shrink-0 animate-pulse"></div>
+          </div>
+        </button>
+      )}
 
       {/* Data Health Indicator */}
       {validationResult && (validationResult.errors.length > 0 || validationResult.warnings.length > 0) && (
@@ -1395,9 +1827,9 @@ export function InteractiveGraphVisualization() {
             onChange={(e) => setSelectedRelationType(e.target.value as RelationshipType)}
             className="w-full border border-gray-600 bg-gray-700 text-gray-200 rounded px-2 py-1 text-sm"
           >
-            {Object.entries(relationshipTypeInfo).map(([type, info]) => (
-              <option key={type} value={type}>
-                {type.replace('_', ' ')} - {info.description}
+            {RELATIONSHIP_OPTIONS.map((option) => (
+              <option key={option.type} value={option.type}>
+                {option.label} - {option.description}
               </option>
             ))}
           </select>
@@ -1407,7 +1839,7 @@ export function InteractiveGraphVisualization() {
       {/* Node Context Menu */}
       {nodeMenu.visible && nodeMenu.node && (
         <div
-          className="absolute bg-gray-800 border border-gray-600 rounded-lg shadow-lg py-2 z-50"
+          className="absolute bg-gray-800 border border-gray-600 rounded-lg shadow-lg py-2 z-50 max-h-96 overflow-y-auto"
           style={{
             left: nodeMenu.position.x,
             top: nodeMenu.position.y,
@@ -1426,19 +1858,83 @@ export function InteractiveGraphVisualization() {
             </div>
             <div className="flex items-center space-x-4 mt-1 text-xs text-gray-500">
               <span className="flex items-center">
-                <span className={`w-2 h-2 rounded-full mr-1`} style={{ backgroundColor: getStatusColor(nodeMenu.node.status) }} />
-                {nodeMenu.node.status}
+                {(() => {
+                  const status = nodeMenu.node?.status?.toUpperCase() || '';
+                  const statusIcon = getStatusIconElement(status as any, "h-3 w-3 mr-1");
+                  const getStatusBgColor = () => {
+                    switch (status) {
+                      case 'PROPOSED': return 'text-cyan-400 bg-cyan-400/10 px-2 py-0.5 rounded';
+                      case 'PLANNED': return 'text-purple-400 bg-purple-400/10 px-2 py-0.5 rounded';
+                      case 'IN_PROGRESS': return 'text-yellow-400 bg-yellow-400/10 px-2 py-0.5 rounded';
+                      case 'COMPLETED': return 'text-green-400 bg-green-400/10 px-2 py-0.5 rounded';
+                      case 'BLOCKED': return 'text-red-400 bg-red-400/10 px-2 py-0.5 rounded';
+                      default: return '';
+                    }
+                  };
+                  const formatStatus = (status: string) => {
+                    switch (status.toUpperCase()) {
+                      case 'IN_PROGRESS': return 'In Progress';
+                      case 'PROPOSED': return 'Proposed';
+                      case 'PLANNED': return 'Planned';
+                      case 'COMPLETED': return 'Completed';
+                      case 'BLOCKED': return 'Blocked';
+                      default: return status;
+                    }
+                  };
+                  return (
+                    <>
+                      {statusIcon}
+                      <span className={getStatusBgColor()}>{formatStatus(nodeMenu.node.status)}</span>
+                    </>
+                  );
+                })()}
               </span>
-              <span>{nodeMenu.node.type}</span>
+              <span className="flex items-center">
+                {(() => {
+                  const getTypeIcon = () => {
+                    if (!nodeMenu.node?.type) return null;
+                    return getTypeIconElement(nodeMenu.node.type as any, "h-3 w-3 mr-1");
+                  };
+                  const getTypeBgColor = () => {
+                    if (!nodeMenu.node?.type) return 'text-gray-400 bg-gray-400/10 px-2 py-0.5 rounded';
+                    const typeConfig = getTypeConfig(nodeMenu.node.type as any);
+                    return `${typeConfig.color} ${typeConfig.bgColor} px-2 py-0.5 rounded`;
+                  };
+                  return (
+                    <>
+                      {getTypeIcon()}
+                      <span className={getTypeBgColor()}>{nodeMenu.node.type}</span>
+                    </>
+                  );
+                })()}
+              </span>
             </div>
           </div>
 
           {/* Quick Stats */}
           <div className="px-4 py-2 border-b border-gray-600">
             <div className="grid grid-cols-2 gap-2 text-xs">
-              <div>
-                <span className="text-gray-400">Priority:</span>
-                <span className="ml-1 font-medium">{Math.round((nodeMenu.node?.priority?.computed || nodeMenu.node?.priorityComp || 0) * 100)}%</span>
+              <div className="flex flex-col space-y-1">
+                <div className="flex items-center">
+                  {(() => {
+                    const priority = nodeMenu.node?.priority?.computed || nodeMenu.node?.priorityComp || 0;
+                    return getPriorityIconElement(priority, "h-3 w-3 mr-1");
+                  })()}
+                  <span className="text-gray-400">Priority:</span>
+                  <span className="ml-1 font-medium">{Math.round((nodeMenu.node?.priority?.computed || nodeMenu.node?.priorityComp || 0) * 100)}%</span>
+                </div>
+                <div className="w-full bg-gray-600 rounded-full h-1.5">
+                  <div 
+                    className={`h-1.5 rounded-full transition-all duration-300 ${
+                      (nodeMenu.node?.priority?.computed || nodeMenu.node?.priorityComp || 0) >= 0.8 ? 'bg-red-400' :
+                      (nodeMenu.node?.priority?.computed || nodeMenu.node?.priorityComp || 0) >= 0.6 ? 'bg-orange-400' :
+                      (nodeMenu.node?.priority?.computed || nodeMenu.node?.priorityComp || 0) >= 0.4 ? 'bg-yellow-400' :
+                      (nodeMenu.node?.priority?.computed || nodeMenu.node?.priorityComp || 0) >= 0.2 ? 'bg-blue-400' :
+                      'bg-gray-400'
+                    }`}
+                    style={{ width: `${Math.round((nodeMenu.node?.priority?.computed || nodeMenu.node?.priorityComp || 0) * 100)}%` }}
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -1446,10 +1942,24 @@ export function InteractiveGraphVisualization() {
           {/* Actions */}
           <div className="py-1">
             <button
-              onClick={(e) => handleCreateConnectedNode(nodeMenu.node!, e)}
+              onClick={() => {
+                setShowCreateNodeModal(true);
+                setSelectedNode(null);
+                setNodeMenu(prev => ({ ...prev, visible: false }));
+              }}
               className="w-full flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
             >
               <Plus className="h-4 w-4 mr-3 flex-shrink-0" />
+              <div className="text-left">
+                <div className="font-medium">Add New Node</div>
+                <div className="text-xs text-gray-400 mt-0.5">Create a standalone node</div>
+              </div>
+            </button>
+            <button
+              onClick={(e) => handleCreateConnectedNode(nodeMenu.node!, e)}
+              className="w-full flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
+            >
+              <GitBranch className="h-4 w-4 mr-3 flex-shrink-0" />
               <div className="text-left">
                 <div className="font-medium">Create New & Connect</div>
                 <div className="text-xs text-gray-400 mt-0.5">Add a new node linked to this one</div>
@@ -1463,6 +1973,16 @@ export function InteractiveGraphVisualization() {
               <div className="text-left">
                 <div className="font-medium">Connect to Existing Nodes</div>
                 <div className="text-xs text-gray-400 mt-0.5">Link this to other nodes in graph</div>
+              </div>
+            </button>
+            <button
+              onClick={() => handleDisconnectNodes(nodeMenu.node!)}
+              className="w-full flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700 hover:bg-red-900/20"
+            >
+              <Unlink className="h-4 w-4 mr-3 flex-shrink-0 text-red-400" />
+              <div className="text-left">
+                <div className="font-medium">Disconnect Nodes</div>
+                <div className="text-xs text-gray-400 mt-0.5">Remove connections from this node</div>
               </div>
             </button>
             <div className="border-t border-gray-600 my-1"></div>
@@ -1513,8 +2033,8 @@ export function InteractiveGraphVisualization() {
               <div
                 className="w-3 h-1 mr-2"
                 style={{
-                  backgroundColor: relationshipTypeInfo[edgeMenu.edge.type].color,
-                  borderStyle: relationshipTypeInfo[edgeMenu.edge.type].style
+                  backgroundColor: getRelationshipConfig(edgeMenu.edge.type as RelationshipType).hexColor,
+                  borderStyle: 'solid'
                 }}
               />
               <span className="text-gray-300">Strength: {Math.round((edgeMenu.edge.strength || 0.8) * 100)}%</span>
@@ -1539,53 +2059,119 @@ export function InteractiveGraphVisualization() {
         </div>
       )}
 
+      {/* Create Node Button - Hide when no nodes exist */}
+      {!showEmptyStateOverlay && (
+      <button
+        onClick={() => setShowCreateNodeModal(true)}
+        className="absolute left-4 z-40 backdrop-blur-sm border-0 rounded-lg shadow-xl px-4 py-3 text-white font-semibold transition-all duration-300 flex items-center space-x-2 transform hover:scale-105 w-40 h-12"
+        style={{ 
+          ...getPanelPosition('create'),
+          background: 'linear-gradient(135deg, #10b981, #059669)',
+          boxShadow: '0 10px 25px rgba(16, 185, 129, 0.4)'
+        }}
+        title="Create new node"
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = 'linear-gradient(135deg, #059669, #047857)';
+          e.currentTarget.style.boxShadow = '0 15px 35px rgba(16, 185, 129, 0.6)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+          e.currentTarget.style.boxShadow = '0 10px 25px rgba(16, 185, 129, 0.4)';
+        }}
+      >
+        <div className="flex items-center justify-between w-full">
+          <div className="flex items-center space-x-2">
+            <Plus className="h-4 w-4" />
+            <span className="text-sm font-medium">Create Node</span>
+          </div>
+        </div>
+      </button>
+      )}
+
       {/* Legend */}
-      <div className="absolute bottom-4 left-4 bg-gray-800/95 backdrop-blur-sm border border-gray-600/60 rounded-lg shadow-xl p-4 w-64">
-        <div className="text-sm font-semibold text-white mb-3 text-center">Node Types</div>
-        <div className="grid grid-cols-2 gap-2 text-sm text-gray-300">
-          <div className="flex items-center space-x-2">
-            <Layers className="w-4 h-4 text-purple-400" />
-            <span>Epic</span>
+      {showLegend ? (
+        <div className="absolute left-4 bg-gray-800/95 backdrop-blur-sm border border-gray-600/60 rounded-lg shadow-xl p-4 w-64" style={getPanelPosition('legend')}>
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-sm font-semibold text-white">Node Types</div>
+            <button
+              onClick={() => setShowLegend(false)}
+              className="p-1 rounded text-gray-400 hover:text-white hover:bg-gray-700/50 transition-colors"
+              title="Minimize legend"
+            >
+              <Minus className="h-4 w-4" />
+            </button>
           </div>
-          <div className="flex items-center space-x-2">
-            <ListTodo className="w-4 h-4 text-green-400" />
-            <span>Task</span>
+          <div className="grid grid-cols-2 gap-2 text-sm text-gray-300">
+            <div className="flex items-center space-x-2">
+              {getTypeIconElement('EPIC', "w-4 h-4")}
+              <span>Epic</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              {getTypeIconElement('TASK', "w-4 h-4")}
+              <span>Task</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              {getTypeIconElement('MILESTONE', "w-4 h-4")}
+              <span>Milestone</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              {getTypeIconElement('BUG', "w-4 h-4")}
+              <span>Bug</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              {getTypeIconElement('OUTCOME', "w-4 h-4")}
+              <span>Outcome</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              {getTypeIconElement('IDEA', "w-4 h-4")}
+              <span>Idea</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              {getTypeIconElement('FEATURE', "w-4 h-4")}
+              <span>Feature</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              {getTypeIconElement('RESEARCH', "w-4 h-4")}
+              <span>Research</span>
+            </div>
           </div>
-          <div className="flex items-center space-x-2">
-            <Trophy className="w-4 h-4 text-orange-400" />
-            <span>Milestone</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <AlertTriangle className="w-4 h-4 text-red-400" />
-            <span>Bug</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Target className="w-4 h-4 text-indigo-400" />
-            <span>Outcome</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Lightbulb className="w-4 h-4 text-yellow-400" />
-            <span>Idea</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Sparkles className="w-4 h-4 text-blue-400" />
-            <span>Feature</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Microscope className="w-4 h-4 text-teal-400" />
-            <span>Research</span>
+          <hr className="border-gray-600 mt-3" />
+          <div className="pt-3">
+            <div className="text-sm text-gray-500 opacity-85 w-full leading-relaxed text-left">
+              • Select nodes to access menu<br/>
+              • Drag to reposition<br/>
+              • Scroll for zoom<br/>
+              • Select edges for options
+            </div>
           </div>
         </div>
-        <hr className="border-gray-600 mt-3" />
-        <div className="pt-3">
-          <div className="text-sm text-gray-500 opacity-75 w-full leading-relaxed text-left">
-            • Select nodes to access menu<br/>
-            • Drag to reposition<br/>
-            • Scroll for zoom<br/>
-            • Select edges for options
+      ) : (
+        <button
+          onClick={() => setShowLegend(true)}
+          className="absolute left-4 z-40 backdrop-blur-sm border-0 rounded-lg shadow-xl px-4 py-3 text-white font-semibold transition-all duration-300 flex items-center space-x-2 transform hover:scale-105 w-40 h-12"
+          style={{ 
+            ...getPanelPosition('legend'),
+            background: 'linear-gradient(135deg, #ec4899, #f97316)',
+            boxShadow: '0 10px 25px rgba(236, 72, 153, 0.4)'
+          }}
+          title="Show legend"
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'linear-gradient(135deg, #f43f5e, #ec4899)';
+            e.currentTarget.style.boxShadow = '0 15px 35px rgba(244, 63, 94, 0.6)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'linear-gradient(135deg, #ec4899, #f97316)';
+            e.currentTarget.style.boxShadow = '0 10px 25px rgba(236, 72, 153, 0.4)';
+          }}
+        >
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center space-x-2">
+              <FileText className="h-4 w-4" />
+              <span className="text-sm font-medium">Node Types</span>
+            </div>
           </div>
-        </div>
-      </div>
+        </button>
+      )}
 
       {/* Node Details Modal */}
       {showNodeDetailsModal && selectedNode && (
@@ -1596,10 +2182,12 @@ export function InteractiveGraphVisualization() {
             setSelectedNode(null);
           }}
           node={selectedNode}
+          edges={validatedEdges}
+          nodes={validatedNodes}
           onEdit={(node) => {
             setShowNodeDetailsModal(false);
-            setSelectedNode(node);
             setShowEditModal(true);
+            // Don't set selectedNode again since it's already the correct node
           }}
         />
       )}
@@ -1621,6 +2209,7 @@ export function InteractiveGraphVisualization() {
           nodeId={selectedNode.id}
           nodeTitle={selectedNode.title}
           nodeType={selectedNode.type}
+          onOpenDisconnectModal={handleOpenDisconnectFromDelete}
         />
       )}
 
@@ -1656,6 +2245,7 @@ export function InteractiveGraphVisualization() {
         />
       )}
 
+
       {/* Create Node Modal */}
       {showCreateNodeModal && selectedNode && (
         <CreateNodeModal
@@ -1666,7 +2256,15 @@ export function InteractiveGraphVisualization() {
         />
       )}
 
-      {/* Connect Node Modal */}
+      {/* Create Node Modal - For Empty State */}
+      {showCreateNodeModal && !selectedNode && (
+        <CreateNodeModal
+          isOpen={showCreateNodeModal}
+          onClose={() => setShowCreateNodeModal(false)}
+        />
+      )}
+
+      {/* Connect Node Modal - With Connect and Disconnect Tabs */}
       {showConnectModal && selectedNode && (
         <ConnectNodeModal
           isOpen={showConnectModal}
@@ -1676,8 +2274,18 @@ export function InteractiveGraphVisualization() {
             title: selectedNode.title,
             type: selectedNode.type
           }}
+          initialTab={connectModalInitialTab}
+          onAllConnectionsRemoved={openedFromDeleteModal ? () => {
+            // Auto-return to delete modal when all connections removed
+            setShowConnectModal(false);
+            setOpenedFromDeleteModal(false);
+            setConnectModalInitialTab('connect');
+            setShowDeleteModal(true);
+          } : undefined}
         />
       )}
+
+
     </div>
   );
 }

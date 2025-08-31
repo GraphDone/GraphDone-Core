@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { X, Folder, FolderOpen, Plus, Copy, FileText } from 'lucide-react';
 import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useNotifications } from '../contexts/NotificationContext';
 import { CreateGraphInput } from '../types/graph';
 
 interface CreateGraphModalProps {
@@ -13,6 +14,7 @@ interface CreateGraphModalProps {
 export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraphModalProps) {
   const { currentTeam, currentUser } = useAuth();
   const { createGraph, availableGraphs, isCreating } = useGraph();
+  const { showSuccess, showError } = useNotifications();
   
   const [step, setStep] = useState<'type' | 'details' | 'template'>('type');
   const [formData, setFormData] = useState<Partial<CreateGraphInput>>({
@@ -54,8 +56,10 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
       type: 'TEMPLATE' as const,
       title: 'Template',
       description: 'A reusable template for creating similar graphs',
-      icon: <FileText className="h-8 w-8 text-orange-400" />,
-      color: 'border-orange-500/50 bg-orange-900/20 hover:bg-orange-900/30'
+      icon: <FileText className="h-8 w-8 text-gray-500" />,
+      color: 'border-gray-600/50 bg-gray-800/20 cursor-not-allowed opacity-60',
+      disabled: true,
+      comingSoon: true
     }
   ];
 
@@ -124,11 +128,21 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
       console.log('Creating graph with data:', graphInput);
       console.log('Tags in form data:', formData.tags);
       await createGraph(graphInput as CreateGraphInput);
+      
+      // Show success notification
+      showSuccess(
+        'Graph Created Successfully!',
+        `"${formData.name}" has been created and is ready for use.`
+      );
+      
       onClose();
       resetForm();
     } catch (error) {
       console.error('Error creating graph:', error);
-      // TODO: Show user-friendly error message
+      showError(
+        'Failed to Create Graph',
+        error instanceof Error ? error.message : 'An unexpected error occurred while creating the graph. Please try again.'
+      );
     }
   };
 
@@ -189,18 +203,27 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
                 {graphTypes.map((type) => (
                   <button
                     key={type.type}
-                    onClick={() => setFormData(prev => ({ ...prev, type: type.type }))}
-                    className={`p-4 border-2 rounded-lg text-left transition-all ${
+                    onClick={() => type.disabled ? null : setFormData(prev => ({ ...prev, type: type.type }))}
+                    disabled={type.disabled}
+                    title={type.comingSoon ? "Template functionality coming soon!" : undefined}
+                    className={`p-4 border-2 rounded-lg text-left transition-all relative ${
                       formData.type === type.type
                         ? `${type.color} border-current`
+                        : type.disabled
+                        ? type.color
                         : 'border-gray-600 bg-gray-700/50 hover:bg-gray-700 hover:border-gray-500'
                     }`}
                   >
+                    {type.comingSoon && (
+                      <div className="absolute top-2 right-2 bg-gray-700 text-xs text-gray-400 px-2 py-1 rounded">
+                        Coming Soon
+                      </div>
+                    )}
                     <div className="flex items-center space-x-3 mb-3">
                       {type.icon}
-                      <h4 className="font-semibold text-gray-200">{type.title}</h4>
+                      <h4 className={`font-semibold ${type.disabled ? 'text-gray-500' : 'text-gray-200'}`}>{type.title}</h4>
                     </div>
-                    <p className="text-sm text-gray-400">{type.description}</p>
+                    <p className={`text-sm ${type.disabled ? 'text-gray-500' : 'text-gray-400'}`}>{type.description}</p>
                   </button>
                 ))}
               </div>
@@ -262,21 +285,18 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
                 </button>
                 
                 <button
-                  onClick={() => {
-                    setShowTemplates(true);
-                    setFormData(prev => ({ ...prev, copyFromGraphId: undefined }));
-                  }}
-                  className={`p-4 border-2 rounded-xl text-center transition-all ${
-                    showTemplates
-                      ? 'border-green-500 bg-green-900/20 text-white'
-                      : 'border-gray-600 bg-gray-700/30 text-gray-300 hover:border-gray-500 hover:bg-gray-700/50'
-                  }`}
+                  disabled
+                  title="Template functionality coming soon!"
+                  className="p-4 border-2 rounded-xl text-center transition-all border-gray-700 bg-gray-800/30 text-gray-500 cursor-not-allowed opacity-60 relative"
                 >
-                  <div className="w-12 h-12 mx-auto mb-3 bg-blue-600/20 rounded-lg flex items-center justify-center">
-                    <FileText className="h-6 w-6 text-blue-400" />
+                  <div className="absolute top-2 right-2 bg-gray-700 text-xs text-gray-400 px-2 py-1 rounded">
+                    Coming Soon
+                  </div>
+                  <div className="w-12 h-12 mx-auto mb-3 bg-gray-700/50 rounded-lg flex items-center justify-center">
+                    <FileText className="h-6 w-6 text-gray-500" />
                   </div>
                   <h5 className="font-medium mb-1">Use Template</h5>
-                  <p className="text-xs text-gray-400">Start with a pre-built template</p>
+                  <p className="text-xs text-gray-500">Start with a pre-built template</p>
                 </button>
 
                 {copyableGraphs.length > 0 && (
@@ -311,17 +331,17 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
                         .map((template) => (
                           <button
                             key={template.id}
-                            onClick={() => setFormData(prev => ({ ...prev, templateId: template.id }))}
-                            className={`p-4 border rounded-lg text-left transition-all ${
-                              formData.templateId === template.id
-                                ? 'border-green-500 bg-green-900/20'
-                                : 'border-gray-600 bg-gray-700/50 hover:bg-gray-700 hover:border-gray-500'
-                            }`}
+                            disabled
+                            title="Template functionality coming soon!"
+                            className="p-4 border rounded-lg text-left cursor-not-allowed opacity-60 relative border-gray-700 bg-gray-800/30"
                           >
+                            <div className="absolute top-2 right-2 bg-gray-700 text-xs text-gray-400 px-2 py-1 rounded">
+                              Coming Soon
+                            </div>
                             <div className="flex items-center justify-between">
                               <div>
-                                <h5 className="font-medium text-gray-200">{template.name}</h5>
-                                <p className="text-sm text-gray-400 mt-1">{template.description}</p>
+                                <h5 className="font-medium text-gray-500">{template.name}</h5>
+                                <p className="text-sm text-gray-500 mt-1">{template.description}</p>
                               </div>
                               <div className="text-sm text-gray-500">
                                 {template.nodeCount} nodes
