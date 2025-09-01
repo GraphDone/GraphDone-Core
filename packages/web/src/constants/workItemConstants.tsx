@@ -29,7 +29,9 @@ import {
   Copy,
   Shield,
   Bookmark,
-  Package
+  Package,
+  // Default Icon
+  Square
 } from 'lucide-react';
 
 // ============================
@@ -73,14 +75,17 @@ export {
   Copy,
   Shield,
   Bookmark,
-  Package
+  Package,
+  
+  // Default Icon
+  Square
 } from 'lucide-react';
 
 // ============================
 // CORE TYPE DEFINITIONS  
 // ============================
 
-export type WorkItemType = 'EPIC' | 'MILESTONE' | 'OUTCOME' | 'FEATURE' | 'TASK' | 'BUG' | 'IDEA' | 'RESEARCH';
+export type WorkItemType = 'EPIC' | 'MILESTONE' | 'OUTCOME' | 'FEATURE' | 'TASK' | 'BUG' | 'IDEA' | 'RESEARCH' | 'DEFAULT';
 export type WorkItemStatus = 'PROPOSED' | 'PLANNED' | 'IN_PROGRESS' | 'COMPLETED' | 'BLOCKED' | 'CANCELLED';
 export type PriorityLevel = 'critical' | 'high' | 'moderate' | 'low' | 'minimal';
 
@@ -210,6 +215,16 @@ export const WORK_ITEM_TYPES: Record<WorkItemType, TypeOption> = {
     bgColor: 'bg-teal-400/10',
     borderColor: 'border-teal-400/30',
     hexColor: '#2dd4bf'
+  },
+  DEFAULT: {
+    value: 'DEFAULT',
+    label: 'Default',
+    description: 'Generic work item',
+    icon: Square,
+    color: 'text-gray-400',
+    bgColor: 'bg-gray-400/10',
+    borderColor: 'border-gray-400/30',
+    hexColor: '#9ca3af'
   }
 };
 
@@ -481,6 +496,21 @@ export const getPriorityColorScheme = (priorityValue: number) => {
     level: config.value,
     description: config.description
   };
+};
+
+// ============================
+// DEFAULT NODE CONFIGURATION
+// ============================
+
+export const DEFAULT_NODE_CONFIG = {
+  title: 'New Node',
+  type: 'DEFAULT' as WorkItemType,
+  status: 'PROPOSED' as WorkItemStatus,
+  priority: 'minimal' as PriorityLevel,
+  priorityExec: 0.1,
+  priorityIndiv: 0.1,
+  priorityComm: 0.1,
+  description: ''
 };
 
 // ============================
