@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import * as d3 from 'd3';
-import { Link2, Edit3, Trash2, Folder, FolderOpen, Plus, FileText, Settings, Unlink, X, GitBranch, Minus } from 'lucide-react';
+import { Link2, Edit3, Trash2, Folder, FolderOpen, Plus, FileText, Settings, Unlink, X, GitBranch, Minus, Maximize2, ArrowLeft } from 'lucide-react';
 import {
   getPriorityIconElement,
   getStatusIconElement,
@@ -26,6 +26,7 @@ import {
 import { useQuery, useMutation } from '@apollo/client';
 import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { GET_WORK_ITEMS, GET_EDGES, CREATE_EDGE, UPDATE_EDGE, DELETE_EDGE, CREATE_WORK_ITEM } from '../lib/queries';
 import { validateGraphData, getValidationSummary, ValidationResult } from '../utils/graphDataValidation';
 import { DEFAULT_NODE_CONFIG } from '../constants/workItemConstants';
@@ -79,6 +80,10 @@ export function InteractiveGraphVisualization() {
   const containerRef = useRef<HTMLDivElement>(null);
   const { currentGraph, availableGraphs } = useGraph();
   const { currentUser } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  
+  const isFullscreen = location.pathname === '/graph';
   
   const { data: workItemsData, loading, error, refetch } = useQuery(GET_WORK_ITEMS, {
     variables: currentGraph ? {
@@ -198,8 +203,8 @@ export function InteractiveGraphVisualization() {
     const legendPanelHeight = 220; // Height of expanded legend panel
     const createPanelHeight = 80; // Height of expanded create panel
     const buttonHeight = 48; // Height of minimized buttons (h-12 = 48px)
-    const compactSpacing = 27; // Spacing when panel is minimized
-    const expandedSpacing = 32; // Spacing when panel is expanded
+    const compactSpacing = 12; // Spacing when panel is minimized
+    const expandedSpacing = 1; // Spacing when panel is expanded
     
     if (panelType === 'graph') {
       // Graph panel/button is always at top position
@@ -701,9 +706,11 @@ export function InteractiveGraphVisualization() {
 
     // Filter edges based on visible nodes for performance
     const visibleNodeIds = new Set(visibleNodes.map((node: WorkItem) => node.id));
-    const visibleEdges = validatedEdges.filter((edge: WorkItemEdge) => 
-      visibleNodeIds.has(edge.source.id) && visibleNodeIds.has(edge.target.id)
-    );
+    const visibleEdges = validatedEdges.filter((edge: WorkItemEdge) => {
+      const sourceId = typeof edge.source === 'string' ? edge.source : (edge.source as any).id;
+      const targetId = typeof edge.target === 'string' ? edge.target : (edge.target as any).id;
+      return visibleNodeIds.has(sourceId) && visibleNodeIds.has(targetId);
+    });
     
     // Create edges FIRST (so they render under nodes)
     const linkElements = g.append('g')
@@ -1851,19 +1858,18 @@ export function InteractiveGraphVisualization() {
       )}
       
       {/* Graph Control Panel */}
-      {showGraphPanel ? (
+      {showGraphPanel && !isFullscreen ? (
         <div className="absolute left-4 z-40" style={{ top: '20px' }}>
-          <div className="bg-gray-800/95 backdrop-blur-sm border border-gray-600/60 rounded-lg shadow-xl p-4 w-64">
+          <div className={`bg-gray-800/95 backdrop-blur-sm border border-gray-600/60 rounded-lg shadow-xl ${isFullscreen ? 'p-0 w-32' : 'p-4 w-64'}`}>
             {/* Current Graph Header */}
-            <div className="flex items-center space-x-3 mb-4">
-              <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center flex-shrink-0">
+            <div className={`flex items-center space-x-2 mb-3 ${isFullscreen ? 'p-2' : ''}`}>
+              <div className="w-6 h-6 bg-green-500 rounded flex items-center justify-center flex-shrink-0">
                 {getGraphTypeIcon(currentGraph?.type)}
               </div>
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold text-white truncate">{currentGraph?.name || 'No Graph Selected'}</div>
-                <div className="text-xs text-gray-400">{currentGraph?.type || 'Select a graph to begin'}</div>
+                <div className="text-xs font-semibold text-white truncate">{currentGraph?.name || 'No Graph'}</div>
               </div>
-              <div className="w-3 h-3 bg-green-400 rounded-full flex-shrink-0 animate-pulse"></div>
+              <div className="w-2 h-2 bg-green-400 rounded-full flex-shrink-0 animate-pulse"></div>
               <button
                 onClick={() => setShowGraphPanel(false)}
                 className="p-1 rounded text-gray-400 hover:text-white hover:bg-gray-700/50 transition-colors"
@@ -1873,75 +1879,132 @@ export function InteractiveGraphVisualization() {
               </button>
             </div>
 
-          {/* Graph Stats */}
-          <div className="grid grid-cols-3 gap-2 mb-4">
-            <div className="bg-gray-700/50 rounded-md p-2 text-center">
-              <div className="text-white text-lg font-medium">{nodes.length}</div>
+{!isFullscreen && (
+          /* Graph Stats */
+          <div className="grid grid-cols-3 gap-1 mb-3">
+            <div className="bg-gray-700/50 rounded p-1 text-center">
+              <div className="text-white text-sm font-medium">{nodes.length}</div>
               <div className="text-gray-400 text-xs">Nodes</div>
             </div>
-            <div className="bg-gray-700/50 rounded-md p-2 text-center">
-              <div className="text-white text-lg font-medium">{validatedEdges.length}</div>
+            <div className="bg-gray-700/50 rounded p-1 text-center">
+              <div className="text-white text-sm font-medium">{validatedEdges.length}</div>
               <div className="text-gray-400 text-xs">Edges</div>
             </div>
-            <div className="bg-gray-700/50 rounded-md p-2 text-center">
-              <div className="text-white text-lg font-medium">{currentGraph?.contributorCount || 0}</div>
+            <div className="bg-gray-700/50 rounded p-1 text-center">
+              <div className="text-white text-sm font-medium">{currentGraph?.contributorCount || 0}</div>
               <div className="text-gray-400 text-xs">Users</div>
             </div>
           </div>
+          )}
 
           {/* Action Buttons */}
-          <div className="space-y-2">
-            {/* Create New Graph Button */}
-            <button 
-              onClick={() => setShowCreateGraphModal(true)}
-              className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2.5 px-3 rounded-md transition-colors duration-200 flex items-center justify-center space-x-2"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-              </svg>
-              <span className="text-sm">Create New Graph</span>
-            </button>
-
-            {/* Switch Graph Button */}
-            <button 
-              onClick={() => setShowGraphSwitcher(true)}
-              className="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-2.5 px-3 rounded-lg transition-colors flex items-center justify-between"
-            >
-              <div className="flex items-center space-x-2">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                </svg>
-                <span className="text-sm">Switch Graph</span>
-              </div>
-              <span className="text-xs bg-white px-2 py-1 rounded-full text-yellow-700 font-bold shadow-md">{availableGraphs.length}</span>
-            </button>
-
-            {/* Update and Delete Graph Buttons */}
-            {currentGraph && (
-              <div className="grid grid-cols-2 gap-2 mt-2">
+          <div className={isFullscreen ? "space-y-1 p-2" : "space-y-2"}>
+            {isFullscreen ? (
+              <>
+                {/* Reset Layout Button */}
                 <button 
-                  onClick={() => setShowUpdateGraphModal(true)}
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-3 rounded-md transition-colors duration-200 flex items-center justify-center space-x-2"
+                  onClick={() => {
+                    nodes.forEach((node: any) => {
+                      node.userPinned = false;
+                      node.userPreferredPosition = null;
+                      node.userPreferenceVector = null;
+                      node.fx = null;
+                      node.fy = null;
+                    });
+                    if (simulationRef.current) {
+                      simulationRef.current.alpha(0.3).restart();
+                    }
+                  }}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-1 px-1 rounded text-xs flex items-center justify-center space-x-1"
                 >
-                  <Settings className="w-4 h-4" />
-                  <span className="text-sm">Edit</span>
+                  <Settings className="w-3 h-3" />
+                  <span>Reset</span>
                 </button>
+
+                {/* Create Node Button */}
                 <button 
-                  onClick={() => setShowDeleteGraphModal(true)}
-                  className="bg-red-600 hover:bg-red-700 text-white font-medium py-2.5 px-3 rounded-md transition-colors duration-200 flex items-center justify-center space-x-2"
+                  onClick={() => setShowCreateNodeModal(true)}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-1 px-1 rounded text-xs flex items-center justify-center space-x-1"
                 >
-                  <Trash2 className="w-4 h-4" />
-                  <span className="text-sm">Delete</span>
+                  <Plus className="w-3 h-3" />
+                  <span>Create</span>
                 </button>
-              </div>
+
+                {/* Node Types - minimal */}
+                <div className="border-t border-gray-600 pt-1">
+                  <div className="grid grid-cols-2 gap-1">
+                    <button 
+                      onClick={() => createInlineNode(400, 300)}
+                      className="bg-gray-700 hover:bg-gray-600 text-white text-xs py-1 px-1 rounded flex items-center justify-center"
+                      title="Task"
+                    >
+                      <ListTodo className="w-3 h-3" />
+                    </button>
+                    <button 
+                      onClick={() => createInlineNode(400, 300)}
+                      className="bg-gray-700 hover:bg-gray-600 text-white text-xs py-1 px-1 rounded flex items-center justify-center"
+                      title="Goal"
+                    >
+                      <Target className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Create New Graph Button */}
+                <button 
+                  onClick={() => setShowCreateGraphModal(true)}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2.5 px-3 rounded-md transition-colors duration-200 flex items-center justify-center space-x-2"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                  <span className="text-sm">Create New Graph</span>
+                </button>
+
+                {/* Switch Graph Button */}
+                <button 
+                  onClick={() => setShowGraphSwitcher(true)}
+                  className="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-2.5 px-3 rounded-lg transition-colors flex items-center justify-between"
+                >
+                  <div className="flex items-center space-x-2">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                    </svg>
+                    <span className="text-sm">Switch Graph</span>
+                  </div>
+                  <span className="text-xs bg-white px-2 py-1 rounded-full text-yellow-700 font-bold shadow-md">{availableGraphs.length}</span>
+                </button>
+
+                {/* Update and Delete Graph Buttons */}
+                {currentGraph && (
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                    <button 
+                      onClick={() => setShowUpdateGraphModal(true)}
+                      className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-3 rounded-md transition-colors duration-200 flex items-center justify-center space-x-2"
+                    >
+                      <Settings className="w-4 h-4" />
+                      <span className="text-sm">Edit</span>
+                    </button>
+                    <button 
+                      onClick={() => setShowDeleteGraphModal(true)}
+                      className="bg-red-600 hover:bg-red-700 text-white font-medium py-2.5 px-3 rounded-md transition-colors duration-200 flex items-center justify-center space-x-2"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      <span className="text-sm">Delete</span>
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
       </div>
-      ) : (
+      ) : !isFullscreen && (
         <button
           onClick={() => setShowGraphPanel(true)}
-          className="absolute left-4 z-40 backdrop-blur-sm border-0 rounded-lg shadow-xl px-4 py-3 text-white font-semibold transition-all duration-300 flex items-center space-x-2 transform hover:scale-105 w-40 h-12"
+          className="absolute left-4 z-40 backdrop-blur-sm border-0 rounded-lg shadow-xl px-3 py-2 text-white font-semibold transition-all duration-300 flex items-center space-x-2 transform hover:scale-105 w-36 h-10"
           style={{ 
             ...getPanelPosition('graph'),
             background: 'linear-gradient(135deg, #4285f4, #0f9d58, #ea4335)',
@@ -1960,7 +2023,7 @@ export function InteractiveGraphVisualization() {
           <div className="flex items-center justify-between w-full">
             <div className="flex items-center space-x-2">
               <Settings className="h-4 w-4" />
-              <span className="text-sm font-medium">Graph Panel</span>
+              <span className="text-xs font-medium">Graph Panel</span>
             </div>
             <div className="w-2 h-2 bg-green-400 rounded-full flex-shrink-0 animate-pulse"></div>
           </div>
@@ -2337,10 +2400,10 @@ export function InteractiveGraphVisualization() {
       )}
 
       {/* Create Node Button - Hide when no nodes exist */}
-      {!showEmptyStateOverlay && (
+      {!showEmptyStateOverlay && !isFullscreen && (
       <button
         onClick={() => createInlineNode(400, 300)}
-        className="absolute left-4 z-40 backdrop-blur-sm border-0 rounded-lg shadow-xl px-4 py-3 text-white font-semibold transition-all duration-300 flex items-center space-x-2 transform hover:scale-105 w-40 h-12"
+        className="absolute left-4 z-40 backdrop-blur-sm border-0 rounded-lg shadow-xl px-3 py-2 text-white font-semibold transition-all duration-300 flex items-center space-x-2 transform hover:scale-105 w-36 h-10"
         style={{ 
           ...getPanelPosition('create'),
           background: 'linear-gradient(135deg, #10b981, #059669)',
@@ -2359,7 +2422,7 @@ export function InteractiveGraphVisualization() {
         <div className="flex items-center justify-between w-full">
           <div className="flex items-center space-x-2">
             <Plus className="h-4 w-4" />
-            <span className="text-sm font-medium">Create Node</span>
+            <span className="text-xs font-medium">Create Node</span>
           </div>
         </div>
       </button>
@@ -2367,7 +2430,7 @@ export function InteractiveGraphVisualization() {
 
 
       {/* Legend */}
-      {showLegend ? (
+      {showLegend && !isFullscreen ? (
         <div className="absolute left-4 bg-gray-800/95 backdrop-blur-sm border border-gray-600/60 rounded-lg shadow-xl p-4 w-64" style={getPanelPosition('legend')}>
           <div className="flex items-center justify-between mb-3">
             <div className="text-sm font-semibold text-white">Node Types</div>
@@ -2423,10 +2486,10 @@ export function InteractiveGraphVisualization() {
             </div>
           </div>
         </div>
-      ) : (
+      ) : !isFullscreen && (
         <button
           onClick={() => setShowLegend(true)}
-          className="absolute left-4 z-40 backdrop-blur-sm border-0 rounded-lg shadow-xl px-4 py-3 text-white font-semibold transition-all duration-300 flex items-center space-x-2 transform hover:scale-105 w-40 h-12"
+          className="absolute left-4 z-40 backdrop-blur-sm border-0 rounded-lg shadow-xl px-3 py-2 text-white font-semibold transition-all duration-300 flex items-center space-x-2 transform hover:scale-105 w-36 h-10"
           style={{ 
             ...getPanelPosition('legend'),
             background: 'linear-gradient(135deg, #ec4899, #f97316)',
@@ -2445,7 +2508,7 @@ export function InteractiveGraphVisualization() {
           <div className="flex items-center justify-between w-full">
             <div className="flex items-center space-x-2">
               <FileText className="h-4 w-4" />
-              <span className="text-sm font-medium">Node Types</span>
+              <span className="text-xs font-medium">Node Types</span>
             </div>
           </div>
         </button>
@@ -2563,6 +2626,26 @@ export function InteractiveGraphVisualization() {
         />
       )}
 
+      {/* Fullscreen Toggle */}
+      {isFullscreen ? (
+        <button
+          onClick={() => navigate('/')}
+          className="absolute top-4 left-4 z-50 bg-gray-800 hover:bg-gray-700 text-white p-3 rounded-lg border border-gray-600 flex items-center space-x-2 transition-colors"
+          title="Back to Workspace"
+        >
+          <ArrowLeft className="h-5 w-5" />
+          <span>Back</span>
+        </button>
+      ) : (
+        <button
+          onClick={() => navigate('/graph')}
+          className="absolute top-4 right-4 z-50 bg-gray-800 hover:bg-gray-700 text-white p-3 rounded-lg border border-gray-600 flex items-center space-x-2 transition-colors"
+          title="Full Zen Mode"
+        >
+          <Maximize2 className="h-5 w-5" />
+          <span>Zen Mode</span>
+        </button>
+      )}
 
     </div>
   );
