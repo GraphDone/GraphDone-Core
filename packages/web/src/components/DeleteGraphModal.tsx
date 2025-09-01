@@ -22,6 +22,7 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
   const [nodeCount, setNodeCount] = useState<number>(0);
   const [nodes, setNodes] = useState<any[]>([]);
   const [nodeConnections, setNodeConnections] = useState<{[key: string]: any[]}>({});
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
 
   // Query to get the nodes in the graph
   const { loading: loadingNodes } = useQuery(GET_WORK_ITEMS, {
@@ -306,6 +307,47 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
                     <p className="text-orange-300 text-sm mb-4">
                       This graph contains <strong className="text-orange-200">{nodeCount} node{nodeCount !== 1 ? 's' : ''}</strong>. Remove connections first, then delete nodes:
                     </p>
+                    
+                    {/* Delete All Unconnected Button */}
+                    {nodes.some(node => !(nodeConnections[node.id]?.length > 0)) && (
+                      <div className="mb-4">
+                        {!showBulkDeleteConfirm ? (
+                          <button
+                            onClick={() => setShowBulkDeleteConfirm(true)}
+                            className="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors flex items-center justify-center space-x-2"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            <span>Delete All Unconnected Nodes ({nodes.filter(node => !(nodeConnections[node.id]?.length > 0)).length})</span>
+                          </button>
+                        ) : (
+                          <div className="bg-red-900/30 border border-red-600/50 rounded-lg p-3">
+                            <p className="text-red-200 text-sm mb-3">
+                              Are you sure you want to delete all {nodes.filter(node => !(nodeConnections[node.id]?.length > 0)).length} unconnected nodes?
+                            </p>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={async () => {
+                                  const unconnectedNodes = nodes.filter(node => !(nodeConnections[node.id]?.length > 0));
+                                  for (const node of unconnectedNodes) {
+                                    await handleDeleteNode(node.id, node.title);
+                                  }
+                                  setShowBulkDeleteConfirm(false);
+                                }}
+                                className="flex-1 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded text-sm"
+                              >
+                                Yes, Delete All
+                              </button>
+                              <button
+                                onClick={() => setShowBulkDeleteConfirm(false)}
+                                className="flex-1 px-3 py-1.5 bg-gray-600 hover:bg-gray-700 text-white rounded text-sm"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                     
                     {/* Nodes list */}
                     <div className="max-h-64 overflow-y-auto space-y-3">
