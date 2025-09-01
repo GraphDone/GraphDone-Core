@@ -147,6 +147,9 @@ export const typeDefs = gql`
     INTERVIEW
     PERFORMANCE_REVIEW
     TEAM_BUILDING
+    
+    # Default Type
+    DEFAULT
     VACATION_REQUEST
     
     # Creative & Design

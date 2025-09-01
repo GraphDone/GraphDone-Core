@@ -26,8 +26,10 @@ import {
 import { useQuery, useMutation } from '@apollo/client';
 import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
-import { GET_WORK_ITEMS, GET_EDGES, CREATE_EDGE, UPDATE_EDGE, DELETE_EDGE } from '../lib/queries';
+import { GET_WORK_ITEMS, GET_EDGES, CREATE_EDGE, UPDATE_EDGE, DELETE_EDGE, CREATE_WORK_ITEM } from '../lib/queries';
 import { validateGraphData, getValidationSummary, ValidationResult } from '../utils/graphDataValidation';
+import { DEFAULT_NODE_CONFIG } from '../constants/workItemConstants';
+
 import { EditNodeModal } from './EditNodeModal';
 import { DeleteNodeModal } from './DeleteNodeModal';
 import { CreateNodeModal } from './CreateNodeModal';
@@ -76,6 +78,7 @@ export function InteractiveGraphVisualization() {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const { currentGraph, availableGraphs } = useGraph();
+  const { currentUser } = useAuth();
   
   const { data: workItemsData, loading, error, refetch } = useQuery(GET_WORK_ITEMS, {
     variables: currentGraph ? {
@@ -103,6 +106,22 @@ export function InteractiveGraphVisualization() {
     fetchPolicy: currentGraph ? 'cache-and-network' : 'cache-only',
     pollInterval: currentGraph ? 5000 : 0,
     errorPolicy: 'all'
+  });
+
+  // Mutation for creating work items
+  const [createNodeMutation] = useMutation(CREATE_WORK_ITEM, {
+    refetchQueries: [
+      { 
+        query: GET_WORK_ITEMS,
+        variables: currentGraph ? {
+          where: {
+            graph: {
+              id: currentGraph.id
+            }
+          }
+        } : { where: {} }
+      }
+    ]
   });
 
   // Mutation for creating edges
@@ -161,6 +180,8 @@ export function InteractiveGraphVisualization() {
   const [currentTransform, setCurrentTransform] = useState({ x: 0, y: 0, scale: 1 });
   const [showLegend, setShowLegend] = useState(false);
   const [showGraphPanel, setShowGraphPanel] = useState(false);
+  const [nodeCounter, setNodeCounter] = useState(1);
+  
 
   // Calculate dynamic positioning for panels and minimized buttons to avoid overlap
   const getPanelPosition = (panelType: 'graph' | 'legend' | 'create') => {
@@ -376,17 +397,20 @@ export function InteractiveGraphVisualization() {
   const validatedEdges = currentValidationResult.validEdges;
   
 
-  const nodes = validatedNodes.map(item => ({
-    ...item,
-    x: item.positionX,
-    y: item.positionY,
-    priority: {
-      executive: item.priorityExec,
-      individual: item.priorityIndiv,
-      community: item.priorityComm,
-      computed: item.priorityComp
-    }
-  }));
+  const nodes = [
+    // Real nodes from database
+    ...validatedNodes.map(item => ({
+      ...item,
+      x: item.positionX,
+      y: item.positionY,
+      priority: {
+        executive: item.priorityExec,
+        individual: item.priorityIndiv,
+        community: item.priorityComm,
+        computed: item.priorityComp
+      }
+    }))
+  ];
   
   // Define whether to show empty state overlay (but don't early return)
   const showEmptyStateOverlay = !loading && !error && nodes.length === 0;
@@ -503,6 +527,51 @@ export function InteractiveGraphVisualization() {
     const g = svg.append('g');
   }, []);
 
+  // Inline node creation function
+  const createInlineNode = async (x: number, y: number) => {
+    if (!currentGraph?.id) return;
+    
+    try {
+      const workItemInput = {
+        title: `New Node ${nodeCounter}`,
+        description: DEFAULT_NODE_CONFIG.description,
+        type: DEFAULT_NODE_CONFIG.type,
+        status: DEFAULT_NODE_CONFIG.status,
+        priorityExec: DEFAULT_NODE_CONFIG.priorityExec,
+        priorityIndiv: DEFAULT_NODE_CONFIG.priorityIndiv,
+        priorityComm: DEFAULT_NODE_CONFIG.priorityComm,
+        positionX: x,
+        positionY: y,
+        positionZ: 0,
+        radius: 1.0,
+        theta: 0.0,
+        phi: 0.0,
+        
+        owner: {
+          connect: {
+            where: { node: { id: currentUser?.id } }
+          }
+        },
+        graph: {
+          connect: {
+            where: { node: { id: currentGraph.id } }
+          }
+        }
+      };
+
+      const result = await createNodeMutation({
+        variables: { input: [workItemInput] }
+      });
+      
+      if (result.data) {
+        setNodeCounter(prev => prev + 1);
+        refetch();
+      }
+    } catch (error) {
+      console.error('Failed to create node:', error);
+    }
+  };
+
   // Define initializeVisualization function with access to nodes data
   const initializeVisualization = useCallback(() => {
     if (!svgRef.current || !containerRef.current) return;
@@ -535,6 +604,21 @@ export function InteractiveGraphVisualization() {
 
     svg.call(zoom);
     const g = svg.append('g');
+
+    // Add background for capturing clicks to create nodes
+    g.append('rect')
+      .attr('class', 'background')
+      .attr('width', width)
+      .attr('height', height)
+      .attr('fill', 'transparent')
+      .style('cursor', 'crosshair')
+      .on('click', (event: MouseEvent) => {
+        // Only create node if clicking on empty space (not dragging)
+        if (event.defaultPrevented) return;
+        
+        const [x, y] = d3.pointer(event, g.node());
+        createInlineNode(x, y);
+      });
 
     // Initialize all nodes at screen center for 2D layout
     nodes.forEach((node: any) => {
@@ -1273,7 +1357,8 @@ export function InteractiveGraphVisualization() {
     }, 150);
 
     // Add click handlers to nodes
-    nodeElements.on('click', (event: MouseEvent, d: WorkItem) => {
+    nodeElements.on('click', (event: MouseEvent, d: any) => {
+      // Handle regular node clicks
       handleNodeClick(event, d);
     });
 
@@ -1681,6 +1766,7 @@ export function InteractiveGraphVisualization() {
     <div ref={containerRef} className="graph-container relative w-full bg-gray-900" style={{ height: '100vh', minHeight: '900px' }}>
       <svg ref={svgRef} className="w-full h-full" style={{ background: 'radial-gradient(circle at center, #1f2937 0%, #111827 100%)' }} />
       
+      
       {/* Empty State Overlay */}
       {showEmptyStateOverlay && (
         <div className="absolute inset-0 flex items-start justify-center pointer-events-none pt-16 pl-32">
@@ -1696,7 +1782,7 @@ export function InteractiveGraphVisualization() {
             </div>
             
             <button 
-              onClick={() => setShowCreateNodeModal(true)}
+              onClick={() => createInlineNode(400, 300)}
               className="bg-gradient-to-r from-emerald-700 to-green-700 hover:from-emerald-600 hover:to-green-600 text-white px-8 py-4 rounded-xl font-semibold text-lg transition-all duration-300 flex items-center gap-3 mx-auto pointer-events-auto cursor-pointer shadow-lg hover:shadow-xl hover:shadow-green-500/25 transform hover:-translate-y-0.5 hover:scale-105"
             >
               <div className="w-5 h-5 bg-white/20 rounded-full flex items-center justify-center">
@@ -2197,7 +2283,7 @@ export function InteractiveGraphVisualization() {
       {/* Create Node Button - Hide when no nodes exist */}
       {!showEmptyStateOverlay && (
       <button
-        onClick={() => setShowCreateNodeModal(true)}
+        onClick={() => createInlineNode(400, 300)}
         className="absolute left-4 z-40 backdrop-blur-sm border-0 rounded-lg shadow-xl px-4 py-3 text-white font-semibold transition-all duration-300 flex items-center space-x-2 transform hover:scale-105 w-40 h-12"
         style={{ 
           ...getPanelPosition('create'),
@@ -2222,6 +2308,7 @@ export function InteractiveGraphVisualization() {
         </div>
       </button>
       )}
+
 
       {/* Legend */}
       {showLegend ? (
