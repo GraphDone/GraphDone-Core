@@ -178,6 +178,15 @@ export function InteractiveGraphVisualization() {
   const [selectedNode, setSelectedNode] = useState<WorkItem | null>(null);
   const [createNodePosition, setCreateNodePosition] = useState<{ x: number; y: number; z: number } | undefined>(undefined);
   const [currentTransform, setCurrentTransform] = useState({ x: 0, y: 0, scale: 1 });
+  
+  // Level of detail thresholds
+  const LOD_THRESHOLDS = {
+    VERY_FAR: 0.3,    // Only show basic shapes
+    FAR: 0.5,         // Add node icons  
+    MEDIUM: 0.8,      // Add node titles
+    CLOSE: 0.6,       // Add edge labels (earlier)
+    VERY_CLOSE: 2.0   // Full detail
+  };
   const [showLegend, setShowLegend] = useState(false);
   const [showGraphPanel, setShowGraphPanel] = useState(false);
   const [nodeCounter, setNodeCounter] = useState(1);
@@ -628,8 +637,18 @@ export function InteractiveGraphVisualization() {
       node.fy = null;
     });
 
+    // Viewport culling - only render visible nodes for performance
+    const margin = 200;
+    const visibleNodes = currentTransform.scale < LOD_THRESHOLDS.VERY_FAR ? 
+      nodes.filter((node: WorkItem) => {
+        const nodeX = (node.positionX || 0) * currentTransform.scale + currentTransform.x;
+        const nodeY = (node.positionY || 0) * currentTransform.scale + currentTransform.y;
+        return nodeX >= -margin && nodeX <= width + margin && 
+               nodeY >= -margin && nodeY <= height + margin;
+      }) : nodes;
+    
     // Simple 2D force simulation
-    const simulation = d3.forceSimulation(nodes as any);
+    const simulation = d3.forceSimulation(visibleNodes as any);
     simulationRef.current = simulation; // Store reference for resize handling
     
     simulation
@@ -680,11 +699,17 @@ export function InteractiveGraphVisualization() {
       .alphaDecay(0.015) // Slightly slower decay for better collision resolution
       .velocityDecay(0.4); // Add velocity decay for smoother movement
 
+    // Filter edges based on visible nodes for performance
+    const visibleNodeIds = new Set(visibleNodes.map((node: WorkItem) => node.id));
+    const visibleEdges = validatedEdges.filter((edge: WorkItemEdge) => 
+      visibleNodeIds.has(edge.source.id) && visibleNodeIds.has(edge.target.id)
+    );
+    
     // Create edges FIRST (so they render under nodes)
     const linkElements = g.append('g')
       .attr('class', 'edges-group')
       .selectAll('.edge')
-      .data(validatedEdges)
+      .data(visibleEdges)
       .enter()
       .append('line')
       .attr('class', 'edge')
@@ -712,14 +737,15 @@ export function InteractiveGraphVisualization() {
         .attr('d', 'M-3,-3 L0,0 L-3,3 L-1,0 Z')
         .attr('fill', option.hexColor)
         .attr('stroke', option.hexColor)
-        .attr('stroke-width', 1);
+        .attr('stroke-width', currentTransform.scale >= LOD_THRESHOLDS.FAR ? 1 : 0.5)
+      .style('opacity', currentTransform.scale >= LOD_THRESHOLDS.VERY_FAR ? 1 : 0.3);
     });
 
     // Create nodes AFTER edges (so they render on top)
     const nodeElements = g.append('g')
       .attr('class', 'nodes-group')
       .selectAll('.node')
-      .data(nodes)
+      .data(visibleNodes)
       .enter()
       .append('g')
       .attr('class', 'node')
@@ -887,6 +913,7 @@ export function InteractiveGraphVisualization() {
       .attr('text-anchor', 'middle')
       .attr('dominant-baseline', 'middle')
       .text((d: WorkItem) => d.type)
+      .style('opacity', currentTransform.scale >= LOD_THRESHOLDS.FAR ? 1 : 0)
       .style('font-size', '13px')
       .style('font-weight', '700')
       .style('fill', (d: WorkItem) => {
@@ -957,6 +984,7 @@ export function InteractiveGraphVisualization() {
           .attr('text-anchor', 'middle')
           .attr('dominant-baseline', 'middle')
           .text(line)
+          .style('opacity', currentTransform.scale >= LOD_THRESHOLDS.MEDIUM ? 1 : 0)
           .style('font-size', '14px')
           .style('font-weight', '600')
           .style('fill', () => {
@@ -1009,6 +1037,7 @@ export function InteractiveGraphVisualization() {
         // Hide description if too long instead of truncating
         return d.description.length > maxLength ? '' : d.description;
       })
+      .style('opacity', currentTransform.scale >= LOD_THRESHOLDS.CLOSE ? 1 : 0)
       .style('font-size', '11px')
       .style('font-weight', '400')
       .style('fill', (d: WorkItem) => {
@@ -1262,11 +1291,11 @@ export function InteractiveGraphVisualization() {
       .attr('stroke-width', 1)
       .attr('opacity', 1);
 
-    // Create edge label groups with rounded rectangles and text
+    // Create edge label groups with rounded rectangles and text (only for visible edges)
     const edgeLabelGroups = g.append('g')
       .attr('class', 'edge-labels-group')
       .selectAll('.edge-label-group')
-      .data(validatedEdges)
+      .data(visibleEdges)
       .enter()
       .append('g')
       .attr('class', 'edge-label-group')
@@ -1286,11 +1315,13 @@ export function InteractiveGraphVisualization() {
       .text((d: WorkItemEdge) => {
         const config = getRelationshipConfig(d.type as RelationshipType);
         return config.label;
-      });
+      })
+      .style('opacity', currentTransform.scale >= LOD_THRESHOLDS.CLOSE ? 1 : 0);
 
     // Add icons positioned to the left of text
     edgeLabelGroups
       .append('foreignObject')
+      .style('opacity', currentTransform.scale >= LOD_THRESHOLDS.CLOSE ? 1 : 0)
       .attr('class', 'edge-label-icon')
       .attr('width', 14)
       .attr('height', 14)
@@ -1419,7 +1450,7 @@ export function InteractiveGraphVisualization() {
       updateEdgePositions();
     });
 
-    // Update zoom
+    // Update zoom with LOD updates
     zoom.on('zoom', (event) => {
       g.attr('transform', event.transform);
       setCurrentTransform({ 
@@ -1427,6 +1458,31 @@ export function InteractiveGraphVisualization() {
         y: event.transform.y, 
         scale: event.transform.k 
       });
+      
+      // Update LOD based on zoom level
+      const scale = event.transform.k;
+      
+      // Smooth opacity transitions based on zoom level
+      const getSmoothedOpacity = (threshold: number, fadeRange: number = 0.2) => {
+        if (scale >= threshold + fadeRange) return 1;
+        if (scale <= threshold - fadeRange) return 0;
+        return (scale - (threshold - fadeRange)) / (fadeRange * 2);
+      };
+      
+      // Update text opacities with smooth transitions
+      g.selectAll('.node-type-text')
+        .style('opacity', getSmoothedOpacity(LOD_THRESHOLDS.FAR));
+      g.selectAll('.node-title-text')
+        .style('opacity', getSmoothedOpacity(LOD_THRESHOLDS.MEDIUM));
+      g.selectAll('.node-description-text')
+        .style('opacity', getSmoothedOpacity(LOD_THRESHOLDS.CLOSE));
+      g.selectAll('.edge-label')
+        .style('opacity', getSmoothedOpacity(LOD_THRESHOLDS.CLOSE));
+      g.selectAll('.edge-label-icon')
+        .style('opacity', getSmoothedOpacity(LOD_THRESHOLDS.CLOSE));
+      g.selectAll('.edge')
+        .style('opacity', Math.max(0.1, getSmoothedOpacity(LOD_THRESHOLDS.VERY_FAR, 0.1)))
+        .attr('stroke-width', scale >= LOD_THRESHOLDS.FAR ? 1 : Math.max(0.3, scale * 0.8));
     });
 
     // Properly restart simulation to ensure initial positioning works
