@@ -58,7 +58,8 @@ const getIconSVGData = (type: RelationshipType): string => {
     'CONFLICTS_WITH': '<path d="m13 2-3 3.5a2 2 0 0 0 0 3l3 3.5a2 2 0 0 1 0 3L10 18"/><path d="M9 18h3a2 2 0 0 0 2-2v-1a2 2 0 0 1 2-2 2 2 0 0 1 2 2v1a2 2 0 0 0 2 2h3"/>',  // Zap
     'VALIDATES': '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/>',  // Shield
     'REFERENCES': '<path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/>',  // Bookmark
-    'CONTAINS': '<path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>'  // Package
+    'CONTAINS': '<path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>',  // Package
+    'DEFAULT_EDGE': '<path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="m15 7 5 5-5 5"/><path d="m11 7 5 5-5 5"/>'  // Link2
   };
   return iconPaths[type] || iconPaths['RELATES_TO'];
 };
@@ -166,7 +167,7 @@ export function InteractiveGraphVisualization() {
   const [edgeMenu, setEdgeMenu] = useState<EdgeMenuState>({ edge: null, position: { x: 0, y: 0 }, visible: false });
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionSource, setConnectionSource] = useState<string | null>(null);
-  const [selectedRelationType, setSelectedRelationType] = useState<RelationshipType>('DEPENDS_ON');
+  const [selectedRelationType, setSelectedRelationType] = useState<RelationshipType>('DEFAULT_EDGE');
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
   const [showDataHealth, setShowDataHealth] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -399,6 +400,8 @@ export function InteractiveGraphVisualization() {
   });
 
   // Validate and sanitize data before D3 processing
+  console.log('🔍 Input to validation - workItems:', workItems.length, 'workItemEdges:', workItemEdges.length);
+  console.log('🔍 First few workItemEdges:', workItemEdges.slice(0, 3));
   const currentValidationResult = validateGraphData(workItems, workItemEdges);
   
   // Update validation state
@@ -706,11 +709,15 @@ export function InteractiveGraphVisualization() {
 
     // Filter edges based on visible nodes for performance
     const visibleNodeIds = new Set(visibleNodes.map((node: WorkItem) => node.id));
-    const visibleEdges = validatedEdges.filter((edge: WorkItemEdge) => {
-      const sourceId = typeof edge.source === 'string' ? edge.source : (edge.source as any).id;
-      const targetId = typeof edge.target === 'string' ? edge.target : (edge.target as any).id;
-      return visibleNodeIds.has(sourceId) && visibleNodeIds.has(targetId);
-    });
+    // Temporarily show ALL edges for debugging
+    const visibleEdges = validatedEdges;
+    
+    // Debug: Log edge visibility
+    console.log('🔍 Total edges:', validatedEdges.length);
+    console.log('🔍 Visible edges:', visibleEdges.length);
+    console.log('🔍 Visible nodes:', visibleNodes.length);
+    console.log('🔍 Raw edges data:', edgesData?.edges?.length || 0);
+    console.log('🔍 First few edges:', validatedEdges.slice(0, 3));
     
     // Create edges FIRST (so they render under nodes)
     const linkElements = g.append('g')
@@ -759,6 +766,16 @@ export function InteractiveGraphVisualization() {
       .style('cursor', 'pointer')
       .call(d3.drag<any, any>()
         .on('start', (event, d: any) => {
+          console.log('🔍 Drag start - altKey:', event.sourceEvent.altKey, 'node:', d.title);
+          
+          // Check if this is an edge creation attempt (Alt/Option key held)
+          if (event.sourceEvent.altKey) {
+            mousedownNodeRef.current = d;
+            console.log('🟢 Edge creation started from:', d.title);
+            return;
+          }
+          
+          // Normal drag behavior
           if (!event.active) simulation.alphaTarget(0.2).restart();
           d.fx = d.x;
           d.fy = d.y;
@@ -773,6 +790,31 @@ export function InteractiveGraphVisualization() {
           d.y = d.fy;
         })
         .on('end', (event, d: any) => {
+          // Check if this is edge creation end
+          if (mousedownNodeRef.current && mousedownNodeRef.current.id !== d.id) {
+            console.log('🔗 Creating edge:', mousedownNodeRef.current.title, '→', d.title);
+            
+            // Create edge using GraphQL mutation
+            createEdgeMutation({
+              variables: {
+                input: [{
+                  type: 'DEFAULT_EDGE',
+                  weight: 0.8,
+                  source: { connect: { where: { node: { id: mousedownNodeRef.current.id } } } },
+                  target: { connect: { where: { node: { id: d.id } } } },
+                }]
+              }
+            }).then(() => {
+              console.log('✅ Edge created successfully');
+            }).catch((error) => {
+              console.error('❌ Edge creation failed:', error);
+            });
+            
+            mousedownNodeRef.current = null;
+            return;
+          }
+          
+          // Normal drag end behavior
           if (!event.active) simulation.alphaTarget(0.05);
           // Keep position fixed for a short time to allow other nodes to settle
           setTimeout(() => {
@@ -780,6 +822,7 @@ export function InteractiveGraphVisualization() {
             d.fy = null;
             simulation.alphaTarget(0.02);
           }, 500);
+          mousedownNodeRef.current = null;
         }));
 
     // Monopoly-style rectangular nodes with colored title bars
@@ -1394,10 +1437,101 @@ export function InteractiveGraphVisualization() {
       });
     }, 150);
 
-    // Add click handlers to nodes
-    nodeElements.on('click', (event: MouseEvent, d: any) => {
-      // Handle regular node clicks
-      handleNodeClick(event, d);
+    // Node click handling with edge creation
+    nodeElements
+    .on('click', (event: MouseEvent, d: any) => {
+      // Shift+Click for edge creation
+      if (event.shiftKey) {
+        event.stopPropagation();
+        event.preventDefault();
+        
+        if (!mousedownNodeRef.current) {
+          // First click - select source node
+          mousedownNodeRef.current = d;
+          console.log('🟢 Edge creation started from:', d.title);
+          console.log('Now Shift+Click another node to create edge');
+          
+          // Visual feedback - highlight source node
+          d3.select(event.currentTarget as SVGElement)
+            .select('rect')
+            .style('stroke', '#10b981')
+            .style('stroke-width', 3);
+        } else if (mousedownNodeRef.current.id !== d.id) {
+          // Second click - create edge with professional animation
+          const sourceNode = mousedownNodeRef.current;
+          const targetNode = d;
+          console.log('🔗 Creating edge:', sourceNode.title, '→', targetNode.title);
+          
+          // Remove source node highlight
+          nodeElements.selectAll('rect')
+            .style('stroke', null)
+            .style('stroke-width', null);
+          
+          // Create temporary dotted edge for animation
+          const tempEdgeId = `temp-edge-${sourceNode.id}-${targetNode.id}`;
+          const edgeContainer = svg.select('.edges-group');
+          
+          const tempEdge = edgeContainer
+            .append('line')
+            .attr('id', tempEdgeId)
+            .attr('class', 'temp-edge')
+            .attr('x1', sourceNode.x)
+            .attr('y1', sourceNode.y)
+            .attr('x2', targetNode.x)
+            .attr('y2', targetNode.y)
+            .style('stroke', '#10b981')
+            .style('stroke-width', 2)
+            .style('stroke-dasharray', '8,4')
+            .style('opacity', 0);
+          
+          // Fade in dotted edge
+          tempEdge
+            .transition()
+            .duration(1000)
+            .style('opacity', 1)
+            .on('end', () => {
+              // After fade in, animate to solid
+              tempEdge
+                .transition()
+                .duration(9000)
+                .style('stroke-dasharray', '0,0')
+                .style('stroke-width', 3)
+                .on('end', () => {
+                  // Create actual edge in database
+                  createEdgeMutation({
+                    variables: {
+                      input: [{
+                        type: 'DEFAULT_EDGE',
+                        weight: 0.8,
+                        source: { connect: { where: { node: { id: sourceNode.id } } } },
+                        target: { connect: { where: { node: { id: targetNode.id } } } },
+                      }]
+                    }
+                  }).then(() => {
+                    console.log('✅ Edge created successfully');
+                    // Remove temporary edge after real edge is added
+                    setTimeout(() => {
+                      tempEdge.remove();
+                    }, 200);
+                  }).catch((error) => {
+                    console.error('❌ Edge creation failed:', error);
+                    // Remove temp edge on error
+                    tempEdge.remove();
+                  });
+                });
+            });
+          
+          mousedownNodeRef.current = null;
+        }
+        return;
+      }
+      
+      // Regular node clicks (right-click menu)
+      setTimeout(() => {
+        if (!mousedownNodeRef.current) {
+          handleNodeClick(event, d);
+        }
+      }, 10);
     });
 
     const updateEdgePositions = () => {
@@ -1506,6 +1640,7 @@ export function InteractiveGraphVisualization() {
 
   // Store simulation reference for resize handling
   const simulationRef = useRef<d3.Simulation<any, any> | null>(null);
+  const mousedownNodeRef = useRef<any>(null);
 
   // Initialization effect
   useEffect(() => {
@@ -2187,14 +2322,23 @@ export function InteractiveGraphVisualization() {
           }}
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Node Info Header */}
+          {/* Node Info Header with Close Button */}
           <div className="px-4 py-2 border-b border-gray-600">
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
               <div
                 className="w-4 h-4 rounded-full"
                 style={{ backgroundColor: getNodeColor(nodeMenu.node) }}
               />
               <span className="font-medium text-gray-100">{nodeMenu.node.title}</span>
+              </div>
+              <button
+                onClick={() => setNodeMenu(prev => ({ ...prev, visible: false }))}
+                className="p-1 hover:bg-gray-700 rounded transition-colors"
+                title="Close menu"
+              >
+                <X className="h-4 w-4 text-gray-400 hover:text-gray-200" />
+              </button>
             </div>
             <div className="flex items-center space-x-4 mt-1 text-xs text-gray-500">
               <span className="flex items-center">

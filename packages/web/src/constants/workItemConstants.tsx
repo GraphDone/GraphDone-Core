@@ -545,7 +545,8 @@ export type RelationshipType =
   | 'CONFLICTS_WITH'
   | 'VALIDATES'
   | 'REFERENCES'
-  | 'CONTAINS';
+  | 'CONTAINS'
+  | 'DEFAULT_EDGE';
 
 export interface RelationshipOption {
   type: RelationshipType;
@@ -652,6 +653,14 @@ export const RELATIONSHIP_TYPES: Record<RelationshipType, RelationshipOption> = 
     icon: Package,
     color: 'text-blue-400',
     hexColor: '#60a5fa'
+  },
+  DEFAULT_EDGE: {
+    type: 'DEFAULT_EDGE',
+    label: 'Connected',
+    description: 'Simple connection between nodes',
+    icon: Link2,
+    color: 'text-gray-400',
+    hexColor: '#9ca3af'
   }
 };
 
