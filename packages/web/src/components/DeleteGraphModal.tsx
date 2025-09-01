@@ -322,15 +322,45 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
                         ) : (
                           <div className="bg-red-900/30 border border-red-600/50 rounded-lg p-3">
                             <p className="text-red-200 text-sm mb-3">
-                              Are you sure you want to delete all {nodes.filter(node => !(nodeConnections[node.id]?.length > 0)).length} unconnected nodes?
+                              <strong>Delete {nodes.filter(node => !(nodeConnections[node.id]?.length > 0)).length} unconnected nodes?</strong>
+                            </p>
+                            <p className="text-red-300 text-xs mb-3">
+                              This will permanently remove all nodes that have no connections to other nodes. This action cannot be undone.
                             </p>
                             <div className="flex gap-2">
                               <button
                                 onClick={async () => {
                                   const unconnectedNodes = nodes.filter(node => !(nodeConnections[node.id]?.length > 0));
-                                  for (const node of unconnectedNodes) {
-                                    await handleDeleteNode(node.id, node.title);
+                                  const nodeCount = unconnectedNodes.length;
+                                  
+                                  try {
+                                    // Bulk delete all unconnected nodes in single operation
+                                    const nodeIds = unconnectedNodes.map(node => node.id);
+                                    await deleteWorkItem({
+                                      variables: { 
+                                        where: { 
+                                          id_IN: nodeIds
+                                        }
+                                      }
+                                    });
+                                    
+                                    // Single success notification for bulk operation
+                                    showSuccess(
+                                      'Nodes Deletion Completed Successfully!',
+                                      `Removed ${nodeCount} node${nodeCount !== 1 ? 's' : ''} from ${currentGraph.name}.`
+                                    );
+                                    
+                                    // Update local state
+                                    setNodes(prev => prev.filter(node => !unconnectedNodes.some(deleted => deleted.id === node.id)));
+                                    setNodeCount(prev => prev - nodeCount);
+                                    
+                                  } catch (error) {
+                                    showError(
+                                      'Bulk Delete Failed',
+                                      error instanceof Error ? error.message : 'Please try again.'
+                                    );
                                   }
+                                  
                                   setShowBulkDeleteConfirm(false);
                                 }}
                                 className="flex-1 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded text-sm"
