@@ -680,12 +680,16 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
   const [activeTab, setActiveTab] = useState<'connect' | 'disconnect'>(initialTab);
   const [selectedNodes, setSelectedNodes] = useState<Set<string>>(new Set());
   const [selectedConnections, setSelectedConnections] = useState<Set<string>>(new Set());
-  const [selectedRelationType, setSelectedRelationType] = useState('DEPENDS_ON');
+  const [selectedRelationType, setSelectedRelationType] = useState('DEFAULT_EDGE');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
   const [relationshipFilter, setRelationshipFilter] = useState<string[]>(RELATIONSHIP_OPTIONS.map(r => r.type));
+  
+  // Debug: Log available relationship options
+  console.log('🔍 Available relationship options:', RELATIONSHIP_OPTIONS.map(r => r.type));
+  console.log('🔍 DEFAULT_EDGE found:', RELATIONSHIP_OPTIONS.find(r => r.type === 'DEFAULT_EDGE'));
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   
   // Custom dropdown states
@@ -1268,7 +1272,7 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center space-x-2">
                   <div className="h-2 w-2 bg-emerald-400 rounded-full"></div>
-                  <h4 className="text-sm font-bold text-gray-100 tracking-wide">Relationship Type</h4>
+                  <h4 className="text-sm font-bold text-gray-100 tracking-wide">Relationship Type ({RELATIONSHIP_OPTIONS.filter(relation => relationshipFilter.includes(relation.type)).length} available)</h4>
                 </div>
                 
                 <div className="relative">
@@ -1323,6 +1327,8 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
               
               <div className="space-y-3 max-h-96 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
                 {RELATIONSHIP_OPTIONS.filter(relation => relationshipFilter.includes(relation.type)).map((relation) => {
+                  // Debug: Log each relationship being rendered
+                  console.log('🔍 Rendering relationship:', relation.type, relation.label);
                   const isDisabled = isRelationshipDisabled(relation.type);
                   
                   // Get which nodes already have this relationship

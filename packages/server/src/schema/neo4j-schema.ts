@@ -191,6 +191,7 @@ export const typeDefs = gql`
     RELATES_TO
     IS_PART_OF
     FOLLOWS
+    DEFAULT_EDGE
     PARALLEL_WITH
     DUPLICATES
     CONFLICTS_WITH
