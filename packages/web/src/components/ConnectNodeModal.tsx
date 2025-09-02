@@ -23,11 +23,6 @@ import {
   getRelationshipDescription,
   RelationshipType
 } from '../constants/workItemConstants';
-import { 
-  getStatusColor as getStatusColorScheme,
-  getTypeColor, 
-  getPriorityColor
-} from '../utils/nodeColorSystem';
 import {
   TYPE_OPTIONS,
   STATUS_OPTIONS,
@@ -35,6 +30,9 @@ import {
   getTypeIconElement,
   getStatusIconElement,
   getPriorityIconElement,
+  getTypeColorScheme,
+  getStatusColorScheme,
+  getPriorityColorScheme,
   AlertTriangle,
   Target
 } from '../constants/workItemConstants';
@@ -2026,7 +2024,7 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
                             <div className="flex items-center space-x-3 text-xs">
                               {/* Type with icon */}
                               <div className="flex items-center space-x-1">
-                                <div className={getTypeColor(node.type).text}>
+                                <div className={getTypeColorScheme(node.type as any).text}>
                                   {getTypeIconElement(node.type as any)}
                                 </div>
                                 <span className="text-gray-300 font-medium">
@@ -2036,7 +2034,7 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
                               
                               {/* Status with icon and label */}
                               <div className="flex items-center space-x-1">
-                                <div className={getStatusColorScheme(node.status).text}>
+                                <div className={getStatusColorScheme(node.status as any).text}>
                                   {getStatusIconElement(node.status as any)}
                                 </div>
                                 <span className="text-gray-300 font-medium">
@@ -2047,7 +2045,7 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
                               {/* Priority with icon and progress bar */}
                               {(node.priorityComp !== undefined && node.priorityComp !== null) && (
                                 <div className="flex items-center space-x-1">
-                                  <div className={getPriorityColor(node.priorityComp).text}>
+                                  <div className={getPriorityColorScheme(node.priorityComp).text}>
                                     {getPriorityIconElement(node.priorityComp as any)}
                                   </div>
                                   <span className="text-gray-300 font-medium">Priority</span>
@@ -2057,11 +2055,11 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
                                         className="h-full transition-all duration-300"
                                         style={{ 
                                           width: `${Math.round(node.priorityComp * 100)}%`,
-                                          backgroundColor: getPriorityColor(node.priorityComp).hex
+                                          backgroundColor: getPriorityColorScheme(node.priorityComp).hex
                                         }}
                                       />
                                     </div>
-                                    <span className={`text-xs font-medium ${getPriorityColor(node.priorityComp).text}`}>
+                                    <span className={`text-xs font-medium ${getPriorityColorScheme(node.priorityComp).text}`}>
                                       {Math.round(node.priorityComp * 100)}%
                                     </span>
                                   </div>

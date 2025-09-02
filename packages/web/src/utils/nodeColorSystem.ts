@@ -1,7 +1,16 @@
+/* 
+DEPRECATED: This file has been replaced by centralized workItemConstants.tsx
+All color schemes, icons, and utility functions are now in workItemConstants.tsx
+This file is kept for reference but should not be used in new code.
+TODO: Remove this file once migration is complete
+*/
+
+/* eslint-disable */
+/*
 /**
  * Unified Node Color System
  * Provides consistent color schemes across Status, Type, and Priority for visual harmony
- */
+ *
 
 export interface ColorScheme {
   primary: string;       // Main color
@@ -268,3 +277,4 @@ export function getColorSimilarityScore(color1: string, color2: string): number 
   
   return hslDistance(color1, color2);
 }
+*/

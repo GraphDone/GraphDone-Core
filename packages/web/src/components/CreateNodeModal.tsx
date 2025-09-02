@@ -13,19 +13,11 @@ import {
   getRelationshipIconElement,
   RelationshipType
 } from '../constants/workItemConstants';
-import { 
-  getStatusColor as getStatusColorScheme,
-  getTypeColor, 
-  getPriorityColor,
-  suggestSimilarNodes
-} from '../utils/nodeColorSystem';
 import {
   STATUS_OPTIONS,
   PRIORITY_OPTIONS,
   getPriorityIcon as getCentralizedPriorityIcon,
   getPriorityIconElement,
-  getPriorityColor as getCentralizedPriorityColor,
-  getStatusColorScheme as getCentralizedStatusColorScheme,
   ClipboardList
 } from '../constants/workItemConstants';
 
