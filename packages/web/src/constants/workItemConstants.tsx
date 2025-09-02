@@ -686,6 +686,22 @@ export const getRelationshipIconElement = (type: RelationshipType, className: st
   return IconComponent ? <IconComponent className={fullClassName} /> : null;
 };
 
+// Get relationship icon component for D3/SVG usage
+export const getRelationshipIconComponent = (type: RelationshipType): React.ComponentType<{ className?: string }> => {
+  const IconComponent = getRelationshipIcon(type);
+  return IconComponent || Link2; // Fallback to Link2 if not found
+};
+
+// Get relationship icon component and color for D3 usage
+export const getRelationshipIconForD3 = (type: RelationshipType) => {
+  const config = getRelationshipConfig(type);
+  return {
+    IconComponent: config.icon,
+    color: config.color,
+    hexColor: config.hexColor
+  };
+};
+
 // Get appropriate arrow for relationship type
 export const getRelationshipArrow = (type: RelationshipType): '→' | '↔' | '—' => {
   const bidirectionalTypes: RelationshipType[] = ['RELATES_TO', 'PARALLEL_WITH', 'CONFLICTS_WITH'];
