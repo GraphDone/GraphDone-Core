@@ -19,6 +19,7 @@ import {
 import { useQuery, useMutation, useApolloClient } from '@apollo/client';
 import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useNotifications } from '../contexts/NotificationContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { GET_WORK_ITEMS, GET_EDGES, CREATE_EDGE, UPDATE_EDGE, DELETE_EDGE, CREATE_WORK_ITEM } from '../lib/queries';
 import { validateGraphData, getValidationSummary, ValidationResult } from '../utils/graphDataValidation';
@@ -55,6 +56,7 @@ export function InteractiveGraphVisualization() {
   const containerRef = useRef<HTMLDivElement>(null);
   const { currentGraph, availableGraphs } = useGraph();
   const { currentUser } = useAuth();
+  const { showSuccess, showError } = useNotifications();
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -154,6 +156,9 @@ export function InteractiveGraphVisualization() {
   const [showUpdateGraphModal, setShowUpdateGraphModal] = useState(false);
   const [showDeleteGraphModal, setShowDeleteGraphModal] = useState(false);
   const [selectedNode, setSelectedNode] = useState<WorkItem | null>(null);
+  const [selectedEdge, setSelectedEdge] = useState<WorkItemEdge | null>(null);
+  const [showEdgeDetails, setShowEdgeDetails] = useState(false);
+  const [edgeDetailsPosition, setEdgeDetailsPosition] = useState<{ x: number; y: number } | null>(null);
   const [createNodePosition, setCreateNodePosition] = useState<{ x: number; y: number; z: number } | undefined>(undefined);
   const [currentTransform, setCurrentTransform] = useState({ x: 0, y: 0, scale: 1 });
   const [editingEdge, setEditingEdge] = useState<{ edge: WorkItemEdge; position: { x: number; y: number } } | null>(null);
@@ -764,8 +769,10 @@ export function InteractiveGraphVisualization() {
     // Debug: Log edge visibility
     
     // Create edges FIRST (so they render under nodes)
-    const linkElements = g.append('g')
-      .attr('class', 'edges-group')
+    const edgesGroup = g.append('g').attr('class', 'edges-group');
+    
+    // Create visible edge lines
+    const linkElements = edgesGroup
       .selectAll('.edge')
       .data(visibleEdges)
       .enter()
@@ -777,6 +784,39 @@ export function InteractiveGraphVisualization() {
       })
       .attr('stroke-width', (d: WorkItemEdge) => (d.strength || 0.8) * 3)
       .attr('stroke-opacity', 0.7);
+    
+    // Create invisible thicker clickable areas for easier interaction
+    const clickableEdges = edgesGroup
+      .selectAll('.edge-clickable')
+      .data(visibleEdges)
+      .enter()
+      .append('line')
+      .attr('class', 'edge-clickable')
+      .attr('stroke', 'transparent')
+      .attr('stroke-width', 12)
+      .style('cursor', 'pointer')
+      .on('click', (event: MouseEvent, d: WorkItemEdge) => {
+        event.stopPropagation();
+        
+        // Simple positioning - use mouse coordinates
+        setEdgeDetailsPosition({ x: event.clientX, y: event.clientY });
+        setSelectedEdge(d);
+        setShowEdgeDetails(true);
+      })
+      .on('mouseover', function(event: MouseEvent, d: WorkItemEdge) {
+        // Highlight the corresponding visible edge
+        linkElements
+          .filter((edge: WorkItemEdge) => edge.id === d.id)
+          .attr('stroke-width', (d: WorkItemEdge) => ((d.strength || 0.8) * 3) + 2)
+          .attr('stroke-opacity', 1);
+      })
+      .on('mouseout', function(event: MouseEvent, d: WorkItemEdge) {
+        // Reset the corresponding visible edge
+        linkElements
+          .filter((edge: WorkItemEdge) => edge.id === d.id)
+          .attr('stroke-width', (d: WorkItemEdge) => (d.strength || 0.8) * 3)
+          .attr('stroke-opacity', 0.7);
+      });
 
     // Add arrowhead markers for middle of edges
     const defs = svg.append('defs');
@@ -1478,9 +1518,12 @@ export function InteractiveGraphVisualization() {
         const config = getRelationshipConfig(d.type as RelationshipType);
         return config.hexColor;
       })
-      .style('opacity', 0.9)
-      .style('stroke', '#1f2937')
-      .style('stroke-width', 1)
+      .style('opacity', 1)
+      .style('stroke', (d: WorkItemEdge) => {
+        const config = getRelationshipConfig(d.type as RelationshipType);
+        return config.hexColor;
+      })
+      .style('stroke-width', 1.5)
       .style('pointer-events', 'all')
       .style('cursor', 'pointer')
       .on('mouseover', function() {
@@ -1639,8 +1682,15 @@ export function InteractiveGraphVisualization() {
     });
 
     const updateEdgePositions = () => {
-      // Update edge positions - D3 has already updated source/target with current positions
+      // Update visible edge positions
       linkElements
+        .attr('x1', (d: any) => d.source.x)
+        .attr('y1', (d: any) => d.source.y)
+        .attr('x2', (d: any) => d.target.x)
+        .attr('y2', (d: any) => d.target.y);
+      
+      // Update clickable edge positions  
+      clickableEdges
         .attr('x1', (d: any) => d.source.x)
         .attr('y1', (d: any) => d.source.y)
         .attr('x2', (d: any) => d.target.x)
@@ -3002,6 +3052,86 @@ export function InteractiveGraphVisualization() {
             setShowDeleteModal(true);
           } : undefined}
         />
+      )}
+
+      {/* Edge Details Panel */}
+      {showEdgeDetails && selectedEdge && (
+        <div 
+          className="fixed w-80 bg-gray-800 border border-gray-600 rounded-lg shadow-xl z-50"
+          style={{
+            left: `${edgeDetailsPosition ? Math.min(edgeDetailsPosition.x - 160, window.innerWidth - 320) : window.innerWidth - 340}px`,
+            top: `${edgeDetailsPosition ? Math.max(edgeDetailsPosition.y - 100, 10) : 20}px`
+          }}
+        >
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white">Edge Details</h3>
+              <button
+                onClick={() => {
+                  setShowEdgeDetails(false);
+                  setSelectedEdge(null);
+                  setEdgeDetailsPosition(null);
+                }}
+                className="text-gray-400 hover:text-white"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm font-medium text-gray-300">Relationship Type</label>
+                <div className="flex items-center space-x-2 mt-1">
+                  {getRelationshipIconElement(selectedEdge.type, 'h-4 w-4')}
+                  <span className="text-white">{getRelationshipConfig(selectedEdge.type).label}</span>
+                </div>
+              </div>
+              
+              <div>
+                <label className="text-sm font-medium text-gray-300">From</label>
+                <p className="text-white text-sm mt-1">
+                  {typeof selectedEdge.source === 'string' ? selectedEdge.source : (selectedEdge.source as any)?.title || (selectedEdge.source as any)?.id || 'Unknown'}
+                </p>
+              </div>
+              
+              <div>
+                <label className="text-sm font-medium text-gray-300">To</label>
+                <p className="text-white text-sm mt-1">
+                  {typeof selectedEdge.target === 'string' ? selectedEdge.target : (selectedEdge.target as any)?.title || (selectedEdge.target as any)?.id || 'Unknown'}
+                </p>
+              </div>
+              
+              {selectedEdge.description && (
+                <div>
+                  <label className="text-sm font-medium text-gray-300">Description</label>
+                  <p className="text-white text-sm mt-1">{selectedEdge.description}</p>
+                </div>
+              )}
+              
+              <div className="pt-4 border-t border-gray-600">
+                <button
+                  onClick={async () => {
+                    try {
+                      await deleteEdgeMutation({
+                        variables: { where: { id: selectedEdge.id } }
+                      });
+                      setShowEdgeDetails(false);
+                      setSelectedEdge(null);
+                      setEdgeDetailsPosition(null);
+                      showSuccess('Edge Deleted', 'Relationship removed successfully');
+                    } catch (error: any) {
+                      showError('Delete Failed', error.message || 'Could not delete edge');
+                    }
+                  }}
+                  className="w-full bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg flex items-center justify-center space-x-2"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span>Delete Relationship</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Fullscreen Toggle */}
