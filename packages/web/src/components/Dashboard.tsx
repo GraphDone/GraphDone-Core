@@ -12,6 +12,10 @@ import {
   AlertCircle,
   Calendar,
   ClipboardList,
+  Eye,
+  Pause,
+  XCircle,
+  Hexagon,
   Layers,
   Trophy,
   Target,
@@ -58,11 +62,15 @@ interface DashboardProps {
   filteredNodes: WorkItem[];
   stats: {
     total: number;
-    completed: number;
-    inProgress: number;
-    blocked: number;
-    planned: number;
+    notStarted: number;
     proposed: number;
+    planned: number;
+    inProgress: number;
+    inReview: number;
+    blocked: number;
+    onHold: number;
+    completed: number;
+    cancelled: number;
     priorityStats: {
       critical: number;
       high: number;
@@ -215,11 +223,15 @@ const PieChart = ({ data, title }: { data: Array<{label: string, value: number, 
                 const getIcon = (label: string) => {
               switch(label) {
                 // Status icons
+                case 'Not Started': return <Hexagon className="h-5 w-5" style={{ color: item.color }} />;
                 case 'Proposed': return <ClipboardList className="h-5 w-5" style={{ color: item.color }} />;
                 case 'Planned': return <Calendar className="h-5 w-5" style={{ color: item.color }} />;
                 case 'In Progress': return <Clock className="h-5 w-5" style={{ color: item.color }} />;
-                case 'Completed': return <CheckCircle className="h-5 w-5" style={{ color: item.color }} />;
+                case 'In Review': return <Eye className="h-5 w-5" style={{ color: item.color }} />;
                 case 'Blocked': return <AlertCircle className="h-5 w-5" style={{ color: item.color }} />;
+                case 'On Hold': return <Pause className="h-5 w-5" style={{ color: item.color }} />;
+                case 'Completed': return <CheckCircle className="h-5 w-5" style={{ color: item.color }} />;
+                case 'Cancelled': return <XCircle className="h-5 w-5" style={{ color: item.color }} />;
                 // Type icons
                 case 'Epic': return <Layers className="h-5 w-5" style={{ color: item.color }} />;
                 case 'Milestone': return <Trophy className="h-5 w-5" style={{ color: item.color }} />;
@@ -263,16 +275,107 @@ const PieChart = ({ data, title }: { data: Array<{label: string, value: number, 
 const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
   return (
     <div className="p-6 space-y-6">
-      {/* Stats Cards - First Row */}
+      {/* Total Tasks - Full Width Card */}
+      <div className="bg-gray-800 rounded-lg p-8 border border-gray-700">
+        <div className="flex items-center justify-center">
+          <div className="flex-shrink-0">
+            <Sigma className="h-12 w-12 text-lime-500" />
+          </div>
+          <div className="ml-6 text-center">
+            <div className="text-2xl font-bold text-gray-300">Total Tasks</div>
+            <div className="text-4xl font-bold text-lime-400">{stats.total}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats Cards - Second Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <Sigma className="h-10 w-10 text-lime-500" />
+              <Hexagon className="h-8 w-8 text-gray-400" />
             </div>
             <div className="ml-4">
-              <div className="text-lg font-bold text-gray-300">Total Tasks</div>
-              <div className="text-4xl font-bold text-lime-400">{stats.total}</div>
+              <div className="text-base font-bold text-gray-300">Not Started</div>
+              <div className="text-3xl font-bold text-gray-400">{stats.notStarted}</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <ClipboardList className="h-8 w-8 text-cyan-500" />
+            </div>
+            <div className="ml-4">
+              <div className="text-base font-bold text-gray-300">Proposed</div>
+              <div className="text-3xl font-bold text-cyan-400">{stats.proposed}</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <Calendar className="h-8 w-8 text-purple-500" />
+            </div>
+            <div className="ml-4">
+              <div className="text-base font-bold text-gray-300">Planned</div>
+              <div className="text-3xl font-bold text-purple-400">{stats.planned}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats Cards - Second Row */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <Clock className="h-8 w-8 text-yellow-500" />
+            </div>
+            <div className="ml-4">
+              <div className="text-base font-bold text-gray-300">In Progress</div>
+              <div className="text-3xl font-bold text-yellow-400">{stats.inProgress}</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <Eye className="h-8 w-8 text-blue-400" />
+            </div>
+            <div className="ml-4">
+              <div className="text-base font-bold text-gray-300">In Review</div>
+              <div className="text-3xl font-bold text-blue-400">{stats.inReview}</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <AlertCircle className="h-8 w-8 text-red-500" />
+            </div>
+            <div className="ml-4">
+              <div className="text-base font-bold text-gray-300">Blocked</div>
+              <div className="text-3xl font-bold text-red-500">{stats.blocked}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats Cards - Fourth Row */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <Pause className="h-8 w-8 text-orange-400" />
+            </div>
+            <div className="ml-4">
+              <div className="text-base font-bold text-gray-300">On Hold</div>
+              <div className="text-3xl font-bold text-orange-400">{stats.onHold}</div>
             </div>
           </div>
         </div>
@@ -292,50 +395,11 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
         <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <Clock className="h-8 w-8 text-yellow-500" />
+              <XCircle className="h-8 w-8 text-pink-500" />
             </div>
             <div className="ml-4">
-              <div className="text-base font-bold text-gray-300">In Progress</div>
-              <div className="text-3xl font-bold text-yellow-400">{stats.inProgress}</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Stats Cards - Second Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <AlertCircle className="h-8 w-8 text-red-500" />
-            </div>
-            <div className="ml-4">
-              <div className="text-base font-bold text-gray-300">Blocked</div>
-              <div className="text-3xl font-bold text-red-500">{stats.blocked}</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <Calendar className="h-8 w-8 text-purple-500" />
-            </div>
-            <div className="ml-4">
-              <div className="text-base font-bold text-gray-300">Planned</div>
-              <div className="text-3xl font-bold text-purple-400">{stats.planned}</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <ClipboardList className="h-8 w-8 text-cyan-500" />
-            </div>
-            <div className="ml-4">
-              <div className="text-base font-bold text-gray-300">Proposed</div>
-              <div className="text-3xl font-bold text-cyan-400">{stats.proposed}</div>
+              <div className="text-base font-bold text-gray-300">Cancelled</div>
+              <div className="text-3xl font-bold text-pink-500">{stats.cancelled}</div>
             </div>
           </div>
         </div>
@@ -383,11 +447,15 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
                 <PieChart 
                   title=""
                   data={[
-                    { label: 'Proposed', value: stats.proposed, color: '#22d3ee' },
-                    { label: 'Planned', value: stats.planned, color: '#c084fc' },
-                    { label: 'In Progress', value: stats.inProgress, color: '#facc15' },
-                    { label: 'Completed', value: stats.completed, color: '#4ade80' },
-                    { label: 'Blocked', value: stats.blocked, color: '#ef4444' }
+                    { label: 'Not Started', value: stats.notStarted, color: '#9ca3af' },
+                    { label: 'Proposed', value: stats.proposed, color: '#06b6d4' },
+                    { label: 'Planned', value: stats.planned, color: '#a855f7' },
+                    { label: 'In Progress', value: stats.inProgress, color: '#eab308' },
+                    { label: 'In Review', value: stats.inReview, color: '#3b82f6' },
+                    { label: 'Blocked', value: stats.blocked, color: '#ef4444' },
+                    { label: 'On Hold', value: stats.onHold, color: '#fb923c' },
+                    { label: 'Completed', value: stats.completed, color: '#22c55e' },
+                    { label: 'Cancelled', value: stats.cancelled, color: '#ff1493' }
                   ]}
                 />
               </div>

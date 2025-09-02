@@ -90,8 +90,14 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
         const endDate = node.dueDate ? new Date(node.dueDate) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
         const duration = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
         const progress = node.status === 'COMPLETED' ? 100 : 
+                        node.status === 'IN_REVIEW' ? 85 :
                         node.status === 'IN_PROGRESS' ? 65 : 
-                        node.status === 'PLANNED' ? 25 : 10;
+                        node.status === 'PLANNED' ? 25 : 
+                        node.status === 'PROPOSED' ? 15 :
+                        node.status === 'ON_HOLD' ? 50 :
+                        node.status === 'BLOCKED' ? 40 :
+                        node.status === 'CANCELLED' ? 0 :
+                        10; // NOT_STARTED
         const priority = node.priorityExec || node.priorityComp || 0;
         
         return {
