@@ -362,8 +362,8 @@ function sanitizeNode(node: any): any {
   }
   
   // Set default values for missing fields
-  sanitized.type = sanitized.type || 'TASK';
-  sanitized.status = sanitized.status || 'PROPOSED';
+  sanitized.type = sanitized.type || 'DEFAULT';
+  sanitized.status = sanitized.status || 'NOT_STARTED';
   
   // Initialize numeric fields with defaults
   if (sanitized.positionX === undefined) sanitized.positionX = 0;
