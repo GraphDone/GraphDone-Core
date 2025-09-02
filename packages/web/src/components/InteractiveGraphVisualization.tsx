@@ -2462,24 +2462,11 @@ export function InteractiveGraphVisualization() {
                   const status = nodeMenu.node?.status?.toUpperCase() || '';
                   const statusIcon = getStatusIconElement(status as any, "h-3 w-3 mr-1");
                   const getStatusBgColor = () => {
-                    switch (status) {
-                      case 'PROPOSED': return 'text-cyan-400 bg-cyan-400/10 px-2 py-0.5 rounded';
-                      case 'PLANNED': return 'text-purple-400 bg-purple-400/10 px-2 py-0.5 rounded';
-                      case 'IN_PROGRESS': return 'text-yellow-400 bg-yellow-400/10 px-2 py-0.5 rounded';
-                      case 'COMPLETED': return 'text-green-400 bg-green-400/10 px-2 py-0.5 rounded';
-                      case 'BLOCKED': return 'text-red-400 bg-red-400/10 px-2 py-0.5 rounded';
-                      default: return '';
-                    }
+                    const statusConfig = getStatusConfig(status as WorkItemStatus);
+                    return `${statusConfig.color} ${statusConfig.bgColor} px-2 py-0.5 rounded`;
                   };
                   const formatStatus = (status: string) => {
-                    switch (status.toUpperCase()) {
-                      case 'IN_PROGRESS': return 'In Progress';
-                      case 'PROPOSED': return 'Proposed';
-                      case 'PLANNED': return 'Planned';
-                      case 'COMPLETED': return 'Completed';
-                      case 'BLOCKED': return 'Blocked';
-                      default: return status;
-                    }
+                    return getStatusConfig(status as WorkItemStatus).label;
                   };
                   return (
                     <>

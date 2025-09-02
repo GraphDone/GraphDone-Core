@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { GitBranch, ZoomIn, ZoomOut, Calendar, ChevronLeft, ChevronRight, Filter, Download, MoreVertical, Link2, BarChart3, GanttChartSquare, Flag, ChevronDown, Target, Search } from 'lucide-react';
-import { getStatusConfig, WorkItemStatus, getTypeConfig, WorkItemType, getPriorityConfig, STATUS_OPTIONS, PRIORITY_OPTIONS, TYPE_OPTIONS, WORK_ITEM_PRIORITIES, WORK_ITEM_STATUSES, WORK_ITEM_TYPES } from '../constants/workItemConstants';
+import { getStatusConfig, getStatusCompletionPercentage, WorkItemStatus, getTypeConfig, WorkItemType, getPriorityConfig, STATUS_OPTIONS, PRIORITY_OPTIONS, TYPE_OPTIONS, WORK_ITEM_PRIORITIES, WORK_ITEM_STATUSES, WORK_ITEM_TYPES } from '../constants/workItemConstants';
 
 interface WorkItem {
   id: string;
@@ -89,15 +89,7 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
         const startDate = new Date(node.createdAt);
         const endDate = node.dueDate ? new Date(node.dueDate) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
         const duration = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
-        const progress = node.status === 'COMPLETED' ? 100 : 
-                        node.status === 'IN_REVIEW' ? 85 :
-                        node.status === 'IN_PROGRESS' ? 65 : 
-                        node.status === 'PLANNED' ? 25 : 
-                        node.status === 'PROPOSED' ? 15 :
-                        node.status === 'ON_HOLD' ? 50 :
-                        node.status === 'BLOCKED' ? 40 :
-                        node.status === 'CANCELLED' ? 0 :
-                        10; // NOT_STARTED
+        const progress = getStatusCompletionPercentage(node.status as WorkItemStatus);
         const priority = node.priorityExec || node.priorityComp || 0;
         
         return {
@@ -218,12 +210,8 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
   
-  const getProgressColor = (progress: number) => {
-    if (progress >= 100) return WORK_ITEM_STATUSES.COMPLETED.color.replace('text-', 'bg-');
-    if (progress >= 75) return WORK_ITEM_STATUSES.IN_REVIEW.color.replace('text-', 'bg-');
-    if (progress >= 50) return WORK_ITEM_STATUSES.IN_PROGRESS.color.replace('text-', 'bg-');
-    if (progress >= 25) return WORK_ITEM_STATUSES.PLANNED.color.replace('text-', 'bg-');
-    return 'bg-gray-500';
+  const getProgressColor = (status: WorkItemStatus) => {
+    return getStatusConfig(status).color.replace('text-', 'bg-');
   };
 
   const getDependencyPath = (fromTask: any, toTask: any) => {
@@ -615,7 +603,7 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
                             >
                               {/* Progress Fill */}
                               <div 
-                                className={`h-full rounded-lg transition-all duration-300 ${getProgressColor(item.progress)}`}
+                                className={`h-full rounded-lg transition-all duration-300 ${getProgressColor(item.status as WorkItemStatus)}`}
                                 style={{ width: `${item.progress}%` }}
                               />
                               
