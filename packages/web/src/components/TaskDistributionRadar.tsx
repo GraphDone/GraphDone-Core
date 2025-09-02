@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
-import { ClipboardList, Calendar, Clock, CheckCircle, AlertCircle, WORK_ITEM_STATUSES } from '../constants/workItemConstants';
+import { ClipboardList, Calendar, Clock, CheckCircle, AlertCircle, Eye, Pause, XCircle, Hexagon, WORK_ITEM_STATUSES } from '../constants/workItemConstants';
 import { RadarChart } from './RadarChart';
 import { useGraph } from '../contexts/GraphContext';
 import { useQuery, gql } from '@apollo/client';
@@ -42,17 +42,24 @@ export function TaskDistributionRadar({ className = '', showLegend = true }: Tas
   const radarData = useMemo(() => {
     if (!taskData?.workItems) return [];
 
-    // Count tasks by status using the same logic as ListView
+    // Count tasks by status using all 9 statuses
     const statusCounts = {
+      notStarted: 0,
       proposed: 0,
       planned: 0,
       inProgress: 0,
+      inReview: 0,
       blocked: 0,
-      completed: 0
+      onHold: 0,
+      completed: 0,
+      cancelled: 0
     };
 
     taskData.workItems.forEach((item: any) => {
       switch(item.status) {
+        case 'NOT_STARTED':
+          statusCounts.notStarted++;
+          break;
         case 'PROPOSED':
           statusCounts.proposed++;
           break;
@@ -63,22 +70,35 @@ export function TaskDistributionRadar({ className = '', showLegend = true }: Tas
         case 'ACTIVE':
           statusCounts.inProgress++;
           break;
+        case 'IN_REVIEW':
+          statusCounts.inReview++;
+          break;
         case 'BLOCKED':
           statusCounts.blocked++;
+          break;
+        case 'ON_HOLD':
+          statusCounts.onHold++;
           break;
         case 'COMPLETED':
           statusCounts.completed++;
           break;
+        case 'CANCELLED':
+          statusCounts.cancelled++;
+          break;
       }
     });
 
-    // Status colors matching the pie chart
+    // Status colors matching the centralized configuration
     const statusData = [
-      { axis: 'Proposed', value: statusCounts.proposed, color: '#22d3ee' },
-      { axis: 'Planned', value: statusCounts.planned, color: '#c084fc' },
-      { axis: 'In Progress', value: statusCounts.inProgress, color: '#facc15' },
-      { axis: 'Completed', value: statusCounts.completed, color: '#4ade80' },
-      { axis: 'Blocked', value: statusCounts.blocked, color: '#ef4444' }
+      { axis: 'Not Started', value: statusCounts.notStarted, color: '#9ca3af' },
+      { axis: 'Proposed', value: statusCounts.proposed, color: '#06b6d4' },
+      { axis: 'Planned', value: statusCounts.planned, color: '#a855f7' },
+      { axis: 'In Progress', value: statusCounts.inProgress, color: '#eab308' },
+      { axis: 'In Review', value: statusCounts.inReview, color: '#3b82f6' },
+      { axis: 'Blocked', value: statusCounts.blocked, color: '#ef4444' },
+      { axis: 'On Hold', value: statusCounts.onHold, color: '#fb923c' },
+      { axis: 'Completed', value: statusCounts.completed, color: '#22c55e' },
+      { axis: 'Cancelled', value: statusCounts.cancelled, color: '#ff1493' }
     ].filter(item => item.value > 0); // Only show statuses with tasks
 
     const maxValue = Math.max(...statusData.map(item => item.value), 1);
@@ -183,11 +203,15 @@ export function TaskDistributionRadar({ className = '', showLegend = true }: Tas
               {radarData.map((item, index) => {
                 const getIcon = (axis: string) => {
                   switch(axis) {
-                    case 'Proposed': return <ClipboardList className="h-5 w-5" style={{ color: item.color || '#22d3ee' }} />;
-                    case 'Planned': return <Calendar className="h-5 w-5" style={{ color: item.color || '#c084fc' }} />;
-                    case 'In Progress': return <Clock className="h-5 w-5" style={{ color: item.color || '#facc15' }} />;
-                    case 'Completed': return <CheckCircle className="h-5 w-5" style={{ color: item.color || '#4ade80' }} />;
+                    case 'Not Started': return <Hexagon className="h-5 w-5" style={{ color: item.color || '#9ca3af' }} />;
+                    case 'Proposed': return <ClipboardList className="h-5 w-5" style={{ color: item.color || '#06b6d4' }} />;
+                    case 'Planned': return <Calendar className="h-5 w-5" style={{ color: item.color || '#a855f7' }} />;
+                    case 'In Progress': return <Clock className="h-5 w-5" style={{ color: item.color || '#eab308' }} />;
+                    case 'In Review': return <Eye className="h-5 w-5" style={{ color: item.color || '#3b82f6' }} />;
                     case 'Blocked': return <AlertCircle className="h-5 w-5" style={{ color: item.color || '#ef4444' }} />;
+                    case 'On Hold': return <Pause className="h-5 w-5" style={{ color: item.color || '#fb923c' }} />;
+                    case 'Completed': return <CheckCircle className="h-5 w-5" style={{ color: item.color || '#22c55e' }} />;
+                    case 'Cancelled': return <XCircle className="h-5 w-5" style={{ color: item.color || '#ff1493' }} />;
                     default: return <div className="w-4 h-4 rounded-full" style={{ backgroundColor: item.color || '#4ade80' }}></div>;
                   }
                 };

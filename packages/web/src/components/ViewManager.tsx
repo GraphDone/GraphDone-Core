@@ -252,11 +252,15 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
   // Calculate statistics
   const stats = useMemo(() => {
     const total = filteredNodes.length;
-    const completed = filteredNodes.filter(node => node.status === 'COMPLETED').length;
-    const inProgress = filteredNodes.filter(node => node.status === 'IN_PROGRESS').length;
-    const blocked = filteredNodes.filter(node => node.status === 'BLOCKED').length;
-    const planned = filteredNodes.filter(node => node.status === 'PLANNED').length;
+    const notStarted = filteredNodes.filter(node => node.status === 'NOT_STARTED').length;
     const proposed = filteredNodes.filter(node => node.status === 'PROPOSED').length;
+    const planned = filteredNodes.filter(node => node.status === 'PLANNED').length;
+    const inProgress = filteredNodes.filter(node => node.status === 'IN_PROGRESS').length;
+    const inReview = filteredNodes.filter(node => node.status === 'IN_REVIEW').length;
+    const blocked = filteredNodes.filter(node => node.status === 'BLOCKED').length;
+    const onHold = filteredNodes.filter(node => node.status === 'ON_HOLD').length;
+    const completed = filteredNodes.filter(node => node.status === 'COMPLETED').length;
+    const cancelled = filteredNodes.filter(node => node.status === 'CANCELLED').length;
 
     const typeStats = filteredNodes.reduce((acc, node) => {
       acc[node.type] = (acc[node.type] || 0) + 1;
@@ -273,11 +277,15 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
 
     return {
       total,
-      completed,
-      inProgress,
-      blocked,
-      planned,
+      notStarted,
       proposed,
+      planned,
+      inProgress,
+      inReview,
+      blocked,
+      onHold,
+      completed,
+      cancelled,
       typeStats,
       priorityStats
     };

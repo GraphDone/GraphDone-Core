@@ -6,6 +6,8 @@ import {
   CheckCircle, 
   AlertCircle,
   XCircle,
+  Eye,
+  Pause,
   Layers, 
   Trophy, 
   Target, 
@@ -48,6 +50,8 @@ export {
   CheckCircle,
   AlertCircle,
   XCircle,
+  Eye,
+  Pause,
   
   // Type Icons
   Layers,
@@ -88,7 +92,7 @@ export {
 // ============================
 
 export type WorkItemType = 'EPIC' | 'MILESTONE' | 'OUTCOME' | 'FEATURE' | 'TASK' | 'BUG' | 'IDEA' | 'RESEARCH' | 'DEFAULT';
-export type WorkItemStatus = 'NOT_STARTED' | 'PROPOSED' | 'PLANNED' | 'IN_PROGRESS' | 'COMPLETED' | 'BLOCKED' | 'CANCELLED';
+export type WorkItemStatus = 'NOT_STARTED' | 'PROPOSED' | 'PLANNED' | 'IN_PROGRESS' | 'IN_REVIEW' | 'BLOCKED' | 'ON_HOLD' | 'COMPLETED' | 'CANCELLED';
 export type PriorityLevel = 'critical' | 'high' | 'moderate' | 'low' | 'minimal';
 
 // ============================
@@ -238,7 +242,7 @@ export const WORK_ITEM_STATUSES: Record<WorkItemStatus, StatusOption> = {
   NOT_STARTED: {
     value: 'NOT_STARTED',
     label: 'Not Started',
-    description: 'Work has not yet begun',
+    description: 'Waiting to begin',
     icon: Hexagon,
     color: 'text-gray-400',
     bgColor: 'bg-gray-400/10',
@@ -249,7 +253,7 @@ export const WORK_ITEM_STATUSES: Record<WorkItemStatus, StatusOption> = {
   PROPOSED: {
     value: 'PROPOSED',
     label: 'Proposed',
-    description: 'Initial idea or suggestion',
+    description: 'Idea added',
     icon: ClipboardList,
     color: 'text-cyan-400',
     bgColor: 'bg-cyan-400/10',
@@ -260,7 +264,7 @@ export const WORK_ITEM_STATUSES: Record<WorkItemStatus, StatusOption> = {
   PLANNED: {
     value: 'PLANNED',
     label: 'Planned',
-    description: 'Approved and scheduled for work',
+    description: 'Agreed to do',
     icon: Calendar,
     color: 'text-purple-400',
     bgColor: 'bg-purple-400/10',
@@ -271,7 +275,7 @@ export const WORK_ITEM_STATUSES: Record<WorkItemStatus, StatusOption> = {
   IN_PROGRESS: {
     value: 'IN_PROGRESS',
     label: 'In Progress',
-    description: 'Currently being worked on',
+    description: 'Being worked on',
     icon: Clock,
     color: 'text-yellow-400',
     bgColor: 'bg-yellow-400/10',
@@ -279,21 +283,21 @@ export const WORK_ITEM_STATUSES: Record<WorkItemStatus, StatusOption> = {
     dotColor: 'bg-yellow-400',
     hexColor: '#eab308'
   },
-  COMPLETED: {
-    value: 'COMPLETED',
-    label: 'Completed',
-    description: 'Work has been finished',
-    icon: CheckCircle,
-    color: 'text-green-400',
-    bgColor: 'bg-green-400/10',
-    borderColor: 'border-green-400/30',
-    dotColor: 'bg-green-400',
-    hexColor: '#22c55e'
+  IN_REVIEW: {
+    value: 'IN_REVIEW',
+    label: 'In Review',
+    description: 'Needs checking/approval',
+    icon: Eye,
+    color: 'text-blue-400',
+    bgColor: 'bg-blue-400/10',
+    borderColor: 'border-blue-400/30',
+    dotColor: 'bg-blue-400',
+    hexColor: '#3b82f6'
   },
   BLOCKED: {
     value: 'BLOCKED',
     label: 'Blocked',
-    description: 'Cannot proceed due to dependencies or issues',
+    description: 'Can\'t move forward',
     icon: AlertCircle,
     color: 'text-red-500',
     bgColor: 'bg-red-500/10',
@@ -301,10 +305,32 @@ export const WORK_ITEM_STATUSES: Record<WorkItemStatus, StatusOption> = {
     dotColor: 'bg-red-500',
     hexColor: '#ef4444'
   },
+  ON_HOLD: {
+    value: 'ON_HOLD',
+    label: 'On Hold',
+    description: 'Paused for now',
+    icon: Pause,
+    color: 'text-orange-400',
+    bgColor: 'bg-orange-400/10',
+    borderColor: 'border-orange-400/30',
+    dotColor: 'bg-orange-400',
+    hexColor: '#fb923c'
+  },
+  COMPLETED: {
+    value: 'COMPLETED',
+    label: 'Completed',
+    description: 'Finished successfully',
+    icon: CheckCircle,
+    color: 'text-green-400',
+    bgColor: 'bg-green-400/10',
+    borderColor: 'border-green-400/30',
+    dotColor: 'bg-green-400',
+    hexColor: '#22c55e'
+  },
   CANCELLED: {
     value: 'CANCELLED',
     label: 'Cancelled',
-    description: 'Work was stopped and will not be completed',
+    description: 'Stopped, won\'t do',
     icon: XCircle,
     color: 'text-pink-500',
     bgColor: 'bg-pink-500/10',
