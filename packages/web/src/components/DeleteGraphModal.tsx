@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
-import { X, Trash2, Shield, GitBranch } from 'lucide-react';
+import { X, Trash2, GitBranch, Shield } from 'lucide-react';
 import { AlertTriangle, CheckCircle, WORK_ITEM_TYPES } from '../constants/workItemConstants';
 import { useGraph } from '../contexts/GraphContext';
 import { useNotifications } from '../contexts/NotificationContext';
@@ -308,6 +308,48 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
                       This graph contains <strong className="text-orange-200">{nodeCount} node{nodeCount !== 1 ? 's' : ''}</strong>. Remove connections first, then delete nodes:
                     </p>
                     
+                    {/* Global Disconnect All Button */}
+                    {Object.values(nodeConnections).some(connections => connections.length > 0) && (
+                      <div className="mb-4">
+                        <button
+                          onClick={async () => {
+                            try {
+                              // Get all unique edge IDs
+                              const allEdgeIds = new Set<string>();
+                              Object.values(nodeConnections).forEach(connections => {
+                                connections.forEach(conn => allEdgeIds.add(conn.id));
+                              });
+                              
+                              // Disconnect all edges at once
+                              for (const edgeId of allEdgeIds) {
+                                await deleteEdge({
+                                  variables: { where: { id: edgeId } }
+                                });
+                              }
+                              
+                              showSuccess(
+                                'All Connections Removed!',
+                                `Disconnected all ${allEdgeIds.size} connection${allEdgeIds.size !== 1 ? 's' : ''} in the graph.`
+                              );
+                              
+                              // Clear all connections from local state
+                              setNodeConnections({});
+                              
+                            } catch (error) {
+                              showError(
+                                'Failed to Remove All Connections',
+                                error instanceof Error ? error.message : 'Please try again.'
+                              );
+                            }
+                          }}
+                          className="w-full px-4 py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors flex items-center justify-center space-x-2 font-medium"
+                        >
+                          <GitBranch className="h-4 w-4" />
+                          <span>Disconnect All Connections</span>
+                        </button>
+                      </div>
+                    )}
+                    
                     {/* Delete All Unconnected Button */}
                     {nodes.some(node => !(nodeConnections[node.id]?.length > 0)) && (
                       <div className="mb-4">
@@ -331,7 +373,7 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
                               <button
                                 onClick={async () => {
                                   const unconnectedNodes = nodes.filter(node => !(nodeConnections[node.id]?.length > 0));
-                                  const nodeCount = unconnectedNodes.length;
+                                  const unconnectedNodeCount = unconnectedNodes.length;
                                   
                                   try {
                                     // Bulk delete all unconnected nodes in single operation
@@ -347,12 +389,12 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
                                     // Single success notification for bulk operation
                                     showSuccess(
                                       'Nodes Deletion Completed Successfully!',
-                                      `Removed ${nodeCount} node${nodeCount !== 1 ? 's' : ''} from ${currentGraph.name}.`
+                                      `Removed ${unconnectedNodeCount} node${unconnectedNodeCount !== 1 ? 's' : ''} from ${currentGraph.name}.`
                                     );
                                     
                                     // Update local state
                                     setNodes(prev => prev.filter(node => !unconnectedNodes.some(deleted => deleted.id === node.id)));
-                                    setNodeCount(prev => prev - nodeCount);
+                                    setNodeCount(prev => prev - unconnectedNodeCount);
                                     
                                   } catch (error) {
                                     showError(
@@ -647,7 +689,7 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
                   <div>
                     <h5 className="text-blue-200 font-semibold mb-2">Deletion Process:</h5>
                     <ol className="text-blue-300 text-sm space-y-1 list-decimal list-inside">
-                      <li>Delete all {nodeCount} nodes (edges are removed automatically)</li>
+                      <li>Confirm the graph is empty (no nodes or edges)</li>
                       <li>Delete the graph structure and metadata</li>
                       <li>Clear all permissions and access rights</li>
                     </ol>
