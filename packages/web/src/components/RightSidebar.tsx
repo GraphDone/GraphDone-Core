@@ -12,11 +12,15 @@ interface RightSidebarProps {
   currentView: 'dashboard' | 'table' | 'cards' | 'kanban' | 'gantt' | 'calendar' | 'activity';
   stats: {
     total: number;
-    completed: number;
-    inProgress: number;
-    blocked: number;
-    planned: number;
+    notStarted: number;
     proposed: number;
+    planned: number;
+    inProgress: number;
+    inReview: number;
+    blocked: number;
+    onHold: number;
+    completed: number;
+    cancelled: number;
     priorityStats: {
       critical: number;
       high: number;
@@ -148,8 +152,21 @@ const RightSidebar: React.FC<RightSidebarProps> = ({ currentView, stats }) => {
           
           <div className="space-y-6">
             {Object.entries(WORK_ITEM_STATUSES).map(([statusKey, statusConfig]) => {
-              const statusLowerKey = statusKey.toLowerCase();
-              const count = statusKey === 'IN_PROGRESS' ? stats.inProgress : stats[statusLowerKey as keyof typeof stats] as number;
+              const getCount = (key: string) => {
+                switch(key) {
+                  case 'NOT_STARTED': return stats.notStarted;
+                  case 'PROPOSED': return stats.proposed;
+                  case 'PLANNED': return stats.planned;
+                  case 'IN_PROGRESS': return stats.inProgress;
+                  case 'IN_REVIEW': return stats.inReview;
+                  case 'BLOCKED': return stats.blocked;
+                  case 'ON_HOLD': return stats.onHold;
+                  case 'COMPLETED': return stats.completed;
+                  case 'CANCELLED': return stats.cancelled;
+                  default: return 0;
+                }
+              };
+              const count = getCount(statusKey);
               const IconComponent = statusConfig.icon;
               
               return (
