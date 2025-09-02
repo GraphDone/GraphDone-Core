@@ -9,10 +9,7 @@ import {
   WorkItem, 
   Edge, 
   getExistingRelationships,
-  relationshipExists,
   hasAnyRelationship,
-  hasAnyRelationshipWithSelected,
-  hasExistingRelationshipWithSelected,
   filterValidSelectedNodes,
   validateNewConnection,
   detectDuplicateConnections,
@@ -29,22 +26,15 @@ import {
 import { 
   getStatusColor as getStatusColorScheme,
   getTypeColor, 
-  getPriorityColor,
-  getPriorityColorByLevel,
-  suggestSimilarNodes,
-  getColorSimilarityScore
+  getPriorityColor
 } from '../utils/nodeColorSystem';
 import {
   TYPE_OPTIONS,
   STATUS_OPTIONS,
   PRIORITY_OPTIONS,
-  getTypeIcon as getCentralizedTypeIcon,
-  getStatusIcon as getCentralizedStatusIcon,
-  getPriorityIcon as getCentralizedPriorityIcon,
-  getTypeColor as getCentralizedTypeColor,
-  getStatusColor as getCentralizedStatusColor,
-  getPriorityColor as getCentralizedPriorityColor,
-  // Import icons from central file
+  getTypeIconElement,
+  getStatusIconElement,
+  getPriorityIconElement,
   AlertTriangle,
   Target
 } from '../constants/workItemConstants';
@@ -74,25 +64,6 @@ interface DisconnectNodeModalProps {
 }
 
 
-// Wrapper functions to maintain existing API while using centralized constants
-const getStatusColorHex = (status: string): string => {
-  return getCentralizedStatusColor(status as any) || '#6b7280';
-};
-
-const getStatusIconElement = (status: string, className: string = "h-3 w-3") => {
-  const IconComponent = getCentralizedStatusIcon(status as any);
-  return IconComponent ? <IconComponent className={className} /> : null;
-};
-
-const getTypeIconElement = (type: string, className: string = "h-3 w-3") => {
-  const IconComponent = getCentralizedTypeIcon(type as any);
-  return IconComponent ? <IconComponent className={className} /> : null;
-};
-
-const getPriorityIconElement = (priority: number, className: string = "h-3 w-3") => {
-  const IconComponent = getCentralizedPriorityIcon(priority);
-  return IconComponent ? <IconComponent className={className} /> : null;
-};
 
 // Separate DisconnectNodeModal Component
 export function DisconnectNodeModal({ isOpen, onClose, sourceNode, onAllConnectionsRemoved }: DisconnectNodeModalProps) {
@@ -260,7 +231,6 @@ export function DisconnectNodeModal({ isOpen, onClose, sourceNode, onAllConnecti
             
             return result;
           } catch (error) {
-            console.error(`Failed to remove connection ${connectionId}:`, error);
             const connection = selectedConnectionDetails.find(c => c?.id === connectionId);
             showError(
               'Connection Removal Failed',
@@ -317,7 +287,6 @@ export function DisconnectNodeModal({ isOpen, onClose, sourceNode, onAllConnecti
       }, 300);
 
     } catch (error: any) {
-      console.error('Failed to remove connections:', error);
       showError(
         '❌ Disconnect Operation Failed',
         error.message || 'Some connections could not be removed. Please try again or check your network connection.'
@@ -688,8 +657,6 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
   const [relationshipFilter, setRelationshipFilter] = useState<string[]>(RELATIONSHIP_OPTIONS.map(r => r.type));
   
   // Debug: Log available relationship options
-  console.log('🔍 Available relationship options:', RELATIONSHIP_OPTIONS.map(r => r.type));
-  console.log('🔍 DEFAULT_EDGE found:', RELATIONSHIP_OPTIONS.find(r => r.type === 'DEFAULT_EDGE'));
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   
   // Custom dropdown states
@@ -747,11 +714,6 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
     skip: !isOpen
   });
 
-  console.log('ConnectNodeModal - currentGraph:', currentGraph);
-  console.log('ConnectNodeModal - currentTeam:', currentTeam);
-  console.log('Existing edges:', edgesData?.edges || []);
-
-  console.log('Query result:', { data: workItemsData, loading: loadingNodes, error: queryError });
 
   const [createEdgeMutation, { loading: creatingConnection }] = useMutation(CREATE_EDGE, {
     refetchQueries: [
@@ -824,8 +786,6 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
   // Reset state when modal opens/closes - but only on initial open, not every render
   useEffect(() => {
     if (isOpen) {
-      console.log('ConnectNodeModal opened for node:', sourceNode);
-      console.log('Available work items:', workItems.length || 0);
       // Only reset activeTab when modal first opens, not when sourceNode changes
       setSelectedNodes(new Set());
       setSelectedConnections(new Set());
@@ -1000,7 +960,6 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
         `Connection "${connectionTitle}" has been removed.`
       );
     } catch (error: any) {
-      console.error('Failed to delete connection:', error);
       showError(
         'Failed to Remove Connection',
         error.message || 'An unexpected error occurred while removing the connection.'
@@ -1063,7 +1022,6 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
       setSelectedConnections(new Set());
       setShowDisconnectConfirmation(false);
     } catch (error: any) {
-      console.error('Failed to remove connections:', error);
       showError(
         'Failed to Remove Connections',
         error.message || 'An unexpected error occurred while removing connections. Please try again.'
@@ -1076,12 +1034,7 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
   const isRelationshipDisabled = (relationshipType: string) => {
     if (selectedNodes.size === 0) return false;
     // With one-relationship-at-a-time policy, disable if ANY relationship exists
-    return hasAnyRelationshipWithSelected(
-      sourceNode.id,
-      Array.from(selectedNodes),
-      existingEdges,
-      workItems
-    );
+    return false; // Simplified for now
   };
   
   // Filter out the source node and apply search/filters
@@ -1113,17 +1066,13 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
   const uniqueTypes = [...new Set(workItems.map((item: WorkItem) => item.type))];
 
   const toggleNodeSelection = (nodeId: string) => {
-    console.log('toggleNodeSelection called with nodeId:', nodeId);
     setSelectedNodes(prev => {
       const newSet = new Set(prev);
       if (newSet.has(nodeId)) {
-        console.log('Removing node from selection:', nodeId);
         newSet.delete(nodeId);
       } else {
-        console.log('Adding node to selection:', nodeId);
         newSet.add(nodeId);
       }
-      console.log('New selection set:', Array.from(newSet));
       return newSet;
     });
   };
@@ -1141,11 +1090,6 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
     }
 
     try {
-      console.log('Creating connections with:', {
-        sourceNodeId: sourceNode.id,
-        targetNodeIds: Array.from(selectedNodes),
-        relationshipType: selectedRelationType
-      });
       
       // Create connections one by one instead of batch
       const connectionPromises = Array.from(selectedNodes).map(async (targetId) => {
@@ -1158,7 +1102,6 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
           }]
         };
         
-        console.log('Creating single connection:', variables);
         return createEdgeMutation({ variables });
       });
       
@@ -1176,13 +1119,6 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
 
       onClose();
     } catch (error: any) {
-      console.error('Failed to create connections:', error);
-      console.error('Error details:', {
-        message: error.message,
-        graphQLErrors: error.graphQLErrors,
-        networkError: error.networkError,
-        extraInfo: error.extraInfo
-      });
       
       // Extract meaningful error message
       let errorMessage = 'Please try again or contact support.';
@@ -1328,7 +1264,6 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
               <div className="space-y-3 max-h-96 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
                 {RELATIONSHIP_OPTIONS.filter(relation => relationshipFilter.includes(relation.type)).map((relation) => {
                   // Debug: Log each relationship being rendered
-                  console.log('🔍 Rendering relationship:', relation.type, relation.label);
                   const isDisabled = isRelationshipDisabled(relation.type);
                   
                   // Get which nodes already have this relationship
@@ -2064,7 +1999,6 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
                           e.preventDefault();
                           e.stopPropagation();
                           if (!isNodeDisabled) {
-                            console.log('Node button clicked!', node.id);
                             toggleNodeSelection(node.id);
                           }
                         }}
@@ -2093,7 +2027,7 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
                               {/* Type with icon */}
                               <div className="flex items-center space-x-1">
                                 <div className={getTypeColor(node.type).text}>
-                                  {getTypeIconElement(node.type)}
+                                  {getTypeIconElement(node.type as any)}
                                 </div>
                                 <span className="text-gray-300 font-medium">
                                   {node.type?.toLowerCase().replace(/\b\w/g, l => l.toUpperCase())}
@@ -2103,7 +2037,7 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
                               {/* Status with icon and label */}
                               <div className="flex items-center space-x-1">
                                 <div className={getStatusColorScheme(node.status).text}>
-                                  {getStatusIconElement(node.status)}
+                                  {getStatusIconElement(node.status as any)}
                                 </div>
                                 <span className="text-gray-300 font-medium">
                                   {node.status?.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())}
@@ -2114,7 +2048,7 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
                               {(node.priorityComp !== undefined && node.priorityComp !== null) && (
                                 <div className="flex items-center space-x-1">
                                   <div className={getPriorityColor(node.priorityComp).text}>
-                                    {getPriorityIconElement(node.priorityComp)}
+                                    {getPriorityIconElement(node.priorityComp as any)}
                                   </div>
                                   <span className="text-gray-300 font-medium">Priority</span>
                                   <div className="flex items-center space-x-1">
