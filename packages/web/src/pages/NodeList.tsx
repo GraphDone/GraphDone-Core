@@ -1,3 +1,8 @@
+/* 
+DEPRECATED: This component is not currently used in the application
+TODO: Update to use centralized workItemConstants when/if this component is reactivated
+Issues: Uses legacy 'ACTIVE' status, hardcoded colors, missing 9-status system integration
+
 import { useState } from 'react';
 import { Search, Filter, Plus, Clock, Users, AlertCircle, RefreshCw } from 'lucide-react';
 import { useFilteredNodes } from '../hooks/useTeamData';
@@ -136,6 +141,7 @@ export function NodeList() {
                     <div className="flex-1">
                       <div className="flex items-center space-x-3 mb-2">
                         <h3 className="text-lg font-semibold text-gray-100">{node.title}</h3>
+                        {/* TODO: Replace with getTypeConfig() when reactivating this component */}
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                           node.type === 'OUTCOME' ? 'bg-blue-900 text-blue-300' :
                           node.type === 'TASK' ? 'bg-green-900 text-green-300' :
@@ -215,3 +221,4 @@ export function NodeList() {
     </div>
   );
 }
+*/
