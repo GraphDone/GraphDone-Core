@@ -5,6 +5,7 @@ import {
   getPriorityIconElement,
   getStatusIconElement,
   getTypeIconElement,
+  getRelationshipIconElement,
   getTypeConfig,
   getStatusConfig,
   getPriorityConfig,
@@ -184,6 +185,7 @@ export function InteractiveGraphVisualization() {
   const [selectedNode, setSelectedNode] = useState<WorkItem | null>(null);
   const [createNodePosition, setCreateNodePosition] = useState<{ x: number; y: number; z: number } | undefined>(undefined);
   const [currentTransform, setCurrentTransform] = useState({ x: 0, y: 0, scale: 1 });
+  const [editingEdge, setEditingEdge] = useState<{ edge: WorkItemEdge; position: { x: number; y: number } } | null>(null);
   
   // Level of detail thresholds
   const LOD_THRESHOLDS = {
@@ -290,16 +292,29 @@ export function InteractiveGraphVisualization() {
   };
 
 
-  // Close menus when clicking outside
+  // Close menus when clicking outside or pressing ESC
   useEffect(() => {
     const handleClickOutside = () => {
       setNodeMenu(prev => ({ ...prev, visible: false }));
       setEdgeMenu(prev => ({ ...prev, visible: false }));
+      setEditingEdge(null); // Close inline edge editor
       setSelectedNode(null); // Clear selected node when clicking outside
     };
 
+    const handleEscKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setEditingEdge(null);
+        setNodeMenu(prev => ({ ...prev, visible: false }));
+        setEdgeMenu(prev => ({ ...prev, visible: false }));
+      }
+    };
+
     document.addEventListener('click', handleClickOutside);
-    return () => document.removeEventListener('click', handleClickOutside);
+    document.addEventListener('keydown', handleEscKey);
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+      document.removeEventListener('keydown', handleEscKey);
+    };
   }, []);
 
   const handleNodeClick = useCallback((event: MouseEvent, node: WorkItem) => {
@@ -1349,7 +1364,25 @@ export function InteractiveGraphVisualization() {
       .enter()
       .append('g')
       .attr('class', 'edge-label-group')
-      .style('pointer-events', 'none');
+      .style('pointer-events', 'all')
+      .style('cursor', 'pointer')
+      .on('click', function(event: MouseEvent, d: WorkItemEdge) {
+        event.stopPropagation();
+        console.log('🔗 Edge label clicked:', d.type);
+        
+        // Get the bounding box of the clicked element for precise positioning
+        const element = event.currentTarget as SVGElement;
+        const rect = element.getBoundingClientRect();
+        
+        // Position dropdown with top aligned to edge label, shifted down slightly
+        setEditingEdge({
+          edge: d,
+          position: { 
+            x: rect.left + rect.width / 2,  // Center horizontally on label
+            y: rect.top + 10  // Top of label + 10px down
+          }
+        });
+      });
 
     // Add text labels first to measure their size
     const edgeLabelElements = edgeLabelGroups
@@ -1401,7 +1434,21 @@ export function InteractiveGraphVisualization() {
       })
       .style('opacity', 0.9)
       .style('stroke', '#1f2937')
-      .style('stroke-width', 1);
+      .style('stroke-width', 1)
+      .style('pointer-events', 'all')
+      .style('cursor', 'pointer')
+      .on('mouseover', function() {
+        d3.select(this)
+          .style('opacity', 1)
+          .style('stroke', '#ffffff')
+          .style('stroke-width', 2);
+      })
+      .on('mouseout', function() {
+        d3.select(this)
+          .style('opacity', 0.9)
+          .style('stroke', '#1f2937')
+          .style('stroke-width', 1);
+      });
 
     // Size and position elements after text is rendered
     setTimeout(() => {
@@ -1931,17 +1978,15 @@ export function InteractiveGraphVisualization() {
 
 
   const handleEditEdge = (edge: WorkItemEdge) => {
-    // For now, just allow changing the relationship type
-    const sourceTitle = edge.source || 'Unknown';
-    const targetTitle = edge.target || 'Unknown';
-    const newType = prompt(`Change relationship type for "${sourceTitle}" → "${targetTitle}". Current: ${edge.type}`, edge.type);
-    if (newType && newType !== edge.type) {
-      updateEdgeMutation({
-        variables: {
-          where: { id: edge.id },
-          update: { type: newType }
-        }
-      });
+    // Find source and target nodes
+    const sourceNode = validatedNodes.find(n => n.id === edge.source);
+    const targetNode = validatedNodes.find(n => n.id === edge.target);
+    
+    if (sourceNode && targetNode) {
+      // Open connect modal with disconnect tab to edit the relationship
+      setSelectedNode(sourceNode);
+      setShowConnectModal(true);
+      setConnectModalInitialTab('disconnect');
     }
     setEdgeMenu(prev => ({ ...prev, visible: false }));
   };
@@ -2539,6 +2584,115 @@ export function InteractiveGraphVisualization() {
               <Trash2 className="h-4 w-4 mr-3" />
               Delete Relationship
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modern Inline Edge Type Editor Dropdown */}
+      {editingEdge && (
+        <div
+          className="absolute z-50"
+          style={{
+            left: editingEdge.position.x,
+            top: editingEdge.position.y,
+            transform: 'translateX(-50%)',  // Center horizontally only
+            minWidth: '250px',
+            animation: 'fadeInScale 0.2s ease-out'
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Remove arrow since dropdown is at same position as label */}
+          
+          {/* Dropdown content with professional shadow */}
+          <div className="bg-gray-800/98 backdrop-blur-xl border border-gray-700/50 rounded-lg shadow-2xl overflow-hidden"
+               style={{
+                 boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.3)'
+               }}>
+            {/* Header */}
+            <div className="px-3 py-2 bg-gradient-to-r from-gray-800 to-gray-700 border-b border-gray-700/50">
+              <div className="text-xs font-semibold text-gray-300 flex items-center justify-between">
+                <span>Select Relationship Type</span>
+                <button
+                  onClick={() => setEditingEdge(null)}
+                  className="text-gray-500 hover:text-gray-300 transition-colors"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            </div>
+            
+            {/* Options with scroll */}
+            <div className="max-h-80 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
+              <div className="p-1">
+                {RELATIONSHIP_OPTIONS.map((option, index) => (
+                  <button
+                    key={option.type}
+                    onClick={() => {
+                      // Update the edge type with animation
+                      updateEdgeMutation({
+                        variables: {
+                          where: { id: editingEdge.edge.id },
+                          update: { type: option.type }
+                        }
+                      }).then(() => {
+                        console.log('✅ Edge type updated to:', option.type);
+                        // Add slight delay for visual feedback
+                        setTimeout(() => setEditingEdge(null), 150);
+                      }).catch((error) => {
+                        console.error('❌ Failed to update edge:', error);
+                      });
+                    }}
+                    className={`w-full flex items-center px-3 py-2.5 rounded-lg transition-all duration-150 group ${
+                      editingEdge.edge.type === option.type
+                        ? 'bg-gradient-to-r from-blue-600/20 to-purple-600/20 text-white border border-blue-500/30'
+                        : 'text-gray-300 hover:bg-gray-700/50 hover:text-white'
+                    }`}
+                    style={{
+                      animationDelay: `${index * 20}ms`
+                    }}
+                  >
+                    <div className="flex items-center space-x-3 flex-1">
+                      {/* Icon with color */}
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-transform group-hover:scale-110 ${
+                        editingEdge.edge.type === option.type 
+                          ? 'bg-gradient-to-br from-blue-500/20 to-purple-500/20' 
+                          : 'bg-gray-700/50'
+                      }`}>
+                        {getRelationshipIconElement(option.type, 'h-4 w-4')}
+                      </div>
+                      
+                      {/* Label and description */}
+                      <div className="text-left">
+                        <div className="font-medium text-sm">{option.label}</div>
+                        <div className="text-xs text-gray-500 mt-0.5">{option.description}</div>
+                      </div>
+                    </div>
+                    
+                    {/* Selected indicator */}
+                    {editingEdge.edge.type === option.type && (
+                      <div className="flex items-center space-x-1">
+                        <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                        <span className="text-xs text-green-400 font-medium">Current</span>
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+            
+            {/* Footer with current selection */}
+            <div className="px-3 py-2 bg-gray-900/50 border-t border-gray-700/50">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-gray-500">
+                  Current: <span className="text-gray-300 font-medium">
+                    {getRelationshipConfig(editingEdge.edge.type as RelationshipType).label}
+                  </span>
+                </span>
+                <kbd className="px-1.5 py-0.5 text-xs bg-gray-800 rounded border border-gray-700 text-gray-400">
+                  ESC to close
+                </kbd>
+              </div>
+            </div>
           </div>
         </div>
       )}
