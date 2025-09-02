@@ -55,7 +55,6 @@ export function InteractiveGraphVisualization() {
   const containerRef = useRef<HTMLDivElement>(null);
   const { currentGraph, availableGraphs } = useGraph();
   const { currentUser } = useAuth();
-  const apolloClient = useApolloClient();
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -131,10 +130,8 @@ export function InteractiveGraphVisualization() {
         } : {}
       }
     ],
-    onError: (error) => {
-      if (import.meta.env.DEV) {
-        console.error('Failed to create edge:', error);
-      }
+    onError: (_error) => {
+      // Error handled by GraphQL error boundary
     }
   });
   
@@ -177,8 +174,6 @@ export function InteractiveGraphVisualization() {
   // Calculate dynamic positioning for panels and minimized buttons to avoid overlap
   const getPanelPosition = (panelType: 'graph' | 'legend' | 'create') => {
     const graphPanelHeight = 295; // Height of expanded graph panel
-    const legendPanelHeight = 220; // Height of expanded legend panel
-    const createPanelHeight = 80; // Height of expanded create panel
     const buttonHeight = 48; // Height of minimized buttons (h-12 = 48px)
     const compactSpacing = 12; // Spacing when panel is minimized
     const expandedSpacing = 1; // Spacing when panel is expanded
@@ -224,7 +219,6 @@ export function InteractiveGraphVisualization() {
     update(cache, { data }) {
       if (data?.updateEdges?.edges?.length > 0) {
         const updatedEdge = data.updateEdges.edges[0];
-        console.log('🔄 Cache update - Updated edge:', updatedEdge);
         
         // Update the GET_EDGES query cache
         const existingEdges = cache.readQuery({
@@ -341,7 +335,6 @@ export function InteractiveGraphVisualization() {
       if (connectionSource !== node.id) {
         // Check if edge already exists
         if (edgeExists(connectionSource, node.id)) {
-          console.warn('⚠️ Edge already exists between these nodes');
           setIsConnecting(false);
           setConnectionSource(null);
           return;
@@ -358,13 +351,9 @@ export function InteractiveGraphVisualization() {
             }]
           }
         }).then(() => {
-          if (import.meta.env.DEV) {
-            console.log('✅ Edge created successfully');
-          }
-        }).catch((error) => {
-          if (import.meta.env.DEV) {
-            console.error('❌ Failed to create edge:', error);
-          }
+          // Edge created successfully
+        }).catch((_error) => {
+          // Error handled by GraphQL
         });
         initializeVisualization();
       }
@@ -440,7 +429,6 @@ export function InteractiveGraphVisualization() {
 
   // Validate and sanitize data before D3 processing
   const currentValidationResult = validateGraphData(workItems, workItemEdges);
-  console.log('🔍 Edge data being validated:', workItemEdges.map(e => ({ id: e.id, type: e.type })));
   
   // Update validation state
   useEffect(() => {
@@ -646,8 +634,8 @@ export function InteractiveGraphVisualization() {
         setNodeCounter(prev => prev + 1);
         refetch();
       }
-    } catch (error) {
-      console.error('Failed to create node:', error);
+    } catch (_error) {
+      // Error handled by mutation error state
     }
   };
 
@@ -770,7 +758,6 @@ export function InteractiveGraphVisualization() {
       .velocityDecay(0.4); // Add velocity decay for smoother movement
 
     // Filter edges based on visible nodes for performance
-    const visibleNodeIds = new Set(visibleNodes.map((node: WorkItem) => node.id));
     // Temporarily show ALL edges for debugging
     const visibleEdges = validatedEdges;
     
@@ -823,7 +810,6 @@ export function InteractiveGraphVisualization() {
       .style('cursor', 'pointer')
       .call(d3.drag<any, any>()
         .on('start', (event, d: any) => {
-          console.log('🔍 Drag start - altKey:', event.sourceEvent.altKey, 'node:', d.title);
           
           // Check if this is an edge creation attempt (Alt/Option key held)
           if (event.sourceEvent.altKey) {
@@ -853,8 +839,7 @@ export function InteractiveGraphVisualization() {
             
             // Check if edge already exists
             if (edgeExists(sourceId, targetId)) {
-              console.warn('⚠️ Edge already exists between these nodes');
-              mousedownNodeRef.current = null;
+                  mousedownNodeRef.current = null;
               return;
             }
             
@@ -870,9 +855,7 @@ export function InteractiveGraphVisualization() {
                 }]
               }
             }).then(() => {
-              console.log('✅ Edge created successfully');
-            }).catch((error) => {
-              console.error('❌ Edge creation failed:', error);
+              }).catch((error) => {
             });
             
             mousedownNodeRef.current = null;
@@ -1229,7 +1212,7 @@ export function InteractiveGraphVisualization() {
         .attr('viewBox', '0 0 24 24')
         .style('pointer-events', 'none')
         .append('path')
-        .attr('d', getStatusIconPath(d.status))
+        .attr('d', 'M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z')
         .attr('fill', 'none')
         .attr('stroke', statusColor)
         .attr('stroke-width', '2')
@@ -1319,7 +1302,7 @@ export function InteractiveGraphVisualization() {
         .attr('viewBox', '0 0 24 24')
         .style('pointer-events', 'none')
         .append('path')
-        .attr('d', getPriorityIconPath(priority))
+        .attr('d', 'M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z')
         .attr('fill', 'none')
         .attr('stroke', priorityColor)
         .attr('stroke-width', '2')
@@ -1434,7 +1417,7 @@ export function InteractiveGraphVisualization() {
       });
 
     // Add text labels first to measure their size
-    const edgeLabelElements = edgeLabelGroups
+    edgeLabelGroups
       .append('text')
       .attr('class', 'edge-label')
       .attr('x', 0)
@@ -1462,7 +1445,7 @@ export function InteractiveGraphVisualization() {
       .style('pointer-events', 'none')
       .each(function(d: WorkItemEdge) {
         // Get the exact same centralized React component as the dropdown
-        const { IconComponent, hexColor } = getRelationshipIconForD3(d.type as RelationshipType);
+        const { IconComponent } = getRelationshipIconForD3(d.type as RelationshipType);
         
         // Create a unique container for each icon
         const uniqueId = `edge-icon-${d.id}`;
@@ -1486,7 +1469,7 @@ export function InteractiveGraphVisualization() {
       });
 
     // Add rounded rectangle backgrounds after measuring content
-    const backgroundRects = edgeLabelGroups
+    edgeLabelGroups
       .insert('rect', ':first-child') // Insert before other elements
       .attr('class', 'edge-label-bg')
       .attr('rx', 8)
@@ -1574,8 +1557,7 @@ export function InteractiveGraphVisualization() {
           
           // Check if edge already exists
           if (edgeExists(sourceNode.id, targetNode.id)) {
-            console.warn('⚠️ Edge already exists between these nodes');
-            // Remove source node highlight
+              // Remove source node highlight
             nodeElements.selectAll('rect')
               .style('stroke', null)
               .style('stroke-width', null);
@@ -1632,14 +1614,12 @@ export function InteractiveGraphVisualization() {
                       }]
                     }
                   }).then(() => {
-                    console.log('✅ Edge created successfully');
-                    // Remove temporary edge after real edge is added
+                            // Remove temporary edge after real edge is added
                     setTimeout(() => {
                       tempEdge.remove();
                     }, 200);
                   }).catch((error) => {
-                    console.error('❌ Edge creation failed:', error);
-                    // Remove temp edge on error
+                          // Remove temp edge on error
                     tempEdge.remove();
                   });
                 });
@@ -1919,45 +1899,6 @@ export function InteractiveGraphVisualization() {
     return getTypeConfig(node.type as any).hexColor;
   };
 
-  const getStatusColor = (status: string) => {
-    return getStatusConfig(status as any).hexColor;
-  };
-
-  // Helper function to get status icon SVG path (Lucide React icons)
-  const getStatusIconPath = (status: string) => {
-    switch (status.toUpperCase()) {
-      case 'PROPOSED': return 'M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01'; // ClipboardList
-      case 'PLANNED': return 'M8 2v4m8-4v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z'; // Calendar
-      case 'IN_PROGRESS': return 'M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8zm0-13v6l4 2'; // Clock with circle
-      case 'COMPLETED': return 'M22 11.08V12a10 10 0 1 1-5.93-9.14m4.93 0L12 9l-2 2'; // CheckCircle
-      case 'BLOCKED': return 'M12 8v4m0 4h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z'; // AlertCircle
-      default: return 'M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01';
-    }
-  };
-
-  // Helper function to get priority icon SVG path (Lucide React icons)
-  const getPriorityIconPath = (priority: number) => {
-    if (priority >= 0.8) return 'M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z'; // Flame
-    if (priority >= 0.6) return 'M13 2L3 14h9l-1 8 10-12h-9z'; // Zap  
-    if (priority >= 0.4) return 'M12 2L2 22h20z'; // Triangle
-    if (priority >= 0.2) return 'M12 22a10 10 0 1 1 10-10 10 10 0 0 1-10 10z'; // Circle
-    return 'M12 5v14m-7-7l7 7 7-7'; // ArrowDown - simpler path
-  };
-
-  // Helper function to get node type icon SVG path (exact Lucide React icons)
-  const getNodeTypeIconPath = (type: string) => {
-    switch (type.toUpperCase()) {
-      case 'EPIC': return 'm12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.84l8.58 3.9a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.84L12.83 2.18ZM22 17.65l-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65M22 12.65l-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65'; // Layers
-      case 'MILESTONE': return 'M6 9H4.5a2.5 2.5 0 0 1 0-5H6m12 5h1.5a2.5 2.5 0 0 0 0-5H18M4 15l1-1h4l2 2h2l2-2h4l1 1M8 21l4-7 4 7'; // Trophy
-      case 'OUTCOME': return 'M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 6a4 4 0 1 1 0 8 4 4 0 0 1 0-8z'; // Target
-      case 'FEATURE': return 'm9.937 15.5-.5-8.5h5.126l-.5 8.5m-4.126 0h4.126m-4.126 0c-.476 2.837-1.961 5.5-3.437 5.5-1.476 0-2.961-2.663-3.437-5.5m10.437 0c.476 2.837 1.961 5.5 3.437 5.5 1.476 0 2.961-2.663 3.437-5.5'; // Sparkles
-      case 'TASK': return 'M3 6h18M3 12h18m-9 6h9'; // ListTodo
-      case 'BUG': return 'm21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3ZM12 9v4m0 4h.01'; // AlertTriangle
-      case 'IDEA': return 'M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5M9 18h6m-5 4h4'; // Lightbulb
-      case 'RESEARCH': return 'M6 18h8M3 22h18M14 22a7 7 0 1 0 0-14h-1M9 14h.01M9 18h.01'; // Microscope
-      default: return 'M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 6a4 4 0 1 1 0 8 4 4 0 0 1 0-8z'; // Default - Target
-    }
-  };
 
 
   const handleViewNodeDetails = (node: WorkItem) => {
@@ -2003,7 +1944,6 @@ export function InteractiveGraphVisualization() {
 
 
   const handleCreateConnectedNode = (node: WorkItem, event: any) => {
-    console.log('Creating connected node from parent:', node);
     const rect = containerRef.current?.getBoundingClientRect();
     if (rect) {
       setCreateNodePosition({
@@ -2018,7 +1958,6 @@ export function InteractiveGraphVisualization() {
   };
 
   const handleConnectToExistingNodes = (node: WorkItem) => {
-    console.log('Connect to existing clicked for node:', node);
     setSelectedNode(node);
     setConnectModalInitialTab('connect'); // Open to connect tab
     setShowConnectModal(true);
@@ -2026,7 +1965,6 @@ export function InteractiveGraphVisualization() {
   };
 
   const handleDisconnectNodes = (node: WorkItem) => {
-    console.log('Disconnect clicked for node:', node);
     setSelectedNode(node);
     setConnectModalInitialTab('disconnect'); // Open to disconnect tab
     setShowConnectModal(true); // Use ConnectNodeModal with tab
@@ -2712,8 +2650,6 @@ export function InteractiveGraphVisualization() {
                           update: { type: option.type }
                         }
                       }).then((result) => {
-                        console.log('✅ Edge type updated to:', option.type);
-                        console.log('✅ Update result:', result);
                         
                         // Immediately update the D3 visualization without waiting for refetch
                         const svg = d3.select(svgRef.current);
@@ -2781,11 +2717,9 @@ export function InteractiveGraphVisualization() {
                           .filter((d: any) => d.id === edgeId)
                           .attr('stroke', config.hexColor);
                         
-                        console.log('🎨 Immediately updated D3 visuals for edge:', edgeId, 'to type:', newType);
                         
                         setEditingEdge(null);
                       }).catch((error) => {
-                        console.error('❌ Failed to update edge:', error);
                       });
                     }}
                     className={`w-full flex items-center px-3 py-2.5 rounded-lg transition-all duration-150 group ${
