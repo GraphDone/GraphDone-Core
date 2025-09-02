@@ -10,6 +10,8 @@ import {
   getRelationshipIconForD3,
   getTypeConfig,
   getStatusConfig,
+  getPriorityConfig,
+  getStatusColorScheme,
   getStatusCompletionPercentage,
   WorkItemType,
   WorkItemStatus,
@@ -1296,13 +1298,7 @@ export function InteractiveGraphVisualization() {
       const priorityPercentage = Math.round(priority * 100);
       
       // Get priority color
-      const priorityColor = (() => {
-        if (priority >= 0.8) return '#ef4444'; // Critical - red
-        if (priority >= 0.6) return '#f97316'; // High - orange  
-        if (priority >= 0.4) return '#eab308'; // Medium - yellow
-        if (priority >= 0.2) return '#3b82f6'; // Low - blue
-        return '#6b7280'; // Minimal - gray
-      })();
+      const priorityColor = getPriorityConfig(priority).hexColor;
       
       const barWidth = 40;
       const barHeight = 3;
