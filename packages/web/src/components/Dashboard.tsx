@@ -6,29 +6,19 @@ import {
   ZoomIn,
   ZoomOut
 } from 'lucide-react';
-import {
-  CheckCircle,
-  Clock,
-  AlertCircle,
-  Calendar,
-  ClipboardList,
-  Eye,
-  Pause,
-  XCircle,
-  Hexagon,
-  Layers,
-  Trophy,
-  Target,
-  Sparkles,
-  ListTodo,
-  AlertTriangle,
-  Lightbulb,
-  Microscope,
-  Flame,
-  Zap,
-  Triangle,
-  Circle,
-  ArrowDown
+import { 
+  getStatusConfig, 
+  getTypeConfig, 
+  getPriorityConfig,
+  getStatusIconElement,
+  getTypeIconElement,
+  getPriorityIconElement,
+  WORK_ITEM_STATUSES, 
+  WORK_ITEM_PRIORITIES,
+  WORK_ITEM_TYPES,
+  type WorkItemStatus,
+  type WorkItemType,
+  type PriorityLevel
 } from '../constants/workItemConstants';
 import { TaskDistributionRadar } from './TaskDistributionRadar';
 import { PriorityDistributionRadar } from './PriorityDistributionRadar';
@@ -221,34 +211,28 @@ const PieChart = ({ data, title }: { data: Array<{label: string, value: number, 
               {filteredData.map((item, index) => {
                 const percentage = ((item.value / total) * 100).toFixed(1);
                 const getIcon = (label: string) => {
-              switch(label) {
-                // Status icons
-                case 'Not Started': return <Hexagon className="h-5 w-5" style={{ color: item.color }} />;
-                case 'Proposed': return <ClipboardList className="h-5 w-5" style={{ color: item.color }} />;
-                case 'Planned': return <Calendar className="h-5 w-5" style={{ color: item.color }} />;
-                case 'In Progress': return <Clock className="h-5 w-5" style={{ color: item.color }} />;
-                case 'In Review': return <Eye className="h-5 w-5" style={{ color: item.color }} />;
-                case 'Blocked': return <AlertCircle className="h-5 w-5" style={{ color: item.color }} />;
-                case 'On Hold': return <Pause className="h-5 w-5" style={{ color: item.color }} />;
-                case 'Completed': return <CheckCircle className="h-5 w-5" style={{ color: item.color }} />;
-                case 'Cancelled': return <XCircle className="h-5 w-5" style={{ color: item.color }} />;
-                // Type icons
-                case 'Epic': return <Layers className="h-5 w-5" style={{ color: item.color }} />;
-                case 'Milestone': return <Trophy className="h-5 w-5" style={{ color: item.color }} />;
-                case 'Outcome': return <Target className="h-5 w-5" style={{ color: item.color }} />;
-                case 'Feature': return <Sparkles className="h-5 w-5" style={{ color: item.color }} />;
-                case 'Task': return <ListTodo className="h-5 w-5" style={{ color: item.color }} />;
-                case 'Bug': return <AlertTriangle className="h-5 w-5" style={{ color: item.color }} />;
-                case 'Idea': return <Lightbulb className="h-5 w-5" style={{ color: item.color }} />;
-                case 'Research': return <Microscope className="h-5 w-5" style={{ color: item.color }} />;
-                // Priority icons
-                case 'Critical': return <Flame className="h-5 w-5" style={{ color: item.color }} />;
-                case 'High': return <Zap className="h-5 w-5" style={{ color: item.color }} />;
-                case 'Moderate': return <Triangle className="h-5 w-5" style={{ color: item.color }} />;
-                case 'Low': return <Circle className="h-5 w-5" style={{ color: item.color }} />;
-                case 'Minimal': return <ArrowDown className="h-5 w-5" style={{ color: item.color }} />;
-                default: return <div className="w-4 h-4 rounded-full" style={{ backgroundColor: item.color }}></div>;
+              // Find status by label
+              const statusEntry = Object.entries(WORK_ITEM_STATUSES).find(([, config]) => config.label === label);
+              if (statusEntry) {
+                return getStatusIconElement(statusEntry[0] as WorkItemStatus, "h-5 w-5");
               }
+              
+              // Find type by label  
+              const typeEntry = Object.entries(WORK_ITEM_TYPES).find(([, config]) => config.label === label);
+              if (typeEntry) {
+                return getTypeIconElement(typeEntry[0] as WorkItemType, "h-5 w-5");
+              }
+              
+              // Find priority by label
+              const priorityEntry = Object.entries(WORK_ITEM_PRIORITIES).find(([, config]) => config.label === label);
+              if (priorityEntry) {
+                // Convert label back to priority value for getPriorityIconElement
+                const priorityLevel = priorityEntry[0] as PriorityLevel;
+                const priorityValue = priorityEntry[1].threshold.min;
+                return getPriorityIconElement(priorityValue, "h-5 w-5");
+              }
+              
+              return <div className="w-4 h-4 rounded-full" style={{ backgroundColor: item.color }}></div>;
             };
                 
                 return (
@@ -293,11 +277,11 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
         <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <Hexagon className="h-8 w-8 text-gray-400" />
+              {React.createElement(getStatusConfig('NOT_STARTED').icon!, { className: `h-8 w-8 ${getStatusConfig('NOT_STARTED').color}` })}
             </div>
             <div className="ml-4">
               <div className="text-base font-bold text-gray-300">Not Started</div>
-              <div className="text-3xl font-bold text-gray-400">{stats.notStarted}</div>
+              <div className={`text-3xl font-bold ${getStatusConfig('NOT_STARTED').color}`}>{stats.notStarted}</div>
             </div>
           </div>
         </div>
@@ -305,11 +289,11 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
         <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <ClipboardList className="h-8 w-8 text-cyan-500" />
+              {React.createElement(getStatusConfig('PROPOSED').icon!, { className: `h-8 w-8 ${getStatusConfig('PROPOSED').color}` })}
             </div>
             <div className="ml-4">
               <div className="text-base font-bold text-gray-300">Proposed</div>
-              <div className="text-3xl font-bold text-cyan-400">{stats.proposed}</div>
+              <div className={`text-3xl font-bold ${getStatusConfig('PROPOSED').color}`}>{stats.proposed}</div>
             </div>
           </div>
         </div>
@@ -317,11 +301,11 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
         <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <Calendar className="h-8 w-8 text-purple-500" />
+              {React.createElement(getStatusConfig('PLANNED').icon!, { className: `h-8 w-8 ${getStatusConfig('PLANNED').color}` })}
             </div>
             <div className="ml-4">
               <div className="text-base font-bold text-gray-300">Planned</div>
-              <div className="text-3xl font-bold text-purple-400">{stats.planned}</div>
+              <div className={`text-3xl font-bold ${getStatusConfig('PLANNED').color}`}>{stats.planned}</div>
             </div>
           </div>
         </div>
@@ -332,11 +316,11 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
         <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <Clock className="h-8 w-8 text-yellow-500" />
+              {React.createElement(getStatusConfig('IN_PROGRESS').icon!, { className: `h-8 w-8 ${getStatusConfig('IN_PROGRESS').color}` })}
             </div>
             <div className="ml-4">
               <div className="text-base font-bold text-gray-300">In Progress</div>
-              <div className="text-3xl font-bold text-yellow-400">{stats.inProgress}</div>
+              <div className={`text-3xl font-bold ${getStatusConfig('IN_PROGRESS').color}`}>{stats.inProgress}</div>
             </div>
           </div>
         </div>
@@ -344,11 +328,11 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
         <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <Eye className="h-8 w-8 text-blue-400" />
+              {React.createElement(getStatusConfig('IN_REVIEW').icon!, { className: `h-8 w-8 ${getStatusConfig('IN_REVIEW').color}` })}
             </div>
             <div className="ml-4">
               <div className="text-base font-bold text-gray-300">In Review</div>
-              <div className="text-3xl font-bold text-blue-400">{stats.inReview}</div>
+              <div className={`text-3xl font-bold ${getStatusConfig('IN_REVIEW').color}`}>{stats.inReview}</div>
             </div>
           </div>
         </div>
@@ -356,11 +340,11 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
         <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <AlertCircle className="h-8 w-8 text-red-500" />
+              {React.createElement(getStatusConfig('BLOCKED').icon!, { className: `h-8 w-8 ${getStatusConfig('BLOCKED').color}` })}
             </div>
             <div className="ml-4">
               <div className="text-base font-bold text-gray-300">Blocked</div>
-              <div className="text-3xl font-bold text-red-500">{stats.blocked}</div>
+              <div className={`text-3xl font-bold ${getStatusConfig('BLOCKED').color}`}>{stats.blocked}</div>
             </div>
           </div>
         </div>
@@ -371,11 +355,11 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
         <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <Pause className="h-8 w-8 text-orange-400" />
+              {React.createElement(getStatusConfig('ON_HOLD').icon!, { className: `h-8 w-8 ${getStatusConfig('ON_HOLD').color}` })}
             </div>
             <div className="ml-4">
               <div className="text-base font-bold text-gray-300">On Hold</div>
-              <div className="text-3xl font-bold text-orange-400">{stats.onHold}</div>
+              <div className={`text-3xl font-bold ${getStatusConfig('ON_HOLD').color}`}>{stats.onHold}</div>
             </div>
           </div>
         </div>
@@ -383,11 +367,11 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
         <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <CheckCircle className="h-8 w-8 text-green-500" />
+              {React.createElement(getStatusConfig('COMPLETED').icon!, { className: `h-8 w-8 ${getStatusConfig('COMPLETED').color}` })}
             </div>
             <div className="ml-4">
               <div className="text-base font-bold text-gray-300">Completed</div>
-              <div className="text-3xl font-bold text-green-400">{stats.completed}</div>
+              <div className={`text-3xl font-bold ${getStatusConfig('COMPLETED').color}`}>{stats.completed}</div>
             </div>
           </div>
         </div>
@@ -395,11 +379,11 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
         <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <XCircle className="h-8 w-8 text-pink-500" />
+              {React.createElement(getStatusConfig('CANCELLED').icon!, { className: `h-8 w-8 ${getStatusConfig('CANCELLED').color}` })}
             </div>
             <div className="ml-4">
               <div className="text-base font-bold text-gray-300">Cancelled</div>
-              <div className="text-3xl font-bold text-pink-500">{stats.cancelled}</div>
+              <div className={`text-3xl font-bold ${getStatusConfig('CANCELLED').color}`}>{stats.cancelled}</div>
             </div>
           </div>
         </div>
@@ -447,15 +431,15 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
                 <PieChart 
                   title=""
                   data={[
-                    { label: 'Not Started', value: stats.notStarted, color: '#9ca3af' },
-                    { label: 'Proposed', value: stats.proposed, color: '#06b6d4' },
-                    { label: 'Planned', value: stats.planned, color: '#a855f7' },
-                    { label: 'In Progress', value: stats.inProgress, color: '#eab308' },
-                    { label: 'In Review', value: stats.inReview, color: '#3b82f6' },
-                    { label: 'Blocked', value: stats.blocked, color: '#ef4444' },
-                    { label: 'On Hold', value: stats.onHold, color: '#fb923c' },
-                    { label: 'Completed', value: stats.completed, color: '#22c55e' },
-                    { label: 'Cancelled', value: stats.cancelled, color: '#ff1493' }
+                    { label: WORK_ITEM_STATUSES.NOT_STARTED.label, value: stats.notStarted, color: WORK_ITEM_STATUSES.NOT_STARTED.hexColor },
+                    { label: WORK_ITEM_STATUSES.PROPOSED.label, value: stats.proposed, color: WORK_ITEM_STATUSES.PROPOSED.hexColor },
+                    { label: WORK_ITEM_STATUSES.PLANNED.label, value: stats.planned, color: WORK_ITEM_STATUSES.PLANNED.hexColor },
+                    { label: WORK_ITEM_STATUSES.IN_PROGRESS.label, value: stats.inProgress, color: WORK_ITEM_STATUSES.IN_PROGRESS.hexColor },
+                    { label: WORK_ITEM_STATUSES.IN_REVIEW.label, value: stats.inReview, color: WORK_ITEM_STATUSES.IN_REVIEW.hexColor },
+                    { label: WORK_ITEM_STATUSES.BLOCKED.label, value: stats.blocked, color: WORK_ITEM_STATUSES.BLOCKED.hexColor },
+                    { label: WORK_ITEM_STATUSES.ON_HOLD.label, value: stats.onHold, color: WORK_ITEM_STATUSES.ON_HOLD.hexColor },
+                    { label: WORK_ITEM_STATUSES.COMPLETED.label, value: stats.completed, color: WORK_ITEM_STATUSES.COMPLETED.hexColor },
+                    { label: WORK_ITEM_STATUSES.CANCELLED.label, value: stats.cancelled, color: WORK_ITEM_STATUSES.CANCELLED.hexColor }
                   ]}
                 />
               </div>
@@ -468,11 +452,11 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
                 <PieChart 
                   title=""
                   data={[
-                    { label: 'Critical', value: stats.priorityStats.critical, color: '#ef4444' },
-                    { label: 'High', value: stats.priorityStats.high, color: '#f97316' },
-                    { label: 'Moderate', value: stats.priorityStats.moderate, color: '#eab308' },
-                    { label: 'Low', value: stats.priorityStats.low, color: '#3b82f6' },
-                    { label: 'Minimal', value: stats.priorityStats.minimal, color: '#6b7280' }
+                    { label: WORK_ITEM_PRIORITIES.critical.label, value: stats.priorityStats.critical, color: WORK_ITEM_PRIORITIES.critical.hexColor },
+                    { label: WORK_ITEM_PRIORITIES.high.label, value: stats.priorityStats.high, color: WORK_ITEM_PRIORITIES.high.hexColor },
+                    { label: WORK_ITEM_PRIORITIES.moderate.label, value: stats.priorityStats.moderate, color: WORK_ITEM_PRIORITIES.moderate.hexColor },
+                    { label: WORK_ITEM_PRIORITIES.low.label, value: stats.priorityStats.low, color: WORK_ITEM_PRIORITIES.low.hexColor },
+                    { label: WORK_ITEM_PRIORITIES.minimal.label, value: stats.priorityStats.minimal, color: WORK_ITEM_PRIORITIES.minimal.hexColor }
                   ]}
                 />
               </div>
@@ -489,14 +473,7 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
                     .map(([type, count]) => ({
                       label: formatLabel(type),
                       value: count,
-                      color: type === 'EPIC' ? '#c084fc' : 
-                             type === 'MILESTONE' ? '#fb923c' :
-                             type === 'OUTCOME' ? '#818cf8' :
-                             type === 'FEATURE' ? '#38bdf8' :
-                             type === 'TASK' ? '#4ade80' :
-                             type === 'BUG' ? '#ef4444' :
-                             type === 'IDEA' ? '#fde047' :
-                             type === 'RESEARCH' ? '#2dd4bf' : '#6b7280'
+                      color: getTypeConfig(type as any).hexColor
                     }))}
                 />
               </div>

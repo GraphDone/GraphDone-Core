@@ -253,12 +253,11 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
         priorityExec: formData.priorityExec,
         priorityIndiv: formData.priorityIndiv,
         priorityComm: formData.priorityComm,
-        assignedTo: formData.assignedTo || undefined,
         dueDate: formData.dueDate || undefined,
         tags: formData.tags || [],
       };
       
-      const workItemInput = {
+      const workItemInput: any = {
         ...cleanFormData,
         positionX: position?.x || (400 + Math.random() * 200),
         positionY: position?.y || (300 + Math.random() * 200),
@@ -267,20 +266,28 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
         theta: 0.0,
         phi: 0.0,
         priorityComp: (formData.priorityExec + formData.priorityIndiv + formData.priorityComm) / 3,
-        
-        // Relationships - connect to current user and graph
-        owner: {
+      };
+
+      // Handle assignedTo relationship properly for Neo4j GraphQL
+      if (formData.assignedTo) {
+        workItemInput.assignedTo = {
           connect: {
-            where: { node: { id: currentUser?.id } }
+            where: { node: { id: formData.assignedTo } }
           }
-        },
-        graph: {
-          connect: {
-            where: { node: { id: currentGraph?.id } }
-          }
-        },
-        
-        // Don't create automatic dependency - we'll create the proper edge type after
+        };
+      }
+
+      // Add required relationships
+      workItemInput.owner = {
+        connect: {
+          where: { node: { id: currentUser?.id } }
+        }
+      };
+      
+      workItemInput.graph = {
+        connect: {
+          where: { node: { id: currentGraph?.id } }
+        }
       };
 
       const result = await createWorkItem({

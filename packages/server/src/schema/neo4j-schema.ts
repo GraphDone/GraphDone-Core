@@ -178,9 +178,10 @@ export const typeDefs = gql`
     NOT_STARTED
     PROPOSED
     PLANNED
-    ACTIVE
     IN_PROGRESS
+    IN_REVIEW
     BLOCKED
+    ON_HOLD
     COMPLETED
     CANCELLED
   }
