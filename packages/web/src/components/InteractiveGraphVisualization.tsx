@@ -1,30 +1,22 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import ReactDOM from 'react-dom/client';
 import * as d3 from 'd3';
-import { Link2, Edit3, Trash2, Folder, FolderOpen, Plus, FileText, Settings, Unlink, X, GitBranch, Minus, Maximize2, ArrowLeft } from 'lucide-react';
+import { Link2, Edit3, Trash2, Folder, FolderOpen, Plus, FileText, Settings, Maximize2, ArrowLeft, X, GitBranch, Minus, Unlink } from 'lucide-react';
 import {
   getPriorityIconElement,
   getStatusIconElement,
   getTypeIconElement,
   getRelationshipIconElement,
+  getRelationshipIconForD3,
   getTypeConfig,
   getStatusConfig,
-  getPriorityConfig,
-  WORK_ITEM_TYPES,
-  WORK_ITEM_STATUSES,
-  WORK_ITEM_PRIORITIES,
   WorkItemType,
-  // Import icons from central file
   AlertTriangle,
   AlertCircle,
-  Layers,
-  Trophy,
   ListTodo,
-  Target,
-  Lightbulb,
-  Sparkles,
-  Microscope
+  Target
 } from '../constants/workItemConstants';
-import { useQuery, useMutation } from '@apollo/client';
+import { useQuery, useMutation, useApolloClient } from '@apollo/client';
 import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -43,27 +35,8 @@ import { ConnectNodeModal } from './ConnectNodeModal';
 import { NodeDetailsModal } from './NodeDetailsModal';
 
 import { WorkItem, WorkItemEdge } from '../types/graph';
-import { RelationshipType, RELATIONSHIP_OPTIONS, getRelationshipConfig, getRelationshipArrow } from '../constants/workItemConstants';
+import { RelationshipType, RELATIONSHIP_OPTIONS, getRelationshipConfig } from '../constants/workItemConstants';
 
-// Helper function to get SVG path data for Lucide icons
-const getIconSVGData = (type: RelationshipType): string => {
-  const iconPaths: Record<RelationshipType, string> = {
-    'DEPENDS_ON': '<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>',  // ArrowLeft
-    'BLOCKS': '<circle cx="12" cy="12" r="10"/><path d="M6 6l12 12"/>',  // Ban
-    'ENABLES': '<path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/>',  // CheckCircle
-    'RELATES_TO': '<path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="m15 7 5 5-5 5"/><path d="m11 7 5 5-5 5"/>',  // Link2
-    'IS_PART_OF': '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',  // Folder
-    'FOLLOWS': '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',  // ArrowRight
-    'PARALLEL_WITH': '<path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3"/>',  // Split
-    'DUPLICATES': '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',  // Copy
-    'CONFLICTS_WITH': '<path d="m13 2-3 3.5a2 2 0 0 0 0 3l3 3.5a2 2 0 0 1 0 3L10 18"/><path d="M9 18h3a2 2 0 0 0 2-2v-1a2 2 0 0 1 2-2 2 2 0 0 1 2 2v1a2 2 0 0 0 2 2h3"/>',  // Zap
-    'VALIDATES': '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/>',  // Shield
-    'REFERENCES': '<path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/>',  // Bookmark
-    'CONTAINS': '<path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>',  // Package
-    'DEFAULT_EDGE': '<path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="m15 7 5 5-5 5"/><path d="m11 7 5 5-5 5"/>'  // Link2
-  };
-  return iconPaths[type] || iconPaths['RELATES_TO'];
-};
 
 interface NodeMenuState {
   node: WorkItem | null;
@@ -82,6 +55,7 @@ export function InteractiveGraphVisualization() {
   const containerRef = useRef<HTMLDivElement>(null);
   const { currentGraph, availableGraphs } = useGraph();
   const { currentUser } = useAuth();
+  const apolloClient = useApolloClient();
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -247,18 +221,60 @@ export function InteractiveGraphVisualization() {
 
   // Additional edge operations
   const [updateEdgeMutation] = useMutation(UPDATE_EDGE, {
-    refetchQueries: [{ 
-      query: GET_EDGES, 
-      variables: {
-        where: {
-          source: {
-            graph: {
-              id: currentGraph?.id
+    update(cache, { data }) {
+      if (data?.updateEdges?.edges?.length > 0) {
+        const updatedEdge = data.updateEdges.edges[0];
+        console.log('🔄 Cache update - Updated edge:', updatedEdge);
+        
+        // Update the GET_EDGES query cache
+        const existingEdges = cache.readQuery({
+          query: GET_EDGES,
+          variables: {
+            where: {
+              source: {
+                graph: {
+                  id: currentGraph?.id
+                }
+              }
+            }
+          }
+        });
+        
+        if (existingEdges) {
+          cache.writeQuery({
+            query: GET_EDGES,
+            variables: {
+              where: {
+                source: {
+                  graph: {
+                    id: currentGraph?.id
+                  }
+                }
+              }
+            },
+            data: {
+              edges: (existingEdges as any).edges.map((edge: any) => 
+                edge.id === updatedEdge.id ? updatedEdge : edge
+              )
+            }
+          });
+        }
+      }
+    },
+    refetchQueries: [
+      { 
+        query: GET_EDGES, 
+        variables: {
+          where: {
+            source: {
+              graph: {
+                id: currentGraph?.id
+              }
             }
           }
         }
       }
-    }],
+    ],
   });
 
   const [deleteEdgeMutation] = useMutation(DELETE_EDGE, {
@@ -323,6 +339,14 @@ export function InteractiveGraphVisualization() {
     if (isConnecting && connectionSource) {
       // Complete connection
       if (connectionSource !== node.id) {
+        // Check if edge already exists
+        if (edgeExists(connectionSource, node.id)) {
+          console.warn('⚠️ Edge already exists between these nodes');
+          setIsConnecting(false);
+          setConnectionSource(null);
+          return;
+        }
+        
         // Create edge in backend
         createEdgeMutation({
           variables: {
@@ -415,9 +439,8 @@ export function InteractiveGraphVisualization() {
   });
 
   // Validate and sanitize data before D3 processing
-  console.log('🔍 Input to validation - workItems:', workItems.length, 'workItemEdges:', workItemEdges.length);
-  console.log('🔍 First few workItemEdges:', workItemEdges.slice(0, 3));
   const currentValidationResult = validateGraphData(workItems, workItemEdges);
+  console.log('🔍 Edge data being validated:', workItemEdges.map(e => ({ id: e.id, type: e.type })));
   
   // Update validation state
   useEffect(() => {
@@ -428,6 +451,14 @@ export function InteractiveGraphVisualization() {
   const validatedNodes = currentValidationResult.validNodes;
   const validatedEdges = currentValidationResult.validEdges;
   
+
+  // Helper function to check if edge already exists
+  const edgeExists = (sourceId: string, targetId: string): boolean => {
+    return validatedEdges.some(edge => 
+      (edge.source === sourceId && edge.target === targetId) ||
+      (edge.source === targetId && edge.target === sourceId) // Check both directions
+    );
+  };
 
   const nodes = [
     // Real nodes from database
@@ -564,8 +595,24 @@ export function InteractiveGraphVisualization() {
     if (!currentGraph?.id) return;
     
     try {
+      // Generate a unique name that doesn't conflict with existing nodes
+      let nodeTitle = `New Node ${nodeCounter}`;
+      let attempts = 0;
+      
+      // Check if name already exists and generate a new one if needed
+      while (validatedNodes.some(node => node.title.toLowerCase().trim() === nodeTitle.toLowerCase().trim()) && attempts < 100) {
+        attempts++;
+        nodeTitle = `New Node ${nodeCounter + attempts}`;
+      }
+      
+      // Update counter for next node
+      if (attempts > 0) {
+        setNodeCounter(prev => prev + attempts);
+      }
+      
+      
       const workItemInput = {
-        title: `New Node ${nodeCounter}`,
+        title: nodeTitle,
         description: DEFAULT_NODE_CONFIG.description,
         type: DEFAULT_NODE_CONFIG.type,
         status: DEFAULT_NODE_CONFIG.status,
@@ -728,11 +775,6 @@ export function InteractiveGraphVisualization() {
     const visibleEdges = validatedEdges;
     
     // Debug: Log edge visibility
-    console.log('🔍 Total edges:', validatedEdges.length);
-    console.log('🔍 Visible edges:', visibleEdges.length);
-    console.log('🔍 Visible nodes:', visibleNodes.length);
-    console.log('🔍 Raw edges data:', edgesData?.edges?.length || 0);
-    console.log('🔍 First few edges:', validatedEdges.slice(0, 3));
     
     // Create edges FIRST (so they render under nodes)
     const linkElements = g.append('g')
@@ -786,7 +828,6 @@ export function InteractiveGraphVisualization() {
           // Check if this is an edge creation attempt (Alt/Option key held)
           if (event.sourceEvent.altKey) {
             mousedownNodeRef.current = d;
-            console.log('🟢 Edge creation started from:', d.title);
             return;
           }
           
@@ -807,7 +848,16 @@ export function InteractiveGraphVisualization() {
         .on('end', (event, d: any) => {
           // Check if this is edge creation end
           if (mousedownNodeRef.current && mousedownNodeRef.current.id !== d.id) {
-            console.log('🔗 Creating edge:', mousedownNodeRef.current.title, '→', d.title);
+            const sourceId = mousedownNodeRef.current.id;
+            const targetId = d.id;
+            
+            // Check if edge already exists
+            if (edgeExists(sourceId, targetId)) {
+              console.warn('⚠️ Edge already exists between these nodes');
+              mousedownNodeRef.current = null;
+              return;
+            }
+            
             
             // Create edge using GraphQL mutation
             createEdgeMutation({
@@ -815,8 +865,8 @@ export function InteractiveGraphVisualization() {
                 input: [{
                   type: 'DEFAULT_EDGE',
                   weight: 0.8,
-                  source: { connect: { where: { node: { id: mousedownNodeRef.current.id } } } },
-                  target: { connect: { where: { node: { id: d.id } } } },
+                  source: { connect: { where: { node: { id: sourceId } } } },
+                  target: { connect: { where: { node: { id: targetId } } } },
                 }]
               }
             }).then(() => {
@@ -1368,18 +1418,17 @@ export function InteractiveGraphVisualization() {
       .style('cursor', 'pointer')
       .on('click', function(event: MouseEvent, d: WorkItemEdge) {
         event.stopPropagation();
-        console.log('🔗 Edge label clicked:', d.type);
         
-        // Get the bounding box of the clicked element for precise positioning
-        const element = event.currentTarget as SVGElement;
-        const rect = element.getBoundingClientRect();
+        // Get the actual mouse click position (most accurate)
+        const clickX = event.clientX;
+        const clickY = event.clientY;
         
-        // Position dropdown with top aligned to edge label, shifted down slightly
+        // Position dropdown very close to the click point
         setEditingEdge({
           edge: d,
           position: { 
-            x: rect.left + rect.width / 2,  // Center horizontally on label
-            y: rect.top + 10  // Top of label + 10px down
+            x: clickX,  // Use exact click position
+            y: clickY + 5  // Just 5px below the click
           }
         });
       });
@@ -1412,14 +1461,28 @@ export function InteractiveGraphVisualization() {
       .attr('y', -7)
       .style('pointer-events', 'none')
       .each(function(d: WorkItemEdge) {
-        const iconData = getIconSVGData(d.type as RelationshipType);
-        d3.select(this).html(`
-          <div style="width: 14px; height: 14px; display: flex; align-items: center; justify-content: center;">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              ${iconData}
-            </svg>
-          </div>
-        `);
+        // Get the exact same centralized React component as the dropdown
+        const { IconComponent, hexColor } = getRelationshipIconForD3(d.type as RelationshipType);
+        
+        // Create a unique container for each icon
+        const uniqueId = `edge-icon-${d.id}`;
+        
+        d3.select(this)
+          .style('width', '14px')
+          .style('height', '14px')
+          .style('display', 'flex')
+          .style('align-items', 'center')
+          .style('justify-content', 'center')
+          .html(`<div id="${uniqueId}" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;"></div>`);
+        
+        // Render the centralized React component in the unique container
+        const container = document.getElementById(uniqueId);
+        if (container) {
+          const root = ReactDOM.createRoot(container);
+          root.render(React.createElement(IconComponent, { 
+            className: "h-3 w-3 text-white"
+          }));
+        }
       });
 
     // Add rounded rectangle backgrounds after measuring content
@@ -1459,10 +1522,11 @@ export function InteractiveGraphVisualization() {
         if (textElement) {
           const bbox = textElement.getBBox();
           const iconWidth = 14;
-          const spacing = 6;
-          const padding = 8;
-          const totalWidth = iconWidth + spacing + bbox.width + padding;
-          const totalHeight = 20;
+          const spacing = 8;
+          const paddingLeft = 6;
+          const paddingRight = 8;
+          const totalWidth = paddingLeft + iconWidth + spacing + bbox.width + paddingRight;
+          const totalHeight = Math.max(22, bbox.height + 8);
           
           // Update rectangle size and center it
           group.select('.edge-label-bg')
@@ -1471,15 +1535,17 @@ export function InteractiveGraphVisualization() {
             .attr('x', -totalWidth / 2)
             .attr('y', -totalHeight / 2);
           
-          // Position icon on the left side
+          // Position icon on the left side with proper padding
           group.select('.edge-label-icon')
-            .attr('x', -totalWidth / 2 + 4)
-            .attr('y', -7);
+            .attr('x', -totalWidth / 2 + paddingLeft)
+            .attr('y', -totalHeight / 2 + (totalHeight - 14) / 2);
           
-          // Position text next to icon
+          // Position text next to icon (left-aligned, not centered)
           group.select('.edge-label')
-            .attr('x', -totalWidth / 2 + iconWidth + spacing + bbox.width / 2)
-            .attr('text-anchor', 'middle');
+            .attr('x', -totalWidth / 2 + paddingLeft + iconWidth + spacing)
+            .attr('y', 0)
+            .attr('text-anchor', 'start')
+            .attr('dominant-baseline', 'middle');
         }
       });
     }, 150);
@@ -1495,8 +1561,6 @@ export function InteractiveGraphVisualization() {
         if (!mousedownNodeRef.current) {
           // First click - select source node
           mousedownNodeRef.current = d;
-          console.log('🟢 Edge creation started from:', d.title);
-          console.log('Now Shift+Click another node to create edge');
           
           // Visual feedback - highlight source node
           d3.select(event.currentTarget as SVGElement)
@@ -1507,7 +1571,18 @@ export function InteractiveGraphVisualization() {
           // Second click - create edge with professional animation
           const sourceNode = mousedownNodeRef.current;
           const targetNode = d;
-          console.log('🔗 Creating edge:', sourceNode.title, '→', targetNode.title);
+          
+          // Check if edge already exists
+          if (edgeExists(sourceNode.id, targetNode.id)) {
+            console.warn('⚠️ Edge already exists between these nodes');
+            // Remove source node highlight
+            nodeElements.selectAll('rect')
+              .style('stroke', null)
+              .style('stroke-width', null);
+            mousedownNodeRef.current = null;
+            return;
+          }
+          
           
           // Remove source node highlight
           nodeElements.selectAll('rect')
@@ -1531,16 +1606,18 @@ export function InteractiveGraphVisualization() {
             .style('stroke-dasharray', '8,4')
             .style('opacity', 0);
           
-          // Fade in dotted edge
+          // Fade in dotted edge smoothly
           tempEdge
             .transition()
-            .duration(1000)
+            .duration(3000)
+            .ease(d3.easeQuadInOut)
             .style('opacity', 1)
             .on('end', () => {
-              // After fade in, animate to solid
+              // After fade in, animate to solid smoothly
               tempEdge
                 .transition()
-                .duration(9000)
+                .duration(12000)
+                .ease(d3.easeQuadInOut)
                 .style('stroke-dasharray', '0,0')
                 .style('stroke-width', 3)
                 .on('end', () => {
@@ -2634,10 +2711,79 @@ export function InteractiveGraphVisualization() {
                           where: { id: editingEdge.edge.id },
                           update: { type: option.type }
                         }
-                      }).then(() => {
+                      }).then((result) => {
                         console.log('✅ Edge type updated to:', option.type);
-                        // Add slight delay for visual feedback
-                        setTimeout(() => setEditingEdge(null), 150);
+                        console.log('✅ Update result:', result);
+                        
+                        // Immediately update the D3 visualization without waiting for refetch
+                        const svg = d3.select(svgRef.current);
+                        const edgeId = editingEdge.edge.id;
+                        const newType = option.type;
+                        const config = getRelationshipConfig(newType);
+                        
+                        // Update edge label text and layout immediately
+                        svg.selectAll('.edge-label-group')
+                          .filter((d: any) => d.id === edgeId)
+                          .each(function() {
+                            const group = d3.select(this);
+                            const textElement = group.select('.edge-label');
+                            
+                            // Update text
+                            textElement.text(config.label);
+                            
+                            // Update icon to match new relationship type
+                            const iconElement = group.select('.edge-label-icon');
+                            const { IconComponent } = getRelationshipIconForD3(newType);
+                            const iconContainer = iconElement.node();
+                            if (iconContainer) {
+                              const uniqueId = `edge-icon-${edgeId}-${Date.now()}`;
+                              iconElement.html(`<div id="${uniqueId}" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;"></div>`);
+                              
+                              const newContainer = document.getElementById(uniqueId);
+                              if (newContainer) {
+                                const root = ReactDOM.createRoot(newContainer);
+                                root.render(React.createElement(IconComponent, { 
+                                  className: "h-3 w-3 text-white"
+                                }));
+                              }
+                            }
+                            
+                            // Recalculate layout after text change
+                            const bbox = (textElement.node() as SVGTextElement).getBBox();
+                            const iconWidth = 14;
+                            const spacing = 8;
+                            const paddingLeft = 6;
+                            const paddingRight = 8;
+                            const totalWidth = paddingLeft + iconWidth + spacing + bbox.width + paddingRight;
+                            const totalHeight = Math.max(22, bbox.height + 8);
+                            
+                            // Update background rectangle
+                            group.select('.edge-label-bg')
+                              .attr('width', totalWidth)
+                              .attr('height', totalHeight)
+                              .attr('x', -totalWidth / 2)
+                              .attr('y', -totalHeight / 2)
+                              .style('fill', config.hexColor);
+                            
+                            // Reposition icon
+                            group.select('.edge-label-icon')
+                              .attr('x', -totalWidth / 2 + paddingLeft)
+                              .attr('y', -totalHeight / 2 + (totalHeight - 14) / 2);
+                            
+                            // Reposition text  
+                            textElement
+                              .attr('x', -totalWidth / 2 + paddingLeft + iconWidth + spacing)
+                              .attr('text-anchor', 'start');
+                          });
+                        
+                        // Update edge stroke color immediately
+                        svg.selectAll('.edge')
+                          .filter((d: any) => d.id === edgeId)
+                          .attr('stroke', config.hexColor);
+                        
+                        console.log('🎨 Immediately updated D3 visuals for edge:', edgeId, 'to type:', newType);
+                        
+                        setEditingEdge(null);
                       }).catch((error) => {
                         console.error('❌ Failed to update edge:', error);
                       });
