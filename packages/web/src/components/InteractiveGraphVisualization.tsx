@@ -11,6 +11,7 @@ import {
   getTypeConfig,
   getStatusConfig,
   WorkItemType,
+  WorkItemStatus,
   AlertTriangle,
   AlertCircle,
   ListTodo,
@@ -170,6 +171,29 @@ export function InteractiveGraphVisualization() {
     MEDIUM: 0.8,      // Add node titles
     CLOSE: 0.6,       // Add edge labels (earlier)
     VERY_CLOSE: 2.0   // Full detail
+  };
+
+  // Function to get SVG path for priority icons
+  const getPriorityIconSvgPath = (priorityValue: number): string => {
+    if (priorityValue >= 0.8) return 'M12 2L2 7v10c0 5.55 3.84 10 9 11 1.16-.21 2.31-.54 3.42-1.01C16.1 26.46 18.05 25.24 20 23.5 21.95 21.76 23.84 19.54 24 17v-10L12 2z'; // Flame
+    if (priorityValue >= 0.6) return 'M13 2L3 14h9l-1 8 10-12h-9l1-8z'; // Zap
+    if (priorityValue >= 0.4) return 'M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z'; // Triangle (star-like)
+    if (priorityValue >= 0.2) return 'M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z'; // Circle
+    return 'M12 5v14m-7-7l7 7 7-7'; // ArrowDown
+  };
+
+  // Function to get SVG path for status icons  
+  const getStatusIconSvgPath = (status: string): string => {
+    switch (status) {
+      case 'NOT_STARTED': return 'M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z'; // Hexagon
+      case 'PROPOSED': return 'M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01'; // ClipboardList
+      case 'PLANNED': return 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z'; // Calendar
+      case 'IN_PROGRESS': return 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z'; // Clock
+      case 'COMPLETED': return 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'; // CheckCircle
+      case 'BLOCKED': return 'M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'; // AlertCircle
+      case 'CANCELLED': return 'M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z'; // XCircle
+      default: return 'M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z'; // Circle (fallback)
+    }
   };
   const [showLegend, setShowLegend] = useState(false);
   const [showGraphPanel, setShowGraphPanel] = useState(false);
@@ -585,7 +609,11 @@ export function InteractiveGraphVisualization() {
 
   // Inline node creation function
   const createInlineNode = async (x: number, y: number) => {
-    if (!currentGraph?.id) return;
+    console.log('createInlineNode called with:', { x, y, currentGraph: currentGraph?.id, currentUser: currentUser?.id });
+    if (!currentGraph?.id) {
+      console.log('No current graph selected');
+      return;
+    }
     
     try {
       // Generate a unique name that doesn't conflict with existing nodes
@@ -612,6 +640,7 @@ export function InteractiveGraphVisualization() {
         priorityExec: DEFAULT_NODE_CONFIG.priorityExec,
         priorityIndiv: DEFAULT_NODE_CONFIG.priorityIndiv,
         priorityComm: DEFAULT_NODE_CONFIG.priorityComm,
+        priorityComp: 0.0,
         positionX: x,
         positionY: y,
         positionZ: 0,
@@ -1201,17 +1230,8 @@ export function InteractiveGraphVisualization() {
         }
       })();
       
-      // Get status color
-      const statusColor = (() => {
-        switch (d.status) {
-          case 'PROPOSED': return '#06b6d4'; // cyan
-          case 'PLANNED': return '#a855f7'; // purple
-          case 'IN_PROGRESS': return '#eab308'; // yellow
-          case 'COMPLETED': return '#22c55e'; // green
-          case 'BLOCKED': return '#ef4444'; // red
-          default: return '#9ca3af'; // gray
-        }
-      })();
+      // Get status color from centralized constants
+      const statusColor = getStatusConfig(d.status as WorkItemStatus).hexColor;
       
       const barWidth = 40;
       const barHeight = 3;
@@ -1240,24 +1260,30 @@ export function InteractiveGraphVisualization() {
         .attr('fill', statusColor)
         .style('pointer-events', 'none');
       
-      // Status icon (SVG) - positioned after "Status" text
+      // Status icon (SVG) - using centralized icon system
       const statusLabelX = barX + barWidth / 2 - 8;
       const statusIconX = statusLabelX + 15; // Position after "Status" text
-      nodeGroup.append('svg')
+      const statusConfig = getStatusConfig(d.status as any);
+      const statusIconSvg = nodeGroup.append('svg')
         .attr('class', 'status-icon-svg')
         .attr('x', statusIconX)
         .attr('y', barY - 22)
         .attr('width', 10)
         .attr('height', 10)
         .attr('viewBox', '0 0 24 24')
-        .style('pointer-events', 'none')
-        .append('path')
-        .attr('d', 'M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z')
-        .attr('fill', 'none')
-        .attr('stroke', statusColor)
-        .attr('stroke-width', '2')
-        .attr('stroke-linecap', 'round')
-        .attr('stroke-linejoin', 'round');
+        .style('pointer-events', 'none');
+      
+      // Add the correct icon path based on status
+      const statusIconPath = getStatusIconSvgPath(d.status as string);
+      if (statusIconPath) {
+        statusIconSvg.append('path')
+          .attr('d', statusIconPath)
+          .attr('fill', 'none')
+          .attr('stroke', statusColor)
+          .attr('stroke-width', '2')
+          .attr('stroke-linecap', 'round')
+          .attr('stroke-linejoin', 'round');
+      }
 
       // Status label (above percentage)
       nodeGroup.append('text')
@@ -1330,24 +1356,29 @@ export function InteractiveGraphVisualization() {
         .attr('fill', priorityColor)
         .style('pointer-events', 'none');
       
-      // Priority icon (SVG) - positioned after "Priority" text
+      // Priority icon (SVG) - using correct icon based on priority value
       const priorityLabelX = barX + barWidth / 2;
       const priorityIconX = priorityLabelX + 18 - 2; // Position after "Priority" text, shifted left by 2
-      nodeGroup.append('svg')
+      const prioritySvg = nodeGroup.append('svg')
         .attr('class', 'priority-icon-svg')
         .attr('x', priorityIconX)
         .attr('y', barY - 22)
         .attr('width', 10)
         .attr('height', 10)
         .attr('viewBox', '0 0 24 24')
-        .style('pointer-events', 'none')
-        .append('path')
-        .attr('d', 'M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z')
-        .attr('fill', 'none')
-        .attr('stroke', priorityColor)
-        .attr('stroke-width', '2')
-        .attr('stroke-linecap', 'round')
-        .attr('stroke-linejoin', 'round');
+        .style('pointer-events', 'none');
+      
+      // Add correct priority icon path
+      const priorityIconPath = getPriorityIconSvgPath(priority);
+      if (priorityIconPath) {
+        prioritySvg.append('path')
+          .attr('d', priorityIconPath)
+          .attr('fill', 'none')
+          .attr('stroke', priorityColor)
+          .attr('stroke-width', '2')
+          .attr('stroke-linecap', 'round')
+          .attr('stroke-linejoin', 'round');
+      }
 
       // Priority label (above percentage)
       nodeGroup.append('text')

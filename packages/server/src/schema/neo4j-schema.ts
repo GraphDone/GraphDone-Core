@@ -175,6 +175,7 @@ export const typeDefs = gql`
   }
 
   enum NodeStatus {
+    NOT_STARTED
     PROPOSED
     PLANNED
     ACTIVE
@@ -329,7 +330,7 @@ export const typeDefs = gql`
     priorityIndiv: Float! @default(value: 0.0)
     priorityComm: Float! @default(value: 0.0)
     priorityComp: Float! @default(value: 0.0)
-    status: NodeStatus! @default(value: PROPOSED)
+    status: NodeStatus! @default(value: NOT_STARTED)
     dueDate: DateTime
     tags: [String!]
     metadata: String # JSON as string

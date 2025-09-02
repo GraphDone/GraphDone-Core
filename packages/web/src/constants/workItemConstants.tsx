@@ -19,6 +19,7 @@ import {
   Triangle,
   Circle,
   ArrowDown,
+  Hexagon,
   // Relationship Icons
   ArrowLeft,
   Ban,
@@ -64,6 +65,7 @@ export {
   Triangle,
   Circle,
   ArrowDown,
+  Hexagon,
   
   // Relationship Icons
   ArrowLeft,
@@ -86,7 +88,7 @@ export {
 // ============================
 
 export type WorkItemType = 'EPIC' | 'MILESTONE' | 'OUTCOME' | 'FEATURE' | 'TASK' | 'BUG' | 'IDEA' | 'RESEARCH' | 'DEFAULT';
-export type WorkItemStatus = 'PROPOSED' | 'PLANNED' | 'IN_PROGRESS' | 'COMPLETED' | 'BLOCKED' | 'CANCELLED';
+export type WorkItemStatus = 'NOT_STARTED' | 'PROPOSED' | 'PLANNED' | 'IN_PROGRESS' | 'COMPLETED' | 'BLOCKED' | 'CANCELLED';
 export type PriorityLevel = 'critical' | 'high' | 'moderate' | 'low' | 'minimal';
 
 // ============================
@@ -233,6 +235,17 @@ export const WORK_ITEM_TYPES: Record<WorkItemType, TypeOption> = {
 // ============================
 
 export const WORK_ITEM_STATUSES: Record<WorkItemStatus, StatusOption> = {
+  NOT_STARTED: {
+    value: 'NOT_STARTED',
+    label: 'Not Started',
+    description: 'Work has not yet begun',
+    icon: Hexagon,
+    color: 'text-gray-400',
+    bgColor: 'bg-gray-400/10',
+    borderColor: 'border-gray-400/30',
+    dotColor: 'bg-gray-400',
+    hexColor: '#9ca3af'
+  },
   PROPOSED: {
     value: 'PROPOSED',
     label: 'Proposed',
@@ -293,11 +306,11 @@ export const WORK_ITEM_STATUSES: Record<WorkItemStatus, StatusOption> = {
     label: 'Cancelled',
     description: 'Work was stopped and will not be completed',
     icon: XCircle,
-    color: 'text-slate-400',
-    bgColor: 'bg-slate-400/10',
-    borderColor: 'border-slate-400/30',
-    dotColor: 'bg-slate-400',
-    hexColor: '#94a3b8'
+    color: 'text-pink-500',
+    bgColor: 'bg-pink-500/10',
+    borderColor: 'border-pink-500/30',
+    dotColor: 'bg-pink-500',
+    hexColor: '#ff1493'
   }
 };
 
@@ -505,11 +518,11 @@ export const getPriorityColorScheme = (priorityValue: number) => {
 export const DEFAULT_NODE_CONFIG = {
   title: 'New Node',
   type: 'DEFAULT' as WorkItemType,
-  status: 'PROPOSED' as WorkItemStatus,
+  status: 'NOT_STARTED' as WorkItemStatus,
   priority: 'minimal' as PriorityLevel,
-  priorityExec: 0.1,
-  priorityIndiv: 0.1,
-  priorityComm: 0.1,
+  priorityExec: 0.0,
+  priorityIndiv: 0.0,
+  priorityComm: 0.0,
   description: ''
 };
 
