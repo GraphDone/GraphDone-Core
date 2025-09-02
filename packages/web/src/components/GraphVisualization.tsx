@@ -5,6 +5,7 @@ import { Plus, Edit } from 'lucide-react';
 import { GET_WORK_ITEMS, GET_EDGES } from '../lib/queries';
 import { CreateNodeModal } from './CreateNodeModal';
 import { EditNodeModal } from './EditNodeModal';
+import { getTypeConfig, getPriorityConfig, WorkItemType, WORK_ITEM_TYPES, WORK_ITEM_PRIORITIES } from '../constants/workItemConstants';
 
 interface WorkItem {
   id: string;
@@ -230,18 +231,7 @@ export function GraphVisualization() {
       .attr('class', 'node-circle')
       .attr('r', d => 15 + (d.priorityComp || 0) * 15) // Size based on priority
       .attr('fill', d => {
-        // Lighter, more vibrant colors
-        const colors: Record<string, string> = {
-          EPIC: '#c084fc',      // purple-400
-          MILESTONE: '#fb923c', // orange-400
-          OUTCOME: '#818cf8',   // indigo-400
-          FEATURE: '#38bdf8',   // sky-400
-          TASK: '#4ade80',      // green-400
-          BUG: '#f87171',       // red-400
-          IDEA: '#fbbf24',      // yellow-400
-          RESEARCH: '#2dd4bf'   // teal-400
-        };
-        return colors[d.type] || '#6b7280';
+        return getTypeConfig(d.type as WorkItemType).hexColor;
       })
       .attr('stroke', '#fff')
       .attr('stroke-width', 2)
@@ -279,9 +269,7 @@ export function GraphVisualization() {
       .attr('r', 3)
       .attr('cy', 15)
       .attr('fill', d => {
-        if (d.priorityComp > 0.7) return '#dc2626';
-        if (d.priorityComp > 0.4) return '#d97706';
-        return '#059669';
+        return getPriorityConfig(d.priorityComp || 0).hexColor;
       });
 
     // Add hover effects
@@ -342,54 +330,22 @@ export function GraphVisualization() {
       <div className="absolute top-20 left-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-4">
         <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Node Types</h3>
         <div className="space-y-1">
-          <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#8b5cf6' }}></div>
-            <span className="text-xs text-gray-600 dark:text-gray-300">Epic</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#f59e0b' }}></div>
-            <span className="text-xs text-gray-600 dark:text-gray-300">Milestone</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#6366f1' }}></div>
-            <span className="text-xs text-gray-600 dark:text-gray-300">Outcome</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#3b82f6' }}></div>
-            <span className="text-xs text-gray-600 dark:text-gray-300">Feature</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#10b981' }}></div>
-            <span className="text-xs text-gray-600 dark:text-gray-300">Task</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#ef4444' }}></div>
-            <span className="text-xs text-gray-600 dark:text-gray-300">Bug</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#eab308' }}></div>
-            <span className="text-xs text-gray-600 dark:text-gray-300">Idea</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#14b8a6' }}></div>
-            <span className="text-xs text-gray-600 dark:text-gray-300">Research</span>
-          </div>
+          {Object.values(WORK_ITEM_TYPES).map((type) => (
+            <div key={type.value} className="flex items-center space-x-2">
+              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: type.hexColor }}></div>
+              <span className="text-xs text-gray-600 dark:text-gray-300">{type.label}</span>
+            </div>
+          ))}
         </div>
         
         <h3 className="text-sm font-semibold text-gray-900 dark:text-white mt-4 mb-3">Priority</h3>
         <div className="space-y-2">
-          <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 rounded-full bg-red-600"></div>
-            <span className="text-xs text-gray-600 dark:text-gray-300">High (0.7+)</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 rounded-full bg-yellow-600"></div>
-            <span className="text-xs text-gray-600 dark:text-gray-300">Medium (0.4-0.7)</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 rounded-full bg-green-600"></div>
-            <span className="text-xs text-gray-600 dark:text-gray-300">Low (0-0.4)</span>
-          </div>
+          {Object.values(WORK_ITEM_PRIORITIES).reverse().map((priority) => (
+            <div key={priority.value} className="flex items-center space-x-2">
+              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: priority.hexColor }}></div>
+              <span className="text-xs text-gray-600 dark:text-gray-300">{priority.label} ({priority.description})</span>
+            </div>
+          ))}
         </div>
         
         <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-600">
