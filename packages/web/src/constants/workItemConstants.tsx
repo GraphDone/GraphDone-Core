@@ -470,6 +470,22 @@ export const getPriorityLevel = (priorityValue: number): PriorityLevel => {
   return getPriorityConfig(priorityValue).value as PriorityLevel;
 };
 
+// Get status completion percentage (for workflow progression visualization)
+export const getStatusCompletionPercentage = (status: WorkItemStatus): number => {
+  switch (status) {
+    case 'NOT_STARTED': return 0;    // Starting point
+    case 'PROPOSED': return 10;      // Idea submitted
+    case 'PLANNED': return 25;       // Planning complete
+    case 'IN_PROGRESS': return 60;   // Actively working
+    case 'IN_REVIEW': return 85;     // Nearly done, awaiting approval
+    case 'BLOCKED': return 40;       // Progress halted (maintain current progress)
+    case 'ON_HOLD': return 30;       // Paused (maintain current progress)
+    case 'COMPLETED': return 100;    // Fully complete
+    case 'CANCELLED': return 0;      // Not completed
+    default: return 0;
+  }
+};
+
 // Legacy compatibility functions (for gradual migration)
 export const getTypeColor = (type: WorkItemType): string => {
   return getTypeConfig(type).color;
@@ -617,6 +633,14 @@ export interface RelationshipOption {
 }
 
 export const RELATIONSHIP_TYPES: Record<RelationshipType, RelationshipOption> = {
+  DEFAULT_EDGE: {
+    type: 'DEFAULT_EDGE',
+    label: 'Connected',
+    description: 'Simple connection between nodes',
+    icon: Paperclip,
+    color: 'text-gray-400',
+    hexColor: '#9ca3af'
+  },
   DEPENDS_ON: {
     type: 'DEPENDS_ON',
     label: 'Depends On',
@@ -713,14 +737,6 @@ export const RELATIONSHIP_TYPES: Record<RelationshipType, RelationshipOption> = 
     color: 'text-blue-400',
     hexColor: '#60a5fa'
   },
-  DEFAULT_EDGE: {
-    type: 'DEFAULT_EDGE',
-    label: 'Connected',
-    description: 'Simple connection between nodes',
-    icon: Paperclip,
-    color: 'text-gray-400',
-    hexColor: '#9ca3af'
-  }
 };
 
 // ============================
