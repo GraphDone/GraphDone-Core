@@ -10,6 +10,7 @@ import {
   getRelationshipIconForD3,
   getTypeConfig,
   getStatusConfig,
+  getStatusCompletionPercentage,
   WorkItemType,
   WorkItemStatus,
   AlertTriangle,
@@ -1201,17 +1202,8 @@ export function InteractiveGraphVisualization() {
       const nodeGroup = d3.select(this);
       const dimensions = getNodeDimensions(d);
       
-      // Calculate status percentage
-      const statusPercentage = (() => {
-        switch (d.status) {
-          case 'PROPOSED': return 20;
-          case 'PLANNED': return 40;
-          case 'BLOCKED': return 50;
-          case 'IN_PROGRESS': return 70;
-          case 'COMPLETED': return 100;
-          default: return 0;
-        }
-      })();
+      // Calculate status percentage using centralized function
+      const statusPercentage = getStatusCompletionPercentage(d.status as WorkItemStatus);
       
       // Get status color from centralized constants
       const statusColor = getStatusConfig(d.status as WorkItemStatus).hexColor;
