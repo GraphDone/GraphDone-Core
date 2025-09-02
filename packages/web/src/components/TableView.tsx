@@ -9,7 +9,9 @@ import {
   getTypeConfig,
   getStatusConfig,
   getTypeIconElement,
-  getStatusIconElement
+  getStatusIconElement,
+  getContributorColor,
+  getDueDateColorScheme
 } from '../constants/workItemConstants';
 import { TagDisplay } from './TagDisplay';
 import { AnimatedPriority } from './AnimatedPriority';
@@ -65,15 +67,7 @@ const getNodePriority = (node: WorkItem) => {
   return node.priorityExec || 0;
 };
 
-const getContributorColor = (name: string) => {
-  const colors = [
-    'bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-pink-500',
-    'bg-indigo-500', 'bg-yellow-500', 'bg-red-500', 'bg-teal-500',
-    'bg-orange-500', 'bg-cyan-500', 'bg-emerald-500', 'bg-violet-500'
-  ];
-  const hash = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  return colors[hash % colors.length];
-};
+// Using centralized contributor color function
 
 const getContributorAvatar = (contributor?: string) => {
   if (!contributor) return null;
@@ -200,26 +194,14 @@ const TableView: React.FC<TableViewProps> = ({ filteredNodes, handleEditNode, ha
                   <td className="pl-6 pr-6 py-10 dynamic-table-cell">
                     {node.dueDate ? (
                       <div className="space-y-1">
-                        <div className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
-                          new Date(node.dueDate) < new Date() 
-                            ? 'bg-red-50 border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400' 
-                            : new Date(node.dueDate).getTime() - new Date().getTime() < 7 * 24 * 60 * 60 * 1000 
-                              ? 'bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-400' 
-                              : 'bg-blue-100 text-blue-800 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800'
-                        }`}>
+                        <div className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${getDueDateColorScheme(node.dueDate).bg} ${getDueDateColorScheme(node.dueDate).border} ${getDueDateColorScheme(node.dueDate).text}`}>
                           {new Date(node.dueDate).toLocaleDateString('en-US', { 
                             month: 'short', 
                             day: 'numeric',
                             year: 'numeric'
                           })}
                         </div>
-                        <div className={`text-xs font-medium ${
-                          new Date(node.dueDate) < new Date() 
-                            ? 'text-red-600 dark:text-red-400' 
-                            : new Date(node.dueDate).getTime() - new Date().getTime() < 7 * 24 * 60 * 60 * 1000 
-                              ? 'text-amber-600 dark:text-amber-400' 
-                              : 'text-blue-600 dark:text-blue-400'
-                        }`}>
+                        <div className={`text-xs font-medium ${getDueDateColorScheme(node.dueDate).textSecondary}`}>
                           {(() => {
                             const today = new Date();
                             const due = new Date(node.dueDate);

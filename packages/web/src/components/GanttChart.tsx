@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { GitBranch, ZoomIn, ZoomOut, Calendar, ChevronLeft, ChevronRight, Filter, Download, MoreVertical, Link2, BarChart3, GanttChartSquare, Flag, ChevronDown, Target, Search } from 'lucide-react';
-import { getStatusConfig, WorkItemStatus, getTypeConfig, WorkItemType, getPriorityConfig, STATUS_OPTIONS, PRIORITY_OPTIONS, TYPE_OPTIONS } from '../constants/workItemConstants';
+import { getStatusConfig, WorkItemStatus, getTypeConfig, WorkItemType, getPriorityConfig, STATUS_OPTIONS, PRIORITY_OPTIONS, TYPE_OPTIONS, WORK_ITEM_PRIORITIES, WORK_ITEM_STATUSES, WORK_ITEM_TYPES } from '../constants/workItemConstants';
 
 interface WorkItem {
   id: string;
@@ -219,10 +219,10 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
   }, []);
   
   const getProgressColor = (progress: number) => {
-    if (progress >= 100) return 'bg-green-500';
-    if (progress >= 75) return 'bg-green-400';
-    if (progress >= 50) return 'bg-yellow-500';
-    if (progress >= 25) return 'bg-orange-500';
+    if (progress >= 100) return WORK_ITEM_STATUSES.COMPLETED.color.replace('text-', 'bg-');
+    if (progress >= 75) return WORK_ITEM_STATUSES.IN_REVIEW.color.replace('text-', 'bg-');
+    if (progress >= 50) return WORK_ITEM_STATUSES.IN_PROGRESS.color.replace('text-', 'bg-');
+    if (progress >= 25) return WORK_ITEM_STATUSES.PLANNED.color.replace('text-', 'bg-');
     return 'bg-gray-500';
   };
 
@@ -559,7 +559,7 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
                       <div 
                         key={item.id} 
                         className={`flex border-b border-gray-700 transition-all duration-200 h-15 ${
-                          isSelected ? 'bg-green-500/10 border-green-500/50' : 'hover:bg-gray-700/30'
+                          isSelected ? `${WORK_ITEM_STATUSES.COMPLETED.bgColor} ${WORK_ITEM_STATUSES.COMPLETED.borderColor}` : 'hover:bg-gray-700/30'
                         }`}
                         onClick={() => setSelectedTask(isSelected ? null : item.id)}
                         style={{ height: '60px' }}
@@ -635,7 +635,7 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
                             {/* Milestone Indicator */}
                             {item.type === 'MILESTONE' && (
                               <div 
-                                className="absolute w-3 h-3 bg-orange-500 rotate-45 border border-orange-400"
+                                className={`absolute w-3 h-3 ${WORK_ITEM_TYPES.MILESTONE.color.replace('text-', 'bg-')} rotate-45 border ${WORK_ITEM_TYPES.MILESTONE.borderColor}`}
                                 style={{
                                   left: `${barLeft + barWidth}%`,
                                   top: '9px',
@@ -647,7 +647,7 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
                             
                             {/* Overdue Indicator */}
                             {new Date() > item.endDate && item.status !== 'COMPLETED' && (
-                              <div className="absolute -top-1 right-0 w-2 h-2 bg-red-500 rounded-full animate-pulse" title="Overdue" />
+                              <div className={`absolute -top-1 right-0 w-2 h-2 ${WORK_ITEM_STATUSES.BLOCKED.color.replace('text-', 'bg-')} rounded-full animate-pulse`} title="Overdue" />
                             )}
                           </div>
                         </div>
@@ -693,19 +693,19 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
               <span className="text-gray-400">Not Started</span>
             </div>
             <div className="flex items-center space-x-1">
-              <div className="w-3 h-2 bg-yellow-500 rounded"></div>
+              <div className={`w-3 h-2 ${WORK_ITEM_STATUSES.IN_PROGRESS.color.replace('text-', 'bg-')} rounded`}></div>
               <span className="text-gray-400">In Progress</span>
             </div>
             <div className="flex items-center space-x-1">
-              <div className="w-3 h-2 bg-green-500 rounded"></div>
+              <div className={`w-3 h-2 ${WORK_ITEM_STATUSES.COMPLETED.color.replace('text-', 'bg-')} rounded`}></div>
               <span className="text-gray-400">Completed</span>
             </div>
             <div className="flex items-center space-x-1">
-              <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+              <div className={`w-2 h-2 ${WORK_ITEM_STATUSES.BLOCKED.color.replace('text-', 'bg-')} rounded-full`}></div>
               <span className="text-gray-400">Overdue</span>
             </div>
             <div className="flex items-center space-x-1">
-              <div className="w-2 h-2 bg-orange-500 rotate-45"></div>
+              <div className={`w-2 h-2 ${WORK_ITEM_TYPES.MILESTONE.color.replace('text-', 'bg-')} rotate-45`}></div>
               <span className="text-gray-400">Milestone</span>
             </div>
           </div>

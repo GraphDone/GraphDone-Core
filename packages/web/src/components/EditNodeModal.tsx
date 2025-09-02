@@ -140,15 +140,32 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
         priorityExec: formData.priorityExec,
         priorityIndiv: formData.priorityIndiv,
         priorityComm: formData.priorityComm,
-        assignedTo: formData.assignedTo || undefined,
         dueDate: formData.dueDate || undefined,
         tags: formData.tags || [],
-      };
-      
-      const updateInput = {
-        ...cleanFormData,
         priorityComp: (formData.priorityExec + formData.priorityIndiv + formData.priorityComm) / 3,
       };
+      
+      const updateInput: any = { ...cleanFormData };
+      
+      // Handle assignedTo relationship properly for Neo4j GraphQL
+      const currentAssignedToId = typeof node.assignedTo === 'string' ? node.assignedTo : node.assignedTo?.id;
+      const newAssignedToId = formData.assignedTo;
+      
+      if (newAssignedToId && newAssignedToId !== currentAssignedToId) {
+        // Connect to new user
+        updateInput.assignedTo = {
+          connect: {
+            where: { node: { id: newAssignedToId } }
+          }
+        };
+      } else if (!newAssignedToId && currentAssignedToId) {
+        // Disconnect current user
+        updateInput.assignedTo = {
+          disconnect: {
+            where: { node: { id: currentAssignedToId } }
+          }
+        };
+      }
 
       
       const result = await updateWorkItem({
