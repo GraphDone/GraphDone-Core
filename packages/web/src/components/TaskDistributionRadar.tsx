@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
-import { ClipboardList, Calendar, Clock, CheckCircle, AlertCircle, Eye, Pause, XCircle, Hexagon, WORK_ITEM_STATUSES } from '../constants/workItemConstants';
+import { WORK_ITEM_STATUSES, getStatusConfig, getStatusIconElement, type WorkItemStatus } from '../constants/workItemConstants';
 import { RadarChart } from './RadarChart';
 import { useGraph } from '../contexts/GraphContext';
 import { useQuery, gql } from '@apollo/client';
@@ -88,17 +88,17 @@ export function TaskDistributionRadar({ className = '', showLegend = true }: Tas
       }
     });
 
-    // Status colors matching the centralized configuration
+    // Status data using centralized configuration
     const statusData = [
-      { axis: 'Not Started', value: statusCounts.notStarted, color: '#9ca3af' },
-      { axis: 'Proposed', value: statusCounts.proposed, color: '#06b6d4' },
-      { axis: 'Planned', value: statusCounts.planned, color: '#a855f7' },
-      { axis: 'In Progress', value: statusCounts.inProgress, color: '#eab308' },
-      { axis: 'In Review', value: statusCounts.inReview, color: '#3b82f6' },
-      { axis: 'Blocked', value: statusCounts.blocked, color: '#ef4444' },
-      { axis: 'On Hold', value: statusCounts.onHold, color: '#fb923c' },
-      { axis: 'Completed', value: statusCounts.completed, color: '#22c55e' },
-      { axis: 'Cancelled', value: statusCounts.cancelled, color: '#ff1493' }
+      { axis: WORK_ITEM_STATUSES.NOT_STARTED.label, value: statusCounts.notStarted, color: WORK_ITEM_STATUSES.NOT_STARTED.hexColor },
+      { axis: WORK_ITEM_STATUSES.PROPOSED.label, value: statusCounts.proposed, color: WORK_ITEM_STATUSES.PROPOSED.hexColor },
+      { axis: WORK_ITEM_STATUSES.PLANNED.label, value: statusCounts.planned, color: WORK_ITEM_STATUSES.PLANNED.hexColor },
+      { axis: WORK_ITEM_STATUSES.IN_PROGRESS.label, value: statusCounts.inProgress, color: WORK_ITEM_STATUSES.IN_PROGRESS.hexColor },
+      { axis: WORK_ITEM_STATUSES.IN_REVIEW.label, value: statusCounts.inReview, color: WORK_ITEM_STATUSES.IN_REVIEW.hexColor },
+      { axis: WORK_ITEM_STATUSES.BLOCKED.label, value: statusCounts.blocked, color: WORK_ITEM_STATUSES.BLOCKED.hexColor },
+      { axis: WORK_ITEM_STATUSES.ON_HOLD.label, value: statusCounts.onHold, color: WORK_ITEM_STATUSES.ON_HOLD.hexColor },
+      { axis: WORK_ITEM_STATUSES.COMPLETED.label, value: statusCounts.completed, color: WORK_ITEM_STATUSES.COMPLETED.hexColor },
+      { axis: WORK_ITEM_STATUSES.CANCELLED.label, value: statusCounts.cancelled, color: WORK_ITEM_STATUSES.CANCELLED.hexColor }
     ].filter(item => item.value > 0); // Only show statuses with tasks
 
     const maxValue = Math.max(...statusData.map(item => item.value), 1);
@@ -202,18 +202,12 @@ export function TaskDistributionRadar({ className = '', showLegend = true }: Tas
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-3">
               {radarData.map((item, index) => {
                 const getIcon = (axis: string) => {
-                  switch(axis) {
-                    case 'Not Started': return <Hexagon className="h-5 w-5" style={{ color: item.color || '#9ca3af' }} />;
-                    case 'Proposed': return <ClipboardList className="h-5 w-5" style={{ color: item.color || '#06b6d4' }} />;
-                    case 'Planned': return <Calendar className="h-5 w-5" style={{ color: item.color || '#a855f7' }} />;
-                    case 'In Progress': return <Clock className="h-5 w-5" style={{ color: item.color || '#eab308' }} />;
-                    case 'In Review': return <Eye className="h-5 w-5" style={{ color: item.color || '#3b82f6' }} />;
-                    case 'Blocked': return <AlertCircle className="h-5 w-5" style={{ color: item.color || '#ef4444' }} />;
-                    case 'On Hold': return <Pause className="h-5 w-5" style={{ color: item.color || '#fb923c' }} />;
-                    case 'Completed': return <CheckCircle className="h-5 w-5" style={{ color: item.color || '#22c55e' }} />;
-                    case 'Cancelled': return <XCircle className="h-5 w-5" style={{ color: item.color || '#ff1493' }} />;
-                    default: return <div className="w-4 h-4 rounded-full" style={{ backgroundColor: item.color || '#4ade80' }}></div>;
+                  // Find status by label
+                  const statusEntry = Object.entries(WORK_ITEM_STATUSES).find(([, config]) => config.label === axis);
+                  if (statusEntry) {
+                    return getStatusIconElement(statusEntry[0] as WorkItemStatus, "h-5 w-5");
                   }
+                  return <div className="w-4 h-4 rounded-full" style={{ backgroundColor: item.color }}></div>;
                 };
                 
                 return (

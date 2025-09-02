@@ -9,7 +9,9 @@ import {
   getTypeConfig,
   getStatusConfig,
   getTypeIconElement,
-  getStatusIconElement
+  getStatusIconElement,
+  getContributorColor,
+  getDueDateColorScheme
 } from '../constants/workItemConstants';
 import { TagDisplay } from './TagDisplay';
 import { AnimatedPriority } from './AnimatedPriority';
@@ -60,15 +62,6 @@ const getNodePriority = (node: WorkItem) => {
   return node.priorityExec || 0;
 };
 
-const getContributorColor = (name: string) => {
-  const colors = [
-    'bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-pink-500',
-    'bg-indigo-500', 'bg-yellow-500', 'bg-red-500', 'bg-teal-500',
-    'bg-orange-500', 'bg-cyan-500', 'bg-emerald-500', 'bg-violet-500'
-  ];
-  const hash = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  return colors[hash % colors.length];
-};
 
 const getContributorAvatar = (contributor?: string) => {
   if (!contributor) return null;
@@ -176,26 +169,14 @@ const CardView: React.FC<CardViewProps> = ({ filteredNodes, handleEditNode, hand
               <div className="flex flex-col items-start justify-center mr-2">
                 {node.dueDate ? (
                   <div className="space-y-1 text-left">
-                    <div className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-md shadow-sm ${
-                      new Date(node.dueDate) < new Date() 
-                        ? 'bg-red-100 text-red-800 border border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800' 
-                        : new Date(node.dueDate).getTime() - new Date().getTime() < 7 * 24 * 60 * 60 * 1000 
-                          ? 'bg-amber-100 text-amber-800 border border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800' 
-                          : 'bg-blue-100 text-blue-800 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800'
-                    }`}>
+                    <div className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-md shadow-sm ${getDueDateColorScheme(node.dueDate).bg} ${getDueDateColorScheme(node.dueDate).border} ${getDueDateColorScheme(node.dueDate).text}`}>
                       {new Date(node.dueDate).toLocaleDateString('en-US', { 
                         month: 'short', 
                         day: 'numeric',
                         year: 'numeric'
                       })}
                     </div>
-                    <div className={`text-xs font-medium ${
-                      new Date(node.dueDate) < new Date() 
-                        ? 'text-red-600 dark:text-red-400' 
-                        : new Date(node.dueDate).getTime() - new Date().getTime() < 7 * 24 * 60 * 60 * 1000 
-                          ? 'text-amber-600 dark:text-amber-400' 
-                          : 'text-blue-600 dark:text-blue-400'
-                    }`}>
+                    <div className={`text-xs font-medium ${getDueDateColorScheme(node.dueDate).textSecondary}`}>
                       {(() => {
                         const today = new Date();
                         const due = new Date(node.dueDate);
@@ -218,10 +199,10 @@ const CardView: React.FC<CardViewProps> = ({ filteredNodes, handleEditNode, hand
                   </div>
                 ) : (
                   <div className="space-y-1 text-left">
-                    <div className="inline-flex items-center px-2 py-1 bg-gray-100 border border-gray-200 text-gray-600 text-xs font-medium rounded-md dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400">
+                    <div className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-md ${getDueDateColorScheme().bg} ${getDueDateColorScheme().border} ${getDueDateColorScheme().text}`}>
                       No due date
                     </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                    <div className={`text-xs ${getDueDateColorScheme().textSecondary}`}>
                       Schedule recommended
                     </div>
                   </div>

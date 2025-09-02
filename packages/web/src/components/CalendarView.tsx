@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Calendar, Clock, CheckCircle, Filter, Eye, Plus, MoreHorizontal, User, Flag, Target, CalendarDays, ChevronDown, Search } from 'lucide-react';
-import { getStatusConfig, WorkItemStatus, getTypeConfig, WorkItemType, getPriorityConfig, STATUS_OPTIONS, PRIORITY_OPTIONS, TYPE_OPTIONS } from '../constants/workItemConstants';
+import { getStatusConfig, WorkItemStatus, getTypeConfig, WorkItemType, getPriorityConfig, STATUS_OPTIONS, PRIORITY_OPTIONS, TYPE_OPTIONS, WORK_ITEM_PRIORITIES, WORK_ITEM_STATUSES } from '../constants/workItemConstants';
 
 interface WorkItem {
   id: string;
@@ -459,7 +459,7 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
                       min-h-[120px] p-3 border-2 rounded-lg transition-all duration-200 cursor-pointer
                       ${isCurrentMonthDay ? 'bg-gray-700' : 'bg-gray-800/50'}
                       ${isTodayDay ? 'ring-2 ring-green-500' : ''}
-                      ${isSelected ? 'ring-2 ring-blue-500 bg-blue-500/10' : ''}
+                      ${isSelected ? `ring-2 ring-blue-400 ${WORK_ITEM_PRIORITIES.moderate.bgColor}` : ''}
                       ${taskCount > 0 ? priorityColor : 'border-gray-600'}
                       hover:bg-gray-600 hover:border-gray-500
                     `}
@@ -474,10 +474,10 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
                       {taskCount > 0 && (
                         <div className="flex items-center space-x-1">
                           <div className={`w-2 h-2 rounded-full ${
-                            highestPriority >= 0.8 ? 'bg-red-500' :
-                            highestPriority >= 0.6 ? 'bg-orange-500' :
-                            highestPriority >= 0.4 ? 'bg-yellow-500' :
-                            highestPriority >= 0.2 ? 'bg-blue-500' : 'bg-gray-500'
+                            highestPriority >= 0.8 ? WORK_ITEM_PRIORITIES.critical.color.replace('text-', 'bg-') :
+                            highestPriority >= 0.6 ? WORK_ITEM_PRIORITIES.high.color.replace('text-', 'bg-') :
+                            highestPriority >= 0.4 ? WORK_ITEM_PRIORITIES.moderate.color.replace('text-', 'bg-') :
+                            highestPriority >= 0.2 ? WORK_ITEM_PRIORITIES.low.color.replace('text-', 'bg-') : 'bg-gray-500'
                           }`} title={`Highest priority: ${Math.round(highestPriority * 100)}%`} />
                           <span className="text-xs text-gray-400">{taskCount}</span>
                         </div>
@@ -500,7 +500,7 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
                             }}
                             className={`text-xs px-2 py-1 rounded-md truncate transition-all cursor-pointer border ${
                               selectedTask === node.id 
-                                ? 'border-green-500 bg-green-500/20' 
+                                ? `${WORK_ITEM_STATUSES.COMPLETED.borderColor} ${WORK_ITEM_STATUSES.COMPLETED.bgColor}` 
                                 : `${statusConfig.bgColor} ${statusConfig.color} border-transparent hover:border-gray-400`
                             }`}
                             title={`${node.title}\nType: ${node.type}\nStatus: ${node.status.replace('_', ' ')}\nPriority: ${Math.round(priority * 100)}%\nDue: ${node.dueDate ? new Date(node.dueDate).toLocaleDateString() : 'No due date'}`}
