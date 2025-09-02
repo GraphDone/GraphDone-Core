@@ -1041,34 +1041,17 @@ export function InteractiveGraphVisualization() {
           return '#9ca3af'; // Gray for completed nodes
         }
         
-        const colors: Record<string, string> = {
-          EPIC: '#c084fc',      // fuchsia-400 - exact match with icon
-          MILESTONE: '#fb923c', // orange-400 - exact match with icon  
-          OUTCOME: '#818cf8',   // indigo-400 - exact match with icon
-          FEATURE: '#38bdf8',   // sky-400 - exact match with icon
-          TASK: '#4ade80',      // green-400 - exact match with icon
-          BUG: '#ef4444',       // red-500 - exact match with icon
-          IDEA: '#eab308',      // yellow-500 - exact match with icon
-          RESEARCH: '#2dd4bf'   // teal-400 - exact match with icon
-        };
-        return colors[d.type] || '#6B7280';
+        // Use centralized color system
+        return getTypeConfig(d.type as WorkItemType).hexColor;
       })
       .attr('stroke', (d: WorkItem) => {
         if (d.status === 'COMPLETED' || d.status === 'Completed' || d.status === 'Done' || d.status === 'DONE') {
           return '#6b7280';
         }
         
-        const borderColors: Record<string, string> = {
-          EPIC: '#a855f7',      // fuchsia-500 - slightly darker than bg
-          MILESTONE: '#f97316', // orange-500 - slightly darker than bg
-          OUTCOME: '#6366f1',   // indigo-500 - slightly darker than bg
-          FEATURE: '#0ea5e9',   // sky-500 - slightly darker than bg
-          TASK: '#22c55e',      // green-500 - slightly darker than bg
-          BUG: '#dc2626',       // red-600 - slightly darker than bg
-          IDEA: '#d97706',      // yellow-600 - darker border
-          RESEARCH: '#14b8a6'   // teal-500 - slightly darker than bg
-        };
-        return borderColors[d.type] || '#4B5563';
+        // Use centralized color system - slightly darker for border
+        const typeConfig = getTypeConfig(d.type as WorkItemType);
+        return typeConfig.hexColor;
       })
       .attr('stroke-width', 1.5);
 
