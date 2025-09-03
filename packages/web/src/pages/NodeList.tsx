@@ -1,4 +1,4 @@
-/* eslint-disable */
+ 
 /*
 DEPRECATED: This component is not currently used in the application
 TODO: Update to use centralized workItemConstants when/if this component is reactivated

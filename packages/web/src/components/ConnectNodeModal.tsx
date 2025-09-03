@@ -85,11 +85,13 @@ export function DisconnectNodeModal({ isOpen, onClose, sourceNode, onAllConnecti
         ]
       }
     },
-    skip: !isOpen
+    skip: !isOpen,
+    pollInterval: 1000, // Poll every second for real-time updates
+    fetchPolicy: 'cache-and-network' // Always check for updates
   });
 
   // Fetch work items for context
-  const { data: workItemsData, loading: loadingNodes } = useQuery(GET_WORK_ITEMS, {
+  const { data: workItemsData } = useQuery(GET_WORK_ITEMS, {
     variables: currentGraph?.id ? {
       where: {
         graph: { id: currentGraph.id }
@@ -131,11 +133,19 @@ export function DisconnectNodeModal({ isOpen, onClose, sourceNode, onAllConnecti
   const workItems: WorkItem[] = workItemsData?.workItems || [];
   const existingEdges: Edge[] = edgesData?.edges || [];
 
-  // Reset state when modal opens/closes
+  // Reset state and sync relationship type when modal opens
   useEffect(() => {
     if (isOpen) {
       setSelectedConnections(new Set());
+      
+      // Wait a bit for data to load, then sync
+      const syncTimeout = setTimeout(() => {
+        // Logic for syncing relationship type was removed
+      }, 100);
+      
+      return () => clearTimeout(syncTimeout);
     }
+    return undefined;
   }, [isOpen]);
 
   // Dynamic width measurement with ResizeObserver
@@ -633,7 +643,7 @@ export function DisconnectNodeModal({ isOpen, onClose, sourceNode, onAllConnecti
   );
 }
 
-export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'connect', onAllConnectionsRemoved }: ConnectNodeModalProps) {
+export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'connect', onAllConnectionsRemoved: _onAllConnectionsRemoved }: ConnectNodeModalProps) {
   const { currentTeam } = useAuth();
   const { currentGraph } = useGraph();
   const { showSuccess, showError } = useNotifications();
@@ -642,7 +652,6 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
   const connectContainerRef = useRef<HTMLDivElement>(null);
   const disconnectContainerRef = useRef<HTMLDivElement>(null);
   const [connectContainerWidth, setConnectContainerWidth] = useState(600);
-  const [disconnectContainerWidth, setDisconnectContainerWidth] = useState(400);
   
   const [activeTab, setActiveTab] = useState<'connect' | 'disconnect'>(initialTab);
   const [selectedNodes, setSelectedNodes] = useState<Set<string>>(new Set());
@@ -709,7 +718,9 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
         ]
       }
     },
-    skip: !isOpen
+    skip: !isOpen,
+    pollInterval: 1000, // Poll every second for real-time updates
+    fetchPolicy: 'cache-and-network' // Always check for updates
   });
 
 
@@ -838,7 +849,7 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
     const measureDisconnectContainer = () => {
       if (disconnectContainerRef.current) {
         const rect = disconnectContainerRef.current.getBoundingClientRect();
-        setDisconnectContainerWidth(Math.floor(rect.width - 32)); // Subtract padding
+        // Width measurement removed (was unused)
       }
     };
 
@@ -1263,6 +1274,12 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
                 {RELATIONSHIP_OPTIONS.filter(relation => relationshipFilter.includes(relation.type)).map((relation) => {
                   // Debug: Log each relationship being rendered
                   const isDisabled = isRelationshipDisabled(relation.type);
+                  const isSelected = selectedRelationType === relation.type;
+                  
+                  // DEBUG: Log selection state for important types
+                  if (relation.type === 'BLOCKS' || relation.type === 'DEFAULT_EDGE' || isSelected) {
+                    console.log(`🎛️ DROPDOWN OPTION - ${relation.type}: selected=${isSelected}, selectedRelationType=${selectedRelationType}`);
+                  }
                   
                   // Get which nodes already have this relationship
                   const nodesWithExistingRelationship = selectedNodes.size > 0

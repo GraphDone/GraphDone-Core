@@ -57,7 +57,7 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   // Generate and sort timeline data
   const timelineData = useMemo(() => {
-    let data = filteredNodes
+    const data = filteredNodes
       .filter(node => {
         // Search filter
         if (searchQuery.trim()) {
