@@ -247,6 +247,7 @@ export function InteractiveGraphVisualization() {
     if (!svgRef.current) return;
     
     const svg = d3.select(svgRef.current);
+    const defs = svg.select('defs');
     
     // Remove glow and reset properties from all elements first
     svg.selectAll('.node-bg').style('filter', null);
@@ -254,26 +255,157 @@ export function InteractiveGraphVisualization() {
       .style('filter', null)
       .attr('stroke-width', (d: any) => (d.strength || 0.8) * 3); // Reset to normal thickness
     
-    // Apply glow to active node if nodeMenu is visible
+    // Apply type-specific glow to active node if nodeMenu is visible
     if (nodeMenu.visible && nodeMenu.node) {
+      const nodeTypeConfig = getTypeConfig(nodeMenu.node.type as WorkItemType);
+      const nodeColor = nodeTypeConfig.hexColor;
+      const filterId = `node-glow-${nodeMenu.node.type.toLowerCase()}`;
+      
+      // Remove existing filter and create new one with node's type color
+      defs.select(`#${filterId}`).remove();
+      
+      const nodeGlowFilter = defs.append('filter')
+        .attr('id', filterId)
+        .attr('x', '-100%')
+        .attr('y', '-100%')
+        .attr('width', '300%')
+        .attr('height', '300%');
+      
+      // Convert hex to RGB values for feColorMatrix
+      const hexToRgb = (hex: string) => {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? {
+          r: parseInt(result[1], 16) / 255,
+          g: parseInt(result[2], 16) / 255,
+          b: parseInt(result[3], 16) / 255
+        } : { r: 0.06, g: 0.73, b: 0.51 }; // fallback green
+      };
+      
+      const rgb = hexToRgb(nodeColor);
+      nodeGlowFilter.append('feColorMatrix')
+        .attr('in', 'SourceGraphic')
+        .attr('type', 'matrix')
+        .attr('values', `0 0 0 0 ${rgb.r} 0 0 0 0 ${rgb.g} 0 0 0 0 ${rgb.b} 0 0 0 1 0`);
+      
+      const blur = nodeGlowFilter.append('feGaussianBlur')
+        .attr('stdDeviation', '15')
+        .attr('result', 'coloredBlur');
+      
+      blur.append('animate')
+        .attr('attributeName', 'stdDeviation')
+        .attr('values', '10;20;10')
+        .attr('dur', '2s')
+        .attr('repeatCount', 'indefinite');
+      
+      const feMerge = nodeGlowFilter.append('feMerge');
+      feMerge.append('feMergeNode').attr('in', 'coloredBlur');
+      feMerge.append('feMergeNode').attr('in', 'SourceGraphic');
+      
+      // Apply the type-specific glow filter
       svg.selectAll('.node-bg')
         .filter((d: any) => d && d.id === nodeMenu.node?.id)
-        .style('filter', 'url(#dialog-glow)');
+        .style('filter', `url(#${filterId})`);
     }
     
-    // Apply stronger glow to active edge if editingEdge OR showEdgeDetails is visible
+    // Apply relationship-specific glow to active edge if editingEdge is visible
     if (editingEdge && editingEdge.edge) {
+      const relationshipConfig = getRelationshipConfig(editingEdge.edge.type as RelationshipType);
+      const edgeColor = relationshipConfig.hexColor;
+      const edgeFilterId = `edge-glow-${editingEdge.edge.type.toLowerCase()}`;
+      
+      // Remove existing filter and create new one with relationship color
+      defs.select(`#${edgeFilterId}`).remove();
+      
+      const edgeGlowFilter = defs.append('filter')
+        .attr('id', edgeFilterId)
+        .attr('x', '-150%')
+        .attr('y', '-150%')
+        .attr('width', '400%')
+        .attr('height', '400%');
+      
+      const hexToRgb = (hex: string) => {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? {
+          r: parseInt(result[1], 16) / 255,
+          g: parseInt(result[2], 16) / 255,
+          b: parseInt(result[3], 16) / 255
+        } : { r: 0.06, g: 0.73, b: 0.51 }; // fallback green
+      };
+      
+      const rgb = hexToRgb(edgeColor);
+      edgeGlowFilter.append('feColorMatrix')
+        .attr('in', 'SourceGraphic')
+        .attr('type', 'matrix')
+        .attr('values', `0 0 0 0 ${rgb.r} 0 0 0 0 ${rgb.g} 0 0 0 0 ${rgb.b} 0 0 0 1 0`);
+      
+      const edgeBlur = edgeGlowFilter.append('feGaussianBlur')
+        .attr('stdDeviation', '25')
+        .attr('result', 'coloredBlur');
+      
+      edgeBlur.append('animate')
+        .attr('attributeName', 'stdDeviation')
+        .attr('values', '15;35;15')
+        .attr('dur', '1.5s')
+        .attr('repeatCount', 'indefinite');
+      
+      const edgeFeMerge = edgeGlowFilter.append('feMerge');
+      edgeFeMerge.append('feMergeNode').attr('in', 'coloredBlur');
+      edgeFeMerge.append('feMergeNode').attr('in', 'SourceGraphic');
+      
       svg.selectAll('.edge')
         .filter((d: any) => d && d.id === editingEdge.edge?.id)
-        .style('filter', 'url(#edge-dialog-glow)')
+        .style('filter', `url(#${edgeFilterId})`)
         .attr('stroke-width', 12); // Also make the edge thicker
     }
     
-    // Also apply glow to edge when showing edge details
+    // Also apply relationship-specific glow to edge when showing edge details
     if (showEdgeDetails && selectedEdge) {
+      const relationshipConfig = getRelationshipConfig(selectedEdge.type as RelationshipType);
+      const edgeColor = relationshipConfig.hexColor;
+      const edgeFilterId = `edge-glow-${selectedEdge.type.toLowerCase()}`;
+      
+      // Remove existing filter and create new one with relationship color
+      defs.select(`#${edgeFilterId}`).remove();
+      
+      const edgeGlowFilter = defs.append('filter')
+        .attr('id', edgeFilterId)
+        .attr('x', '-150%')
+        .attr('y', '-150%')
+        .attr('width', '400%')
+        .attr('height', '400%');
+      
+      const hexToRgb = (hex: string) => {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? {
+          r: parseInt(result[1], 16) / 255,
+          g: parseInt(result[2], 16) / 255,
+          b: parseInt(result[3], 16) / 255
+        } : { r: 0.06, g: 0.73, b: 0.51 }; // fallback green
+      };
+      
+      const rgb = hexToRgb(edgeColor);
+      edgeGlowFilter.append('feColorMatrix')
+        .attr('in', 'SourceGraphic')
+        .attr('type', 'matrix')
+        .attr('values', `0 0 0 0 ${rgb.r} 0 0 0 0 ${rgb.g} 0 0 0 0 ${rgb.b} 0 0 0 1 0`);
+      
+      const edgeBlur = edgeGlowFilter.append('feGaussianBlur')
+        .attr('stdDeviation', '25')
+        .attr('result', 'coloredBlur');
+      
+      edgeBlur.append('animate')
+        .attr('attributeName', 'stdDeviation')
+        .attr('values', '15;35;15')
+        .attr('dur', '1.5s')
+        .attr('repeatCount', 'indefinite');
+      
+      const edgeFeMerge = edgeGlowFilter.append('feMerge');
+      edgeFeMerge.append('feMergeNode').attr('in', 'coloredBlur');
+      edgeFeMerge.append('feMergeNode').attr('in', 'SourceGraphic');
+      
       svg.selectAll('.edge')
         .filter((d: any) => d && d.id === selectedEdge.id)
-        .style('filter', 'url(#edge-dialog-glow)')
+        .style('filter', `url(#${edgeFilterId})`)
         .attr('stroke-width', 12); // Same thickness as relationship editing
     }
   }, [nodeMenu.visible, nodeMenu.node?.id, editingEdge?.edge?.id, showEdgeDetails, selectedEdge?.id]);
@@ -1079,10 +1211,7 @@ export function InteractiveGraphVisualization() {
         return classes;
       })
       .attr('stroke', (d: WorkItemEdge) => {
-        // Force bright green for active dialog
-        if (editingEdge && editingEdge.edge && editingEdge.edge.id === d.id) {
-          return '#10b981'; // Bright green
-        }
+        // Use relationship color for active dialog (same as normal)
         const config = getRelationshipConfig(d.type as RelationshipType);
         return config.hexColor;
       })
@@ -1163,65 +1292,6 @@ export function InteractiveGraphVisualization() {
     // Add arrowhead markers for middle of edges
     const defs = svg.append('defs');
     
-    // Create pulsing glow filter for active dialogs (nodes)
-    const glowFilter = defs.append('filter')
-      .attr('id', 'dialog-glow')
-      .attr('x', '-100%')
-      .attr('y', '-100%')
-      .attr('width', '300%')
-      .attr('height', '300%');
-    
-    // Create a bright green glow that pulses
-    glowFilter.append('feColorMatrix')
-      .attr('in', 'SourceGraphic')
-      .attr('type', 'matrix')
-      .attr('values', '0 0 0 0 0.06 0 0 0 0 0.73 0 0 0 0 0.51 0 0 0 1 0'); // bright green
-    
-    const blur = glowFilter.append('feGaussianBlur')
-      .attr('stdDeviation', '15')
-      .attr('result', 'coloredBlur');
-    
-    // Add animation to the blur intensity for pulsing effect
-    blur.append('animate')
-      .attr('attributeName', 'stdDeviation')
-      .attr('values', '10;20;10')
-      .attr('dur', '2s')
-      .attr('repeatCount', 'indefinite');
-    
-    // Merge blur with original
-    const feMerge = glowFilter.append('feMerge');
-    feMerge.append('feMergeNode').attr('in', 'coloredBlur');
-    feMerge.append('feMergeNode').attr('in', 'SourceGraphic');
-
-    // Create stronger glow filter specifically for edges
-    const edgeGlowFilter = defs.append('filter')
-      .attr('id', 'edge-dialog-glow')
-      .attr('x', '-150%')
-      .attr('y', '-150%')
-      .attr('width', '400%')
-      .attr('height', '400%');
-    
-    // Much stronger glow for edges
-    edgeGlowFilter.append('feColorMatrix')
-      .attr('in', 'SourceGraphic')
-      .attr('type', 'matrix')
-      .attr('values', '0 0 0 0 0.06 0 0 0 0 0.73 0 0 0 0 0.51 0 0 0 1 0'); // bright green
-    
-    const edgeBlur = edgeGlowFilter.append('feGaussianBlur')
-      .attr('stdDeviation', '25')
-      .attr('result', 'coloredBlur');
-    
-    // Stronger pulsing animation for edges
-    edgeBlur.append('animate')
-      .attr('attributeName', 'stdDeviation')
-      .attr('values', '15;35;15')
-      .attr('dur', '1.5s')
-      .attr('repeatCount', 'indefinite');
-    
-    // Merge blur with original for edges
-    const edgeFeMerge = edgeGlowFilter.append('feMerge');
-    edgeFeMerge.append('feMergeNode').attr('in', 'coloredBlur');
-    edgeFeMerge.append('feMergeNode').attr('in', 'SourceGraphic');
     
     // Create different arrowhead colors for each edge type
     RELATIONSHIP_OPTIONS.forEach((option) => {
@@ -1437,13 +1507,15 @@ export function InteractiveGraphVisualization() {
         return '#1f2937'; // Dark background consistent with theme
       })
       .attr('stroke', (d: WorkItem) => {
-        // Force bright green with glow for active dialog
+        // Use node type color for active dialog
         if (nodeMenu.visible && nodeMenu.node && nodeMenu.node.id === d.id) {
-          return '#10b981'; // Bright green
+          const typeConfig = getTypeConfig(d.type as WorkItemType);
+          return typeConfig.hexColor;
         }
-        // Highlight selected node with bright border
+        // Highlight selected node with type color border
         if (selectedNode && selectedNode.id === d.id) {
-          return '#10b981'; // Bright green for selected node
+          const typeConfig = getTypeConfig(d.type as WorkItemType);
+          return typeConfig.hexColor;
         }
         if (d.status === 'COMPLETED' || d.status === 'Completed' || d.status === 'Done' || d.status === 'DONE') {
           return '#4b5563';
@@ -1855,22 +1927,12 @@ export function InteractiveGraphVisualization() {
       .attr('class', 'arrow')
       .attr('d', 'M-16,-8 L0,0 L-16,8 L-8,0 Z')
       .attr('fill', (d: WorkItemEdge) => {
-        // Use the source node's color for the arrow
-        const sourceNode = nodes.find(n => n.id === (typeof d.source === 'string' ? d.source : (d.source as any)?.id));
-        if (sourceNode) {
-          return getNodeColor(sourceNode);
-        }
-        // Fallback to edge type color if node not found
+        // Use the relationship color for consistency with edge stroke
         const config = getRelationshipConfig(d.type as RelationshipType);
         return config.hexColor;
       })
       .attr('stroke', (d: WorkItemEdge) => {
-        // Use the source node's color for the arrow stroke
-        const sourceNode = nodes.find(n => n.id === (typeof d.source === 'string' ? d.source : (d.source as any)?.id));
-        if (sourceNode) {
-          return getNodeColor(sourceNode);
-        }
-        // Fallback to edge type color if node not found
+        // Always use relationship color for consistency
         const config = getRelationshipConfig(d.type as RelationshipType);
         return config.hexColor;
       })
