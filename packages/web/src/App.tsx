@@ -9,7 +9,7 @@ import { Admin } from './pages/Admin';
 import { Backend } from './pages/Backend';
 import { LoginForm } from './pages/LoginForm';
 import { Signup } from './pages/Signup';
-import { GraphVisualization } from './components/GraphVisualization';
+import { InteractiveGraphVisualization } from './components/InteractiveGraphVisualization';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { GraphProvider } from './contexts/GraphContext';
 import { NotificationProvider } from './contexts/NotificationContext';
@@ -58,18 +58,22 @@ function AuthenticatedApp() {
   return (
     <NotificationProvider>
       <GraphProvider>
-        <Layout>
-          <Routes>
-            <Route path="/" element={<Workspace />} />
-            <Route path="/graph" element={<div className="h-screen"><GraphVisualization /></div>} />
-            <Route path="/ontology" element={<Ontology />} />
-            <Route path="/agents" element={<Agents />} />
-            <Route path="/analytics" element={<Analytics />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/admin" element={<Admin />} />
-            <Route path="/backend" element={<Backend />} />
-          </Routes>
-        </Layout>
+        <Routes>
+          <Route path="/graph" element={<div className="h-screen overflow-hidden"><InteractiveGraphVisualization /></div>} />
+          <Route path="/*" element={
+            <Layout>
+              <Routes>
+                <Route path="/" element={<Workspace />} />
+                <Route path="/ontology" element={<Ontology />} />
+                <Route path="/agents" element={<Agents />} />
+                <Route path="/analytics" element={<Analytics />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="/admin" element={<Admin />} />
+                <Route path="/backend" element={<Backend />} />
+              </Routes>
+            </Layout>
+          } />
+        </Routes>
       </GraphProvider>
     </NotificationProvider>
   );
