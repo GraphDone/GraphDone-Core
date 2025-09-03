@@ -11,10 +11,7 @@ import { WorkItem } from '../types/graph';
 import {
   STATUS_OPTIONS,
   PRIORITY_OPTIONS,
-  getPriorityIcon as getCentralizedPriorityIcon,
-  getPriorityConfig,
-  getPriorityIconElement,
-  WORK_ITEM_PRIORITIES
+  getPriorityIcon as getCentralizedPriorityIcon
 } from '../constants/workItemConstants';
 
 interface EditNodeModalProps {
@@ -423,9 +420,9 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                       <div className="flex items-center justify-center space-x-1 mb-1">
                         {(() => {
                           const CriticalIcon = getCentralizedPriorityIcon(0.9);
-                          return getPriorityIconElement(0.9, "w-6 h-6");
+                          return CriticalIcon ? <CriticalIcon className="w-6 h-6 text-red-500" /> : null;
                         })()}
-                        <div className={`${getPriorityConfig(0.9).color} font-bold text-sm`}>Critical</div>
+                        <div className="text-red-500 font-bold text-sm">Critical</div>
                       </div>
                       <div className="text-xs font-mono text-gray-400">80% - 100%</div>
                     </button>
@@ -445,9 +442,9 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                       <div className="flex items-center justify-center space-x-1 mb-1">
                         {(() => {
                           const HighIcon = getCentralizedPriorityIcon(0.7);
-                          return getPriorityIconElement(0.7, "w-6 h-6");
+                          return HighIcon ? <HighIcon className="w-6 h-6 text-orange-500" /> : null;
                         })()}
-                        <div className={`${getPriorityConfig(0.7).color} font-bold text-sm`}>High</div>
+                        <div className="text-orange-400 font-bold text-sm">High</div>
                       </div>
                       <div className="text-xs font-mono text-gray-400">60% - 79%</div>
                     </button>
@@ -467,9 +464,9 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                       <div className="flex items-center justify-center space-x-1 mb-1">
                         {(() => {
                           const ModerateIcon = getCentralizedPriorityIcon(0.5);
-                          return getPriorityIconElement(0.5, "w-6 h-6");
+                          return ModerateIcon ? <ModerateIcon className="w-6 h-6 text-yellow-500" /> : null;
                         })()}
-                        <div className={`${getPriorityConfig(0.5).color} font-bold text-sm`}>Moderate</div>
+                        <div className="text-yellow-400 font-bold text-sm">Moderate</div>
                       </div>
                       <div className="text-xs font-mono text-gray-400">40% - 59%</div>
                     </button>
@@ -491,9 +488,9 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                       <div className="flex items-center justify-center space-x-1 mb-1">
                         {(() => {
                           const LowIcon = getCentralizedPriorityIcon(0.3);
-                          return getPriorityIconElement(0.3, "w-6 h-6");
+                          return LowIcon ? <LowIcon className="w-6 h-6 text-blue-500" /> : null;
                         })()}
-                        <div className={`${getPriorityConfig(0.3).color} font-bold text-sm`}>Low</div>
+                        <div className="text-blue-400 font-bold text-sm">Low</div>
                       </div>
                       <div className="text-xs font-mono text-gray-400">20% - 39%</div>
                     </button>
@@ -545,7 +542,13 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                     'accent-gray-500'
                   }`}
                 />
-                <div className={`text-sm text-center font-medium ${getPriorityConfig(formData.priorityExec).color}`}>
+                <div className={`text-sm text-center font-medium ${
+                  formData.priorityExec >= 0.8 ? 'text-red-500' :
+                  formData.priorityExec >= 0.6 ? 'text-orange-500' :
+                  formData.priorityExec >= 0.4 ? 'text-yellow-500' :
+                  formData.priorityExec >= 0.2 ? 'text-blue-500' :
+                  'text-gray-500'
+                }`}>
                   {(() => {
                     const PriorityIcon = getCentralizedPriorityIcon(formData.priorityExec);
                     const priorityConfig = PRIORITY_OPTIONS.find(p => p.value !== 'all' && 
@@ -582,7 +585,13 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                     'accent-gray-500'
                   }`}
                 />
-                <div className={`text-sm text-center font-medium ${getPriorityConfig(formData.priorityIndiv).color}`}>
+                <div className={`text-sm text-center font-medium ${
+                  formData.priorityIndiv >= 0.8 ? 'text-red-500' :
+                  formData.priorityIndiv >= 0.6 ? 'text-orange-500' :
+                  formData.priorityIndiv >= 0.4 ? 'text-yellow-500' :
+                  formData.priorityIndiv >= 0.2 ? 'text-blue-500' :
+                  'text-gray-500'
+                }`}>
                   {(() => {
                     const PriorityIcon = getCentralizedPriorityIcon(formData.priorityIndiv);
                     const priorityConfig = PRIORITY_OPTIONS.find(p => p.value !== 'all' && 
@@ -619,7 +628,13 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                     'accent-gray-500'
                   }`}
                 />
-                <div className={`text-sm text-center font-medium ${getPriorityConfig(formData.priorityComm).color}`}>
+                <div className={`text-sm text-center font-medium ${
+                  formData.priorityComm >= 0.8 ? 'text-red-500' :
+                  formData.priorityComm >= 0.6 ? 'text-orange-500' :
+                  formData.priorityComm >= 0.4 ? 'text-yellow-500' :
+                  formData.priorityComm >= 0.2 ? 'text-blue-500' :
+                  'text-gray-500'
+                }`}>
                   {(() => {
                     const PriorityIcon = getCentralizedPriorityIcon(formData.priorityComm);
                     const priorityConfig = PRIORITY_OPTIONS.find(p => p.value !== 'all' && 
