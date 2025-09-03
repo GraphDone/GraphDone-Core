@@ -1042,8 +1042,18 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
   // Check if any relationship type is disabled (any relationship already exists with selected nodes)
   const isRelationshipDisabled = (relationshipType: string) => {
     if (selectedNodes.size === 0) return false;
-    // With one-relationship-at-a-time policy, disable if ANY relationship exists
-    return false; // Simplified for now
+    
+    // Check if this relationship type would create duplicates for ANY selected node
+    return Array.from(selectedNodes).some(targetId => {
+      const validation = validateNewConnection(
+        sourceNode.id,
+        targetId,
+        relationshipType,
+        existingEdges,
+        workItems
+      );
+      return !validation.isValid;
+    });
   };
   
   // Filter out the source node and apply search/filters
