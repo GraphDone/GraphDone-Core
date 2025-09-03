@@ -187,6 +187,7 @@ export function InteractiveGraphVisualization() {
   const [createNodePosition, setCreateNodePosition] = useState<{ x: number; y: number; z: number } | undefined>(undefined);
   const [currentTransform, setCurrentTransform] = useState({ x: 0, y: 0, scale: 1 });
   const [editingEdge, setEditingEdge] = useState<{ edge: WorkItemEdge; position: { x: number; y: number } } | null>(null);
+  const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number; graphX: number; graphY: number } | null>(null);
   
   // Level of detail thresholds
   const LOD_THRESHOLDS = {
@@ -540,15 +541,6 @@ export function InteractiveGraphVisualization() {
   const validatedNodes = currentValidationResult.validNodes;
   const validatedEdges = currentValidationResult.validEdges;
   
-
-  // Helper function to check if edge already exists
-  const edgeExists = (sourceId: string, targetId: string): boolean => {
-    return validatedEdges.some(edge => 
-      (edge.source === sourceId && edge.target === targetId) ||
-      (edge.source === targetId && edge.target === sourceId) // Check both directions
-    );
-  };
-
   const nodes = [
     // Real nodes from database
     ...validatedNodes.map(item => ({
@@ -563,6 +555,14 @@ export function InteractiveGraphVisualization() {
       }
     }))
   ];
+
+  // Helper function to check if edge already exists
+  const edgeExists = (sourceId: string, targetId: string): boolean => {
+    return validatedEdges.some(edge => 
+      (edge.source === sourceId && edge.target === targetId) ||
+      (edge.source === targetId && edge.target === sourceId) // Check both directions
+    );
+  };
   
   // Define whether to show empty state overlay (but don't early return)
   const showEmptyStateOverlay = !loading && !error && nodes.length === 0;
@@ -775,23 +775,59 @@ export function InteractiveGraphVisualization() {
     const zoom = d3.zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.1, 4]);
 
-    svg.call(zoom);
     const g = svg.append('g');
 
-    // Add background for capturing clicks to create nodes
-    g.append('rect')
+    // Add background for capturing clicks to show context menu
+    const background = g.append('rect')
       .attr('class', 'background')
       .attr('width', width)
       .attr('height', height)
       .attr('fill', 'transparent')
-      .style('cursor', 'crosshair')
-      .on('click', (event: MouseEvent) => {
-        // Only create node if clicking on empty space (not dragging)
-        if (event.defaultPrevented) return;
-        
-        const [x, y] = d3.pointer(event, g.node());
-        createInlineNode(x, y);
+      .style('cursor', 'default');
+
+    // Apply zoom behavior to the svg
+    svg.call(zoom);
+
+    // Add click handler for context menu
+    background.on('click', function(event: MouseEvent) {
+      event.stopPropagation();
+      
+      // Close all existing dialogs first (exclusive dialog behavior)
+      setEditingEdge(null);
+      
+      // Check if there was already a context menu open - if so, close it and show context menu on next click
+      if (contextMenuPosition) {
+        setContextMenuPosition(null);
+        return; // Don't show menu on this click, wait for next click
+      }
+      
+      const [graphX, graphY] = d3.pointer(event, g.node());
+      
+      // Set the context menu position (screen coordinates for menu, graph coordinates for node creation)
+      setContextMenuPosition({
+        x: event.clientX,
+        y: event.clientY,
+        graphX,
+        graphY
       });
+    });
+
+    // Add right-click handler for context menu
+    background.on('contextmenu', function(event: MouseEvent) {
+      event.preventDefault();
+      
+      // Close all existing dialogs first (exclusive dialog behavior)
+      setEditingEdge(null);
+      
+      const [graphX, graphY] = d3.pointer(event, g.node());
+      
+      setContextMenuPosition({
+        x: event.clientX,
+        y: event.clientY,
+        graphX,
+        graphY
+      });
+    });
 
     // Initialize all nodes at screen center for 2D layout
     nodes.forEach((node: any) => {
@@ -2715,6 +2751,119 @@ export function InteractiveGraphVisualization() {
             </button>
           </div>
         </div>
+      )}
+
+      {/* Context Menu */}
+      {contextMenuPosition && (
+        <div
+          className="fixed z-50 bg-gray-800 border border-gray-600 rounded-lg shadow-2xl py-2 min-w-[200px]"
+          style={{
+            left: Math.min(contextMenuPosition.x, window.innerWidth - 220),
+            top: Math.min(contextMenuPosition.y, window.innerHeight - 200)
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={() => {
+              createInlineNode(contextMenuPosition.graphX, contextMenuPosition.graphY);
+              setContextMenuPosition(null);
+            }}
+            className="w-full text-left px-4 py-2 hover:bg-gray-700 text-gray-200 flex items-center space-x-2"
+          >
+            <Plus className="h-4 w-4" />
+            <span>Create Node</span>
+          </button>
+          
+          <button
+            onClick={() => {
+              // Zoom to fit all nodes
+              const svg = d3.select(svgRef.current);
+              const containerRect = containerRef.current?.getBoundingClientRect();
+              if (svg.node() && containerRect && nodes.length > 0) {
+                // Find bounds of all nodes using actual simulation positions
+                const margin = 150;
+                const nodePositions = nodes.map(node => ({
+                  x: node.x || node.positionX || 0,
+                  y: node.y || node.positionY || 0
+                }));
+                
+                const xExtent = d3.extent(nodePositions, d => d.x) as [number, number];
+                const yExtent = d3.extent(nodePositions, d => d.y) as [number, number];
+                
+                const width = containerRect.width;
+                const height = containerRect.height;
+                
+                // Calculate the bounding box of all nodes (add padding for node radius)
+                const nodeRadius = 50; // Account for node size
+                const nodeWidth = Math.max(xExtent[1] - xExtent[0] + 2 * nodeRadius, 300);
+                const nodeHeight = Math.max(yExtent[1] - yExtent[0] + 2 * nodeRadius, 300);
+                
+                // Calculate scale to fit all nodes with margin (be more conservative)
+                const scaleX = (width - 2 * margin) / nodeWidth;
+                const scaleY = (height - 2 * margin) / nodeHeight;
+                const scale = Math.min(scaleX, scaleY, 0.8); // Max scale of 0.8x to zoom out more
+                
+                // Calculate center position of all nodes
+                const nodesCenterX = (xExtent[0] + xExtent[1]) / 2;
+                const nodesCenterY = (yExtent[0] + yExtent[1]) / 2;
+                
+                // Calculate screen center
+                const screenCenterX = width / 2;
+                const screenCenterY = height / 2;
+                
+                // Calculate translation to put the center of nodes at the center of the screen
+                // Formula: translate = screenCenter - (nodeCenter * scale)
+                const translateX = screenCenterX - nodesCenterX * scale;
+                const translateY = screenCenterY - nodesCenterY * scale;
+                
+                console.log('Zoom to fit:', { 
+                  scale, 
+                  translateX, 
+                  translateY, 
+                  nodesCenterX, 
+                  nodesCenterY, 
+                  screenCenterX, 
+                  screenCenterY,
+                  width,
+                  height,
+                  xExtent,
+                  yExtent
+                });
+                
+                // Create the transform and update D3's zoom behavior state properly
+                const newTransform = d3.zoomIdentity.translate(translateX, translateY).scale(scale);
+                
+                // Update D3's internal zoom state immediately (no transition)
+                svg.property('__zoom', newTransform);
+                
+                // Apply the visual transform with transition
+                const g = svg.select('g');
+                g.transition()
+                  .duration(750)
+                  .attr('transform', newTransform.toString())
+                  .on('end', () => {
+                    // Update the current transform state
+                    setCurrentTransform({ x: translateX, y: translateY, scale: scale });
+                  });
+              }
+              setContextMenuPosition(null);
+            }}
+            className="w-full text-left px-4 py-2 hover:bg-gray-700 text-gray-200 flex items-center space-x-2"
+          >
+            <div className="h-4 w-4 flex items-center justify-center">
+              <div className="w-3 h-3 border border-gray-400 rounded"></div>
+            </div>
+            <span>Zoom to Fit</span>
+          </button>
+        </div>
+      )}
+
+      {/* Click outside handler for context menu */}
+      {contextMenuPosition && (
+        <div 
+          className="fixed inset-0 z-[40]" 
+          onClick={() => setContextMenuPosition(null)}
+        />
       )}
 
       {/* Modern Inline Edge Type Editor Dropdown */}
