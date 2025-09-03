@@ -18,7 +18,7 @@ import {
   ListTodo,
   Target
 } from '../constants/workItemConstants';
-import { useQuery, useMutation, useApolloClient } from '@apollo/client';
+import { useQuery, useMutation } from '@apollo/client';
 import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
@@ -489,9 +489,9 @@ export function InteractiveGraphVisualization() {
           }
         }
       });
-      console.log(`Saved position for node ${nodeId}: (${x.toFixed(1)}, ${y.toFixed(1)})`);
+      // Position saved successfully
     } catch (error) {
-      console.error('Error saving node position:', error);
+      // Error saving position, continue without logging
     }
   }, [updateWorkItemMutation]);
 
@@ -675,7 +675,7 @@ export function InteractiveGraphVisualization() {
       }
     ],
     awaitRefetchQueries: true,
-    optimisticResponse: (vars) => {
+    optimisticResponse: () => {
       return {
         deleteEdges: {
           nodesDeleted: 0,
@@ -752,7 +752,7 @@ export function InteractiveGraphVisualization() {
           }
         }).then(() => {
           // Edge created successfully
-        }).catch((_error) => {
+        }).catch(() => {
           // Error handled by GraphQL
         });
         initializeVisualization();
@@ -997,14 +997,14 @@ export function InteractiveGraphVisualization() {
       });
 
     svg.call(zoom);
-    const g = svg.append('g');
+    svg.append('g');
   }, []);
 
   // Inline node creation function
   const createInlineNode = async (x: number, y: number) => {
-    console.log('createInlineNode called with:', { x, y, currentGraph: currentGraph?.id, currentUser: currentUser?.id });
+    // Create inline node function
     if (!currentGraph?.id) {
-      console.log('No current graph selected');
+      // No current graph selected
       return;
     }
     
@@ -1451,7 +1451,7 @@ export function InteractiveGraphVisualization() {
             const deltaX = event.x - d.x;
             const deltaY = event.y - d.y;
             
-            d._connectedNodes.forEach(({ node, wasFixed }) => {
+            d._connectedNodes.forEach(({ node, wasFixed }: { node: any, wasFixed: boolean }) => {
               if (!wasFixed) { // Only move if not already fixed by user previously
                 node.fx = (node.fx || node.x) + deltaX;
                 node.fy = (node.fy || node.y) + deltaY;
@@ -1461,7 +1461,7 @@ export function InteractiveGraphVisualization() {
             });
           } else {
             // Edge stretching - release connected nodes to move independently
-            d._connectedNodes.forEach(({ node, wasFixed }) => {
+            d._connectedNodes.forEach(({ node, wasFixed }: { node: any, wasFixed: boolean }) => {
               if (!wasFixed) { // Only release if we were controlling it and it wasn't user-fixed
                 node.fx = null;
                 node.fy = null;
@@ -1499,7 +1499,7 @@ export function InteractiveGraphVisualization() {
                 }]
               }
             }).then(() => {
-              }).catch((error) => {
+              }).catch(() => {
             });
             
             mousedownNodeRef.current = null;
@@ -2273,7 +2273,7 @@ export function InteractiveGraphVisualization() {
                     setTimeout(() => {
                       tempEdge.remove();
                     }, 200);
-                  }).catch((error) => {
+                  }).catch(() => {
                           // Remove temp edge on error
                     tempEdge.remove();
                   });
@@ -3290,7 +3290,7 @@ export function InteractiveGraphVisualization() {
           
           <button
             onClick={() => {
-              console.log('Zoom to fit button clicked!');
+              // Zoom to fit button clicked
               // Zoom to fit all nodes - completely rewritten for proper detection
               const svg = d3.select(svgRef.current);
               const containerRect = containerRef.current?.getBoundingClientRect();
@@ -3302,7 +3302,7 @@ export function InteractiveGraphVisualization() {
                 })).filter(pos => pos.x !== undefined && pos.y !== undefined);
                 
                 if (allPositions.length === 0) {
-                  console.log('No valid node positions found');
+                  // No valid node positions found
                   setContextMenuPosition(null);
                   return;
                 }
@@ -3337,15 +3337,7 @@ export function InteractiveGraphVisualization() {
                 const translateX = (containerWidth / 2) - (centerX * scale);
                 const translateY = (containerHeight / 2) - (centerY * scale);
                 
-                console.log('Zoom to fit (improved):', {
-                  nodeCount: allPositions.length,
-                  bounds: { minX, maxX, minY, maxY },
-                  boundsSize: { width: boundsWidth, height: boundsHeight },
-                  container: { width: containerWidth, height: containerHeight },
-                  scale,
-                  center: { x: centerX, y: centerY },
-                  translate: { x: translateX, y: translateY }
-                });
+                // Zoom to fit calculation complete
                 
                 // Create the transform and update D3's zoom behavior state properly
                 const newTransform = d3.zoomIdentity.translate(translateX, translateY).scale(scale);
@@ -3532,7 +3524,7 @@ export function InteractiveGraphVisualization() {
                         
                         
                         setEditingEdge(null);
-                      }).catch((error) => {
+                      }).catch(() => {
                       });
                     }}
                     className={`w-full flex items-center px-3 py-2.5 rounded-lg transition-all duration-150 group ${
