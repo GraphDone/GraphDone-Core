@@ -207,7 +207,76 @@ export function InteractiveGraphVisualization() {
   const [createNodePosition, setCreateNodePosition] = useState<{ x: number; y: number; z: number } | undefined>(undefined);
   const [currentTransform, setCurrentTransform] = useState({ x: 0, y: 0, scale: 1 });
   const [editingEdge, setEditingEdge] = useState<{ edge: WorkItemEdge; position: { x: number; y: number } } | null>(null);
+  const [dropdownPosition, setDropdownPosition] = useState<{ left: number; top: number } | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number; graphX: number; graphY: number } | null>(null);
+  
+  // Intelligent dropdown positioning - detect when off-screen and slide into view
+  useEffect(() => {
+    if (editingEdge && dropdownRef.current) {
+      const dropdown = dropdownRef.current;
+      const rect = dropdown.getBoundingClientRect();
+      const margin = 20;
+      
+      let newLeft = editingEdge.position.x - rect.width / 2;
+      let newTop = editingEdge.position.y + 10;
+      
+      // Check horizontal boundaries
+      if (rect.right > window.innerWidth - margin) {
+        newLeft = window.innerWidth - rect.width - margin;
+      } else if (rect.left < margin) {
+        newLeft = margin;
+      }
+      
+      // Check vertical boundaries
+      if (rect.bottom > window.innerHeight - margin) {
+        newTop = editingEdge.position.y - rect.height - 10;
+      } else if (newTop < margin) {
+        newTop = margin;
+      }
+      
+      // Gradually slide into position if off-screen
+      if (Math.abs(newLeft - rect.left) > 5 || Math.abs(newTop - rect.top) > 5) {
+        setDropdownPosition({ left: newLeft, top: newTop });
+      }
+    }
+  }, [editingEdge]);
+
+  // Apply glow effect to active dialog elements after D3 renders
+  useEffect(() => {
+    if (!svgRef.current) return;
+    
+    const svg = d3.select(svgRef.current);
+    
+    // Remove glow and reset properties from all elements first
+    svg.selectAll('.node-bg').style('filter', null);
+    svg.selectAll('.edge')
+      .style('filter', null)
+      .attr('stroke-width', (d: any) => (d.strength || 0.8) * 3); // Reset to normal thickness
+    
+    // Apply glow to active node if nodeMenu is visible
+    if (nodeMenu.visible && nodeMenu.node) {
+      svg.selectAll('.node-bg')
+        .filter((d: any) => d && d.id === nodeMenu.node?.id)
+        .style('filter', 'url(#dialog-glow)');
+    }
+    
+    // Apply stronger glow to active edge if editingEdge OR showEdgeDetails is visible
+    if (editingEdge && editingEdge.edge) {
+      svg.selectAll('.edge')
+        .filter((d: any) => d && d.id === editingEdge.edge?.id)
+        .style('filter', 'url(#edge-dialog-glow)')
+        .attr('stroke-width', 12); // Also make the edge thicker
+    }
+    
+    // Also apply glow to edge when showing edge details
+    if (showEdgeDetails && selectedEdge) {
+      svg.selectAll('.edge')
+        .filter((d: any) => d && d.id === selectedEdge.id)
+        .style('filter', 'url(#edge-dialog-glow)')
+        .attr('stroke-width', 12); // Same thickness as relationship editing
+    }
+  }, [nodeMenu.visible, nodeMenu.node?.id, editingEdge?.edge?.id, showEdgeDetails, selectedEdge?.id]);
   
   // Level of detail thresholds
   const LOD_THRESHOLDS = {
@@ -466,6 +535,7 @@ export function InteractiveGraphVisualization() {
       document.removeEventListener('keydown', handleEscKey);
     };
   }, []);
+
 
   const handleNodeClick = useCallback((event: MouseEvent, node: WorkItem) => {
     event.stopPropagation();
@@ -849,22 +919,30 @@ export function InteractiveGraphVisualization() {
     // Apply zoom behavior to the svg
     svg.call(zoom);
 
-    // Add click handler for context menu
+    // Add click handler for context menu on background
     background.on('click', function(event: MouseEvent) {
       event.stopPropagation();
       
-      // Close all existing dialogs first (exclusive dialog behavior)
-      setEditingEdge(null);
+      // Check only the main dialogs that we care about
+      const hasOpenDialogs = 
+        nodeMenu.visible ||
+        edgeMenu.visible ||
+        editingEdge !== null ||
+        showEdgeDetails;
       
-      // Check if there was already a context menu open - if so, close it and show context menu on next click
-      if (contextMenuPosition) {
+      if (hasOpenDialogs) {
+        // Close all dialogs and menus - first click
+        setNodeMenu({ node: null, position: { x: 0, y: 0 }, visible: false });
+        setEdgeMenu({ edge: null, position: { x: 0, y: 0 }, visible: false });
+        setEditingEdge(null);
+        setShowEdgeDetails(false);
+        setEdgeDetailsPosition(null);
         setContextMenuPosition(null);
-        return; // Don't show menu on this click, wait for next click
+        return;
       }
       
+      // No dialogs open - show the context menu
       const [graphX, graphY] = d3.pointer(event, g.node());
-      
-      // Set the context menu position (screen coordinates for menu, graph coordinates for node creation)
       setContextMenuPosition({
         x: event.clientX,
         y: event.clientY,
@@ -992,13 +1070,43 @@ export function InteractiveGraphVisualization() {
       .data(visibleEdges)
       .enter()
       .append('line')
-      .attr('class', 'edge')
+      .attr('class', (d: WorkItemEdge) => {
+        let classes = 'edge';
+        // Add pulsing class if edge dialog is active
+        if (editingEdge && editingEdge.edge && editingEdge.edge.id === d.id) {
+          classes += ' dialog-active-pulse';
+        }
+        return classes;
+      })
       .attr('stroke', (d: WorkItemEdge) => {
+        // Force bright green for active dialog
+        if (editingEdge && editingEdge.edge && editingEdge.edge.id === d.id) {
+          return '#10b981'; // Bright green
+        }
         const config = getRelationshipConfig(d.type as RelationshipType);
         return config.hexColor;
       })
-      .attr('stroke-width', (d: WorkItemEdge) => (d.strength || 0.8) * 3)
-      .attr('stroke-opacity', 0.7);
+      .attr('stroke-width', (d: WorkItemEdge) => {
+        // Much thicker for active dialog
+        if (editingEdge && editingEdge.edge && editingEdge.edge.id === d.id) {
+          return 10; // Very thick to make it obvious
+        }
+        return (d.strength || 0.8) * 3;
+      })
+      .attr('stroke-opacity', (d: WorkItemEdge) => {
+        // Full opacity for active dialog
+        if (editingEdge && editingEdge.edge && editingEdge.edge.id === d.id) {
+          return 1;
+        }
+        return 0.7;
+      })
+      .style('filter', (d: WorkItemEdge) => {
+        // Apply pulsing glow to edges with active dialogs
+        if (editingEdge && editingEdge.edge && editingEdge.edge.id === d.id) {
+          return 'url(#dialog-glow)';
+        }
+        return null;
+      });
     
     // Create invisible thicker clickable areas for easier interaction
     const clickableEdges = edgesGroup
@@ -1013,8 +1121,27 @@ export function InteractiveGraphVisualization() {
       .on('click', (event: MouseEvent, d: WorkItemEdge) => {
         event.stopPropagation();
         
-        // Simple positioning - use mouse coordinates
-        setEdgeDetailsPosition({ x: event.clientX, y: event.clientY });
+        // Position dialog to the side of the edge to avoid obstructing the glow
+        const offset = 100; // Distance from edge
+        const dialogWidth = 300; // Estimated dialog width
+        const dialogHeight = 200; // Estimated dialog height
+        
+        // Calculate position to the right side, but check boundaries
+        let x = event.clientX + offset;
+        let y = event.clientY - dialogHeight / 2;
+        
+        // If dialog would go off right edge, position to the left
+        if (x + dialogWidth > window.innerWidth - 20) {
+          x = event.clientX - offset - dialogWidth;
+        }
+        
+        // Keep dialog within vertical bounds
+        if (y < 20) y = 20;
+        if (y + dialogHeight > window.innerHeight - 20) {
+          y = window.innerHeight - dialogHeight - 20;
+        }
+        
+        setEdgeDetailsPosition({ x, y });
         setSelectedEdge(d);
         setShowEdgeDetails(true);
       })
@@ -1035,6 +1162,66 @@ export function InteractiveGraphVisualization() {
 
     // Add arrowhead markers for middle of edges
     const defs = svg.append('defs');
+    
+    // Create pulsing glow filter for active dialogs (nodes)
+    const glowFilter = defs.append('filter')
+      .attr('id', 'dialog-glow')
+      .attr('x', '-100%')
+      .attr('y', '-100%')
+      .attr('width', '300%')
+      .attr('height', '300%');
+    
+    // Create a bright green glow that pulses
+    glowFilter.append('feColorMatrix')
+      .attr('in', 'SourceGraphic')
+      .attr('type', 'matrix')
+      .attr('values', '0 0 0 0 0.06 0 0 0 0 0.73 0 0 0 0 0.51 0 0 0 1 0'); // bright green
+    
+    const blur = glowFilter.append('feGaussianBlur')
+      .attr('stdDeviation', '15')
+      .attr('result', 'coloredBlur');
+    
+    // Add animation to the blur intensity for pulsing effect
+    blur.append('animate')
+      .attr('attributeName', 'stdDeviation')
+      .attr('values', '10;20;10')
+      .attr('dur', '2s')
+      .attr('repeatCount', 'indefinite');
+    
+    // Merge blur with original
+    const feMerge = glowFilter.append('feMerge');
+    feMerge.append('feMergeNode').attr('in', 'coloredBlur');
+    feMerge.append('feMergeNode').attr('in', 'SourceGraphic');
+
+    // Create stronger glow filter specifically for edges
+    const edgeGlowFilter = defs.append('filter')
+      .attr('id', 'edge-dialog-glow')
+      .attr('x', '-150%')
+      .attr('y', '-150%')
+      .attr('width', '400%')
+      .attr('height', '400%');
+    
+    // Much stronger glow for edges
+    edgeGlowFilter.append('feColorMatrix')
+      .attr('in', 'SourceGraphic')
+      .attr('type', 'matrix')
+      .attr('values', '0 0 0 0 0.06 0 0 0 0 0.73 0 0 0 0 0.51 0 0 0 1 0'); // bright green
+    
+    const edgeBlur = edgeGlowFilter.append('feGaussianBlur')
+      .attr('stdDeviation', '25')
+      .attr('result', 'coloredBlur');
+    
+    // Stronger pulsing animation for edges
+    edgeBlur.append('animate')
+      .attr('attributeName', 'stdDeviation')
+      .attr('values', '15;35;15')
+      .attr('dur', '1.5s')
+      .attr('repeatCount', 'indefinite');
+    
+    // Merge blur with original for edges
+    const edgeFeMerge = edgeGlowFilter.append('feMerge');
+    edgeFeMerge.append('feMergeNode').attr('in', 'coloredBlur');
+    edgeFeMerge.append('feMergeNode').attr('in', 'SourceGraphic');
     
     // Create different arrowhead colors for each edge type
     RELATIONSHIP_OPTIONS.forEach((option) => {
@@ -1229,7 +1416,14 @@ export function InteractiveGraphVisualization() {
     
     // Main node rectangle (dark theme background)
     nodeElements.append('rect')
-      .attr('class', 'node-bg')
+      .attr('class', (d: WorkItem) => {
+        let classes = 'node-bg';
+        // Add pulsing class if node dialog is active
+        if (nodeMenu.visible && nodeMenu.node && nodeMenu.node.id === d.id) {
+          classes += ' dialog-active-pulse';
+        }
+        return classes;
+      })
       .attr('x', (d: WorkItem) => -getNodeDimensions(d).width / 2)
       .attr('y', (d: WorkItem) => -getNodeDimensions(d).height / 2)
       .attr('width', (d: WorkItem) => getNodeDimensions(d).width)
@@ -1243,6 +1437,10 @@ export function InteractiveGraphVisualization() {
         return '#1f2937'; // Dark background consistent with theme
       })
       .attr('stroke', (d: WorkItem) => {
+        // Force bright green with glow for active dialog
+        if (nodeMenu.visible && nodeMenu.node && nodeMenu.node.id === d.id) {
+          return '#10b981'; // Bright green
+        }
         // Highlight selected node with bright border
         if (selectedNode && selectedNode.id === d.id) {
           return '#10b981'; // Bright green for selected node
@@ -1253,11 +1451,22 @@ export function InteractiveGraphVisualization() {
         return '#4b5563'; // Gray border
       })
       .attr('stroke-width', (d: WorkItem) => {
+        // Much thicker for active dialog to make it obvious
+        if (nodeMenu.visible && nodeMenu.node && nodeMenu.node.id === d.id) {
+          return 8; // Very thick
+        }
         // Thicker border for selected node
         if (selectedNode && selectedNode.id === d.id) {
           return 3;
         }
         return 1.5;
+      })
+      .style('stroke-opacity', (d: WorkItem) => {
+        // Full opacity for active dialog
+        if (nodeMenu.visible && nodeMenu.node && nodeMenu.node.id === d.id) {
+          return 1;
+        }
+        return 1;
       });
 
     // Colored title bar at top (like Monopoly property cards)
@@ -1681,17 +1890,29 @@ export function InteractiveGraphVisualization() {
       .on('click', function(event: MouseEvent, d: WorkItemEdge) {
         event.stopPropagation();
         
-        // Get the actual mouse click position (most accurate)
+        // Position dropdown to the side to avoid obstructing the glow
         const clickX = event.clientX;
         const clickY = event.clientY;
+        const offset = 120; // Distance from edge
+        const dropdownWidth = 250;
         
-        // Position dropdown very close to the click point
+        let x = clickX + offset;
+        let y = clickY;
+        
+        // If dropdown would go off right edge, position to the left
+        if (x + dropdownWidth > window.innerWidth - 20) {
+          x = clickX - offset - dropdownWidth;
+        }
+        
+        // Keep dropdown within bounds
+        if (y + 320 > window.innerHeight - 20) { // 320 is dropdown height
+          y = window.innerHeight - 320 - 20;
+        }
+        if (y < 20) y = 20;
+        
         setEditingEdge({
           edge: d,
-          position: { 
-            x: clickX,  // Use exact click position
-            y: clickY + 5  // Just 5px below the click
-          }
+          position: { x, y }
         });
       });
 
@@ -2011,7 +2232,13 @@ export function InteractiveGraphVisualization() {
         .style('opacity', getSmoothedOpacity(LOD_THRESHOLDS.CLOSE));
       g.selectAll('.edge')
         .style('opacity', Math.max(0.1, getSmoothedOpacity(LOD_THRESHOLDS.VERY_FAR, 0.1)))
-        .attr('stroke-width', scale >= LOD_THRESHOLDS.FAR ? 1 : Math.max(0.3, scale * 0.8));
+        .attr('stroke-width', function(d: any) {
+          // Don't override stroke width if this edge has an active dialog
+          if (editingEdge && editingEdge.edge && editingEdge.edge.id === d.id) {
+            return 10; // Keep thick for active dialog
+          }
+          return scale >= LOD_THRESHOLDS.FAR ? 1 : Math.max(0.3, scale * 0.8);
+        });
     });
 
     // Configure simulation for stability
@@ -2309,7 +2536,11 @@ export function InteractiveGraphVisualization() {
 
   return (
     <div ref={containerRef} className="graph-container relative w-full h-full bg-gray-900 overflow-hidden">
-      <svg ref={svgRef} className="w-full h-full" style={{ background: 'radial-gradient(circle at center, #1f2937 0%, #111827 100%)' }} />
+      <svg 
+        ref={svgRef} 
+        className="w-full h-full" 
+        style={{ background: 'radial-gradient(circle at center, #1f2937 0%, #111827 100%)' }}
+      />
       
       
       {/* Empty State Overlay */}
@@ -2660,14 +2891,20 @@ export function InteractiveGraphVisualization() {
 
       {/* Node Context Menu */}
       {nodeMenu.visible && nodeMenu.node && (
-        <div
-          className="absolute bg-gray-800 border border-gray-600 rounded-lg shadow-lg py-2 z-50 max-h-96 overflow-y-auto"
-          style={{
-            left: nodeMenu.position.x,
-            top: nodeMenu.position.y,
-            minWidth: '250px'
-          }}
-          onClick={(e) => e.stopPropagation()}
+        <>
+          {/* Backdrop for node menu */}
+          <div 
+            className="fixed inset-0 z-40" 
+            onClick={() => setNodeMenu({ node: null, position: { x: 0, y: 0 }, visible: false })}
+          />
+          <div
+            className="absolute bg-gray-800 border border-gray-600 rounded-lg shadow-lg py-2 z-50 max-h-96 overflow-y-auto"
+            style={{
+              left: nodeMenu.position.x,
+              top: nodeMenu.position.y,
+              minWidth: '250px'
+            }}
+            onClick={(e) => e.stopPropagation()}
         >
           {/* Node Info Header with Close Button */}
           <div className="px-4 py-2 border-b border-gray-600">
@@ -2827,6 +3064,7 @@ export function InteractiveGraphVisualization() {
             </button>
           </div>
         </div>
+        </>
       )}
 
       {/* Edge Context Menu */}
@@ -2995,16 +3233,49 @@ export function InteractiveGraphVisualization() {
 
       {/* Modern Inline Edge Type Editor Dropdown */}
       {editingEdge && (
-        <div
-          className="absolute z-50"
-          style={{
-            left: editingEdge.position.x,
-            top: editingEdge.position.y,
-            transform: 'translateX(-50%)',  // Center horizontally only
-            minWidth: '250px',
-            animation: 'fadeInScale 0.2s ease-out'
-          }}
-          onClick={(e) => e.stopPropagation()}
+        <>
+          {/* Backdrop for edge editor */}
+          <div 
+            className="fixed inset-0 z-40" 
+            onClick={() => setEditingEdge(null)}
+          />
+          <div
+            ref={dropdownRef}
+            className="absolute z-50"
+            style={{
+              left: dropdownPosition?.left ?? (() => {
+                const dropdownWidth = 250;
+                const margin = 20;
+                const x = editingEdge.position.x;
+                
+                // If dropdown would go off the right edge, align it to the right
+                if (x + dropdownWidth/2 > window.innerWidth - margin) {
+                  return window.innerWidth - dropdownWidth - margin;
+                }
+                // If dropdown would go off the left edge, align it to the left
+                if (x - dropdownWidth/2 < margin) {
+                  return margin;
+                }
+                // Otherwise center it on the cursor
+                return x - dropdownWidth/2;
+              })(),
+              top: dropdownPosition?.top ?? (() => {
+                const dropdownHeight = 320; // Estimate for full dropdown height
+                const margin = 20;
+                const y = editingEdge.position.y;
+                
+                // If dropdown would go off the bottom, position it above the cursor
+                if (y + dropdownHeight > window.innerHeight - margin) {
+                  return Math.max(margin, y - dropdownHeight - 10);
+                }
+                // Otherwise position it below the cursor
+                return Math.min(y + 10, window.innerHeight - dropdownHeight - margin);
+              })(),
+              minWidth: '250px',
+              animation: 'fadeInScale 0.2s ease-out',
+              transition: 'left 0.3s ease-out, top 0.3s ease-out'
+            }}
+            onClick={(e) => e.stopPropagation()}
         >
           {/* Remove arrow since dropdown is at same position as label */}
           
@@ -3165,6 +3436,7 @@ export function InteractiveGraphVisualization() {
             </div>
           </div>
         </div>
+        </>
       )}
 
       {/* Create Node Button - Hide when no nodes exist */}
@@ -3396,13 +3668,24 @@ export function InteractiveGraphVisualization() {
 
       {/* Edge Details Panel */}
       {showEdgeDetails && selectedEdge && (
-        <div 
-          className="fixed w-80 bg-gray-800 border border-gray-600 rounded-lg shadow-xl z-50"
-          style={{
-            left: `${edgeDetailsPosition ? Math.min(edgeDetailsPosition.x - 160, window.innerWidth - 320) : window.innerWidth - 340}px`,
-            top: `${edgeDetailsPosition ? Math.max(edgeDetailsPosition.y - 100, 10) : 20}px`
-          }}
-        >
+        <>
+          {/* Backdrop for edge details */}
+          <div 
+            className="fixed inset-0 z-40" 
+            onClick={() => {
+              setShowEdgeDetails(false);
+              setSelectedEdge(null);
+              setEdgeDetailsPosition(null);
+            }}
+          />
+          <div 
+            className="fixed w-80 bg-gray-800 border border-gray-600 rounded-lg shadow-xl z-50"
+            style={{
+              left: `${edgeDetailsPosition ? Math.min(edgeDetailsPosition.x - 160, window.innerWidth - 320) : window.innerWidth - 340}px`,
+              top: `${edgeDetailsPosition ? Math.max(edgeDetailsPosition.y - 100, 10) : 20}px`
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
           <div className="p-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-white">Edge Details</h3>
@@ -3472,6 +3755,7 @@ export function InteractiveGraphVisualization() {
             </div>
           </div>
         </div>
+        </>
       )}
 
       {/* Fullscreen Toggle */}
