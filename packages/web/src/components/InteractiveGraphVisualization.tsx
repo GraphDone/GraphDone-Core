@@ -73,7 +73,7 @@ export function InteractiveGraphVisualization() {
       }
     } : { where: {} },
     fetchPolicy: currentGraph ? 'cache-and-network' : 'cache-only',
-    pollInterval: currentGraph ? 5000 : 0,
+    pollInterval: currentGraph ? 100 : 0,
     errorPolicy: 'all'
   });
 
@@ -88,7 +88,7 @@ export function InteractiveGraphVisualization() {
       }
     } : { where: {} },
     fetchPolicy: currentGraph ? 'cache-and-network' : 'cache-only',
-    pollInterval: currentGraph ? 5000 : 0,
+    pollInterval: currentGraph ? 100 : 0,
     errorPolicy: 'all'
   });
 
@@ -105,7 +105,8 @@ export function InteractiveGraphVisualization() {
           }
         } : { where: {} }
       }
-    ]
+    ],
+    awaitRefetchQueries: true
   });
 
   // Mutation for creating edges
