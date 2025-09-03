@@ -242,6 +242,63 @@ export function InteractiveGraphVisualization() {
     }
   }, [editingEdge]);
 
+  // Helper function to apply glow effect immediately when node is clicked
+  const applyNodeGlowImmediately = useCallback((node: WorkItem) => {
+    if (!svgRef.current) return;
+    
+    const svg = d3.select(svgRef.current);
+    const defs = svg.select('defs');
+    
+    const nodeTypeConfig = getTypeConfig(node.type as WorkItemType);
+    const nodeColor = nodeTypeConfig.hexColor;
+    const filterId = `node-glow-${node.type.toLowerCase()}`;
+    
+    // Remove existing filter and create new one with node's type color
+    defs.select(`#${filterId}`).remove();
+    
+    const nodeGlowFilter = defs.append('filter')
+      .attr('id', filterId)
+      .attr('x', '-100%')
+      .attr('y', '-100%')
+      .attr('width', '300%')
+      .attr('height', '300%');
+    
+    // Convert hex to RGB values for feColorMatrix
+    const hexToRgb = (hex: string) => {
+      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      return result ? {
+        r: parseInt(result[1], 16) / 255,
+        g: parseInt(result[2], 16) / 255,
+        b: parseInt(result[3], 16) / 255
+      } : { r: 0.06, g: 0.73, b: 0.51 }; // fallback green
+    };
+    
+    const rgb = hexToRgb(nodeColor);
+    nodeGlowFilter.append('feColorMatrix')
+      .attr('in', 'SourceGraphic')
+      .attr('type', 'matrix')
+      .attr('values', `0 0 0 0 ${rgb.r} 0 0 0 0 ${rgb.g} 0 0 0 0 ${rgb.b} 0 0 0 1 0`);
+    
+    const blur = nodeGlowFilter.append('feGaussianBlur')
+      .attr('stdDeviation', '15')
+      .attr('result', 'coloredBlur');
+    
+    blur.append('animate')
+      .attr('attributeName', 'stdDeviation')
+      .attr('values', '10;20;10')
+      .attr('dur', '2s')
+      .attr('repeatCount', 'indefinite');
+    
+    const feMerge = nodeGlowFilter.append('feMerge');
+    feMerge.append('feMergeNode').attr('in', 'coloredBlur');
+    feMerge.append('feMergeNode').attr('in', 'SourceGraphic');
+    
+    // Apply the type-specific glow filter immediately
+    svg.selectAll('.node-bg')
+      .filter((d: any) => d && d.id === node.id)
+      .style('filter', `url(#${filterId})`);
+  }, []);
+
   // Apply glow effect to active dialog elements after D3 renders
   useEffect(() => {
     if (!svgRef.current) return;
@@ -408,6 +465,7 @@ export function InteractiveGraphVisualization() {
         .style('filter', `url(#${edgeFilterId})`)
         .attr('stroke-width', 12); // Same thickness as relationship editing
     }
+    
   }, [nodeMenu.visible, nodeMenu.node?.id, editingEdge?.edge?.id, showEdgeDetails, selectedEdge?.id]);
   
   // Level of detail thresholds
@@ -705,6 +763,9 @@ export function InteractiveGraphVisualization() {
     } else {
       // Set selected node for the Node Actions panel
       setSelectedNode(node);
+      
+      // Apply glow effect immediately without waiting for useEffect
+      applyNodeGlowImmediately(node);
       
       // Show node menu
       const containerRect = containerRef.current?.getBoundingClientRect();
@@ -1235,6 +1296,35 @@ export function InteractiveGraphVisualization() {
           return 'url(#dialog-glow)';
         }
         return null;
+      })
+      .on('mouseenter', function(event: MouseEvent, d: WorkItemEdge) {
+        // Skip hover effect if edge has active dialog (glow is already applied)
+        if ((editingEdge && editingEdge.edge && editingEdge.edge.id === d.id) ||
+            (showEdgeDetails && selectedEdge && selectedEdge.id === d.id)) {
+          return;
+        }
+        
+        // Add white border hover effect to edges
+        d3.select(this)
+          .style('stroke', '#ffffff')
+          .style('stroke-width', '4')
+          .style('stroke-opacity', '1')
+          .style('filter', 'drop-shadow(0 0 4px #ffffff)');
+      })
+      .on('mouseleave', function(event: MouseEvent, d: WorkItemEdge) {
+        // Skip hover reset if edge has active dialog (glow should remain)
+        if ((editingEdge && editingEdge.edge && editingEdge.edge.id === d.id) ||
+            (showEdgeDetails && selectedEdge && selectedEdge.id === d.id)) {
+          return;
+        }
+        
+        // Restore original edge stroke
+        const config = getRelationshipConfig(d.type as RelationshipType);
+        d3.select(this)
+          .style('stroke', config.hexColor)
+          .style('stroke-width', (d.strength || 0.8) * 3)
+          .style('stroke-opacity', '0.7')
+          .style('filter', null);
       });
     
     // Create invisible thicker clickable areas for easier interaction
@@ -1318,7 +1408,7 @@ export function InteractiveGraphVisualization() {
       .data(visibleNodes)
       .enter()
       .append('g')
-      .attr('class', 'node')
+      .attr('class', (d: WorkItem) => `node node-type-${d.type.toLowerCase()}`)
       .style('cursor', 'pointer')
       .call(d3.drag<any, any>()
         .on('start', (event, d: any) => {
