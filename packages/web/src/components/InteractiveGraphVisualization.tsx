@@ -23,7 +23,7 @@ import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { GET_WORK_ITEMS, GET_EDGES, CREATE_EDGE, UPDATE_EDGE, DELETE_EDGE, CREATE_WORK_ITEM } from '../lib/queries';
+import { GET_WORK_ITEMS, GET_EDGES, CREATE_EDGE, UPDATE_EDGE, DELETE_EDGE, CREATE_WORK_ITEM, UPDATE_WORK_ITEM } from '../lib/queries';
 import { validateGraphData, getValidationSummary, ValidationResult } from '../utils/graphDataValidation';
 import { DEFAULT_NODE_CONFIG } from '../constants/workItemConstants';
 
@@ -175,6 +175,12 @@ export function InteractiveGraphVisualization() {
       // Error handled by GraphQL error boundary
     }
   });
+
+  // Mutation for updating work item positions
+  const [updateWorkItemMutation] = useMutation(UPDATE_WORK_ITEM, {
+    // Don't refetch - we want immediate UI updates without waiting for server
+    errorPolicy: 'all'
+  });
   
   const [nodeMenu, setNodeMenu] = useState<NodeMenuState>({ node: null, position: { x: 0, y: 0 }, visible: false });
   const [edgeMenu, setEdgeMenu] = useState<EdgeMenuState>({ edge: null, position: { x: 0, y: 0 }, visible: false });
@@ -211,6 +217,24 @@ export function InteractiveGraphVisualization() {
     CLOSE: 0.6,       // Add edge labels (earlier)
     VERY_CLOSE: 2.0   // Full detail
   };
+
+  // Function to save node position to database
+  const saveNodePosition = useCallback(async (nodeId: string, x: number, y: number) => {
+    try {
+      await updateWorkItemMutation({
+        variables: {
+          where: { id: nodeId },
+          update: { 
+            positionX: x,
+            positionY: y
+          }
+        }
+      });
+      console.log(`Saved position for node ${nodeId}: (${x.toFixed(1)}, ${y.toFixed(1)})`);
+    } catch (error) {
+      console.error('Error saving node position:', error);
+    }
+  }, [updateWorkItemMutation]);
 
   // Function to get SVG path for priority icons
   const getPriorityIconSvgPath = (priorityValue: number): string => {
@@ -556,18 +580,38 @@ export function InteractiveGraphVisualization() {
   const validatedEdges = currentValidationResult.validEdges;
   
   const nodes = [
-    // Real nodes from database
-    ...validatedNodes.map(item => ({
-      ...item,
-      x: item.positionX,
-      y: item.positionY,
-      priority: {
-        executive: item.priorityExec,
-        individual: item.priorityIndiv,
-        community: item.priorityComm,
-        computed: item.priorityComp
+    // Real nodes from database with smart initial positioning
+    ...validatedNodes.map((item, index) => {
+      // Check if this node has any connections
+      const hasConnections = validatedEdges.some(edge => 
+        edge.source.id === item.id || edge.target.id === item.id
+      );
+      
+      let x = item.positionX;
+      let y = item.positionY;
+      
+      // If node has never been positioned (0,0) and has no connections, place it on periphery
+      if ((item.positionX === 0 && item.positionY === 0) && !hasConnections) {
+        const angle = (index / validatedNodes.length) * 2 * Math.PI;
+        const radius = Math.min(window.innerWidth, window.innerHeight) * 0.4; // Place on outer ring
+        const centerX = 0; // Start from center
+        const centerY = 0;
+        x = centerX + Math.cos(angle) * radius;
+        y = centerY + Math.sin(angle) * radius;
       }
-    }))
+      
+      return {
+        ...item,
+        x,
+        y,
+        priority: {
+          executive: item.priorityExec,
+          individual: item.priorityIndiv,
+          community: item.priorityComm,
+          computed: item.priorityComp
+        }
+      };
+    })
   ];
 
   // Helper function to check if edge already exists
@@ -871,39 +915,56 @@ export function InteractiveGraphVisualization() {
     simulation
       .force('link', d3.forceLink(validatedEdges)
         .id((d: any) => d.id)
-        .distance(500) // Much larger distance for massive spread
-        .strength(0.05) // Weaker to allow more flexibility
+        .distance((d: any) => {
+          const minDistance = Math.min(width, height) * 0.4; // 40% of screen size for minimum
+          const maxDistance = Math.min(width, height) * 0.6; // 60% of screen size for maximum
+          
+          // Calculate current distance between nodes
+          const sourceNode = d.source;
+          const targetNode = d.target;
+          const currentDistance = Math.sqrt(
+            Math.pow(targetNode.x - sourceNode.x, 2) + 
+            Math.pow(targetNode.y - sourceNode.y, 2)
+          );
+          
+          // If current distance exceeds maximum, return maximum to create pulling force
+          if (currentDistance > maxDistance) {
+            return maxDistance;
+          }
+          
+          // Otherwise use minimum as preferred distance
+          return minDistance;
+        })
+        .strength((d: any) => {
+          // Calculate current distance between nodes
+          const sourceNode = d.source;
+          const targetNode = d.target;
+          const currentDistance = Math.sqrt(
+            Math.pow(targetNode.x - sourceNode.x, 2) + 
+            Math.pow(targetNode.y - sourceNode.y, 2)
+          );
+          
+          const maxDistance = Math.min(width, height) * 0.6;
+          
+          // Stronger force when edge is too long to create pulling effect
+          if (currentDistance > maxDistance) {
+            return 0.8; // Strong pulling force
+          }
+          
+          // Normal strength otherwise
+          return 0.3;
+        })
       )
       .force('charge', d3.forceManyBody()
-        .strength((d: any) => {
-          // Much stronger repulsion for maximum spread
-          switch (d.type) {
-            case 'EPIC':
-              return -1200; // Extreme repulsion
-            case 'OUTCOME': 
-              return -1000; 
-            case 'MILESTONE':
-              return -900;
-            case 'FEATURE':
-              return -800;
-            case 'TASK':
-              return -700;
-            case 'BUG':
-              return -700;
-            case 'IDEA':
-              return -600;
-            default:
-              return -800;
-          }
-        })
-        .distanceMax(1500) // Much larger max distance for wider influence
+        .strength(-100) // Simple, consistent repulsion for all nodes
+        .distanceMax(200) // Reasonable influence range
       )
       .force('center', d3.forceCenter(centerX, centerY).strength(0.01)) // Minimal centering
       .force('x', d3.forceX(centerX).strength(0.002)) // Extremely weak horizontal centering for maximum width
       .force('y', d3.forceY(centerY).strength(0.002)) // Extremely weak vertical centering for maximum height
-      .force('collision', d3.forceCollide(250) // Much larger collision radius for maximum spacing
-        .strength(0.95) // Very strong collision prevention
-        .iterations(5) // More iterations for better separation
+      .force('collision', d3.forceCollide(90) // Sufficient collision radius to prevent overlap
+        .strength(0.7) // Moderate collision prevention
+        .iterations(2) // Fewer iterations for stability
       )
       // Add hierarchical attraction forces (Epic->Milestone, Feature->Task, etc.)
       .force('hierarchy', d3.forceLink()
@@ -1011,13 +1072,57 @@ export function InteractiveGraphVisualization() {
             return;
           }
           
+          // Store initial position and connected nodes for cluster behavior
+          d._dragStart = { x: d.x, y: d.y };
+          d._connectedNodes = validatedEdges
+            .filter(edge => edge.source.id === d.id || edge.target.id === d.id)
+            .map(edge => {
+              const connectedNode = edge.source.id === d.id ? edge.target : edge.source;
+              return {
+                node: connectedNode,
+                wasFixed: connectedNode.fx !== null || connectedNode.fy !== null
+              };
+            });
+          
           // Normal drag behavior
           if (!event.active) simulation.alphaTarget(0.2).restart();
           d.fx = d.x;
           d.fy = d.y;
         })
         .on('drag', (event, d: any) => {
-          // Allow free dragging without bounds constraints
+          // Calculate drag distance from start
+          const dragDistance = Math.sqrt(
+            Math.pow(event.x - d._dragStart.x, 2) + 
+            Math.pow(event.y - d._dragStart.y, 2)
+          );
+          
+          // Threshold for switching from cluster movement to edge stretching
+          const stretchThreshold = 80; // pixels
+          
+          if (dragDistance < stretchThreshold) {
+            // Cluster movement - move connected nodes together
+            const deltaX = event.x - d.x;
+            const deltaY = event.y - d.y;
+            
+            d._connectedNodes.forEach(({ node, wasFixed }) => {
+              if (!wasFixed) { // Only move if not already fixed by user previously
+                node.fx = (node.fx || node.x) + deltaX;
+                node.fy = (node.fy || node.y) + deltaY;
+                node.x = node.fx;
+                node.y = node.fy;
+              }
+            });
+          } else {
+            // Edge stretching - release connected nodes to move independently
+            d._connectedNodes.forEach(({ node, wasFixed }) => {
+              if (!wasFixed) { // Only release if we were controlling it and it wasn't user-fixed
+                node.fx = null;
+                node.fy = null;
+              }
+            });
+          }
+          
+          // Move the dragged node
           d.fx = event.x;
           d.fy = event.y;
           d.x = d.fx;
@@ -1054,14 +1159,20 @@ export function InteractiveGraphVisualization() {
             return;
           }
           
-          // Normal drag end behavior
-          if (!event.active) simulation.alphaTarget(0.05);
-          // Keep position fixed for a short time to allow other nodes to settle
+          // Sticky drag behavior - node stays where user put it
+          if (!event.active) simulation.alphaTarget(0.1).restart();
+          
+          // Keep the node fixed at the dropped position
+          // Don't release fx/fy - let the node stay where the user put it
+          // The physics will adapt around the fixed position
+          
+          // Save the new position to the database
+          saveNodePosition(d.id, d.fx, d.fy);
+          
+          // Gradually reduce simulation energy to let other nodes settle
           setTimeout(() => {
-            d.fx = null;
-            d.fy = null;
             simulation.alphaTarget(0.02);
-          }, 500);
+          }, 1000);
           mousedownNodeRef.current = null;
         }));
 
@@ -1903,8 +2014,11 @@ export function InteractiveGraphVisualization() {
         .attr('stroke-width', scale >= LOD_THRESHOLDS.FAR ? 1 : Math.max(0.3, scale * 0.8));
     });
 
-    // Properly restart simulation to ensure initial positioning works
-    simulation.alpha(0.8).restart();
+    // Configure simulation for stability
+    simulation
+      .alpha(0.6) // Lower starting energy for stability
+      .alphaDecay(0.015) // Slower decay for smoother movement
+      .restart();
     
     // Add method to restart collision detection
     (simulation as any).restartCollisions = () => {
