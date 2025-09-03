@@ -59,7 +59,7 @@ function AuthenticatedApp() {
     <NotificationProvider>
       <GraphProvider>
         <Routes>
-          <Route path="/graph" element={<div className="h-screen"><InteractiveGraphVisualization /></div>} />
+          <Route path="/graph" element={<div className="h-screen overflow-hidden"><InteractiveGraphVisualization /></div>} />
           <Route path="/*" element={
             <Layout>
               <Routes>
