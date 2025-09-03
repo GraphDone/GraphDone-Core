@@ -63,6 +63,20 @@ export function InteractiveGraphVisualization() {
   const location = useLocation();
   
   const isFullscreen = location.pathname === '/graph';
+
+  // Prevent body scroll when graph view is active
+  useEffect(() => {
+    const originalBodyOverflow = window.getComputedStyle(document.body).overflow;
+    const originalHtmlOverflow = window.getComputedStyle(document.documentElement).overflow;
+    
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    
+    return () => {
+      document.body.style.overflow = originalBodyOverflow;
+      document.documentElement.style.overflow = originalHtmlOverflow;
+    };
+  }, []);
   
   const { data: workItemsData, loading, error, refetch } = useQuery(GET_WORK_ITEMS, {
     variables: currentGraph ? {
@@ -2180,7 +2194,7 @@ export function InteractiveGraphVisualization() {
 
 
   return (
-    <div ref={containerRef} className="graph-container relative w-full bg-gray-900" style={{ height: '100vh' }}>
+    <div ref={containerRef} className="graph-container relative w-full h-full bg-gray-900 overflow-hidden">
       <svg ref={svgRef} className="w-full h-full" style={{ background: 'radial-gradient(circle at center, #1f2937 0%, #111827 100%)' }} />
       
       
