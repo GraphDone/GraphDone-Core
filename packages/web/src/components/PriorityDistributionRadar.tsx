@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
-import { Flame, Zap, Triangle, Circle, ArrowDown } from '../constants/workItemConstants';
+import { WORK_ITEM_PRIORITIES, getPriorityConfig, getPriorityIconElement, type PriorityLevel } from '../constants/workItemConstants';
 import { RadarChart } from './RadarChart';
 import { useGraph } from '../contexts/GraphContext';
 import { useQuery, gql } from '@apollo/client';
@@ -75,13 +75,13 @@ export function PriorityDistributionRadar({ className = '', showLegend = true }:
       }
     });
 
-    // Priority colors matching the pie chart
+    // Priority data using centralized configuration
     const priorityData = [
-      { axis: 'Critical', value: priorityCounts.critical, color: '#ef4444' },
-      { axis: 'High', value: priorityCounts.high, color: '#f97316' },
-      { axis: 'Moderate', value: priorityCounts.moderate, color: '#eab308' },
-      { axis: 'Low', value: priorityCounts.low, color: '#3b82f6' },
-      { axis: 'Minimal', value: priorityCounts.minimal, color: '#6b7280' }
+      { axis: WORK_ITEM_PRIORITIES.critical.label, value: priorityCounts.critical, color: WORK_ITEM_PRIORITIES.critical.hexColor },
+      { axis: WORK_ITEM_PRIORITIES.high.label, value: priorityCounts.high, color: WORK_ITEM_PRIORITIES.high.hexColor },
+      { axis: WORK_ITEM_PRIORITIES.moderate.label, value: priorityCounts.moderate, color: WORK_ITEM_PRIORITIES.moderate.hexColor },
+      { axis: WORK_ITEM_PRIORITIES.low.label, value: priorityCounts.low, color: WORK_ITEM_PRIORITIES.low.hexColor },
+      { axis: WORK_ITEM_PRIORITIES.minimal.label, value: priorityCounts.minimal, color: WORK_ITEM_PRIORITIES.minimal.hexColor }
     ].filter(item => item.value > 0); // Only show priorities with tasks
 
     const maxValue = Math.max(...priorityData.map(item => item.value), 1);
@@ -184,14 +184,13 @@ export function PriorityDistributionRadar({ className = '', showLegend = true }:
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-3">
               {radarData.map((item, index) => {
                 const getIcon = (axis: string) => {
-                  switch(axis) {
-                    case 'Critical': return <Flame className="h-5 w-5" style={{ color: item.color || '#ef4444' }} />;
-                    case 'High': return <Zap className="h-5 w-5" style={{ color: item.color || '#f97316' }} />;
-                    case 'Moderate': return <Triangle className="h-5 w-5" style={{ color: item.color || '#eab308' }} />;
-                    case 'Low': return <Circle className="h-5 w-5" style={{ color: item.color || '#3b82f6' }} />;
-                    case 'Minimal': return <ArrowDown className="h-5 w-5" style={{ color: item.color || '#6b7280' }} />;
-                    default: return <div className="w-4 h-4 rounded-full" style={{ backgroundColor: item.color || '#4ade80' }}></div>;
+                  // Find priority by label
+                  const priorityEntry = Object.entries(WORK_ITEM_PRIORITIES).find(([, config]) => config.label === axis);
+                  if (priorityEntry) {
+                    const priorityValue = priorityEntry[1].threshold.min;
+                    return getPriorityIconElement(priorityValue, "h-5 w-5");
                   }
+                  return <div className="w-4 h-4 rounded-full" style={{ backgroundColor: item.color }}></div>;
                 };
                 
                 return (

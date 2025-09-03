@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Clock, User, MessageSquare, AlertCircle, Filter, Search, Trash2, Eye, TrendingUp, UserPlus, Target, Flag, Bell, BellOff, ChevronDown, Calendar } from 'lucide-react';
-import { getStatusConfig, WorkItemStatus, getTypeConfig, WorkItemType, getPriorityConfig, STATUS_OPTIONS, PRIORITY_OPTIONS, TYPE_OPTIONS } from '../constants/workItemConstants';
+import { getStatusConfig, WorkItemStatus, getTypeConfig, WorkItemType, getPriorityConfig, STATUS_OPTIONS, PRIORITY_OPTIONS, TYPE_OPTIONS, WORK_ITEM_PRIORITIES, WORK_ITEM_STATUSES, WORK_ITEM_TYPES } from '../constants/workItemConstants';
 
 interface WorkItem {
   id: string;
@@ -389,7 +389,7 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ filteredNodes }) => {
               <h2 className="text-2xl font-bold text-white mb-1">Activity Feed</h2>
               <div className="flex items-center space-x-3 text-sm">
                 <div className="flex items-center space-x-2">
-                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                  <div className={`w-2 h-2 ${WORK_ITEM_STATUSES.COMPLETED.color.replace('text-', 'bg-')} rounded-full animate-pulse`} />
                   <span className="text-gray-400">{filteredActivities.length} activities</span>
                 </div>
                 <div className="text-gray-500">•</div>
@@ -619,7 +619,7 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ filteredNodes }) => {
                   key={activity.id} 
                   className={`bg-gray-800 rounded-lg border transition-all duration-200 cursor-pointer ${
                     isSelected 
-                      ? 'border-green-500 bg-green-500/5 shadow-lg shadow-green-500/10' 
+                      ? `${WORK_ITEM_STATUSES.COMPLETED.borderColor} ${WORK_ITEM_STATUSES.COMPLETED.bgColor} shadow-lg shadow-green-500/10` 
                       : 'border-gray-700 hover:border-gray-600 hover:bg-gray-750'
                   }`}
                   onClick={() => setSelectedActivity(isSelected ? null : activity.id)}
@@ -646,8 +646,8 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ filteredNodes }) => {
                               ) : null;
                             })()} 
                             <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                              activity.category === 'task' ? 'bg-blue-500/10 text-blue-400 border border-blue-400/20' :
-                              activity.category === 'user' ? 'bg-purple-500/10 text-purple-400 border border-purple-400/20' :
+                              activity.category === 'task' ? `${WORK_ITEM_TYPES.TASK.bgColor} ${WORK_ITEM_TYPES.TASK.color} ${WORK_ITEM_TYPES.TASK.borderColor}` :
+                              activity.category === 'user' ? `${WORK_ITEM_TYPES.EPIC.bgColor} ${WORK_ITEM_TYPES.EPIC.color} ${WORK_ITEM_TYPES.EPIC.borderColor}` :
                               'bg-gray-500/10 text-gray-400 border border-gray-400/20'
                             }`}>
                               {activity.category}
@@ -656,7 +656,7 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ filteredNodes }) => {
                           <div className="flex items-center space-x-3">
                             <span className="text-xs text-gray-400 font-medium">{getTimeAgo(activity.timestamp)}</span>
                             {isSelected && (
-                              <div className="p-1 rounded-full bg-green-500/10">
+                              <div className={`p-1 rounded-full ${WORK_ITEM_STATUSES.COMPLETED.bgColor}`}>
                                 <Eye className="h-3 w-3 text-green-400" />
                               </div>
                             )}
@@ -688,11 +688,11 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ filteredNodes }) => {
                               {activity.metadata.oldValue && activity.metadata.newValue && (
                                 <div className="flex items-center space-x-2 text-xs">
                                   <span className="text-gray-400">Changed from:</span>
-                                  <span className="px-2 py-1 bg-red-500/10 text-red-400 rounded">
+                                  <span className={`px-2 py-1 ${WORK_ITEM_STATUSES.BLOCKED.bgColor} ${WORK_ITEM_STATUSES.BLOCKED.color} rounded`}>
                                     {activity.metadata.oldValue}
                                   </span>
                                   <span className="text-gray-400">to:</span>
-                                  <span className="px-2 py-1 bg-green-500/10 text-green-400 rounded">
+                                  <span className={`px-2 py-1 ${WORK_ITEM_STATUSES.COMPLETED.bgColor} ${WORK_ITEM_STATUSES.COMPLETED.color} rounded`}>
                                     {activity.metadata.newValue}
                                   </span>
                                 </div>

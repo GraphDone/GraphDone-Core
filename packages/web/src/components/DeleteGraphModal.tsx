@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
-import { X, Trash2, Shield, GitBranch } from 'lucide-react';
+import { X, Trash2, GitBranch, Shield } from 'lucide-react';
 import { AlertTriangle, CheckCircle, WORK_ITEM_TYPES } from '../constants/workItemConstants';
 import { useGraph } from '../contexts/GraphContext';
 import { useNotifications } from '../contexts/NotificationContext';
@@ -22,6 +22,7 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
   const [nodeCount, setNodeCount] = useState<number>(0);
   const [nodes, setNodes] = useState<any[]>([]);
   const [nodeConnections, setNodeConnections] = useState<{[key: string]: any[]}>({});
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
 
   // Query to get the nodes in the graph
   const { loading: loadingNodes } = useQuery(GET_WORK_ITEMS, {
@@ -307,6 +308,119 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
                       This graph contains <strong className="text-orange-200">{nodeCount} node{nodeCount !== 1 ? 's' : ''}</strong>. Remove connections first, then delete nodes:
                     </p>
                     
+                    {/* Global Disconnect All Button */}
+                    {Object.values(nodeConnections).some(connections => connections.length > 0) && (
+                      <div className="mb-4">
+                        <button
+                          onClick={async () => {
+                            try {
+                              // Get all unique edge IDs
+                              const allEdgeIds = new Set<string>();
+                              Object.values(nodeConnections).forEach(connections => {
+                                connections.forEach(conn => allEdgeIds.add(conn.id));
+                              });
+                              
+                              // Disconnect all edges at once
+                              for (const edgeId of allEdgeIds) {
+                                await deleteEdge({
+                                  variables: { where: { id: edgeId } }
+                                });
+                              }
+                              
+                              showSuccess(
+                                'All Connections Removed!',
+                                `Disconnected all ${allEdgeIds.size} connection${allEdgeIds.size !== 1 ? 's' : ''} in the graph.`
+                              );
+                              
+                              // Clear all connections from local state
+                              setNodeConnections({});
+                              
+                            } catch (error) {
+                              showError(
+                                'Failed to Remove All Connections',
+                                error instanceof Error ? error.message : 'Please try again.'
+                              );
+                            }
+                          }}
+                          className="w-full px-4 py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors flex items-center justify-center space-x-2 font-medium"
+                        >
+                          <GitBranch className="h-4 w-4" />
+                          <span>Disconnect All Connections</span>
+                        </button>
+                      </div>
+                    )}
+                    
+                    {/* Delete All Unconnected Button */}
+                    {nodes.some(node => !(nodeConnections[node.id]?.length > 0)) && (
+                      <div className="mb-4">
+                        {!showBulkDeleteConfirm ? (
+                          <button
+                            onClick={() => setShowBulkDeleteConfirm(true)}
+                            className="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors flex items-center justify-center space-x-2"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            <span>Delete All Unconnected Nodes ({nodes.filter(node => !(nodeConnections[node.id]?.length > 0)).length})</span>
+                          </button>
+                        ) : (
+                          <div className="bg-red-900/30 border border-red-600/50 rounded-lg p-3">
+                            <p className="text-red-200 text-sm mb-3">
+                              <strong>Delete {nodes.filter(node => !(nodeConnections[node.id]?.length > 0)).length} unconnected nodes?</strong>
+                            </p>
+                            <p className="text-red-300 text-xs mb-3">
+                              This will permanently remove all nodes that have no connections to other nodes. This action cannot be undone.
+                            </p>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={async () => {
+                                  const unconnectedNodes = nodes.filter(node => !(nodeConnections[node.id]?.length > 0));
+                                  const unconnectedNodeCount = unconnectedNodes.length;
+                                  
+                                  try {
+                                    // Bulk delete all unconnected nodes in single operation
+                                    const nodeIds = unconnectedNodes.map(node => node.id);
+                                    await deleteWorkItem({
+                                      variables: { 
+                                        where: { 
+                                          id_IN: nodeIds
+                                        }
+                                      }
+                                    });
+                                    
+                                    // Single success notification for bulk operation
+                                    showSuccess(
+                                      'Nodes Deletion Completed Successfully!',
+                                      `Removed ${unconnectedNodeCount} node${unconnectedNodeCount !== 1 ? 's' : ''} from ${currentGraph.name}.`
+                                    );
+                                    
+                                    // Update local state
+                                    setNodes(prev => prev.filter(node => !unconnectedNodes.some(deleted => deleted.id === node.id)));
+                                    setNodeCount(prev => prev - unconnectedNodeCount);
+                                    
+                                  } catch (error) {
+                                    showError(
+                                      'Bulk Delete Failed',
+                                      error instanceof Error ? error.message : 'Please try again.'
+                                    );
+                                  }
+                                  
+                                  setShowBulkDeleteConfirm(false);
+                                }}
+                                className="flex-1 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded text-sm"
+                              >
+                                Yes, Delete All
+                              </button>
+                              <button
+                                onClick={() => setShowBulkDeleteConfirm(false)}
+                                className="flex-1 px-3 py-1.5 bg-gray-600 hover:bg-gray-700 text-white rounded text-sm"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    
                     {/* Nodes list */}
                     <div className="max-h-64 overflow-y-auto space-y-3">
                       {nodes.map((node) => {
@@ -575,7 +689,7 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
                   <div>
                     <h5 className="text-blue-200 font-semibold mb-2">Deletion Process:</h5>
                     <ol className="text-blue-300 text-sm space-y-1 list-decimal list-inside">
-                      <li>Delete all {nodeCount} nodes (edges are removed automatically)</li>
+                      <li>Confirm the graph is empty (no nodes or edges)</li>
                       <li>Delete the graph structure and metadata</li>
                       <li>Clear all permissions and access rights</li>
                     </ol>
