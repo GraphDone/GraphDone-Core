@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
-import { Layers, Trophy, Target, Sparkles, ListTodo, AlertTriangle, Lightbulb, Microscope, WORK_ITEM_TYPES, getTypeConfig, getTypeIconElement, WorkItemType } from '../constants/workItemConstants';
+import { Layers, Trophy, Target, Sparkles, ListTodo, AlertTriangle, Lightbulb, Microscope, WORK_ITEM_TYPES, getTypeConfig, WorkItemType } from '../constants/workItemConstants';
 import { RadarChart } from './RadarChart';
 import { useGraph } from '../contexts/GraphContext';
 import { useQuery, gql } from '@apollo/client';
@@ -63,7 +63,14 @@ export function NodeDistributionRadar({ className = '', showLegend = true }: Nod
       .map(type => ({
         axis: formatLabel(type),
         value: typeCounts[type],
-        color: getTypeConfig(type as WorkItemType).hexColor
+        color: type === 'EPIC' ? '#c084fc' : 
+               type === 'MILESTONE' ? '#fb923c' :
+               type === 'OUTCOME' ? '#818cf8' :
+               type === 'FEATURE' ? '#38bdf8' :
+               type === 'TASK' ? '#4ade80' :
+               type === 'BUG' ? '#ef4444' :
+               type === 'IDEA' ? '#fde047' :
+               type === 'RESEARCH' ? '#2dd4bf' : '#6b7280'
       }));
 
     const maxValue = Math.max(...nodeTypeData.map(item => item.value), 1);
@@ -167,15 +174,15 @@ export function NodeDistributionRadar({ className = '', showLegend = true }: Nod
               {radarData.map((item, index) => {
                 const getIcon = (axis: string) => {
                   switch(axis) {
-                    case 'Epic': return getTypeIconElement('EPIC', "h-5 w-5");
-                    case 'Milestone': return getTypeIconElement('MILESTONE', "h-5 w-5");
-                    case 'Outcome': return getTypeIconElement('OUTCOME', "h-5 w-5");
-                    case 'Feature': return getTypeIconElement('FEATURE', "h-5 w-5");
-                    case 'Task': return getTypeIconElement('TASK', "h-5 w-5");
-                    case 'Bug': return getTypeIconElement('BUG', "h-5 w-5");
-                    case 'Idea': return getTypeIconElement('IDEA', "h-5 w-5");
-                    case 'Research': return getTypeIconElement('RESEARCH', "h-5 w-5");
-                    default: return getTypeIconElement('DEFAULT', "h-5 w-5");
+                    case 'Epic': return <Layers className="h-5 w-5" style={{ color: item.color || '#c084fc' }} />;
+                    case 'Milestone': return <Trophy className="h-5 w-5" style={{ color: item.color || '#fb923c' }} />;
+                    case 'Outcome': return <Target className="h-5 w-5" style={{ color: item.color || '#818cf8' }} />;
+                    case 'Feature': return <Sparkles className="h-5 w-5" style={{ color: item.color || '#38bdf8' }} />;
+                    case 'Task': return <ListTodo className="h-5 w-5" style={{ color: item.color || '#4ade80' }} />;
+                    case 'Bug': return <AlertTriangle className="h-5 w-5" style={{ color: item.color || '#ef4444' }} />;
+                    case 'Idea': return <Lightbulb className="h-5 w-5" style={{ color: item.color || '#fde047' }} />;
+                    case 'Research': return <Microscope className="h-5 w-5" style={{ color: item.color || '#2dd4bf' }} />;
+                    default: return <div className="w-4 h-4 rounded-full" style={{ backgroundColor: item.color || '#6b7280' }}></div>;
                   }
                 };
                 
