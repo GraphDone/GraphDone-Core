@@ -111,6 +111,12 @@ export function InteractiveGraphVisualization() {
   // Mutation for creating edges
   const [createEdgeMutation] = useMutation(CREATE_EDGE, {
     refetchQueries: [
+      // Refetch all edges for graph visualization (matches ConnectNodeModal)
+      { 
+        query: GET_EDGES,
+        variables: {}
+      },
+      // Refetch edges for current graph
       { 
         query: GET_EDGES, 
         variables: {
@@ -123,6 +129,7 @@ export function InteractiveGraphVisualization() {
           }
         }
       },
+      // Refetch work items for current graph
       { 
         query: GET_WORK_ITEMS, 
         variables: currentGraph ? {
@@ -134,6 +141,21 @@ export function InteractiveGraphVisualization() {
         } : {}
       }
     ],
+    awaitRefetchQueries: true,
+    optimisticResponse: (vars) => {
+      const input = vars.input[0];
+      return {
+        createEdges: {
+          edges: [{
+            id: `temp-${Date.now()}`,
+            type: input.type,
+            weight: input.weight,
+            source: { id: 'temp-source' },
+            target: { id: 'temp-target' }
+          }]
+        }
+      };
+    },
     onError: (_error) => {
       // Error handled by GraphQL error boundary
     }
@@ -246,6 +268,40 @@ export function InteractiveGraphVisualization() {
 
   // Additional edge operations
   const [updateEdgeMutation] = useMutation(UPDATE_EDGE, {
+    refetchQueries: [
+      // Refetch all edges for graph visualization (matches other mutations)
+      { 
+        query: GET_EDGES,
+        variables: {}
+      },
+      // Refetch edges for current graph
+      { 
+        query: GET_EDGES, 
+        variables: {
+          where: {
+            source: {
+              graph: {
+                id: currentGraph?.id
+              }
+            }
+          }
+        }
+      }
+    ],
+    awaitRefetchQueries: true,
+    optimisticResponse: (vars) => {
+      return {
+        updateEdges: {
+          edges: [{
+            id: vars.where.id,
+            type: vars.update.type || 'DEFAULT_EDGE',
+            weight: vars.update.weight || 0.8,
+            source: { id: 'temp-source' },
+            target: { id: 'temp-target' }
+          }]
+        }
+      };
+    },
     update(cache, { data }) {
       if (data?.updateEdges?.edges?.length > 0) {
         const updatedEdge = data.updateEdges.edges[0];
@@ -284,8 +340,17 @@ export function InteractiveGraphVisualization() {
           });
         }
       }
-    },
+    }
+  });
+
+  const [deleteEdgeMutation] = useMutation(DELETE_EDGE, {
     refetchQueries: [
+      // Refetch all edges for graph visualization (matches ConnectNodeModal)
+      { 
+        query: GET_EDGES,
+        variables: {}
+      },
+      // Refetch edges for current graph
       { 
         query: GET_EDGES, 
         variables: {
@@ -297,23 +362,28 @@ export function InteractiveGraphVisualization() {
             }
           }
         }
-      }
-    ],
-  });
-
-  const [deleteEdgeMutation] = useMutation(DELETE_EDGE, {
-    refetchQueries: [{ 
-      query: GET_EDGES, 
-      variables: {
-        where: {
-          source: {
+      },
+      // Refetch work items for current graph
+      { 
+        query: GET_WORK_ITEMS, 
+        variables: currentGraph ? {
+          where: {
             graph: {
-              id: currentGraph?.id
+              id: currentGraph.id
             }
           }
-        }
+        } : {}
       }
-    }],
+    ],
+    awaitRefetchQueries: true,
+    optimisticResponse: (vars) => {
+      return {
+        deleteEdges: {
+          nodesDeleted: 0,
+          relationshipsDeleted: 1
+        }
+      };
+    }
   });
 
   const getGraphTypeIcon = (type?: string) => {
