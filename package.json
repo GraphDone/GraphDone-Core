@@ -1,6 +1,6 @@
 {
   "name": "graphdone",
-  "version": "0.2.1-alpha",
+  "version": "0.2.2-alpha",
   "description": "Project management for teams who think differently",
   "private": true,
   "workspaces": [
