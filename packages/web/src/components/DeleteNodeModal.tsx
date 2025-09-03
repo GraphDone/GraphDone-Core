@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useMutation, useQuery } from '@apollo/client';
 import { X, Trash2, AlertTriangle, Shield, CheckCircle, GitBranch } from 'lucide-react';
-import { DELETE_WORK_ITEM, GET_WORK_ITEMS, GET_EDGES } from '../lib/queries';
+import { DELETE_WORK_ITEM, GET_WORK_ITEMS, GET_EDGES, DELETE_EDGE } from '../lib/queries';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { getRelationshipConfig, type RelationshipType } from '../constants/workItemConstants';
@@ -106,10 +106,74 @@ export function DeleteNodeModal({ isOpen, onClose, nodeId, nodeTitle, nodeType, 
     }
   });
 
+  const [deleteEdge, { loading: deletingConnection }] = useMutation(DELETE_EDGE, {
+    refetchQueries: [
+      { 
+        query: GET_EDGES,
+        variables: {
+          where: {
+            OR: [
+              { source: { id: nodeId } },
+              { target: { id: nodeId } }
+            ]
+          }
+        }
+      }
+    ],
+    awaitRefetchQueries: true
+  });
+
   const handleGoToDisconnect = () => {
     onClose(); // Close delete modal
     if (onOpenDisconnectModal) {
       onOpenDisconnectModal(); // Open disconnect modal
+    }
+  };
+
+  const handleDisconnectAllConnections = async () => {
+    if (nodeConnections.length === 0) return;
+
+    try {
+      // Disconnect all edges for this node
+      for (const edge of nodeConnections) {
+        await deleteEdge({
+          variables: { 
+            where: { id: edge.id }
+          }
+        });
+      }
+      
+      showSuccess(
+        'All Connections Removed!',
+        `Disconnected all ${nodeConnections.length} connection${nodeConnections.length !== 1 ? 's' : ''} from "${nodeTitle}".`
+      );
+      
+    } catch (error) {
+      showError(
+        'Failed to Remove All Connections',
+        error instanceof Error ? error.message : 'Please try again.'
+      );
+    }
+  };
+
+  const handleDisconnectEdge = async (edgeId: string, sourceTitle: string, targetTitle: string) => {
+    try {
+      await deleteEdge({
+        variables: { 
+          where: { id: edgeId }
+        }
+      });
+      
+      showSuccess(
+        'Connection Removed!',
+        `Disconnected "${sourceTitle}" from "${targetTitle}".`
+      );
+      
+    } catch (error) {
+      showError(
+        'Failed to Remove Connection',
+        error instanceof Error ? error.message : 'Please try again.'
+      );
     }
   };
 
@@ -212,7 +276,7 @@ export function DeleteNodeModal({ isOpen, onClose, nodeId, nodeTitle, nodeType, 
             </div>
           )}
 
-          {/* Connections blocking screen */}
+          {/* Connections blocking screen - same pattern as DeleteGraphModal */}
           {!loadingEdges && hasConnections && (
             <div className="p-8">
               <div className="mb-8">
@@ -238,75 +302,73 @@ export function DeleteNodeModal({ isOpen, onClose, nodeId, nodeTitle, nodeType, 
                 </div>
               </div>
 
-              <div className="mb-8">
-                <div className="flex items-center justify-center mb-4">
-                  <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-600 to-transparent"></div>
-                  <span className="px-4 text-sm font-medium text-gray-400 bg-gray-800">Active Connections</span>
-                  <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-600 to-transparent"></div>
-                </div>
-                <div className="max-h-40 overflow-y-auto space-y-3 custom-scrollbar">
-                  {nodeConnections.map((edge: any, index: number) => (
-                    <div 
-                      key={edge.id} 
-                      className="group relative bg-gradient-to-r from-gray-800/80 to-gray-700/60 border border-gray-600/50 rounded-xl p-4 hover:border-orange-400/30 transition-all duration-200 hover:shadow-lg hover:shadow-orange-500/10 animate-slide-in-up"
-                      style={{ animationDelay: `${index * 0.1}s` }}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                          <div className="flex-shrink-0 w-2 h-2 bg-orange-400 rounded-full animate-pulse"></div>
-                          <div>
-                            <span className="text-gray-200 font-medium">
-                              {edge.source.id === nodeId ? 'Connected to' : 'Connected from'}
-                            </span>
-                            <div className="text-white font-semibold text-lg">
-                              {edge.source.id === nodeId ? edge.target.title : edge.source.title}
+              {/* Inline disconnect actions - matching DeleteGraphModal pattern */}
+              <div className="bg-orange-900/20 border border-orange-600/30 rounded-lg p-5 mb-6">
+                <div className="flex items-start">
+                  <AlertTriangle className="h-6 w-6 text-orange-400 mt-0.5 mr-3 flex-shrink-0" />
+                  <div className="flex-1">
+                    <h4 className="text-orange-200 font-semibold mb-3">Disconnect Connections First</h4>
+                    <p className="text-orange-300 text-sm mb-4">
+                      This node has <strong className="text-orange-200">{nodeConnections.length} connection{nodeConnections.length !== 1 ? 's' : ''}</strong>. Remove them to enable deletion:
+                    </p>
+                    
+                    {/* Disconnect All Button */}
+                    <div className="mb-4">
+                      <button
+                        onClick={handleDisconnectAllConnections}
+                        disabled={deletingConnection}
+                        className="w-full px-4 py-3 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 text-white rounded-lg transition-colors flex items-center justify-center space-x-2 font-medium disabled:cursor-not-allowed"
+                      >
+                        <GitBranch className="h-4 w-4" />
+                        <span>{deletingConnection ? 'Disconnecting...' : 'Disconnect All Connections'}</span>
+                      </button>
+                    </div>
+                    
+                    {/* Individual connections with disconnect buttons */}
+                    <div className="space-y-3">
+                      {nodeConnections.map((edge: any, index: number) => (
+                        <div key={edge.id} className="flex items-center justify-between p-3 bg-gray-700/50 border border-gray-600/30 rounded-lg">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-2 h-2 bg-orange-400 rounded-full"></div>
+                            <div>
+                              <span className="text-gray-300 text-sm">
+                                {edge.source.id === nodeId ? 'connects to' : 'connected from'} "{edge.source.id === nodeId ? edge.target.title : edge.source.title}"
+                              </span>
+                              <div className="flex items-center space-x-2 mt-1">
+                                <span className="inline-flex items-center px-2 py-1 bg-gradient-to-r from-orange-500/20 to-amber-500/20 border border-orange-400/30 rounded-full text-xs font-semibold text-orange-200">
+                                  {getRelationshipConfig(edge.type as RelationshipType).label}
+                                </span>
+                              </div>
                             </div>
                           </div>
+                          <button
+                            onClick={() => handleDisconnectEdge(
+                              edge.id,
+                              edge.source.title,
+                              edge.target.title
+                            )}
+                            disabled={deletingConnection}
+                            className="px-2 py-1 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 text-white rounded text-xs flex items-center space-x-1 disabled:cursor-not-allowed"
+                            title="Disconnect this relationship"
+                          >
+                            <X className="h-3 w-3" />
+                            <span>Disconnect</span>
+                          </button>
                         </div>
-                        <div className="text-right">
-                          <span className="inline-flex items-center px-3 py-1 bg-gradient-to-r from-orange-500/20 to-amber-500/20 border border-orange-400/30 rounded-full text-xs font-semibold text-orange-200 backdrop-blur-sm">
-                            {getRelationshipConfig(edge.type as RelationshipType).label}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-6">
-                {/* Modern info banner */}
-                <div className="relative bg-gradient-to-r from-blue-500/10 to-indigo-500/10 border border-blue-400/20 rounded-xl p-4 backdrop-blur-sm">
-                  <div className="flex items-center space-x-3">
-                    <div className="flex-shrink-0 w-8 h-8 bg-blue-500/20 border border-blue-400/30 rounded-full flex items-center justify-center">
-                      <GitBranch className="h-4 w-4 text-blue-400" />
-                    </div>
-                    <div>
-                      <p className="text-blue-200 font-medium text-sm">Next Step Required</p>
-                      <p className="text-gray-300 text-sm">Use the disconnect tool to safely remove all connections</p>
+                      ))}
                     </div>
                   </div>
                 </div>
+              </div>
 
-                {/* Modern button group */}
-                <div className="flex flex-col sm:flex-row gap-3 justify-end">
-                  {onOpenDisconnectModal && (
-                    <button
-                      onClick={handleGoToDisconnect}
-                      className="group relative px-6 py-3 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-semibold rounded-xl transition-all duration-200 transform hover:scale-[1.02] hover:shadow-lg hover:shadow-orange-500/25 flex items-center justify-center space-x-2"
-                    >
-                      <div className="absolute inset-0 bg-gradient-to-r from-orange-400/20 to-amber-400/20 rounded-xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
-                      <GitBranch className="h-5 w-5 relative z-10" />
-                      <span className="relative z-10">Go to Disconnect</span>
-                    </button>
-                  )}
-                  <button
-                    onClick={onClose}
-                    className="px-6 py-3 bg-gray-700/80 hover:bg-gray-600/80 border border-gray-600/50 hover:border-gray-500/50 text-gray-200 font-medium rounded-xl transition-all duration-200 backdrop-blur-sm"
-                  >
-                    Close
-                  </button>
-                </div>
+              {/* Modern button group */}
+              <div className="flex justify-end">
+                <button
+                  onClick={onClose}
+                  className="px-6 py-3 bg-gray-700/80 hover:bg-gray-600/80 border border-gray-600/50 hover:border-gray-500/50 text-gray-200 font-medium rounded-xl transition-all duration-200 backdrop-blur-sm"
+                >
+                  Close
+                </button>
               </div>
             </div>
           )}
