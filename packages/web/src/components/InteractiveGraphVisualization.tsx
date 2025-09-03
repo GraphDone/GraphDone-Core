@@ -738,7 +738,8 @@ export function InteractiveGraphVisualization() {
       
       if (result.data) {
         setNodeCounter(prev => prev + 1);
-        refetch();
+        // Let Apollo's cache update handle the UI update instead of refetch to avoid camera jumping
+        // The refetchQueries in the mutation config will handle the data update
       }
     } catch (_error) {
       // Error handled by mutation error state
@@ -777,11 +778,13 @@ export function InteractiveGraphVisualization() {
 
     const g = svg.append('g');
 
-    // Add background for capturing clicks to show context menu
+    // Add background for capturing clicks to show context menu (make it very large for better detection)
     const background = g.append('rect')
       .attr('class', 'background')
-      .attr('width', width)
-      .attr('height', height)
+      .attr('x', -10000)
+      .attr('y', -10000)
+      .attr('width', 20000)
+      .attr('height', 20000)
       .attr('fill', 'transparent')
       .style('cursor', 'default');
 
@@ -1000,11 +1003,9 @@ export function InteractiveGraphVisualization() {
           d.fy = d.y;
         })
         .on('drag', (event, d: any) => {
-          // Get node radius
-          const nodeRadius = 30;
-          // Constrain to container bounds
-          d.fx = Math.max(nodeRadius, Math.min(width - nodeRadius, event.x));
-          d.fy = Math.max(nodeRadius, Math.min(height - nodeRadius, event.y));
+          // Allow free dragging without bounds constraints
+          d.fx = event.x;
+          d.fy = event.y;
           d.x = d.fx;
           d.y = d.fy;
         })
@@ -1843,12 +1844,7 @@ export function InteractiveGraphVisualization() {
 
     // Simulation tick
     simulation.on('tick', () => {
-      // Constrain nodes to container bounds
-      nodes.forEach((d: any) => {
-        const nodeRadius = 30;
-        d.x = Math.max(nodeRadius, Math.min(width - nodeRadius, d.x || centerX));
-        d.y = Math.max(nodeRadius, Math.min(height - nodeRadius, d.y || centerY));
-      });
+      // Allow nodes to move freely without bounds constraints
       
       // Update node positions
       nodeElements
@@ -2184,7 +2180,7 @@ export function InteractiveGraphVisualization() {
 
 
   return (
-    <div ref={containerRef} className="graph-container relative w-full bg-gray-900" style={{ height: '100vh', minHeight: '900px' }}>
+    <div ref={containerRef} className="graph-container relative w-full bg-gray-900" style={{ height: '100vh' }}>
       <svg ref={svgRef} className="w-full h-full" style={{ background: 'radial-gradient(circle at center, #1f2937 0%, #111827 100%)' }} />
       
       
@@ -2776,58 +2772,61 @@ export function InteractiveGraphVisualization() {
           
           <button
             onClick={() => {
-              // Zoom to fit all nodes
+              console.log('Zoom to fit button clicked!');
+              // Zoom to fit all nodes - completely rewritten for proper detection
               const svg = d3.select(svgRef.current);
               const containerRect = containerRef.current?.getBoundingClientRect();
               if (svg.node() && containerRect && nodes.length > 0) {
-                // Find bounds of all nodes using actual simulation positions
-                const margin = 150;
-                const nodePositions = nodes.map(node => ({
-                  x: node.x || node.positionX || 0,
-                  y: node.y || node.positionY || 0
-                }));
+                // Get all node positions (both from simulation and stored positions)
+                const allPositions = nodes.map(node => ({
+                  x: node.x !== undefined ? node.x : (node.positionX || 0),
+                  y: node.y !== undefined ? node.y : (node.positionY || 0)
+                })).filter(pos => pos.x !== undefined && pos.y !== undefined);
                 
-                const xExtent = d3.extent(nodePositions, d => d.x) as [number, number];
-                const yExtent = d3.extent(nodePositions, d => d.y) as [number, number];
+                if (allPositions.length === 0) {
+                  console.log('No valid node positions found');
+                  setContextMenuPosition(null);
+                  return;
+                }
                 
-                const width = containerRect.width;
-                const height = containerRect.height;
+                // Find the absolute bounds of all nodes
+                const minX = Math.min(...allPositions.map(p => p.x));
+                const maxX = Math.max(...allPositions.map(p => p.x));
+                const minY = Math.min(...allPositions.map(p => p.y));
+                const maxY = Math.max(...allPositions.map(p => p.y));
                 
-                // Calculate the bounding box of all nodes (add padding for node radius)
-                const nodeRadius = 50; // Account for node size
-                const nodeWidth = Math.max(xExtent[1] - xExtent[0] + 2 * nodeRadius, 300);
-                const nodeHeight = Math.max(yExtent[1] - yExtent[0] + 2 * nodeRadius, 300);
+                // Add generous padding for node sizes and breathing room
+                const nodePadding = 150; // Account for node size
+                const extraMargin = 300; // Extra breathing room
+                const totalPadding = nodePadding + extraMargin;
                 
-                // Calculate scale to fit all nodes with margin (be more conservative)
-                const scaleX = (width - 2 * margin) / nodeWidth;
-                const scaleY = (height - 2 * margin) / nodeHeight;
-                const scale = Math.min(scaleX, scaleY, 0.8); // Max scale of 0.8x to zoom out more
+                const boundsWidth = (maxX - minX) + (2 * totalPadding);
+                const boundsHeight = (maxY - minY) + (2 * totalPadding);
                 
-                // Calculate center position of all nodes
-                const nodesCenterX = (xExtent[0] + xExtent[1]) / 2;
-                const nodesCenterY = (yExtent[0] + yExtent[1]) / 2;
+                // Calculate how much we need to scale to fit everything
+                const containerWidth = containerRect.width;
+                const containerHeight = containerRect.height;
                 
-                // Calculate screen center
-                const screenCenterX = width / 2;
-                const screenCenterY = height / 2;
+                const scaleX = containerWidth / boundsWidth;
+                const scaleY = containerHeight / boundsHeight;
+                const scale = Math.min(scaleX, scaleY, 0.2); // Very conservative max scale for wide zoom out
                 
-                // Calculate translation to put the center of nodes at the center of the screen
-                // Formula: translate = screenCenter - (nodeCenter * scale)
-                const translateX = screenCenterX - nodesCenterX * scale;
-                const translateY = screenCenterY - nodesCenterY * scale;
+                // Find the center of all nodes
+                const centerX = (minX + maxX) / 2;
+                const centerY = (minY + maxY) / 2;
                 
-                console.log('Zoom to fit:', { 
-                  scale, 
-                  translateX, 
-                  translateY, 
-                  nodesCenterX, 
-                  nodesCenterY, 
-                  screenCenterX, 
-                  screenCenterY,
-                  width,
-                  height,
-                  xExtent,
-                  yExtent
+                // Calculate translation to center the nodes
+                const translateX = (containerWidth / 2) - (centerX * scale);
+                const translateY = (containerHeight / 2) - (centerY * scale);
+                
+                console.log('Zoom to fit (improved):', {
+                  nodeCount: allPositions.length,
+                  bounds: { minX, maxX, minY, maxY },
+                  boundsSize: { width: boundsWidth, height: boundsHeight },
+                  container: { width: containerWidth, height: containerHeight },
+                  scale,
+                  center: { x: centerX, y: centerY },
+                  translate: { x: translateX, y: translateY }
                 });
                 
                 // Create the transform and update D3's zoom behavior state properly
