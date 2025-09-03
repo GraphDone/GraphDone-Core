@@ -13,19 +13,11 @@ import {
   getRelationshipIconElement,
   RelationshipType
 } from '../constants/workItemConstants';
-import { 
-  getStatusColor as getStatusColorScheme,
-  getTypeColor, 
-  getPriorityColor,
-  suggestSimilarNodes
-} from '../utils/nodeColorSystem';
 import {
   STATUS_OPTIONS,
   PRIORITY_OPTIONS,
   getPriorityIcon as getCentralizedPriorityIcon,
   getPriorityIconElement,
-  getPriorityColor as getCentralizedPriorityColor,
-  getStatusColorScheme as getCentralizedStatusColorScheme,
   ClipboardList
 } from '../constants/workItemConstants';
 
@@ -76,17 +68,17 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
   const [formData, setFormData] = React.useState({
     title: '',
     description: '',
-    type: '',
+    type: 'DEFAULT',
     priorityExec: 0,
     priorityIndiv: 0,
     priorityComm: 0,
-    status: 'PROPOSED',
+    status: 'NOT_STARTED',
     assignedTo: '',
     dueDate: '',
     tags: [] as string[]
   });
 
-  const [selectedRelationType, setSelectedRelationType] = React.useState('DEPENDS_ON');
+  const [selectedRelationType, setSelectedRelationType] = React.useState('DEFAULT_EDGE');
 
   const [isStatusOpen, setIsStatusOpen] = React.useState(false);
   const statusDropdownRef = React.useRef<HTMLDivElement>(null);
@@ -119,7 +111,7 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
   );
   
   // Check if all required fields are filled and no duplicate name
-  const isFormValid = formData.title.trim() !== '' && formData.type !== '' && !isDuplicateName;
+  const isFormValid = formData.title.trim() !== '' && !isDuplicateName;
 
 
   const [createWorkItem, { loading: creatingWorkItem }] = useMutation(CREATE_WORK_ITEM, {
@@ -233,10 +225,6 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
     e.preventDefault();
     
     
-    if (!formData.type) {
-      showError('Validation Error', 'Please select a node type.');
-      return;
-    }
 
     if (!currentGraph) {
       showError('No Graph Selected', 'Please select a graph before creating work items.');
@@ -253,12 +241,11 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
         priorityExec: formData.priorityExec,
         priorityIndiv: formData.priorityIndiv,
         priorityComm: formData.priorityComm,
-        assignedTo: formData.assignedTo || undefined,
         dueDate: formData.dueDate || undefined,
         tags: formData.tags || [],
       };
       
-      const workItemInput = {
+      const workItemInput: any = {
         ...cleanFormData,
         positionX: position?.x || (400 + Math.random() * 200),
         positionY: position?.y || (300 + Math.random() * 200),
@@ -267,27 +254,28 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
         theta: 0.0,
         phi: 0.0,
         priorityComp: (formData.priorityExec + formData.priorityIndiv + formData.priorityComm) / 3,
-        
-        // Relationships - connect to current user and graph
-        owner: {
+      };
+
+      // Handle assignedTo relationship properly for Neo4j GraphQL
+      if (formData.assignedTo) {
+        workItemInput.assignedTo = {
           connect: {
-            where: { node: { id: currentUser?.id } }
+            where: { node: { id: formData.assignedTo } }
           }
-        },
-        graph: {
-          connect: {
-            where: { node: { id: currentGraph?.id } }
-          }
-        },
-        
-        // If parentNodeId is provided, create a dependency relationship
-        ...(parentNodeId && {
-          dependencies: {
-            connect: {
-              where: { node: { id: parentNodeId } }
-            }
-          }
-        })
+        };
+      }
+
+      // Add required relationships
+      workItemInput.owner = {
+        connect: {
+          where: { node: { id: currentUser?.id } }
+        }
+      };
+      
+      workItemInput.graph = {
+        connect: {
+          where: { node: { id: currentGraph?.id } }
+        }
       };
 
       const result = await createWorkItem({
@@ -297,8 +285,16 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
       if (result.data?.createWorkItems?.workItems?.[0]) {
         const createdNode = result.data.createWorkItems.workItems[0];
         
-        // Connection is already created through the dependencies field in workItemInput
+        // If parentNodeId is provided, create the edge with the correct relationship type
         if (parentNodeId) {
+          const edgeInput = {
+            type: selectedRelationType,
+            source: { connect: { where: { node: { id: parentNodeId } } } },
+            target: { connect: { where: { node: { id: createdNode.id } } } }
+          };
+          
+          await createEdge({ variables: { input: [edgeInput] } });
+          
           const relationshipLabel = getRelationshipConfig(selectedRelationType as RelationshipType).label;
           showSuccess(
             'Node Created and Connected Successfully!',
@@ -315,16 +311,16 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
         setFormData({
           title: '',
           description: '',
-          type: '',
+          type: 'DEFAULT',
           priorityExec: 0,
           priorityIndiv: 0,
           priorityComm: 0,
-          status: 'PROPOSED',
+          status: 'NOT_STARTED',
           assignedTo: '',
           dueDate: '',
           tags: []
         });
-        setSelectedRelationType('DEPENDS_ON');
+        setSelectedRelationType('DEFAULT_EDGE');
       }
     } catch (error) {
       
@@ -397,7 +393,7 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                   <div className="flex items-center space-x-2 mb-4">
                     <div className="h-1.5 w-1.5 bg-emerald-400 rounded-full"></div>
                     <label className="text-sm font-bold text-gray-100 tracking-wide">
-                      Relationship Type *
+                      Relationship Type
                     </label>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
@@ -460,7 +456,7 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
               <div className="flex items-center space-x-2 mb-3">
                 <div className="h-1.5 w-1.5 bg-purple-400 rounded-full"></div>
                 <label className="text-sm font-bold text-gray-100 tracking-wide">
-                  Node Type *
+                  Node Type
                 </label>
               </div>
               

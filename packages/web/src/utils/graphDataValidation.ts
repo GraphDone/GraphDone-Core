@@ -1,4 +1,4 @@
-import { RelationshipType } from '../types/projectData';
+import { RelationshipType, RELATIONSHIP_OPTIONS } from '../constants/workItemConstants';
 
 // Types for validation results
 export interface ValidationResult {
@@ -309,11 +309,7 @@ function validateEdge(edge: any, index: number, nodeIdMap: Map<string, any>): Va
   
   // Validate edge type
   if (edge.type) {
-    const validTypes: RelationshipType[] = [
-      'DEPENDS_ON', 'BLOCKS', 'ENABLES', 'RELATES_TO',
-      'IS_PART_OF', 'FOLLOWS', 'PARALLEL_WITH', 'DUPLICATES',
-      'CONFLICTS_WITH', 'VALIDATES', 'REFERENCES', 'CONTAINS'
-    ];
+    const validTypes: RelationshipType[] = RELATIONSHIP_OPTIONS.map(r => r.type);
     
     if (!validTypes.includes(edge.type)) {
       errors.push({
@@ -366,8 +362,8 @@ function sanitizeNode(node: any): any {
   }
   
   // Set default values for missing fields
-  sanitized.type = sanitized.type || 'TASK';
-  sanitized.status = sanitized.status || 'PROPOSED';
+  sanitized.type = sanitized.type || 'DEFAULT';
+  sanitized.status = sanitized.status || 'NOT_STARTED';
   
   // Initialize numeric fields with defaults
   if (sanitized.positionX === undefined) sanitized.positionX = 0;
