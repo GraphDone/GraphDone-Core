@@ -108,6 +108,46 @@
   }
 }
 
+/* Pulsing green indicator for active dialogs - much more aggressive */
+.dialog-active-pulse {
+  animation: pulse-green 1.0s ease-in-out infinite !important;
+  stroke: #10b981 !important;
+  stroke-width: 6 !important;
+  filter: drop-shadow(0 0 20px #10b981) drop-shadow(0 0 40px #10b981) !important;
+}
+
+@keyframes pulse-green {
+  0%, 100% {
+    stroke: #10b981 !important;
+    stroke-width: 6 !important;
+    stroke-opacity: 1 !important;
+    filter: drop-shadow(0 0 20px #10b981) drop-shadow(0 0 40px #10b981) !important;
+  }
+  50% {
+    stroke: #34d399 !important;
+    stroke-width: 8 !important;
+    stroke-opacity: 1 !important;
+    filter: drop-shadow(0 0 30px #34d399) drop-shadow(0 0 60px #34d399) !important;
+  }
+}
+
+/* Force the glow on any SVG element with the pulse class */
+svg .dialog-active-pulse,
+.dialog-active-pulse {
+  animation: pulse-green 1.0s ease-in-out infinite !important;
+  stroke: #10b981 !important;
+  stroke-width: 6 !important;
+  filter: drop-shadow(0 0 20px #10b981) drop-shadow(0 0 40px #10b981) !important;
+}
+
+/* More specific targeting for SVG elements in the graph */
+.graph-container svg .dialog-active-pulse {
+  stroke: #10b981 !important;
+  stroke-width: 6 !important;
+  filter: drop-shadow(0 0 20px #10b981) drop-shadow(0 0 40px #10b981) !important;
+  animation: pulse-green 1.0s ease-in-out infinite !important;
+}
+
 .node:hover circle {
   filter: drop-shadow(0 0 6px currentColor);
   stroke-width: 2.5;
