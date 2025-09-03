@@ -15,7 +15,9 @@ import {
   getTypeIconElement,
   getStatusConfig,
   getStatusIconElement,
-  WORK_ITEM_STATUSES
+  WORK_ITEM_STATUSES,
+  getContributorColor,
+  getDueDateColorScheme
 } from '../constants/workItemConstants';
 import { TagDisplay } from './TagDisplay';
 import { AnimatedPriority } from './AnimatedPriority';
@@ -66,15 +68,6 @@ const getNodePriority = (node: WorkItem) => {
   return node.priorityExec || 0;
 };
 
-const getContributorColor = (name: string) => {
-  const colors = [
-    'bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-pink-500',
-    'bg-indigo-500', 'bg-yellow-500', 'bg-red-500', 'bg-teal-500',
-    'bg-orange-500', 'bg-cyan-500', 'bg-emerald-500', 'bg-violet-500'
-  ];
-  const hash = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  return colors[hash % colors.length];
-};
 
 const getContributorAvatar = (contributor?: string) => {
   if (!contributor) return null;
@@ -203,13 +196,7 @@ const KanbanView: React.FC<KanbanViewProps> = ({ filteredNodes, handleEditNode, 
                       <div className="flex flex-col items-start">
                         {node.dueDate ? (
                           <div className="space-y-1 text-left">
-                            <div className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded border transition-colors ${
-                              new Date(node.dueDate) < new Date() 
-                                ? 'bg-red-50 border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400' 
-                                : new Date(node.dueDate).getTime() - new Date().getTime() < 7 * 24 * 60 * 60 * 1000 
-                                  ? 'bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-400' 
-                                  : 'bg-blue-100 text-blue-800 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800'
-                            }`}>
+                            <div className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded border transition-colors ${getDueDateColorScheme(node.dueDate).bg} ${getDueDateColorScheme(node.dueDate).border} ${getDueDateColorScheme(node.dueDate).text}`}>
                               {new Date(node.dueDate).toLocaleDateString('en-US', { 
                                 month: 'short', 
                                 day: 'numeric',

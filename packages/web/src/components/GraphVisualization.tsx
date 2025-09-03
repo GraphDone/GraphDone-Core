@@ -70,14 +70,14 @@ export function GraphVisualization() {
       options: { limit: 100 }
     },
     fetchPolicy: 'cache-and-network',
-    pollInterval: 5000,
+    pollInterval: 100,
     notifyOnNetworkStatusChange: true,
     errorPolicy: 'all'
   });
 
   const { data: edgesData, loading: edgesLoading } = useQuery(GET_EDGES, {
     fetchPolicy: 'cache-and-network',
-    pollInterval: 5000,  // Also poll edges for consistency
+    pollInterval: 100,  // Also poll edges for consistency
     notifyOnNetworkStatusChange: true
   });
 
