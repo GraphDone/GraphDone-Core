@@ -5,7 +5,7 @@
 ![GraphDone UI Screenshot](./docs/graphdone_ui.png)
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Version](https://img.shields.io/badge/version-0.1.0--alpha-orange.svg)
+![Version](https://img.shields.io/badge/version-0.2.2--alpha-orange.svg)
 ![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
 
 ## What is GraphDone?
