@@ -225,19 +225,7 @@ svg text:not(.completion-indicator) {
 }
 
 .edge {
-  @apply stroke-current opacity-60;
-}
-
-.edge-dependency {
-  @apply stroke-blue-500;
-}
-
-.edge-blocks {
-  @apply stroke-red-500;
-}
-
-.edge-relates {
-  @apply stroke-gray-400;
+  opacity: 0.6;
 }
 
 /* Priority indicator styles */
