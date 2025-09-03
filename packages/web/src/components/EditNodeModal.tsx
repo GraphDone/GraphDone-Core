@@ -3,6 +3,7 @@ import { useMutation } from '@apollo/client';
 import { X, Edit, Save, ChevronDown } from 'lucide-react';
 import { UPDATE_WORK_ITEM, GET_WORK_ITEMS } from '../lib/queries';
 import { useAuth } from '../contexts/AuthContext';
+import { useGraph } from '../contexts/GraphContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { NodeTypeSelector } from './NodeCategorySelector';
 import { TagInput } from './TagInput';
@@ -21,6 +22,7 @@ interface EditNodeModalProps {
 
 export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
   const { currentTeam } = useAuth();
+  const { currentGraph } = useGraph();
   const { showSuccess, showError } = useNotifications();
   
   // Helper function to format DateTime to date string (YYYY-MM-DD)
@@ -92,11 +94,13 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
     refetchQueries: [
       { 
         query: GET_WORK_ITEMS,
-        variables: { options: { limit: 100 } }
-      },
-      { 
-        query: GET_WORK_ITEMS,
-        variables: { where: { graph: { teamId: currentTeam?.id || 'team-1' } } }
+        variables: currentGraph ? {
+          where: {
+            graph: {
+              id: currentGraph.id
+            }
+          }
+        } : { options: { limit: 100 } }
       }
     ],
     awaitRefetchQueries: true,
@@ -136,15 +140,32 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
         priorityExec: formData.priorityExec,
         priorityIndiv: formData.priorityIndiv,
         priorityComm: formData.priorityComm,
-        assignedTo: formData.assignedTo || undefined,
         dueDate: formData.dueDate || undefined,
         tags: formData.tags || [],
-      };
-      
-      const updateInput = {
-        ...cleanFormData,
         priorityComp: (formData.priorityExec + formData.priorityIndiv + formData.priorityComm) / 3,
       };
+      
+      const updateInput: any = { ...cleanFormData };
+      
+      // Handle assignedTo relationship properly for Neo4j GraphQL
+      const currentAssignedToId = typeof node.assignedTo === 'string' ? node.assignedTo : node.assignedTo?.id;
+      const newAssignedToId = formData.assignedTo;
+      
+      if (newAssignedToId && newAssignedToId !== currentAssignedToId) {
+        // Connect to new user
+        updateInput.assignedTo = {
+          connect: {
+            where: { node: { id: newAssignedToId } }
+          }
+        };
+      } else if (!newAssignedToId && currentAssignedToId) {
+        // Disconnect current user
+        updateInput.assignedTo = {
+          disconnect: {
+            where: { node: { id: currentAssignedToId } }
+          }
+        };
+      }
 
       
       const result = await updateWorkItem({

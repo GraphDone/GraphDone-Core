@@ -9,10 +9,7 @@ import {
   WorkItem, 
   Edge, 
   getExistingRelationships,
-  relationshipExists,
   hasAnyRelationship,
-  hasAnyRelationshipWithSelected,
-  hasExistingRelationshipWithSelected,
   filterValidSelectedNodes,
   validateNewConnection,
   detectDuplicateConnections,
@@ -22,27 +19,20 @@ import {
   RELATIONSHIP_OPTIONS,
   getRelationshipConfig,
   getRelationshipIconElement,
+  getRelationshipArrow,
+  getRelationshipDescription,
   RelationshipType
 } from '../constants/workItemConstants';
-import { 
-  getStatusColor as getStatusColorScheme,
-  getTypeColor, 
-  getPriorityColor,
-  getPriorityColorByLevel,
-  suggestSimilarNodes,
-  getColorSimilarityScore
-} from '../utils/nodeColorSystem';
 import {
   TYPE_OPTIONS,
   STATUS_OPTIONS,
   PRIORITY_OPTIONS,
-  getTypeIcon as getCentralizedTypeIcon,
-  getStatusIcon as getCentralizedStatusIcon,
-  getPriorityIcon as getCentralizedPriorityIcon,
-  getTypeColor as getCentralizedTypeColor,
-  getStatusColor as getCentralizedStatusColor,
-  getPriorityColor as getCentralizedPriorityColor,
-  // Import icons from central file
+  getTypeIconElement,
+  getStatusIconElement,
+  getPriorityIconElement,
+  getTypeColorScheme,
+  getStatusColorScheme,
+  getPriorityColorScheme,
   AlertTriangle,
   Target
 } from '../constants/workItemConstants';
@@ -72,25 +62,6 @@ interface DisconnectNodeModalProps {
 }
 
 
-// Wrapper functions to maintain existing API while using centralized constants
-const getStatusColorHex = (status: string): string => {
-  return getCentralizedStatusColor(status as any) || '#6b7280';
-};
-
-const getStatusIconElement = (status: string, className: string = "h-3 w-3") => {
-  const IconComponent = getCentralizedStatusIcon(status as any);
-  return IconComponent ? <IconComponent className={className} /> : null;
-};
-
-const getTypeIconElement = (type: string, className: string = "h-3 w-3") => {
-  const IconComponent = getCentralizedTypeIcon(type as any);
-  return IconComponent ? <IconComponent className={className} /> : null;
-};
-
-const getPriorityIconElement = (priority: number, className: string = "h-3 w-3") => {
-  const IconComponent = getCentralizedPriorityIcon(priority);
-  return IconComponent ? <IconComponent className={className} /> : null;
-};
 
 // Separate DisconnectNodeModal Component
 export function DisconnectNodeModal({ isOpen, onClose, sourceNode, onAllConnectionsRemoved }: DisconnectNodeModalProps) {
@@ -114,11 +85,13 @@ export function DisconnectNodeModal({ isOpen, onClose, sourceNode, onAllConnecti
         ]
       }
     },
-    skip: !isOpen
+    skip: !isOpen,
+    pollInterval: 1000, // Poll every second for real-time updates
+    fetchPolicy: 'cache-and-network' // Always check for updates
   });
 
   // Fetch work items for context
-  const { data: workItemsData, loading: loadingNodes } = useQuery(GET_WORK_ITEMS, {
+  const { data: workItemsData } = useQuery(GET_WORK_ITEMS, {
     variables: currentGraph?.id ? {
       where: {
         graph: { id: currentGraph.id }
@@ -160,11 +133,19 @@ export function DisconnectNodeModal({ isOpen, onClose, sourceNode, onAllConnecti
   const workItems: WorkItem[] = workItemsData?.workItems || [];
   const existingEdges: Edge[] = edgesData?.edges || [];
 
-  // Reset state when modal opens/closes
+  // Reset state and sync relationship type when modal opens
   useEffect(() => {
     if (isOpen) {
       setSelectedConnections(new Set());
+      
+      // Wait a bit for data to load, then sync
+      const syncTimeout = setTimeout(() => {
+        // Logic for syncing relationship type was removed
+      }, 100);
+      
+      return () => clearTimeout(syncTimeout);
     }
+    return undefined;
   }, [isOpen]);
 
   // Dynamic width measurement with ResizeObserver
@@ -258,7 +239,6 @@ export function DisconnectNodeModal({ isOpen, onClose, sourceNode, onAllConnecti
             
             return result;
           } catch (error) {
-            console.error(`Failed to remove connection ${connectionId}:`, error);
             const connection = selectedConnectionDetails.find(c => c?.id === connectionId);
             showError(
               'Connection Removal Failed',
@@ -315,7 +295,6 @@ export function DisconnectNodeModal({ isOpen, onClose, sourceNode, onAllConnecti
       }, 300);
 
     } catch (error: any) {
-      console.error('Failed to remove connections:', error);
       showError(
         '❌ Disconnect Operation Failed',
         error.message || 'Some connections could not be removed. Please try again or check your network connection.'
@@ -526,19 +505,15 @@ export function DisconnectNodeModal({ isOpen, onClose, sourceNode, onAllConnecti
                                       </span>
                                     </div>
                                     
-                                    {/* Relationship - Dynamic width */}
-                                    <div className="flex items-center space-x-1 flex-shrink-0">
-                                      <ArrowRight className={`h-3 w-3 ${relationshipType?.color || 'text-gray-400'}`} />
-                                      <div className="flex items-center space-x-1 px-2 py-1 rounded bg-gray-600/40" style={{ width: `${relationshipWidth}px` }}>
-                                        {relationshipType ? 
-                                          getRelationshipIconElement(relationshipType.type, `h-2.5 w-2.5`) :
-                                          getRelationshipIconElement('RELATES_TO', 'h-2.5 w-2.5 text-gray-400')
-                                        }
-                                        <span className={`text-xs font-medium ${relationshipType?.color || 'text-gray-400'} truncate`} title={relationshipLabel}>
-                                          {truncatedRelationship}
-                                        </span>
-                                      </div>
-                                      <ArrowRight className="h-3 w-3 text-gray-400" />
+                                    {/* Relationship - Adaptive display: symbol when tight, label when space allows */}
+                                    <div className="flex items-center space-x-1 px-2 py-1 rounded bg-gray-600/40 flex-shrink-0" style={{ width: `${relationshipWidth}px` }} title={getRelationshipDescription(sourceTitle, targetTitle, relationshipType?.type || 'RELATES_TO')}>
+                                      {relationshipType ? 
+                                        getRelationshipIconElement(relationshipType.type, `h-2.5 w-2.5`) :
+                                        getRelationshipIconElement('RELATES_TO', 'h-2.5 w-2.5 text-gray-400')
+                                      }
+                                      <span className={`text-xs font-medium ${relationshipType?.color || 'text-gray-400'} truncate`}>
+                                        {getRelationshipConfig(relationshipType?.type || 'RELATES_TO').label}
+                                      </span>
                                     </div>
 
                                     {/* Target - Dynamic width based on content */}
@@ -668,7 +643,7 @@ export function DisconnectNodeModal({ isOpen, onClose, sourceNode, onAllConnecti
   );
 }
 
-export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'connect', onAllConnectionsRemoved }: ConnectNodeModalProps) {
+export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'connect', onAllConnectionsRemoved: _onAllConnectionsRemoved }: ConnectNodeModalProps) {
   const { currentTeam } = useAuth();
   const { currentGraph } = useGraph();
   const { showSuccess, showError } = useNotifications();
@@ -677,17 +652,18 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
   const connectContainerRef = useRef<HTMLDivElement>(null);
   const disconnectContainerRef = useRef<HTMLDivElement>(null);
   const [connectContainerWidth, setConnectContainerWidth] = useState(600);
-  const [disconnectContainerWidth, setDisconnectContainerWidth] = useState(400);
   
   const [activeTab, setActiveTab] = useState<'connect' | 'disconnect'>(initialTab);
   const [selectedNodes, setSelectedNodes] = useState<Set<string>>(new Set());
   const [selectedConnections, setSelectedConnections] = useState<Set<string>>(new Set());
-  const [selectedRelationType, setSelectedRelationType] = useState('DEPENDS_ON');
+  const [selectedRelationType, setSelectedRelationType] = useState('DEFAULT_EDGE');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
   const [relationshipFilter, setRelationshipFilter] = useState<string[]>(RELATIONSHIP_OPTIONS.map(r => r.type));
+  
+  // Debug: Log available relationship options
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   
   // Custom dropdown states
@@ -742,14 +718,11 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
         ]
       }
     },
-    skip: !isOpen
+    skip: !isOpen,
+    pollInterval: 1000, // Poll every second for real-time updates
+    fetchPolicy: 'cache-and-network' // Always check for updates
   });
 
-  console.log('ConnectNodeModal - currentGraph:', currentGraph);
-  console.log('ConnectNodeModal - currentTeam:', currentTeam);
-  console.log('Existing edges:', edgesData?.edges || []);
-
-  console.log('Query result:', { data: workItemsData, loading: loadingNodes, error: queryError });
 
   const [createEdgeMutation, { loading: creatingConnection }] = useMutation(CREATE_EDGE, {
     refetchQueries: [
@@ -822,8 +795,6 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
   // Reset state when modal opens/closes - but only on initial open, not every render
   useEffect(() => {
     if (isOpen) {
-      console.log('ConnectNodeModal opened for node:', sourceNode);
-      console.log('Available work items:', workItems.length || 0);
       // Only reset activeTab when modal first opens, not when sourceNode changes
       setSelectedNodes(new Set());
       setSelectedConnections(new Set());
@@ -878,7 +849,7 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
     const measureDisconnectContainer = () => {
       if (disconnectContainerRef.current) {
         const rect = disconnectContainerRef.current.getBoundingClientRect();
-        setDisconnectContainerWidth(Math.floor(rect.width - 32)); // Subtract padding
+        // Width measurement removed (was unused)
       }
     };
 
@@ -998,7 +969,6 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
         `Connection "${connectionTitle}" has been removed.`
       );
     } catch (error: any) {
-      console.error('Failed to delete connection:', error);
       showError(
         'Failed to Remove Connection',
         error.message || 'An unexpected error occurred while removing the connection.'
@@ -1061,7 +1031,6 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
       setSelectedConnections(new Set());
       setShowDisconnectConfirmation(false);
     } catch (error: any) {
-      console.error('Failed to remove connections:', error);
       showError(
         'Failed to Remove Connections',
         error.message || 'An unexpected error occurred while removing connections. Please try again.'
@@ -1073,13 +1042,18 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
   // Check if any relationship type is disabled (any relationship already exists with selected nodes)
   const isRelationshipDisabled = (relationshipType: string) => {
     if (selectedNodes.size === 0) return false;
-    // With one-relationship-at-a-time policy, disable if ANY relationship exists
-    return hasAnyRelationshipWithSelected(
-      sourceNode.id,
-      Array.from(selectedNodes),
-      existingEdges,
-      workItems
-    );
+    
+    // Check if this relationship type would create duplicates for ANY selected node
+    return Array.from(selectedNodes).some(targetId => {
+      const validation = validateNewConnection(
+        sourceNode.id,
+        targetId,
+        relationshipType,
+        existingEdges,
+        workItems
+      );
+      return !validation.isValid;
+    });
   };
   
   // Filter out the source node and apply search/filters
@@ -1111,17 +1085,13 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
   const uniqueTypes = [...new Set(workItems.map((item: WorkItem) => item.type))];
 
   const toggleNodeSelection = (nodeId: string) => {
-    console.log('toggleNodeSelection called with nodeId:', nodeId);
     setSelectedNodes(prev => {
       const newSet = new Set(prev);
       if (newSet.has(nodeId)) {
-        console.log('Removing node from selection:', nodeId);
         newSet.delete(nodeId);
       } else {
-        console.log('Adding node to selection:', nodeId);
         newSet.add(nodeId);
       }
-      console.log('New selection set:', Array.from(newSet));
       return newSet;
     });
   };
@@ -1139,11 +1109,6 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
     }
 
     try {
-      console.log('Creating connections with:', {
-        sourceNodeId: sourceNode.id,
-        targetNodeIds: Array.from(selectedNodes),
-        relationshipType: selectedRelationType
-      });
       
       // Create connections one by one instead of batch
       const connectionPromises = Array.from(selectedNodes).map(async (targetId) => {
@@ -1156,7 +1121,6 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
           }]
         };
         
-        console.log('Creating single connection:', variables);
         return createEdgeMutation({ variables });
       });
       
@@ -1174,13 +1138,6 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
 
       onClose();
     } catch (error: any) {
-      console.error('Failed to create connections:', error);
-      console.error('Error details:', {
-        message: error.message,
-        graphQLErrors: error.graphQLErrors,
-        networkError: error.networkError,
-        extraInfo: error.extraInfo
-      });
       
       // Extract meaningful error message
       let errorMessage = 'Please try again or contact support.';
@@ -1270,7 +1227,7 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center space-x-2">
                   <div className="h-2 w-2 bg-emerald-400 rounded-full"></div>
-                  <h4 className="text-sm font-bold text-gray-100 tracking-wide">Relationship Type</h4>
+                  <h4 className="text-sm font-bold text-gray-100 tracking-wide">Relationship Type ({RELATIONSHIP_OPTIONS.filter(relation => relationshipFilter.includes(relation.type)).length} available)</h4>
                 </div>
                 
                 <div className="relative">
@@ -1325,7 +1282,14 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
               
               <div className="space-y-3 max-h-96 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
                 {RELATIONSHIP_OPTIONS.filter(relation => relationshipFilter.includes(relation.type)).map((relation) => {
+                  // Debug: Log each relationship being rendered
                   const isDisabled = isRelationshipDisabled(relation.type);
+                  const isSelected = selectedRelationType === relation.type;
+                  
+                  // DEBUG: Log selection state for important types
+                  if (relation.type === 'BLOCKS' || relation.type === 'DEFAULT_EDGE' || isSelected) {
+                    console.log(`🎛️ DROPDOWN OPTION - ${relation.type}: selected=${isSelected}, selectedRelationType=${selectedRelationType}`);
+                  }
                   
                   // Get which nodes already have this relationship
                   const nodesWithExistingRelationship = selectedNodes.size > 0
@@ -1663,19 +1627,18 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
                                         </span>
                                       </div>
                                       
-                                      {/* Relationship - Full size */}
-                                      <div className="flex items-center space-x-1 flex-shrink-0">
-                                        <ArrowRight className={`h-3 w-3 ${isOutgoing ? (relationshipType?.color || 'text-gray-400') : 'text-gray-400'}`} />
-                                        <div className="flex items-center space-x-1 px-2 py-1 rounded bg-gray-600/40">
-                                          {relationshipType ? 
-                                            getRelationshipIconElement(relationshipType.type, `h-2.5 w-2.5`) :
-                                            getRelationshipIconElement('RELATES_TO', 'h-2.5 w-2.5 text-gray-400')
-                                          }
-                                          <span className={`text-xs font-medium ${relationshipType?.color || 'text-gray-400'}`} title={`${relationshipType?.label || connection.type}${!isOutgoing ? ' (incoming)' : ''}`}>
-                                            {relationshipLabel.length > Math.floor(actualBoxWidth / 30) ? relationshipLabel.substring(0, Math.floor(actualBoxWidth / 30) - 1) + '…' : relationshipLabel}
-                                          </span>
-                                        </div>
-                                        <ArrowRight className="h-3 w-3 text-gray-400" />
+                                      {/* Relationship - Adaptive arrow with smart labeling */}
+                                      <div className="flex items-center space-x-1 px-2 py-1 rounded bg-gray-600/40 flex-shrink-0" title={getRelationshipDescription(sourceNode.title, connection.connectedNode.title, relationshipType?.type || 'RELATES_TO', !isOutgoing)}>
+                                        <span className={`text-sm ${isOutgoing ? (relationshipType?.color || 'text-gray-400') : 'text-gray-400'}`}>
+                                          {getRelationshipArrow(relationshipType?.type || 'RELATES_TO')}
+                                        </span>
+                                        {relationshipType ? 
+                                          getRelationshipIconElement(relationshipType.type, `h-2.5 w-2.5`) :
+                                          getRelationshipIconElement('RELATES_TO', 'h-2.5 w-2.5 text-gray-400')
+                                        }
+                                        <span className={`text-xs font-medium ${relationshipType?.color || 'text-gray-400'}`}>
+                                          {getRelationshipConfig(connection.type as RelationshipType).label}
+                                        </span>
                                       </div>
 
                                       {/* Target - Generous for connect */}
@@ -2061,7 +2024,6 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
                           e.preventDefault();
                           e.stopPropagation();
                           if (!isNodeDisabled) {
-                            console.log('Node button clicked!', node.id);
                             toggleNodeSelection(node.id);
                           }
                         }}
@@ -2089,8 +2051,8 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
                             <div className="flex items-center space-x-3 text-xs">
                               {/* Type with icon */}
                               <div className="flex items-center space-x-1">
-                                <div className={getTypeColor(node.type).text}>
-                                  {getTypeIconElement(node.type)}
+                                <div className={getTypeColorScheme(node.type as any).text}>
+                                  {getTypeIconElement(node.type as any)}
                                 </div>
                                 <span className="text-gray-300 font-medium">
                                   {node.type?.toLowerCase().replace(/\b\w/g, l => l.toUpperCase())}
@@ -2099,8 +2061,8 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
                               
                               {/* Status with icon and label */}
                               <div className="flex items-center space-x-1">
-                                <div className={getStatusColorScheme(node.status).text}>
-                                  {getStatusIconElement(node.status)}
+                                <div className={getStatusColorScheme(node.status as any).text}>
+                                  {getStatusIconElement(node.status as any)}
                                 </div>
                                 <span className="text-gray-300 font-medium">
                                   {node.status?.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())}
@@ -2110,8 +2072,8 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
                               {/* Priority with icon and progress bar */}
                               {(node.priorityComp !== undefined && node.priorityComp !== null) && (
                                 <div className="flex items-center space-x-1">
-                                  <div className={getPriorityColor(node.priorityComp).text}>
-                                    {getPriorityIconElement(node.priorityComp)}
+                                  <div className={getPriorityColorScheme(node.priorityComp).text}>
+                                    {getPriorityIconElement(node.priorityComp as any)}
                                   </div>
                                   <span className="text-gray-300 font-medium">Priority</span>
                                   <div className="flex items-center space-x-1">
@@ -2120,11 +2082,11 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
                                         className="h-full transition-all duration-300"
                                         style={{ 
                                           width: `${Math.round(node.priorityComp * 100)}%`,
-                                          backgroundColor: getPriorityColor(node.priorityComp).hex
+                                          backgroundColor: getPriorityColorScheme(node.priorityComp).hex
                                         }}
                                       />
                                     </div>
-                                    <span className={`text-xs font-medium ${getPriorityColor(node.priorityComp).text}`}>
+                                    <span className={`text-xs font-medium ${getPriorityColorScheme(node.priorityComp).text}`}>
                                       {Math.round(node.priorityComp * 100)}%
                                     </span>
                                   </div>
@@ -2299,19 +2261,18 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
                                       </span>
                                     </div>
                                     
-                                    <ArrowRight className={`h-3 w-3 ${relationshipType?.color || 'text-gray-400'}`} />
-                                    
-                                    <div className="flex items-center space-x-1 px-2 py-1 rounded bg-gray-600/40">
+                                    <div className="flex items-center space-x-1 px-2 py-1 rounded bg-gray-600/40" title={getRelationshipDescription(sourceNode.title, connection.connectedNode.title, relationshipType?.type || 'RELATES_TO')}>
+                                      <span className={`text-sm ${relationshipType?.color || 'text-gray-400'}`}>
+                                        {getRelationshipArrow(relationshipType?.type || 'RELATES_TO')}
+                                      </span>
                                       {relationshipType ? 
                                         getRelationshipIconElement(relationshipType.type, `h-2.5 w-2.5`) :
                                         getRelationshipIconElement('RELATES_TO', 'h-2.5 w-2.5 text-gray-400')
                                       }
-                                      <span className={`text-xs font-medium ${relationshipType?.color || 'text-gray-400'}`} title={relationshipType?.label || connection.type}>
-                                        {relationshipType?.label || connection.type}
+                                      <span className={`text-xs font-medium ${relationshipType?.color || 'text-gray-400'}`}>
+                                        {relationshipType?.label || 'Relates To'}
                                       </span>
                                     </div>
-                                    
-                                    <ArrowRight className="h-3 w-3 text-gray-400" />
                                     
                                     <div className="flex items-center px-2 py-1 bg-gray-600/40 rounded-md">
                                       <span className="text-gray-200 font-medium text-xs" title={connection.connectedNode.title}>

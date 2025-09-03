@@ -147,6 +147,9 @@ export const typeDefs = gql`
     INTERVIEW
     PERFORMANCE_REVIEW
     TEAM_BUILDING
+    
+    # Default Type
+    DEFAULT
     VACATION_REQUEST
     
     # Creative & Design
@@ -172,11 +175,13 @@ export const typeDefs = gql`
   }
 
   enum NodeStatus {
+    NOT_STARTED
     PROPOSED
     PLANNED
-    ACTIVE
     IN_PROGRESS
+    IN_REVIEW
     BLOCKED
+    ON_HOLD
     COMPLETED
     CANCELLED
   }
@@ -188,6 +193,7 @@ export const typeDefs = gql`
     RELATES_TO
     IS_PART_OF
     FOLLOWS
+    DEFAULT_EDGE
     PARALLEL_WITH
     DUPLICATES
     CONFLICTS_WITH
@@ -325,7 +331,7 @@ export const typeDefs = gql`
     priorityIndiv: Float! @default(value: 0.0)
     priorityComm: Float! @default(value: 0.0)
     priorityComp: Float! @default(value: 0.0)
-    status: NodeStatus! @default(value: PROPOSED)
+    status: NodeStatus! @default(value: NOT_STARTED)
     dueDate: DateTime
     tags: [String!]
     metadata: String # JSON as string

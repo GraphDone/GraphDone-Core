@@ -6,6 +6,8 @@ import {
   CheckCircle, 
   AlertCircle,
   XCircle,
+  Eye,
+  Pause,
   Layers, 
   Trophy, 
   Target, 
@@ -19,6 +21,7 @@ import {
   Triangle,
   Circle,
   ArrowDown,
+  Hexagon,
   // Relationship Icons
   ArrowLeft,
   Ban,
@@ -29,14 +32,18 @@ import {
   Copy,
   Shield,
   Bookmark,
-  Package
+  Package,
+  // Default Icon
+  Square,
+  Paperclip
 } from 'lucide-react';
 
 // ============================
 // RE-EXPORT ICON COMPONENTS
 // ============================
 
-// Export all icon components for centralized importing
+// Export all Lucide React icons used in the application
+// This provides a single import point for all icons to maintain consistency
 export {
   // Status Icons
   ClipboardList,
@@ -45,6 +52,8 @@ export {
   CheckCircle,
   AlertCircle,
   XCircle,
+  Eye,
+  Pause,
   
   // Type Icons
   Layers,
@@ -62,6 +71,7 @@ export {
   Triangle,
   Circle,
   ArrowDown,
+  Hexagon,
   
   // Relationship Icons
   ArrowLeft,
@@ -73,56 +83,69 @@ export {
   Copy,
   Shield,
   Bookmark,
-  Package
+  Package,
+  
+  // Default Icon
+  Square,
+  Paperclip
 } from 'lucide-react';
 
 // ============================
 // CORE TYPE DEFINITIONS  
 // ============================
 
-export type WorkItemType = 'EPIC' | 'MILESTONE' | 'OUTCOME' | 'FEATURE' | 'TASK' | 'BUG' | 'IDEA' | 'RESEARCH';
-export type WorkItemStatus = 'PROPOSED' | 'PLANNED' | 'IN_PROGRESS' | 'COMPLETED' | 'BLOCKED' | 'CANCELLED';
+// Work item types define what kind of work this represents
+export type WorkItemType = 'EPIC' | 'MILESTONE' | 'OUTCOME' | 'FEATURE' | 'TASK' | 'BUG' | 'IDEA' | 'RESEARCH' | 'DEFAULT';
+
+// Work item statuses represent the current state of progress (9 total statuses)
+// NOT_STARTED is the default status for new items
+export type WorkItemStatus = 'NOT_STARTED' | 'PROPOSED' | 'PLANNED' | 'IN_PROGRESS' | 'IN_REVIEW' | 'BLOCKED' | 'ON_HOLD' | 'COMPLETED' | 'CANCELLED';
+
+// Priority levels map to numeric priority ranges (0.0 - 1.0)
 export type PriorityLevel = 'critical' | 'high' | 'moderate' | 'low' | 'minimal';
 
 // ============================
 // INTERFACE DEFINITIONS
 // ============================
 
+// Configuration interface for work item types (Epic, Task, Bug, etc.)
 export interface TypeOption {
   value: WorkItemType | 'all';
-  label: string;
-  description?: string;
-  icon: React.ComponentType<{ className?: string }> | null;
-  color: string;
-  bgColor?: string;
-  borderColor?: string;
-  hexColor: string;
+  label: string; // Display name for UI
+  description?: string; // Tooltip/help text
+  icon: React.ComponentType<{ className?: string }> | null; // Lucide React icon
+  color: string; // Tailwind text color class
+  bgColor?: string; // Tailwind background color class
+  borderColor?: string; // Tailwind border color class
+  hexColor: string; // Raw hex value for D3/SVG usage
 }
 
+// Configuration interface for work item statuses (Not Started, In Progress, etc.)
 export interface StatusOption {
   value: WorkItemStatus | 'all';
-  label: string;
-  description?: string;
-  icon: React.ComponentType<{ className?: string }> | null;
-  color: string;
-  bgColor?: string;
-  borderColor?: string;
-  dotColor?: string;
-  hexColor: string;
+  label: string; // Display name for UI
+  description?: string; // Tooltip/help text
+  icon: React.ComponentType<{ className?: string }> | null; // Lucide React icon
+  color: string; // Tailwind text color class
+  bgColor?: string; // Tailwind background color class
+  borderColor?: string; // Tailwind border color class
+  dotColor?: string; // Special dot/indicator color for status
+  hexColor: string; // Raw hex value for D3/SVG usage
 }
 
+// Configuration interface for priority levels (Critical, High, Low, etc.)
 export interface PriorityOption {
   value: PriorityLevel | 'all';
-  label: string;
-  description?: string;
-  icon: React.ComponentType<{ className?: string }> | null;
-  color: string;
-  bgColor?: string;
-  borderColor?: string;
-  hexColor: string;
-  threshold: {
-    min: number;
-    max: number;
+  label: string; // Display name for UI
+  description?: string; // Priority range description (e.g., "80% - 100%")
+  icon: React.ComponentType<{ className?: string }> | null; // Lucide React icon
+  color: string; // Tailwind text color class
+  bgColor?: string; // Tailwind background color class
+  borderColor?: string; // Tailwind border color class
+  hexColor: string; // Raw hex value for D3/SVG usage
+  threshold: { // Numeric priority range this level represents
+    min: number; // Minimum priority value (0.0 - 1.0)
+    max: number; // Maximum priority value (0.0 - 1.0)
   };
 }
 
@@ -210,6 +233,16 @@ export const WORK_ITEM_TYPES: Record<WorkItemType, TypeOption> = {
     bgColor: 'bg-teal-400/10',
     borderColor: 'border-teal-400/30',
     hexColor: '#2dd4bf'
+  },
+  DEFAULT: {
+    value: 'DEFAULT',
+    label: 'Default',
+    description: 'Generic work item',
+    icon: Square,
+    color: 'text-gray-400',
+    bgColor: 'bg-gray-400/10',
+    borderColor: 'border-gray-400/30',
+    hexColor: '#9ca3af'
   }
 };
 
@@ -217,11 +250,24 @@ export const WORK_ITEM_TYPES: Record<WorkItemType, TypeOption> = {
 // STATUS CONFIGURATION
 // ============================
 
+// Complete 9-status system for work items
+// Order matters: NOT_STARTED is first/default, followed by typical workflow progression
 export const WORK_ITEM_STATUSES: Record<WorkItemStatus, StatusOption> = {
+  NOT_STARTED: {
+    value: 'NOT_STARTED',
+    label: 'Not Started',
+    description: 'Waiting to begin',
+    icon: Hexagon,
+    color: 'text-gray-400',
+    bgColor: 'bg-gray-400/10',
+    borderColor: 'border-gray-400/30',
+    dotColor: 'bg-gray-400',
+    hexColor: '#9ca3af'
+  },
   PROPOSED: {
     value: 'PROPOSED',
     label: 'Proposed',
-    description: 'Initial idea or suggestion',
+    description: 'Idea added',
     icon: ClipboardList,
     color: 'text-cyan-400',
     bgColor: 'bg-cyan-400/10',
@@ -232,7 +278,7 @@ export const WORK_ITEM_STATUSES: Record<WorkItemStatus, StatusOption> = {
   PLANNED: {
     value: 'PLANNED',
     label: 'Planned',
-    description: 'Approved and scheduled for work',
+    description: 'Agreed to do',
     icon: Calendar,
     color: 'text-purple-400',
     bgColor: 'bg-purple-400/10',
@@ -243,7 +289,7 @@ export const WORK_ITEM_STATUSES: Record<WorkItemStatus, StatusOption> = {
   IN_PROGRESS: {
     value: 'IN_PROGRESS',
     label: 'In Progress',
-    description: 'Currently being worked on',
+    description: 'Being worked on',
     icon: Clock,
     color: 'text-yellow-400',
     bgColor: 'bg-yellow-400/10',
@@ -251,21 +297,21 @@ export const WORK_ITEM_STATUSES: Record<WorkItemStatus, StatusOption> = {
     dotColor: 'bg-yellow-400',
     hexColor: '#eab308'
   },
-  COMPLETED: {
-    value: 'COMPLETED',
-    label: 'Completed',
-    description: 'Work has been finished',
-    icon: CheckCircle,
-    color: 'text-green-400',
-    bgColor: 'bg-green-400/10',
-    borderColor: 'border-green-400/30',
-    dotColor: 'bg-green-400',
-    hexColor: '#22c55e'
+  IN_REVIEW: {
+    value: 'IN_REVIEW',
+    label: 'In Review',
+    description: 'Needs checking/approval',
+    icon: Eye,
+    color: 'text-blue-400',
+    bgColor: 'bg-blue-400/10',
+    borderColor: 'border-blue-400/30',
+    dotColor: 'bg-blue-400',
+    hexColor: '#3b82f6'
   },
   BLOCKED: {
     value: 'BLOCKED',
     label: 'Blocked',
-    description: 'Cannot proceed due to dependencies or issues',
+    description: 'Can\'t move forward',
     icon: AlertCircle,
     color: 'text-red-500',
     bgColor: 'bg-red-500/10',
@@ -273,16 +319,38 @@ export const WORK_ITEM_STATUSES: Record<WorkItemStatus, StatusOption> = {
     dotColor: 'bg-red-500',
     hexColor: '#ef4444'
   },
+  ON_HOLD: {
+    value: 'ON_HOLD',
+    label: 'On Hold',
+    description: 'Paused for now',
+    icon: Pause,
+    color: 'text-orange-400',
+    bgColor: 'bg-orange-400/10',
+    borderColor: 'border-orange-400/30',
+    dotColor: 'bg-orange-400',
+    hexColor: '#fb923c'
+  },
+  COMPLETED: {
+    value: 'COMPLETED',
+    label: 'Completed',
+    description: 'Finished successfully',
+    icon: CheckCircle,
+    color: 'text-green-400',
+    bgColor: 'bg-green-400/10',
+    borderColor: 'border-green-400/30',
+    dotColor: 'bg-green-400',
+    hexColor: '#22c55e'
+  },
   CANCELLED: {
     value: 'CANCELLED',
     label: 'Cancelled',
-    description: 'Work was stopped and will not be completed',
+    description: 'Stopped, won\'t do',
     icon: XCircle,
-    color: 'text-slate-400',
-    bgColor: 'bg-slate-400/10',
-    borderColor: 'border-slate-400/30',
-    dotColor: 'bg-slate-400',
-    hexColor: '#94a3b8'
+    color: 'text-pink-500',
+    bgColor: 'bg-pink-500/10',
+    borderColor: 'border-pink-500/30',
+    dotColor: 'bg-pink-500',
+    hexColor: '#ff1493'
   }
 };
 
@@ -380,12 +448,12 @@ export const PRIORITY_OPTIONS: PriorityOption[] = [
 
 // Get type configuration
 export const getTypeConfig = (type: WorkItemType): TypeOption => {
-  return WORK_ITEM_TYPES[type] || WORK_ITEM_TYPES.TASK;
+  return WORK_ITEM_TYPES[type] || WORK_ITEM_TYPES.DEFAULT;
 };
 
 // Get status configuration
 export const getStatusConfig = (status: WorkItemStatus): StatusOption => {
-  return WORK_ITEM_STATUSES[status] || WORK_ITEM_STATUSES.PROPOSED;
+  return WORK_ITEM_STATUSES[status] || WORK_ITEM_STATUSES.NOT_STARTED;
 };
 
 // Get priority configuration based on numeric priority value
@@ -400,6 +468,22 @@ export const getPriorityConfig = (priorityValue: number): PriorityOption => {
 // Get priority level from numeric value
 export const getPriorityLevel = (priorityValue: number): PriorityLevel => {
   return getPriorityConfig(priorityValue).value as PriorityLevel;
+};
+
+// Get status completion percentage (for workflow progression visualization)
+export const getStatusCompletionPercentage = (status: WorkItemStatus): number => {
+  switch (status) {
+    case 'NOT_STARTED': return 0;    // Starting point
+    case 'PROPOSED': return 10;      // Idea submitted
+    case 'PLANNED': return 25;       // Planning complete
+    case 'IN_PROGRESS': return 60;   // Actively working
+    case 'IN_REVIEW': return 85;     // Nearly done, awaiting approval
+    case 'BLOCKED': return 40;       // Progress halted (maintain current progress)
+    case 'ON_HOLD': return 30;       // Paused (maintain current progress)
+    case 'COMPLETED': return 100;    // Fully complete
+    case 'CANCELLED': return 0;      // Not completed
+    default: return 0;
+  }
 };
 
 // Legacy compatibility functions (for gradual migration)
@@ -484,17 +568,36 @@ export const getPriorityColorScheme = (priorityValue: number) => {
 };
 
 // ============================
+// DEFAULT NODE CONFIGURATION
+// ============================
+
+// Default values for creating new work items
+export const DEFAULT_NODE_CONFIG = {
+  title: 'New Node', // Default title for new nodes
+  type: 'DEFAULT' as WorkItemType, // Default type (generic work item)
+  status: 'NOT_STARTED' as WorkItemStatus, // Default status (beginning of workflow)
+  priority: 'minimal' as PriorityLevel, // Default priority level
+  priorityExec: 0.0, // Executive priority score (0.0-1.0)
+  priorityIndiv: 0.0, // Individual priority score (0.0-1.0)
+  priorityComm: 0.0, // Community priority score (0.0-1.0)
+  description: '' // Empty description by default
+};
+
+// ============================
 // VALIDATION HELPERS
 // ============================
 
+// Check if a string is a valid work item type
 export const isValidWorkItemType = (type: string): type is WorkItemType => {
   return Object.keys(WORK_ITEM_TYPES).includes(type as WorkItemType);
 };
 
+// Check if a string is a valid work item status
 export const isValidWorkItemStatus = (status: string): status is WorkItemStatus => {
   return Object.keys(WORK_ITEM_STATUSES).includes(status as WorkItemStatus);
 };
 
+// Check if a string is a valid priority level
 export const isValidPriorityLevel = (priority: string): priority is PriorityLevel => {
   return Object.keys(WORK_ITEM_PRIORITIES).includes(priority as PriorityLevel);
 };
@@ -503,19 +606,22 @@ export const isValidPriorityLevel = (priority: string): priority is PriorityLeve
 // RELATIONSHIP TYPES SYSTEM
 // ============================
 
+// All possible relationship types between work items
+// These define how nodes connect to each other in the graph
 export type RelationshipType = 
-  | 'DEPENDS_ON'
-  | 'BLOCKS'
-  | 'ENABLES'
-  | 'RELATES_TO'
-  | 'IS_PART_OF'
-  | 'FOLLOWS'
-  | 'PARALLEL_WITH'
-  | 'DUPLICATES'
-  | 'CONFLICTS_WITH'
-  | 'VALIDATES'
-  | 'REFERENCES'
-  | 'CONTAINS';
+  | 'DEPENDS_ON'      // Source needs target to be completed first
+  | 'BLOCKS'          // Source prevents target from progressing
+  | 'ENABLES'         // Source makes target easier/possible
+  | 'RELATES_TO'      // General relationship or similarity
+  | 'IS_PART_OF'      // Source is component of target
+  | 'FOLLOWS'         // Source should be done after target (sequence)
+  | 'PARALLEL_WITH'   // Source can be done simultaneously with target
+  | 'DUPLICATES'      // Source duplicates effort of target
+  | 'CONFLICTS_WITH'  // Source has opposing goals to target
+  | 'VALIDATES'       // Source tests/validates target
+  | 'REFERENCES'      // Source references/cites target
+  | 'CONTAINS'        // Source contains/encompasses target
+  | 'DEFAULT_EDGE';   // Generic connection
 
 export interface RelationshipOption {
   type: RelationshipType;
@@ -527,6 +633,14 @@ export interface RelationshipOption {
 }
 
 export const RELATIONSHIP_TYPES: Record<RelationshipType, RelationshipOption> = {
+  DEFAULT_EDGE: {
+    type: 'DEFAULT_EDGE',
+    label: 'Connected',
+    description: 'Simple connection between nodes',
+    icon: Paperclip,
+    color: 'text-gray-400',
+    hexColor: '#9ca3af'
+  },
   DEPENDS_ON: {
     type: 'DEPENDS_ON',
     label: 'Depends On',
@@ -622,7 +736,7 @@ export const RELATIONSHIP_TYPES: Record<RelationshipType, RelationshipOption> = 
     icon: Package,
     color: 'text-blue-400',
     hexColor: '#60a5fa'
-  }
+  },
 };
 
 // ============================
@@ -645,6 +759,48 @@ export const getRelationshipIconElement = (type: RelationshipType, className: st
   const config = getRelationshipConfig(type);
   const fullClassName = `${className} ${config.color}`;
   return IconComponent ? <IconComponent className={fullClassName} /> : null;
+};
+
+// Get relationship icon component for D3/SVG usage
+export const getRelationshipIconComponent = (type: RelationshipType): React.ComponentType<{ className?: string }> => {
+  const IconComponent = getRelationshipIcon(type);
+  return IconComponent || Link2; // Fallback to Link2 if not found
+};
+
+// Get relationship icon component and color for D3 usage
+export const getRelationshipIconForD3 = (type: RelationshipType) => {
+  const config = getRelationshipConfig(type);
+  return {
+    IconComponent: config.icon,
+    color: config.color,
+    hexColor: config.hexColor
+  };
+};
+
+// Get appropriate arrow for relationship type
+export const getRelationshipArrow = (type: RelationshipType): '→' | '↔' | '—' => {
+  const bidirectionalTypes: RelationshipType[] = ['RELATES_TO', 'PARALLEL_WITH', 'CONFLICTS_WITH'];
+  const undirectedTypes: RelationshipType[] = ['DUPLICATES'];
+  
+  if (bidirectionalTypes.includes(type)) return '↔';
+  if (undirectedTypes.includes(type)) return '—';
+  return '→';
+};
+
+// Get full descriptive text for tooltip
+export const getRelationshipDescription = (
+  sourceTitle: string, 
+  targetTitle: string, 
+  type: RelationshipType, 
+  isIncoming: boolean = false
+): string => {
+  const config = getRelationshipConfig(type);
+  const arrow = getRelationshipArrow(type);
+  
+  if (isIncoming && arrow === '→') {
+    return `${targetTitle} ${config.label.toLowerCase()} ${sourceTitle}`;
+  }
+  return `${sourceTitle} ${config.label.toLowerCase()} ${targetTitle}`;
 };
 
 // Get relationship color scheme
@@ -682,6 +838,97 @@ export function getRelationshipIconLegacy(iconName: string, className: string = 
   const relationshipType = iconMap[iconName];
   return relationshipType ? getRelationshipIconElement(relationshipType, className) : null;
 }
+
+// ============================
+// UTILITY COLOR SCHEMES
+// ============================
+
+// Contributor avatar colors for consistent user representation
+export const CONTRIBUTOR_COLORS = [
+  'bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-pink-500',
+  'bg-indigo-500', 'bg-yellow-500', 'bg-red-500', 'bg-teal-500',
+  'bg-orange-500', 'bg-cyan-500', 'bg-emerald-500', 'bg-violet-500'
+];
+
+// Due date color schemes for time-based status indicators
+export const DUE_DATE_COLORS = {
+  overdue: {
+    bg: 'bg-red-50 dark:bg-red-900/20',
+    border: 'border-red-200 dark:border-red-800',
+    text: 'text-red-800 dark:text-red-400',
+    textSecondary: 'text-red-600 dark:text-red-400'
+  },
+  warning: {
+    bg: 'bg-amber-50 dark:bg-amber-900/20',
+    border: 'border-amber-200 dark:border-amber-800',
+    text: 'text-amber-800 dark:text-amber-400',
+    textSecondary: 'text-amber-600 dark:text-amber-400'
+  },
+  normal: {
+    bg: 'bg-blue-100 dark:bg-blue-900/30',
+    border: 'border-blue-200 dark:border-blue-800',
+    text: 'text-blue-800 dark:text-blue-400',
+    textSecondary: 'text-blue-600 dark:text-blue-400'
+  },
+  none: {
+    bg: 'bg-gray-100 dark:bg-gray-800',
+    border: 'border-gray-200 dark:border-gray-700',
+    text: 'text-gray-600 dark:text-gray-400',
+    textSecondary: 'text-gray-500 dark:text-gray-400'
+  }
+};
+
+// Utility functions for contributor colors
+export const getContributorColor = (name: string): string => {
+  const hash = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  return CONTRIBUTOR_COLORS[hash % CONTRIBUTOR_COLORS.length];
+};
+
+// Utility function for due date colors
+export const getDueDateColorScheme = (dueDate?: string) => {
+  if (!dueDate) return DUE_DATE_COLORS.none;
+  
+  const today = new Date();
+  const due = new Date(dueDate);
+  const diffTime = due.getTime() - today.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  if (diffDays < 0) return DUE_DATE_COLORS.overdue;
+  if (diffDays <= 7) return DUE_DATE_COLORS.warning;
+  return DUE_DATE_COLORS.normal;
+};
+
+// ============================
+// PROJECT HEALTH COLORS
+// ============================
+
+// Health indicator colors based on completion percentage
+export const PROJECT_HEALTH_COLORS = {
+  outstanding: '#22c55e', // 90%+ completion
+  excellent: '#3b82f6',   // 70%+ completion  
+  good: '#a855f7',        // 50%+ completion
+  fair: '#f59e0b',        // 30%+ completion
+  critical: '#f43f5e',    // <30% completion
+  noData: '#6b7280'       // No data available
+};
+
+// Get project health color based on completion percentage
+export const getProjectHealthColor = (completionRatio: number): string => {
+  if (completionRatio >= 0.9) return PROJECT_HEALTH_COLORS.outstanding;
+  if (completionRatio >= 0.7) return PROJECT_HEALTH_COLORS.excellent;
+  if (completionRatio >= 0.5) return PROJECT_HEALTH_COLORS.good;
+  if (completionRatio >= 0.3) return PROJECT_HEALTH_COLORS.fair;
+  return PROJECT_HEALTH_COLORS.critical;
+};
+
+// Get project health status text
+export const getProjectHealthStatus = (completionRatio: number): string => {
+  if (completionRatio >= 0.9) return 'Outstanding 🌟';
+  if (completionRatio >= 0.7) return 'Excellent ✨';
+  if (completionRatio >= 0.5) return 'Good 👍';
+  if (completionRatio >= 0.3) return 'Fair ⚠️';
+  return 'Critical 🚨';
+};
 
 // ============================
 // EXPORT DEFAULT COLLECTIONS
