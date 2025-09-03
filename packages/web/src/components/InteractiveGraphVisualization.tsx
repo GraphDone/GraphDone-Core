@@ -2390,7 +2390,7 @@ export function InteractiveGraphVisualization() {
 
       {/* Data Health Indicator */}
       {validationResult && (validationResult.errors.length > 0 || validationResult.warnings.length > 0) && (
-        <div className="absolute top-4 right-4 z-40">
+        <div className="absolute top-20 right-6 z-40">
           <button 
             onClick={() => setShowDataHealth(!showDataHealth)}
             className="bg-yellow-600/90 backdrop-blur-sm border border-yellow-500 rounded-lg px-3 py-2 shadow-md hover:bg-yellow-500 transition-all duration-200"
@@ -3351,7 +3351,7 @@ export function InteractiveGraphVisualization() {
       {isFullscreen ? (
         <button
           onClick={() => navigate('/')}
-          className="absolute top-4 left-4 z-50 bg-gray-800 hover:bg-gray-700 text-white p-3 rounded-lg border border-gray-600 flex items-center space-x-2 transition-colors"
+          className="absolute top-4 right-6 z-50 bg-gray-800 hover:bg-gray-700 text-white p-3 rounded-lg border border-gray-600 flex items-center space-x-2 transition-colors shadow-lg"
           title="Back to Workspace"
         >
           <ArrowLeft className="h-5 w-5" />
@@ -3360,7 +3360,7 @@ export function InteractiveGraphVisualization() {
       ) : (
         <button
           onClick={() => navigate('/graph')}
-          className="absolute top-4 right-4 z-50 bg-gray-800 hover:bg-gray-700 text-white p-3 rounded-lg border border-gray-600 flex items-center space-x-2 transition-colors"
+          className="absolute top-4 right-6 z-50 bg-gray-800 hover:bg-gray-700 text-white p-3 rounded-lg border border-gray-600 flex items-center space-x-2 transition-colors shadow-lg"
           title="Full Zen Mode"
         >
           <Maximize2 className="h-5 w-5" />
