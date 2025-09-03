@@ -73,7 +73,7 @@
 
 /* Graph visualization styles */
 .graph-container {
-  @apply w-full h-full;
+  @apply w-full h-full overflow-hidden;
 }
 
 .node {
