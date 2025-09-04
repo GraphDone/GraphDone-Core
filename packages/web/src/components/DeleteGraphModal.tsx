@@ -252,48 +252,66 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] overflow-y-auto">
+    <div className="fixed inset-0 z-[9999] overflow-y-auto backdrop-blur-sm">
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-        <div className="fixed inset-0 bg-gray-900 bg-opacity-75 transition-opacity" onClick={onClose} />
+        {/* Enhanced Backdrop with gradient */}
+        <div 
+          className="fixed inset-0 transition-opacity bg-gradient-to-br from-red-900/90 via-black/80 to-gray-900/90 animate-in fade-in duration-300"
+          onClick={onClose}
+        />
 
-        <div className="inline-block align-bottom bg-gray-800 rounded-xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
-          {/* Header */}
-          <div className="bg-red-900/20 px-6 py-4 border-b border-red-600/30">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <AlertTriangle className="h-5 w-5 text-red-400" />
-                <h3 className="text-lg font-semibold text-red-200">Delete Graph</h3>
+        {/* Enhanced Modal with better styling */}
+        <div className="inline-block align-bottom bg-gradient-to-br from-gray-800 via-gray-800 to-gray-900 rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full border border-red-600/30 animate-in slide-in-from-bottom-4 duration-300 relative">
+          {/* Gradient accent line at top - red for danger */}
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-red-500 via-orange-500 to-red-600"></div>
+          
+          {/* Enhanced Header with gradient background */}
+          <div className="flex items-center justify-between px-6 py-5 border-b border-red-600/30 bg-gradient-to-r from-red-900/30 to-gray-900/90 backdrop-blur-sm">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-red-600 rounded-xl flex items-center justify-center shadow-lg">
+                <AlertTriangle className="h-5 w-5 text-white" />
               </div>
-              <button
-                onClick={onClose}
-                className="text-gray-400 hover:text-gray-300 transition-colors"
-              >
-                <X className="h-5 w-5" />
-              </button>
+              <h3 className="text-xl font-bold bg-gradient-to-r from-red-100 via-orange-100 to-red-200 bg-clip-text text-transparent">Delete Graph</h3>
             </div>
+            <button
+              onClick={onClose}
+              className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-xl transition-all duration-200 hover:scale-110"
+            >
+              <X className="h-5 w-5" />
+            </button>
           </div>
 
-          {/* Loading state */}
-          {loadingNodes && (
-            <div className="p-6">
-              <div className="flex items-center justify-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500"></div>
-              </div>
-              <p className="text-center text-gray-400 mt-3">Analyzing graph structure...</p>
+          {/* Content */}
+          <div className="px-8 pt-0 pb-8 max-h-[80vh] overflow-y-auto relative">
+            {/* Subtle background pattern */}
+            <div className="absolute inset-0 opacity-5">
+              <div className="w-full h-full" style={{
+                backgroundImage: `radial-gradient(circle at 1px 1px, rgba(255,255,255,0.15) 1px, transparent 0)`,
+                backgroundSize: '20px 20px'
+              }}></div>
             </div>
-          )}
+            
+            {/* Loading state */}
+            {loadingNodes && (
+              <div className="py-12 relative z-10">
+                <div className="flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500"></div>
+                </div>
+                <p className="text-center text-gray-400 mt-4 font-medium">Analyzing graph structure...</p>
+              </div>
+            )}
 
-          {/* Block deletion if graph has nodes */}
-          {!loadingNodes && nodeCount > 0 && (
-            <div className="p-6">
-              <div className="mb-6">
+            {/* Block deletion if graph has nodes */}
+            {!loadingNodes && nodeCount > 0 && (
+              <div className="px-8 pt-2 pb-8 relative z-10">
+              <div className="mb-8">
                 <div className="flex items-center justify-center w-16 h-16 bg-orange-900/20 rounded-full mx-auto mb-4">
                   <AlertTriangle className="h-8 w-8 text-orange-400" />
                 </div>
                 <h4 className="text-xl font-semibold text-orange-200 text-center mb-2">
                   Graph Contains Active Nodes
                 </h4>
-                <p className="text-gray-300 text-center mb-6">
+                <p className="text-gray-300 text-center mb-8">
                   Cannot delete <strong className="text-white">"{currentGraph.name}"</strong> while it contains nodes
                 </p>
               </div>
@@ -763,7 +781,8 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
                 </div>
               </div>
             </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </div>
