@@ -432,32 +432,45 @@ export function NodeDetailsModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-lg z-50 flex items-center justify-center p-4">
       <div 
         className="fixed inset-0 cursor-pointer" 
         onClick={onClose}
       />
       <div 
-        className="relative bg-gradient-to-br from-gray-900 to-gray-800 border border-gray-600 shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-xl animate-in fade-in zoom-in-95 duration-300 ring-1 ring-white/10"
+        className="relative bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 border border-gray-600/50 shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl animate-in fade-in zoom-in-95 duration-300 ring-1 ring-white/20 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-600 bg-gray-800/30">
-          <div className="flex items-center space-x-8">
-            {/* Clickable Type Badge */}
+        {/* Gradient accent line at top */}
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-green-500 to-purple-500"></div>
+        
+        {/* Subtle background pattern */}
+        <div className="absolute inset-0 opacity-5 pointer-events-none">
+          <div className="w-full h-full" style={{
+            backgroundImage: `radial-gradient(circle at 1px 1px, rgba(255,255,255,0.15) 1px, transparent 0)`,
+            backgroundSize: '24px 24px'
+          }}></div>
+        </div>
+
+        {/* Enhanced Header */}
+        <div className="relative flex items-center justify-between p-8 border-b border-gray-600/50 bg-gradient-to-r from-gray-800/30 via-gray-700/20 to-gray-800/30 backdrop-blur-sm">
+          <div className="flex items-center space-x-20">
+            {/* Enhanced Clickable Type Badge */}
             <div className="relative">
               <button
                 onClick={() => setShowTypeDropdown(!showTypeDropdown)}
-                className={`flex items-center space-x-2 px-3 py-1 rounded-md text-sm font-medium hover:opacity-80 transition-opacity cursor-pointer ${getTypeColor(currentNode.type)}`}
+                className={`flex items-center space-x-3 px-5 py-3 rounded-xl text-sm font-semibold hover:scale-105 transition-all duration-200 cursor-pointer shadow-lg backdrop-blur-sm ${getTypeColor(currentNode.type)} border border-opacity-30 hover:border-opacity-50`}
               >
-                {getTypeIcon(currentNode.type)}
-                <span>{currentNode.type}</span>
-                <ChevronDown className="h-4 w-4" />
+                <div className="flex items-center space-x-2">
+                  {getTypeIcon(currentNode.type)}
+                  <span className="bg-gradient-to-r from-white to-gray-100 bg-clip-text text-transparent font-bold">{currentNode.type}</span>
+                </div>
+                <ChevronDown className="h-4 w-4 opacity-70" />
               </button>
               
-              {/* Type Dropdown */}
+              {/* Enhanced Type Dropdown */}
               {showTypeDropdown && (
-                <div className="absolute top-full left-0 mt-1 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-10">
+                <div className="absolute top-full left-0 mt-1 w-56 bg-gray-900 border-2 border-gray-500 rounded-lg shadow-2xl z-[9999] max-h-[350px] overflow-y-auto overflow-x-hidden">
                   {TYPE_OPTIONS.filter(opt => opt.value !== 'all').map((type) => (
                     <button
                       key={type.value}
@@ -465,7 +478,7 @@ export function NodeDetailsModal({
                         setEditedNode(prev => prev ? { ...prev, type: type.value as WorkItemType } : null);
                         setShowTypeDropdown(false);
                       }}
-                      className={`w-full flex items-center justify-between px-3 py-2 hover:bg-gray-700 transition-colors text-left ${getTypeColorScheme(type.value as WorkItemType).text}`}
+                      className={`w-full flex items-center justify-between px-4 py-3 hover:bg-gray-800 transition-colors text-left border-b border-gray-600 last:border-b-0 ${getTypeColorScheme(type.value as WorkItemType).text} text-white`}
                     >
                       <div className="flex items-center space-x-2">
                         {type.icon && <type.icon className={`h-4 w-4 ${getTypeColorScheme(type.value as WorkItemType).text}`} />}
@@ -480,20 +493,22 @@ export function NodeDetailsModal({
               )}
             </div>
 
-            {/* Clickable Status Badge */}
+            {/* Enhanced Clickable Status Badge */}
             <div className="relative">
               <button
                 onClick={() => setShowStatusDropdown(!showStatusDropdown)}
-                className={`flex items-center space-x-2 px-3 py-1 rounded-md text-sm font-medium hover:opacity-80 transition-opacity cursor-pointer ${getStatusColor(currentNode.status)}`}
+                className={`flex items-center space-x-3 px-5 py-3 rounded-xl text-sm font-semibold hover:scale-105 transition-all duration-200 cursor-pointer shadow-lg backdrop-blur-sm ${getStatusColor(currentNode.status)} border border-opacity-30 hover:border-opacity-50`}
               >
-                {getStatusIcon(currentNode.status)}
-                <span>{currentNode.status.replace(/_/g, ' ')}</span>
-                <ChevronDown className="h-4 w-4" />
+                <div className="flex items-center space-x-2">
+                  {getStatusIcon(currentNode.status)}
+                  <span className="bg-gradient-to-r from-white to-gray-100 bg-clip-text text-transparent font-bold">{currentNode.status.replace(/_/g, ' ')}</span>
+                </div>
+                <ChevronDown className="h-4 w-4 opacity-70" />
               </button>
               
-              {/* Status Dropdown */}
+              {/* Enhanced Status Dropdown */}
               {showStatusDropdown && (
-                <div className="absolute top-full left-0 mt-1 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-10">
+                <div className="absolute top-full left-0 mt-1 w-56 bg-gray-900 border-2 border-gray-500 rounded-lg shadow-2xl z-[9999] max-h-[350px] overflow-y-auto overflow-x-hidden">
                   {STATUS_OPTIONS.filter(opt => opt.value !== 'all').map((status) => (
                     <button
                       key={status.value}
@@ -501,7 +516,7 @@ export function NodeDetailsModal({
                         setEditedNode(prev => prev ? { ...prev, status: status.value as WorkItemStatus } : null);
                         setShowStatusDropdown(false);
                       }}
-                      className={`w-full flex items-center justify-between px-3 py-2 hover:bg-gray-700 transition-colors text-left ${getStatusColorScheme(status.value as WorkItemStatus).text}`}
+                      className={`w-full flex items-center justify-between px-4 py-3 hover:bg-gray-800 transition-colors text-left border-b border-gray-600 last:border-b-0 ${getStatusColorScheme(status.value as WorkItemStatus).text} text-white`}
                     >
                       <div className="flex items-center space-x-2">
                         {status.icon && <status.icon className={`h-4 w-4 ${getStatusColorScheme(status.value as WorkItemStatus).text}`} />}
@@ -516,14 +531,14 @@ export function NodeDetailsModal({
               )}
             </div>
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-3">
             <button
               onClick={handleSave}
               disabled={updating || !hasChanges}
-              className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors text-sm font-medium ${
+              className={`flex items-center space-x-2 px-6 py-3 rounded-xl transition-all duration-300 text-sm font-semibold shadow-lg ${
                 hasChanges && !updating
-                  ? 'text-green-400 hover:text-green-300 hover:bg-gray-800'
-                  : 'text-gray-600 cursor-not-allowed'
+                  ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:from-green-500 hover:to-emerald-500 hover:scale-105 transform border border-green-400/30'
+                  : 'bg-gray-700 text-gray-500 cursor-not-allowed border border-gray-600'
               }`}
               title={hasChanges ? "Save Changes" : "No changes to save"}
             >
@@ -532,51 +547,59 @@ export function NodeDetailsModal({
             </button>
             <button
               onClick={onClose}
-              className="p-2 text-gray-400 hover:text-gray-300 hover:bg-gray-800 rounded-lg transition-colors"
+              className="p-3 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-xl transition-all duration-200 hover:scale-110 shadow-lg backdrop-blur-sm"
             >
               <X className="h-5 w-5" />
             </button>
           </div>
         </div>
 
-        {/* Content */}
-        <div className="flex p-4 gap-4">
-          {/* Left Column - Main Content */}
+        {/* Enhanced Content */}
+        <div className="flex p-8 gap-8 bg-gradient-to-br from-gray-800/20 via-transparent to-gray-900/20">
+          {/* Enhanced Left Column - Main Content */}
           <div className="flex-1">
-          {/* Title - Always Editable */}
-          <input
-            type="text"
-            value={editedNode?.title || ''}
-            onChange={(e) => setEditedNode(prev => prev ? { ...prev, title: e.target.value } : null)}
-            className="text-xl font-semibold bg-transparent border-b-2 border-gray-600 text-white mb-4 w-full focus:outline-none focus:border-green-400 transition-all duration-300 hover:border-gray-500 pb-2"
-            placeholder="Enter title..."
-          />
+          {/* Enhanced Title - Always Editable */}
+          <div className="mb-6">
+            <input
+              type="text"
+              value={editedNode?.title || ''}
+              onChange={(e) => setEditedNode(prev => prev ? { ...prev, title: e.target.value } : null)}
+              className="text-2xl font-bold bg-gray-800 border border-gray-600 text-white placeholder-gray-400 mb-2 w-full focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-400 transition-all duration-300 hover:border-gray-500 p-4 rounded-xl shadow-lg cursor-text"
+              placeholder="Enter title..."
+              autoComplete="off"
+            />
+          </div>
 
-          {/* Description - Always Editable */}
-          <div className="mb-4">
-            <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3 flex items-center">
-              <Edit3 className="h-4 w-4 mr-2 text-emerald-400" />
+          {/* Enhanced Description - Always Editable */}
+          <div className="mb-8">
+            <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4 flex items-center">
+              <div className="p-2 bg-gradient-to-br from-emerald-500/20 to-teal-500/20 rounded-lg mr-3 border border-emerald-500/30">
+                <Edit3 className="h-4 w-4 text-emerald-400" />
+              </div>
               Description
             </h3>
             <textarea
               value={editedNode?.description || ''}
               onChange={(e) => setEditedNode(prev => prev ? { ...prev, description: e.target.value } : null)}
-              className="w-full text-gray-300 bg-gray-800/50 border border-gray-600 rounded-lg p-4 focus:outline-none focus:border-green-400 focus:ring-2 focus:ring-green-400/20 transition-all duration-300 resize-none hover:border-gray-500"
+              className="w-full text-white bg-gray-800 border border-gray-600 rounded-xl placeholder-gray-400 p-5 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-400 transition-all duration-300 resize-none hover:border-gray-500 shadow-lg cursor-text"
               placeholder="Enter description"
               rows={4}
+              autoComplete="off"
             />
           </div>
 
 
-          {/* Details Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Priority - Editable */}
-            <div>
-              <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3 flex items-center">
-                <Flag className={`h-4 w-4 mr-2 ${priorityInfo.flagColor}`} />
+          {/* Enhanced Details Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Enhanced Priority - Editable */}
+            <div className="bg-gradient-to-br from-gray-800/30 to-gray-700/20 border border-gray-600/30 rounded-xl p-6 shadow-lg backdrop-blur-sm">
+              <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4 flex items-center">
+                <div className={`p-2 bg-gradient-to-br from-orange-500/20 to-red-500/20 rounded-lg mr-3 border border-orange-500/30`}>
+                  <Flag className={`h-4 w-4 ${priorityInfo.flagColor}`} />
+                </div>
                 Priority
               </h3>
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <input
                   type="range"
                   min="0"
@@ -584,7 +607,7 @@ export function NodeDetailsModal({
                   step="0.1"
                   value={editedNode?.priority || 0}
                   onChange={(e) => setEditedNode(prev => prev ? { ...prev, priority: parseFloat(e.target.value) } : null)}
-                  className={`w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider ${
+                  className={`w-full h-3 bg-gray-700/50 rounded-xl appearance-none cursor-pointer slider shadow-inner ${
                     getPriorityConfig(editedNode?.priority || 0).value === 'critical' ? 'accent-red-500' :
                     getPriorityConfig(editedNode?.priority || 0).value === 'high' ? 'accent-orange-500' :
                     getPriorityConfig(editedNode?.priority || 0).value === 'moderate' ? 'accent-yellow-500' :
@@ -600,19 +623,21 @@ export function NodeDetailsModal({
                   }}
                 />
                 <div className="flex items-center justify-between">
-                  <span className={`flex items-center space-x-2 px-3 py-1 rounded-md text-sm font-medium ${priorityInfo.color} ${getPriorityColorScheme(editedNode?.priority || 0).background}`}>
+                  <span className={`flex items-center space-x-3 px-4 py-2 rounded-xl text-sm font-semibold shadow-lg ${priorityInfo.color} ${getPriorityColorScheme(editedNode?.priority || 0).background} border border-opacity-30`}>
                     {getPriorityIconElement(editedNode?.priority || 0, "h-4 w-4")}
                     <span>{priorityInfo.label}</span>
                   </span>
-                  <span className="text-gray-400 text-sm">{Math.round((editedNode?.priority || 0) * 100)}%</span>
+                  <span className="text-gray-300 text-sm font-medium bg-gray-700/30 px-3 py-1 rounded-lg">{Math.round((editedNode?.priority || 0) * 100)}%</span>
                 </div>
               </div>
             </div>
 
-            {/* Assigned To - Editable */}
-            <div>
-              <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3 flex items-center">
-                <User className="h-4 w-4 mr-2 text-violet-400" />
+            {/* Enhanced Assigned To - Editable */}
+            <div className="bg-gradient-to-br from-gray-800/30 to-gray-700/20 border border-gray-600/30 rounded-xl p-6 shadow-lg backdrop-blur-sm">
+              <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4 flex items-center">
+                <div className="p-2 bg-gradient-to-br from-violet-500/20 to-purple-500/20 rounded-lg mr-3 border border-violet-500/30">
+                  <User className="h-4 w-4 text-violet-400" />
+                </div>
                 Contributor
               </h3>
               <div className="relative">
@@ -625,7 +650,7 @@ export function NodeDetailsModal({
                       assignedTo: value ? { id: value, name: e.target.selectedOptions[0].text.split(' (')[0], username: value } : undefined 
                     } : null);
                   }}
-                  className="w-full bg-gray-800/50 border border-gray-600 rounded-lg px-4 py-3 text-gray-300 focus:outline-none focus:border-green-400 focus:ring-2 focus:ring-green-400/20 transition-all duration-300 appearance-none hover:border-gray-500"
+                  className="w-full bg-gray-800 border border-gray-600 rounded-xl px-5 py-4 text-white focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-400 transition-all duration-300 appearance-none hover:border-gray-500 shadow-lg font-medium"
                 >
                   <option value="">No contributor</option>
                   <option value="user-1">John Doe (@john)</option>
@@ -634,36 +659,40 @@ export function NodeDetailsModal({
                   <option value="user-4">Sarah Wilson (@sarah)</option>
                   <option value="user-5">Alex Chen (@alex)</option>
                 </select>
-                <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                <ChevronDown className="absolute right-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
               </div>
               {editedNode?.assignedTo && typeof editedNode.assignedTo === 'object' && (
                 <div className="mt-2 text-xs text-gray-500">@{editedNode.assignedTo.username}</div>
               )}
             </div>
 
-            {/* Owner */}
-            <div>
-              <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3 flex items-center">
-                <Crown className="h-4 w-4 mr-2 text-amber-400" />
+            {/* Enhanced Owner */}
+            <div className="bg-gradient-to-br from-gray-800/30 to-gray-700/20 border border-gray-600/30 rounded-xl p-6 shadow-lg backdrop-blur-sm">
+              <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4 flex items-center">
+                <div className="p-2 bg-gradient-to-br from-amber-500/20 to-yellow-500/20 rounded-lg mr-3 border border-amber-500/30">
+                  <Crown className="h-4 w-4 text-amber-400" />
+                </div>
                 Owner
               </h3>
               {currentNode.owner ? (
-                <>
-                  <div className="text-gray-300">{currentNode.owner.name}</div>
-                  <div className="text-gray-500 text-sm">@{currentNode.owner.username}</div>
-                </>
+                <div className="bg-gradient-to-r from-gray-700/50 to-gray-600/30 border border-gray-600/40 rounded-lg p-4 backdrop-blur-sm">
+                  <div className="text-gray-200 font-medium">{currentNode.owner.name}</div>
+                  <div className="text-gray-400 text-sm mt-1">@{currentNode.owner.username}</div>
+                </div>
               ) : (
-                <>
-                  <div className="text-gray-300">Default Admin</div>
-                  <div className="text-gray-500 text-sm">@admin</div>
-                </>
+                <div className="bg-gradient-to-r from-gray-700/50 to-gray-600/30 border border-gray-600/40 rounded-lg p-4 backdrop-blur-sm">
+                  <div className="text-gray-200 font-medium">System Administrator</div>
+                  <div className="text-gray-400 text-sm mt-1">@admin</div>
+                </div>
               )}
             </div>
 
-            {/* Due Date - Editable */}
-            <div>
-              <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3 flex items-center">
-                <Calendar className="h-4 w-4 mr-2 text-teal-400" />
+            {/* Enhanced Due Date - Editable */}
+            <div className="bg-gradient-to-br from-gray-800/30 to-gray-700/20 border border-gray-600/30 rounded-xl p-6 shadow-lg backdrop-blur-sm">
+              <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4 flex items-center">
+                <div className="p-2 bg-gradient-to-br from-teal-500/20 to-cyan-500/20 rounded-lg mr-3 border border-teal-500/30">
+                  <Calendar className="h-4 w-4 text-teal-400" />
+                </div>
                 Due Date
               </h3>
               <input
@@ -676,7 +705,8 @@ export function NodeDetailsModal({
                     dueDate: value ? `${value}T23:59:59.999Z` : undefined 
                   } : null);
                 }}
-                className="w-full bg-gray-800/50 border border-gray-600 rounded-lg px-4 py-3 text-gray-300 focus:outline-none focus:border-green-400 focus:ring-2 focus:ring-green-400/20 transition-all duration-300 hover:border-gray-500"
+                className="w-full bg-gray-800 border border-gray-600 rounded-xl px-5 py-4 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-400 transition-all duration-300 hover:border-gray-500 shadow-lg font-medium"
+                placeholder="dd/mm/yyyy"
               />
               {editedNode?.dueDate && (
                 <div className="mt-1 text-xs text-gray-500">
@@ -687,117 +717,136 @@ export function NodeDetailsModal({
 
           </div>
 
-          {/* Tags - Editable */}
-          <div className="mt-6">
-            <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3 flex items-center">
-              <Hash className="h-4 w-4 mr-2 text-sky-400" />
+          {/* Enhanced Tags - Editable */}
+          <div className="mt-8">
+            <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4 flex items-center">
+              <div className="p-2 bg-gradient-to-br from-sky-500/20 to-blue-500/20 rounded-lg mr-3 border border-sky-500/30">
+                <Hash className="h-4 w-4 text-sky-400" />
+              </div>
               Tags
             </h3>
-            <div className="flex flex-wrap gap-2">
-              {/* Existing Tags */}
-              {editedNode?.tags?.map((tag, index) => (
-                <span
-                  key={index}
-                  className="flex items-center px-2 py-1 bg-gray-700 text-gray-300 rounded-md text-xs group hover:bg-gray-600 transition-colors"
-                >
-                  <span>{tag}</span>
-                  <button
-                    onClick={() => {
-                      const newTags = editedNode.tags?.filter((_, i) => i !== index) || [];
-                      setEditedNode(prev => prev ? { ...prev, tags: newTags } : null);
-                    }}
-                    className="ml-1 text-gray-400 hover:text-red-400 transition-colors"
-                    title="Remove tag"
+            <div className="bg-gradient-to-br from-gray-800/40 to-gray-700/30 border border-gray-600/40 rounded-xl p-5 shadow-lg backdrop-blur-sm">
+              <div className="flex flex-wrap gap-3">
+                {/* Enhanced Existing Tags */}
+                {editedNode?.tags?.map((tag, index) => (
+                  <span
+                    key={index}
+                    className="flex items-center px-3 py-2 bg-gradient-to-r from-gray-700/60 to-gray-600/40 text-gray-200 rounded-lg text-xs font-medium group hover:from-gray-600/60 hover:to-gray-500/40 transition-all duration-200 hover:scale-105 shadow-md border border-gray-600/30"
                   >
-                    ×
-                  </button>
-                </span>
+                    <span>{tag}</span>
+                    <button
+                      onClick={() => {
+                        const newTags = editedNode.tags?.filter((_, i) => i !== index) || [];
+                        setEditedNode(prev => prev ? { ...prev, tags: newTags } : null);
+                      }}
+                      className="ml-2 text-gray-400 hover:text-red-400 transition-all duration-200 hover:scale-125"
+                      title="Remove tag"
+                    >
+                      ×
+                    </button>
+                  </span>
               ))}
-              
-              {/* Inline Add Tag Input */}
-              {(!editedNode?.tags || editedNode.tags.length < 5) && (
-                <div className="flex items-center">
-                  <input
-                    type="text"
-                    placeholder="Add Tag"
-                    className="text-xs bg-gray-800 border border-gray-600 rounded-md px-2 py-1 text-gray-300 focus:outline-none focus:border-green-500 transition-colors min-w-16"
-                    style={{ width: `${Math.max(16, 8)}ch` }}
-                    onInput={(e) => {
-                      const input = e.target as HTMLInputElement;
-                      const textLength = input.value.length;
-                      input.style.width = `${Math.max(16, textLength + 2)}ch`;
-                    }}
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter') {
+                
+                {/* Enhanced Inline Add Tag Input */}
+                {(!editedNode?.tags || editedNode.tags.length < 5) && (
+                  <div className="flex items-center">
+                    <input
+                      type="text"
+                      placeholder="Add Tag"
+                      className="text-xs bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-400 transition-all duration-300 min-w-20 shadow-lg font-medium"
+                      style={{ width: `${Math.max(20, 8)}ch` }}
+                      onInput={(e) => {
                         const input = e.target as HTMLInputElement;
-                        const newTag = input.value.trim();
-                        const currentTags = editedNode?.tags || [];
-                        if (newTag && !currentTags.includes(newTag) && currentTags.length < 5) {
-                          setEditedNode(prev => prev ? { ...prev, tags: [...currentTags, newTag] } : null);
-                          input.value = '';
-                          input.style.width = '16ch';
+                        const textLength = input.value.length;
+                        input.style.width = `${Math.max(20, textLength + 2)}ch`;
+                      }}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                          const input = e.target as HTMLInputElement;
+                          const newTag = input.value.trim();
+                          const currentTags = editedNode?.tags || [];
+                          if (newTag && !currentTags.includes(newTag) && currentTags.length < 5) {
+                            setEditedNode(prev => prev ? { ...prev, tags: [...currentTags, newTag] } : null);
+                            input.value = '';
+                            input.style.width = '20ch';
+                          }
                         }
-                      }
-                    }}
-                  />
-                </div>
-              )}
-              
-              {/* Max tags indicator */}
-              {editedNode?.tags && editedNode.tags.length >= 5 && (
-                <span className="text-xs text-gray-500 italic">Max 5 tags</span>
-              )}
+                      }}
+                    />
+                  </div>
+                )}
+                
+                {/* Enhanced Max tags indicator */}
+                {editedNode?.tags && editedNode.tags.length >= 5 && (
+                  <span className="text-xs text-amber-400 italic font-medium bg-amber-500/10 px-2 py-1 rounded-lg border border-amber-500/20">Max 5 tags</span>
+                )}
+              </div>
+              {/* Tip for creating tags */}
+              <div className="mt-3 text-xs text-gray-400 italic flex items-center">
+                <div className="w-1 h-1 bg-sky-400 rounded-full mr-2"></div>
+                Type and press Enter to create tags • Maximum 5 tags allowed
+              </div>
             </div>
           </div>
 
-          {/* Timestamps */}
-          <div className="mt-6">
-            <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3 flex items-center">
-              <Clock className="h-4 w-4 mr-2 text-lime-400" />
+          {/* Enhanced Timestamps */}
+          <div className="mt-8">
+            <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4 flex items-center">
+              <div className="p-2 bg-gradient-to-br from-lime-500/20 to-green-500/20 rounded-lg mr-3 border border-lime-500/30">
+                <Clock className="h-4 w-4 text-lime-400" />
+              </div>
               Timestamps
             </h3>
-            <div className="text-gray-300 space-y-1">
+            <div className="bg-gradient-to-br from-gray-800/40 to-gray-700/30 border border-gray-600/40 rounded-xl p-5 shadow-lg backdrop-blur-sm space-y-3">
               {currentNode.createdAt && (
-                <div className="text-sm">
-                  <span className="text-gray-500">Created:</span> {formatDate(currentNode.createdAt)}
+                <div className="text-sm flex justify-between items-center">
+                  <span className="text-gray-400 font-medium">Created:</span> 
+                  <span className="text-gray-200 font-semibold bg-gray-700/50 px-3 py-1 rounded-lg">{formatDate(currentNode.createdAt)}</span>
                 </div>
               )}
               {currentNode.updatedAt && (
-                <div className="text-sm">
-                  <span className="text-gray-500">Updated:</span> {formatDate(currentNode.updatedAt)}
+                <div className="text-sm flex justify-between items-center">
+                  <span className="text-gray-400 font-medium">Updated:</span> 
+                  <span className="text-gray-200 font-semibold bg-gray-700/50 px-3 py-1 rounded-lg">{formatDate(currentNode.updatedAt)}</span>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Connections */}
-          <div className="mt-6">
-            <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-4 flex items-center">
-              <GitBranch className="h-4 w-4 mr-2 text-fuchsia-400" />
+          {/* Enhanced Connections */}
+          <div className="mt-8">
+            <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-6 flex items-center">
+              <div className="p-2 bg-gradient-to-br from-fuchsia-500/20 to-pink-500/20 rounded-lg mr-3 border border-fuchsia-500/30">
+                <GitBranch className="h-4 w-4 text-fuchsia-400" />
+              </div>
               Connections ({nodeConnections.length})
             </h3>
             
             {nodeConnections.length === 0 ? (
-              <div className="text-center py-8">
-                <GitBranch className="h-12 w-12 text-gray-600 mx-auto mb-3" />
-                <p className="text-gray-500 text-sm">No connections yet</p>
-                <p className="text-gray-600 text-xs mt-1">Connect this node to other nodes to see relationships here</p>
+              <div className="bg-gradient-to-br from-gray-800/40 to-gray-700/30 border border-gray-600/40 rounded-xl p-8 shadow-lg backdrop-blur-sm text-center">
+                <div className="p-4 bg-gradient-to-br from-gray-700/30 to-gray-600/20 rounded-xl inline-block mb-4 border border-gray-600/30">
+                  <GitBranch className="h-12 w-12 text-gray-500 mx-auto" />
+                </div>
+                <p className="text-gray-400 text-sm font-medium mb-2">No connections yet</p>
+                <p className="text-gray-500 text-xs">Connect this node to other nodes to see relationships here</p>
               </div>
             ) : (
               
-              <div className="space-y-4">
-                {/* Incoming Connections */}
+              <div className="bg-gradient-to-br from-gray-800/40 to-gray-700/30 border border-gray-600/40 rounded-xl p-6 shadow-lg backdrop-blur-sm space-y-6">
+                {/* Enhanced Incoming Connections */}
                 {incomingConnections.length > 0 && (
                   <div>
-                    <h4 className="text-xs font-medium text-gray-400 mb-3 flex items-center">
-                      <ArrowRight className="h-4 w-4 mr-2 text-red-400" />
+                    <h4 className="text-sm font-semibold text-gray-300 mb-4 flex items-center">
+                      <div className="p-2 bg-gradient-to-br from-red-500/20 to-pink-500/20 rounded-lg mr-3 border border-red-500/30">
+                        <ArrowRight className="h-4 w-4 text-red-400" />
+                      </div>
                       Incoming ({incomingConnections.length})
                     </h4>
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       {incomingConnections.map((edge) => {
                         const connectedNode = getConnectedNode(edge.source);
                         return (
-                          <div key={edge.id} className="flex items-center space-x-3 p-3 bg-gradient-to-r from-red-900/20 to-gray-800/50 border border-red-500/20 rounded-lg hover:bg-red-900/30 transition-all">
+                          <div key={edge.id} className="flex items-center space-x-4 p-4 bg-gradient-to-r from-red-900/30 to-gray-800/50 border border-red-500/30 rounded-xl hover:from-red-900/40 hover:to-gray-800/60 hover:border-red-400/40 transition-all duration-200 hover:scale-[1.02] shadow-md backdrop-blur-sm">
                             <div className="flex items-center space-x-2 flex-1">
                               {connectedNode && (
                                 <span className={`flex items-center space-x-1 px-2 py-1 rounded text-xs font-medium ${getTypeColor(connectedNode.type)}`}>
@@ -817,18 +866,20 @@ export function NodeDetailsModal({
                   </div>
                 )}
 
-                {/* Outgoing Connections */}
+                {/* Enhanced Outgoing Connections */}
                 {outgoingConnections.length > 0 && (
                   <div>
-                    <h4 className="text-xs font-medium text-gray-400 mb-3 flex items-center">
-                      <ArrowLeft className="h-4 w-4 mr-2 text-purple-400" />
+                    <h4 className="text-sm font-semibold text-gray-300 mb-4 flex items-center">
+                      <div className="p-2 bg-gradient-to-br from-purple-500/20 to-violet-500/20 rounded-lg mr-3 border border-purple-500/30">
+                        <ArrowLeft className="h-4 w-4 text-purple-400" />
+                      </div>
                       Outgoing ({outgoingConnections.length})
                     </h4>
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       {outgoingConnections.map((edge) => {
                         const connectedNode = getConnectedNode(edge.target);
                         return (
-                          <div key={edge.id} className="flex items-center space-x-3 p-3 bg-gradient-to-r from-purple-900/20 to-gray-800/50 border border-purple-500/20 rounded-lg hover:bg-purple-900/30 transition-all">
+                          <div key={edge.id} className="flex items-center space-x-4 p-4 bg-gradient-to-r from-purple-900/30 to-gray-800/50 border border-purple-500/30 rounded-xl hover:from-purple-900/40 hover:to-gray-800/60 hover:border-purple-400/40 transition-all duration-200 hover:scale-[1.02] shadow-md backdrop-blur-sm">
                             <div className="flex items-center space-x-2 flex-1">
                               {connectedNode && (
                                 <span className={`flex items-center space-x-1 px-2 py-1 rounded text-xs font-medium ${getTypeColor(connectedNode.type)}`}>
@@ -851,31 +902,37 @@ export function NodeDetailsModal({
             )}
           </div>
 
-            {/* Node ID */}
-            <div className="mt-6 pt-4 border-t border-gray-600">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <Star className="h-4 w-4 text-amber-400" />
-                  <span className="text-xs text-gray-400 uppercase">Node ID</span>
+            {/* Enhanced Node ID */}
+            <div className="mt-8 pt-6 border-t border-gray-600/50">
+              <div className="bg-gradient-to-br from-gray-800/40 to-gray-700/30 border border-gray-600/40 rounded-xl p-5 shadow-lg backdrop-blur-sm">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 bg-gradient-to-br from-amber-500/20 to-yellow-500/20 rounded-lg border border-amber-500/30">
+                      <Star className="h-4 w-4 text-amber-400" />
+                    </div>
+                    <span className="text-sm text-gray-300 uppercase font-semibold">Node ID</span>
+                  </div>
+                  <span className="text-xs text-gray-400 font-mono bg-gray-700/50 px-3 py-2 rounded-lg border border-gray-600/40">{currentNode.id}</span>
                 </div>
-                <span className="text-xs text-gray-500 font-mono">{currentNode.id}</span>
               </div>
             </div>
           </div>
 
-          {/* Right Column - Action Buttons */}
-          <div className="w-48 flex-shrink-0">
-            <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-4 flex items-center">
-              <Rocket className="h-4 w-4 mr-2 text-cyan-400" />
+          {/* Enhanced Right Column - Action Buttons */}
+          <div className="w-56 flex-shrink-0 relative">
+            <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-6 flex items-center">
+              <div className="p-2 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-lg mr-3 border border-cyan-500/30">
+                <Rocket className="h-4 w-4 text-cyan-400" />
+              </div>
               Actions
             </h3>
-            <div className="space-y-2">
-              {/* Connect Dropdown */}
+            <div className="space-y-4">
+              {/* Enhanced Connect Dropdown */}
               <div className="relative" ref={connectDropdownRef}>
                 <button
                   onClick={() => setShowConnectDropdown(!showConnectDropdown)}
                   disabled={getAvailableNodes().length === 0}
-                  className="w-full flex items-center justify-between space-x-2 px-3 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-md transition-colors text-sm font-medium"
+                  className="w-full flex items-center justify-between space-x-2 px-5 py-4 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white rounded-xl transition-all duration-300 text-sm font-semibold shadow-lg hover:scale-105 transform border border-green-400/30"
                 >
                   <div className="flex items-center space-x-2">
                     <Link2 className="h-4 w-4" />
@@ -944,12 +1001,12 @@ export function NodeDetailsModal({
                 )}
               </div>
 
-              {/* Disconnect Dropdown */}
+              {/* Enhanced Disconnect Dropdown */}
               <div className="relative" ref={disconnectDropdownRef}>
                 <button
                   onClick={() => setShowDisconnectDropdown(!showDisconnectDropdown)}
                   disabled={getConnectedNodes().length === 0}
-                  className="w-full flex items-center justify-between space-x-2 px-3 py-2 bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-md transition-colors text-sm font-medium"
+                  className="w-full flex items-center justify-between space-x-2 px-5 py-4 bg-gradient-to-r from-yellow-600 to-amber-600 hover:from-yellow-500 hover:to-amber-500 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white rounded-xl transition-all duration-300 text-sm font-semibold shadow-lg hover:scale-105 transform border border-yellow-400/30"
                 >
                   <div className="flex items-center space-x-2">
                     <Unlink className="h-4 w-4" />
@@ -1022,17 +1079,17 @@ export function NodeDetailsModal({
                 <button
                   onClick={handleDelete}
                   disabled={deleting}
-                  className="w-full flex items-center justify-center space-x-2 px-3 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-400 disabled:cursor-not-allowed text-white rounded-md transition-colors text-sm font-medium"
+                  className="w-full flex items-center justify-center space-x-2 px-5 py-4 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 disabled:from-red-400 disabled:to-rose-400 disabled:cursor-not-allowed text-white rounded-xl transition-all duration-300 text-sm font-semibold shadow-lg hover:scale-105 transform border border-red-400/30"
                 >
                   <Trash2 className="h-4 w-4" />
                   <span>{deleting ? 'Deleting...' : 'Delete Node'}</span>
                 </button>
               ) : (
-                <div className="space-y-3 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-                  <div className="text-sm text-red-800 dark:text-red-400 text-center font-medium">
+                <div className="space-y-4 p-6 bg-gradient-to-br from-red-900/30 to-red-800/20 border border-red-500/40 rounded-xl shadow-lg backdrop-blur-sm">
+                  <div className="text-sm text-red-300 text-center font-semibold">
                     Delete "{currentNode.title}"?
                   </div>
-                  <div className="text-xs text-red-600 dark:text-red-400 text-left">
+                  <div className="text-xs text-red-400 text-center leading-relaxed">
                     This action cannot be undone and will permanently remove this node.
                   </div>
                   
@@ -1055,20 +1112,20 @@ export function NodeDetailsModal({
                     </span>
                   </label>
                   
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 gap-3">
                     <button
                       onClick={() => {
                         setShowDeleteConfirm(false);
                         setDeleteConfirmed(false);
                       }}
-                      className="px-3 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-md transition-colors text-sm font-medium"
+                      className="px-4 py-3 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-500 hover:to-gray-600 text-white rounded-xl transition-all duration-200 text-sm font-semibold shadow-lg hover:scale-105 transform"
                     >
                       Cancel
                     </button>
                     <button
                       onClick={confirmDelete}
                       disabled={deleting || !deleteConfirmed}
-                      className="px-3 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-400 disabled:cursor-not-allowed text-white rounded-md transition-colors text-sm font-medium"
+                      className="px-4 py-3 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 disabled:from-red-400 disabled:to-rose-400 disabled:cursor-not-allowed text-white rounded-xl transition-all duration-200 text-sm font-semibold shadow-lg hover:scale-105 transform"
                     >
                       {deleting ? 'Deleting...' : 'Delete'}
                     </button>
