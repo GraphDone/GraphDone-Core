@@ -10,7 +10,7 @@ interface UpdateGraphModalProps {
 }
 
 export function UpdateGraphModal({ isOpen, onClose }: UpdateGraphModalProps) {
-  const { currentGraph, updateGraph } = useGraph();
+  const { currentGraph, updateGraph, availableGraphs } = useGraph();
   const { currentTeam } = useAuth();
   const { showSuccess, showError } = useNotifications();
   const [loading, setLoading] = useState(false);
@@ -144,6 +144,17 @@ export function UpdateGraphModal({ isOpen, onClose }: UpdateGraphModalProps) {
     e.preventDefault();
     
     if (!formData.name.trim()) {
+      showError('Validation Error', 'Please enter a graph name');
+      return;
+    }
+
+    // Check for duplicate graph names (excluding current graph)
+    const existingGraph = availableGraphs.find(g => 
+      g.id !== currentGraph.id && 
+      g.name.toLowerCase().trim() === formData.name.toLowerCase().trim()
+    );
+    if (existingGraph) {
+      showError('Duplicate Name', `A graph with the name "${formData.name}" already exists. Please choose a different name.`);
       return;
     }
 
@@ -291,35 +302,21 @@ export function UpdateGraphModal({ isOpen, onClose }: UpdateGraphModalProps) {
                   <span>Tags</span>
                   <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></div>
                 </label>
-                <div className="space-y-3">
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={tagInput}
-                      onChange={handleTagInputChange}
-                      onKeyDown={handleTagInput}
-                      className="w-full px-4 py-4 bg-gray-800 border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-400 transition-all duration-300 hover:border-gray-500 shadow-lg"
-                      placeholder="Type and press comma to add tags (max 5)"
-                      disabled={formData.tags.length >= 5}
-                    />
-                    <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-purple-500/5 to-pink-500/5 pointer-events-none group-hover:from-purple-500/10 group-hover:to-pink-500/10 transition-all duration-300"></div>
-                  </div>
-                  <p className="text-xs text-gray-400 flex items-center space-x-2">
-                    <span className="w-1.5 h-1.5 bg-purple-400 rounded-full"></span>
-                    <span>Type and press comma to add tags (max 5)</span>
-                  </p>
-                  
-                  {formData.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                      {formData.tags.map((tag, index) => {
+                
+                {/* Enhanced Tag Display Area - matching CreateGraphModal */}
+                <div className="relative">
+                  <div className="w-full min-h-[3.5rem] px-4 py-3 bg-gray-800 border border-gray-600 rounded-xl focus-within:ring-2 focus-within:ring-purple-500/50 focus-within:border-purple-400 transition-all duration-300 hover:border-gray-500 shadow-lg">
+                    <div className="flex flex-wrap gap-2 items-center">
+                      {/* Existing Tags */}
+                      {formData.tags && formData.tags.slice(0, 5).map((tag, index) => {
                         const colorIndex = index % colors.length;
                         const color = colors[colorIndex];
                         return (
                           <div
                             key={index}
-                            className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border-2 bg-gradient-to-r ${color.bg} ${color.text} ${color.border} cursor-pointer hover:scale-105 transition-all duration-200 shadow-sm`}
+                            className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold bg-gradient-to-r ${color.bg} ${color.text} border-2 ${color.border} transition-all duration-200 hover:scale-105 shadow-md animate-in slide-in-from-left-2`}
                             style={{
-                              clipPath: 'polygon(10px 0%, 100% 0%, calc(100% - 10px) 100%, 0% 100%)'
+                              animationDelay: `${index * 100}ms`
                             }}
                           >
                             <span className="mr-2">{tag}</span>
@@ -333,9 +330,26 @@ export function UpdateGraphModal({ isOpen, onClose }: UpdateGraphModalProps) {
                           </div>
                         );
                       })}
+                      
+                      {/* Tag Input */}
+                      {formData.tags.length < 5 && (
+                        <input
+                          type="text"
+                          value={tagInput}
+                          onChange={handleTagInputChange}
+                          onKeyDown={handleTagInput}
+                          placeholder={formData.tags.length === 0 ? "Type and press comma to add tags (max 5)" : "Add more tags"}
+                          className="flex-1 min-w-[200px] px-2 py-1 bg-transparent border-0 outline-0 text-white placeholder-gray-400 text-sm"
+                        />
+                      )}
                     </div>
-                  )}
+                  </div>
+                  <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-purple-500/5 to-pink-500/5 pointer-events-none group-hover:from-purple-500/10 group-hover:to-pink-500/10 transition-all duration-300"></div>
                 </div>
+                <p className="text-xs text-gray-400 mt-2 flex items-center space-x-2">
+                  <span className="w-1.5 h-1.5 bg-purple-400 rounded-full"></span>
+                  <span>Type and press comma to add tags (max 5) • Click × to remove</span>
+                </p>
               </div>
 
               {/* Default Role for Team Members */}
