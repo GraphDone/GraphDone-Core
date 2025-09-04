@@ -1124,10 +1124,21 @@ export function InteractiveGraphVisualization() {
       });
     });
 
-    // Right-click context menu disabled
+    // Add right-click handler for context menu
     background.on('contextmenu', function(event: MouseEvent) {
       event.preventDefault();
-      // Context menu disabled - no action
+      
+      // Close all existing dialogs first (exclusive dialog behavior)
+      setEditingEdge(null);
+      
+      const [graphX, graphY] = d3.pointer(event, g.node());
+      
+      setContextMenuPosition({
+        x: event.clientX,
+        y: event.clientY,
+        graphX,
+        graphY
+      });
     });
 
     // Initialize all nodes at screen center for 2D layout
@@ -3234,8 +3245,8 @@ export function InteractiveGraphVisualization() {
         </div>
       )}
 
-      {/* Context Menu - Disabled */}
-      {false ? (
+      {/* Context Menu */}
+      {contextMenuPosition && (
         <div
           className="fixed z-50 bg-gray-800 border border-gray-600 rounded-lg shadow-2xl py-2 min-w-[200px]"
           style={{
@@ -3332,15 +3343,15 @@ export function InteractiveGraphVisualization() {
             <span>Zoom to Fit</span>
           </button>
         </div>
-      ) : null}
+      )}
 
-      {/* Click outside handler for context menu - Disabled */}
-      {false ? (
+      {/* Click outside handler for context menu */}
+      {contextMenuPosition && (
         <div 
           className="fixed inset-0 z-[40]" 
           onClick={() => setContextMenuPosition(null)}
         />
-      ) : null}
+      )}
 
       {/* Modern Inline Edge Type Editor Dropdown */}
       {editingEdge && (
