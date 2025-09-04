@@ -27,9 +27,10 @@ export function GraphProvider({ children }: GraphProviderProps) {
 
 
   // GraphQL operations - Now loads all graphs without team filter
-  const { data: graphsData, loading: isLoading, error: graphsError } = useQuery(GET_GRAPHS, {
+  const { data: graphsData, loading: isLoading, error: graphsError, refetch: refetchGraphs } = useQuery(GET_GRAPHS, {
     skip: false, // Always query graphs
   });
+  
 
   const [createGraphMutation] = useMutation(CREATE_GRAPH);
   const [updateGraphMutation] = useMutation(UPDATE_GRAPH);
@@ -104,22 +105,24 @@ export function GraphProvider({ children }: GraphProviderProps) {
       let graphToSelect = null;
       
       if (storedGraphId) {
-        graphToSelect = parsedGraphs.find((g: Graph) => g.id === storedGraphId);
+        graphToSelect = parsedGraphs.find((g: any) => g.id === storedGraphId);
       }
       
-      // Auto-select first graph if none selected or stored graph not found
-      if (!currentGraph && parsedGraphs.length > 0) {
-        const selectedGraph = graphToSelect || parsedGraphs[0];
-        setCurrentGraph(selectedGraph);
-        // Save to localStorage for persistence
-        localStorage.setItem('currentGraphId', selectedGraph.id);
+      // Auto-select graph: either previously selected or first available
+      if (parsedGraphs.length > 0) {
+        if (!currentGraph || !parsedGraphs.find((g: any) => g.id === currentGraph.id)) {
+          const selectedGraph = graphToSelect || parsedGraphs[0];
+          setCurrentGraph(selectedGraph);
+          // Save to localStorage for persistence
+          localStorage.setItem('currentGraphId', selectedGraph.id);
+        }
       }
-    } else if (!isLoading) {
-      // No graphs available - clear state
+    } else if (!isLoading && !graphsError) {
+      // No graphs available - clear state only if no error
       setAvailableGraphs([]);
       setCurrentGraph(null);
     }
-  }, [graphsData, currentTeam, currentUser, isLoading]);
+  }, [graphsData, currentTeam, currentUser, isLoading, graphsError]);
 
   // Build graph hierarchy
   const graphHierarchy: GraphHierarchy[] = availableGraphs
@@ -182,7 +185,9 @@ export function GraphProvider({ children }: GraphProviderProps) {
       };
 
       const { data } = await createGraphMutation({
-        variables: { input: graphInput }
+        variables: { input: graphInput },
+        refetchQueries: [{ query: GET_GRAPHS }],
+        awaitRefetchQueries: true
       });
 
       if (data?.createGraphs?.graphs?.[0]) {
@@ -193,8 +198,12 @@ export function GraphProvider({ children }: GraphProviderProps) {
           shareSettings: JSON.parse(data.createGraphs.graphs[0].shareSettings || '{}')
         };
         
+        // Manually refetch to ensure UI is in sync
+        await refetchGraphs();
+        
         setAvailableGraphs(prev => [...prev, newGraph]);
         setCurrentGraph(newGraph);
+        localStorage.setItem('currentGraphId', newGraph.id);
         return newGraph;
       }
       
