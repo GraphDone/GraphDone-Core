@@ -1359,27 +1359,8 @@ export function InteractiveGraphVisualization() {
           .attr('stroke-opacity', 0.7);
       });
 
-    // Add arrowhead markers for middle of edges
+    // Create defs for filters (keep existing filter definitions)
     const defs = svg.append('defs');
-    
-    
-    // Create different arrowhead colors for each edge type
-    RELATIONSHIP_OPTIONS.forEach((option) => {
-      defs.append('marker')
-        .attr('id', `arrowhead-${option.type}`)
-        .attr('viewBox', '-5 -5 10 10')
-        .attr('refX', 0)
-        .attr('refY', 0)
-        .attr('orient', 'auto')
-        .attr('markerWidth', 8)
-        .attr('markerHeight', 8)
-        .append('path')
-        .attr('d', 'M-3,-3 L0,0 L-3,3 L-1,0 Z')
-        .attr('fill', option.hexColor)
-        .attr('stroke', option.hexColor)
-        .attr('stroke-width', currentTransform.scale >= LOD_THRESHOLDS.FAR ? 1 : 0.5)
-      .style('opacity', currentTransform.scale >= LOD_THRESHOLDS.VERY_FAR ? 1 : 0.3);
-    });
 
     // Create nodes AFTER edges (so they render on top)
     const nodeElements = g.append('g')
@@ -3498,6 +3479,12 @@ export function InteractiveGraphVisualization() {
                         // Update edge stroke color immediately
                         svg.selectAll('.edge')
                           .filter((d: any) => d.id === edgeId)
+                          .attr('stroke', config.hexColor);
+                        
+                        // Update middle arrow color immediately  
+                        svg.selectAll('.arrow')
+                          .filter((d: any) => d.id === edgeId)
+                          .attr('fill', config.hexColor)
                           .attr('stroke', config.hexColor);
                         
                         
