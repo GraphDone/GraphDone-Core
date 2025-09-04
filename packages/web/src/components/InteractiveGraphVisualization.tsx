@@ -2663,22 +2663,36 @@ export function InteractiveGraphVisualization() {
         </div>
       )}
       
-      {/* Graph Control Panel */}
-      {showGraphPanel && !isFullscreen ? (
+      {/* Enhanced Graph Control Panel */}
+      {showGraphPanel && !isFullscreen && (
         <div className="absolute left-4 z-40" style={{ top: '20px' }}>
-          <div className={`bg-gray-800/95 backdrop-blur-sm border border-gray-600/60 rounded-lg shadow-xl ${isFullscreen ? 'p-0 w-32' : 'p-4 w-64'}`}>
-            {/* Current Graph Header */}
-            <div className={`flex items-center space-x-2 mb-3 ${isFullscreen ? 'p-2' : ''}`}>
-              <div className="w-6 h-6 bg-green-500 rounded flex items-center justify-center flex-shrink-0">
+          <div className={`bg-gradient-to-br from-gray-800 via-gray-800 to-gray-900 backdrop-blur-sm border border-gray-600/50 rounded-2xl shadow-2xl ${isFullscreen ? 'p-0 w-32' : 'p-6 w-72'} relative overflow-hidden`}>
+            {/* Gradient accent line at top */}
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-green-500 to-purple-500"></div>
+            
+            {/* Subtle background pattern */}
+            <div className="absolute inset-0 opacity-5">
+              <div className="w-full h-full" style={{
+                backgroundImage: `radial-gradient(circle at 1px 1px, rgba(255,255,255,0.15) 1px, transparent 0)`,
+                backgroundSize: '20px 20px'
+              }}></div>
+            </div>
+            
+            {/* Enhanced Current Graph Header */}
+            <div className={`flex items-center space-x-3 mb-6 ${isFullscreen ? 'p-2' : ''} relative z-10`}>
+              <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg">
                 {getGraphTypeIcon(currentGraph?.type)}
               </div>
               <div className="flex-1 min-w-0">
-                <div className="text-xs font-semibold text-white truncate">{currentGraph?.name || 'No Graph'}</div>
+                <div className="text-lg font-bold bg-gradient-to-r from-white via-green-100 to-blue-100 bg-clip-text text-transparent truncate">{currentGraph?.name || 'No Graph'}</div>
+                <div className="text-xs text-gray-400 flex items-center space-x-2 mt-1">
+                  <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></div>
+                  <span>Active Workspace</span>
+                </div>
               </div>
-              <div className="w-2 h-2 bg-green-400 rounded-full flex-shrink-0 animate-pulse"></div>
               <button
                 onClick={() => setShowGraphPanel(false)}
-                className="p-1 rounded text-gray-400 hover:text-white hover:bg-gray-700/50 transition-colors"
+                className="p-2 rounded-xl text-gray-400 hover:text-white hover:bg-gray-700/50 transition-all duration-200 hover:scale-110"
                 title="Minimize graph panel"
               >
                 <Minus className="h-4 w-4" />
@@ -2686,19 +2700,28 @@ export function InteractiveGraphVisualization() {
             </div>
 
 {!isFullscreen && (
-          /* Graph Stats */
-          <div className="grid grid-cols-3 gap-1 mb-3">
-            <div className="bg-gray-700/50 rounded p-1 text-center">
-              <div className="text-white text-sm font-medium">{nodes.length}</div>
-              <div className="text-gray-400 text-xs">Nodes</div>
+          /* Enhanced Graph Stats */
+          <div className="grid grid-cols-3 gap-3 mb-6 relative z-10">
+            <div className="group bg-gradient-to-br from-blue-900/30 to-blue-800/20 border border-blue-500/30 rounded-xl p-3 text-center transition-all duration-300 hover:from-blue-900/40 hover:to-blue-800/30 hover:border-blue-400/50 hover:scale-105 shadow-lg backdrop-blur-sm">
+              <div className="text-white text-lg font-bold group-hover:text-blue-100">{nodes.length}</div>
+              <div className="text-blue-300 text-xs font-medium flex items-center justify-center space-x-1 mt-1">
+                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full"></div>
+                <span>Nodes</span>
+              </div>
             </div>
-            <div className="bg-gray-700/50 rounded p-1 text-center">
-              <div className="text-white text-sm font-medium">{validatedEdges.length}</div>
-              <div className="text-gray-400 text-xs">Edges</div>
+            <div className="group bg-gradient-to-br from-green-900/30 to-emerald-800/20 border border-green-500/30 rounded-xl p-3 text-center transition-all duration-300 hover:from-green-900/40 hover:to-emerald-800/30 hover:border-green-400/50 hover:scale-105 shadow-lg backdrop-blur-sm">
+              <div className="text-white text-lg font-bold group-hover:text-green-100">{validatedEdges.length}</div>
+              <div className="text-green-300 text-xs font-medium flex items-center justify-center space-x-1 mt-1">
+                <div className="w-1.5 h-1.5 bg-green-400 rounded-full"></div>
+                <span>Edges</span>
+              </div>
             </div>
-            <div className="bg-gray-700/50 rounded p-1 text-center">
-              <div className="text-white text-sm font-medium">{currentGraph?.contributorCount || 0}</div>
-              <div className="text-gray-400 text-xs">Users</div>
+            <div className="group bg-gradient-to-br from-purple-900/30 to-violet-800/20 border border-purple-500/30 rounded-xl p-3 text-center transition-all duration-300 hover:from-purple-900/40 hover:to-violet-800/30 hover:border-purple-400/50 hover:scale-105 shadow-lg backdrop-blur-sm">
+              <div className="text-white text-lg font-bold group-hover:text-purple-100">{currentGraph?.contributorCount || 0}</div>
+              <div className="text-purple-300 text-xs font-medium flex items-center justify-center space-x-1 mt-1">
+                <div className="w-1.5 h-1.5 bg-purple-400 rounded-full"></div>
+                <span>Users</span>
+              </div>
             </div>
           </div>
           )}
@@ -2758,47 +2781,49 @@ export function InteractiveGraphVisualization() {
               </>
             ) : (
               <>
-                {/* Create New Graph Button */}
+                {/* Enhanced Create New Graph Button */}
                 <button 
                   onClick={() => setShowCreateGraphModal(true)}
-                  className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2.5 px-3 rounded-md transition-colors duration-200 flex items-center justify-center space-x-2"
+                  className="w-full bg-gradient-to-r from-green-600 via-emerald-600 to-teal-600 text-white font-semibold py-3 px-4 rounded-xl transition-all duration-300 shadow-xl hover:shadow-2xl hover:scale-105 transform border border-green-400/30 hover:from-green-500 hover:via-emerald-500 hover:to-teal-500 flex items-center justify-center space-x-2 group relative overflow-hidden"
                 >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                  </svg>
-                  <span className="text-sm">Create New Graph</span>
+                  <div className="absolute inset-0 bg-gradient-to-r from-green-500/10 to-teal-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  <Plus className="w-4 h-4 relative z-10" />
+                  <span className="text-sm relative z-10">Create New Graph</span>
                 </button>
 
-                {/* Switch Graph Button */}
+                {/* Enhanced Switch Graph Button */}
                 <button 
                   onClick={() => setShowGraphSwitcher(true)}
-                  className="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-2.5 px-3 rounded-lg transition-colors flex items-center justify-between"
+                  className="w-full bg-gradient-to-r from-yellow-600 via-amber-600 to-orange-600 text-white font-semibold py-3 px-4 rounded-xl transition-all duration-300 shadow-xl hover:shadow-2xl hover:scale-105 transform border border-yellow-400/30 hover:from-yellow-500 hover:via-amber-500 hover:to-orange-500 flex items-center justify-between group relative overflow-hidden"
                 >
-                  <div className="flex items-center space-x-2">
+                  <div className="absolute inset-0 bg-gradient-to-r from-yellow-500/10 to-orange-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  <div className="flex items-center space-x-2 relative z-10">
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
                     </svg>
                     <span className="text-sm">Switch Graph</span>
                   </div>
-                  <span className="text-xs bg-white px-2 py-1 rounded-full text-yellow-700 font-bold shadow-md">{availableGraphs.length}</span>
+                  <span className="text-xs bg-white/90 px-2 py-1 rounded-full text-yellow-700 font-bold shadow-lg relative z-10 group-hover:bg-white group-hover:scale-110 transition-all duration-200">{availableGraphs.length}</span>
                 </button>
 
-                {/* Update and Delete Graph Buttons */}
+                {/* Enhanced Update and Delete Graph Buttons */}
                 {currentGraph && (
-                  <div className="grid grid-cols-2 gap-2 mt-2">
+                  <div className="grid grid-cols-2 gap-3 mt-4">
                     <button 
                       onClick={() => setShowUpdateGraphModal(true)}
-                      className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-3 rounded-md transition-colors duration-200 flex items-center justify-center space-x-2"
+                      className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold py-3 px-3 rounded-xl transition-all duration-300 shadow-xl hover:shadow-2xl hover:scale-105 transform border border-blue-400/30 hover:from-blue-500 hover:to-indigo-500 flex items-center justify-center space-x-2 group relative overflow-hidden"
                     >
-                      <Settings className="w-4 h-4" />
-                      <span className="text-sm">Edit</span>
+                      <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-indigo-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                      <Settings className="w-4 h-4 relative z-10" />
+                      <span className="text-sm relative z-10">Edit</span>
                     </button>
                     <button 
                       onClick={() => setShowDeleteGraphModal(true)}
-                      className="bg-red-600 hover:bg-red-700 text-white font-medium py-2.5 px-3 rounded-md transition-colors duration-200 flex items-center justify-center space-x-2"
+                      className="bg-gradient-to-r from-red-600 to-rose-600 text-white font-semibold py-3 px-3 rounded-xl transition-all duration-300 shadow-xl hover:shadow-2xl hover:scale-105 transform border border-red-400/30 hover:from-red-500 hover:to-rose-500 flex items-center justify-center space-x-2 group relative overflow-hidden"
                     >
-                      <Trash2 className="w-4 h-4" />
-                      <span className="text-sm">Delete</span>
+                      <div className="absolute inset-0 bg-gradient-to-r from-red-500/10 to-rose-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                      <Trash2 className="w-4 h-4 relative z-10" />
+                      <span className="text-sm relative z-10">Delete</span>
                     </button>
                   </div>
                 )}
@@ -2807,7 +2832,10 @@ export function InteractiveGraphVisualization() {
           </div>
         </div>
       </div>
-      ) : !isFullscreen && (
+      )}
+
+      {/* Closed Panel Button */}
+      {!showGraphPanel && !isFullscreen && (
         <button
           onClick={() => setShowGraphPanel(true)}
           className="absolute left-4 z-40 backdrop-blur-sm border-0 rounded-lg shadow-xl px-3 py-2 text-white font-semibold transition-all duration-300 flex items-center space-x-2 transform hover:scale-105 w-36 h-10"
