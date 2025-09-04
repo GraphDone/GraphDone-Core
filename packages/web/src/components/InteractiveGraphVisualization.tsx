@@ -1124,21 +1124,10 @@ export function InteractiveGraphVisualization() {
       });
     });
 
-    // Add right-click handler for context menu
+    // Right-click context menu disabled
     background.on('contextmenu', function(event: MouseEvent) {
       event.preventDefault();
-      
-      // Close all existing dialogs first (exclusive dialog behavior)
-      setEditingEdge(null);
-      
-      const [graphX, graphY] = d3.pointer(event, g.node());
-      
-      setContextMenuPosition({
-        x: event.clientX,
-        y: event.clientY,
-        graphX,
-        graphY
-      });
+      // Context menu disabled - no action
     });
 
     // Initialize all nodes at screen center for 2D layout
@@ -2252,12 +2241,15 @@ export function InteractiveGraphVisualization() {
       event.preventDefault();
       event.stopPropagation();
       
-      // Set selected node
+      // Context menu disabled - just select the node
       setSelectedNode(d);
       
       // Apply glow effect
       applyNodeGlowImmediately(d);
       
+      // Context menu disabled
+      return;
+      /*
       // Show context menu for advanced actions
       const containerRect = containerRef.current?.getBoundingClientRect();
       if (containerRect) {
@@ -2270,6 +2262,7 @@ export function InteractiveGraphVisualization() {
           visible: true
         });
       }
+      */
     });
 
     const updateEdgePositions = () => {
@@ -3241,19 +3234,19 @@ export function InteractiveGraphVisualization() {
         </div>
       )}
 
-      {/* Context Menu */}
-      {contextMenuPosition && (
+      {/* Context Menu - Disabled */}
+      {false ? (
         <div
           className="fixed z-50 bg-gray-800 border border-gray-600 rounded-lg shadow-2xl py-2 min-w-[200px]"
           style={{
-            left: Math.min(contextMenuPosition.x, window.innerWidth - 220),
-            top: Math.min(contextMenuPosition.y, window.innerHeight - 200)
+            left: Math.min(contextMenuPosition?.x || 0, window.innerWidth - 220),
+            top: Math.min(contextMenuPosition?.y || 0, window.innerHeight - 200)
           }}
           onClick={(e) => e.stopPropagation()}
         >
           <button
             onClick={() => {
-              createInlineNode(contextMenuPosition.graphX, contextMenuPosition.graphY);
+              createInlineNode(contextMenuPosition?.graphX || 0, contextMenuPosition?.graphY || 0);
               setContextMenuPosition(null);
             }}
             className="w-full text-left px-4 py-2 hover:bg-gray-700 text-gray-200 flex items-center space-x-2"
@@ -3339,15 +3332,15 @@ export function InteractiveGraphVisualization() {
             <span>Zoom to Fit</span>
           </button>
         </div>
-      )}
+      ) : null}
 
-      {/* Click outside handler for context menu */}
-      {contextMenuPosition && (
+      {/* Click outside handler for context menu - Disabled */}
+      {false ? (
         <div 
           className="fixed inset-0 z-[40]" 
           onClick={() => setContextMenuPosition(null)}
         />
-      )}
+      ) : null}
 
       {/* Modern Inline Edge Type Editor Dropdown */}
       {editingEdge && (
