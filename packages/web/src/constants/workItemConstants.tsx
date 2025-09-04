@@ -35,7 +35,8 @@ import {
   Package,
   // Default Icon
   Square,
-  Paperclip
+  Paperclip,
+  Eraser
 } from 'lucide-react';
 
 // ============================
@@ -238,10 +239,10 @@ export const WORK_ITEM_TYPES: Record<WorkItemType, TypeOption> = {
     value: 'DEFAULT',
     label: 'Default',
     description: 'Generic work item',
-    icon: Square,
-    color: 'text-gray-400',
-    bgColor: 'bg-gray-400/10',
-    borderColor: 'border-gray-400/30',
+    icon: Eraser,
+    color: 'text-gray-300',
+    bgColor: 'bg-gray-600/20',
+    borderColor: 'border-gray-500/30',
     hexColor: '#9ca3af'
   }
 };
@@ -258,9 +259,9 @@ export const WORK_ITEM_STATUSES: Record<WorkItemStatus, StatusOption> = {
     label: 'Not Started',
     description: 'Waiting to begin',
     icon: Hexagon,
-    color: 'text-gray-400',
-    bgColor: 'bg-gray-400/10',
-    borderColor: 'border-gray-400/30',
+    color: 'text-gray-300',
+    bgColor: 'bg-gray-600/20',
+    borderColor: 'border-gray-500/30',
     dotColor: 'bg-gray-400',
     hexColor: '#9ca3af'
   },
@@ -576,10 +577,7 @@ export const DEFAULT_NODE_CONFIG = {
   title: 'New Node', // Default title for new nodes
   type: 'DEFAULT' as WorkItemType, // Default type (generic work item)
   status: 'NOT_STARTED' as WorkItemStatus, // Default status (beginning of workflow)
-  priority: 'minimal' as PriorityLevel, // Default priority level
-  priorityExec: 0.0, // Executive priority score (0.0-1.0)
-  priorityIndiv: 0.0, // Individual priority score (0.0-1.0)
-  priorityComm: 0.0, // Community priority score (0.0-1.0)
+  priority: 0.0, // Priority score (0.0-1.0)
   description: '' // Empty description by default
 };
 

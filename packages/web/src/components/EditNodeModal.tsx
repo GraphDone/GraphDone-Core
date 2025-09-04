@@ -41,9 +41,7 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
     description: node.description || '',
     type: node.type,
     status: node.status,
-    priorityExec: node.priorityExec || 0,
-    priorityIndiv: node.priorityIndiv || 0,
-    priorityComm: node.priorityComm || 0,
+    priority: node.priority || 0,
     assignedTo: typeof node.assignedTo === 'string' ? node.assignedTo : (node.assignedTo?.id || ''),
     dueDate: formatDateForInput(node.dueDate),
     tags: node.tags || [],
@@ -56,9 +54,7 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
       description: node.description || '',
       type: node.type,
       status: node.status,
-      priorityExec: node.priorityExec || 0,
-      priorityIndiv: node.priorityIndiv || 0,
-      priorityComm: node.priorityComm || 0,
+      priority: node.priority || 0,
       assignedTo: typeof node.assignedTo === 'string' ? node.assignedTo : (node.assignedTo?.id || ''),
       dueDate: formatDateForInput(node.dueDate),
       tags: node.tags || [],
@@ -137,12 +133,9 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
         description: formData.description.trim() || undefined,
         type: formData.type,
         status: formData.status,
-        priorityExec: formData.priorityExec,
-        priorityIndiv: formData.priorityIndiv,
-        priorityComm: formData.priorityComm,
+        priority: formData.priority,
         dueDate: formData.dueDate || undefined,
         tags: formData.tags || [],
-        priorityComp: (formData.priorityExec + formData.priorityIndiv + formData.priorityComm) / 3,
       };
       
       const updateInput: any = { ...cleanFormData };
@@ -396,7 +389,7 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
             </div>
             
             <div className="space-y-3">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Priority Distribution</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Priority Level</label>
               
               <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 mb-4 shadow-sm">
                 <div className="mb-3">
@@ -410,9 +403,7 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                       onClick={() => {
                         setFormData(prev => ({
                           ...prev,
-                          priorityExec: 0.9,
-                          priorityIndiv: 0.9,
-                          priorityComm: 0.9
+                          priority: 0.9
                         }));
                       }}
                       className="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 border border-red-500/30 text-center hover:shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600 transition-all cursor-pointer"
@@ -432,9 +423,7 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                       onClick={() => {
                         setFormData(prev => ({
                           ...prev,
-                          priorityExec: 0.7,
-                          priorityIndiv: 0.7,
-                          priorityComm: 0.7
+                          priority: 0.7
                         }));
                       }}
                       className="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 border border-orange-500/30 text-center hover:shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600 transition-all cursor-pointer"
@@ -454,9 +443,7 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                       onClick={() => {
                         setFormData(prev => ({
                           ...prev,
-                          priorityExec: 0.5,
-                          priorityIndiv: 0.5,
-                          priorityComm: 0.5
+                          priority: 0.5
                         }));
                       }}
                       className="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 border border-yellow-500/30 text-center hover:shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600 transition-all cursor-pointer"
@@ -478,9 +465,7 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                       onClick={() => {
                         setFormData(prev => ({
                           ...prev,
-                          priorityExec: 0.3,
-                          priorityIndiv: 0.3,
-                          priorityComm: 0.3
+                          priority: 0.3
                         }));
                       }}
                       className="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 border border-blue-500/30 text-center hover:shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600 transition-all cursor-pointer"
@@ -500,9 +485,7 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                       onClick={() => {
                         setFormData(prev => ({
                           ...prev,
-                          priorityExec: 0.1,
-                          priorityIndiv: 0.1,
-                          priorityComm: 0.1
+                          priority: 0.1
                         }));
                       }}
                       className="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 border border-gray-500/30 text-center hover:shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600 transition-all cursor-pointer"
@@ -522,132 +505,47 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
               
               <div>
                 <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
-                  Executive Priority
+                  Priority Level
                 </label>
                 <input
                   type="range"
                   min="0"
                   max="1"
                   step="0.1"
-                  value={formData.priorityExec}
+                  value={formData.priority}
                   onChange={(e) => setFormData(prev => ({
                     ...prev,
-                    priorityExec: parseFloat(e.target.value)
+                    priority: parseFloat(e.target.value)
                   }))}
                   className={`w-full ${
-                    formData.priorityExec >= 0.8 ? 'accent-red-500' :
-                    formData.priorityExec >= 0.6 ? 'accent-orange-500' :
-                    formData.priorityExec >= 0.4 ? 'accent-yellow-500' :
-                    formData.priorityExec >= 0.2 ? 'accent-blue-500' :
+                    formData.priority >= 0.8 ? 'accent-red-500' :
+                    formData.priority >= 0.6 ? 'accent-orange-500' :
+                    formData.priority >= 0.4 ? 'accent-yellow-500' :
+                    formData.priority >= 0.2 ? 'accent-blue-500' :
                     'accent-gray-500'
                   }`}
                 />
                 <div className={`text-sm text-center font-medium ${
-                  formData.priorityExec >= 0.8 ? 'text-red-500' :
-                  formData.priorityExec >= 0.6 ? 'text-orange-500' :
-                  formData.priorityExec >= 0.4 ? 'text-yellow-500' :
-                  formData.priorityExec >= 0.2 ? 'text-blue-500' :
+                  formData.priority >= 0.8 ? 'text-red-500' :
+                  formData.priority >= 0.6 ? 'text-orange-500' :
+                  formData.priority >= 0.4 ? 'text-yellow-500' :
+                  formData.priority >= 0.2 ? 'text-blue-500' :
                   'text-gray-500'
                 }`}>
                   {(() => {
-                    const PriorityIcon = getCentralizedPriorityIcon(formData.priorityExec);
+                    const PriorityIcon = getCentralizedPriorityIcon(formData.priority);
                     const priorityConfig = PRIORITY_OPTIONS.find(p => p.value !== 'all' && 
-                      formData.priorityExec >= p.threshold!.min && formData.priorityExec <= p.threshold!.max);
+                      formData.priority >= p.threshold!.min && formData.priority <= p.threshold!.max);
                     return (
                       <>
                         {PriorityIcon && <PriorityIcon className="h-6 w-6 inline mr-1" />}
-                        {priorityConfig?.label || 'Minimal'} ({Math.round(formData.priorityExec * 100)}%)
+                        {priorityConfig?.label || 'Minimal'} ({Math.round(formData.priority * 100)}%)
                       </>
                     );
                   })()}
                 </div>
               </div>
               
-              <div>
-                <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
-                  Individual Priority
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.1"
-                  value={formData.priorityIndiv}
-                  onChange={(e) => setFormData(prev => ({
-                    ...prev,
-                    priorityIndiv: parseFloat(e.target.value)
-                  }))}
-                  className={`w-full ${
-                    formData.priorityIndiv >= 0.8 ? 'accent-red-500' :
-                    formData.priorityIndiv >= 0.6 ? 'accent-orange-500' :
-                    formData.priorityIndiv >= 0.4 ? 'accent-yellow-500' :
-                    formData.priorityIndiv >= 0.2 ? 'accent-blue-500' :
-                    'accent-gray-500'
-                  }`}
-                />
-                <div className={`text-sm text-center font-medium ${
-                  formData.priorityIndiv >= 0.8 ? 'text-red-500' :
-                  formData.priorityIndiv >= 0.6 ? 'text-orange-500' :
-                  formData.priorityIndiv >= 0.4 ? 'text-yellow-500' :
-                  formData.priorityIndiv >= 0.2 ? 'text-blue-500' :
-                  'text-gray-500'
-                }`}>
-                  {(() => {
-                    const PriorityIcon = getCentralizedPriorityIcon(formData.priorityIndiv);
-                    const priorityConfig = PRIORITY_OPTIONS.find(p => p.value !== 'all' && 
-                      formData.priorityIndiv >= p.threshold!.min && formData.priorityIndiv <= p.threshold!.max);
-                    return (
-                      <>
-                        {PriorityIcon && <PriorityIcon className="h-6 w-6 inline mr-1" />}
-                        {priorityConfig?.label || 'Minimal'} ({Math.round(formData.priorityIndiv * 100)}%)
-                      </>
-                    );
-                  })()}
-                </div>
-              </div>
-              
-              <div>
-                <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
-                  Community Priority
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.1"
-                  value={formData.priorityComm}
-                  onChange={(e) => setFormData(prev => ({
-                    ...prev,
-                    priorityComm: parseFloat(e.target.value)
-                  }))}
-                  className={`w-full ${
-                    formData.priorityComm >= 0.8 ? 'accent-red-500' :
-                    formData.priorityComm >= 0.6 ? 'accent-orange-500' :
-                    formData.priorityComm >= 0.4 ? 'accent-yellow-500' :
-                    formData.priorityComm >= 0.2 ? 'accent-blue-500' :
-                    'accent-gray-500'
-                  }`}
-                />
-                <div className={`text-sm text-center font-medium ${
-                  formData.priorityComm >= 0.8 ? 'text-red-500' :
-                  formData.priorityComm >= 0.6 ? 'text-orange-500' :
-                  formData.priorityComm >= 0.4 ? 'text-yellow-500' :
-                  formData.priorityComm >= 0.2 ? 'text-blue-500' :
-                  'text-gray-500'
-                }`}>
-                  {(() => {
-                    const PriorityIcon = getCentralizedPriorityIcon(formData.priorityComm);
-                    const priorityConfig = PRIORITY_OPTIONS.find(p => p.value !== 'all' && 
-                      formData.priorityComm >= p.threshold!.min && formData.priorityComm <= p.threshold!.max);
-                    return (
-                      <>
-                        {PriorityIcon && <PriorityIcon className="h-6 w-6 inline mr-1" />}
-                        {priorityConfig?.label || 'Minimal'} ({Math.round(formData.priorityComm * 100)}%)
-                      </>
-                    );
-                  })()}
-                </div>
-              </div>
             </div>
             
             <div className="flex justify-end space-x-3 pt-4">
