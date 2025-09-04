@@ -271,7 +271,7 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
 
       {/* Stats Cards - Second Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 hover:scale-[1.02] hover:-translate-y-1 hover:bg-gray-750 transition-all duration-200 cursor-pointer">
           <div className="flex items-center">
             <div className="flex-shrink-0">
               {React.createElement(getStatusConfig('NOT_STARTED').icon!, { className: `h-8 w-8 ${getStatusConfig('NOT_STARTED').color}` })}
@@ -283,7 +283,7 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
           </div>
         </div>
 
-        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 hover:scale-[1.02] hover:-translate-y-1 hover:bg-gray-750 transition-all duration-200 cursor-pointer">
           <div className="flex items-center">
             <div className="flex-shrink-0">
               {React.createElement(getStatusConfig('PROPOSED').icon!, { className: `h-8 w-8 ${getStatusConfig('PROPOSED').color}` })}
@@ -295,7 +295,7 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
           </div>
         </div>
 
-        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 hover:scale-[1.02] hover:-translate-y-1 hover:bg-gray-750 transition-all duration-200 cursor-pointer">
           <div className="flex items-center">
             <div className="flex-shrink-0">
               {React.createElement(getStatusConfig('PLANNED').icon!, { className: `h-8 w-8 ${getStatusConfig('PLANNED').color}` })}
@@ -310,7 +310,7 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
 
       {/* Stats Cards - Second Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 hover:scale-[1.02] hover:-translate-y-1 hover:bg-gray-750 transition-all duration-200 cursor-pointer">
           <div className="flex items-center">
             <div className="flex-shrink-0">
               {React.createElement(getStatusConfig('IN_PROGRESS').icon!, { className: `h-8 w-8 ${getStatusConfig('IN_PROGRESS').color}` })}
@@ -322,7 +322,7 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
           </div>
         </div>
 
-        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 hover:scale-[1.02] hover:-translate-y-1 hover:bg-gray-750 transition-all duration-200 cursor-pointer">
           <div className="flex items-center">
             <div className="flex-shrink-0">
               {React.createElement(getStatusConfig('IN_REVIEW').icon!, { className: `h-8 w-8 ${getStatusConfig('IN_REVIEW').color}` })}
@@ -334,7 +334,7 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
           </div>
         </div>
 
-        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 hover:scale-[1.02] hover:-translate-y-1 hover:bg-gray-750 transition-all duration-200 cursor-pointer">
           <div className="flex items-center">
             <div className="flex-shrink-0">
               {React.createElement(getStatusConfig('BLOCKED').icon!, { className: `h-8 w-8 ${getStatusConfig('BLOCKED').color}` })}
@@ -349,7 +349,7 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
 
       {/* Stats Cards - Fourth Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 hover:scale-[1.02] hover:-translate-y-1 hover:bg-gray-750 transition-all duration-200 cursor-pointer">
           <div className="flex items-center">
             <div className="flex-shrink-0">
               {React.createElement(getStatusConfig('ON_HOLD').icon!, { className: `h-8 w-8 ${getStatusConfig('ON_HOLD').color}` })}
@@ -361,7 +361,7 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
           </div>
         </div>
 
-        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 hover:scale-[1.02] hover:-translate-y-1 hover:bg-gray-750 transition-all duration-200 cursor-pointer">
           <div className="flex items-center">
             <div className="flex-shrink-0">
               {React.createElement(getStatusConfig('COMPLETED').icon!, { className: `h-8 w-8 ${getStatusConfig('COMPLETED').color}` })}
@@ -373,7 +373,7 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
           </div>
         </div>
 
-        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 hover:scale-[1.02] hover:-translate-y-1 hover:bg-gray-750 transition-all duration-200 cursor-pointer">
           <div className="flex items-center">
             <div className="flex-shrink-0">
               {React.createElement(getStatusConfig('CANCELLED').icon!, { className: `h-8 w-8 ${getStatusConfig('CANCELLED').color}` })}

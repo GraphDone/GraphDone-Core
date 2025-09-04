@@ -155,6 +155,16 @@ export interface PriorityOption {
 // ============================
 
 export const WORK_ITEM_TYPES: Record<WorkItemType, TypeOption> = {
+  DEFAULT: {
+    value: 'DEFAULT',
+    label: 'Default',
+    description: 'Generic work item',
+    icon: Eraser,
+    color: 'text-gray-300',
+    bgColor: 'bg-gray-600/20',
+    borderColor: 'border-gray-500/30',
+    hexColor: '#9ca3af'
+  },
   EPIC: {
     value: 'EPIC',
     label: 'Epic',
@@ -234,16 +244,6 @@ export const WORK_ITEM_TYPES: Record<WorkItemType, TypeOption> = {
     bgColor: 'bg-teal-400/10',
     borderColor: 'border-teal-400/30',
     hexColor: '#2dd4bf'
-  },
-  DEFAULT: {
-    value: 'DEFAULT',
-    label: 'Default',
-    description: 'Generic work item',
-    icon: Eraser,
-    color: 'text-gray-300',
-    bgColor: 'bg-gray-600/20',
-    borderColor: 'border-gray-500/30',
-    hexColor: '#9ca3af'
   }
 };
 
@@ -423,7 +423,8 @@ export const WORK_ITEM_PRIORITIES: Record<PriorityLevel, PriorityOption> = {
 
 export const TYPE_OPTIONS: TypeOption[] = [
   { value: 'all', label: 'All Type', icon: null, color: 'text-gray-400', hexColor: '#9ca3af' },
-  ...Object.values(WORK_ITEM_TYPES)
+  WORK_ITEM_TYPES.DEFAULT,
+  ...Object.values(WORK_ITEM_TYPES).filter(type => type.value !== 'DEFAULT')
 ];
 
 export const STATUS_OPTIONS: StatusOption[] = [

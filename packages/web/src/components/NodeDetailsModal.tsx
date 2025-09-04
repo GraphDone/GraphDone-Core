@@ -457,11 +457,7 @@ export function NodeDetailsModal({
               {/* Type Dropdown */}
               {showTypeDropdown && (
                 <div className="absolute top-full left-0 mt-1 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-10">
-                  {TYPE_OPTIONS.filter(opt => opt.value !== 'all').sort((a, b) => {
-                    if (a.value === 'DEFAULT') return -1;
-                    if (b.value === 'DEFAULT') return 1;
-                    return 0;
-                  }).map((type) => (
+                  {TYPE_OPTIONS.filter(opt => opt.value !== 'all').map((type) => (
                     <button
                       key={type.value}
                       onClick={() => {
