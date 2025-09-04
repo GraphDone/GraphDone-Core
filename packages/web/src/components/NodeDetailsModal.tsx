@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, User, Flag, Edit3, Save, ChevronDown, Plus, Unlink, Trash2,
-  GitBranch, ArrowRight, ArrowLeft, Ban, Link2, Folder, Split, Copy, Shield, Bookmark, Package
+  GitBranch, ArrowRight, ArrowLeft, Ban, Link2, Folder, Split, Copy, Shield, Bookmark, Package,
+  Sparkles, Hash, Crown, Activity, Gem, Rocket, Star, Brain
 } from 'lucide-react';
 import { useMutation } from '@apollo/client';
 import { UPDATE_WORK_ITEM, GET_WORK_ITEMS, CREATE_EDGE, GET_EDGES, DELETE_EDGE, DELETE_WORK_ITEM } from '../lib/queries';
@@ -10,7 +11,7 @@ import { useGraph } from '../contexts/GraphContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import {
   Calendar, Clock,
-  Layers, Trophy, Target, Sparkles, ListTodo, AlertTriangle, Lightbulb, Microscope,
+  Layers, Trophy, Target, ListTodo, AlertTriangle, Lightbulb, Microscope,
   ClipboardList, CheckCircle, AlertCircle, Flame, Zap, Triangle, Circle, ArrowDown,
   getRelationshipIconElement,
   getRelationshipConfig,
@@ -427,21 +428,21 @@ export function NodeDetailsModal({
   };
 
   const getRelationshipIcon = (type: string) => {
-    return getRelationshipIconElement(type as RelationshipType, "h-3 w-3");
+    return getRelationshipIconElement(type as RelationshipType, "h-4 w-4");
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
       <div 
         className="fixed inset-0 cursor-pointer" 
         onClick={onClose}
       />
       <div 
-        className="relative bg-gray-900 border border-gray-700 shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-lg animate-in fade-in zoom-in-95 duration-300"
+        className="relative bg-gradient-to-br from-gray-900 to-gray-800 border border-gray-600 shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-xl animate-in fade-in zoom-in-95 duration-300 ring-1 ring-white/10"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-700">
+        <div className="flex items-center justify-between p-6 border-b border-gray-600 bg-gray-800/30">
           <div className="flex items-center space-x-8">
             {/* Clickable Type Badge */}
             <div className="relative">
@@ -451,7 +452,7 @@ export function NodeDetailsModal({
               >
                 {getTypeIcon(currentNode.type)}
                 <span>{currentNode.type}</span>
-                <ChevronDown className="h-3 w-3" />
+                <ChevronDown className="h-4 w-4" />
               </button>
               
               {/* Type Dropdown */}
@@ -487,7 +488,7 @@ export function NodeDetailsModal({
               >
                 {getStatusIcon(currentNode.status)}
                 <span>{currentNode.status.replace(/_/g, ' ')}</span>
-                <ChevronDown className="h-3 w-3" />
+                <ChevronDown className="h-4 w-4" />
               </button>
               
               {/* Status Dropdown */}
@@ -547,18 +548,21 @@ export function NodeDetailsModal({
             type="text"
             value={editedNode?.title || ''}
             onChange={(e) => setEditedNode(prev => prev ? { ...prev, title: e.target.value } : null)}
-            className="text-xl font-semibold bg-transparent border-b border-gray-700 text-white mb-3 w-full focus:outline-none focus:border-blue-500 transition-colors hover:border-gray-600 pb-1"
+            className="text-xl font-semibold bg-transparent border-b-2 border-gray-600 text-white mb-4 w-full focus:outline-none focus:border-green-400 transition-all duration-300 hover:border-gray-500 pb-2"
             placeholder="Enter title..."
           />
 
           {/* Description - Always Editable */}
           <div className="mb-4">
-            <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Description</h3>
+            <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3 flex items-center">
+              <Edit3 className="h-4 w-4 mr-2 text-emerald-400" />
+              Description
+            </h3>
             <textarea
               value={editedNode?.description || ''}
               onChange={(e) => setEditedNode(prev => prev ? { ...prev, description: e.target.value } : null)}
-              className="w-full text-gray-300 bg-gray-800 border border-gray-700 rounded-lg p-3 focus:outline-none focus:border-blue-500 transition-colors resize-none hover:border-gray-500"
-              placeholder="Enter description..."
+              className="w-full text-gray-300 bg-gray-800/50 border border-gray-600 rounded-lg p-4 focus:outline-none focus:border-green-400 focus:ring-2 focus:ring-green-400/20 transition-all duration-300 resize-none hover:border-gray-500"
+              placeholder="Enter description"
               rows={4}
             />
           </div>
@@ -568,8 +572,8 @@ export function NodeDetailsModal({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Priority - Editable */}
             <div>
-              <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2 flex items-center">
-                <Flag className={`h-3 w-3 mr-1.5 ${priorityInfo.flagColor}`} />
+              <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3 flex items-center">
+                <Flag className={`h-4 w-4 mr-2 ${priorityInfo.flagColor}`} />
                 Priority
               </h3>
               <div className="space-y-3">
@@ -607,8 +611,8 @@ export function NodeDetailsModal({
 
             {/* Assigned To - Editable */}
             <div>
-              <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2 flex items-center">
-                <User className="h-3 w-3 mr-1.5" />
+              <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3 flex items-center">
+                <User className="h-4 w-4 mr-2 text-violet-400" />
                 Contributor
               </h3>
               <div className="relative">
@@ -621,7 +625,7 @@ export function NodeDetailsModal({
                       assignedTo: value ? { id: value, name: e.target.selectedOptions[0].text.split(' (')[0], username: value } : undefined 
                     } : null);
                   }}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-gray-300 focus:outline-none focus:border-blue-500 transition-colors appearance-none hover:border-gray-500"
+                  className="w-full bg-gray-800/50 border border-gray-600 rounded-lg px-4 py-3 text-gray-300 focus:outline-none focus:border-green-400 focus:ring-2 focus:ring-green-400/20 transition-all duration-300 appearance-none hover:border-gray-500"
                 >
                   <option value="">No contributor</option>
                   <option value="user-1">John Doe (@john)</option>
@@ -639,7 +643,10 @@ export function NodeDetailsModal({
 
             {/* Owner */}
             <div>
-              <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Owner</h3>
+              <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3 flex items-center">
+                <Crown className="h-4 w-4 mr-2 text-amber-400" />
+                Owner
+              </h3>
               {currentNode.owner ? (
                 <>
                   <div className="text-gray-300">{currentNode.owner.name}</div>
@@ -655,8 +662,8 @@ export function NodeDetailsModal({
 
             {/* Due Date - Editable */}
             <div>
-              <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2 flex items-center">
-                <Calendar className="h-3 w-3 mr-1.5" />
+              <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3 flex items-center">
+                <Calendar className="h-4 w-4 mr-2 text-teal-400" />
                 Due Date
               </h3>
               <input
@@ -669,7 +676,7 @@ export function NodeDetailsModal({
                     dueDate: value ? `${value}T23:59:59.999Z` : undefined 
                   } : null);
                 }}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-gray-300 focus:outline-none focus:border-blue-500 transition-colors hover:border-gray-500"
+                className="w-full bg-gray-800/50 border border-gray-600 rounded-lg px-4 py-3 text-gray-300 focus:outline-none focus:border-green-400 focus:ring-2 focus:ring-green-400/20 transition-all duration-300 hover:border-gray-500"
               />
               {editedNode?.dueDate && (
                 <div className="mt-1 text-xs text-gray-500">
@@ -682,7 +689,10 @@ export function NodeDetailsModal({
 
           {/* Tags - Editable */}
           <div className="mt-6">
-            <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Tags</h3>
+            <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3 flex items-center">
+              <Hash className="h-4 w-4 mr-2 text-sky-400" />
+              Tags
+            </h3>
             <div className="flex flex-wrap gap-2">
               {/* Existing Tags */}
               {editedNode?.tags?.map((tag, index) => (
@@ -710,7 +720,7 @@ export function NodeDetailsModal({
                   <input
                     type="text"
                     placeholder="Add Tag"
-                    className="text-xs bg-gray-800 border border-gray-600 rounded-md px-2 py-1 text-gray-300 focus:outline-none focus:border-blue-500 transition-colors min-w-16"
+                    className="text-xs bg-gray-800 border border-gray-600 rounded-md px-2 py-1 text-gray-300 focus:outline-none focus:border-green-500 transition-colors min-w-16"
                     style={{ width: `${Math.max(16, 8)}ch` }}
                     onInput={(e) => {
                       const input = e.target as HTMLInputElement;
@@ -742,8 +752,8 @@ export function NodeDetailsModal({
 
           {/* Timestamps */}
           <div className="mt-6">
-            <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2 flex items-center">
-              <Clock className="h-3 w-3 mr-1.5" />
+            <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3 flex items-center">
+              <Clock className="h-4 w-4 mr-2 text-lime-400" />
               Timestamps
             </h3>
             <div className="text-gray-300 space-y-1">
@@ -762,7 +772,8 @@ export function NodeDetailsModal({
 
           {/* Connections */}
           <div className="mt-6">
-            <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">
+            <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-4 flex items-center">
+              <GitBranch className="h-4 w-4 mr-2 text-fuchsia-400" />
               Connections ({nodeConnections.length})
             </h3>
             
@@ -778,15 +789,15 @@ export function NodeDetailsModal({
                 {/* Incoming Connections */}
                 {incomingConnections.length > 0 && (
                   <div>
-                    <h4 className="text-xs font-medium text-gray-500 mb-2 flex items-center">
-                      <ArrowRight className="h-3 w-3 mr-1" />
+                    <h4 className="text-xs font-medium text-gray-400 mb-3 flex items-center">
+                      <ArrowRight className="h-4 w-4 mr-2 text-red-400" />
                       Incoming ({incomingConnections.length})
                     </h4>
                     <div className="space-y-2">
                       {incomingConnections.map((edge) => {
                         const connectedNode = getConnectedNode(edge.source);
                         return (
-                          <div key={edge.id} className="flex items-center space-x-3 p-2 bg-gray-800/50 rounded-md">
+                          <div key={edge.id} className="flex items-center space-x-3 p-3 bg-gradient-to-r from-red-900/20 to-gray-800/50 border border-red-500/20 rounded-lg hover:bg-red-900/30 transition-all">
                             <div className="flex items-center space-x-2 flex-1">
                               {connectedNode && (
                                 <span className={`flex items-center space-x-1 px-2 py-1 rounded text-xs font-medium ${getTypeColor(connectedNode.type)}`}>
@@ -809,15 +820,15 @@ export function NodeDetailsModal({
                 {/* Outgoing Connections */}
                 {outgoingConnections.length > 0 && (
                   <div>
-                    <h4 className="text-xs font-medium text-gray-500 mb-2 flex items-center">
-                      <ArrowLeft className="h-3 w-3 mr-1" />
+                    <h4 className="text-xs font-medium text-gray-400 mb-3 flex items-center">
+                      <ArrowLeft className="h-4 w-4 mr-2 text-purple-400" />
                       Outgoing ({outgoingConnections.length})
                     </h4>
                     <div className="space-y-2">
                       {outgoingConnections.map((edge) => {
                         const connectedNode = getConnectedNode(edge.target);
                         return (
-                          <div key={edge.id} className="flex items-center space-x-3 p-2 bg-gray-800/50 rounded-md">
+                          <div key={edge.id} className="flex items-center space-x-3 p-3 bg-gradient-to-r from-purple-900/20 to-gray-800/50 border border-purple-500/20 rounded-lg hover:bg-purple-900/30 transition-all">
                             <div className="flex items-center space-x-2 flex-1">
                               {connectedNode && (
                                 <span className={`flex items-center space-x-1 px-2 py-1 rounded text-xs font-medium ${getTypeColor(connectedNode.type)}`}>
@@ -841,16 +852,23 @@ export function NodeDetailsModal({
           </div>
 
             {/* Node ID */}
-            <div className="mt-6 pt-4 border-t border-gray-700">
-              <div className="text-xs text-gray-500">
-                <span className="font-mono">{currentNode.id}</span>
+            <div className="mt-6 pt-4 border-t border-gray-600">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Star className="h-4 w-4 text-amber-400" />
+                  <span className="text-xs text-gray-400 uppercase">Node ID</span>
+                </div>
+                <span className="text-xs text-gray-500 font-mono">{currentNode.id}</span>
               </div>
             </div>
           </div>
 
           {/* Right Column - Action Buttons */}
           <div className="w-48 flex-shrink-0">
-            <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">Actions</h3>
+            <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-4 flex items-center">
+              <Rocket className="h-4 w-4 mr-2 text-cyan-400" />
+              Actions
+            </h3>
             <div className="space-y-2">
               {/* Connect Dropdown */}
               <div className="relative" ref={connectDropdownRef}>
@@ -860,7 +878,7 @@ export function NodeDetailsModal({
                   className="w-full flex items-center justify-between space-x-2 px-3 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-md transition-colors text-sm font-medium"
                 >
                   <div className="flex items-center space-x-2">
-                    <GitBranch className="h-4 w-4" />
+                    <Link2 className="h-4 w-4" />
                     <span>Connect ({getAvailableNodes().length})</span>
                   </div>
                   <ChevronDown className={`h-4 w-4 transition-transform ${showConnectDropdown ? 'rotate-180' : ''}`} />
