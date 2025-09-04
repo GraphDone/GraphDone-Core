@@ -23,10 +23,7 @@ interface WorkItem {
   description?: string;
   type: string;
   status: string;
-  priorityExec: number;
-  priorityIndiv: number;
-  priorityComm: number;
-  priorityComp: number;
+  priority: number;
   dueDate?: string;
   tags?: string[];
   metadata?: string;
@@ -64,7 +61,7 @@ const getStatusColor = (status: string) => {
 };
 
 const getNodePriority = (node: WorkItem) => {
-  return node.priorityExec || 0;
+  return node.priority || 0;
 };
 
 // Using centralized contributor color function

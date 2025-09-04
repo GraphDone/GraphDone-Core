@@ -23,10 +23,7 @@ interface WorkItem {
   description?: string;
   type: string;
   status: string;
-  priorityExec: number;
-  priorityIndiv: number;
-  priorityComm: number;
-  priorityComp: number;
+  priority: number;
   dueDate?: string;
   tags?: string[];
   metadata?: string;
@@ -180,9 +177,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
     description: node.description || '',
     type: node.type,
     status: node.status,
-    priorityExec: node.priorityExec,
-    priorityIndiv: node.priorityIndiv,
-    priorityComm: node.priorityComm,
+    priority: node.priority,
     dueDate: node.dueDate,
     tags: node.tags || [],
     metadata: node.metadata || '',
@@ -217,7 +212,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
 
     // Priority filter
     if (priorityFilter && priorityFilter !== '' && priorityFilter !== 'All Priorities') {
-      const priority = (node: WorkItem) => node.priorityComp || node.priorityExec || 0;
+      const priority = (node: WorkItem) => node.priority || 0;
       switch (priorityFilter) {
         case 'Critical':
           filtered = filtered.filter(node => priority(node) >= 0.8);
@@ -268,11 +263,11 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
     }, {} as Record<string, number>);
 
     const priorityStats = {
-      critical: filteredNodes.filter(node => (node.priorityComp || node.priorityExec) >= 0.8).length,
-      high: filteredNodes.filter(node => (node.priorityComp || node.priorityExec) >= 0.6 && (node.priorityComp || node.priorityExec) < 0.8).length,
-      moderate: filteredNodes.filter(node => (node.priorityComp || node.priorityExec) >= 0.4 && (node.priorityComp || node.priorityExec) < 0.6).length,
-      low: filteredNodes.filter(node => (node.priorityComp || node.priorityExec) >= 0.2 && (node.priorityComp || node.priorityExec) < 0.4).length,
-      minimal: filteredNodes.filter(node => (node.priorityComp || node.priorityExec) < 0.2).length
+      critical: filteredNodes.filter(node => node.priority >= 0.8).length,
+      high: filteredNodes.filter(node => node.priority >= 0.6 && node.priority < 0.8).length,
+      moderate: filteredNodes.filter(node => node.priority >= 0.4 && node.priority < 0.6).length,
+      low: filteredNodes.filter(node => node.priority >= 0.2 && node.priority < 0.4).length,
+      minimal: filteredNodes.filter(node => node.priority < 0.2).length
     };
 
     return {

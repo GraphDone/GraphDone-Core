@@ -63,9 +63,7 @@ export function Ontology() {
       { id: 'description', name: 'description', type: 'text' as const, required: false },
       { id: 'type', name: 'type', type: 'text' as const, required: true },
       { id: 'status', name: 'status', type: 'text' as const, required: true },
-      { id: 'priorityExec', name: 'priorityExec', type: 'number' as const, required: false },
-      { id: 'priorityIndiv', name: 'priorityIndiv', type: 'number' as const, required: false },
-      { id: 'priorityComm', name: 'priorityComm', type: 'number' as const, required: false },
+      { id: 'priority', name: 'priority', type: 'number' as const, required: false },
       { id: 'assignedTo', name: 'assignedTo', type: 'text' as const, required: false },
       { id: 'dueDate', name: 'dueDate', type: 'text' as const, required: false },
       { id: 'tags', name: 'tags', type: 'text' as const, required: false }

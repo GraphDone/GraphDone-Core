@@ -86,7 +86,7 @@ export const GET_GRAPH = gql`
         positionX
         positionY
         positionZ
-        priorityComp
+        priority
       }
       subgraphs {
         id
