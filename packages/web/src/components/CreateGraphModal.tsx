@@ -13,7 +13,7 @@ interface CreateGraphModalProps {
 
 export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraphModalProps) {
   const { currentTeam, currentUser } = useAuth();
-  const { createGraph, availableGraphs, isCreating } = useGraph();
+  const { createGraph, duplicateGraph, availableGraphs, isCreating } = useGraph();
   const { showSuccess, showError } = useNotifications();
   
   const [step, setStep] = useState<'type' | 'details' | 'template'>('type');
@@ -107,7 +107,7 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
   ];
 
   const copyableGraphs = availableGraphs.filter(graph => 
-    graph.teamId === currentTeam?.id && graph.type === formData.type
+    graph.teamId === currentTeam?.id || graph.teamId === 'team-1' || true
   );
 
   const handleSubmit = async () => {
@@ -118,7 +118,16 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
     
     if (!formData.name) {
       console.error('Graph name is required');
-      alert('Please enter a graph name');
+      showError('Validation Error', 'Please enter a graph name');
+      return;
+    }
+    
+    // Check for duplicate graph names
+    const existingGraph = availableGraphs.find(g => 
+      g.name.toLowerCase().trim() === formData.name!.toLowerCase().trim()
+    );
+    if (existingGraph) {
+      showError('Duplicate Name', `A graph with the name "${formData.name}" already exists. Please choose a different name.`);
       return;
     }
     
@@ -130,16 +139,23 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
     console.log('Using user ID:', fallbackUserId);
 
     try {
-      const graphInput = {
-        ...formData,
-        teamId: fallbackTeamId,
-        // Ensure we have a user ID for createdBy field
-        createdBy: fallbackUserId
-      };
-      
-      console.log('Creating graph with data:', graphInput);
-      console.log('Tags in form data:', formData.tags);
-      await createGraph(graphInput as CreateGraphInput);
+      // Handle copying existing graph
+      if (formData.copyFromGraphId && formData.copyFromGraphId !== 'select') {
+        console.log('Duplicating graph:', formData.copyFromGraphId);
+        await duplicateGraph(formData.copyFromGraphId, formData.name!);
+      } else {
+        // Create new graph from scratch
+        const graphInput = {
+          ...formData,
+          teamId: fallbackTeamId,
+          // Ensure we have a user ID for createdBy field
+          createdBy: fallbackUserId
+        };
+        
+        console.log('Creating graph with data:', graphInput);
+        console.log('Tags in form data:', formData.tags);
+        await createGraph(graphInput as CreateGraphInput);
+      }
       
       // Show success notification
       showSuccess(
@@ -383,41 +399,6 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
                   </div>
                 </button>
 
-                {copyableGraphs.length > 0 && (
-                  <button
-                    onClick={() => {
-                      setShowTemplates(false);
-                      setFormData(prev => ({ ...prev, templateId: undefined, copyFromGraphId: 'select' }));
-                    }}
-                    className={`group p-6 border-2 rounded-2xl text-center transition-all duration-300 relative overflow-hidden ${
-                      formData.copyFromGraphId
-                        ? 'border-purple-500/70 bg-gradient-to-br from-purple-900/40 to-pink-900/30 shadow-xl scale-[1.02] hover:shadow-purple-500/20'
-                        : 'border-gray-600/50 bg-gradient-to-br from-gray-700/40 to-gray-800/40 hover:from-gray-700/60 hover:to-gray-800/60 hover:border-gray-500/70 hover:scale-[1.02] hover:shadow-lg backdrop-blur-sm'
-                    }`}
-                  >
-                    {/* Background gradient effect */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-pink-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
-                    
-                    <div className="relative z-10">
-                      <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-purple-500/20 to-pink-600/20 rounded-2xl flex items-center justify-center shadow-lg border border-white/5 group-hover:scale-110 transition-transform duration-300">
-                        <Copy className="h-8 w-8 text-purple-400" />
-                      </div>
-                      <h5 className="font-bold text-white mb-2 text-lg">Copy Existing</h5>
-                      <p className="text-sm text-gray-300">Duplicate an existing graph</p>
-                    </div>
-                    
-                    {/* Selection indicator */}
-                    {formData.copyFromGraphId && (
-                      <div className="absolute top-4 right-4">
-                        <div className="w-6 h-6 bg-purple-500 rounded-full flex items-center justify-center shadow-lg">
-                          <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                          </svg>
-                        </div>
-                      </div>
-                    )}
-                  </button>
-                )}
               </div>
 
               {/* Templates */}
@@ -464,56 +445,6 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
                 </div>
               )}
 
-              {/* Copy from existing */}
-              {formData.copyFromGraphId && copyableGraphs.length > 0 && (
-                <div className="space-y-4">
-                  <div>
-                    <h4 className="font-medium text-gray-200 mb-1">Choose Graph to Copy</h4>
-                    <p className="text-sm text-gray-400">Select an existing graph to duplicate</p>
-                  </div>
-                  <div className="grid gap-3 max-h-48 overflow-y-auto">
-                    {copyableGraphs.map((graph) => (
-                      <button
-                        key={graph.id}
-                        onClick={() => setFormData(prev => ({ ...prev, copyFromGraphId: graph.id }))}
-                        className={`p-4 border rounded-xl text-left transition-all group ${
-                          formData.copyFromGraphId === graph.id
-                            ? 'border-green-500 bg-green-900/20'
-                            : 'border-gray-600 bg-gray-700/30 hover:bg-gray-700/50 hover:border-gray-500'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-3">
-                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                              graph.type === 'PROJECT' ? 'bg-blue-600/20' :
-                              graph.type === 'WORKSPACE' ? 'bg-purple-600/20' :
-                              graph.type === 'SUBGRAPH' ? 'bg-green-600/20' :
-                              'bg-orange-600/20'
-                            }`}>
-                              <Copy className="h-5 w-5 text-gray-400" />
-                            </div>
-                            <div className="flex-1">
-                              <h5 className="font-medium text-gray-200 group-hover:text-white">{graph.name}</h5>
-                              <p className="text-xs text-gray-400 mt-1 line-clamp-1">{graph.description || 'No description'}</p>
-                              <div className="flex items-center gap-3 mt-2">
-                                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                                  graph.type === 'PROJECT' ? 'bg-blue-600/20 text-blue-300' :
-                                  graph.type === 'WORKSPACE' ? 'bg-purple-600/20 text-purple-300' :
-                                  graph.type === 'SUBGRAPH' ? 'bg-green-600/20 text-green-300' :
-                                  'bg-orange-600/20 text-orange-300'
-                                }`}>
-                                  {graph.type}
-                                </span>
-                                <span className="text-xs text-gray-500">{graph.nodeCount} nodes</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
 
               <div className="flex justify-between pt-6 border-t border-gradient-to-r from-gray-600/30 via-gray-500/50 to-gray-600/30 relative z-10">
                 <button
@@ -698,7 +629,7 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
                             setFormData(prev => ({ ...prev, tags: newTags }));
                           }
                         }}
-                        placeholder={(!formData.tags || formData.tags.length === 0) ? "project, frontend, urgent, team-alpha" : formData.tags.length >= 5 ? "Maximum 5 tags reached" : "Add more tags..."}
+                        placeholder={(!formData.tags || formData.tags.length === 0) ? "project, frontend, urgent, team-alpha" : formData.tags.length >= 5 ? "Maximum 5 tags reached" : "Add more tags"}
                         className="flex-1 min-w-[120px] bg-transparent border-none outline-none text-gray-200 placeholder-gray-400"
                         disabled={formData.tags && formData.tags.length >= 5}
                       />

@@ -200,8 +200,6 @@ export function GraphProvider({ children }: GraphProviderProps) {
         
         // Manually refetch to ensure UI is in sync
         await refetchGraphs();
-        
-        setAvailableGraphs(prev => [...prev, newGraph]);
         setCurrentGraph(newGraph);
         localStorage.setItem('currentGraphId', newGraph.id);
         return newGraph;
@@ -225,6 +223,9 @@ export function GraphProvider({ children }: GraphProviderProps) {
       const graphUpdateInput = {
         ...(updates.name && { name: updates.name }),
         ...(updates.description !== undefined && { description: updates.description }),
+        ...(updates.tags !== undefined && { tags: updates.tags }),
+        ...(updates.defaultRole && { defaultRole: updates.defaultRole }),
+        ...(updates.isShared !== undefined && { isShared: updates.isShared }),
         ...(updates.status && { status: updates.status }),
         ...(updates.settings && { settings: JSON.stringify(updates.settings) }),
         ...(updates.permissions && { permissions: JSON.stringify(updates.permissions) }),
@@ -299,15 +300,43 @@ export function GraphProvider({ children }: GraphProviderProps) {
     const originalGraph = availableGraphs.find(g => g.id === graphId);
     if (!originalGraph) throw new Error('Graph not found');
 
-    return createGraph({
-      name,
-      description: `Copy of ${originalGraph.name}`,
-      type: originalGraph.type,
-      parentGraphId: originalGraph.parentGraphId,
-      teamId: originalGraph.teamId,
-      createdBy: currentUser?.id || '',
-      copyFromGraphId: graphId
-    });
+    try {
+      // Step 1: Create the new graph structure
+      const newGraph = await createGraph({
+        name,
+        description: `Copy of ${originalGraph.name}`,
+        type: originalGraph.type,
+        parentGraphId: originalGraph.parentGraphId,
+        teamId: originalGraph.teamId,
+        createdBy: currentUser?.id || '',
+        copyFromGraphId: graphId
+      });
+
+      // Step 2: Copy all nodes from the original graph
+      const { data: originalNodesData } = await apolloClient.query({
+        query: GET_WORK_ITEMS,
+        variables: {
+          where: {
+            graph: {
+              id: graphId
+            }
+          }
+        }
+      });
+
+      const originalNodes = originalNodesData?.workItems || [];
+      
+      // TODO: Implement node copying in the GraphQL schema
+      // This requires CREATE_WORK_ITEM mutation and copying all node properties
+      
+      // Step 3: Copy all edges from the original graph  
+      // TODO: Implement edge copying after nodes are copied
+      
+      return newGraph;
+    } catch (error) {
+      console.error('Error duplicating graph:', error);
+      throw error;
+    }
   };
 
   const moveGraph = async (graphId: string, newParentId?: string): Promise<void> => {

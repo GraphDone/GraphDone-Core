@@ -70,10 +70,20 @@ function GraphItem({ graph, onSelect, getGraphTypeIcon }: GraphItemProps) {
     }
   };
 
+  const getCardBackgroundColor = (type: string) => {
+    switch (type) {
+      case 'PROJECT': return 'bg-gradient-to-br from-blue-900/20 via-blue-800/10 to-indigo-900/20 hover:from-blue-800/30 hover:via-blue-700/20 hover:to-indigo-800/30 border-blue-500/30 hover:border-blue-400/50';
+      case 'WORKSPACE': return 'bg-gradient-to-br from-purple-900/20 via-purple-800/10 to-violet-900/20 hover:from-purple-800/30 hover:via-purple-700/20 hover:to-violet-800/30 border-purple-500/30 hover:border-purple-400/50';
+      case 'SUBGRAPH': return 'bg-gradient-to-br from-emerald-900/20 via-green-800/10 to-teal-900/20 hover:from-emerald-800/30 hover:via-green-700/20 hover:to-teal-800/30 border-emerald-500/30 hover:border-emerald-400/50';
+      case 'TEMPLATE': return 'bg-gradient-to-br from-amber-900/20 via-orange-800/10 to-red-900/20 hover:from-amber-800/30 hover:via-orange-700/20 hover:to-red-800/30 border-amber-500/30 hover:border-amber-400/50';
+      default: return 'bg-gradient-to-br from-slate-900/20 via-gray-800/10 to-stone-900/20 hover:from-slate-800/30 hover:via-gray-700/20 hover:to-stone-800/30 border-slate-500/30 hover:border-slate-400/50';
+    }
+  };
+
   return (
     <button
       onClick={() => onSelect(graph.id)}
-      className="w-full flex items-center px-4 py-4 hover:bg-gray-700 transition-colors text-left group rounded-lg border border-gray-600 hover:border-green-500 bg-gray-800 mb-2"
+      className={`w-full flex items-center px-6 py-5 transition-all duration-300 text-left group rounded-xl border shadow-lg hover:shadow-xl hover:scale-[1.01] transform backdrop-blur-sm overflow-hidden ${getCardBackgroundColor(graph.type)}`}
     >
       <div className="flex-shrink-0 mr-4">
         <div className={`w-10 h-10 rounded flex items-center justify-center ${getGraphTypeColor(graph.type)}`}>
@@ -167,36 +177,57 @@ export function GraphSelectionModal({ isOpen, onClose }: GraphSelectionModalProp
 
   return (
     <>
-      <div className="fixed inset-0 z-50 overflow-y-auto">
+      <div className="fixed inset-0 z-50 overflow-y-auto backdrop-blur-sm">
         <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-          {/* Backdrop */}
+          {/* Enhanced Backdrop with gradient */}
           <div 
-            className="fixed inset-0 transition-opacity bg-black bg-opacity-50"
+            className="fixed inset-0 transition-opacity bg-gradient-to-br from-gray-900/90 via-black/80 to-blue-900/90 animate-in fade-in duration-300"
             onClick={onClose}
           />
 
-          {/* Modal */}
-          <div className="inline-block w-full max-w-4xl p-0 my-6 overflow-hidden text-left align-middle transition-all transform bg-gray-800 shadow-lg rounded border border-gray-700">
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700 bg-gray-800">
-              <div>
-                <h3 className="text-xl font-semibold text-green-300">
-                  Select Graph
-                </h3>
-                <p className="text-sm text-gray-400 mt-1">Choose your graph to begin</p>
+          {/* Enhanced Modal with better styling */}
+          <div className="inline-block w-full max-w-4xl p-0 my-6 overflow-hidden text-left align-middle transition-all transform bg-gradient-to-br from-gray-800 via-gray-800 to-gray-900 shadow-2xl rounded-2xl border border-gray-600/50 animate-in slide-in-from-bottom-4 duration-300 relative">
+            {/* Gradient accent line at top */}
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-green-500 to-purple-500"></div>
+            
+            {/* Enhanced Header with gradient background */}
+            <div className="flex items-center justify-between px-6 py-5 border-b border-gray-600/50 bg-gradient-to-r from-gray-800/90 to-gray-900/90 backdrop-blur-sm">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
+                  <Folder className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold bg-gradient-to-r from-white via-green-100 to-blue-100 bg-clip-text text-transparent">
+                    Select Graph
+                  </h3>
+                </div>
               </div>
               <button
                 onClick={onClose}
-                className="p-2 text-gray-400 hover:text-gray-300 hover:bg-gray-700 rounded transition-colors"
+                className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-xl transition-all duration-200 hover:scale-110"
               >
-                <X className="h-6 w-6" />
+                <X className="h-5 w-5" />
               </button>
             </div>
 
             {/* Content */}
-            {availableGraphs.length > 0 ? (
-              <div className="p-4">
-                <div className="max-h-80 overflow-y-auto space-y-2" style={{scrollbarWidth: 'none', msOverflowStyle: 'none'}}>
+            <div className="px-8 pt-1 pb-8 space-y-4 relative">
+              {/* Subtle background pattern */}
+              <div className="absolute inset-0 opacity-5">
+                <div className="w-full h-full" style={{
+                  backgroundImage: `radial-gradient(circle at 1px 1px, rgba(255,255,255,0.15) 1px, transparent 0)`,
+                  backgroundSize: '20px 20px'
+                }}></div>
+              </div>
+              
+              <div className="relative z-10 mb-4">
+                <p className="text-lg font-medium text-gray-200 mb-2">Choose your graph to begin</p>
+                <p className="text-sm text-gray-400">Select from your available graphs</p>
+              </div>
+              
+              {availableGraphs.length > 0 ? (
+                <div className="relative z-10">
+                <div className="max-h-80 overflow-y-auto space-y-3 px-1" style={{scrollbarWidth: 'none', msOverflowStyle: 'none'}}>
                   <style>{`
                     div::-webkit-scrollbar {
                       display: none;
@@ -211,9 +242,9 @@ export function GraphSelectionModal({ isOpen, onClose }: GraphSelectionModalProp
                     />
                   ))}
                 </div>
-              </div>
-            ) : (
-              <div className="p-8">
+                </div>
+              ) : (
+                <div className="py-12 relative z-10">
                 <div className="text-center max-w-md mx-auto">
                   {/* Icon */}
                   <div className="mx-auto mb-6 w-16 h-16 bg-gray-700 rounded flex items-center justify-center">
@@ -233,7 +264,7 @@ export function GraphSelectionModal({ isOpen, onClose }: GraphSelectionModalProp
                   {/* CTA Button */}
                   <button
                     onClick={handleCreateGraph}
-                    className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded font-medium transition-colors"
+                    className="px-8 py-4 bg-gradient-to-r from-green-600 via-emerald-600 to-blue-600 text-white rounded-xl hover:from-green-500 hover:via-emerald-500 hover:to-blue-500 transition-all duration-300 shadow-xl hover:shadow-2xl hover:scale-105 transform border border-green-400/30 font-semibold"
                   >
                     <div className="flex items-center justify-center">
                       <Plus className="h-4 w-4 mr-2" />
@@ -241,8 +272,9 @@ export function GraphSelectionModal({ isOpen, onClose }: GraphSelectionModalProp
                     </div>
                   </button>
                 </div>
-              </div>
-            )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
