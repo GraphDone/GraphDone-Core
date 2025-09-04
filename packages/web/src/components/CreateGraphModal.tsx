@@ -35,29 +35,41 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
       type: 'PROJECT' as const,
       title: 'Project',
       description: 'A main project with goals, tasks, and deliverables',
-      icon: <Folder className="h-8 w-8 text-blue-400" />,
-      color: 'border-blue-500/50 bg-blue-900/20 hover:bg-blue-900/30'
+      icon: <Folder className="h-10 w-10 text-blue-400" />,
+      color: 'border-blue-500/50 bg-gradient-to-br from-blue-900/30 to-blue-800/20 hover:from-blue-900/40 hover:to-blue-800/30',
+      bgGradient: 'from-blue-500/10 to-indigo-500/10',
+      iconBg: 'bg-gradient-to-br from-blue-500/20 to-indigo-600/20',
+      hoverShadow: 'hover:shadow-blue-500/20'
     },
     {
       type: 'WORKSPACE' as const,
       title: 'Workspace',
       description: 'A collaborative space for brainstorming and experimentation',
-      icon: <FolderOpen className="h-8 w-8 text-purple-400" />,
-      color: 'border-purple-500/50 bg-purple-900/20 hover:bg-purple-900/30'
+      icon: <FolderOpen className="h-10 w-10 text-purple-400" />,
+      color: 'border-purple-500/50 bg-gradient-to-br from-purple-900/30 to-purple-800/20 hover:from-purple-900/40 hover:to-purple-800/30',
+      bgGradient: 'from-purple-500/10 to-pink-500/10',
+      iconBg: 'bg-gradient-to-br from-purple-500/20 to-pink-600/20',
+      hoverShadow: 'hover:shadow-purple-500/20'
     },
     {
       type: 'SUBGRAPH' as const,
       title: 'Subgraph',
       description: 'A focused subset within a larger project or workspace',
-      icon: <Plus className="h-8 w-8 text-green-400" />,
-      color: 'border-green-500/50 bg-green-900/20 hover:bg-green-900/30'
+      icon: <Plus className="h-10 w-10 text-green-400" />,
+      color: 'border-green-500/50 bg-gradient-to-br from-green-900/30 to-green-800/20 hover:from-green-900/40 hover:to-green-800/30',
+      bgGradient: 'from-green-500/10 to-emerald-500/10',
+      iconBg: 'bg-gradient-to-br from-green-500/20 to-emerald-600/20',
+      hoverShadow: 'hover:shadow-green-500/20'
     },
     {
       type: 'TEMPLATE' as const,
       title: 'Template',
       description: 'A reusable template for creating similar graphs',
-      icon: <FileText className="h-8 w-8 text-gray-500" />,
+      icon: <FileText className="h-10 w-10 text-gray-500" />,
       color: 'border-gray-600/50 bg-gray-800/20 cursor-not-allowed opacity-60',
+      bgGradient: 'from-gray-700/10 to-gray-600/10',
+      iconBg: 'bg-gray-700/20',
+      hoverShadow: '',
       disabled: true,
       comingSoon: true
     }
@@ -169,61 +181,103 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[9999] overflow-y-auto" style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0}}>
+    <div className="fixed inset-0 z-[9999] overflow-y-auto backdrop-blur-sm" style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0}}>
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-        {/* Backdrop */}
+        {/* Enhanced Backdrop with gradient */}
         <div 
-          className="fixed inset-0 transition-opacity bg-black bg-opacity-50"
+          className="fixed inset-0 transition-opacity bg-gradient-to-br from-gray-900/90 via-black/80 to-gray-800/90 animate-in fade-in duration-300"
           onClick={handleClose}
         />
 
-        {/* Modal */}
-        <div className="inline-block w-full max-w-2xl p-0 my-8 overflow-hidden text-left align-middle transition-all transform bg-gray-800 shadow-xl rounded-lg border border-gray-700">
-          {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700 bg-gray-800">
-            <h3 className="text-xl font-semibold text-green-300">
-              {step === 'type' && 'Create New Graph'}
-              {step === 'details' && 'Graph Details'}
-              {step === 'template' && 'Choose Starting Point'}
-            </h3>
+        {/* Enhanced Modal with better styling */}
+        <div className="inline-block w-full max-w-2xl p-0 my-8 overflow-hidden text-left align-middle transition-all transform bg-gradient-to-br from-gray-800 via-gray-800 to-gray-900 shadow-2xl rounded-2xl border border-gray-600/50 animate-in slide-in-from-bottom-4 duration-300 relative">
+          {/* Gradient accent line at top */}
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-green-500"></div>
+          
+          {/* Enhanced Header with gradient background */}
+          <div className="flex items-center justify-between px-6 py-5 border-b border-gray-600/50 bg-gradient-to-r from-gray-800/90 to-gray-900/90 backdrop-blur-sm">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg">
+                <Plus className="h-5 w-5 text-white" />
+              </div>
+              <h3 className="text-xl font-bold bg-gradient-to-r from-white via-green-100 to-blue-100 bg-clip-text text-transparent">
+                {step === 'type' && 'Create New Graph'}
+                {step === 'details' && 'Graph Details'}
+                {step === 'template' && 'Starting Point'}
+              </h3>
+            </div>
             <button
               onClick={handleClose}
-              className="p-2 text-gray-400 hover:text-gray-300 hover:bg-gray-700 rounded-lg transition-colors"
+              className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-xl transition-all duration-200 hover:scale-110"
             >
               <X className="h-5 w-5" />
             </button>
           </div>
 
-          {/* Step 1: Choose Type */}
+          {/* Step 1: Choose Type with enhanced styling */}
           {step === 'type' && (
-            <div className="p-6 space-y-6">
-              <p className="text-gray-300">What type of graph would you like to create?</p>
+            <div className="px-8 pt-1 pb-8 space-y-4 relative">
+              {/* Subtle background pattern */}
+              <div className="absolute inset-0 opacity-5">
+                <div className="w-full h-full" style={{
+                  backgroundImage: `radial-gradient(circle at 1px 1px, rgba(255,255,255,0.15) 1px, transparent 0)`,
+                  backgroundSize: '20px 20px'
+                }}></div>
+              </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="relative z-10 mb-8">
+                <p className="text-lg font-medium text-gray-200 mb-2">What type of graph would you like to create?</p>
+                <p className="text-sm text-gray-400">Choose the type that best fits your needs</p>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10">
                 {graphTypes.map((type) => (
                   <button
                     key={type.type}
                     onClick={() => type.disabled ? null : setFormData(prev => ({ ...prev, type: type.type }))}
                     disabled={type.disabled}
                     title={type.comingSoon ? "Template functionality coming soon!" : undefined}
-                    className={`p-4 border-2 rounded-lg text-left transition-all relative ${
+                    className={`group p-6 border-2 rounded-2xl text-left transition-all duration-300 relative overflow-hidden ${
                       formData.type === type.type
-                        ? `${type.color} border-current`
+                        ? `${type.color} border-current shadow-xl scale-[1.02] ${type.hoverShadow}`
                         : type.disabled
                         ? type.color
-                        : 'border-gray-600 bg-gray-700/50 hover:bg-gray-700 hover:border-gray-500'
+                        : 'border-gray-600/50 bg-gradient-to-br from-gray-700/40 to-gray-800/40 hover:from-gray-700/60 hover:to-gray-800/60 hover:border-gray-500/70 hover:scale-[1.02] hover:shadow-lg backdrop-blur-sm'
                     }`}
                   >
+                    {/* Background gradient effect */}
+                    <div className={`absolute inset-0 bg-gradient-to-br ${type.bgGradient} opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none`}></div>
+                    
                     {type.comingSoon && (
-                      <div className="absolute top-2 right-2 bg-gray-700 text-xs text-gray-400 px-2 py-1 rounded">
+                      <div className="absolute top-3 right-3 bg-gradient-to-r from-gray-700 to-gray-600 text-xs text-gray-300 px-3 py-1.5 rounded-full shadow-md font-medium">
                         Coming Soon
                       </div>
                     )}
-                    <div className="flex items-center space-x-3 mb-3">
-                      {type.icon}
-                      <h4 className={`font-semibold ${type.disabled ? 'text-gray-500' : 'text-gray-200'}`}>{type.title}</h4>
+                    
+                    <div className="relative z-10">
+                      <div className="flex items-center space-x-4 mb-4">
+                        <div className={`p-3 rounded-2xl ${type.iconBg} border border-white/5 shadow-lg group-hover:scale-110 transition-transform duration-300`}>
+                          {type.icon}
+                        </div>
+                        <h4 className={`font-bold text-lg ${type.disabled ? 'text-gray-500' : 'text-white group-hover:text-white'}`}>
+                          {type.title}
+                        </h4>
+                      </div>
+                      <p className={`text-sm leading-relaxed ${type.disabled ? 'text-gray-500' : 'text-gray-300 group-hover:text-gray-200'}`}>
+                        {type.description}
+                      </p>
                     </div>
-                    <p className={`text-sm ${type.disabled ? 'text-gray-500' : 'text-gray-400'}`}>{type.description}</p>
+                    
+                    {/* Selection indicator */}
+                    {formData.type === type.type && !type.disabled && (
+                      <div className="absolute bottom-3 right-3">
+                        <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center shadow-lg">
+                          <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                      </div>
+                    )}
                   </button>
                 ))}
               </div>
@@ -240,63 +294,93 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
                 </div>
               )}
 
-              <div className="flex justify-end space-x-3">
+              <div className="flex justify-end space-x-4 pt-6 border-t border-gradient-to-r from-gray-600/30 via-gray-500/50 to-gray-600/30 relative z-10">
                 <button
                   onClick={handleClose}
-                  className="px-4 py-2 text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors"
+                  className="px-6 py-3 text-gray-300 bg-gradient-to-r from-gray-700/80 to-gray-600/80 rounded-xl hover:from-gray-600/80 hover:to-gray-500/80 transition-all duration-300 hover:scale-105 shadow-lg backdrop-blur-sm border border-gray-500/30 hover:border-gray-400/50 hover:text-white font-medium"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={() => setStep('template')}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  className="px-8 py-3 bg-gradient-to-r from-green-600 via-emerald-600 to-teal-600 text-white rounded-xl hover:from-green-500 hover:via-emerald-500 hover:to-teal-500 transition-all duration-300 shadow-xl hover:shadow-2xl hover:scale-105 transform border border-green-400/30 font-semibold flex items-center space-x-2"
                 >
-                  Continue
+                  <span>Continue</span>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path>
+                  </svg>
                 </button>
               </div>
             </div>
           )}
 
-          {/* Step 2: Choose Template/Starting Point */}
+          {/* Step 2: Choose Template/Starting Point - Enhanced */}
           {step === 'template' && (
-            <div className="p-6 space-y-6">
-              <div>
-                <h4 className="text-lg font-semibold text-gray-200 mb-2">Choose Starting Point</h4>
-                <p className="text-gray-400 text-sm mb-6">Select how you want to create your graph</p>
+            <div className="px-8 pt-0 pb-8 space-y-4 relative">
+              {/* Subtle background pattern */}
+              <div className="absolute inset-0 opacity-5">
+                <div className="w-full h-full" style={{
+                  backgroundImage: `radial-gradient(circle at 1px 1px, rgba(255,255,255,0.15) 1px, transparent 0)`,
+                  backgroundSize: '20px 20px'
+                }}></div>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="relative z-10 mb-12">
+                <h4 className="text-lg font-bold text-gray-200 mb-2">Choose Starting Point</h4>
+                <p className="text-sm text-gray-400">Select how you want to create your graph</p>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10">
                 <button
                   onClick={() => {
                     setShowTemplates(false);
                     setFormData(prev => ({ ...prev, templateId: undefined, copyFromGraphId: undefined }));
                   }}
-                  className={`p-4 border-2 rounded-xl text-center transition-all ${
+                  className={`group p-6 border-2 rounded-2xl text-center transition-all duration-300 relative overflow-hidden ${
                     !showTemplates && !formData.copyFromGraphId
-                      ? 'border-green-500 bg-green-900/20 text-white'
-                      : 'border-gray-600 bg-gray-700/30 text-gray-300 hover:border-gray-500 hover:bg-gray-700/50'
+                      ? 'border-green-500/70 bg-gradient-to-br from-green-900/40 to-emerald-900/30 shadow-xl scale-[1.02] hover:shadow-green-500/20'
+                      : 'border-gray-600/50 bg-gradient-to-br from-gray-700/40 to-gray-800/40 hover:from-gray-700/60 hover:to-gray-800/60 hover:border-gray-500/70 hover:scale-[1.02] hover:shadow-lg backdrop-blur-sm'
                   }`}
                 >
-                  <div className="w-12 h-12 mx-auto mb-3 bg-gray-600 rounded-lg flex items-center justify-center">
-                    <Plus className="h-6 w-6 text-gray-300" />
+                  {/* Background gradient effect */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+                  
+                  <div className="relative z-10">
+                    <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-green-500/20 to-emerald-600/20 rounded-2xl flex items-center justify-center shadow-lg border border-white/5 group-hover:scale-110 transition-transform duration-300">
+                      <Plus className="h-8 w-8 text-green-400" />
+                    </div>
+                    <h5 className="font-bold text-white mb-2 text-lg">Start Empty</h5>
+                    <p className="text-sm text-gray-300">Create a blank graph from scratch</p>
                   </div>
-                  <h5 className="font-medium mb-1">Start Empty</h5>
-                  <p className="text-xs text-gray-400">Create a blank graph from scratch</p>
+                  
+                  {/* Selection indicator */}
+                  {!showTemplates && !formData.copyFromGraphId && (
+                    <div className="absolute top-4 right-4">
+                      <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center shadow-lg">
+                        <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                    </div>
+                  )}
                 </button>
                 
                 <button
                   disabled
                   title="Template functionality coming soon!"
-                  className="p-4 border-2 rounded-xl text-center transition-all border-gray-700 bg-gray-800/30 text-gray-500 cursor-not-allowed opacity-60 relative"
+                  className="group p-6 border-2 rounded-2xl text-center transition-all duration-300 relative overflow-hidden border-gray-600/50 bg-gradient-to-br from-gray-800/30 to-gray-900/30 cursor-not-allowed opacity-60"
                 >
-                  <div className="absolute top-2 right-2 bg-gray-700 text-xs text-gray-400 px-2 py-1 rounded">
+                  <div className="absolute top-3 right-3 bg-gradient-to-r from-gray-700 to-gray-600 text-xs text-gray-300 px-3 py-1.5 rounded-full shadow-md font-medium">
                     Coming Soon
                   </div>
-                  <div className="w-12 h-12 mx-auto mb-3 bg-gray-700/50 rounded-lg flex items-center justify-center">
-                    <FileText className="h-6 w-6 text-gray-500" />
+                  
+                  <div className="relative z-10">
+                    <div className="w-16 h-16 mx-auto mb-4 bg-gray-700/30 rounded-2xl flex items-center justify-center border border-gray-600/30">
+                      <FileText className="h-8 w-8 text-gray-500" />
+                    </div>
+                    <h5 className="font-bold text-gray-400 mb-2 text-lg">Use Template</h5>
+                    <p className="text-sm text-gray-500">Start with a pre-built template</p>
                   </div>
-                  <h5 className="font-medium mb-1">Use Template</h5>
-                  <p className="text-xs text-gray-500">Start with a pre-built template</p>
                 </button>
 
                 {copyableGraphs.length > 0 && (
@@ -305,17 +389,33 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
                       setShowTemplates(false);
                       setFormData(prev => ({ ...prev, templateId: undefined, copyFromGraphId: 'select' }));
                     }}
-                    className={`p-4 border-2 rounded-xl text-center transition-all ${
+                    className={`group p-6 border-2 rounded-2xl text-center transition-all duration-300 relative overflow-hidden ${
                       formData.copyFromGraphId
-                        ? 'border-green-500 bg-green-900/20 text-white'
-                        : 'border-gray-600 bg-gray-700/30 text-gray-300 hover:border-gray-500 hover:bg-gray-700/50'
+                        ? 'border-purple-500/70 bg-gradient-to-br from-purple-900/40 to-pink-900/30 shadow-xl scale-[1.02] hover:shadow-purple-500/20'
+                        : 'border-gray-600/50 bg-gradient-to-br from-gray-700/40 to-gray-800/40 hover:from-gray-700/60 hover:to-gray-800/60 hover:border-gray-500/70 hover:scale-[1.02] hover:shadow-lg backdrop-blur-sm'
                     }`}
                   >
-                    <div className="w-12 h-12 mx-auto mb-3 bg-purple-600/20 rounded-lg flex items-center justify-center">
-                      <Copy className="h-6 w-6 text-purple-400" />
+                    {/* Background gradient effect */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-pink-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+                    
+                    <div className="relative z-10">
+                      <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-purple-500/20 to-pink-600/20 rounded-2xl flex items-center justify-center shadow-lg border border-white/5 group-hover:scale-110 transition-transform duration-300">
+                        <Copy className="h-8 w-8 text-purple-400" />
+                      </div>
+                      <h5 className="font-bold text-white mb-2 text-lg">Copy Existing</h5>
+                      <p className="text-sm text-gray-300">Duplicate an existing graph</p>
                     </div>
-                    <h5 className="font-medium mb-1">Copy Existing</h5>
-                    <p className="text-xs text-gray-400">Duplicate an existing graph</p>
+                    
+                    {/* Selection indicator */}
+                    {formData.copyFromGraphId && (
+                      <div className="absolute top-4 right-4">
+                        <div className="w-6 h-6 bg-purple-500 rounded-full flex items-center justify-center shadow-lg">
+                          <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                      </div>
+                    )}
                   </button>
                 )}
               </div>
@@ -415,76 +515,107 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
                 </div>
               )}
 
-              <div className="flex justify-between">
+              <div className="flex justify-between pt-6 border-t border-gradient-to-r from-gray-600/30 via-gray-500/50 to-gray-600/30 relative z-10">
                 <button
                   onClick={() => setStep('type')}
-                  className="px-4 py-2 text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors"
+                  className="px-6 py-3 text-gray-300 bg-gradient-to-r from-gray-700/80 to-gray-600/80 rounded-xl hover:from-gray-600/80 hover:to-gray-500/80 transition-all duration-300 hover:scale-105 shadow-lg backdrop-blur-sm border border-gray-500/30 hover:border-gray-400/50 hover:text-white font-medium flex items-center space-x-2"
                 >
-                  Back
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path>
+                  </svg>
+                  <span>Back</span>
                 </button>
                 <button
                   onClick={() => setStep('details')}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  className="px-8 py-3 bg-gradient-to-r from-green-600 via-emerald-600 to-teal-600 text-white rounded-xl hover:from-green-500 hover:via-emerald-500 hover:to-teal-500 transition-all duration-300 shadow-xl hover:shadow-2xl hover:scale-105 transform border border-green-400/30 font-semibold flex items-center space-x-2"
                 >
-                  Continue
+                  <span>Continue</span>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path>
+                  </svg>
                 </button>
               </div>
             </div>
           )}
 
-          {/* Step 3: Graph Details */}
+          {/* Step 3: Graph Details - Enhanced */}
           {step === 'details' && (
-            <div className="p-6 space-y-6">
-              <div className="mb-6">
-                <p className="text-gray-400 text-sm">Provide essential information to set up your graph</p>
+            <div className="px-8 pt-0 pb-8 space-y-4 relative">
+              {/* Subtle background pattern */}
+              <div className="absolute inset-0 opacity-5">
+                <div className="w-full h-full" style={{
+                  backgroundImage: `radial-gradient(circle at 1px 1px, rgba(255,255,255,0.15) 1px, transparent 0)`,
+                  backgroundSize: '20px 20px'
+                }}></div>
+              </div>
+              
+              <div className="mb-12 relative z-10">
+                <p className="text-sm text-gray-400">Provide essential information to set up your graph</p>
               </div>
 
-              <div className="space-y-5">
+              <div className="space-y-6 relative z-10">
                 {/* Graph Name */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-200 mb-2">
-                    Graph Name *
+                <div className="group">
+                  <label className="block text-sm font-semibold text-gray-200 mb-3 flex items-center space-x-2">
+                    <span>Graph Name</span>
+                    <span className="text-red-400">*</span>
+                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
                   </label>
-                  <input
-                    type="text"
-                    value={formData.name || ''}
-                    onChange={(e) => {
-                      console.log('Name input changed to:', e.target.value);
-                      setFormData(prev => {
-                        const newData = { ...prev, name: e.target.value };
-                        console.log('New form data will be:', newData);
-                        return newData;
-                      });
-                    }}
-                    placeholder="Enter a descriptive name for your graph"
-                    className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 placeholder-gray-400 focus:ring-2 focus:ring-green-500 focus:border-green-500 focus:outline-none transition-colors"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Choose a clear, descriptive name that team members will recognize</p>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={formData.name || ''}
+                      onChange={(e) => {
+                        console.log('Name input changed to:', e.target.value);
+                        setFormData(prev => {
+                          const newData = { ...prev, name: e.target.value };
+                          console.log('New form data will be:', newData);
+                          return newData;
+                        });
+                      }}
+                      placeholder="Enter a descriptive name for your graph"
+                      className="w-full px-4 py-4 bg-gray-800 border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-400 transition-all duration-300 hover:border-gray-500 shadow-lg"
+                    />
+                    <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-blue-500/5 to-purple-500/5 pointer-events-none group-hover:from-blue-500/10 group-hover:to-purple-500/10 transition-all duration-300"></div>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-2 flex items-center space-x-2">
+                    <span className="w-1.5 h-1.5 bg-blue-400 rounded-full"></span>
+                    <span>Choose a clear, descriptive name that team members will recognize</span>
+                  </p>
                 </div>
 
                 {/* Description */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-200 mb-2">
-                    Description
+                <div className="group">
+                  <label className="block text-sm font-semibold text-gray-200 mb-3 flex items-center space-x-2">
+                    <span>Description</span>
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                   </label>
-                  <textarea
-                    value={formData.description || ''}
-                    onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                    placeholder="Describe the purpose and scope of this graph"
-                    rows={4}
-                    className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 placeholder-gray-400 focus:ring-2 focus:ring-green-500 focus:border-green-500 focus:outline-none transition-colors resize-none"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Help team members understand the purpose and context</p>
+                  <div className="relative">
+                    <textarea
+                      value={formData.description || ''}
+                      onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                      placeholder="Describe the purpose and scope of this graph"
+                      rows={4}
+                      className="w-full px-4 py-4 bg-gray-800 border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-400 transition-all duration-300 hover:border-gray-500 shadow-lg resize-none"
+                    />
+                    <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-green-500/5 to-teal-500/5 pointer-events-none group-hover:from-green-500/10 group-hover:to-teal-500/10 transition-all duration-300"></div>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-2 flex items-center space-x-2">
+                    <span className="w-1.5 h-1.5 bg-green-400 rounded-full"></span>
+                    <span>Help team members understand the purpose and context</span>
+                  </p>
                 </div>
 
                 {/* Tags */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-200 mb-2">
-                    Tags
+                <div className="group">
+                  <label className="block text-sm font-semibold text-gray-200 mb-3 flex items-center space-x-2">
+                    <span>Tags</span>
+                    <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></div>
                   </label>
                   
-                  {/* Tag Display Area */}
-                  <div className="w-full min-h-[3rem] px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg focus-within:ring-2 focus-within:ring-green-500 focus-within:border-green-500 transition-colors">
+                  {/* Enhanced Tag Display Area */}
+                  <div className="relative">
+                    <div className="w-full min-h-[3.5rem] px-4 py-3 bg-gray-800 border border-gray-600 rounded-xl focus-within:ring-2 focus-within:ring-purple-500/50 focus-within:border-purple-400 transition-all duration-300 hover:border-gray-500 shadow-lg">
                     <div className="flex flex-wrap gap-2 items-center">
                       {/* Existing Tags */}
                       {formData.tags && formData.tags.slice(0, 5).map((tag, index) => {
@@ -500,28 +631,21 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
                         return (
                           <span
                             key={index}
-                            className={`inline-flex items-center pl-2 pr-3 py-1 text-sm font-medium bg-gradient-to-r ${colorScheme.bg} ${colorScheme.text} border ${colorScheme.border} transition-colors`}
+                            className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold bg-gradient-to-r ${colorScheme.bg} ${colorScheme.text} border-2 ${colorScheme.border} transition-all duration-200 hover:scale-105 shadow-md animate-in slide-in-from-left-2`}
                             style={{
-                              clipPath: 'polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%, 8px 50%)'
+                              animationDelay: `${index * 100}ms`
                             }}
                           >
-                            {/* Tag Icon */}
-                            <svg className="w-3 h-3 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M17.707 9.293l-5-5A.997.997 0 0012 4H5a3 3 0 00-3 3v6a3 3 0 003 3h7a.997.997 0 00.707-.293l5-5a.999.999 0 000-1.414zM6.5 9.5a1.5 1.5 0 111.5-1.5 1.5 1.5 0 01-1.5 1.5z" clipRule="evenodd" />
-                            </svg>
                             {tag}
                             <button
                               type="button"
                               onClick={() => {
                                 const newTags = formData.tags?.filter((_, i) => i !== index) || [];
                                 setFormData(prev => ({ ...prev, tags: newTags }));
-                                // Don't update tagInput when removing tags - keep it for current typing
                               }}
-                              className={`ml-2 transition-colors ${colorScheme.text.replace('text-', 'text-')}/60 hover:${colorScheme.text}`}
+                              className="ml-2 hover:bg-white/20 rounded-full p-0.5 transition-all duration-200 hover:scale-125"
                             >
-                              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                              </svg>
+                              ×
                             </button>
                           </span>
                         );
@@ -580,7 +704,12 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
                       />
                     </div>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">Type and press comma to add tags (max 5) • Click × to remove</p>
+                    <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-purple-500/5 to-pink-500/5 pointer-events-none group-hover:from-purple-500/10 group-hover:to-pink-500/10 transition-all duration-300"></div>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-2 flex items-center space-x-2">
+                    <span className="w-1.5 h-1.5 bg-purple-400 rounded-full"></span>
+                    <span>Type and press comma to add tags (max 5) • Click × to remove</span>
+                  </p>
                 </div>
 
                 {/* Default Role for Team Members */}
@@ -634,90 +763,162 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
                   </div>
                 </div>
 
-                {/* Configuration Summary */}
-                <div className="p-5 bg-gray-700/50 border border-gray-600 rounded-xl">
-                  <h4 className="font-semibold text-gray-200 mb-4 flex items-center">
-                    <div className="w-5 h-5 bg-green-600 rounded-full mr-2"></div>
+                {/* Interactive Configuration Summary */}
+                <div className="group p-6 bg-gradient-to-br from-gray-700/40 to-gray-800/40 border border-gray-500/50 rounded-2xl shadow-xl backdrop-blur-sm hover:from-gray-700/50 hover:to-gray-800/50 transition-all duration-300">
+                  <h4 className="font-bold text-white mb-6 flex items-center group-hover:scale-105 transition-transform duration-300">
+                    <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center mr-3 shadow-lg group-hover:shadow-green-500/20">
+                      <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    </div>
                     Review Configuration
                   </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                    <div className="space-y-3">
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Graph Type:</span>
-                        <span className="font-medium text-gray-200 capitalize">{formData.type?.toLowerCase()}</span>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+                    <div className="space-y-4">
+                      <div className="p-3 bg-gray-800/50 rounded-xl border border-gray-600/30 hover:bg-gray-800/70 transition-all duration-200 group/item">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-400 flex items-center space-x-2">
+                            <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                            <span>Graph Type:</span>
+                          </span>
+                          <span className="font-semibold text-blue-300 capitalize group-hover/item:text-blue-200">{formData.type?.toLowerCase()}</span>
+                        </div>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Team:</span>
-                        <span className="font-medium text-gray-200">{currentTeam?.name || 'Default Team'}</span>
+                      
+                      <div className="p-3 bg-gray-800/50 rounded-xl border border-gray-600/30 hover:bg-gray-800/70 transition-all duration-200 group/item">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-400 flex items-center space-x-2">
+                            <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
+                            <span>Team:</span>
+                          </span>
+                          <span className="font-semibold text-purple-300 group-hover/item:text-purple-200">{currentTeam?.name || 'Default Team'}</span>
+                        </div>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Privacy:</span>
-                        <span className="font-medium text-gray-200">{formData.isShared ? 'Shared' : 'Private'}</span>
+                      
+                      <div className="p-3 bg-gray-800/50 rounded-xl border border-gray-600/30 hover:bg-gray-800/70 transition-all duration-200 group/item">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-400 flex items-center space-x-2">
+                            <div className="w-2 h-2 bg-cyan-400 rounded-full"></div>
+                            <span>Privacy:</span>
+                          </span>
+                          <span className="font-semibold text-cyan-300 group-hover/item:text-cyan-200">{formData.isShared ? 'Shared' : 'Private'}</span>
+                        </div>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Status:</span>
-                        <span className={`font-medium ${formData.status === 'ACTIVE' ? 'text-green-300' : 'text-yellow-300'}`}>
-                          {formData.status || 'Draft'}
-                        </span>
+                      
+                      <div className="p-3 bg-gray-800/50 rounded-xl border border-gray-600/30 hover:bg-gray-800/70 transition-all duration-200 group/item">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-400 flex items-center space-x-2">
+                            <div className={`w-2 h-2 rounded-full ${formData.status === 'ACTIVE' ? 'bg-green-400' : 'bg-yellow-400'}`}></div>
+                            <span>Status:</span>
+                          </span>
+                          <span className={`font-semibold ${formData.status === 'ACTIVE' ? 'text-green-300 group-hover/item:text-green-200' : 'text-yellow-300 group-hover/item:text-yellow-200'}`}>
+                            {formData.status || 'Draft'}
+                          </span>
+                        </div>
                       </div>
+                      
                       {formData.tags && formData.tags.length > 0 && (
-                        <div className="flex justify-between">
-                          <span className="text-gray-400">Tags:</span>
-                          <span className="font-medium text-blue-300">{formData.tags.length} tag{formData.tags.length !== 1 ? 's' : ''}</span>
+                        <div className="p-3 bg-gray-800/50 rounded-xl border border-gray-600/30 hover:bg-gray-800/70 transition-all duration-200 group/item">
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-400 flex items-center space-x-2">
+                              <div className="w-2 h-2 bg-indigo-400 rounded-full"></div>
+                              <span>Tags:</span>
+                            </span>
+                            <span className="font-semibold text-indigo-300 group-hover/item:text-indigo-200">{formData.tags.length} tag{formData.tags.length !== 1 ? 's' : ''}</span>
+                          </div>
                         </div>
                       )}
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Default Role:</span>
-                        <span className="font-medium text-purple-300">{formData.defaultRole || 'VIEWER'}</span>
+                      
+                      <div className="p-3 bg-gray-800/50 rounded-xl border border-gray-600/30 hover:bg-gray-800/70 transition-all duration-200 group/item">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-400 flex items-center space-x-2">
+                            <div className="w-2 h-2 bg-amber-400 rounded-full"></div>
+                            <span>Default Role:</span>
+                          </span>
+                          <span className="font-semibold text-amber-300 group-hover/item:text-amber-200">{formData.defaultRole || 'VIEWER'}</span>
+                        </div>
                       </div>
                     </div>
-                    <div className="space-y-3">
+                    
+                    <div className="space-y-4">
                       {parentGraphId && (
-                        <div className="flex justify-between">
-                          <span className="text-gray-400">Parent Graph:</span>
-                          <span className="font-medium text-green-300">Connected</span>
+                        <div className="p-3 bg-gray-800/50 rounded-xl border border-gray-600/30 hover:bg-gray-800/70 transition-all duration-200 group/item">
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-400 flex items-center space-x-2">
+                              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                              <span>Parent Graph:</span>
+                            </span>
+                            <span className="font-semibold text-green-300 group-hover/item:text-green-200">Connected</span>
+                          </div>
                         </div>
                       )}
+                      
                       {formData.templateId && formData.templateId !== 'use-template' && (
-                        <div className="flex justify-between">
-                          <span className="text-gray-400">Template:</span>
-                          <span className="font-medium text-blue-300">Applied</span>
+                        <div className="p-3 bg-gray-800/50 rounded-xl border border-gray-600/30 hover:bg-gray-800/70 transition-all duration-200 group/item">
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-400 flex items-center space-x-2">
+                              <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                              <span>Template:</span>
+                            </span>
+                            <span className="font-semibold text-blue-300 group-hover/item:text-blue-200">Applied</span>
+                          </div>
                         </div>
                       )}
+                      
                       {formData.copyFromGraphId && formData.copyFromGraphId !== 'select' && (
-                        <div className="flex justify-between">
-                          <span className="text-gray-400">Source:</span>
-                          <span className="font-medium text-purple-300">Existing Graph</span>
+                        <div className="p-3 bg-gray-800/50 rounded-xl border border-gray-600/30 hover:bg-gray-800/70 transition-all duration-200 group/item">
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-400 flex items-center space-x-2">
+                              <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse"></div>
+                              <span>Source:</span>
+                            </span>
+                            <span className="font-semibold text-purple-300 group-hover/item:text-purple-200">Existing Graph</span>
+                          </div>
                         </div>
                       )}
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Ready to Create:</span>
-                        <span className={`font-medium ${formData.name ? 'text-green-300' : 'text-red-300'}`}>
-                          {formData.name ? 'Yes' : 'Name Required'}
-                        </span>
+                      
+                      <div className="p-3 bg-gray-800/50 rounded-xl border border-gray-600/30 hover:bg-gray-800/70 transition-all duration-200 group/item">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-400 flex items-center space-x-2">
+                            <div className={`w-2 h-2 rounded-full ${formData.name ? 'bg-green-400 animate-pulse' : 'bg-red-400 animate-pulse'}`}></div>
+                            <span>Ready to Create:</span>
+                          </span>
+                          <span className={`font-semibold ${formData.name ? 'text-green-300 group-hover/item:text-green-200' : 'text-red-300 group-hover/item:text-red-200'}`}>
+                            {formData.name ? 'Yes' : 'Name Required'}
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Button State:</span>
-                        <span className={`font-medium ${!formData.name?.trim() || isCreating ? 'text-red-300' : 'text-green-300'}`}>
-                          {!formData.name?.trim() ? 'Disabled (No Name)' : isCreating ? 'Disabled (Creating)' : 'Enabled'}
-                        </span>
+                      
+                      <div className="p-3 bg-gray-800/50 rounded-xl border border-gray-600/30 hover:bg-gray-800/70 transition-all duration-200 group/item">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-400 flex items-center space-x-2">
+                            <div className={`w-2 h-2 rounded-full ${!formData.name?.trim() || isCreating ? 'bg-red-400 animate-pulse' : 'bg-green-400 animate-pulse'}`}></div>
+                            <span>Button State:</span>
+                          </span>
+                          <span className={`font-semibold ${!formData.name?.trim() || isCreating ? 'text-red-300 group-hover/item:text-red-200' : 'text-green-300 group-hover/item:text-green-200'}`}>
+                            {!formData.name?.trim() ? 'Disabled (No Name)' : isCreating ? 'Disabled (Creating)' : 'Enabled'}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div className="flex justify-between pt-4">
+              <div className="flex justify-between pt-6 border-t border-gradient-to-r from-gray-600/30 via-gray-500/50 to-gray-600/30 relative z-10">
                 <button
                   onClick={() => setStep('template')}
-                  className="px-6 py-3 text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors font-medium"
+                  className="px-6 py-3 text-gray-300 bg-gradient-to-r from-gray-700/80 to-gray-600/80 rounded-xl hover:from-gray-600/80 hover:to-gray-500/80 transition-all duration-300 hover:scale-105 shadow-lg backdrop-blur-sm border border-gray-500/30 hover:border-gray-400/50 hover:text-white font-medium flex items-center space-x-2"
                 >
-                  Back
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path>
+                  </svg>
+                  <span>Back</span>
                 </button>
-                <div className="flex space-x-3">
+                <div className="flex space-x-4">
                   <button
                     onClick={handleClose}
-                    className="px-6 py-3 text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors font-medium"
+                    className="px-6 py-3 text-gray-300 bg-gradient-to-r from-gray-700/80 to-gray-600/80 rounded-xl hover:from-gray-600/80 hover:to-gray-500/80 transition-all duration-300 hover:scale-105 shadow-lg backdrop-blur-sm border border-gray-500/30 hover:border-gray-400/50 hover:text-white font-medium"
                   >
                     Cancel
                   </button>
@@ -741,9 +942,25 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
                       }
                     }}
                     disabled={!formData.name?.trim() || isCreating}
-                    className="px-6 py-3 bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500 disabled:from-gray-600 disabled:to-gray-600 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all font-semibold shadow-lg hover:shadow-xl"
+                    className={`px-8 py-3 font-semibold rounded-xl transition-all duration-300 shadow-xl transform flex items-center space-x-2 ${
+                      !formData.name?.trim() || isCreating
+                        ? 'bg-gray-600/50 text-gray-400 cursor-not-allowed opacity-60'
+                        : 'bg-gradient-to-r from-green-600 via-emerald-600 to-teal-600 text-white hover:from-green-500 hover:via-emerald-500 hover:to-teal-500 hover:shadow-2xl hover:scale-105 border border-green-400/30'
+                    }`}
                   >
-                    {isCreating ? 'Creating...' : 'Create Graph'}
+                    {isCreating ? (
+                      <>
+                        <span>Creating...</span>
+                        <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+                      </>
+                    ) : (
+                      <>
+                        <span>Create Graph</span>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                        </svg>
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
