@@ -515,13 +515,12 @@ export function InteractiveGraphVisualization() {
       default: return 'M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z'; // Circle (fallback)
     }
   };
-  const [showLegend, setShowLegend] = useState(false);
   const [showGraphPanel, setShowGraphPanel] = useState(false);
   const [nodeCounter, setNodeCounter] = useState(1);
   
 
   // Calculate dynamic positioning for panels and minimized buttons to avoid overlap
-  const getPanelPosition = (panelType: 'graph' | 'legend' | 'create') => {
+  const getPanelPosition = (panelType: 'graph' | 'create') => {
     const graphPanelHeight = 295; // Height of expanded graph panel
     const buttonHeight = 48; // Height of minimized buttons (h-12 = 48px)
     const compactSpacing = 12; // Spacing when panel is minimized
@@ -537,23 +536,6 @@ export function InteractiveGraphVisualization() {
       if (showGraphPanel) {
         topOffset += graphPanelHeight + expandedSpacing;
       } else {
-        topOffset += buttonHeight + compactSpacing;
-      }
-      
-      return { top: `${topOffset}px` };
-    } else if (panelType === 'legend') {
-      // Legend panel positioning depends on graph panel AND create button states
-      let topOffset = 20; // Start position
-      
-      // Add graph panel height/button
-      if (showGraphPanel) {
-        topOffset += graphPanelHeight + expandedSpacing;
-      } else {
-        topOffset += buttonHeight + compactSpacing;
-      }
-      
-      // Add create button height (only if not in empty state)
-      if (!showEmptyStateOverlay) {
         topOffset += buttonHeight + compactSpacing;
       }
       
@@ -3548,120 +3530,8 @@ export function InteractiveGraphVisualization() {
         </>
       )}
 
-      {/* Create Node Button - Hide when no nodes exist */}
-      {!showEmptyStateOverlay && !isFullscreen && (
-      <button
-        onClick={() => createInlineNode(400, 300)}
-        className="absolute left-4 z-40 backdrop-blur-sm border-0 rounded-lg shadow-xl px-3 py-2 text-white font-semibold transition-all duration-300 flex items-center space-x-2 transform hover:scale-105 w-36 h-10"
-        style={{ 
-          ...getPanelPosition('create'),
-          background: 'linear-gradient(135deg, #10b981, #059669)',
-          boxShadow: '0 10px 25px rgba(16, 185, 129, 0.4)'
-        }}
-        title="Create new node"
-        onMouseEnter={(e) => {
-          e.currentTarget.style.background = 'linear-gradient(135deg, #059669, #047857)';
-          e.currentTarget.style.boxShadow = '0 15px 35px rgba(16, 185, 129, 0.6)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.background = 'linear-gradient(135deg, #10b981, #059669)';
-          e.currentTarget.style.boxShadow = '0 10px 25px rgba(16, 185, 129, 0.4)';
-        }}
-      >
-        <div className="flex items-center justify-between w-full">
-          <div className="flex items-center space-x-2">
-            <Plus className="h-4 w-4" />
-            <span className="text-xs font-medium">Create Node</span>
-          </div>
-        </div>
-      </button>
-      )}
 
 
-      {/* Legend */}
-      {showLegend && !isFullscreen ? (
-        <div className="absolute left-4 bg-gray-800/95 backdrop-blur-sm border border-gray-600/60 rounded-lg shadow-xl p-4 w-64" style={getPanelPosition('legend')}>
-          <div className="flex items-center justify-between mb-3">
-            <div className="text-sm font-semibold text-white">Node Types</div>
-            <button
-              onClick={() => setShowLegend(false)}
-              className="p-1 rounded text-gray-400 hover:text-white hover:bg-gray-700/50 transition-colors"
-              title="Minimize legend"
-            >
-              <Minus className="h-4 w-4" />
-            </button>
-          </div>
-          <div className="grid grid-cols-2 gap-2 text-sm text-gray-300">
-            <div className="flex items-center space-x-2">
-              {getTypeIconElement('EPIC', "w-4 h-4")}
-              <span>Epic</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              {getTypeIconElement('TASK', "w-4 h-4")}
-              <span>Task</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              {getTypeIconElement('MILESTONE', "w-4 h-4")}
-              <span>Milestone</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              {getTypeIconElement('BUG', "w-4 h-4")}
-              <span>Bug</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              {getTypeIconElement('OUTCOME', "w-4 h-4")}
-              <span>Outcome</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              {getTypeIconElement('IDEA', "w-4 h-4")}
-              <span>Idea</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              {getTypeIconElement('FEATURE', "w-4 h-4")}
-              <span>Feature</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              {getTypeIconElement('RESEARCH', "w-4 h-4")}
-              <span>Research</span>
-            </div>
-          </div>
-          <hr className="border-gray-600 mt-3" />
-          <div className="pt-3">
-            <div className="text-sm text-gray-500 opacity-85 w-full leading-relaxed text-left">
-              • Select nodes to access menu<br/>
-              • Drag to reposition<br/>
-              • Scroll for zoom<br/>
-              • Select edges for options
-            </div>
-          </div>
-        </div>
-      ) : !isFullscreen && (
-        <button
-          onClick={() => setShowLegend(true)}
-          className="absolute left-4 z-40 backdrop-blur-sm border-0 rounded-lg shadow-xl px-3 py-2 text-white font-semibold transition-all duration-300 flex items-center space-x-2 transform hover:scale-105 w-36 h-10"
-          style={{ 
-            ...getPanelPosition('legend'),
-            background: 'linear-gradient(135deg, #ec4899, #f97316)',
-            boxShadow: '0 10px 25px rgba(236, 72, 153, 0.4)'
-          }}
-          title="Show legend"
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'linear-gradient(135deg, #f43f5e, #ec4899)';
-            e.currentTarget.style.boxShadow = '0 15px 35px rgba(244, 63, 94, 0.6)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'linear-gradient(135deg, #ec4899, #f97316)';
-            e.currentTarget.style.boxShadow = '0 10px 25px rgba(236, 72, 153, 0.4)';
-          }}
-        >
-          <div className="flex items-center justify-between w-full">
-            <div className="flex items-center space-x-2">
-              <FileText className="h-4 w-4" />
-              <span className="text-xs font-medium">Node Types</span>
-            </div>
-          </div>
-        </button>
-      )}
 
       {/* Node Details Modal */}
       {showNodeDetailsModal && selectedNode && (
