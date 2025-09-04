@@ -27,7 +27,6 @@ import { GET_WORK_ITEMS, GET_EDGES, CREATE_EDGE, UPDATE_EDGE, DELETE_EDGE, CREAT
 import { validateGraphData, getValidationSummary, ValidationResult } from '../utils/graphDataValidation';
 import { DEFAULT_NODE_CONFIG } from '../constants/workItemConstants';
 
-import { EditNodeModal } from './EditNodeModal';
 import { DeleteNodeModal } from './DeleteNodeModal';
 import { CreateNodeModal } from './CreateNodeModal';
 import { CreateGraphModal } from './CreateGraphModal';
@@ -189,7 +188,6 @@ export function InteractiveGraphVisualization() {
   const [selectedRelationType, setSelectedRelationType] = useState<RelationshipType>('DEFAULT_EDGE');
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
   const [showDataHealth, setShowDataHealth] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showCreateNodeModal, setShowCreateNodeModal] = useState(false);
   const [showNodeDetailsModal, setShowNodeDetailsModal] = useState(false);
@@ -761,24 +759,14 @@ export function InteractiveGraphVisualization() {
       setIsConnecting(false);
       setConnectionSource(null);
     } else {
-      // Set selected node for the Node Actions panel
+      // Set selected node and show details modal directly
       setSelectedNode(node);
       
       // Apply glow effect immediately without waiting for useEffect
       applyNodeGlowImmediately(node);
       
-      // Show node menu
-      const containerRect = containerRef.current?.getBoundingClientRect();
-      if (containerRect) {
-        setNodeMenu({
-          node,
-          position: {
-            x: event.clientX - containerRect.left,
-            y: event.clientY - containerRect.top
-          },
-          visible: true
-        });
-      }
+      // Open details modal directly instead of context menu
+      setShowNodeDetailsModal(true);
     }
   }, [isConnecting, connectionSource, selectedRelationType]);
 
@@ -867,12 +855,7 @@ export function InteractiveGraphVisualization() {
         ...item,
         x,
         y,
-        priority: {
-          executive: item.priorityExec,
-          individual: item.priorityIndiv,
-          community: item.priorityComm,
-          computed: item.priorityComp
-        }
+        priority: item.priority || 0
       };
     })
   ];
@@ -1030,10 +1013,7 @@ export function InteractiveGraphVisualization() {
         description: DEFAULT_NODE_CONFIG.description,
         type: DEFAULT_NODE_CONFIG.type,
         status: DEFAULT_NODE_CONFIG.status,
-        priorityExec: DEFAULT_NODE_CONFIG.priorityExec,
-        priorityIndiv: DEFAULT_NODE_CONFIG.priorityIndiv,
-        priorityComm: DEFAULT_NODE_CONFIG.priorityComm,
-        priorityComp: 0.0,
+        priority: 0.0,
         positionX: x,
         positionY: y,
         positionZ: 0,
@@ -1749,30 +1729,6 @@ export function InteractiveGraphVisualization() {
           .style('pointer-events', 'none');
       });
 
-      // Add eye icon at bottom after title text ends
-      const titleEndY = startY + (lines.length * 16) + 8; // 8px gap after title text
-      
-      const eyeIconGroup = nodeGroup.append('g')
-        .attr('class', 'eye-icon-group')
-        .attr('transform', `translate(0, ${titleEndY})`)
-        .style('cursor', 'pointer')
-        .style('pointer-events', 'all')
-        .on('click', function(event) {
-          event.stopPropagation();
-          handleViewNodeDetails(d);
-        });
-      
-      // Eye icon at bottom center
-      eyeIconGroup.append('path')
-        .attr('class', 'eye-icon-path')
-        .attr('d', 'M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z M12 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6z')
-        .attr('fill', 'none')
-        .attr('stroke', '#ffffff')
-        .attr('stroke-width', '1')
-        .attr('stroke-linecap', 'round')
-        .attr('stroke-linejoin', 'round')
-        .attr('transform', 'translate(-12, -12) scale(0.5)')
-        .style('opacity', '0.7');
     });
 
     // Description section - bigger and more readable
@@ -1896,7 +1852,7 @@ export function InteractiveGraphVisualization() {
       const nodeGroup = d3.select(this);
       const dimensions = getNodeDimensions(d);
       
-      const priority = d.priorityComp || d.priorityExec || 0;
+      const priority = d.priority || 0;
       const priorityPercentage = Math.round(priority * 100);
       
       // Get priority color
@@ -2291,6 +2247,29 @@ export function InteractiveGraphVisualization() {
           handleNodeClick(event, d);
         }
       }, 10);
+    })
+    .on('contextmenu', (event: MouseEvent, d: any) => {
+      event.preventDefault();
+      event.stopPropagation();
+      
+      // Set selected node
+      setSelectedNode(d);
+      
+      // Apply glow effect
+      applyNodeGlowImmediately(d);
+      
+      // Show context menu for advanced actions
+      const containerRect = containerRef.current?.getBoundingClientRect();
+      if (containerRect) {
+        setNodeMenu({
+          node: d,
+          position: {
+            x: event.clientX - containerRect.left,
+            y: event.clientY - containerRect.top
+          },
+          visible: true
+        });
+      }
     });
 
     const updateEdgePositions = () => {
@@ -2575,13 +2554,8 @@ export function InteractiveGraphVisualization() {
 
   const handleEditNode = (node: WorkItem) => {
     setSelectedNode(node);
-    setShowEditModal(true);
+    setShowNodeDetailsModal(true);
     setNodeMenu(prev => ({ ...prev, visible: false }));
-  };
-
-  const handleCloseEditModal = () => {
-    setShowEditModal(false);
-    setSelectedNode(null);
   };
 
   const handleDeleteNode = (node: WorkItem) => {
@@ -3124,22 +3098,22 @@ export function InteractiveGraphVisualization() {
               <div className="flex flex-col space-y-1">
                 <div className="flex items-center">
                   {(() => {
-                    const priority = nodeMenu.node?.priority?.computed || nodeMenu.node?.priorityComp || 0;
+                    const priority = nodeMenu.node?.priority || 0;
                     return getPriorityIconElement(priority, "h-3 w-3 mr-1");
                   })()}
                   <span className="text-gray-400">Priority:</span>
-                  <span className="ml-1 font-medium">{Math.round((nodeMenu.node?.priority?.computed || nodeMenu.node?.priorityComp || 0) * 100)}%</span>
+                  <span className="ml-1 font-medium">{Math.round((nodeMenu.node?.priority || 0) * 100)}%</span>
                 </div>
                 <div className="w-full bg-gray-600 rounded-full h-1.5">
                   <div 
                     className={`h-1.5 rounded-full transition-all duration-300 ${
-                      (nodeMenu.node?.priority?.computed || nodeMenu.node?.priorityComp || 0) >= 0.8 ? 'bg-red-400' :
-                      (nodeMenu.node?.priority?.computed || nodeMenu.node?.priorityComp || 0) >= 0.6 ? 'bg-orange-400' :
-                      (nodeMenu.node?.priority?.computed || nodeMenu.node?.priorityComp || 0) >= 0.4 ? 'bg-yellow-400' :
-                      (nodeMenu.node?.priority?.computed || nodeMenu.node?.priorityComp || 0) >= 0.2 ? 'bg-blue-400' :
+                      (nodeMenu.node?.priority || 0) >= 0.8 ? 'bg-red-400' :
+                      (nodeMenu.node?.priority || 0) >= 0.6 ? 'bg-orange-400' :
+                      (nodeMenu.node?.priority || 0) >= 0.4 ? 'bg-yellow-400' :
+                      (nodeMenu.node?.priority || 0) >= 0.2 ? 'bg-blue-400' :
                       'bg-gray-400'
                     }`}
-                    style={{ width: `${Math.round((nodeMenu.node?.priority?.computed || nodeMenu.node?.priorityComp || 0) * 100)}%` }}
+                    style={{ width: `${Math.round((nodeMenu.node?.priority || 0) * 100)}%` }}
                   />
                 </div>
               </div>
@@ -3709,20 +3683,18 @@ export function InteractiveGraphVisualization() {
           node={selectedNode}
           edges={validatedEdges}
           nodes={validatedNodes}
-          onEdit={(node) => {
+          onConnectToExisting={(node) => {
             setShowNodeDetailsModal(false);
-            setShowEditModal(true);
-            // Don't set selectedNode again since it's already the correct node
+            handleConnectToExistingNodes(node);
           }}
-        />
-      )}
-
-      {/* Edit Node Modal */}
-      {showEditModal && selectedNode && (
-        <EditNodeModal
-          isOpen={showEditModal}
-          onClose={handleCloseEditModal}
-          node={selectedNode}
+          onDisconnect={(node) => {
+            setShowNodeDetailsModal(false);
+            handleDisconnectNodes(node);
+          }}
+          onDelete={(node) => {
+            setShowNodeDetailsModal(false);
+            handleDeleteNode(node);
+          }}
         />
       )}
 

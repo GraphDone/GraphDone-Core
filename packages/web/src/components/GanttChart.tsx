@@ -8,10 +8,7 @@ interface WorkItem {
   description?: string;
   type: string;
   status: string;
-  priorityExec: number;
-  priorityIndiv: number;
-  priorityComm: number;
-  priorityComp: number;
+  priority: number;
   dueDate?: string;
   tags?: string[];
   metadata?: string;
@@ -75,7 +72,7 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
         
         // Priority filter
         if (filterPriority !== 'all') {
-          const priority = node.priorityExec || node.priorityComp || 0;
+          const priority = node.priority || 0;
           const priorityLevel = getPriorityConfig(priority).value;
           if (priorityLevel !== filterPriority) return false;
         }
@@ -90,7 +87,7 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
         const endDate = node.dueDate ? new Date(node.dueDate) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
         const duration = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
         const progress = getStatusCompletionPercentage(node.status as WorkItemStatus);
-        const priority = node.priorityExec || node.priorityComp || 0;
+        const priority = node.priority || 0;
         
         return {
           ...node,

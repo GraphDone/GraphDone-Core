@@ -14,10 +14,7 @@ export const GET_WORK_ITEMS = gql`
       radius
       theta
       phi
-      priorityExec
-      priorityIndiv
-      priorityComm
-      priorityComp
+      priority
       dueDate
       tags
       metadata
@@ -100,10 +97,7 @@ export const GET_WORK_ITEM_BY_ID = gql`
       radius
       theta
       phi
-      priorityExec
-      priorityIndiv
-      priorityComm
-      priorityComp
+      priority
       dueDate
       tags
       metadata
@@ -161,10 +155,7 @@ export const CREATE_WORK_ITEM = gql`
         radius
         theta
         phi
-        priorityExec
-        priorityIndiv
-        priorityComm
-        priorityComp
+        priority
         dueDate
         tags
         metadata
@@ -203,10 +194,7 @@ export const UPDATE_WORK_ITEM = gql`
         radius
         theta
         phi
-        priorityExec
-        priorityIndiv
-        priorityComm
-        priorityComp
+        priority
         dueDate
         tags
         metadata
@@ -276,10 +264,7 @@ export const SUBSCRIBE_TO_WORK_ITEM_CHANGES = gql`
       radius
       theta
       phi
-      priorityExec
-      priorityIndiv
-      priorityComm
-      priorityComp
+      priority
       dueDate
       assignedTo
       tags
