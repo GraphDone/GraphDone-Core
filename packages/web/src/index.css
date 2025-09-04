@@ -148,20 +148,67 @@ svg .dialog-active-pulse,
   animation: pulse-green 1.0s ease-in-out infinite !important;
 }
 
-/* Type-specific node hover effects - light highlight border only */
-.node-type-epic:hover rect,
-.node-type-milestone:hover rect,
-.node-type-outcome:hover rect,
-.node-type-feature:hover rect,
-.node-type-task:hover rect,
-.node-type-bug:hover rect,
-.node-type-idea:hover rect,
-.node-type-research:hover rect,
-.node-type-default:hover rect {
-  stroke: #ffffff !important;
-  stroke-width: 2 !important;
-  stroke-opacity: 0.7 !important;
-  transform: scale(1.02);
+/* Type-specific node hover effects with matching type colors */
+.node-type-epic:hover .node-bg {
+  stroke: #c084fc !important;
+  stroke-width: 3 !important;
+  stroke-opacity: 0.8 !important;
+  transition: all 0.2s ease-in-out;
+}
+
+.node-type-milestone:hover .node-bg {
+  stroke: #fb923c !important;
+  stroke-width: 3 !important;
+  stroke-opacity: 0.8 !important;
+  transition: all 0.2s ease-in-out;
+}
+
+.node-type-outcome:hover .node-bg {
+  stroke: #818cf8 !important;
+  stroke-width: 3 !important;
+  stroke-opacity: 0.8 !important;
+  transition: all 0.2s ease-in-out;
+}
+
+.node-type-feature:hover .node-bg {
+  stroke: #38bdf8 !important;
+  stroke-width: 3 !important;
+  stroke-opacity: 0.8 !important;
+  transition: all 0.2s ease-in-out;
+}
+
+.node-type-task:hover .node-bg {
+  stroke: #4ade80 !important;
+  stroke-width: 3 !important;
+  stroke-opacity: 0.8 !important;
+  transition: all 0.2s ease-in-out;
+}
+
+.node-type-bug:hover .node-bg {
+  stroke: #f87171 !important;
+  stroke-width: 3 !important;
+  stroke-opacity: 0.8 !important;
+  transition: all 0.2s ease-in-out;
+}
+
+.node-type-idea:hover .node-bg {
+  stroke: #fde047 !important;
+  stroke-width: 3 !important;
+  stroke-opacity: 0.8 !important;
+  transition: all 0.2s ease-in-out;
+}
+
+.node-type-research:hover .node-bg {
+  stroke: #2dd4bf !important;
+  stroke-width: 3 !important;
+  stroke-opacity: 0.8 !important;
+  transition: all 0.2s ease-in-out;
+}
+
+.node-type-default:hover .node-bg {
+  stroke: #9ca3af !important;
+  stroke-width: 3 !important;
+  stroke-opacity: 0.8 !important;
   transition: all 0.2s ease-in-out;
 }
 
