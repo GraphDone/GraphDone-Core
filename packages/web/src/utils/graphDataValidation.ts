@@ -211,7 +211,7 @@ function validateNode(node: any, index: number): ValidationError[] {
   // Validate numeric fields
   const numericFields = [
     'positionX', 'positionY', 'positionZ',
-    'priorityExec', 'priorityIndiv', 'priorityComm', 'priorityComp',
+    'priority',
     'x', 'y', 'z'
   ];
   
@@ -230,23 +230,20 @@ function validateNode(node: any, index: number): ValidationError[] {
     }
   });
   
-  // Validate priority values are between 0 and 1
-  const priorityFields = ['priorityExec', 'priorityIndiv', 'priorityComm', 'priorityComp'];
-  priorityFields.forEach(field => {
-    if (node[field] !== undefined && node[field] !== null) {
-      const value = node[field];
-      if (typeof value === 'number' && (value < 0 || value > 1)) {
-        errors.push({
-          type: 'error',
-          category: 'node',
-          itemId: node.id,
-          field,
-          message: `Node ${node.id} has priority value outside valid range [0,1]: ${value}`,
-          suggestion: 'Priority values should be between 0 and 1'
-        });
-      }
+  // Validate priority value is between 0 and 1
+  if (node.priority !== undefined && node.priority !== null) {
+    const value = node.priority;
+    if (typeof value === 'number' && (value < 0 || value > 1)) {
+      errors.push({
+        type: 'error',
+        category: 'node',
+        itemId: node.id,
+        field: 'priority',
+        message: `Node ${node.id} has priority value outside valid range [0,1]: ${value}`,
+        suggestion: 'Priority values should be between 0 and 1'
+      });
     }
-  });
+  }
   
   return errors;
 }
@@ -370,19 +367,13 @@ function sanitizeNode(node: any): any {
   if (sanitized.positionY === undefined) sanitized.positionY = 0;
   if (sanitized.positionZ === undefined) sanitized.positionZ = 0;
   
-  // Initialize priority fields
-  if (sanitized.priorityExec === undefined) sanitized.priorityExec = 0.5;
-  if (sanitized.priorityIndiv === undefined) sanitized.priorityIndiv = 0.5;
-  if (sanitized.priorityComm === undefined) sanitized.priorityComm = 0.5;
-  if (sanitized.priorityComp === undefined) sanitized.priorityComp = 0.5;
+  // Initialize priority field
+  if (sanitized.priority === undefined) sanitized.priority = 0.5;
   
-  // Clamp priority values to valid range
-  const priorityFields = ['priorityExec', 'priorityIndiv', 'priorityComm', 'priorityComp'];
-  priorityFields.forEach(field => {
-    if (typeof sanitized[field] === 'number') {
-      sanitized[field] = Math.max(0, Math.min(1, sanitized[field]));
-    }
-  });
+  // Clamp priority value to valid range
+  if (typeof sanitized.priority === 'number') {
+    sanitized.priority = Math.max(0, Math.min(1, sanitized.priority));
+  }
   
   // Remove any NaN or Infinity values
   Object.keys(sanitized).forEach(key => {

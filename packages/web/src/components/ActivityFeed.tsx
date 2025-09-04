@@ -8,10 +8,7 @@ interface WorkItem {
   description?: string;
   type: string;
   status: string;
-  priorityExec: number;
-  priorityIndiv: number;
-  priorityComm: number;
-  priorityComp: number;
+  priority: number;
   dueDate?: string;
   tags?: string[];
   metadata?: string;
@@ -88,7 +85,7 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ filteredNodes }) => {
     const activityList: ActivityItem[] = [];
     
     filteredNodes.forEach(node => {
-      const priority = node.priorityExec || node.priorityComp || 0;
+      const priority = node.priority || 0;
       const activityPriority = priority >= 0.8 ? 'critical' : 
                               priority >= 0.6 ? 'high' : 
                               priority >= 0.4 ? 'moderate' : 
