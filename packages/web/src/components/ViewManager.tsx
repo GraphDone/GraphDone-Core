@@ -4,7 +4,7 @@ import { Search, X, ChevronDown } from 'lucide-react';
 import { STATUS_OPTIONS, TYPE_OPTIONS, PRIORITY_OPTIONS } from '../constants/workItemConstants';
 import { useAuth } from '../contexts/AuthContext';
 import { useGraph } from '../contexts/GraphContext';
-import { GET_WORK_ITEMS } from '../lib/queries';
+import { GET_WORK_ITEMS, GET_EDGES } from '../lib/queries';
 import { EditNodeModal } from './EditNodeModal';
 import { DeleteNodeModal } from './DeleteNodeModal';
 import { NodeDetailsModal } from './NodeDetailsModal';
@@ -82,6 +82,31 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
   });
 
   const workItems: WorkItem[] = data?.workItems || [];
+
+  // Fetch edges to compute connections manually
+  const { data: edgeData } = useQuery(GET_EDGES, {
+    variables: currentGraph ? {
+      where: {
+        OR: [
+          { source: { graph: { id: currentGraph.id } } },
+          { target: { graph: { id: currentGraph.id } } }
+        ]
+      }
+    } : { where: {} },
+    pollInterval: currentGraph ? 5000 : 0,
+    fetchPolicy: currentGraph ? 'cache-and-network' : 'cache-only'
+  });
+
+  const edges = edgeData?.edges || [];
+  
+  // Convert edges to WorkItemEdge format for NodeDetailsModal
+  const workItemEdges = edges.map((edge: any) => ({
+    id: edge.id,
+    source: edge.source.id,
+    target: edge.target.id,
+    type: edge.type,
+    strength: edge.weight
+  }));
 
 
   // Convert centralized options to ViewManager format
@@ -324,11 +349,11 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
       case 'dashboard':
         return <Dashboard filteredNodes={filteredNodes} stats={stats} />;
       case 'table':
-        return <TableView filteredNodes={filteredNodes} handleEditNode={handleEditNode} handleDeleteNode={handleDeleteNode} />;
+        return <TableView filteredNodes={filteredNodes} handleEditNode={handleEditNode} edges={edges} />;
       case 'cards':
-        return <CardView filteredNodes={filteredNodes} handleEditNode={handleEditNode} handleDeleteNode={handleDeleteNode} />;
+        return <CardView filteredNodes={filteredNodes} handleEditNode={handleEditNode} edges={edges} />;
       case 'kanban':
-        return <KanbanView filteredNodes={filteredNodes} handleEditNode={handleEditNode} handleDeleteNode={handleDeleteNode} />;
+        return <KanbanView filteredNodes={filteredNodes} handleEditNode={handleEditNode} edges={edges} />;
       case 'gantt':
         return <GanttChart filteredNodes={filteredNodes} />;
       case 'calendar':
@@ -711,7 +736,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
           isOpen={showNodeDetailsModal}
           onClose={handleCloseModals}
           node={selectedNode}
-          edges={[]}
+          edges={workItemEdges}
           nodes={filteredNodes}
         />
       )}
