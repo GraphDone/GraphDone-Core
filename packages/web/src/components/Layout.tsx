@@ -38,7 +38,9 @@ export function Layout({ children }: LayoutProps) {
             >
               <Menu className="h-6 w-6" aria-hidden="true" />
             </button>
-            <h1 className="ml-3 text-xl font-bold text-green-400">GraphDone</h1>
+            <Link to="/" className="ml-3 text-xl font-bold text-green-400 hover:text-green-300 transition-colors">
+              GraphDone
+            </Link>
           </div>
         </div>
       </div>
@@ -55,7 +57,9 @@ export function Layout({ children }: LayoutProps) {
             {/* Logo */}
             <div className="flex items-center h-16 px-6 border-b border-gray-700">
               <img src="/favicon.svg" alt="GraphDone Logo" className="h-8 w-8" />
-              <span className="ml-3 text-xl font-bold text-green-300">GraphDone</span>
+              <Link to="/" className="ml-3 text-xl font-bold text-green-300 hover:text-green-400 transition-colors">
+                GraphDone
+              </Link>
             </div>
 
             {/* Navigation */}
