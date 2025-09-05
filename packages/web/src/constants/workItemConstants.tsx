@@ -1036,6 +1036,23 @@ export const getStatusGradientBackground = (status: WorkItemStatus, style: Gradi
 };
 
 // ============================
+// SIDEBAR SECTION COLORS
+// ============================
+
+// Unique colors for RightSidebar main sections (completely unused elsewhere in project)
+export const SIDEBAR_SECTION_COLORS = {
+  projectOverview: '#8E24AA',   // Material Deep Purple 500 - unique
+  taskStatus: '#00ACC1',        // Material Cyan 600 - unique  
+  priorityDistribution: '#FFA726', // Material Orange 400 - unique
+  nodeTypes: '#D32F2F'          // Material Red 700 - unique
+} as const;
+
+// Get sidebar section border color
+export const getSidebarSectionColor = (section: keyof typeof SIDEBAR_SECTION_COLORS): string => {
+  return SIDEBAR_SECTION_COLORS[section];
+};
+
+// ============================
 // EXPORT DEFAULT COLLECTIONS
 // ============================
 
