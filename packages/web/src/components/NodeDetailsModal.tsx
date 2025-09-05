@@ -846,18 +846,18 @@ export function NodeDetailsModal({
                       {incomingConnections.map((edge) => {
                         const connectedNode = getConnectedNode(edge.source);
                         return (
-                          <div key={edge.id} className="flex items-center space-x-4 p-4 bg-gradient-to-r from-red-900/30 to-gray-800/50 border border-red-500/30 rounded-xl hover:from-red-900/40 hover:to-gray-800/60 hover:border-red-400/40 transition-all duration-200 hover:scale-[1.02] shadow-md backdrop-blur-sm">
-                            <div className="flex items-center space-x-2 flex-1">
+                          <div key={edge.id} className="p-4 bg-gradient-to-r from-red-900/30 to-gray-800/50 border border-red-500/30 rounded-xl hover:from-red-900/40 hover:to-gray-800/60 hover:border-red-400/40 transition-all duration-200 hover:scale-[1.02] shadow-md backdrop-blur-sm">
+                            <div className="flex items-start gap-2">
                               {connectedNode && (
-                                <span className={`flex items-center space-x-1 px-2 py-1 rounded text-xs font-medium ${getTypeColor(connectedNode.type)}`}>
+                                <div className={`inline-flex items-center space-x-1 px-2 py-1 rounded text-sm font-medium ${getTypeColor(connectedNode.type)}`}>
                                   {getTypeIcon(connectedNode.type)}
-                                  <span className="max-w-32 truncate">{connectedNode.title}</span>
-                                </span>
+                                  <span>{connectedNode.title}</span>
+                                </div>
                               )}
-                              <span className={`flex items-center space-x-1 px-2 py-1 rounded text-xs font-medium ${getRelationshipColor(edge.type)}`}>
+                              <div className={`inline-flex items-center space-x-1 px-2 py-1 rounded text-xs font-medium ${getRelationshipColor(edge.type)} flex-shrink-0`}>
                                 {getRelationshipIcon(edge.type)}
-                                <span>{getRelationshipDisplayName(edge.type)}</span>
-                              </span>
+                                <span className="whitespace-nowrap">{getRelationshipDisplayName(edge.type)}</span>
+                              </div>
                             </div>
                           </div>
                         );
@@ -879,18 +879,18 @@ export function NodeDetailsModal({
                       {outgoingConnections.map((edge) => {
                         const connectedNode = getConnectedNode(edge.target);
                         return (
-                          <div key={edge.id} className="flex items-center space-x-4 p-4 bg-gradient-to-r from-purple-900/30 to-gray-800/50 border border-purple-500/30 rounded-xl hover:from-purple-900/40 hover:to-gray-800/60 hover:border-purple-400/40 transition-all duration-200 hover:scale-[1.02] shadow-md backdrop-blur-sm">
-                            <div className="flex items-center space-x-2 flex-1">
+                          <div key={edge.id} className="p-4 bg-gradient-to-r from-purple-900/30 to-gray-800/50 border border-purple-500/30 rounded-xl hover:from-purple-900/40 hover:to-gray-800/60 hover:border-purple-400/40 transition-all duration-200 hover:scale-[1.02] shadow-md backdrop-blur-sm">
+                            <div className="flex items-start gap-2">
                               {connectedNode && (
-                                <span className={`flex items-center space-x-1 px-2 py-1 rounded text-xs font-medium ${getTypeColor(connectedNode.type)}`}>
+                                <div className={`inline-flex items-center space-x-1 px-2 py-1 rounded text-sm font-medium ${getTypeColor(connectedNode.type)}`}>
                                   {getTypeIcon(connectedNode.type)}
-                                  <span className="max-w-32 truncate">{connectedNode.title}</span>
-                                </span>
+                                  <span>{connectedNode.title}</span>
+                                </div>
                               )}
-                              <span className={`flex items-center space-x-1 px-2 py-1 rounded text-xs font-medium ${getRelationshipColor(edge.type)}`}>
+                              <div className={`inline-flex items-center space-x-1 px-2 py-1 rounded text-xs font-medium ${getRelationshipColor(edge.type)} flex-shrink-0`}>
                                 {getRelationshipIcon(edge.type)}
-                                <span>{getRelationshipDisplayName(edge.type)}</span>
-                              </span>
+                                <span className="whitespace-nowrap">{getRelationshipDisplayName(edge.type)}</span>
+                              </div>
                             </div>
                           </div>
                         );
