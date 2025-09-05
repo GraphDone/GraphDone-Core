@@ -192,7 +192,7 @@ const PieChart = ({ data, title }: { data: Array<{label: string, value: number, 
           const isPriorityChart = filteredData.some(item => ['Critical', 'High', 'Moderate', 'Low', 'Minimal'].includes(item.label));
           const isStatusChart = filteredData.some(item => ['Proposed', 'Planned', 'In Progress', 'Completed', 'Blocked'].includes(item.label));
           const gridCols = isPriorityChart ? "grid grid-cols-2 gap-2" : 
-                           isStatusChart ? "grid grid-cols-2 gap-2" : 
+                           isStatusChart ? "grid grid-cols-3 gap-2" : 
                            "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2";
           
           return (
@@ -227,12 +227,20 @@ const PieChart = ({ data, title }: { data: Array<{label: string, value: number, 
                 return (
                   <div
                     key={index}
-                    className="flex items-center gap-2 p-2 rounded-lg bg-gray-700/50 hover:bg-gray-700 transition-colors"
+                    className="bg-gradient-to-br from-gray-800/80 via-gray-700/60 to-gray-800/40 border border-gray-600/50 rounded-xl p-3 hover:from-gray-700/90 hover:via-gray-600/70 hover:to-gray-700/50 hover:border-gray-500/70 transition-all duration-200 hover:scale-[1.02] hover:-translate-y-1 shadow-lg hover:shadow-xl"
                   >
-                    {getIcon(item.label)}
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs text-white font-medium truncate">{item.label}</div>
-                      <div className="text-xs text-gray-400">{item.value} ({percentage}%)</div>
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-8 h-8 rounded-lg bg-gray-900/50 flex items-center justify-center">
+                        {getIcon(item.label)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm text-white font-semibold truncate">{item.label}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-center">
+                      <span className="text-sm font-medium px-2 py-1 rounded-full bg-gray-900/40" style={{ color: item.color }}>
+                        {percentage}%
+                      </span>
                     </div>
                   </div>
                 );
