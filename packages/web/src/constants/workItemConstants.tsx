@@ -233,7 +233,7 @@ export const WORK_ITEM_TYPES: Record<WorkItemType, TypeOption> = {
     color: 'text-yellow-400',
     bgColor: 'bg-yellow-400/10',
     borderColor: 'border-yellow-400/30',
-    hexColor: '#fde047'
+    hexColor: '#facc15'
   },
   RESEARCH: {
     value: 'RESEARCH',
