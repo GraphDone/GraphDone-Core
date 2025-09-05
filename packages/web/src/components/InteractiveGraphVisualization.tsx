@@ -3273,100 +3273,115 @@ export function InteractiveGraphVisualization() {
       {/* Context Menu */}
       {contextMenuPosition && (
         <div
-          className="fixed z-50 bg-gray-800 border border-gray-600 rounded-lg shadow-2xl py-2 min-w-[200px]"
+          className="fixed z-50 bg-black/90 backdrop-blur-md border border-white/10 rounded-lg shadow-2xl overflow-hidden min-w-[200px]"
           style={{
             left: Math.min(contextMenuPosition?.x || 0, window.innerWidth - 220),
-            top: Math.min(contextMenuPosition?.y || 0, window.innerHeight - 200)
+            top: Math.min(contextMenuPosition?.y || 0, window.innerHeight - 120),
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.05)',
+            animation: 'slideInScale 0.2s ease-out'
           }}
           onClick={(e) => e.stopPropagation()}
         >
-          <button
-            onClick={() => {
-              createInlineNode(contextMenuPosition?.graphX || 0, contextMenuPosition?.graphY || 0);
-              setContextMenuPosition(null);
-            }}
-            className="w-full text-left px-4 py-2 hover:bg-gray-700 text-gray-200 flex items-center space-x-2"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Create Node</span>
-          </button>
-          
-          <button
-            onClick={() => {
-              // Zoom to fit button clicked
-              // Zoom to fit all nodes - completely rewritten for proper detection
-              const svg = d3.select(svgRef.current);
-              const containerRect = containerRef.current?.getBoundingClientRect();
-              if (svg.node() && containerRect && nodes.length > 0) {
-                // Get all node positions (both from simulation and stored positions)
-                const allPositions = nodes.map(node => ({
-                  x: node.x !== undefined ? node.x : (node.positionX || 0),
-                  y: node.y !== undefined ? node.y : (node.positionY || 0)
-                })).filter(pos => pos.x !== undefined && pos.y !== undefined);
-                
-                if (allPositions.length === 0) {
-                  // No valid node positions found
-                  setContextMenuPosition(null);
-                  return;
+          <div className="py-2">
+            <button
+              onClick={() => {
+                createInlineNode(contextMenuPosition?.graphX || 0, contextMenuPosition?.graphY || 0);
+                setContextMenuPosition(null);
+              }}
+              className="w-full text-left px-4 py-3 hover:bg-white/8 text-gray-200 flex items-center space-x-3 transition-all duration-300 ease-out group rounded-lg mx-2"
+            >
+              <div className="w-6 h-6 rounded-lg bg-gray-700/50 flex items-center justify-center group-hover:bg-emerald-500/20 transition-all duration-300 ease-out">
+                <Plus className="h-4 w-4 text-gray-400 group-hover:text-emerald-400 transition-colors duration-300" />
+              </div>
+              <span className="text-gray-300 font-medium group-hover:text-white transition-colors duration-300">Create Node</span>
+              <div className="ml-auto">
+                <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-300 ease-out"></div>
+              </div>
+            </button>
+            
+            <button
+              onClick={() => {
+                // Zoom to fit button clicked
+                // Zoom to fit all nodes - completely rewritten for proper detection
+                const svg = d3.select(svgRef.current);
+                const containerRect = containerRef.current?.getBoundingClientRect();
+                if (svg.node() && containerRect && nodes.length > 0) {
+                  // Get all node positions (both from simulation and stored positions)
+                  const allPositions = nodes.map(node => ({
+                    x: node.x !== undefined ? node.x : (node.positionX || 0),
+                    y: node.y !== undefined ? node.y : (node.positionY || 0)
+                  })).filter(pos => pos.x !== undefined && pos.y !== undefined);
+                  
+                  if (allPositions.length === 0) {
+                    // No valid node positions found
+                    setContextMenuPosition(null);
+                    return;
+                  }
+                  
+                  // Find the absolute bounds of all nodes
+                  const minX = Math.min(...allPositions.map(p => p.x));
+                  const maxX = Math.max(...allPositions.map(p => p.x));
+                  const minY = Math.min(...allPositions.map(p => p.y));
+                  const maxY = Math.max(...allPositions.map(p => p.y));
+                  
+                  // Add generous padding for node sizes and breathing room
+                  const nodePadding = 150; // Account for node size
+                  const extraMargin = 300; // Extra breathing room
+                  const totalPadding = nodePadding + extraMargin;
+                  
+                  const boundsWidth = (maxX - minX) + (2 * totalPadding);
+                  const boundsHeight = (maxY - minY) + (2 * totalPadding);
+                  
+                  // Calculate how much we need to scale to fit everything
+                  const containerWidth = containerRect.width;
+                  const containerHeight = containerRect.height;
+                  
+                  const scaleX = containerWidth / boundsWidth;
+                  const scaleY = containerHeight / boundsHeight;
+                  const scale = Math.min(scaleX, scaleY, 0.2); // Very conservative max scale for wide zoom out
+                  
+                  // Find the center of all nodes
+                  const centerX = (minX + maxX) / 2;
+                  const centerY = (minY + maxY) / 2;
+                  
+                  // Calculate translation to center the nodes
+                  const translateX = (containerWidth / 2) - (centerX * scale);
+                  const translateY = (containerHeight / 2) - (centerY * scale);
+                  
+                  // Zoom to fit calculation complete
+                  
+                  // Create the transform and update D3's zoom behavior state properly
+                  const newTransform = d3.zoomIdentity.translate(translateX, translateY).scale(scale);
+                  
+                  // Update D3's internal zoom state immediately (no transition)
+                  svg.property('__zoom', newTransform);
+                  
+                  // Apply the visual transform with transition
+                  const g = svg.select('g');
+                  g.transition()
+                    .duration(750)
+                    .attr('transform', newTransform.toString())
+                    .on('end', () => {
+                      // Update the current transform state
+                      setCurrentTransform({ x: translateX, y: translateY, scale: scale });
+                    });
                 }
-                
-                // Find the absolute bounds of all nodes
-                const minX = Math.min(...allPositions.map(p => p.x));
-                const maxX = Math.max(...allPositions.map(p => p.x));
-                const minY = Math.min(...allPositions.map(p => p.y));
-                const maxY = Math.max(...allPositions.map(p => p.y));
-                
-                // Add generous padding for node sizes and breathing room
-                const nodePadding = 150; // Account for node size
-                const extraMargin = 300; // Extra breathing room
-                const totalPadding = nodePadding + extraMargin;
-                
-                const boundsWidth = (maxX - minX) + (2 * totalPadding);
-                const boundsHeight = (maxY - minY) + (2 * totalPadding);
-                
-                // Calculate how much we need to scale to fit everything
-                const containerWidth = containerRect.width;
-                const containerHeight = containerRect.height;
-                
-                const scaleX = containerWidth / boundsWidth;
-                const scaleY = containerHeight / boundsHeight;
-                const scale = Math.min(scaleX, scaleY, 0.2); // Very conservative max scale for wide zoom out
-                
-                // Find the center of all nodes
-                const centerX = (minX + maxX) / 2;
-                const centerY = (minY + maxY) / 2;
-                
-                // Calculate translation to center the nodes
-                const translateX = (containerWidth / 2) - (centerX * scale);
-                const translateY = (containerHeight / 2) - (centerY * scale);
-                
-                // Zoom to fit calculation complete
-                
-                // Create the transform and update D3's zoom behavior state properly
-                const newTransform = d3.zoomIdentity.translate(translateX, translateY).scale(scale);
-                
-                // Update D3's internal zoom state immediately (no transition)
-                svg.property('__zoom', newTransform);
-                
-                // Apply the visual transform with transition
-                const g = svg.select('g');
-                g.transition()
-                  .duration(750)
-                  .attr('transform', newTransform.toString())
-                  .on('end', () => {
-                    // Update the current transform state
-                    setCurrentTransform({ x: translateX, y: translateY, scale: scale });
-                  });
-              }
-              setContextMenuPosition(null);
-            }}
-            className="w-full text-left px-4 py-2 hover:bg-gray-700 text-gray-200 flex items-center space-x-2"
-          >
-            <div className="h-4 w-4 flex items-center justify-center">
-              <div className="w-3 h-3 border border-gray-400 rounded"></div>
-            </div>
-            <span>Zoom to Fit</span>
-          </button>
+                setContextMenuPosition(null);
+              }}
+              className="w-full text-left px-4 py-3 hover:bg-white/8 text-gray-200 flex items-center space-x-3 transition-all duration-300 ease-out group rounded-lg mx-2"
+            >
+              <div className="w-6 h-6 rounded-lg bg-gray-700/50 flex items-center justify-center group-hover:bg-blue-500/20 transition-all duration-300 ease-out">
+                <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-400 transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" strokeWidth="2"/>
+                  <path d="M9 9h6v6H9z" strokeWidth="2"/>
+                </svg>
+              </div>
+              <span className="text-gray-300 font-medium group-hover:text-white transition-colors duration-300">Zoom to Fit</span>
+              <div className="ml-auto">
+                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-300 ease-out"></div>
+              </div>
+            </button>
+          </div>
         </div>
       )}
 
