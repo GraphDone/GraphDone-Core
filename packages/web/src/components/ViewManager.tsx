@@ -7,6 +7,7 @@ import { useGraph } from '../contexts/GraphContext';
 import { GET_WORK_ITEMS } from '../lib/queries';
 import { EditNodeModal } from './EditNodeModal';
 import { DeleteNodeModal } from './DeleteNodeModal';
+import { NodeDetailsModal } from './NodeDetailsModal';
 import Dashboard from './Dashboard';
 import TableView from './TableView';
 import CardView from './CardView';
@@ -33,8 +34,8 @@ interface WorkItem {
   assignedTo?: { id: string; name: string; username: string; };
   graph?: { id: string; name: string; team?: { id: string; name: string; } };
   contributors?: Array<{ id: string; name: string; type: string; }>;
-  dependencies?: Array<{ id: string; title: string; type: string; }>;
-  dependents?: Array<{ id: string; title: string; type: string; }>;
+  dependencies?: Array<{ id: string; title: string; type: string; status: string; }>;
+  dependents?: Array<{ id: string; title: string; type: string; status: string; }>;
 }
 
 type ViewType = 'dashboard' | 'table' | 'cards' | 'kanban' | 'gantt' | 'calendar' | 'activity';
@@ -48,6 +49,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
   const [selectedNode, setSelectedNode] = useState<WorkItem | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showNodeDetailsModal, setShowNodeDetailsModal] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [typeFilter, setTypeFilter] = useState<string>('');
   const [priorityFilter, setPriorityFilter] = useState<string>('');
@@ -156,7 +158,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
   // Handle node actions
   const handleEditNode = (node: WorkItem) => {
     setSelectedNode(node);
-    setShowEditModal(true);
+    setShowNodeDetailsModal(true);
   };
 
   const handleDeleteNode = (node: WorkItem) => {
@@ -168,6 +170,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
     setSelectedNode(null);
     setShowEditModal(false);
     setShowDeleteModal(false);
+    setShowNodeDetailsModal(false);
   };
 
   // Transform node data for EditNodeModal
@@ -699,6 +702,17 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
           nodeId={selectedNode.id}
           nodeTitle={selectedNode.title}
           nodeType={selectedNode.type}
+        />
+      )}
+
+      {/* Node Details Modal */}
+      {showNodeDetailsModal && selectedNode && (
+        <NodeDetailsModal
+          isOpen={showNodeDetailsModal}
+          onClose={handleCloseModals}
+          node={selectedNode}
+          edges={[]}
+          nodes={filteredNodes}
         />
       )}
     </div>
