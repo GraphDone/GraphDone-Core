@@ -85,28 +85,7 @@ const getNodeTypeRowBackground = (type: string) => {
 };
 
 const getNodeTypeBorderColor = (type: string) => {
-  const normalizedType = type?.toUpperCase?.() || 'DEFAULT';
-  
-  switch (normalizedType) {
-    case 'EPIC':
-      return '#e879f9'; // fuchsia-400
-    case 'MILESTONE':
-      return '#fb923c'; // orange-400
-    case 'OUTCOME':
-      return '#818cf8'; // indigo-400
-    case 'FEATURE':
-      return '#38bdf8'; // sky-400
-    case 'TASK':
-      return '#4ade80'; // green-400
-    case 'BUG':
-      return '#ef4444'; // red-500
-    case 'IDEA':
-      return '#facc15'; // yellow-400
-    case 'RESEARCH':
-      return '#2dd4bf'; // teal-400
-    default:
-      return '#9ca3af'; // gray-400
-  }
+  return getTypeConfig(type as WorkItemType).hexColor;
 };
 
 const getStatusColor = (status: string) => {
