@@ -100,7 +100,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
   const edges = edgeData?.edges || [];
   
   // Convert edges to WorkItemEdge format for NodeDetailsModal
-  const workItemEdges = edges.map((edge: any) => ({
+  const workItemEdges = edges.map((edge: { id: string; source: { id: string }; target: { id: string }; type: string; weight: number }) => ({
     id: edge.id,
     source: edge.source.id,
     target: edge.target.id,

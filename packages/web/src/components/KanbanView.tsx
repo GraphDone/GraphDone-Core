@@ -69,8 +69,58 @@ const getNodeTypeColor = (type: string) => {
   return `${config.color} ${config.bgColor} ${config.borderColor} border`;
 };
 
+const getNodeTypeKanbanBackground = (type: string) => {
+  const config = getTypeConfig(type as WorkItemType);
+  // Create enhanced backgrounds for kanban cards - matching Card view opacity levels
+  switch (type) {
+    case 'EPIC':
+      return 'bg-gradient-to-br from-fuchsia-500/10 via-gray-800 to-fuchsia-500/5 hover:from-fuchsia-500/20 hover:to-fuchsia-500/15';
+    case 'MILESTONE':
+      return 'bg-gradient-to-br from-orange-500/10 via-gray-800 to-orange-500/5 hover:from-orange-500/20 hover:to-orange-500/15';
+    case 'OUTCOME':
+      return 'bg-gradient-to-br from-indigo-500/10 via-gray-800 to-indigo-500/5 hover:from-indigo-500/20 hover:to-indigo-500/15';
+    case 'FEATURE':
+      return 'bg-gradient-to-br from-sky-500/10 via-gray-800 to-sky-500/5 hover:from-sky-500/20 hover:to-sky-500/15';
+    case 'TASK':
+      return 'bg-gradient-to-br from-green-500/10 via-gray-800 to-green-500/5 hover:from-green-500/20 hover:to-green-500/15';
+    case 'BUG':
+      return 'bg-gradient-to-br from-red-500/10 via-gray-800 to-red-500/5 hover:from-red-500/20 hover:to-red-500/15';
+    case 'IDEA':
+      return 'bg-gradient-to-br from-yellow-500/10 via-gray-800 to-yellow-500/5 hover:from-yellow-500/20 hover:to-yellow-500/15';
+    case 'RESEARCH':
+      return 'bg-gradient-to-br from-teal-500/10 via-gray-800 to-teal-500/5 hover:from-teal-500/20 hover:to-teal-500/15';
+    default:
+      return 'bg-gradient-to-br from-gray-500/10 via-gray-800 to-gray-500/5 hover:from-gray-500/20 hover:to-gray-500/15';
+  }
+};
+
 const getNodePriority = (node: WorkItem) => {
   return node.priority || 0;
+};
+
+const getNodeTypeKanbanBorderColor = (type: string) => {
+  const normalizedType = type?.toUpperCase?.() || 'DEFAULT';
+  
+  switch (normalizedType) {
+    case 'EPIC':
+      return '#e879f9'; // fuchsia-400
+    case 'MILESTONE':
+      return '#fb923c'; // orange-400
+    case 'OUTCOME':
+      return '#818cf8'; // indigo-400
+    case 'FEATURE':
+      return '#38bdf8'; // sky-400
+    case 'TASK':
+      return '#4ade80'; // green-400
+    case 'BUG':
+      return '#ef4444'; // red-500
+    case 'IDEA':
+      return '#facc15'; // yellow-400
+    case 'RESEARCH':
+      return '#2dd4bf'; // teal-400
+    default:
+      return '#9ca3af'; // gray-400
+  }
 };
 
 const getConnectionDetails = (node: WorkItem, edges: Edge[]) => {
@@ -147,7 +197,13 @@ const KanbanView: React.FC<KanbanViewProps> = ({ filteredNodes, handleEditNode, 
                   <div
                     key={node.id}
                     onClick={() => handleEditNode(node)}
-                    className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm hover:shadow-md dark:shadow-md dark:hover:shadow-lg transition-all duration-200 cursor-pointer border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700/50 hover:scale-[1.02] hover:-translate-y-1 group"
+                    className={`${getNodeTypeKanbanBackground(node.type)} rounded-lg p-4 shadow-md hover:shadow-lg hover:shadow-white/10 transition-all duration-200 cursor-pointer border border-gray-600/40 hover:border-gray-500/60 hover:bg-white/5 hover:scale-[1.02] hover:-translate-y-1 hover:brightness-125 group backdrop-blur-sm`}
+                    style={{
+                      borderLeft: `4px solid ${getNodeTypeKanbanBorderColor(node.type)}`,
+                      borderLeftWidth: '4px',
+                      borderLeftStyle: 'solid',
+                      borderLeftColor: getNodeTypeKanbanBorderColor(node.type)
+                    }}
                   >
                     <div className="flex items-start justify-between mb-2">
                       <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${getNodeTypeColor(node.type)}`}>
