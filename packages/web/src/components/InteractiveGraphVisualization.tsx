@@ -3733,9 +3733,9 @@ export function InteractiveGraphVisualization() {
       {/* Edge Details Panel */}
       {showEdgeDetails && selectedEdge && (
         <>
-          {/* Backdrop for edge details */}
+          {/* Backdrop with subtle blur */}
           <div 
-            className="fixed inset-0 z-40" 
+            className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm" 
             onClick={() => {
               setShowEdgeDetails(false);
               setSelectedEdge(null);
@@ -3743,59 +3743,142 @@ export function InteractiveGraphVisualization() {
             }}
           />
           <div 
-            className="fixed w-80 bg-gray-800 border border-gray-600 rounded-lg shadow-xl z-50"
+            className="fixed bg-black/90 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden"
             style={{
-              left: `${edgeDetailsPosition ? Math.min(edgeDetailsPosition.x - 160, window.innerWidth - 320) : window.innerWidth - 340}px`,
-              top: `${edgeDetailsPosition ? Math.max(edgeDetailsPosition.y - 100, 10) : 20}px`
+              minWidth: '384px',
+              maxWidth: '600px',
+              width: (() => {
+                const sourceTitle = typeof selectedEdge.source === 'string' ? selectedEdge.source : (selectedEdge.source as any)?.title || (selectedEdge.source as any)?.id || 'Unknown Node';
+                const targetTitle = typeof selectedEdge.target === 'string' ? selectedEdge.target : (selectedEdge.target as any)?.title || (selectedEdge.target as any)?.id || 'Unknown Node';
+                const maxTitleLength = Math.max(sourceTitle.length, targetTitle.length);
+                
+                // Dynamic width based on title length
+                if (maxTitleLength > 30) return '600px';
+                if (maxTitleLength > 20) return '500px';
+                if (maxTitleLength > 15) return '450px';
+                return '384px';
+              })(),
+              left: (() => {
+                const sourceTitle = typeof selectedEdge.source === 'string' ? selectedEdge.source : (selectedEdge.source as any)?.title || (selectedEdge.source as any)?.id || 'Unknown Node';
+                const targetTitle = typeof selectedEdge.target === 'string' ? selectedEdge.target : (selectedEdge.target as any)?.title || (selectedEdge.target as any)?.id || 'Unknown Node';
+                const maxTitleLength = Math.max(sourceTitle.length, targetTitle.length);
+                
+                let width = 384;
+                if (maxTitleLength > 30) width = 600;
+                else if (maxTitleLength > 20) width = 500;
+                else if (maxTitleLength > 15) width = 450;
+                
+                const halfWidth = width / 2;
+                return `${edgeDetailsPosition ? Math.min(edgeDetailsPosition.x - halfWidth, window.innerWidth - width - 20) : window.innerWidth - width - 20}px`;
+              })(),
+              top: `${edgeDetailsPosition ? Math.max(edgeDetailsPosition.y - 100, 10) : 20}px`,
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.05)',
+              animation: 'slideInScale 0.3s ease-out'
             }}
             onClick={(e) => e.stopPropagation()}
           >
-          <div className="p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-white">Edge Details</h3>
-              <button
-                onClick={() => {
-                  setShowEdgeDetails(false);
-                  setSelectedEdge(null);
-                  setEdgeDetailsPosition(null);
-                }}
-                className="text-gray-400 hover:text-white"
-              >
-                <X className="h-5 w-5" />
-              </button>
+            {/* Compact Header */}
+            <div className="relative p-4 bg-gradient-to-r from-blue-600/20 via-purple-600/20 to-blue-600/20 border-b border-white/10">
+              <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent"></div>
+              <div className="relative flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 rounded-lg bg-white/10 backdrop-blur-sm flex items-center justify-center">
+                    <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white">Edge Details</h3>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowEdgeDetails(false);
+                    setSelectedEdge(null);
+                    setEdgeDetailsPosition(null);
+                  }}
+                  className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-all duration-200"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
             </div>
             
-            <div className="space-y-3">
+            {/* Compact Content */}
+            <div className="p-4 space-y-4">
+              {/* Relationship Type Section */}
               <div>
-                <label className="text-sm font-medium text-gray-300">Relationship Type</label>
-                <div className="flex items-center space-x-2 mt-1">
-                  {getRelationshipIconElement(selectedEdge.type, 'h-4 w-4')}
-                  <span className="text-white">{getRelationshipConfig(selectedEdge.type).label}</span>
+                <div className="bg-white/5 rounded-lg p-3 border border-white/10 hover:bg-white/10 transition-all duration-200">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center">
+                      {getRelationshipIconElement(selectedEdge.type, 'h-4 w-4')}
+                    </div>
+                    <div>
+                      <div className="text-white font-semibold">
+                        {getRelationshipConfig(selectedEdge.type).label}
+                      </div>
+                      <div className="text-gray-400 text-xs">
+                        Relationship Type
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
               
-              <div>
-                <label className="text-sm font-medium text-gray-300">From</label>
-                <p className="text-white text-sm mt-1">
-                  {typeof selectedEdge.source === 'string' ? selectedEdge.source : (selectedEdge.source as any)?.title || (selectedEdge.source as any)?.id || 'Unknown'}
-                </p>
+              {/* Connection Flow - Side by Side */}
+              <div className="flex items-center space-x-3">
+                {/* From Node */}
+                <div className="flex-1 bg-emerald-500/10 rounded-lg p-3 border border-emerald-500/20">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-6 h-6 rounded bg-emerald-500/20 flex items-center justify-center">
+                      <svg className="w-3 h-3 text-emerald-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.707l-3-3a1 1 0 00-1.414 0l-3 3a1 1 0 001.414 1.414L9 9.414V13a1 1 0 102 0V9.414l1.293 1.293a1 1 0 001.414-1.414z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-medium text-emerald-400">FROM</div>
+                      <div className="text-white font-medium text-sm break-words">
+                        {typeof selectedEdge.source === 'string' ? selectedEdge.source : (selectedEdge.source as any)?.title || (selectedEdge.source as any)?.id || 'Unknown Node'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Connection Arrow */}
+                <div className="flex-shrink-0 px-2">
+                  <svg className="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                
+                {/* To Node */}
+                <div className="flex-1 bg-blue-500/10 rounded-lg p-3 border border-blue-500/20">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-6 h-6 rounded bg-blue-500/20 flex items-center justify-center">
+                      <svg className="w-3 h-3 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v3.586L7.707 9.293a1 1 0 00-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 10.586V7z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-medium text-blue-400">TO</div>
+                      <div className="text-white font-medium text-sm break-words">
+                        {typeof selectedEdge.target === 'string' ? selectedEdge.target : (selectedEdge.target as any)?.title || (selectedEdge.target as any)?.id || 'Unknown Node'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
               
-              <div>
-                <label className="text-sm font-medium text-gray-300">To</label>
-                <p className="text-white text-sm mt-1">
-                  {typeof selectedEdge.target === 'string' ? selectedEdge.target : (selectedEdge.target as any)?.title || (selectedEdge.target as any)?.id || 'Unknown'}
-                </p>
-              </div>
-              
-              {selectedEdge.description && (
-                <div>
-                  <label className="text-sm font-medium text-gray-300">Description</label>
-                  <p className="text-white text-sm mt-1">{selectedEdge.description}</p>
+              {/* Description Section - Compact */}
+              {getRelationshipConfig(selectedEdge.type).description && (
+                <div className="bg-white/5 rounded-lg p-3 border border-white/10">
+                  <div className="text-xs font-medium text-gray-400 mb-1">Description</div>
+                  <p className="text-gray-200 text-sm leading-relaxed">{getRelationshipConfig(selectedEdge.type).description}</p>
                 </div>
               )}
               
-              <div className="pt-4 border-t border-gray-600">
+              {/* Action Section - Smaller */}
+              <div className="pt-1 border-t border-white/10">
                 <button
                   onClick={async () => {
                     try {
@@ -3810,15 +3893,14 @@ export function InteractiveGraphVisualization() {
                       showError('Delete Failed', error.message || 'Could not delete edge');
                     }
                   }}
-                  className="w-full bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg flex items-center justify-center space-x-2"
+                  className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white py-2 px-3 rounded-lg flex items-center justify-center space-x-2 font-medium transition-all duration-200 shadow-lg hover:shadow-red-500/25 group"
                 >
-                  <Trash2 className="h-4 w-4" />
+                  <Trash2 className="h-4 w-4 group-hover:animate-pulse" />
                   <span>Delete Relationship</span>
                 </button>
               </div>
             </div>
           </div>
-        </div>
         </>
       )}
 
