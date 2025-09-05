@@ -63,8 +63,58 @@ const getNodeTypeColor = (type: string) => {
   return `${config.bgColor} ${config.color}`;
 };
 
+const getNodeTypeCardBackground = (type: string) => {
+  const config = getTypeConfig(type as WorkItemType);
+  // Create enhanced backgrounds based on type with improved hover states
+  switch (type) {
+    case 'EPIC':
+      return 'bg-gradient-to-br from-fuchsia-500/10 via-gray-800 to-fuchsia-500/5 border-l-4 border-l-fuchsia-400/40 hover:from-fuchsia-500/20 hover:to-fuchsia-500/15 hover:border-l-fuchsia-300/60';
+    case 'MILESTONE':
+      return 'bg-gradient-to-br from-orange-500/10 via-gray-800 to-orange-500/5 border-l-4 border-l-orange-400/40 hover:from-orange-500/20 hover:to-orange-500/15 hover:border-l-orange-300/60';
+    case 'OUTCOME':
+      return 'bg-gradient-to-br from-indigo-500/10 via-gray-800 to-indigo-500/5 border-l-4 border-l-indigo-400/40 hover:from-indigo-500/20 hover:to-indigo-500/15 hover:border-l-indigo-300/60';
+    case 'FEATURE':
+      return 'bg-gradient-to-br from-sky-500/10 via-gray-800 to-sky-500/5 border-l-4 border-l-sky-400/40 hover:from-sky-500/20 hover:to-sky-500/15 hover:border-l-sky-300/60';
+    case 'TASK':
+      return 'bg-gradient-to-br from-green-500/10 via-gray-800 to-green-500/5 border-l-4 border-l-green-400/40 hover:from-green-500/20 hover:to-green-500/15 hover:border-l-green-300/60';
+    case 'BUG':
+      return 'bg-gradient-to-br from-red-500/10 via-gray-800 to-red-500/5 border-l-4 border-l-red-500/40 hover:from-red-500/20 hover:to-red-500/15 hover:border-l-red-400/60';
+    case 'IDEA':
+      return 'bg-gradient-to-br from-yellow-500/10 via-gray-800 to-yellow-500/5 border-l-4 border-l-yellow-400/40 hover:from-yellow-500/20 hover:to-yellow-500/15 hover:border-l-yellow-300/60';
+    case 'RESEARCH':
+      return 'bg-gradient-to-br from-teal-500/10 via-gray-800 to-teal-500/5 border-l-4 border-l-teal-400/40 hover:from-teal-500/20 hover:to-teal-500/15 hover:border-l-teal-300/60';
+    default:
+      return 'bg-gradient-to-br from-gray-500/10 via-gray-800 to-gray-500/5 border-l-4 border-l-gray-500/40 hover:from-gray-500/20 hover:to-gray-500/15 hover:border-l-gray-400/60';
+  }
+};
+
 const getNodePriority = (node: WorkItem) => {
   return node.priority || 0;
+};
+
+const getNodeTypeCardBorderColor = (type: string) => {
+  const normalizedType = type?.toUpperCase?.() || 'DEFAULT';
+  
+  switch (normalizedType) {
+    case 'EPIC':
+      return '#e879f9'; // fuchsia-400
+    case 'MILESTONE':
+      return '#fb923c'; // orange-400
+    case 'OUTCOME':
+      return '#818cf8'; // indigo-400
+    case 'FEATURE':
+      return '#38bdf8'; // sky-400
+    case 'TASK':
+      return '#4ade80'; // green-400
+    case 'BUG':
+      return '#ef4444'; // red-500
+    case 'IDEA':
+      return '#facc15'; // yellow-400
+    case 'RESEARCH':
+      return '#2dd4bf'; // teal-400
+    default:
+      return '#9ca3af'; // gray-400
+  }
 };
 
 const getConnectionDetails = (node: WorkItem, edges: Edge[]) => {
@@ -111,7 +161,13 @@ const CardView: React.FC<CardViewProps> = ({ filteredNodes, handleEditNode, edge
         <div
           key={node.id}
           onClick={() => handleEditNode(node)}
-          className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm hover:shadow-md dark:shadow-md dark:hover:shadow-lg transition-all duration-200 cursor-pointer border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700/50 hover:scale-[1.02] hover:-translate-y-1 group"
+          className={`${getNodeTypeCardBackground(node.type)} rounded-xl p-6 shadow-lg hover:shadow-xl hover:shadow-white/10 transition-all duration-200 cursor-pointer border border-gray-600/50 hover:border-gray-500/70 hover:bg-white/5 hover:scale-[1.02] hover:-translate-y-1 hover:brightness-125 group backdrop-blur-sm`}
+          style={{
+            borderLeft: `4px solid ${getNodeTypeCardBorderColor(node.type)}`,
+            borderLeftWidth: '4px',
+            borderLeftStyle: 'solid',
+            borderLeftColor: getNodeTypeCardBorderColor(node.type)
+          }}
         >
           <div className="flex items-start justify-between mb-4">
             <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold shadow-sm ${getNodeTypeColor(node.type)}`}>
