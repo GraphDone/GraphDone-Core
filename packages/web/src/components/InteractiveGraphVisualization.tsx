@@ -205,40 +205,64 @@ export function InteractiveGraphVisualization() {
   const [createNodePosition, setCreateNodePosition] = useState<{ x: number; y: number; z: number } | undefined>(undefined);
   const [currentTransform, setCurrentTransform] = useState({ x: 0, y: 0, scale: 1 });
   const [editingEdge, setEditingEdge] = useState<{ edge: WorkItemEdge; position: { x: number; y: number } } | null>(null);
-  const [dropdownPosition, setDropdownPosition] = useState<{ left: number; top: number } | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [dragStart, setDragStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number; graphX: number; graphY: number } | null>(null);
   
-  // Intelligent dropdown positioning - detect when off-screen and slide into view
+  // Handle dragging for relationship selector
   useEffect(() => {
-    if (editingEdge && dropdownRef.current) {
-      const dropdown = dropdownRef.current;
-      const rect = dropdown.getBoundingClientRect();
-      const margin = 20;
-      
-      let newLeft = editingEdge.position.x - rect.width / 2;
-      let newTop = editingEdge.position.y + 10;
-      
-      // Check horizontal boundaries
-      if (rect.right > window.innerWidth - margin) {
-        newLeft = window.innerWidth - rect.width - margin;
-      } else if (rect.left < margin) {
-        newLeft = margin;
+    let animationFrame: number | null = null;
+    
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isDragging && editingEdge) {
+        if (animationFrame) {
+          cancelAnimationFrame(animationFrame);
+        }
+        
+        animationFrame = requestAnimationFrame(() => {
+          const newX = e.clientX - dragStart.x;
+          const newY = e.clientY - dragStart.y;
+          setDragOffset({ x: newX, y: newY });
+        });
       }
-      
-      // Check vertical boundaries
-      if (rect.bottom > window.innerHeight - margin) {
-        newTop = editingEdge.position.y - rect.height - 10;
-      } else if (newTop < margin) {
-        newTop = margin;
+    };
+
+    const handleMouseUp = () => {
+      if (isDragging) {
+        setIsDragging(false);
+        if (animationFrame) {
+          cancelAnimationFrame(animationFrame);
+        }
       }
+    };
+
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      document.body.style.userSelect = 'none';
+      document.body.style.cursor = 'grabbing';
       
-      // Gradually slide into position if off-screen
-      if (Math.abs(newLeft - rect.left) > 5 || Math.abs(newTop - rect.top) > 5) {
-        setDropdownPosition({ left: newLeft, top: newTop });
-      }
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+        document.body.style.userSelect = '';
+        document.body.style.cursor = '';
+        if (animationFrame) {
+          cancelAnimationFrame(animationFrame);
+        }
+      };
     }
-  }, [editingEdge]);
+    
+    // Return cleanup function for when not dragging
+    return () => {
+      if (animationFrame) {
+        cancelAnimationFrame(animationFrame);
+      }
+    };
+  }, [isDragging, dragStart, editingEdge]);
+
 
   // Helper function to apply glow effect immediately when node is clicked
   const applyNodeGlowImmediately = useCallback((node: WorkItem) => {
@@ -1960,12 +1984,18 @@ export function InteractiveGraphVisualization() {
       .style('cursor', 'pointer')
       .on('click', function(event: MouseEvent, d: WorkItemEdge) {
         event.stopPropagation();
+        event.preventDefault(); // Prevent any default behavior
+        
+        // Close any existing dialogs first to prevent conflicts
+        setShowEdgeDetails(false);
+        setEdgeDetailsPosition(null);
+        setSelectedEdge(null);
         
         // Position dropdown to the side to avoid obstructing the glow
         const clickX = event.clientX;
         const clickY = event.clientY;
         const offset = 120; // Distance from edge
-        const dropdownWidth = 250;
+        const dropdownWidth = 320; // Updated width
         
         let x = clickX + offset;
         let y = clickY;
@@ -1981,10 +2011,14 @@ export function InteractiveGraphVisualization() {
         }
         if (y < 20) y = 20;
         
-        setEditingEdge({
-          edge: d,
-          position: { x, y }
-        });
+        // Use setTimeout to prevent any race conditions with other state updates
+        setTimeout(() => {
+          setEditingEdge({
+            edge: d,
+            position: { x, y }
+          });
+          setDragOffset({ x: 0, y: 0 }); // Reset drag offset for new dropdown
+        }, 0);
       });
 
     // Add text labels first to measure their size
@@ -3356,67 +3390,81 @@ export function InteractiveGraphVisualization() {
             ref={dropdownRef}
             className="absolute z-50"
             style={{
-              left: dropdownPosition?.left ?? (() => {
-                const dropdownWidth = 250;
-                const margin = 20;
-                const x = editingEdge.position.x;
-                
-                // If dropdown would go off the right edge, align it to the right
-                if (x + dropdownWidth/2 > window.innerWidth - margin) {
-                  return window.innerWidth - dropdownWidth - margin;
-                }
-                // If dropdown would go off the left edge, align it to the left
-                if (x - dropdownWidth/2 < margin) {
-                  return margin;
-                }
-                // Otherwise center it on the cursor
-                return x - dropdownWidth/2;
-              })(),
-              top: dropdownPosition?.top ?? (() => {
-                const dropdownHeight = 320; // Estimate for full dropdown height
-                const margin = 20;
-                const y = editingEdge.position.y;
-                
-                // If dropdown would go off the bottom, position it above the cursor
-                if (y + dropdownHeight > window.innerHeight - margin) {
-                  return Math.max(margin, y - dropdownHeight - 10);
-                }
-                // Otherwise position it below the cursor
-                return Math.min(y + 10, window.innerHeight - dropdownHeight - margin);
-              })(),
-              minWidth: '250px',
-              animation: 'fadeInScale 0.2s ease-out',
-              transition: 'left 0.3s ease-out, top 0.3s ease-out'
+              left: editingEdge.position.x - 160 + dragOffset.x,
+              top: editingEdge.position.y + 10 + dragOffset.y,
+              minWidth: '320px',
+              transition: isDragging ? 'none' : 'none',
+              willChange: isDragging ? 'left, top' : 'auto',
+              cursor: isDragging ? 'grabbing' : 'default'
             }}
             onClick={(e) => e.stopPropagation()}
         >
           {/* Remove arrow since dropdown is at same position as label */}
           
-          {/* Dropdown content with professional shadow */}
-          <div className="bg-gray-800/98 backdrop-blur-xl border border-gray-700/50 rounded-lg shadow-2xl overflow-hidden"
+          {/* Modern dropdown with clean glass effect */}
+          <div className="bg-black/80 backdrop-blur-md border border-white/10 rounded-xl shadow-2xl overflow-hidden"
                style={{
-                 boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.3)'
+                 boxShadow: isDragging 
+                   ? '0 30px 60px -15px rgba(0, 0, 0, 0.95), 0 0 0 1px rgba(255, 255, 255, 0.1)' 
+                   : '0 25px 50px -12px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.05)',
+                 transform: isDragging ? 'scale(1.02)' : 'scale(1)',
+                 transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s ease'
                }}>
-            {/* Header */}
-            <div className="px-3 py-2 bg-gradient-to-r from-gray-800 to-gray-700 border-b border-gray-700/50">
-              <div className="text-xs font-semibold text-gray-300 flex items-center justify-between">
-                <span>Select Relationship Type</span>
+            {/* Header with drag handle */}
+            <div 
+              className="px-5 py-3 bg-black/50 border-b border-white/10 cursor-move select-none hover:bg-black/60 transition-colors"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsDragging(true);
+                setDragStart({
+                  x: e.clientX - dragOffset.x,
+                  y: e.clientY - dragOffset.y
+                });
+              }}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  {/* Drag handle indicator */}
+                  <div className="flex flex-col space-y-1 opacity-40 group-hover:opacity-60 transition-opacity">
+                    <div className="flex space-x-1">
+                      <div className="w-1 h-1 bg-white rounded-full"></div>
+                      <div className="w-1 h-1 bg-white rounded-full"></div>
+                    </div>
+                    <div className="flex space-x-1">
+                      <div className="w-1 h-1 bg-white rounded-full"></div>
+                      <div className="w-1 h-1 bg-white rounded-full"></div>
+                    </div>
+                  </div>
+                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                  <span className="text-sm font-medium text-white">Select Relationship Type</span>
+                </div>
                 <button
-                  onClick={() => setEditingEdge(null)}
-                  className="text-gray-500 hover:text-gray-300 transition-colors"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setEditingEdge(null);
+                  }}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  className="text-gray-400 hover:text-white hover:bg-white/10 p-1 rounded-lg transition-all duration-200"
                 >
-                  <X className="h-3 w-3" />
+                  <X className="h-4 w-4" />
                 </button>
               </div>
             </div>
             
             {/* Options with scroll */}
-            <div className="max-h-80 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
-              <div className="p-1">
+            <div className="max-h-80 overflow-y-auto scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
+              <div className="p-3">
                 {RELATIONSHIP_OPTIONS.map((option, index) => (
                   <button
                     key={option.type}
                     onClick={() => {
+                      // Update the local state immediately for UI sync
+                      setEditingEdge(prev => prev ? {
+                        ...prev,
+                        edge: { ...prev.edge, type: option.type }
+                      } : null);
+                      
                       // Update the edge type with animation
                       updateEdgeMutation({
                         variables: {
@@ -3497,58 +3545,69 @@ export function InteractiveGraphVisualization() {
                           .attr('fill', config.hexColor)
                           .attr('stroke', config.hexColor);
                         
-                        
-                        setEditingEdge(null);
+                        // Don't close immediately - let user see the update
+                        // setEditingEdge(null);
                       }).catch(() => {
+                        // On error, revert the local state
+                        setEditingEdge(prev => prev ? {
+                          ...prev,
+                          edge: { ...prev.edge, type: editingEdge.edge.type }
+                        } : null);
                       });
                     }}
-                    className={`w-full flex items-center px-3 py-2.5 rounded-lg transition-all duration-150 group ${
+                    className={`w-full flex items-center px-4 py-3 rounded-xl transition-all duration-200 group relative overflow-hidden mb-2 ${
                       editingEdge.edge.type === option.type
-                        ? 'bg-gradient-to-r from-blue-600/20 to-purple-600/20 text-white border border-blue-500/30'
-                        : 'text-gray-300 hover:bg-gray-700/50 hover:text-white'
+                        ? 'bg-white/10 text-white border border-white/20 shadow-lg'
+                        : 'text-gray-300 hover:bg-white/5 hover:text-white border border-transparent'
                     }`}
                     style={{
-                      animationDelay: `${index * 20}ms`
+                      animationDelay: `${index * 30}ms`
                     }}
                   >
-                    <div className="flex items-center space-x-3 flex-1">
-                      {/* Icon with color */}
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-transform group-hover:scale-110 ${
+                    {/* Subtle gradient overlay for selected items */}
+                    {editingEdge.edge.type === option.type && (
+                      <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 via-purple-500/5 to-blue-500/10 rounded-xl"></div>
+                    )}
+                    
+                    <div className="flex items-center space-x-3 flex-1 relative z-10">
+                      {/* Icon with modern styling */}
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 group-hover:scale-105 ${
                         editingEdge.edge.type === option.type 
-                          ? 'bg-gradient-to-br from-blue-500/20 to-purple-500/20' 
-                          : 'bg-gray-700/50'
+                          ? 'bg-white/15 shadow-md' 
+                          : 'bg-white/5 group-hover:bg-white/10'
                       }`}>
-                        {getRelationshipIconElement(option.type, 'h-4 w-4')}
+                        {getRelationshipIconElement(option.type, 'h-5 w-5')}
                       </div>
                       
                       {/* Label and description */}
-                      <div className="text-left">
-                        <div className="font-medium text-sm">{option.label}</div>
-                        <div className="text-xs text-gray-500 mt-0.5">{option.description}</div>
+                      <div className="text-left flex-1">
+                        <div className="font-medium text-sm leading-tight">{option.label}</div>
+                        <div className="text-xs text-gray-400 mt-1 leading-relaxed">{option.description}</div>
                       </div>
+                      
+                      {/* Selected indicator with modern design - moved inside flex-1 container */}
+                      {editingEdge.edge.type === option.type && (
+                        <div className="flex items-center space-x-2 ml-auto mr-2">
+                          <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse shadow-lg shadow-green-400/50"></div>
+                          <span className="text-xs text-green-400 font-medium">Current</span>
+                        </div>
+                      )}
                     </div>
-                    
-                    {/* Selected indicator */}
-                    {editingEdge.edge.type === option.type && (
-                      <div className="flex items-center space-x-1">
-                        <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                        <span className="text-xs text-green-400 font-medium">Current</span>
-                      </div>
-                    )}
                   </button>
                 ))}
               </div>
             </div>
             
             {/* Footer with current selection */}
-            <div className="px-3 py-2 bg-gray-900/50 border-t border-gray-700/50">
+            <div className="px-5 py-3 bg-black/60 border-t border-white/10 backdrop-blur-sm">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-gray-500">
-                  Current: <span className="text-gray-300 font-medium">
+                <div className="flex items-center space-x-2">
+                  <span className="text-gray-400">Current:</span>
+                  <span className="text-white font-medium px-2 py-1 bg-white/10 rounded-lg">
                     {getRelationshipConfig(editingEdge.edge.type as RelationshipType).label}
                   </span>
-                </span>
-                <kbd className="px-1.5 py-0.5 text-xs bg-gray-800 rounded border border-gray-700 text-gray-400">
+                </div>
+                <kbd className="px-2 py-1 text-xs bg-white/10 rounded-lg border border-white/20 text-gray-300 font-medium">
                   ESC to close
                 </kbd>
               </div>
