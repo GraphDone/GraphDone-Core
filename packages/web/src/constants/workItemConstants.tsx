@@ -998,9 +998,37 @@ export const getStatusGradientBackground = (status: WorkItemStatus, style: Gradi
   
   const tailwindColor = colorMap[baseColor] || 'gray-500';
   
+  // Use static classes to ensure Tailwind generates them
+  const borderColorMap: Record<string, string> = {
+    'gray-500': 'border-l-gray-400/70',
+    'cyan-500': 'border-l-cyan-400/70', 
+    'purple-500': 'border-l-purple-400/70',
+    'yellow-500': 'border-l-yellow-400/70',
+    'blue-500': 'border-l-blue-400/70',
+    'red-500': 'border-l-red-400/70',
+    'orange-500': 'border-l-orange-400/70',
+    'green-500': 'border-l-green-400/70',
+    'pink-500': 'border-l-pink-400/70'
+  };
+
+  const hoverColorMap: Record<string, string> = {
+    'gray-500': 'hover:from-gray-500/40 hover:via-gray-500/30 hover:to-gray-500/35',
+    'cyan-500': 'hover:from-cyan-500/40 hover:via-cyan-500/30 hover:to-cyan-500/35', 
+    'purple-500': 'hover:from-purple-500/40 hover:via-purple-500/30 hover:to-purple-500/35',
+    'yellow-500': 'hover:from-yellow-500/40 hover:via-yellow-500/30 hover:to-yellow-500/35',
+    'blue-500': 'hover:from-blue-500/40 hover:via-blue-500/30 hover:to-blue-500/35',
+    'red-500': 'hover:from-red-500/40 hover:via-red-500/30 hover:to-red-500/35',
+    'orange-500': 'hover:from-orange-500/40 hover:via-orange-500/30 hover:to-orange-500/35',
+    'green-500': 'hover:from-green-500/40 hover:via-green-500/30 hover:to-green-500/35',
+    'pink-500': 'hover:from-pink-500/40 hover:via-pink-500/30 hover:to-pink-500/35'
+  };
+
   switch (style) {
-    case 'dashboard':
-      return `bg-gradient-to-br from-${tailwindColor}/10 via-gray-800 to-${tailwindColor}/5 border-l-4 border-l-${tailwindColor.replace('-500', '-400')}/40 hover:from-${tailwindColor}/20 hover:to-${tailwindColor}/15 hover:border-l-${tailwindColor.replace('-500', '-300')}/60`;
+    case 'dashboard': {
+      const borderClass = borderColorMap[tailwindColor] || 'border-l-gray-400/40';
+      const hoverClass = hoverColorMap[tailwindColor] || 'hover:from-gray-500/25 hover:via-gray-500/15 hover:to-gray-500/20';
+      return `bg-gradient-to-br from-${tailwindColor}/10 via-${tailwindColor}/5 to-${tailwindColor}/3 border-l-4 ${borderClass} ${hoverClass}`;
+    }
     
     default:
       return `bg-gradient-to-br from-${tailwindColor}/10 via-gray-800 to-${tailwindColor}/5`;
