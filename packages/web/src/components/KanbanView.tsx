@@ -18,7 +18,8 @@ import {
   getStatusIconElement,
   WORK_ITEM_STATUSES,
   getContributorColor,
-  getDueDateColorScheme
+  getDueDateColorScheme,
+  getTypeGradientBackground
 } from '../constants/workItemConstants';
 import { TagDisplay } from './TagDisplay';
 import { AnimatedPriority } from './AnimatedPriority';
@@ -70,28 +71,7 @@ const getNodeTypeColor = (type: string) => {
 };
 
 const getNodeTypeKanbanBackground = (type: string) => {
-  const config = getTypeConfig(type as WorkItemType);
-  // Create enhanced backgrounds for kanban cards - matching Card view opacity levels
-  switch (type) {
-    case 'EPIC':
-      return 'bg-gradient-to-br from-fuchsia-500/10 via-gray-800 to-fuchsia-500/5 hover:from-fuchsia-500/20 hover:to-fuchsia-500/15';
-    case 'MILESTONE':
-      return 'bg-gradient-to-br from-orange-500/10 via-gray-800 to-orange-500/5 hover:from-orange-500/20 hover:to-orange-500/15';
-    case 'OUTCOME':
-      return 'bg-gradient-to-br from-indigo-500/10 via-gray-800 to-indigo-500/5 hover:from-indigo-500/20 hover:to-indigo-500/15';
-    case 'FEATURE':
-      return 'bg-gradient-to-br from-sky-500/10 via-gray-800 to-sky-500/5 hover:from-sky-500/20 hover:to-sky-500/15';
-    case 'TASK':
-      return 'bg-gradient-to-br from-green-500/10 via-gray-800 to-green-500/5 hover:from-green-500/20 hover:to-green-500/15';
-    case 'BUG':
-      return 'bg-gradient-to-br from-red-500/10 via-gray-800 to-red-500/5 hover:from-red-500/20 hover:to-red-500/15';
-    case 'IDEA':
-      return 'bg-gradient-to-br from-yellow-500/10 via-gray-800 to-yellow-500/5 hover:from-yellow-500/20 hover:to-yellow-500/15';
-    case 'RESEARCH':
-      return 'bg-gradient-to-br from-teal-500/10 via-gray-800 to-teal-500/5 hover:from-teal-500/20 hover:to-teal-500/15';
-    default:
-      return 'bg-gradient-to-br from-gray-500/10 via-gray-800 to-gray-500/5 hover:from-gray-500/20 hover:to-gray-500/15';
-  }
+  return getTypeGradientBackground(type as WorkItemType, 'kanban');
 };
 
 const getNodePriority = (node: WorkItem) => {

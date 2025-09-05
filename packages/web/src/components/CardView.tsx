@@ -12,7 +12,8 @@ import {
   getTypeIconElement,
   getStatusIconElement,
   getContributorColor,
-  getDueDateColorScheme
+  getDueDateColorScheme,
+  getTypeGradientBackground
 } from '../constants/workItemConstants';
 import { TagDisplay } from './TagDisplay';
 import { AnimatedPriority } from './AnimatedPriority';
@@ -64,28 +65,7 @@ const getNodeTypeColor = (type: string) => {
 };
 
 const getNodeTypeCardBackground = (type: string) => {
-  const config = getTypeConfig(type as WorkItemType);
-  // Create enhanced backgrounds based on type with improved hover states
-  switch (type) {
-    case 'EPIC':
-      return 'bg-gradient-to-br from-fuchsia-500/10 via-gray-800 to-fuchsia-500/5 border-l-4 border-l-fuchsia-400/40 hover:from-fuchsia-500/20 hover:to-fuchsia-500/15 hover:border-l-fuchsia-300/60';
-    case 'MILESTONE':
-      return 'bg-gradient-to-br from-orange-500/10 via-gray-800 to-orange-500/5 border-l-4 border-l-orange-400/40 hover:from-orange-500/20 hover:to-orange-500/15 hover:border-l-orange-300/60';
-    case 'OUTCOME':
-      return 'bg-gradient-to-br from-indigo-500/10 via-gray-800 to-indigo-500/5 border-l-4 border-l-indigo-400/40 hover:from-indigo-500/20 hover:to-indigo-500/15 hover:border-l-indigo-300/60';
-    case 'FEATURE':
-      return 'bg-gradient-to-br from-sky-500/10 via-gray-800 to-sky-500/5 border-l-4 border-l-sky-400/40 hover:from-sky-500/20 hover:to-sky-500/15 hover:border-l-sky-300/60';
-    case 'TASK':
-      return 'bg-gradient-to-br from-green-500/10 via-gray-800 to-green-500/5 border-l-4 border-l-green-400/40 hover:from-green-500/20 hover:to-green-500/15 hover:border-l-green-300/60';
-    case 'BUG':
-      return 'bg-gradient-to-br from-red-500/10 via-gray-800 to-red-500/5 border-l-4 border-l-red-500/40 hover:from-red-500/20 hover:to-red-500/15 hover:border-l-red-400/60';
-    case 'IDEA':
-      return 'bg-gradient-to-br from-yellow-500/10 via-gray-800 to-yellow-500/5 border-l-4 border-l-yellow-400/40 hover:from-yellow-500/20 hover:to-yellow-500/15 hover:border-l-yellow-300/60';
-    case 'RESEARCH':
-      return 'bg-gradient-to-br from-teal-500/10 via-gray-800 to-teal-500/5 border-l-4 border-l-teal-400/40 hover:from-teal-500/20 hover:to-teal-500/15 hover:border-l-teal-300/60';
-    default:
-      return 'bg-gradient-to-br from-gray-500/10 via-gray-800 to-gray-500/5 border-l-4 border-l-gray-500/40 hover:from-gray-500/20 hover:to-gray-500/15 hover:border-l-gray-400/60';
-  }
+  return getTypeGradientBackground(type as WorkItemType, 'card');
 };
 
 const getNodePriority = (node: WorkItem) => {
