@@ -930,6 +930,84 @@ export const getProjectHealthStatus = (completionRatio: number): string => {
 };
 
 // ============================
+// CENTRALIZED GRADIENT SYSTEM
+// ============================
+
+// Gradient style types for different views
+export type GradientStyle = 'table' | 'card' | 'kanban' | 'dashboard';
+
+// Central function to get type-based gradient backgrounds
+export const getTypeGradientBackground = (type: WorkItemType, style: GradientStyle): string => {
+  const config = getTypeConfig(type);
+  
+  // Extract base color from hex (remove #)
+  const baseColor = config.hexColor.replace('#', '');
+  
+  // Map hex to Tailwind color names for consistency
+  const colorMap: Record<string, string> = {
+    'e879f9': 'fuchsia-500',  // EPIC
+    'fb923c': 'orange-500',   // MILESTONE  
+    '818cf8': 'indigo-500',   // OUTCOME
+    '38bdf8': 'sky-500',      // FEATURE
+    '4ade80': 'green-500',    // TASK
+    'ef4444': 'red-500',      // BUG
+    'facc15': 'yellow-500',   // IDEA
+    '2dd4bf': 'teal-500',     // RESEARCH
+    '9ca3af': 'gray-500'      // DEFAULT
+  };
+  
+  const tailwindColor = colorMap[baseColor] || 'gray-500';
+  
+  switch (style) {
+    case 'table':
+      return `bg-gradient-to-r from-${tailwindColor}/5 via-transparent to-${tailwindColor}/5 hover:from-${tailwindColor}/15 hover:to-${tailwindColor}/15`;
+    
+    case 'card':
+      return `bg-gradient-to-br from-${tailwindColor}/10 via-gray-800 to-${tailwindColor}/5 border-l-4 border-l-${tailwindColor.replace('-500', '-400')}/40 hover:from-${tailwindColor}/20 hover:to-${tailwindColor}/15 hover:border-l-${tailwindColor.replace('-500', '-300')}/60`;
+    
+    case 'kanban':
+      return `bg-gradient-to-br from-${tailwindColor}/10 via-gray-800 to-${tailwindColor}/5 hover:from-${tailwindColor}/20 hover:to-${tailwindColor}/15`;
+    
+    case 'dashboard':
+      return `bg-gradient-to-br from-${tailwindColor}/10 via-gray-800 to-${tailwindColor}/5 border-l-4 border-l-${tailwindColor.replace('-500', '-400')}/40 hover:from-${tailwindColor}/20 hover:to-${tailwindColor}/15 hover:border-l-${tailwindColor.replace('-500', '-300')}/60`;
+    
+    default:
+      return `bg-gradient-to-br from-${tailwindColor}/10 via-gray-800 to-${tailwindColor}/5`;
+  }
+};
+
+// Central function to get status-based gradient backgrounds (for Dashboard)
+export const getStatusGradientBackground = (status: WorkItemStatus, style: GradientStyle): string => {
+  const config = getStatusConfig(status);
+  
+  // Extract base color from hex (remove #)
+  const baseColor = config.hexColor.replace('#', '');
+  
+  // Map hex to Tailwind color names for consistency
+  const colorMap: Record<string, string> = {
+    '9ca3af': 'gray-500',     // NOT_STARTED
+    '06b6d4': 'cyan-500',     // PROPOSED
+    'a855f7': 'purple-500',   // PLANNED
+    'eab308': 'yellow-500',   // IN_PROGRESS
+    '3b82f6': 'blue-500',     // IN_REVIEW
+    'ef4444': 'red-500',      // BLOCKED
+    'fb923c': 'orange-500',   // ON_HOLD
+    '22c55e': 'green-500',    // COMPLETED
+    'ff1493': 'pink-500'      // CANCELLED
+  };
+  
+  const tailwindColor = colorMap[baseColor] || 'gray-500';
+  
+  switch (style) {
+    case 'dashboard':
+      return `bg-gradient-to-br from-${tailwindColor}/10 via-gray-800 to-${tailwindColor}/5 border-l-4 border-l-${tailwindColor.replace('-500', '-400')}/40 hover:from-${tailwindColor}/20 hover:to-${tailwindColor}/15 hover:border-l-${tailwindColor.replace('-500', '-300')}/60`;
+    
+    default:
+      return `bg-gradient-to-br from-${tailwindColor}/10 via-gray-800 to-${tailwindColor}/5`;
+  }
+};
+
+// ============================
 // EXPORT DEFAULT COLLECTIONS
 // ============================
 

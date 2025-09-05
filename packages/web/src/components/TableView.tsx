@@ -8,7 +8,8 @@ import {
   getTypeIconElement,
   getStatusIconElement,
   getContributorColor,
-  getDueDateColorScheme
+  getDueDateColorScheme,
+  getTypeGradientBackground
 } from '../constants/workItemConstants';
 import { TagDisplay } from './TagDisplay';
 import { AnimatedPriority } from './AnimatedPriority';
@@ -60,28 +61,7 @@ const getNodeTypeColor = (type: string) => {
 };
 
 const getNodeTypeRowBackground = (type: string) => {
-  const normalizedType = type?.toUpperCase?.() || 'DEFAULT';
-  
-  switch (normalizedType) {
-    case 'EPIC':
-      return 'bg-gradient-to-r from-fuchsia-500/5 via-transparent to-fuchsia-500/5 hover:from-fuchsia-500/15 hover:to-fuchsia-500/15';
-    case 'MILESTONE':
-      return 'bg-gradient-to-r from-orange-500/5 via-transparent to-orange-500/5 hover:from-orange-500/15 hover:to-orange-500/15';
-    case 'OUTCOME':
-      return 'bg-gradient-to-r from-indigo-500/5 via-transparent to-indigo-500/5 hover:from-indigo-500/15 hover:to-indigo-500/15';
-    case 'FEATURE':
-      return 'bg-gradient-to-r from-sky-500/5 via-transparent to-sky-500/5 hover:from-sky-500/15 hover:to-sky-500/15';
-    case 'TASK':
-      return 'bg-gradient-to-r from-green-500/5 via-transparent to-green-500/5 hover:from-green-500/15 hover:to-green-500/15';
-    case 'BUG':
-      return 'bg-gradient-to-r from-red-500/5 via-transparent to-red-500/5 hover:from-red-500/15 hover:to-red-500/15';
-    case 'IDEA':
-      return 'bg-gradient-to-r from-yellow-500/5 via-transparent to-yellow-500/5 hover:from-yellow-500/15 hover:to-yellow-500/15';
-    case 'RESEARCH':
-      return 'bg-gradient-to-r from-teal-500/5 via-transparent to-teal-500/5 hover:from-teal-500/15 hover:to-teal-500/15';
-    default:
-      return 'bg-gradient-to-r from-gray-500/5 via-transparent to-gray-500/5 hover:from-gray-500/15 hover:to-gray-500/15';
-  }
+  return getTypeGradientBackground(type as WorkItemType, 'table');
 };
 
 const getNodeTypeBorderColor = (type: string) => {
