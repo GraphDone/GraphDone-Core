@@ -59,6 +59,56 @@ const getNodeTypeColor = (type: string) => {
   return `${config.color} ${config.bgColor} ${config.borderColor} border`;
 };
 
+const getNodeTypeRowBackground = (type: string) => {
+  const normalizedType = type?.toUpperCase?.() || 'DEFAULT';
+  
+  switch (normalizedType) {
+    case 'EPIC':
+      return 'bg-gradient-to-r from-fuchsia-500/5 via-transparent to-fuchsia-500/5 hover:from-fuchsia-500/15 hover:to-fuchsia-500/15';
+    case 'MILESTONE':
+      return 'bg-gradient-to-r from-orange-500/5 via-transparent to-orange-500/5 hover:from-orange-500/15 hover:to-orange-500/15';
+    case 'OUTCOME':
+      return 'bg-gradient-to-r from-indigo-500/5 via-transparent to-indigo-500/5 hover:from-indigo-500/15 hover:to-indigo-500/15';
+    case 'FEATURE':
+      return 'bg-gradient-to-r from-sky-500/5 via-transparent to-sky-500/5 hover:from-sky-500/15 hover:to-sky-500/15';
+    case 'TASK':
+      return 'bg-gradient-to-r from-green-500/5 via-transparent to-green-500/5 hover:from-green-500/15 hover:to-green-500/15';
+    case 'BUG':
+      return 'bg-gradient-to-r from-red-500/5 via-transparent to-red-500/5 hover:from-red-500/15 hover:to-red-500/15';
+    case 'IDEA':
+      return 'bg-gradient-to-r from-yellow-500/5 via-transparent to-yellow-500/5 hover:from-yellow-500/15 hover:to-yellow-500/15';
+    case 'RESEARCH':
+      return 'bg-gradient-to-r from-teal-500/5 via-transparent to-teal-500/5 hover:from-teal-500/15 hover:to-teal-500/15';
+    default:
+      return 'bg-gradient-to-r from-gray-500/5 via-transparent to-gray-500/5 hover:from-gray-500/15 hover:to-gray-500/15';
+  }
+};
+
+const getNodeTypeBorderColor = (type: string) => {
+  const normalizedType = type?.toUpperCase?.() || 'DEFAULT';
+  
+  switch (normalizedType) {
+    case 'EPIC':
+      return '#e879f9'; // fuchsia-400
+    case 'MILESTONE':
+      return '#fb923c'; // orange-400
+    case 'OUTCOME':
+      return '#818cf8'; // indigo-400
+    case 'FEATURE':
+      return '#38bdf8'; // sky-400
+    case 'TASK':
+      return '#4ade80'; // green-400
+    case 'BUG':
+      return '#ef4444'; // red-500
+    case 'IDEA':
+      return '#facc15'; // yellow-400
+    case 'RESEARCH':
+      return '#2dd4bf'; // teal-400
+    default:
+      return '#9ca3af'; // gray-400
+  }
+};
+
 const getStatusColor = (status: string) => {
   const config = getStatusConfig(status as WorkItemStatus);
   return config.color;
@@ -103,32 +153,43 @@ const getContributorAvatar = (contributor?: string) => {
 const TableView: React.FC<TableViewProps> = ({ filteredNodes, handleEditNode, edges }) => {
   return (
     <div className="p-6">
-      <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden max-w-full">
+      <div className="bg-gray-800/80 backdrop-blur-sm rounded-xl border border-gray-700/50 shadow-2xl overflow-hidden max-w-full">
         <div className="overflow-x-auto max-w-full">
           <table className="w-max min-w-full">
-            <thead className="bg-gray-700 border-b border-gray-700">
+            <thead className="bg-gradient-to-r from-gray-700 to-gray-800 border-b border-gray-600/50">
               <tr>
-                <th className="pr-4 py-12 text-left text-sm font-semibold text-gray-300 tracking-wider" style={{ paddingLeft: '80px' }}>Task</th>
-                <th className="pl-2 pr-3 py-10 text-left text-sm font-semibold text-gray-300 tracking-wider">Type</th>
-                <th className="pl-3 pr-3 py-10 text-left text-sm font-semibold text-gray-300 tracking-wider">Status</th>
-                <th className="pl-3 pr-6 py-10 text-left text-sm font-semibold text-gray-300 tracking-wider">Contributor</th>
-                <th className="pl-6 pr-6 py-10 text-left text-sm font-semibold text-gray-300 tracking-wider">Priority</th>
-                <th className="pl-6 pr-6 py-10 text-left text-sm font-semibold text-gray-300 tracking-wider">Connections</th>
-                <th className="pl-6 pr-6 py-10 text-left text-sm font-semibold text-gray-300 tracking-wider whitespace-nowrap">Due Date</th>
+                <th className="pr-4 py-12 text-left text-sm font-semibold text-gray-200 tracking-wider uppercase" style={{ paddingLeft: '80px' }}>Task</th>
+                <th className="pl-2 pr-3 py-10 text-left text-sm font-semibold text-gray-200 tracking-wider uppercase">Type</th>
+                <th className="pl-3 pr-3 py-10 text-left text-sm font-semibold text-gray-200 tracking-wider uppercase">Status</th>
+                <th className="pl-3 pr-6 py-10 text-left text-sm font-semibold text-gray-200 tracking-wider uppercase">Contributor</th>
+                <th className="pl-6 pr-6 py-10 text-left text-sm font-semibold text-gray-200 tracking-wider uppercase">Priority</th>
+                <th className="pl-6 pr-6 py-10 text-left text-sm font-semibold text-gray-200 tracking-wider uppercase">Connections</th>
+                <th className="pl-6 pr-6 py-10 text-left text-sm font-semibold text-gray-200 tracking-wider uppercase whitespace-nowrap">Due Date</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-700">
+            <tbody className="divide-y divide-gray-600/30 backdrop-blur-sm">
               {[...filteredNodes]
                 .sort((a, b) => {
                   const dateA = new Date(a.updatedAt || a.createdAt).getTime();
                   const dateB = new Date(b.updatedAt || b.createdAt).getTime();
                   return dateB - dateA; // Most recent first
                 })
-                .map((node) => (
+                .map((node, index) => {
+                  console.log(`Row ${index}:`, {
+                    id: node.id,
+                    title: node.title,
+                    type: node.type,
+                    visible: 'rendering'
+                  });
+                  return (
                 <tr 
                   key={node.id} 
                   onClick={() => handleEditNode(node)}
-                  className="hover:bg-gray-700/50 transition-colors group dynamic-table-row cursor-pointer"
+                  className={`${getNodeTypeRowBackground(node.type)} hover:bg-white/5 hover:scale-[1.01] transition-all duration-200 group dynamic-table-row cursor-pointer hover:shadow-xl hover:shadow-white/10 relative hover:brightness-125`}
+                  style={{
+                    borderLeft: `4px solid ${getNodeTypeBorderColor(node.type)}`,
+                    borderRight: `2px solid ${getNodeTypeBorderColor(node.type)}`
+                  }}
                 >
                   <td className="pl-6 pr-4 py-12 dynamic-table-cell">
                     <div className="space-y-6">
@@ -267,7 +328,8 @@ const TableView: React.FC<TableViewProps> = ({ filteredNodes, handleEditNode, ed
                     )}
                   </td>
                 </tr>
-              ))}
+                  );
+                })}
             </tbody>
           </table>
         </div>
