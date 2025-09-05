@@ -45,11 +45,13 @@ export const GET_WORK_ITEMS = gql`
         id
         title
         type
+        status
       }
       dependents {
         id
         title
         type
+        status
       }
       createdAt
       updatedAt
@@ -128,11 +130,13 @@ export const GET_WORK_ITEM_BY_ID = gql`
         id
         title
         type
+        status
       }
       dependents {
         id
         title
         type
+        status
       }
       createdAt
       updatedAt
