@@ -33,8 +33,8 @@ interface WorkItem {
   assignedTo?: { id: string; name: string; username: string; };
   graph?: { id: string; name: string; team?: { id: string; name: string; } };
   contributors?: Array<{ id: string; name: string; type: string; }>;
-  dependencies?: Array<{ id: string; title: string; type: string; }>;
-  dependents?: Array<{ id: string; title: string; type: string; }>;
+  dependencies?: Array<{ id: string; title: string; type: string; status: string; }>;
+  dependents?: Array<{ id: string; title: string; type: string; status: string; }>;
 }
 
 interface TableViewProps {
@@ -105,7 +105,7 @@ const TableView: React.FC<TableViewProps> = ({ filteredNodes, handleEditNode, ha
                   return dateB - dateA; // Most recent first
                 })
                 .map((node) => (
-                <tr key={node.id} className="hover:bg-gray-700/50 transition-colors cursor-pointer group dynamic-table-row">
+                <tr key={node.id} className="hover:bg-gray-700/50 transition-colors group dynamic-table-row">
                   <td className="pl-6 pr-4 py-12 dynamic-table-cell">
                     <div className="space-y-6">
                       <div className="flex items-start justify-between">
