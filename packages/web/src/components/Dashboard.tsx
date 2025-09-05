@@ -110,7 +110,7 @@ const PieChart = ({ data, title }: { data: Array<{label: string, value: number, 
 
   if (total === 0) {
     return (
-      <div className="bg-gray-800 rounded-lg p-4 pl-2 border border-gray-700">
+      <div className="bg-gradient-to-br from-gray-700/30 via-gray-800/50 to-gray-700/20 rounded-lg p-4 pl-2 border border-gray-600/50">
         <h3 className="text-lg font-semibold text-white mb-4 text-center">{title}</h3>
         <div className="flex items-center justify-center h-48">
           <div className="text-center">
@@ -123,7 +123,7 @@ const PieChart = ({ data, title }: { data: Array<{label: string, value: number, 
   }
 
   return (
-    <div className="bg-gray-800 border border-gray-600 rounded-lg p-6">
+    <div className="bg-gradient-to-br from-gray-700/30 via-gray-800/50 to-gray-700/20 border border-gray-600/50 rounded-lg p-6 backdrop-blur-sm">
       <div className="mb-4">
         <h3 className="text-lg font-semibold text-white mb-2">{title}</h3>
       </div>
@@ -131,31 +131,22 @@ const PieChart = ({ data, title }: { data: Array<{label: string, value: number, 
         <div className="absolute top-4 right-4 flex flex-col gap-2 z-10">
           <button
             onClick={handleZoomIn}
-            className="p-2 text-white rounded shadow-lg transition-all duration-200"
-            style={{ backgroundColor: '#228B22', boxShadow: '0 4px 6px rgba(34, 139, 34, 0.25)' }}
+            className="p-2 text-white rounded-lg shadow-lg transition-all duration-200 bg-emerald-600/80 hover:bg-emerald-500 border border-emerald-500/30"
             title="Zoom In"
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#32CD32'}
-            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#228B22'}
           >
             <ZoomIn className="h-4 w-4" />
           </button>
           <button
             onClick={handleZoomOut}
-            className="p-2 text-white rounded shadow-lg transition-all duration-200"
-            style={{ backgroundColor: '#DC143C', boxShadow: '0 4px 6px rgba(220, 20, 60, 0.25)' }}
+            className="p-2 text-white rounded-lg shadow-lg transition-all duration-200 bg-rose-600/80 hover:bg-rose-500 border border-rose-500/30"
             title="Zoom Out"
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#FF6347'}
-            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#DC143C'}
           >
             <ZoomOut className="h-4 w-4" />
           </button>
           <button
             onClick={handleResetLayout}
-            className="p-2 text-white rounded shadow-lg transition-all duration-200"
-            style={{ backgroundColor: '#4682B4', boxShadow: '0 4px 6px rgba(70, 130, 180, 0.25)' }}
+            className="p-2 text-white rounded-lg shadow-lg transition-all duration-200 bg-sky-600/80 hover:bg-sky-500 border border-sky-500/30"
             title="Reset Zoom"
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#5A9BD4'}
-            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#4682B4'}
           >
             <RotateCcw className="h-4 w-4" />
           </button>
@@ -402,7 +393,7 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
         </div>
 
         {/* Pie Charts Container */}
-        <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-600 rounded-lg p-6 shadow-xl hover:shadow-2xl transition-all duration-300 hover:border-gray-500">
+        <div className="bg-gradient-to-br from-cyan-500/10 via-gray-800 to-cyan-500/5 border border-gray-600 border-l-4 border-l-cyan-400/70 rounded-lg p-6 shadow-xl hover:shadow-2xl transition-all duration-300 hover:border-gray-500 hover:from-cyan-500/20 hover:via-cyan-500/10 hover:to-cyan-500/15">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center space-x-2">
               <svg className="h-6 w-6" viewBox="0 0 90 90" style={{ fill: '#00FFFF' }}>
@@ -480,7 +471,7 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
         </div>
 
         {/* Radar Charts Container */}
-        <div className="bg-gradient-to-br from-gray-900 to-gray-800 border border-gray-600 rounded-lg p-6 shadow-xl hover:shadow-2xl transition-all duration-300 hover:border-gray-500">
+        <div className="bg-gradient-to-br from-pink-500/10 via-gray-800 to-pink-500/5 border border-gray-600 border-l-4 border-l-pink-400/70 rounded-lg p-6 shadow-xl hover:shadow-2xl transition-all duration-300 hover:border-gray-500 hover:from-pink-500/20 hover:via-pink-500/10 hover:to-pink-500/15">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center space-x-2">
               <svg className="h-6 w-6" viewBox="0 0 24 24" fill="hotpink">
