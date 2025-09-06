@@ -188,7 +188,7 @@ const RightSidebar: React.FC<RightSidebarProps> = ({ currentView, stats }) => {
                 }}
               >
                 {stats.total > 0 
-                  ? `Project Health: ${Math.round((stats.completed / stats.total) * 100)}% - ${getProjectHealthStatus(stats.completed / stats.total)}`
+                  ? `Project Health: ${Math.round((stats.completed / stats.total) * 100)}% - ${getProjectHealthStatus(stats.completed / stats.total).replace(/🌟|✨|👍|⚠️|🚨/g, '').trim()}`
                   : 'No data available'
                 }
                 {/* Tooltip arrow */}

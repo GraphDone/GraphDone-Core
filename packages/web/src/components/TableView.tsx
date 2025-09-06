@@ -144,7 +144,7 @@ const TableView: React.FC<TableViewProps> = ({ filteredNodes, handleEditNode, ed
                 <tr 
                   key={node.id} 
                   onClick={() => handleEditNode(node)}
-                  className={`${getNodeTypeRowBackground(node.type)} hover:bg-white/5 hover:scale-[1.01] transition-all duration-200 group dynamic-table-row cursor-pointer hover:shadow-xl hover:shadow-white/10 relative hover:brightness-125`}
+                  className={`${getNodeTypeRowBackground(node.type)} hover:scale-[1.01] transition-all duration-200 group dynamic-table-row cursor-pointer hover:shadow-xl hover:shadow-white/10 relative hover:brightness-125`}
                   style={{
                     borderLeft: `4px solid ${getNodeTypeBorderColor(node.type)}`,
                     borderRight: `2px solid ${getNodeTypeBorderColor(node.type)}`
