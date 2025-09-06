@@ -120,7 +120,7 @@ const CardView: React.FC<CardViewProps> = ({ filteredNodes, handleEditNode, edge
         <div
           key={node.id}
           onClick={() => handleEditNode(node)}
-          className={`${getNodeTypeCardBackground(node.type)} rounded-xl p-6 shadow-lg hover:shadow-xl hover:shadow-white/10 transition-all duration-200 cursor-pointer border border-gray-600/50 hover:border-gray-500/70 hover:bg-white/5 hover:scale-[1.02] hover:-translate-y-1 hover:brightness-125 group backdrop-blur-sm`}
+          className={`${getNodeTypeCardBackground(node.type)} rounded-xl p-6 shadow-lg hover:shadow-xl hover:shadow-white/10 transition-all duration-200 cursor-pointer border border-gray-600/50 hover:border-gray-500/70 hover:scale-[1.02] hover:-translate-y-1 hover:brightness-125 group backdrop-blur-sm`}
           style={{
             borderLeft: `4px solid ${getNodeTypeCardBorderColor(node.type)}`,
             borderLeftWidth: '4px',

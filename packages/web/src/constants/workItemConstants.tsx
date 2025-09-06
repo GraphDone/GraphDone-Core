@@ -960,16 +960,16 @@ export const getTypeGradientBackground = (type: WorkItemType, style: GradientSty
   
   switch (style) {
     case 'table':
-      return `bg-gradient-to-r from-${tailwindColor}/5 via-transparent to-${tailwindColor}/5 hover:from-${tailwindColor}/15 hover:to-${tailwindColor}/15`;
+      return `bg-gradient-to-r from-${tailwindColor}/5 via-transparent to-${tailwindColor}/5 hover:from-${tailwindColor}/20 hover:to-${tailwindColor}/20`;
     
     case 'card':
-      return `bg-gradient-to-br from-${tailwindColor}/10 via-gray-800 to-${tailwindColor}/5 border-l-4 border-l-${tailwindColor.replace('-500', '-400')}/40 hover:from-${tailwindColor}/20 hover:to-${tailwindColor}/15 hover:border-l-${tailwindColor.replace('-500', '-300')}/60`;
+      return `bg-gradient-to-br from-${tailwindColor}/10 via-gray-800 to-${tailwindColor}/5 border-l-4 border-l-${tailwindColor.replace('-500', '-400')}/40 hover:from-${tailwindColor}/20 hover:to-${tailwindColor}/20 hover:border-l-${tailwindColor.replace('-500', '-300')}/60`;
     
     case 'kanban':
-      return `bg-gradient-to-br from-${tailwindColor}/10 via-gray-800 to-${tailwindColor}/5 hover:from-${tailwindColor}/20 hover:to-${tailwindColor}/15`;
+      return `bg-gradient-to-br from-${tailwindColor}/10 via-gray-800 to-${tailwindColor}/5 hover:from-${tailwindColor}/20 hover:to-${tailwindColor}/20`;
     
     case 'dashboard':
-      return `bg-gradient-to-br from-${tailwindColor}/10 via-gray-800 to-${tailwindColor}/5 border-l-4 border-l-${tailwindColor.replace('-500', '-400')}/40 hover:from-${tailwindColor}/20 hover:to-${tailwindColor}/15 hover:border-l-${tailwindColor.replace('-500', '-300')}/60`;
+      return `bg-gradient-to-br from-${tailwindColor}/10 via-gray-800 to-${tailwindColor}/5 border-l-4 border-l-${tailwindColor.replace('-500', '-400')}/40 hover:from-${tailwindColor}/20 hover:to-${tailwindColor}/20 hover:border-l-${tailwindColor.replace('-500', '-300')}/60`;
     
     default:
       return `bg-gradient-to-br from-${tailwindColor}/10 via-gray-800 to-${tailwindColor}/5`;
