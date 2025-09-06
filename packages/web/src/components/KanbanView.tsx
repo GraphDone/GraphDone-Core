@@ -156,7 +156,7 @@ const KanbanView: React.FC<KanbanViewProps> = ({ filteredNodes, handleEditNode, 
                   <div
                     key={node.id}
                     onClick={() => handleEditNode(node)}
-                    className={`${getNodeTypeKanbanBackground(node.type)} rounded-lg p-4 shadow-md hover:shadow-lg hover:shadow-white/10 transition-all duration-200 cursor-pointer border border-gray-600/40 hover:border-gray-500/60 hover:bg-white/5 hover:scale-[1.02] hover:-translate-y-1 hover:brightness-125 group backdrop-blur-sm`}
+                    className={`${getNodeTypeKanbanBackground(node.type)} rounded-lg p-4 shadow-md hover:shadow-lg hover:shadow-white/10 transition-all duration-200 cursor-pointer border border-gray-600/40 hover:border-gray-500/60 hover:scale-[1.02] hover:-translate-y-1 hover:brightness-125 group backdrop-blur-sm`}
                     style={{
                       borderLeft: `4px solid ${getNodeTypeKanbanBorderColor(node.type)}`,
                       borderLeftWidth: '4px',
