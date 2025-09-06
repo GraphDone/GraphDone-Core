@@ -35,7 +35,8 @@ import {
   Package,
   // Default Icon
   Square,
-  Paperclip
+  Paperclip,
+  Eraser
 } from 'lucide-react';
 
 // ============================
@@ -154,6 +155,16 @@ export interface PriorityOption {
 // ============================
 
 export const WORK_ITEM_TYPES: Record<WorkItemType, TypeOption> = {
+  DEFAULT: {
+    value: 'DEFAULT',
+    label: 'Default',
+    description: 'Generic work item',
+    icon: Eraser,
+    color: 'text-gray-300',
+    bgColor: 'bg-gray-600/20',
+    borderColor: 'border-gray-500/30',
+    hexColor: '#9ca3af'
+  },
   EPIC: {
     value: 'EPIC',
     label: 'Epic',
@@ -222,7 +233,7 @@ export const WORK_ITEM_TYPES: Record<WorkItemType, TypeOption> = {
     color: 'text-yellow-400',
     bgColor: 'bg-yellow-400/10',
     borderColor: 'border-yellow-400/30',
-    hexColor: '#fde047'
+    hexColor: '#facc15'
   },
   RESEARCH: {
     value: 'RESEARCH',
@@ -233,16 +244,6 @@ export const WORK_ITEM_TYPES: Record<WorkItemType, TypeOption> = {
     bgColor: 'bg-teal-400/10',
     borderColor: 'border-teal-400/30',
     hexColor: '#2dd4bf'
-  },
-  DEFAULT: {
-    value: 'DEFAULT',
-    label: 'Default',
-    description: 'Generic work item',
-    icon: Square,
-    color: 'text-gray-400',
-    bgColor: 'bg-gray-400/10',
-    borderColor: 'border-gray-400/30',
-    hexColor: '#9ca3af'
   }
 };
 
@@ -258,9 +259,9 @@ export const WORK_ITEM_STATUSES: Record<WorkItemStatus, StatusOption> = {
     label: 'Not Started',
     description: 'Waiting to begin',
     icon: Hexagon,
-    color: 'text-gray-400',
-    bgColor: 'bg-gray-400/10',
-    borderColor: 'border-gray-400/30',
+    color: 'text-gray-300',
+    bgColor: 'bg-gray-600/20',
+    borderColor: 'border-gray-500/30',
     dotColor: 'bg-gray-400',
     hexColor: '#9ca3af'
   },
@@ -422,7 +423,8 @@ export const WORK_ITEM_PRIORITIES: Record<PriorityLevel, PriorityOption> = {
 
 export const TYPE_OPTIONS: TypeOption[] = [
   { value: 'all', label: 'All Type', icon: null, color: 'text-gray-400', hexColor: '#9ca3af' },
-  ...Object.values(WORK_ITEM_TYPES)
+  WORK_ITEM_TYPES.DEFAULT,
+  ...Object.values(WORK_ITEM_TYPES).filter(type => type.value !== 'DEFAULT')
 ];
 
 export const STATUS_OPTIONS: StatusOption[] = [
@@ -576,10 +578,7 @@ export const DEFAULT_NODE_CONFIG = {
   title: 'New Node', // Default title for new nodes
   type: 'DEFAULT' as WorkItemType, // Default type (generic work item)
   status: 'NOT_STARTED' as WorkItemStatus, // Default status (beginning of workflow)
-  priority: 'minimal' as PriorityLevel, // Default priority level
-  priorityExec: 0.0, // Executive priority score (0.0-1.0)
-  priorityIndiv: 0.0, // Individual priority score (0.0-1.0)
-  priorityComm: 0.0, // Community priority score (0.0-1.0)
+  priority: 0.0, // Priority score (0.0-1.0)
   description: '' // Empty description by default
 };
 
@@ -928,6 +927,129 @@ export const getProjectHealthStatus = (completionRatio: number): string => {
   if (completionRatio >= 0.5) return 'Good 👍';
   if (completionRatio >= 0.3) return 'Fair ⚠️';
   return 'Critical 🚨';
+};
+
+// ============================
+// CENTRALIZED GRADIENT SYSTEM
+// ============================
+
+// Gradient style types for different views
+export type GradientStyle = 'table' | 'card' | 'kanban' | 'dashboard';
+
+// Central function to get type-based gradient backgrounds
+export const getTypeGradientBackground = (type: WorkItemType, style: GradientStyle): string => {
+  const config = getTypeConfig(type);
+  
+  // Extract base color from hex (remove #)
+  const baseColor = config.hexColor.replace('#', '');
+  
+  // Map hex to Tailwind color names for consistency
+  const colorMap: Record<string, string> = {
+    'e879f9': 'fuchsia-500',  // EPIC
+    'fb923c': 'orange-500',   // MILESTONE  
+    '818cf8': 'indigo-500',   // OUTCOME
+    '38bdf8': 'sky-500',      // FEATURE
+    '4ade80': 'green-500',    // TASK
+    'ef4444': 'red-500',      // BUG
+    'facc15': 'yellow-500',   // IDEA
+    '2dd4bf': 'teal-500',     // RESEARCH
+    '9ca3af': 'gray-500'      // DEFAULT
+  };
+  
+  const tailwindColor = colorMap[baseColor] || 'gray-500';
+  
+  switch (style) {
+    case 'table':
+      return `bg-gradient-to-r from-${tailwindColor}/5 via-transparent to-${tailwindColor}/5 hover:from-${tailwindColor}/20 hover:to-${tailwindColor}/20`;
+    
+    case 'card':
+      return `bg-gradient-to-br from-${tailwindColor}/10 via-gray-800 to-${tailwindColor}/5 border-l-4 border-l-${tailwindColor.replace('-500', '-400')}/40 hover:from-${tailwindColor}/20 hover:to-${tailwindColor}/20 hover:border-l-${tailwindColor.replace('-500', '-300')}/60`;
+    
+    case 'kanban':
+      return `bg-gradient-to-br from-${tailwindColor}/10 via-gray-800 to-${tailwindColor}/5 hover:from-${tailwindColor}/20 hover:to-${tailwindColor}/20`;
+    
+    case 'dashboard':
+      return `bg-gradient-to-br from-${tailwindColor}/10 via-gray-800 to-${tailwindColor}/5 border-l-4 border-l-${tailwindColor.replace('-500', '-400')}/40 hover:from-${tailwindColor}/20 hover:to-${tailwindColor}/20 hover:border-l-${tailwindColor.replace('-500', '-300')}/60`;
+    
+    default:
+      return `bg-gradient-to-br from-${tailwindColor}/10 via-gray-800 to-${tailwindColor}/5`;
+  }
+};
+
+// Central function to get status-based gradient backgrounds (for Dashboard)
+export const getStatusGradientBackground = (status: WorkItemStatus, style: GradientStyle): string => {
+  const config = getStatusConfig(status);
+  
+  // Extract base color from hex (remove #)
+  const baseColor = config.hexColor.replace('#', '');
+  
+  // Map hex to Tailwind color names for consistency
+  const colorMap: Record<string, string> = {
+    '9ca3af': 'gray-500',     // NOT_STARTED
+    '06b6d4': 'cyan-500',     // PROPOSED
+    'a855f7': 'purple-500',   // PLANNED
+    'eab308': 'yellow-500',   // IN_PROGRESS
+    '3b82f6': 'blue-500',     // IN_REVIEW
+    'ef4444': 'red-500',      // BLOCKED
+    'fb923c': 'orange-500',   // ON_HOLD
+    '22c55e': 'green-500',    // COMPLETED
+    'ff1493': 'pink-500'      // CANCELLED
+  };
+  
+  const tailwindColor = colorMap[baseColor] || 'gray-500';
+  
+  // Use static classes to ensure Tailwind generates them
+  const borderColorMap: Record<string, string> = {
+    'gray-500': 'border-l-gray-400/70',
+    'cyan-500': 'border-l-cyan-400/70', 
+    'purple-500': 'border-l-purple-400/70',
+    'yellow-500': 'border-l-yellow-400/70',
+    'blue-500': 'border-l-blue-400/70',
+    'red-500': 'border-l-red-400/70',
+    'orange-500': 'border-l-orange-400/70',
+    'green-500': 'border-l-green-400/70',
+    'pink-500': 'border-l-pink-400/70'
+  };
+
+  const hoverColorMap: Record<string, string> = {
+    'gray-500': 'hover:from-gray-500/40 hover:via-gray-500/30 hover:to-gray-500/35',
+    'cyan-500': 'hover:from-cyan-500/40 hover:via-cyan-500/30 hover:to-cyan-500/35', 
+    'purple-500': 'hover:from-purple-500/40 hover:via-purple-500/30 hover:to-purple-500/35',
+    'yellow-500': 'hover:from-yellow-500/40 hover:via-yellow-500/30 hover:to-yellow-500/35',
+    'blue-500': 'hover:from-blue-500/40 hover:via-blue-500/30 hover:to-blue-500/35',
+    'red-500': 'hover:from-red-500/40 hover:via-red-500/30 hover:to-red-500/35',
+    'orange-500': 'hover:from-orange-500/40 hover:via-orange-500/30 hover:to-orange-500/35',
+    'green-500': 'hover:from-green-500/40 hover:via-green-500/30 hover:to-green-500/35',
+    'pink-500': 'hover:from-pink-500/40 hover:via-pink-500/30 hover:to-pink-500/35'
+  };
+
+  switch (style) {
+    case 'dashboard': {
+      const borderClass = borderColorMap[tailwindColor] || 'border-l-gray-400/40';
+      const hoverClass = hoverColorMap[tailwindColor] || 'hover:from-gray-500/25 hover:via-gray-500/15 hover:to-gray-500/20';
+      return `bg-gradient-to-br from-${tailwindColor}/10 via-${tailwindColor}/5 to-${tailwindColor}/3 border-l-4 ${borderClass} ${hoverClass}`;
+    }
+    
+    default:
+      return `bg-gradient-to-br from-${tailwindColor}/10 via-gray-800 to-${tailwindColor}/5`;
+  }
+};
+
+// ============================
+// SIDEBAR SECTION COLORS
+// ============================
+
+// Unique colors for RightSidebar main sections (completely unused elsewhere in project)
+export const SIDEBAR_SECTION_COLORS = {
+  projectOverview: '#8E24AA',   // Material Deep Purple 500 - unique
+  taskStatus: '#00ACC1',        // Material Cyan 600 - unique  
+  priorityDistribution: '#FFA726', // Material Orange 400 - unique
+  nodeTypes: '#D32F2F'          // Material Red 700 - unique
+} as const;
+
+// Get sidebar section border color
+export const getSidebarSectionColor = (section: keyof typeof SIDEBAR_SECTION_COLORS): string => {
+  return SIDEBAR_SECTION_COLORS[section];
 };
 
 // ============================

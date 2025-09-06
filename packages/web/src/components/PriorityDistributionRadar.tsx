@@ -8,10 +8,7 @@ import { useQuery, gql } from '@apollo/client';
 const GET_PRIORITY_DISTRIBUTION = gql`
   query GetPriorityDistribution($graphId: ID) {
     workItems(where: { graph: { id: $graphId } }) {
-      priorityExec
-      priorityIndiv
-      priorityComm
-      priorityComp
+      priority
     }
   }
 `;
@@ -54,21 +51,15 @@ export function PriorityDistributionRadar({ className = '', showLegend = true }:
     };
 
     queryData.workItems.forEach((item: any) => {
-      // Calculate composite priority (average of all priorities)
-      const compositePriority = (
-        (item.priorityExec || 0) + 
-        (item.priorityIndiv || 0) + 
-        (item.priorityComm || 0) + 
-        (item.priorityComp || 0)
-      ) / 4;
+      const priority = item.priority || 0;
 
-      if (compositePriority >= 0.8) {
+      if (priority >= 0.8) {
         priorityCounts.critical++;
-      } else if (compositePriority >= 0.6) {
+      } else if (priority >= 0.6) {
         priorityCounts.high++;
-      } else if (compositePriority >= 0.4) {
+      } else if (priority >= 0.4) {
         priorityCounts.moderate++;
-      } else if (compositePriority >= 0.2) {
+      } else if (priority >= 0.2) {
         priorityCounts.low++;
       } else {
         priorityCounts.minimal++;

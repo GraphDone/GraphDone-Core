@@ -8,10 +8,7 @@ interface WorkItem {
   description?: string;
   type: string;
   status: string;
-  priorityExec: number;
-  priorityIndiv: number;
-  priorityComm: number;
-  priorityComp: number;
+  priority: number;
   dueDate?: string;
   tags?: string[];
   metadata?: string;
@@ -71,7 +68,7 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
       
       if (!showCompleted && node.status === 'COMPLETED') return false;
       if (filterPriority !== 'all') {
-        const priority = node.priorityExec || node.priorityComp || 0;
+        const priority = node.priority || 0;
         const priorityLevel = getPriorityConfig(priority).value;
         if (priorityLevel !== filterPriority) return false;
       }
@@ -104,8 +101,8 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
     // Sort tasks within each day by priority
     Object.keys(grouped).forEach(dateKey => {
       grouped[dateKey].sort((a, b) => {
-        const aPriority = a.priorityExec || a.priorityComp || 0;
-        const bPriority = b.priorityExec || b.priorityComp || 0;
+        const aPriority = a.priority || 0;
+        const bPriority = b.priority || 0;
         return bPriority - aPriority;
       });
     });
@@ -192,7 +189,7 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
     const dateKey = date.toDateString();
     const tasks = nodesByDate[dateKey] || [];
     if (tasks.length === 0) return 0;
-    return Math.max(...tasks.map(t => t.priorityExec || t.priorityComp || 0));
+    return Math.max(...tasks.map(t => t.priority || 0));
   };
 
   const formatDateRange = () => {
@@ -489,7 +486,7 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
                       {dayNodes.slice(0, 4).map((node, nodeIndex) => {
                         const statusConfig = getStatusConfig(node.status as WorkItemStatus);
                         const typeConfig = getTypeConfig(node.type as WorkItemType);
-                        const priority = node.priorityExec || node.priorityComp || 0;
+                        const priority = node.priority || 0;
                         
                         return (
                           <div
@@ -558,7 +555,7 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
                 {nodesByDate[selectedDate.toDateString()].map((node, index) => {
                   const statusConfig = getStatusConfig(node.status as WorkItemStatus);
                   const typeConfig = getTypeConfig(node.type as WorkItemType);
-                  const priority = node.priorityExec || node.priorityComp || 0;
+                  const priority = node.priority || 0;
                   const priorityConfig = getPriorityConfig(priority);
                   
                   return (

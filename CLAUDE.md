@@ -51,8 +51,8 @@ The project has a fully implemented monorepo structure with these commands:
 # Manual setup
 npm install                   # Install dependencies
 cp .env.example .env          # Create environment file
-docker-compose up -d postgres # Start PostgreSQL
-npm run db:migrate            # Run database migrations
+docker-compose up -d graphdone-neo4j # Start Neo4j database
+npm run db:seed               # Seed database with initial data
 
 # Development
 npm run dev                   # Start all development servers (Turbo)
