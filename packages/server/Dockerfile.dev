@@ -2,17 +2,28 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# Install dependencies
-RUN npm install -g nodemon tsx
+# Install global dependencies
+RUN npm install -g nodemon tsx turbo
 
-# Copy package files first for better caching
-COPY package.json turbo.json ./
+# Copy root package files
+COPY package.json package-lock.json turbo.json tsconfig.json ./
+
+# Copy all package.json files to maintain workspace structure
+COPY packages/core/package.json packages/core/
+COPY packages/server/package.json packages/server/
+COPY packages/web/package.json packages/web/
+COPY packages/mcp-server/package.json packages/mcp-server/
+
+# Install all dependencies
 RUN npm ci
 
-# Create packages directory structure
-RUN mkdir -p packages/core packages/server
+# Copy source code
+COPY packages/ packages/
 
-EXPOSE 4000
+# Build core package first (dependency for server)
+RUN cd packages/core && npm run build
 
-# Development command will be overridden by docker-compose
-CMD ["npm", "run", "dev"]
+EXPOSE 4127
+
+# Development command
+CMD ["npm", "run", "dev", "--workspace=@graphdone/server"]
