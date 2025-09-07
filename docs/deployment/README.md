@@ -1,7 +1,5 @@
 # Deployment Guide
 
-**AI-Generated Content Warning: This documentation contains AI-generated content. Verify information before depending on it for decision making.**
-
 This guide covers various deployment options for GraphDone, from local development to production environments.
 
 ## Quick Deployment Options
@@ -26,8 +24,9 @@ This guide covers various deployment options for GraphDone, from local developme
 ### Server (.env)
 ```bash
 # Database
-DATABASE_URL=postgresql://user:pass@localhost:5432/graphdone
-REDIS_URL=redis://localhost:6379
+NEO4J_URI=bolt://localhost:7687
+NEO4J_USER=neo4j
+NEO4J_PASSWORD=graphdone_password
 
 # Server
 NODE_ENV=production
@@ -84,7 +83,9 @@ version: '3.8'
 services:
   server:
     environment:
-      - DATABASE_URL=postgresql://user:pass@your-db:5432/graphdone
+      - NEO4J_URI=bolt://your-neo4j:7687
+      - NEO4J_USER=neo4j
+      - NEO4J_PASSWORD=secure_password
     deploy:
       replicas: 3
       resources:
@@ -123,7 +124,8 @@ kubectl get ingress graphdone-ingress
 1. **Create secrets:**
    ```bash
    kubectl create secret generic graphdone-secrets \
-     --from-literal=database-url="postgresql://..." \
+     --from-literal=neo4j-uri="bolt://..." \
+     --from-literal=neo4j-password="your-password" \
      --from-literal=jwt-secret="your-secret"
    ```
 
@@ -190,8 +192,8 @@ kubectl get ingress graphdone-ingress
          ],
          "secrets": [
            {
-             "name": "DATABASE_URL",
-             "valueFrom": "arn:aws:secretsmanager:region:account:secret:graphdone/database"
+             "name": "NEO4J_URI",
+             "valueFrom": "arn:aws:secretsmanager:region:account:secret:graphdone/neo4j"
            }
          ]
        }
@@ -243,25 +245,27 @@ az container create \
 
 ## Database Setup
 
-### PostgreSQL
+### Neo4j
 
 #### Managed Services
-- **AWS RDS**: Recommended for production
-- **Google Cloud SQL**: Good performance and reliability
-- **Azure Database**: Integrated with Azure services
-- **DigitalOcean Managed Database**: Cost-effective option
+- **Neo4j AuraDB**: Recommended for production
+- **AWS**: Neo4j on EC2 or ECS
+- **Google Cloud**: Neo4j on GKE
+- **Azure**: Neo4j on AKS
 
 #### Self-hosted
 ```bash
 # Using Docker
 docker run -d \
-  --name graphdone-postgres \
-  -e POSTGRES_DB=graphdone \
-  -e POSTGRES_USER=graphdone \
-  -e POSTGRES_PASSWORD=secure_password \
-  -v postgres_data:/var/lib/postgresql/data \
-  -p 5432:5432 \
-  postgres:15-alpine
+  --name graphdone-neo4j \
+  -e NEO4J_AUTH=neo4j/graphdone_password \
+  -e NEO4J_PLUGINS='["apoc"]' \
+  -e NEO4J_apoc_export_file_enabled=true \
+  -e NEO4J_apoc_import_file_enabled=true \
+  -v neo4j_data:/data \
+  -v neo4j_logs:/logs \
+  -p 7474:7474 -p 7687:7687 \
+  neo4j:5.15-community
 ```
 
 ### Redis (Optional)
@@ -389,7 +393,7 @@ sudo ufw enable
 ```bash
 # Daily backup script
 #!/bin/bash
-pg_dump $DATABASE_URL | gzip > backup-$(date +%Y%m%d).sql.gz
+neo4j-admin backup --backup-dir=/backups --name=graphdone-$(date +%Y%m%d)
 
 # Upload to cloud storage
 aws s3 cp backup-$(date +%Y%m%d).sql.gz s3://your-backup-bucket/
@@ -415,9 +419,9 @@ sudo kill -9 <PID>
 #### Database Connection
 ```bash
 # Test connection
-psql $DATABASE_URL
-\l  # List databases
-\q  # Quit
+cypher-shell -u neo4j -p $NEO4J_PASSWORD
+MATCH (n) RETURN count(n);  // Test query
+:exit  // Quit
 ```
 
 #### Docker Issues
