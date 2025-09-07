@@ -144,6 +144,7 @@ export const RelationshipEditorWindow: React.FC<RelationshipEditorWindowProps> =
         document.removeEventListener('mouseup', handleMouseUp);
       };
     }
+    return undefined;
   }, [isDragging, isResizing, handleMouseMove, handleMouseUp]);
 
   const handleDragStart = (e: React.MouseEvent) => {
@@ -222,8 +223,8 @@ export const RelationshipEditorWindow: React.FC<RelationshipEditorWindowProps> =
         variables: {
           input: [{
             type: editingEdge.edge.type,
-            source: { connect: { where: { node: { id: editingEdge.edge.target.id } } } },
-            target: { connect: { where: { node: { id: editingEdge.edge.source.id } } } },
+            source: { connect: { where: { node: { id: editingEdge.edge.target } } } },
+            target: { connect: { where: { node: { id: editingEdge.edge.source } } } },
             weight: 1.0
           }]
         }
@@ -319,7 +320,7 @@ export const RelationshipEditorWindow: React.FC<RelationshipEditorWindowProps> =
             )}
             {isEditingMode && (
               <div className="text-blue-400 text-sm">
-                Editing relationship: {editingEdge?.edge.source.title} → {editingEdge?.edge.target.title}
+                Editing relationship: {workItems.find(item => item.id === editingEdge?.edge.source)?.title || 'Unknown'} → {workItems.find(item => item.id === editingEdge?.edge.target)?.title || 'Unknown'}
               </div>
             )}
           </div>
