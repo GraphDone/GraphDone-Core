@@ -630,7 +630,7 @@ class SQLiteAuthStore {
           reject(err);
         } else {
           // Return updated user
-          this.findUserById(userId).then(resolve).catch(reject);
+          this.findUserById(userId).then(user => resolve(user!)).catch(reject);
         }
       });
     });
@@ -650,7 +650,7 @@ class SQLiteAuthStore {
           reject(err);
         } else {
           // Return updated user
-          this.findUserById(userId).then(resolve).catch(reject);
+          this.findUserById(userId).then(user => resolve(user!)).catch(reject);
         }
       });
     });
