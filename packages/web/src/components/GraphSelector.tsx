@@ -86,6 +86,7 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph }: Gra
       document.addEventListener('mousedown', handleClickOutside);
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
+    return undefined;
   }, [isOpen]);
 
   // Graph selection handler - DON'T close dropdown automatically
@@ -148,9 +149,9 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph }: Gra
       // Determine folder based on graph properties
       if (graph.type === 'TEMPLATE') {
         folders.templates.push(graph);
-      } else if (graph.owner?.id === currentUser?.id && !graph.isShared) {
+      } else if (graph.permissions === 'OWNER' && !graph.isShared) {
         folders.personal.push(graph);
-      } else if (graph.isShared || (currentTeam && graph.team?.id === currentTeam.id)) {
+      } else if (graph.isShared) {
         folders.team.push(graph);
       } else if (graph.name.toLowerCase().includes('ai') || graph.name.toLowerCase().includes('bot')) {
         folders.ai.push(graph);
