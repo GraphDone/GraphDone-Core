@@ -204,7 +204,7 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
   };
 
   return (
-    <div className="flex flex-col h-full bg-gray-900">
+    <div className="flex flex-col h-full">
       {/* Header */}
       <div className="p-6 border-b border-gray-700">
         <div className="flex items-center justify-between mb-4">
@@ -398,7 +398,7 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
 
       {/* Main Content */}
       <div className="flex-1 overflow-hidden p-6">
-        <div className="bg-gray-800 rounded-lg border border-gray-700 h-full flex flex-col">
+        <div className="bg-gray-800/50 backdrop-blur-sm rounded-lg border border-gray-700/50 h-full flex flex-col">
           {/* Calendar Header */}
           <div className="flex items-center justify-between p-4 border-b border-gray-700">
             <button
@@ -454,7 +454,7 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
                     onClick={() => handleDateClick(day)}
                     className={`
                       min-h-[120px] p-3 border-2 rounded-lg transition-all duration-200 cursor-pointer
-                      ${isCurrentMonthDay ? 'bg-gray-700' : 'bg-gray-800/50'}
+                      ${isCurrentMonthDay ? 'bg-gray-700/50 backdrop-blur-sm' : 'bg-gray-800/30 backdrop-blur-sm'}
                       ${isTodayDay ? 'ring-2 ring-green-500' : ''}
                       ${isSelected ? `ring-2 ring-blue-400 ${WORK_ITEM_PRIORITIES.moderate.bgColor}` : ''}
                       ${taskCount > 0 ? priorityColor : 'border-gray-600'}
@@ -532,7 +532,7 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
         
         {/* Selected Date Details Panel */}
         {selectedDate && (
-          <div className="mt-4 bg-gray-800 rounded-lg border border-gray-700 p-4">
+          <div className="mt-4 bg-gray-800/50 backdrop-blur-sm rounded-lg border border-gray-700/50 p-4">
             <div className="flex items-center justify-between mb-3">
               <h4 className="text-lg font-semibold text-white">
                 {selectedDate.toLocaleDateString('en-US', { 
@@ -597,7 +597,7 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
       </div>
 
       {/* Footer Statistics */}
-      <div className="border-t border-gray-700 p-4 bg-gray-800">
+      <div className="border-t border-gray-700/50 p-4 bg-gray-800/50 backdrop-blur-sm">
         <div className="grid grid-cols-2 md:grid-cols-6 gap-4 text-center">
           <div>
             <div className="text-xl font-bold text-white">
