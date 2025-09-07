@@ -1,5 +1,9 @@
 name: graphdone-dev
 
+networks:
+  graphdone-internal:
+    driver: bridge
+
 services:
   graphdone-neo4j:
     container_name: graphdone-neo4j
@@ -9,30 +13,64 @@ services:
       NEO4J_PLUGINS: '["graph-data-science", "apoc"]'
       NEO4J_dbms_security_procedures_unrestricted: "gds.*,apoc.*"
       NEO4J_dbms_security_procedures_allowlist: "gds.*,apoc.*"
-    ports:
-      - "7474:7474"  # HTTP
-      - "7687:7687"  # Bolt
+    # No external ports - internal network only
+    expose:
+      - "7474"
+      - "7687"
     volumes:
       - neo4j_data:/data
       - logs:/logs
+    networks:
+      - graphdone-internal
+    # Security configurations
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "graphdone_password", "RETURN 1"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
 
   graphdone-redis:
     container_name: graphdone-redis
     image: redis:8-alpine
-    ports:
-      - "6379:6379"
+    # No external ports - internal network only
+    expose:
+      - "6379"
     volumes:
       - redis_data:/data
+    networks:
+      - graphdone-internal
+    # Security configurations
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+    restart: unless-stopped
+    user: "999:999"  # Redis user
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,size=100m
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
 
   graphdone-api:
     container_name: graphdone-api
@@ -46,8 +84,9 @@ services:
       - NEO4J_PASSWORD=graphdone_password
       - PORT=4127
       - CORS_ORIGIN=http://localhost:3127
-    ports:
-      - "4127:4127"
+    # No external ports - internal network only
+    expose:
+      - "4127"
     depends_on:
       graphdone-neo4j:
         condition: service_healthy
@@ -56,6 +95,29 @@ services:
     volumes:
       - logs:/app/logs
       - sqlite_auth_data:/app/data
+    networks:
+      - graphdone-internal
+    # Security configurations
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    restart: unless-stopped
+    user: "1001:1001"  # Non-root user
+    tmpfs:
+      - /tmp:noexec,nosuid,size=100m
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4127/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   graphdone-web:
     container_name: graphdone-web
@@ -63,15 +125,40 @@ services:
       context: ..
       dockerfile: packages/web/Dockerfile.dev
     environment:
-      - VITE_GRAPHQL_URL=http://localhost:4127/graphql
-      - VITE_GRAPHQL_WS_URL=ws://localhost:4127/graphql
       - PORT=3127
+      - VITE_PROXY_TARGET=http://graphdone-api:4127
+      - VITE_GRAPHQL_URL=http://localhost:3127/graphql
+      - VITE_GRAPHQL_WS_URL=ws://localhost:3127/graphql
+    # Only expose web UI to host
     ports:
       - "3127:3127"
     depends_on:
       - graphdone-api
     volumes:
       - logs:/app/logs
+    networks:
+      - graphdone-internal
+    # Security configurations
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    restart: unless-stopped
+    user: "1001:1001"  # Non-root user
+    tmpfs:
+      - /tmp:noexec,nosuid,size=100m
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3127"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
 volumes:
   neo4j_data:
