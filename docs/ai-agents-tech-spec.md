@@ -25,9 +25,9 @@
 - **Custom Tool Pipeline**: Extensible system for adding new capabilities
 - **Safe Sandboxing**: All tool calls go through approval pipeline
 
-### GPU Infrastructure Setup
+### GPU Infrastructure Setup (Multiple Deployment Options)
 
-**LAN GPU Server Configuration**:
+**Option A: Traditional Ollama Server Setup**:
 ```bash
 # Install Ollama on GPU server (192.168.1.100)
 curl -fsSL https://ollama.com/install.sh | sh
@@ -35,6 +35,66 @@ curl -fsSL https://ollama.com/install.sh | sh
 # Pull recommended model for POC
 ollama pull qwen2.5:7b  # 4.7GB, good function calling support
 
+# Verify installation
+ollama serve  # Default port 11434
+```
+
+**Option B: Docker Model Containers (NEW 2025 Approach)**:
+```bash
+# GPU server setup with direct model containers
+# Each model runs its own TCP server - no Ollama middleman needed
+
+# Create docker-compose for AI infrastructure
+cat << EOF > ai-infrastructure.yml
+version: '3.8'
+services:
+  qwen-chat:
+    image: registry.ollama.ai/library/qwen2.5:1.5b
+    container_name: ai-qwen-chat
+    ports:
+      - "11434:8000"  # Map to standard Ollama port for compatibility
+    environment:
+      - MODEL_SERVER_PORT=8000
+      - MAX_CONCURRENT_REQUESTS=6
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    
+  qwen-functions:
+    image: registry.ollama.ai/library/qwen2.5:7b
+    container_name: ai-qwen-functions
+    ports:
+      - "11435:8000"
+    environment:
+      - MODEL_SERVER_PORT=8000
+      - MAX_CONCURRENT_REQUESTS=2
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+networks:
+  default:
+    name: graphdone-ai-network
+EOF
+
+# Start AI infrastructure
+docker-compose -f ai-infrastructure.yml up -d
+
+# Verify models are running
+curl http://localhost:11434/api/generate -d '{"model":"qwen2.5:1.5b","prompt":"Hello!"}'
+curl http://localhost:11435/api/generate -d '{"model":"qwen2.5:7b","prompt":"Hello!"}'
+```
+
+**Piper TTS Setup (Both Options)**:
+```bash
 # Install Piper TTS for agent speech
 wget https://github.com/rhasspy/piper/releases/download/v1.2.0/piper_amd64.tar.gz
 tar -xzf piper_amd64.tar.gz
@@ -51,10 +111,6 @@ wget -O /opt/piper/voices/en_US-lessac-medium.onnx.json \
 echo "Hello! I'm your GraphDone AI companion!" | piper \
   --model /opt/piper/voices/en_US-lessac-medium.onnx \
   --output_file test.wav
-
-# Verify installation
-ollama serve  # Default port 11434
-# Piper TTS ready on same server
 ```
 
 ### Agent Management Service
