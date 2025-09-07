@@ -221,7 +221,7 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-gray-900">
+    <div className="flex flex-col h-full">
       {/* Header */}
       <div className="p-6 border-b border-gray-700">
         <div className="flex items-center justify-between mb-4">
@@ -453,7 +453,7 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
       {/* Main Content */}
       <div className="flex-1 overflow-hidden">
         <div className="h-full overflow-auto" ref={scrollRef}>
-          <div className="bg-gray-800 border border-gray-700">
+          <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700/50">
             <div className="overflow-x-auto">
               <div className="relative" style={{ minWidth: `${800 * zoomLevel}px`, transform: `scale(${zoomLevel})`, transformOrigin: 'top left' }}>
                 {/* Timeline Header */}
@@ -588,8 +588,8 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
                           <div className="relative h-9">
                             {/* Main Task Bar */}
                             <div 
-                              className={`absolute h-6 bg-gray-600 rounded-lg shadow-sm border transition-all duration-200 cursor-pointer ${
-                                isSelected ? 'border-green-500 shadow-lg shadow-green-500/25' : 'border-gray-500'
+                              className={`absolute h-6 bg-gray-600/40 backdrop-blur-sm rounded-lg shadow-sm border transition-all duration-200 cursor-pointer ${
+                                isSelected ? 'border-green-500 shadow-lg shadow-green-500/25' : 'border-gray-500/50'
                               }`}
                               style={{
                                 left: `${Math.max(barLeft, 0)}%`,
@@ -600,7 +600,7 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
                             >
                               {/* Progress Fill */}
                               <div 
-                                className={`h-full rounded-lg transition-all duration-300 ${getProgressColor(item.status as WorkItemStatus)}`}
+                                className={`h-full rounded-lg transition-all duration-300 ${getProgressColor(item.status as WorkItemStatus)} opacity-60`}
                                 style={{ width: `${item.progress}%` }}
                               />
                               
@@ -647,7 +647,7 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
       </div>
 
       {/* Footer with Statistics and Legend */}
-      <div className="border-t border-gray-700 p-4 bg-gray-800">
+      <div className="border-t border-gray-700/50 p-4 bg-gray-800/50 backdrop-blur-sm">
         <div className="flex flex-wrap items-center justify-between gap-4">
           {/* Statistics */}
           <div className="flex items-center space-x-6 text-sm">

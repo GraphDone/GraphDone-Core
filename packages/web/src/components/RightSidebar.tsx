@@ -168,7 +168,7 @@ const RightSidebar: React.FC<RightSidebarProps> = ({ currentView, stats }) => {
     return blendColors(colorsToBlend);
   };
   return (
-    <div className="w-80 bg-gray-800 border-l border-gray-700 p-6 transition-all duration-300 ease-in-out">
+    <div className="w-80 bg-gray-800/90 backdrop-blur-md border-l border-gray-700/50 p-6 transition-all duration-300 ease-in-out shadow-2xl">
       <div className="space-y-6">
         {/* Project Overview */}
         <div 
