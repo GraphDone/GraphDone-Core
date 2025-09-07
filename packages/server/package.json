@@ -22,6 +22,7 @@
     "@neo4j/graphql": "^5.5.0",
     "@types/node-fetch": "^2.6.13",
     "@types/passport-github2": "^1.2.9",
+    "@types/sqlite3": "^3.1.11",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "dotenv": "^16.3.0",
@@ -37,6 +38,7 @@
     "passport-github2": "^0.1.12",
     "passport-google-oauth20": "^2.0.0",
     "passport-linkedin-oauth2": "^2.0.0",
+    "sqlite3": "^5.1.7",
     "uuid": "^11.1.0",
     "ws": "^8.14.0"
   },
