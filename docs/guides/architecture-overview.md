@@ -24,7 +24,8 @@ graph TB
     end
     
     subgraph "Data Layer"
-        NEO4J[(Neo4j 5.15-community<br/>Native graph database<br/>APOC plugins<br/>Port 7687)]
+        SQLITE[(SQLite<br/>User authentication<br/>User settings & preferences<br/>Fast local storage)]
+        NEO4J[(Neo4j 5.15-community<br/>Project management graph<br/>Work items & dependencies<br/>APOC plugins<br/>Port 7687)]
         REDIS[(Redis 8-alpine<br/>Available in Docker<br/>Not yet integrated<br/>Port 6379)]
     end
     
@@ -37,6 +38,7 @@ graph TB
     WEB --> GQL
     IOS --> GQL
     CLAUDE --> NEO4J
+    GQL --> SQLITE
     GQL --> NEO4J
     GQL --> CORE
     REDIS -.-> GQL
@@ -217,23 +219,73 @@ sequenceDiagram
     WS->>User2: Show AI agent joined
 ```
 
-### Database Schema Design
+### Hybrid Database Architecture
 
-The database schema is optimized for graph operations while maintaining ACID properties.
+GraphDone uses a hybrid database approach, optimizing each database for its specific use case:
+
+**SQLite: Authentication & User Data**
+- User authentication (login, passwords, tokens)
+- User settings and preferences
+- Application configuration
+- Fast, local storage with ACID properties
+- No network latency for auth operations
+
+**Neo4j: Graph Data**
+- Project management nodes (tasks, outcomes, milestones)
+- Dependencies and relationships between work items
+- Graph traversal and pathfinding operations
+- Complex graph queries and analytics
+
+**Benefits of Hybrid Architecture:**
+- **Performance**: Auth operations are lightning-fast (no network latency)
+- **Reliability**: Server can start without Neo4j (auth-only mode)
+- **Scalability**: SQLite handles auth load, Neo4j focuses on graph operations
+- **Security**: User credentials isolated in separate database
+- **Flexibility**: Can switch graph databases without affecting authentication
+- **Development**: Easier testing and development with minimal dependencies
 
 ```mermaid
 erDiagram
-    Node ||--o{ NodeDependency : "depends_on"
-    Node ||--o{ NodeDependency : "depended_by"
-    Node ||--o{ NodeContributor : "has_contributors"
-    Node ||--o{ Edge : "source_of"
-    Node ||--o{ Edge : "target_of"
-    
-    Contributor ||--o{ NodeContributor : "contributes_to"
-    
-    Node {
+    %% SQLite Schema - Authentication & User Data
+    User {
         uuid id PK
-        node_type type
+        varchar username UK
+        varchar email UK  
+        varchar password_hash
+        varchar name
+        varchar role
+        boolean is_active
+        boolean is_email_verified
+        varchar email_verification_token
+        varchar password_reset_token
+        timestamp password_reset_expires
+        jsonb settings
+        jsonb metadata
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    Team {
+        uuid id PK
+        varchar name
+        text description
+        boolean is_active
+        jsonb settings
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    UserTeam {
+        uuid user_id PK,FK
+        uuid team_id PK,FK
+        varchar role
+        timestamp added_at
+    }
+    
+    %% Neo4j Schema - Graph Data
+    WorkItem {
+        uuid id PK
+        work_item_type type
         varchar title
         text description
         float position_x
@@ -246,47 +298,42 @@ erDiagram
         float priority_indiv
         float priority_comm
         float priority_comp
-        node_status status
+        work_item_status status
+        uuid assigned_to FK
         jsonb metadata
         timestamp created_at
         timestamp updated_at
     }
     
-    Edge {
+    Dependency {
         uuid id PK
         uuid source_id FK
         uuid target_id FK
-        edge_type type
+        dependency_type type
         float weight
         jsonb metadata
         timestamp created_at
     }
     
-    NodeDependency {
+    Graph {
         uuid id PK
-        uuid node_id FK
-        uuid dependency_id FK
-    }
-    
-    NodeContributor {
-        uuid id PK
-        uuid node_id FK
-        uuid contributor_id FK
-        varchar role
-        timestamp added_at
-    }
-    
-    Contributor {
-        uuid id PK
-        contributor_type type
         varchar name
-        varchar email
-        varchar avatar_url
-        jsonb capabilities
-        jsonb metadata
+        text description
+        uuid owner_id FK
+        uuid team_id FK
+        boolean is_public
+        jsonb settings
         timestamp created_at
         timestamp updated_at
     }
+    
+    %% Relationships
+    User ||--o{ Team : "member_of"
+    User ||--o{ Graph : "owns"
+    Team ||--o{ Graph : "team_graphs"
+    WorkItem ||--o{ Dependency : "source_of"
+    WorkItem ||--o{ Dependency : "target_of"
+    Graph ||--o{ WorkItem : "contains"
 ```
 
 ### Performance Optimization Strategies
