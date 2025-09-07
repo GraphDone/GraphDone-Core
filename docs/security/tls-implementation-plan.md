@@ -9,7 +9,7 @@ Based on existing codebase analysis:
 
 1. **Hardcoded Secrets in Production**:
    ```javascript
-   // packages/server/src/resolvers/auth.ts:7
+   // packages/server/src/resolvers/sqlite-auth.ts:8 (NEW SQLite auth system)
    const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
    
    // deployment/docker-compose.yml:8
@@ -29,20 +29,26 @@ Based on existing codebase analysis:
    ```yaml
    # Neo4j, Redis, all internal communications use unencrypted channels
    - NEO4J_URI=bolt://graphdone-neo4j:7687  # No TLS
+   # SQLite is local file system - no network encryption needed
    ```
 
-4. **Default Passwords in Production**:
-   ```javascript
-   // packages/server/src/index.ts:125,160
-   const adminPasswordHash = await bcrypt.hash('graphdone', 10);  // Default password
+4. **SQLite Database File Security**:
+   ```bash
+   # SQLite auth database needs secure file permissions
+   # Default: potentially world-readable database file
+   # Needed: 600 permissions (owner read/write only)
+   # Location: packages/server/graphdone-auth.db
    ```
 
 ### ✅ **Current Security Strengths**
-- Password hashing with bcrypt (10 rounds)
-- JWT tokens for authentication
-- CORS configuration
-- Database connection isolation within Docker network
-- User role-based access control
+- **Hybrid Database Architecture**: User auth isolated in SQLite, graph data in Neo4j
+- **Password hashing** with bcrypt (10 rounds)
+- **JWT tokens** for stateless authentication
+- **CORS configuration** for cross-origin protection
+- **Database connection isolation** within Docker network
+- **User role-based access control** (ADMIN, USER, VIEWER, GUEST)
+- **Auth-only mode**: Server can run without Neo4j for authentication-only operations
+- **Fast auth operations**: SQLite provides zero-latency authentication
 
 ## TLS Implementation Strategy
 
@@ -360,12 +366,16 @@ JWT_SECRET = 'your-secret-key-change-in-production'  # Default secret
 ### **Phase 1: Environment Variables** ✅ **IMMEDIATE**
 ```bash
 # .env.production (NOT in version control)
-# Database
+# Database - Neo4j (graph data)
 NEO4J_USER=neo4j
 NEO4J_PASSWORD=secureRandomPassword123!@#
 NEO4J_URI=bolt://graphdone-neo4j:7687
 
-# Authentication  
+# Authentication - SQLite (user data)
+SQLITE_AUTH_DB=/secure/path/graphdone-auth.db
+SQLITE_ENCRYPTION_KEY=sqlite-encryption-key-32-bytes-long
+
+# JWT Authentication  
 JWT_SECRET=your-super-secure-random-jwt-secret-256-bits-long
 JWT_EXPIRES_IN=24h
 
@@ -596,9 +606,35 @@ echo "Checking environment configuration..."
 echo "Checking Docker secrets..."
 ls secrets/*.txt 2>/dev/null && echo "✅ Docker secrets configured" || echo "❌ Docker secrets missing"
 
+# Check SQLite database security
+echo "Checking SQLite database security..."
+SQLITE_DB="packages/server/graphdone-auth.db"
+if [ -f "$SQLITE_DB" ]; then
+  PERMS=$(stat -f "%OLp" "$SQLITE_DB" 2>/dev/null || stat -c "%a" "$SQLITE_DB" 2>/dev/null)
+  if [ "$PERMS" = "600" ]; then
+    echo "✅ SQLite database has secure permissions (600)"
+  else
+    echo "❌ SQLite database permissions are $PERMS (should be 600)"
+    echo "Fix with: chmod 600 $SQLITE_DB"
+  fi
+else
+  echo "⚠️  SQLite database not found (will be created on first run)"
+fi
+
 # Check default passwords
 echo "Checking for default passwords..."
 docker-compose exec graphdone-neo4j cypher-shell -u neo4j -p graphdone_password "RETURN 1" 2>/dev/null && echo "❌ Default Neo4j password detected" || echo "✅ Neo4j password secured"
+
+# Check for default admin in SQLite
+echo "Checking SQLite default users..."
+if [ -f "$SQLITE_DB" ]; then
+  DEFAULT_ADMIN=$(sqlite3 "$SQLITE_DB" "SELECT username FROM users WHERE username='admin' AND password_hash LIKE '%\$2b\$10\$%' LIMIT 1;" 2>/dev/null || echo "")
+  if [ -n "$DEFAULT_ADMIN" ]; then
+    echo "⚠️  Default admin user found in SQLite - ensure password is changed"
+  else
+    echo "✅ No default admin user found in SQLite"
+  fi
+fi
 
 echo "🔒 Security check complete"
 ```
