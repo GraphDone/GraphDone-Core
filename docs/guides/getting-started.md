@@ -1,7 +1,5 @@
 # Getting Started with GraphDone
 
-**AI-Generated Content Warning: This documentation contains AI-generated content. Verify information before depending on it for decision making.**
-
 Welcome to GraphDone! This guide will help you set up and start using GraphDone for your team's project management needs.
 
 ## Prerequisites
@@ -20,7 +18,7 @@ Before you begin, ensure you have the following installed:
 ```bash
 # Clone the repository
 git clone https://github.com/GraphDone/GraphDone-Core.git
-cd graphdone
+cd GraphDone-Core
 
 # Run setup script
 ./tools/setup.sh
@@ -38,7 +36,7 @@ The setup script will:
 ```bash
 # Clone and install dependencies
 git clone https://github.com/GraphDone/GraphDone-Core.git
-cd graphdone
+cd GraphDone-Core
 npm install
 
 # Set up environment variables
@@ -46,10 +44,9 @@ cp packages/server/.env.example packages/server/.env
 cp packages/web/.env.example packages/web/.env
 
 # Start database
-docker-compose up -d postgres redis
+docker-compose up -d neo4j
 
-# Run database migrations
-cd packages/server && npm run db:migrate && cd ../..
+# Database seeding handled automatically by the application
 
 # Build packages
 npm run build
@@ -66,7 +63,8 @@ Start the development servers:
 This will start:
 - **Web application** at http://localhost:3000
 - **GraphQL API** at http://localhost:4000/graphql
-- **PostgreSQL database** at localhost:5432
+- **Neo4j database** at localhost:7687
+- **Neo4j Browser** at http://localhost:7474
 
 ## Core Concepts
 
@@ -123,9 +121,9 @@ Your node will appear in the graph visualization, positioned based on its comput
 ## Common Issues
 
 ### Database Connection Errors
-Ensure PostgreSQL is running:
+Ensure Neo4j is running:
 ```bash
-docker-compose up -d postgres
+docker-compose up -d neo4j
 ```
 
 ### Port Already in Use
