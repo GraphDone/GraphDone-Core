@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Minimize2, Maximize2, Move, Zap } from 'lucide-react';
-import { WorkItemEdge, RelationshipType } from '../types';
+import { WorkItemEdge, RelationshipType } from '../types/graph';
 import { getRelationshipConfig, RELATIONSHIP_OPTIONS, getRelationshipIconElement } from '../constants/workItemConstants';
 import { useMutation } from '@apollo/client';
 import { UPDATE_EDGE, CREATE_EDGE, DELETE_EDGE } from '../lib/queries';
