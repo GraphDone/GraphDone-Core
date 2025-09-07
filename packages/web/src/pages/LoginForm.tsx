@@ -377,7 +377,7 @@ export function LoginForm() {
                 Quick access for testing. Please change these passwords in production!
               </p>
               <div className="space-y-2">
-                {defaultAccounts.map((account) => (
+                {defaultAccounts.map((account: any) => (
                   <button
                     key={account.username}
                     onClick={() => fillDefaultCredentials(account.username, account.password)}
