@@ -1,6 +1,40 @@
 import { gql } from 'graphql-tag';
 
-export const authTypeDefs = gql`
+// Standalone auth schema that includes all necessary types for auth-only mode
+export const authOnlyTypeDefs = gql`
+  # User roles
+  enum UserRole {
+    ADMIN
+    USER
+    VIEWER
+    GUEST
+  }
+
+  # Team type (minimal for auth)
+  type Team {
+    id: ID!
+    name: String!
+    description: String
+  }
+
+  # User type (from SQLite)
+  type User {
+    id: ID!
+    email: String!
+    username: String!
+    name: String!
+    avatar: String
+    role: UserRole!
+    isActive: Boolean!
+    isEmailVerified: Boolean!
+    lastLogin: String
+    deactivationDate: String
+    createdAt: String!
+    updatedAt: String!
+    team: Team
+  }
+
+  # Auth payload
   type AuthPayload {
     token: String!
     user: User!
@@ -175,24 +209,24 @@ export const authTypeDefs = gql`
     requestPasswordReset(email: String!): MessageResponse!
     resetPassword(input: ResetPasswordInput!): MessageResponse!
     
-    # Team management (for GRAPH_MASTER role)
+    # Team management (for ADMIN role)
     createTeam(name: String!, description: String): Team!
     inviteToTeam(email: String!, teamId: String!, role: UserRole!): MessageResponse!
     acceptInvite(inviteToken: String!): AuthPayload!
     
-    # Role management (for PATH_KEEPER and GRAPH_MASTER)
+    # Role management (for ADMIN)
     updateUserRole(userId: String!, role: UserRole!): User!
     
-    # Admin password reset (for GRAPH_MASTER only)
+    # Admin password reset (for ADMIN only)
     resetUserPassword(userId: String!): PasswordResetResponse!
     
-    # Admin user deletion (for GRAPH_MASTER only)
+    # Admin user deletion (for ADMIN only)
     deleteUser(userId: String!): MessageResponse!
     
-    # Admin user creation (for GRAPH_MASTER only)
+    # Admin user creation (for ADMIN only)
     createUser(input: CreateUserInput!): User!
     
-    # Admin user status update (for GRAPH_MASTER only)
+    # Admin user status update (for ADMIN only)
     updateUserStatus(userId: String!, isActive: Boolean!): User!
     
     # Folder Management Mutations
