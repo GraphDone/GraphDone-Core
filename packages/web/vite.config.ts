@@ -23,15 +23,15 @@ export default defineConfig({
     },
     proxy: {
       '/graphql': {
-        target: 'http://localhost:4127',
+        target: process.env.VITE_PROXY_TARGET || 'http://localhost:4127',
         changeOrigin: true
       },
       '/health': {
-        target: 'http://localhost:4127',
+        target: process.env.VITE_PROXY_TARGET || 'http://localhost:4127',
         changeOrigin: true
       },
       '/mcp': {
-        target: 'http://localhost:4127',
+        target: process.env.VITE_PROXY_TARGET || 'http://localhost:4127',
         changeOrigin: true
       }
     }
