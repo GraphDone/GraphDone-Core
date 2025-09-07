@@ -680,9 +680,392 @@ export function Backend() {
                 </div>
               )}
             </div>
+
+            {/* Database Administration Section */}
+            <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-lg font-semibold text-gray-100 flex items-center">
+                  <Database className="h-5 w-5 mr-2" />
+                  Database Administration
+                </h2>
+                <div className="text-sm text-gray-400">
+                  GraphQL Query Tools & Data Management
+                </div>
+              </div>
+              
+              {/* Database Statistics */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div className="bg-gray-700 border border-gray-600 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-gray-400">Total Graphs</p>
+                      <p className="text-xl font-bold text-blue-300" id="graph-count">Loading...</p>
+                    </div>
+                    <div className="text-blue-400">
+                      <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M3 4a1 1 0 011-1h4a1 1 0 010 2H6.414l2.293 2.293a1 1 0 01-1.414 1.414L5 6.414V8a1 1 0 01-2 0V4zm9 1a1 1 0 010-2h4a1 1 0 011 1v4a1 1 0 01-2 0V6.414l-2.293 2.293a1 1 0 11-1.414-1.414L13.586 5H12z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="bg-gray-700 border border-gray-600 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-gray-400">Total Nodes</p>
+                      <p className="text-xl font-bold text-green-300" id="node-count">Loading...</p>
+                    </div>
+                    <div className="text-green-400">
+                      <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="bg-gray-700 border border-gray-600 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-gray-400">Total Edges</p>
+                      <p className="text-xl font-bold text-purple-300" id="edge-count">Loading...</p>
+                    </div>
+                    <div className="text-purple-400">
+                      <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="bg-gray-700 border border-gray-600 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-gray-400">Data Issues</p>
+                      <p className="text-xl font-bold text-red-300" id="issue-count">Checking...</p>
+                    </div>
+                    <div className="text-red-400">
+                      <AlertCircle className="w-6 h-6" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Actions */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <button
+                  onClick={async () => {
+                    const debug = [...debugInfo];
+                    try {
+                      debug.push('🔄 Refreshing database statistics...');
+                      await updateDatabaseStats(debug);
+                      setDebugInfo(debug);
+                    } catch (error) {
+                      debug.push(`❌ Failed to refresh stats: ${error}`);
+                      setDebugInfo(debug);
+                    }
+                  }}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center justify-center space-x-2"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  <span>Refresh Stats</span>
+                </button>
+                
+                <button
+                  onClick={async () => {
+                    const debug = [...debugInfo];
+                    try {
+                      debug.push('🔍 Checking for data integrity issues...');
+                      await checkDataIntegrity(debug);
+                      setDebugInfo(debug);
+                    } catch (error) {
+                      debug.push(`❌ Data integrity check failed: ${error}`);
+                      setDebugInfo(debug);
+                    }
+                  }}
+                  className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center justify-center space-x-2"
+                >
+                  <AlertCircle className="h-4 w-4" />
+                  <span>Check Data</span>
+                </button>
+                
+                <button
+                  onClick={async () => {
+                    const debug = [...debugInfo];
+                    if (confirm('This will delete duplicate and corrupted test data. Continue?')) {
+                      try {
+                        debug.push('🧹 Starting database cleanup...');
+                        await cleanupTestData(debug);
+                        setDebugInfo(debug);
+                      } catch (error) {
+                        debug.push(`❌ Cleanup failed: ${error}`);
+                        setDebugInfo(debug);
+                      }
+                    } else {
+                      debug.push('ℹ️ Cleanup cancelled by user');
+                      setDebugInfo(debug);
+                    }
+                  }}
+                  className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center justify-center space-x-2"
+                >
+                  <Database className="h-4 w-4" />
+                  <span>Cleanup Data</span>
+                </button>
+              </div>
+
+              {/* GraphQL Query Tool */}
+              <div className="space-y-4">
+                <h3 className="text-md font-medium text-gray-200">GraphQL Query Tool</h3>
+                
+                <div className="bg-gray-900 rounded-lg p-4 border border-gray-600">
+                  <textarea
+                    id="graphql-query"
+                    placeholder={`Enter GraphQL query or mutation here, e.g.:
+
+query GetGraphs {
+  graphs {
+    id
+    name
+    type
+    status
+  }
+}
+
+mutation DeleteGraph($id: ID!) {
+  deleteGraphs(where: { id: $id }) {
+    nodesDeleted
+  }
+}`}
+                    className="w-full h-32 bg-transparent text-green-300 font-mono text-sm border-none outline-none resize-none"
+                    style={{ fontFamily: 'Monaco, Consolas, "Courier New", monospace' }}
+                  />
+                </div>
+                
+                <div className="flex space-x-2">
+                  <button
+                    onClick={async () => {
+                      const query = (document.getElementById('graphql-query') as HTMLTextAreaElement).value.trim();
+                      if (!query) {
+                        alert('Please enter a GraphQL query');
+                        return;
+                      }
+                      
+                      const debug = [...debugInfo];
+                      try {
+                        debug.push(`🔍 Executing GraphQL query...`);
+                        debug.push(`📝 Query: ${query.substring(0, 100)}${query.length > 100 ? '...' : ''}`);
+                        
+                        const response = await fetch('/graphql', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ query })
+                        });
+                        
+                        const result = await response.json();
+                        
+                        if (result.errors) {
+                          debug.push(`❌ GraphQL errors:`);
+                          result.errors.forEach((err: any, i: number) => {
+                            debug.push(`  ${i + 1}. ${err.message}`);
+                          });
+                        }
+                        
+                        if (result.data) {
+                          debug.push(`✅ Query successful!`);
+                          debug.push(`📊 Result: ${JSON.stringify(result.data, null, 2).substring(0, 500)}...`);
+                        }
+                      } catch (error) {
+                        debug.push(`💥 Query execution failed: ${error}`);
+                      }
+                      setDebugInfo(debug);
+                    }}
+                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors"
+                  >
+                    Execute Query
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                      (document.getElementById('graphql-query') as HTMLTextAreaElement).value = '';
+                    }}
+                    className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors"
+                  >
+                    Clear
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                      (document.getElementById('graphql-query') as HTMLTextAreaElement).value = `query GetDatabaseStats {
+  graphs { id name type status }
+  workItems { id title type status }
+  edges { id type }
+}`;
+                    }}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+                  >
+                    Sample Query
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </div>
   );
+
+  // Database utility functions
+  async function updateDatabaseStats(debug: string[]) {
+    try {
+      debug.push('📊 Fetching graph count...');
+      const graphResponse = await fetch('/graphql', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: 'query { graphs { id } }' })
+      });
+      const graphData = await graphResponse.json();
+      const graphCount = graphData.data?.graphs?.length || 0;
+      document.getElementById('graph-count')!.textContent = graphCount.toString();
+      debug.push(`✅ Found ${graphCount} graphs`);
+
+      debug.push('📊 Fetching node count...');
+      const nodeResponse = await fetch('/graphql', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: 'query { workItems { id } }' })
+      });
+      const nodeData = await nodeResponse.json();
+      const nodeCount = nodeData.data?.workItems?.length || 0;
+      document.getElementById('node-count')!.textContent = nodeCount.toString();
+      debug.push(`✅ Found ${nodeCount} nodes`);
+
+      debug.push('📊 Fetching edge count...');
+      const edgeResponse = await fetch('/graphql', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: 'query { edges { id } }' })
+      });
+      const edgeData = await edgeResponse.json();
+      const edgeCount = edgeData.data?.edges?.length || 0;
+      document.getElementById('edge-count')!.textContent = edgeCount.toString();
+      debug.push(`✅ Found ${edgeCount} edges`);
+
+    } catch (error) {
+      debug.push(`❌ Failed to update stats: ${error}`);
+      document.getElementById('graph-count')!.textContent = 'Error';
+      document.getElementById('node-count')!.textContent = 'Error';
+      document.getElementById('edge-count')!.textContent = 'Error';
+    }
+  }
+
+  async function checkDataIntegrity(debug: string[]) {
+    let issueCount = 0;
+    debug.push('🔍 Checking for data integrity issues...');
+
+    try {
+      // Check for graphs with invalid types
+      const graphResponse = await fetch('/graphql', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: 'query { graphs { id name } }' })
+      });
+      
+      const graphResult = await graphResponse.json();
+      if (graphResult.errors) {
+        issueCount += graphResult.errors.length;
+        debug.push(`❌ Found ${graphResult.errors.length} GraphQL schema errors`);
+        graphResult.errors.forEach((err: any, i: number) => {
+          debug.push(`  ${i + 1}. ${err.message}`);
+        });
+      }
+
+      // Check for extremely long names (likely test data)
+      if (graphResult.data?.graphs) {
+        const longNameGraphs = graphResult.data.graphs.filter((g: any) => g.name && g.name.length > 100);
+        if (longNameGraphs.length > 0) {
+          issueCount += longNameGraphs.length;
+          debug.push(`⚠️ Found ${longNameGraphs.length} graphs with extremely long names (likely test data)`);
+        }
+
+        // Check for single-character names (likely test data)
+        const shortNameGraphs = graphResult.data.graphs.filter((g: any) => g.name && g.name.length <= 2);
+        if (shortNameGraphs.length > 0) {
+          debug.push(`ℹ️ Found ${shortNameGraphs.length} graphs with very short names (a, x, etc.)`);
+        }
+      }
+
+      document.getElementById('issue-count')!.textContent = issueCount.toString();
+      
+      if (issueCount === 0) {
+        debug.push('✅ No major data integrity issues found');
+        document.getElementById('issue-count')!.textContent = '0';
+      } else {
+        debug.push(`⚠️ Found ${issueCount} data integrity issues`);
+      }
+
+    } catch (error) {
+      debug.push(`❌ Data integrity check failed: ${error}`);
+      document.getElementById('issue-count')!.textContent = 'Error';
+    }
+  }
+
+  async function cleanupTestData(debug: string[]) {
+    debug.push('🧹 Starting cleanup of test data...');
+    let cleanedCount = 0;
+
+    try {
+      // Get all graphs to identify test data
+      const graphResponse = await fetch('/graphql', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: 'query { graphs { id name } }' })
+      });
+      
+      const graphData = await graphResponse.json();
+      
+      if (graphData.data?.graphs) {
+        const testGraphs = graphData.data.graphs.filter((g: any) => {
+          return (
+            g.name === 'a' ||
+            g.name === 'x' ||
+            g.name.length > 100 ||
+            g.name.includes('xxxxxxxxxxxx') ||
+            g.name.startsWith('Test Graph Debug')
+          );
+        });
+
+        debug.push(`🎯 Identified ${testGraphs.length} test graphs for cleanup`);
+
+        for (const graph of testGraphs.slice(0, 50)) { // Limit to 50 at a time to avoid timeout
+          try {
+            const deleteResponse = await fetch('/graphql', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                query: 'mutation DeleteGraph($id: ID!) { deleteGraphs(where: { id: $id }) { nodesDeleted } }',
+                variables: { id: graph.id }
+              })
+            });
+
+            const deleteResult = await deleteResponse.json();
+            if (!deleteResult.errors) {
+              cleanedCount++;
+              debug.push(`🗑️ Deleted graph: ${graph.name.substring(0, 30)}...`);
+            } else {
+              debug.push(`⚠️ Could not delete graph ${graph.id}: ${deleteResult.errors[0]?.message}`);
+            }
+          } catch (error) {
+            debug.push(`❌ Error deleting graph ${graph.id}: ${error}`);
+          }
+        }
+      }
+
+      debug.push(`✅ Cleanup complete! Removed ${cleanedCount} test graphs`);
+      
+      // Refresh stats after cleanup
+      await updateDatabaseStats(debug);
+      
+    } catch (error) {
+      debug.push(`❌ Cleanup failed: ${error}`);
+    }
+  }
 }
