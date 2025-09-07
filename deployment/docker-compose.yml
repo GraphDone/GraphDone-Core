@@ -1,7 +1,9 @@
+name: graphdone
+
 services:
   graphdone-neo4j:
     container_name: graphdone-neo4j-prod
-    image: neo4j:5.15-community
+    image: neo4j:5.26.12
     environment:
       NEO4J_AUTH: neo4j/graphdone_password
       NEO4J_PLUGINS: '["graph-data-science", "apoc"]'
@@ -12,7 +14,7 @@ services:
       - "7687:7687"  # Bolt
     volumes:
       - neo4j_data:/data
-      - neo4j_logs:/logs
+      - logs:/logs
     healthcheck:
       test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "graphdone_password", "RETURN 1"]
       interval: 10s
@@ -21,7 +23,7 @@ services:
 
   graphdone-redis:
     container_name: graphdone-redis-prod
-    image: redis:7-alpine
+    image: redis:8-alpine
     ports:
       - "6379:6379"
     volumes:
@@ -53,6 +55,8 @@ services:
         condition: service_healthy
     volumes:
       - ../packages/server/.env:/app/.env
+      - logs:/app/logs
+      - sqlite_auth_data:/app/data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4127/health"]
       interval: 30s
@@ -73,8 +77,10 @@ services:
       - graphdone-api
     volumes:
       - ../packages/web/.env:/app/.env
+      - logs:/app/logs
 
 volumes:
   neo4j_data:
-  neo4j_logs:
   redis_data:
+  logs:
+  sqlite_auth_data:
