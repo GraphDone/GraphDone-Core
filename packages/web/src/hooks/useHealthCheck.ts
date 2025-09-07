@@ -51,17 +51,22 @@ export function useHealthCheck(options: UseHealthCheckOptions = {}) {
   const [error, setError] = useState<string | null>(null);
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
 
-  const API_BASE_URL = import.meta.env.VITE_API_URL || ''; // Use relative URLs to leverage Vite proxy
+  const API_BASE_URL = ''; // Always use relative URLs to leverage Vite proxy in all environments
 
   const checkHealth = useCallback(async () => {
-    const timeoutId = setTimeout(() => {
-      setLoading(false);
-      setError('Health check timed out');
-    }, 10000); // 10 second timeout
-    
     try {
       setLoading(true);
       setError(null);
+      
+      console.log('🔍 Starting health check...');
+
+      // Create AbortController for proper timeout handling
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        controller.abort();
+        setError('Health check timed out after 10 seconds');
+        setLoading(false);
+      }, 10000);
 
       // Fetch general health status
       const healthResponse = await fetch(`${API_BASE_URL}/health`, {
@@ -69,7 +74,11 @@ export function useHealthCheck(options: UseHealthCheckOptions = {}) {
         headers: {
           'Content-Type': 'application/json',
         },
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
+      console.log('✅ Health response received:', healthResponse.status);
 
       if (!healthResponse.ok) {
         throw new Error(`Health check failed: ${healthResponse.statusText}`);
@@ -102,7 +111,12 @@ export function useHealthCheck(options: UseHealthCheckOptions = {}) {
       setLastChecked(new Date());
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Health check failed';
-      console.error('Health check error:', err);
+      console.error('❌ Health check error:', err);
+      console.error('Error type:', typeof err);
+      if (err instanceof Error) {
+        console.error('Error name:', err.name);
+        console.error('Error message:', err.message);
+      }
       setError(errorMessage);
       
       // Set fallback status when there's an error
