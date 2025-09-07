@@ -1,22 +1,32 @@
 import { useState } from 'react';
-import { Plus, Share2, Users, Table, Activity, Network, CreditCard, Columns, CalendarDays, GanttChartSquare, LayoutDashboard } from 'lucide-react';
+import { Plus, Share2, Users, Table, Activity, Network, CreditCard, Columns, CalendarDays, GanttChartSquare, LayoutDashboard, Database, AlertTriangle, Map, X, Minimize2, Edit3, Trash2, FolderPlus } from 'lucide-react';
+import { createPortal } from 'react-dom';
 import { useQuery } from '@apollo/client';
 import { SafeGraphVisualization } from '../components/SafeGraphVisualization';
+import { GraphSelector } from '../components/GraphSelector';
 import { CreateNodeModal } from '../components/CreateNodeModal';
 import { CreateGraphModal } from '../components/CreateGraphModal';
 import { GraphSelectionModal } from '../components/GraphSelectionModal';
+import { UpdateGraphModal } from '../components/UpdateGraphModal';
+import { DeleteGraphModal } from '../components/DeleteGraphModal';
 import ViewManager from '../components/ViewManager';
 import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
 import { GET_WORK_ITEMS, GET_EDGES } from '../lib/queries';
+import { APP_VERSION } from '../utils/version';
+import { useHealthStatus } from '../hooks/useHealthStatus';
 
 export function Workspace() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showCreateGraphModal, setShowCreateGraphModal] = useState(false);
+  const [showUpdateGraphModal, setShowUpdateGraphModal] = useState(false);
+  const [showDeleteGraphModal, setShowDeleteGraphModal] = useState(false);
   const [showGraphSelectionModal, setShowGraphSelectionModal] = useState(false);
   const [viewMode, setViewMode] = useState<'graph' | 'dashboard' | 'table' | 'cards' | 'kanban' | 'gantt' | 'calendar' | 'activity'>('graph');
+  const [showMiniMap, setShowMiniMap] = useState(true);
   const { currentGraph, availableGraphs } = useGraph();
   const { currentTeam, currentUser } = useAuth();
+  const { health, loading: healthLoading, error: healthError } = useHealthStatus();
 
   // Get real-time counts for header display
   const { data: workItemsData } = useQuery(GET_WORK_ITEMS, {
@@ -52,55 +62,43 @@ export function Workspace() {
   return (
     <div className="h-screen flex flex-col">
       {/* Header with Graph Context */}
-      <div className="bg-gray-800 border-b border-gray-700">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            {/* Left Section: Graph Info and Navigation */}
-            <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 lg:gap-8 flex-1">
-              {/* Graph Information */}
-              <div className="flex-shrink-0">
-                <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-emerald-400 via-green-300 to-blue-400 bg-clip-text text-transparent">
-                  {currentGraph?.name || (availableGraphs.length > 0 ? 'Select a Graph' : 'Create a Graph')}
+      <div className="bg-gray-900/30 backdrop-blur-md border-b border-gray-700/30 px-6 py-4">
+        {/* Responsive Layout Container */}
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          
+          {/* Left Section: Graph Selector */}
+          <div className="flex-1 min-w-0 lg:order-1 max-w-lg">
+            <div className="flex items-center space-x-4 h-full">
+              {/* Title & Version - Compact */}
+              <div className="flex flex-col justify-center">
+                <h1 className="text-sm font-medium text-gray-200 leading-tight">
+                  Graph Viewer
                 </h1>
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-gray-400 mt-1">
+                <div className="flex items-center space-x-2 text-xs text-gray-400 leading-tight">
+                  <span>v{APP_VERSION}</span>
                   {currentTeam && (
                     <>
+                      <span>•</span>
                       <span>{currentTeam.name}</span>
-                      <span>•</span>
-                    </>
-                  )}
-                  {currentGraph && (
-                    <>
-                      <span className="whitespace-nowrap">{actualNodeCount} node{actualNodeCount !== 1 ? 's' : ''}</span>
-                      <span>•</span>
-                      <span className="whitespace-nowrap">{actualEdgeCount} connection{actualEdgeCount !== 1 ? 's' : ''}</span>
-                      <span>•</span>
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border shadow-sm ${
-                        currentGraph.type === 'PROJECT' ? 'bg-blue-500/20 text-blue-300 border-blue-400/30' :
-                        currentGraph.type === 'WORKSPACE' ? 'bg-purple-500/20 text-purple-300 border-purple-400/30' :
-                        currentGraph.type === 'SUBGRAPH' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400/30' :
-                        currentGraph.type === 'TEMPLATE' ? 'bg-amber-500/20 text-amber-300 border-amber-400/30' :
-                        'bg-slate-500/20 text-slate-300 border-slate-400/30'
-                      }`}>
-                        {currentGraph.type}
-                      </span>
-                      {currentGraph.isShared && (
-                        <>
-                          <span>•</span>
-                          <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30 shadow-sm">
-                            <Share2 className="h-3 w-3" />
-                            <span className="text-xs font-medium">Shared</span>
-                          </div>
-                        </>
-                      )}
                     </>
                   )}
                 </div>
               </div>
               
-              {/* All Views Selector - Responsive */}
-              <div className="flex items-center flex-1 ml-8">
-                <div className="flex bg-gray-700/50 backdrop-blur-sm rounded-lg p-2 gap-1 sm:gap-2 lg:gap-4 overflow-x-auto w-full min-w-0">
+              {/* Graph Selector - Full Featured */}
+              <div className="flex-1 min-w-0">
+                <GraphSelector 
+                  onCreateGraph={() => setShowCreateGraphModal(true)}
+                  onEditGraph={(graph) => setShowUpdateGraphModal(true)}
+                  onDeleteGraph={(graph) => setShowDeleteGraphModal(true)}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Center Section: View Mode Buttons (Always Centered) */}
+          <div className="flex justify-center lg:order-2">
+            <div className="flex bg-gray-700/50 backdrop-blur-sm rounded-lg p-2 gap-1 border border-gray-600/50">
               <button
                 onClick={() => setViewMode('graph')}
                 className={`px-3 py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center space-y-2 ${
@@ -213,12 +211,27 @@ export function Workspace() {
                   Activity
                 </div>
               </button>
-                </div>
-              </div>
+            </div>
+          </div>
+
+          {/* Right Section: Status and Actions */}
+          <div className="flex flex-col lg:flex-row lg:items-center gap-3 lg:order-3">
+            {/* Neo4j Status Indicator */}
+            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-all cursor-help ${
+              health?.services?.neo4j?.status === 'healthy' 
+                ? 'bg-green-600/20 text-green-300 border border-green-500/30' 
+                : 'bg-red-600/20 text-red-300 border border-red-500/30'
+            }`} title={
+              health?.services?.neo4j?.status === 'healthy' 
+                ? 'Neo4j Graph Database Connected - All graph operations available' 
+                : `Neo4j Graph Database Offline - Limited functionality${health?.services?.neo4j?.error ? `\nError: ${health.services.neo4j.error}` : ''}`
+            }>
+              <Database className="w-4 h-4" />
+              <span className="font-medium">
+                {health?.services?.neo4j?.status === 'healthy' ? 'Neo4j GraphDB' : 'Neo4j GraphDB Offline'}
+              </span>
             </div>
 
-            {/* Right Section: Actions */}
-            <div className="flex items-center gap-3 flex-shrink-0">
             {currentGraph?.isShared && (
               <button
                 type="button"
@@ -228,7 +241,6 @@ export function Workspace() {
                 Collaborators
               </button>
             )}
-            </div>
           </div>
         </div>
       </div>
@@ -320,11 +332,78 @@ export function Workspace() {
             </div>
           </div>
         ) : viewMode === 'graph' ? (
-          <SafeGraphVisualization />
+          <div className="relative h-full">
+            {/* Neo4j Connection Warning */}
+            {health?.services?.neo4j?.status !== 'healthy' && (
+              <div className="absolute top-4 left-4 right-4 z-50">
+                <div className="bg-red-600/90 backdrop-blur-sm border border-red-500 rounded-lg p-4 shadow-lg">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="h-5 w-5 text-red-200 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <h3 className="font-semibold text-red-100 mb-1">Database Connection Lost</h3>
+                      <p className="text-red-200 text-sm mb-2">
+                        Neo4j database is not available. Graph features are limited.
+                      </p>
+                      {health?.services?.neo4j?.error && (
+                        <p className="text-red-300 text-xs font-mono bg-red-800/30 px-2 py-1 rounded">
+                          {health.services.neo4j.error}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            <SafeGraphVisualization />
+          </div>
         ) : (
           <ViewManager viewMode={viewMode as 'dashboard' | 'table' | 'cards' | 'kanban' | 'gantt' | 'calendar' | 'activity'} />
         )}
       </div>
+
+      {/* Mini-Map Navigation - Bottom Right Corner */}
+      {viewMode === 'graph' && currentGraph && showMiniMap && createPortal(
+        <div className="fixed bottom-4 right-4 w-64 h-48 bg-gray-800/95 backdrop-blur-sm border border-gray-600 rounded-lg shadow-xl z-50">
+          {/* Mini-Map Header */}
+          <div className="flex items-center justify-between p-3 border-b border-gray-700">
+            <div className="flex items-center gap-2">
+              <Map className="h-4 w-4 text-gray-400" />
+              <span className="text-sm font-medium text-gray-300">Mini-Map</span>
+            </div>
+            <button
+              onClick={() => setShowMiniMap(false)}
+              className="p-1 text-gray-400 hover:text-gray-300 hover:bg-gray-700 rounded transition-colors"
+              title="Hide Mini-Map"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          
+          {/* Mini-Map Content */}
+          <div className="p-3 h-32">
+            <div className="w-full h-full bg-gray-900/50 rounded border border-gray-600 flex items-center justify-center">
+              <div className="text-center text-gray-500">
+                <Map className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p className="text-xs">Graph Overview</p>
+                <p className="text-xs opacity-75">Coming Soon</p>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Mini-Map Toggle Button - Shows when mini-map is hidden */}
+      {viewMode === 'graph' && currentGraph && !showMiniMap && createPortal(
+        <button
+          onClick={() => setShowMiniMap(true)}
+          className="fixed bottom-4 right-4 bg-gray-800/90 backdrop-blur-sm border border-gray-600 rounded-lg p-3 shadow-xl hover:bg-gray-700/90 transition-all duration-200 z-50"
+          title="Show Mini-Map"
+        >
+          <Map className="h-5 w-5 text-gray-400" />
+        </button>,
+        document.body
+      )}
 
       {/* Create Node Modal */}
       {showCreateModal && (
@@ -347,6 +426,24 @@ export function Workspace() {
         <GraphSelectionModal
           isOpen={showGraphSelectionModal}
           onClose={() => setShowGraphSelectionModal(false)}
+        />
+      )}
+
+      {/* Update Graph Modal */}
+      {showUpdateGraphModal && currentGraph && (
+        <UpdateGraphModal
+          isOpen={showUpdateGraphModal}
+          onClose={() => setShowUpdateGraphModal(false)}
+          graph={currentGraph}
+        />
+      )}
+
+      {/* Delete Graph Modal */}
+      {showDeleteGraphModal && currentGraph && (
+        <DeleteGraphModal
+          isOpen={showDeleteGraphModal}
+          onClose={() => setShowDeleteGraphModal(false)}
+          graph={currentGraph}
         />
       )}
     </div>

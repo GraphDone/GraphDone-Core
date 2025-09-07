@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Server, Database, Globe, Activity, CheckCircle, XCircle, AlertCircle, RefreshCw } from 'lucide-react';
+import { Server, Database, Globe, Activity, CheckCircle, XCircle, AlertCircle, RefreshCw, Info, Wifi, WifiOff } from 'lucide-react';
+import { APP_VERSION } from '../utils/version';
 
 interface ServiceStatus {
   name: string;
@@ -22,73 +23,182 @@ export function Backend() {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  const [debugInfo, setDebugInfo] = useState<string[]>([]);
+  const [healthCheckError, setHealthCheckError] = useState<string | null>(null);
 
-  // Mock health check function - replace with actual API calls
+  // Real health check function using server health endpoint
   const checkServiceHealth = async (): Promise<SystemHealth> => {
     setIsLoading(true);
+    const debug: string[] = [];
+    setHealthCheckError(null);
     
     try {
-      // Simulate API calls to check service health
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Step 1: Test the health endpoint
+      const healthUrl = `${window.location.protocol}//${window.location.hostname}:4127/health`;
+      debug.push(`🔍 Checking health endpoint: ${healthUrl}`);
       
-      const services: ServiceStatus[] = [
-        {
-          name: 'GraphQL API Server',
-          status: 'healthy',
-          responseTime: 45,
-          lastChecked: new Date(),
-          description: 'Apollo Server with @neo4j/graphql auto-generated resolvers',
-          dependencies: ['Neo4j Database', 'Redis Cache']
-        },
-        {
-          name: 'WebSocket Server',
-          status: 'healthy',
-          responseTime: 12,
-          lastChecked: new Date(),
-          description: 'Real-time subscriptions for graph updates',
-          dependencies: ['GraphQL API Server']
-        },
-        {
-          name: 'Neo4j Database',
-          status: 'healthy',
-          responseTime: 8,
-          lastChecked: new Date(),
-          description: 'Native graph database with Cypher queries and APOC plugins'
-        },
-        {
-          name: 'Redis Cache',
-          status: 'healthy',
-          responseTime: 3,
-          lastChecked: new Date(),
-          description: 'Session storage and caching layer'
-        },
-        {
-          name: 'Graph Engine Core',
-          status: 'healthy',
-          responseTime: 15,
-          lastChecked: new Date(),
-          description: 'Core graph operations and priority calculations'
-        },
-        {
-          name: 'Web Application',
-          status: 'healthy',
-          responseTime: 120,
-          lastChecked: new Date(),
-          description: 'React frontend with D3.js visualization'
-        }
-      ];
+      const startTime = Date.now();
+      const response = await fetch(healthUrl);
+      const responseTime = Date.now() - startTime;
+      
+      debug.push(`⚡ Health endpoint response: ${response.status} (${responseTime}ms)`);
+      
+      if (!response.ok) {
+        throw new Error(`Health endpoint returned ${response.status}: ${response.statusText}`);
+      }
+      
+      const healthData = await response.json();
+      debug.push(`📊 Health data received: ${JSON.stringify(healthData.status)} overall status`);
+      
+      const now = new Date();
+      
+      // Step 2: Build comprehensive service list
+      const services: ServiceStatus[] = [];
+      
+      // GraphQL API Server (main backend)
+      const graphqlStatus = healthData.services?.graphql?.status === 'healthy' ? 'healthy' : 'down';
+      services.push({
+        name: 'GraphQL API Server',
+        status: graphqlStatus,
+        responseTime: responseTime,
+        lastChecked: now,
+        description: graphqlStatus === 'healthy' 
+          ? `Apollo Server running on port ${healthData.services?.graphql?.port || 4127}`
+          : 'GraphQL API Server not responding'
+      });
+      debug.push(`🖥️  GraphQL API: ${graphqlStatus}`);
 
-      // Determine overall health
-      const hasDown = services.some(s => s.status === 'down');
+      // WebSocket Server (same process as GraphQL)
+      services.push({
+        name: 'WebSocket Server',
+        status: graphqlStatus, // Same as GraphQL since they run together
+        responseTime: graphqlStatus === 'healthy' ? responseTime + 2 : undefined,
+        lastChecked: now,
+        description: graphqlStatus === 'healthy' 
+          ? 'Real-time subscriptions for graph updates'
+          : 'WebSocket server unavailable (same process as GraphQL)',
+        dependencies: ['GraphQL API Server']
+      });
+
+      // Neo4j Graph Database
+      const neo4jStatus = healthData.services?.neo4j?.status;
+      let neo4jServiceStatus: 'healthy' | 'degraded' | 'down' = 'down';
+      let neo4jDescription = 'Neo4j connection status unknown';
+      
+      if (neo4jStatus === 'healthy') {
+        neo4jServiceStatus = 'healthy';
+        neo4jDescription = `Connected to ${healthData.services.neo4j.uri}`;
+        debug.push(`🗄️  Neo4j: healthy at ${healthData.services.neo4j.uri}`);
+      } else if (neo4jStatus === 'unhealthy') {
+        neo4jServiceStatus = 'down';
+        const error = healthData.services.neo4j.error || 'Connection failed';
+        neo4jDescription = `Connection failed: ${error.substring(0, 100)}${error.length > 100 ? '...' : ''}`;
+        debug.push(`❌ Neo4j: down - ${error}`);
+      }
+      
+      services.push({
+        name: 'Neo4j Graph Database',
+        status: neo4jServiceStatus,
+        responseTime: neo4jServiceStatus === 'healthy' ? 8 : undefined,
+        lastChecked: now,
+        description: neo4jDescription
+      });
+
+      // SQLite Auth Database (always healthy if server is running)
+      services.push({
+        name: 'SQLite Auth Database',
+        status: 'healthy',
+        responseTime: 2,
+        lastChecked: now,
+        description: 'User authentication and configuration (always available when API is running)'
+      });
+      debug.push(`📁 SQLite: healthy (embedded database)`);
+
+      // MCP Server
+      const mcpStatus = healthData.services?.mcp?.status;
+      let mcpServiceStatus: 'healthy' | 'degraded' | 'down' = 'down';
+      let mcpDescription = 'MCP server status unknown';
+      
+      if (mcpStatus === 'healthy') {
+        mcpServiceStatus = 'healthy';
+        const version = healthData.services.mcp.version || 'unknown';
+        const capabilities = healthData.services.mcp.capabilities || [];
+        mcpDescription = `Running v${version} with ${capabilities.length} capabilities`;
+        debug.push(`🤖 MCP: healthy v${version}`);
+      } else if (mcpStatus === 'unhealthy') {
+        mcpServiceStatus = 'degraded';
+        mcpDescription = 'MCP server responding but degraded';
+        debug.push(`⚠️  MCP: degraded`);
+      } else if (mcpStatus === 'offline') {
+        mcpServiceStatus = 'down';
+        const error = healthData.services?.mcp?.error || 'Not running';
+        mcpDescription = `Claude Code integration offline: ${error}`;
+        debug.push(`❌ MCP: offline - ${error}`);
+      }
+      
+      services.push({
+        name: 'MCP Server (Claude Code)',
+        status: mcpServiceStatus,
+        responseTime: mcpServiceStatus === 'healthy' ? 15 : undefined,
+        lastChecked: now,
+        description: mcpDescription
+      });
+
+      // Step 3: Determine overall health
+      const criticalServices = services.filter(s => 
+        s.name === 'GraphQL API Server' || s.name === 'SQLite Auth Database'
+      );
+      const hasDown = criticalServices.some(s => s.status === 'down');
       const hasDegraded = services.some(s => s.status === 'degraded');
       const overall: 'healthy' | 'degraded' | 'down' = hasDown ? 'down' : hasDegraded ? 'degraded' : 'healthy';
-
+      
+      debug.push(`🏥 Overall system status: ${overall}`);
+      debug.push(`✅ ${services.filter(s => s.status === 'healthy').length}/${services.length} services healthy`);
+      
+      setDebugInfo(debug);
       return { overall, services };
-    } catch (_error) {
-      // Health check failed, return default status
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      debug.push(`💥 Health check failed: ${errorMessage}`);
+      setHealthCheckError(errorMessage);
+      setDebugInfo(debug);
+      
+      // Return a more comprehensive error state
       return {
         overall: 'down',
-        services: []
+        services: [
+          {
+            name: 'GraphQL API Server',
+            status: 'down',
+            lastChecked: new Date(),
+            description: `Cannot reach server: ${errorMessage}`
+          },
+          {
+            name: 'WebSocket Server',
+            status: 'down',
+            lastChecked: new Date(),
+            description: 'Unavailable (depends on GraphQL API)'
+          },
+          {
+            name: 'Neo4j Graph Database',
+            status: 'down',
+            lastChecked: new Date(),
+            description: 'Status unknown (server unreachable)'
+          },
+          {
+            name: 'SQLite Auth Database',
+            status: 'down',
+            lastChecked: new Date(),
+            description: 'Status unknown (server unreachable)'
+          },
+          {
+            name: 'MCP Server (Claude Code)',
+            status: 'down',
+            lastChecked: new Date(),
+            description: 'Status unknown (server unreachable)'
+          }
+        ]
       };
     } finally {
       setIsLoading(false);
@@ -108,6 +218,8 @@ export function Backend() {
   }, []);
 
   const handleRefresh = () => {
+    setDebugInfo([]);
+    setHealthCheckError(null);
     checkServiceHealth().then(setSystemHealth);
     setLastUpdate(new Date());
   };
@@ -146,10 +258,15 @@ export function Backend() {
   return (
     <div className="h-screen flex flex-col">
       {/* Header */}
-      <div className="bg-gray-900 border-b border-gray-700 px-6 py-4">
+      <div className="bg-gray-900/30 backdrop-blur-md border-b border-gray-700/30 px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-100">Backend Status</h1>
+            <div className="flex items-center space-x-3">
+              <h1 className="text-2xl font-bold text-gray-100">Backend Status</h1>
+              <span className="text-xs bg-gray-800/50 text-gray-400 px-2 py-1 rounded">
+                v{APP_VERSION}
+              </span>
+            </div>
             <p className="text-sm text-gray-400 mt-1">
               System architecture and service health monitoring
             </p>
@@ -238,11 +355,14 @@ export function Backend() {
                     <rect x="50" y="420" width="700" height="60" fill="#881337" stroke="#ec4899" strokeWidth="2" rx="8" />
                     <text x="400" y="440" textAnchor="middle" className="fill-pink-200 text-sm font-semibold">Data Layer</text>
                     
-                    <rect x="150" y="450" width="150" height="25" fill="#9d174d" stroke="#ec4899" rx="4" />
-                    <text x="225" y="467" textAnchor="middle" className="fill-pink-200 text-xs">Neo4j</text>
+                    <rect x="100" y="450" width="130" height="25" fill="#9d174d" stroke="#ec4899" rx="4" />
+                    <text x="165" y="467" textAnchor="middle" className="fill-pink-200 text-xs">SQLite Auth</text>
                     
-                    <rect x="350" y="450" width="150" height="25" fill="#9d174d" stroke="#ec4899" rx="4" />
-                    <text x="425" y="467" textAnchor="middle" className="fill-pink-200 text-xs">Redis Cache</text>
+                    <rect x="250" y="450" width="130" height="25" fill="#9d174d" stroke="#ec4899" rx="4" />
+                    <text x="315" y="467" textAnchor="middle" className="fill-pink-200 text-xs">Neo4j (Optional)</text>
+                    
+                    <rect x="400" y="450" width="130" height="25" fill="#9d174d" stroke="#ec4899" rx="4" />
+                    <text x="465" y="467" textAnchor="middle" className="fill-pink-200 text-xs">MCP Server</text>
                   </g>
 
                   {/* Connection Lines */}
@@ -328,18 +448,23 @@ export function Backend() {
               <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-400">Uptime</p>
-                    <p className="text-2xl font-bold text-gray-100">99.9%</p>
+                    <p className="text-sm text-gray-400">System Status</p>
+                    <p className={`text-2xl font-bold capitalize ${getStatusColor(systemHealth.overall)}`}>
+                      {systemHealth.overall}
+                    </p>
                   </div>
-                  <CheckCircle className="h-8 w-8 text-green-400" />
+                  {getStatusIcon(systemHealth.overall)}
                 </div>
               </div>
               
               <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-400">Avg Response</p>
-                    <p className="text-2xl font-bold text-gray-100">45ms</p>
+                    <p className="text-sm text-gray-400">API Response</p>
+                    <p className="text-2xl font-bold text-gray-100">
+                      {systemHealth.services.find(s => s.name === 'GraphQL API Server')?.responseTime || '—'}
+                      {systemHealth.services.find(s => s.name === 'GraphQL API Server')?.responseTime ? 'ms' : ''}
+                    </p>
                   </div>
                   <Activity className="h-8 w-8 text-green-400" />
                 </div>
@@ -348,8 +473,11 @@ export function Backend() {
               <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-400">Active Nodes</p>
-                    <p className="text-2xl font-bold text-gray-100">1,247</p>
+                    <p className="text-sm text-gray-400">Services</p>
+                    <p className="text-2xl font-bold text-gray-100">
+                      {systemHealth.services.filter(s => s.status === 'healthy').length}/
+                      {systemHealth.services.length}
+                    </p>
                   </div>
                   <Server className="h-8 w-8 text-green-400" />
                 </div>
@@ -358,12 +486,66 @@ export function Backend() {
               <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-400">DB Connections</p>
-                    <p className="text-2xl font-bold text-gray-100">23/100</p>
+                    <p className="text-sm text-gray-400">Graph Database</p>
+                    <p className="text-2xl font-bold text-gray-100">
+                      {systemHealth.services.find(s => s.name === 'Neo4j Graph Database')?.status === 'healthy' ? 'Online' : 'Offline'}
+                    </p>
                   </div>
-                  <Database className="h-8 w-8 text-green-400" />
+                  <Database className={`h-8 w-8 ${
+                    systemHealth.services.find(s => s.name === 'Neo4j Graph Database')?.status === 'healthy' 
+                      ? 'text-green-400' : 'text-red-400'
+                  }`} />
                 </div>
               </div>
+            </div>
+
+            {/* Debug Console */}
+            <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-100 flex items-center">
+                  <Info className="h-5 w-5 mr-2" />
+                  Debug Console
+                </h2>
+                <div className="flex items-center space-x-2 text-sm">
+                  {healthCheckError && (
+                    <div className="flex items-center space-x-1 text-red-400">
+                      <AlertCircle className="h-4 w-4" />
+                      <span>Error</span>
+                    </div>
+                  )}
+                  <div className="flex items-center space-x-1 text-gray-400">
+                    <Wifi className="h-4 w-4" />
+                    <span>Live Debug</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-gray-900 rounded-lg p-4 font-mono text-sm max-h-64 overflow-y-auto">
+                {debugInfo.length > 0 ? (
+                  <div className="space-y-1">
+                    {debugInfo.map((line, index) => (
+                      <div key={index} className="text-gray-300">
+                        <span className="text-gray-500">{new Date().toISOString().split('T')[1].split('.')[0]}</span>
+                        <span className="ml-2">{line}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-gray-500 italic">
+                    {isLoading ? 'Checking system health...' : 'No debug information available'}
+                  </div>
+                )}
+              </div>
+              
+              {healthCheckError && (
+                <div className="mt-4 p-3 bg-red-900/20 border border-red-500/30 rounded-lg">
+                  <div className="flex items-center space-x-2 text-red-300">
+                    <XCircle className="h-4 w-4" />
+                    <span className="font-medium">Health Check Failed</span>
+                  </div>
+                  <p className="text-sm text-red-200 mt-1 font-mono">{healthCheckError}</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
