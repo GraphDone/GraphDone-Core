@@ -17,18 +17,14 @@ export function useHealthStatus() {
 
   const checkHealth = async () => {
     try {
-      console.log('🔍 useHealthStatus: Starting health check...');
       const response = await fetch('/health'); // Use relative URL to leverage Vite proxy
-      console.log('✅ useHealthStatus: Health response received:', response.status);
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
       const data = await response.json();
-      console.log('📊 useHealthStatus: Health data:', data);
       setHealth(data);
       setError(null);
     } catch (err) {
-      console.error('❌ useHealthStatus: Health check error:', err);
       setError(err instanceof Error ? err.message : 'Health check failed');
       setHealth(null);
     } finally {

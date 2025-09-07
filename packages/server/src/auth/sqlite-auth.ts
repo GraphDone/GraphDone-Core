@@ -45,7 +45,7 @@ class SQLiteAuthStore {
         if (err) {
           reject(err);
         } else {
-          console.log('✅ Connected to SQLite auth database:', dbPath);
+          // Database connection successful
           resolve(this.db!);
         }
       });
@@ -256,13 +256,13 @@ class SQLiteAuthStore {
                 if (err) {
                   reject(err);
                 } else {
-                  console.log('✅ Default folder structure created');
+                  // Default folder structure created
                   resolve();
                 }
               });
           });
         } else {
-          console.log('📁 Default folders already exist');
+          // Default folders already exist
           resolve();
         }
       });
@@ -314,14 +314,12 @@ class SQLiteAuthStore {
               if (err) {
                 reject(err);
               } else {
-                console.log('✅ Default users created:');
-                console.log('   👤 admin / graphdone (ADMIN)');
-                console.log('   👁️  viewer / viewer123 (VIEWER)');
+                // Default users created successfully
                 resolve();
               }
             });
         } else {
-          console.log('👤 Default users already exist');
+          // Default users already exist
           resolve();
         }
       });
@@ -932,12 +930,12 @@ class SQLiteAuthStore {
                   if (err) {
                     reject(err);
                   } else {
-                    console.log(`✅ Created folder structure for user ${userId}`);
+                    // Created folder structure for user
                     resolve();
                   }
                 });
             } else {
-              console.log(`✅ Created personal folder structure for user ${userId}`);
+              // Created personal folder structure for user
               resolve();
             }
           });
