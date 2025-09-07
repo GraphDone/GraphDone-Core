@@ -34,21 +34,31 @@ export function Backend() {
     
     try {
       // Step 1: Test the health endpoint
-      const healthUrl = `${window.location.protocol}//${window.location.hostname}:4127/health`;
-      debug.push(`🔍 Checking health endpoint: ${healthUrl}`);
+      const healthUrl = '/health'; // Use relative URL to leverage Vite proxy
+      debug.push(`🔍 Checking health endpoint: ${window.location.origin}${healthUrl}`);
+      debug.push(`🔍 Using fetch with relative URL: "${healthUrl}"`);
       
       const startTime = Date.now();
-      const response = await fetch(healthUrl);
+      const response = await fetch(healthUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      });
       const responseTime = Date.now() - startTime;
       
       debug.push(`⚡ Health endpoint response: ${response.status} (${responseTime}ms)`);
+      debug.push(`⚡ Response headers: Content-Type: ${response.headers.get('content-type')}`);
       
       if (!response.ok) {
+        debug.push(`❌ Response not OK: ${response.status} ${response.statusText}`);
         throw new Error(`Health endpoint returned ${response.status}: ${response.statusText}`);
       }
       
       const healthData = await response.json();
-      debug.push(`📊 Health data received: ${JSON.stringify(healthData.status)} overall status`);
+      debug.push(`📊 Raw health data: ${JSON.stringify(healthData, null, 2)}`);
+      debug.push(`📊 Health status: ${healthData.status}`);
       
       const now = new Date();
       
@@ -161,6 +171,12 @@ export function Backend() {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       debug.push(`💥 Health check failed: ${errorMessage}`);
+      debug.push(`💥 Error type: ${typeof error}`);
+      if (error instanceof Error) {
+        debug.push(`💥 Error name: ${error.name}`);
+        debug.push(`💥 Error stack: ${error.stack?.substring(0, 200)}`);
+      }
+      debug.push(`💥 Fetch URL attempted: ${window.location.origin}/health`);
       setHealthCheckError(errorMessage);
       setDebugInfo(debug);
       
@@ -206,13 +222,22 @@ export function Backend() {
   };
 
   useEffect(() => {
-    checkServiceHealth().then(setSystemHealth);
-    
-    // Auto-refresh every 30 seconds
-    const interval = setInterval(() => {
-      checkServiceHealth().then(setSystemHealth);
+    // Immediate health check on component mount
+    console.log('🏥 Backend Status page mounted - starting health check...');
+    checkServiceHealth().then((result) => {
+      setSystemHealth(result);
       setLastUpdate(new Date());
-    }, 30000);
+      console.log('🏥 Initial health check completed:', result);
+    });
+    
+    // Auto-refresh every 15 seconds for more frequent updates
+    const interval = setInterval(() => {
+      console.log('🔄 Auto-refreshing health status...');
+      checkServiceHealth().then((result) => {
+        setSystemHealth(result);
+        setLastUpdate(new Date());
+      });
+    }, 15000);
 
     return () => clearInterval(interval);
   }, []);
@@ -280,15 +305,38 @@ export function Backend() {
               </div>
             </div>
             
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={handleRefresh}
-              disabled={isLoading}
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-              Refresh
-            </button>
+            <div className="flex space-x-2">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={handleRefresh}
+                disabled={isLoading}
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+                Refresh
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => {
+                  const debug: string[] = [];
+                  debug.push('🔄 Force debug refresh initiated by user');
+                  debug.push(`🕐 Time: ${new Date().toISOString()}`);
+                  debug.push(`🌐 Current URL: ${window.location.href}`);
+                  debug.push(`📍 Origin: ${window.location.origin}`);
+                  debug.push(`🔗 Health URL: /health`);
+                  debug.push(`🔗 GraphQL URL: /graphql`);
+                  debug.push(`📶 Navigator online: ${navigator.onLine}`);
+                  debug.push(`🖥️  User agent: ${navigator.userAgent.substring(0, 100)}...`);
+                  setDebugInfo(debug);
+                  handleRefresh();
+                }}
+                disabled={isLoading}
+              >
+                <Activity className="h-4 w-4 mr-2" />
+                Force Debug
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -497,6 +545,94 @@ export function Backend() {
                   }`} />
                 </div>
               </div>
+            </div>
+
+            {/* System Information */}
+            <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
+              <h2 className="text-lg font-semibold text-gray-100 flex items-center mb-4">
+                <Server className="h-5 w-5 mr-2" />
+                System Information
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Current URL:</span>
+                    <span className="text-gray-200 font-mono">{window.location.href}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Origin:</span>
+                    <span className="text-gray-200 font-mono">{window.location.origin}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Health URL:</span>
+                    <span className="text-gray-200 font-mono">{window.location.origin}/health</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">GraphQL URL:</span>
+                    <span className="text-gray-200 font-mono">{window.location.origin}/graphql</span>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">User Agent:</span>
+                    <span className="text-gray-200 font-mono text-xs">{navigator.userAgent.substring(0, 50)}...</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Online:</span>
+                    <span className={`font-semibold ${navigator.onLine ? 'text-green-400' : 'text-red-400'}`}>
+                      {navigator.onLine ? 'Yes' : 'No'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Last Update:</span>
+                    <span className="text-gray-200">{lastUpdate.toLocaleTimeString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Auto-refresh:</span>
+                    <span className="text-green-400">Every 15s</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Network Test */}
+            <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
+              <h2 className="text-lg font-semibold text-gray-100 flex items-center mb-4">
+                <Globe className="h-5 w-5 mr-2" />
+                Network Test
+              </h2>
+              <button
+                onClick={async () => {
+                  const debug: string[] = [];
+                  try {
+                    debug.push('🧪 Starting manual network test...');
+                    debug.push(`🌐 Testing fetch to: ${window.location.origin}/health`);
+                    
+                    const startTime = Date.now();
+                    const response = await fetch('/health');
+                    const endTime = Date.now();
+                    
+                    debug.push(`⚡ Response time: ${endTime - startTime}ms`);
+                    debug.push(`📡 Status: ${response.status} ${response.statusText}`);
+                    debug.push(`📦 Content-Type: ${response.headers.get('content-type')}`);
+                    
+                    if (response.ok) {
+                      const data = await response.json();
+                      debug.push(`✅ JSON parse successful`);
+                      debug.push(`📊 Health status: ${data.status}`);
+                      debug.push(`🔢 Services count: ${Object.keys(data.services || {}).length}`);
+                    } else {
+                      debug.push(`❌ Response not OK`);
+                    }
+                  } catch (error) {
+                    debug.push(`💥 Network test failed: ${error}`);
+                  }
+                  setDebugInfo(debug);
+                }}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+              >
+                Run Network Test
+              </button>
             </div>
 
             {/* Debug Console */}
