@@ -434,7 +434,6 @@ export function Workspace() {
         <UpdateGraphModal
           isOpen={showUpdateGraphModal}
           onClose={() => setShowUpdateGraphModal(false)}
-          graph={currentGraph}
         />
       )}
 
@@ -443,7 +442,6 @@ export function Workspace() {
         <DeleteGraphModal
           isOpen={showDeleteGraphModal}
           onClose={() => setShowDeleteGraphModal(false)}
-          graph={currentGraph}
         />
       )}
     </div>
