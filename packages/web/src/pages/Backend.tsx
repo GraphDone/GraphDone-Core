@@ -223,16 +223,13 @@ export function Backend() {
 
   useEffect(() => {
     // Immediate health check on component mount
-    console.log('🏥 Backend Status page mounted - starting health check...');
     checkServiceHealth().then((result) => {
       setSystemHealth(result);
       setLastUpdate(new Date());
-      console.log('🏥 Initial health check completed:', result);
     });
     
     // Auto-refresh every 15 seconds for more frequent updates
     const interval = setInterval(() => {
-      console.log('🔄 Auto-refreshing health status...');
       checkServiceHealth().then((result) => {
         setSystemHealth(result);
         setLastUpdate(new Date());
