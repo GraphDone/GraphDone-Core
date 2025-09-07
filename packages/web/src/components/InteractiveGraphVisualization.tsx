@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import ReactDOM from 'react-dom/client';
 import * as d3 from 'd3';
-import { Link2, Edit3, Trash2, Folder, FolderOpen, Plus, FileText, Settings, Maximize2, ArrowLeft, X, GitBranch, Minus, Unlink } from 'lucide-react';
+import { Link2, Edit3, Trash2, Folder, FolderOpen, Plus, FileText, Settings, Maximize2, ArrowLeft, X, GitBranch, Minus, Unlink, Crosshair } from 'lucide-react';
 import {
   getPriorityIconElement,
   getStatusIconElement,
@@ -18,7 +18,7 @@ import {
   ListTodo,
   Target
 } from '../constants/workItemConstants';
-import { useQuery, useMutation } from '@apollo/client';
+import { useQuery, useMutation, useApolloClient, gql } from '@apollo/client';
 import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
@@ -28,6 +28,7 @@ import { validateGraphData, getValidationSummary, ValidationResult } from '../ut
 import { DEFAULT_NODE_CONFIG } from '../constants/workItemConstants';
 
 import { DeleteNodeModal } from './DeleteNodeModal';
+import { RelationshipEditorWindow } from './RelationshipEditorWindow';
 import { CreateNodeModal } from './CreateNodeModal';
 import { CreateGraphModal } from './CreateGraphModal';
 import { GraphSelectionModal } from './GraphSelectionModal';
@@ -52,7 +53,11 @@ interface EdgeMenuState {
   visible: boolean;
 }
 
-export function InteractiveGraphVisualization() {
+interface InteractiveGraphVisualizationProps {
+  onResetLayout?: () => void;
+}
+
+export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGraphVisualizationProps = {}) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const { currentGraph, availableGraphs } = useGraph();
@@ -61,7 +66,7 @@ export function InteractiveGraphVisualization() {
   const navigate = useNavigate();
   const location = useLocation();
   
-  const isFullscreen = location.pathname === '/graph';
+  // Fullscreen mode abandoned - keeping single view mode
 
   // Prevent body scroll when graph view is active
   useEffect(() => {
@@ -177,8 +182,39 @@ export function InteractiveGraphVisualization() {
 
   // Mutation for updating work item positions
   const [updateWorkItemMutation] = useMutation(UPDATE_WORK_ITEM, {
-    // Don't refetch - we want immediate UI updates without waiting for server
-    errorPolicy: 'all'
+    refetchQueries: [
+      { 
+        query: GET_WORK_ITEMS,
+        variables: currentGraph ? {
+          where: {
+            graph: {
+              id: currentGraph.id
+            }
+          }
+        } : { where: {} }
+      },
+      { 
+        query: GET_EDGES,
+        variables: currentGraph ? {
+          where: {
+            source: {
+              graph: {
+                id: currentGraph.id
+              }
+            }
+          }
+        } : { where: {} }
+      }
+    ],
+    awaitRefetchQueries: true, // Wait for refetch to complete
+    errorPolicy: 'all',
+    onCompleted: (data) => {
+      console.log('[Graph Debug] Node update completed successfully', data);
+      // Don't force reinitialization - let data updates flow through naturally
+    },
+    onError: (error) => {
+      console.error('[Graph Debug] Node update failed:', error);
+    }
   });
   
   const [nodeMenu, setNodeMenu] = useState<NodeMenuState>({ node: null, position: { x: 0, y: 0 }, visible: false });
@@ -199,9 +235,8 @@ export function InteractiveGraphVisualization() {
   const [showUpdateGraphModal, setShowUpdateGraphModal] = useState(false);
   const [showDeleteGraphModal, setShowDeleteGraphModal] = useState(false);
   const [selectedNode, setSelectedNode] = useState<WorkItem | null>(null);
+  const lastSelectedNodeRef = useRef<any>(null); // Track last selected node for centering
   const [selectedEdge, setSelectedEdge] = useState<WorkItemEdge | null>(null);
-  const [showEdgeDetails, setShowEdgeDetails] = useState(false);
-  const [edgeDetailsPosition, setEdgeDetailsPosition] = useState<{ x: number; y: number } | null>(null);
   const [createNodePosition, setCreateNodePosition] = useState<{ x: number; y: number; z: number } | undefined>(undefined);
   const [currentTransform, setCurrentTransform] = useState({ x: 0, y: 0, scale: 1 });
   const [editingEdge, setEditingEdge] = useState<{ edge: WorkItemEdge; position: { x: number; y: number } } | null>(null);
@@ -210,6 +245,10 @@ export function InteractiveGraphVisualization() {
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [dragStart, setDragStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number; graphX: number; graphY: number } | null>(null);
+  const [isFlippingEdge, setIsFlippingEdge] = useState(false);
+  const [showRelationshipWindow, setShowRelationshipWindow] = useState(false);
+  const [selectedNodes, setSelectedNodes] = useState<Set<string>>(new Set());
+  
   
   // Handle dragging for relationship selector
   useEffect(() => {
@@ -386,6 +425,77 @@ export function InteractiveGraphVisualization() {
         .style('filter', `url(#${filterId})`);
     }
     
+    // Apply glow effects to all selected nodes (for multi-select)
+    if (selectedNodes.size > 0) {
+      const nodeIdsArray = Array.from(selectedNodes);
+      
+      // Group nodes by type for efficient filter creation
+      const nodesByType = new Map<string, string[]>();
+      
+      svg.selectAll('.node-bg')
+        .filter((d: any) => d && nodeIdsArray.includes(d.id))
+        .each((d: any) => {
+          const nodeType = d.type.toLowerCase();
+          if (!nodesByType.has(nodeType)) {
+            nodesByType.set(nodeType, []);
+          }
+          nodesByType.get(nodeType)!.push(d.id);
+        });
+      
+      // Create glow filters for each node type that has selected nodes
+      nodesByType.forEach((nodeIds, nodeType) => {
+        const nodeTypeConfig = getTypeConfig(nodeType as WorkItemType);
+        const nodeColor = nodeTypeConfig.hexColor;
+        const filterId = `selected-node-glow-${nodeType}`;
+        
+        // Remove existing filter and create new one
+        defs.select(`#${filterId}`).remove();
+        
+        const nodeGlowFilter = defs.append('filter')
+          .attr('id', filterId)
+          .attr('x', '-100%')
+          .attr('y', '-100%')
+          .attr('width', '300%')
+          .attr('height', '300%');
+        
+        // Convert hex to RGB values
+        const hexToRgb = (hex: string) => {
+          const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+          return result ? {
+            r: parseInt(result[1], 16) / 255,
+            g: parseInt(result[2], 16) / 255,
+            b: parseInt(result[3], 16) / 255
+          } : { r: 0.06, g: 0.73, b: 0.51 }; // fallback green
+        };
+        
+        const rgb = hexToRgb(nodeColor);
+        nodeGlowFilter.append('feColorMatrix')
+          .attr('in', 'SourceGraphic')
+          .attr('type', 'matrix')
+          .attr('values', `0 0 0 0 ${rgb.r} 0 0 0 0 ${rgb.g} 0 0 0 0 ${rgb.b} 0 0 0 1 0`);
+        
+        const blur = nodeGlowFilter.append('feGaussianBlur')
+          .attr('stdDeviation', '8')  // Slightly smaller than dialog glow
+          .attr('result', 'coloredBlur');
+        
+        // Subtle pulsing animation for selected nodes
+        blur.append('animate')
+          .attr('attributeName', 'stdDeviation')
+          .attr('values', '6;12;6')
+          .attr('dur', '3s')
+          .attr('repeatCount', 'indefinite');
+        
+        const feMerge = nodeGlowFilter.append('feMerge');
+        feMerge.append('feMergeNode').attr('in', 'coloredBlur');
+        feMerge.append('feMergeNode').attr('in', 'SourceGraphic');
+        
+        // Apply the glow to nodes of this type that are selected
+        svg.selectAll('.node-bg')
+          .filter((d: any) => d && nodeIds.includes(d.id))
+          .style('filter', `url(#${filterId})`);
+      });
+    }
+    
     // Apply relationship-specific glow to active edge if editingEdge is visible
     if (editingEdge && editingEdge.edge) {
       const relationshipConfig = getRelationshipConfig(editingEdge.edge.type as RelationshipType);
@@ -438,7 +548,7 @@ export function InteractiveGraphVisualization() {
     }
     
     // Also apply relationship-specific glow to edge when showing edge details
-    if (showEdgeDetails && selectedEdge) {
+    if (false) { // Removed edge details dialog
       const relationshipConfig = getRelationshipConfig(selectedEdge.type as RelationshipType);
       const edgeColor = relationshipConfig.hexColor;
       const edgeFilterId = `edge-glow-${selectedEdge.type.toLowerCase()}`;
@@ -488,7 +598,13 @@ export function InteractiveGraphVisualization() {
         .attr('stroke-width', 12); // Same thickness as relationship editing
     }
     
-  }, [nodeMenu.visible, nodeMenu.node?.id, editingEdge?.edge?.id, showEdgeDetails, selectedEdge?.id]);
+  }, [nodeMenu.visible, nodeMenu.node?.id, editingEdge?.edge?.id, selectedEdge?.id, selectedNodes]);
+  
+  // Auto-collapse relationship panel when no items are selected
+  useEffect(() => {
+    // Auto-hide relationship window when no items are selected (optional)
+    // Window will be controlled manually by user interactions
+  }, [selectedNodes.size, editingEdge]);
   
   // Level of detail thresholds
   const LOD_THRESHOLDS = {
@@ -646,6 +762,9 @@ export function InteractiveGraphVisualization() {
     }
   });
 
+  // Apollo client for direct mutations
+  const client = useApolloClient();
+
   const [deleteEdgeMutation] = useMutation(DELETE_EDGE, {
     refetchQueries: [
       // Refetch all edges for graph visualization (matches ConnectNodeModal)
@@ -720,6 +839,15 @@ export function InteractiveGraphVisualization() {
         setNodeMenu(prev => ({ ...prev, visible: false }));
         setEdgeMenu(prev => ({ ...prev, visible: false }));
       }
+      
+      // Manual text refresh shortcut (R key)
+      if (event.key === 'r' || event.key === 'R') {
+        if (!event.ctrlKey && !event.metaKey && !event.altKey) { // Only plain R key
+          event.preventDefault();
+          refreshTextVisibility();
+          console.log('[Graph Debug] Manual text visibility refresh triggered');
+        }
+      }
     };
 
     document.addEventListener('click', handleClickOutside);
@@ -759,20 +887,42 @@ export function InteractiveGraphVisualization() {
         }).catch(() => {
           // Error handled by GraphQL
         });
-        initializeVisualization();
+        // Don't reinitialize - let refetchQueries handle the update
       }
       
       setIsConnecting(false);
       setConnectionSource(null);
     } else {
-      // Set selected node and show details modal directly
+      // Handle node selection with 2-item ring buffer
+      setSelectedNodes(prev => {
+        const newSet = new Set(prev);
+        
+        if (newSet.has(node.id)) {
+          // If clicking on already selected node, deselect it
+          newSet.delete(node.id);
+        } else {
+          // Add node to selection
+          newSet.add(node.id);
+          
+          // Implement 2-item ring buffer: remove oldest if we exceed 2
+          if (newSet.size > 2) {
+            const allNodes = Array.from(newSet);
+            const oldestNode = allNodes[0]; // Remove first (oldest) node
+            newSet.delete(oldestNode);
+          }
+        }
+        
+        return newSet;
+      });
+      
+      // Update single selected node for backwards compatibility
       setSelectedNode(node);
+      
+      // Clear any selected edge when selecting nodes
+      setEditingEdge(null);
       
       // Apply glow effect immediately without waiting for useEffect
       applyNodeGlowImmediately(node);
-      
-      // Open details modal directly instead of context menu
-      setShowNodeDetailsModal(true);
     }
   }, [isConnecting, connectionSource, selectedRelationType]);
 
@@ -780,6 +930,27 @@ export function InteractiveGraphVisualization() {
 
   const workItems: WorkItem[] = workItemsData?.workItems || [];
   
+  // Text refresh utility function
+  const refreshTextVisibility = useCallback(() => {
+    if (!d3 || !containerRef.current) return;
+    
+    const svg = d3.select(containerRef.current).select('svg');
+    const g = svg.select('.main-group');
+    
+    // Force refresh all text elements with proper LOD opacities
+    setTimeout(() => {
+      g.selectAll('.node-type-text')
+        .style('visibility', 'visible')
+        .style('opacity', getSmoothedOpacity(LOD_THRESHOLDS.FAR));
+      g.selectAll('.node-title-text')
+        .style('visibility', 'visible')
+        .style('opacity', getSmoothedOpacity(LOD_THRESHOLDS.MEDIUM));
+      g.selectAll('.node-description-text')
+        .style('visibility', 'visible')
+        .style('opacity', getSmoothedOpacity(LOD_THRESHOLDS.CLOSE));
+    }, 100); // Small delay to ensure DOM is updated
+  }, []);
+
   // Refetch data when graph changes
   useEffect(() => {
     if (currentGraph) {
@@ -787,6 +958,13 @@ export function InteractiveGraphVisualization() {
       refetchEdges();
     }
   }, [currentGraph?.id, refetch, refetchEdges]);
+  
+  // Refresh text visibility after data changes - DISABLED to prevent conflicts
+  // useEffect(() => {
+  //   if (workItems && edgesData?.edges) {
+  //     refreshTextVisibility();
+  //   }
+  // }, [workItems?.length, edgesData?.edges?.length, refreshTextVisibility]);
   
   const workItemEdges: WorkItemEdge[] = [];
   
@@ -827,6 +1005,25 @@ export function InteractiveGraphVisualization() {
   // Validate and sanitize data before D3 processing
   const currentValidationResult = validateGraphData(workItems, workItemEdges);
   
+  // Debug logging for data validation issues
+  useEffect(() => {
+    console.log('[Graph Debug] Data validation result:', {
+      totalWorkItems: workItems.length,
+      totalEdges: workItemEdges.length,
+      validNodes: currentValidationResult.validNodes.length,
+      validEdges: currentValidationResult.validEdges.length,
+      errors: currentValidationResult.errors,
+      warnings: currentValidationResult.warnings
+    });
+    
+    if (workItems.length > 0 && currentValidationResult.validNodes.length === 0) {
+      console.error('[Graph Debug] CRITICAL: All nodes filtered out by validation!', {
+        rawWorkItems: workItems,
+        validationResult: currentValidationResult
+      });
+    }
+  }, [workItems.length, currentValidationResult.validNodes.length, currentValidationResult.errors.length]);
+  
   // Update validation state
   useEffect(() => {
     setValidationResult(currentValidationResult);
@@ -857,12 +1054,19 @@ export function InteractiveGraphVisualization() {
         y = centerY + Math.sin(angle) * radius;
       }
       
-      return {
+      const node = {
         ...item,
         x,
         y,
         priority: item.priority || 0
       };
+      
+      // DEBUG: Log if this node is being reset to origin
+      if (x === 0 && y === 0 && item.positionX !== 0 && item.positionY !== 0) {
+        console.log('[CRITICAL DEBUG] Node position being reset to origin:', item.id, 'was at:', item.positionX, item.positionY);
+      }
+      
+      return node;
     })
   ];
 
@@ -964,11 +1168,27 @@ export function InteractiveGraphVisualization() {
     const container = containerRef.current;
     const svg = d3.select(svgRef.current);
     
-    // Clear previous content
-    svg.selectAll('*').remove();
+    // Check if this is the first initialization or we need to preserve existing structure
+    const existingMainGroup = svg.select('g.main-graph-group');
+    const isFirstInit = existingMainGroup.empty();
     
-    // Clear any existing HTML label containers
-    d3.select(containerRef.current).selectAll('.node-labels-container').remove();
+    // Store current zoom transform if preserving structure
+    let currentTransform = null;
+    if (!isFirstInit) {
+      currentTransform = d3.zoomTransform(svg.node()!);
+    }
+    
+    if (isFirstInit) {
+      // First initialization - clear everything and create core structure
+      svg.selectAll('*').remove();
+      d3.select(containerRef.current).selectAll('.node-labels-container').remove();
+    } else {
+      // Surgical update - only clear data elements, preserve core structure
+      existingMainGroup.selectAll('.nodes-group').remove();
+      existingMainGroup.selectAll('.edges-group').remove();
+      existingMainGroup.selectAll('.edge-labels-group').remove();
+      d3.select(containerRef.current).selectAll('.node-labels-container').remove();
+    }
 
     const width = container.clientWidth;
     const height = container.clientHeight;
@@ -979,14 +1199,48 @@ export function InteractiveGraphVisualization() {
     const zoom = d3.zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.1, 3])
       .on('zoom', (event) => {
-        const g = svg.select('g');
+        const g = svg.select('g.main-graph-group');
         if (!g.empty()) {
           g.attr('transform', event.transform);
         }
       });
 
+    const g = isFirstInit ? svg.append('g').attr('class', 'main-graph-group') : existingMainGroup;
+    
+    // Create grid pattern and overlay (only on first init)
+    if (isFirstInit) {
+      // Add subtle grid pattern that moves with camera
+      const gridDefs = svg.append('defs');
+      const pattern = gridDefs.append('pattern')
+        .attr('id', 'grid-pattern')
+        .attr('width', 100)
+        .attr('height', 100)
+        .attr('patternUnits', 'userSpaceOnUse');
+      
+      // Grid lines
+      pattern.append('path')
+        .attr('d', 'M 100 0 L 0 0 0 100')
+        .attr('fill', 'none')
+        .attr('stroke', 'rgba(255, 255, 255, 0.03)')
+        .attr('stroke-width', 1);
+      
+      // Add grid overlay
+      const gridOverlay = g.append('rect')
+        .attr('class', 'grid-overlay')
+        .attr('x', -10000)
+        .attr('y', -10000)
+        .attr('width', 20000)
+        .attr('height', 20000)
+        .attr('fill', 'url(#grid-pattern)')
+        .attr('pointer-events', 'none');
+    }
+
     svg.call(zoom);
-    svg.append('g');
+    
+    // Restore zoom transform if this is a surgical update
+    if (!isFirstInit && currentTransform) {
+      svg.call(zoom.transform, currentTransform);
+    }
   }, []);
 
   // Inline node creation function
@@ -1053,6 +1307,41 @@ export function InteractiveGraphVisualization() {
     }
   };
 
+  // Selective data update function - updates simulation data without DOM rebuilds
+  const updateVisualizationData = useCallback(() => {
+    if (!simulationRef.current || !svgRef.current) return;
+    
+    console.log('[Graph Debug] Performing selective data update...');
+    
+    // For relationship creation/deletion, we need full reinitialization to properly handle 
+    // edge labels and complex DOM synchronization
+    const currentEdgeCount = d3.select(svgRef.current).select('.edges-group').selectAll('.edge').size();
+    const newEdgeCount = validatedEdges.length;
+    
+    if (currentEdgeCount !== newEdgeCount) {
+      console.log('[Graph Debug] Edge count changed, forcing full reinit for proper label sync');
+      setReinitTrigger(prev => prev + 1);
+      return;
+    }
+    
+    // Update simulation with new data
+    const simulation = simulationRef.current;
+    
+    // Update nodes data
+    simulation.nodes(nodes as any);
+    
+    // Update links data  
+    const linkForce = simulation.force('link') as d3.ForceLink<any, any>;
+    if (linkForce) {
+      linkForce.links(validatedEdges);
+    }
+      
+    // Restart simulation with low alpha to settle new positions
+    simulation.alpha(0.1).restart();
+    
+    console.log('[Graph Debug] Selective update completed');
+  }, [nodes, validatedEdges]);
+
   // Define initializeVisualization function with access to nodes data
   const initializeVisualization = useCallback(() => {
     if (!svgRef.current || !containerRef.current) return;
@@ -1062,15 +1351,42 @@ export function InteractiveGraphVisualization() {
       initializeEmptyVisualization();
       return;
     }
+    
+    // PRESERVE EXISTING NODE POSITIONS before reinitialization
+    const existingPositions = new Map();
+    if (simulationRef.current) {
+      simulationRef.current.nodes().forEach((node: any) => {
+        if (node.x !== undefined && node.y !== undefined) {
+          existingPositions.set(node.id, { x: node.x, y: node.y, vx: node.vx || 0, vy: node.vy || 0 });
+        }
+      });
+    }
 
     const container = containerRef.current;
     const svg = d3.select(svgRef.current);
     
-    // Clear previous content
-    svg.selectAll('*').remove();
+    // Check if this is the first initialization or we need to preserve existing structure
+    const existingMainGroup = svg.select('g.main-graph-group');
+    const isFirstInit = existingMainGroup.empty();
     
-    // Clear any existing HTML label containers
-    d3.select(containerRef.current).selectAll('.node-labels-container').remove();
+    // Store current zoom transform if preserving structure
+    let currentTransform = null;
+    if (!isFirstInit) {
+      currentTransform = d3.zoomTransform(svg.node()!);
+    }
+    
+    if (isFirstInit) {
+      // First initialization - clear everything and create core structure
+      svg.selectAll('*').remove();
+      d3.select(containerRef.current).selectAll('.node-labels-container').remove();
+    } else {
+      // Surgical update - only clear data elements, preserve core structure
+      existingMainGroup.selectAll('.nodes-group').remove();
+      existingMainGroup.selectAll('.edges-group').remove();
+      existingMainGroup.selectAll('.edge-labels-group').remove();
+      existingMainGroup.selectAll('.node-labels-container').remove();
+      d3.select(containerRef.current).selectAll('.node-labels-container').remove();
+    }
 
     const width = container.clientWidth;
     const height = container.clientHeight;
@@ -1079,24 +1395,60 @@ export function InteractiveGraphVisualization() {
 
     svg.attr('width', width).attr('height', height);
     
-    // Create zoom behavior
+    // Create or reuse zoom behavior
     const zoom = d3.zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.1, 4]);
 
-    const g = svg.append('g');
+    const g = isFirstInit ? svg.append('g').attr('class', 'main-graph-group') : existingMainGroup;
 
-    // Add background for capturing clicks to show context menu (make it very large for better detection)
-    const background = g.append('rect')
-      .attr('class', 'background')
-      .attr('x', -10000)
-      .attr('y', -10000)
-      .attr('width', 20000)
-      .attr('height', 20000)
-      .attr('fill', 'transparent')
-      .style('cursor', 'default');
+    // Create or reuse background for capturing clicks  
+    let background = g.select('rect.background');
+    if (background.empty()) {
+      background = g.append('rect')
+        .attr('class', 'background')
+        .attr('x', -10000)
+        .attr('y', -10000)
+        .attr('width', 20000)
+        .attr('height', 20000)
+        .attr('fill', 'transparent')
+        .style('cursor', 'default');
+    }
 
-    // Apply zoom behavior to the svg
+    // Create or reuse grid pattern and overlay (only on first init)
+    if (isFirstInit) {
+      // Add subtle grid pattern that moves with camera
+      const gridDefs = svg.append('defs');
+      const pattern = gridDefs.append('pattern')
+        .attr('id', 'grid-pattern')
+        .attr('width', 100)
+        .attr('height', 100)
+        .attr('patternUnits', 'userSpaceOnUse');
+      
+      // Grid lines
+      pattern.append('path')
+        .attr('d', 'M 100 0 L 0 0 0 100')
+        .attr('fill', 'none')
+        .attr('stroke', 'rgba(255, 255, 255, 0.03)')
+        .attr('stroke-width', 1);
+      
+      // Add grid overlay
+      const gridOverlay = g.append('rect')
+        .attr('class', 'grid-overlay')
+        .attr('x', -10000)
+        .attr('y', -10000)
+        .attr('width', 20000)
+        .attr('height', 20000)
+        .attr('fill', 'url(#grid-pattern)')
+        .attr('pointer-events', 'none');
+    }
+
+    // Apply zoom behavior to the svg (always, but preserve existing transform)
     svg.call(zoom);
+    
+    // Restore zoom transform if this is a surgical update
+    if (!isFirstInit && currentTransform) {
+      svg.call(zoom.transform, currentTransform);
+    }
 
     // Add click handler for context menu on background
     background.on('click', function(event: MouseEvent) {
@@ -1107,7 +1459,7 @@ export function InteractiveGraphVisualization() {
         nodeMenu.visible ||
         edgeMenu.visible ||
         editingEdge !== null ||
-        showEdgeDetails;
+        false; // Removed edge details dialog
       
       if (hasOpenDialogs) {
         // Close all dialogs and menus - first click
@@ -1117,6 +1469,14 @@ export function InteractiveGraphVisualization() {
         setShowEdgeDetails(false);
         setEdgeDetailsPosition(null);
         setContextMenuPosition(null);
+        return;
+      }
+      
+      // Clear node selection when clicking on empty space
+      if (selectedNode || selectedNodes.size > 0) {
+        setSelectedNode(null);
+        setSelectedNodes(new Set());
+        clearNodeGlow();
         return;
       }
       
@@ -1149,18 +1509,24 @@ export function InteractiveGraphVisualization() {
 
     // Initialize all nodes at screen center for 2D layout
     nodes.forEach((node: any) => {
-      if (!node.x) node.x = centerX + (Math.random() - 0.5) * 100;
-      if (!node.y) node.y = centerY + (Math.random() - 0.5) * 100;
+      // Reset any user pinning/positioning (like Reset Layout button)
+      node.userPinned = false;
+      node.userPreferredPosition = null;
+      node.userPreferenceVector = null;
       node.fx = null;
       node.fy = null;
+      
+      // Set initial position at screen center with some randomness
+      if (!node.x) node.x = centerX + (Math.random() - 0.5) * 100;
+      if (!node.y) node.y = centerY + (Math.random() - 0.5) * 100;
     });
 
     // Viewport culling - only render visible nodes for performance
     const margin = 200;
-    const visibleNodes = currentTransform.scale < LOD_THRESHOLDS.VERY_FAR ? 
+    const visibleNodes = (currentTransform?.scale || 1) < LOD_THRESHOLDS.VERY_FAR ? 
       nodes.filter((node: WorkItem) => {
-        const nodeX = (node.positionX || 0) * currentTransform.scale + currentTransform.x;
-        const nodeY = (node.positionY || 0) * currentTransform.scale + currentTransform.y;
+        const nodeX = (node.positionX || 0) * (currentTransform?.scale || 1) + (currentTransform?.x || 0);
+        const nodeY = (node.positionY || 0) * (currentTransform?.scale || 1) + (currentTransform?.y || 0);
         return nodeX >= -margin && nodeX <= width + margin && 
                nodeY >= -margin && nodeY <= height + margin;
       }) : nodes;
@@ -1168,6 +1534,21 @@ export function InteractiveGraphVisualization() {
     // Simple 2D force simulation
     const simulation = d3.forceSimulation(visibleNodes as any);
     simulationRef.current = simulation; // Store reference for resize handling
+    
+    // RESTORE PRESERVED POSITIONS to prevent nodes jumping to origin
+    if (existingPositions.size > 0) {
+      simulation.nodes().forEach((node: any) => {
+        const savedPos = existingPositions.get(node.id);
+        if (savedPos) {
+          node.x = savedPos.x;
+          node.y = savedPos.y;
+          node.vx = savedPos.vx;
+          node.vy = savedPos.vy;
+        }
+      });
+      // Stop simulation immediately to freeze positions
+      simulation.alpha(0).stop();
+    }
     
     simulation
       .force('link', d3.forceLink(validatedEdges)
@@ -1286,7 +1667,7 @@ export function InteractiveGraphVisualization() {
       .on('mouseenter', function(event: MouseEvent, d: WorkItemEdge) {
         // Skip hover effect if edge has active dialog (glow is already applied)
         if ((editingEdge && editingEdge.edge && editingEdge.edge.id === d.id) ||
-            (showEdgeDetails && selectedEdge && selectedEdge.id === d.id)) {
+            false) { // Removed edge details dialog
           return;
         }
         
@@ -1300,7 +1681,7 @@ export function InteractiveGraphVisualization() {
       .on('mouseleave', function(event: MouseEvent, d: WorkItemEdge) {
         // Skip hover reset if edge has active dialog (glow should remain)
         if ((editingEdge && editingEdge.edge && editingEdge.edge.id === d.id) ||
-            (showEdgeDetails && selectedEdge && selectedEdge.id === d.id)) {
+            false) { // Removed edge details dialog
           return;
         }
         
@@ -1365,8 +1746,26 @@ export function InteractiveGraphVisualization() {
           .attr('stroke-opacity', 0.7);
       });
 
-    // Create defs for filters (keep existing filter definitions)
-    const defs = svg.append('defs');
+    // Create or get defs element for filters
+    let filterDefs = svg.select('defs');
+    if (filterDefs.empty()) {
+      filterDefs = svg.append('defs');
+    }
+    
+    // Add drop shadow filter for nodes
+    const dropShadowFilter = filterDefs.append('filter')
+      .attr('id', 'node-drop-shadow')
+      .attr('x', '-50%')
+      .attr('y', '-50%')
+      .attr('width', '200%')
+      .attr('height', '200%');
+    
+    dropShadowFilter.append('feDropShadow')
+      .attr('dx', 2)
+      .attr('dy', 3)
+      .attr('stdDeviation', 3)
+      .attr('flood-color', 'rgba(0, 0, 0, 0.4)')
+      .attr('flood-opacity', 1);
 
     // Create nodes AFTER edges (so they render on top)
     const nodeElements = g.append('g')
@@ -1563,6 +1962,7 @@ export function InteractiveGraphVisualization() {
         }
         return '#1f2937'; // Dark background consistent with theme
       })
+      .style('filter', 'url(#node-drop-shadow)')
       .attr('stroke', (d: WorkItem) => {
         // Use node type color for active dialog
         if (nodeMenu.visible && nodeMenu.node && nodeMenu.node.id === d.id) {
@@ -1635,7 +2035,7 @@ export function InteractiveGraphVisualization() {
       .attr('text-anchor', 'middle')
       .attr('dominant-baseline', 'middle')
       .text((d: WorkItem) => d.type)
-      .style('opacity', currentTransform.scale >= LOD_THRESHOLDS.FAR ? 1 : 0)
+      .style('opacity', (currentTransform?.scale || 1) >= LOD_THRESHOLDS.FAR ? 1 : 0)
       .style('font-size', '13px')
       .style('font-weight', '700')
       .style('fill', (d: WorkItem) => {
@@ -1643,6 +2043,181 @@ export function InteractiveGraphVisualization() {
         return config.hexColor;
       })
       .style('pointer-events', 'none');
+
+    // Edit icon in title bar (centered vertically, left side) - scales with zoom
+    const iconSize = Math.max(16, Math.min(24, titleBarHeight * 0.7));
+    const editIcons = nodeElements.append('g')
+      .attr('class', 'node-edit-icon')
+      .attr('transform', (d: WorkItem) => {
+        const x = -getNodeDimensions(d).width / 2 + iconSize / 2 + 12;
+        const y = -getNodeDimensions(d).height / 2 + 2 + titleBarHeight / 2;
+        return `translate(${x}, ${y}) scale(${1 / (currentTransform?.scale || 1)})`;
+      })
+      .style('cursor', 'pointer')
+      .style('opacity', (currentTransform?.scale || 1) >= LOD_THRESHOLDS.FAR ? 0.85 : 0)
+      .style('pointer-events', 'all');
+    
+    // Edit icon background - scales with icon
+    const editBg = editIcons.append('rect')
+      .attr('class', 'edit-bg')
+      .attr('x', -iconSize/2)
+      .attr('y', -iconSize/2)
+      .attr('width', iconSize)
+      .attr('height', iconSize)
+      .attr('rx', 3)
+      .attr('fill', 'rgba(0, 0, 0, 0.7)')
+      .attr('stroke', 'rgba(255, 255, 255, 0.8)')
+      .attr('stroke-width', 1);
+    
+    // Simple gear using text (emoji) - proper size
+    editIcons.append('text')
+      .attr('class', 'edit-gear')
+      .attr('x', 0)
+      .attr('y', 0)
+      .attr('text-anchor', 'middle')
+      .attr('dominant-baseline', 'middle')
+      .style('font-size', `${iconSize * 1.1}px`)
+      .style('fill', '#ffffff')
+      .style('pointer-events', 'none')
+      .text('⚙');
+    
+    // Hover effects for the entire edit icon group
+    editIcons
+      .on('mouseenter', function() {
+        const icon = d3.select(this);
+        // Brighten background and add glow
+        icon.select('.edit-bg')
+          .transition().duration(200)
+          .attr('fill', 'rgba(59, 130, 246, 0.8)')
+          .attr('stroke', '#3b82f6')
+          .attr('stroke-width', 2);
+        
+        // Highlight background
+        icon.select('.edit-bg')
+          .transition().duration(200)
+          .attr('fill', 'rgba(59, 130, 246, 0.9)')
+          .attr('stroke', '#3b82f6')
+          .attr('stroke-width', 2);
+        
+        // Scale up text slightly
+        icon.select('.edit-gear')
+          .transition().duration(200)
+          .style('font-size', `${iconSize * 1.3}px`);
+      })
+      .on('mouseleave', function() {
+        const icon = d3.select(this);
+        // Return to normal state
+        icon.select('.edit-bg')
+          .transition().duration(200)
+          .attr('fill', 'rgba(0, 0, 0, 0.7)')
+          .attr('stroke', 'rgba(255, 255, 255, 0.8)')
+          .attr('stroke-width', 1);
+        
+        // Scale text back to normal
+        icon.select('.edit-gear')
+          .transition().duration(200)
+          .style('font-size', `${iconSize * 1.1}px`);
+      });
+    
+    // Edit icon click handler - opens edit modal
+    editIcons.on('click', (event: MouseEvent, d: WorkItem) => {
+      event.stopPropagation();
+      event.preventDefault();
+      
+      // Set selected node and show details modal for editing
+      setSelectedNode(d);
+      lastSelectedNodeRef.current = d; // Track last selected
+      applyNodeGlowImmediately(d);
+      setShowNodeDetailsModal(true);
+    });
+
+    // Relationship creation icon in title bar (centered vertically, right side) - mirrors edit icon
+    const relationshipIcons = nodeElements.append('g')
+      .attr('class', 'node-relationship-icon')
+      .attr('transform', (d: WorkItem) => {
+        const x = getNodeDimensions(d).width / 2 - iconSize / 2 - 12; // Right side, mirrored from edit icon
+        const y = -getNodeDimensions(d).height / 2 + 2 + titleBarHeight / 2;
+        return `translate(${x}, ${y}) scale(${1 / (currentTransform?.scale || 1)})`;
+      })
+      .style('cursor', 'pointer')
+      .style('opacity', (currentTransform?.scale || 1) >= LOD_THRESHOLDS.FAR ? 0.85 : 0)
+      .style('pointer-events', 'all');
+    
+    // Relationship icon background - same as edit icon
+    relationshipIcons.append('rect')
+      .attr('class', 'relationship-bg')
+      .attr('x', -iconSize/2)
+      .attr('y', -iconSize/2)
+      .attr('width', iconSize)
+      .attr('height', iconSize)
+      .attr('rx', 3)
+      .attr('fill', 'rgba(0, 0, 0, 0.7)')
+      .attr('stroke', 'rgba(255, 255, 255, 0.8)')
+      .attr('stroke-width', 1);
+    
+    // Plus sign using text - matching the gear styling
+    relationshipIcons.append('text')
+      .attr('class', 'relationship-plus')
+      .attr('x', 0)
+      .attr('y', 0)
+      .attr('text-anchor', 'middle')
+      .attr('dominant-baseline', 'middle')
+      .style('font-size', `${iconSize * 1.2}px`) // Slightly bigger than gear for visual balance
+      .style('font-weight', 'bold')
+      .style('fill', '#ffffff')
+      .style('pointer-events', 'none')
+      .text('+');
+    
+    // Hover effects for relationship icon - mirroring edit icon
+    relationshipIcons
+      .on('mouseenter', function() {
+        const icon = d3.select(this);
+        
+        // Grow background
+        icon.select('.relationship-bg')
+          .transition().duration(200)
+          .attr('width', iconSize * 1.2)
+          .attr('height', iconSize * 1.2)
+          .attr('x', -iconSize * 0.6)
+          .attr('y', -iconSize * 0.6)
+          .attr('fill', 'rgba(34, 197, 94, 0.9)') // Green color for relationship creation
+          .attr('stroke', 'rgba(255, 255, 255, 1.0)');
+        
+        // Scale up text slightly
+        icon.select('.relationship-plus')
+          .transition().duration(200)
+          .style('font-size', `${iconSize * 1.4}px`);
+      })
+      .on('mouseleave', function() {
+        const icon = d3.select(this);
+        
+        // Shrink background back
+        icon.select('.relationship-bg')
+          .transition().duration(200)
+          .attr('width', iconSize)
+          .attr('height', iconSize)
+          .attr('x', -iconSize/2)
+          .attr('y', -iconSize/2)
+          .attr('fill', 'rgba(0, 0, 0, 0.7)')
+          .attr('stroke', 'rgba(255, 255, 255, 0.8)');
+        
+        // Scale text back to normal
+        icon.select('.relationship-plus')
+          .transition().duration(200)
+          .style('font-size', `${iconSize * 1.2}px`);
+      });
+
+    // Relationship icon click handler - just opens relationship window
+    relationshipIcons.on('click', (event: MouseEvent, d: WorkItem) => {
+      event.stopPropagation();
+      event.preventDefault();
+      
+      console.log('[Graph Debug] + button clicked, opening relationship window');
+      
+      // Simply open the relationship window - avoid changing selectedNodes to prevent graph refresh
+      setShowRelationshipWindow(true);
+      setEditingEdge(null);
+    });
 
     // Node title section - with text wrapping
     nodeElements.each(function(d: WorkItem) {
@@ -1706,7 +2281,7 @@ export function InteractiveGraphVisualization() {
           .attr('text-anchor', 'middle')
           .attr('dominant-baseline', 'middle')
           .text(line)
-          .style('opacity', currentTransform.scale >= LOD_THRESHOLDS.MEDIUM ? 1 : 0)
+          .style('opacity', (currentTransform?.scale || 1) >= LOD_THRESHOLDS.MEDIUM ? 1 : 0)
           .style('font-size', '14px')
           .style('font-weight', '600')
           .style('fill', () => {
@@ -1735,7 +2310,7 @@ export function InteractiveGraphVisualization() {
         // Hide description if too long instead of truncating
         return d.description.length > maxLength ? '' : d.description;
       })
-      .style('opacity', currentTransform.scale >= LOD_THRESHOLDS.CLOSE ? 1 : 0)
+      .style('opacity', (currentTransform?.scale || 1) >= LOD_THRESHOLDS.CLOSE ? 1 : 0)
       .style('font-size', '11px')
       .style('font-weight', '400')
       .style('fill', (d: WorkItem) => {
@@ -1986,39 +2561,25 @@ export function InteractiveGraphVisualization() {
         event.stopPropagation();
         event.preventDefault(); // Prevent any default behavior
         
-        // Close any existing dialogs first to prevent conflicts
-        setShowEdgeDetails(false);
-        setEdgeDetailsPosition(null);
-        setSelectedEdge(null);
-        
-        // Position dropdown to the side to avoid obstructing the glow
-        const clickX = event.clientX;
-        const clickY = event.clientY;
-        const offset = 120; // Distance from edge
-        const dropdownWidth = 320; // Updated width
-        
-        let x = clickX + offset;
-        let y = clickY;
-        
-        // If dropdown would go off right edge, position to the left
-        if (x + dropdownWidth > window.innerWidth - 20) {
-          x = clickX - offset - dropdownWidth;
-        }
-        
-        // Keep dropdown within bounds
-        if (y + 320 > window.innerHeight - 20) { // 320 is dropdown height
-          y = window.innerHeight - 320 - 20;
-        }
-        if (y < 20) y = 20;
-        
-        // Use setTimeout to prevent any race conditions with other state updates
-        setTimeout(() => {
+        // Auto-show relationship window when edge is clicked
+        if (!showRelationshipWindow) {
+          setShowRelationshipWindow(true);
+          // Set the selected edge with initial position for new window
           setEditingEdge({
             edge: d,
-            position: { x, y }
+            position: { x: 200, y: 80 } // Initial position for new window
           });
-          setDragOffset({ x: 0, y: 0 }); // Reset drag offset for new dropdown
-        }, 0);
+        } else {
+          // Window already visible, just update the edge data (preserve window position)
+          setEditingEdge(prev => prev ? {
+            edge: d,
+            position: prev.position // Keep existing window position
+          } : {
+            edge: d,
+            position: { x: 200, y: 80 }
+          });
+        }
+        setDragOffset({ x: 0, y: 0 }); // Reset drag offset
       });
 
     // Add text labels first to measure their size
@@ -2036,12 +2597,12 @@ export function InteractiveGraphVisualization() {
         const config = getRelationshipConfig(d.type as RelationshipType);
         return config.label;
       })
-      .style('opacity', currentTransform.scale >= LOD_THRESHOLDS.CLOSE ? 1 : 0);
+      .style('opacity', (currentTransform?.scale || 1) >= LOD_THRESHOLDS.CLOSE ? 1 : 0);
 
     // Add icons positioned to the left of text
     edgeLabelGroups
       .append('foreignObject')
-      .style('opacity', currentTransform.scale >= LOD_THRESHOLDS.CLOSE ? 1 : 0)
+      .style('opacity', (currentTransform?.scale || 1) >= LOD_THRESHOLDS.CLOSE ? 1 : 0)
       .attr('class', 'edge-label-icon')
       .attr('width', 14)
       .attr('height', 14)
@@ -2251,6 +2812,7 @@ export function InteractiveGraphVisualization() {
       
       // Context menu disabled - just select the node
       setSelectedNode(d);
+      lastSelectedNodeRef.current = d; // Track last selected
       
       // Apply glow effect
       applyNodeGlowImmediately(d);
@@ -2324,9 +2886,42 @@ export function InteractiveGraphVisualization() {
     simulation.on('tick', () => {
       // Allow nodes to move freely without bounds constraints
       
+      // DEBUG: Log if any nodes are at origin during tick
+      const nodesAtOrigin = nodes.filter((n: any) => (n.x === 0 || n.x === undefined) && (n.y === 0 || n.y === undefined));
+      if (nodesAtOrigin.length > 0) {
+        console.log('[CRITICAL DEBUG] Nodes at origin during tick:', nodesAtOrigin.length, 'out of', nodes.length);
+        console.log('[CRITICAL DEBUG] First few nodes at origin:', nodesAtOrigin.slice(0, 3).map((n: any) => ({id: n.id, x: n.x, y: n.y})));
+      }
+      
       // Update node positions
       nodeElements
         .attr('transform', (d: any) => `translate(${d.x || 0},${d.y || 0})`);
+
+      // Ensure text elements are visible and properly positioned after position updates
+      g.selectAll('.node-type-text, .node-title-text, .node-description-text')
+        .style('visibility', 'visible')
+        .style('opacity', function() {
+          // Restore LOD-appropriate opacity if it was hidden
+          const currentOpacity = parseFloat(d3.select(this).style('opacity')) || 0;
+          if (currentOpacity === 0) {
+            const classList = d3.select(this).attr('class');
+            if (classList.includes('node-type-text')) return getSmoothedOpacity(LOD_THRESHOLDS.FAR);
+            if (classList.includes('node-title-text')) return getSmoothedOpacity(LOD_THRESHOLDS.MEDIUM);
+            if (classList.includes('node-description-text')) return getSmoothedOpacity(LOD_THRESHOLDS.CLOSE);
+          }
+          return currentOpacity;
+        });
+
+      // Update mini-map with current node positions
+      if ((window as any).updateMiniMapPositions && nodes.length > 0) {
+        const positions: {[key: string]: {x: number, y: number}} = {};
+        nodes.forEach((node: any) => {
+          if (node.x !== undefined && node.y !== undefined) {
+            positions[node.id] = { x: node.x, y: node.y };
+          }
+        });
+        (window as any).updateMiniMapPositions(positions);
+      }
         
       // Always update edges to stay anchored to nodes
       updateEdgePositions();
@@ -2340,6 +2935,20 @@ export function InteractiveGraphVisualization() {
         y: event.transform.y, 
         scale: event.transform.k 
       });
+      
+      // Update mini-map viewport
+      if ((window as any).updateMiniMapViewport) {
+        const viewportUpdate = {
+          x: event.transform.x,
+          y: event.transform.y,
+          k: event.transform.k
+        };
+        if ((window as any).debugLog) {
+          (window as any).debugLog('Graph', '🔍 Zoom/pan event', viewportUpdate);
+        }
+        console.log('🔍 ZOOM-EVENT viewport update:', viewportUpdate);
+        (window as any).updateMiniMapViewport(viewportUpdate);
+      }
       
       // Update LOD based on zoom level
       const scale = event.transform.k;
@@ -2392,10 +3001,249 @@ export function InteractiveGraphVisualization() {
   const simulationRef = useRef<d3.Simulation<any, any> | null>(null);
   const mousedownNodeRef = useRef<any>(null);
 
-  // Initialization effect
+  // Fit view to show all nodes
+  const fitViewToNodes = useCallback(() => {
+    if (!svgRef.current || !containerRef.current || nodes.length === 0) return;
+    
+    const svg = d3.select(svgRef.current);
+    const container = containerRef.current;
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+    
+    // Calculate bounding box of all nodes
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    
+    nodes.forEach((node: any) => {
+      const x = node.x || 0;
+      const y = node.y || 0;
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y);
+      maxY = Math.max(maxY, y);
+    });
+    
+    if (!isFinite(minX)) return; // No valid positions
+    
+    // Add padding
+    const padding = 100;
+    minX -= padding;
+    maxX += padding;
+    minY -= padding;
+    maxY += padding;
+    
+    const boundsWidth = maxX - minX;
+    const boundsHeight = maxY - minY;
+    
+    // Calculate scale to fit all nodes
+    const scale = Math.min(
+      width / boundsWidth,
+      height / boundsHeight,
+      2 // Max zoom level
+    );
+    
+    // Calculate translate to center the bounds
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const boundsCenterX = (minX + maxX) / 2;
+    const boundsCenterY = (minY + maxY) / 2;
+    
+    const translateX = centerX - boundsCenterX * scale;
+    const translateY = centerY - boundsCenterY * scale;
+    
+    // Apply the transform
+    const transform = d3.zoomIdentity.translate(translateX, translateY).scale(scale);
+    svg.call(d3.zoom<SVGSVGElement, unknown>().transform as any, transform);
+  }, [nodes]);
+
+  // Center on specific node
+  const centerOnNode = useCallback((nodeId?: string) => {
+    const nodeToCenter = nodeId 
+      ? nodes.find((n: any) => n.id === nodeId)
+      : lastSelectedNodeRef.current || nodes[0];
+      
+    if (!nodeToCenter || !svgRef.current) return;
+    
+    const svg = d3.select(svgRef.current);
+    const svgElement = svgRef.current;
+    const { width, height } = svgElement.getBoundingClientRect();
+    
+    // Get node position
+    const nodeX = nodeToCenter.x || 0;
+    const nodeY = nodeToCenter.y || 0;
+    
+    // Calculate transform to center this node
+    const centerX = width / 2;
+    const centerY = height / 2;
+    
+    // Get current zoom scale (maintain it)
+    const currentScale = currentTransform?.scale || 1;
+    
+    // Calculate translation to center the node
+    const translateX = centerX - nodeX * currentScale;
+    const translateY = centerY - nodeY * currentScale;
+    
+    // Apply transform with smooth transition
+    const transform = d3.zoomIdentity.translate(translateX, translateY).scale(currentScale);
+    svg.transition()
+      .duration(750)
+      .call(d3.zoom<SVGSVGElement, unknown>().transform as any, transform);
+      
+    // Update mini-map viewport
+    if ((window as any).updateMiniMapViewport) {
+      const viewportUpdate = {
+        x: translateX,
+        y: translateY,
+        k: currentScale
+      };
+      if ((window as any).debugLog) {
+        (window as any).debugLog('Graph', '🎯 Center on node', viewportUpdate);
+      }
+      console.log('🎯 CENTER-ON-NODE viewport update:', viewportUpdate);
+      (window as any).updateMiniMapViewport(viewportUpdate);
+    }
+  }, [nodes, currentTransform]);
+
+  // Track viewport dimensions for mini-map
   useEffect(() => {
-    // Always initialize visualization (handles both empty and populated states)
+    if (!svgRef.current) return;
+    
+    const updateDimensions = () => {
+      if (!svgRef.current) return;
+      const { width, height } = svgRef.current.getBoundingClientRect();
+      const dimensions = { width, height };
+      if ((window as any).debugLog) {
+        (window as any).debugLog('Graph', '📊 Viewport dimensions updated', dimensions);
+      }
+      console.log('📊 VIEWPORT DIMENSIONS:', dimensions);
+      if ((window as any).updateViewportDimensions) {
+        (window as any).updateViewportDimensions(dimensions);
+      }
+    };
+    
+    // Initial dimensions
+    updateDimensions();
+    
+    // Set up resize observer
+    const resizeObserver = new ResizeObserver(updateDimensions);
+    resizeObserver.observe(svgRef.current);
+    
+    // Also listen to window resize for good measure
+    window.addEventListener('resize', updateDimensions);
+    
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', updateDimensions);
+    };
+  }, []);
+
+  // Reset layout function
+  const resetLayout = useCallback(() => {
+    nodes.forEach((node: any) => {
+      node.userPinned = false;
+      node.userPreferredPosition = null;
+      node.userPreferenceVector = null;
+      node.fx = null;
+      node.fy = null;
+      // Clear positioning cache to force recalculation
+      node.targetX = null;
+      node.targetY = null;
+    });
     initializeVisualization();
+    // Auto-fit after reset
+    setTimeout(() => {
+      fitViewToNodes();
+    }, 1000);
+  }, [nodes, initializeVisualization, fitViewToNodes]);
+
+  // Auto-fit view when component first mounts with nodes
+  useEffect(() => {
+    if (nodes.length > 0 && svgRef.current) {
+      // Check if this is the initial load (no previous transform stored)
+      const hasStoredTransform = sessionStorage.getItem('graphViewTransform');
+      if (!hasStoredTransform) {
+        // First time loading - auto fit after simulation settles
+        const timer = setTimeout(() => {
+          fitViewToNodes();
+          // Store the fitted transform
+          if (svgRef.current) {
+            const svg = d3.select(svgRef.current);
+            const transform = d3.zoomTransform(svg.node()!);
+            sessionStorage.setItem('graphViewTransform', JSON.stringify({
+              x: transform.x,
+              y: transform.y,
+              k: transform.k
+            }));
+          }
+        }, 1500);
+        return () => clearTimeout(timer);
+      } else {
+        // Restore previous transform
+        try {
+          const saved = JSON.parse(hasStoredTransform);
+          const timer = setTimeout(() => {
+            if (svgRef.current) {
+              const svg = d3.select(svgRef.current);
+              const transform = d3.zoomIdentity.translate(saved.x, saved.y).scale(saved.k);
+              svg.call(d3.zoom<SVGSVGElement, unknown>().transform as any, transform);
+            }
+          }, 500);
+          return () => clearTimeout(timer);
+        } catch (e) {
+          // If stored transform is invalid, auto-fit
+          const timer = setTimeout(() => {
+            fitViewToNodes();
+          }, 1500);
+          return () => clearTimeout(timer);
+        }
+      }
+    }
+  }, [nodes.length > 0, fitViewToNodes]);
+
+  // Expose reset function to parent component
+  useEffect(() => {
+    if (onResetLayout) {
+      // Set up a way for parent to trigger reset
+      (window as any).triggerGraphReset = resetLayout;
+    }
+    return () => {
+      if ((window as any).triggerGraphReset === resetLayout) {
+        delete (window as any).triggerGraphReset;
+      }
+    };
+  }, [resetLayout, onResetLayout]);
+
+  // Force reinitialization trigger - incremented when view needs refresh
+  const [reinitTrigger, setReinitTrigger] = useState(0);
+
+  // Comprehensive reinitialization effect - ONLY when actually needed
+  useEffect(() => {
+    console.log('[Graph Debug] Checking if reinitialization needed...', { 
+      nodesLength: nodes.length, 
+      edgesLength: validatedEdges.length,
+      trigger: reinitTrigger,
+      currentGraph: currentGraph?.id
+    });
+    
+    // Only reinitialize if this is truly necessary
+    const shouldReinit = 
+      !svgRef.current ||
+      !containerRef.current ||
+      nodes.length === 0 ||
+      !d3.select(svgRef.current).select('.main-graph-group').node() ||
+      reinitTrigger > 0;
+    
+    if (shouldReinit) {
+      console.log('[Graph Debug] Full reinitialization required');
+      initializeVisualization();
+      // Reset trigger after use
+      if (reinitTrigger > 0) {
+        setReinitTrigger(0);
+      }
+    } else {
+      console.log('[Graph Debug] Using selective updates instead of full reinit');
+      // Use selective data updates instead of full reinitialization
+      updateVisualizationData();
+    }
 
     const handleResize = () => {
       if (!containerRef.current || !svgRef.current || !simulationRef.current) return;
@@ -2417,32 +3265,66 @@ export function InteractiveGraphVisualization() {
         .alpha(0.3) // Restart simulation with some energy
         .restart();
     };
-
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, [nodes.length, validatedEdges.length]); // Only re-initialize when data changes, not on every render
+  }, [
+    nodes.length, 
+    validatedEdges.length, 
+    currentGraph?.id, // Re-init when graph changes
+    reinitTrigger, // Manual trigger
+    loading, // Re-init when loading completes
+    edgesLoading // Re-init when edges loading completes
+    // Removed JSON.stringify dependency - it was triggering reinitialization on every node property change
+  ]);
 
-  // Handle case where no graph is selected
-  if (!currentGraph) {
-    return (
-      <div className="graph-container relative w-full h-full bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-yellow-300 text-xl mb-4">📊 No Graph Selected</div>
-          <div className="text-gray-400 text-lg font-medium mb-6">Choose a graph to start visualizing</div>
-          <button 
-            onClick={() => setShowGraphSwitcher(true)}
-            className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
-          >
-            Select Graph
-          </button>
-        </div>
-      </div>
-    );
-  }
+  // Manual reinitialization function (expose globally for debugging)
+  useEffect(() => {
+    (window as any).forceGraphReinit = () => {
+      console.log('[Graph Debug] Forcing manual reinitialization...');
+      setReinitTrigger(prev => prev + 1);
+    };
+    
+    // Auto-reinit on view switches or navigation changes - DISABLED to prevent conflicts
+    // const handleVisibilityChange = () => {
+    //   if (!document.hidden) {
+    //     console.log('[Graph Debug] View became visible, checking if reinit needed...');
+    //     setTimeout(() => {
+    //       const svg = d3.select(containerRef.current).select('svg');
+    //       const hasNodes = svg.select('.nodes-group').selectAll('.node').size() > 0;
+    //       if (nodes.length > 0 && !hasNodes) {
+    //         console.log('[Graph Debug] Missing nodes detected, forcing reinit...');
+    //         setReinitTrigger(prev => prev + 1);
+    //       }
+    //     }, 100);
+    //   }
+    // };
+    
+    // document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      delete (window as any).forceGraphReinit;
+    };
+  }, [nodes.length]);
+
+  // Keyboard shortcut for manual reinit (Shift+R)
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'R' && event.shiftKey) {
+        event.preventDefault();
+        console.log('[Graph Debug] Manual reinit triggered by Shift+R');
+        setReinitTrigger(prev => prev + 1);
+      }
+    };
+    
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Set empty state overlay when no graph is selected
+  const showNoGraphMessage = !currentGraph;
 
   if (loading || edgesLoading) {
     return (
-      <div className="graph-container relative w-full h-full bg-gray-900 flex items-center justify-center">
+      <div className="graph-container relative w-full h-full flex items-center justify-center">
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <div className="text-green-300 text-lg font-medium">Loading graph data...</div>
@@ -2495,8 +3377,8 @@ export function InteractiveGraphVisualization() {
     const isNetworkError = errorMessage.includes('Cannot connect');
     
     return (
-      <div ref={containerRef} className="graph-container relative w-full h-full bg-gray-900">
-        <svg ref={svgRef} className="w-full h-full" style={{ background: 'radial-gradient(circle at center, #1f2937 0%, #111827 100%)' }}>
+      <div ref={containerRef} className="graph-container relative w-full h-full">
+        <svg ref={svgRef} className="w-full h-full">
           {/* Error message centered in SVG */}
           <foreignObject x="20%" y="30%" width="60%" height="40%">
             <div className="w-full h-full flex items-center justify-center p-4">
@@ -2662,11 +3544,10 @@ export function InteractiveGraphVisualization() {
 
 
   return (
-    <div ref={containerRef} className="graph-container relative w-full h-full bg-gray-900 overflow-hidden">
+    <div ref={containerRef} className="graph-container relative w-full h-full overflow-hidden select-none">
       <svg 
         ref={svgRef} 
         className="w-full h-full" 
-        style={{ background: 'radial-gradient(circle at center, #1f2937 0%, #111827 100%)' }}
       />
       
       
@@ -2697,315 +3578,32 @@ export function InteractiveGraphVisualization() {
         </div>
       )}
       
-      {/* Enhanced Graph Control Panel */}
-      {showGraphPanel && !isFullscreen && (
-        <div className="absolute left-4 z-40" style={{ top: '20px' }}>
-          <div className={`bg-gradient-to-br from-gray-800 via-gray-800 to-gray-900 backdrop-blur-sm border border-gray-600/50 rounded-2xl shadow-2xl ${isFullscreen ? 'p-0 w-32' : 'p-6 w-72'} relative overflow-hidden`}>
-            {/* Gradient accent line at top */}
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-green-500 to-purple-500"></div>
-            
-            {/* Subtle background pattern */}
-            <div className="absolute inset-0 opacity-5">
-              <div className="w-full h-full" style={{
-                backgroundImage: `radial-gradient(circle at 1px 1px, rgba(255,255,255,0.15) 1px, transparent 0)`,
-                backgroundSize: '20px 20px'
-              }}></div>
+      {/* No Graph Selected Overlay */}
+      {showNoGraphMessage && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="max-w-lg text-center bg-gray-800/90 backdrop-blur-sm rounded-xl p-8 border border-gray-600/50 shadow-2xl pointer-events-auto">
+            <div className="text-yellow-300 text-4xl mb-4">
+              📊
+            </div>
+            <h3 className="text-2xl font-bold text-white mb-3">
+              No Graph Selected
+            </h3>
+            <div className="text-gray-400 mb-8 leading-relaxed">
+              Choose a graph to start visualizing your data and see the magic of GraphDone in action.
             </div>
             
-            {/* Enhanced Current Graph Header */}
-            <div className={`flex items-center space-x-3 mb-6 ${isFullscreen ? 'p-2' : ''} relative z-10`}>
-              <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg">
-                {getGraphTypeIcon(currentGraph?.type)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-lg font-bold bg-gradient-to-r from-white via-green-100 to-blue-100 bg-clip-text text-transparent truncate">{currentGraph?.name || 'No Graph'}</div>
-                <div className="text-xs text-gray-400 flex items-center space-x-2 mt-1">
-                  <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></div>
-                  <span>Active Workspace</span>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowGraphPanel(false)}
-                className="p-2 rounded-xl text-gray-400 hover:text-white hover:bg-gray-700/50 transition-all duration-200 hover:scale-110"
-                title="Minimize graph panel"
-              >
-                <Minus className="h-4 w-4" />
-              </button>
-            </div>
-
-{!isFullscreen && (
-          /* Enhanced Graph Stats */
-          <div className="grid grid-cols-3 gap-3 mb-6 relative z-10">
-            <div className="group bg-gradient-to-br from-blue-900/30 to-blue-800/20 border border-blue-500/30 rounded-xl p-3 text-center transition-all duration-300 hover:from-blue-900/40 hover:to-blue-800/30 hover:border-blue-400/50 hover:scale-105 shadow-lg backdrop-blur-sm">
-              <div className="text-white text-lg font-bold group-hover:text-blue-100">{nodes.length}</div>
-              <div className="text-blue-300 text-xs font-medium flex items-center justify-center space-x-1 mt-1">
-                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full"></div>
-                <span>Nodes</span>
-              </div>
-            </div>
-            <div className="group bg-gradient-to-br from-green-900/30 to-emerald-800/20 border border-green-500/30 rounded-xl p-3 text-center transition-all duration-300 hover:from-green-900/40 hover:to-emerald-800/30 hover:border-green-400/50 hover:scale-105 shadow-lg backdrop-blur-sm">
-              <div className="text-white text-lg font-bold group-hover:text-green-100">{validatedEdges.length}</div>
-              <div className="text-green-300 text-xs font-medium flex items-center justify-center space-x-1 mt-1">
-                <div className="w-1.5 h-1.5 bg-green-400 rounded-full"></div>
-                <span>Edges</span>
-              </div>
-            </div>
-            <div className="group bg-gradient-to-br from-purple-900/30 to-violet-800/20 border border-purple-500/30 rounded-xl p-3 text-center transition-all duration-300 hover:from-purple-900/40 hover:to-violet-800/30 hover:border-purple-400/50 hover:scale-105 shadow-lg backdrop-blur-sm">
-              <div className="text-white text-lg font-bold group-hover:text-purple-100">{currentGraph?.contributorCount || 0}</div>
-              <div className="text-purple-300 text-xs font-medium flex items-center justify-center space-x-1 mt-1">
-                <div className="w-1.5 h-1.5 bg-purple-400 rounded-full"></div>
-                <span>Users</span>
-              </div>
-            </div>
-          </div>
-          )}
-
-          {/* Action Buttons */}
-          <div className={isFullscreen ? "space-y-1 p-2" : "space-y-2"}>
-            {isFullscreen ? (
-              <>
-                {/* Reset Layout Button */}
-                <button 
-                  onClick={() => {
-                    nodes.forEach((node: any) => {
-                      node.userPinned = false;
-                      node.userPreferredPosition = null;
-                      node.userPreferenceVector = null;
-                      node.fx = null;
-                      node.fy = null;
-                    });
-                    if (simulationRef.current) {
-                      simulationRef.current.alpha(0.3).restart();
-                    }
-                  }}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-1 px-1 rounded text-xs flex items-center justify-center space-x-1"
-                >
-                  <Settings className="w-3 h-3" />
-                  <span>Reset</span>
-                </button>
-
-                {/* Create Node Button */}
-                <button 
-                  onClick={() => setShowCreateNodeModal(true)}
-                  className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-1 px-1 rounded text-xs flex items-center justify-center space-x-1"
-                >
-                  <Plus className="w-3 h-3" />
-                  <span>Create</span>
-                </button>
-
-                {/* Node Types - minimal */}
-                <div className="border-t border-gray-600 pt-1">
-                  <div className="grid grid-cols-2 gap-1">
-                    <button 
-                      onClick={() => createInlineNode(400, 300)}
-                      className="bg-gray-700 hover:bg-gray-600 text-white text-xs py-1 px-1 rounded flex items-center justify-center"
-                      title="Task"
-                    >
-                      <ListTodo className="w-3 h-3" />
-                    </button>
-                    <button 
-                      onClick={() => createInlineNode(400, 300)}
-                      className="bg-gray-700 hover:bg-gray-600 text-white text-xs py-1 px-1 rounded flex items-center justify-center"
-                      title="Goal"
-                    >
-                      <Target className="w-3 h-3" />
-                    </button>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <>
-                {/* Enhanced Create New Graph Button */}
-                <button 
-                  onClick={() => setShowCreateGraphModal(true)}
-                  className="w-full bg-gradient-to-r from-green-600 via-emerald-600 to-teal-600 text-white font-semibold py-3 px-4 rounded-xl transition-all duration-300 shadow-xl hover:shadow-2xl hover:scale-105 transform border border-green-400/30 hover:from-green-500 hover:via-emerald-500 hover:to-teal-500 flex items-center justify-center space-x-2 group relative overflow-hidden"
-                >
-                  <div className="absolute inset-0 bg-gradient-to-r from-green-500/10 to-teal-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                  <Plus className="w-4 h-4 relative z-10" />
-                  <span className="text-sm relative z-10">Create New Graph</span>
-                </button>
-
-                {/* Enhanced Switch Graph Button */}
-                <button 
-                  onClick={() => setShowGraphSwitcher(true)}
-                  className="w-full bg-gradient-to-r from-yellow-600 via-amber-600 to-orange-600 text-white font-semibold py-3 px-4 rounded-xl transition-all duration-300 shadow-xl hover:shadow-2xl hover:scale-105 transform border border-yellow-400/30 hover:from-yellow-500 hover:via-amber-500 hover:to-orange-500 flex items-center justify-between group relative overflow-hidden"
-                >
-                  <div className="absolute inset-0 bg-gradient-to-r from-yellow-500/10 to-orange-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                  <div className="flex items-center space-x-2 relative z-10">
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                    </svg>
-                    <span className="text-sm">Switch Graph</span>
-                  </div>
-                  <span className="text-xs bg-white/90 px-2 py-1 rounded-full text-yellow-700 font-bold shadow-lg relative z-10 group-hover:bg-white group-hover:scale-110 transition-all duration-200">{availableGraphs.length}</span>
-                </button>
-
-                {/* Enhanced Update and Delete Graph Buttons */}
-                {currentGraph && (
-                  <div className="grid grid-cols-2 gap-3 mt-4">
-                    <button 
-                      onClick={() => setShowUpdateGraphModal(true)}
-                      className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold py-3 px-3 rounded-xl transition-all duration-300 shadow-xl hover:shadow-2xl hover:scale-105 transform border border-blue-400/30 hover:from-blue-500 hover:to-indigo-500 flex items-center justify-center space-x-2 group relative overflow-hidden"
-                    >
-                      <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-indigo-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                      <Settings className="w-4 h-4 relative z-10" />
-                      <span className="text-sm relative z-10">Edit</span>
-                    </button>
-                    <button 
-                      onClick={() => setShowDeleteGraphModal(true)}
-                      className="bg-gradient-to-r from-red-600 to-rose-600 text-white font-semibold py-3 px-3 rounded-xl transition-all duration-300 shadow-xl hover:shadow-2xl hover:scale-105 transform border border-red-400/30 hover:from-red-500 hover:to-rose-500 flex items-center justify-center space-x-2 group relative overflow-hidden"
-                    >
-                      <div className="absolute inset-0 bg-gradient-to-r from-red-500/10 to-rose-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                      <Trash2 className="w-4 h-4 relative z-10" />
-                      <span className="text-sm relative z-10">Delete</span>
-                    </button>
-                  </div>
-                )}
-              </>
-            )}
+            <button 
+              onClick={() => setShowGraphSwitcher(true)}
+              className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white px-8 py-4 rounded-xl font-semibold text-lg transition-all duration-300 flex items-center gap-3 mx-auto pointer-events-auto cursor-pointer shadow-lg hover:shadow-xl hover:shadow-green-500/25 transform hover:-translate-y-0.5 hover:scale-105"
+            >
+              Select Graph
+            </button>
           </div>
         </div>
-      </div>
       )}
+      
 
-      {/* Closed Panel Button */}
-      {!showGraphPanel && !isFullscreen && (
-        <button
-          onClick={() => setShowGraphPanel(true)}
-          className="absolute left-4 z-40 backdrop-blur-sm border-0 rounded-lg shadow-xl px-3 py-2 text-white font-semibold transition-all duration-300 flex items-center space-x-2 transform hover:scale-105 w-36 h-10"
-          style={{ 
-            ...getPanelPosition('graph'),
-            background: 'linear-gradient(135deg, #4285f4, #0f9d58, #ea4335)',
-            boxShadow: '0 10px 25px rgba(66, 133, 244, 0.4)'
-          }}
-          title="Show graph panel"
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'linear-gradient(135deg, #1a73e8, #137333, #d93025)';
-            e.currentTarget.style.boxShadow = '0 15px 35px rgba(66, 133, 244, 0.6)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'linear-gradient(135deg, #4285f4, #0f9d58, #ea4335)';
-            e.currentTarget.style.boxShadow = '0 10px 25px rgba(66, 133, 244, 0.4)';
-          }}
-        >
-          <div className="flex items-center justify-between w-full">
-            <div className="flex items-center space-x-2">
-              <Settings className="h-4 w-4" />
-              <span className="text-xs font-medium">Graph Panel</span>
-            </div>
-            <div className="w-2 h-2 bg-green-400 rounded-full flex-shrink-0 animate-pulse"></div>
-          </div>
-        </button>
-      )}
 
-      {/* Data Health Indicator */}
-      {validationResult && (validationResult.errors.length > 0 || validationResult.warnings.length > 0) && (
-        <div className="absolute top-20 right-6 z-40">
-          <button 
-            onClick={() => setShowDataHealth(!showDataHealth)}
-            className="bg-yellow-600/90 backdrop-blur-sm border border-yellow-500 rounded-lg px-3 py-2 shadow-md hover:bg-yellow-500 transition-all duration-200"
-            data-testid="data-health-indicator"
-          >
-            <div className="flex items-center space-x-2">
-              <AlertTriangle className="w-4 h-4 text-yellow-100" />
-              <span className="text-sm font-medium text-yellow-100">Data Issues</span>
-              <span className="text-xs bg-yellow-500 text-yellow-900 rounded-full px-2 py-0.5">
-                {validationResult.errors.length + validationResult.warnings.length}
-              </span>
-            </div>
-          </button>
-          
-          {/* Data Health Dashboard */}
-          {showDataHealth && (
-            <div className="absolute top-full right-0 mt-2 w-96 bg-gray-800/95 backdrop-blur-sm border border-gray-600 rounded-lg shadow-xl z-50 animate-in fade-in slide-in-from-top-2 duration-200">
-              <div className="p-4 border-b border-gray-600" data-testid="validation-summary">
-                <h3 className="text-sm font-medium text-yellow-300 mb-2">Data Health Summary</h3>
-                <p className="text-xs text-gray-400 mb-3">{getValidationSummary(validationResult)}</p>
-                
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div className="bg-green-900/30 border border-green-500/30 rounded p-2">
-                    <div className="text-green-300 font-medium">Valid Data</div>
-                    <div className="text-green-100">{validationResult.stats.validNodes} nodes, {validationResult.stats.validEdges} edges</div>
-                  </div>
-                  <div className="bg-red-900/30 border border-red-500/30 rounded p-2">
-                    <div className="text-red-300 font-medium">Invalid Data</div>
-                    <div className="text-red-100">{validationResult.stats.invalidNodes} nodes, {validationResult.stats.invalidEdges} edges</div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Errors Section */}
-              {validationResult.errors.length > 0 && (
-                <div className="p-4 border-b border-gray-600">
-                  <h4 className="text-sm font-medium text-red-300 mb-2 flex items-center">
-                    <AlertCircle className="w-4 h-4 mr-2" />
-                    Errors ({validationResult.errors.length})
-                  </h4>
-                  <div className="max-h-32 overflow-y-auto space-y-2">
-                    {validationResult.errors.slice(0, 5).map((error, index) => (
-                      <div key={index} className="text-xs bg-red-900/20 border border-red-500/30 rounded p-2">
-                        <div className="text-red-200 font-medium">{error.message}</div>
-                        {error.suggestion && (
-                          <div className="text-red-300 mt-1">💡 {error.suggestion}</div>
-                        )}
-                      </div>
-                    ))}
-                    {validationResult.errors.length > 5 && (
-                      <div className="text-xs text-gray-400 text-center">... and {validationResult.errors.length - 5} more errors</div>
-                    )}
-                  </div>
-                </div>
-              )}
-              
-              {/* Warnings Section */}
-              {validationResult.warnings.length > 0 && (
-                <div className="p-4">
-                  <h4 className="text-sm font-medium text-yellow-300 mb-2 flex items-center">
-                    <AlertTriangle className="w-4 h-4 mr-2" />
-                    Warnings ({validationResult.warnings.length})
-                  </h4>
-                  <div className="max-h-32 overflow-y-auto space-y-2">
-                    {validationResult.warnings.slice(0, 3).map((warning, index) => (
-                      <div key={index} className="text-xs bg-yellow-900/20 border border-yellow-500/30 rounded p-2">
-                        <div className="text-yellow-200 font-medium">{warning.message}</div>
-                        {warning.suggestion && (
-                          <div className="text-yellow-300 mt-1">💡 {warning.suggestion}</div>
-                        )}
-                      </div>
-                    ))}
-                    {validationResult.warnings.length > 3 && (
-                      <div className="text-xs text-gray-400 text-center">... and {validationResult.warnings.length - 3} more warnings</div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Graph Controls */}
-      <div className="absolute bottom-4 right-4 space-y-2">        
-        <button
-          onClick={() => {
-            // Reset all user preferences and return to algorithmic positioning
-            nodes.forEach((node: any) => {
-              node.userPinned = false;
-              node.userPreferredPosition = null;
-              node.userPreferenceVector = null;
-              node.fx = null;
-              node.fy = null;
-              // Clear positioning cache to force recalculation
-              node.targetX = null;
-              node.targetY = null;
-            });
-            initializeVisualization();
-          }}
-          className="block w-full bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg text-xs font-medium transition-colors shadow-lg backdrop-blur-sm border border-green-500/30"
-        >
-          Reset Layout
-        </button>
-      </div>
 
       {/* Connection Mode Indicator */}
       {isConnecting && (
@@ -3211,6 +3809,16 @@ export function InteractiveGraphVisualization() {
               Edit Node Details
             </button>
             <button 
+              onClick={() => {
+                centerOnNode(nodeMenu.node!.id);
+                setNodeMenu(prev => ({ ...prev, visible: false }));
+              }}
+              className="w-full flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
+            >
+              <Crosshair className="h-4 w-4 mr-3" />
+              Center on Node
+            </button>
+            <button 
               onClick={() => handleDeleteNode(nodeMenu.node!)}
               className="w-full flex items-center px-4 py-2 text-sm text-red-400 hover:bg-red-900/50"
             >
@@ -3283,6 +3891,21 @@ export function InteractiveGraphVisualization() {
           onClick={(e) => e.stopPropagation()}
         >
           <div className="py-2">
+            {/* Reload Button - at the top for recovery */}
+            <button
+              onClick={() => {
+                console.log('[Graph Debug] User triggered page reload from context menu');
+                window.location.reload();
+              }}
+              className="w-full text-left px-4 py-3 hover:bg-red-500/10 text-gray-200 flex items-center space-x-3 transition-all duration-300 ease-out group rounded-lg mx-2 border-b border-white/5 mb-2"
+            >
+              <div className="w-6 h-6 rounded-lg bg-gray-700/50 flex items-center justify-center group-hover:bg-red-500/20 transition-all duration-300 ease-out">
+                <ArrowLeft className="h-4 w-4 text-gray-400 group-hover:text-red-400 transition-colors duration-300 transform group-hover:rotate-[-90deg]" />
+              </div>
+              <span className="text-gray-300 font-medium group-hover:text-red-400 transition-colors duration-300">Reload Page</span>
+              <div className="ml-auto text-xs text-gray-500 group-hover:text-red-400">Recovery</div>
+            </button>
+            
             <button
               onClick={() => {
                 createInlineNode(contextMenuPosition?.graphX || 0, contextMenuPosition?.graphY || 0);
@@ -3393,246 +4016,31 @@ export function InteractiveGraphVisualization() {
         />
       )}
 
-      {/* Modern Inline Edge Type Editor Dropdown */}
-      {editingEdge && (
-        <>
-          {/* Backdrop for edge editor */}
-          <div 
-            className="fixed inset-0 z-40" 
-            onClick={() => setEditingEdge(null)}
-          />
-          <div
-            ref={dropdownRef}
-            className="absolute z-50"
-            style={{
-              left: editingEdge.position.x - 160 + dragOffset.x,
-              top: editingEdge.position.y + 10 + dragOffset.y,
-              minWidth: '320px',
-              transition: isDragging ? 'none' : 'none',
-              willChange: isDragging ? 'left, top' : 'auto',
-              cursor: isDragging ? 'grabbing' : 'default'
-            }}
-            onClick={(e) => e.stopPropagation()}
-        >
-          {/* Remove arrow since dropdown is at same position as label */}
-          
-          {/* Modern dropdown with clean glass effect */}
-          <div className="bg-black/80 backdrop-blur-md border border-white/10 rounded-xl shadow-2xl overflow-hidden"
-               style={{
-                 boxShadow: isDragging 
-                   ? '0 30px 60px -15px rgba(0, 0, 0, 0.95), 0 0 0 1px rgba(255, 255, 255, 0.1)' 
-                   : '0 25px 50px -12px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.05)',
-                 transform: isDragging ? 'scale(1.02)' : 'scale(1)',
-                 transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s ease'
-               }}>
-            {/* Header with drag handle */}
-            <div 
-              className="px-5 py-3 bg-black/50 border-b border-white/10 cursor-move select-none hover:bg-black/60 transition-colors"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setIsDragging(true);
-                setDragStart({
-                  x: e.clientX - dragOffset.x,
-                  y: e.clientY - dragOffset.y
-                });
-              }}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  {/* Drag handle indicator */}
-                  <div className="flex flex-col space-y-1 opacity-40 group-hover:opacity-60 transition-opacity">
-                    <div className="flex space-x-1">
-                      <div className="w-1 h-1 bg-white rounded-full"></div>
-                      <div className="w-1 h-1 bg-white rounded-full"></div>
-                    </div>
-                    <div className="flex space-x-1">
-                      <div className="w-1 h-1 bg-white rounded-full"></div>
-                      <div className="w-1 h-1 bg-white rounded-full"></div>
-                    </div>
-                  </div>
-                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-                  <span className="text-sm font-medium text-white">Select Relationship Type</span>
-                </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setEditingEdge(null);
-                  }}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  className="text-gray-400 hover:text-white hover:bg-white/10 p-1 rounded-lg transition-all duration-200"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-            
-            {/* Options with scroll */}
-            <div className="max-h-80 overflow-y-auto scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
-              <div className="p-3">
-                {RELATIONSHIP_OPTIONS.map((option, index) => (
-                  <button
-                    key={option.type}
-                    onClick={() => {
-                      // Update the local state immediately for UI sync
-                      setEditingEdge(prev => prev ? {
-                        ...prev,
-                        edge: { ...prev.edge, type: option.type }
-                      } : null);
-                      
-                      // Update the edge type with animation
-                      updateEdgeMutation({
-                        variables: {
-                          where: { id: editingEdge.edge.id },
-                          update: { type: option.type }
-                        }
-                      }).then((result) => {
-                        
-                        // Immediately update the D3 visualization without waiting for refetch
-                        const svg = d3.select(svgRef.current);
-                        const edgeId = editingEdge.edge.id;
-                        const newType = option.type;
-                        const config = getRelationshipConfig(newType);
-                        
-                        // Update edge label text and layout immediately
-                        svg.selectAll('.edge-label-group')
-                          .filter((d: any) => d.id === edgeId)
-                          .each(function() {
-                            const group = d3.select(this);
-                            const textElement = group.select('.edge-label');
-                            
-                            // Update text
-                            textElement.text(config.label);
-                            
-                            // Update icon to match new relationship type
-                            const iconElement = group.select('.edge-label-icon');
-                            const { IconComponent } = getRelationshipIconForD3(newType);
-                            const iconContainer = iconElement.node();
-                            if (iconContainer) {
-                              const uniqueId = `edge-icon-${edgeId}-${Date.now()}`;
-                              iconElement.html(`<div id="${uniqueId}" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;"></div>`);
-                              
-                              const newContainer = document.getElementById(uniqueId);
-                              if (newContainer) {
-                                const root = ReactDOM.createRoot(newContainer);
-                                root.render(React.createElement(IconComponent, { 
-                                  className: "h-3 w-3 text-white"
-                                }));
-                              }
-                            }
-                            
-                            // Recalculate layout after text change
-                            const bbox = (textElement.node() as SVGTextElement).getBBox();
-                            const iconWidth = 14;
-                            const spacing = 8;
-                            const paddingLeft = 6;
-                            const paddingRight = 8;
-                            const totalWidth = paddingLeft + iconWidth + spacing + bbox.width + paddingRight;
-                            const totalHeight = Math.max(22, bbox.height + 8);
-                            
-                            // Update background rectangle
-                            group.select('.edge-label-bg')
-                              .attr('width', totalWidth)
-                              .attr('height', totalHeight)
-                              .attr('x', -totalWidth / 2)
-                              .attr('y', -totalHeight / 2)
-                              .style('fill', config.hexColor);
-                            
-                            // Reposition icon
-                            group.select('.edge-label-icon')
-                              .attr('x', -totalWidth / 2 + paddingLeft)
-                              .attr('y', -totalHeight / 2 + (totalHeight - 14) / 2);
-                            
-                            // Reposition text  
-                            textElement
-                              .attr('x', -totalWidth / 2 + paddingLeft + iconWidth + spacing)
-                              .attr('text-anchor', 'start');
-                          });
-                        
-                        // Update edge stroke color immediately
-                        svg.selectAll('.edge')
-                          .filter((d: any) => d.id === edgeId)
-                          .attr('stroke', config.hexColor);
-                        
-                        // Update middle arrow color immediately  
-                        svg.selectAll('.arrow')
-                          .filter((d: any) => d.id === edgeId)
-                          .attr('fill', config.hexColor)
-                          .attr('stroke', config.hexColor);
-                        
-                        // Don't close immediately - let user see the update
-                        // setEditingEdge(null);
-                      }).catch(() => {
-                        // On error, revert the local state
-                        setEditingEdge(prev => prev ? {
-                          ...prev,
-                          edge: { ...prev.edge, type: editingEdge.edge.type }
-                        } : null);
-                      });
-                    }}
-                    className={`w-full flex items-center px-4 py-3 rounded-xl transition-all duration-200 group relative overflow-hidden mb-2 ${
-                      editingEdge.edge.type === option.type
-                        ? 'bg-white/10 text-white border border-white/20 shadow-lg'
-                        : 'text-gray-300 hover:bg-white/5 hover:text-white border border-transparent'
-                    }`}
-                    style={{
-                      animationDelay: `${index * 30}ms`
-                    }}
-                  >
-                    {/* Subtle gradient overlay for selected items */}
-                    {editingEdge.edge.type === option.type && (
-                      <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 via-purple-500/5 to-blue-500/10 rounded-xl"></div>
-                    )}
-                    
-                    <div className="flex items-center space-x-3 flex-1 relative z-10">
-                      {/* Icon with modern styling */}
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 group-hover:scale-105 ${
-                        editingEdge.edge.type === option.type 
-                          ? 'bg-white/15 shadow-md' 
-                          : 'bg-white/5 group-hover:bg-white/10'
-                      }`}>
-                        {getRelationshipIconElement(option.type, 'h-5 w-5')}
-                      </div>
-                      
-                      {/* Label and description */}
-                      <div className="text-left flex-1">
-                        <div className="font-medium text-sm leading-tight">{option.label}</div>
-                        <div className="text-xs text-gray-400 mt-1 leading-relaxed">{option.description}</div>
-                      </div>
-                      
-                      {/* Selected indicator with modern design - moved inside flex-1 container */}
-                      {editingEdge.edge.type === option.type && (
-                        <div className="flex items-center space-x-2 ml-auto mr-2">
-                          <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse shadow-lg shadow-green-400/50"></div>
-                          <span className="text-xs text-green-400 font-medium">Current</span>
-                        </div>
-                      )}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-            
-            {/* Footer with current selection */}
-            <div className="px-5 py-3 bg-black/60 border-t border-white/10 backdrop-blur-sm">
-              <div className="flex items-center justify-between text-xs">
-                <div className="flex items-center space-x-2">
-                  <span className="text-gray-400">Current:</span>
-                  <span className="text-white font-medium px-2 py-1 bg-white/10 rounded-lg">
-                    {getRelationshipConfig(editingEdge.edge.type as RelationshipType).label}
-                  </span>
-                </div>
-                <kbd className="px-2 py-1 text-xs bg-white/10 rounded-lg border border-white/20 text-gray-300 font-medium">
-                  ESC to close
-                </kbd>
-              </div>
-            </div>
-          </div>
-        </div>
-        </>
-      )}
-
-
+      {/* Relationship Editor Window */}
+      <RelationshipEditorWindow
+        isVisible={showRelationshipWindow}
+        editingEdge={editingEdge}
+        selectedNodes={selectedNodes}
+        workItems={workItems}
+        onClose={() => setShowRelationshipWindow(false)}
+        onFlipDirection={() => {
+          // The component handles flip internally
+          setEditingEdge(null); // Clear after flip
+        }}
+        onDeleteEdge={(edgeId) => {
+          setEditingEdge(null); // Clear after delete
+        }}
+        onCreateEdge={(sourceId, targetId, type) => {
+          // Clear selection after create
+          setSelectedNodes(new Set());
+        }}
+        showSuccess={showSuccess}
+        showError={showError}
+        refetchEdges={refetchEdges}
+        onClearSelection={() => {
+          setSelectedNodes(new Set());
+        }}
+      />
 
 
       {/* Node Details Modal */}
@@ -3654,291 +4062,10 @@ export function InteractiveGraphVisualization() {
             setShowNodeDetailsModal(false);
             handleDisconnectNodes(node);
           }}
-          onDelete={(node) => {
-            setShowNodeDetailsModal(false);
-            handleDeleteNode(node);
-          }}
         />
       )}
 
-      {/* Delete Node Modal */}
-      {showDeleteModal && selectedNode && (
-        <DeleteNodeModal
-          isOpen={showDeleteModal}
-          onClose={handleCloseDeleteModal}
-          nodeId={selectedNode.id}
-          nodeTitle={selectedNode.title}
-          nodeType={selectedNode.type}
-          onOpenDisconnectModal={handleOpenDisconnectFromDelete}
-        />
-      )}
-
-      {/* Create Graph Modal */}
-      {showCreateGraphModal && (
-        <CreateGraphModal
-          isOpen={showCreateGraphModal}
-          onClose={() => setShowCreateGraphModal(false)}
-        />
-      )}
-
-      {/* Graph Selection Modal */}
-      {showGraphSwitcher && (
-        <GraphSelectionModal
-          isOpen={showGraphSwitcher}
-          onClose={() => setShowGraphSwitcher(false)}
-        />
-      )}
-
-      {/* Update Graph Modal */}
-      {showUpdateGraphModal && (
-        <UpdateGraphModal
-          isOpen={showUpdateGraphModal}
-          onClose={() => setShowUpdateGraphModal(false)}
-        />
-      )}
-
-      {/* Delete Graph Modal */}
-      {showDeleteGraphModal && (
-        <DeleteGraphModal
-          isOpen={showDeleteGraphModal}
-          onClose={() => setShowDeleteGraphModal(false)}
-        />
-      )}
-
-
-      {/* Create Node Modal */}
-      {showCreateNodeModal && selectedNode && (
-        <CreateNodeModal
-          isOpen={showCreateNodeModal}
-          onClose={handleCloseCreateNodeModal}
-          parentNodeId={selectedNode.id}
-          position={createNodePosition}
-        />
-      )}
-
-      {/* Create Node Modal - For Empty State */}
-      {showCreateNodeModal && !selectedNode && (
-        <CreateNodeModal
-          isOpen={showCreateNodeModal}
-          onClose={() => setShowCreateNodeModal(false)}
-        />
-      )}
-
-      {/* Connect Node Modal - With Connect and Disconnect Tabs */}
-      {showConnectModal && selectedNode && (
-        <ConnectNodeModal
-          isOpen={showConnectModal}
-          onClose={handleCloseConnectModal}
-          sourceNode={{
-            id: selectedNode.id,
-            title: selectedNode.title,
-            type: selectedNode.type
-          }}
-          initialTab={connectModalInitialTab}
-          onAllConnectionsRemoved={openedFromDeleteModal ? () => {
-            // Auto-return to delete modal when all connections removed
-            setShowConnectModal(false);
-            setOpenedFromDeleteModal(false);
-            setConnectModalInitialTab('connect');
-            setShowDeleteModal(true);
-          } : undefined}
-        />
-      )}
-
-      {/* Edge Details Panel */}
-      {showEdgeDetails && selectedEdge && (
-        <>
-          {/* Backdrop with subtle blur */}
-          <div 
-            className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm" 
-            onClick={() => {
-              setShowEdgeDetails(false);
-              setSelectedEdge(null);
-              setEdgeDetailsPosition(null);
-            }}
-          />
-          <div 
-            className="fixed bg-black/90 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden"
-            style={{
-              minWidth: '384px',
-              maxWidth: '600px',
-              width: (() => {
-                const sourceTitle = typeof selectedEdge.source === 'string' ? selectedEdge.source : (selectedEdge.source as any)?.title || (selectedEdge.source as any)?.id || 'Unknown Node';
-                const targetTitle = typeof selectedEdge.target === 'string' ? selectedEdge.target : (selectedEdge.target as any)?.title || (selectedEdge.target as any)?.id || 'Unknown Node';
-                const maxTitleLength = Math.max(sourceTitle.length, targetTitle.length);
-                
-                // Dynamic width based on title length
-                if (maxTitleLength > 30) return '600px';
-                if (maxTitleLength > 20) return '500px';
-                if (maxTitleLength > 15) return '450px';
-                return '384px';
-              })(),
-              left: (() => {
-                const sourceTitle = typeof selectedEdge.source === 'string' ? selectedEdge.source : (selectedEdge.source as any)?.title || (selectedEdge.source as any)?.id || 'Unknown Node';
-                const targetTitle = typeof selectedEdge.target === 'string' ? selectedEdge.target : (selectedEdge.target as any)?.title || (selectedEdge.target as any)?.id || 'Unknown Node';
-                const maxTitleLength = Math.max(sourceTitle.length, targetTitle.length);
-                
-                let width = 384;
-                if (maxTitleLength > 30) width = 600;
-                else if (maxTitleLength > 20) width = 500;
-                else if (maxTitleLength > 15) width = 450;
-                
-                const halfWidth = width / 2;
-                return `${edgeDetailsPosition ? Math.min(edgeDetailsPosition.x - halfWidth, window.innerWidth - width - 20) : window.innerWidth - width - 20}px`;
-              })(),
-              top: `${edgeDetailsPosition ? Math.max(edgeDetailsPosition.y - 100, 10) : 20}px`,
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.05)',
-              animation: 'slideInScale 0.3s ease-out'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Compact Header */}
-            <div className="relative p-4 bg-gradient-to-r from-blue-600/20 via-purple-600/20 to-blue-600/20 border-b border-white/10">
-              <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent"></div>
-              <div className="relative flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 rounded-lg bg-white/10 backdrop-blur-sm flex items-center justify-center">
-                    <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-white">Edge Details</h3>
-                  </div>
-                </div>
-                <button
-                  onClick={() => {
-                    setShowEdgeDetails(false);
-                    setSelectedEdge(null);
-                    setEdgeDetailsPosition(null);
-                  }}
-                  className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-all duration-200"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-            
-            {/* Compact Content */}
-            <div className="p-4 space-y-4">
-              {/* Relationship Type Section */}
-              <div>
-                <div className="bg-white/5 rounded-lg p-3 border border-white/10 hover:bg-white/10 transition-all duration-200">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center">
-                      {getRelationshipIconElement(selectedEdge.type, 'h-4 w-4')}
-                    </div>
-                    <div>
-                      <div className="text-white font-semibold">
-                        {getRelationshipConfig(selectedEdge.type).label}
-                      </div>
-                      <div className="text-gray-400 text-xs">
-                        Relationship Type
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Connection Flow - Side by Side */}
-              <div className="flex items-center space-x-3">
-                {/* From Node */}
-                <div className="flex-1 bg-emerald-500/10 rounded-lg p-3 border border-emerald-500/20">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-6 h-6 rounded bg-emerald-500/20 flex items-center justify-center">
-                      <svg className="w-3 h-3 text-emerald-400" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.707l-3-3a1 1 0 00-1.414 0l-3 3a1 1 0 001.414 1.414L9 9.414V13a1 1 0 102 0V9.414l1.293 1.293a1 1 0 001.414-1.414z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs font-medium text-emerald-400">FROM</div>
-                      <div className="text-white font-medium text-sm break-words">
-                        {typeof selectedEdge.source === 'string' ? selectedEdge.source : (selectedEdge.source as any)?.title || (selectedEdge.source as any)?.id || 'Unknown Node'}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Connection Arrow */}
-                <div className="flex-shrink-0 px-2">
-                  <svg className="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                
-                {/* To Node */}
-                <div className="flex-1 bg-blue-500/10 rounded-lg p-3 border border-blue-500/20">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-6 h-6 rounded bg-blue-500/20 flex items-center justify-center">
-                      <svg className="w-3 h-3 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v3.586L7.707 9.293a1 1 0 00-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 10.586V7z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs font-medium text-blue-400">TO</div>
-                      <div className="text-white font-medium text-sm break-words">
-                        {typeof selectedEdge.target === 'string' ? selectedEdge.target : (selectedEdge.target as any)?.title || (selectedEdge.target as any)?.id || 'Unknown Node'}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Description Section - Compact */}
-              {getRelationshipConfig(selectedEdge.type).description && (
-                <div className="bg-white/5 rounded-lg p-3 border border-white/10">
-                  <div className="text-xs font-medium text-gray-400 mb-1">Description</div>
-                  <p className="text-gray-200 text-sm leading-relaxed">{getRelationshipConfig(selectedEdge.type).description}</p>
-                </div>
-              )}
-              
-              {/* Action Section - Smaller */}
-              <div className="pt-1 border-t border-white/10">
-                <button
-                  onClick={async () => {
-                    try {
-                      await deleteEdgeMutation({
-                        variables: { where: { id: selectedEdge.id } }
-                      });
-                      setShowEdgeDetails(false);
-                      setSelectedEdge(null);
-                      setEdgeDetailsPosition(null);
-                      showSuccess('Edge Deleted', 'Relationship removed successfully');
-                    } catch (error: any) {
-                      showError('Delete Failed', error.message || 'Could not delete edge');
-                    }
-                  }}
-                  className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white py-2 px-3 rounded-lg flex items-center justify-center space-x-2 font-medium transition-all duration-200 shadow-lg hover:shadow-red-500/25 group"
-                >
-                  <Trash2 className="h-4 w-4 group-hover:animate-pulse" />
-                  <span>Delete Relationship</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* Fullscreen Toggle */}
-      {isFullscreen ? (
-        <button
-          onClick={() => navigate('/')}
-          className="absolute top-4 right-6 z-50 bg-gray-800 hover:bg-gray-700 text-white p-3 rounded-lg border border-gray-600 flex items-center space-x-2 transition-colors shadow-lg"
-          title="Back to Workspace"
-        >
-          <ArrowLeft className="h-5 w-5" />
-          <span>Back</span>
-        </button>
-      ) : (
-        <button
-          onClick={() => navigate('/graph')}
-          className="absolute top-4 right-6 z-50 bg-gray-800 hover:bg-gray-700 text-white p-3 rounded-lg border border-gray-600 flex items-center space-x-2 transition-colors shadow-lg"
-          title="Full Zen Mode"
-        >
-          <Maximize2 className="h-5 w-5" />
-          <span>Zen Mode</span>
-        </button>
-      )}
+{/* Fullscreen toggle removed - fullscreen mode abandoned */}
 
     </div>
   );
