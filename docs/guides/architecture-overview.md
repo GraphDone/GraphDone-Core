@@ -1,7 +1,5 @@
 # GraphDone Architecture Overview
 
-**AI-Generated Content Warning: This documentation contains AI-generated content. Verify information before depending on it for decision making.**
-
 ## System Architecture Philosophy
 
 GraphDone is architected around three core principles:
@@ -10,70 +8,42 @@ GraphDone is architected around three core principles:
 2. **Real-Time First**: Changes propagate immediately to all participants
 3. **Democratic Coordination**: Priority emerges from community validation, not top-down assignment
 
-## High-Level Architecture
+## Current Architecture (v0.2.2-alpha)
 
 ```mermaid
 graph TB
-    subgraph "Client Layer"
-        WEB[Web Application<br/>React + D3.js<br/>Touch-optimized]
-        MOBILE[Mobile App<br/>React Native<br/>Offline-capable]
-        SDK[AI Agent SDK<br/>GraphQL + REST<br/>Multiple languages]
+    subgraph "Client Applications"
+        WEB[Web Application<br/>React + TypeScript + D3.js<br/>Touch-optimized UI<br/>Port 3127]
+        IOS[iPhone App<br/>SwiftUI<br/>Separate GraphDone-iOS repo]
+        CLAUDE[Claude Code MCP<br/>Natural language interface<br/>Port 3128]
     end
     
-    subgraph "API Gateway"
-        ROUTER[API Router<br/>Request routing]
-        AUTH[Authentication<br/>JWT validation]
-        RATE[Rate Limiting<br/>DoS protection]
+    subgraph "API Layer"
+        GQL[GraphQL Server<br/>Apollo Server + @neo4j/graphql<br/>Auto-generated resolvers<br/>WebSocket subscriptions<br/>Port 4127]
+        CORE[Core Graph Engine<br/>@graphdone/core package<br/>Priority algorithms]
     end
     
-    subgraph "Application Services"
-        GQL[GraphQL Server<br/>Apollo Server<br/>Query federation]
-        WS[WebSocket Hub<br/>Real-time events<br/>Subscription management]
-        REST[REST API<br/>Agent integration<br/>Webhook support]
+    subgraph "Data Layer"
+        NEO4J[(Neo4j 5.15-community<br/>Native graph database<br/>APOC plugins<br/>Port 7687)]
+        REDIS[(Redis 8-alpine<br/>Available in Docker<br/>Not yet integrated<br/>Port 6379)]
     end
     
-    subgraph "Business Logic"
-        GRAPH[Graph Engine<br/>Node operations<br/>Algorithm execution]
-        PRIORITY[Priority Engine<br/>Multi-dimensional calculation<br/>Migration algorithms]
-        COLLAB[Collaboration Engine<br/>Conflict resolution<br/>Human-AI coordination]
+    subgraph "Future: Monitoring & Analytics (TIG Stack)"
+        TELEGRAF[Telegraf<br/>Metrics collection<br/>Server monitoring]
+        INFLUXDB[(InfluxDB<br/>Time-series database<br/>Metrics storage)]  
+        GRAFANA[Grafana<br/>Dashboards & alerts<br/>GraphDone insights]
     end
     
-    subgraph "Data Persistence"
-        POSTGRES[(PostgreSQL<br/>Graph relationships<br/>ACID transactions)]
-        REDIS[(Redis<br/>Session storage<br/>Real-time cache)]
-        SEARCH[(Search Index<br/>Full-text search<br/>Graph queries)]
-    end
+    WEB --> GQL
+    IOS --> GQL
+    CLAUDE --> NEO4J
+    GQL --> NEO4J
+    GQL --> CORE
+    REDIS -.-> GQL
     
-    subgraph "External Services"
-        AUTH_PROVIDER[Auth Provider<br/>Auth0, Cognito, etc.]
-        FILE_STORAGE[File Storage<br/>S3, CloudFlare R2]
-        MONITORING[Monitoring<br/>Prometheus, Grafana]
-    end
-    
-    WEB --> ROUTER
-    MOBILE --> ROUTER
-    SDK --> ROUTER
-    
-    ROUTER --> AUTH
-    AUTH --> GQL
-    AUTH --> WS
-    AUTH --> REST
-    
-    GQL --> GRAPH
-    WS --> GRAPH
-    REST --> GRAPH
-    
-    GRAPH --> PRIORITY
-    GRAPH --> COLLAB
-    GRAPH --> POSTGRES
-    
-    PRIORITY --> REDIS
-    COLLAB --> REDIS
-    
-    POSTGRES -.-> SEARCH
-    AUTH -.-> AUTH_PROVIDER
-    GRAPH -.-> FILE_STORAGE
-    GRAPH -.-> MONITORING
+    GQL -.-> TELEGRAF
+    TELEGRAF -.-> INFLUXDB
+    INFLUXDB -.-> GRAFANA
 ```
 
 ## Core Components Deep Dive

@@ -1,7 +1,5 @@
 # GraphDone User Flows & Interaction Patterns
 
-**AI-Generated Content Warning: This documentation contains AI-generated content. Verify information before depending on it for decision making.**
-
 ## Core User Flows
 
 ### 1. New User Onboarding Flow
