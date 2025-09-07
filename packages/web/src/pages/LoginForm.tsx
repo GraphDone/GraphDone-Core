@@ -51,6 +51,21 @@ const GUEST_LOGIN_MUTATION = gql`
   }
 `;
 
+const DEVELOPMENT_INFO_QUERY = gql`
+  query DevelopmentInfo {
+    developmentInfo {
+      isDevelopment
+      hasDefaultCredentials
+      defaultAccounts {
+        username
+        password
+        role
+        description
+      }
+    }
+  }
+`;
+
 const GET_SYSTEM_SETTINGS = gql`
   query GetSystemSettings {
     systemSettings {
@@ -74,6 +89,11 @@ export function LoginForm() {
   // Check if guest access is enabled
   const { data: systemSettings } = useQuery(GET_SYSTEM_SETTINGS);
   const isGuestEnabled = systemSettings?.systemSettings?.allowAnonymousGuest ?? true;
+
+  // Check for development mode and default credentials
+  const { data: devInfo } = useQuery(DEVELOPMENT_INFO_QUERY);
+  const showDefaultCredentials = devInfo?.developmentInfo?.hasDefaultCredentials ?? false;
+  const defaultAccounts = devInfo?.developmentInfo?.defaultAccounts ?? [];
 
   const [login, { loading }] = useMutation(LOGIN_MUTATION, {
     onCompleted: (data) => {
@@ -143,10 +163,51 @@ export function LoginForm() {
     }
   };
 
+  const fillDefaultCredentials = async (username: string, password: string) => {
+    setFormData({
+      emailOrUsername: username,
+      password: password
+    });
+    setErrors({});
+    
+    // Auto-submit for better UX
+    await login({
+      variables: {
+        input: {
+          emailOrUsername: username,
+          password: password
+        }
+      }
+    });
+  };
+
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4">
-      <div className="max-w-md w-full">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Tropical lagoon light scattering background animation - consistent with main app */}
+      <div className="lagoon-caustics">
+        <div className="caustic-layer caustic-layer-1"></div>
+        <div className="caustic-layer caustic-layer-2"></div>
+        <div className="caustic-layer caustic-layer-3"></div>
+        <div className="caustic-layer caustic-layer-4"></div>
+        <div className="caustic-layer caustic-layer-5"></div>
+        <div className="caustic-layer caustic-layer-6"></div>
+        <div className="caustic-layer caustic-layer-7"></div>
+        <div className="caustic-layer caustic-layer-8"></div>
+        <div className="caustic-layer caustic-layer-9"></div>
+        <div className="caustic-layer caustic-layer-10"></div>
+        <div className="lagoon-shimmer lagoon-shimmer-1"></div>
+        <div className="lagoon-shimmer lagoon-shimmer-2"></div>
+        <div className="lagoon-shimmer lagoon-shimmer-3"></div>
+        <div className="lagoon-shimmer lagoon-shimmer-4"></div>
+        <div className="lagoon-shimmer lagoon-shimmer-5"></div>
+        <div className="lagoon-shimmer lagoon-shimmer-6"></div>
+        <div className="lagoon-shimmer lagoon-shimmer-7"></div>
+        <div className="lagoon-shimmer lagoon-shimmer-8"></div>
+        <div className="lagoon-shimmer lagoon-shimmer-9"></div>
+        <div className="lagoon-shimmer lagoon-shimmer-10"></div>
+      </div>
+      <div className="max-w-md w-full relative z-10">
         {/* Header */}
         <div className="text-center mb-8">
           <Link to="/" className="flex items-center justify-center mb-4 hover:opacity-80 transition-opacity">
@@ -304,6 +365,45 @@ export function LoginForm() {
           )}
         </form>
 
+        {/* Development Mode - Default Credentials */}
+        {showDefaultCredentials && (
+          <div className="mt-6">
+            <div className="bg-amber-900/20 border border-amber-400/30 rounded-lg p-4 backdrop-blur-sm">
+              <div className="flex items-center mb-3">
+                <div className="w-2 h-2 bg-amber-400 rounded-full animate-pulse mr-2"></div>
+                <h3 className="text-sm font-medium text-amber-300">Development Mode - Default Accounts</h3>
+              </div>
+              <p className="text-xs text-amber-200/80 mb-3">
+                Quick access for testing. Please change these passwords in production!
+              </p>
+              <div className="space-y-2">
+                {defaultAccounts.map((account) => (
+                  <button
+                    key={account.username}
+                    onClick={() => fillDefaultCredentials(account.username, account.password)}
+                    className="w-full text-left p-3 bg-amber-800/20 hover:bg-amber-700/30 border border-amber-400/20 hover:border-amber-400/40 rounded transition-all group"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2">
+                          <span className="font-mono text-amber-300 font-medium">{account.username}</span>
+                          <span className="text-xs px-2 py-0.5 bg-amber-400/20 text-amber-300 rounded-full border border-amber-400/30">
+                            {account.role}
+                          </span>
+                        </div>
+                        <p className="text-xs text-amber-200/70 mt-1">{account.description}</p>
+                        <p className="text-xs text-amber-200/50 mt-1">Password: {account.password}</p>
+                      </div>
+                      <div className="text-amber-400 group-hover:text-amber-300 opacity-60 group-hover:opacity-100 transition-all">
+                        <ArrowRight className="h-4 w-4" />
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Signup Link */}
         <div className="mt-6 text-center">
