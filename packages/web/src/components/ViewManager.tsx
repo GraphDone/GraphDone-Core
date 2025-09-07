@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useQuery } from '@apollo/client';
-import { Search, X, ChevronDown } from 'lucide-react';
+import { Search, X, ChevronDown, BarChart3, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { STATUS_OPTIONS, TYPE_OPTIONS, PRIORITY_OPTIONS } from '../constants/workItemConstants';
 import { useAuth } from '../contexts/AuthContext';
 import { useGraph } from '../contexts/GraphContext';
@@ -58,6 +58,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
   const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
   const [isPriorityDropdownOpen, setIsPriorityDropdownOpen] = useState(false);
   const [isContributorDropdownOpen, setIsContributorDropdownOpen] = useState(false);
+  const [showProjectHealth, setShowProjectHealth] = useState(false);
 
   // Refs for dropdown management
   const statusDropdownRef = useRef<HTMLDivElement>(null);
@@ -369,10 +370,10 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
   const shouldShowFilters = ['table', 'cards', 'kanban'].includes(viewMode);
 
   return (
-    <div className="h-full flex flex-col bg-gray-900">
+    <div className="h-full flex flex-col">
       {/* Search and Filter Bar - Only for table, card, kanban views */}
       {shouldShowFilters && (
-        <div className="bg-gray-800 border-b border-gray-700 p-4">
+        <div className="bg-gray-800/90 backdrop-blur-sm border-b border-gray-700/50 p-4">
           <div className="flex flex-col sm:flex-row gap-4 items-center">
             {/* Search Input */}
             <div className="relative w-full sm:w-80 md:w-96 lg:w-[28rem]">
@@ -700,14 +701,31 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
       )}
 
       {/* Main Content Container */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden relative">
         {/* Main Content */}
         <div className="flex-1 overflow-auto">
           {renderView()}
         </div>
 
-        {/* Right Sidebar */}
-        <RightSidebar currentView={viewMode} stats={stats} />
+        {/* Project Health Toggle Button - Floating */}
+        <button
+          onClick={() => setShowProjectHealth(!showProjectHealth)}
+          className="fixed right-4 top-20 z-40 p-3 bg-gray-700/60 hover:bg-gray-700/80 backdrop-blur-sm rounded-lg border border-gray-600/50 hover:border-gray-500/70 transition-all duration-200 group"
+          title={showProjectHealth ? "Hide Project Health" : "Show Project Health"}
+        >
+          {showProjectHealth ? (
+            <PanelRightClose className="h-5 w-5 text-gray-300 group-hover:text-white" />
+          ) : (
+            <BarChart3 className="h-5 w-5 text-gray-300 group-hover:text-white" />
+          )}
+        </button>
+
+        {/* Right Sidebar - Overlay */}
+        {showProjectHealth && (
+          <div className="absolute right-0 top-0 bottom-0 z-30">
+            <RightSidebar currentView={viewMode} stats={stats} />
+          </div>
+        )}
       </div>
 
       {/* Edit Node Modal */}

@@ -129,8 +129,8 @@ const KanbanView: React.FC<KanbanViewProps> = ({ filteredNodes, handleEditNode, 
         
         return (
           <div key={status} className="flex-shrink-0 w-80">
-            <div className="bg-gray-800 rounded-lg h-full">
-              <div className={`p-4 border-b border-gray-600`}>
+            <div className="bg-gray-800/40 backdrop-blur-sm rounded-lg h-full">
+              <div className={`p-4 border-b border-gray-600/30`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
                     <div className={`${config.bgColor} rounded-lg p-2 border ${config.borderColor}`}>
@@ -281,7 +281,7 @@ const KanbanView: React.FC<KanbanViewProps> = ({ filteredNodes, handleEditNode, 
                           </div>
                         ) : (
                           <div className="space-y-1 text-left">
-                            <div className="inline-flex items-center px-2 py-1 bg-gray-100 border border-gray-200 text-gray-600 text-xs font-medium rounded dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400">
+                            <div className="inline-flex items-center px-2 py-1 bg-gray-100/50 border border-gray-200/50 text-gray-600 text-xs font-medium rounded dark:bg-gray-800/30 dark:border-gray-700/30 dark:text-gray-400 backdrop-blur-sm">
                               No due date
                             </div>
                             <div className="text-xs text-gray-500 dark:text-gray-400">
