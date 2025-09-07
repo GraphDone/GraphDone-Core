@@ -33,6 +33,15 @@ docker run -d \
 # Pull model in Docker container
 docker exec ollama ollama pull qwen2.5:1.5b
 
+# Option 3: Docker Hub Models (NEW 2024/2025 approach)
+# Many models now ship with their own built-in TCP server runners
+docker run -d \
+  --name qwen-model \
+  --network graphdone-network \
+  -p 11434:8000 \
+  registry.ollama.ai/library/qwen2.5:1.5b
+
+# No separate Ollama server needed - model includes inference server
 # Test basic chat (from official ollama-js docs)
 npm install ollama
 ```
@@ -400,7 +409,7 @@ The goal is a **delightful pet** that happens to help with work, not a **work to
 
 ## Docker Integration with GraphDone
 
-### Complete Docker Setup
+### Complete Docker Setup (Multiple Options)
 ```yaml
 # docker-compose.yml - Add to existing GraphDone setup
 version: '3.8'
@@ -414,7 +423,7 @@ services:
     build: ./packages/server  
     networks: [graphdone-network]
   
-  # New: Ollama AI service
+  # Option A: Traditional Ollama server + model management
   ollama:
     image: ollama/ollama:latest
     container_name: graphdone-ollama
@@ -422,9 +431,6 @@ services:
       - ollama-models:/root/.ollama
     networks:
       - graphdone-network
-    # Only expose to host if needed for debugging
-    # ports:
-    #   - "11434:11434"
     environment:
       - OLLAMA_HOST=0.0.0.0
     # Optional: GPU support (if available)
@@ -436,12 +442,35 @@ services:
     #           count: 1
     #           capabilities: [gpu]
 
+  # Option B: Direct model containers (NEW 2025 approach)
+  # Each model runs its own TCP server - no Ollama middleman needed
+  qwen-chat:
+    image: registry.ollama.ai/library/qwen2.5:1.5b
+    container_name: graphdone-qwen-chat
+    networks:
+      - graphdone-network
+    environment:
+      - MODEL_SERVER_PORT=8000
+      - MAX_CONCURRENT_REQUESTS=4
+    # Automatic model server startup
+    
+  # Can run multiple specialized models simultaneously
+  qwen-function-calling:
+    image: registry.ollama.ai/library/qwen2.5:7b
+    container_name: graphdone-qwen-functions  
+    networks:
+      - graphdone-network
+    environment:
+      - MODEL_SERVER_PORT=8001
+      - MAX_CONCURRENT_REQUESTS=2
+    # For tool calling capabilities
+
 networks:
   graphdone-network:
     driver: bridge
 
 volumes:
-  ollama-models:
+  ollama-models:  # Only needed for Option A
 ```
 
 ### Agent Service Configuration
@@ -449,27 +478,68 @@ volumes:
 // packages/web/src/lib/ollama.js
 import ollama from 'ollama'
 
-// In Docker network, Ollama is accessible at 'ollama:11434'
-const client = new ollama.Ollama({
+// Option A: Traditional Ollama server
+const traditionalClient = new ollama.Ollama({
   host: process.env.NODE_ENV === 'development' 
     ? 'http://localhost:11434'  // Local development
     : 'http://ollama:11434'     // Docker network
 });
 
-export default client;
+// Option B: Direct model containers (recommended for 2025)
+const directModelClients = {
+  chat: new ollama.Ollama({
+    host: process.env.NODE_ENV === 'development'
+      ? 'http://localhost:8000'
+      : 'http://qwen-chat:8000'
+  }),
+  
+  functions: new ollama.Ollama({
+    host: process.env.NODE_ENV === 'development'
+      ? 'http://localhost:8001' 
+      : 'http://qwen-function-calling:8001'
+  })
+};
+
+// Smart client that automatically selects best model for task
+class SmartOllamaClient {
+  async chat(messages, options = {}) {
+    const needsFunctions = options.tools && options.tools.length > 0;
+    const client = needsFunctions ? directModelClients.functions : directModelClients.chat;
+    
+    return await client.chat({
+      model: needsFunctions ? 'qwen2.5:7b' : 'qwen2.5:1.5b',
+      messages,
+      ...options
+    });
+  }
+}
+
+export default new SmartOllamaClient();
 ```
 
 ### Model Management
 ```bash
-# Initialize models after startup
+# Option A: Traditional Ollama server management
 docker-compose exec ollama ollama pull qwen2.5:1.5b
-docker-compose exec ollama ollama pull qwen2.5:7b  # If you want function calling later
-
-# Check what models are available
+docker-compose exec ollama ollama pull qwen2.5:7b
 docker-compose exec ollama ollama list
-
-# Remove models to save space
 docker-compose exec ollama ollama rm qwen2.5:7b
+
+# Option B: Direct model containers (NEW approach)
+# No model management needed - models are pre-built into containers
+docker-compose up qwen-chat qwen-function-calling
+
+# Check model container status
+docker-compose ps | grep qwen
+docker logs graphdone-qwen-chat    # See model server logs
+docker logs graphdone-qwen-functions
+
+# Update to newer model versions
+docker-compose pull qwen-chat      # Pull updated model image
+docker-compose up -d qwen-chat     # Restart with new version
+
+# Resource monitoring
+docker stats graphdone-qwen-chat graphdone-qwen-functions
 ```
 
 ### Hardware Requirements
