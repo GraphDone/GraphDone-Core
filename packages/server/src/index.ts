@@ -15,14 +15,12 @@ import fetch from 'node-fetch';
 
 import { typeDefs } from './schema/neo4j-schema.js';
 import { authTypeDefs } from './schema/auth-schema.js';
-import { authResolvers } from './resolvers/auth.js';
+import { authOnlyTypeDefs } from './schema/auth-only-schema.js';
+import { sqliteAuthResolvers } from './resolvers/sqlite-auth.js';
 import { extractUserFromToken } from './middleware/auth.js';
 import { mergeTypeDefs } from '@graphql-tools/merge';
 import { driver, NEO4J_URI } from './db.js';
-import bcrypt from 'bcryptjs';
-import { v4 as uuidv4 } from 'uuid';
-// import { configurePassport } from './config/passport.js';
-// import { authRoutes } from './routes/auth.js';
+import { sqliteAuthStore } from './auth/sqlite-auth.js';
 
 dotenv.config();
 
@@ -199,24 +197,56 @@ async function startServer() {
   const app = express();
   const httpServer = createServer(app);
 
-  // OAuth configuration disabled
-  // configurePassport();
-  // app.use(session(...));
-  // app.use(passport.initialize());
-  // app.use(passport.session());
-  // app.use('/auth', authRoutes);
+  // Initialize SQLite auth system first (for users and config)
+  try {
+    await sqliteAuthStore.initialize();
+    console.log('🔐 SQLite authentication system initialized');
+  } catch (error) {
+    console.error('❌ Failed to initialize SQLite auth:', error.message);
+    console.error('🚫 Server cannot start without authentication system');
+    process.exit(1);
+  }
 
-  // Merge type definitions
-  const mergedTypeDefs = mergeTypeDefs([typeDefs, authTypeDefs]);
+  // Try to connect to Neo4j, but don't block server startup if it fails
+  let schema;
+  let isNeo4jAvailable = false;
+  
+  try {
+    // Test Neo4j connection
+    const session = driver.session();
+    await session.run('RETURN 1');
+    await session.close();
+    isNeo4jAvailable = true;
+    console.log('✅ Neo4j connection successful');
+    
+    // Merge type definitions (Neo4j schema + auth schema)  
+    const mergedTypeDefs = mergeTypeDefs([typeDefs, authTypeDefs]);
 
-  // Create Neo4jGraphQL instance
-  const neoSchema = new Neo4jGraphQL({
-    typeDefs: mergedTypeDefs,
-    driver,
-    resolvers: authResolvers,
-  });
+    // Create Neo4jGraphQL instance for graph data with SQLite auth resolvers override
+    const neoSchema = new Neo4jGraphQL({
+      typeDefs: mergedTypeDefs,
+      driver,
+      resolvers: {
+        // Override auth resolvers to use SQLite instead of Neo4j User nodes
+        ...sqliteAuthResolvers,
+      },
+    });
 
-  const schema = await neoSchema.getSchema();
+    schema = await neoSchema.getSchema();
+    console.log('🔗 Full Neo4j + SQLite auth schema ready');
+    
+  } catch (error) {
+    console.log('⚠️  Neo4j not available, using auth-only mode:', error.message);
+    isNeo4jAvailable = false;
+    
+    // Create auth-only schema using just SQLite resolvers and complete auth schema
+    const { makeExecutableSchema } = await import('@graphql-tools/schema');
+    schema = makeExecutableSchema({
+      typeDefs: authOnlyTypeDefs,
+      resolvers: sqliteAuthResolvers
+    });
+    console.log('🔐 Auth-only SQLite schema ready (Neo4j disabled)');
+  }
 
   const wsServer = new WebSocketServer({
     server: httpServer,
@@ -243,11 +273,6 @@ async function startServer() {
 
   await server.start();
 
-  // Clean up any duplicate users first
-  await cleanupDuplicateUsers();
-  
-  // Ensure default users exist
-  await ensureDefaultUsers();
 
   app.use(
     '/graphql',
@@ -257,15 +282,16 @@ async function startServer() {
       context: async ({ req }) => {
         const user = extractUserFromToken(req.headers.authorization);
         return {
-          driver,
+          driver: isNeo4jAvailable ? driver : null,
           user,
+          isNeo4jAvailable,
         };
       },
     })
   );
 
   // Enhanced health check endpoint that checks all services
-  app.get('/health', async (_req, res) => {
+  app.get('/health', cors<cors.CorsRequest>(), async (_req, res) => {
     const health: {
       status: string;
       timestamp: string;
@@ -339,7 +365,7 @@ async function startServer() {
   });
 
   // MCP-specific status endpoint
-  app.get('/mcp/status', async (_req, res) => {
+  app.get('/mcp/status', cors<cors.CorsRequest>(), async (_req, res) => {
     try {
       const mcpStatusUrl = `http://localhost:${process.env.MCP_HEALTH_PORT || 3128}/status`;
       const controller = new AbortController();
