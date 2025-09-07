@@ -3,6 +3,7 @@ import { Users, Database, Shield, Download, Upload, Settings2 } from 'lucide-rea
 import { useAuth } from '../contexts/AuthContext';
 import { AdminUserManagement } from '../components/AdminUserManagement';
 import { CustomDropdown } from '../components/CustomDropdown';
+import { APP_VERSION } from '../utils/version';
 
 export function Admin() {
   const { currentUser } = useAuth();
@@ -49,13 +50,18 @@ export function Admin() {
   return (
     <div className="h-screen flex flex-col">
       {/* Header */}
-      <div className="bg-gray-900 border-b border-gray-700 px-6 py-4">
+      <div className="bg-gray-900/30 backdrop-blur-md border-b border-gray-700/30 px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-100 flex items-center">
-              <Shield className="h-6 w-6 mr-3 text-yellow-400" />
-              System Administration
-            </h1>
+            <div className="flex items-center space-x-3">
+              <h1 className="text-2xl font-bold text-gray-100 flex items-center">
+                <Shield className="h-6 w-6 mr-3 text-yellow-400" />
+                System Administration
+              </h1>
+              <span className="text-xs bg-gray-800/50 text-gray-400 px-2 py-1 rounded">
+                v{APP_VERSION}
+              </span>
+            </div>
             <p className="text-sm text-gray-400 mt-1">
               Manage users, security, and system settings
             </p>
