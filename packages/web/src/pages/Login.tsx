@@ -1,13 +1,15 @@
 import { useState } from 'react';
-import { Users, ArrowRight } from 'lucide-react';
+import { Users, ArrowRight, Shield } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { User, Team } from '../types/auth';
+import { LoginSecurityDialog } from '../components/LoginSecurityDialog';
 
 export function Login() {
   const { availableUsers, availableTeams, login } = useAuth();
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
+  const [showSecurityDialog, setShowSecurityDialog] = useState(false);
 
   const handleUserSelect = (user: User) => {
     setSelectedUser(user);
@@ -33,8 +35,26 @@ export function Login() {
   const teamUsers = selectedTeam ? availableUsers.filter(u => u.team?.id === selectedTeam.id) : [];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4">
-      <div className="max-w-4xl w-full">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4 relative overflow-hidden select-none">
+      {/* Tropical lagoon light scattering background animation */}
+      <div className="lagoon-caustics">
+        <div className="caustic-layer caustic-layer-1"></div>
+        <div className="caustic-layer caustic-layer-2"></div>
+        <div className="caustic-layer caustic-layer-3"></div>
+        <div className="caustic-layer caustic-layer-4"></div>
+        <div className="caustic-layer caustic-layer-5"></div>
+        <div className="caustic-layer caustic-layer-6"></div>
+        <div className="caustic-layer caustic-layer-7"></div>
+        <div className="caustic-layer caustic-layer-8"></div>
+        <div className="caustic-layer caustic-layer-9"></div>
+        <div className="caustic-layer caustic-layer-10"></div>
+        <div className="lagoon-shimmer lagoon-shimmer-1"></div>
+        <div className="lagoon-shimmer lagoon-shimmer-2"></div>
+        <div className="lagoon-shimmer lagoon-shimmer-3"></div>
+        <div className="lagoon-shimmer lagoon-shimmer-4"></div>
+        <div className="lagoon-shimmer lagoon-shimmer-5"></div>
+      </div>
+      <div className="max-w-4xl w-full relative z-10">
         {/* Header */}
         <div className="text-center mb-8">
           <div className="flex items-center justify-center mb-4">
@@ -179,11 +199,21 @@ export function Login() {
           </div>
         </div>
 
-        {/* Demo Notice */}
-        <div className="mt-8 text-center">
+        {/* Security & Demo Notice */}
+        <div className="mt-8 text-center space-y-4">
           <div className="inline-flex items-center px-4 py-2 bg-yellow-900 border border-yellow-700 rounded-lg text-sm text-yellow-300">
             <span className="mr-2">⚡</span>
             Demo Mode: This is a placeholder authentication system for development
+          </div>
+          
+          <div className="flex items-center justify-center">
+            <button
+              onClick={() => setShowSecurityDialog(true)}
+              className="inline-flex items-center px-3 py-2 text-sm text-green-400 hover:text-green-300 hover:bg-gray-800 rounded-lg border border-gray-700 hover:border-gray-600 transition-colors"
+            >
+              <Shield className="h-4 w-4 mr-2" />
+              How we protect your login
+            </button>
           </div>
         </div>
 
@@ -197,6 +227,12 @@ export function Login() {
           </p>
         </div>
       </div>
+
+      {/* Security Dialog */}
+      <LoginSecurityDialog 
+        isOpen={showSecurityDialog} 
+        onClose={() => setShowSecurityDialog(false)} 
+      />
     </div>
   );
 }

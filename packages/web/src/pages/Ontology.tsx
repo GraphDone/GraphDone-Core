@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Plus, Search, Edit3, Trash2, Eye, Copy, Brain, Settings, X, Calendar, User, Hash } from 'lucide-react';
 import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
+import { APP_VERSION } from '../utils/version';
 import { 
   WORK_ITEM_TYPES, 
   getTypeIconElement, 
@@ -116,10 +117,15 @@ export function Ontology() {
   return (
     <div className="h-screen flex flex-col">
       {/* Header */}
-      <div className="bg-gray-900 border-b border-gray-700 px-6 py-4">
+      <div className="bg-gray-900/30 backdrop-blur-md border-b border-gray-700/30 px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-100">Ontology</h1>
+            <div className="flex items-center space-x-3">
+              <h1 className="text-2xl font-bold text-gray-100">Ontology</h1>
+              <span className="text-xs bg-gray-800/50 text-gray-400 px-2 py-1 rounded">
+                v{APP_VERSION}
+              </span>
+            </div>
             <p className="text-sm text-gray-400 mt-1">
               Define node types, relationships, and schemas for {currentGraph?.name || 'your graphs'}
             </p>
@@ -146,7 +152,7 @@ export function Ontology() {
       </div>
 
       {/* Tabs */}
-      <div className="bg-gray-900 border-b border-gray-700">
+      <div className="bg-gray-900/20 backdrop-blur-md border-b border-gray-700/30">
         <div className="px-6">
           <nav className="flex space-x-8">
             <button
