@@ -248,10 +248,27 @@ export function Workspace() {
       {/* Main Content */}
       <div className="flex-1 relative">
         {!currentGraph ? (
-          <div className="h-full flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
-            <div className="text-center max-w-xl mx-auto px-6">
+          <div className="h-full flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 relative">
+            {/* Tropical lagoon light scattering background animation - zen mode for welcome page */}
+            <div className="lagoon-caustics absolute inset-0 opacity-30">
+              <div 
+                className="absolute inset-0 opacity-40"
+                style={{
+                  background: 'radial-gradient(circle at 20% 50%, rgba(120, 130, 140, 0.13), transparent 50%), radial-gradient(circle at 80% 20%, rgba(120, 140, 160, 0.13), transparent 50%), radial-gradient(circle at 40% 80%, rgba(100, 150, 130, 0.13), transparent 50%)',
+                  animation: 'lagoon-drift 20s infinite linear',
+                }}
+              />
+              
+              <div className="lagoon-shimmer lagoon-shimmer-1"></div>
+              <div className="lagoon-shimmer lagoon-shimmer-2"></div>
+              <div className="lagoon-shimmer lagoon-shimmer-3"></div>
+              <div className="lagoon-shimmer lagoon-shimmer-4"></div>
+              <div className="lagoon-shimmer lagoon-shimmer-5"></div>
+            </div>
+
+            <div className="text-center max-w-xl mx-auto px-6 relative z-20">
               {/* Compact Icon */}
-              <div className="mx-auto mb-6 w-16 h-16 bg-gradient-to-br from-green-600 to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
+              <div className="mx-auto mb-6 w-16 h-16 bg-gradient-to-br from-green-600 to-blue-600 rounded-xl flex items-center justify-center shadow-lg backdrop-blur-sm border border-green-400/20">
                 <Plus className="h-8 w-8 text-white" />
               </div>
 
@@ -277,7 +294,7 @@ export function Workspace() {
                   <>
                     <button
                       onClick={() => setShowGraphSelectionModal(true)}
-                      className="w-full px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-all duration-200 font-medium flex items-center justify-center shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                      className="w-full px-6 py-3 bg-gray-700/80 hover:bg-gray-600/80 backdrop-blur-sm text-white rounded-lg transition-all duration-200 font-medium flex items-center justify-center shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 border border-gray-600/30"
                     >
                       <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"/>
@@ -296,7 +313,7 @@ export function Workspace() {
 
                 <button
                   onClick={() => setShowCreateGraphModal(true)}
-                  className="w-full px-6 py-3 bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500 text-white rounded-lg transition-all duration-200 font-medium flex items-center justify-center shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                  className="w-full px-6 py-3 bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500 text-white rounded-lg transition-all duration-200 font-medium flex items-center justify-center shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 backdrop-blur-sm border border-green-400/30"
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Create New Graph
