@@ -54,15 +54,15 @@ export function useHealthCheck(options: UseHealthCheckOptions = {}) {
   const API_BASE_URL = ''; // Always use relative URLs to leverage Vite proxy in all environments
 
   const checkHealth = useCallback(async () => {
+    // Create AbortController for proper timeout handling
+    const controller = new AbortController();
+    let timeoutId: NodeJS.Timeout | null = null;
+    
     try {
       setLoading(true);
       setError(null);
-      
-      console.log('🔍 Starting health check...');
 
-      // Create AbortController for proper timeout handling
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => {
+      timeoutId = setTimeout(() => {
         controller.abort();
         setError('Health check timed out after 10 seconds');
         setLoading(false);
@@ -77,8 +77,10 @@ export function useHealthCheck(options: UseHealthCheckOptions = {}) {
         signal: controller.signal
       });
       
-      clearTimeout(timeoutId);
-      console.log('✅ Health response received:', healthResponse.status);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
 
       if (!healthResponse.ok) {
         throw new Error(`Health check failed: ${healthResponse.statusText}`);
@@ -111,12 +113,6 @@ export function useHealthCheck(options: UseHealthCheckOptions = {}) {
       setLastChecked(new Date());
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Health check failed';
-      console.error('❌ Health check error:', err);
-      console.error('Error type:', typeof err);
-      if (err instanceof Error) {
-        console.error('Error name:', err.name);
-        console.error('Error message:', err.message);
-      }
       setError(errorMessage);
       
       // Set fallback status when there's an error
@@ -131,7 +127,9 @@ export function useHealthCheck(options: UseHealthCheckOptions = {}) {
       });
       setMcpStatus({ connected: false, error: errorMessage });
     } finally {
-      clearTimeout(timeoutId);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
       setLoading(false);
     }
   }, [API_BASE_URL]);
