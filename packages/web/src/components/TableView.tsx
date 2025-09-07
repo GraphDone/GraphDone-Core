@@ -181,7 +181,7 @@ const TableView: React.FC<TableViewProps> = ({ filteredNodes, handleEditNode, ed
                       getContributorAvatar(node.assignedTo.name)
                     ) : (
                       <div className="flex items-center space-x-2">
-                        <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center">
+                        <div className="w-8 h-8 rounded-full bg-gray-600/30 backdrop-blur-sm flex items-center justify-center">
                           <span className="text-gray-400 text-xs">?</span>
                         </div>
                         <span className="text-gray-500 text-sm">Available</span>
@@ -194,7 +194,7 @@ const TableView: React.FC<TableViewProps> = ({ filteredNodes, handleEditNode, ed
                         value={getNodePriority(node)}
                         className="text-xs font-bold"
                         renderBar={(animatedValue, animatedColor) => (
-                          <div className="w-4 h-16 bg-gray-600 rounded overflow-hidden flex flex-col justify-end relative">
+                          <div className="w-4 h-16 bg-gray-600/30 backdrop-blur-sm rounded overflow-hidden flex flex-col justify-end relative">
                             <div 
                               className="w-full transition-colors duration-300"
                               style={{ 
@@ -277,7 +277,7 @@ const TableView: React.FC<TableViewProps> = ({ filteredNodes, handleEditNode, ed
                       </div>
                     ) : (
                       <div className="space-y-1">
-                        <div className="inline-flex items-center px-3 py-2 bg-gray-100 border border-gray-200 text-gray-600 text-sm font-medium rounded-lg dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400">
+                        <div className="inline-flex items-center px-3 py-2 bg-gray-100/50 border border-gray-200/50 text-gray-600 text-sm font-medium rounded-lg dark:bg-gray-800/30 dark:border-gray-700/30 dark:text-gray-400 backdrop-blur-sm">
                           No due date
                         </div>
                         <div className="text-xs text-gray-500 dark:text-gray-400">
