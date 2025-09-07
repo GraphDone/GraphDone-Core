@@ -355,7 +355,7 @@ export const sqliteAuthResolvers = {
     },
 
     // Update profile
-    updateProfile: async (_: any, { input }: { input: UpdateProfileInput }, context: any) => {
+    updateProfile: async (_: any, { input: _input }: { input: UpdateProfileInput }, context: any) => {
       if (!context.user) {
         throw new GraphQLError('Unauthorized', {
           extensions: { code: 'UNAUTHENTICATED' }
