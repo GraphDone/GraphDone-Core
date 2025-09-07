@@ -40,6 +40,20 @@ import { NodeDetailsModal } from './NodeDetailsModal';
 import { WorkItem, WorkItemEdge } from '../types/graph';
 import { RelationshipType, RELATIONSHIP_OPTIONS, getRelationshipConfig } from '../constants/workItemConstants';
 
+// LOD thresholds for different zoom levels
+const LOD_THRESHOLDS = {
+  VERY_FAR: 0.1,
+  FAR: 0.3,
+  MEDIUM: 0.6,
+  CLOSE: 1.0,
+};
+
+// Utility functions
+const getSmoothedOpacity = (scale: number, threshold: number, fadeRange: number = 0.2) => {
+  if (scale >= threshold + fadeRange) return 1;
+  if (scale <= threshold - fadeRange) return 0;
+  return (scale - (threshold - fadeRange)) / (fadeRange * 2);
+};
 
 interface NodeMenuState {
   node: WorkItem | null;
@@ -547,56 +561,6 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         .attr('stroke-width', 12); // Also make the edge thicker
     }
     
-    // Also apply relationship-specific glow to edge when showing edge details
-    if (false) { // Removed edge details dialog
-      const relationshipConfig = getRelationshipConfig(selectedEdge.type as RelationshipType);
-      const edgeColor = relationshipConfig.hexColor;
-      const edgeFilterId = `edge-glow-${selectedEdge.type.toLowerCase()}`;
-      
-      // Remove existing filter and create new one with relationship color
-      defs.select(`#${edgeFilterId}`).remove();
-      
-      const edgeGlowFilter = defs.append('filter')
-        .attr('id', edgeFilterId)
-        .attr('x', '-150%')
-        .attr('y', '-150%')
-        .attr('width', '400%')
-        .attr('height', '400%');
-      
-      const hexToRgb = (hex: string) => {
-        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-        return result ? {
-          r: parseInt(result[1], 16) / 255,
-          g: parseInt(result[2], 16) / 255,
-          b: parseInt(result[3], 16) / 255
-        } : { r: 0.06, g: 0.73, b: 0.51 }; // fallback green
-      };
-      
-      const rgb = hexToRgb(edgeColor);
-      edgeGlowFilter.append('feColorMatrix')
-        .attr('in', 'SourceGraphic')
-        .attr('type', 'matrix')
-        .attr('values', `0 0 0 0 ${rgb.r} 0 0 0 0 ${rgb.g} 0 0 0 0 ${rgb.b} 0 0 0 1 0`);
-      
-      const edgeBlur = edgeGlowFilter.append('feGaussianBlur')
-        .attr('stdDeviation', '25')
-        .attr('result', 'coloredBlur');
-      
-      edgeBlur.append('animate')
-        .attr('attributeName', 'stdDeviation')
-        .attr('values', '15;35;15')
-        .attr('dur', '1.5s')
-        .attr('repeatCount', 'indefinite');
-      
-      const edgeFeMerge = edgeGlowFilter.append('feMerge');
-      edgeFeMerge.append('feMergeNode').attr('in', 'coloredBlur');
-      edgeFeMerge.append('feMergeNode').attr('in', 'SourceGraphic');
-      
-      svg.selectAll('.edge')
-        .filter((d: any) => d && d.id === selectedEdge.id)
-        .style('filter', `url(#${edgeFilterId})`)
-        .attr('stroke-width', 12); // Same thickness as relationship editing
-    }
     
   }, [nodeMenu.visible, nodeMenu.node?.id, editingEdge?.edge?.id, selectedEdge?.id, selectedNodes]);
   
@@ -937,17 +901,21 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     const svg = d3.select(containerRef.current).select('svg');
     const g = svg.select('.main-group');
     
+    // Get current zoom scale
+    const currentTransform = d3.zoomTransform(svg.node() as Element);
+    const scale = currentTransform.k;
+    
     // Force refresh all text elements with proper LOD opacities
     setTimeout(() => {
-      g.selectAll('.node-type-text')
+      (g.selectAll('.node-type-text') as any)
         .style('visibility', 'visible')
-        .style('opacity', getSmoothedOpacity(LOD_THRESHOLDS.FAR));
-      g.selectAll('.node-title-text')
+        .style('opacity', getSmoothedOpacity(scale, LOD_THRESHOLDS.FAR));
+      (g.selectAll('.node-title-text') as any)
         .style('visibility', 'visible')
-        .style('opacity', getSmoothedOpacity(LOD_THRESHOLDS.MEDIUM));
-      g.selectAll('.node-description-text')
+        .style('opacity', getSmoothedOpacity(scale, LOD_THRESHOLDS.MEDIUM));
+      (g.selectAll('.node-description-text') as any)
         .style('visibility', 'visible')
-        .style('opacity', getSmoothedOpacity(LOD_THRESHOLDS.CLOSE));
+        .style('opacity', getSmoothedOpacity(scale, LOD_THRESHOLDS.CLOSE));
     }, 100); // Small delay to ensure DOM is updated
   }, []);
 
@@ -1411,7 +1379,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         .attr('width', 20000)
         .attr('height', 20000)
         .attr('fill', 'transparent')
-        .style('cursor', 'default');
+        .style('cursor', 'default') as any;
     }
 
     // Create or reuse grid pattern and overlay (only on first init)
@@ -1466,8 +1434,6 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         setNodeMenu({ node: null, position: { x: 0, y: 0 }, visible: false });
         setEdgeMenu({ edge: null, position: { x: 0, y: 0 }, visible: false });
         setEditingEdge(null);
-        setShowEdgeDetails(false);
-        setEdgeDetailsPosition(null);
         setContextMenuPosition(null);
         return;
       }
@@ -1476,7 +1442,6 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       if (selectedNode || selectedNodes.size > 0) {
         setSelectedNode(null);
         setSelectedNodes(new Set());
-        clearNodeGlow();
         return;
       }
       
@@ -1523,10 +1488,10 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
 
     // Viewport culling - only render visible nodes for performance
     const margin = 200;
-    const visibleNodes = (currentTransform?.scale || 1) < LOD_THRESHOLDS.VERY_FAR ? 
+    const visibleNodes = (currentTransform?.k || 1) < LOD_THRESHOLDS.VERY_FAR ? 
       nodes.filter((node: WorkItem) => {
-        const nodeX = (node.positionX || 0) * (currentTransform?.scale || 1) + (currentTransform?.x || 0);
-        const nodeY = (node.positionY || 0) * (currentTransform?.scale || 1) + (currentTransform?.y || 0);
+        const nodeX = (node.positionX || 0) * (currentTransform?.k || 1) + (currentTransform?.x || 0);
+        const nodeY = (node.positionY || 0) * (currentTransform?.k || 1) + (currentTransform?.y || 0);
         return nodeX >= -margin && nodeX <= width + margin && 
                nodeY >= -margin && nodeY <= height + margin;
       }) : nodes;
@@ -1727,9 +1692,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
           y = window.innerHeight - dialogHeight - 20;
         }
         
-        setEdgeDetailsPosition({ x, y });
         setSelectedEdge(d);
-        setShowEdgeDetails(true);
       })
       .on('mouseover', function(event: MouseEvent, d: WorkItemEdge) {
         // Highlight the corresponding visible edge
@@ -1747,9 +1710,9 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       });
 
     // Create or get defs element for filters
-    let filterDefs = svg.select('defs');
+    let filterDefs = svg.select('defs') as any;
     if (filterDefs.empty()) {
-      filterDefs = svg.append('defs');
+      filterDefs = svg.append('defs') as any;
     }
     
     // Add drop shadow filter for nodes
@@ -2035,7 +1998,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       .attr('text-anchor', 'middle')
       .attr('dominant-baseline', 'middle')
       .text((d: WorkItem) => d.type)
-      .style('opacity', (currentTransform?.scale || 1) >= LOD_THRESHOLDS.FAR ? 1 : 0)
+      .style('opacity', (currentTransform?.k || 1) >= LOD_THRESHOLDS.FAR ? 1 : 0)
       .style('font-size', '13px')
       .style('font-weight', '700')
       .style('fill', (d: WorkItem) => {
@@ -2051,10 +2014,10 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       .attr('transform', (d: WorkItem) => {
         const x = -getNodeDimensions(d).width / 2 + iconSize / 2 + 12;
         const y = -getNodeDimensions(d).height / 2 + 2 + titleBarHeight / 2;
-        return `translate(${x}, ${y}) scale(${1 / (currentTransform?.scale || 1)})`;
+        return `translate(${x}, ${y}) scale(${1 / (currentTransform?.k || 1)})`;
       })
       .style('cursor', 'pointer')
-      .style('opacity', (currentTransform?.scale || 1) >= LOD_THRESHOLDS.FAR ? 0.85 : 0)
+      .style('opacity', (currentTransform?.k || 1) >= LOD_THRESHOLDS.FAR ? 0.85 : 0)
       .style('pointer-events', 'all');
     
     // Edit icon background - scales with icon
@@ -2137,10 +2100,10 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       .attr('transform', (d: WorkItem) => {
         const x = getNodeDimensions(d).width / 2 - iconSize / 2 - 12; // Right side, mirrored from edit icon
         const y = -getNodeDimensions(d).height / 2 + 2 + titleBarHeight / 2;
-        return `translate(${x}, ${y}) scale(${1 / (currentTransform?.scale || 1)})`;
+        return `translate(${x}, ${y}) scale(${1 / (currentTransform?.k || 1)})`;
       })
       .style('cursor', 'pointer')
-      .style('opacity', (currentTransform?.scale || 1) >= LOD_THRESHOLDS.FAR ? 0.85 : 0)
+      .style('opacity', (currentTransform?.k || 1) >= LOD_THRESHOLDS.FAR ? 0.85 : 0)
       .style('pointer-events', 'all');
     
     // Relationship icon background - same as edit icon
@@ -2281,7 +2244,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
           .attr('text-anchor', 'middle')
           .attr('dominant-baseline', 'middle')
           .text(line)
-          .style('opacity', (currentTransform?.scale || 1) >= LOD_THRESHOLDS.MEDIUM ? 1 : 0)
+          .style('opacity', (currentTransform?.k || 1) >= LOD_THRESHOLDS.MEDIUM ? 1 : 0)
           .style('font-size', '14px')
           .style('font-weight', '600')
           .style('fill', () => {
@@ -2310,7 +2273,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         // Hide description if too long instead of truncating
         return d.description.length > maxLength ? '' : d.description;
       })
-      .style('opacity', (currentTransform?.scale || 1) >= LOD_THRESHOLDS.CLOSE ? 1 : 0)
+      .style('opacity', (currentTransform?.k || 1) >= LOD_THRESHOLDS.CLOSE ? 1 : 0)
       .style('font-size', '11px')
       .style('font-weight', '400')
       .style('fill', (d: WorkItem) => {
@@ -2597,12 +2560,12 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         const config = getRelationshipConfig(d.type as RelationshipType);
         return config.label;
       })
-      .style('opacity', (currentTransform?.scale || 1) >= LOD_THRESHOLDS.CLOSE ? 1 : 0);
+      .style('opacity', (currentTransform?.k || 1) >= LOD_THRESHOLDS.CLOSE ? 1 : 0);
 
     // Add icons positioned to the left of text
     edgeLabelGroups
       .append('foreignObject')
-      .style('opacity', (currentTransform?.scale || 1) >= LOD_THRESHOLDS.CLOSE ? 1 : 0)
+      .style('opacity', (currentTransform?.k || 1) >= LOD_THRESHOLDS.CLOSE ? 1 : 0)
       .attr('class', 'edge-label-icon')
       .attr('width', 14)
       .attr('height', 14)
@@ -2898,16 +2861,22 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         .attr('transform', (d: any) => `translate(${d.x || 0},${d.y || 0})`);
 
       // Ensure text elements are visible and properly positioned after position updates
-      g.selectAll('.node-type-text, .node-title-text, .node-description-text')
+      g.selectAll('.node-type-text, .node-title-text, .node-description-text' as any)
         .style('visibility', 'visible')
-        .style('opacity', function() {
+        .style('opacity', function(this: any) {
           // Restore LOD-appropriate opacity if it was hidden
           const currentOpacity = parseFloat(d3.select(this).style('opacity')) || 0;
           if (currentOpacity === 0) {
-            const classList = d3.select(this).attr('class');
-            if (classList.includes('node-type-text')) return getSmoothedOpacity(LOD_THRESHOLDS.FAR);
-            if (classList.includes('node-title-text')) return getSmoothedOpacity(LOD_THRESHOLDS.MEDIUM);
-            if (classList.includes('node-description-text')) return getSmoothedOpacity(LOD_THRESHOLDS.CLOSE);
+            // Get current scale from the svg element
+            const svgElement = svg.node();
+            if (svgElement) {
+              const currentTransform = d3.zoomTransform(svgElement);
+              const scale = currentTransform.k;
+              const classList = d3.select(this as any).attr('class');
+              if (classList?.includes('node-type-text')) return getSmoothedOpacity(scale, LOD_THRESHOLDS.FAR);
+              if (classList?.includes('node-title-text')) return getSmoothedOpacity(scale, LOD_THRESHOLDS.MEDIUM);
+              if (classList?.includes('node-description-text')) return getSmoothedOpacity(scale, LOD_THRESHOLDS.CLOSE);
+            }
           }
           return currentOpacity;
         });
@@ -2961,17 +2930,17 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       };
       
       // Update text opacities with smooth transitions
-      g.selectAll('.node-type-text')
+      g.selectAll('.node-type-text' as any)
         .style('opacity', getSmoothedOpacity(LOD_THRESHOLDS.FAR));
-      g.selectAll('.node-title-text')
+      g.selectAll('.node-title-text' as any)
         .style('opacity', getSmoothedOpacity(LOD_THRESHOLDS.MEDIUM));
-      g.selectAll('.node-description-text')
+      g.selectAll('.node-description-text' as any)
         .style('opacity', getSmoothedOpacity(LOD_THRESHOLDS.CLOSE));
-      g.selectAll('.edge-label')
+      g.selectAll('.edge-label' as any)
         .style('opacity', getSmoothedOpacity(LOD_THRESHOLDS.CLOSE));
-      g.selectAll('.edge-label-icon')
+      g.selectAll('.edge-label-icon' as any)
         .style('opacity', getSmoothedOpacity(LOD_THRESHOLDS.CLOSE));
-      g.selectAll('.edge')
+      g.selectAll('.edge' as any)
         .style('opacity', Math.max(0.1, getSmoothedOpacity(LOD_THRESHOLDS.VERY_FAR, 0.1)))
         .attr('stroke-width', function(d: any) {
           // Don't override stroke width if this edge has an active dialog
@@ -3197,6 +3166,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         }
       }
     }
+    return undefined;
   }, [nodes.length > 0, fitViewToNodes]);
 
   // Expose reset function to parent component
