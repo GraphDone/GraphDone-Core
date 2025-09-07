@@ -245,9 +245,26 @@ export function GraphSelectionModal({ isOpen, onClose }: GraphSelectionModalProp
                 </div>
               ) : (
                 <div className="py-12 relative z-10">
-                <div className="text-center max-w-md mx-auto">
+                  {/* Tropical lagoon light scattering background animation - zen mode for empty state */}
+                  <div className="lagoon-caustics absolute inset-0 opacity-30">
+                    <div 
+                      className="absolute inset-0 opacity-40"
+                      style={{
+                        background: 'radial-gradient(circle at 20% 50%, rgba(120, 130, 140, 0.13), transparent 50%), radial-gradient(circle at 80% 20%, rgba(120, 140, 160, 0.13), transparent 50%), radial-gradient(circle at 40% 80%, rgba(100, 150, 130, 0.13), transparent 50%)',
+                        animation: 'lagoon-drift 20s infinite linear',
+                      }}
+                    />
+                    
+                    <div className="lagoon-shimmer lagoon-shimmer-1"></div>
+                    <div className="lagoon-shimmer lagoon-shimmer-2"></div>
+                    <div className="lagoon-shimmer lagoon-shimmer-3"></div>
+                    <div className="lagoon-shimmer lagoon-shimmer-4"></div>
+                    <div className="lagoon-shimmer lagoon-shimmer-5"></div>
+                  </div>
+
+                <div className="text-center max-w-md mx-auto relative z-20">
                   {/* Icon */}
-                  <div className="mx-auto mb-6 w-16 h-16 bg-gray-700 rounded flex items-center justify-center">
+                  <div className="mx-auto mb-6 w-16 h-16 bg-gray-700/80 backdrop-blur-sm rounded flex items-center justify-center border border-gray-500/30">
                     <Folder className="h-8 w-8 text-gray-400" />
                   </div>
 
@@ -264,7 +281,7 @@ export function GraphSelectionModal({ isOpen, onClose }: GraphSelectionModalProp
                   {/* CTA Button */}
                   <button
                     onClick={handleCreateGraph}
-                    className="px-8 py-4 bg-gradient-to-r from-green-600 via-emerald-600 to-blue-600 text-white rounded-xl hover:from-green-500 hover:via-emerald-500 hover:to-blue-500 transition-all duration-300 shadow-xl hover:shadow-2xl hover:scale-105 transform border border-green-400/30 font-semibold"
+                    className="px-8 py-4 bg-gradient-to-r from-green-600 via-emerald-600 to-blue-600 text-white rounded-xl hover:from-green-500 hover:via-emerald-500 hover:to-blue-500 transition-all duration-300 shadow-xl hover:shadow-2xl hover:scale-105 transform border border-green-400/30 font-semibold backdrop-blur-sm"
                   >
                     <div className="flex items-center justify-center">
                       <Plus className="h-4 w-4 mr-2" />
