@@ -959,14 +959,86 @@ export const getTypeGradientBackground = (type: WorkItemType, style: GradientSty
   const tailwindColor = colorMap[baseColor] || 'gray-500';
   
   switch (style) {
-    case 'table':
-      return `bg-gradient-to-r from-${tailwindColor}/5 via-transparent to-${tailwindColor}/5 hover:from-${tailwindColor}/20 hover:to-${tailwindColor}/20`;
+    case 'table': {
+      // Use static gradient classes for proper Tailwind compilation and better transparency
+      const gradientMap: Record<string, string> = {
+        'green-500': 'bg-gradient-to-r from-green-500/15 via-green-500/5 to-green-500/15',   // OUTCOME
+        'blue-500': 'bg-gradient-to-r from-blue-500/15 via-blue-500/5 to-blue-500/15',       // TASK
+        'purple-500': 'bg-gradient-to-r from-purple-500/15 via-purple-500/5 to-purple-500/15', // MILESTONE
+        'amber-500': 'bg-gradient-to-r from-amber-500/15 via-amber-500/5 to-amber-500/15',   // DELIVERABLE
+        'rose-500': 'bg-gradient-to-r from-rose-500/15 via-rose-500/5 to-rose-500/15',       // EPIC
+        'indigo-500': 'bg-gradient-to-r from-indigo-500/15 via-indigo-500/5 to-indigo-500/15', // FEATURE
+        'teal-500': 'bg-gradient-to-r from-teal-500/15 via-teal-500/5 to-teal-500/15',       // STORY
+        'orange-500': 'bg-gradient-to-r from-orange-500/15 via-orange-500/5 to-orange-500/15', // BUG
+        'slate-500': 'bg-gradient-to-r from-slate-500/15 via-slate-500/5 to-slate-500/15'    // ISSUE
+      };
+      
+      const hoverMap: Record<string, string> = {
+        'green-500': 'hover:from-green-500/25 hover:via-green-500/15 hover:to-green-500/25',
+        'blue-500': 'hover:from-blue-500/25 hover:via-blue-500/15 hover:to-blue-500/25',
+        'purple-500': 'hover:from-purple-500/25 hover:via-purple-500/15 hover:to-purple-500/25',
+        'amber-500': 'hover:from-amber-500/25 hover:via-amber-500/15 hover:to-amber-500/25',
+        'rose-500': 'hover:from-rose-500/25 hover:via-rose-500/15 hover:to-rose-500/25',
+        'indigo-500': 'hover:from-indigo-500/25 hover:via-indigo-500/15 hover:to-indigo-500/25',
+        'teal-500': 'hover:from-teal-500/25 hover:via-teal-500/15 hover:to-teal-500/25',
+        'orange-500': 'hover:from-orange-500/25 hover:via-orange-500/15 hover:to-orange-500/25',
+        'slate-500': 'hover:from-slate-500/25 hover:via-slate-500/15 hover:to-slate-500/25'
+      };
+      
+      const gradientClass = gradientMap[tailwindColor] || 'bg-gradient-to-r from-gray-500/15 via-gray-500/5 to-gray-500/15';
+      const hoverClass = hoverMap[tailwindColor] || 'hover:from-gray-500/25 hover:via-gray-500/15 hover:to-gray-500/25';
+      
+      return `${gradientClass} ${hoverClass} backdrop-blur-sm`;
+    }
     
-    case 'card':
-      return `bg-gradient-to-br from-${tailwindColor}/10 via-gray-800 to-${tailwindColor}/5 border-l-4 border-l-${tailwindColor.replace('-500', '-400')}/40 hover:from-${tailwindColor}/20 hover:to-${tailwindColor}/20 hover:border-l-${tailwindColor.replace('-500', '-300')}/60`;
+    case 'card': {
+      // Use static gradient classes for proper Tailwind compilation and transparency
+      const gradientMap: Record<string, string> = {
+        'green-500': 'bg-gradient-to-br from-green-500/20 via-green-500/10 to-green-500/5',   // OUTCOME
+        'blue-500': 'bg-gradient-to-br from-blue-500/20 via-blue-500/10 to-blue-500/5',       // TASK
+        'purple-500': 'bg-gradient-to-br from-purple-500/20 via-purple-500/10 to-purple-500/5', // MILESTONE
+        'amber-500': 'bg-gradient-to-br from-amber-500/20 via-amber-500/10 to-amber-500/5',   // DELIVERABLE
+        'rose-500': 'bg-gradient-to-br from-rose-500/20 via-rose-500/10 to-rose-500/5',       // EPIC
+        'indigo-500': 'bg-gradient-to-br from-indigo-500/20 via-indigo-500/10 to-indigo-500/5', // FEATURE
+        'teal-500': 'bg-gradient-to-br from-teal-500/20 via-teal-500/10 to-teal-500/5',       // STORY
+        'orange-500': 'bg-gradient-to-br from-orange-500/20 via-orange-500/10 to-orange-500/5', // BUG
+        'slate-500': 'bg-gradient-to-br from-slate-500/20 via-slate-500/10 to-slate-500/5'    // ISSUE
+      };
+      
+      const borderColorMap: Record<string, string> = {
+        'green-500': 'border-l-green-400/40',
+        'blue-500': 'border-l-blue-400/40',
+        'purple-500': 'border-l-purple-400/40',
+        'amber-500': 'border-l-amber-400/40',
+        'rose-500': 'border-l-rose-400/40',
+        'indigo-500': 'border-l-indigo-400/40',
+        'teal-500': 'border-l-teal-400/40',
+        'orange-500': 'border-l-orange-400/40',
+        'slate-500': 'border-l-slate-400/40'
+      };
+      
+      const gradientClass = gradientMap[tailwindColor] || 'bg-gradient-to-br from-gray-500/20 via-gray-500/10 to-gray-500/5';
+      const borderClass = borderColorMap[tailwindColor] || 'border-l-gray-400/40';
+      
+      return `${gradientClass} border-l-4 ${borderClass}`;
+    }
     
-    case 'kanban':
-      return `bg-gradient-to-br from-${tailwindColor}/10 via-gray-800 to-${tailwindColor}/5 hover:from-${tailwindColor}/20 hover:to-${tailwindColor}/20`;
+    case 'kanban': {
+      // Use static gradient classes for proper Tailwind compilation and transparency
+      const gradientMap: Record<string, string> = {
+        'green-500': 'bg-gradient-to-br from-green-500/20 via-green-500/10 to-green-500/5',   // OUTCOME
+        'blue-500': 'bg-gradient-to-br from-blue-500/20 via-blue-500/10 to-blue-500/5',       // TASK
+        'purple-500': 'bg-gradient-to-br from-purple-500/20 via-purple-500/10 to-purple-500/5', // MILESTONE
+        'amber-500': 'bg-gradient-to-br from-amber-500/20 via-amber-500/10 to-amber-500/5',   // DELIVERABLE
+        'rose-500': 'bg-gradient-to-br from-rose-500/20 via-rose-500/10 to-rose-500/5',       // EPIC
+        'indigo-500': 'bg-gradient-to-br from-indigo-500/20 via-indigo-500/10 to-indigo-500/5', // FEATURE
+        'teal-500': 'bg-gradient-to-br from-teal-500/20 via-teal-500/10 to-teal-500/5',       // STORY
+        'orange-500': 'bg-gradient-to-br from-orange-500/20 via-orange-500/10 to-orange-500/5', // BUG
+        'slate-500': 'bg-gradient-to-br from-slate-500/20 via-slate-500/10 to-slate-500/5'    // ISSUE
+      };
+      
+      return gradientMap[tailwindColor] || 'bg-gradient-to-br from-gray-500/20 via-gray-500/10 to-gray-500/5';
+    }
     
     case 'dashboard':
       return `bg-gradient-to-br from-${tailwindColor}/10 via-gray-800 to-${tailwindColor}/5 border-l-4 border-l-${tailwindColor.replace('-500', '-400')}/40 hover:from-${tailwindColor}/20 hover:to-${tailwindColor}/20 hover:border-l-${tailwindColor.replace('-500', '-300')}/60`;
@@ -1025,9 +1097,23 @@ export const getStatusGradientBackground = (status: WorkItemStatus, style: Gradi
 
   switch (style) {
     case 'dashboard': {
+      // Use static gradient classes for proper Tailwind compilation
+      const gradientMap: Record<string, string> = {
+        'gray-500': 'bg-gradient-to-br from-gray-500/30 via-gray-500/20 to-gray-500/10',     // NOT_STARTED
+        'cyan-500': 'bg-gradient-to-br from-cyan-500/30 via-cyan-500/20 to-cyan-500/10',     // PROPOSED
+        'purple-500': 'bg-gradient-to-br from-purple-500/30 via-purple-500/20 to-purple-500/10', // PLANNED
+        'yellow-500': 'bg-gradient-to-br from-yellow-500/30 via-yellow-500/20 to-yellow-500/10', // IN_PROGRESS
+        'blue-500': 'bg-gradient-to-br from-blue-500/30 via-blue-500/20 to-blue-500/10',     // IN_REVIEW
+        'red-500': 'bg-gradient-to-br from-red-500/30 via-red-500/20 to-red-500/10',         // BLOCKED
+        'orange-500': 'bg-gradient-to-br from-orange-500/30 via-orange-500/20 to-orange-500/10', // ON_HOLD
+        'green-500': 'bg-gradient-to-br from-green-500/30 via-green-500/20 to-green-500/10', // COMPLETED
+        'pink-500': 'bg-gradient-to-br from-pink-500/30 via-pink-500/20 to-pink-500/10'      // CANCELLED
+      };
+      
+      const gradientClass = gradientMap[tailwindColor] || 'bg-gradient-to-br from-gray-500/30 via-gray-500/20 to-gray-500/10';
       const borderClass = borderColorMap[tailwindColor] || 'border-l-gray-400/40';
       const hoverClass = hoverColorMap[tailwindColor] || 'hover:from-gray-500/25 hover:via-gray-500/15 hover:to-gray-500/20';
-      return `bg-gradient-to-br from-${tailwindColor}/10 via-${tailwindColor}/5 to-${tailwindColor}/3 border-l-4 ${borderClass} ${hoverClass}`;
+      return `${gradientClass} backdrop-blur-sm border-l-4 ${borderClass} ${hoverClass}`;
     }
     
     default:

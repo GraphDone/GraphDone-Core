@@ -1,5 +1,5 @@
 import { Component, ErrorInfo, ReactNode } from 'react';
-import { AlertTriangle, RefreshCw, FileText, ChevronDown, ChevronUp } from 'lucide-react';
+import { AlertTriangle, RefreshCw, FileText, ChevronDown, ChevronUp, Copy, Check } from 'lucide-react';
 
 interface Props {
   children: ReactNode;
@@ -13,6 +13,7 @@ interface State {
   errorInfo: ErrorInfo | null;
   showDetails: boolean;
   attemptedRecovery: boolean;
+  copySuccess: boolean;
 }
 
 export class GraphErrorBoundary extends Component<Props, State> {
@@ -23,7 +24,8 @@ export class GraphErrorBoundary extends Component<Props, State> {
       error: null,
       errorInfo: null,
       showDetails: false,
-      attemptedRecovery: false
+      attemptedRecovery: false,
+      copySuccess: false
     };
   }
 
@@ -122,18 +124,43 @@ export class GraphErrorBoundary extends Component<Props, State> {
     return suggestions;
   };
 
+  copyErrorDetails = async () => {
+    const { error, errorInfo } = this.state;
+    const errorText = [
+      '--- GraphDone Error Report ---',
+      `Error: ${error?.message || 'Unknown error'}`,
+      `Stack: ${error?.stack || 'No stack trace'}`,
+      `Component Stack: ${errorInfo?.componentStack || 'No component stack'}`,
+      `Timestamp: ${new Date().toISOString()}`,
+      `User Agent: ${navigator.userAgent}`,
+      `URL: ${window.location.href}`,
+      '--- End Report ---'
+    ].join('\n');
+
+    try {
+      await navigator.clipboard.writeText(errorText);
+      this.setState({ copySuccess: true });
+      setTimeout(() => {
+        this.setState({ copySuccess: false });
+      }, 2000);
+    } catch (err) {
+      // Fallback for browsers that don't support clipboard API
+      console.error('Failed to copy error details:', err);
+    }
+  };
+
   render() {
     if (this.state.hasError) {
       if (this.props.fallbackComponent) {
         return <>{this.props.fallbackComponent}</>;
       }
 
-      const { error, errorInfo, showDetails } = this.state;
+      const { error, errorInfo, showDetails, copySuccess } = this.state;
       const errorMessage = this.getErrorMessage(error);
       const suggestions = this.getSuggestions(error);
 
       return (
-        <div className="h-full flex items-center justify-center bg-gray-900 p-4">
+        <div className="h-full flex items-center justify-center bg-gray-900 p-4 tropical-lagoon-bg">
           <div className="max-w-2xl w-full">
             <div className="bg-gray-800 border border-red-500/30 rounded-lg shadow-xl">
               {/* Error Header */}
@@ -229,6 +256,23 @@ export class GraphErrorBoundary extends Component<Props, State> {
                   >
                     <FileText className="h-4 w-4 mr-2" />
                     Report Issue
+                  </button>
+                  
+                  <button
+                    onClick={this.copyErrorDetails}
+                    className={`btn ${this.state.copySuccess ? 'btn-success' : 'btn-secondary'} flex items-center transition-all duration-200`}
+                  >
+                    {this.state.copySuccess ? (
+                      <>
+                        <Check className="h-4 w-4 mr-2" />
+                        Copied!
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-4 w-4 mr-2" />
+                        Copy Error
+                      </>
+                    )}
                   </button>
                   
                   <button

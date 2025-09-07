@@ -39,10 +39,12 @@ export function UserSelector() {
 
   const getRoleColor = (role: string) => {
     switch (role) {
-      case 'admin': return 'text-purple-600 bg-purple-50';
-      case 'member': return 'text-blue-600 bg-blue-50';
-      case 'viewer': return 'text-gray-600 bg-gray-50';
-      default: return 'text-gray-600 bg-gray-50';
+      case 'admin': return 'text-purple-300 bg-purple-900';
+      case 'ADMIN': return 'text-purple-300 bg-purple-900';
+      case 'member': return 'text-blue-300 bg-blue-900';
+      case 'viewer': return 'text-gray-300 bg-gray-700';
+      case 'VIEWER': return 'text-gray-300 bg-gray-700';
+      default: return 'text-gray-300 bg-gray-700';
     }
   };
 
@@ -75,15 +77,15 @@ export function UserSelector() {
 
       {/* Dropdown menu */}
       {isOpen && (
-        <div className="absolute bottom-full left-0 right-0 mb-2 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-96 overflow-hidden">
+        <div className="absolute bottom-full left-0 right-0 mb-2 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-50 max-h-96 overflow-hidden">
           {/* Tabs */}
-          <div className="flex border-b border-gray-200">
+          <div className="flex border-b border-gray-600">
             <button
               onClick={() => setActiveTab('users')}
               className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
                 activeTab === 'users'
-                  ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  ? 'text-blue-400 border-b-2 border-blue-400 bg-gray-700'
+                  : 'text-gray-300 hover:text-gray-100 hover:bg-gray-700'
               }`}
             >
               <User className="h-4 w-4 inline mr-2" />
@@ -93,8 +95,8 @@ export function UserSelector() {
               onClick={() => setActiveTab('teams')}
               className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
                 activeTab === 'teams'
-                  ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  ? 'text-blue-400 border-b-2 border-blue-400 bg-gray-700'
+                  : 'text-gray-300 hover:text-gray-100 hover:bg-gray-700'
               }`}
             >
               <Users className="h-4 w-4 inline mr-2" />
@@ -105,7 +107,7 @@ export function UserSelector() {
           <div className="max-h-64 overflow-y-auto">
             {activeTab === 'users' && (
               <div className="p-2">
-                <div className="text-xs font-medium text-gray-500 px-2 py-1 uppercase tracking-wide">
+                <div className="text-xs font-medium text-gray-400 px-2 py-1 uppercase tracking-wide">
                   {currentTeam?.name} Members
                 </div>
                 {currentTeamUsers.map((user) => (
@@ -114,8 +116,8 @@ export function UserSelector() {
                     onClick={() => handleUserSelect(user.id)}
                     className={`w-full flex items-center space-x-3 p-2 rounded-lg text-left transition-colors ${
                       user.id === currentUser.id
-                        ? 'bg-blue-50 text-blue-700'
-                        : 'hover:bg-gray-50 text-gray-900'
+                        ? 'bg-blue-900 text-blue-100'
+                        : 'hover:bg-gray-700 text-gray-100'
                     }`}
                   >
                     <div className="flex-shrink-0">
@@ -125,7 +127,7 @@ export function UserSelector() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium truncate">{user.name}</div>
-                      <div className="text-xs text-gray-500 truncate">{user.email}</div>
+                      <div className="text-xs text-gray-400 truncate">{user.email}</div>
                     </div>
                     <div className={`text-xs px-2 py-1 rounded-full ${getRoleColor(user.role)}`}>
                       {user.role}
@@ -139,7 +141,7 @@ export function UserSelector() {
                 {/* Other team users */}
                 {availableUsers.filter(user => user.team?.id !== currentTeam?.id).length > 0 && (
                   <>
-                    <div className="text-xs font-medium text-gray-500 px-2 py-1 mt-3 uppercase tracking-wide border-t pt-3">
+                    <div className="text-xs font-medium text-gray-400 px-2 py-1 mt-3 uppercase tracking-wide border-t border-gray-600 pt-3">
                       Other Teams
                     </div>
                     {availableUsers
@@ -150,7 +152,7 @@ export function UserSelector() {
                           <button
                             key={user.id}
                             onClick={() => handleUserSelect(user.id)}
-                            className="w-full flex items-center space-x-3 p-2 rounded-lg text-left hover:bg-gray-50 text-gray-900 transition-colors"
+                            className="w-full flex items-center space-x-3 p-2 rounded-lg text-left hover:bg-gray-700 text-gray-100 transition-colors"
                           >
                             <div className="flex-shrink-0">
                               <div className="w-6 h-6 bg-gradient-to-br from-gray-400 to-gray-600 rounded-full flex items-center justify-center text-white text-xs font-medium">
@@ -159,7 +161,7 @@ export function UserSelector() {
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="text-sm font-medium truncate">{user.name}</div>
-                              <div className="text-xs text-gray-500 truncate">{userTeam?.name}</div>
+                              <div className="text-xs text-gray-400 truncate">{userTeam?.name}</div>
                             </div>
                             <div className={`text-xs px-2 py-1 rounded-full ${getRoleColor(user.role)}`}>
                               {user.role}
@@ -180,8 +182,8 @@ export function UserSelector() {
                     onClick={() => handleTeamSelect(team.id)}
                     className={`w-full flex items-center space-x-3 p-2 rounded-lg text-left transition-colors ${
                       team.id === currentTeam?.id
-                        ? 'bg-blue-50 text-blue-700'
-                        : 'hover:bg-gray-50 text-gray-900'
+                        ? 'bg-blue-900 text-blue-100'
+                        : 'hover:bg-gray-700 text-gray-100'
                     }`}
                   >
                     <div className="flex-shrink-0">
@@ -191,7 +193,7 @@ export function UserSelector() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium truncate">{team.name}</div>
-                      <div className="text-xs text-gray-500 truncate">
+                      <div className="text-xs text-gray-400 truncate">
                         {team.memberCount} members • {team.description}
                       </div>
                     </div>
@@ -205,10 +207,10 @@ export function UserSelector() {
           </div>
 
           {/* Logout button */}
-          <div className="border-t border-gray-200 p-2">
+          <div className="border-t border-gray-600 p-2">
             <button
               onClick={handleLogout}
-              className="w-full flex items-center space-x-3 p-2 rounded-lg text-left hover:bg-red-50 text-red-600 transition-colors"
+              className="w-full flex items-center space-x-3 p-2 rounded-lg text-left hover:bg-red-900 text-red-400 transition-colors"
             >
               <LogOut className="h-4 w-4" />
               <span className="text-sm font-medium">Logout</span>
