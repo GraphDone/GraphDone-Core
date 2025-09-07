@@ -239,11 +239,183 @@ export function Backend() {
     return () => clearInterval(interval);
   }, []);
 
+  // Load database stats on component mount
+  useEffect(() => {
+    const loadInitialStats = async () => {
+      const debug: string[] = [];
+      try {
+        await updateDatabaseStats(debug);
+        await checkDataIntegrity(debug);
+        setDebugInfo(debug);
+      } catch (error) {
+        console.error('Failed to load initial database stats:', error);
+      }
+    };
+    
+    loadInitialStats();
+  }, []);
+
   const handleRefresh = () => {
     setDebugInfo([]);
     setHealthCheckError(null);
     checkServiceHealth().then(setSystemHealth);
     setLastUpdate(new Date());
+  };
+
+  // Database utility functions
+  const updateDatabaseStats = async (debug: string[]) => {
+    try {
+      debug.push('📊 Fetching graph count...');
+      const graphResponse = await fetch('/graphql', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: 'query { graphs { id } }' })
+      });
+      const graphData = await graphResponse.json();
+      const graphCount = graphData.data?.graphs?.length || 0;
+      document.getElementById('graph-count')!.textContent = graphCount.toString();
+      debug.push(`✅ Found ${graphCount} graphs`);
+
+      debug.push('📊 Fetching node count...');
+      const nodeResponse = await fetch('/graphql', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: 'query { workItems { id } }' })
+      });
+      const nodeData = await nodeResponse.json();
+      const nodeCount = nodeData.data?.workItems?.length || 0;
+      document.getElementById('node-count')!.textContent = nodeCount.toString();
+      debug.push(`✅ Found ${nodeCount} nodes`);
+
+      debug.push('📊 Fetching edge count...');
+      const edgeResponse = await fetch('/graphql', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: 'query { edges { id } }' })
+      });
+      const edgeData = await edgeResponse.json();
+      const edgeCount = edgeData.data?.edges?.length || 0;
+      document.getElementById('edge-count')!.textContent = edgeCount.toString();
+      debug.push(`✅ Found ${edgeCount} edges`);
+
+    } catch (error) {
+      debug.push(`❌ Failed to update stats: ${error}`);
+      document.getElementById('graph-count')!.textContent = 'Error';
+      document.getElementById('node-count')!.textContent = 'Error';
+      document.getElementById('edge-count')!.textContent = 'Error';
+    }
+  };
+
+  const checkDataIntegrity = async (debug: string[]) => {
+    let issueCount = 0;
+    debug.push('🔍 Checking for data integrity issues...');
+
+    try {
+      // Check for graphs with invalid types
+      const graphResponse = await fetch('/graphql', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: 'query { graphs { id name } }' })
+      });
+      
+      const graphResult = await graphResponse.json();
+      if (graphResult.errors) {
+        issueCount += graphResult.errors.length;
+        debug.push(`❌ Found ${graphResult.errors.length} GraphQL schema errors`);
+        graphResult.errors.forEach((err: any, i: number) => {
+          debug.push(`  ${i + 1}. ${err.message}`);
+        });
+      }
+
+      // Check for extremely long names (likely test data)
+      if (graphResult.data?.graphs) {
+        const longNameGraphs = graphResult.data.graphs.filter((g: any) => g.name && g.name.length > 100);
+        if (longNameGraphs.length > 0) {
+          issueCount += longNameGraphs.length;
+          debug.push(`⚠️ Found ${longNameGraphs.length} graphs with extremely long names (likely test data)`);
+        }
+
+        // Check for single-character names (likely test data)
+        const shortNameGraphs = graphResult.data.graphs.filter((g: any) => g.name && g.name.length <= 2);
+        if (shortNameGraphs.length > 0) {
+          debug.push(`ℹ️ Found ${shortNameGraphs.length} graphs with very short names (a, x, etc.)`);
+        }
+      }
+
+      document.getElementById('issue-count')!.textContent = issueCount.toString();
+      
+      if (issueCount === 0) {
+        debug.push('✅ No major data integrity issues found');
+        document.getElementById('issue-count')!.textContent = '0';
+      } else {
+        debug.push(`⚠️ Found ${issueCount} data integrity issues`);
+      }
+
+    } catch (error) {
+      debug.push(`❌ Data integrity check failed: ${error}`);
+      document.getElementById('issue-count')!.textContent = 'Error';
+    }
+  };
+
+  const cleanupTestData = async (debug: string[]) => {
+    debug.push('🧹 Starting cleanup of test data...');
+    let cleanedCount = 0;
+
+    try {
+      // Get all graphs to identify test data
+      const graphResponse = await fetch('/graphql', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: 'query { graphs { id name } }' })
+      });
+      
+      const graphData = await graphResponse.json();
+      
+      if (graphData.data?.graphs) {
+        const testGraphs = graphData.data.graphs.filter((g: any) => {
+          return (
+            g.name === 'a' ||
+            g.name === 'x' ||
+            g.name.length > 100 ||
+            g.name.includes('xxxxxxxxxxxx') ||
+            g.name.startsWith('Test Graph Debug')
+          );
+        });
+
+        debug.push(`🎯 Identified ${testGraphs.length} test graphs for cleanup`);
+
+        for (const graph of testGraphs.slice(0, 50)) { // Limit to 50 at a time to avoid timeout
+          try {
+            const deleteResponse = await fetch('/graphql', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                query: 'mutation DeleteGraph($id: ID!) { deleteGraphs(where: { id: $id }) { nodesDeleted } }',
+                variables: { id: graph.id }
+              })
+            });
+
+            const deleteResult = await deleteResponse.json();
+            if (!deleteResult.errors) {
+              cleanedCount++;
+              debug.push(`🗑️ Deleted graph: ${graph.name.substring(0, 30)}...`);
+            } else {
+              debug.push(`⚠️ Could not delete graph ${graph.id}: ${deleteResult.errors[0]?.message}`);
+            }
+          } catch (error) {
+            debug.push(`❌ Error deleting graph ${graph.id}: ${error}`);
+          }
+        }
+      }
+
+      debug.push(`✅ Cleanup complete! Removed ${cleanedCount} test graphs`);
+      
+      // Refresh stats after cleanup
+      await updateDatabaseStats(debug);
+      
+    } catch (error) {
+      debug.push(`❌ Cleanup failed: ${error}`);
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -912,160 +1084,4 @@ mutation DeleteGraph($id: ID!) {
       </div>
     </div>
   );
-
-  // Database utility functions
-  async function updateDatabaseStats(debug: string[]) {
-    try {
-      debug.push('📊 Fetching graph count...');
-      const graphResponse = await fetch('/graphql', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: 'query { graphs { id } }' })
-      });
-      const graphData = await graphResponse.json();
-      const graphCount = graphData.data?.graphs?.length || 0;
-      document.getElementById('graph-count')!.textContent = graphCount.toString();
-      debug.push(`✅ Found ${graphCount} graphs`);
-
-      debug.push('📊 Fetching node count...');
-      const nodeResponse = await fetch('/graphql', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: 'query { workItems { id } }' })
-      });
-      const nodeData = await nodeResponse.json();
-      const nodeCount = nodeData.data?.workItems?.length || 0;
-      document.getElementById('node-count')!.textContent = nodeCount.toString();
-      debug.push(`✅ Found ${nodeCount} nodes`);
-
-      debug.push('📊 Fetching edge count...');
-      const edgeResponse = await fetch('/graphql', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: 'query { edges { id } }' })
-      });
-      const edgeData = await edgeResponse.json();
-      const edgeCount = edgeData.data?.edges?.length || 0;
-      document.getElementById('edge-count')!.textContent = edgeCount.toString();
-      debug.push(`✅ Found ${edgeCount} edges`);
-
-    } catch (error) {
-      debug.push(`❌ Failed to update stats: ${error}`);
-      document.getElementById('graph-count')!.textContent = 'Error';
-      document.getElementById('node-count')!.textContent = 'Error';
-      document.getElementById('edge-count')!.textContent = 'Error';
-    }
-  }
-
-  async function checkDataIntegrity(debug: string[]) {
-    let issueCount = 0;
-    debug.push('🔍 Checking for data integrity issues...');
-
-    try {
-      // Check for graphs with invalid types
-      const graphResponse = await fetch('/graphql', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: 'query { graphs { id name } }' })
-      });
-      
-      const graphResult = await graphResponse.json();
-      if (graphResult.errors) {
-        issueCount += graphResult.errors.length;
-        debug.push(`❌ Found ${graphResult.errors.length} GraphQL schema errors`);
-        graphResult.errors.forEach((err: any, i: number) => {
-          debug.push(`  ${i + 1}. ${err.message}`);
-        });
-      }
-
-      // Check for extremely long names (likely test data)
-      if (graphResult.data?.graphs) {
-        const longNameGraphs = graphResult.data.graphs.filter((g: any) => g.name && g.name.length > 100);
-        if (longNameGraphs.length > 0) {
-          issueCount += longNameGraphs.length;
-          debug.push(`⚠️ Found ${longNameGraphs.length} graphs with extremely long names (likely test data)`);
-        }
-
-        // Check for single-character names (likely test data)
-        const shortNameGraphs = graphResult.data.graphs.filter((g: any) => g.name && g.name.length <= 2);
-        if (shortNameGraphs.length > 0) {
-          debug.push(`ℹ️ Found ${shortNameGraphs.length} graphs with very short names (a, x, etc.)`);
-        }
-      }
-
-      document.getElementById('issue-count')!.textContent = issueCount.toString();
-      
-      if (issueCount === 0) {
-        debug.push('✅ No major data integrity issues found');
-        document.getElementById('issue-count')!.textContent = '0';
-      } else {
-        debug.push(`⚠️ Found ${issueCount} data integrity issues`);
-      }
-
-    } catch (error) {
-      debug.push(`❌ Data integrity check failed: ${error}`);
-      document.getElementById('issue-count')!.textContent = 'Error';
-    }
-  }
-
-  async function cleanupTestData(debug: string[]) {
-    debug.push('🧹 Starting cleanup of test data...');
-    let cleanedCount = 0;
-
-    try {
-      // Get all graphs to identify test data
-      const graphResponse = await fetch('/graphql', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: 'query { graphs { id name } }' })
-      });
-      
-      const graphData = await graphResponse.json();
-      
-      if (graphData.data?.graphs) {
-        const testGraphs = graphData.data.graphs.filter((g: any) => {
-          return (
-            g.name === 'a' ||
-            g.name === 'x' ||
-            g.name.length > 100 ||
-            g.name.includes('xxxxxxxxxxxx') ||
-            g.name.startsWith('Test Graph Debug')
-          );
-        });
-
-        debug.push(`🎯 Identified ${testGraphs.length} test graphs for cleanup`);
-
-        for (const graph of testGraphs.slice(0, 50)) { // Limit to 50 at a time to avoid timeout
-          try {
-            const deleteResponse = await fetch('/graphql', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ 
-                query: 'mutation DeleteGraph($id: ID!) { deleteGraphs(where: { id: $id }) { nodesDeleted } }',
-                variables: { id: graph.id }
-              })
-            });
-
-            const deleteResult = await deleteResponse.json();
-            if (!deleteResult.errors) {
-              cleanedCount++;
-              debug.push(`🗑️ Deleted graph: ${graph.name.substring(0, 30)}...`);
-            } else {
-              debug.push(`⚠️ Could not delete graph ${graph.id}: ${deleteResult.errors[0]?.message}`);
-            }
-          } catch (error) {
-            debug.push(`❌ Error deleting graph ${graph.id}: ${error}`);
-          }
-        }
-      }
-
-      debug.push(`✅ Cleanup complete! Removed ${cleanedCount} test graphs`);
-      
-      // Refresh stats after cleanup
-      await updateDatabaseStats(debug);
-      
-    } catch (error) {
-      debug.push(`❌ Cleanup failed: ${error}`);
-    }
-  }
 }
