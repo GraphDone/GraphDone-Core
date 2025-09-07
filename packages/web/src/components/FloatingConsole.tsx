@@ -132,6 +132,7 @@ export const FloatingConsole: React.FC<FloatingConsoleProps> = ({
         document.removeEventListener('mouseup', handleMouseUp);
       };
     }
+    return undefined;
   }, [isDragging, isResizing, handleMouseMove, handleMouseUp]);
 
   const handleDragStart = (e: React.MouseEvent) => {
