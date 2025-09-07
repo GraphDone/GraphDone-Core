@@ -8,6 +8,8 @@
 ![Version](https://img.shields.io/badge/version-0.2.2--alpha-orange.svg)
 ![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
 
+> 🚨 **PRODUCTION SECURITY WARNING**: This project is currently configured for development only with HTTP and hardcoded passwords. See [TLS Implementation Plan](./docs/security/tls-implementation-plan.md) for required security changes before production deployment.
+
 ## What is GraphDone?
 
 GraphDone reimagines project management as a collaborative graph where work flows through natural dependencies rather than artificial hierarchies. It's designed for high-quality individual contributors who thrive on autonomy, teams that include AI agents, and organizations ready to embrace democratic coordination.
@@ -257,6 +259,7 @@ Anyone can propose ideas and assign personal priority. The community validates t
 - 🎯 **[Project Philosophy](./docs/philosophy.md)** - Core beliefs and design principles  
 - 🚀 **[Getting Started Guide](./docs/guides/getting-started.md)** - Step-by-step setup and first steps
 - 🏗️ **[Architecture Overview](./docs/guides/architecture-overview.md)** - System design and technical decisions
+- 🤖 **[AI Agents Integration](./docs/guides/ai-agents-integration.md)** - Multi-agent AI system with tamagotchi-style companions
 - 👥 **[User Flows](./docs/guides/user-flows.md)** - How teams actually use GraphDone
 - 🔌 **[API Documentation](./docs/api/graphql.md)** - GraphQL schema and integration guide
 - 🚀 **[Deployment Guide](./docs/deployment/README.md)** - Self-hosted and cloud deployment options

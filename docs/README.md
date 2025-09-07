@@ -1,7 +1,5 @@
 # GraphDone Documentation
 
-**AI-Generated Content Warning: This documentation contains AI-generated content. Verify information before depending on it for decision making.**
-
 Welcome to the GraphDone documentation! This directory contains comprehensive guides, API references, and deployment information for working with GraphDone.
 
 ## 📚 Documentation Structure
@@ -13,16 +11,30 @@ Welcome to the GraphDone documentation! This directory contains comprehensive gu
 - Authentication and authorization
 
 ### [Developer Guides](./guides/)
-- Getting started
-- Core concepts
-- Architecture overview
-- Contributing guidelines
+- [Getting Started](./guides/getting-started.md) - Setup and first steps
+- [Architecture Overview](./guides/architecture-overview.md) - System design and technical decisions
+- [User Flows](./guides/user-flows.md) - How teams actually use GraphDone
+
+### 🤖 AI Agents Documentation
+> **Start here**: [Simple AI Agent Reality Check](./simple-agent-reality.md) - **What we're actually building**
+
+**Implementation Guides**:
+- [Simple AI Agent Reality Check](./simple-agent-reality.md) - 🎯 **THE PLAN**: Smart chia pet with Ollama
+- [AI Agents Technical Spec](./ai-agents-tech-spec.md) - 📚 Complete technical implementation (advanced)
+- [Agent Planning Scenarios](./agent-planning-scenarios.md) - 🎪 Interactive planning examples (future)
+
+### 🔒 Security & Production
+> **CRITICAL FOR RELEASE**: [TLS Implementation Plan](./security/tls-implementation-plan.md) - **Required before production**
+
+**Security Documentation**:
+- [TLS Implementation Plan](./security/tls-implementation-plan.md) - 🚨 **MUST READ**: HTTPS, SSL certificates, secrets management
+- [Production Security Checklist](./security/tls-implementation-plan.md#deployment-security-checklist) - Pre-launch security validation
 
 ### [Deployment](./deployment/)
 - Docker setup
-- Kubernetes manifests
+- Kubernetes manifests  
 - Cloud provider guides
-- Production considerations
+- Production considerations (see Security section above for TLS)
 
 ## 🚀 Quick Start
 
@@ -51,7 +63,7 @@ Welcome to the GraphDone documentation! This directory contains comprehensive gu
 - **Graph-native collaboration** - Work flows through natural dependencies
 - **Spherical priority model** - Ideas migrate from periphery to center
 - **Democratic prioritization** - Community validation guides resource allocation
-- **Human-AI coordination** - Agents participate as first-class citizens
+- **Human-AI coordination** - Smart chia pets that help with planning (see AI docs above)
 
 ## 🔗 Quick Links
 
