@@ -46,8 +46,15 @@ services:
       - NEO4J_PASSWORD=graphdone_password
       - PORT=4127
       - CORS_ORIGIN=http://localhost:3127
+      # SSL Configuration (uncomment and configure for HTTPS)
+      # - SSL_ENABLED=true
+      # - SSL_KEY_PATH=/app/certs/server-key.pem
+      # - SSL_CERT_PATH=/app/certs/server-cert.pem
+      # - HTTPS_PORT=4128
     ports:
       - "4127:4127"
+      # HTTPS port (uncomment when SSL is enabled)
+      # - "4128:4128"
     depends_on:
       graphdone-neo4j:
         condition: service_healthy
@@ -57,6 +64,8 @@ services:
       - ../packages/server/.env:/app/.env
       - logs:/app/logs
       - sqlite_auth_data:/app/data
+      # SSL certificates (uncomment when using HTTPS)
+      # - ./certs:/app/certs:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4127/health"]
       interval: 30s
