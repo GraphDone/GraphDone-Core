@@ -1275,39 +1275,51 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     }
   };
 
-  // Selective data update function - updates simulation data without DOM rebuilds
+  // Smart data update function - only reinitializes when necessary, preserves camera position
   const updateVisualizationData = useCallback(() => {
     if (!simulationRef.current || !svgRef.current) return;
     
-    console.log('[Graph Debug] Performing selective data update...');
+    console.log('[Graph Debug] Checking for data changes...');
     
-    // For relationship creation/deletion, we need full reinitialization to properly handle 
-    // edge labels and complex DOM synchronization
-    const currentEdgeCount = d3.select(svgRef.current).select('.edges-group').selectAll('.edge').size();
+    const svg = d3.select(svgRef.current);
+    const simulation = simulationRef.current;
+    
+    // Get current data counts from DOM
+    const currentNodeCount = svg.select('.nodes-group').selectAll('.node').size();
+    const currentEdgeCount = svg.select('.edges-group').selectAll('.edge').size();
+    const newNodeCount = nodes.length;
     const newEdgeCount = validatedEdges.length;
     
-    if (currentEdgeCount !== newEdgeCount) {
-      console.log('[Graph Debug] Edge count changed, forcing full reinit for proper label sync');
+    console.log('[Graph Debug] Data counts:', {
+      currentNodes: currentNodeCount,
+      newNodes: newNodeCount,
+      currentEdges: currentEdgeCount,
+      newEdges: newEdgeCount
+    });
+
+    // Check if we need full reinitialization (node/edge count changed)
+    const needsReinit = (currentNodeCount !== newNodeCount) || (currentEdgeCount !== newEdgeCount);
+    
+    if (needsReinit) {
+      console.log('[Graph Debug] Data structure changed - triggering reinitialization with preserved camera');
       setReinitTrigger(prev => prev + 1);
       return;
     }
+
+    // If counts are the same, just update simulation data (for property changes)
+    console.log('[Graph Debug] Data counts unchanged - updating simulation data only');
     
-    // Update simulation with new data
-    const simulation = simulationRef.current;
-    
-    // Update nodes data
+    // Update simulation with current data (handles property changes)
     simulation.nodes(nodes as any);
-    
-    // Update links data  
     const linkForce = simulation.force('link') as d3.ForceLink<any, any>;
     if (linkForce) {
       linkForce.links(validatedEdges);
     }
-      
-    // Restart simulation with low alpha to settle new positions
+
+    // Gentle restart to settle any property changes
     simulation.alpha(0.1).restart();
     
-    console.log('[Graph Debug] Selective update completed');
+    console.log('[Graph Debug] Simulation data updated');
   }, [nodes, validatedEdges]);
 
   // Define initializeVisualization function with access to nodes data
