@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import fs from 'fs';
-import { createTlsConfig, TlsConfig } from './tls.js';
+import { createTlsConfig, validateTlsConfig, TlsConfig } from './tls.js';
 
 // Mock fs module
 vi.mock('fs');
@@ -122,6 +122,156 @@ describe('TLS Configuration', () => {
       });
 
       expect(() => createTlsConfig()).toThrow('Failed to read SSL key file: EACCES: permission denied');
+    });
+  });
+
+  describe('validateTlsConfig', () => {
+    it('should return true for valid configuration', () => {
+      const config: TlsConfig = {
+        enabled: true,
+        key: '-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC...\n-----END PRIVATE KEY-----\n',
+        cert: '-----BEGIN CERTIFICATE-----\nMIIDXTCCAkWgAwIBAgIJAKoK/OvH0DDhMA0GCSqGSIb3DQEBCwUA...\n-----END CERTIFICATE-----\n',
+        port: 443,
+        keyPath: '/etc/ssl/key.pem',
+        certPath: '/etc/ssl/cert.pem'
+      };
+
+      expect(() => validateTlsConfig(config)).not.toThrow();
+      expect(validateTlsConfig(config)).toBe(true);
+    });
+
+    it('should throw error for empty key content', () => {
+      const config: TlsConfig = {
+        enabled: true,
+        key: '',
+        cert: '-----BEGIN CERTIFICATE-----\nvalid cert\n-----END CERTIFICATE-----\n',
+        port: 443,
+        keyPath: '/etc/ssl/key.pem',
+        certPath: '/etc/ssl/cert.pem'
+      };
+
+      expect(() => validateTlsConfig(config)).toThrow('SSL key content is empty or invalid');
+    });
+
+    it('should throw error for whitespace-only key content', () => {
+      const config: TlsConfig = {
+        enabled: true,
+        key: '   \n\t  ',
+        cert: '-----BEGIN CERTIFICATE-----\nvalid cert\n-----END CERTIFICATE-----\n',
+        port: 443,
+        keyPath: '/etc/ssl/key.pem',
+        certPath: '/etc/ssl/cert.pem'
+      };
+
+      expect(() => validateTlsConfig(config)).toThrow('SSL key content is empty or invalid');
+    });
+
+    it('should throw error for empty certificate content', () => {
+      const config: TlsConfig = {
+        enabled: true,
+        key: '-----BEGIN PRIVATE KEY-----\nvalid key\n-----END PRIVATE KEY-----\n',
+        cert: '',
+        port: 443,
+        keyPath: '/etc/ssl/key.pem',
+        certPath: '/etc/ssl/cert.pem'
+      };
+
+      expect(() => validateTlsConfig(config)).toThrow('SSL certificate content is empty or invalid');
+    });
+
+    it('should throw error for whitespace-only certificate content', () => {
+      const config: TlsConfig = {
+        enabled: true,
+        key: '-----BEGIN PRIVATE KEY-----\nvalid key\n-----END PRIVATE KEY-----\n',
+        cert: '   \n\t  ',
+        port: 443,
+        keyPath: '/etc/ssl/key.pem',
+        certPath: '/etc/ssl/cert.pem'
+      };
+
+      expect(() => validateTlsConfig(config)).toThrow('SSL certificate content is empty or invalid');
+    });
+
+    it('should throw error for invalid private key format', () => {
+      const config: TlsConfig = {
+        enabled: true,
+        key: 'this is not a valid private key format',
+        cert: '-----BEGIN CERTIFICATE-----\nvalid cert\n-----END CERTIFICATE-----\n',
+        port: 443,
+        keyPath: '/etc/ssl/key.pem',
+        certPath: '/etc/ssl/cert.pem'
+      };
+
+      expect(() => validateTlsConfig(config)).toThrow('SSL key file does not appear to contain a valid private key');
+    });
+
+    it('should accept RSA private key format', () => {
+      const config: TlsConfig = {
+        enabled: true,
+        key: '-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA...\n-----END RSA PRIVATE KEY-----\n',
+        cert: '-----BEGIN CERTIFICATE-----\nvalid cert\n-----END CERTIFICATE-----\n',
+        port: 443,
+        keyPath: '/etc/ssl/key.pem',
+        certPath: '/etc/ssl/cert.pem'
+      };
+
+      expect(() => validateTlsConfig(config)).not.toThrow();
+    });
+
+    it('should throw error for invalid certificate format', () => {
+      const config: TlsConfig = {
+        enabled: true,
+        key: '-----BEGIN PRIVATE KEY-----\nvalid key\n-----END PRIVATE KEY-----\n',
+        cert: 'this is not a valid certificate format',
+        port: 443,
+        keyPath: '/etc/ssl/key.pem',
+        certPath: '/etc/ssl/cert.pem'
+      };
+
+      expect(() => validateTlsConfig(config)).toThrow('SSL certificate file does not appear to contain a valid certificate');
+    });
+
+    it('should throw error for port number too low', () => {
+      const config: TlsConfig = {
+        enabled: true,
+        key: '-----BEGIN PRIVATE KEY-----\nvalid key\n-----END PRIVATE KEY-----\n',
+        cert: '-----BEGIN CERTIFICATE-----\nvalid cert\n-----END CERTIFICATE-----\n',
+        port: 0,
+        keyPath: '/etc/ssl/key.pem',
+        certPath: '/etc/ssl/cert.pem'
+      };
+
+      expect(() => validateTlsConfig(config)).toThrow('Invalid HTTPS port: 0. Must be between 1 and 65535');
+    });
+
+    it('should throw error for port number too high', () => {
+      const config: TlsConfig = {
+        enabled: true,
+        key: '-----BEGIN PRIVATE KEY-----\nvalid key\n-----END PRIVATE KEY-----\n',
+        cert: '-----BEGIN CERTIFICATE-----\nvalid cert\n-----END CERTIFICATE-----\n',
+        port: 65536,
+        keyPath: '/etc/ssl/key.pem',
+        certPath: '/etc/ssl/cert.pem'
+      };
+
+      expect(() => validateTlsConfig(config)).toThrow('Invalid HTTPS port: 65536. Must be between 1 and 65535');
+    });
+
+    it('should accept valid port ranges', () => {
+      const testPorts = [1, 80, 443, 8080, 8443, 65535];
+      
+      testPorts.forEach(port => {
+        const config: TlsConfig = {
+          enabled: true,
+          key: '-----BEGIN PRIVATE KEY-----\nvalid key\n-----END PRIVATE KEY-----\n',
+          cert: '-----BEGIN CERTIFICATE-----\nvalid cert\n-----END CERTIFICATE-----\n',
+          port: port,
+          keyPath: '/etc/ssl/key.pem',
+          certPath: '/etc/ssl/cert.pem'
+        };
+
+        expect(() => validateTlsConfig(config)).not.toThrow();
+      });
     });
   });
 
