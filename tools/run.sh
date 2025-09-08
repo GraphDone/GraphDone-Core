@@ -125,22 +125,23 @@ case $MODE in
             fi
         fi
         
+        # Clean up any existing Docker containers first
+        echo "🧹 Cleaning up any existing Docker containers..."
+        ${DOCKER_SUDO}docker-compose -f deployment/docker-compose.yml down 2>/dev/null || true
+        ${DOCKER_SUDO}docker-compose -f deployment/docker-compose.dev.yml down 2>/dev/null || true
+        
         # Check if database is running
-        echo "🔍 Checking Neo4j status..."
-        if ! ${DOCKER_SUDO}docker-compose -f deployment/docker-compose.yml ps neo4j 2>/dev/null | grep -q "Up"; then
-            echo "🗄️  Starting Neo4j database..."
-            ${DOCKER_SUDO}docker-compose -f deployment/docker-compose.yml up -d neo4j redis
-            echo "⏳ Waiting for Neo4j to be ready..."
-            
-            # Wait for Neo4j to be ready
-            until ${DOCKER_SUDO}docker-compose -f deployment/docker-compose.yml exec -T neo4j cypher-shell -u neo4j -p graphdone_password "RETURN 1" 2>/dev/null; do
-                echo "⏳ Neo4j not ready yet, waiting..."
-                sleep 3
-            done
-            echo "✅ Neo4j is ready!"
-        else
-            echo "✅ Neo4j is already running"
-        fi
+        echo "🔍 Starting database services..."
+        echo "🗄️  Starting Neo4j and Redis databases..."
+        ${DOCKER_SUDO}docker-compose -f deployment/docker-compose.dev.yml up -d graphdone-neo4j graphdone-redis
+        echo "⏳ Waiting for Neo4j to be ready..."
+        
+        # Wait for Neo4j to be ready
+        until ${DOCKER_SUDO}docker-compose -f deployment/docker-compose.dev.yml exec -T graphdone-neo4j cypher-shell -u neo4j -p graphdone_password "RETURN 1" 2>/dev/null; do
+            echo "⏳ Neo4j not ready yet, waiting..."
+            sleep 3
+        done
+        echo "✅ Neo4j is ready!"
         
         # Clean up any hanging processes on our ports
         echo "🧹 Cleaning up any processes on ports 3127 and 4127..."

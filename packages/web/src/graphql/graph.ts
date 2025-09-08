@@ -12,6 +12,8 @@ export const GET_GRAPHS = gql`
       parentGraphId
       teamId
       createdBy
+      tags
+      defaultRole
       depth
       path
       isShared
@@ -39,6 +41,8 @@ export const GET_GRAPHS_BY_TEAM = gql`
       parentGraphId
       teamId
       createdBy
+      tags
+      defaultRole
       depth
       path
       isShared
@@ -66,6 +70,8 @@ export const GET_GRAPH = gql`
       parentGraphId
       teamId
       createdBy
+      tags
+      defaultRole
       depth
       path
       isShared
@@ -86,7 +92,7 @@ export const GET_GRAPH = gql`
         positionX
         positionY
         positionZ
-        priorityComp
+        priority
       }
       subgraphs {
         id
@@ -115,6 +121,8 @@ export const CREATE_GRAPH = gql`
         parentGraphId
         teamId
         createdBy
+        tags
+        defaultRole
         depth
         path
         isShared
@@ -144,6 +152,8 @@ export const UPDATE_GRAPH = gql`
         parentGraphId
         teamId
         createdBy
+        tags
+        defaultRole
         depth
         path
         isShared

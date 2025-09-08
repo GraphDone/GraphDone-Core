@@ -12,10 +12,7 @@ interface WorkItem {
   description?: string;
   type: string;
   status: string;
-  priorityComp: number;
-  priorityExec: number;
-  priorityIndiv: number;
-  priorityComm: number;
+  priority: number;
   tags?: string[];
   dueDate?: string;
   assignedTo?: string;
@@ -228,7 +225,7 @@ export function GraphVisualization() {
     // Add node circles
     nodeGroup.append('circle')
       .attr('class', 'node-circle')
-      .attr('r', d => 15 + (d.priorityComp || 0) * 15) // Size based on priority
+      .attr('r', d => 15 + (d.priority || 0) * 15) // Size based on priority
       .attr('fill', d => {
         // Lighter, more vibrant colors
         const colors: Record<string, string> = {
@@ -279,8 +276,8 @@ export function GraphVisualization() {
       .attr('r', 3)
       .attr('cy', 15)
       .attr('fill', d => {
-        if (d.priorityComp > 0.7) return '#dc2626';
-        if (d.priorityComp > 0.4) return '#d97706';
+        if (d.priority > 0.7) return '#dc2626';
+        if (d.priority > 0.4) return '#d97706';
         return '#059669';
       });
 
@@ -290,13 +287,13 @@ export function GraphVisualization() {
         d3.select(this).select('circle.node-circle')
           .transition()
           .duration(200)
-          .attr('r', (15 + (d.priorityComp || 0) * 15) * 1.2);
+          .attr('r', (15 + (d.priority || 0) * 15) * 1.2);
       })
       .on('mouseleave', function(_event, d) {
         d3.select(this).select('circle.node-circle')
           .transition()
           .duration(200)
-          .attr('r', 15 + (d.priorityComp || 0) * 15);
+          .attr('r', 15 + (d.priority || 0) * 15);
       });
 
     // Center the view
