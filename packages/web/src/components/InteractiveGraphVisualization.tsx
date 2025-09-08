@@ -1163,9 +1163,17 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
 
     svg.attr('width', width).attr('height', height);
     
-    // Create zoom behavior for empty canvas
+    // Create zoom behavior for empty canvas with reversed wheel direction
     const zoom = d3.zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.1, 3])
+      .filter((event: any) => {
+        // Reverse mouse wheel direction for more intuitive zooming
+        // Scroll up = zoom in (deltaY negative), Scroll down = zoom out (deltaY positive)
+        if (event.type === 'wheel') {
+          event.deltaY = -event.deltaY;
+        }
+        return true;
+      })
       .on('zoom', (event) => {
         const g = svg.select('g.main-graph-group');
         if (!g.empty()) {
@@ -1375,9 +1383,17 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
 
     svg.attr('width', width).attr('height', height);
     
-    // Create or reuse zoom behavior
+    // Create or reuse zoom behavior with reversed wheel direction
     const zoom = d3.zoom<SVGSVGElement, unknown>()
-      .scaleExtent([0.1, 4]);
+      .scaleExtent([0.1, 4])
+      .filter((event: any) => {
+        // Reverse mouse wheel direction for more intuitive zooming
+        // Scroll up = zoom in (deltaY negative), Scroll down = zoom out (deltaY positive)
+        if (event.type === 'wheel') {
+          event.deltaY = -event.deltaY;
+        }
+        return true;
+      });
 
     const g = isFirstInit ? svg.append('g').attr('class', 'main-graph-group') : existingMainGroup;
 
