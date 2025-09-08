@@ -424,9 +424,22 @@ cmd_remove() {
 
 cmd_stop() {
     log_info "🛑 Stopping all services..."
+    
+    # Stop Docker containers
     docker-compose -f deployment/docker-compose.yml down 2>/dev/null || true
     docker-compose -f deployment/docker-compose.dev.yml down 2>/dev/null || true
+    
+    # Stop npm processes
     pkill -f "npm run dev" 2>/dev/null || true
+    pkill -f "vite" 2>/dev/null || true
+    pkill -f "tsx.*watch" 2>/dev/null || true
+    
+    # Clean up any processes on GraphDone ports
+    lsof -ti:3127 | xargs -r kill -9 2>/dev/null || true
+    lsof -ti:4127 | xargs -r kill -9 2>/dev/null || true
+    lsof -ti:7474 | xargs -r kill -9 2>/dev/null || true
+    lsof -ti:7687 | xargs -r kill -9 2>/dev/null || true
+    
     log_success "✅ All services stopped"
 }
 

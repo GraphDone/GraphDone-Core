@@ -13,6 +13,7 @@ import {
   getStatusIconElement,
   getTypeIconElement,
   getPriorityIconElement,
+  getStatusGradientBackground,
   WORK_ITEM_STATUSES, 
   WORK_ITEM_PRIORITIES,
   WORK_ITEM_TYPES,
@@ -31,10 +32,7 @@ interface WorkItem {
   description?: string;
   type: string;
   status: string;
-  priorityExec: number;
-  priorityIndiv: number;
-  priorityComm: number;
-  priorityComp: number;
+  priority: number;
   dueDate?: string;
   tags?: string[];
   metadata?: string;
@@ -112,7 +110,7 @@ const PieChart = ({ data, title }: { data: Array<{label: string, value: number, 
 
   if (total === 0) {
     return (
-      <div className="bg-gray-800 rounded-lg p-4 pl-2 border border-gray-700">
+      <div className="bg-gradient-to-br from-gray-700/30 via-gray-800/50 to-gray-700/20 rounded-lg p-4 pl-2 border border-gray-600/50">
         <h3 className="text-lg font-semibold text-white mb-4 text-center">{title}</h3>
         <div className="flex items-center justify-center h-48">
           <div className="text-center">
@@ -125,7 +123,7 @@ const PieChart = ({ data, title }: { data: Array<{label: string, value: number, 
   }
 
   return (
-    <div className="bg-gray-800 border border-gray-600 rounded-lg p-6">
+    <div className="bg-gradient-to-br from-gray-700/30 via-gray-800/50 to-gray-700/20 border border-gray-600/50 rounded-lg p-6 backdrop-blur-sm">
       <div className="mb-4">
         <h3 className="text-lg font-semibold text-white mb-2">{title}</h3>
       </div>
@@ -133,31 +131,22 @@ const PieChart = ({ data, title }: { data: Array<{label: string, value: number, 
         <div className="absolute top-4 right-4 flex flex-col gap-2 z-10">
           <button
             onClick={handleZoomIn}
-            className="p-2 text-white rounded shadow-lg transition-all duration-200"
-            style={{ backgroundColor: '#228B22', boxShadow: '0 4px 6px rgba(34, 139, 34, 0.25)' }}
+            className="p-2 text-white rounded-lg shadow-lg transition-all duration-200 bg-emerald-600/80 hover:bg-emerald-500 border border-emerald-500/30"
             title="Zoom In"
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#32CD32'}
-            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#228B22'}
           >
             <ZoomIn className="h-4 w-4" />
           </button>
           <button
             onClick={handleZoomOut}
-            className="p-2 text-white rounded shadow-lg transition-all duration-200"
-            style={{ backgroundColor: '#DC143C', boxShadow: '0 4px 6px rgba(220, 20, 60, 0.25)' }}
+            className="p-2 text-white rounded-lg shadow-lg transition-all duration-200 bg-rose-600/80 hover:bg-rose-500 border border-rose-500/30"
             title="Zoom Out"
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#FF6347'}
-            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#DC143C'}
           >
             <ZoomOut className="h-4 w-4" />
           </button>
           <button
             onClick={handleResetLayout}
-            className="p-2 text-white rounded shadow-lg transition-all duration-200"
-            style={{ backgroundColor: '#4682B4', boxShadow: '0 4px 6px rgba(70, 130, 180, 0.25)' }}
+            className="p-2 text-white rounded-lg shadow-lg transition-all duration-200 bg-sky-600/80 hover:bg-sky-500 border border-sky-500/30"
             title="Reset Zoom"
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#5A9BD4'}
-            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#4682B4'}
           >
             <RotateCcw className="h-4 w-4" />
           </button>
@@ -203,7 +192,7 @@ const PieChart = ({ data, title }: { data: Array<{label: string, value: number, 
           const isPriorityChart = filteredData.some(item => ['Critical', 'High', 'Moderate', 'Low', 'Minimal'].includes(item.label));
           const isStatusChart = filteredData.some(item => ['Proposed', 'Planned', 'In Progress', 'Completed', 'Blocked'].includes(item.label));
           const gridCols = isPriorityChart ? "grid grid-cols-2 gap-2" : 
-                           isStatusChart ? "grid grid-cols-2 gap-2" : 
+                           isStatusChart ? "grid grid-cols-3 gap-2" : 
                            "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2";
           
           return (
@@ -238,12 +227,20 @@ const PieChart = ({ data, title }: { data: Array<{label: string, value: number, 
                 return (
                   <div
                     key={index}
-                    className="flex items-center gap-2 p-2 rounded-lg bg-gray-700/50 hover:bg-gray-700 transition-colors"
+                    className="bg-gradient-to-br from-gray-800/80 via-gray-700/60 to-gray-800/40 border border-gray-600/50 rounded-xl p-3 hover:from-gray-700/90 hover:via-gray-600/70 hover:to-gray-700/50 hover:border-gray-500/70 transition-all duration-200 hover:scale-[1.02] hover:-translate-y-1 shadow-lg hover:shadow-xl"
                   >
-                    {getIcon(item.label)}
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs text-white font-medium truncate">{item.label}</div>
-                      <div className="text-xs text-gray-400">{item.value} ({percentage}%)</div>
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-8 h-8 rounded-lg bg-gray-800/30 backdrop-blur-sm flex items-center justify-center">
+                        {getIcon(item.label)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm text-white font-semibold truncate">{item.label}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-center">
+                      <span className="text-sm font-medium px-2 py-1 rounded-full bg-gray-800/30 backdrop-blur-sm" style={{ color: item.color }}>
+                        {percentage}%
+                      </span>
                     </div>
                   </div>
                 );
@@ -260,10 +257,10 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
   return (
     <div className="p-6 space-y-6">
       {/* Total Tasks - Full Width Card */}
-      <div className="bg-gray-800 rounded-lg p-8 border border-gray-700">
+      <div className="bg-gradient-to-br from-lime-500/15 via-lime-500/8 to-lime-500/5 rounded-lg p-8 border border-gray-700/30 border-l-4 border-l-lime-400/70 hover:from-lime-500/25 hover:via-lime-500/18 hover:to-lime-500/15 transition-all duration-200 hover:scale-[1.01] hover:-translate-y-1 cursor-pointer">
         <div className="flex items-center justify-center">
           <div className="flex-shrink-0">
-            <Sigma className="h-12 w-12 text-lime-500" />
+            <Sigma className="h-12 w-12 text-lime-400" />
           </div>
           <div className="ml-6 text-center">
             <div className="text-2xl font-bold text-gray-300">Total Tasks</div>
@@ -274,7 +271,7 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
 
       {/* Stats Cards - Second Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+        <div className={`${getStatusGradientBackground('NOT_STARTED' as WorkItemStatus, 'dashboard')} rounded-lg p-6 border border-gray-700/30 hover:scale-[1.02] hover:-translate-y-1 transition-all duration-200 cursor-pointer`}>
           <div className="flex items-center">
             <div className="flex-shrink-0">
               {React.createElement(getStatusConfig('NOT_STARTED').icon!, { className: `h-8 w-8 ${getStatusConfig('NOT_STARTED').color}` })}
@@ -286,7 +283,7 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
           </div>
         </div>
 
-        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+        <div className={`${getStatusGradientBackground('PROPOSED' as WorkItemStatus, 'dashboard')} rounded-lg p-6 border border-gray-700/30 hover:scale-[1.02] hover:-translate-y-1 transition-all duration-200 cursor-pointer`}>
           <div className="flex items-center">
             <div className="flex-shrink-0">
               {React.createElement(getStatusConfig('PROPOSED').icon!, { className: `h-8 w-8 ${getStatusConfig('PROPOSED').color}` })}
@@ -298,7 +295,7 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
           </div>
         </div>
 
-        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+        <div className={`${getStatusGradientBackground('PLANNED' as WorkItemStatus, 'dashboard')} rounded-lg p-6 border border-gray-700/30 hover:scale-[1.02] hover:-translate-y-1 transition-all duration-200 cursor-pointer`}>
           <div className="flex items-center">
             <div className="flex-shrink-0">
               {React.createElement(getStatusConfig('PLANNED').icon!, { className: `h-8 w-8 ${getStatusConfig('PLANNED').color}` })}
@@ -311,9 +308,9 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
         </div>
       </div>
 
-      {/* Stats Cards - Second Row */}
+      {/* Stats Cards - Third Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+        <div className={`${getStatusGradientBackground('IN_PROGRESS' as WorkItemStatus, 'dashboard')} rounded-lg p-6 border border-gray-700/30 hover:scale-[1.02] hover:-translate-y-1 transition-all duration-200 cursor-pointer`}>
           <div className="flex items-center">
             <div className="flex-shrink-0">
               {React.createElement(getStatusConfig('IN_PROGRESS').icon!, { className: `h-8 w-8 ${getStatusConfig('IN_PROGRESS').color}` })}
@@ -325,7 +322,7 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
           </div>
         </div>
 
-        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+        <div className={`${getStatusGradientBackground('IN_REVIEW' as WorkItemStatus, 'dashboard')} rounded-lg p-6 border border-gray-700/30 hover:scale-[1.02] hover:-translate-y-1 transition-all duration-200 cursor-pointer`}>
           <div className="flex items-center">
             <div className="flex-shrink-0">
               {React.createElement(getStatusConfig('IN_REVIEW').icon!, { className: `h-8 w-8 ${getStatusConfig('IN_REVIEW').color}` })}
@@ -337,7 +334,7 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
           </div>
         </div>
 
-        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+        <div className={`${getStatusGradientBackground('BLOCKED' as WorkItemStatus, 'dashboard')} rounded-lg p-6 border border-gray-700/30 hover:scale-[1.02] hover:-translate-y-1 transition-all duration-200 cursor-pointer`}>
           <div className="flex items-center">
             <div className="flex-shrink-0">
               {React.createElement(getStatusConfig('BLOCKED').icon!, { className: `h-8 w-8 ${getStatusConfig('BLOCKED').color}` })}
@@ -352,7 +349,7 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
 
       {/* Stats Cards - Fourth Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+        <div className={`${getStatusGradientBackground('ON_HOLD' as WorkItemStatus, 'dashboard')} rounded-lg p-6 border border-gray-700/30 hover:scale-[1.02] hover:-translate-y-1 transition-all duration-200 cursor-pointer`}>
           <div className="flex items-center">
             <div className="flex-shrink-0">
               {React.createElement(getStatusConfig('ON_HOLD').icon!, { className: `h-8 w-8 ${getStatusConfig('ON_HOLD').color}` })}
@@ -364,7 +361,7 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
           </div>
         </div>
 
-        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+        <div className={`${getStatusGradientBackground('COMPLETED' as WorkItemStatus, 'dashboard')} rounded-lg p-6 border border-gray-700/30 hover:scale-[1.02] hover:-translate-y-1 transition-all duration-200 cursor-pointer`}>
           <div className="flex items-center">
             <div className="flex-shrink-0">
               {React.createElement(getStatusConfig('COMPLETED').icon!, { className: `h-8 w-8 ${getStatusConfig('COMPLETED').color}` })}
@@ -376,7 +373,7 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
           </div>
         </div>
 
-        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+        <div className={`${getStatusGradientBackground('CANCELLED' as WorkItemStatus, 'dashboard')} rounded-lg p-6 border border-gray-700/30 hover:scale-[1.02] hover:-translate-y-1 transition-all duration-200 cursor-pointer`}>
           <div className="flex items-center">
             <div className="flex-shrink-0">
               {React.createElement(getStatusConfig('CANCELLED').icon!, { className: `h-8 w-8 ${getStatusConfig('CANCELLED').color}` })}
@@ -404,7 +401,7 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
         </div>
 
         {/* Pie Charts Container */}
-        <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-600 rounded-lg p-6 shadow-xl hover:shadow-2xl transition-all duration-300 hover:border-gray-500">
+        <div className="bg-gradient-to-br from-cyan-500/10 via-gray-800 to-cyan-500/5 border border-gray-600 border-l-4 border-l-cyan-400/70 rounded-lg p-6 shadow-xl hover:shadow-2xl transition-all duration-300 hover:border-gray-500 hover:from-cyan-500/20 hover:via-cyan-500/10 hover:to-cyan-500/15">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center space-x-2">
               <svg className="h-6 w-6" viewBox="0 0 90 90" style={{ fill: '#00FFFF' }}>
@@ -482,7 +479,7 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
         </div>
 
         {/* Radar Charts Container */}
-        <div className="bg-gradient-to-br from-gray-900 to-gray-800 border border-gray-600 rounded-lg p-6 shadow-xl hover:shadow-2xl transition-all duration-300 hover:border-gray-500">
+        <div className="bg-gradient-to-br from-pink-500/10 via-gray-800 to-pink-500/5 border border-gray-600 border-l-4 border-l-pink-400/70 rounded-lg p-6 shadow-xl hover:shadow-2xl transition-all duration-300 hover:border-gray-500 hover:from-pink-500/20 hover:via-pink-500/10 hover:to-pink-500/15">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center space-x-2">
               <svg className="h-6 w-6" viewBox="0 0 24 24" fill="hotpink">

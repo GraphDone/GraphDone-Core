@@ -8,7 +8,8 @@ import {
   PriorityLevel,
   getProjectHealthColor,
   getProjectHealthStatus,
-  PROJECT_HEALTH_COLORS
+  PROJECT_HEALTH_COLORS,
+  getSidebarSectionColor
 } from '../constants/workItemConstants';
 
 interface RightSidebarProps {
@@ -43,11 +44,139 @@ const formatLabel = (label: string) => {
 };
 
 const RightSidebar: React.FC<RightSidebarProps> = ({ currentView, stats }) => {
+  // Helper function to blend colors when there's a tie
+  const blendColors = (colors: Array<{hex: string, weight: number}>): string => {
+    if (colors.length === 0) return '#9ca3af';
+    if (colors.length === 1) return colors[0].hex;
+    
+    let totalWeight = colors.reduce((sum, c) => sum + c.weight, 0);
+    if (totalWeight === 0) return '#9ca3af';
+    
+    let r = 0, g = 0, b = 0;
+    
+    colors.forEach(color => {
+      const hex = color.hex.replace('#', '');
+      const weight = color.weight / totalWeight;
+      r += parseInt(hex.substr(0, 2), 16) * weight;
+      g += parseInt(hex.substr(2, 2), 16) * weight;
+      b += parseInt(hex.substr(4, 2), 16) * weight;
+    });
+    
+    const rHex = Math.round(r).toString(16).padStart(2, '0');
+    const gHex = Math.round(g).toString(16).padStart(2, '0');
+    const bHex = Math.round(b).toString(16).padStart(2, '0');
+    
+    return `#${rHex}${gHex}${bHex}`;
+  };
+
+  // Helper functions for dynamic border colors
+  const getProjectHealthBorderColor = () => {
+    return stats.total > 0 ? getProjectHealthColor(stats.completed / stats.total) : PROJECT_HEALTH_COLORS.noData;
+  };
+
+  const getDominantStatusColor = () => {
+    const statusCounts = [
+      { key: 'BLOCKED', count: stats.blocked, config: WORK_ITEM_STATUSES.BLOCKED },
+      { key: 'IN_PROGRESS', count: stats.inProgress, config: WORK_ITEM_STATUSES.IN_PROGRESS },
+      { key: 'IN_REVIEW', count: stats.inReview, config: WORK_ITEM_STATUSES.IN_REVIEW },
+      { key: 'COMPLETED', count: stats.completed, config: WORK_ITEM_STATUSES.COMPLETED },
+      { key: 'PLANNED', count: stats.planned, config: WORK_ITEM_STATUSES.PLANNED },
+      { key: 'PROPOSED', count: stats.proposed, config: WORK_ITEM_STATUSES.PROPOSED },
+      { key: 'ON_HOLD', count: stats.onHold, config: WORK_ITEM_STATUSES.ON_HOLD },
+      { key: 'NOT_STARTED', count: stats.notStarted, config: WORK_ITEM_STATUSES.NOT_STARTED },
+      { key: 'CANCELLED', count: stats.cancelled, config: WORK_ITEM_STATUSES.CANCELLED }
+    ].filter(status => status.count > 0);
+    
+    if (statusCounts.length === 0) return WORK_ITEM_STATUSES.NOT_STARTED.hexColor;
+    if (statusCounts.length === 1) return statusCounts[0].config.hexColor;
+    
+    const maxCount = Math.max(...statusCounts.map(s => s.count));
+    const topStatuses = statusCounts.filter(s => s.count === maxCount);
+    
+    // If there's a clear winner, return its color
+    if (topStatuses.length === 1) {
+      return topStatuses[0].config.hexColor;
+    }
+    
+    // If there's a tie, blend the colors
+    const colorsToBlend = topStatuses.map(status => ({
+      hex: status.config.hexColor,
+      weight: status.count
+    }));
+    
+    return blendColors(colorsToBlend);
+  };
+
+  const getDominantPriorityColor = () => {
+    const priorityCounts = [
+      { key: 'critical', count: stats.priorityStats.critical, config: WORK_ITEM_PRIORITIES.critical },
+      { key: 'high', count: stats.priorityStats.high, config: WORK_ITEM_PRIORITIES.high },
+      { key: 'moderate', count: stats.priorityStats.moderate, config: WORK_ITEM_PRIORITIES.moderate },
+      { key: 'low', count: stats.priorityStats.low, config: WORK_ITEM_PRIORITIES.low },
+      { key: 'minimal', count: stats.priorityStats.minimal, config: WORK_ITEM_PRIORITIES.minimal }
+    ].filter(priority => priority.count > 0);
+    
+    if (priorityCounts.length === 0) return WORK_ITEM_PRIORITIES.minimal.hexColor;
+    if (priorityCounts.length === 1) return priorityCounts[0].config.hexColor;
+    
+    const maxCount = Math.max(...priorityCounts.map(p => p.count));
+    const topPriorities = priorityCounts.filter(p => p.count === maxCount);
+    
+    // If there's a clear winner, return its color
+    if (topPriorities.length === 1) {
+      return topPriorities[0].config.hexColor;
+    }
+    
+    // If there's a tie, blend the colors
+    const colorsToBlend = topPriorities.map(priority => ({
+      hex: priority.config.hexColor,
+      weight: priority.count
+    }));
+    
+    return blendColors(colorsToBlend);
+  };
+
+  const getDominantNodeTypeColor = () => {
+    const typeCounts = [
+      { key: 'BUG', count: stats.typeStats['BUG'] || 0, config: WORK_ITEM_TYPES.BUG },
+      { key: 'EPIC', count: stats.typeStats['EPIC'] || 0, config: WORK_ITEM_TYPES.EPIC },
+      { key: 'FEATURE', count: stats.typeStats['FEATURE'] || 0, config: WORK_ITEM_TYPES.FEATURE },
+      { key: 'MILESTONE', count: stats.typeStats['MILESTONE'] || 0, config: WORK_ITEM_TYPES.MILESTONE },
+      { key: 'OUTCOME', count: stats.typeStats['OUTCOME'] || 0, config: WORK_ITEM_TYPES.OUTCOME },
+      { key: 'TASK', count: stats.typeStats['TASK'] || 0, config: WORK_ITEM_TYPES.TASK },
+      { key: 'RESEARCH', count: stats.typeStats['RESEARCH'] || 0, config: WORK_ITEM_TYPES.RESEARCH },
+      { key: 'IDEA', count: stats.typeStats['IDEA'] || 0, config: WORK_ITEM_TYPES.IDEA }
+    ].filter(type => type.count > 0);
+    
+    if (typeCounts.length === 0) return WORK_ITEM_TYPES.TASK.hexColor;
+    if (typeCounts.length === 1) return typeCounts[0].config.hexColor;
+    
+    const maxCount = Math.max(...typeCounts.map(t => t.count));
+    const topTypes = typeCounts.filter(t => t.count === maxCount);
+    
+    // If there's a clear winner, return its color
+    if (topTypes.length === 1) {
+      return topTypes[0].config.hexColor;
+    }
+    
+    // If there's a tie, blend the colors
+    const colorsToBlend = topTypes.map(type => ({
+      hex: type.config.hexColor,
+      weight: type.count
+    }));
+    
+    return blendColors(colorsToBlend);
+  };
   return (
-    <div className="w-80 bg-gray-800 border-l border-gray-700 p-6 transition-all duration-300 ease-in-out">
+    <div className="w-80 bg-gray-800/90 backdrop-blur-md border-l border-gray-700/50 p-6 transition-all duration-300 ease-in-out shadow-2xl">
       <div className="space-y-6">
         {/* Project Overview */}
-        <div className="bg-gray-800 rounded-lg p-10 border border-gray-600">
+        <div 
+          className="bg-gray-800/50 rounded-xl p-10 border border-gray-600/50 hover:border-gray-500/70 hover:bg-gray-800/70 transition-all duration-200 backdrop-blur-sm hover:shadow-lg hover:shadow-white/5"
+          style={{
+            borderLeft: `4px solid ${getProjectHealthBorderColor()}`,
+          }}
+        >
           <div className="flex items-center space-x-3 mb-7">
             {/* Dynamic Health Icon - Energy Efficiency */}
             <div className="relative group cursor-pointer">
@@ -59,7 +188,7 @@ const RightSidebar: React.FC<RightSidebarProps> = ({ currentView, stats }) => {
                 }}
               >
                 {stats.total > 0 
-                  ? `Project Health: ${Math.round((stats.completed / stats.total) * 100)}% - ${getProjectHealthStatus(stats.completed / stats.total)}`
+                  ? `Project Health: ${Math.round((stats.completed / stats.total) * 100)}% - ${getProjectHealthStatus(stats.completed / stats.total).replace(/🌟|✨|👍|⚠️|🚨/g, '').trim()}`
                   : 'No data available'
                 }
                 {/* Tooltip arrow */}
@@ -121,10 +250,15 @@ const RightSidebar: React.FC<RightSidebarProps> = ({ currentView, stats }) => {
         </div>
 
         {/* Status Breakdown */}
-        <div className="bg-gray-800 rounded-lg p-6 border border-gray-600">
+        <div 
+          className="bg-gray-800/50 rounded-xl p-6 border border-gray-600/50 hover:border-gray-500/70 hover:bg-gray-800/70 transition-all duration-200 backdrop-blur-sm"
+          style={{
+            borderLeft: `4px solid ${getDominantStatusColor()}`,
+          }}
+        >
           <h3 className="text-xl font-semibold text-white mb-6">Task Status</h3>
           
-          <div className="space-y-6">
+          <div className="grid grid-cols-1 gap-3">
             {Object.entries(WORK_ITEM_STATUSES).map(([statusKey, statusConfig]) => {
               const getCount = (key: string) => {
                 switch(key) {
@@ -144,21 +278,33 @@ const RightSidebar: React.FC<RightSidebarProps> = ({ currentView, stats }) => {
               const IconComponent = statusConfig.icon;
               
               return (
-                <div key={statusKey} className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <div className="flex items-center space-x-2">
-                      {IconComponent && <IconComponent className={`h-6 w-6 ${statusConfig.color}`} />}
-                      <span className="text-gray-300">{statusConfig.label}</span>
+                <div
+                  key={statusKey}
+                  className="bg-gray-700/50 rounded-xl p-4 border border-gray-600/50 hover:border-gray-500/70 hover:bg-gray-700/70 transition-all duration-200 hover:scale-[1.02] hover:-translate-y-1 hover:shadow-lg cursor-pointer backdrop-blur-sm"
+                  style={{
+                    borderLeft: `4px solid ${statusConfig.hexColor}`,
+                  }}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center space-x-3">
+                      {IconComponent && <IconComponent className={`h-5 w-5 ${statusConfig.color}`} />}
+                      <span className="text-gray-200 font-medium text-sm">{statusConfig.label}</span>
                     </div>
+                    <span className="text-white font-bold text-lg">{count || 0}</span>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-white font-medium">{count || 0}</span>
-                    <div className="w-16 h-2 bg-gray-700 rounded-full">
-                      <div 
-                        className={`h-2 ${statusConfig.color.replace('text-', 'bg-')} rounded-full`}
-                        style={{ width: `${stats.total > 0 ? ((count || 0) / stats.total) * 100 : 0}%` }}
-                      ></div>
-                    </div>
+                  <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
+                    <div 
+                      className="h-2 rounded-full transition-all duration-300"
+                      style={{ 
+                        width: `${stats.total > 0 ? ((count || 0) / stats.total) * 100 : 0}%`,
+                        backgroundColor: statusConfig.hexColor
+                      }}
+                    ></div>
+                  </div>
+                  <div className="mt-2 text-right">
+                    <span className="text-xs text-gray-400">
+                      {stats.total > 0 ? Math.round(((count || 0) / stats.total) * 100) : 0}%
+                    </span>
                   </div>
                 </div>
               );
@@ -167,29 +313,46 @@ const RightSidebar: React.FC<RightSidebarProps> = ({ currentView, stats }) => {
         </div>
 
         {/* Priority Distribution */}
-        <div className="bg-gray-800 rounded-lg p-6 border border-gray-600">
+        <div 
+          className="bg-gray-800/50 rounded-xl p-6 border border-gray-600/50 hover:border-gray-500/70 hover:bg-gray-800/70 transition-all duration-200 backdrop-blur-sm"
+          style={{
+            borderLeft: `4px solid ${getDominantPriorityColor()}`,
+          }}
+        >
           <h3 className="text-xl font-semibold text-white mb-6">Priority Distribution</h3>
-          <div className="space-y-6">
+          <div className="grid grid-cols-1 gap-3">
             {Object.entries(WORK_ITEM_PRIORITIES).map(([priorityKey, priorityConfig]) => {
               const count = stats.priorityStats[priorityKey as keyof typeof stats.priorityStats];
               const IconComponent = priorityConfig.icon;
               
               return (
-                <div key={priorityKey} className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <div className="flex items-center space-x-2">
-                      {IconComponent && <IconComponent className={`h-6 w-6 ${priorityConfig.color}`} />}
-                      <span className="text-gray-300">{priorityConfig.label}</span>
+                <div
+                  key={priorityKey}
+                  className="bg-gray-700/50 rounded-xl p-4 border border-gray-600/50 hover:border-gray-500/70 hover:bg-gray-700/70 transition-all duration-200 hover:scale-[1.02] hover:-translate-y-1 hover:shadow-lg cursor-pointer backdrop-blur-sm"
+                  style={{
+                    borderLeft: `4px solid ${priorityConfig.hexColor}`,
+                  }}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center space-x-3">
+                      {IconComponent && <IconComponent className={`h-5 w-5 ${priorityConfig.color}`} />}
+                      <span className="text-gray-200 font-medium text-sm">{priorityConfig.label}</span>
                     </div>
+                    <span className="text-white font-bold text-lg">{count || 0}</span>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-white font-medium">{count || 0}</span>
-                    <div className="w-16 h-2 bg-gray-700 rounded-full">
-                      <div 
-                        className={`h-2 ${priorityConfig.color.replace('text-', 'bg-')} rounded-full`}
-                        style={{ width: `${stats.total > 0 ? ((count || 0) / stats.total) * 100 : 0}%` }}
-                      ></div>
-                    </div>
+                  <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
+                    <div 
+                      className="h-2 rounded-full transition-all duration-300"
+                      style={{ 
+                        width: `${stats.total > 0 ? ((count || 0) / stats.total) * 100 : 0}%`,
+                        backgroundColor: priorityConfig.hexColor
+                      }}
+                    ></div>
+                  </div>
+                  <div className="mt-2 text-right">
+                    <span className="text-xs text-gray-400">
+                      {stats.total > 0 ? Math.round(((count || 0) / stats.total) * 100) : 0}%
+                    </span>
                   </div>
                 </div>
               );
@@ -198,29 +361,46 @@ const RightSidebar: React.FC<RightSidebarProps> = ({ currentView, stats }) => {
         </div>
 
         {/* Node Types */}
-        <div className="bg-gray-800 rounded-lg p-6 border border-gray-600">
+        <div 
+          className="bg-gray-800/50 rounded-xl p-6 border border-gray-600/50 hover:border-gray-500/70 hover:bg-gray-800/70 transition-all duration-200 backdrop-blur-sm"
+          style={{
+            borderLeft: `4px solid ${getDominantNodeTypeColor()}`,
+          }}
+        >
           <h3 className="text-xl font-semibold text-white mb-6">Node Types</h3>
-          <div className="space-y-6">
+          <div className="grid grid-cols-1 gap-3">
             {Object.entries(WORK_ITEM_TYPES).map(([typeKey, typeConfig]) => {
               const count = stats.typeStats[typeKey] || 0;
               const IconComponent = typeConfig.icon;
               
               return (
-                <div key={typeKey} className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <div className="flex items-center space-x-2">
-                      {IconComponent && <IconComponent className={`h-6 w-6 ${typeConfig.color}`} />}
-                      <span className="text-gray-300">{typeConfig.label}</span>
+                <div
+                  key={typeKey}
+                  className="bg-gray-700/50 rounded-xl p-4 border border-gray-600/50 hover:border-gray-500/70 hover:bg-gray-700/70 transition-all duration-200 hover:scale-[1.02] hover:-translate-y-1 hover:shadow-lg cursor-pointer backdrop-blur-sm"
+                  style={{
+                    borderLeft: `4px solid ${typeConfig.hexColor}`,
+                  }}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center space-x-3">
+                      {IconComponent && <IconComponent className={`h-5 w-5 ${typeConfig.color}`} />}
+                      <span className="text-gray-200 font-medium text-sm">{typeConfig.label}</span>
                     </div>
+                    <span className="text-white font-bold text-lg">{count}</span>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-white font-medium">{count}</span>
-                    <div className="w-16 h-2 bg-gray-700 rounded-full">
-                      <div 
-                        className={`h-2 ${typeConfig.color.replace('text-', 'bg-')} rounded-full`}
-                        style={{ width: `${stats.total > 0 ? (count / stats.total) * 100 : 0}%` }}
-                      ></div>
-                    </div>
+                  <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
+                    <div 
+                      className="h-2 rounded-full transition-all duration-300"
+                      style={{ 
+                        width: `${stats.total > 0 ? (count / stats.total) * 100 : 0}%`,
+                        backgroundColor: typeConfig.hexColor
+                      }}
+                    ></div>
+                  </div>
+                  <div className="mt-2 text-right">
+                    <span className="text-xs text-gray-400">
+                      {stats.total > 0 ? Math.round((count / stats.total) * 100) : 0}%
+                    </span>
                   </div>
                 </div>
               );
