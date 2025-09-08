@@ -1,7 +1,5 @@
 # GraphDone Architecture Overview
 
-**AI-Generated Content Warning: This documentation contains AI-generated content. Verify information before depending on it for decision making.**
-
 ## System Architecture Philosophy
 
 GraphDone is architected around three core principles:
@@ -10,70 +8,44 @@ GraphDone is architected around three core principles:
 2. **Real-Time First**: Changes propagate immediately to all participants
 3. **Democratic Coordination**: Priority emerges from community validation, not top-down assignment
 
-## High-Level Architecture
+## Current Architecture (v0.2.2-alpha)
 
 ```mermaid
 graph TB
-    subgraph "Client Layer"
-        WEB[Web Application<br/>React + D3.js<br/>Touch-optimized]
-        MOBILE[Mobile App<br/>React Native<br/>Offline-capable]
-        SDK[AI Agent SDK<br/>GraphQL + REST<br/>Multiple languages]
+    subgraph "Client Applications"
+        WEB[Web Application<br/>React + TypeScript + D3.js<br/>Touch-optimized UI<br/>Port 3127]
+        IOS[iPhone App<br/>SwiftUI<br/>Separate GraphDone-iOS repo]
+        CLAUDE[Claude Code MCP<br/>Natural language interface<br/>Port 3128]
     end
     
-    subgraph "API Gateway"
-        ROUTER[API Router<br/>Request routing]
-        AUTH[Authentication<br/>JWT validation]
-        RATE[Rate Limiting<br/>DoS protection]
+    subgraph "API Layer"
+        GQL[GraphQL Server<br/>Apollo Server + @neo4j/graphql<br/>Auto-generated resolvers<br/>WebSocket subscriptions<br/>Port 4127]
+        CORE[Core Graph Engine<br/>@graphdone/core package<br/>Priority algorithms]
     end
     
-    subgraph "Application Services"
-        GQL[GraphQL Server<br/>Apollo Server<br/>Query federation]
-        WS[WebSocket Hub<br/>Real-time events<br/>Subscription management]
-        REST[REST API<br/>Agent integration<br/>Webhook support]
+    subgraph "Data Layer"
+        SQLITE[(SQLite<br/>User authentication<br/>User settings & preferences<br/>Fast local storage)]
+        NEO4J[(Neo4j 5.15-community<br/>Project management graph<br/>Work items & dependencies<br/>APOC plugins<br/>Port 7687)]
+        REDIS[(Redis 8-alpine<br/>Available in Docker<br/>Not yet integrated<br/>Port 6379)]
     end
     
-    subgraph "Business Logic"
-        GRAPH[Graph Engine<br/>Node operations<br/>Algorithm execution]
-        PRIORITY[Priority Engine<br/>Multi-dimensional calculation<br/>Migration algorithms]
-        COLLAB[Collaboration Engine<br/>Conflict resolution<br/>Human-AI coordination]
+    subgraph "Future: Monitoring & Analytics (TIG Stack)"
+        TELEGRAF[Telegraf<br/>Metrics collection<br/>Server monitoring]
+        INFLUXDB[(InfluxDB<br/>Time-series database<br/>Metrics storage)]  
+        GRAFANA[Grafana<br/>Dashboards & alerts<br/>GraphDone insights]
     end
     
-    subgraph "Data Persistence"
-        POSTGRES[(PostgreSQL<br/>Graph relationships<br/>ACID transactions)]
-        REDIS[(Redis<br/>Session storage<br/>Real-time cache)]
-        SEARCH[(Search Index<br/>Full-text search<br/>Graph queries)]
-    end
+    WEB --> GQL
+    IOS --> GQL
+    CLAUDE --> NEO4J
+    GQL --> SQLITE
+    GQL --> NEO4J
+    GQL --> CORE
+    REDIS -.-> GQL
     
-    subgraph "External Services"
-        AUTH_PROVIDER[Auth Provider<br/>Auth0, Cognito, etc.]
-        FILE_STORAGE[File Storage<br/>S3, CloudFlare R2]
-        MONITORING[Monitoring<br/>Prometheus, Grafana]
-    end
-    
-    WEB --> ROUTER
-    MOBILE --> ROUTER
-    SDK --> ROUTER
-    
-    ROUTER --> AUTH
-    AUTH --> GQL
-    AUTH --> WS
-    AUTH --> REST
-    
-    GQL --> GRAPH
-    WS --> GRAPH
-    REST --> GRAPH
-    
-    GRAPH --> PRIORITY
-    GRAPH --> COLLAB
-    GRAPH --> POSTGRES
-    
-    PRIORITY --> REDIS
-    COLLAB --> REDIS
-    
-    POSTGRES -.-> SEARCH
-    AUTH -.-> AUTH_PROVIDER
-    GRAPH -.-> FILE_STORAGE
-    GRAPH -.-> MONITORING
+    GQL -.-> TELEGRAF
+    TELEGRAF -.-> INFLUXDB
+    INFLUXDB -.-> GRAFANA
 ```
 
 ## Core Components Deep Dive
@@ -247,23 +219,73 @@ sequenceDiagram
     WS->>User2: Show AI agent joined
 ```
 
-### Database Schema Design
+### Hybrid Database Architecture
 
-The database schema is optimized for graph operations while maintaining ACID properties.
+GraphDone uses a hybrid database approach, optimizing each database for its specific use case:
+
+**SQLite: Authentication & User Data**
+- User authentication (login, passwords, tokens)
+- User settings and preferences
+- Application configuration
+- Fast, local storage with ACID properties
+- No network latency for auth operations
+
+**Neo4j: Graph Data**
+- Project management nodes (tasks, outcomes, milestones)
+- Dependencies and relationships between work items
+- Graph traversal and pathfinding operations
+- Complex graph queries and analytics
+
+**Benefits of Hybrid Architecture:**
+- **Performance**: Auth operations are lightning-fast (no network latency)
+- **Reliability**: Server can start without Neo4j (auth-only mode)
+- **Scalability**: SQLite handles auth load, Neo4j focuses on graph operations
+- **Security**: User credentials isolated in separate database
+- **Flexibility**: Can switch graph databases without affecting authentication
+- **Development**: Easier testing and development with minimal dependencies
 
 ```mermaid
 erDiagram
-    Node ||--o{ NodeDependency : "depends_on"
-    Node ||--o{ NodeDependency : "depended_by"
-    Node ||--o{ NodeContributor : "has_contributors"
-    Node ||--o{ Edge : "source_of"
-    Node ||--o{ Edge : "target_of"
-    
-    Contributor ||--o{ NodeContributor : "contributes_to"
-    
-    Node {
+    %% SQLite Schema - Authentication & User Data
+    User {
         uuid id PK
-        node_type type
+        varchar username UK
+        varchar email UK  
+        varchar password_hash
+        varchar name
+        varchar role
+        boolean is_active
+        boolean is_email_verified
+        varchar email_verification_token
+        varchar password_reset_token
+        timestamp password_reset_expires
+        jsonb settings
+        jsonb metadata
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    Team {
+        uuid id PK
+        varchar name
+        text description
+        boolean is_active
+        jsonb settings
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    UserTeam {
+        uuid user_id PK,FK
+        uuid team_id PK,FK
+        varchar role
+        timestamp added_at
+    }
+    
+    %% Neo4j Schema - Graph Data
+    WorkItem {
+        uuid id PK
+        work_item_type type
         varchar title
         text description
         float position_x
@@ -276,47 +298,42 @@ erDiagram
         float priority_indiv
         float priority_comm
         float priority_comp
-        node_status status
+        work_item_status status
+        uuid assigned_to FK
         jsonb metadata
         timestamp created_at
         timestamp updated_at
     }
     
-    Edge {
+    Dependency {
         uuid id PK
         uuid source_id FK
         uuid target_id FK
-        edge_type type
+        dependency_type type
         float weight
         jsonb metadata
         timestamp created_at
     }
     
-    NodeDependency {
+    Graph {
         uuid id PK
-        uuid node_id FK
-        uuid dependency_id FK
-    }
-    
-    NodeContributor {
-        uuid id PK
-        uuid node_id FK
-        uuid contributor_id FK
-        varchar role
-        timestamp added_at
-    }
-    
-    Contributor {
-        uuid id PK
-        contributor_type type
         varchar name
-        varchar email
-        varchar avatar_url
-        jsonb capabilities
-        jsonb metadata
+        text description
+        uuid owner_id FK
+        uuid team_id FK
+        boolean is_public
+        jsonb settings
         timestamp created_at
         timestamp updated_at
     }
+    
+    %% Relationships
+    User ||--o{ Team : "member_of"
+    User ||--o{ Graph : "owns"
+    Team ||--o{ Graph : "team_graphs"
+    WorkItem ||--o{ Dependency : "source_of"
+    WorkItem ||--o{ Dependency : "target_of"
+    Graph ||--o{ WorkItem : "contains"
 ```
 
 ### Performance Optimization Strategies

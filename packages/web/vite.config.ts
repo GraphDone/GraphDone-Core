@@ -16,24 +16,37 @@ export default defineConfig({
     port: Number(process.env.PORT) || 3127,
     strictPort: true, // Exit if port is already in use instead of trying next available
     allowedHosts: ['localhost', hostname(), '*.local', '.tailscale'], // Auto-detect hostname + common patterns
+    headers: {
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0'
+    },
     proxy: {
       '/graphql': {
-        target: 'http://localhost:4127',
+        target: process.env.VITE_PROXY_TARGET || 'http://localhost:4127',
         changeOrigin: true
       },
       '/health': {
-        target: 'http://localhost:4127',
+        target: process.env.VITE_PROXY_TARGET || 'http://localhost:4127',
         changeOrigin: true
       },
       '/mcp': {
-        target: 'http://localhost:4127',
+        target: process.env.VITE_PROXY_TARGET || 'http://localhost:4127',
         changeOrigin: true
       }
     }
   },
   build: {
     outDir: 'dist',
-    sourcemap: true
+    sourcemap: true,
+    rollupOptions: {
+      output: {
+        // Force new filenames to break cache
+        entryFileNames: `assets/[name]-${Date.now()}.js`,
+        chunkFileNames: `assets/[name]-${Date.now()}.js`,
+        assetFileNames: `assets/[name]-${Date.now()}.[ext]`
+      }
+    }
   },
   test: {
     globals: true,
