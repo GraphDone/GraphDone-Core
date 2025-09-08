@@ -3,6 +3,7 @@ import { expressMiddleware } from '@apollo/server/express4';
 import { ApolloServerPluginDrainHttpServer } from '@apollo/server/plugin/drainHttpServer';
 import express from 'express';
 import { createServer } from 'http';
+import { createServer as createHttpsServer } from 'https';
 import { WebSocketServer } from 'ws';
 import { useServer } from 'graphql-ws/lib/use/ws';
 import cors from 'cors';
@@ -21,6 +22,7 @@ import { extractUserFromToken } from './middleware/auth.js';
 import { mergeTypeDefs } from '@graphql-tools/merge';
 import { driver, NEO4J_URI } from './db.js';
 import { sqliteAuthStore } from './auth/sqlite-auth.js';
+import { createTlsConfig, validateTlsConfig, type TlsConfig } from './config/tls.js';
 
 dotenv.config();
 
@@ -28,7 +30,29 @@ const PORT = Number(process.env.PORT) || 4127;
 
 async function startServer() {
   const app = express();
-  const httpServer = createServer(app);
+  
+  // Configure TLS if enabled
+  let tlsConfig: TlsConfig | null = null;
+  try {
+    tlsConfig = createTlsConfig();
+    if (tlsConfig) {
+      validateTlsConfig(tlsConfig);
+      console.log('🔐 TLS/SSL configuration loaded successfully');
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown TLS configuration error';
+    console.error('❌ TLS/SSL configuration failed:', errorMessage);
+    process.exit(1);
+  }
+
+  // Create server (HTTP or HTTPS based on configuration)
+  const server = tlsConfig 
+    ? createHttpsServer({ key: tlsConfig.key, cert: tlsConfig.cert }, app)
+    : createServer(app);
+    
+  const serverPort = tlsConfig ? tlsConfig.port : PORT;
+  const protocol = tlsConfig ? 'https' : 'http';
+  const wsProtocol = tlsConfig ? 'wss' : 'ws';
 
   // Initialize SQLite auth system first (for users and config)
   try {
@@ -82,16 +106,16 @@ async function startServer() {
   }
 
   const wsServer = new WebSocketServer({
-    server: httpServer,
+    server,
     path: '/graphql',
   });
 
   const serverCleanup = useServer({ schema }, wsServer);
 
-  const server = new ApolloServer({
+  const apolloServer = new ApolloServer({
     schema,
     plugins: [
-      ApolloServerPluginDrainHttpServer({ httpServer }),
+      ApolloServerPluginDrainHttpServer({ httpServer: server }),
       {
         async serverWillStart() {
           return {
@@ -104,14 +128,13 @@ async function startServer() {
     ],
   });
 
-  await server.start();
-
+  await apolloServer.start();
 
   app.use(
     '/graphql',
     cors<cors.CorsRequest>(),
     express.json(),
-    expressMiddleware(server, {
+    expressMiddleware(apolloServer, {
       context: async ({ req }) => {
         const user = extractUserFromToken(req.headers.authorization);
         return {
@@ -129,7 +152,7 @@ async function startServer() {
       status: string;
       timestamp: string;
       services: {
-        graphql: { status: string; port: number };
+        graphql: { status: string; port: number; protocol: string };
         neo4j: { status: string; uri: string; error?: string };
         mcp: { status: string; port: number; capabilities: string[]; version?: string; uptime?: number; lastAccessed?: string; error?: string };
       };
@@ -139,7 +162,8 @@ async function startServer() {
       services: {
         graphql: {
           status: 'healthy',
-          port: PORT
+          port: serverPort,
+          protocol: protocol
         },
         neo4j: {
           status: 'unknown',
@@ -230,11 +254,15 @@ async function startServer() {
     }
   });
 
-  httpServer.listen(PORT, '0.0.0.0', () => {
+  server.listen(serverPort, '0.0.0.0', () => {
     // eslint-disable-next-line no-console
-    console.log(`🚀 GraphQL server ready at http://localhost:${PORT}/graphql`);
+    console.log(`🚀 GraphQL server ready at ${protocol}://localhost:${serverPort}/graphql`);
     // eslint-disable-next-line no-console
-    console.log(`🔌 WebSocket server ready at ws://localhost:${PORT}/graphql`);
+    console.log(`🔌 WebSocket server ready at ${wsProtocol}://localhost:${serverPort}/graphql`);
+    if (tlsConfig) {
+      // eslint-disable-next-line no-console
+      console.log(`🔒 HTTPS/TLS encryption enabled`);
+    }
   });
 }
 

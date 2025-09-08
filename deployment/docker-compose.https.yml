@@ -1,8 +1,8 @@
-name: graphdone
+name: graphdone-https
 
 services:
   graphdone-neo4j:
-    container_name: graphdone-neo4j-prod
+    container_name: graphdone-neo4j-https
     image: neo4j:5.26.12
     environment:
       NEO4J_AUTH: neo4j/graphdone_password
@@ -22,7 +22,7 @@ services:
       retries: 5
 
   graphdone-redis:
-    container_name: graphdone-redis-prod
+    container_name: graphdone-redis-https
     image: redis:8-alpine
     ports:
       - "6379:6379"
@@ -35,7 +35,7 @@ services:
       retries: 5
 
   graphdone-api:
-    container_name: graphdone-api-prod
+    container_name: graphdone-api-https
     build:
       context: ..
       dockerfile: packages/server/Dockerfile
@@ -44,17 +44,13 @@ services:
       - NEO4J_URI=bolt://graphdone-neo4j:7687
       - NEO4J_USER=neo4j
       - NEO4J_PASSWORD=graphdone_password
-      - PORT=4127
-      - CORS_ORIGIN=http://localhost:3127
-      # SSL Configuration (uncomment and configure for HTTPS)
-      # - SSL_ENABLED=true
-      # - SSL_KEY_PATH=/app/certs/server-key.pem
-      # - SSL_CERT_PATH=/app/certs/server-cert.pem
-      # - HTTPS_PORT=4128
+      - SSL_ENABLED=true
+      - SSL_KEY_PATH=/app/certs/server-key.pem
+      - SSL_CERT_PATH=/app/certs/server-cert.pem
+      - HTTPS_PORT=4128
+      - CORS_ORIGIN=https://localhost:3128
     ports:
-      - "4127:4127"
-      # HTTPS port (uncomment when SSL is enabled)
-      # - "4128:4128"
+      - "4128:4128"  # HTTPS port
     depends_on:
       graphdone-neo4j:
         condition: service_healthy
@@ -64,24 +60,23 @@ services:
       - ../packages/server/.env:/app/.env
       - logs:/app/logs
       - sqlite_auth_data:/app/data
-      # SSL certificates (uncomment when using HTTPS)
-      # - ./certs:/app/certs:ro
+      - ./certs:/app/certs:ro  # Mount SSL certificates
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4127/health"]
+      test: ["CMD", "curl", "-k", "-f", "https://localhost:4128/health"]
       interval: 30s
       timeout: 10s
       retries: 3
 
   graphdone-web:
-    container_name: graphdone-web-prod
+    container_name: graphdone-web-https
     build:
       context: ..
       dockerfile: packages/web/Dockerfile
     environment:
-      - VITE_GRAPHQL_URL=http://localhost:4127/graphql
-      - VITE_GRAPHQL_WS_URL=ws://localhost:4127/graphql
+      - VITE_GRAPHQL_URL=https://localhost:4128/graphql
+      - VITE_GRAPHQL_WS_URL=wss://localhost:4128/graphql
     ports:
-      - "3127:3127"
+      - "3128:3127"  # Web HTTPS port
     depends_on:
       - graphdone-api
     volumes:
