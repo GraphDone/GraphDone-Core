@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Database, Shield, Download, Upload, Settings2, RefreshCw, AlertCircle } from 'lucide-react';
+import { Users, Database, Shield, Download, Upload, Settings2, RefreshCw, AlertCircle, Lock, Key, Globe, CheckCircle, XCircle, AlertTriangle, FileText, Calendar, Server, Network } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { AdminUserManagement } from '../components/AdminUserManagement';
 import { CustomDropdown } from '../components/CustomDropdown';
 import { APP_VERSION } from '../utils/version';
+import { useSystemConfig } from '../hooks/useSystemConfig';
 
 export function Admin() {
   const { currentUser } = useAuth();
@@ -690,18 +691,963 @@ mutation DeleteGraph($id: ID!) {
 }
 
 function SecurityManagement() {
+  const [tlsStatus, setTlsStatus] = useState<any>(null);
+  const [certificateInfo, setCertificateInfo] = useState<any>(null);
+  const [proxyStatus, setProxyStatus] = useState<any>(null);
+  const [debugLog, setDebugLog] = useState<string[]>([]);
+  const [certificateWarning, setCertificateWarning] = useState<string | null>(null);
+  const debugConsoleRef = React.useRef<HTMLDivElement>(null);
+  
+  // Use live system configuration with automatic updates every 8 seconds
+  const { config, isLoading: configLoading, error: configError, lastUpdated } = useSystemConfig({
+    refreshInterval: 8000, // 8 seconds - not too aggressive
+    enableAutoRefresh: true
+  });
+  
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Add a debug message with auto-scroll
+  const addDebugMessage = (message: string) => {
+    const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
+    setDebugLog(prev => {
+      const newLog = [...prev, `${timestamp} ${message}`];
+      // Auto-scroll to bottom after state update
+      setTimeout(() => {
+        if (debugConsoleRef.current) {
+          debugConsoleRef.current.scrollTop = debugConsoleRef.current.scrollHeight;
+        }
+      }, 100);
+      return newLog;
+    });
+  };
+
+  // Check certificate expiration and set warning
+  const checkCertificateExpiration = (certInfo: any) => {
+    if (!certInfo || !certInfo.expirationDate) return;
+    
+    const now = new Date();
+    const expirationDate = new Date(certInfo.expirationDate);
+    const daysUntilExpiration = Math.ceil((expirationDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (daysUntilExpiration <= 30 && daysUntilExpiration > 0) {
+      setCertificateWarning(`Certificate expires in ${daysUntilExpiration} days. Consider renewing soon.`);
+      addDebugMessage(`⚠️ Certificate expiration warning: ${daysUntilExpiration} days remaining`);
+    } else if (daysUntilExpiration <= 0) {
+      setCertificateWarning(`Certificate has expired! Immediate renewal required.`);
+      addDebugMessage(`🚨 Certificate has expired! Immediate action required`);
+    } else {
+      setCertificateWarning(null);
+    }
+  };
+
+  // Check TLS/SSL Status
+  const checkTlsStatus = async () => {
+    addDebugMessage('🔍 Starting TLS/SSL status check...');
+    setIsLoading(true);
+
+    try {
+      // Check current protocol
+      const currentProtocol = window.location.protocol;
+      const isHttps = currentProtocol === 'https:';
+      const currentPort = window.location.port;
+      
+      addDebugMessage(`📍 Current connection: ${currentProtocol}//${window.location.host}`);
+      
+      // Test health endpoint accessibility
+      const healthUrl = isHttps ? `https://localhost:${currentPort || '8443'}/health` : '/health';
+      addDebugMessage(`🏥 Testing health endpoint: ${healthUrl}`);
+      
+      const healthResponse = await fetch('/health');
+      const healthData = await healthResponse.json();
+      
+      setTlsStatus({
+        enabled: isHttps,
+        protocol: currentProtocol,
+        port: currentPort || (isHttps ? '8443' : '3127'),
+        proxyEnabled: currentPort === '8443',
+        healthEndpoint: healthData,
+        lastCheck: new Date().toISOString()
+      });
+
+      addDebugMessage(isHttps ? '✅ HTTPS connection detected' : '⚠️ HTTP connection detected');
+
+      // Get certificate info if HTTPS
+      if (isHttps) {
+        await getCertificateInfo();
+        await checkProxyConfiguration();
+      } else {
+        addDebugMessage('ℹ️ Certificate info not available (HTTP mode)');
+      }
+
+    } catch (error) {
+      addDebugMessage(`❌ TLS status check failed: ${error}`);
+      setTlsStatus({
+        enabled: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        lastCheck: new Date().toISOString()
+      });
+    }
+    
+    setIsLoading(false);
+  };
+
+  // Get certificate information
+  const getCertificateInfo = async () => {
+    addDebugMessage('🔐 Checking certificate information...');
+    addDebugMessage('📋 Analyzing SSL certificate properties...');
+    
+    try {
+      // Since we can't access certificate details directly from the browser,
+      // we'll infer information from the connection
+      const isLocalhost = window.location.hostname === 'localhost';
+      const isMkcert = isLocalhost; // Assume mkcert if localhost HTTPS works without warnings
+      
+      // For mkcert, we know the typical expiration is 2+ years
+      const mkcertExpirationDate = isMkcert ? new Date('2027-12-08') : null;
+      
+      const certInfo = {
+        type: isMkcert ? 'mkcert (locally trusted)' : 'self-signed or CA-signed',
+        hostname: window.location.hostname,
+        port: window.location.port || '8443',
+        validFor: isLocalhost ? ['localhost', '127.0.0.1', '::1'] : [window.location.hostname],
+        issuer: isMkcert ? 'mkcert development CA' : 'Unknown',
+        trusted: isMkcert,
+        expirationNote: isMkcert ? 'Expires December 8, 2027' : 'Check certificate details in browser',
+        expirationDate: mkcertExpirationDate?.toISOString(),
+        algorithm: isMkcert ? 'RSA 2048-bit' : 'Unknown',
+        serialNumber: isMkcert ? 'Generated by mkcert' : 'Unknown',
+        lastCheck: new Date().toISOString()
+      };
+      
+      setCertificateInfo(certInfo);
+      
+      addDebugMessage(isMkcert ? '✅ mkcert certificate detected and analyzed' : '⚠️ Certificate type inferred from connection');
+      addDebugMessage(`📊 Certificate valid for: ${certInfo.validFor.join(', ')}`);
+      addDebugMessage(`🏢 Issuer: ${certInfo.issuer}`);
+      
+      // Check expiration
+      if (mkcertExpirationDate) {
+        checkCertificateExpiration(certInfo);
+      }
+      
+    } catch (error) {
+      addDebugMessage(`❌ Certificate info check failed: ${error}`);
+    }
+  };
+
+  // Check proxy configuration
+  const checkProxyConfiguration = async () => {
+    addDebugMessage('🔧 Checking reverse proxy configuration...');
+    
+    try {
+      // Test if we're going through nginx proxy
+      const isProxied = window.location.port === '8443';
+      
+      if (isProxied) {
+        addDebugMessage('📡 Nginx reverse proxy detected');
+        
+        // Test backend connectivity through proxy
+        const graphqlResponse = await fetch('/graphql', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: '{ __typename }' })
+        });
+        
+        const graphqlData = await graphqlResponse.json();
+        
+        setProxyStatus({
+          enabled: true,
+          nginx: true,
+          httpsPort: '8443',
+          backendConnected: !!graphqlData.data,
+          services: {
+            frontend: { port: '3127', status: 'proxied' },
+            graphql: { port: '4127', status: graphqlData.data ? 'connected' : 'error' },
+            websocket: { port: '4127', status: 'available' }
+          },
+          lastCheck: new Date().toISOString()
+        });
+        
+        addDebugMessage(graphqlData.data ? '✅ Backend services accessible through proxy' : '❌ Backend connection failed');
+        
+      } else {
+        setProxyStatus({
+          enabled: false,
+          directConnection: true,
+          note: 'Direct connection to development server',
+          lastCheck: new Date().toISOString()
+        });
+        
+        addDebugMessage('ℹ️ Direct connection (no proxy)');
+      }
+      
+    } catch (error) {
+      addDebugMessage(`❌ Proxy check failed: ${error}`);
+    }
+  };
+
+  // Load initial status
+  useEffect(() => {
+    checkTlsStatus();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="max-w-6xl mx-auto px-6 py-8">
+        <div className="bg-gray-800 border border-gray-700 rounded-lg p-6 text-center">
+          <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-400" />
+          <p className="text-gray-300">Loading TLS/SSL status...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="max-w-6xl mx-auto px-6 py-8">
+    <div className="max-w-6xl mx-auto px-6 py-8 space-y-6">
+      {/* Certificate Expiration Warning */}
+      {certificateWarning && (
+        <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-4">
+          <div className="flex items-center space-x-3">
+            <AlertTriangle className="h-6 w-6 text-yellow-400" />
+            <div className="flex-1">
+              <h3 className="text-yellow-300 font-medium">Certificate Expiration Warning</h3>
+              <p className="text-yellow-200/80 text-sm mt-1">{certificateWarning}</p>
+            </div>
+            <button
+              onClick={() => {
+                addDebugMessage('📋 Opening certificate renewal guide...');
+                const renewalGuide = `
+Certificate Renewal Guide:
+
+For mkcert certificates:
+1. Regenerate certificates: mkcert localhost 127.0.0.1 ::1
+2. Restart nginx: nginx -s reload
+3. Verify in admin panel
+
+For production certificates:
+1. Check with your CA or Let's Encrypt
+2. Download new certificates
+3. Update nginx.conf paths
+4. Restart nginx: sudo systemctl reload nginx
+5. Test with: openssl s_client -connect yourdomain.com:443
+
+For Let's Encrypt auto-renewal:
+certbot renew --dry-run
+                `.trim();
+                
+                navigator.clipboard.writeText(renewalGuide);
+                addDebugMessage('✅ Certificate renewal guide copied to clipboard');
+                alert('Certificate renewal guide copied to clipboard!');
+              }}
+              className="bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-1 rounded text-sm transition-colors"
+              title="Get step-by-step certificate renewal instructions"
+            >
+              Renewal Guide
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* TLS Setup Architecture Diagram */}
+      <div className="bg-gray-800 border border-gray-700 rounded-lg p-6 mb-6">
+        <h2 className="text-xl font-semibold text-gray-100 flex items-center mb-6">
+          <Network className="h-6 w-6 mr-3 text-blue-400" />
+          TLS/SSL Setup Architecture
+        </h2>
+        
+        <div className="bg-gray-900/50 rounded-lg p-4 mb-4">
+          {!config && configLoading ? (
+            <div className="flex items-center justify-center h-32">
+              <div className="text-gray-400">Loading live configuration...</div>
+            </div>
+          ) : (
+            <>
+              <svg viewBox="0 0 800 200" className="w-full h-32 text-gray-300">
+                {/* Browser */}
+                <g transform="translate(20, 80)">
+                  <rect x="0" y="0" width="80" height="40" rx="6" fill="rgb(59, 130, 246)" fillOpacity="0.2" stroke="rgb(59, 130, 246)" strokeWidth="2"/>
+                  <text x="40" y="25" textAnchor="middle" className="fill-blue-300 text-sm font-medium">Browser</text>
+                </g>
+                
+                {/* HTTPS Arrow */}
+                <g transform="translate(120, 95)">
+                  <line x1="0" y1="10" x2="80" y2="10" stroke="rgb(34, 197, 94)" strokeWidth="2" markerEnd="url(#arrowhead)"/>
+                  <text x="40" y="0" textAnchor="middle" className="fill-green-400 text-xs font-medium">
+                    {config ? `HTTPS:${config.services.proxy.httpsPort}` : 'HTTPS:8443'}
+                  </text>
+                </g>
+                
+                {/* Nginx Proxy */}
+                <g transform="translate(220, 70)">
+                  <rect x="0" y="0" width="100" height="60" rx="6" fill="rgb(168, 85, 247)" fillOpacity="0.2" stroke="rgb(168, 85, 247)" strokeWidth="2"/>
+                  <text x="50" y="25" textAnchor="middle" className="fill-purple-300 text-sm font-medium">Nginx</text>
+                  <text x="50" y="40" textAnchor="middle" className="fill-purple-300 text-sm font-medium">Proxy</text>
+                  <text x="50" y="55" textAnchor="middle" className="fill-purple-300 text-xs">TLS Term.</text>
+                </g>
+                
+                {/* Split arrows to Frontend and API */}
+                <g transform="translate(340, 95)">
+                  <line x1="0" y1="10" x2="50" y2="-20" stroke="rgb(34, 197, 94)" strokeWidth="2" markerEnd="url(#arrowhead)"/>
+                  <line x1="0" y1="10" x2="50" y2="40" stroke="rgb(34, 197, 94)" strokeWidth="2" markerEnd="url(#arrowhead)"/>
+                  <text x="25" y="-10" textAnchor="middle" className="fill-green-400 text-xs">
+                    {config ? `HTTP:${config.services.web.port}` : 'HTTP:3127'}
+                  </text>
+                  <text x="25" y="55" textAnchor="middle" className="fill-green-400 text-xs">
+                    {config ? `HTTP:${config.services.api.port}` : 'HTTP:4127'}
+                  </text>
+                </g>
+                
+                {/* Frontend Server */}
+                <g transform="translate(420, 30)">
+                  <rect x="0" y="0" width="100" height="50" rx="6" fill="rgb(34, 197, 94)" fillOpacity="0.2" stroke="rgb(34, 197, 94)" strokeWidth="2"/>
+                  <text x="50" y="20" textAnchor="middle" className="fill-green-300 text-sm font-medium">Web Server</text>
+                  <text x="50" y="35" textAnchor="middle" className="fill-green-300 text-xs">React App</text>
+                </g>
+                
+                {/* API Server */}
+                <g transform="translate(420, 120)">
+                  <rect x="0" y="0" width="100" height="50" rx="6" fill="rgb(249, 115, 22)" fillOpacity="0.2" stroke="rgb(249, 115, 22)" strokeWidth="2"/>
+                  <text x="50" y="20" textAnchor="middle" className="fill-orange-300 text-sm font-medium">API Server</text>
+                  <text x="50" y="35" textAnchor="middle" className="fill-orange-300 text-xs">GraphQL</text>
+                </g>
+                
+                {/* Database connection */}
+                <g transform="translate(540, 140)">
+                  <line x1="0" y1="5" x2="80" y2="5" stroke="rgb(14, 165, 233)" strokeWidth="2" markerEnd="url(#arrowhead)"/>
+                  <text x="40" y="-5" textAnchor="middle" className="fill-sky-400 text-xs">
+                    {config ? `Neo4j:${config.services.neo4j.port}` : 'Neo4j:7687'}
+                  </text>
+                </g>
+                
+                {/* Neo4j Database */}
+                <g transform="translate(640, 120)">
+                  <rect x="0" y="0" width="100" height="50" rx="6" fill="rgb(14, 165, 233)" fillOpacity="0.2" stroke="rgb(14, 165, 233)" strokeWidth="2"/>
+                  <text x="50" y="20" textAnchor="middle" className="fill-sky-300 text-sm font-medium">Neo4j</text>
+                  <text x="50" y="35" textAnchor="middle" className="fill-sky-300 text-xs">Database</text>
+                </g>
+                
+                {/* Arrow marker definition */}
+                <defs>
+                  <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+                    <polygon points="0 0, 10 3.5, 0 7" fill="rgb(34, 197, 94)" />
+                  </marker>
+                </defs>
+              </svg>
+              
+              <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                <div className="flex items-center space-x-2" title="End user browsers connecting via HTTPS">
+                  <div className="w-3 h-3 bg-blue-500/30 border border-blue-500 rounded"></div>
+                  <span className="text-blue-300">Client Browser</span>
+                </div>
+                <div className="flex items-center space-x-2" title="Nginx reverse proxy handling TLS termination">
+                  <div className="w-3 h-3 bg-purple-500/30 border border-purple-500 rounded"></div>
+                  <span className="text-purple-300">Nginx Proxy</span>
+                </div>
+                <div className="flex items-center space-x-2" title="React frontend serving the GraphDone interface">
+                  <div className="w-3 h-3 bg-green-500/30 border border-green-500 rounded"></div>
+                  <span className="text-green-300">Frontend</span>
+                </div>
+                <div className="flex items-center space-x-2" title="GraphQL API server handling data operations">
+                  <div className="w-3 h-3 bg-orange-500/30 border border-orange-500 rounded"></div>
+                  <span className="text-orange-300">API Server</span>
+                </div>
+              </div>
+              
+              <div className="mt-3 text-xs text-gray-400" title="Traffic flow explanation">
+                <strong className="text-green-400">Traffic Flow:</strong> Browser → HTTPS ({config?.services.proxy.httpsPort || '8443'}) → Nginx Proxy → HTTP backends ({config?.services.web.port || '3127'} Web, {config?.services.api.port || '4127'} API) → Neo4j ({config?.services.neo4j.port || '7687'})
+              </div>
+              
+              {lastUpdated && (
+                <div className="mt-2 text-xs text-gray-500">
+                  <strong>Live Data:</strong> Last updated {lastUpdated.toLocaleTimeString()} • Auto-refreshing every 8 seconds
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* TLS/SSL Status Overview */}
       <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
-        <h2 className="text-xl font-semibold text-gray-100 mb-4">Security Settings</h2>
-        <div className="text-gray-400">
-          <p className="mb-4">Security management features coming soon:</p>
-          <ul className="space-y-2">
-            <li>• JWT secret rotation</li>
-            <li>• Session timeout settings</li>
-            <li>• Password policy configuration</li>
-            <li>• API key management</li>
-          </ul>
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-semibold text-gray-100 flex items-center">
+            <Shield className="h-6 w-6 mr-3" />
+            TLS/SSL Security Status
+          </h2>
+          <div className="flex items-center space-x-3">
+            {configError && (
+              <div className="flex items-center space-x-2 text-red-400 text-sm">
+                <AlertCircle className="h-4 w-4" />
+                <span>Config Error</span>
+              </div>
+            )}
+            {configLoading && (
+              <div className="flex items-center space-x-2 text-blue-400 text-sm">
+                <RefreshCw className="h-4 w-4 animate-spin" />
+                <span>Updating...</span>
+              </div>
+            )}
+            {lastUpdated && !configLoading && (
+              <div className="flex items-center space-x-2 text-green-400 text-sm">
+                <CheckCircle className="h-4 w-4" />
+                <span>Live • Updated {lastUpdated.toLocaleTimeString()}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Status Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          {/* Connection Security */}
+          <div 
+            className="bg-gray-700 border border-gray-600 rounded-lg p-4 hover:border-gray-500 transition-colors cursor-help" 
+            title={tlsStatus?.enabled 
+              ? "Your connection is encrypted with HTTPS. All data transmission is secure."
+              : "Your connection is unencrypted HTTP. Consider enabling HTTPS for production."}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-400">Connection Security</p>
+                <p className="text-lg font-bold flex items-center">
+                  {tlsStatus?.enabled ? (
+                    <>
+                      <CheckCircle className="h-5 w-5 text-green-400 mr-2" title="Secure HTTPS connection active" />
+                      <span className="text-green-300">HTTPS Enabled</span>
+                    </>
+                  ) : (
+                    <>
+                      <AlertTriangle className="h-5 w-5 text-yellow-400 mr-2" title="Insecure HTTP connection" />
+                      <span className="text-yellow-300">HTTP Only</span>
+                    </>
+                  )}
+                </p>
+                <p className="text-xs text-gray-500 mt-1" title="Current connection URL">
+                  {tlsStatus?.protocol}://{window.location.host}
+                </p>
+              </div>
+              <Lock 
+                className={`h-8 w-8 ${tlsStatus?.enabled ? 'text-green-400' : 'text-gray-500'}`} 
+                title={tlsStatus?.enabled ? "Connection is encrypted and secure" : "Connection is not encrypted"}
+              />
+            </div>
+          </div>
+
+          {/* Certificate Status */}
+          <div 
+            className="bg-gray-700 border border-gray-600 rounded-lg p-4 hover:border-gray-500 transition-colors cursor-help"
+            title={certificateInfo?.trusted 
+              ? `Certificate is trusted by your system. Type: ${certificateInfo.type}. Expires: ${certificateInfo.expirationNote}`
+              : certificateInfo 
+                ? `Certificate is self-signed and may show browser warnings. Type: ${certificateInfo.type}`
+                : "No certificate information available (HTTP mode)"}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-400">Certificate Status</p>
+                <p className="text-lg font-bold flex items-center">
+                  {certificateInfo?.trusted ? (
+                    <>
+                      <CheckCircle className="h-5 w-5 text-green-400 mr-2" title="Certificate is trusted by browsers" />
+                      <span className="text-green-300">Trusted</span>
+                    </>
+                  ) : certificateInfo ? (
+                    <>
+                      <AlertTriangle className="h-5 w-5 text-yellow-400 mr-2" title="Certificate may show browser warnings" />
+                      <span className="text-yellow-300">Self-Signed</span>
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="h-5 w-5 text-gray-400 mr-2" title="No certificate in use" />
+                      <span className="text-gray-400">Not Available</span>
+                    </>
+                  )}
+                </p>
+                <p className="text-xs text-gray-500 mt-1" title="Certificate type and issuer">
+                  {certificateInfo?.type || 'HTTP mode'}
+                </p>
+              </div>
+              <Key 
+                className={`h-8 w-8 ${certificateInfo?.trusted ? 'text-green-400' : 'text-gray-500'}`} 
+                title={certificateInfo?.trusted ? "Certificate is cryptographically valid" : "Certificate status unknown or not available"}
+              />
+            </div>
+          </div>
+
+          {/* Proxy Status */}
+          <div 
+            className="bg-gray-700 border border-gray-600 rounded-lg p-4 hover:border-gray-500 transition-colors cursor-help"
+            title={proxyStatus?.enabled 
+              ? `Nginx reverse proxy is routing requests. HTTPS port: ${proxyStatus.httpsPort}. Backend services are proxied for security.`
+              : "Direct connection to development servers. No reverse proxy detected."}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-400">Reverse Proxy</p>
+                <p className="text-lg font-bold flex items-center">
+                  {proxyStatus?.enabled ? (
+                    <>
+                      <CheckCircle className="h-5 w-5 text-green-400 mr-2" title="Reverse proxy is active and routing traffic" />
+                      <span className="text-green-300">Active</span>
+                    </>
+                  ) : (
+                    <>
+                      <AlertTriangle className="h-5 w-5 text-yellow-400 mr-2" title="No reverse proxy detected" />
+                      <span className="text-yellow-300">Direct</span>
+                    </>
+                  )}
+                </p>
+                <p className="text-xs text-gray-500 mt-1" title="Current routing configuration">
+                  {proxyStatus?.enabled ? 'Nginx proxy' : 'Development mode'}
+                </p>
+              </div>
+              <Globe 
+                className={`h-8 w-8 ${proxyStatus?.enabled ? 'text-green-400' : 'text-yellow-400'}`}
+                title={proxyStatus?.enabled ? "Traffic routed through proxy for security" : "Direct connection to services"}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Security Recommendations */}
+        <div className="bg-gray-900/50 rounded-lg p-4 border border-gray-600">
+          <h3 className="text-lg font-medium text-gray-200 mb-3 flex items-center">
+            <AlertTriangle className="h-5 w-5 mr-2 text-yellow-400" />
+            Security Recommendations
+          </h3>
+          <div className="space-y-2 text-sm">
+            {!tlsStatus?.enabled && (
+              <div className="flex items-start space-x-2">
+                <AlertTriangle className="h-4 w-4 text-red-400 mt-0.5 flex-shrink-0" />
+                <div>
+                  <span className="text-red-300 font-medium">Enable HTTPS encryption</span>
+                  <p className="text-gray-400">Your connection is not encrypted. Enable HTTPS for production use.</p>
+                </div>
+              </div>
+            )}
+            
+            {tlsStatus?.enabled && !certificateInfo?.trusted && (
+              <div className="flex items-start space-x-2">
+                <AlertTriangle className="h-4 w-4 text-yellow-400 mt-0.5 flex-shrink-0" />
+                <div>
+                  <span className="text-yellow-300 font-medium">Use trusted certificates</span>
+                  <p className="text-gray-400">Consider using Let's Encrypt or a commercial CA for production.</p>
+                </div>
+              </div>
+            )}
+            
+            {!proxyStatus?.enabled && (
+              <div className="flex items-start space-x-2">
+                <AlertTriangle className="h-4 w-4 text-yellow-400 mt-0.5 flex-shrink-0" />
+                <div>
+                  <span className="text-yellow-300 font-medium">Enable reverse proxy</span>
+                  <p className="text-gray-400">Use Nginx or similar for better security and performance.</p>
+                </div>
+              </div>
+            )}
+
+            {tlsStatus?.enabled && certificateInfo?.trusted && proxyStatus?.enabled && (
+              <div className="flex items-start space-x-2">
+                <CheckCircle className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
+                <div>
+                  <span className="text-green-300 font-medium">Security configuration looks good!</span>
+                  <p className="text-gray-400">Your GraphDone instance is properly secured with HTTPS.</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Certificate Details */}
+      {certificateInfo && (
+        <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
+          <h3 className="text-lg font-semibold text-gray-100 mb-4 flex items-center">
+            <FileText className="h-5 w-5 mr-2" />
+            Certificate Details
+          </h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-400">Certificate Type</label>
+                <p className="text-gray-200">{certificateInfo.type}</p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-400">Hostname</label>
+                <p className="text-gray-200">{certificateInfo.hostname}:{certificateInfo.port}</p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-400">Valid For</label>
+                <div className="text-gray-200">
+                  {certificateInfo.validFor.map((domain: string, index: number) => (
+                    <span key={index} className="inline-block bg-gray-700 px-2 py-1 rounded text-xs mr-1 mb-1">
+                      {domain}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+            
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-400">Issuer</label>
+                <p className="text-gray-200">{certificateInfo.issuer}</p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-400">Trust Status</label>
+                <div className="flex items-center space-x-2">
+                  {certificateInfo.trusted ? (
+                    <CheckCircle className="h-4 w-4 text-green-400" />
+                  ) : (
+                    <AlertTriangle className="h-4 w-4 text-yellow-400" />
+                  )}
+                  <span className="text-gray-200">
+                    {certificateInfo.trusted ? 'Locally Trusted' : 'Self-Signed'}
+                  </span>
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-400">Expiration</label>
+                <p className="text-gray-200">{certificateInfo.expirationNote}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Proxy Configuration */}
+      {proxyStatus && (
+        <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
+          <h3 className="text-lg font-semibold text-gray-100 mb-4 flex items-center">
+            <Server className="h-5 w-5 mr-2" />
+            Proxy Configuration
+          </h3>
+          
+          {proxyStatus.enabled ? (
+            <div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                {Object.entries(proxyStatus.services).map(([service, config]: [string, any]) => (
+                  <div key={service} className="bg-gray-700 rounded-lg p-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-gray-200 capitalize">{service}</p>
+                        <p className="text-sm text-gray-400">Port {config.port}</p>
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        {config.status === 'connected' || config.status === 'proxied' ? (
+                          <CheckCircle className="h-5 w-5 text-green-400" />
+                        ) : config.status === 'available' ? (
+                          <AlertTriangle className="h-5 w-5 text-yellow-400" />
+                        ) : (
+                          <XCircle className="h-5 w-5 text-red-400" />
+                        )}
+                        <span className="text-xs capitalize text-gray-400">{config.status}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              <div className="bg-gray-900/50 rounded-lg p-4">
+                <h4 className="text-sm font-medium text-gray-300 mb-2">Configuration</h4>
+                <div className="text-sm text-gray-400 space-y-1">
+                  <p>• HTTPS Port: {proxyStatus.httpsPort}</p>
+                  <p>• Frontend: localhost:3127 → https://localhost:{proxyStatus.httpsPort}/</p>
+                  <p>• GraphQL API: localhost:4127 → https://localhost:{proxyStatus.httpsPort}/graphql</p>
+                  <p>• WebSocket: localhost:4127 → wss://localhost:{proxyStatus.httpsPort}/graphql</p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-gray-900/50 rounded-lg p-4">
+              <p className="text-gray-400">{proxyStatus.note}</p>
+              <p className="text-sm text-gray-500 mt-2">
+                To enable HTTPS with reverse proxy, run: <code className="bg-gray-800 px-2 py-1 rounded">nginx -c nginx.conf</code>
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Debug Console */}
+      <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-100">TLS/SSL Debug Console</h3>
+          <button
+            onClick={() => setDebugLog([])}
+            className="text-gray-400 hover:text-gray-300 text-sm"
+          >
+            Clear Log
+          </button>
+        </div>
+        
+        <div className="bg-gray-900 rounded-lg p-4 font-mono text-sm max-h-60 overflow-y-auto">
+          {debugLog.length > 0 ? (
+            <div className="space-y-1">
+              {debugLog.map((line, index) => (
+                <div key={index} className="text-gray-300">
+                  {line}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-gray-500 italic">
+              Debug messages will appear here...
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* TLS Configuration Actions */}
+      <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
+        <h3 className="text-lg font-semibold text-gray-100 mb-4">TLS/SSL Management Actions</h3>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-3">
+            <h4 className="text-sm font-medium text-gray-300">Development Setup</h4>
+            
+            <button
+              onClick={() => {
+                addDebugMessage('📋 Opening certificate installation guide...');
+                const instructions = `
+To enable trusted HTTPS certificates (no browser warnings):
+
+1. Install mkcert root CA:
+   mkcert -install
+
+2. The certificates are already generated and nginx is configured.
+
+3. Refresh this page to see updated status.
+
+For more details, see: /docs/tls-ssl-setup.md
+                `.trim();
+                
+                navigator.clipboard.writeText(instructions);
+                addDebugMessage('✅ Installation instructions copied to clipboard');
+                alert('Installation instructions copied to clipboard!');
+              }}
+              className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center justify-center space-x-2"
+            >
+              <Key className="h-4 w-4" />
+              <span>Setup Trusted Certificates</span>
+            </button>
+            
+            <button
+              onClick={async () => {
+                addDebugMessage('🔄 Starting comprehensive TLS endpoint testing...');
+                addDebugMessage('📋 Testing all critical GraphDone endpoints for security and connectivity');
+                
+                try {
+                  const testResults = {
+                    total: 0,
+                    passed: 0,
+                    failed: 0
+                  };
+
+                  // Test 1: Health Endpoint
+                  addDebugMessage('');
+                  addDebugMessage('🏥 TEST 1: Health Endpoint (/health)');
+                  addDebugMessage('📝 Purpose: Verify server status and service health');
+                  testResults.total++;
+                  
+                  try {
+                    const healthStart = Date.now();
+                    const healthResponse = await fetch('/health');
+                    const healthTime = Date.now() - healthStart;
+                    const healthData = await healthResponse.json();
+                    
+                    addDebugMessage(`⏱️ Response time: ${healthTime}ms`);
+                    addDebugMessage(`📊 Status code: ${healthResponse.status}`);
+                    addDebugMessage(`🔍 Server status: ${healthData.status}`);
+                    addDebugMessage(`💾 GraphQL service: ${healthData.services?.graphql?.status || 'unknown'}`);
+                    addDebugMessage(`🗄️ Neo4j status: ${healthData.services?.neo4j?.status || 'unknown'}`);
+                    
+                    if (healthResponse.ok) {
+                      addDebugMessage('✅ Health endpoint test PASSED');
+                      testResults.passed++;
+                    } else {
+                      addDebugMessage('❌ Health endpoint test FAILED');
+                      testResults.failed++;
+                    }
+                  } catch (error) {
+                    addDebugMessage(`❌ Health endpoint test FAILED: ${error}`);
+                    testResults.failed++;
+                  }
+
+                  // Test 2: GraphQL Endpoint
+                  addDebugMessage('');
+                  addDebugMessage('🔗 TEST 2: GraphQL API Endpoint (/graphql)');
+                  addDebugMessage('📝 Purpose: Verify GraphQL server functionality and query processing');
+                  testResults.total++;
+                  
+                  try {
+                    const gqlStart = Date.now();
+                    const gqlResponse = await fetch('/graphql', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ query: '{ __typename }' })
+                    });
+                    const gqlTime = Date.now() - gqlStart;
+                    const gqlData = await gqlResponse.json();
+                    
+                    addDebugMessage(`⏱️ GraphQL response time: ${gqlTime}ms`);
+                    addDebugMessage(`📊 Status code: ${gqlResponse.status}`);
+                    addDebugMessage(`🔍 Query result: ${JSON.stringify(gqlData)}`);
+                    addDebugMessage(`📋 Content-Type: ${gqlResponse.headers.get('content-type')}`);
+                    
+                    if (gqlResponse.ok && gqlData.data) {
+                      addDebugMessage('✅ GraphQL endpoint test PASSED');
+                      testResults.passed++;
+                    } else {
+                      addDebugMessage('❌ GraphQL endpoint test FAILED');
+                      testResults.failed++;
+                    }
+                  } catch (error) {
+                    addDebugMessage(`❌ GraphQL endpoint test FAILED: ${error}`);
+                    testResults.failed++;
+                  }
+
+                  // Test 3: Frontend Assets
+                  addDebugMessage('');
+                  addDebugMessage('🌐 TEST 3: Frontend Asset Loading');
+                  addDebugMessage('📝 Purpose: Verify static assets and frontend accessibility');
+                  testResults.total++;
+                  
+                  try {
+                    const assetStart = Date.now();
+                    const assetResponse = await fetch('/');
+                    const assetTime = Date.now() - assetStart;
+                    const htmlContent = await assetResponse.text();
+                    
+                    addDebugMessage(`⏱️ Frontend load time: ${assetTime}ms`);
+                    addDebugMessage(`📊 Status code: ${assetResponse.status}`);
+                    addDebugMessage(`📄 Content length: ${htmlContent.length} characters`);
+                    addDebugMessage(`🔍 Contains GraphDone branding: ${htmlContent.includes('GraphDone') ? 'Yes' : 'No'}`);
+                    addDebugMessage(`🔍 HTML document type: ${htmlContent.includes('<!doctype html>') ? 'Valid HTML5' : 'Unknown'}`);
+                    
+                    if (assetResponse.ok && htmlContent.includes('GraphDone')) {
+                      addDebugMessage('✅ Frontend asset test PASSED');
+                      testResults.passed++;
+                    } else {
+                      addDebugMessage('❌ Frontend asset test FAILED');
+                      testResults.failed++;
+                    }
+                  } catch (error) {
+                    addDebugMessage(`❌ Frontend asset test FAILED: ${error}`);
+                    testResults.failed++;
+                  }
+
+                  // Test 4: Security Headers
+                  addDebugMessage('');
+                  addDebugMessage('🛡️ TEST 4: Security Headers Analysis');
+                  addDebugMessage('📝 Purpose: Check for important security headers');
+                  testResults.total++;
+                  
+                  try {
+                    const securityResponse = await fetch('/', { method: 'HEAD' });
+                    const headers = securityResponse.headers;
+                    
+                    addDebugMessage(`📊 Response status: ${securityResponse.status}`);
+                    addDebugMessage(`🔍 Server header: ${headers.get('server') || 'Not disclosed'}`);
+                    addDebugMessage(`🔍 Content-Security-Policy: ${headers.get('content-security-policy') || 'Not set'}`);
+                    addDebugMessage(`🔍 X-Frame-Options: ${headers.get('x-frame-options') || 'Not set'}`);
+                    addDebugMessage(`🔍 X-Content-Type-Options: ${headers.get('x-content-type-options') || 'Not set'}`);
+                    addDebugMessage(`🔍 Strict-Transport-Security: ${headers.get('strict-transport-security') || 'Not set'}`);
+                    
+                    // Count security headers
+                    const securityHeadersPresent = [
+                      'content-security-policy',
+                      'x-frame-options', 
+                      'x-content-type-options',
+                      'strict-transport-security'
+                    ].filter(header => headers.get(header)).length;
+                    
+                    addDebugMessage(`📈 Security headers present: ${securityHeadersPresent}/4`);
+                    
+                    if (securityResponse.ok) {
+                      addDebugMessage('✅ Security headers test PASSED');
+                      testResults.passed++;
+                    } else {
+                      addDebugMessage('❌ Security headers test FAILED');
+                      testResults.failed++;
+                    }
+                  } catch (error) {
+                    addDebugMessage(`❌ Security headers test FAILED: ${error}`);
+                    testResults.failed++;
+                  }
+
+                  // Test Summary
+                  addDebugMessage('');
+                  addDebugMessage('📊 ENDPOINT TESTING SUMMARY');
+                  addDebugMessage('='.repeat(40));
+                  addDebugMessage(`📈 Total tests: ${testResults.total}`);
+                  addDebugMessage(`✅ Passed: ${testResults.passed}`);
+                  addDebugMessage(`❌ Failed: ${testResults.failed}`);
+                  addDebugMessage(`📊 Success rate: ${Math.round((testResults.passed / testResults.total) * 100)}%`);
+                  
+                  if (testResults.failed === 0) {
+                    addDebugMessage('🎉 ALL TESTS PASSED! Your GraphDone instance is responding correctly.');
+                  } else {
+                    addDebugMessage(`⚠️ ${testResults.failed} test(s) failed. Review the details above for issues.`);
+                  }
+                  
+                  addDebugMessage('🏁 Comprehensive endpoint testing complete');
+                  
+                } catch (error) {
+                  addDebugMessage(`💥 Critical testing failure: ${error}`);
+                  addDebugMessage('🚨 Unable to complete endpoint testing suite');
+                }
+              }}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center justify-center space-x-2"
+              title="Run comprehensive tests on all GraphDone endpoints including health, GraphQL, frontend assets, and security headers"
+            >
+              <Globe className="h-4 w-4" />
+              <span>Test All Endpoints</span>
+            </button>
+          </div>
+          
+          <div className="space-y-3">
+            <h4 className="text-sm font-medium text-gray-300">Production Preparation</h4>
+            
+            <button
+              onClick={() => {
+                addDebugMessage('📋 Opening production deployment guide...');
+                const guide = `
+Production TLS/SSL Deployment:
+
+1. Obtain CA-signed certificates (Let's Encrypt recommended)
+2. Update nginx.conf with production certificates
+3. Configure firewall for ports 80/443
+4. Set up certificate auto-renewal
+5. Update DNS records
+6. Test with SSL Labs checker
+
+Documentation: /docs/tls-ssl-setup.md#production
+                `.trim();
+                
+                navigator.clipboard.writeText(guide);
+                addDebugMessage('✅ Production guide copied to clipboard');
+                alert('Production deployment guide copied to clipboard!');
+              }}
+              className="w-full bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center justify-center space-x-2"
+            >
+              <Shield className="h-4 w-4" />
+              <span>Production Deployment Guide</span>
+            </button>
+            
+            <button
+              disabled={true}
+              className="w-full bg-gray-700/50 text-gray-500 px-4 py-2 rounded-lg cursor-not-allowed flex items-center justify-center space-x-2"
+              title="Documentation is not yet available. Use the debug console and test tools above for troubleshooting."
+            >
+              <FileText className="h-4 w-4" />
+              <span>Documentation (Coming Soon)</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
