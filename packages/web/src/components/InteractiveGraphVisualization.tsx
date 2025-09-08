@@ -1457,14 +1457,8 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         return;
       }
       
-      // No dialogs open - show the context menu
-      const [graphX, graphY] = d3.pointer(event, g.node());
-      setContextMenuPosition({
-        x: event.clientX,
-        y: event.clientY,
-        graphX,
-        graphY
-      });
+      // Don't show context menu on single left-click in empty space - only on right-click
+      // This prevents camera jumps from rapid context menu show/hide cycles
     });
 
     // Add right-click handler for context menu
@@ -3136,9 +3130,10 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     }, 1000);
   }, [nodes, initializeVisualization, fitViewToNodes]);
 
-  // Auto-fit view when component first mounts with nodes
+  // Auto-fit view when component first mounts with nodes - using stable dependency
+  const hasNodes = nodes.length > 0;
   useEffect(() => {
-    if (nodes.length > 0 && svgRef.current) {
+    if (hasNodes && svgRef.current) {
       // Check if this is the initial load (no previous transform stored)
       const hasStoredTransform = sessionStorage.getItem('graphViewTransform');
       if (!hasStoredTransform) {
@@ -3179,7 +3174,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       }
     }
     return undefined;
-  }, [nodes.length > 0, fitViewToNodes]);
+  }, [hasNodes]); // Removed fitViewToNodes dependency to prevent camera jumps
 
   // Expose reset function to parent component
   useEffect(() => {
