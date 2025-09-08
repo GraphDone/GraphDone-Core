@@ -34,11 +34,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [currentTeam, setCurrentTeam] = useState<Team | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
   
-  const [getMe] = useLazyQuery(ME_QUERY, {
-    onCompleted: (data) => {
-      if (data.me) {
-        setCurrentUser(data.me);
-        setCurrentTeam(data.me.team);
+  const [getMe, { data: meData, error: meError }] = useLazyQuery(ME_QUERY);
+  
+  // Handle ME query results with useEffect
+  useEffect(() => {
+    if (meData) {
+      if (meData.me) {
+        setCurrentUser(meData.me);
+        setCurrentTeam(meData.me.team);
       } else {
         // ME query returned null, clear stale data
         localStorage.removeItem('authToken');
@@ -47,8 +50,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setCurrentTeam(null);
       }
       setIsInitializing(false);
-    },
-    onError: (error) => {
+    }
+  }, [meData]);
+  
+  useEffect(() => {
+    if (meError) {
       // Token is invalid, clear it
       localStorage.removeItem('authToken');
       localStorage.removeItem('currentUser');
@@ -56,7 +62,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setCurrentTeam(null);
       setIsInitializing(false);
     }
-  });
+  }, [meError]);
 
   // Load saved user from localStorage and validate token on mount
   useEffect(() => {

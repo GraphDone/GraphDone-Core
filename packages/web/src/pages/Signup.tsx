@@ -194,8 +194,31 @@ export function Signup() {
   const passwordStrength = getPasswordStrength(formData.password);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4">
-      <div className="max-w-md w-full">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Tropical lagoon light scattering background animation - consistent with main app */}
+      <div className="lagoon-caustics">
+        <div className="caustic-layer caustic-layer-1"></div>
+        <div className="caustic-layer caustic-layer-2"></div>
+        <div className="caustic-layer caustic-layer-3"></div>
+        <div className="caustic-layer caustic-layer-4"></div>
+        <div className="caustic-layer caustic-layer-5"></div>
+        <div className="caustic-layer caustic-layer-6"></div>
+        <div className="caustic-layer caustic-layer-7"></div>
+        <div className="caustic-layer caustic-layer-8"></div>
+        <div className="caustic-layer caustic-layer-9"></div>
+        <div className="caustic-layer caustic-layer-10"></div>
+        <div className="lagoon-shimmer lagoon-shimmer-1"></div>
+        <div className="lagoon-shimmer lagoon-shimmer-2"></div>
+        <div className="lagoon-shimmer lagoon-shimmer-3"></div>
+        <div className="lagoon-shimmer lagoon-shimmer-4"></div>
+        <div className="lagoon-shimmer lagoon-shimmer-5"></div>
+        <div className="lagoon-shimmer lagoon-shimmer-6"></div>
+        <div className="lagoon-shimmer lagoon-shimmer-7"></div>
+        <div className="lagoon-shimmer lagoon-shimmer-8"></div>
+        <div className="lagoon-shimmer lagoon-shimmer-9"></div>
+        <div className="lagoon-shimmer lagoon-shimmer-10"></div>
+      </div>
+      <div className="max-w-md w-full relative z-10">
         {/* Header */}
         <div className="text-center mb-8">
           <Link to="/" className="flex items-center justify-center mb-4 hover:opacity-80 transition-opacity">
