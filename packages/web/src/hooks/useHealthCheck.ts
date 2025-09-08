@@ -56,7 +56,7 @@ export function useHealthCheck(options: UseHealthCheckOptions = {}) {
   const checkHealth = useCallback(async () => {
     // Create AbortController for proper timeout handling
     const controller = new AbortController();
-    let timeoutId: NodeJS.Timeout | null = null;
+    let timeoutId: number | null = null;
     
     try {
       setLoading(true);
@@ -66,7 +66,7 @@ export function useHealthCheck(options: UseHealthCheckOptions = {}) {
         controller.abort();
         setError('Health check timed out after 10 seconds');
         setLoading(false);
-      }, 10000);
+      }, 10000) as unknown as number;
 
       // Fetch general health status
       const healthResponse = await fetch(`${API_BASE_URL}/health`, {
