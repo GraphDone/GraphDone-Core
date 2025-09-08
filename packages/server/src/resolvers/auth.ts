@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
 import { GraphQLError } from 'graphql';
 import { Driver } from 'neo4j-driver';
+import { sqliteAuthStore } from '../auth/sqlite-auth.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
@@ -58,6 +59,20 @@ export const authResolvers = {
         return null;
       }
 
+      // Try SQLite first
+      try {
+        const user = await sqliteAuthStore.findUserById(context.user.userId);
+        if (user) {
+          return {
+            ...user,
+            passwordHash: undefined // Never expose password hash
+          };
+        }
+      } catch (sqliteError: any) {
+        console.log('⚠️  SQLite user lookup failed, trying Neo4j fallback:', sqliteError.message);
+      }
+
+      // Fallback to Neo4j
       const session = context.driver.session();
       try {
         const result = await session.run(
@@ -79,6 +94,9 @@ export const authResolvers = {
           team: team || null,
           passwordHash: undefined // Never expose password hash
         };
+      } catch (error: any) {
+        console.log('⚠️  Both SQLite and Neo4j user lookup failed');
+        return null;
       } finally {
         await session.close();
       }
@@ -148,6 +166,72 @@ export const authResolvers = {
         return {
           success: true,
           message: 'Available'
+        };
+      } finally {
+        await session.close();
+      }
+    },
+
+    // Query to check development mode and default credentials status
+    developmentInfo: async (_: any, __: any, context: AuthContext) => {
+      const isDevelopment = process.env.NODE_ENV !== 'production';
+      
+      if (!isDevelopment) {
+        return {
+          isDevelopment: false,
+          hasDefaultCredentials: false,
+          defaultAccounts: []
+        };
+      }
+
+      const session = context.driver.session();
+      try {
+        // Check if default admin/viewer accounts exist with default password
+        const adminResult = await session.run(
+          `MATCH (u:User {username: 'admin'}) RETURN u.passwordHash as passwordHash`
+        );
+        
+        const viewerResult = await session.run(
+          `MATCH (u:User {username: 'viewer'}) RETURN u.passwordHash as passwordHash`
+        );
+
+        const defaultAccounts = [];
+        let hasDefaultCredentials = false;
+
+        // Check if admin exists and has default password
+        if (adminResult.records.length > 0) {
+          const adminPasswordHash = adminResult.records[0].get('passwordHash');
+          const isDefaultPassword = await bcrypt.compare('graphdone', adminPasswordHash);
+          if (isDefaultPassword) {
+            defaultAccounts.push({
+              username: 'admin',
+              password: 'graphdone',
+              role: 'ADMIN',
+              description: 'Full administrator access'
+            });
+            hasDefaultCredentials = true;
+          }
+        }
+
+        // Check if viewer exists and has default password  
+        if (viewerResult.records.length > 0) {
+          const viewerPasswordHash = viewerResult.records[0].get('passwordHash');
+          const isDefaultPassword = await bcrypt.compare('graphdone', viewerPasswordHash);
+          if (isDefaultPassword) {
+            defaultAccounts.push({
+              username: 'viewer',
+              password: 'graphdone', 
+              role: 'VIEWER',
+              description: 'Read-only access'
+            });
+            hasDefaultCredentials = true;
+          }
+        }
+
+        return {
+          isDevelopment,
+          hasDefaultCredentials,
+          defaultAccounts
         };
       } finally {
         await session.close();
@@ -242,68 +326,49 @@ export const authResolvers = {
       }
     },
 
-    login: async (_: any, { input }: { input: LoginInput }, context: AuthContext) => {
-      const session = context.driver.session();
-      try {
-        // Find user by email or username
-        const result = await session.run(
-          `MATCH (u:User)
-           WHERE u.email = $identifier OR u.username = $identifier
-           OPTIONAL MATCH (u)-[:MEMBER_OF]->(t:Team)
-           RETURN u, t`,
-          { identifier: input.emailOrUsername.toLowerCase() }
-        );
-
-        if (result.records.length === 0) {
-          throw new GraphQLError('Invalid credentials', {
-            extensions: { code: 'UNAUTHENTICATED' }
-          });
-        }
-
-        const user = result.records[0].get('u').properties;
-        const team = result.records[0].get('t')?.properties;
-
-        // Verify password
-        const validPassword = await bcrypt.compare(input.password, user.passwordHash);
-        if (!validPassword) {
-          throw new GraphQLError('Invalid credentials', {
-            extensions: { code: 'UNAUTHENTICATED' }
-          });
-        }
-
-        // Check if user is active
-        if (!user.isActive) {
-          throw new GraphQLError('Account is deactivated', {
-            extensions: { code: 'FORBIDDEN' }
-          });
-        }
-
-        // Update last login
-        await session.run(
-          'MATCH (u:User {id: $userId}) SET u.lastLogin = datetime()',
-          { userId: user.id }
-        );
-
-        const token = generateToken(user.id, user.email, user.role);
-
-        return {
-          token,
-          user: {
-            ...user,
-            team: team || null,
-            passwordHash: undefined
-          }
-        };
-      } catch (error: any) {
-        if (error instanceof GraphQLError) {
-          throw error;
-        }
-        throw new GraphQLError('Login failed', {
-          extensions: { code: 'INTERNAL_SERVER_ERROR' }
+    login: async (_: any, { input }: { input: LoginInput }) => {
+      console.log(`🔐 Login attempt for: ${input.emailOrUsername}`);
+      
+      // SQLite-only authentication
+      const user = await sqliteAuthStore.findUserByEmailOrUsername(input.emailOrUsername);
+      
+      if (!user) {
+        console.log('❌ User not found:', input.emailOrUsername);
+        throw new GraphQLError('Invalid credentials', {
+          extensions: { code: 'UNAUTHENTICATED' }
         });
-      } finally {
-        await session.close();
       }
+
+      console.log(`👤 Found user: ${user.username}`);
+      
+      // Verify password
+      const validPassword = await sqliteAuthStore.validatePassword(user, input.password);
+      if (!validPassword) {
+        console.log('❌ Invalid password for user:', user.username);
+        throw new GraphQLError('Invalid credentials', {
+          extensions: { code: 'UNAUTHENTICATED' }
+        });
+      }
+
+      // Check if user is active
+      if (!user.isActive) {
+        console.log('❌ User is deactivated:', user.username);
+        throw new GraphQLError('Account is deactivated', {
+          extensions: { code: 'FORBIDDEN' }
+        });
+      }
+
+      const token = generateToken(user.id, user.email, user.role);
+
+      console.log(`✅ Login successful: ${user.username} (${user.role})`);
+
+      return {
+        token,
+        user: {
+          ...user,
+          passwordHash: undefined
+        }
+      };
     },
 
     guestLogin: async () => {

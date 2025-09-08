@@ -1,7 +1,5 @@
 # GraphQL API Reference
 
-**AI-Generated Content Warning: This documentation contains AI-generated content. Verify information before depending on it for decision making.**
-
 GraphDone provides a comprehensive GraphQL API for all data operations. The API supports queries, mutations, and real-time subscriptions.
 
 ## Endpoint

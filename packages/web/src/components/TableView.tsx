@@ -1,8 +1,5 @@
 import React from 'react';
-import { 
-  Edit,
-  Trash2
-} from 'lucide-react';
+import { GitBranch, ArrowRight, ArrowLeft } from 'lucide-react';
 import {
   WorkItemType,
   WorkItemStatus,
@@ -11,7 +8,8 @@ import {
   getTypeIconElement,
   getStatusIconElement,
   getContributorColor,
-  getDueDateColorScheme
+  getDueDateColorScheme,
+  getTypeGradientBackground
 } from '../constants/workItemConstants';
 import { TagDisplay } from './TagDisplay';
 import { AnimatedPriority } from './AnimatedPriority';
@@ -23,10 +21,7 @@ interface WorkItem {
   description?: string;
   type: string;
   status: string;
-  priorityExec: number;
-  priorityIndiv: number;
-  priorityComm: number;
-  priorityComp: number;
+  priority: number;
   dueDate?: string;
   tags?: string[];
   metadata?: string;
@@ -36,14 +31,21 @@ interface WorkItem {
   assignedTo?: { id: string; name: string; username: string; };
   graph?: { id: string; name: string; team?: { id: string; name: string; } };
   contributors?: Array<{ id: string; name: string; type: string; }>;
-  dependencies?: Array<{ id: string; title: string; type: string; }>;
-  dependents?: Array<{ id: string; title: string; type: string; }>;
+  dependencies?: Array<{ id: string; title: string; type: string; status: string; }>;
+  dependents?: Array<{ id: string; title: string; type: string; status: string; }>;
+}
+
+interface Edge {
+  id: string;
+  type: string;
+  source: { id: string; title: string; type: string; };
+  target: { id: string; title: string; type: string; };
 }
 
 interface TableViewProps {
   filteredNodes: WorkItem[];
   handleEditNode: (node: WorkItem) => void;
-  handleDeleteNode: (node: WorkItem) => void;
+  edges: Edge[];
 }
 
 const formatLabel = (label: string) => {
@@ -58,13 +60,36 @@ const getNodeTypeColor = (type: string) => {
   return `${config.color} ${config.bgColor} ${config.borderColor} border`;
 };
 
+const getNodeTypeRowBackground = (type: string) => {
+  return getTypeGradientBackground(type as WorkItemType, 'table');
+};
+
+const getNodeTypeBorderColor = (type: string) => {
+  return getTypeConfig(type as WorkItemType).hexColor;
+};
+
 const getStatusColor = (status: string) => {
   const config = getStatusConfig(status as WorkItemStatus);
   return config.color;
 };
 
 const getNodePriority = (node: WorkItem) => {
-  return node.priorityExec || 0;
+  return node.priority || 0;
+};
+
+const getConnectionDetails = (node: WorkItem, edges: Edge[]) => {
+  const incomingEdges = edges.filter(edge => edge.target.id === node.id);
+  const outgoingEdges = edges.filter(edge => edge.source.id === node.id);
+  const incomingCount = incomingEdges.length;
+  const outgoingCount = outgoingEdges.length;
+  const totalCount = incomingCount + outgoingCount;
+  return { 
+    incomingCount, 
+    outgoingCount, 
+    totalCount,
+    incomingEdges,
+    outgoingEdges
+  };
 };
 
 // Using centralized contributor color function
@@ -84,59 +109,50 @@ const getContributorAvatar = (contributor?: string) => {
   );
 };
 
-const TableView: React.FC<TableViewProps> = ({ filteredNodes, handleEditNode, handleDeleteNode }) => {
+const TableView: React.FC<TableViewProps> = ({ filteredNodes, handleEditNode, edges }) => {
   return (
     <div className="p-6">
-      <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden max-w-full">
+      <div className="bg-gray-800/80 backdrop-blur-sm rounded-xl border border-gray-700/50 shadow-2xl overflow-hidden max-w-full">
         <div className="overflow-x-auto max-w-full">
           <table className="w-max min-w-full">
-            <thead className="bg-gray-700 border-b border-gray-700">
+            <thead className="bg-gradient-to-r from-gray-700 to-gray-800 border-b border-gray-600/50">
               <tr>
-                <th className="pr-4 py-12 text-left text-sm font-semibold text-gray-300 tracking-wider" style={{ paddingLeft: '80px' }}>Task</th>
-                <th className="pl-2 pr-3 py-10 text-left text-sm font-semibold text-gray-300 tracking-wider">Type</th>
-                <th className="pl-3 pr-3 py-10 text-left text-sm font-semibold text-gray-300 tracking-wider">Status</th>
-                <th className="pl-3 pr-6 py-10 text-left text-sm font-semibold text-gray-300 tracking-wider">Contributor</th>
-                <th className="pl-6 pr-6 py-10 text-left text-sm font-semibold text-gray-300 tracking-wider">Priority</th>
-                <th className="pl-6 pr-6 py-10 text-left text-sm font-semibold text-gray-300 tracking-wider whitespace-nowrap">Due Date</th>
+                <th className="pr-4 py-12 text-left text-sm font-semibold text-gray-200 tracking-wider uppercase" style={{ paddingLeft: '80px' }}>Task</th>
+                <th className="pl-2 pr-3 py-10 text-left text-sm font-semibold text-gray-200 tracking-wider uppercase">Type</th>
+                <th className="pl-3 pr-3 py-10 text-left text-sm font-semibold text-gray-200 tracking-wider uppercase">Status</th>
+                <th className="pl-3 pr-6 py-10 text-left text-sm font-semibold text-gray-200 tracking-wider uppercase">Contributor</th>
+                <th className="pl-6 pr-6 py-10 text-left text-sm font-semibold text-gray-200 tracking-wider uppercase">Priority</th>
+                <th className="pl-6 pr-6 py-10 text-left text-sm font-semibold text-gray-200 tracking-wider uppercase">Connections</th>
+                <th className="pl-6 pr-6 py-10 text-left text-sm font-semibold text-gray-200 tracking-wider uppercase whitespace-nowrap">Due Date</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-700">
+            <tbody className="divide-y divide-gray-600/30 backdrop-blur-sm">
               {[...filteredNodes]
                 .sort((a, b) => {
                   const dateA = new Date(a.updatedAt || a.createdAt).getTime();
                   const dateB = new Date(b.updatedAt || b.createdAt).getTime();
                   return dateB - dateA; // Most recent first
                 })
-                .map((node) => (
-                <tr key={node.id} className="hover:bg-gray-700/50 transition-colors cursor-pointer group dynamic-table-row">
+                .map((node, index) => {
+                  console.log(`Row ${index}:`, {
+                    id: node.id,
+                    title: node.title,
+                    type: node.type,
+                    visible: 'rendering'
+                  });
+                  return (
+                <tr 
+                  key={node.id} 
+                  onClick={() => handleEditNode(node)}
+                  className={`${getNodeTypeRowBackground(node.type)} hover:scale-[1.01] transition-all duration-200 group dynamic-table-row cursor-pointer hover:shadow-xl hover:shadow-white/10 relative hover:brightness-125`}
+                  style={{
+                    borderLeft: `4px solid ${getNodeTypeBorderColor(node.type)}`,
+                    borderRight: `2px solid ${getNodeTypeBorderColor(node.type)}`
+                  }}
+                >
                   <td className="pl-6 pr-4 py-12 dynamic-table-cell">
                     <div className="space-y-6">
-                      <div className="flex items-start justify-between">
-                        <div className="text-white font-medium text-base flex-1 table-text-content min-w-0">{node.title}</div>
-                        {/* Action buttons - appear on hover */}
-                        <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity ml-3">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleEditNode(node);
-                            }}
-                            className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/30 text-blue-600 dark:text-blue-400 transition-colors"
-                            title="Edit node"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteNode(node);
-                            }}
-                            className="flex items-center justify-center w-8 h-8 rounded-full bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 transition-colors"
-                            title="Delete node"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </div>
+                      <div className="text-white font-medium text-base table-text-content">{node.title}</div>
                       {node.description && (
                         <div className="text-gray-400 text-sm table-text-content min-w-0">{node.description}</div>
                       )}
@@ -165,7 +181,7 @@ const TableView: React.FC<TableViewProps> = ({ filteredNodes, handleEditNode, ha
                       getContributorAvatar(node.assignedTo.name)
                     ) : (
                       <div className="flex items-center space-x-2">
-                        <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center">
+                        <div className="w-8 h-8 rounded-full bg-gray-600/30 backdrop-blur-sm flex items-center justify-center">
                           <span className="text-gray-400 text-xs">?</span>
                         </div>
                         <span className="text-gray-500 text-sm">Available</span>
@@ -178,7 +194,7 @@ const TableView: React.FC<TableViewProps> = ({ filteredNodes, handleEditNode, ha
                         value={getNodePriority(node)}
                         className="text-xs font-bold"
                         renderBar={(animatedValue, animatedColor) => (
-                          <div className="w-4 h-16 bg-gray-600 rounded overflow-hidden flex flex-col justify-end relative">
+                          <div className="w-4 h-16 bg-gray-600/30 backdrop-blur-sm rounded overflow-hidden flex flex-col justify-end relative">
                             <div 
                               className="w-full transition-colors duration-300"
                               style={{ 
@@ -190,6 +206,43 @@ const TableView: React.FC<TableViewProps> = ({ filteredNodes, handleEditNode, ha
                         )}
                       />
                     </div>
+                  </td>
+                  <td className="pl-6 pr-6 py-10 dynamic-table-cell">
+                    {(() => {
+                      const { incomingCount, outgoingCount, totalCount } = getConnectionDetails(node, edges);
+                      
+                      if (totalCount === 0) {
+                        return (
+                          <div className="flex items-center space-x-2 text-gray-500">
+                            <GitBranch className="h-4 w-4" />
+                            <span className="text-sm">None</span>
+                          </div>
+                        );
+                      }
+                      
+                      return (
+                        <div className="flex items-center space-x-3">
+                          <div className="flex items-center space-x-1">
+                            <GitBranch className="h-4 w-4 text-gray-400" />
+                            <span className="text-sm font-medium text-white">{totalCount}</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            {incomingCount > 0 && (
+                              <div className="flex items-center space-x-1 px-2 py-1 bg-red-900/20 border border-red-500/30 rounded-md">
+                                <ArrowLeft className="h-3 w-3 text-red-400" />
+                                <span className="text-xs font-medium text-red-300">{incomingCount}</span>
+                              </div>
+                            )}
+                            {outgoingCount > 0 && (
+                              <div className="flex items-center space-x-1 px-2 py-1 bg-purple-900/20 border border-purple-500/30 rounded-md">
+                                <ArrowRight className="h-3 w-3 text-purple-400" />
+                                <span className="text-xs font-medium text-purple-300">{outgoingCount}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </td>
                   <td className="pl-6 pr-6 py-10 dynamic-table-cell">
                     {node.dueDate ? (
@@ -224,7 +277,7 @@ const TableView: React.FC<TableViewProps> = ({ filteredNodes, handleEditNode, ha
                       </div>
                     ) : (
                       <div className="space-y-1">
-                        <div className="inline-flex items-center px-3 py-2 bg-gray-100 border border-gray-200 text-gray-600 text-sm font-medium rounded-lg dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400">
+                        <div className="inline-flex items-center px-3 py-2 bg-gray-100/50 border border-gray-200/50 text-gray-600 text-sm font-medium rounded-lg dark:bg-gray-800/30 dark:border-gray-700/30 dark:text-gray-400 backdrop-blur-sm">
                           No due date
                         </div>
                         <div className="text-xs text-gray-500 dark:text-gray-400">
@@ -234,7 +287,8 @@ const TableView: React.FC<TableViewProps> = ({ filteredNodes, handleEditNode, ha
                     )}
                   </td>
                 </tr>
-              ))}
+                  );
+                })}
             </tbody>
           </table>
         </div>

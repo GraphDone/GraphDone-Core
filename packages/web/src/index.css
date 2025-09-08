@@ -2,6 +2,46 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Lagoon Animation Parameters - Easy to edit and randomize */
+:root {
+  /* Layer 1 Parameters */
+  --lagoon-1-duration: 45s;
+  --lagoon-1-x-amplitude: 20%;
+  --lagoon-1-y-amplitude: 15%;
+  --lagoon-1-scale-base: 0.9;
+  --lagoon-1-scale-amplitude: 0.3;
+  --lagoon-1-opacity-min: 0.12;
+  --lagoon-1-opacity-max: 0.28;
+  
+  /* Layer 2 Parameters */
+  --lagoon-2-duration: 38s;
+  --lagoon-2-x-amplitude: 25%;
+  --lagoon-2-y-amplitude: 18%;
+  --lagoon-2-scale-base: 1.0;
+  --lagoon-2-scale-amplitude: 0.4;
+  --lagoon-2-opacity-min: 0.11;
+  --lagoon-2-opacity-max: 0.32;
+  
+  /* Layer 3 Parameters */
+  --lagoon-3-duration: 52s;
+  --lagoon-3-x-amplitude: 30%;
+  --lagoon-3-y-amplitude: 20%;
+  --lagoon-3-scale-base: 1.1;
+  --lagoon-3-scale-amplitude: 0.5;
+  --lagoon-3-opacity-min: 0.08;
+  --lagoon-3-opacity-max: 0.35;
+  
+  /* Shimmer Parameters */
+  --lagoon-shimmer-duration: 28s;
+  --lagoon-shimmer-opacity-min: 0.06;
+  --lagoon-shimmer-opacity-max: 0.24;
+  
+  /* Color Parameters */
+  --lagoon-color-1-opacity: 0.16;
+  --lagoon-color-2-opacity: 0.14;
+  --lagoon-color-3-opacity: 0.12;
+}
+
 /* Professional dropdown animation */
 @keyframes fadeInScale {
   from {
@@ -13,6 +53,239 @@
     transform: translateX(-50%) translateY(0) scale(1);
   }
 }
+
+/* Modern slide in scale animation for edge details */
+@keyframes slideInScale {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Tropical lagoon light scattering animation - sinusoidal wave motion for organic flow */
+@keyframes lagoonCaustics1 {
+  0% {
+    transform: translateX(-20%) translateY(-5%) scale(0.8) rotate(0deg);
+    opacity: 0.12;
+  }
+  12.5% {
+    transform: translateX(-14%) translateY(-12%) scale(0.92) rotate(45deg);
+    opacity: 0.18;
+  }
+  25% {
+    transform: translateX(15%) translateY(-10%) scale(1.1) rotate(90deg);
+    opacity: 0.22;
+  }
+  37.5% {
+    transform: translateX(23%) translateY(2%) scale(1.18) rotate(135deg);
+    opacity: 0.25;
+  }
+  50% {
+    transform: translateX(-5%) translateY(0%) scale(0.9) rotate(180deg);
+    opacity: 0.15;
+  }
+  62.5% {
+    transform: translateX(-13%) translateY(-8%) scale(0.82) rotate(225deg);
+    opacity: 0.20;
+  }
+  75% {
+    transform: translateX(25%) translateY(-5%) scale(1.2) rotate(270deg);
+    opacity: 0.28;
+  }
+  87.5% {
+    transform: translateX(18%) translateY(-15%) scale(1.05) rotate(315deg);
+    opacity: 0.16;
+  }
+  100% {
+    transform: translateX(-20%) translateY(-5%) scale(0.8) rotate(360deg);
+    opacity: 0.12;
+  }
+}
+
+@keyframes lagoonCaustics2 {
+  0% {
+    transform: translateX(30%) translateY(20%) scale(1.1) rotate(45deg);
+    opacity: 0.15;
+  }
+  16.7% {
+    transform: translateX(8%) translateY(18%) scale(0.85) rotate(105deg);
+    opacity: 0.28;
+  }
+  33% {
+    transform: translateX(-10%) translateY(5%) scale(0.7) rotate(165deg);
+    opacity: 0.32;
+  }
+  50% {
+    transform: translateX(-2%) translateY(-8%) scale(0.95) rotate(225deg);
+    opacity: 0.20;
+  }
+  66% {
+    transform: translateX(20%) translateY(-15%) scale(1.3) rotate(285deg);
+    opacity: 0.11;
+  }
+  83.3% {
+    transform: translateX(35%) translateY(8%) scale(1.18) rotate(345deg);
+    opacity: 0.18;
+  }
+  100% {
+    transform: translateX(30%) translateY(20%) scale(1.1) rotate(405deg);
+    opacity: 0.15;
+  }
+}
+
+@keyframes lagoonCaustics3 {
+  0% {
+    transform: translateX(-15%) translateY(20%) scale(0.9) rotate(180deg);
+    opacity: 0.18;
+  }
+  40% {
+    transform: translateX(35%) translateY(-10%) scale(1.4) rotate(270deg);
+    opacity: 0.08;
+  }
+  80% {
+    transform: translateX(-25%) translateY(5%) scale(0.6) rotate(360deg);
+    opacity: 0.35;
+  }
+  100% {
+    transform: translateX(-15%) translateY(20%) scale(0.9) rotate(540deg);
+    opacity: 0.18;
+  }
+}
+
+@keyframes lagoonShimmer {
+  0% {
+    background-position: 0% 0%;
+    opacity: 0.06;
+  }
+  25% {
+    background-position: 100% 50%;
+    opacity: 0.18;
+  }
+  50% {
+    background-position: 0% 100%;
+    opacity: 0.10;
+  }
+  75% {
+    background-position: 50% 0%;
+    opacity: 0.24;
+  }
+  100% {
+    background-position: 0% 0%;
+    opacity: 0.06;
+  }
+}
+
+/* Lagoon caustics utility classes */
+.lagoon-caustics {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+}
+
+.caustic-layer {
+  position: absolute;
+  width: 150%;
+  height: 150%;
+  top: -25%;
+  left: -25%;
+  background: radial-gradient(
+    ellipse at 25% 35%,
+    rgba(59, 130, 246, 0.03) 0%,
+    rgba(59, 130, 246, 0.02) 20%,
+    transparent 45%
+  ),
+  radial-gradient(
+    ellipse at 75% 25%,
+    rgba(16, 185, 129, 0.04) 0%,
+    rgba(16, 185, 129, 0.02) 18%,
+    transparent 40%
+  ),
+  radial-gradient(
+    ellipse at 40% 70%,
+    rgba(139, 92, 246, 0.02) 0%,
+    rgba(139, 92, 246, 0.01) 25%,
+    transparent 50%
+  ),
+  radial-gradient(
+    ellipse at 60% 50%,
+    rgba(34, 197, 94, 0.025) 0%,
+    rgba(34, 197, 94, 0.01) 22%,
+    transparent 48%
+  ),
+  radial-gradient(
+    ellipse at 85% 80%,
+    rgba(14, 165, 233, 0.03) 0%,
+    rgba(14, 165, 233, 0.015) 16%,
+    transparent 38%
+  );
+  background-size: 25% 35%, 30% 28%, 22% 40%, 28% 32%, 26% 30%;
+  mix-blend-mode: screen;
+  filter: blur(0.5px);
+  pointer-events: none;
+}
+
+/* Caustic layers with immediate animation start and varied initial positions */
+.caustic-layer-1 { animation: lagoonCaustics1 45s ease-in-out infinite; transform: translateX(-10%) translateY(5%) scale(0.95) rotate(45deg); }
+.caustic-layer-2 { animation: lagoonCaustics2 38s ease-in-out infinite reverse; transform: translateX(15%) translateY(-8%) scale(1.05) rotate(120deg); }
+.caustic-layer-3 { animation: lagoonCaustics3 52s ease-in-out infinite; transform: translateX(-5%) translateY(12%) scale(0.8) rotate(270deg); }
+
+/* Additional caustic layers with immediate start, varied positions and reduced opacity for clean effect */
+.caustic-layer-4 { animation: lagoonCaustics1 62s ease-in-out infinite -15s; opacity: 0.4; transform: translateX(20%) translateY(-15%) scale(1.1) rotate(180deg); }
+.caustic-layer-5 { animation: lagoonCaustics2 33s ease-in-out infinite reverse -8s; opacity: 0.5; transform: translateX(-25%) translateY(10%) scale(0.7) rotate(60deg); }
+.caustic-layer-6 { animation: lagoonCaustics3 71s ease-in-out infinite -22s; opacity: 0.3; transform: translateX(12%) translateY(20%) scale(0.9) rotate(300deg); }
+.caustic-layer-7 { animation: lagoonCaustics1 29s ease-in-out infinite reverse -5s; opacity: 0.6; transform: translateX(-18%) translateY(-5%) scale(1.2) rotate(90deg); }
+.caustic-layer-8 { animation: lagoonCaustics2 58s ease-in-out infinite -30s; opacity: 0.4; transform: translateX(8%) translateY(15%) scale(0.85) rotate(210deg); }
+.caustic-layer-9 { animation: lagoonCaustics3 41s ease-in-out infinite reverse -12s; opacity: 0.5; transform: translateX(-22%) translateY(-10%) scale(1.0) rotate(150deg); }
+.caustic-layer-10 { animation: lagoonCaustics1 76s ease-in-out infinite -18s; opacity: 0.3; transform: translateX(25%) translateY(8%) scale(0.75) rotate(330deg); }
+.caustic-layer-11 { animation: lagoonCaustics2 35s ease-in-out infinite reverse -25s; opacity: 0.6; transform: translateX(-8%) translateY(-18%) scale(1.15) rotate(45deg); }
+.caustic-layer-12 { animation: lagoonCaustics3 49s ease-in-out infinite -7s; opacity: 0.4; transform: translateX(18%) translateY(-12%) scale(0.9) rotate(240deg); }
+.caustic-layer-13 { animation: lagoonCaustics1 67s ease-in-out infinite reverse -35s; opacity: 0.5; transform: translateX(-15%) translateY(25%) scale(0.8) rotate(135deg); }
+.caustic-layer-14 { animation: lagoonCaustics2 31s ease-in-out infinite -14s; opacity: 0.3; transform: translateX(22%) translateY(-8%) scale(1.1) rotate(15deg); }
+.caustic-layer-15 { animation: lagoonCaustics3 84s ease-in-out infinite reverse -40s; opacity: 0.6; transform: translateX(-12%) translateY(18%) scale(0.65) rotate(285deg); }
+.caustic-layer-16 { animation: lagoonCaustics1 43s ease-in-out infinite -28s; opacity: 0.4; transform: translateX(28%) translateY(5%) scale(1.0) rotate(195deg); }
+.caustic-layer-17 { animation: lagoonCaustics2 69s ease-in-out infinite reverse -33s; opacity: 0.5; transform: translateX(-20%) translateY(-22%) scale(0.9) rotate(75deg); }
+.caustic-layer-18 { animation: lagoonCaustics3 37s ease-in-out infinite -10s; opacity: 0.3; transform: translateX(5%) translateY(22%) scale(1.25) rotate(345deg); }
+.caustic-layer-19 { animation: lagoonCaustics1 54s ease-in-out infinite reverse -45s; opacity: 0.6; transform: translateX(-28%) translateY(-2%) scale(0.7) rotate(165deg); }
+.caustic-layer-20 { animation: lagoonCaustics2 78s ease-in-out infinite -20s; opacity: 0.4; transform: translateX(15%) translateY(-25%) scale(1.05) rotate(255deg); }
+
+.lagoon-shimmer {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    75deg,
+    transparent 35%,
+    rgba(59, 130, 246, 0.02) 38%,
+    rgba(16, 185, 129, 0.025) 41%,
+    rgba(59, 130, 246, 0.015) 44%,
+    transparent 47%,
+    transparent 53%,
+    rgba(139, 92, 246, 0.015) 56%,
+    rgba(16, 185, 129, 0.02) 59%,
+    transparent 62%
+  );
+  background-size: 400% 400%;
+  animation: lagoonShimmer 28s linear infinite;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  filter: blur(0.8px);
+}
+
+/* Additional shimmer variations with immediate start at different animation phases */
+.lagoon-shimmer-2 { animation: lagoonShimmer 34s linear infinite -12s; transform: rotate(15deg); opacity: 0.8; }
+.lagoon-shimmer-3 { animation: lagoonShimmer 42s linear infinite -18s; transform: rotate(-22deg); opacity: 0.6; }
+.lagoon-shimmer-4 { animation: lagoonShimmer 31s linear infinite -8s; transform: rotate(8deg); opacity: 0.7; }
+.lagoon-shimmer-5 { animation: lagoonShimmer 39s linear infinite -25s; transform: rotate(-12deg); opacity: 0.5; }
+.lagoon-shimmer-6 { animation: lagoonShimmer 45s linear infinite -15s; transform: rotate(25deg); opacity: 0.9; }
+.lagoon-shimmer-7 { animation: lagoonShimmer 33s linear infinite -20s; transform: rotate(-18deg); opacity: 0.4; }
+.lagoon-shimmer-8 { animation: lagoonShimmer 38s linear infinite -10s; transform: rotate(11deg); opacity: 0.8; }
+.lagoon-shimmer-9 { animation: lagoonShimmer 41s linear infinite -30s; transform: rotate(-28deg); opacity: 0.6; }
+.lagoon-shimmer-10 { animation: lagoonShimmer 36s linear infinite -5s; transform: rotate(19deg); opacity: 0.5; }
 
 @layer base {
   html {
@@ -148,20 +421,67 @@ svg .dialog-active-pulse,
   animation: pulse-green 1.0s ease-in-out infinite !important;
 }
 
-/* Type-specific node hover effects - light highlight border only */
-.node-type-epic:hover rect,
-.node-type-milestone:hover rect,
-.node-type-outcome:hover rect,
-.node-type-feature:hover rect,
-.node-type-task:hover rect,
-.node-type-bug:hover rect,
-.node-type-idea:hover rect,
-.node-type-research:hover rect,
-.node-type-default:hover rect {
-  stroke: #ffffff !important;
-  stroke-width: 2 !important;
-  stroke-opacity: 0.7 !important;
-  transform: scale(1.02);
+/* Type-specific node hover effects with matching type colors */
+.node-type-epic:hover .node-bg {
+  stroke: #c084fc !important;
+  stroke-width: 3 !important;
+  stroke-opacity: 0.8 !important;
+  transition: all 0.2s ease-in-out;
+}
+
+.node-type-milestone:hover .node-bg {
+  stroke: #fb923c !important;
+  stroke-width: 3 !important;
+  stroke-opacity: 0.8 !important;
+  transition: all 0.2s ease-in-out;
+}
+
+.node-type-outcome:hover .node-bg {
+  stroke: #818cf8 !important;
+  stroke-width: 3 !important;
+  stroke-opacity: 0.8 !important;
+  transition: all 0.2s ease-in-out;
+}
+
+.node-type-feature:hover .node-bg {
+  stroke: #38bdf8 !important;
+  stroke-width: 3 !important;
+  stroke-opacity: 0.8 !important;
+  transition: all 0.2s ease-in-out;
+}
+
+.node-type-task:hover .node-bg {
+  stroke: #4ade80 !important;
+  stroke-width: 3 !important;
+  stroke-opacity: 0.8 !important;
+  transition: all 0.2s ease-in-out;
+}
+
+.node-type-bug:hover .node-bg {
+  stroke: #f87171 !important;
+  stroke-width: 3 !important;
+  stroke-opacity: 0.8 !important;
+  transition: all 0.2s ease-in-out;
+}
+
+.node-type-idea:hover .node-bg {
+  stroke: #fde047 !important;
+  stroke-width: 3 !important;
+  stroke-opacity: 0.8 !important;
+  transition: all 0.2s ease-in-out;
+}
+
+.node-type-research:hover .node-bg {
+  stroke: #2dd4bf !important;
+  stroke-width: 3 !important;
+  stroke-opacity: 0.8 !important;
+  transition: all 0.2s ease-in-out;
+}
+
+.node-type-default:hover .node-bg {
+  stroke: #9ca3af !important;
+  stroke-width: 3 !important;
+  stroke-opacity: 0.8 !important;
   transition: all 0.2s ease-in-out;
 }
 
@@ -324,4 +644,11 @@ input[type="date"]:focus {
 
 .animate-slide-in-right {
   animation: slide-in-right 0.3s ease-out;
+}
+
+/* Allow text selection in interactive elements even when parent has select-none */
+@layer utilities {
+  input, textarea, [contenteditable], .select-text {
+    user-select: text !important;
+  }
 }

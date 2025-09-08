@@ -1,23 +1,20 @@
 import { Driver } from 'neo4j-driver';
-import { Neo4jGraph } from '@graphdone/core';
 
 export interface Context {
-  driver: Driver;
-  neo4jGraph: Neo4jGraph;
+  driver?: Driver;
   user?: {
     id: string;
     email: string;
     name: string;
   };
+  isNeo4jAvailable?: boolean;
 }
 
-export async function createContext({ driver }: { driver: Driver }): Promise<Context> {
-  const neo4jGraph = new Neo4jGraph(driver);
-  
+export async function createContext({ driver }: { driver?: Driver }): Promise<Context> {
   return {
     driver,
-    neo4jGraph,
     user: undefined, // TODO: Implement authentication
+    isNeo4jAvailable: !!driver,
   };
 }
 

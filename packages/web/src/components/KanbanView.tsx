@@ -1,7 +1,8 @@
 import React from 'react';
 import { 
-  Edit,
-  Trash2
+  GitBranch,
+  ArrowRight,
+  ArrowLeft
 } from 'lucide-react';
 import {
   CheckCircle,
@@ -17,7 +18,8 @@ import {
   getStatusIconElement,
   WORK_ITEM_STATUSES,
   getContributorColor,
-  getDueDateColorScheme
+  getDueDateColorScheme,
+  getTypeGradientBackground
 } from '../constants/workItemConstants';
 import { TagDisplay } from './TagDisplay';
 import { AnimatedPriority } from './AnimatedPriority';
@@ -29,10 +31,7 @@ interface WorkItem {
   description?: string;
   type: string;
   status: string;
-  priorityExec: number;
-  priorityIndiv: number;
-  priorityComm: number;
-  priorityComp: number;
+  priority: number;
   dueDate?: string;
   tags?: string[];
   metadata?: string;
@@ -42,14 +41,21 @@ interface WorkItem {
   assignedTo?: { id: string; name: string; username: string; };
   graph?: { id: string; name: string; team?: { id: string; name: string; } };
   contributors?: Array<{ id: string; name: string; type: string; }>;
-  dependencies?: Array<{ id: string; title: string; type: string; }>;
-  dependents?: Array<{ id: string; title: string; type: string; }>;
+  dependencies?: Array<{ id: string; title: string; type: string; status: string; }>;
+  dependents?: Array<{ id: string; title: string; type: string; status: string; }>;
+}
+
+interface Edge {
+  id: string;
+  type: string;
+  source: { id: string; title: string; type: string; };
+  target: { id: string; title: string; type: string; };
 }
 
 interface KanbanViewProps {
   filteredNodes: WorkItem[];
   handleEditNode: (node: WorkItem) => void;
-  handleDeleteNode: (node: WorkItem) => void;
+  edges: Edge[];
 }
 
 const formatLabel = (label: string) => {
@@ -64,8 +70,31 @@ const getNodeTypeColor = (type: string) => {
   return `${config.color} ${config.bgColor} ${config.borderColor} border`;
 };
 
+const getNodeTypeKanbanBackground = (type: string) => {
+  return getTypeGradientBackground(type as WorkItemType, 'kanban');
+};
+
 const getNodePriority = (node: WorkItem) => {
-  return node.priorityExec || 0;
+  return node.priority || 0;
+};
+
+const getNodeTypeKanbanBorderColor = (type: string) => {
+  return getTypeConfig(type as WorkItemType).hexColor;
+};
+
+const getConnectionDetails = (node: WorkItem, edges: Edge[]) => {
+  const incomingEdges = edges.filter(edge => edge.target.id === node.id);
+  const outgoingEdges = edges.filter(edge => edge.source.id === node.id);
+  const incomingCount = incomingEdges.length;
+  const outgoingCount = outgoingEdges.length;
+  const totalCount = incomingCount + outgoingCount;
+  return { 
+    incomingCount, 
+    outgoingCount, 
+    totalCount,
+    incomingEdges,
+    outgoingEdges
+  };
 };
 
 
@@ -84,7 +113,7 @@ const getContributorAvatar = (contributor?: string) => {
   );
 };
 
-const KanbanView: React.FC<KanbanViewProps> = ({ filteredNodes, handleEditNode, handleDeleteNode }) => {
+const KanbanView: React.FC<KanbanViewProps> = ({ filteredNodes, handleEditNode, edges }) => {
   const statuses = Object.keys(WORK_ITEM_STATUSES) as WorkItemStatus[];
 
   const nodesByStatus = statuses.reduce((acc, status) => {
@@ -100,8 +129,8 @@ const KanbanView: React.FC<KanbanViewProps> = ({ filteredNodes, handleEditNode, 
         
         return (
           <div key={status} className="flex-shrink-0 w-80">
-            <div className="bg-gray-800 rounded-lg h-full">
-              <div className={`p-4 border-b border-gray-600`}>
+            <div className="bg-gray-800/40 backdrop-blur-sm rounded-lg h-full">
+              <div className={`p-4 border-b border-gray-600/30`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
                     <div className={`${config.bgColor} rounded-lg p-2 border ${config.borderColor}`}>
@@ -126,7 +155,14 @@ const KanbanView: React.FC<KanbanViewProps> = ({ filteredNodes, handleEditNode, 
                   .map((node) => (
                   <div
                     key={node.id}
-                    className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm hover:shadow-md dark:shadow-md dark:hover:shadow-lg transition-all duration-200 cursor-pointer border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700/50 hover:scale-[1.02] hover:-translate-y-1 group"
+                    onClick={() => handleEditNode(node)}
+                    className={`${getNodeTypeKanbanBackground(node.type)} rounded-lg p-4 shadow-md hover:shadow-lg hover:shadow-white/10 transition-all duration-200 cursor-pointer border border-gray-600/40 hover:border-gray-500/60 hover:scale-[1.02] hover:-translate-y-1 hover:brightness-125 group backdrop-blur-sm`}
+                    style={{
+                      borderLeft: `4px solid ${getNodeTypeKanbanBorderColor(node.type)}`,
+                      borderLeftWidth: '4px',
+                      borderLeftStyle: 'solid',
+                      borderLeftColor: getNodeTypeKanbanBorderColor(node.type)
+                    }}
                   >
                     <div className="flex items-start justify-between mb-2">
                       <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${getNodeTypeColor(node.type)}`}>
@@ -134,29 +170,42 @@ const KanbanView: React.FC<KanbanViewProps> = ({ filteredNodes, handleEditNode, 
                         <span className="ml-1">{formatLabel(node.type)}</span>
                       </span>
                       
-                      {/* Action buttons - appear on hover */}
-                      <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEditNode(node);
-                          }}
-                          className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/30 text-blue-600 dark:text-blue-400 transition-colors"
-                          title="Edit node"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteNode(node);
-                          }}
-                          className="flex items-center justify-center w-8 h-8 rounded-full bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 transition-colors"
-                          title="Delete node"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
+                      {/* Connections */}
+                      {(() => {
+                        const { incomingCount, outgoingCount, totalCount } = getConnectionDetails(node, edges);
+                        
+                        if (totalCount === 0) {
+                          return (
+                            <div className="flex items-center space-x-1 text-gray-400 dark:text-gray-500">
+                              <GitBranch className="h-3 w-3" />
+                              <span className="text-xs">0</span>
+                            </div>
+                          );
+                        }
+                        
+                        return (
+                          <div className="flex items-center space-x-2">
+                            <div className="flex items-center space-x-1">
+                              <GitBranch className="h-3 w-3 text-gray-500 dark:text-gray-400" />
+                              <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{totalCount}</span>
+                            </div>
+                            <div className="flex items-center space-x-1">
+                              {incomingCount > 0 && (
+                                <div className="flex items-center space-x-1 px-1 py-0.5 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-500/30 rounded">
+                                  <ArrowLeft className="h-2 w-2 text-red-500" />
+                                  <span className="text-xs font-medium text-red-600 dark:text-red-400">{incomingCount}</span>
+                                </div>
+                              )}
+                              {outgoingCount > 0 && (
+                                <div className="flex items-center space-x-1 px-1 py-0.5 bg-purple-100 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-500/30 rounded">
+                                  <ArrowRight className="h-2 w-2 text-purple-500" />
+                                  <span className="text-xs font-medium text-purple-600 dark:text-purple-400">{outgoingCount}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                     
                     <h4 className="text-gray-900 dark:text-white font-medium mb-2 text-base break-words">{node.title}</h4>
@@ -232,7 +281,7 @@ const KanbanView: React.FC<KanbanViewProps> = ({ filteredNodes, handleEditNode, 
                           </div>
                         ) : (
                           <div className="space-y-1 text-left">
-                            <div className="inline-flex items-center px-2 py-1 bg-gray-100 border border-gray-200 text-gray-600 text-xs font-medium rounded dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400">
+                            <div className="inline-flex items-center px-2 py-1 bg-gray-100/50 border border-gray-200/50 text-gray-600 text-xs font-medium rounded dark:bg-gray-800/30 dark:border-gray-700/30 dark:text-gray-400 backdrop-blur-sm">
                               No due date
                             </div>
                             <div className="text-xs text-gray-500 dark:text-gray-400">

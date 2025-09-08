@@ -14,10 +14,7 @@ export const GET_WORK_ITEMS = gql`
       radius
       theta
       phi
-      priorityExec
-      priorityIndiv
-      priorityComm
-      priorityComp
+      priority
       dueDate
       tags
       metadata
@@ -48,11 +45,13 @@ export const GET_WORK_ITEMS = gql`
         id
         title
         type
+        status
       }
       dependents {
         id
         title
         type
+        status
       }
       createdAt
       updatedAt
@@ -100,10 +99,7 @@ export const GET_WORK_ITEM_BY_ID = gql`
       radius
       theta
       phi
-      priorityExec
-      priorityIndiv
-      priorityComm
-      priorityComp
+      priority
       dueDate
       tags
       metadata
@@ -134,11 +130,13 @@ export const GET_WORK_ITEM_BY_ID = gql`
         id
         title
         type
+        status
       }
       dependents {
         id
         title
         type
+        status
       }
       createdAt
       updatedAt
@@ -161,10 +159,7 @@ export const CREATE_WORK_ITEM = gql`
         radius
         theta
         phi
-        priorityExec
-        priorityIndiv
-        priorityComm
-        priorityComp
+        priority
         dueDate
         tags
         metadata
@@ -203,10 +198,7 @@ export const UPDATE_WORK_ITEM = gql`
         radius
         theta
         phi
-        priorityExec
-        priorityIndiv
-        priorityComm
-        priorityComp
+        priority
         dueDate
         tags
         metadata
@@ -276,10 +268,7 @@ export const SUBSCRIBE_TO_WORK_ITEM_CHANGES = gql`
       radius
       theta
       phi
-      priorityExec
-      priorityIndiv
-      priorityComm
-      priorityComp
+      priority
       dueDate
       assignedTo
       tags
@@ -308,19 +297,17 @@ export const GET_ALL_USERS = gql`
 
 // User Management Mutations
 export const UPDATE_USER_ROLE = gql`
-  mutation UpdateUserRole($userId: ID!, $role: String!) {
-    updateUsers(where: { id: $userId }, update: { role: $role }) {
-      users {
-        id
-        role
-        updatedAt
-      }
+  mutation UpdateUserRole($userId: String!, $role: UserRole!) {
+    updateUserRole(userId: $userId, role: $role) {
+      id
+      role
+      updatedAt
     }
   }
 `;
 
 export const RESET_USER_PASSWORD = gql`
-  mutation ResetUserPassword($userId: ID!) {
+  mutation ResetUserPassword($userId: String!) {
     resetUserPassword(userId: $userId) {
       success
       tempPassword
@@ -330,7 +317,7 @@ export const RESET_USER_PASSWORD = gql`
 `;
 
 export const DELETE_USER = gql`
-  mutation DeleteUser($userId: ID!) {
+  mutation DeleteUser($userId: String!) {
     deleteUser(userId: $userId) {
       success
       message

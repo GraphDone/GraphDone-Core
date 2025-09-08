@@ -327,9 +327,7 @@ export const typeDefs = gql`
     radius: Float! @default(value: 1.0)
     theta: Float! @default(value: 0.0)
     phi: Float! @default(value: 0.0)
-    priorityExec: Float! @default(value: 0.0)
-    priorityIndiv: Float! @default(value: 0.0)
-    priorityComm: Float! @default(value: 0.0)
+    priority: Float! @default(value: 0.0)
     priorityComp: Float! @default(value: 0.0)
     status: NodeStatus! @default(value: NOT_STARTED)
     dueDate: DateTime

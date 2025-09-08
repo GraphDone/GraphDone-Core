@@ -51,17 +51,22 @@ export function useHealthCheck(options: UseHealthCheckOptions = {}) {
   const [error, setError] = useState<string | null>(null);
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
 
-  const API_BASE_URL = import.meta.env.VITE_API_URL || ''; // Use relative URLs to leverage Vite proxy
+  const API_BASE_URL = ''; // Always use relative URLs to leverage Vite proxy in all environments
 
   const checkHealth = useCallback(async () => {
-    const timeoutId = setTimeout(() => {
-      setLoading(false);
-      setError('Health check timed out');
-    }, 10000); // 10 second timeout
+    // Create AbortController for proper timeout handling
+    const controller = new AbortController();
+    let timeoutId: number | null = null;
     
     try {
       setLoading(true);
       setError(null);
+
+      timeoutId = setTimeout(() => {
+        controller.abort();
+        setError('Health check timed out after 10 seconds');
+        setLoading(false);
+      }, 10000) as unknown as number;
 
       // Fetch general health status
       const healthResponse = await fetch(`${API_BASE_URL}/health`, {
@@ -69,7 +74,13 @@ export function useHealthCheck(options: UseHealthCheckOptions = {}) {
         headers: {
           'Content-Type': 'application/json',
         },
+        signal: controller.signal
       });
+      
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
 
       if (!healthResponse.ok) {
         throw new Error(`Health check failed: ${healthResponse.statusText}`);
@@ -102,7 +113,6 @@ export function useHealthCheck(options: UseHealthCheckOptions = {}) {
       setLastChecked(new Date());
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Health check failed';
-      console.error('Health check error:', err);
       setError(errorMessage);
       
       // Set fallback status when there's an error
@@ -117,7 +127,9 @@ export function useHealthCheck(options: UseHealthCheckOptions = {}) {
       });
       setMcpStatus({ connected: false, error: errorMessage });
     } finally {
-      clearTimeout(timeoutId);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
       setLoading(false);
     }
   }, [API_BASE_URL]);
