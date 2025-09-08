@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, gql } from '@apollo/client';
 import { Eye, EyeOff, ArrowRight, Mail, Lock, Users } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { TlsStatusIndicator } from '../components/TlsStatusIndicator';
 
 const LOGIN_MUTATION = gql`
   mutation Login($input: LoginInput!) {
@@ -416,6 +417,9 @@ export function LoginForm() {
         </div>
 
       </div>
+      
+      {/* TLS/SSL Status Indicator */}
+      <TlsStatusIndicator />
     </div>
   );
 }

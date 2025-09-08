@@ -8,7 +8,7 @@
 ![Version](https://img.shields.io/badge/version-0.2.2--alpha-orange.svg)
 ![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
 
-> 🚨 **PRODUCTION SECURITY WARNING**: This project is currently configured for development only with HTTP and hardcoded passwords. See [TLS Implementation Plan](./docs/security/tls-implementation-plan.md) for required security changes before production deployment.
+> 🔒 **SECURITY NOTE**: GraphDone supports both HTTP (development) and HTTPS/TLS (production) modes. For production deployment, enable TLS encryption and use production-grade authentication. See [TLS/SSL Setup Guide](./docs/tls-ssl-setup.md) for configuration details.
 
 ## What is GraphDone?
 
@@ -79,6 +79,7 @@ Visit **http://localhost:3127** when you see the "GraphDone is Ready!" message.
 **Core GraphDone Services:**
 - 🌐 **Web Application**: http://localhost:3127 - Full graph visualization and collaboration interface
 - 🔗 **GraphQL API**: http://localhost:4127/graphql - Auto-generated resolvers with @neo4j/graphql  
+- 🔒 **HTTPS Support**: Optional TLS/SSL encryption for production deployments ([Setup Guide](./docs/tls-ssl-setup.md))
 - 🩺 **Health Check**: http://localhost:4127/health - Service status monitoring
 - 🗄️ **Database**: Neo4j 5.15-community with APOC plugins for native graph storage
 

@@ -6,6 +6,7 @@ import { GraphSelector } from './GraphSelector';
 import { useAuth } from '../contexts/AuthContext';
 import { McpHealthIndicator } from './McpHealthIndicator';
 import FloatingConsole from './FloatingConsole';
+import { TlsStatusIndicator, TlsSecurityBanner } from './TlsStatusIndicator';
 import { APP_VERSION } from '../utils/version';
 
 interface LayoutProps {
@@ -323,6 +324,9 @@ export function Layout({ children }: LayoutProps) {
         onToggle={() => setShowFloatingConsole(!showFloatingConsole)}
         onClose={() => setShowFloatingConsole(false)}
       />
+      
+      {/* TLS/SSL Status Indicator */}
+      <TlsStatusIndicator />
     </div>
   );
 }
