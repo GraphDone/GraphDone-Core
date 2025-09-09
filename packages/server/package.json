@@ -1,6 +1,6 @@
 {
   "name": "@graphdone/server",
-  "version": "0.2.2-alpha",
+  "version": "0.3.1-alpha",
   "description": "GraphQL API server for GraphDone",
   "type": "module",
   "main": "dist/index.js",
