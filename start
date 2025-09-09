@@ -302,9 +302,8 @@ cmd_build() {
 
 cmd_deploy() {
     show_banner
-    log_info "🚀 Deploying to production..."
-    ensure_nodejs
-    ./tools/deploy.sh
+    log_info "🚀 Starting production deployment with Docker..."
+    ./tools/run.sh --docker
 }
 
 cmd_remove() {

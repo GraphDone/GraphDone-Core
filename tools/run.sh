@@ -63,10 +63,6 @@ MODE="dev"
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --prod|--production)
-            MODE="prod"
-            shift
-            ;;
         --docker)
             MODE="docker"
             shift
@@ -81,7 +77,6 @@ while [[ $# -gt 0 ]]; do
             echo "Usage: ./run.sh [OPTIONS]"
             echo ""
             echo "Options:"
-            echo "  --prod, --production    Run in production mode"
             echo "  --docker                Run with Docker (production)"
             echo "  --docker-dev            Run with Docker (development)"
             echo "  --help, -h              Show this help message"
@@ -283,15 +278,6 @@ case $MODE in
         
         # Wait for the background process
         wait $DEV_PID
-        ;;
-        
-    "prod")
-        echo "🏭 Building for production..."
-        npm run build
-        
-        echo "🚀 Starting production servers..."
-        # In a real setup, you'd use pm2 or similar
-        npm run start
         ;;
         
     "docker")
