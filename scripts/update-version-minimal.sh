@@ -29,15 +29,23 @@ for compose in deployment/docker-compose*.yml; do
     fi
 done
 
-# 3. Update fallback in version.ts (should match root package.json)
-echo "✓ Updating version fallback..."
-sed -i.bak "s/return '[0-9]*\.[0-9]*\.[0-9]*-alpha'/return '$NEW_VERSION'/" version.ts
-rm version.ts.bak
+# 3. Update web version utility
+echo "✓ Updating web version utility..."
+sed -i.bak "s/APP_VERSION = '[0-9]*\.[0-9]*\.[0-9]*-alpha'/APP_VERSION = '$NEW_VERSION'/g" packages/web/src/utils/version.ts
+rm packages/web/src/utils/version.ts.bak
 
 # 4. Update README badge
 echo "✓ Updating README version badge..."
 sed -i.bak "s/version-[0-9]*\.[0-9]*\.[0-9]*--alpha/version-${NEW_VERSION//./-}/g" README.md
 rm README.md.bak
+
+# 5. Update MCP server hardcoded versions
+echo "✓ Updating MCP server versions..."
+sed -i.bak "s/version: '[0-9]*\.[0-9]*\.[0-9]*-alpha'/version: '$NEW_VERSION'/g" packages/mcp-server/src/index.ts
+sed -i.bak "s/version: '[0-9]*\.[0-9]*\.[0-9]*-alpha'/version: '$NEW_VERSION'/g" packages/mcp-server/src/health-server.ts
+sed -i.bak "s/toBe('[0-9]*\.[0-9]*\.[0-9]*-alpha')/toBe('$NEW_VERSION')/g" packages/mcp-server/tests/health-server.test.ts
+rm packages/mcp-server/src/index.ts.bak packages/mcp-server/src/health-server.ts.bak packages/mcp-server/tests/health-server.test.ts.bak
+
 
 echo
 echo "🎉 Version updated to $NEW_VERSION"
@@ -45,8 +53,9 @@ echo
 echo "📝 What was updated:"
 echo "   • Root package.json (source of truth)"
 echo "   • Docker image tags (can't import from package.json)"  
-echo "   • Fallback in version.ts (matches source)"
 echo "   • README.md version badge"
+echo "   • MCP server hardcoded versions"
+echo "   • Web version utility constant"
 echo
 echo "📦 Everything else imports automatically from root package.json!"
 echo
