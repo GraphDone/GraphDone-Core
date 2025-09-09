@@ -13,7 +13,7 @@ GraphDone uses a centralized version management system with the root `package.js
 ### Simple Update Process
 ```bash
 # 1. Run the simple update script
-./scripts/update-version-simple.sh 0.3.2-alpha
+./scripts/update-version-minimal.sh 0.3.2-alpha
 
 # 2. Regenerate lockfile
 npm install

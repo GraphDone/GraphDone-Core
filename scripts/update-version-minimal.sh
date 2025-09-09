@@ -34,6 +34,11 @@ echo "✓ Updating version fallback..."
 sed -i.bak "s/return '[0-9]*\.[0-9]*\.[0-9]*-alpha'/return '$NEW_VERSION'/" version.ts
 rm version.ts.bak
 
+# 4. Update README badge
+echo "✓ Updating README version badge..."
+sed -i.bak "s/version-[0-9]*\.[0-9]*\.[0-9]*--alpha/version-${NEW_VERSION//./-}/g" README.md
+rm README.md.bak
+
 echo
 echo "🎉 Version updated to $NEW_VERSION"
 echo
@@ -41,6 +46,7 @@ echo "📝 What was updated:"
 echo "   • Root package.json (source of truth)"
 echo "   • Docker image tags (can't import from package.json)"  
 echo "   • Fallback in version.ts (matches source)"
+echo "   • README.md version badge"
 echo
 echo "📦 Everything else imports automatically from root package.json!"
 echo
