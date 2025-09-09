@@ -5,7 +5,7 @@
 ![GraphDone UI Screenshot](./docs/graphdone_ui.png)
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Version](https://img.shields.io/badge/version-0.2.2--alpha-orange.svg)
+![Version](https://img.shields.io/badge/version-0.3.1--alpha-orange.svg)
 ![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
 
 > 🔒 **SECURITY NOTE**: GraphDone supports both HTTP (development) and HTTPS/TLS (production) modes. For production deployment, enable TLS encryption and use production-grade authentication. See [TLS/SSL Setup Guide](./docs/tls-ssl-setup.md) for configuration details.
@@ -264,6 +264,7 @@ Anyone can propose ideas and assign personal priority. The community validates t
 - 👥 **[User Flows](./docs/guides/user-flows.md)** - How teams actually use GraphDone
 - 🔌 **[API Documentation](./docs/api/graphql.md)** - GraphQL schema and integration guide
 - 🚀 **[Deployment Guide](./docs/deployment/README.md)** - Self-hosted and cloud deployment options
+- 🏷️ **[Version Management](./docs/version-management.md)** - How to update versions across the monorepo
 
 ## Contributing
 
