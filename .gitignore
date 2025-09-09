@@ -24,7 +24,15 @@ out/
 
 # Misc
 .DS_Store
+# Certificates and cryptographic files
 *.pem
+*.key
+*.crt
+*.csr
+*.p12
+*.pfx
+certs/
+deployment/certs/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

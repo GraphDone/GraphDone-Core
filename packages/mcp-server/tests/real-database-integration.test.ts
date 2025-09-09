@@ -349,7 +349,8 @@ describe.skipIf(process.env.CI)('REAL DATABASE INTEGRATION - Graph Management', 
         console.log('🔍 Actual Neo4j Indexes:', JSON.stringify(indexes, null, 2));
 
         // This will help us understand what's actually enforced vs. what we think is enforced
-        expect(true).toBe(true); // Always passes, but logs real schema info
+        expect(Array.isArray(indexes)).toBe(true);
+        expect(constraints).toBeDefined();
         
       } finally {
         await session.close();
