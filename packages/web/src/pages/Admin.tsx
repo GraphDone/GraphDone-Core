@@ -1111,12 +1111,12 @@ certbot renew --dry-run
                 <p className="text-lg font-bold flex items-center">
                   {tlsStatus?.enabled ? (
                     <>
-                      <CheckCircle className="h-5 w-5 text-green-400 mr-2" title="Secure HTTPS connection active" />
+                      <CheckCircle className="h-5 w-5 text-green-400 mr-2" />
                       <span className="text-green-300">HTTPS Enabled</span>
                     </>
                   ) : (
                     <>
-                      <AlertTriangle className="h-5 w-5 text-yellow-400 mr-2" title="Insecure HTTP connection" />
+                      <AlertTriangle className="h-5 w-5 text-yellow-400 mr-2" />
                       <span className="text-yellow-300">HTTP Only</span>
                     </>
                   )}
@@ -1127,7 +1127,6 @@ certbot renew --dry-run
               </div>
               <Lock 
                 className={`h-8 w-8 ${tlsStatus?.enabled ? 'text-green-400' : 'text-gray-500'}`} 
-                title={tlsStatus?.enabled ? "Connection is encrypted and secure" : "Connection is not encrypted"}
               />
             </div>
           </div>
@@ -1147,17 +1146,17 @@ certbot renew --dry-run
                 <p className="text-lg font-bold flex items-center">
                   {certificateInfo?.trusted ? (
                     <>
-                      <CheckCircle className="h-5 w-5 text-green-400 mr-2" title="Certificate is trusted by browsers" />
+                      <CheckCircle className="h-5 w-5 text-green-400 mr-2" />
                       <span className="text-green-300">Trusted</span>
                     </>
                   ) : certificateInfo ? (
                     <>
-                      <AlertTriangle className="h-5 w-5 text-yellow-400 mr-2" title="Certificate may show browser warnings" />
+                      <AlertTriangle className="h-5 w-5 text-yellow-400 mr-2" />
                       <span className="text-yellow-300">Self-Signed</span>
                     </>
                   ) : (
                     <>
-                      <XCircle className="h-5 w-5 text-gray-400 mr-2" title="No certificate in use" />
+                      <XCircle className="h-5 w-5 text-gray-400 mr-2" />
                       <span className="text-gray-400">Not Available</span>
                     </>
                   )}
@@ -1168,7 +1167,6 @@ certbot renew --dry-run
               </div>
               <Key 
                 className={`h-8 w-8 ${certificateInfo?.trusted ? 'text-green-400' : 'text-gray-500'}`} 
-                title={certificateInfo?.trusted ? "Certificate is cryptographically valid" : "Certificate status unknown or not available"}
               />
             </div>
           </div>
@@ -1186,12 +1184,12 @@ certbot renew --dry-run
                 <p className="text-lg font-bold flex items-center">
                   {proxyStatus?.enabled ? (
                     <>
-                      <CheckCircle className="h-5 w-5 text-green-400 mr-2" title="Reverse proxy is active and routing traffic" />
+                      <CheckCircle className="h-5 w-5 text-green-400 mr-2" />
                       <span className="text-green-300">Active</span>
                     </>
                   ) : (
                     <>
-                      <AlertTriangle className="h-5 w-5 text-yellow-400 mr-2" title="No reverse proxy detected" />
+                      <AlertTriangle className="h-5 w-5 text-yellow-400 mr-2" />
                       <span className="text-yellow-300">Direct</span>
                     </>
                   )}
@@ -1202,7 +1200,6 @@ certbot renew --dry-run
               </div>
               <Globe 
                 className={`h-8 w-8 ${proxyStatus?.enabled ? 'text-green-400' : 'text-yellow-400'}`}
-                title={proxyStatus?.enabled ? "Traffic routed through proxy for security" : "Direct connection to services"}
               />
             </div>
           </div>

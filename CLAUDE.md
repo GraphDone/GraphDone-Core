@@ -1271,3 +1271,155 @@ claude mcp add graphdone node dist/index.js \
   --env "NEO4J_USER=neo4j" \
   --env "NEO4J_PASSWORD=graphdone_password"
 ```
+
+## Development Best Practices & Lessons Learned
+
+### Certificate Management
+
+**CRITICAL**: Never commit certificates to the repository. All certificates are generated on-demand:
+
+```bash
+# Generate development certificates (when needed)
+./scripts/generate-dev-certs.sh
+
+# Certificate files are in .gitignore and should never be committed
+# Empty .gitkeep files document the certificate directories
+```
+
+**Certificate Script Issues Fixed:**
+- Changed `rm "$CERT_DIR/dev-csr.pem"` to `rm -f "$CERT_DIR/dev-csr.pem"` to prevent warnings when file doesn't exist
+
+### Build and Dependency Management
+
+**NPM Dependency Issues:**
+- Use `npm install --legacy-peer-deps` when ESLint version conflicts occur
+- ESLint 9.x has compatibility issues with older React plugins
+- Most deprecated package warnings are upstream dependencies that will be resolved by maintainers
+
+**Browser/Node.js Compatibility:**
+```typescript
+// WRONG: NodeJS.Timeout in browser environments
+const intervalRef = useRef<NodeJS.Timeout>();
+
+// CORRECT: Use number type with proper casting
+const intervalRef = useRef<number>();
+intervalRef.current = setInterval(callback, interval) as unknown as number;
+```
+
+### Lucide React Icon Issues
+
+**CRITICAL**: Lucide React icons do NOT support `title` props:
+
+```typescript
+// WRONG: TypeScript will fail
+<CheckCircle className="h-5 w-5" title="Description" />
+
+// CORRECT: Remove title prop
+<CheckCircle className="h-5 w-5" />
+
+// Use wrapper div or aria-label if needed for accessibility
+<div title="Description">
+  <CheckCircle className="h-5 w-5" />
+</div>
+```
+
+### Test Quality Standards
+
+**CRITICAL**: No fake or cheating tests allowed. Common anti-patterns found and fixed:
+
+```typescript
+// WRONG: Fake assertions that always pass
+expect(true).toBe(true);
+
+// CORRECT: Meaningful validation
+expect(result).toBeDefined();
+expect(result.content).toBeDefined();
+expect(Array.isArray(result.content)).toBe(true);
+
+// WRONG: Skip pattern with fake assertion
+it('should skip when no database', () => {
+  expect(true).toBe(true);
+});
+
+// CORRECT: Proper test skipping
+it.skip('should skip when no database', () => {
+  // Clear skip reason in comment
+});
+```
+
+**Test Quality Checklist:**
+- ✅ All assertions validate actual behavior or data structure
+- ✅ Skip patterns use `test.skip()` instead of fake assertions
+- ✅ Error recovery tests validate response structure, not just "didn't throw"
+- ✅ Informational tests check data types and array structures
+- ✅ No `expect(true).toBe(true)` patterns anywhere
+
+### Clean Environment Testing Procedures
+
+**CRITICAL**: Always test with completely clean environments:
+
+```bash
+# Complete clean start (removes all volumes, containers, dependencies)
+./start remove
+echo "yes" | ./start remove  # Non-interactive
+
+# Fresh development setup
+./start dev
+
+# Fresh production build
+./start build
+```
+
+**Docker Issues:**
+- Docker Desktop must be running for clean environment tests
+- Use `docker system prune -f --volumes` for complete cleanup
+- Container startup can take 30+ seconds, allow time for Neo4j readiness
+
+### TLS/SSL Testing Integration
+
+**Certificate Generation is Now On-Demand:**
+- No certificates stored in repository
+- `scripts/generate-dev-certs.sh` creates development certificates
+- `scripts/test-cert-security.sh` validates certificate security
+- TLS integration tests moved to `tests/e2e/tls-integration.spec.ts`
+
+**Playwright Browser Management:**
+```bash
+# Install missing browsers (required after clean setup)
+npx playwright install
+
+# Browsers needed: Chromium, Firefox, WebKit
+# Firefox and WebKit often missing after fresh installs
+```
+
+### Repository Cleanup Patterns
+
+**File Organization Learned:**
+- Move test utilities to `scripts/testing/` subdirectory
+- Certificate scripts go in `scripts/` (not tools/)
+- E2E tests belong in `tests/e2e/` (not top-level e2e/)
+- Use `.gitkeep` files to document empty but necessary directories
+
+**Safe Integration Patterns:**
+1. **Read and understand** existing files before moving
+2. **Test functionality** of moved scripts
+3. **Update any hardcoded paths** after moving
+4. **Verify tests still pass** after reorganization
+5. **Remove only after confirming** new locations work
+
+## Troubleshooting Common Issues
+
+### Build Failures
+- **ESLint Errors**: Check for `NodeJS` type usage in browser code
+- **TypeScript Errors**: Verify Lucide icon props don't include `title`
+- **Test Failures**: Ensure no fake assertions remain (`expect(true).toBe(true)`)
+
+### Docker Issues
+- **Connection Refused**: Docker Desktop may not be fully started, wait 15+ seconds
+- **Port Conflicts**: Use `./start stop` to clean up running services
+- **Volume Issues**: Use `./start remove` for complete cleanup
+
+### Certificate Issues
+- **File Not Found**: Run `./scripts/generate-dev-certs.sh` to create certificates
+- **Permission Denied**: Certificates have correct permissions (600 for keys, 644 for certs)
+- **Browser Warnings**: Development certificates are self-signed, warnings expected
