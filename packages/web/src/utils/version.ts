@@ -1,3 +1,1 @@
-// Import version from root package.json
-import packageJson from '../../../../../package.json';
-export const APP_VERSION = packageJson.version;
+export const APP_VERSION = '0.3.1-alpha';
