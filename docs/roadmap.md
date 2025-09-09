@@ -1,6 +1,6 @@
 # GraphDone Roadmap & Release Philosophy
 
-> **Current Status**: v0.2.2-alpha - **Core architecture complete, actively refining user experience**
+> **Current Status**: v0.3.1-alpha - **Core architecture complete, actively refining user experience**
 
 ## Release Philosophy
 

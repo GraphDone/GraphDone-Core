@@ -68,6 +68,16 @@ npm run db:seed
 # http://localhost:7474 (neo4j/graphdone_password)
 ```
 
+### Version Management
+```bash
+# Update version across entire project
+./scripts/update-version-minimal.sh 0.3.2-alpha
+npm install
+git add . && git commit -m "Update version to v0.3.2-alpha"
+
+# See docs/version-management.md for details
+```
+
 ### Package-Specific Development
 ```bash
 # Core graph engine
@@ -1182,6 +1192,7 @@ const HeavyEditModal = ({ isOpen, onSave, onCancel }) => (
 8. **Backdrop Blur**: Combine `backdrop-blur-sm` with semi-transparent backgrounds for depth
 9. **Hot Reloading**: Vite HMR requires manual refresh after GraphQL schema changes
 10. **D3.js Integration**: Force simulation requires careful cleanup in React useEffect hooks
+11. **Version Updates**: Use `./scripts/update-version-minimal.sh` to update version across project. See [docs/version-management.md](./docs/version-management.md) for details.
 
 ## 🚨 Production Readiness & Security
 
