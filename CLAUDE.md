@@ -33,14 +33,13 @@ GraphDone is a graph-native project management system that reimagines work coord
 
 ### Quick Start
 ```bash
-# Single command to get everything running
-./start
+# Production HTTPS deployment (standard)
+./start deploy
 
-# Alternative quick start without full setup checks
-./start quick
-
-# Manual setup (advanced)
-./tools/setup.sh && ./tools/run.sh
+# Development environment (HTTP only)
+./start                # Full setup + development start
+./start quick          # Quick start without full setup checks
+./start dev            # Development with npm servers
 ```
 
 ### Development Workflow
@@ -1235,7 +1234,15 @@ CORS_ORIGIN=https://localhost:3128        # Update for production domain
 
 ## URLs and Services
 
-**Development Environment (HTTP Mode - Default):**
+**Production Environment (Default - HTTPS):**
+- Web Application: https://localhost:3128 ✅ HTTPS
+- GraphQL API: https://localhost:4128/graphql ✅ HTTPS
+- WebSocket: wss://localhost:4128/graphql ✅ Secure WebSocket
+- Health Check: https://localhost:4128/health ✅ HTTPS
+- Neo4j Browser: http://localhost:7474 (neo4j/graphdone_password)
+- HTTP Redirect: http://localhost:3127 → https://localhost:3128
+
+**Development Environment (--dev flag - HTTP only):**
 - Web Application: http://localhost:3127
 - GraphQL API: http://localhost:4127/graphql
 - WebSocket: ws://localhost:4127/graphql  
@@ -1243,14 +1250,7 @@ CORS_ORIGIN=https://localhost:3128        # Update for production domain
 - Neo4j Browser: http://localhost:7474
 - MCP Server: http://localhost:3128 (optional)
 
-**Development Environment (HTTPS Mode - SSL Enabled):**
-- Web Application: https://localhost:3127 (configure web server for HTTPS)
-- GraphQL API: https://localhost:4128/graphql ✅ HTTPS
-- WebSocket: wss://localhost:4128/graphql ✅ Secure WebSocket
-- Health Check: https://localhost:4128/health ✅ HTTPS
-- Neo4j Browser: http://localhost:7474 (Neo4j HTTPS requires separate config)
-
-**Production Environment:**
+**Remote Production Environment:**
 - Web Application: https://your-domain.com ✅ HTTPS
 - GraphQL API: https://your-domain.com/graphql ✅ HTTPS  
 - WebSocket: wss://your-domain.com/graphql ✅ Secure WebSocket

@@ -1,4 +1,5 @@
 import passport from 'passport';
+// import { v4 as uuidv4 } from 'uuid'; // For OAuth - commented out with strategies
 // OAuth strategies disabled - uncomment when needed
 // import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 // import { Strategy as LinkedInStrategy } from 'passport-linkedin-oauth2';

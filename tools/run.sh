@@ -49,6 +49,8 @@ cleanup() {
     # Clean up any processes on our ports
     lsof -ti:3127 | xargs -r kill -9 2>/dev/null || true
     lsof -ti:4127 | xargs -r kill -9 2>/dev/null || true
+    lsof -ti:3128 | xargs -r kill -9 2>/dev/null || true  # HTTPS web
+    lsof -ti:4128 | xargs -r kill -9 2>/dev/null || true  # HTTPS API
     
     echo "✅ Cleanup complete"
     exit 0
@@ -57,14 +59,14 @@ cleanup() {
 # Set up signal handlers for clean shutdown
 trap cleanup SIGINT SIGTERM
 
-# Default mode
-MODE="dev"
+# Default mode is Docker production HTTPS
+MODE="docker"
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --docker)
-            MODE="docker"
+        --dev)
+            MODE="dev"
             shift
             ;;
         --docker-dev)
@@ -72,16 +74,27 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         --help|-h)
-            echo "GraphDone Development Runner"
+            echo "GraphDone Production Runner"
             echo ""
             echo "Usage: ./run.sh [OPTIONS]"
             echo ""
-            echo "Options:"
-            echo "  --docker                Run with Docker (production)"
-            echo "  --docker-dev            Run with Docker (development)"
+            echo "PRODUCTION MODE (default):"
+            echo "  ./run.sh                Start production Docker stack with HTTPS"
+            echo ""
+            echo "DEVELOPMENT MODES:"
+            echo "  --dev                   Run with local npm servers (development)"
+            echo "  --docker-dev            Run with Docker (development HTTP only)"
+            echo ""
+            echo "OTHER OPTIONS:"
             echo "  --help, -h              Show this help message"
             echo ""
-            echo "Default: Development mode with local servers"
+            echo "Production Features:"
+            echo "  • Full HTTPS encryption (web + API)"
+            echo "  • Auto-generated SSL certificates"
+            echo "  • Secure WebSocket connections (WSS)"
+            echo "  • Production-optimized containers"
+            echo "  • Complete database stack (Neo4j + Redis)"
+            echo ""
             exit 0
             ;;
         *)
@@ -281,7 +294,15 @@ case $MODE in
         ;;
         
     "docker")
-        echo "🐳 Starting with Docker (production)..."
+        echo "🐳 Starting with Docker (production HTTPS)..."
+        
+        # Ensure SSL certificates exist for production
+        if [ ! -f "deployment/certs/server-cert.pem" ] || [ ! -f "deployment/certs/server-key.pem" ]; then
+            echo "🔐 Generating SSL certificates for production..."
+            ./scripts/generate-ssl-certs.sh
+        fi
+        
+        # Use main compose file (HTTPS production)
         docker-compose -f deployment/docker-compose.yml up --build
         ;;
         
