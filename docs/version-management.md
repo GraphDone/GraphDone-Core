@@ -10,23 +10,22 @@ GraphDone uses a centralized version management system with the root `package.js
 
 ## Version Update Process
 
-### Manual Update (Current)
+### Simple Update Process
 ```bash
-# 1. Update root package.json version
-# 2. Run update script
-node scripts/update-version.js 0.3.2-alpha
+# 1. Run the simple update script
+./scripts/update-version-simple.sh 0.3.2-alpha
 
-# 3. Regenerate lockfile
+# 2. Regenerate lockfile
 npm install
 
-# 4. Commit changes
+# 3. Commit changes
 git add .
 git commit -m "Update version to v0.3.2-alpha"
 git push
 ```
 
-### Automated Script
-The `scripts/update-version.js` script updates:
+### What Gets Updated
+The script only updates files that **cannot** import from package.json:
 - All package.json files in the monorepo
 - Docker image tags in compose files
 - Environment variable defaults
