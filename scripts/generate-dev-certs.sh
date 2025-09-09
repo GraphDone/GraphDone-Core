@@ -47,7 +47,7 @@ EOF
 )
 
 # Clean up CSR file
-rm "$CERT_DIR/dev-csr.pem"
+rm -f "$CERT_DIR/dev-csr.pem"
 
 # Set appropriate permissions
 chmod 600 "$CERT_DIR/dev-key.pem"
