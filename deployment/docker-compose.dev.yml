@@ -13,7 +13,10 @@ services:
       NEO4J_PLUGINS: '["graph-data-science", "apoc"]'
       NEO4J_dbms_security_procedures_unrestricted: "gds.*,apoc.*"
       NEO4J_dbms_security_procedures_allowlist: "gds.*,apoc.*"
-    # No external ports - internal network only
+    # Expose ports for local development (npm servers on host)
+    ports:
+      - "7474:7474"  # Neo4j Browser
+      - "7687:7687"  # Bolt protocol
     expose:
       - "7474"
       - "7687"
