@@ -47,7 +47,7 @@ export function useHealthStatus() {
     };
     
     // Set up dynamic polling
-    let timeoutId: NodeJS.Timeout;
+    let timeoutId: ReturnType<typeof setTimeout>;
     
     const scheduleNext = () => {
       const interval = getPollingInterval();
