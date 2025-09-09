@@ -225,31 +225,59 @@ case $MODE in
             # If no work items found, seed the database
             if [ "$work_items_count" -eq 0 ] 2>/dev/null; then
                 echo "📊 No data found. Seeding database with sample data..."
-                (cd packages/server && npm run db:seed) || echo "⚠️  Database seeding failed, continuing anyway..."
-                echo "✅ Database seeded!"
+                if (cd packages/server && npm run db:seed); then
+                    echo "✅ Database seeded!"
+                else
+                    echo "❌ Database seeding failed!"
+                    echo "⚠️  GraphDone is running in LIMITED AUTH-ONLY mode"
+                    echo "   Neo4j connection failed - only authentication will work"
+                    # Don't show the success banner
+                    SEEDING_FAILED=true
+                fi
             else
                 echo "✅ Database already has data"
             fi
         fi
         
-        # Show status box
+        # Show status box - different based on whether DB connection worked
         echo ""
-        echo -e "\033[0;32m"
-        echo "╔════════════════════════════════════════════════════════════════╗"
-        echo "║                                                                ║"
-        echo "║                    🎉 GraphDone is Ready! 🎉                   ║"
-        echo "║                                                                ║"
-        echo "║  📍 Access your application:                                   ║"
-        echo "║     🌐 Web App:      http://localhost:3127                     ║"
-        echo "║     🔌 GraphQL API:  http://localhost:4127/graphql             ║"
-        echo "║     🩺 Health Check: http://localhost:4127/health              ║"
-        echo "║                                                                ║"
-        echo "║  💡 Tips:                                                      ║"
-        echo "║     • Press Ctrl+C to stop all services                        ║"
-        echo "║     • Check logs above for any issues                          ║"
-        echo "║     • Visit the web app to start using GraphDone               ║"
-        echo "║                                                                ║"
-        echo "╚════════════════════════════════════════════════════════════════╝"
+        if [ "$SEEDING_FAILED" = true ]; then
+            echo -e "\033[0;33m"  # Yellow for warning
+            echo "╔════════════════════════════════════════════════════════════════╗"
+            echo "║                                                                ║"
+            echo "║                ⚠️  GraphDone LIMITED MODE ⚠️                   ║"
+            echo "║                                                                ║"
+            echo "║  📍 Services running (AUTHENTICATION ONLY):                   ║"
+            echo "║     🌐 Web App:      http://localhost:3127                     ║"
+            echo "║     🔌 GraphQL API:  http://localhost:4127/graphql             ║"
+            echo "║     🩺 Health Check: http://localhost:4127/health              ║"
+            echo "║                                                                ║"
+            echo "║  ❌ DATABASE UNAVAILABLE:                                      ║"
+            echo "║     • Neo4j connection failed                                  ║"
+            echo "║     • Graph features disabled                                  ║"
+            echo "║     • Only user authentication works                          ║"
+            echo "║                                                                ║"
+            echo "║  🔧 To fix: Check Docker containers and network connectivity  ║"
+            echo "║                                                                ║"
+            echo "╚════════════════════════════════════════════════════════════════╝"
+        else
+            echo -e "\033[0;32m"  # Green for success
+            echo "╔════════════════════════════════════════════════════════════════╗"
+            echo "║                                                                ║"
+            echo "║                    🎉 GraphDone is Ready! 🎉                   ║"
+            echo "║                                                                ║"
+            echo "║  📍 Access your application:                                   ║"
+            echo "║     🌐 Web App:      http://localhost:3127                     ║"
+            echo "║     🔌 GraphQL API:  http://localhost:4127/graphql             ║"
+            echo "║     🩺 Health Check: http://localhost:4127/health              ║"
+            echo "║                                                                ║"
+            echo "║  💡 Tips:                                                      ║"
+            echo "║     • Press Ctrl+C to stop all services                        ║"
+            echo "║     • Check logs above for any issues                          ║"
+            echo "║     • Visit the web app to start using GraphDone               ║"
+            echo "║                                                                ║"
+            echo "╚════════════════════════════════════════════════════════════════╝"
+        fi
         echo -e "\033[0m"
         echo ""
         
