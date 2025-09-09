@@ -67,7 +67,7 @@ export function useSystemConfig(options: UseSystemConfigOptions = {}) {
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   
-  const intervalRef = useRef<NodeJS.Timeout>();
+  const intervalRef = useRef<number>();
   const abortControllerRef = useRef<AbortController>();
 
   const fetchConfig = async () => {
@@ -117,7 +117,7 @@ export function useSystemConfig(options: UseSystemConfigOptions = {}) {
 
     // Set up periodic refresh if enabled
     if (enableAutoRefresh && refreshInterval > 0) {
-      intervalRef.current = setInterval(fetchConfig, refreshInterval);
+      intervalRef.current = setInterval(fetchConfig, refreshInterval) as unknown as number;
     }
 
     // Cleanup function
