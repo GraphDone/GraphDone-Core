@@ -7,8 +7,8 @@ COPY package.json turbo.json ./
 COPY packages/core/package.json ./packages/core/
 COPY packages/server/package.json ./packages/server/
 
-# Install dependencies
-RUN npm ci
+# Install dependencies (with legacy peer deps for compatibility)
+RUN npm install --legacy-peer-deps
 
 # Copy source code
 COPY packages/core ./packages/core
