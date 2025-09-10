@@ -211,15 +211,28 @@ export const RelationshipEditorWindow: React.FC<RelationshipEditorWindowProps> =
   const handleFlipDirection = async () => {
     if (!editingEdge) return;
     
+    console.log('DEBUG: Edge source is:', typeof editingEdge.edge.source, editingEdge.edge.source);
+    console.log('DEBUG: Edge target is:', typeof editingEdge.edge.target, editingEdge.edge.target);
+    console.log('DEBUG: This is the D3 force simulation behavior - it converts string IDs to node objects!');
+    
     setIsFlippingEdge(true);
     try {
-      // Extract IDs safely - handle both string and object formats
+      // Extract IDs safely - D3 force simulation converts string IDs to node objects
       const sourceId = typeof editingEdge.edge.source === 'string' 
         ? editingEdge.edge.source 
-        : editingEdge.edge.source.id;
+        : (editingEdge.edge.source as any)?.id;
       const targetId = typeof editingEdge.edge.target === 'string' 
         ? editingEdge.edge.target 
-        : editingEdge.edge.target.id;
+        : (editingEdge.edge.target as any)?.id;
+        
+      console.log('DEBUG: Extracted sourceId:', sourceId);
+      console.log('DEBUG: Extracted targetId:', targetId);
+      
+      // Validate that we successfully extracted IDs
+      if (!sourceId || !targetId) {
+        showError('Flip Failed', 'Unable to extract node IDs from edge data');
+        return;
+      }
       
       // Delete current edge
       await deleteEdgeMutation({
@@ -328,17 +341,19 @@ export const RelationshipEditorWindow: React.FC<RelationshipEditorWindowProps> =
             )}
             {isEditingMode && (
               <div className="text-blue-400 text-sm">
-                Editing relationship: {workItems.find(item => {
+                Editing relationship: {(() => {
                   const sourceId = typeof editingEdge?.edge.source === 'string' 
                     ? editingEdge?.edge.source 
-                    : editingEdge?.edge.source?.id;
-                  return item.id === sourceId;
-                })?.title || 'Unknown'} → {workItems.find(item => {
+                    : (editingEdge?.edge.source as any)?.id;
                   const targetId = typeof editingEdge?.edge.target === 'string' 
                     ? editingEdge?.edge.target 
-                    : editingEdge?.edge.target?.id;
-                  return item.id === targetId;
-                })?.title || 'Unknown'}
+                    : (editingEdge?.edge.target as any)?.id;
+                  
+                  const sourceTitle = workItems.find(item => item.id === sourceId)?.title || 'Unknown';
+                  const targetTitle = workItems.find(item => item.id === targetId)?.title || 'Unknown';
+                  
+                  return `${sourceTitle} → ${targetTitle}`;
+                })()}
               </div>
             )}
           </div>
