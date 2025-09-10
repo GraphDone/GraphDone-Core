@@ -211,10 +211,6 @@ export const RelationshipEditorWindow: React.FC<RelationshipEditorWindowProps> =
   const handleFlipDirection = async () => {
     if (!editingEdge) return;
     
-    console.log('DEBUG: Edge source is:', typeof editingEdge.edge.source, editingEdge.edge.source);
-    console.log('DEBUG: Edge target is:', typeof editingEdge.edge.target, editingEdge.edge.target);
-    console.log('DEBUG: This is the D3 force simulation behavior - it converts string IDs to node objects!');
-    
     setIsFlippingEdge(true);
     try {
       // Extract IDs safely - D3 force simulation converts string IDs to node objects
@@ -224,9 +220,6 @@ export const RelationshipEditorWindow: React.FC<RelationshipEditorWindowProps> =
       const targetId = typeof editingEdge.edge.target === 'string' 
         ? editingEdge.edge.target 
         : (editingEdge.edge.target as any)?.id;
-        
-      console.log('DEBUG: Extracted sourceId:', sourceId);
-      console.log('DEBUG: Extracted targetId:', targetId);
       
       // Validate that we successfully extracted IDs
       if (!sourceId || !targetId) {
