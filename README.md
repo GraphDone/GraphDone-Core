@@ -260,6 +260,7 @@ Anyone can propose ideas and assign personal priority. The community validates t
 - 🎯 **[Project Philosophy](./docs/philosophy.md)** - Core beliefs and design principles  
 - 🚀 **[Getting Started Guide](./docs/guides/getting-started.md)** - Step-by-step setup and first steps
 - 🏗️ **[Architecture Overview](./docs/guides/architecture-overview.md)** - System design and technical decisions
+- 🧪 **[Testing Guide](./tests/README.md)** - **E2E testing with robust authentication system**
 - 🤖 **[AI Agents Integration](./docs/guides/ai-agents-integration.md)** - Multi-agent AI system with tamagotchi-style companions
 - 👥 **[User Flows](./docs/guides/user-flows.md)** - How teams actually use GraphDone
 - 🔌 **[API Documentation](./docs/api/graphql.md)** - GraphQL schema and integration guide
