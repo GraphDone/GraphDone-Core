@@ -28,8 +28,8 @@ test.describe('TLS/SSL Integration', () => {
     test('should serve GraphQL over HTTPS when SSL is enabled', async ({ page }) => {
       // Set environment variables for HTTPS testing
       process.env.SSL_ENABLED = 'true';
-      process.env.SSL_KEY_PATH = './certs/dev-key.pem';
-      process.env.SSL_CERT_PATH = './certs/dev-cert.pem';
+      process.env.SSL_KEY_PATH = './artifacts/certificates/certs-dev/dev-key.pem';
+      process.env.SSL_CERT_PATH = './artifacts/certificates/certs-dev/dev-cert.pem';
       process.env.HTTPS_PORT = '4128';
       
       // Navigate to HTTPS endpoint (bypassing certificate warnings)
@@ -67,8 +67,8 @@ test.describe('TLS/SSL Integration', () => {
   test.describe('WebSocket Secure (WSS) Support', () => {
     test('should upgrade WebSocket connections to WSS when HTTPS is enabled', async ({ page }) => {
       process.env.SSL_ENABLED = 'true';
-      process.env.SSL_KEY_PATH = './certs/dev-key.pem';
-      process.env.SSL_CERT_PATH = './certs/dev-cert.pem';
+      process.env.SSL_KEY_PATH = './artifacts/certificates/certs-dev/dev-key.pem';
+      process.env.SSL_CERT_PATH = './artifacts/certificates/certs-dev/dev-cert.pem';
       process.env.HTTPS_PORT = '4128';
       
       await page.context().setIgnoreHTTPSErrors(true);
@@ -107,8 +107,8 @@ test.describe('TLS/SSL Integration', () => {
       if (!hasCerts) return;
       
       process.env.SSL_ENABLED = 'true';
-      process.env.SSL_KEY_PATH = './certs/dev-key.pem';
-      process.env.SSL_CERT_PATH = './certs/dev-cert.pem';
+      process.env.SSL_KEY_PATH = './artifacts/certificates/certs-dev/dev-key.pem';
+      process.env.SSL_CERT_PATH = './artifacts/certificates/certs-dev/dev-cert.pem';
       
       // Test certificate validity using Node.js HTTPS
       const options = {
