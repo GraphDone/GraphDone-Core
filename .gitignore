@@ -39,7 +39,13 @@ out/
 *.p12
 *.pfx
 certs/
-deployment/certs/
+# Include development certificates for automated testing
+!deployment/certs/server-key.pem
+!deployment/certs/server-cert.pem
+# Exclude production certificates
+deployment/certs/*.production.pem
+deployment/certs/*.production.key
+deployment/certs/*.production.crt
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
