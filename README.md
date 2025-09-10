@@ -260,10 +260,17 @@ Anyone can propose ideas and assign personal priority. The community validates t
 - 🎯 **[Project Philosophy](./docs/philosophy.md)** - Core beliefs and design principles  
 - 🚀 **[Getting Started Guide](./docs/guides/getting-started.md)** - Step-by-step setup and first steps
 - 🏗️ **[Architecture Overview](./docs/guides/architecture-overview.md)** - System design and technical decisions
-- 🧪 **[Testing Guide](./tests/README.md)** - **E2E testing with robust authentication system**
-- 🤖 **[AI Agents Integration](./docs/guides/ai-agents-integration.md)** - Multi-agent AI system with tamagotchi-style companions
+
+### User Guides & Features
+- 📊 **[Graph Creation Workflow](./docs/features/graph-creation.md)** - Complete guide to creating and managing graphs
+- 🛡️ **[Admin System Guide](./docs/features/admin-system.md)** - Comprehensive admin panel documentation
 - 👥 **[User Flows](./docs/guides/user-flows.md)** - How teams actually use GraphDone
-- 🔌 **[API Documentation](./docs/api/graphql.md)** - GraphQL schema and integration guide
+- 🤖 **[AI Agents Integration](./docs/guides/ai-agents-integration.md)** - Multi-agent AI system with tamagotchi-style companions
+
+### Technical Reference
+- 🔌 **[API Documentation](./docs/api/graphql.md)** - Complete GraphQL schema and integration guide
+- 🧪 **[Testing Guide](./tests/README.md)** - E2E testing with robust authentication system
+- 🎯 **[Admin & Graph E2E Testing](./docs/testing/e2e-admin-graph-creation.md)** - Comprehensive testing for admin and graph creation
 - 🚀 **[Deployment Guide](./docs/deployment/README.md)** - Self-hosted and cloud deployment options
 - 🏷️ **[Version Management](./docs/version-management.md)** - How to update versions across the monorepo
 
