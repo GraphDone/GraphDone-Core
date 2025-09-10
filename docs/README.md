@@ -70,7 +70,6 @@ Welcome to the GraphDone documentation! This directory contains comprehensive gu
 ## 🔗 Quick Links
 
 - [Project Philosophy](../philosophy.md)
-- [Contributing Guide](./guides/contributing.md)
 - [API Documentation](./api/graphql.md)
 - [Deployment Guide](./deployment/README.md)
 

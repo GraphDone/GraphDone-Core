@@ -78,7 +78,7 @@ GraphDone follows **democratic development principles** - releases happen when t
 4. **Share joy moments**: What made you smile or feel productive?
 
 ### As a Contributor
-1. **Understand the vision**: Read our [philosophy](./docs/philosophy.md)
+1. **Understand the vision**: Read our [philosophy](./philosophy.md)
 2. **Focus on user experience**: Every change should make the interface more delightful
 3. **Test with real usage**: Use GraphDone for actual project organization
 4. **Document your improvements**: Help others understand UX decisions
