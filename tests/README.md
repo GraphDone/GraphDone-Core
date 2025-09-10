@@ -193,11 +193,38 @@ test('authentication error handling', async ({ page }) => {
 
 ## 🚀 Running Tests
 
+### HTTPS/TLS Tests Setup (Required!)
+
+**🔐 Before running E2E tests, generate development certificates:**
+
+```bash
+# 1. Generate development certificates (required for TLS tests)
+./scripts/generate-dev-certs.sh
+
+# 2. Verify certificates were created
+ls -la deployment/certs/server-*.pem
+# Should show: server-key.pem and server-cert.pem
+
+# 3. Enable HTTPS in .env file
+SSL_ENABLED=true
+SSL_KEY_PATH=./deployment/certs/server-key.pem
+SSL_CERT_PATH=./deployment/certs/server-cert.pem
+HTTPS_PORT=4128
+```
+
+**Why this is important:**
+- TLS integration tests will **skip** if certificates are missing
+- Development certificates are **included in repository** for automated testing
+- Playwright automatically ignores HTTPS errors for development certificates
+
 ### E2E Tests
 
 ```bash
-# Run all E2E tests
+# Run all E2E tests (includes TLS tests if certificates exist)
 npm run test:e2e
+
+# Run TLS-specific tests
+npm run test:e2e -- tests/e2e/tls-integration.spec.ts
 
 # Run specific test file
 npm run test:e2e -- tests/e2e/auth-basic-test.spec.ts
@@ -315,6 +342,12 @@ test.describe('Feature Name', () => {
    - Verify GraphQL server is running on correct port
    - Check browser console for CORS issues
    - Ensure database is properly seeded
+
+4. **TLS/HTTPS Test Issues**
+   - **Tests skip with "TLS tests require certificates"**: Run `./scripts/generate-dev-certs.sh`
+   - **"SSL key file not found"**: Ensure paths use `deployment/certs/server-*.pem` format
+   - **Certificate warnings in browser**: Expected for dev certificates - tests handle this automatically
+   - **"ENOENT: generate-dev-certs.sh"**: Script symlink missing - run `ln -sf manage-certificates.sh scripts/generate-dev-certs.sh`
 
 ### Debug Tools
 
