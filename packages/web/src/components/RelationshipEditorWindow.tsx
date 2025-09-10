@@ -213,6 +213,14 @@ export const RelationshipEditorWindow: React.FC<RelationshipEditorWindowProps> =
     
     setIsFlippingEdge(true);
     try {
+      // Extract IDs safely - handle both string and object formats
+      const sourceId = typeof editingEdge.edge.source === 'string' 
+        ? editingEdge.edge.source 
+        : editingEdge.edge.source.id;
+      const targetId = typeof editingEdge.edge.target === 'string' 
+        ? editingEdge.edge.target 
+        : editingEdge.edge.target.id;
+      
       // Delete current edge
       await deleteEdgeMutation({
         variables: { where: { id: editingEdge.edge.id } }
@@ -223,8 +231,8 @@ export const RelationshipEditorWindow: React.FC<RelationshipEditorWindowProps> =
         variables: {
           input: [{
             type: editingEdge.edge.type,
-            source: { connect: { where: { node: { id: editingEdge.edge.target } } } },
-            target: { connect: { where: { node: { id: editingEdge.edge.source } } } },
+            source: { connect: { where: { node: { id: targetId } } } },
+            target: { connect: { where: { node: { id: sourceId } } } },
             weight: 1.0
           }]
         }
@@ -320,7 +328,17 @@ export const RelationshipEditorWindow: React.FC<RelationshipEditorWindowProps> =
             )}
             {isEditingMode && (
               <div className="text-blue-400 text-sm">
-                Editing relationship: {workItems.find(item => item.id === editingEdge?.edge.source)?.title || 'Unknown'} → {workItems.find(item => item.id === editingEdge?.edge.target)?.title || 'Unknown'}
+                Editing relationship: {workItems.find(item => {
+                  const sourceId = typeof editingEdge?.edge.source === 'string' 
+                    ? editingEdge?.edge.source 
+                    : editingEdge?.edge.source?.id;
+                  return item.id === sourceId;
+                })?.title || 'Unknown'} → {workItems.find(item => {
+                  const targetId = typeof editingEdge?.edge.target === 'string' 
+                    ? editingEdge?.edge.target 
+                    : editingEdge?.edge.target?.id;
+                  return item.id === targetId;
+                })?.title || 'Unknown'}
               </div>
             )}
           </div>
