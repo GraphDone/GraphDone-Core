@@ -10,11 +10,18 @@ coverage/
 test-results/
 test-artifacts/
 playwright-report/
+artifacts/
+
+# Images and screenshots (allow docs images)
 *.png
 *.jpg
 *.jpeg
 *.gif
 *.webp
+!docs/**/*.png
+!docs/**/*.jpg
+!docs/**/*.jpeg
+!docs/**/*.svg
 
 # Production
 build/
