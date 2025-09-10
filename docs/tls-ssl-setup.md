@@ -16,8 +16,8 @@ This guide explains how to enable HTTPS/TLS encryption for GraphDone in both dev
    
    # Edit .env file
    SSL_ENABLED=true
-   SSL_KEY_PATH=./certs/dev-key.pem
-   SSL_CERT_PATH=./certs/dev-cert.pem
+   SSL_KEY_PATH=./deployment/certs/server-key.pem
+   SSL_CERT_PATH=./deployment/certs/server-cert.pem
    HTTPS_PORT=4128
    
    # Update client URLs for HTTPS
@@ -51,8 +51,8 @@ This guide explains how to enable HTTPS/TLS encryption for GraphDone in both dev
 #### Development with self-signed certificates:
 ```bash
 SSL_ENABLED=true
-SSL_KEY_PATH=./certs/dev-key.pem
-SSL_CERT_PATH=./certs/dev-cert.pem
+SSL_KEY_PATH=./deployment/certs/server-key.pem
+SSL_CERT_PATH=./deployment/certs/server-cert.pem
 HTTPS_PORT=4128
 ```
 
@@ -73,10 +73,6 @@ Use the provided HTTPS Docker configuration:
 ```bash
 # Generate certificates first
 ./scripts/generate-dev-certs.sh
-
-# Create certs directory for Docker
-mkdir -p deployment/certs
-cp certs/dev-*.pem deployment/certs/
 
 # Start with HTTPS configuration
 cd deployment
@@ -237,10 +233,10 @@ npm run test:e2e -- tls-integration.spec.ts
 
 ```bash
 # Check certificate validity
-openssl x509 -in certs/dev-cert.pem -text -noout
+openssl x509 -in deployment/certs/server-cert.pem -text -noout
 
 # Check private key validity
-openssl rsa -in certs/dev-key.pem -check -noout
+openssl rsa -in deployment/certs/server-key.pem -check -noout
 
 # Test server response
 curl -v -k https://localhost:4128/health
@@ -248,6 +244,36 @@ curl -v -k https://localhost:4128/health
 # Check if server is listening on HTTPS port
 netstat -an | grep 4128
 ```
+
+### Quick Testing Verification
+
+After setting up HTTPS, verify everything is working:
+
+```bash
+# 1. Verify certificates exist
+ls -la deployment/certs/server-*.pem
+# Should show both server-key.pem and server-cert.pem
+
+# 2. Start the server with HTTPS
+npm run dev
+
+# 3. Test HTTPS endpoints
+curl -k https://localhost:4128/health
+curl -k https://localhost:4128/graphql -d '{"query":"{ __typename }"}'
+
+# 4. Run TLS integration tests
+npm run test:e2e -- tests/e2e/tls-integration.spec.ts
+```
+
+### Common Problems & Solutions
+
+| Problem | Cause | Solution |
+|---------|-------|----------|
+| "SSL key file not found" | Wrong certificate path | Use `./deployment/certs/server-*.pem` paths |
+| Tests skip with "TLS tests require certificates" | Missing dev certificates | Run `./scripts/generate-dev-certs.sh` |
+| "ENOENT: no such file 'generate-dev-certs.sh'" | Script reference issue | Use symlink: `ln -sf manage-certificates.sh scripts/generate-dev-certs.sh` |
+| Browser shows certificate warnings | Self-signed certificate | Expected for development - click "Proceed" |
+| Playwright tests fail with certificate errors | Missing ignoreHTTPSErrors | Add `ignoreHTTPSErrors: true` to playwright.config.ts |
 
 ## Implementation Details
 
@@ -273,11 +299,11 @@ GraphDone-Core/
 ├── deployment/
 │   ├── docker-compose.yml      # Standard HTTP Docker config
 │   └── docker-compose.https.yml # HTTPS Docker config
-├── e2e/
+├── tests/e2e/
 │   └── tls-integration.spec.ts  # E2E TLS tests
-└── certs/                      # Generated certificates (gitignored)
-    ├── dev-key.pem
-    └── dev-cert.pem
+└── deployment/certs/           # Generated certificates (dev certs gitignored)
+    ├── server-key.pem
+    └── server-cert.pem
 ```
 
 ### Security Features
