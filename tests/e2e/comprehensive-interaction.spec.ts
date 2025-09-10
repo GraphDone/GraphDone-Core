@@ -92,7 +92,7 @@ test.describe('Comprehensive UI Interaction Testing', () => {
           
           // Take screenshot of this view
           await page.screenshot({ 
-            path: `view-${viewText?.toLowerCase().replace(/\s+/g, '-') || i}.png` 
+            path: `artifacts/screenshots/view-${viewText?.toLowerCase().replace(/\s+/g, '-') || i}.png` 
           });
           
           // Test scrollbars in this view
@@ -320,7 +320,7 @@ test.describe('Comprehensive UI Interaction Testing', () => {
     console.log('\n✅ COMPREHENSIVE UI INTERACTION TEST COMPLETED');
     
     // Final screenshot
-    await page.screenshot({ path: 'final-ui-state.png', fullPage: true });
+    await page.screenshot({ path: 'artifacts/screenshots/final-ui-state.png', fullPage: true });
   });
   
   // Helper function to test scrollbars in different views

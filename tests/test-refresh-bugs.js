@@ -58,7 +58,7 @@ async function testRefreshBugs() {
     await page.waitForTimeout(5000);
     
     // Take a screenshot to see current state
-    await page.screenshot({ path: 'current-state.png' });
+    await page.screenshot({ path: 'artifacts/screenshots/current-state.png' });
     console.log('📸 Screenshot saved as current-state.png');
     
     // Step 4: Test node creation (if possible)
@@ -123,13 +123,13 @@ async function testRefreshBugs() {
         console.log('⏳ Flipping relationship direction...');
         
         // Capture before state
-        await page.screenshot({ path: 'before-flip.png' });
+        await page.screenshot({ path: 'artifacts/screenshots/before-flip.png' });
         
         await flipBtn.click();
         await page.waitForTimeout(3000);
         
         // Capture after state  
-        await page.screenshot({ path: 'after-flip.png' });
+        await page.screenshot({ path: 'artifacts/screenshots/after-flip.png' });
         
         console.log('🔄 Flip attempted - compare before-flip.png and after-flip.png');
         console.log('💡 If they look the same, try refreshing the page manually to see if flip took effect');
@@ -139,17 +139,17 @@ async function testRefreshBugs() {
         await page.reload();
         await page.waitForTimeout(3000);
         
-        await page.screenshot({ path: 'after-flip-refresh.png' });
+        await page.screenshot({ path: 'artifacts/screenshots/after-flip-refresh.png' });
         console.log('📸 After refresh screenshot: after-flip-refresh.png');
       }
     }
     
     console.log('✅ Manual testing completed!');
     console.log('📁 Check these screenshots:');
-    console.log('   - current-state.png (initial state)');
-    console.log('   - before-flip.png (before relationship flip)'); 
-    console.log('   - after-flip.png (after flip, before refresh)');
-    console.log('   - after-flip-refresh.png (after refresh)');
+    console.log('   - artifacts/screenshots/current-state.png (initial state)');
+    console.log('   - artifacts/screenshots/before-flip.png (before relationship flip)'); 
+    console.log('   - artifacts/screenshots/after-flip.png (after flip, before refresh)');
+    console.log('   - artifacts/screenshots/after-flip-refresh.png (after refresh)');
     
     // Keep browser open for manual inspection
     console.log('🔍 Browser staying open for manual inspection...');

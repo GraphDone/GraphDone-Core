@@ -17,7 +17,7 @@ NC='\033[0m' # No Color
 # Test configuration
 HTTP_PORT=4127
 HTTPS_PORT=4128
-CERT_DIR="./certs"
+CERT_DIR="./artifacts/certificates/certs-dev"
 
 echo ""
 echo "📋 Test Plan:"
@@ -131,8 +131,8 @@ sleep 2
 echo ""
 echo "3️⃣ Testing HTTPS server (SSL enabled)..."
 export SSL_ENABLED=true
-export SSL_KEY_PATH="./certs/dev-key.pem"
-export SSL_CERT_PATH="./certs/dev-cert.pem"
+export SSL_KEY_PATH="./artifacts/certificates/certs-dev/dev-key.pem"
+export SSL_CERT_PATH="./artifacts/certificates/certs-dev/dev-cert.pem"
 export HTTPS_PORT=$HTTPS_PORT
 
 # Start HTTPS server in background
