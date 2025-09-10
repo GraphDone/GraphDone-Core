@@ -384,7 +384,7 @@ test.describe('Comprehensive Graph Operations - Real-Time vs Refresh', () => {
     
     // Take comprehensive final screenshot
     await page.screenshot({ 
-      path: 'comprehensive-graph-operations-final.png',
+      path: 'artifacts/screenshots/comprehensive-graph-operations-final.png',
       fullPage: true 
     });
     

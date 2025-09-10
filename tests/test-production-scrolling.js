@@ -24,7 +24,7 @@ async function testProductionScrolling() {
       timeout: 30000 
     });
     
-    await page.screenshot({ path: 'prod-step1-initial.png' });
+    await page.screenshot({ path: 'artifacts/screenshots/prod-step1-initial.png' });
     console.log('✅ Connected to production deployment');
     
     // Step 2: Handle authentication
@@ -47,7 +47,7 @@ async function testProductionScrolling() {
       await loginButton.click();
       
       await page.waitForTimeout(3000);
-      await page.screenshot({ path: 'prod-step2-after-login.png' });
+      await page.screenshot({ path: 'artifacts/screenshots/prod-step2-after-login.png' });
       console.log('✅ Login completed');
     } else {
       console.log('ℹ️ No login form - may already be authenticated');
@@ -69,7 +69,7 @@ async function testProductionScrolling() {
       }
     }
     
-    await page.screenshot({ path: 'prod-step3-workspace.png' });
+    await page.screenshot({ path: 'artifacts/screenshots/prod-step3-workspace.png' });
     console.log('✅ Navigated to workspace area');
     
     // Step 4: Test view switching and scrolling
@@ -161,7 +161,7 @@ async function testProductionScrolling() {
       
       // Take screenshot
       await page.screenshot({ 
-        path: `prod-${view.name.toLowerCase()}-view-scrolltest.png`,
+        path: `artifacts/screenshots/prod-${view.name.toLowerCase()}-view-scrolltest.png`,
         fullPage: true 
       });
       
@@ -234,15 +234,15 @@ async function testProductionScrolling() {
     console.log(`Clickability: ${clickableCount}/${Math.min(buttonCount, 5)} = ${clickabilityRatio}%`);
     
     // Final screenshot
-    await page.screenshot({ path: 'prod-final-state.png', fullPage: true });
+    await page.screenshot({ path: 'artifacts/screenshots/prod-final-state.png', fullPage: true });
     
     console.log('\n✅ PRODUCTION SCROLLING TEST COMPLETED');
     console.log('\n📁 Screenshots generated:');
-    console.log('   - prod-step1-initial.png');
-    console.log('   - prod-step2-after-login.png'); 
-    console.log('   - prod-step3-workspace.png');
-    console.log('   - prod-*-view-scrolltest.png (for each view)');
-    console.log('   - prod-final-state.png');
+    console.log('   - artifacts/screenshots/prod-step1-initial.png');
+    console.log('   - artifacts/screenshots/prod-step2-after-login.png'); 
+    console.log('   - artifacts/screenshots/prod-step3-workspace.png');
+    console.log('   - artifacts/screenshots/prod-*-view-scrolltest.png (for each view)');
+    console.log('   - artifacts/screenshots/prod-final-state.png');
     
     console.log('\n🔍 Keep browser open for manual inspection...');
     console.log('   Press Ctrl+C when done');
@@ -252,7 +252,7 @@ async function testProductionScrolling() {
     
   } catch (error) {
     console.error('\n❌ Test failed:', error.message);
-    await page.screenshot({ path: 'prod-error.png' });
+    await page.screenshot({ path: 'artifacts/screenshots/prod-error.png' });
   } finally {
     // Browser will stay open due to infinite wait
   }
