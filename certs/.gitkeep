@@ -1,3 +1,0 @@
-# This directory is for generated certificates
-# Certificates are generated on-demand by scripts/generate-dev-certs.sh
-# Do not commit certificate files to the repository
