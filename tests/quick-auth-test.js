@@ -22,7 +22,7 @@ async function quickAuthTest() {
       timeout: 30000 
     });
     
-    await page.screenshot({ path: 'auth-test-1-initial.png' });
+    await page.screenshot({ path: 'artifacts/screenshots/auth-test-1-initial.png' });
     console.log('✅ Connected to production deployment');
     
     // Check if we need to log in
@@ -42,7 +42,7 @@ async function quickAuthTest() {
       await loginButton.click();
       
       await page.waitForTimeout(3000);
-      await page.screenshot({ path: 'auth-test-2-after-login.png' });
+      await page.screenshot({ path: 'artifacts/screenshots/auth-test-2-after-login.png' });
       console.log('✅ Login completed');
     } else {
       console.log('ℹ️ No login form - may already be authenticated or different flow');
@@ -61,7 +61,7 @@ async function quickAuthTest() {
     }
     
     await page.waitForTimeout(3000);
-    await page.screenshot({ path: 'auth-test-3-workspace.png' });
+    await page.screenshot({ path: 'artifacts/screenshots/auth-test-3-workspace.png' });
     
     // Check workspace elements
     console.log('\n=== STEP 4: Check Workspace Elements ===');
@@ -100,9 +100,9 @@ async function quickAuthTest() {
     
     console.log('\n✅ Quick Authentication Test Completed');
     console.log('📁 Screenshots generated:');
-    console.log('   - auth-test-1-initial.png');
-    console.log('   - auth-test-2-after-login.png'); 
-    console.log('   - auth-test-3-workspace.png');
+    console.log('   - artifacts/screenshots/auth-test-1-initial.png');
+    console.log('   - artifacts/screenshots/auth-test-2-after-login.png'); 
+    console.log('   - artifacts/screenshots/auth-test-3-workspace.png');
     
     console.log('\n🔍 Keep browser open for manual inspection...');
     console.log('   Press Ctrl+C when done');
@@ -112,7 +112,7 @@ async function quickAuthTest() {
     
   } catch (error) {
     console.error('\n❌ Test failed:', error.message);
-    await page.screenshot({ path: 'auth-test-error.png' });
+    await page.screenshot({ path: 'artifacts/screenshots/auth-test-error.png' });
   } finally {
     // Browser will stay open due to infinite wait
   }
