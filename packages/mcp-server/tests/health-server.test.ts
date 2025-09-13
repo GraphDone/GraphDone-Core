@@ -27,7 +27,7 @@ describe('MCP Health Server', () => {
       expect(health).toBeDefined();
       expect(health.status).toBe('healthy');
       expect(health.server).toBe('graphdone-mcp');
-      expect(health.version).toBe('0.2.1-alpha');
+      expect(health.version).toBe('0.3.1-alpha');
       expect(health.capabilities).toBeDefined();
       expect(Array.isArray(health.capabilities)).toBe(true);
       expect(health.capabilities.length).toBeGreaterThan(0);

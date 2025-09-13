@@ -5,10 +5,10 @@
 ![GraphDone UI Screenshot](./docs/graphdone_ui.png)
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Version](https://img.shields.io/badge/version-0.2.2--alpha-orange.svg)
+![Version](https://img.shields.io/badge/version-0.3.1--alpha-orange.svg)
 ![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
 
-> 🚨 **PRODUCTION SECURITY WARNING**: This project is currently configured for development only with HTTP and hardcoded passwords. See [TLS Implementation Plan](./docs/security/tls-implementation-plan.md) for required security changes before production deployment.
+> 🔒 **SECURITY NOTE**: GraphDone supports both HTTP (development) and HTTPS/TLS (production) modes. For production deployment, enable TLS encryption and use production-grade authentication. See [TLS/SSL Setup Guide](./docs/tls-ssl-setup.md) for configuration details.
 
 ## What is GraphDone?
 
@@ -79,6 +79,7 @@ Visit **http://localhost:3127** when you see the "GraphDone is Ready!" message.
 **Core GraphDone Services:**
 - 🌐 **Web Application**: http://localhost:3127 - Full graph visualization and collaboration interface
 - 🔗 **GraphQL API**: http://localhost:4127/graphql - Auto-generated resolvers with @neo4j/graphql  
+- 🔒 **HTTPS Support**: Optional TLS/SSL encryption for production deployments ([Setup Guide](./docs/tls-ssl-setup.md))
 - 🩺 **Health Check**: http://localhost:4127/health - Service status monitoring
 - 🗄️ **Database**: Neo4j 5.15-community with APOC plugins for native graph storage
 
@@ -259,10 +260,19 @@ Anyone can propose ideas and assign personal priority. The community validates t
 - 🎯 **[Project Philosophy](./docs/philosophy.md)** - Core beliefs and design principles  
 - 🚀 **[Getting Started Guide](./docs/guides/getting-started.md)** - Step-by-step setup and first steps
 - 🏗️ **[Architecture Overview](./docs/guides/architecture-overview.md)** - System design and technical decisions
-- 🤖 **[AI Agents Integration](./docs/guides/ai-agents-integration.md)** - Multi-agent AI system with tamagotchi-style companions
+
+### User Guides & Features
+- 📊 **[Graph Creation Workflow](./docs/features/graph-creation.md)** - Complete guide to creating and managing graphs
+- 🛡️ **[Admin System Guide](./docs/features/admin-system.md)** - Comprehensive admin panel documentation
 - 👥 **[User Flows](./docs/guides/user-flows.md)** - How teams actually use GraphDone
-- 🔌 **[API Documentation](./docs/api/graphql.md)** - GraphQL schema and integration guide
+- 🤖 **[AI Agents Integration](./docs/guides/ai-agents-integration.md)** - Multi-agent AI system with tamagotchi-style companions
+
+### Technical Reference
+- 🔌 **[API Documentation](./docs/api/graphql.md)** - Complete GraphQL schema and integration guide
+- 🧪 **[Testing Guide](./tests/README.md)** - E2E testing with robust authentication system
+- 🎯 **[Admin & Graph E2E Testing](./docs/testing/e2e-admin-graph-creation.md)** - Comprehensive testing for admin and graph creation
 - 🚀 **[Deployment Guide](./docs/deployment/README.md)** - Self-hosted and cloud deployment options
+- 🏷️ **[Version Management](./docs/version-management.md)** - How to update versions across the monorepo
 
 ## Contributing
 
