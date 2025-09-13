@@ -2,11 +2,23 @@
 
 GraphDone provides a comprehensive GraphQL API for all data operations. The API supports queries, mutations, and real-time subscriptions.
 
-## Endpoint
+## Endpoints
+
+GraphQL API is accessed through the web application proxy:
 
 ```
-http://localhost:4127/graphql
+# Development (HTTP)
+http://localhost:3127/graphql
+
+# Production (HTTPS)
+https://localhost:3128/api/graphql
+
+# WebSocket Subscriptions
+ws://localhost:3127/graphql      # Development
+wss://localhost:3128/api/graphql # Production
 ```
+
+**Note**: The GraphQL API server runs on internal ports (4127 dev, 4128 prod) but is not directly exposed. All API access goes through the web application which proxies requests to the internal GraphQL server.
 
 ## Authentication
 
@@ -18,55 +30,161 @@ Authorization: Bearer <your-jwt-token>
 
 ## Core Types
 
-### Node
+### WorkItem
 
 Represents a work item in the graph.
 
 ```graphql
-type Node {
+type WorkItem {
   id: ID!
   type: NodeType!
   title: String!
   description: String
-  position: SphericalCoordinate!
-  priority: Priority!
+  positionX: Float!
+  positionY: Float!
+  positionZ: Float!
+  radius: Float!
+  theta: Float!
+  phi: Float!
+  priority: Float!
+  priorityComp: Float!
   status: NodeStatus!
-  contributors: [NodeContributor!]!
-  dependencies: [Node!]!
-  dependents: [Node!]!
-  edges: [Edge!]!
-  metadata: JSON
+  dueDate: DateTime
+  tags: [String!]
+  metadata: String # JSON as string
   createdAt: DateTime!
   updatedAt: DateTime!
+  
+  # Relationships
+  owner: User
+  assignedTo: User
+  graph: Graph!
+  dependencies: [WorkItem!]!
+  dependents: [WorkItem!]!
+  contributors: [Contributor!]!
+  sourceEdges: [Edge!]!
+  targetEdges: [Edge!]!
 }
 
 enum NodeType {
-  OUTCOME
-  TASK
-  MILESTONE
-  IDEA
+  DEFAULT      # Generic work item
+  EPIC         # Large initiative spanning multiple deliverables
+  MILESTONE    # Key project checkpoint
+  OUTCOME      # Expected result or deliverable
+  FEATURE      # New functionality or capability
+  TASK         # Specific work item to be completed
+  BUG          # Software defect requiring resolution
+  IDEA         # Concept or proposal for future development
+  RESEARCH     # Investigation or analysis work
 }
 
 enum NodeStatus {
+  NOT_STARTED
   PROPOSED
-  ACTIVE
+  PLANNED
   IN_PROGRESS
+  IN_REVIEW
   BLOCKED
+  ON_HOLD
   COMPLETED
-  ARCHIVED
+  CANCELLED
 }
 ```
 
-### Priority
+### User
 
-Multi-dimensional priority system.
+Represents an authenticated user in the system.
 
 ```graphql
-type Priority {
-  executive: Float!    # Strategic priority (0-1)
-  individual: Float!   # Personal priority (0-1)
-  community: Float!    # Community validation (0-1)
-  computed: Float!     # Weighted combination (0-1)
+type User {
+  id: ID!
+  email: String!
+  username: String!
+  name: String!
+  avatar: String
+  role: UserRole!
+  isActive: Boolean!
+  isEmailVerified: Boolean!
+  lastLogin: DateTime
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  
+  # Relationships
+  team: Team
+  createdGraphs: [Graph!]!
+  contributedTo: [WorkItem!]!
+  ownedNodes: [WorkItem!]!
+}
+
+enum UserRole {
+  GUEST    # Anonymous read-only access
+  VIEWER   # Read-only access to view graphs
+  USER     # Can create and update work items
+  ADMIN    # Full system access and user management
+}
+```
+
+### Graph
+
+Represents a graph/workspace/project.
+
+```graphql
+type Graph {
+  id: ID!
+  name: String!
+  description: String
+  type: GraphType!
+  status: GraphStatus!
+  nodeCount: Int!
+  edgeCount: Int!
+  contributorCount: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  
+  # Relationships
+  creator: User
+  team: Team
+  workItems: [WorkItem!]!
+  subgraphs: [Graph!]!
+  parentGraph: Graph
+}
+
+enum GraphType {
+  PROJECT
+  WORKSPACE
+  SUBGRAPH
+  TEMPLATE
+}
+
+enum GraphStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+  DELETED
+}
+```
+
+### Contributor
+
+Represents contributors (humans and AI agents).
+
+```graphql
+type Contributor {
+  id: ID!
+  type: ContributorType!
+  name: String!
+  email: String
+  capabilities: String # JSON as string
+  createdAt: DateTime!
+  
+  # Relationships
+  user: User
+  workItems: [WorkItem!]!
+}
+
+enum ContributorType {
+  HUMAN
+  AI_AGENT
 }
 ```
 
@@ -86,46 +204,57 @@ type Edge {
 }
 
 enum EdgeType {
-  DEPENDENCY
+  DEPENDS_ON
   BLOCKS
+  ENABLES
   RELATES_TO
+  IS_PART_OF
+  FOLLOWS
+  DEFAULT_EDGE
+  PARALLEL_WITH
+  DUPLICATES
+  CONFLICTS_WITH
+  VALIDATES
+  REFERENCES
   CONTAINS
 }
 ```
 
 ## Common Queries
 
-### Get All Nodes
+### Get All WorkItems
 
 ```graphql
-query GetNodes {
-  nodes {
+query GetWorkItems {
+  workItems {
     id
     title
     type
     status
-    priority {
-      computed
-    }
-    position {
-      radius
-      theta
-      phi
-    }
+    priority
+    positionX
+    positionY
+    positionZ
+    radius
+    theta
+    phi
+    createdAt
+    updatedAt
   }
 }
 ```
 
-### Get Node with Dependencies
+### Get WorkItem with Dependencies
 
 ```graphql
-query GetNodeWithDeps($id: ID!) {
-  node(id: $id) {
+query GetWorkItemWithDeps($id: ID!) {
+  workItems(where: { id: $id }) {
     id
     title
     description
     type
     status
+    priority
     dependencies {
       id
       title
@@ -137,10 +266,8 @@ query GetNodeWithDeps($id: ID!) {
       type
     }
     contributors {
-      contributor {
-        name
-        type
-      }
+      name
+      type
     }
   }
 }
@@ -149,45 +276,56 @@ query GetNodeWithDeps($id: ID!) {
 ### Filter by Priority
 
 ```graphql
-query HighPriorityNodes {
-  nodes(priorityThreshold: 0.7) {
+query HighPriorityWorkItems {
+  workItems(where: { priority_GTE: 0.7 }) {
     id
     title
-    priority {
-      computed
-    }
+    priority
+    type
+    status
   }
 }
 ```
 
-### Get Graph Statistics
+### Get Graph with WorkItems
 
 ```graphql
-query GraphStats {
-  graphStats {
+query GetGraphWithWorkItems($id: ID!) {
+  graphs(where: { id: $id }) {
+    id
+    name
+    description
+    type
+    status
     nodeCount
     edgeCount
-    avgPriority
-    cycleCount
+    workItems {
+      id
+      title
+      type
+      priority
+      status
+    }
   }
 }
 ```
 
 ## Common Mutations
 
-### Create Node
+### Create WorkItem
 
 ```graphql
-mutation CreateNode($input: CreateNodeInput!) {
-  createNode(input: $input) {
-    id
-    title
-    type
-    priority {
-      computed
-    }
-    position {
-      radius
+mutation CreateWorkItem($input: [WorkItemCreateInput!]!) {
+  createWorkItems(input: $input) {
+    workItems {
+      id
+      title
+      type
+      priority
+      status
+      positionX
+      positionY
+      positionZ
     }
   }
 }
@@ -196,47 +334,27 @@ mutation CreateNode($input: CreateNodeInput!) {
 Variables:
 ```json
 {
-  "input": {
+  "input": [{
     "type": "TASK",
     "title": "Implement user authentication",
     "description": "Add secure login and registration",
-    "priority": {
-      "executive": 0.8,
-      "individual": 0.6,
-      "community": 0.4
-    }
-  }
+    "priority": 0.8,
+    "status": "NOT_STARTED"
+  }]
 }
 ```
 
-### Update Node Priority
+### Update WorkItem
 
 ```graphql
-mutation UpdatePriority($id: ID!, $priority: PriorityInput!) {
-  updateNodePriority(id: $id, priority: $priority) {
-    id
-    priority {
-      executive
-      individual
-      community
-      computed
-    }
-    position {
-      radius
-    }
-  }
-}
-```
-
-### Boost Node (Community Priority)
-
-```graphql
-mutation BoostNode($id: ID!, $boost: Float!) {
-  boostNodePriority(id: $id, boost: $boost) {
-    id
-    priority {
-      community
-      computed
+mutation UpdateWorkItem($where: WorkItemWhere!, $update: WorkItemUpdateInput!) {
+  updateWorkItems(where: $where, update: $update) {
+    workItems {
+      id
+      title
+      priority
+      status
+      updatedAt
     }
   }
 }
@@ -245,16 +363,19 @@ mutation BoostNode($id: ID!, $boost: Float!) {
 ### Create Edge (Dependency)
 
 ```graphql
-mutation CreateDependency($input: CreateEdgeInput!) {
-  createEdge(input: $input) {
-    id
-    source {
-      title
+mutation CreateEdge($input: [EdgeCreateInput!]!) {
+  createEdges(input: $input) {
+    edges {
+      id
+      type
+      weight
+      source {
+        title
+      }
+      target {
+        title
+      }
     }
-    target {
-      title
-    }
-    type
   }
 }
 ```
@@ -262,43 +383,69 @@ mutation CreateDependency($input: CreateEdgeInput!) {
 Variables:
 ```json
 {
-  "input": {
-    "sourceId": "node-1-id",
-    "targetId": "node-2-id",
-    "type": "DEPENDENCY",
-    "weight": 1.0
-  }
+  "input": [{
+    "type": "DEPENDS_ON",
+    "weight": 1.0,
+    "source": {
+      "connect": {
+        "where": { "id": "workitem-1-id" }
+      }
+    },
+    "target": {
+      "connect": {
+        "where": { "id": "workitem-2-id" }
+      }
+    }
+  }]
 }
 ```
 
 ## Subscriptions
 
-### Node Updates
+### WorkItem Updates
 
 ```graphql
-subscription NodeUpdates {
-  nodeUpdated {
+subscription WorkItemUpdates {
+  workItemUpdated {
     id
     title
     status
-    priority {
-      computed
-    }
+    priority
+    type
+    updatedAt
   }
 }
 ```
 
-### Priority Changes
+### Graph Changes
 
 ```graphql
-subscription PriorityChanges {
-  priorityChanged {
-    nodeId
-    oldPriority {
-      computed
+subscription GraphChanges {
+  graphUpdated {
+    id
+    name
+    nodeCount
+    edgeCount
+    lastActivity
+  }
+}
+```
+
+### Edge Updates
+
+```graphql
+subscription EdgeUpdates {
+  edgeCreated {
+    id
+    type
+    weight
+    source {
+      id
+      title
     }
-    newPriority {
-      computed
+    target {
+      id
+      title
     }
   }
 }
@@ -347,56 +494,83 @@ Headers included in responses:
 
 ## Examples
 
-### Complete Node Management
+### Complete WorkItem Management
 
 ```graphql
 # Create a new outcome
 mutation {
-  outcome: createNode(input: {
+  createWorkItems(input: [{
     type: OUTCOME
     title: "Launch MVP"
     description: "Release minimum viable product"
-    priority: { executive: 0.9, individual: 0.8, community: 0.0 }
-  }) {
-    id
+    priority: 0.9
+    status: NOT_STARTED
+  }]) {
+    workItems {
+      id
+      title
+      priority
+    }
   }
 }
 
 # Create dependent task
 mutation {
-  task: createNode(input: {
+  createWorkItems(input: [{
     type: TASK
     title: "User testing"
     description: "Conduct user acceptance testing"
-    priority: { executive: 0.7, individual: 0.6, community: 0.0 }
-  }) {
-    id
+    priority: 0.7
+    status: NOT_STARTED
+  }]) {
+    workItems {
+      id
+      title
+      priority
+    }
   }
 }
 
 # Create dependency relationship
 mutation {
-  createEdge(input: {
-    sourceId: "outcome-id"
-    targetId: "task-id"
-    type: DEPENDENCY
-  }) {
-    id
+  createEdges(input: [{
+    type: DEPENDS_ON
+    weight: 1.0
+    source: { connect: { where: { id: "outcome-id" } } }
+    target: { connect: { where: { id: "task-id" } } }
+  }]) {
+    edges {
+      id
+      type
+      weight
+    }
   }
 }
 
-# Boost task priority through community validation
+# Update task priority
 mutation {
-  boostNodePriority(id: "task-id", boost: 0.2) {
-    priority {
-      computed
+  updateWorkItems(
+    where: { id: "task-id" }
+    update: { priority: 0.8 }
+  ) {
+    workItems {
+      id
+      priority
     }
   }
 }
 ```
 
-For more examples, see the [Examples directory](../examples/).
+For more comprehensive examples, see the [Getting Started guide](../guides/getting-started.md) or explore the GraphQL Playground interface.
 
-## Playground
+## GraphQL Playground
 
-Visit http://localhost:4000/graphql in your browser to access the GraphQL Playground for interactive exploration and testing.
+GraphQL Playground is available through the web application interface:
+
+**Development:**
+- Visit http://localhost:3127/graphql in your browser
+
+**Production:**
+- Visit https://localhost:3128/api/graphql in your browser
+
+**Note**: The playground is accessed through the web proxy, not directly from the GraphQL server.

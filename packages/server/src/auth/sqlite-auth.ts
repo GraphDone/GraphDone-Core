@@ -2,6 +2,7 @@ import sqlite3 from 'sqlite3';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
+import fs from 'fs';
 
 // SQLite-based authentication system
 // Separate from Neo4j for better availability and security
@@ -35,7 +36,6 @@ class SQLiteAuthStore {
       const dbPath = path.join(process.cwd(), 'data', 'auth.db');
       
       // Ensure data directory exists
-      const fs = require('fs');
       const dataDir = path.dirname(dbPath);
       if (!fs.existsSync(dataDir)) {
         fs.mkdirSync(dataDir, { recursive: true });

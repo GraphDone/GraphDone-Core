@@ -3,6 +3,7 @@ import { expressMiddleware } from '@apollo/server/express4';
 import { ApolloServerPluginDrainHttpServer } from '@apollo/server/plugin/drainHttpServer';
 import express from 'express';
 import { createServer } from 'http';
+import { createServer as createHttpsServer } from 'https';
 import { WebSocketServer } from 'ws';
 import { useServer } from 'graphql-ws/lib/use/ws';
 import cors from 'cors';
@@ -21,6 +22,7 @@ import { extractUserFromToken } from './middleware/auth.js';
 import { mergeTypeDefs } from '@graphql-tools/merge';
 import { driver, NEO4J_URI } from './db.js';
 import { sqliteAuthStore } from './auth/sqlite-auth.js';
+import { createTlsConfig, validateTlsConfig, type TlsConfig } from './config/tls.js';
 
 dotenv.config();
 
@@ -28,15 +30,37 @@ const PORT = Number(process.env.PORT) || 4127;
 
 async function startServer() {
   const app = express();
-  const httpServer = createServer(app);
+  
+  // Configure TLS if enabled
+  let tlsConfig: TlsConfig | null = null;
+  try {
+    tlsConfig = createTlsConfig();
+    if (tlsConfig) {
+      validateTlsConfig(tlsConfig);
+      console.log('🔐 TLS/SSL configuration loaded successfully'); // eslint-disable-line no-console
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown TLS configuration error';
+    console.error('❌ TLS/SSL configuration failed:', errorMessage); // eslint-disable-line no-console
+    process.exit(1);
+  }
+
+  // Create server (HTTP or HTTPS based on configuration)
+  const server = tlsConfig 
+    ? createHttpsServer({ key: tlsConfig.key, cert: tlsConfig.cert }, app)
+    : createServer(app);
+    
+  const serverPort = tlsConfig ? tlsConfig.port : PORT;
+  const protocol = tlsConfig ? 'https' : 'http';
+  const wsProtocol = tlsConfig ? 'wss' : 'ws';
 
   // Initialize SQLite auth system first (for users and config)
   try {
     await sqliteAuthStore.initialize();
-    console.log('🔐 SQLite authentication system initialized');
+    console.log('🔐 SQLite authentication system initialized'); // eslint-disable-line no-console
   } catch (error) {
-    console.error('❌ Failed to initialize SQLite auth:', (error as Error).message);
-    console.error('🚫 Server cannot start without authentication system');
+    console.error('❌ Failed to initialize SQLite auth:', (error as Error).message); // eslint-disable-line no-console
+    console.error('🚫 Server cannot start without authentication system'); // eslint-disable-line no-console
     process.exit(1);
   }
 
@@ -50,7 +74,7 @@ async function startServer() {
     await session.run('RETURN 1');
     await session.close();
     isNeo4jAvailable = true;
-    console.log('✅ Neo4j connection successful');
+    console.log('✅ Neo4j connection successful'); // eslint-disable-line no-console
     
     // Merge type definitions (Neo4j schema + auth schema)  
     const mergedTypeDefs = mergeTypeDefs([typeDefs, authTypeDefs]);
@@ -66,10 +90,10 @@ async function startServer() {
     });
 
     schema = await neoSchema.getSchema();
-    console.log('🔗 Full Neo4j + SQLite auth schema ready');
+    console.log('🔗 Full Neo4j + SQLite auth schema ready'); // eslint-disable-line no-console
     
   } catch (error) {
-    console.log('⚠️  Neo4j not available, using auth-only mode:', (error as Error).message);
+    console.log('⚠️  Neo4j not available, using auth-only mode:', (error as Error).message); // eslint-disable-line no-console
     isNeo4jAvailable = false;
     
     // Create auth-only schema using just SQLite resolvers and complete auth schema
@@ -78,20 +102,20 @@ async function startServer() {
       typeDefs: authOnlyTypeDefs,
       resolvers: sqliteAuthResolvers
     });
-    console.log('🔐 Auth-only SQLite schema ready (Neo4j disabled)');
+    console.log('🔐 Auth-only SQLite schema ready (Neo4j disabled)'); // eslint-disable-line no-console
   }
 
   const wsServer = new WebSocketServer({
-    server: httpServer,
+    server,
     path: '/graphql',
   });
 
   const serverCleanup = useServer({ schema }, wsServer);
 
-  const server = new ApolloServer({
+  const apolloServer = new ApolloServer({
     schema,
     plugins: [
-      ApolloServerPluginDrainHttpServer({ httpServer }),
+      ApolloServerPluginDrainHttpServer({ httpServer: server }),
       {
         async serverWillStart() {
           return {
@@ -104,14 +128,13 @@ async function startServer() {
     ],
   });
 
-  await server.start();
-
+  await apolloServer.start();
 
   app.use(
     '/graphql',
     cors<cors.CorsRequest>(),
     express.json(),
-    expressMiddleware(server, {
+    expressMiddleware(apolloServer, {
       context: async ({ req }) => {
         const user = extractUserFromToken(req.headers.authorization);
         return {
@@ -129,7 +152,7 @@ async function startServer() {
       status: string;
       timestamp: string;
       services: {
-        graphql: { status: string; port: number };
+        graphql: { status: string; port: number; protocol: string };
         neo4j: { status: string; uri: string; error?: string };
         mcp: { status: string; port: number; capabilities: string[]; version?: string; uptime?: number; lastAccessed?: string; error?: string };
       };
@@ -139,7 +162,8 @@ async function startServer() {
       services: {
         graphql: {
           status: 'healthy',
-          port: PORT
+          port: serverPort,
+          protocol: protocol
         },
         neo4j: {
           status: 'unknown',
@@ -197,6 +221,62 @@ async function startServer() {
     res.json(health);
   });
 
+  // Live system configuration endpoint
+  app.get('/config', cors<cors.CorsRequest>(), async (_req, res) => {
+    const config = {
+      timestamp: new Date().toISOString(),
+      services: {
+        api: {
+          port: serverPort,
+          protocol: protocol,
+          host: 'localhost',
+          path: '/graphql',
+          healthPath: '/health'
+        },
+        web: {
+          port: Number(process.env.WEB_PORT) || 3127,
+          protocol: 'http',
+          host: 'localhost',
+          path: '/'
+        },
+        neo4j: {
+          uri: NEO4J_URI,
+          port: 7687,
+          protocol: 'bolt',
+          host: 'localhost'
+        },
+        mcp: {
+          port: Number(process.env.MCP_HEALTH_PORT) || 3128,
+          protocol: 'http',
+          host: 'localhost',
+          path: '/health'
+        },
+        proxy: {
+          enabled: !!process.env.NGINX_ENABLED || false,
+          httpsPort: Number(process.env.NGINX_HTTPS_PORT) || 8443,
+          httpPort: Number(process.env.NGINX_HTTP_PORT) || 8080,
+          protocol: 'https',
+          host: 'localhost',
+          certPath: tlsConfig?.certPath || null,
+          keyPath: tlsConfig?.keyPath || null
+        }
+      },
+      tls: {
+        enabled: !!tlsConfig,
+        certPath: tlsConfig?.certPath || null,
+        keyPath: tlsConfig?.keyPath || null,
+        httpsPort: tlsConfig ? Number(process.env.HTTPS_PORT) || 4128 : null
+      },
+      environment: {
+        nodeEnv: process.env.NODE_ENV || 'development',
+        clientUrl: process.env.CLIENT_URL || `http://localhost:${Number(process.env.WEB_PORT) || 3127}`,
+        corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:3127'
+      }
+    };
+
+    res.json(config);
+  });
+
   // MCP-specific status endpoint
   app.get('/mcp/status', cors<cors.CorsRequest>(), async (_req, res) => {
     try {
@@ -230,16 +310,20 @@ async function startServer() {
     }
   });
 
-  httpServer.listen(PORT, '0.0.0.0', () => {
+  server.listen(serverPort, '0.0.0.0', () => {
     // eslint-disable-next-line no-console
-    console.log(`🚀 GraphQL server ready at http://localhost:${PORT}/graphql`);
+    console.log(`🚀 GraphQL server ready at ${protocol}://localhost:${serverPort}/graphql`); // eslint-disable-line no-console
     // eslint-disable-next-line no-console
-    console.log(`🔌 WebSocket server ready at ws://localhost:${PORT}/graphql`);
+    console.log(`🔌 WebSocket server ready at ${wsProtocol}://localhost:${serverPort}/graphql`); // eslint-disable-line no-console
+    if (tlsConfig) {
+      // eslint-disable-next-line no-console
+      console.log(`🔒 HTTPS/TLS encryption enabled`); // eslint-disable-line no-console
+    }
   });
 }
 
 startServer().catch((error) => {
   // eslint-disable-next-line no-console
-  console.error('Failed to start server:', error);
+  console.error('Failed to start server:', error); // eslint-disable-line no-console
   process.exit(1);
 });

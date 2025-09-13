@@ -18,7 +18,7 @@ SQLite serves as GraphDone's authentication database, storing:
 ### **File Location**
 ```bash
 # SQLite database location (from sqlite-auth.ts:35)
-/Users/yourname/Code/GraphDone/GraphDone-Core/data/auth.db
+./data/auth.db  (in project root)
 ```
 
 ### **How It Works**

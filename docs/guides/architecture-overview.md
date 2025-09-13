@@ -8,7 +8,7 @@ GraphDone is architected around three core principles:
 2. **Real-Time First**: Changes propagate immediately to all participants
 3. **Democratic Coordination**: Priority emerges from community validation, not top-down assignment
 
-## Current Architecture (v0.2.2-alpha)
+## Current Architecture (v0.3.1-alpha)
 
 ```mermaid
 graph TB
