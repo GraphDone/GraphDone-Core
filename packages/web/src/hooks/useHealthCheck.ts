@@ -43,7 +43,7 @@ interface UseHealthCheckOptions {
 }
 
 export function useHealthCheck(options: UseHealthCheckOptions = {}) {
-  const { interval = 30000, enabled = true } = options; // Default 30 second polling
+  const { interval = 5000, enabled = true } = options; // Default 5 second polling for better responsiveness
   
   const [health, setHealth] = useState<HealthCheckResult | null>(null);
   const [mcpStatus, setMcpStatus] = useState<McpStatus | null>(null);
