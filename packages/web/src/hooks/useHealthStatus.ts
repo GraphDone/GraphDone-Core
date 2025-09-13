@@ -34,10 +34,36 @@ export function useHealthStatus() {
 
   useEffect(() => {
     checkHealth();
-    // Check health every 30 seconds
-    const interval = setInterval(checkHealth, 30000);
-    return () => clearInterval(interval);
-  }, []);
+    
+    // Dynamic polling: faster when unhealthy, slower when healthy
+    const getPollingInterval = () => {
+      if (!health) return 5000; // Initial check every 5 seconds
+      
+      const hasUnhealthyService = health.services?.neo4j?.status !== 'healthy' || 
+                                  health.services?.graphql?.status !== 'healthy';
+      
+      // Poll every 5 seconds if unhealthy, 15 seconds if healthy
+      return hasUnhealthyService ? 5000 : 15000;
+    };
+    
+    // Set up dynamic polling
+    let timeoutId: ReturnType<typeof setTimeout>;
+    
+    const scheduleNext = () => {
+      const interval = getPollingInterval();
+      timeoutId = setTimeout(async () => {
+        await checkHealth();
+        scheduleNext(); // Schedule the next check
+      }, interval);
+    };
+    
+    // Start polling
+    scheduleNext();
+    
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [health?.services?.neo4j?.status, health?.services?.graphql?.status]);
 
   return { health, loading, error, refetch: checkHealth };
 }

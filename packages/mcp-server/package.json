@@ -1,6 +1,6 @@
 {
   "name": "@graphdone/mcp-server",
-  "version": "0.2.2-alpha",
+  "version": "0.3.1-alpha",
   "description": "MCP server for GraphDone graph operations",
   "main": "dist/index.js",
   "type": "module",

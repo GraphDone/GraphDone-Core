@@ -2,22 +2,26 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# Copy package files
+# Copy all package files for monorepo workspace
 COPY package.json turbo.json ./
 COPY packages/core/package.json ./packages/core/
 COPY packages/server/package.json ./packages/server/
+COPY packages/web/package.json ./packages/web/
+COPY packages/mcp-server/package.json ./packages/mcp-server/
 
-# Install dependencies
-RUN npm ci
+# Install all dependencies (monorepo workspace)
+RUN npm install --legacy-peer-deps
 
-# Copy source code
-COPY packages/core ./packages/core
-COPY packages/server ./packages/server
+# Copy all source code (needed for monorepo dependencies)
+COPY packages/ ./packages/
 COPY tsconfig.json ./
 
-# Build the application
-RUN npm run build
+# Build core package first (dependency)
+RUN npm run build --workspace=@graphdone/core
 
-EXPOSE 4000
+# Build server package
+RUN npm run build --workspace=@graphdone/server
 
-CMD ["npm", "run", "start"]
+EXPOSE 4127
+
+CMD ["npm", "run", "start", "--workspace=@graphdone/server"]

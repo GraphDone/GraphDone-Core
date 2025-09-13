@@ -206,14 +206,29 @@ if [ "$RUN_E2E" = true ]; then
     fi
     
     echo "🌐 Running end-to-end tests..."
-    if ! npx playwright test --config=playwright.config.ts; then
+    if ! npx playwright test --config=tests/playwright.config.ts; then
         TEST_FAILED=true
         echo "❌ E2E tests failed"
     fi
 fi
 
-# Generate report if requested
-if [ "$REPORT" = true ]; then
+# Generate comprehensive report if requested or no specific test type
+if [ "$REPORT" = true ] || ([ "$UNIT" = false ] && [ "$E2E" = false ] && [ "$COVERAGE" = false ] && [ -z "$PACKAGE" ] && [ "$WATCH" = false ]); then
+    echo "📊 Running comprehensive test suite with HTML report..."
+    if npm run test:comprehensive; then
+        echo "✅ Comprehensive test report generated!"
+        echo "📄 HTML Report: test-results/reports/index.html"
+        echo "📄 JSON Report: test-results/reports/results.json"
+        echo ""
+        echo "To view the report:"
+        echo "  open test-results/reports/index.html"
+        echo "  # or"
+        echo "  make test-report"
+    else
+        echo "❌ Comprehensive test suite failed, but reports were still generated"
+        TEST_FAILED=true
+    fi
+elif [ "$REPORT" = true ]; then
     generate_report
 fi
 
