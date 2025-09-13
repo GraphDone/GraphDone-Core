@@ -56,7 +56,13 @@ show_help() {
     echo -e "  ${GREEN}./start test --quiet${NC}  # Run tests quietly"
     echo -e "  ${GREEN}./start remove${NC}       # Completely remove GraphDone"
     echo ""
-    echo -e "${BOLD}DEVELOPMENT:${NC}"
+    echo -e "${BOLD}PRODUCTION (deploy):${NC}"
+    echo -e "  ${CYAN}Web UI:${NC}       https://localhost:3128 (HTTPS)"
+    echo -e "  ${CYAN}GraphQL:${NC}     https://localhost:4128/graphql (HTTPS)"
+    echo -e "  ${CYAN}WebSocket:${NC}   wss://localhost:4128/graphql (WSS)"
+    echo -e "  ${CYAN}Database:${NC}    http://localhost:7474 (Neo4j Browser)"
+    echo ""
+    echo -e "${BOLD}DEVELOPMENT (dev):${NC}"
     echo -e "  ${CYAN}Web UI:${NC}       http://localhost:3127"
     echo -e "  ${CYAN}GraphQL:${NC}     http://localhost:4127/graphql"
     echo -e "  ${CYAN}Database:${NC}    http://localhost:7474 (Neo4j Browser)"
@@ -302,9 +308,13 @@ cmd_build() {
 
 cmd_deploy() {
     show_banner
-    log_info "🚀 Deploying to production..."
-    ensure_nodejs
-    ./tools/deploy.sh
+    log_info "🚀 Starting production deployment with HTTPS..."
+    log_info "Features enabled:"
+    log_info "  • Full HTTPS encryption (web + API)"
+    log_info "  • Auto-generated SSL certificates"
+    log_info "  • Secure WebSocket connections (WSS)"
+    log_info "  • Production-optimized containers"
+    ./tools/run.sh
 }
 
 cmd_remove() {

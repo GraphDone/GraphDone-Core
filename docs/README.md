@@ -13,6 +13,7 @@ Welcome to the GraphDone documentation! This directory contains comprehensive gu
 ### [Developer Guides](./guides/)
 - [Getting Started](./guides/getting-started.md) - Setup and first steps
 - [Architecture Overview](./guides/architecture-overview.md) - System design and technical decisions
+- [Testing Guide](../tests/README.md) - **E2E testing with robust authentication system**
 - [SQLite Deployment Modes](./guides/sqlite-deployment-modes.md) - Local dev vs Docker authentication storage
 - [User Flows](./guides/user-flows.md) - How teams actually use GraphDone
 
@@ -69,7 +70,6 @@ Welcome to the GraphDone documentation! This directory contains comprehensive gu
 ## 🔗 Quick Links
 
 - [Project Philosophy](../philosophy.md)
-- [Contributing Guide](./guides/contributing.md)
 - [API Documentation](./api/graphql.md)
 - [Deployment Guide](./deployment/README.md)
 
