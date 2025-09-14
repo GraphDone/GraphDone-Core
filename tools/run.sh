@@ -4,6 +4,43 @@
 
 set -e
 
+# Interactive waiting function for Neo4j startup
+wait_for_neo4j_interactive() {
+    local compose_file="$1"
+    local service_name="$2"
+    
+    echo "🚀 Waiting for Neo4j to be ready (loading plugins: GDS + APOC)..."
+    
+    # Interactive waiting with smooth Braille spinner animation
+    local spinner=("⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏")
+    local neo4j_stages=("Initializing" "Loading plugins" "Starting GDS" "Loading APOC" "Registering" "Finalizing")
+    local attempt=0
+    local max_attempts=40  # 2 minutes max
+    
+    while ! ${DOCKER_SUDO}docker-compose -f "$compose_file" exec -T "$service_name" cypher-shell -u neo4j -p graphdone_password "RETURN 1" 2>/dev/null; do
+        local spinner_idx=$((attempt % 10))
+        local stage_idx=$((attempt / 7 % 6))
+        local elapsed=$((attempt * 3))
+        
+        printf "\r${spinner[$spinner_idx]} Neo4j: ${neo4j_stages[$stage_idx]}... (${elapsed}s) "
+        
+        if [ $attempt -ge $max_attempts ]; then
+            echo ""
+            echo "⚠️  Neo4j is taking longer than expected. Checking status..."
+            ${DOCKER_SUDO}docker-compose -f "$compose_file" ps "$service_name"
+            echo "💡 This is normal for first startup with heavy plugins (GDS + APOC)"
+            echo "⏳ Continuing to wait..."
+            max_attempts=$((max_attempts + 20))  # Extend timeout
+        fi
+        
+        sleep 3
+        attempt=$((attempt + 1))
+    done
+    
+    echo ""
+    echo "✅ Neo4j is ready! 🎉"
+}
+
 # Function to ensure Node.js is available
 ensure_nodejs() {
     # If node/npm not found, try to source nvm
@@ -105,7 +142,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-echo "🚀 Starting GraphDone in $MODE mode..."
+echo "🔧 Starting GraphDone in $MODE mode..."
 
 case $MODE in
     "dev")
@@ -142,14 +179,8 @@ case $MODE in
         echo "🔍 Starting database services..."
         echo "🗄️  Starting Neo4j and Redis databases..."
         ${DOCKER_SUDO}docker-compose -f deployment/docker-compose.dev.yml up -d graphdone-neo4j graphdone-redis
-        echo "⏳ Waiting for Neo4j to be ready..."
-        
-        # Wait for Neo4j to be ready
-        until ${DOCKER_SUDO}docker-compose -f deployment/docker-compose.dev.yml exec -T graphdone-neo4j cypher-shell -u neo4j -p graphdone_password "RETURN 1" 2>/dev/null; do
-            echo "⏳ Neo4j not ready yet, waiting..."
-            sleep 3
-        done
-        echo "✅ Neo4j is ready!"
+        # Wait for Neo4j with interactive progress
+        wait_for_neo4j_interactive "deployment/docker-compose.dev.yml" "graphdone-neo4j"
         
         # Clean up any hanging processes on our ports
         echo "🧹 Cleaning up any processes on ports 3127 and 4127..."
@@ -294,7 +325,7 @@ case $MODE in
         ;;
         
     "docker")
-        echo "🐳 Starting with Docker (production HTTPS)..."
+        echo "📦 Starting with Docker (production HTTPS)..."
         
         # Ensure SSL certificates exist for production
         if [ ! -f "deployment/certs/server-cert.pem" ] || [ ! -f "deployment/certs/server-key.pem" ]; then
@@ -302,8 +333,155 @@ case $MODE in
             ./scripts/generate-ssl-certs.sh
         fi
         
-        # Use main compose file (HTTPS production)
+        echo "🏗️  Building and starting all services..."
+        echo "📊 This includes: Neo4j + GDS + APOC, Redis, API, Web (HTTPS)"
+        
+        # Check if this is likely a first run by checking if images exist
+        if docker images | grep -q "gd-core-api\|gd-core-web\|neo4j.*5.26"; then
+            echo "⏱️  Expected time: 60-90 seconds for startup"
+        else
+            echo "⏱️  First run: 2-5 minutes (downloading images and plugins)"
+        fi
+        echo ""
+        
+        # Start progress monitor in background with smooth Braille animation
+        (
+            spinner=("⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏")
+            elapsed=0
+            stage=0
+            
+            # Track service statuses
+            redis_ready=false
+            neo4j_ready=false
+            api_ready=false
+            web_ready=false
+            api_init_wait=false
+            last_status=""
+            
+            # Wait for all services to be healthy
+            while true; do
+                # Check each service status more accurately
+                # For Redis and Neo4j, check if container is running and healthy
+                redis_output=$(docker-compose -f deployment/docker-compose.yml ps graphdone-redis 2>/dev/null || echo "")
+                if echo "$redis_output" | grep -q "Up.*healthy"; then
+                    redis_status="healthy"
+                elif echo "$redis_output" | grep -q "Up"; then
+                    redis_status="up"
+                else
+                    redis_status=""
+                fi
+                
+                neo4j_output=$(docker-compose -f deployment/docker-compose.yml ps graphdone-neo4j 2>/dev/null || echo "")
+                if echo "$neo4j_output" | grep -q "Up.*healthy"; then
+                    neo4j_status="healthy"
+                elif echo "$neo4j_output" | grep -q "Up.*starting"; then
+                    neo4j_status="starting"
+                elif echo "$neo4j_output" | grep -q "Up"; then
+                    neo4j_status="up"
+                else
+                    neo4j_status=""
+                fi
+                
+                # API won't start until Neo4j is healthy due to depends_on condition
+                api_output=$(docker-compose -f deployment/docker-compose.yml ps graphdone-api 2>/dev/null || echo "")
+                if echo "$api_output" | grep -q "Up"; then
+                    api_status="up"
+                else
+                    api_status=""
+                fi
+                
+                # Web can start immediately, doesn't wait for API to be healthy
+                web_output=$(docker-compose -f deployment/docker-compose.yml ps graphdone-web 2>/dev/null || echo "")
+                if echo "$web_output" | grep -q "Up"; then
+                    web_status="up"
+                else
+                    web_status=""
+                fi
+                
+                # Update ready flags silently
+                if [ "$redis_status" = "healthy" ] || [ "$redis_status" = "up" ]; then
+                    if [ "$redis_ready" = false ]; then
+                        redis_ready=true
+                    fi
+                fi
+                
+                # Web container starts immediately (doesn't wait for Neo4j)
+                if [ "$web_status" = "up" ]; then
+                    if [ "$web_ready" = false ]; then
+                        web_ready=true
+                    fi
+                fi
+                
+                # Neo4j takes time to load plugins
+                if [ "$neo4j_status" = "healthy" ]; then
+                    if [ "$neo4j_ready" = false ]; then
+                        neo4j_ready=true
+                    fi
+                fi
+                
+                # API starts only after Neo4j is healthy
+                if [ "$api_status" = "up" ]; then
+                    if [ "$api_ready" = false ]; then
+                        api_ready=true
+                        # Wait a moment for API to finish initialization
+                        api_init_wait=true
+                    fi
+                fi
+                
+                # Check if all services are ready
+                if [ "$redis_ready" = true ] && [ "$neo4j_ready" = true ] && [ "$api_ready" = true ] && [ "$web_ready" = true ]; then
+                    # If API just became ready, wait for it to finish initialization
+                    if [ "$api_init_wait" = true ]; then
+                        api_init_wait=false
+                        sleep 3  # Give API time to print its startup messages
+                    fi
+                    
+                    # Clear the spinner line and exit
+                    printf "\r                                                                         \r"
+                    break
+                fi
+                
+                # Only show spinner if not all services are ready
+                if [ "$redis_ready" = false ] || [ "$neo4j_ready" = false ] || [ "$api_ready" = false ] || [ "$web_ready" = false ]; then
+                    spinner_idx=$((elapsed % 10))
+                    # Single color: bright magenta
+                    color="\033[1;35m"
+                    
+                    # Show appropriate message with single colored spinner
+                    if [ "$redis_ready" = false ]; then
+                        printf "\r${color}${spinner[$spinner_idx]}\033[0m Starting Redis cache... (${elapsed}s)          "
+                    elif [ "$neo4j_ready" = false ]; then
+                        if [ $elapsed -lt 30 ]; then
+                            printf "\r${color}${spinner[$spinner_idx]}\033[0m Starting Neo4j database... (${elapsed}s)       "
+                        elif [ $elapsed -lt 90 ]; then
+                            printf "\r${color}${spinner[$spinner_idx]}\033[0m Loading GDS + APOC plugins... (${elapsed}s)    "
+                        else
+                            printf "\r${color}${spinner[$spinner_idx]}\033[0m Initializing graph database... (${elapsed}s)   "
+                        fi
+                    elif [ "$api_ready" = false ]; then
+                        printf "\r${color}${spinner[$spinner_idx]}\033[0m Starting GraphQL API... (${elapsed}s)          "
+                    elif [ "$web_ready" = false ]; then
+                        printf "\r${color}${spinner[$spinner_idx]}\033[0m Starting web interface... (${elapsed}s)        "
+                    fi
+                fi
+                
+                sleep 1
+                elapsed=$((elapsed + 1))
+                
+                # Safety timeout after 5 minutes
+                if [ $elapsed -gt 300 ]; then
+                    printf "\r⚠️  Services taking longer than expected (>5 min)     \n"
+                    break
+                fi
+            done
+        ) &
+        PROGRESS_PID=$!
+        
+        # Use main compose file (HTTPS production) 
         docker-compose -f deployment/docker-compose.yml up --build
+        
+        # Stop progress monitor
+        kill $PROGRESS_PID 2>/dev/null || true
         ;;
         
     "docker-dev")
