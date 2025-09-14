@@ -154,22 +154,36 @@ async function startServer() {
 
   // Platform-aware timeout configuration
   const getTimeoutConfig = () => {
-    const isLinux = process.platform === 'linux';
+    const platform = process.platform;
+    const isLinux = platform === 'linux';
+    const isMacOS = platform === 'darwin';
+    const isWindows = platform === 'win32';
     const totalMemoryGB = os.totalmem() / (1024 * 1024 * 1024);
     const isLowMemory = totalMemoryGB < 4;
     
     // Log system info for debugging
-    console.log(`🖥️  Platform: ${process.platform}, Memory: ${totalMemoryGB.toFixed(1)}GB`); // eslint-disable-line no-console
+    console.log(`🖥️  Platform: ${platform}, Memory: ${totalMemoryGB.toFixed(1)}GB`); // eslint-disable-line no-console
     
-    if (isLinux && isLowMemory) {
+    if (isWindows) {
+      if (isLowMemory) {
+        console.log('⚙️  Detected low-memory Windows system - using extended timeouts'); // eslint-disable-line no-console
+        return { maxRetries: 50, timeoutMs: 20000 }; // 16.7 minutes for low-memory Windows
+      } else {
+        console.log('⚙️  Detected Windows system - using Windows-optimized timeouts'); // eslint-disable-line no-console
+        return { maxRetries: 40, timeoutMs: 18000 }; // 12 minutes for Windows
+      }
+    } else if (isLinux && isLowMemory) {
       console.log('⚙️  Detected low-memory Linux system - using extended timeouts'); // eslint-disable-line no-console
-      return { maxRetries: 30, timeoutMs: 15000 }; // 7.5 minutes total for low-memory Linux
+      return { maxRetries: 45, timeoutMs: 18000 }; // 13.5 minutes for low-memory Linux
     } else if (isLinux) {
       console.log('⚙️  Detected Linux system - using standard timeouts'); // eslint-disable-line no-console
-      return { maxRetries: 25, timeoutMs: 12000 }; // 5 minutes for Linux
+      return { maxRetries: 35, timeoutMs: 15000 }; // 8.75 minutes for Linux
+    } else if (isMacOS) {
+      console.log('⚙️  Detected macOS system - using optimized timeouts'); // eslint-disable-line no-console
+      return { maxRetries: 25, timeoutMs: 12000 }; // 5 minutes for macOS
     } else {
-      console.log('⚙️  Detected non-Linux system - using fast timeouts'); // eslint-disable-line no-console
-      return { maxRetries: 15, timeoutMs: 8000 }; // 2 minutes for macOS/Windows
+      console.log('⚙️  Detected unknown system - using default timeouts'); // eslint-disable-line no-console
+      return { maxRetries: 30, timeoutMs: 15000 }; // 7.5 minutes for unknown platforms
     }
   };
 
