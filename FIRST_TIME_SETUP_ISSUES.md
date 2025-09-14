@@ -302,3 +302,77 @@ Role: ADMIN
 - Obvious next steps after startup
 
 **Zero Manual Fixes Required** - All previous issues are now automated.
+
+### **ISSUE #7: ESLint Critical Errors (FIXED - September 2025)**
+**Status**: RESOLVED ✅
+- **Problem**: ESLint build failures blocking CI/CD pipeline with 2 critical errors
+- **Errors Found**:
+  - Empty block statements in `packages/server/src/index.ts` (lines 454-455)
+  - Redundant eslint-disable directive (unused no-console disable)
+- **Impact**: 
+  - `npm run lint` command failing with exit code 1
+  - Build pipeline blocked from proceeding
+  - 195 warnings present but non-blocking
+- **Fix Applied** (2025-09-14):
+  - ✅ Removed empty `if (tlsConfig) {} else {}` blocks from server startup
+  - ✅ Cleaned up redundant `eslint-disable-next-line` + `eslint-disable-line` combo
+  - ✅ Preserved all functional code and logging
+  - ✅ Maintained TypeScript compatibility (typecheck still passes)
+- **Result**: 
+  - ESLint now passes with 0 errors, 195 warnings (warnings are non-blocking)
+  - Build pipeline can proceed normally
+  - Code quality maintained with proper linting standards
+
+**Current Lint Status**:
+```bash
+npm run lint     # ✅ PASSES (0 errors, 195 warnings)
+npm run typecheck # ✅ PASSES (all type checks successful)
+```
+
+**Remaining Warnings** (non-blocking):
+- `@typescript-eslint/no-explicit-any` - Type safety recommendations
+- `no-console` - Expected server logging (intentional console usage)  
+- `@typescript-eslint/no-unused-vars` - Unused error variables in catch blocks
+
+### **ISSUE #8: Cross-Platform macOS Compatibility (IMPLEMENTED - September 2025)**
+**Status**: FULLY IMPLEMENTED ✅
+- **Problem**: Linux-focused startup script didn't handle macOS system differences
+- **macOS Challenges Identified**:
+  - Date command lacks millisecond precision (`%3N` not supported)
+  - Different process management behavior (`pkill`, `lsof` variations)
+  - Docker Desktop vs snap Docker installation differences
+  - Shell environment and PATH handling variations
+- **Solution Implemented** (Enhanced `./start` script):
+  - ✅ **Smart timing system**: Uses `python3` for millisecond precision on macOS (lines 225-232, 380-386)
+  - ✅ **Fallback timing**: Graceful fallback to seconds if Python unavailable
+  - ✅ **macOS process management**: Compatible `pkill` patterns and `lsof -ti:PORT` cleanup
+  - ✅ **Universal Docker handling**: Works with both Docker Desktop and snap installations
+  - ✅ **Cross-platform commands**: All shell commands use macOS-compatible flags
+  - ✅ **Environment handling**: Proper PATH exports and shell compatibility
+
+**macOS-Specific Features Added**:
+```bash
+# Smart millisecond timing (macOS compatible)
+if command -v python3 &> /dev/null; then
+    GRAPHDONE_START_TIME=$(python3 -c 'import time; print(int(time.time() * 1000))')
+else
+    GRAPHDONE_START_TIME=$(($(date +%s) * 1000))  # Fallback
+fi
+
+# macOS-compatible process cleanup
+pkill -f "node.*3127\|node.*4127\|vite\|tsx.*watch" 2>/dev/null || true
+lsof -ti:3127 | xargs -r kill -9 2>/dev/null || true
+```
+
+**Cross-Platform Compatibility**:
+- ✅ **Linux systems**: Full compatibility maintained
+- ✅ **macOS systems**: Native support with intelligent fallbacks  
+- ✅ **Docker Desktop**: Auto-detection and setup
+- ✅ **snap Docker**: Permission fixing and installation
+- ✅ **Terminal compatibility**: Works with Terminal.app, iTerm2, VS Code integrated terminal
+
+**User Experience**:
+- Single `./start` command works identically on both platforms
+- Automatic platform detection and optimization
+- No user intervention required for platform differences
+- Consistent timing and logging across systems

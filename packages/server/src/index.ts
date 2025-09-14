@@ -98,12 +98,12 @@ async function startServer() {
   const startTime = process.env.GRAPHDONE_START_TIME ? parseInt(process.env.GRAPHDONE_START_TIME) : Date.now();
   console.log('🚀 GraphDone Server v0.3.1-alpha starting...'); // eslint-disable-line no-console
   if (process.env.GRAPHDONE_START_TIME) {
-    console.log(`⏱️  Using ./start command timing: ${process.env.GRAPHDONE_START_TIME}`); // eslint-disable-line no-console
+    console.log(`🕰️ Using ./start command timing: ${process.env.GRAPHDONE_START_TIME}`); // eslint-disable-line no-console
   }
   console.log(`📅 Started at: ${new Date().toISOString()}`); // eslint-disable-line no-console
-  console.log(`🖥️  Platform: ${process.platform} ${process.arch}`); // eslint-disable-line no-console
-  console.log(`⚡ Node.js: ${process.version}`); // eslint-disable-line no-console
-  console.log(`💾 Memory: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)} MB used`); // eslint-disable-line no-console
+  console.log(`💻 Platform: ${process.platform} ${process.arch}`); // eslint-disable-line no-console
+  console.log(`💥 Node.js: ${process.version}`); // eslint-disable-line no-console
+  console.log(`✳️  Memory: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)} MB used`); // eslint-disable-line no-console
 
   const app = express();
   const steps: string[] = [];
@@ -140,7 +140,7 @@ async function startServer() {
     const authStart = Date.now();
     await sqliteAuthStore.initialize();
     const authTime = Date.now() - authStart;
-    console.log(`🔐 SQLite authentication system initialized (${authTime}ms)`); // eslint-disable-line no-console
+    console.log(`🔑 SQLite authentication system initialized (${authTime}ms)`); // eslint-disable-line no-console
 
     // Check for existing users
     const userCount = await sqliteAuthStore.getUserCount();
@@ -434,9 +434,9 @@ async function startServer() {
 
     // Print the clean checklist summary
     console.log(''); // eslint-disable-line no-console
-    console.log('🎉 ========================================'); // eslint-disable-line no-console
-    console.log('🎉         GraphDone Server Ready!       '); // eslint-disable-line no-console
-    console.log('🎉 ========================================'); // eslint-disable-line no-console
+    console.log('========================================'); // eslint-disable-line no-console
+    console.log('         GraphDone Server Ready!       '); // eslint-disable-line no-console
+    console.log('========================================'); // eslint-disable-line no-console
     console.log(''); // eslint-disable-line no-console
     steps.forEach((step, index) => {
       console.log(`  ${index + 1}. ${step}`); // eslint-disable-line no-console
@@ -444,30 +444,27 @@ async function startServer() {
     console.log(''); // eslint-disable-line no-console
     console.log('  🌐 The application is now ready to use at:'); // eslint-disable-line no-console
     if (tlsConfig) {
-      console.log('  - 🖥️  Web App: https://localhost:3128'); // eslint-disable-line no-console
-      console.log('  - 🔗 GraphQL API: https://localhost:4128/graphql'); // eslint-disable-line no-console
+      console.log('  🖥️  Web App: https://localhost:3128'); // eslint-disable-line no-console
+      console.log('  🔗 GraphQL API: https://localhost:4128/graphql'); // eslint-disable-line no-console
     } else {
-      console.log('  - 🖥️  Web App: http://localhost:3127'); // eslint-disable-line no-console
-      console.log('  - 🔗 GraphQL API: http://localhost:4127/graphql'); // eslint-disable-line no-console
-    }
-    console.log(''); // eslint-disable-line no-console
-    if (tlsConfig) {
-      console.log('  🚀 You can open https://localhost:3128 in your browser to access GraphDone.'); // eslint-disable-line no-console
-    } else {
-      console.log('  🚀 You can open http://localhost:3127 in your browser to access GraphDone.'); // eslint-disable-line no-console
+      console.log('  🖥️  Web App: http://localhost:3127'); // eslint-disable-line no-console
+      console.log('  🔗 GraphQL API: http://localhost:4127/graphql'); // eslint-disable-line no-console
     }
     console.log(''); // eslint-disable-line no-console
     const timingLabel = process.env.GRAPHDONE_START_TIME ? 'Total startup time' : 'Server startup time';
-    console.log(`  ⚡ ${timingLabel}: ${(totalTime / 1000).toFixed(3)} seconds`); // eslint-disable-line no-console
-    console.log(`  💾 ${memoryInfo.label}: ${memoryInfo.memory} MB`); // eslint-disable-line no-console
-    console.log(`  🌐 Neo4j status: ${isNeo4jAvailable ? '✅ Connected' : '❌ Offline'}`); // eslint-disable-line no-console
-    console.log('🎉 ========================================'); // eslint-disable-line no-console
+    console.log(`  🧩 ${timingLabel}: ${(totalTime / 1000).toFixed(3)} seconds`); // eslint-disable-line no-console
+    console.log(`  🧬 ${memoryInfo.label}: ${memoryInfo.memory} MB`); // eslint-disable-line no-console
+    // More nuanced Neo4j status - check if it might still be starting up
+    const neo4jStatusMessage = isNeo4jAvailable 
+      ? '🟢 Connected' 
+      : (Date.now() - startTime < 60000 ? '⏳ Starting...' : '🔴 Offline');
+    console.log(`  🌐 Neo4j status: ${neo4jStatusMessage}`); // eslint-disable-line no-console
+    console.log('========================================'); // eslint-disable-line no-console
     console.log(''); // eslint-disable-line no-console
   });
 }
 
 startServer().catch((error) => {
-  // eslint-disable-next-line no-console
   console.error('Failed to start server:', error); // eslint-disable-line no-console
   process.exit(1);
 });
