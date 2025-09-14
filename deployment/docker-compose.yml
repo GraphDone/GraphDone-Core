@@ -19,9 +19,10 @@ services:
       - logs:/logs
     healthcheck:
       test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "graphdone_password", "RETURN 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      interval: 15s
+      timeout: 30s
+      retries: 10
+      start_period: 60s
 
   graphdone-redis:
     container_name: graphdone-redis
