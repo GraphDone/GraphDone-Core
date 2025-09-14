@@ -40,6 +40,19 @@ detect_os() {
     elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
         OS="linux"
         SHELL_PROFILE="$HOME/.bashrc"
+    elif [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "cygwin" ]] || [[ "$OS" == "Windows_NT" ]]; then
+        OS="windows"
+        # Windows shell profile detection
+        if [ -n "$USERPROFILE" ]; then
+            # PowerShell profile (preferred)
+            SHELL_PROFILE="$USERPROFILE/Documents/PowerShell/Microsoft.PowerShell_profile.ps1"
+            # Git Bash profile (fallback)
+            if [ ! -f "$SHELL_PROFILE" ]; then
+                SHELL_PROFILE="$HOME/.bashrc"
+            fi
+        else
+            SHELL_PROFILE="$HOME/.bashrc"  # Git Bash fallback
+        fi
     else
         OS="unknown"
         SHELL_PROFILE="$HOME/.bashrc"
@@ -102,6 +115,106 @@ if [ "$OS" = "macos" ]; then
     echo "  4. Restart your terminal"
     echo "  5. Run: ./start"
     echo ""
+    read -p "Have you installed Node.js? (y/N): " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]] && command_exists node; then
+        echo -e "${GREEN}✅ Node.js installation confirmed${NC}"
+        exit 0
+    fi
+
+elif [ "$OS" = "windows" ]; then
+    # Windows Method 1: Try Chocolatey
+    echo "🔧 Attempting Chocolatey installation..."
+    if command_exists choco; then
+        echo -e "${CYAN}🍫 Chocolatey found, installing Node.js...${NC}"
+        if choco install nodejs -y; then
+            # Refresh environment to update PATH
+            if command_exists refreshenv; then
+                refreshenv
+            fi
+            # Verify installation
+            if command_exists node && command_exists npm; then
+                echo -e "${GREEN}✅ Node.js installed via Chocolatey successfully${NC}"
+                echo -e "${GREEN}✅ Node.js version: $(node --version)${NC}"
+                echo -e "${GREEN}✅ npm version: $(npm --version)${NC}"
+                echo -e "${GREEN}🎉 Node.js installation completed successfully!${NC}"
+                exit 0
+            fi
+        fi
+    else
+        echo -e "${YELLOW}⚠️  Chocolatey not found. Installing Chocolatey first...${NC}"
+        echo "🔧 Installing Chocolatey (Windows package manager)..."
+        echo "This requires Administrator privileges."
+        echo ""
+        echo "Please run PowerShell as Administrator and execute:"
+        echo 'Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString("https://community.chocolatey.org/install.ps1"))'
+        echo ""
+        read -p "Have you installed Chocolatey? (y/N): " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            # Try installing Node.js via newly installed Chocolatey
+            if command_exists choco && choco install nodejs -y; then
+                if command_exists refreshenv; then
+                    refreshenv
+                fi
+                if command_exists node && command_exists npm; then
+                    echo -e "${GREEN}✅ Node.js installed via Chocolatey successfully${NC}"
+                    echo -e "${GREEN}✅ Node.js version: $(node --version)${NC}"
+                    echo -e "${GREEN}✅ npm version: $(npm --version)${NC}"
+                    echo -e "${GREEN}🎉 Node.js installation completed successfully!${NC}"
+                    exit 0
+                fi
+            fi
+        fi
+    fi
+
+    # Windows Method 2: Try Scoop (alternative package manager)
+    echo -e "${YELLOW}📦 Chocolatey installation failed, trying Scoop...${NC}"
+    if command_exists scoop; then
+        echo -e "${CYAN}🪣 Scoop found, installing Node.js...${NC}"
+        if scoop install nodejs; then
+            # Verify installation
+            if command_exists node && command_exists npm; then
+                echo -e "${GREEN}✅ Node.js installed via Scoop successfully${NC}"
+                echo -e "${GREEN}✅ Node.js version: $(node --version)${NC}"
+                echo -e "${GREEN}✅ npm version: $(npm --version)${NC}"
+                echo -e "${GREEN}🎉 Node.js installation completed successfully!${NC}"
+                exit 0
+            fi
+        fi
+    else
+        echo -e "${YELLOW}⚠️  Scoop not found. You can install Scoop by running:${NC}"
+        echo 'Set-ExecutionPolicy RemoteSigned -Scope CurrentUser; irm get.scoop.sh | iex'
+        echo ""
+        read -p "Try Scoop installation? (y/N): " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            echo "Please install Scoop first, then run this script again."
+        fi
+    fi
+
+    # Windows Method 3: Manual installer download
+    echo -e "${YELLOW}📥 Package managers failed, trying manual download...${NC}"
+    echo "🔧 Installing Node.js via official Windows installer..."
+    echo ""
+    echo "Please follow these steps:"
+    echo "  1. Visit: https://nodejs.org/en/download/"
+    echo "  2. Download the Windows Installer (.msi) - LTS version recommended"
+    echo "  3. Run the installer as Administrator"
+    echo "  4. Follow the installation wizard (accept defaults)"
+    echo "  5. Restart your terminal/command prompt"
+    echo "  6. Run: ./start"
+    echo ""
+    
+    # Try to open the download page automatically
+    if command_exists powershell; then
+        read -p "Open Node.js download page automatically? (y/N): " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            powershell -Command "Start-Process 'https://nodejs.org/en/download/'"
+        fi
+    fi
+    
     read -p "Have you installed Node.js? (y/N): " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]] && command_exists node; then

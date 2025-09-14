@@ -302,15 +302,153 @@ install_docker_linux() {
 # Windows Docker installation
 install_docker_windows() {
     echo "🪟 Installing Docker Desktop for Windows..."
+    
+    # Check Windows version compatibility
+    if command -v powershell &> /dev/null; then
+        local win_version=$(powershell -Command "[System.Environment]::OSVersion.Version.Major" 2>/dev/null)
+        if [ "$win_version" = "6" ]; then
+            # Windows 6.x = Windows 8/8.1
+            echo ""
+            echo -e "${CYAN}🔧 Windows 8/8.1 Detected - Using Alternative Docker Setup${NC}"
+            echo "Docker Desktop doesn't support Windows 8, but we have alternatives!"
+            echo ""
+            echo "🛠️  Option 1: Docker Toolbox (Recommended for Windows 8)"
+            echo "  • Uses VirtualBox instead of Hyper-V"
+            echo "  • Full Docker functionality in Linux VM"
+            echo "  • GraphDone will work normally"
+            echo ""
+            echo "🛠️  Option 2: Native Windows Development"
+            echo "  • Install Neo4j for Windows directly"
+            echo "  • Skip Docker containers"
+            echo "  • Use Node.js development server"
+            echo ""
+            read -p "Install Docker Toolbox for Windows 8? (Y/N): " -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                echo "🔧 Installing Docker Toolbox..."
+                
+                # Try Chocolatey for Docker Toolbox
+                if command_exists choco; then
+                    if choco install docker-toolbox -y; then
+                        echo -e "${GREEN}✅ Docker Toolbox installed via Chocolatey${NC}"
+                        echo ""
+                        echo "🚀 Next steps:"
+                        echo "  1. Start Docker Quickstart Terminal"
+                        echo "  2. Wait for Docker VM to start (2-3 minutes)"
+                        echo "  3. Run: ./start"
+                        return 0
+                    fi
+                fi
+                
+                # Manual installation
+                echo "📥 Please install Docker Toolbox manually:"
+                echo "  1. Visit: https://github.com/docker/toolbox/releases"
+                echo "  2. Download: DockerToolbox-X.X.X.exe"
+                echo "  3. Install with default settings"
+                echo "  4. Start Docker Quickstart Terminal"
+                echo "  5. Run: ./start"
+                return 0
+            else
+                echo ""
+                echo "🔧 Setting up for native Windows development..."
+                echo "You'll need to install Neo4j for Windows manually:"
+                echo "  1. Visit: https://neo4j.com/download/"
+                echo "  2. Download Neo4j Desktop or Community Edition"
+                echo "  3. Install and start Neo4j"
+                echo "  4. Run: ./start"
+                return 0
+            fi
+        fi
+    fi
+    
+    # Method 1: Try Chocolatey
+    if command_exists choco; then
+        echo "🔧 Method 1: Installing Docker Desktop via Chocolatey..."
+        echo "This will download and install Docker Desktop (~500MB)"
+        read -p "Install Docker Desktop via Chocolatey? (Y/N): " -n 1 -r
+        echo
+        
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            if choco install docker-desktop -y; then
+                echo -e "${GREEN}✅ Docker Desktop installed via Chocolatey${NC}"
+                echo ""
+                echo "🔄 Please start Docker Desktop manually:"
+                echo "  1. Open Docker Desktop from Start Menu"
+                echo "  2. Accept the license agreement"
+                echo "  3. Wait for Docker to start (2-3 minutes)"
+                echo "  4. Enable WSL 2 integration if using WSL"
+                echo ""
+                read -p "Have you started Docker Desktop? (Y/N): " -n 1 -r
+                echo
+                if [[ $REPLY =~ ^[Yy]$ ]]; then
+                    # Wait for Docker daemon with timeout
+                    local attempts=0
+                    local max_attempts=60  # 2 minutes
+                    echo "⏳ Waiting for Docker Desktop to start..."
+                    
+                    while [ $attempts -lt $max_attempts ]; do
+                        if command_exists docker && docker info &> /dev/null; then
+                            echo -e "${GREEN}✅ Docker Desktop is running!${NC}"
+                            docker --version
+                            return 0
+                        fi
+                        sleep 2
+                        attempts=$((attempts + 1))
+                        if [ $((attempts % 15)) -eq 0 ]; then
+                            echo "⏳ Still waiting for Docker Desktop..."
+                        fi
+                    done
+                    
+                    echo "⚠️  Docker Desktop is taking longer than expected"
+                    echo "   Please ensure Docker Desktop is running"
+                    return 0
+                fi
+            else
+                echo "⚠️  Chocolatey installation failed, trying manual method..."
+            fi
+        fi
+    fi
+    
+    # Method 2: Try Scoop
+    if command_exists scoop; then
+        echo "🔧 Method 2: Installing Docker Desktop via Scoop..."
+        read -p "Install Docker Desktop via Scoop? (Y/N): " -n 1 -r
+        echo
+        
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            # Add extras bucket for Docker Desktop
+            scoop bucket add extras 2>/dev/null || true
+            if scoop install docker-desktop; then
+                echo -e "${GREEN}✅ Docker Desktop installed via Scoop${NC}"
+                echo "🔄 Please start Docker Desktop from Start Menu"
+                return 0
+            else
+                echo "⚠️  Scoop installation failed, trying manual method..."
+            fi
+        fi
+    fi
+    
+    # Method 3: Manual installation
+    echo "🔧 Method 3: Manual Docker Desktop installation..."
     echo ""
     echo "📥 Please install Docker Desktop manually:"
     echo "  1. Visit: https://docs.docker.com/desktop/install/windows/"
     echo "  2. Download Docker Desktop for Windows"
-    echo "  3. Install the .exe file"
+    echo "  3. Run the installer as Administrator"
     echo "  4. Restart your computer if prompted"
-    echo "  5. Start Docker Desktop"
+    echo "  5. Start Docker Desktop from Start Menu"
     echo "  6. Enable WSL 2 integration if using WSL"
     echo "  7. Run: ./start"
+    echo ""
+    
+    # Try to open the download page automatically
+    if command_exists powershell; then
+        read -p "Open Docker Desktop download page? (Y/N): " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            powershell -Command "Start-Process 'https://docs.docker.com/desktop/install/windows/'"
+        fi
+    fi
     echo ""
     
     read -p "Have you installed Docker Desktop? (Y/N): " -n 1 -r
