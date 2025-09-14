@@ -8,6 +8,7 @@ import { WebSocketServer } from 'ws';
 import { useServer } from 'graphql-ws/lib/use/ws';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import os from 'os';
 // OAuth imports disabled
 // import session from 'express-session';
 // import passport from 'passport';
@@ -151,21 +152,93 @@ async function startServer() {
     process.exit(1);
   }
 
-  // Try to connect to Neo4j, but don't block server startup if it fails
+  // Platform-aware timeout configuration
+  const getTimeoutConfig = () => {
+    const isLinux = process.platform === 'linux';
+    const totalMemoryGB = os.totalmem() / (1024 * 1024 * 1024);
+    const isLowMemory = totalMemoryGB < 4;
+    
+    // Log system info for debugging
+    console.log(`🖥️  Platform: ${process.platform}, Memory: ${totalMemoryGB.toFixed(1)}GB`); // eslint-disable-line no-console
+    
+    if (isLinux && isLowMemory) {
+      console.log('⚙️  Detected low-memory Linux system - using extended timeouts'); // eslint-disable-line no-console
+      return { maxRetries: 30, timeoutMs: 15000 }; // 7.5 minutes total for low-memory Linux
+    } else if (isLinux) {
+      console.log('⚙️  Detected Linux system - using standard timeouts'); // eslint-disable-line no-console
+      return { maxRetries: 25, timeoutMs: 12000 }; // 5 minutes for Linux
+    } else {
+      console.log('⚙️  Detected non-Linux system - using fast timeouts'); // eslint-disable-line no-console
+      return { maxRetries: 15, timeoutMs: 8000 }; // 2 minutes for macOS/Windows
+    }
+  };
+
+  // Smart Neo4j connection with timeout and retry logic
   let schema;
   let isNeo4jAvailable = false;
 
+  // Neo4j connection function with timeout and retries
+  const connectToNeo4jWithTimeout = async (maxRetries = 20, timeoutMs = 10000): Promise<number | false> => {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const attemptStart = Date.now();
+        const session = driver.session();
+        
+        // Race between connection and timeout
+        const timeoutPromise = new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error('Connection timeout')), timeoutMs)
+        );
+        
+        await Promise.race([
+          session.run('RETURN 1'),
+          timeoutPromise
+        ]);
+        
+        await session.close();
+        const connectionTime = Date.now() - attemptStart;
+        
+        console.log(`✅ Neo4j connection successful after ${attempt} attempts (${connectionTime}ms)`); // eslint-disable-line no-console
+        return connectionTime;
+        
+      } catch (error) {
+        if (attempt === maxRetries) {
+          console.log(`⚠️  Neo4j connection failed after ${maxRetries} attempts`); // eslint-disable-line no-console
+          return false;
+        }
+        
+        // Progressive user feedback
+        if (attempt === 1) {
+          console.log('⏳ Connecting to Neo4j database (this can take 1-5 minutes on first startup)...'); // eslint-disable-line no-console
+        } else if (attempt === 5) {
+          console.log('⏳ Still waiting for Neo4j (normal for first-time installation)...'); // eslint-disable-line no-console
+        } else if (attempt === 10) {
+          console.log('⏳ Neo4j taking longer than usual (checking system resources)...'); // eslint-disable-line no-console
+        } else if (attempt === 15) {
+          console.log('⏳ Almost there - Neo4j initialization nearly complete...'); // eslint-disable-line no-console
+        }
+        
+        // Wait before next attempt with exponential backoff (max 15 seconds)
+        const delay = Math.min(3000 + (attempt * 500), 15000);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+    return false;
+  };
+
   try {
-    // Test Neo4j connection with timing
     const neo4jStart = Date.now();
-    const session = driver.session();
-    await session.run('RETURN 1');
-    await session.close();
-    const neo4jTime = Date.now() - neo4jStart;
-    isNeo4jAvailable = true;
-    console.log(`✅ Neo4j connection successful (${neo4jTime}ms)`); // eslint-disable-line no-console
-    console.log(`🗄️  Neo4j URI: ${NEO4J_URI}`); // eslint-disable-line no-console
-    steps.push('✅ Connected to Neo4j graph database');
+    const timeoutConfig = getTimeoutConfig();
+    const connectionTime = await connectToNeo4jWithTimeout(timeoutConfig.maxRetries, timeoutConfig.timeoutMs);
+    
+    if (connectionTime !== false) {
+      const totalTime = Date.now() - neo4jStart;
+      isNeo4jAvailable = true;
+      console.log(`🗄️  Neo4j URI: ${NEO4J_URI}`); // eslint-disable-line no-console
+      console.log(`⚡ Total Neo4j startup time: ${(totalTime / 1000).toFixed(1)}s`); // eslint-disable-line no-console
+      steps.push('✅ Connected to Neo4j graph database');
+    } else {
+      throw new Error('Neo4j connection timeout - falling back to auth-only mode');
+    }
 
     // Create default admin user for testing if none exists
     try {
@@ -201,8 +274,25 @@ async function startServer() {
     steps.push('✅ Merged GraphQL schemas (Neo4j + auth)');
 
   } catch (error) {
-    console.log('⚠️  Neo4j not available, using auth-only mode:', (error as Error).message); // eslint-disable-line no-console
+    const errorMessage = (error as Error).message;
     isNeo4jAvailable = false;
+    
+    // Enhanced graceful degradation messaging
+    console.log(''); // eslint-disable-line no-console
+    console.log('⚠️  Neo4j connection failed - entering auth-only mode'); // eslint-disable-line no-console
+    console.log(`📋 Reason: ${errorMessage}`); // eslint-disable-line no-console
+    console.log(''); // eslint-disable-line no-console
+    console.log('🔐 Available features in auth-only mode:'); // eslint-disable-line no-console
+    console.log('   • User authentication and registration'); // eslint-disable-line no-console
+    console.log('   • User profile management'); // eslint-disable-line no-console
+    console.log('   • Team and role management'); // eslint-disable-line no-console
+    console.log('   • GraphQL API (auth endpoints only)'); // eslint-disable-line no-console
+    console.log(''); // eslint-disable-line no-console
+    console.log('📊 Disabled features (will be available once Neo4j connects):'); // eslint-disable-line no-console
+    console.log('   • Work item creation and management'); // eslint-disable-line no-console
+    console.log('   • Dependency graph visualization'); // eslint-disable-line no-console
+    console.log('   • Project analytics and reporting'); // eslint-disable-line no-console
+    console.log(''); // eslint-disable-line no-console
     
     // Create auth-only schema using just SQLite resolvers and complete auth schema
     const { makeExecutableSchema } = await import('@graphql-tools/schema');
@@ -210,7 +300,8 @@ async function startServer() {
       typeDefs: authOnlyTypeDefs,
       resolvers: sqliteAuthResolvers
     });
-    console.log('🔐 Auth-only SQLite schema ready (Neo4j disabled)'); // eslint-disable-line no-console
+    console.log('✅ Auth-only SQLite schema ready'); // eslint-disable-line no-console
+    steps.push('✅ Started in auth-only mode (Neo4j unavailable)');
   }
 
   const wsServer = new WebSocketServer({
@@ -461,6 +552,49 @@ async function startServer() {
     console.log(`  🌐 Neo4j status: ${neo4jStatusMessage}`); // eslint-disable-line no-console
     console.log('========================================'); // eslint-disable-line no-console
     console.log(''); // eslint-disable-line no-console
+    
+    // Start background Neo4j reconnection if initially unavailable
+    if (!isNeo4jAvailable) {
+      console.log('🔄 Starting background Neo4j reconnection monitor...'); // eslint-disable-line no-console
+      
+      const backgroundReconnect = async () => {
+        try {
+          const session = driver.session();
+          await session.run('RETURN 1');
+          await session.close();
+          
+          console.log(''); // eslint-disable-line no-console
+          console.log('🎉 ========================================'); // eslint-disable-line no-console
+          console.log('🎉    Neo4j Connected! Full Features Enabled!'); // eslint-disable-line no-console
+          console.log('🎉 ========================================'); // eslint-disable-line no-console
+          console.log(''); // eslint-disable-line no-console
+          console.log('📊 Graph features now available:'); // eslint-disable-line no-console
+          console.log('   • Work item creation and management'); // eslint-disable-line no-console
+          console.log('   • Dependency graph visualization'); // eslint-disable-line no-console
+          console.log('   • Project analytics and reporting'); // eslint-disable-line no-console
+          console.log(''); // eslint-disable-line no-console
+          console.log('🔄 Please restart the server to enable full GraphQL schema'); // eslint-disable-line no-console
+          console.log('   Run: ./start stop && ./start'); // eslint-disable-line no-console
+          console.log(''); // eslint-disable-line no-console
+          
+          // Stop the reconnection attempts
+          return true;
+        } catch {
+          // Still not available, keep trying
+          return false;
+        }
+      };
+      
+      // Check every 30 seconds for Neo4j availability
+      const reconnectInterval = setInterval(async () => {
+        const connected = await backgroundReconnect();
+        if (connected) {
+          clearInterval(reconnectInterval);
+        }
+      }, 30000);
+      
+      console.log('⏰ Will check for Neo4j every 30 seconds...'); // eslint-disable-line no-console
+    }
   });
 }
 
