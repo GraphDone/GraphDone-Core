@@ -197,11 +197,25 @@ ensure_nodejs() {
 
 # Command implementations
 cmd_dev() {
+    # Capture start time for end-to-end timing (milliseconds since epoch)
+    GRAPHDONE_START_TIME=$(date +%s%3N)
+    export GRAPHDONE_START_TIME
+
     show_banner
     log_info "Welcome to GraphDone! Starting development environment..."
-    
+
     ensure_nodejs
-    
+
+    # Check Docker permissions (required for GraphDone)
+    if ! docker ps &> /dev/null; then
+        log_warning "🐳 Docker permissions issue detected..."
+        log_info "Running Docker setup to fix permissions..."
+        if ! ./scripts/setup_docker.sh; then
+            log_error "❌ Docker setup failed. Please fix Docker issues and try again."
+            exit 1
+        fi
+    fi
+
     # Check if setup is needed
     setup_needed=false
     workspace_repair_needed=false
@@ -232,11 +246,19 @@ cmd_dev() {
     if [ "$setup_needed" = true ]; then
         log_warning "🔧 First time setup detected..."
         log_info "Running initial setup (this may take a few minutes):"
+        log_info "  • Setting up Docker"
         log_info "  • Setting up environment variables"
         log_info "  • Starting database"
         log_info "  • Running migrations"
         log_info "  • Building packages"
-        
+
+        # Setup Docker first
+        log_info "🐳 Setting up Docker..."
+        if ! ./scripts/setup_docker.sh; then
+            log_error "❌ Docker setup failed. Please fix Docker issues and try again."
+            exit 1
+        fi
+
         ./tools/setup.sh
         log_success "✅ Setup complete!"
         
@@ -286,6 +308,14 @@ cmd_setup() {
     show_banner
     log_info "🔧 Running initial setup..."
     ensure_nodejs
+
+    # Setup Docker first (required for GraphDone)
+    log_info "🐳 Setting up Docker..."
+    if ! ./scripts/setup_docker.sh; then
+        log_error "❌ Docker setup failed. Please fix Docker issues and try again."
+        exit 1
+    fi
+
     ./tools/setup.sh
     log_success "✅ Setup complete! Run './start' to start development environment."
 }
@@ -307,6 +337,10 @@ cmd_build() {
 }
 
 cmd_deploy() {
+    # Capture start time for end-to-end timing (milliseconds since epoch)
+    GRAPHDONE_START_TIME=$(date +%s%3N)
+    export GRAPHDONE_START_TIME
+
     show_banner
     log_info "🚀 Starting production deployment with HTTPS..."
     log_info "Features enabled:"

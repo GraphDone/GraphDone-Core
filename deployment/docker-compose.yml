@@ -52,6 +52,7 @@ services:
       - SSL_CERT_PATH=/app/certs/server-cert.pem
       - HTTPS_PORT=4128
       - CORS_ORIGIN=https://localhost:3128
+      - GRAPHDONE_START_TIME=${GRAPHDONE_START_TIME}
     # Internal port only - accessed via web container proxy
     expose:
       - "4128"  # HTTPS port
