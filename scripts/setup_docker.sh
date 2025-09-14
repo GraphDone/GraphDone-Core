@@ -1,7 +1,12 @@
 #!/bin/bash
 
-# GraphDone Docker Setup Script
-# Installs Docker via snap and sets up proper permissions
+# GraphDone Docker Auto-Installation Script
+# Installs Docker using multiple methods and sets up proper permissions
+#
+# Installation methods (tried in order):
+# 1. Snap (no sudo) - fastest, safest
+# 2. Snap (with sudo) - requires password
+# 3. Official Docker repository - most reliable, requires sudo
 
 set -e
 
@@ -15,7 +20,7 @@ echo "================================="
 # Function to check if Docker is installed
 check_docker_installed() {
     if command -v docker &> /dev/null; then
-        echo "✅ Docker is already installed"
+        echo "✅ Docker is already installed: $(docker --version 2>/dev/null || echo 'version unknown')"
         return 0
     else
         echo "❌ Docker is not installed"
@@ -23,16 +28,69 @@ check_docker_installed() {
     fi
 }
 
-# Function to install Docker via snap
+# Function to install Docker with multiple methods
 install_docker() {
     echo ""
-    echo "🚀 Installing Docker via snap..."
-    echo "This may take a few minutes..."
+    echo "🚀 Installing Docker automatically..."
 
-    sudo snap install docker
+    # Method 1: Try snap without sudo first
+    echo "🔧 Method 1: Attempting snap installation (no sudo)..."
+    if snap install docker 2>/dev/null; then
+        echo "✅ Docker installed via snap successfully"
+        export PATH="/snap/bin:$PATH"
+        return 0
+    fi
 
-    echo "✅ Docker installed via snap"
-    sleep 2
+    # Method 2: Snap with sudo (ask permission)
+    echo "⚠️  Standard snap installation failed"
+    echo "Docker installation requires administrator privileges."
+    read -p "Install Docker with sudo via snap? (y/N): " -n 1 -r
+    echo
+
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        echo "🔧 Method 2: Installing Docker via snap with sudo..."
+        if sudo snap install docker; then
+            echo "✅ Docker installed via snap with sudo"
+            export PATH="/snap/bin:$PATH"
+            return 0
+        fi
+    fi
+
+    # Method 3: Official Docker repository
+    echo "🔧 Method 3: Installing Docker from official repository..."
+    echo "This requires sudo privileges..."
+    read -p "Install Docker from official repository? (y/N): " -n 1 -r
+    echo
+
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        # Update package list
+        sudo apt-get update
+
+        # Install prerequisites
+        sudo apt-get install -y apt-transport-https ca-certificates curl software-properties-common
+
+        # Add Docker's official GPG key
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+
+        # Add Docker repository
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+        # Update package list again
+        sudo apt-get update
+
+        # Install Docker
+        if sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin; then
+            echo "✅ Docker installed from official repository"
+            return 0
+        fi
+    fi
+
+    # All methods failed
+    echo "❌ All Docker installation methods failed"
+    echo "Please install Docker manually:"
+    echo "  1. Visit: https://docs.docker.com/get-docker/"
+    echo "  2. Or run: curl -fsSL https://get.docker.com -o get-docker.sh && sh get-docker.sh"
+    return 1
 }
 
 # Function to check if Docker daemon is running
@@ -113,8 +171,13 @@ test_docker_access() {
         return 0
     fi
 
-    echo "⚠️  Docker permissions require a new terminal session"
-    echo "Please open a new terminal and test: docker ps"
+    echo "⚠️  Docker permissions still need a new terminal session"
+    echo ""
+    echo "To complete setup:"
+    echo "  1. Close this terminal"
+    echo "  2. Open a new terminal"
+    echo "  3. Run: ./start"
+    echo "  4. Test with: docker ps"
     return 1
 }
 
