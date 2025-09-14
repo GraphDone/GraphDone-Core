@@ -20,6 +20,43 @@ COMMAND=""
 SKIP_BANNER=false
 QUIET=false
 
+# Platform detection
+detect_platform() {
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        PLATFORM="macos"
+        # macOS shell profile detection
+        if [ -n "$ZSH_VERSION" ] || [ -f "$HOME/.zshrc" ]; then
+            SHELL_PROFILE="$HOME/.zshrc"
+        elif [ -f "$HOME/.bash_profile" ]; then
+            SHELL_PROFILE="$HOME/.bash_profile"
+        else
+            SHELL_PROFILE="$HOME/.bashrc"
+        fi
+    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        PLATFORM="linux"
+        SHELL_PROFILE="$HOME/.bashrc"
+    elif [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "cygwin" ]] || [[ "$OS" == "Windows_NT" ]]; then
+        PLATFORM="windows"
+        # Windows shell profile detection
+        if [ -n "$USERPROFILE" ]; then
+            # PowerShell profile (preferred)
+            SHELL_PROFILE="$USERPROFILE/Documents/PowerShell/Microsoft.PowerShell_profile.ps1"
+            # Git Bash profile (fallback)
+            if [ ! -f "$SHELL_PROFILE" ]; then
+                SHELL_PROFILE="$HOME/.bashrc"
+            fi
+        else
+            SHELL_PROFILE="$HOME/.bashrc"  # Git Bash fallback
+        fi
+    else
+        PLATFORM="unknown"
+        SHELL_PROFILE="$HOME/.bashrc"
+    fi
+}
+
+# Initialize platform detection
+detect_platform
+
 # Help function
 show_help() {
     echo -e "${BOLD}GraphDone${NC} - Graph-native project management system"
@@ -195,11 +232,38 @@ ensure_nodejs() {
             if [ -f "./scripts/setup_nodejs.sh" ]; then
                 ./scripts/setup_nodejs.sh
 
-                # After installation, reload shell and check again
-                if [ -f "$HOME/.bashrc" ]; then
-                    source "$HOME/.bashrc" 2>/dev/null || true
-                fi
-                export PATH="/snap/bin:$PATH"
+                # Platform-aware post-installation setup
+                case $PLATFORM in
+                    "macos")
+                        # macOS: Reload shell profile and update PATH for Homebrew
+                        if [ -f "$SHELL_PROFILE" ]; then
+                            source "$SHELL_PROFILE" 2>/dev/null || true
+                        fi
+                        # Add common macOS Node.js paths
+                        export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+                        ;;
+                    "linux")
+                        # Linux: Reload bashrc and add snap PATH
+                        if [ -f "$SHELL_PROFILE" ]; then
+                            source "$SHELL_PROFILE" 2>/dev/null || true
+                        fi
+                        export PATH="/snap/bin:$PATH"
+                        ;;
+                    "windows")
+                        # Windows: Refresh environment and add common paths
+                        if command -v refreshenv &> /dev/null; then
+                            refreshenv 2>/dev/null || true
+                        fi
+                        # Add common Windows Node.js paths
+                        export PATH="/c/Program Files/nodejs:/c/ProgramData/chocolatey/bin:$PATH"
+                        ;;
+                    *)
+                        # Unknown platform: Try to reload profile
+                        if [ -f "$SHELL_PROFILE" ]; then
+                            source "$SHELL_PROFILE" 2>/dev/null || true
+                        fi
+                        ;;
+                esac
 
                 # Verify Node.js is now available
                 if command -v node &> /dev/null && command -v npm &> /dev/null; then
@@ -208,12 +272,33 @@ ensure_nodejs() {
                 fi
             fi
 
-            # Fallback to manual instructions
+            # Fallback to platform-aware manual instructions
             log_error "❌ Could not install Node.js automatically."
-            echo "Please install Node.js manually:"
+            echo "Please install Node.js manually for $PLATFORM:"
             echo "  1. Run: ./scripts/setup_nodejs.sh"
-            echo "  2. Or visit: https://nodejs.org/"
-            echo "  3. Then restart terminal and run: ./start"
+            
+            case $PLATFORM in
+                "macos")
+                    echo "  2. Or install via Homebrew: brew install node"
+                    echo "  3. Or download from: https://nodejs.org/en/download/"
+                    ;;
+                "linux")
+                    echo "  2. Or install via package manager:"
+                    echo "     • Ubuntu/Debian: sudo apt install nodejs npm"
+                    echo "     • Fedora/RHEL: sudo dnf install nodejs npm"
+                    echo "  3. Or download from: https://nodejs.org/en/download/"
+                    ;;
+                "windows")
+                    echo "  2. Or install via Chocolatey: choco install nodejs"
+                    echo "  3. Or install via Scoop: scoop install nodejs"
+                    echo "  4. Or download installer: https://nodejs.org/en/download/"
+                    ;;
+                *)
+                    echo "  2. Visit: https://nodejs.org/en/download/"
+                    ;;
+            esac
+            
+            echo "  ${CYAN}Then restart terminal and run: ./start${NC}"
             exit 1
         fi
     fi
@@ -222,7 +307,7 @@ ensure_nodejs() {
 # Command implementations
 cmd_dev() {
     # Capture start time for end-to-end timing (milliseconds since epoch)
-    # macOS date doesn't support %3N, so we use Python for milliseconds
+    # macOS/Windows date doesn't support %3N, so we use Python for milliseconds
     if command -v python3 &> /dev/null; then
         GRAPHDONE_START_TIME=$(python3 -c 'import time; print(int(time.time() * 1000))')
     else
@@ -376,7 +461,7 @@ cmd_build() {
 
 cmd_deploy() {
     # Capture start time for end-to-end timing (milliseconds since epoch)
-    # macOS date doesn't support %3N, so we use Python for milliseconds
+    # macOS/Windows date doesn't support %3N, so we use Python for milliseconds
     if command -v python3 &> /dev/null; then
         GRAPHDONE_START_TIME=$(python3 -c 'import time; print(int(time.time() * 1000))')
     else
@@ -418,26 +503,45 @@ cmd_remove() {
     # Check and stop GraphDone services
     local services_found=false
     
-    # Stop Node.js processes
-    if pgrep -f "node.*3127\|node.*4127\|vite\|tsx.*watch" >/dev/null 2>&1; then
-        log_info "  • Stopping Node.js development servers..."
-        pkill -f "node.*3127" 2>/dev/null || true
-        pkill -f "node.*4127" 2>/dev/null || true
-        pkill -f "vite" 2>/dev/null || true
-        pkill -f "tsx.*watch" 2>/dev/null || true
-        services_found=true
-    fi
-    
-    # Kill processes on GraphDone ports
-    for port in 3127 4127 7474 7687; do
-        if lsof -ti:$port >/dev/null 2>&1; then
-            if [ "$services_found" = false ]; then
-                log_info "  • Stopping services on GraphDone ports..."
+    # Platform-aware process termination
+    case $PLATFORM in
+        "windows")
+            log_info "  • Stopping services on Windows..."
+            # Windows: Use taskkill for process termination
+            taskkill //F //IM node.exe 2>/dev/null || true
+            taskkill //F //IM "npm.exe" 2>/dev/null || true
+            # Stop services on specific ports (Windows netstat approach)
+            for port in 3127 4127 7474 7687; do
+                local pids=$(netstat -ano | grep ":$port " | awk '{print $5}' | sort -u 2>/dev/null)
+                if [ -n "$pids" ]; then
+                    echo "$pids" | xargs -r taskkill //F //PID 2>/dev/null || true
+                fi
+            done
+            services_found=true
+            ;;
+        *)
+            # Linux/macOS: Use traditional Unix commands
+            if pgrep -f "node.*3127\|node.*4127\|vite\|tsx.*watch" >/dev/null 2>&1; then
+                log_info "  • Stopping Node.js development servers..."
+                pkill -f "node.*3127" 2>/dev/null || true
+                pkill -f "node.*4127" 2>/dev/null || true
+                pkill -f "vite" 2>/dev/null || true
+                pkill -f "tsx.*watch" 2>/dev/null || true
                 services_found=true
             fi
-            lsof -ti:$port | xargs -r kill -9 2>/dev/null || true
-        fi
-    done
+            
+            # Kill processes on GraphDone ports
+            for port in 3127 4127 7474 7687; do
+                if command -v lsof &> /dev/null && lsof -ti:$port >/dev/null 2>&1; then
+                    if [ "$services_found" = false ]; then
+                        log_info "  • Stopping services on GraphDone ports..."
+                        services_found=true
+                    fi
+                    lsof -ti:$port | xargs -r kill -9 2>/dev/null || true
+                fi
+            done
+            ;;
+    esac
     
     if [ "$services_found" = false ]; then
         log_info "  • No running GraphDone services found"
@@ -513,20 +617,41 @@ cmd_remove() {
 cmd_stop() {
     log_info "🛑 Stopping all services..."
     
-    # Stop Docker containers
+    # Stop Docker containers (works on all platforms)
     docker-compose -f deployment/docker-compose.yml down 2>/dev/null || true
     docker-compose -f deployment/docker-compose.dev.yml down 2>/dev/null || true
     
-    # Stop npm processes
-    pkill -f "npm run dev" 2>/dev/null || true
-    pkill -f "vite" 2>/dev/null || true
-    pkill -f "tsx.*watch" 2>/dev/null || true
-    
-    # Clean up any processes on GraphDone ports
-    lsof -ti:3127 | xargs -r kill -9 2>/dev/null || true
-    lsof -ti:4127 | xargs -r kill -9 2>/dev/null || true
-    lsof -ti:7474 | xargs -r kill -9 2>/dev/null || true
-    lsof -ti:7687 | xargs -r kill -9 2>/dev/null || true
+    # Platform-aware process termination
+    case $PLATFORM in
+        "windows")
+            log_info "  • Stopping Windows processes..."
+            # Windows: Use taskkill
+            taskkill //F //IM node.exe 2>/dev/null || true
+            taskkill //F //IM npm.exe 2>/dev/null || true
+            
+            # Stop processes on specific ports
+            for port in 3127 4127 7474 7687; do
+                local pids=$(netstat -ano | grep ":$port " | awk '{print $5}' | sort -u 2>/dev/null)
+                if [ -n "$pids" ]; then
+                    echo "$pids" | xargs -r taskkill //F //PID 2>/dev/null || true
+                fi
+            done
+            ;;
+        *)
+            # Linux/macOS: Use traditional Unix commands
+            pkill -f "npm run dev" 2>/dev/null || true
+            pkill -f "vite" 2>/dev/null || true
+            pkill -f "tsx.*watch" 2>/dev/null || true
+            
+            # Clean up any processes on GraphDone ports
+            if command -v lsof &> /dev/null; then
+                lsof -ti:3127 | xargs -r kill -9 2>/dev/null || true
+                lsof -ti:4127 | xargs -r kill -9 2>/dev/null || true
+                lsof -ti:7474 | xargs -r kill -9 2>/dev/null || true
+                lsof -ti:7687 | xargs -r kill -9 2>/dev/null || true
+            fi
+            ;;
+    esac
     
     log_success "✅ All services stopped"
 }
