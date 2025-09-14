@@ -222,7 +222,13 @@ ensure_nodejs() {
 # Command implementations
 cmd_dev() {
     # Capture start time for end-to-end timing (milliseconds since epoch)
-    GRAPHDONE_START_TIME=$(date +%s%3N)
+    # macOS date doesn't support %3N, so we use Python for milliseconds
+    if command -v python3 &> /dev/null; then
+        GRAPHDONE_START_TIME=$(python3 -c 'import time; print(int(time.time() * 1000))')
+    else
+        # Fallback to seconds * 1000 if Python not available
+        GRAPHDONE_START_TIME=$(($(date +%s) * 1000))
+    fi
     export GRAPHDONE_START_TIME
 
     show_banner
@@ -230,7 +236,7 @@ cmd_dev() {
 
     ensure_nodejs
 
-    # Check Docker permissions (required for GraphDone)
+    # Check Docker status (required for GraphDone)
     if ! docker ps &> /dev/null; then
         # Determine the specific issue
         if ! command -v docker &> /dev/null; then
@@ -243,6 +249,9 @@ cmd_dev() {
             log_error "❌ Docker setup failed. Please fix Docker issues and try again."
             exit 1
         fi
+    else
+        # Docker is working properly
+        log_success "🐳 Docker is running and ready!"
     fi
 
     # Check if setup is needed
@@ -367,7 +376,13 @@ cmd_build() {
 
 cmd_deploy() {
     # Capture start time for end-to-end timing (milliseconds since epoch)
-    GRAPHDONE_START_TIME=$(date +%s%3N)
+    # macOS date doesn't support %3N, so we use Python for milliseconds
+    if command -v python3 &> /dev/null; then
+        GRAPHDONE_START_TIME=$(python3 -c 'import time; print(int(time.time() * 1000))')
+    else
+        # Fallback to seconds * 1000 if Python not available
+        GRAPHDONE_START_TIME=$(($(date +%s) * 1000))
+    fi
     export GRAPHDONE_START_TIME
 
     show_banner
