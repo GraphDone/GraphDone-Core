@@ -123,6 +123,12 @@ fix_docker_permissions() {
     echo ""
     echo "🔧 Setting up Docker permissions for user: $USER"
 
+    # Create docker group if it doesn't exist (needed for snap Docker)
+    if ! getent group docker >/dev/null; then
+        echo "🔧 Creating docker group..."
+        sudo groupadd docker
+    fi
+
     # Add user to docker group
     echo "📝 Adding $USER to docker group..."
     sudo usermod -aG docker $USER
