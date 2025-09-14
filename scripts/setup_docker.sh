@@ -171,13 +171,65 @@ test_docker_access() {
         return 0
     fi
 
-    echo "🔄 Applying group changes with newgrp..."
-    if newgrp docker -c 'docker ps' &> /dev/null; then
-        echo "✅ Docker is working after group refresh!"
-        return 0
-    fi
+    echo "🔄 Testing group changes..."
+    # Check if user is in docker group
+    if id -nG "$USER" | grep -qw docker; then
+        echo "✅ User successfully added to docker group"
 
-    echo "⚠️  Docker permissions still need a new terminal session"
+        # Try docker test (might work immediately after group add)
+        if docker ps &> /dev/null; then
+            echo "✅ Docker is working immediately!"
+            return 0
+        fi
+
+        echo "⚠️  Docker permissions require a new terminal session"
+    else
+        echo "❌ User not found in docker group - attempting to fix..."
+
+        # Try to fix the issue automatically
+        echo "🔧 Attempting to recreate docker group and add user..."
+
+        # Ensure docker group exists and add user (with error handling)
+        if sudo groupadd docker 2>/dev/null || true; then
+            echo "✅ Docker group created/verified"
+        fi
+
+        if sudo usermod -aG docker "$USER"; then
+            echo "✅ User added to docker group successfully"
+
+            # Verify the fix worked
+            if id -nG "$USER" | grep -qw docker; then
+                echo "✅ Group membership verified"
+                echo "⚠️  Docker permissions require a new terminal session"
+            else
+                echo "❌ Group add still failed - trying alternative method..."
+
+                # Alternative method: direct socket permissions
+                echo "🔧 Using alternative permission method..."
+                if [ -S "/var/run/docker.sock" ]; then
+                    sudo chmod 666 /var/run/docker.sock
+                    echo "✅ Applied direct socket permissions"
+
+                    # Test if this worked
+                    if docker ps &> /dev/null; then
+                        echo "✅ Docker is working with direct permissions!"
+                        return 0
+                    fi
+                fi
+
+                echo "❌ All automatic fixes failed"
+                echo "Manual steps required:"
+                echo "  1. sudo groupadd docker"
+                echo "  2. sudo usermod -aG docker $USER"
+                echo "  3. sudo chmod 666 /var/run/docker.sock"
+                echo "  4. Open new terminal and run: ./start"
+                return 1
+            fi
+        else
+            echo "❌ Failed to add user to docker group"
+            return 1
+        fi
+    fi
     echo ""
     echo "To complete setup:"
     echo "  1. Close this terminal"
