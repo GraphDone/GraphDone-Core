@@ -133,29 +133,37 @@ fix_docker_permissions() {
     echo "📝 Adding $USER to docker group..."
     sudo usermod -aG docker $USER
 
-    # Fix snap docker socket permissions if it exists
+    # Fix snap docker socket permissions (more permissive for snap)
     if [ -S "$DOCKER_SOCK" ]; then
         echo "🔧 Setting permissions on snap docker socket..."
         sudo chmod 666 "$DOCKER_SOCK"
     fi
 
-    # Fix standard docker socket permissions if it exists
+    # Fix standard docker socket permissions with proper group ownership
     if [ -S "$DOCKER_SOCK_ALT" ]; then
         echo "🔧 Setting permissions on standard docker socket..."
         sudo chown root:docker "$DOCKER_SOCK_ALT"
         sudo chmod 660 "$DOCKER_SOCK_ALT"
     fi
 
-    # Restart snap docker service
+    # Restart snap docker service to refresh permissions
     echo "🔄 Restarting snap Docker service..."
     sudo snap restart docker
-    sleep 3
 
-    # Re-fix socket permissions after restart (critical for snap)
+    # Wait for socket to be recreated
+    sleep 2
+
+    # Re-fix socket permissions after restart (critical for snap Docker)
     if [ -S "$DOCKER_SOCK_ALT" ]; then
         echo "🔧 Fixing socket ownership after restart..."
         sudo chown root:docker "$DOCKER_SOCK_ALT"
         sudo chmod 660 "$DOCKER_SOCK_ALT"
+    fi
+
+    # Also fix snap socket again if it was recreated
+    if [ -S "$DOCKER_SOCK" ]; then
+        echo "🔧 Re-fixing snap socket after restart..."
+        sudo chmod 666 "$DOCKER_SOCK"
     fi
 
     echo "✅ Docker permissions configured"
@@ -182,7 +190,29 @@ test_docker_access() {
             return 0
         fi
 
-        echo "⚠️  Docker permissions require a new terminal session"
+        echo "⚠️  Docker group membership set but socket access blocked"
+        echo "🔧 Applying direct socket permissions..."
+
+        # Apply direct socket permissions as immediate fix
+        if [ -S "/var/run/docker.sock" ]; then
+            sudo chmod 666 /var/run/docker.sock
+            echo "✅ Applied direct socket permissions"
+
+            # Test if this fixed the issue
+            if docker ps &> /dev/null; then
+                echo "✅ Docker is working with direct permissions!"
+                return 0
+            fi
+        fi
+
+        echo "⚠️  Docker permissions still require a new terminal session"
+        echo ""
+        echo "To complete setup:"
+        echo "  1. Close this terminal"
+        echo "  2. Open a new terminal"
+        echo "  3. Run: ./start"
+        echo "  4. Test with: docker ps"
+        return 0  # Success - user was added to group
     else
         echo "❌ User not found in docker group - attempting to fix..."
 
