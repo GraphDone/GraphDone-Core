@@ -168,8 +168,11 @@ log_error() {
 
 # Function to ensure Node.js is available
 ensure_nodejs() {
-    if ! command -v node &> /dev/null || ! command -v npm &> /dev/null; then
-        log_warning "⚠️  Node.js/npm not found in PATH, attempting to load from nvm..."
+    if command -v node &> /dev/null && command -v npm &> /dev/null; then
+        log_success "✅ Node.js found: $(node --version), npm: $(npm --version)"
+        return 0
+    else
+        log_warning "⚠️  Node.js not found - checking for existing installations..."
         
         export NVM_DIR="$HOME/.nvm"
         if [ -s "$NVM_DIR/nvm.sh" ]; then
@@ -186,10 +189,31 @@ ensure_nodejs() {
             
             log_success "✅ Loaded Node.js from nvm: $(node --version)"
         else
-            log_error "❌ Node.js not found and nvm not available."
-            echo "Please restart your terminal or run:"
-            echo "  source ~/.bashrc  # or ~/.zshrc"
-            echo "  ./start"
+            log_warning "🔧 No Node.js installation found. Installing automatically..."
+
+            # Try to install Node.js automatically
+            if [ -f "./scripts/setup_nodejs.sh" ]; then
+                ./scripts/setup_nodejs.sh
+
+                # After installation, reload shell and check again
+                if [ -f "$HOME/.bashrc" ]; then
+                    source "$HOME/.bashrc" 2>/dev/null || true
+                fi
+                export PATH="/snap/bin:$PATH"
+
+                # Verify Node.js is now available
+                if command -v node &> /dev/null && command -v npm &> /dev/null; then
+                    log_success "✅ Node.js automatically installed: $(node --version)"
+                    return 0
+                fi
+            fi
+
+            # Fallback to manual instructions
+            log_error "❌ Could not install Node.js automatically."
+            echo "Please install Node.js manually:"
+            echo "  1. Run: ./scripts/setup_nodejs.sh"
+            echo "  2. Or visit: https://nodejs.org/"
+            echo "  3. Then restart terminal and run: ./start"
             exit 1
         fi
     fi
@@ -208,8 +232,13 @@ cmd_dev() {
 
     # Check Docker permissions (required for GraphDone)
     if ! docker ps &> /dev/null; then
-        log_warning "🐳 Docker permissions issue detected..."
-        log_info "Running Docker setup to fix permissions..."
+        # Determine the specific issue
+        if ! command -v docker &> /dev/null; then
+            log_warning "🐳 Docker not installed - setting up Docker..."
+        else
+            log_warning "🐳 Docker permission issue detected - fixing permissions..."
+        fi
+
         if ! ./scripts/setup_docker.sh; then
             log_error "❌ Docker setup failed. Please fix Docker issues and try again."
             exit 1
