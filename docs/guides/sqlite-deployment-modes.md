@@ -289,8 +289,8 @@ SQLITE_ENCRYPTION_KEY=your-32-byte-encryption-key
 ### **SQLite Performance Profile**
 - **Reads**: ~100,000+ operations/second (authentication queries)
 - **Writes**: ~50,000+ operations/second (user updates)
-- **Database size**: <1MB for 1000 users
-- **Memory usage**: ~2-5MB resident set
+- **Database size**: <1 MB for 1000 users
+- **Memory usage**: ~2-5 MB resident set
 - **Startup time**: <10ms (database initialization)
 
 ### **Why SQLite for Auth vs Neo4j**

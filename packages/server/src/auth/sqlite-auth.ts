@@ -454,6 +454,90 @@ class SQLiteAuthStore {
     return bcrypt.compare(password, user.passwordHash);
   }
 
+  async createAdminUser(userData: {
+    email: string;
+    username: string;
+    password: string;
+    name: string;
+  }): Promise<User> {
+    await this.initialize();
+    const db = await this.getDb();
+
+    const passwordHash = await bcrypt.hash(userData.password, 10);
+    const userId = uuidv4();
+    const now = new Date().toISOString();
+
+    return new Promise((resolve, reject) => {
+      db.run(`INSERT INTO users (id, email, username, name, role, passwordHash, createdAt, updatedAt, isActive, isEmailVerified)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [userId, userData.email.toLowerCase(), userData.username.toLowerCase(), userData.name, 'ADMIN', passwordHash, now, now, 1, 1],
+        function(err) {
+          if (err) {
+            reject(err);
+          } else {
+            // Return the created admin user
+            resolve({
+              id: userId,
+              email: userData.email.toLowerCase(),
+              username: userData.username.toLowerCase(),
+              name: userData.name,
+              role: 'ADMIN',
+              passwordHash,
+              createdAt: now,
+              updatedAt: now,
+              isActive: true,
+              isEmailVerified: true,
+              team: null
+            });
+          }
+        });
+    });
+  }
+
+  async getUserByRole(role: 'ADMIN' | 'USER' | 'VIEWER' | 'GUEST'): Promise<User | null> {
+    await this.initialize();
+    const db = await this.getDb();
+
+    return new Promise((resolve, reject) => {
+      db.get('SELECT * FROM users WHERE role = ? LIMIT 1', [role], (err, row: any) => {
+        if (err) {
+          reject(err);
+        } else if (row) {
+          resolve({
+            id: row.id,
+            email: row.email,
+            username: row.username,
+            name: row.name,
+            role: row.role,
+            passwordHash: row.passwordHash,
+            createdAt: row.createdAt,
+            updatedAt: row.updatedAt,
+            isActive: Boolean(row.isActive),
+            isEmailVerified: Boolean(row.isEmailVerified),
+            team: null // Will be populated separately if needed
+          });
+        } else {
+          resolve(null);
+        }
+      });
+    });
+  }
+
+  async getUserCount(): Promise<number> {
+    await this.initialize();
+    const db = await this.getDb();
+
+    return new Promise((resolve, reject) => {
+      db.get('SELECT COUNT(*) as count FROM users', (err, row: any) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(row.count || 0);
+        }
+      });
+    });
+  }
+
   async createUser(userData: {
     email: string;
     username: string;
