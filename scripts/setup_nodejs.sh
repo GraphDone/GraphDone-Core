@@ -29,60 +29,206 @@ fi
 
 echo -e "${YELLOW}⚠️  Node.js not found, installing automatically...${NC}"
 
-# Method 1: Try snap without sudo first
-echo "🔧 Attempting snap installation (no sudo)..."
-if snap install node --classic 2>/dev/null; then
-    echo -e "${GREEN}✅ Node.js installed via snap successfully${NC}"
-    # Add snap to PATH
-    export PATH="/snap/bin:$PATH"
-
-    # Verify installation
-    if command_exists node; then
-        echo -e "${GREEN}✅ Node.js version: $(node --version)${NC}"
-        echo -e "${GREEN}✅ npm version: $(npm --version)${NC}"
-
-        # Update shell profile to include snap in PATH
-        if [ -f "$HOME/.bashrc" ] && ! grep -q "/snap/bin" "$HOME/.bashrc"; then
-            echo 'export PATH="/snap/bin:$PATH"' >> "$HOME/.bashrc"
-            echo -e "${CYAN}📝 Added /snap/bin to ~/.bashrc${NC}"
+# Detect operating system
+detect_os() {
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        OS="macos"
+        SHELL_PROFILE="$HOME/.zshrc"  # macOS default shell
+        if [ ! -f "$SHELL_PROFILE" ]; then
+            SHELL_PROFILE="$HOME/.bash_profile"  # Fallback for older macOS
         fi
+    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        OS="linux"
+        SHELL_PROFILE="$HOME/.bashrc"
+    else
+        OS="unknown"
+        SHELL_PROFILE="$HOME/.bashrc"
+    fi
+}
 
-        echo -e "${GREEN}🎉 Node.js installation completed successfully!${NC}"
+detect_os
+echo -e "${CYAN}🖥️  Detected platform: $OS${NC}"
+
+# Platform-specific installation methods
+if [ "$OS" = "macos" ]; then
+    # macOS Method 1: Try Homebrew
+    echo "🔧 Attempting Homebrew installation..."
+    if command_exists brew; then
+        echo -e "${CYAN}📦 Homebrew found, installing Node.js...${NC}"
+        if brew install node; then
+            echo -e "${GREEN}✅ Node.js installed via Homebrew successfully${NC}"
+            # Verify installation
+            if command_exists node; then
+                echo -e "${GREEN}✅ Node.js version: $(node --version)${NC}"
+                echo -e "${GREEN}✅ npm version: $(npm --version)${NC}"
+                echo -e "${GREEN}🎉 Node.js installation completed successfully!${NC}"
+                exit 0
+            fi
+        fi
+    else
+        echo -e "${YELLOW}⚠️  Homebrew not found. Installing Homebrew first...${NC}"
+        echo "🔧 Installing Homebrew (this may take a few minutes)..."
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+        
+        # Add Homebrew to PATH for current session
+        if [[ -x "/opt/homebrew/bin/brew" ]]; then
+            # Apple Silicon Mac
+            export PATH="/opt/homebrew/bin:$PATH"
+            eval "$(/opt/homebrew/bin/brew shellenv)"
+        elif [[ -x "/usr/local/bin/brew" ]]; then
+            # Intel Mac
+            export PATH="/usr/local/bin:$PATH"
+            eval "$(/usr/local/bin/brew shellenv)"
+        fi
+        
+        # Try installing Node.js via newly installed Homebrew
+        if command_exists brew && brew install node; then
+            echo -e "${GREEN}✅ Node.js installed via Homebrew successfully${NC}"
+            if command_exists node; then
+                echo -e "${GREEN}✅ Node.js version: $(node --version)${NC}"
+                echo -e "${GREEN}✅ npm version: $(npm --version)${NC}"
+                echo -e "${GREEN}🎉 Node.js installation completed successfully!${NC}"
+                exit 0
+            fi
+        fi
+    fi
+    
+    # macOS Method 2: Direct download (if Homebrew fails)
+    echo -e "${YELLOW}📥 Homebrew installation failed, trying direct download...${NC}"
+    echo "🔧 Installing Node.js via official installer..."
+    echo "  1. Visit: https://nodejs.org/en/download/"
+    echo "  2. Download the macOS installer (.pkg)"
+    echo "  3. Run the installer"
+    echo "  4. Restart your terminal"
+    echo "  5. Run: ./start"
+    echo ""
+    read -p "Have you installed Node.js? (y/N): " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]] && command_exists node; then
+        echo -e "${GREEN}✅ Node.js installation confirmed${NC}"
         exit 0
     fi
-fi
 
-# Method 2: Try with sudo if user approves
-echo -e "${YELLOW}⚠️  Standard snap installation failed${NC}"
-echo "Node.js installation requires administrator privileges."
-read -p "Install Node.js with sudo? (y/N): " -n 1 -r
-echo
-
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    echo "🔧 Installing Node.js via snap with sudo..."
-
-    if sudo snap install node --classic; then
-        # Add snap to PATH
+elif [ "$OS" = "linux" ]; then
+    # Linux Method 1: Try snap without sudo
+    echo "🔧 Attempting snap installation (no sudo)..."
+    if snap install node --classic 2>/dev/null; then
+        echo -e "${GREEN}✅ Node.js installed via snap successfully${NC}"
         export PATH="/snap/bin:$PATH"
-
+        
         # Verify installation
         if command_exists node; then
             echo -e "${GREEN}✅ Node.js version: $(node --version)${NC}"
             echo -e "${GREEN}✅ npm version: $(npm --version)${NC}"
-
+            
             # Update shell profile
-            if [ -f "$HOME/.bashrc" ] && ! grep -q "/snap/bin" "$HOME/.bashrc"; then
-                echo 'export PATH="/snap/bin:$PATH"' >> "$HOME/.bashrc"
-                echo -e "${CYAN}📝 Added /snap/bin to ~/.bashrc${NC}"
+            if [ -f "$SHELL_PROFILE" ] && ! grep -q "/snap/bin" "$SHELL_PROFILE"; then
+                echo 'export PATH="/snap/bin:$PATH"' >> "$SHELL_PROFILE"
+                echo -e "${CYAN}📝 Added /snap/bin to $SHELL_PROFILE${NC}"
             fi
-
+            
             echo -e "${GREEN}🎉 Node.js installation completed successfully!${NC}"
             exit 0
         fi
     fi
-fi
+    
+    # Linux Method 2: Try snap with sudo
+    echo -e "${YELLOW}⚠️  Standard snap installation failed${NC}"
+    echo "Snap installation requires administrator privileges."
+    read -p "Install Node.js via snap with sudo? (y/N): " -n 1 -r
+    echo
+    
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        echo "🔧 Installing Node.js via snap with sudo..."
+        if sudo snap install node --classic; then
+            echo -e "${GREEN}✅ Node.js installed via snap with sudo${NC}"
+            export PATH="/snap/bin:$PATH"
+            
+            # Verify installation
+            if command_exists node; then
+                echo -e "${GREEN}✅ Node.js version: $(node --version)${NC}"
+                echo -e "${GREEN}✅ npm version: $(npm --version)${NC}"
+                
+                # Update shell profile
+                if [ -f "$SHELL_PROFILE" ] && ! grep -q "/snap/bin" "$SHELL_PROFILE"; then
+                    echo 'export PATH="/snap/bin:$PATH"' >> "$SHELL_PROFILE"
+                    echo -e "${CYAN}📝 Added /snap/bin to $SHELL_PROFILE${NC}"
+                fi
+                
+                echo -e "${GREEN}🎉 Node.js installation completed successfully!${NC}"
+                exit 0
+            fi
+        fi
+    fi
 
-# Method 3: Fallback to nvm (no sudo needed)
+    # Linux Method 3: Try package managers (APT, YUM, DNF)
+    if command_exists apt-get; then
+        # Debian/Ubuntu systems
+        echo -e "${YELLOW}⚠️  Snap installation failed, trying APT package manager...${NC}"
+        echo "Node.js installation via APT requires administrator privileges."
+        read -p "Install Node.js with APT? (y/N): " -n 1 -r
+        echo
+
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            echo "🔧 Installing Node.js via APT..."
+            
+            # Update package index and install Node.js from NodeSource repository
+            echo "📦 Adding NodeSource repository for Node.js 18.x..."
+            curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+            
+            echo "📦 Installing Node.js and npm..."
+            if sudo apt-get install -y nodejs; then
+                # Verify installation
+                if command_exists node && command_exists npm; then
+                    echo -e "${GREEN}✅ Node.js installed via APT successfully${NC}"
+                    echo -e "${GREEN}✅ Node.js version: $(node --version)${NC}"
+                    echo -e "${GREEN}✅ npm version: $(npm --version)${NC}"
+                    echo -e "${GREEN}🎉 Node.js installation completed successfully!${NC}"
+                    exit 0
+                fi
+            else
+                echo -e "${YELLOW}⚠️  APT installation failed, trying alternative methods...${NC}"
+            fi
+        fi
+    elif command_exists yum || command_exists dnf; then
+        # RedHat/Fedora/CentOS systems
+        echo -e "${YELLOW}⚠️  Snap installation failed, trying YUM/DNF package manager...${NC}"
+        echo "Node.js installation via YUM/DNF requires administrator privileges."
+        read -p "Install Node.js with YUM/DNF? (y/N): " -n 1 -r
+        echo
+
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            echo "🔧 Installing Node.js via YUM/DNF..."
+            
+            # Determine package manager
+            PKG_MGR="yum"
+            if command_exists dnf; then
+                PKG_MGR="dnf"
+            fi
+            
+            # Add NodeSource repository and install
+            echo "📦 Adding NodeSource repository for Node.js 18.x..."
+            curl -fsSL https://rpm.nodesource.com/setup_18.x | sudo bash -
+            
+            echo "📦 Installing Node.js and npm..."
+            if sudo $PKG_MGR install -y nodejs; then
+                # Verify installation
+                if command_exists node && command_exists npm; then
+                    echo -e "${GREEN}✅ Node.js installed via $PKG_MGR successfully${NC}"
+                    echo -e "${GREEN}✅ Node.js version: $(node --version)${NC}"
+                    echo -e "${GREEN}✅ npm version: $(npm --version)${NC}"
+                    echo -e "${GREEN}🎉 Node.js installation completed successfully!${NC}"
+                    exit 0
+                fi
+            else
+                echo -e "${YELLOW}⚠️  $PKG_MGR installation failed, trying alternative methods...${NC}"
+            fi
+        fi
+    fi
+    
+fi  # End of Linux-specific methods
+
+# Universal Method: Fallback to nvm (works on all platforms, no sudo needed)
 echo -e "${YELLOW}📦 Falling back to nvm installation (no sudo required)...${NC}"
 
 # Install nvm
