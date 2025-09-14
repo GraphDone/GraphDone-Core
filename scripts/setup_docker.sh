@@ -216,9 +216,55 @@ install_docker_linux() {
         fi
     fi
 
-    # Method 3: Official Docker repository
-    echo "🔧 Method 3: Installing Docker from official repository..."
-    echo "This requires sudo privileges..."
+    # Method 3: Try package manager installation (APT/YUM/DNF)
+    if command -v apt-get &> /dev/null; then
+        # Debian/Ubuntu systems
+        echo "🔧 Method 3: Trying APT package manager (docker.io)..."
+        echo "This installs the distribution's Docker package."
+        read -p "Install Docker via APT? (Y/N): " -n 1 -r
+        echo
+        
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            echo "📦 Installing Docker via APT..."
+            if sudo apt-get update && sudo apt-get install -y docker.io docker-compose; then
+                # Start Docker service
+                sudo systemctl start docker 2>/dev/null || sudo service docker start
+                sudo systemctl enable docker 2>/dev/null || true
+                echo "✅ Docker installed via APT successfully"
+                return 0
+            else
+                echo "⚠️  APT installation failed, trying official repository..."
+            fi
+        fi
+    elif command -v yum &> /dev/null || command -v dnf &> /dev/null; then
+        # RedHat/Fedora/CentOS systems
+        echo "🔧 Method 3: Trying YUM/DNF package manager..."
+        echo "This installs the distribution's Docker package."
+        read -p "Install Docker via YUM/DNF? (Y/N): " -n 1 -r
+        echo
+        
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            PKG_MGR="yum"
+            if command -v dnf &> /dev/null; then
+                PKG_MGR="dnf"
+            fi
+            
+            echo "📦 Installing Docker via $PKG_MGR..."
+            if sudo $PKG_MGR install -y docker docker-compose; then
+                # Start Docker service
+                sudo systemctl start docker
+                sudo systemctl enable docker
+                echo "✅ Docker installed via $PKG_MGR successfully"
+                return 0
+            else
+                echo "⚠️  $PKG_MGR installation failed, trying official repository..."
+            fi
+        fi
+    fi
+
+    # Method 4: Official Docker repository (latest version)
+    echo "🔧 Method 4: Installing Docker from official repository (recommended)..."
+    echo "This installs the latest Docker version."
     read -p "Install Docker from official repository? (Y/N): " -n 1 -r
     echo
 
