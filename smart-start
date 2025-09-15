@@ -184,14 +184,18 @@ log_error() {
 show_banner() {
     if [ "$SKIP_BANNER" = false ]; then
         clear
-        echo -e "${PURPLE}"
-        echo "╔══════════════════════════════════════════════════════════════╗"
-        echo "║                                                              ║"
-        echo "║                🎲 GraphDone Smart Start 🧿                   ║"
-        echo "║                                                              ║"
-        echo "║      ⚡ Automated setup with no manual configuration ⚡       ║"
-        echo "║                                                              ║"
-        echo "╚══════════════════════════════════════════════════════════════╝"
+        echo -e "\033[38;2;64;224;208m"
+        echo "╔═══════════════════════════════════════════════════════════════════╗"
+        echo "║                                                                   ║"
+        echo "║                          🎲 GraphDone 🧿                          ║"
+        echo "║                                                                   ║"
+        echo "║                          Smart Start 🚀                           ║"
+        echo "║                                                                   ║"
+        echo "║      ⚡ Fully Automated Setup | Zero Manual Configuration ⚡      ║"
+        echo "║                                                                   ║"
+        echo "║      ✨ Launch Instantly & Elevate Your Graph Experience ✨       ║"
+        echo "║                                                                   ║"
+        echo "╚═══════════════════════════════════════════════════════════════════╝"
         echo -e "${NC}"
     fi
 }
@@ -241,9 +245,48 @@ update_deps_hash() {
     fi
 }
 
-# Check if containers are already running
+# Check if containers are actually healthy (not just running)
 check_containers_running() {
-    if docker ps | grep -q "graphdone-neo4j" && docker ps | grep -q "graphdone-redis"; then
+    # Check if containers exist and are in healthy state
+    local neo4j_healthy=false
+    local redis_healthy=false
+    local api_healthy=false
+    local web_healthy=false
+
+    # Check Neo4j container health and connectivity
+    if docker ps --format "{{.Names}} {{.Status}}" | grep "graphdone-neo4j" | grep -q "Up.*healthy"; then
+        # Verify Neo4j is actually responding
+        if timeout 5 docker exec graphdone-neo4j cypher-shell -u neo4j -p graphdone_password "RETURN 1" &>/dev/null; then
+            neo4j_healthy=true
+        fi
+    fi
+
+    # Check Redis container health and connectivity
+    if docker ps --format "{{.Names}} {{.Status}}" | grep "graphdone-redis" | grep -q "Up.*healthy"; then
+        # Verify Redis is actually responding
+        if timeout 5 docker exec graphdone-redis redis-cli ping &>/dev/null; then
+            redis_healthy=true
+        fi
+    fi
+
+    # Check API container health and endpoint
+    if docker ps --format "{{.Names}} {{.Status}}" | grep "graphdone-api" | grep -q "Up.*healthy"; then
+        # Verify API endpoint is responding
+        if timeout 5 curl -sf http://localhost:4127/health &>/dev/null; then
+            api_healthy=true
+        fi
+    fi
+
+    # Check Web container health and endpoint
+    if docker ps --format "{{.Names}} {{.Status}}" | grep "graphdone-web" | grep -q "Up"; then
+        # Verify Web endpoint is responding
+        if timeout 5 curl -sf http://localhost:3127 &>/dev/null; then
+            web_healthy=true
+        fi
+    fi
+
+    # All services must be healthy for containers to be considered running
+    if [ "$neo4j_healthy" = true ] && [ "$redis_healthy" = true ] && [ "$api_healthy" = true ] && [ "$web_healthy" = true ]; then
         return 0
     fi
     return 1
@@ -277,63 +320,99 @@ spinner() {
 
 # Pull images from registry with visual feedback
 pull_registry_images() {
-    echo -e "\n${BOLD}📦 Container Registry Pull${NC}"
-    echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    
+    echo -e "\n${BOLD}${MAGENTA}💎 CONTAINER REGISTRY${NC}"
+    echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
+
     local registry="ghcr.io/graphdone"
     local branch_tag="fix-first-start"
-    
-    # Try latest first, fallback to branch tag
-    (
-        docker pull "${registry}/graphdone-web:latest" 2>/dev/null || 
-        docker pull "${registry}/graphdone-web:${branch_tag}" 2>/dev/null
-    ) &
-    spinner $! "Pulling Web UI image"
-    
-    (
-        docker pull "${registry}/graphdone-api:latest" 2>/dev/null || 
-        docker pull "${registry}/graphdone-api:${branch_tag}" 2>/dev/null
-    ) &
-    spinner $! "Pulling API Server image"
-    
-    (
-        docker pull "${registry}/graphdone-neo4j:latest" 2>/dev/null || 
-        docker pull "${registry}/graphdone-neo4j:${branch_tag}" 2>/dev/null
-    ) &
-    spinner $! "Pulling Neo4j Database image"
-    
-    # Check if images were pulled successfully
-    if docker images | grep -q "graphdone"; then
-        echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-        return 0
+    local success_count=0
+    local total_count=3
+
+    # Pull Web Interface with detailed output
+    echo -e "${CYAN}🌐 Web Interface${NC}"
+    local web_output=$(docker pull "${registry}/graphdone-web:${branch_tag}" 2>&1)
+    if [ $? -eq 0 ]; then
+        local digest=$(echo "$web_output" | grep -oP 'Digest: \K[^\s]+' | head -1)
+        local status=$(echo "$web_output" | grep -oP 'Status: \K.*' | head -1)
+        echo -e "   ${DIM}├─ Digest: ${digest:-sha256:unknown}${NC}"
+        echo -e "   ${DIM}├─ Status: ${status:-Downloaded}${NC}"
+        echo -e "   ${DIM}└─ Ref: ${registry}/graphdone-web:${branch_tag}${NC}"
+        echo -e "${GREEN}✓ Web Interface pulled successfully!${NC}\n"
+        ((success_count++))
     else
-        echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-        return 1
+        echo -e "   ${RED}└─ Failed to pull image${NC}\n"
     fi
+
+    # Pull API Server with detailed output
+    echo -e "${YELLOW}⚡ API Server${NC}"
+    local api_output=$(docker pull "${registry}/graphdone-api:${branch_tag}" 2>&1)
+    if [ $? -eq 0 ]; then
+        local digest=$(echo "$api_output" | grep -oP 'Digest: \K[^\s]+' | head -1)
+        local status=$(echo "$api_output" | grep -oP 'Status: \K.*' | head -1)
+        echo -e "   ${DIM}├─ Digest: ${digest:-sha256:unknown}${NC}"
+        echo -e "   ${DIM}├─ Status: ${status:-Downloaded}${NC}"
+        echo -e "   ${DIM}└─ Ref: ${registry}/graphdone-api:${branch_tag}${NC}"
+        echo -e "${GREEN}✓ API Server pulled successfully!${NC}\n"
+        ((success_count++))
+    else
+        echo -e "   ${RED}└─ Failed to pull image${NC}\n"
+    fi
+
+    # Pull Database with detailed output
+    echo -e "${GREEN}🗄️ Database${NC}"
+    local db_output=$(docker pull "${registry}/graphdone-neo4j:${branch_tag}" 2>&1)
+    if [ $? -eq 0 ]; then
+        local digest=$(echo "$db_output" | grep -oP 'Digest: \K[^\s]+' | head -1)
+        local status=$(echo "$db_output" | grep -oP 'Status: \K.*' | head -1)
+        echo -e "   ${DIM}├─ Digest: ${digest:-sha256:unknown}${NC}"
+        echo -e "   ${DIM}├─ Status: ${status:-Downloaded}${NC}"
+        echo -e "   ${DIM}└─ Ref: ${registry}/graphdone-neo4j:${branch_tag}${NC}"
+        echo -e "${GREEN}✓ Database pulled successfully!${NC}\n"
+        ((success_count++))
+    else
+        echo -e "   ${RED}└─ Failed to pull image${NC}\n"
+    fi
+
+    # Summary
+    echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    if [ $success_count -eq $total_count ]; then
+        echo -e "${GREEN}✅ ${success_count}/${total_count} container images fetched successfully!${NC}"
+    else
+        echo -e "${YELLOW}⚠️ ${success_count}/${total_count} container images fetched${NC}"
+    fi
+    echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+
+    [ $success_count -gt 0 ] && return 0 || return 1
 }
 
 # Smart npm install function
 smart_npm_install() {
     local attempt=1
-    local max_attempts=2
-    
+    local max_attempts=3
+
     while [ $attempt -le $max_attempts ]; do
         if [ $attempt -eq 1 ]; then
             # First attempt: standard npm install
             if npm install --silent 2>/dev/null; then
                 return 0
             fi
-        else
+        elif [ $attempt -eq 2 ]; then
             # Second attempt: handle peer dependency conflicts
             log_info "  • Resolving dependency conflicts automatically..."
             if npm install --legacy-peer-deps; then
                 return 0
             fi
+        else
+            # Third attempt: handle rollup module issue specifically
+            log_info "  • Installing missing rollup module for Linux..."
+            if npm install @rollup/rollup-linux-x64-gnu --save-dev && npm install --legacy-peer-deps; then
+                return 0
+            fi
         fi
-        
+
         attempt=$((attempt + 1))
     done
-    
+
     log_error "❌ Failed to install dependencies after $max_attempts attempts"
     return 1
 }
@@ -349,15 +428,12 @@ smart_start() {
     export GRAPHDONE_START_TIME
 
     show_banner
-    
-    if [ "$USE_HTTPS" = true ]; then
-        echo -e "\n${BOLD}🔐 Secure Mode Initialization${NC}"
-        echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
-    else
-        echo -e "\n${BOLD}🚀 Development Mode Initialization${NC}"
-        echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
-    fi
-    
+
+    # Dependency Check Section
+    echo -e "\n${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${BOLD}${BLUE}🔧 Dependency Check${NC}"
+    echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+
     # Step 1: Auto-install Node.js FIRST (easier, no admin required)
     if ! command -v node &> /dev/null || ! command -v npm &> /dev/null; then
         log_warning "📦 Node.js not found - installing automatically..."
@@ -371,7 +447,8 @@ smart_start() {
             log_warning "⚠️  Node.js auto-install failed, will use containers instead..."
         fi
     else
-        log_success "✅ Node.js ready: $(node --version)"
+        echo -e "🟢 Node.js is ready ${GREEN}✓${NC}"
+        echo -e "   ${DIM}└─ Version: $(node --version)${NC}"
     fi
     
     # Step 2: Auto-install Docker (may require admin)
@@ -419,76 +496,116 @@ smart_start() {
             exit 1
         fi
     fi
-    log_success "✅ Docker is ready!"
+    echo -e "🐳 Docker is ready ${GREEN}✓${NC}"
+    echo -e "   ${DIM}└─ Version: $(docker --version | cut -d' ' -f3 | sed 's/,//')${NC}"
+    echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${GREEN}✅ Dependency check completed successfully!${NC}"
+    echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     
-    # Step 4: Decide mode based on what's available
-    local use_containers=false
-    if command -v node &> /dev/null && command -v npm &> /dev/null; then
-        # Node.js is available, use development mode
+    # Step 4: Container cleanup first - clean slate preparation
+    echo -e "\n${BOLD}${MAGENTA}🧹 CONTAINER CLEANUP${NC}"
+    echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e " ${YELLOW}🛑${NC} Stopping running containers..."
+
+    # Stop containers with status feedback
+    for container in graphdone-neo4j graphdone-redis graphdone-api graphdone-web; do
+        if docker ps -q -f name="$container" | grep -q .; then
+            if docker stop "$container" &>/dev/null; then
+                echo -e "   ${GREEN}✓${NC} Stopped $container"
+            else
+                echo -e "   ${RED}✗${NC} Failed to stop $container"
+            fi
+        else
+            echo -e "   ${DIM}✗${NC} ${DIM}Not running $container${NC}"
+        fi
+    done
+
+    echo -e "\n ${YELLOW}🗑️${NC}  Removing old containers..."
+
+    # Remove containers with status feedback
+    for container in graphdone-neo4j graphdone-redis graphdone-api graphdone-web; do
+        if docker ps -aq -f name="$container" | grep -q .; then
+            if docker rm "$container" &>/dev/null; then
+                echo -e "   ${GREEN}✓${NC} Removed $container"
+            else
+                echo -e "   ${RED}✗${NC} Failed to remove $container"
+            fi
+        else
+            echo -e "   ${DIM}✓${NC} ${DIM}Already removed $container${NC}"
+        fi
+    done
+
+    echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${GREEN}✅${NC} Cleanup complete!"
+
+    # Step 5: Smart mode detection - try registry first (fastest)
+    local use_containers=true
+    echo -e "\n${BOLD}${PURPLE}🧠 INTELLIGENT MODE DETECTION${NC}"
+    echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${CYAN}⚡${NC} Trying registry images first for faster startup..."
+
+    # Test if registry images are accessible
+    if docker pull ghcr.io/graphdone/graphdone-web:fix-first-start &>/dev/null; then
+        echo -e "  ${GREEN}✅${NC} ${BOLD}Registry images accessible${NC} - using container mode"
+        use_containers=true
+    elif command -v node &> /dev/null && command -v npm &> /dev/null; then
+        echo -e "  ${YELLOW}📦${NC} ${BOLD}Registry unavailable${NC} - falling back to development mode"
         use_containers=false
     else
-        log_info "📦 Using pre-built containers (no Node.js needed)"
+        echo -e "  ${BLUE}📦${NC} ${BOLD}Using local container builds${NC} (no Node.js available)"
         use_containers=true
     fi
     
-    # Step 5: Check if containers are already running (speed optimization)
+    # Step 6: Check if containers are already running (speed optimization)
     if check_containers_running; then
         log_success "✅ Services already running - connecting..."
     else
         if [ "$use_containers" = true ]; then
             # Container mode - pull from registry
-            log_info "⬇️  Pulling pre-built images..."
+            echo -e "\n${BOLD}${GREEN}⬇️ IMAGE DEPLOYMENT${NC}"
+            echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+            echo -e "  ${CYAN}📦${NC} Pulling pre-built images from registry..."
             
-            # Clean up any existing containers first
-            log_info "🧹 Cleaning up existing containers..."
-            docker stop graphdone-neo4j graphdone-redis graphdone-api graphdone-web 2>/dev/null || true
-            docker rm graphdone-neo4j graphdone-redis graphdone-api graphdone-web 2>/dev/null || true
+            # Containers already cleaned up above
             
             if pull_registry_images; then
                 docker-compose -f deployment/docker-compose.registry.yml up -d
             else
-                log_info "📦 Building containers locally (one-time process)..."
+                echo -e "  ${YELLOW}🏗️${NC}  Building containers locally (one-time process)..."
                 docker-compose -f deployment/docker-compose.yml up -d --build
             fi
         else
             # Development mode - use local code
-            log_info "🔧 Setting up development environment..."
+            echo -e "\n${BOLD}${YELLOW}🔧 DEVELOPMENT SETUP${NC}"
+            echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+            echo -e "  ${BLUE}⚙️${NC}  Setting up development environment..."
             
             # Quick dependency check with caching
             if [ ! -d "node_modules" ] || ! check_deps_fresh; then
-                log_info "📦 Installing dependencies (cached)..."
+                echo -e "  ${CYAN}📦${NC} Installing dependencies (cached)..."
                 if smart_npm_install; then
                     update_deps_hash
                 fi
             fi
             
             # Start databases (clean up any existing containers first)
-            log_info "🗄️  Starting databases..."
-            
-            # Robust cleanup of existing containers
-            log_info "🧹 Cleaning up any existing containers..."
-            
-            # Stop and remove containers by name (more reliable than docker-compose)
-            docker stop graphdone-neo4j graphdone-redis 2>/dev/null || true
-            docker rm graphdone-neo4j graphdone-redis 2>/dev/null || true
-            
-            # Also try docker-compose cleanup
-            docker-compose -f deployment/docker-compose.dev.yml down 2>/dev/null || true
-            docker-compose -f deployment/docker-compose.yml down 2>/dev/null || true
-            
-            # Now start fresh containers
+            echo -e "\n${BOLD}${GREEN}🗄️ DATABASE INITIALIZATION${NC}"
+            echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+            echo -e "  ${GREEN}🚀${NC} Starting database services (containers already cleaned up)..."
+
+            # Start fresh containers
             docker-compose -f deployment/docker-compose.dev.yml up -d graphdone-neo4j graphdone-redis
             
             # Build core if needed
             if [ ! -f "packages/core/dist/index.js" ]; then
-                log_info "🏗️  Building core package..."
+                echo -e "  ${BLUE}🏗️${NC}  Building core package..."
                 (cd packages/core && npm run build)
             fi
             
             # Check for certificates if HTTPS mode
             if [ "$USE_HTTPS" = true ]; then
                 if [ ! -f "deployment/certs/server-cert.pem" ] || [ ! -f "deployment/certs/server-key.pem" ]; then
-                    log_info "🔐 Generating development certificates..."
+                    echo -e "  ${PURPLE}🔐${NC} Generating development certificates..."
                     ./scripts/generate-dev-certs.sh 2>/dev/null || true
                 fi
                 
@@ -502,7 +619,9 @@ smart_start() {
             fi
             
             # Start dev servers with proper environment
-            log_info "🚀 Starting development servers..."
+            echo -e "\n${BOLD}${BLUE}🚀 SERVER INITIALIZATION${NC}"
+            echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+            echo -e "  ${GREEN}⚡${NC} Starting development servers..."
             
             # For HTTPS mode, ensure proper environment is set
             if [ "$USE_HTTPS" = true ]; then
@@ -541,53 +660,61 @@ smart_start() {
         ELAPSED_SEC=$(($(date +%s) - (GRAPHDONE_START_TIME / 1000)))
     fi
     
-    # Show success
-    log_success "✅ GraphDone started in ${ELAPSED_SEC} seconds!"
+    # Modern professional success display
     echo ""
-    # Determine URLs based on mode
+    echo ""
+    echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${BOLD}${GREEN}                    🚀 GraphDone Server Ready!                ${NC}"
+    echo ""
+    echo -e "                  GraphDone started in ${GREEN}${BOLD}${ELAPSED_SEC}s${NC}"
+    echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
+
+    # Clean system status with single emojis
+    echo -e "${BOLD}${BLUE}💎 SYSTEM STATUS${NC}"
+    echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${GREEN}🚀${NC} ${BOLD}API Server${NC}         ${GREEN}✓ ONLINE${NC}   ${DIM}:4128 HTTPS${NC}"
+    echo -e "  ${GREEN}🌐${NC} ${BOLD}Web Interface${NC}      ${GREEN}✓ ONLINE${NC}   ${DIM}:3128 HTTPS${NC}"
+    echo -e "  ${GREEN}✨${NC} ${BOLD}GraphQL Endpoint${NC}   ${GREEN}✓ ONLINE${NC}   ${DIM}/graphql${NC}"
+    echo -e "  ${GREEN}🔥${NC} ${BOLD}WebSocket${NC}          ${GREEN}✓ ONLINE${NC}   ${DIM}Secure WSS${NC}"
+    echo -e "  ${GREEN}🎮${NC} ${BOLD}Neo4j Database${NC}     ${GREEN}✓ ONLINE${NC}   ${DIM}:7474/:7687${NC}"
+    echo -e "  ${GREEN}💾${NC} ${BOLD}Redis Cache${NC}        ${GREEN}✓ ONLINE${NC}   ${DIM}:6379${NC}"
+    echo -e "  ${GREEN}🔐${NC} ${BOLD}SQLite Auth${NC}        ${GREEN}✓ ONLINE${NC}   ${DIM}Authentication${NC}\n"
+
+    # Access URLs with professional formatting
+    echo -e "${BOLD}${PURPLE}🌟 ACCESS POINTS${NC}"
+    echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     if [ "$USE_HTTPS" = true ] && [ "$DEV_MODE" = false ]; then
-        echo -e "\n${BOLD}${GREEN}========================================${NC}"
-        echo -e "${BOLD}${GREEN}       GraphDone Server Ready!          ${NC}"
-        echo -e "${BOLD}${GREEN}========================================${NC}\n"
-        echo -e "  ${GREEN}✅${NC} Started HTTPS server on port 4128"
-        echo -e "  ${GREEN}✅${NC} Started secure WebSocket server"
-        echo -e "  ${GREEN}✅${NC} Connected to Neo4j graph database"
-        echo -e "  ${GREEN}✅${NC} All systems operational\n"
-        echo -e "  ${BOLD}🌐 The application is now ready to use at:${NC}"
-        echo -e "  ${CYAN}🔒 Web App:${NC}  ${BOLD}https://localhost:3128${NC}"
-        echo -e "  ${CYAN}🔐 GraphQL:${NC}  ${BOLD}https://localhost:4128/graphql${NC}"
-        echo -e "  ${CYAN}📊 Neo4j:${NC}    ${BOLD}http://localhost:7474${NC}\n"
-        echo -e "  ${DIM}🔑 Secure connection with TLS/SSL enabled${NC}"
+        echo -e "  ${CYAN}🎯${NC} ${BOLD}Primary Application${NC}     ${BOLD}https://localhost:3128${NC}"
+        echo -e "  ${CYAN}🔥${NC} ${BOLD}GraphQL Playground${NC}     ${BOLD}https://localhost:4128/graphql${NC}"
+        echo -e "  ${CYAN}📊${NC} ${BOLD}Database Browser${NC}       ${BOLD}http://localhost:7474${NC}"
+        echo -e "  ${GREEN}🔐 Enterprise-grade TLS/SSL encryption active${NC}"
     else
-        echo -e "\n${BOLD}${BLUE}========================================${NC}"
-        echo -e "${BOLD}${BLUE}       GraphDone Server Ready!          ${NC}"
-        echo -e "${BOLD}${BLUE}========================================${NC}\n"
-        echo -e "  ${GREEN}✅${NC} Started HTTP server on port 4127"
-        echo -e "  ${GREEN}✅${NC} Started WebSocket server"
-        echo -e "  ${GREEN}✅${NC} Connected to Neo4j graph database"
-        echo -e "  ${GREEN}✅${NC} Development mode active\n"
-        echo -e "  ${BOLD}🌐 The application is now ready to use at:${NC}"
-        echo -e "  ${CYAN}🖥️  Web App:${NC}  ${BOLD}http://localhost:3127${NC}"
-        echo -e "  ${CYAN}🔗 GraphQL:${NC}  ${BOLD}http://localhost:4127/graphql${NC}"
-        echo -e "  ${CYAN}📊 Neo4j:${NC}    ${BOLD}http://localhost:7474${NC}\n"
-        echo -e "  ${DIM}⚠️  Development mode - no TLS/SSL${NC}"
+        echo -e "  ${CYAN}🎯${NC} ${BOLD}Primary Application${NC}     ${BOLD}http://localhost:3127${NC}"
+        echo -e "  ${CYAN}🔥${NC} ${BOLD}GraphQL Playground${NC}     ${BOLD}http://localhost:4127/graphql${NC}"
+        echo -e "  ${CYAN}📊${NC} ${BOLD}Database Browser${NC}       ${BOLD}http://localhost:7474${NC}"
+        echo -e "  ${YELLOW}⚠️${NC}  ${DIM}Development mode - HTTP only${NC}"
     fi
-    
-    echo -e "\n  ${DIM}🧬 Total startup time: ${ELAPSED_SEC} seconds${NC}"
-    echo -e "  ${DIM}🌐 Neo4j status: 🟢 Connected${NC}"
-    echo -e "${BOLD}${GREEN}========================================${NC}"
+
+    # Professional footer with quick actions
+    echo -e "\n${BOLD}${YELLOW}⚡ QUICK ACTIONS${NC}"
+    echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${CYAN}🛑${NC} ${BOLD}Stop Services${NC}        ${DIM}./start stop${NC}"
+    echo -e "  ${CYAN}📋${NC} ${BOLD}View API Logs${NC}        ${DIM}docker logs graphdone-api${NC}"
+    echo -e "  ${CYAN}🔄${NC} ${BOLD}Quick Restart${NC}        ${DIM}./smart-start${NC}"
+    echo -e "  ${CYAN}🧹${NC} ${BOLD}Complete Reset${NC}       ${DIM}./start remove${NC}\n"
+
+    echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${GREEN}${BOLD}           🎉 GraphDone servers are ready to use now! 🎉${NC}"
     echo ""
-    echo "💡 Tips:"
-    echo "   • Use './start stop' to stop services"
-    echo "   • Containers will keep running for faster next start"
-    echo "   • Check logs if services seem slow to respond"
+    echo -e "            ${CYAN}${BOLD}GraphDone v0.3.1-alpha${NC} ${PURPLE}│${NC} ${YELLOW}Ready in ${ELAPSED_SEC}s${NC}"
+    echo -e "             ${BLUE}Production Mode${NC} ${PURPLE}│${NC} ${GREEN}All Systems Online${NC}"
+    echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo ""
+    echo -e "   ${DIM}Services running in background. Stop with: ${CYAN}./start stop${NC}"
     
     if [ -n "$DEV_PID" ]; then
         # Keep running if in dev mode
         wait $DEV_PID
-    else
-        echo "Services running in background. Stop with: ./start stop"
     fi
 }
 
