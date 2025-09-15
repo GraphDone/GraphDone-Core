@@ -1,18 +1,14 @@
 FROM neo4j:5.26.12
 
-# Pre-install plugins to speed up startup
-ENV NEO4J_PLUGINS='["graph-data-science", "apoc"]'
+# Set Neo4j configuration
 ENV NEO4J_AUTH=neo4j/graphdone_password
 ENV NEO4J_dbms_security_procedures_unrestricted=gds.*,apoc.*
 ENV NEO4J_dbms_security_procedures_allowlist=gds.*,apoc.*
 ENV NEO4J_server_config_strict__validation_enabled=false
 
-# Pre-download and install plugins during build
-RUN neo4j-admin server plugin install graph-data-science --accept-license && \
-    neo4j-admin server plugin install apoc --accept-license
-
-# Pre-create the database to speed up first start
-RUN neo4j-admin database create neo4j || true
+# The NEO4J_PLUGINS environment variable will automatically download and install plugins on first start
+# This is the recommended way for Neo4j 5.x - plugins are installed at runtime, not build time
+ENV NEO4J_PLUGINS='["graph-data-science", "apoc"]'
 
 EXPOSE 7474 7687
 
