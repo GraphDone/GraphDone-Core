@@ -184,27 +184,15 @@ log_error() {
 show_banner() {
     if [ "$SKIP_BANNER" = false ]; then
         clear
-        if [ "$USE_HTTPS" = true ]; then
-            echo -e "${GREEN}"
-            echo "╔══════════════════════════════════════════════════════════════╗"
-            echo "║                                                              ║"
-            echo "║              🔐 GraphDone Smart Start (HTTPS) 🔒              ║"
-            echo "║                                                              ║"
-            echo "║      ⚡ Secure automated setup with TLS/SSL enabled ⚡         ║"
-            echo "║                                                              ║"
-            echo "╚══════════════════════════════════════════════════════════════╝"
-            echo -e "${NC}"
-        else
-            echo -e "${BLUE}"
-            echo "╔══════════════════════════════════════════════════════════════╗"
-            echo "║                                                              ║"
-            echo "║              🚀 GraphDone Smart Start (HTTP) 🔧               ║"
-            echo "║                                                              ║"
-            echo "║       ⚡ Development mode - Fast iteration enabled ⚡          ║"
-            echo "║                                                              ║"
-            echo "╚══════════════════════════════════════════════════════════════╝"
-            echo -e "${NC}"
-        fi
+        echo -e "${PURPLE}"
+        echo "╔══════════════════════════════════════════════════════════════╗"
+        echo "║                                                              ║"
+        echo "║                🎲 GraphDone Smart Start 🧿                   ║"
+        echo "║                                                              ║"
+        echo "║      ⚡ Automated setup with no manual configuration ⚡       ║"
+        echo "║                                                              ║"
+        echo "╚══════════════════════════════════════════════════════════════╝"
+        echo -e "${NC}"
     fi
 }
 
