@@ -15,6 +15,7 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_PREFIX: graphdone
+  IMAGE_OWNER: graphdone
 
 jobs:
   build-and-push:
@@ -54,7 +55,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-${{ matrix.image }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ env.IMAGE_PREFIX }}-${{ matrix.image }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -97,9 +98,9 @@ jobs:
 
       - name: Create and push manifest for stack
         run: |
-          docker manifest create ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-stack:latest \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-web:latest \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-api:latest \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-neo4j:latest
+          docker manifest create ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ env.IMAGE_PREFIX }}-stack:latest \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ env.IMAGE_PREFIX }}-web:latest \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ env.IMAGE_PREFIX }}-api:latest \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ env.IMAGE_PREFIX }}-neo4j:latest
           
-          docker manifest push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-stack:latest
+          docker manifest push ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ env.IMAGE_PREFIX }}-stack:latest
