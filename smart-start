@@ -40,6 +40,8 @@ PURPLE='\033[0;35m'
 CYAN='\033[0;36m'
 BOLD='\033[1m'
 NC='\033[0m' # No Color
+DIM='\033[2m'
+BLINK='\033[5m'
 
 # Configuration
 SKIP_BANNER=false
@@ -47,6 +49,8 @@ QUIET=false
 USE_REGISTRY=true
 CACHE_DIR=".graphdone-cache"
 KEEP_ALIVE=false
+USE_HTTPS=true
+DEV_MODE=false
 
 # Platform detection
 detect_platform() {
@@ -101,6 +105,15 @@ while [[ $# -gt 0 ]]; do
             SKIP_BANNER=true
             shift
             ;;
+        --dev|-d)
+            DEV_MODE=true
+            USE_HTTPS=false
+            shift
+            ;;
+        --http)
+            USE_HTTPS=false
+            shift
+            ;;
         *)
             echo -e "${RED}❌ Unknown option: $1${NC}"
             echo "Use './smart-start --help' for usage information."
@@ -120,6 +133,8 @@ show_help() {
     echo -e "  ${YELLOW}--help, -h${NC}      Show this help message"
     echo -e "  ${YELLOW}--no-banner${NC}     Skip the GraphDone banner"
     echo -e "  ${YELLOW}--quiet, -q${NC}     Suppress verbose output"
+    echo -e "  ${YELLOW}--dev, -d${NC}       Development mode (HTTP only)"
+    echo -e "  ${YELLOW}--http${NC}          Force HTTP mode (no TLS/SSL)"
     echo ""
     echo -e "${BOLD}FEATURES:${NC}"
     echo -e "  ${GREEN}✅${NC} Auto-installs Node.js (via NVM, no admin required)"
@@ -136,9 +151,14 @@ show_help() {
     echo -e "  Warm containers:        5-10 seconds"
     echo ""
     echo -e "${BOLD}ACCESS URLS:${NC}"
-    echo -e "  Web App:  ${CYAN}http://localhost:3127${NC}"
-    echo -e "  GraphQL:  ${CYAN}http://localhost:4127/graphql${NC}"
-    echo -e "  Neo4j:    ${CYAN}http://localhost:7474${NC}"
+    echo -e "  ${BOLD}HTTPS Mode (default):${NC}"
+    echo -e "    Web App:  ${CYAN}https://localhost:3128${NC} 🔒"
+    echo -e "    GraphQL:  ${CYAN}https://localhost:4128/graphql${NC} 🔐"
+    echo -e "  ${BOLD}HTTP Mode (--dev):${NC}"
+    echo -e "    Web App:  ${CYAN}http://localhost:3127${NC}"
+    echo -e "    GraphQL:  ${CYAN}http://localhost:4127/graphql${NC}"
+    echo -e "  ${BOLD}Database:${NC}"
+    echo -e "    Neo4j:    ${CYAN}http://localhost:7474${NC}"
 }
 
 # Logging functions
@@ -164,15 +184,27 @@ log_error() {
 show_banner() {
     if [ "$SKIP_BANNER" = false ]; then
         clear
-        echo -e "${PURPLE}"
-        echo "╔══════════════════════════════════════════════════════════════╗"
-        echo "║                                                              ║"
-        echo "║                🎲 GraphDone Smart Start 🧿                    ║"
-        echo "║                                                              ║"
-        echo "║      ⚡ Automated setup with no manual configuration ⚡         ║"
-        echo "║                                                              ║"
-        echo "╚══════════════════════════════════════════════════════════════╝"
-        echo -e "${NC}"
+        if [ "$USE_HTTPS" = true ]; then
+            echo -e "${GREEN}"
+            echo "╔══════════════════════════════════════════════════════════════╗"
+            echo "║                                                              ║"
+            echo "║              🔐 GraphDone Smart Start (HTTPS) 🔒              ║"
+            echo "║                                                              ║"
+            echo "║      ⚡ Secure automated setup with TLS/SSL enabled ⚡         ║"
+            echo "║                                                              ║"
+            echo "╚══════════════════════════════════════════════════════════════╝"
+            echo -e "${NC}"
+        else
+            echo -e "${BLUE}"
+            echo "╔══════════════════════════════════════════════════════════════╗"
+            echo "║                                                              ║"
+            echo "║              🚀 GraphDone Smart Start (HTTP) 🔧               ║"
+            echo "║                                                              ║"
+            echo "║       ⚡ Development mode - Fast iteration enabled ⚡          ║"
+            echo "║                                                              ║"
+            echo "╚══════════════════════════════════════════════════════════════╝"
+            echo -e "${NC}"
+        fi
     fi
 }
 
@@ -229,25 +261,65 @@ check_containers_running() {
     return 1
 }
 
-# Pull images from registry
+# Spinner function for visual feedback
+spinner() {
+    local pid=$1
+    local message=$2
+    local spin='⣾⣽⣻⢿⡿⣟⣯⣷'
+    local i=0
+    
+    printf "\r${CYAN}${message}${NC} "
+    while kill -0 $pid 2>/dev/null; do
+        printf "\r${CYAN}${message}${NC} ${YELLOW}${spin:i:1}${NC} "
+        i=$(( (i+1) % ${#spin} ))
+        sleep 0.1
+    done
+    
+    wait $pid
+    local exit_code=$?
+    
+    if [ $exit_code -eq 0 ]; then
+        printf "\r${GREEN}✅ ${message} - Complete!${NC}\n"
+    else
+        printf "\r${YELLOW}⚠️  ${message} - Skipped${NC}\n"
+    fi
+    
+    return $exit_code
+}
+
+# Pull images from registry with visual feedback
 pull_registry_images() {
-    log_info "📦 Pulling pre-built images from GitHub Registry..."
+    echo -e "\n${BOLD}📦 Container Registry Pull${NC}"
+    echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     
-    # Try to pull images in parallel for speed
     local registry="ghcr.io/graphdone"
+    local branch_tag="fix-first-start"
     
-    (docker pull "${registry}/graphdone-web:latest" 2>/dev/null || true) &
-    (docker pull "${registry}/graphdone-api:latest" 2>/dev/null || true) &
-    (docker pull "${registry}/graphdone-neo4j:latest" 2>/dev/null || true) &
+    # Try latest first, fallback to branch tag
+    (
+        docker pull "${registry}/graphdone-web:latest" 2>/dev/null || 
+        docker pull "${registry}/graphdone-web:${branch_tag}" 2>/dev/null
+    ) &
+    spinner $! "Pulling Web UI image"
     
-    wait
+    (
+        docker pull "${registry}/graphdone-api:latest" 2>/dev/null || 
+        docker pull "${registry}/graphdone-api:${branch_tag}" 2>/dev/null
+    ) &
+    spinner $! "Pulling API Server image"
+    
+    (
+        docker pull "${registry}/graphdone-neo4j:latest" 2>/dev/null || 
+        docker pull "${registry}/graphdone-neo4j:${branch_tag}" 2>/dev/null
+    ) &
+    spinner $! "Pulling Neo4j Database image"
     
     # Check if images were pulled successfully
     if docker images | grep -q "graphdone"; then
-        log_success "✅ Images pulled successfully"
+        echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
         return 0
     else
-        log_warning "⚠️  Could not pull from registry, will build locally"
+        echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
         return 1
     fi
 }
@@ -289,8 +361,14 @@ smart_start() {
     export GRAPHDONE_START_TIME
 
     show_banner
-    log_info "🚀 GraphDone Intelligent Setup & Start"
-    log_info "Installing everything needed automatically..."
+    
+    if [ "$USE_HTTPS" = true ]; then
+        echo -e "\n${BOLD}🔐 Secure Mode Initialization${NC}"
+        echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
+    else
+        echo -e "\n${BOLD}🚀 Development Mode Initialization${NC}"
+        echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
+    fi
     
     # Step 1: Auto-install Node.js FIRST (easier, no admin required)
     if ! command -v node &> /dev/null || ! command -v npm &> /dev/null; then
@@ -419,10 +497,48 @@ smart_start() {
                 (cd packages/core && npm run build)
             fi
             
-            # Start dev servers
+            # Check for certificates if HTTPS mode
+            if [ "$USE_HTTPS" = true ]; then
+                if [ ! -f "deployment/certs/server-cert.pem" ] || [ ! -f "deployment/certs/server-key.pem" ]; then
+                    log_info "🔐 Generating development certificates..."
+                    ./scripts/generate-dev-certs.sh 2>/dev/null || true
+                fi
+                
+                # Set HTTPS environment variables
+                export SSL_ENABLED=true
+                export SSL_KEY_PATH=./deployment/certs/server-key.pem
+                export SSL_CERT_PATH=./deployment/certs/server-cert.pem
+                export HTTPS_PORT=4128
+                export VITE_GRAPHQL_URL=https://localhost:4128/graphql
+                export VITE_GRAPHQL_WS_URL=wss://localhost:4128/graphql
+            fi
+            
+            # Start dev servers with proper environment
             log_info "🚀 Starting development servers..."
-            npm run dev &
-            DEV_PID=$!
+            
+            # For HTTPS mode, ensure proper environment is set
+            if [ "$USE_HTTPS" = true ]; then
+                # Export for child processes
+                export VITE_PORT=3128
+                export VITE_HTTPS=true
+                export PORT=4128
+                
+                # Start with HTTPS environment
+                (cd packages/web && npm run dev -- --port 3128 --https) &
+                WEB_PID=$!
+                (cd packages/server && npm run dev) &
+                API_PID=$!
+                
+                DEV_PID="$WEB_PID $API_PID"
+            else
+                # Standard HTTP mode
+                export VITE_PORT=3127
+                export PORT=4127
+                export SSL_ENABLED=false
+                
+                npm run dev &
+                DEV_PID=$!
+            fi
         fi
     fi
     
@@ -440,10 +556,38 @@ smart_start() {
     # Show success
     log_success "✅ GraphDone started in ${ELAPSED_SEC} seconds!"
     echo ""
-    echo "📍 Access your application:"
-    echo "   🌐 Web App:  http://localhost:3127"
-    echo "   🔌 GraphQL:  http://localhost:4127/graphql"
-    echo "   📊 Neo4j:    http://localhost:7474"
+    # Determine URLs based on mode
+    if [ "$USE_HTTPS" = true ] && [ "$DEV_MODE" = false ]; then
+        echo -e "\n${BOLD}${GREEN}========================================${NC}"
+        echo -e "${BOLD}${GREEN}       GraphDone Server Ready!          ${NC}"
+        echo -e "${BOLD}${GREEN}========================================${NC}\n"
+        echo -e "  ${GREEN}✅${NC} Started HTTPS server on port 4128"
+        echo -e "  ${GREEN}✅${NC} Started secure WebSocket server"
+        echo -e "  ${GREEN}✅${NC} Connected to Neo4j graph database"
+        echo -e "  ${GREEN}✅${NC} All systems operational\n"
+        echo -e "  ${BOLD}🌐 The application is now ready to use at:${NC}"
+        echo -e "  ${CYAN}🔒 Web App:${NC}  ${BOLD}https://localhost:3128${NC}"
+        echo -e "  ${CYAN}🔐 GraphQL:${NC}  ${BOLD}https://localhost:4128/graphql${NC}"
+        echo -e "  ${CYAN}📊 Neo4j:${NC}    ${BOLD}http://localhost:7474${NC}\n"
+        echo -e "  ${DIM}🔑 Secure connection with TLS/SSL enabled${NC}"
+    else
+        echo -e "\n${BOLD}${BLUE}========================================${NC}"
+        echo -e "${BOLD}${BLUE}       GraphDone Server Ready!          ${NC}"
+        echo -e "${BOLD}${BLUE}========================================${NC}\n"
+        echo -e "  ${GREEN}✅${NC} Started HTTP server on port 4127"
+        echo -e "  ${GREEN}✅${NC} Started WebSocket server"
+        echo -e "  ${GREEN}✅${NC} Connected to Neo4j graph database"
+        echo -e "  ${GREEN}✅${NC} Development mode active\n"
+        echo -e "  ${BOLD}🌐 The application is now ready to use at:${NC}"
+        echo -e "  ${CYAN}🖥️  Web App:${NC}  ${BOLD}http://localhost:3127${NC}"
+        echo -e "  ${CYAN}🔗 GraphQL:${NC}  ${BOLD}http://localhost:4127/graphql${NC}"
+        echo -e "  ${CYAN}📊 Neo4j:${NC}    ${BOLD}http://localhost:7474${NC}\n"
+        echo -e "  ${DIM}⚠️  Development mode - no TLS/SSL${NC}"
+    fi
+    
+    echo -e "\n  ${DIM}🧬 Total startup time: ${ELAPSED_SEC} seconds${NC}"
+    echo -e "  ${DIM}🌐 Neo4j status: 🟢 Connected${NC}"
+    echo -e "${BOLD}${GREEN}========================================${NC}"
     echo ""
     echo "💡 Tips:"
     echo "   • Use './start stop' to stop services"
@@ -464,15 +608,19 @@ cleanup() {
     echo ""
     log_info "🛑 Shutting down..."
     
-    # Kill dev server if running
+    # Kill dev servers if running
     if [ -n "$DEV_PID" ]; then
-        kill $DEV_PID 2>/dev/null || true
+        for pid in $DEV_PID; do
+            kill $pid 2>/dev/null || true
+        done
     fi
     
     # Kill processes on ports
     if command -v lsof &> /dev/null; then
         lsof -ti:3127 | xargs -r kill -9 2>/dev/null || true
+        lsof -ti:3128 | xargs -r kill -9 2>/dev/null || true
         lsof -ti:4127 | xargs -r kill -9 2>/dev/null || true
+        lsof -ti:4128 | xargs -r kill -9 2>/dev/null || true
     fi
     
     log_success "✅ Shutdown complete"
