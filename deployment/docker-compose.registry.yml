@@ -1,0 +1,88 @@
+name: graphdone
+
+services:
+  graphdone-neo4j:
+    container_name: graphdone-neo4j
+    image: ghcr.io/graphdone/graphdone-neo4j:latest
+    pull_policy: always
+    ports:
+      - "7474:7474"  # Neo4j Browser
+      - "7687:7687"  # Bolt
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+    healthcheck:
+      test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "graphdone_password", "RETURN 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  graphdone-redis:
+    container_name: graphdone-redis
+    image: redis:8-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  graphdone-api:
+    container_name: graphdone-api
+    image: ghcr.io/graphdone/graphdone-api:latest
+    pull_policy: always
+    environment:
+      - NODE_ENV=production
+      - NEO4J_URI=bolt://graphdone-neo4j:7687
+      - NEO4J_USER=neo4j
+      - NEO4J_PASSWORD=graphdone_password
+      - PORT=4127
+      - REDIS_URL=redis://graphdone-redis:6379
+      - JWT_SECRET=your-secret-key-change-in-production
+      - SSL_ENABLED=false
+    ports:
+      - "4127:4127"
+    depends_on:
+      graphdone-neo4j:
+        condition: service_healthy
+      graphdone-redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4127/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  graphdone-web:
+    container_name: graphdone-web
+    image: ghcr.io/graphdone/graphdone-web:latest
+    pull_policy: always
+    environment:
+      - VITE_GRAPHQL_URL=http://localhost:4127/graphql
+      - VITE_GRAPHQL_WS_URL=ws://localhost:4127/graphql
+    ports:
+      - "3127:3127"
+    depends_on:
+      - graphdone-api
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3127"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  neo4j_data:
+    driver: local
+  neo4j_logs:
+    driver: local
+  redis_data:
+    driver: local
