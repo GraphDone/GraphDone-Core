@@ -86,6 +86,7 @@ logs/
 # Cache
 .cache/
 .parcel-cache/
+.graphdone-cache/
 
 # TypeScript
 *.tsbuildinfo
