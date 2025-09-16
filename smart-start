@@ -31,6 +31,9 @@
 
 set -e  # Exit on any error
 
+# Get the directory where this script is located
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
 # Colors for better output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -51,6 +54,45 @@ CACHE_DIR=".graphdone-cache"
 KEEP_ALIVE=false
 USE_HTTPS=true
 DEV_MODE=false
+
+# Show help function
+show_help() {
+    echo -e "${BOLD}GraphDone Smart Start${NC} - Intelligent launcher with auto-installation"
+    echo ""
+    echo -e "${BOLD}USAGE:${NC}"
+    echo "  ./smart-start [OPTIONS]"
+    echo ""
+    echo -e "${BOLD}OPTIONS:${NC}"
+    echo -e "  ${YELLOW}--help, -h${NC}      Show this help message"
+    echo -e "  ${YELLOW}--no-banner${NC}     Skip the GraphDone banner"
+    echo -e "  ${YELLOW}--quiet, -q${NC}     Suppress verbose output"
+    echo -e "  ${YELLOW}--dev, -d${NC}       Development mode (HTTP only)"
+    echo -e "  ${YELLOW}--http${NC}          Force HTTP mode (no TLS/SSL)"
+    echo ""
+    echo -e "${BOLD}FEATURES:${NC}"
+    echo -e "  ${GREEN}✅${NC} Auto-installs Node.js (via NVM, no admin required)"
+    echo -e "  ${GREEN}✅${NC} Auto-installs Docker (platform-specific methods)"
+    echo -e "  ${GREEN}✅${NC} Smart mode detection (Development vs Container mode)"
+    echo -e "  ${GREEN}✅${NC} GitHub Container Registry (pre-built images)"
+    echo -e "  ${GREEN}✅${NC} Intelligent caching (skip unnecessary operations)"
+    echo -e "  ${GREEN}✅${NC} Container reuse (keep services running)"
+    echo ""
+    echo -e "${BOLD}PERFORMANCE:${NC}"
+    echo -e "  First run (clean):      3-5 minutes"
+    echo -e "  First run (Docker ok):  1-2 minutes" 
+    echo -e "  Subsequent runs:        15-30 seconds"
+    echo -e "  Warm containers:        5-10 seconds"
+    echo ""
+    echo -e "${BOLD}ACCESS URLS:${NC}"
+    echo -e "  ${BOLD}HTTPS Mode (default):${NC}"
+    echo -e "    Web App:  ${CYAN}https://localhost:3128${NC} 🔒"
+    echo -e "    GraphQL:  ${CYAN}https://localhost:4128/graphql${NC} 🔐"
+    echo -e "  ${BOLD}HTTP Mode (--dev):${NC}"
+    echo -e "    Web App:  ${CYAN}http://localhost:3127${NC}"
+    echo -e "    GraphQL:  ${CYAN}http://localhost:4127/graphql${NC}"
+    echo -e "  ${BOLD}Database:${NC}"
+    echo -e "    Neo4j:    ${CYAN}http://localhost:7474${NC}"
+}
 
 # Platform detection
 detect_platform() {
@@ -121,45 +163,6 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
-
-# Show help function
-show_help() {
-    echo -e "${BOLD}GraphDone Smart Start${NC} - Intelligent launcher with auto-installation"
-    echo ""
-    echo -e "${BOLD}USAGE:${NC}"
-    echo "  ./smart-start [OPTIONS]"
-    echo ""
-    echo -e "${BOLD}OPTIONS:${NC}"
-    echo -e "  ${YELLOW}--help, -h${NC}      Show this help message"
-    echo -e "  ${YELLOW}--no-banner${NC}     Skip the GraphDone banner"
-    echo -e "  ${YELLOW}--quiet, -q${NC}     Suppress verbose output"
-    echo -e "  ${YELLOW}--dev, -d${NC}       Development mode (HTTP only)"
-    echo -e "  ${YELLOW}--http${NC}          Force HTTP mode (no TLS/SSL)"
-    echo ""
-    echo -e "${BOLD}FEATURES:${NC}"
-    echo -e "  ${GREEN}✅${NC} Auto-installs Node.js (via NVM, no admin required)"
-    echo -e "  ${GREEN}✅${NC} Auto-installs Docker (platform-specific methods)"
-    echo -e "  ${GREEN}✅${NC} Smart mode detection (Development vs Container mode)"
-    echo -e "  ${GREEN}✅${NC} GitHub Container Registry (pre-built images)"
-    echo -e "  ${GREEN}✅${NC} Intelligent caching (skip unnecessary operations)"
-    echo -e "  ${GREEN}✅${NC} Container reuse (keep services running)"
-    echo ""
-    echo -e "${BOLD}PERFORMANCE:${NC}"
-    echo -e "  First run (clean):      3-5 minutes"
-    echo -e "  First run (Docker ok):  1-2 minutes" 
-    echo -e "  Subsequent runs:        15-30 seconds"
-    echo -e "  Warm containers:        5-10 seconds"
-    echo ""
-    echo -e "${BOLD}ACCESS URLS:${NC}"
-    echo -e "  ${BOLD}HTTPS Mode (default):${NC}"
-    echo -e "    Web App:  ${CYAN}https://localhost:3128${NC} 🔒"
-    echo -e "    GraphQL:  ${CYAN}https://localhost:4128/graphql${NC} 🔐"
-    echo -e "  ${BOLD}HTTP Mode (--dev):${NC}"
-    echo -e "    Web App:  ${CYAN}http://localhost:3127${NC}"
-    echo -e "    GraphQL:  ${CYAN}http://localhost:4127/graphql${NC}"
-    echo -e "  ${BOLD}Database:${NC}"
-    echo -e "    Neo4j:    ${CYAN}http://localhost:7474${NC}"
-}
 
 # Logging functions
 log_info() {
@@ -404,9 +407,36 @@ smart_npm_install() {
             fi
         else
             # Third attempt: handle rollup module issue specifically
-            log_info "  • Installing missing rollup module for Linux..."
-            if npm install @rollup/rollup-linux-x64-gnu --save-dev && npm install --legacy-peer-deps; then
-                return 0
+            log_info "  • Installing missing rollup module for $PLATFORM..."
+            
+            # Install platform-specific rollup binary
+            local rollup_package=""
+            case $PLATFORM in
+                "macos")
+                    # Detect macOS architecture
+                    if [[ $(uname -m) == "arm64" ]]; then
+                        rollup_package="@rollup/rollup-darwin-arm64"
+                    else
+                        rollup_package="@rollup/rollup-darwin-x64"
+                    fi
+                    ;;
+                "linux")
+                    rollup_package="@rollup/rollup-linux-x64-gnu"
+                    ;;
+                *)
+                    log_warning "  • Skipping platform-specific rollup installation for $PLATFORM"
+                    ;;
+            esac
+            
+            if [ -n "$rollup_package" ]; then
+                if npm install "$rollup_package" --save-dev && npm install --legacy-peer-deps; then
+                    return 0
+                fi
+            else
+                # Try without platform-specific rollup
+                if npm install --legacy-peer-deps; then
+                    return 0
+                fi
             fi
         fi
 
@@ -549,7 +579,12 @@ smart_start() {
         echo -e "  ${GREEN}✅${NC} ${BOLD}Registry images accessible${NC} - using container mode"
         use_containers=true
     elif command -v node &> /dev/null && command -v npm &> /dev/null; then
-        echo -e "  ${YELLOW}📦${NC} ${BOLD}Registry unavailable${NC} - falling back to development mode"
+        # Check if it's ARM64 and provide more context
+        if [[ $(uname -m) == "arm64" ]]; then
+            echo -e "  ${YELLOW}📦${NC} ${BOLD}Registry unavailable for ARM64${NC} - using development mode"
+        else
+            echo -e "  ${YELLOW}📦${NC} ${BOLD}Registry unavailable${NC} - falling back to development mode"
+        fi
         use_containers=false
     else
         echo -e "  ${BLUE}📦${NC} ${BOLD}Using local container builds${NC} (no Node.js available)"
@@ -611,8 +646,8 @@ smart_start() {
                 
                 # Set HTTPS environment variables
                 export SSL_ENABLED=true
-                export SSL_KEY_PATH=./deployment/certs/server-key.pem
-                export SSL_CERT_PATH=./deployment/certs/server-cert.pem
+                export SSL_KEY_PATH="$SCRIPT_DIR/deployment/certs/server-key.pem"
+                export SSL_CERT_PATH="$SCRIPT_DIR/deployment/certs/server-cert.pem"
                 export HTTPS_PORT=4128
                 export VITE_GRAPHQL_URL=https://localhost:4128/graphql
                 export VITE_GRAPHQL_WS_URL=wss://localhost:4128/graphql
@@ -630,27 +665,28 @@ smart_start() {
                 export VITE_HTTPS=true
                 export PORT=4128
                 
-                # Start with HTTPS environment
-                (cd packages/web && npm run dev -- --port 3128 --https) &
+                # Start with HTTPS environment (suppress server logs)
+                (cd packages/web && PORT=3128 npm run dev > /tmp/graphdone-web.log 2>&1) &
                 WEB_PID=$!
-                (cd packages/server && npm run dev) &
+                (cd packages/server && npm run dev > /tmp/graphdone-server.log 2>&1) &
                 API_PID=$!
                 
                 DEV_PID="$WEB_PID $API_PID"
             else
-                # Standard HTTP mode
+                # Standard HTTP mode (suppress server logs)
                 export VITE_PORT=3127
                 export PORT=4127
                 export SSL_ENABLED=false
                 
-                npm run dev &
+                npm run dev > /tmp/graphdone-dev.log 2>&1 &
                 DEV_PID=$!
             fi
         fi
     fi
     
-    # Wait a moment for services to stabilize
-    sleep 5
+    # Wait for services to stabilize
+    # Simple wait - servers will output to log files
+    sleep 8
     
     # Calculate elapsed time
     if command -v python3 &> /dev/null; then
@@ -672,10 +708,17 @@ smart_start() {
     # Clean system status with single emojis
     echo -e "${BOLD}${BLUE}💎 SYSTEM STATUS${NC}"
     echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "  ${GREEN}🚀${NC} ${BOLD}API Server${NC}         ${GREEN}✓ ONLINE${NC}   ${DIM}:4128 HTTPS${NC}"
-    echo -e "  ${GREEN}🌐${NC} ${BOLD}Web Interface${NC}      ${GREEN}✓ ONLINE${NC}   ${DIM}:3128 HTTPS${NC}"
-    echo -e "  ${GREEN}✨${NC} ${BOLD}GraphQL Endpoint${NC}   ${GREEN}✓ ONLINE${NC}   ${DIM}/graphql${NC}"
-    echo -e "  ${GREEN}🔥${NC} ${BOLD}WebSocket${NC}          ${GREEN}✓ ONLINE${NC}   ${DIM}Secure WSS${NC}"
+    if [ "$USE_HTTPS" = true ] && [ "$DEV_MODE" = false ]; then
+        echo -e "  ${GREEN}🚀${NC} ${BOLD}API Server${NC}         ${GREEN}✓ ONLINE${NC}   ${DIM}:4128 HTTPS${NC}"
+        echo -e "  ${GREEN}🌐${NC} ${BOLD}Web Interface${NC}      ${GREEN}✓ ONLINE${NC}   ${DIM}:3128 HTTPS${NC}"
+        echo -e "  ${GREEN}✨${NC} ${BOLD}GraphQL Endpoint${NC}   ${GREEN}✓ ONLINE${NC}   ${DIM}/graphql${NC}"
+        echo -e "  ${GREEN}🔥${NC} ${BOLD}WebSocket${NC}          ${GREEN}✓ ONLINE${NC}   ${DIM}Secure WSS${NC}"
+    else
+        echo -e "  ${GREEN}🚀${NC} ${BOLD}API Server${NC}         ${GREEN}✓ ONLINE${NC}   ${DIM}:4127 HTTP${NC}"
+        echo -e "  ${GREEN}🌐${NC} ${BOLD}Web Interface${NC}      ${GREEN}✓ ONLINE${NC}   ${DIM}:3127 HTTP${NC}"
+        echo -e "  ${GREEN}✨${NC} ${BOLD}GraphQL Endpoint${NC}   ${GREEN}✓ ONLINE${NC}   ${DIM}/graphql${NC}"
+        echo -e "  ${GREEN}🔥${NC} ${BOLD}WebSocket${NC}          ${GREEN}✓ ONLINE${NC}   ${DIM}Standard WS${NC}"
+    fi
     echo -e "  ${GREEN}🎮${NC} ${BOLD}Neo4j Database${NC}     ${GREEN}✓ ONLINE${NC}   ${DIM}:7474/:7687${NC}"
     echo -e "  ${GREEN}💾${NC} ${BOLD}Redis Cache${NC}        ${GREEN}✓ ONLINE${NC}   ${DIM}:6379${NC}"
     echo -e "  ${GREEN}🔐${NC} ${BOLD}SQLite Auth${NC}        ${GREEN}✓ ONLINE${NC}   ${DIM}Authentication${NC}\n"
@@ -732,10 +775,10 @@ cleanup() {
     
     # Kill processes on ports
     if command -v lsof &> /dev/null; then
-        lsof -ti:3127 | xargs -r kill -9 2>/dev/null || true
-        lsof -ti:3128 | xargs -r kill -9 2>/dev/null || true
-        lsof -ti:4127 | xargs -r kill -9 2>/dev/null || true
-        lsof -ti:4128 | xargs -r kill -9 2>/dev/null || true
+        lsof -ti:3127 2>/dev/null | xargs kill -9 2>/dev/null || true
+        lsof -ti:3128 2>/dev/null | xargs kill -9 2>/dev/null || true
+        lsof -ti:4127 2>/dev/null | xargs kill -9 2>/dev/null || true
+        lsof -ti:4128 2>/dev/null | xargs kill -9 2>/dev/null || true
     fi
     
     log_success "✅ Shutdown complete"
