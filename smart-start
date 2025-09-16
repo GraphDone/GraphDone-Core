@@ -60,7 +60,12 @@ show_help() {
     echo -e "${BOLD}GraphDone Smart Start${NC} - Intelligent launcher with auto-installation"
     echo ""
     echo -e "${BOLD}USAGE:${NC}"
-    echo "  ./smart-start [OPTIONS]"
+    echo "  ./smart-start [COMMAND] [OPTIONS]"
+    echo ""
+    echo -e "${BOLD}COMMANDS:${NC}"
+    echo -e "  ${YELLOW}(default)${NC}       Start GraphDone services"
+    echo -e "  ${YELLOW}stop${NC}            Stop all running services"
+    echo -e "  ${YELLOW}remove${NC}          Complete reset (remove containers/volumes)"
     echo ""
     echo -e "${BOLD}OPTIONS:${NC}"
     echo -e "  ${YELLOW}--help, -h${NC}      Show this help message"
@@ -132,6 +137,7 @@ detect_platform() {
 detect_platform
 
 # Parse command line arguments
+COMMAND=""
 while [[ $# -gt 0 ]]; do
     case $1 in
         -h|--help)
@@ -154,6 +160,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --http)
             USE_HTTPS=false
+            shift
+            ;;
+        stop|remove)
+            COMMAND=$1
             shift
             ;;
         *)
@@ -445,6 +455,82 @@ smart_npm_install() {
 
     log_error "❌ Failed to install dependencies after $max_attempts attempts"
     return 1
+}
+
+# Stop command - stop all GraphDone services
+smart_stop() {
+    echo -e "\n${BOLD}${MAGENTA}🛑 STOPPING SERVICES${NC}"
+    echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    
+    # Stop Docker containers
+    echo -e " ${YELLOW}🐳${NC} Stopping Docker containers..."
+    for container in graphdone-neo4j graphdone-redis graphdone-api graphdone-web; do
+        if docker ps -q -f name="$container" | grep -q .; then
+            if docker stop "$container" &>/dev/null; then
+                echo -e "   ${GREEN}✓${NC} Stopped $container"
+            else
+                echo -e "   ${RED}✗${NC} Failed to stop $container"
+            fi
+        else
+            echo -e "   ${DIM}✗${NC} ${DIM}Not running $container${NC}"
+        fi
+    done
+    
+    # Kill development processes
+    echo -e "\n ${YELLOW}🔧${NC} Stopping development servers..."
+    if command -v lsof &> /dev/null; then
+        lsof -ti:3127 2>/dev/null | xargs kill -9 2>/dev/null || true
+        lsof -ti:3128 2>/dev/null | xargs kill -9 2>/dev/null || true
+        lsof -ti:4127 2>/dev/null | xargs kill -9 2>/dev/null || true
+        lsof -ti:4128 2>/dev/null | xargs kill -9 2>/dev/null || true
+    fi
+    pkill -f "node.*3127\|node.*4127\|vite\|tsx.*watch" 2>/dev/null || true
+    
+    echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    log_success "✅ All services stopped"
+}
+
+# Remove command - stop and remove all containers/volumes
+smart_remove() {
+    echo -e "\n${BOLD}${MAGENTA}♻️  COMPLETE RESET${NC}"
+    echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    
+    # First stop everything
+    echo -e " ${YELLOW}🛑${NC} Stopping all services..."
+    smart_stop > /dev/null 2>&1
+    
+    # Remove containers
+    echo -e " ${YELLOW}🗑️${NC}  Removing containers..."
+    for container in graphdone-neo4j graphdone-redis graphdone-api graphdone-web; do
+        if docker ps -aq -f name="$container" | grep -q .; then
+            if docker rm "$container" &>/dev/null; then
+                echo -e "   ${GREEN}✓${NC} Removed $container"
+            else
+                echo -e "   ${RED}✗${NC} Failed to remove $container"
+            fi
+        else
+            echo -e "   ${DIM}✓${NC} ${DIM}Already removed $container${NC}"
+        fi
+    done
+    
+    # Remove volumes (optional - ask user)
+    echo -e "\n ${YELLOW}💾${NC} Remove data volumes? (y/N)"
+    read -r response
+    if [[ "$response" =~ ^[Yy]$ ]]; then
+        echo -e " ${YELLOW}🗑️${NC}  Removing volumes..."
+        docker volume rm graphdone_neo4j_data graphdone_neo4j_logs graphdone_redis_data 2>/dev/null || true
+        echo -e "   ${GREEN}✓${NC} Volumes removed"
+    else
+        echo -e "   ${CYAN}ℹ️${NC} Volumes preserved"
+    fi
+    
+    # Clean up build cache
+    echo -e " ${YELLOW}🧹${NC} Cleaning Docker build cache..."
+    docker system prune -f > /dev/null 2>&1
+    
+    echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    log_success "✅ Complete reset finished"
+    echo -e "${CYAN}ℹ️  Run './smart-start' to start fresh${NC}"
 }
 
 # Main smart start function
@@ -741,10 +827,10 @@ smart_start() {
     # Professional footer with quick actions
     echo -e "\n${BOLD}${YELLOW}⚡ QUICK ACTIONS${NC}"
     echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "  ${CYAN}🛑${NC} ${BOLD}Stop Services${NC}        ${DIM}./start stop${NC}"
+    echo -e "  ${CYAN}🛑${NC} ${BOLD}Stop Services${NC}        ${DIM}./smart-start stop${NC}"
     echo -e "  ${CYAN}📋${NC} ${BOLD}View API Logs${NC}        ${DIM}docker logs graphdone-api${NC}"
     echo -e "  ${CYAN}🔄${NC} ${BOLD}Quick Restart${NC}        ${DIM}./smart-start${NC}"
-    echo -e "  ${CYAN}🧹${NC} ${BOLD}Complete Reset${NC}       ${DIM}./start remove${NC}\n"
+    echo -e "  ${CYAN}♻️${NC} ${BOLD}Complete Reset${NC}       ${DIM}./smart-start remove${NC}\n"
 
     echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "${GREEN}${BOLD}           🎉 GraphDone servers are ready to use now! 🎉${NC}"
@@ -787,5 +873,16 @@ cleanup() {
 
 trap cleanup SIGINT SIGTERM
 
-# Run smart start
-smart_start
+# Main execution - handle commands
+case "$COMMAND" in
+    stop)
+        smart_stop
+        ;;
+    remove)
+        smart_remove
+        ;;
+    *)
+        # Default: run smart start
+        smart_start
+        ;;
+esac
