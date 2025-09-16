@@ -827,10 +827,10 @@ smart_start() {
     # Professional footer with quick actions
     echo -e "\n${BOLD}${YELLOW}⚡ QUICK ACTIONS${NC}"
     echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "  ${CYAN}🛑${NC} ${BOLD}Stop Services${NC}        ${DIM}./smart-start stop${NC}"
-    echo -e "  ${CYAN}📋${NC} ${BOLD}View API Logs${NC}        ${DIM}docker logs graphdone-api${NC}"
-    echo -e "  ${CYAN}🔄${NC} ${BOLD}Quick Restart${NC}        ${DIM}./smart-start${NC}"
-    echo -e "  ${CYAN}♻️${NC} ${BOLD}Complete Reset${NC}       ${DIM}./smart-start remove${NC}\n"
+    echo -e "  ${RED}⏹️  Stop Services${NC}      ${DIM}./smart-start stop${NC}"
+    echo -e "  ${BLUE}📊 View API Logs${NC}       ${DIM}docker logs graphdone-api${NC}"
+    echo -e "  ${GREEN}🔁 Quick Restart${NC}       ${DIM}./smart-start${NC}"
+    echo -e "  ${YELLOW}🗑️  Complete Reset${NC}     ${DIM}./smart-start remove${NC}\n"
 
     echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "${GREEN}${BOLD}           🎉 GraphDone servers are ready to use now! 🎉${NC}"
