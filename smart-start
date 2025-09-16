@@ -335,8 +335,8 @@ pull_registry_images() {
     echo -e "${CYAN}🌐 Web Interface${NC}"
     local web_output=$(docker pull "${registry}/graphdone-web:${branch_tag}" 2>&1)
     if [ $? -eq 0 ]; then
-        local digest=$(echo "$web_output" | grep -oP 'Digest: \K[^\s]+' | head -1)
-        local status=$(echo "$web_output" | grep -oP 'Status: \K.*' | head -1)
+        local digest=$(echo "$web_output" | grep 'Digest: ' | sed 's/.*Digest: //' | awk '{print $1}' | head -1)
+        local status=$(echo "$web_output" | grep 'Status: ' | sed 's/.*Status: //' | head -1)
         echo -e "   ${DIM}├─ Digest: ${digest:-sha256:unknown}${NC}"
         echo -e "   ${DIM}├─ Status: ${status:-Downloaded}${NC}"
         echo -e "   ${DIM}└─ Ref: ${registry}/graphdone-web:${branch_tag}${NC}"
@@ -350,8 +350,8 @@ pull_registry_images() {
     echo -e "${YELLOW}⚡ API Server${NC}"
     local api_output=$(docker pull "${registry}/graphdone-api:${branch_tag}" 2>&1)
     if [ $? -eq 0 ]; then
-        local digest=$(echo "$api_output" | grep -oP 'Digest: \K[^\s]+' | head -1)
-        local status=$(echo "$api_output" | grep -oP 'Status: \K.*' | head -1)
+        local digest=$(echo "$api_output" | grep 'Digest: ' | sed 's/.*Digest: //' | awk '{print $1}' | head -1)
+        local status=$(echo "$api_output" | grep 'Status: ' | sed 's/.*Status: //' | head -1)
         echo -e "   ${DIM}├─ Digest: ${digest:-sha256:unknown}${NC}"
         echo -e "   ${DIM}├─ Status: ${status:-Downloaded}${NC}"
         echo -e "   ${DIM}└─ Ref: ${registry}/graphdone-api:${branch_tag}${NC}"
@@ -365,8 +365,8 @@ pull_registry_images() {
     echo -e "${GREEN}🗄️ Database${NC}"
     local db_output=$(docker pull "${registry}/graphdone-neo4j:${branch_tag}" 2>&1)
     if [ $? -eq 0 ]; then
-        local digest=$(echo "$db_output" | grep -oP 'Digest: \K[^\s]+' | head -1)
-        local status=$(echo "$db_output" | grep -oP 'Status: \K.*' | head -1)
+        local digest=$(echo "$db_output" | grep 'Digest: ' | sed 's/.*Digest: //' | awk '{print $1}' | head -1)
+        local status=$(echo "$db_output" | grep 'Status: ' | sed 's/.*Status: //' | head -1)
         echo -e "   ${DIM}├─ Digest: ${digest:-sha256:unknown}${NC}"
         echo -e "   ${DIM}├─ Status: ${status:-Downloaded}${NC}"
         echo -e "   ${DIM}└─ Ref: ${registry}/graphdone-neo4j:${branch_tag}${NC}"
