@@ -372,7 +372,7 @@ pull_registry_images() {
     fi
 
     # Pull Database with detailed output
-    echo -e "${GREEN}🗄️ Database${NC}"
+    echo -e "${GREEN}⛁ Database${NC}"
     local db_output=$(docker pull "${registry}/graphdone-neo4j:${branch_tag}" 2>&1)
     if [ $? -eq 0 ]; then
         local digest=$(echo "$db_output" | grep 'Digest: ' | sed 's/.*Digest: //' | awk '{print $1}' | head -1)
@@ -827,10 +827,10 @@ smart_start() {
     # Professional footer with quick actions
     echo -e "\n${BOLD}${YELLOW}⚡ QUICK ACTIONS${NC}"
     echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "  ${RED}⏹️  Stop Services${NC}      ${DIM}./smart-start stop${NC}"
-    echo -e "  ${BLUE}📊 View API Logs${NC}       ${DIM}docker logs graphdone-api${NC}"
-    echo -e "  ${GREEN}🔁 Quick Restart${NC}       ${DIM}./smart-start${NC}"
-    echo -e "  ${YELLOW}🗑️  Complete Reset${NC}     ${DIM}./smart-start remove${NC}\n"
+    echo -e "  ${RED}⏻  Stop Services${NC}        ${DIM}./smart-start stop${NC}"
+    echo -e "  ${BLUE}☰  View API Logs${NC}        ${DIM}docker logs graphdone-api${NC}"
+    echo -e "  ${GREEN}↻  Quick Restart${NC}        ${DIM}./smart-start${NC}"
+    echo -e "  ${YELLOW}⚠  Complete Reset${NC}       ${DIM}./smart-start remove${NC}\n"
 
     echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "${GREEN}${BOLD}           🎉 GraphDone servers are ready to use now! 🎉${NC}"
@@ -839,7 +839,7 @@ smart_start() {
     echo -e "             ${BLUE}Production Mode${NC} ${PURPLE}│${NC} ${GREEN}All Systems Online${NC}"
     echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo ""
-    echo -e "   ${DIM}Services running in background. Stop with: ${CYAN}./start stop${NC}"
+    echo -e "   ${DIM}Services running in background. Stop with: ${CYAN}./smart-start stop${NC}"
     
     if [ -n "$DEV_PID" ]; then
         # Keep running if in dev mode
