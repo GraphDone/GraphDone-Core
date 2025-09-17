@@ -151,16 +151,18 @@ flowchart TD
 %%{init: {
   'theme': 'base',
   'themeVariables': {
-    'primaryColor': '#1e3c72',
-    'primaryTextColor': '#ffffff',
-    'primaryBorderColor': '#2a5298',
-    'lineColor': '#f093fb',
-    'secondaryColor': '#2a5298',
-    'tertiaryColor': '#f5576c',
-    'background': '#0f172a',
-    'mainBkg': '#1e3c72',
-    'secondBkg': '#2a5298',
-    'tertiaryBkg': '#f5576c'
+    'primaryColor': '#2D3748',
+    'primaryTextColor': '#FFFFFF',
+    'primaryBorderColor': '#4A5568',
+    'lineColor': '#667EEA',
+    'secondaryColor': '#4A5568',
+    'tertiaryColor': '#718096',
+    'background': '#1A202C',
+    'mainBkg': '#2D3748',
+    'secondBkg': '#4A5568',
+    'tertiaryBkg': '#718096',
+    'clusterBkg': '#2D3748',
+    'altBackground': '#4A5568'
   }
 }}%%
 
@@ -205,12 +207,12 @@ graph TB
     API -->|💾 Cypher| Neo4j
     API -->|⚡ Cache| Redis
     
-    classDef userStyle fill:#667eea,stroke:#764ba2,stroke-width:3px,color:#ffffff
-    classDef githubStyle fill:#f093fb,stroke:#f5576c,stroke-width:2px,color:#ffffff
-    classDef localStyle fill:#4facfe,stroke:#00f2fe,stroke-width:2px,color:#ffffff
-    classDef containerStyle fill:#a8edea,stroke:#fed6e3,stroke-width:2px,color:#1e3c72
-    classDef scriptStyle fill:#ffecd2,stroke:#fcb69f,stroke-width:3px,color:#1e3c72
-    classDef smartStyle fill:#89f7fe,stroke:#66a6ff,stroke-width:3px,color:#1e3c72
+    classDef userStyle fill:#4C51BF,stroke:#667EEA,stroke-width:3px,color:#FFFFFF
+    classDef githubStyle fill:#9F7AEA,stroke:#B794F6,stroke-width:2px,color:#FFFFFF
+    classDef localStyle fill:#3182CE,stroke:#4299E1,stroke-width:2px,color:#FFFFFF
+    classDef containerStyle fill:#38A169,stroke:#48BB78,stroke-width:2px,color:#FFFFFF
+    classDef scriptStyle fill:#ED8936,stroke:#F6AD55,stroke-width:3px,color:#FFFFFF
+    classDef smartStyle fill:#00B5D8,stroke:#0BC5EA,stroke-width:3px,color:#FFFFFF
     
     class CLI,Browser userStyle
     class Repo,Registry githubStyle
@@ -226,16 +228,18 @@ graph TB
 %%{init: {
   'theme': 'base',
   'themeVariables': {
-    'primaryColor': '#8B5CF6',
-    'primaryTextColor': '#ffffff',
-    'primaryBorderColor': '#A855F7',
-    'lineColor': '#F59E0B',
-    'secondaryColor': '#EF4444',
-    'tertiaryColor': '#10B981',
-    'background': '#0F0F23',
-    'mainBkg': '#8B5CF6',
-    'secondBkg': '#EF4444',
-    'tertiaryBkg': '#10B981'
+    'primaryColor': '#2D3748',
+    'primaryTextColor': '#FFFFFF',
+    'primaryBorderColor': '#4A5568',
+    'lineColor': '#667EEA',
+    'secondaryColor': '#4A5568',
+    'tertiaryColor': '#718096',
+    'background': '#1A202C',
+    'mainBkg': '#2D3748',
+    'secondBkg': '#4A5568',
+    'tertiaryBkg': '#718096',
+    'clusterBkg': '#2D3748',
+    'altBackground': '#4A5568'
   }
 }}%%
 
@@ -270,9 +274,9 @@ flowchart LR
     F3 -->|Fail| M2
     F4 -->|Fail| M3
     
-    classDef errorStyle fill:#ff6b6b,stroke:#ee5a52,stroke-width:3px,color:#ffffff
-    classDef autoStyle fill:#4ecdc4,stroke:#45b7b8,stroke-width:2px,color:#ffffff
-    classDef manualStyle fill:#45b7b8,stroke:#26d0ce,stroke-width:2px,color:#ffffff
+    classDef errorStyle fill:#E53E3E,stroke:#FC8181,stroke-width:3px,color:#FFFFFF
+    classDef autoStyle fill:#38A169,stroke:#68D391,stroke-width:2px,color:#FFFFFF
+    classDef manualStyle fill:#3182CE,stroke:#63B3ED,stroke-width:2px,color:#FFFFFF
     
     class E1,E2,E3,E4 errorStyle
     class F1,F2,F3,F4 autoStyle
@@ -285,16 +289,18 @@ flowchart LR
 %%{init: {
   'theme': 'base',
   'themeVariables': {
-    'primaryColor': '#FF6B6B',
-    'primaryTextColor': '#ffffff',
-    'primaryBorderColor': '#EE5A52',
-    'lineColor': '#4ECDC4',
-    'secondaryColor': '#45B7B8',
-    'tertiaryColor': '#96CEB4',
-    'background': '#2C3E50',
-    'mainBkg': '#FF6B6B',
-    'secondBkg': '#45B7B8',
-    'tertiaryBkg': '#96CEB4'
+    'primaryColor': '#2D3748',
+    'primaryTextColor': '#FFFFFF',
+    'primaryBorderColor': '#4A5568',
+    'lineColor': '#667EEA',
+    'secondaryColor': '#4A5568',
+    'tertiaryColor': '#718096',
+    'background': '#1A202C',
+    'mainBkg': '#2D3748',
+    'secondBkg': '#4A5568',
+    'tertiaryBkg': '#718096',
+    'clusterBkg': '#2D3748',
+    'altBackground': '#4A5568'
   }
 }}%%
 
@@ -330,11 +336,10 @@ graph TD
     
     Docker --> Registry
     
-    classDef recommendedStyle fill:#00d2d3,stroke:#01a3a4,stroke-width:4px,color:#ffffff
-    classDef alternativeStyle fill:#ff9ff3,stroke:#f368e0,stroke-width:2px,color:#ffffff
-    classDef devStyle fill:#54a0ff,stroke:#2e86de,stroke-width:2px,color:#ffffff
-    classDef containerStyle fill:#ffa502,stroke:#ff6348,stroke-width:2px,color:#ffffff
-    classDef featureStyle fill:#5f27cd,stroke:#341f97,stroke-width:2px,color:#ffffff
+    classDef recommendedStyle fill:#38A169,stroke:#68D391,stroke-width:4px,color:#FFFFFF
+    classDef devStyle fill:#3182CE,stroke:#63B3ED,stroke-width:2px,color:#FFFFFF
+    classDef containerStyle fill:#ED8936,stroke:#F6AD55,stroke-width:2px,color:#FFFFFF
+    classDef featureStyle fill:#9F7AEA,stroke:#B794F6,stroke-width:2px,color:#FFFFFF
     
     class OneLineCurl,OneLineWget recommendedStyle
     class GitClone devStyle
@@ -348,18 +353,22 @@ graph TD
 %%{init: {
   'theme': 'base',
   'themeVariables': {
-    'primaryColor': '#667eea',
-    'primaryTextColor': '#ffffff',
-    'primaryBorderColor': '#764ba2',
-    'gridColor': '#f093fb',
-    'c0': '#667eea',
-    'c1': '#f093fb', 
-    'c2': '#f5576c',
-    'c3': '#4facfe',
-    'c4': '#00f2fe',
-    'cScale0': '#667eea',
-    'cScale1': '#f093fb',
-    'cScale2': '#f5576c'
+    'primaryColor': '#2D3748',
+    'primaryTextColor': '#FFFFFF',
+    'primaryBorderColor': '#4A5568',
+    'gridColor': '#718096',
+    'background': '#1A202C',
+    'altBackground': '#2D3748',
+    'c0': '#38A169',
+    'c1': '#3182CE', 
+    'c2': '#9F7AEA',
+    'c3': '#ED8936',
+    'c4': '#E53E3E',
+    'cScale0': '#38A169',
+    'cScale1': '#3182CE',
+    'cScale2': '#9F7AEA',
+    'cScale3': '#ED8936',
+    'cScale4': '#E53E3E'
   }
 }}%%
 
