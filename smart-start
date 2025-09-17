@@ -284,16 +284,16 @@ check_containers_running() {
 
     # Check API container health and endpoint
     if docker ps --format "{{.Names}} {{.Status}}" | grep "graphdone-api" | grep -q "Up.*healthy"; then
-        # Verify API endpoint is responding
-        if timeout 5 curl -sf http://localhost:4127/health &>/dev/null; then
+        # Verify API endpoint is responding (HTTPS mode)
+        if timeout 15 curl -sf https://localhost:4128/health &>/dev/null; then
             api_healthy=true
         fi
     fi
 
     # Check Web container health and endpoint
     if docker ps --format "{{.Names}} {{.Status}}" | grep "graphdone-web" | grep -q "Up"; then
-        # Verify Web endpoint is responding
-        if timeout 5 curl -sf http://localhost:3127 &>/dev/null; then
+        # Verify Web endpoint is responding (HTTPS mode)
+        if timeout 15 curl -sf https://localhost:3128 &>/dev/null; then
             web_healthy=true
         fi
     fi
