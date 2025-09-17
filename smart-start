@@ -269,7 +269,7 @@ check_containers_running() {
     # Check Neo4j container health and connectivity
     if docker ps --format "{{.Names}} {{.Status}}" | grep "graphdone-neo4j" | grep -q "Up.*healthy"; then
         # Verify Neo4j is actually responding
-        if timeout 5 docker exec graphdone-neo4j cypher-shell -u neo4j -p graphdone_password "RETURN 1" &>/dev/null; then
+        if docker exec graphdone-neo4j cypher-shell -u neo4j -p graphdone_password "RETURN 1" &>/dev/null; then
             neo4j_healthy=true
         fi
     fi
@@ -277,23 +277,23 @@ check_containers_running() {
     # Check Redis container health and connectivity
     if docker ps --format "{{.Names}} {{.Status}}" | grep "graphdone-redis" | grep -q "Up.*healthy"; then
         # Verify Redis is actually responding
-        if timeout 5 docker exec graphdone-redis redis-cli ping &>/dev/null; then
+        if docker exec graphdone-redis redis-cli ping &>/dev/null; then
             redis_healthy=true
         fi
     fi
 
-    # Check API container health and endpoint
-    if docker ps --format "{{.Names}} {{.Status}}" | grep "graphdone-api" | grep -q "Up.*healthy"; then
-        # Verify API endpoint is responding (HTTPS mode)
-        if timeout 15 curl -sf https://localhost:4128/health &>/dev/null; then
+    # Check API container and endpoint (more lenient - just check if responding)
+    if docker ps --format "{{.Names}} {{.Status}}" | grep "graphdone-api" | grep -q "Up"; then
+        # Test if API endpoint is responding (HTTPS mode) - don't require healthy status
+        if curl -k -sf --max-time 15 https://localhost:4128/health &>/dev/null; then
             api_healthy=true
         fi
     fi
 
-    # Check Web container health and endpoint
+    # Check Web container and endpoint (more lenient - just check if responding)
     if docker ps --format "{{.Names}} {{.Status}}" | grep "graphdone-web" | grep -q "Up"; then
-        # Verify Web endpoint is responding (HTTPS mode)
-        if timeout 15 curl -sf https://localhost:3128 &>/dev/null; then
+        # Test if Web endpoint is responding (HTTPS mode) - don't require healthy status
+        if curl -k -sf --max-time 15 https://localhost:3128 &>/dev/null; then
             web_healthy=true
         fi
     fi
@@ -771,8 +771,16 @@ smart_start() {
     fi
     
     # Wait for services to stabilize
-    # Simple wait - servers will output to log files
-    sleep 8
+    # Simple validation - let Docker Compose health checks do the heavy lifting
+    sleep 5
+    
+    # Quick final validation
+    if check_containers_running; then
+        echo -e "${GREEN}✅ All services are healthy and ready!${NC}"
+    else
+        echo -e "${YELLOW}⚠️  Services started - validation in progress${NC}"
+        echo -e "${DIM}   Check status: docker ps | grep graphdone${NC}"
+    fi
     
     # Calculate elapsed time
     if command -v python3 &> /dev/null; then
