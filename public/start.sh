@@ -73,8 +73,9 @@ if [ -d "$INSTALL_DIR" ]; then
 else
     progress "Downloading GraphDone"
     info "Cloning repository..."
+    # Clone from fix/first-start branch for now (until merged to main)
+    git clone --quiet --branch fix/first-start https://github.com/GraphDone/GraphDone-Core.git "$INSTALL_DIR" 2>/dev/null || \
     git clone --quiet https://github.com/GraphDone/GraphDone-Core.git "$INSTALL_DIR" 2>/dev/null || \
-    git clone --quiet https://github.com/GraphDone/graphdone-core.git "$INSTALL_DIR" 2>/dev/null || \
     error "Failed to download GraphDone"
     status "Downloaded successfully"
 fi
