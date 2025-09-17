@@ -372,7 +372,7 @@ pull_registry_images() {
     fi
 
     # Pull Database with detailed output
-    echo -e "${GREEN}⛁ Database${NC}"
+    echo -e "${GREEN}🛢️  Database${NC}"
     local db_output=$(docker pull "${registry}/graphdone-neo4j:${branch_tag}" 2>&1)
     if [ $? -eq 0 ]; then
         local digest=$(echo "$db_output" | grep 'Digest: ' | sed 's/.*Digest: //' | awk '{print $1}' | head -1)
