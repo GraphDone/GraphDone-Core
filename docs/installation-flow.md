@@ -353,54 +353,57 @@ graph TD
 %%{init: {
   'theme': 'base',
   'themeVariables': {
-    'primaryColor': '#1F2937',
-    'primaryTextColor': '#1F2937',
-    'primaryBorderColor': '#9CA3AF',
-    'gridColor': '#E5E7EB',
-    'background': '#FFFFFF',
-    'altBackground': '#F9FAFB',
-    'c0': '#22C55E',
+    'primaryColor': '#2D3748',
+    'primaryTextColor': '#FFFFFF',
+    'primaryBorderColor': '#4A5568',
+    'gridColor': '#4A5568',
+    'background': '#1A202C',
+    'altBackground': '#374151',
+    'todayMarker': '#68D391',
+    'c0': '#10B981',
     'c1': '#3B82F6',
     'c2': '#8B5CF6',
     'c3': '#F59E0B',
     'c4': '#EF4444',
-    'cScale0': '#22C55E',
+    'c5': '#22C55E',
+    'cScale0': '#10B981',
     'cScale1': '#3B82F6',
     'cScale2': '#8B5CF6',
     'cScale3': '#F59E0B',
-    'cScale4': '#EF4444'
+    'cScale4': '#EF4444',
+    'cScale5': '#22C55E'
   }
 }}%%
 
 gantt
-    title GraphDone Installation Timeline (60 seconds)
+    title 🚀 GraphDone Installation Timeline (~60 seconds)
     dateFormat ss
     axisFormat %Ss
     
-    section Download
-    Fetch script           :done, fetch, 00, 1s
-    Clone repository       :done, clone, 01, 5s
+    section 📥 Download
+    📝 Fetch install script    :done, fetch, 00, 1s
+    📋 Clone from GitHub       :done, clone, 01, 5s
     
-    section Setup
-    Check requirements     :done, req, 06, 1s
-    Create .env           :done, env, 07, 1s
-    Generate certificates  :done, cert, 08, 2s
+    section ⚙️ Setup
+    🔍 Check dependencies      :done, req, 06, 1s
+    📄 Configure environment   :done, env, 07, 1s
+    🔒 Generate TLS certs      :done, cert, 08, 2s
     
-    section Docker
-    Pull Neo4j image      :active, neo4j, 10, 10s
-    Pull Redis image      :active, redis, 10, 3s
-    Pull API image        :active, api, 10, 8s
-    Pull Web image        :active, web, 10, 8s
+    section 🐳 Docker Images
+    🗄️ Pull Neo4j (70MB)      :active, neo4j, 10, 10s
+    ⚡ Pull Redis (15MB)       :active, redis, 10, 3s
+    🔌 Pull API (120MB)        :active, api, 10, 8s
+    🌐 Pull Web (80MB)         :active, web, 10, 8s
     
-    section Start
-    Start Neo4j           :crit, startneo, 20, 15s
-    Start Redis           :startredis, 13, 2s
-    Start API             :startapi, 35, 5s
-    Start Web             :startweb, 40, 3s
+    section 🚀 Services
+    🗄️ Start Neo4j DB         :crit, startneo, 20, 15s
+    ⚡ Start Redis Cache       :startredis, 13, 2s
+    🔌 Start GraphQL API       :startapi, 35, 5s
+    🌐 Start Web Interface     :startweb, 40, 3s
     
-    section Verify
-    Health checks         :milestone, 43, 5s
-    Ready to use         :milestone, 48, 0s
+    section ✅ Complete
+    💚 Health check pass       :milestone, health, 43, 5s
+    🎯 GraphDone ready!        :milestone, ready, 48, 0s
 ```
 
 ---
