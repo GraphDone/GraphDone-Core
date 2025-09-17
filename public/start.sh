@@ -137,7 +137,7 @@ check_containers_healthy() {
     # Check Neo4j container health and connectivity
     if docker ps --format "{{.Names}} {{.Status}}" | grep "graphdone-neo4j" | grep -q "Up.*healthy" 2>/dev/null; then
         # Verify Neo4j is actually responding with cypher-shell
-        if timeout 15 docker exec graphdone-neo4j cypher-shell -u neo4j -p graphdone_password "RETURN 1" >/dev/null 2>&1; then
+        if docker exec graphdone-neo4j cypher-shell -u neo4j -p graphdone_password "RETURN 1" >/dev/null 2>&1; then
             neo4j_healthy=true
         fi
     fi
@@ -145,15 +145,15 @@ check_containers_healthy() {
     # Check Redis container health and connectivity
     if docker ps --format "{{.Names}} {{.Status}}" | grep "graphdone-redis" | grep -q "Up.*healthy" 2>/dev/null; then
         # Verify Redis is actually responding
-        if timeout 15 docker exec graphdone-redis redis-cli ping >/dev/null 2>&1; then
+        if docker exec graphdone-redis redis-cli ping >/dev/null 2>&1; then
             redis_healthy=true
         fi
     fi
 
-    # Check API container health and endpoint (HTTPS mode like smart-start configures)
-    if docker ps --format "{{.Names}} {{.Status}}" | grep "graphdone-api" | grep -q "Up.*healthy" 2>/dev/null; then
-        # Test HTTPS API health endpoint (port 4128) since that's what smart-start actually configures
-        if timeout 15 curl -sf https://localhost:4128/health >/dev/null 2>&1; then
+    # Check API container and endpoint (focus on functionality, not Docker health status)
+    if docker ps --format "{{.Names}} {{.Status}}" | grep "graphdone-api" | grep -q "Up" 2>/dev/null; then
+        # Test HTTPS API health endpoint (port 4128) - endpoint response is what matters
+        if curl -k -sf --max-time 15 https://localhost:4128/health >/dev/null 2>&1; then
             api_healthy=true
         fi
     fi
@@ -161,7 +161,7 @@ check_containers_healthy() {
     # Check Web container health and endpoint  
     if docker ps --format "{{.Names}}" | grep -q "graphdone-web" 2>/dev/null; then
         # Test the correct web endpoint (HTTP first, then HTTPS)
-        if timeout 15 curl -sf http://localhost:3127 >/dev/null 2>&1 || timeout 15 curl -sf https://localhost:3128 >/dev/null 2>&1; then
+        if curl -sf --max-time 15 http://localhost:3127 >/dev/null 2>&1 || curl -k -sf --max-time 15 https://localhost:3128 >/dev/null 2>&1; then
             web_healthy=true
         fi
     fi
@@ -181,7 +181,7 @@ wait_for_services() {
     
     printf "${GRAY}▸${NC} Waiting for services to initialize"
     
-    while [ $attempts -lt 90 ]; do  # 90 attempts = ~90 seconds
+    while [ $attempts -lt 180 ]; do  # 180 attempts = ~3 minutes
         if check_containers_healthy; then
             printf "\r\033[K"  # Clear entire line
             printf "${GREEN}✓${NC} Services are ready and healthy\n"
@@ -195,7 +195,7 @@ wait_for_services() {
     done
     
     printf "\r\033[K"  # Clear entire line
-    printf "${YELLOW}!${NC} Services started but initialization is taking longer than expected\n"
+    printf "${YELLOW}!${NC} Services started but initialization is taking longer than 3 minutes\n"
     printf "${GRAY}  Try: docker ps | grep graphdone${NC}\n"
     return 1
 }
@@ -376,9 +376,12 @@ EOF
         run_with_spinner "Starting GraphDone services" docker compose -f deployment/docker-compose.yml up -d || error "Failed to start services"
     fi
 
-    # Wait for services to be ready
+    # Wait for services to be ready (more reliable than smart-start's 8 second sleep)
     if wait_for_services; then
-        ok "All services ready"
+        ok "Installation complete"
+    else
+        warn "Services started but may need more time to fully initialize"
+        log "Check status with: docker ps | grep graphdone"
     fi
 }
 
