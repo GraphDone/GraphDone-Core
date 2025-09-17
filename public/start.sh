@@ -105,17 +105,18 @@ if [ ! -f "deployment/certs/server-cert.pem" ] || [ -d "deployment/certs/server-
     # Remove incorrect directories if they exist
     rm -rf deployment/certs/server-cert.pem deployment/certs/server-key.pem 2>/dev/null
     mkdir -p deployment/certs
-    if [ -f "./scripts/generate-dev-certs.sh" ]; then
-        chmod +x ./scripts/generate-dev-certs.sh
-        ./scripts/generate-dev-certs.sh
-        status "Certificates generated"
-    else
-        # Generate certificates directly if script not found
+
+    # Always use OpenSSL for self-signed certificates in installation script
+    # This avoids mkcert dependency issues during first-time installation
+    if command -v openssl >/dev/null 2>&1; then
         openssl req -x509 -newkey rsa:4096 -nodes \
             -keyout deployment/certs/server-key.pem \
             -out deployment/certs/server-cert.pem \
             -days 365 -subj "/CN=localhost" 2>/dev/null
-        status "Certificates generated"
+        status "Self-signed certificates generated"
+        info "For trusted certificates, run: ./scripts/generate-dev-certs.sh local"
+    else
+        error "OpenSSL not found. Cannot generate certificates."
     fi
 fi
 
