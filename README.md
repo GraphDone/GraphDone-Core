@@ -46,19 +46,39 @@ GraphDone is built on the belief that:
 
 ## Quick Start
 
+### 🚀 One-Line Install (Like Ollama!)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/start.sh | sh
+```
+
+Or with wget:
+```bash
+wget -qO- https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/start.sh | sh
+```
+
+This will:
+- Install GraphDone to `~/graphdone`
+- Configure environment automatically
+- Generate TLS certificates for HTTPS
+- Start all services with smart detection
+- Open https://localhost:3128 when ready
+
 ### Prerequisites
 
 GraphDone requires:
-- **Node.js 18+** - JavaScript runtime (our setup script can install this automatically)
 - **Docker** - For running Neo4j graph database ([Install Docker](https://docs.docker.com/get-docker/))
 - **Git** - For version control (usually pre-installed)
+- **Node.js 18+** - Optional for development (auto-installed if needed)
 
-### One Command to Rule Them All
+### Manual Installation
 
 ```bash
 git clone https://github.com/GraphDone/GraphDone-Core.git
 cd GraphDone-Core
-./start
+./smart-start  # Intelligent auto-setup
+# or
+./start        # Traditional setup
 ```
 
 That's it! The script will automatically:
