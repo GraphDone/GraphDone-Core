@@ -6,17 +6,17 @@
 %%{init: {
   'theme': 'base',
   'themeVariables': {
-    'primaryColor': '#FFFFFF',
-    'primaryTextColor': '#1F2937',
-    'primaryBorderColor': '#9CA3AF',
-    'lineColor': '#6B7280',
-    'secondaryColor': '#F3F4F6',
-    'tertiaryColor': '#E5E7EB',
-    'background': '#FFFFFF',
-    'mainBkg': '#FFFFFF',
-    'secondBkg': '#F9FAFB',
-    'tertiaryBkg': '#F3F4F6',
-    'clusterBkg': '#F9FAFB'
+    'primaryColor': '#2D3748',
+    'primaryTextColor': '#FFFFFF',
+    'primaryBorderColor': '#4A5568',
+    'lineColor': '#68D391',
+    'secondaryColor': '#4A5568',
+    'tertiaryColor': '#718096',
+    'background': '#1A202C',
+    'mainBkg': '#2D3748',
+    'secondBkg': '#374151',
+    'tertiaryBkg': '#4A5568',
+    'clusterBkg': '#374151'
   }
 }}%%
 
@@ -77,17 +77,17 @@ flowchart TD
 %%{init: {
   'theme': 'base',
   'themeVariables': {
-    'primaryColor': '#FFFFFF',
-    'primaryTextColor': '#1F2937',
-    'primaryBorderColor': '#9CA3AF',
-    'lineColor': '#6B7280',
-    'secondaryColor': '#F3F4F6',
-    'tertiaryColor': '#E5E7EB',
-    'background': '#FFFFFF',
-    'mainBkg': '#FFFFFF',
-    'secondBkg': '#F9FAFB',
-    'tertiaryBkg': '#F3F4F6',
-    'clusterBkg': '#F9FAFB'
+    'primaryColor': '#2D3748',
+    'primaryTextColor': '#FFFFFF',
+    'primaryBorderColor': '#4A5568',
+    'lineColor': '#68D391',
+    'secondaryColor': '#4A5568',
+    'tertiaryColor': '#718096',
+    'background': '#1A202C',
+    'mainBkg': '#2D3748',
+    'secondBkg': '#374151',
+    'tertiaryBkg': '#4A5568',
+    'clusterBkg': '#374151'
   }
 }}%%
 
@@ -152,17 +152,17 @@ flowchart TD
 %%{init: {
   'theme': 'base',
   'themeVariables': {
-    'primaryColor': '#FFFFFF',
-    'primaryTextColor': '#1F2937',
-    'primaryBorderColor': '#9CA3AF',
-    'lineColor': '#6B7280',
-    'secondaryColor': '#F3F4F6',
-    'tertiaryColor': '#E5E7EB',
-    'background': '#FFFFFF',
-    'mainBkg': '#FFFFFF',
-    'secondBkg': '#F9FAFB',
-    'tertiaryBkg': '#F3F4F6',
-    'clusterBkg': '#F9FAFB'
+    'primaryColor': '#2D3748',
+    'primaryTextColor': '#FFFFFF',
+    'primaryBorderColor': '#4A5568',
+    'lineColor': '#68D391',
+    'secondaryColor': '#4A5568',
+    'tertiaryColor': '#718096',
+    'background': '#1A202C',
+    'mainBkg': '#2D3748',
+    'secondBkg': '#374151',
+    'tertiaryBkg': '#4A5568',
+    'clusterBkg': '#374151'
   }
 }}%%
 
@@ -228,17 +228,17 @@ graph TB
 %%{init: {
   'theme': 'base',
   'themeVariables': {
-    'primaryColor': '#FFFFFF',
-    'primaryTextColor': '#1F2937',
-    'primaryBorderColor': '#9CA3AF',
-    'lineColor': '#6B7280',
-    'secondaryColor': '#F3F4F6',
-    'tertiaryColor': '#E5E7EB',
-    'background': '#FFFFFF',
-    'mainBkg': '#FFFFFF',
-    'secondBkg': '#F9FAFB',
-    'tertiaryBkg': '#F3F4F6',
-    'clusterBkg': '#F9FAFB'
+    'primaryColor': '#2D3748',
+    'primaryTextColor': '#FFFFFF',
+    'primaryBorderColor': '#4A5568',
+    'lineColor': '#68D391',
+    'secondaryColor': '#4A5568',
+    'tertiaryColor': '#718096',
+    'background': '#1A202C',
+    'mainBkg': '#2D3748',
+    'secondBkg': '#374151',
+    'tertiaryBkg': '#4A5568',
+    'clusterBkg': '#374151'
   }
 }}%%
 
@@ -288,17 +288,17 @@ flowchart LR
 %%{init: {
   'theme': 'base',
   'themeVariables': {
-    'primaryColor': '#FFFFFF',
-    'primaryTextColor': '#1F2937',
-    'primaryBorderColor': '#9CA3AF',
-    'lineColor': '#6B7280',
-    'secondaryColor': '#F3F4F6',
-    'tertiaryColor': '#E5E7EB',
-    'background': '#FFFFFF',
-    'mainBkg': '#FFFFFF',
-    'secondBkg': '#F9FAFB',
-    'tertiaryBkg': '#F3F4F6',
-    'clusterBkg': '#F9FAFB'
+    'primaryColor': '#2D3748',
+    'primaryTextColor': '#FFFFFF',
+    'primaryBorderColor': '#4A5568',
+    'lineColor': '#68D391',
+    'secondaryColor': '#4A5568',
+    'tertiaryColor': '#718096',
+    'background': '#1A202C',
+    'mainBkg': '#2D3748',
+    'secondBkg': '#374151',
+    'tertiaryBkg': '#4A5568',
+    'clusterBkg': '#374151'
   }
 }}%%
 
