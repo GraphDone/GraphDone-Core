@@ -4,21 +4,33 @@
 
 GraphDone can be installed with a single command:
 
+### Using GitHub (Available Now!)
+
 ```bash
-curl -fsSL https://graphdone.com/start.sh | sh
+curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/start.sh | sh
 ```
 
 or using wget:
 
 ```bash
-wget -qO- https://graphdone.com/start.sh | sh
+wget -qO- https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/start.sh | sh
+```
+
+### Using Custom Domain (Future)
+
+Once deployed to graphdone.com:
+
+```bash
+curl -fsSL https://graphdone.com/start.sh | sh
 ```
 
 This will:
 1. Check for required dependencies (git, docker)
-2. Clone GraphDone to `~/.graphdone`
-3. Start services using smart-start
-4. Provide access at http://localhost:3127
+2. Clone GraphDone to `~/graphdone` (visible directory)
+3. Generate TLS certificates automatically
+4. Configure environment for HTTPS
+5. Start services using smart-start
+6. Provide access at https://localhost:3128
 
 ## Hosting the Installation Script
 
