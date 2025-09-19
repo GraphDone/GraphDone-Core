@@ -12,14 +12,25 @@
 
 set -e
 
-# Modern color palette
+# Modern color palette using 256-color codes for better compatibility
 if [ -t 1 ]; then
-    CYAN='\033[0;96m'
-    GREEN='\033[0;92m'
-    YELLOW='\033[0;93m'
-    PURPLE='\033[0;95m'
-    GRAY='\033[0;90m'
-    RED='\033[0;91m'
+    if [ "$(tput colors 2>/dev/null)" -ge 256 ] 2>/dev/null; then
+        # 256-color mode
+        CYAN='\033[38;5;51m'
+        GREEN='\033[38;5;46m'
+        YELLOW='\033[38;5;220m'
+        PURPLE='\033[38;5;135m'
+        GRAY='\033[38;5;244m'
+        RED='\033[38;5;196m'
+    else
+        # Fallback to basic ANSI
+        CYAN='\033[0;36m'
+        GREEN='\033[0;32m'
+        YELLOW='\033[0;33m'
+        PURPLE='\033[0;35m'
+        GRAY='\033[0;90m'
+        RED='\033[0;31m'
+    fi
     BOLD='\033[1m'
     NC='\033[0m'
 else
@@ -265,16 +276,28 @@ install_graphdone() {
     # Beautiful GraphDone header
     clear
     printf "\n\n"
-    TEAL="\033[38;2;32;160;160m"
-    NC="\033[0m"  # No Color
-    OLIVE="\033[38;2;85;107;47m"
-    LIGHTCYAN="\033[38;2;150;220;220m"
-    YELLOW="\033[38;2;255;215;0m"
-    ORANGE="\033[38;2;255;140;0m"
-    GREEN="\033[0;92m"  # Bright green for checkmarks
-    GRAY="\033[0;90m"   # Gray for progress indicators
-    CYAN="\033[0;96m"   # Cyan for labels
-    BOLD="\033[1m"      # Bold text
+    # Use 256-color mode for better compatibility (38;5;XXX format)
+    # or fallback to basic ANSI if terminal doesn't support it
+    if [ "$(tput colors 2>/dev/null)" -ge 256 ] 2>/dev/null; then
+        # 256-color mode
+        TEAL="\033[38;5;37m"     # Cyan/teal color
+        OLIVE="\033[38;5;58m"    # Olive green
+        LIGHTCYAN="\033[38;5;87m" # Light cyan
+        YELLOW="\033[38;5;220m"  # Yellow
+        ORANGE="\033[38;5;208m"  # Orange
+    else
+        # Fallback to basic ANSI colors
+        TEAL="\033[0;36m"        # Basic cyan
+        OLIVE="\033[0;33m"       # Basic yellow (closest to olive)
+        LIGHTCYAN="\033[0;96m"   # Bright cyan
+        YELLOW="\033[0;93m"      # Bright yellow
+        ORANGE="\033[0;91m"      # Bright red (closest to orange)
+    fi
+    NC="\033[0m"      # No Color (reset)
+    GREEN="\033[38;5;46m"   # Bright green for checkmarks (256-color)
+    GRAY="\033[38;5;244m"   # Gray for progress indicators (256-color)
+    CYAN="\033[38;5;51m"    # Cyan for labels (256-color)
+    BOLD="\033[1m"          # Bold text
     
     printf "${TEAL}╔══════════════════════════════════════════════════════════════════════════════════════════════════╗${NC}\n"
     printf "${TEAL}║                                                                                                  ║${NC}\n"
@@ -285,7 +308,7 @@ install_graphdone() {
     printf "${TEAL}║          ╚██████╔╝██║  ██║██║  ██║██║     ██║  ██║██████╔╝╚██████╔╝██║ ╚████║███████╗            ║${NC}\n"
     printf "${TEAL}║           ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝     ╚═╝  ╚═╝╚═════╝  ╚═════╝ ╚═╝  ╚═══╝╚══════╝            ║${NC}\n"
     printf "${TEAL}║                                                                                                  ║${NC}\n"
-    printf "${TEAL}║${OLIVE}                             Instant Setup. Zero Config. Pure Graph.                              ${TEAL}║${NC}\n"
+    printf "${TEAL}║${NC}${OLIVE}                             Instant Setup. Zero Config. Pure Graph.                              ${NC}${TEAL}║${NC}\n"
     printf "${TEAL}║                                                                                                  ║${NC}\n"
     printf "${TEAL}║${LIGHTCYAN}                          Built with ♥ ${YELLOW}for${LIGHTCYAN} teams ${ORANGE}who${LIGHTCYAN} think differently.                           ${TEAL}║${NC}\n"
     printf "${TEAL}║                                                                                                  ║${NC}\n"
@@ -296,7 +319,7 @@ install_graphdone() {
 
     # Start comprehensive status box (same width as banner)
     printf "${TEAL}╔══════════════════════════════════════════════════════════════════════════════════════════════════╗${NC}\n"
-    printf "${TEAL}║${LIGHTCYAN}                                    Installation Progress                                         ${TEAL}║${NC}\n"
+    printf "${TEAL}║                                    Installation Progress                                         ║${NC}\n"
     printf "${TEAL}║  ${TEAL}┌────────────────────────────────────────────────────────────────────────────────────────────┐${TEAL}  ║${NC}\n"
 
     # Auto-install dependencies if needed
@@ -363,17 +386,18 @@ install_graphdone() {
         # Use sed for POSIX-compatible substring
         DISPLAY_DIR="...$(echo "$INSTALL_DIR" | sed 's/.*\(.\{42\}\)$/\1/')"
     fi
-    # Format the install directory line with proper padding (71 chars total like other lines)
+    # Format the install directory line with proper padding
     INSTALL_MSG="Installing to $DISPLAY_DIR"
     # Calculate padding needed (POSIX-compatible)
     MSG_LEN=$(printf "%s" "$INSTALL_MSG" | wc -c)
+    # Account for ANSI codes and actual display width (90 chars for inner content including the ▸ and space)
     PADDING=""
-    PAD_COUNT=$((71 - MSG_LEN))
+    PAD_COUNT=$((90 - MSG_LEN))
     while [ $PAD_COUNT -gt 0 ]; do
         PADDING="$PADDING "
         PAD_COUNT=$((PAD_COUNT - 1))
     done
-    printf "${TEAL}║  ${TEAL}│${GRAY}▸${NC} %s%s                   ${TEAL}│  ║${NC}\n" "$INSTALL_MSG" "$PADDING"
+    printf "${TEAL}║  ${TEAL}│  ${GRAY}▸${NC} %s%s${TEAL}│  ║${NC}\n" "$INSTALL_MSG" "$PADDING"
 
     # Download or update
     if [ -d "$INSTALL_DIR" ]; then
@@ -473,13 +497,21 @@ EOF
 
 # Continue the box with success information
 show_success_in_box() {
-    TEAL="\033[38;2;32;160;160m"
-    NC="\033[0m"  # No Color
-    LIGHTCYAN="\033[38;2;150;220;220m"
-    GREEN="\033[0;92m"  # Bright green for checkmarks
-    GRAY="\033[0;90m"   # Gray for progress indicators
-    CYAN="\033[0;96m"   # Cyan for labels
-    BOLD="\033[1m"      # Bold text
+    # Use same color definitions for consistency
+    if [ "$(tput colors 2>/dev/null)" -ge 256 ] 2>/dev/null; then
+        # 256-color mode
+        TEAL="\033[38;5;37m"     # Cyan/teal color
+        LIGHTCYAN="\033[38;5;87m" # Light cyan
+    else
+        # Fallback to basic ANSI colors
+        TEAL="\033[0;36m"        # Basic cyan
+        LIGHTCYAN="\033[0;96m"   # Bright cyan
+    fi
+    NC="\033[0m"      # No Color (reset)
+    GREEN="\033[38;5;46m"   # Bright green for checkmarks (256-color)
+    GRAY="\033[38;5;244m"   # Gray for progress indicators (256-color)
+    CYAN="\033[38;5;51m"    # Cyan for labels (256-color)
+    BOLD="\033[1m"          # Bold text
     INSTALL_DIR="${GRAPHDONE_HOME:-$HOME/graphdone}"
     
     # Success section in same box with inner box
@@ -490,7 +522,7 @@ show_success_in_box() {
     printf "${TEAL}║                                                                                                  ║${NC}\n"
     
     # Access URLs section in same box with inner box
-    printf "${TEAL}║${LIGHTCYAN}                                        Access URLs                                               ${TEAL}║${NC}\n"
+    printf "${TEAL}║                                        Access URLs                                               ║${NC}\n"
     printf "${TEAL}║  ${TEAL}┌────────────────────────────────────────────────────────────────────────────────────────────┐${TEAL}  ║${NC}\n"
     printf "${TEAL}║  ${TEAL}│  ${CYAN}Web App:${NC}    https://localhost:3128                                                        ${TEAL}│  ║${NC}\n"
     printf "${TEAL}║  ${TEAL}│  ${CYAN}GraphQL:${NC}    https://localhost:4128/graphql                                                ${TEAL}│  ║${NC}\n"
@@ -499,9 +531,23 @@ show_success_in_box() {
     printf "${TEAL}║                                                                                                  ║${NC}\n"
     
     # Management commands section in same box with inner box
-    printf "${TEAL}║${LIGHTCYAN}                                     Management Commands                                          ${TEAL}║${NC}\n"
+    printf "${TEAL}║                                     Management Commands                                          ║${NC}\n"
     printf "${TEAL}║  ${TEAL}┌────────────────────────────────────────────────────────────────────────────────────────────┐${TEAL}  ║${NC}\n"
-    printf "${TEAL}║  ${TEAL}│  ${GRAY}cd %s${NC}                                                         ${TEAL}│  ║${NC}\n" "$INSTALL_DIR"
+    # Format cd command with proper padding
+    CD_CMD="cd $INSTALL_DIR"
+    # Truncate if too long
+    if [ $(printf "%s" "$CD_CMD" | wc -c) -gt 85 ]; then
+        CD_CMD="cd ...$(echo "$INSTALL_DIR" | sed 's/.*\(.\{75\}\)$/\1/')"
+    fi
+    CMD_LEN=$(printf "%s" "$CD_CMD" | wc -c)
+    CD_PADDING=""
+    # 90 chars total (accounting for the 2 spaces after │)
+    PAD_COUNT=$((90 - CMD_LEN))
+    while [ $PAD_COUNT -gt 0 ]; do
+        CD_PADDING="$CD_PADDING "
+        PAD_COUNT=$((PAD_COUNT - 1))
+    done
+    printf "${TEAL}║  ${TEAL}│  ${GRAY}%s${NC}%s${TEAL}│  ║${NC}\n" "$CD_CMD" "$CD_PADDING"
     printf "${TEAL}║  ${TEAL}│  ${GRAY}sh public/install.sh stop     ${NC}${GRAY}# Stop services${NC}                                             ${TEAL}│  ║${NC}\n"
     printf "${TEAL}║  ${TEAL}│  ${GRAY}sh public/install.sh remove   ${NC}${GRAY}# Complete reset${NC}                                            ${TEAL}│  ║${NC}\n"
     printf "${TEAL}║  ${TEAL}└────────────────────────────────────────────────────────────────────────────────────────────┘${TEAL}  ║${NC}\n"
