@@ -276,28 +276,28 @@ install_graphdone() {
     CYAN="\033[0;96m"   # Cyan for labels
     BOLD="\033[1m"      # Bold text
     
-    printf "${TEAL}╔════════════════════════════════════════════════════════════════════════════════════════════════════╗${NC}\n"
-    printf "${TEAL}║                                                                                                    ║${NC}\n"
-    printf "${TEAL}║           ██████╗ ██████╗  █████╗ ██████╗ ██╗  ██╗██████╗  ██████╗ ███╗   ██╗███████╗              ║${NC}\n"
-    printf "${TEAL}║          ██╔════╝ ██╔══██╗██╔══██╗██╔══██╗██║  ██║██╔══██╗██╔═══██╗████╗  ██║██╔════╝              ║${NC}\n"
-    printf "${TEAL}║          ██║  ███╗██████╔╝███████║██████╔╝███████║██║  ██║██║   ██║██╔██╗ ██║█████╗                ║${NC}\n"
-    printf "${TEAL}║          ██║   ██║██╔══██╗██╔══██║██╔═══╝ ██╔══██║██║  ██║██║   ██║██║╚██╗██║██╔══╝                ║${NC}\n"
-    printf "${TEAL}║          ╚██████╔╝██║  ██║██║  ██║██║     ██║  ██║██████╔╝╚██████╔╝██║ ╚████║███████╗              ║${NC}\n"
-    printf "${TEAL}║           ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝     ╚═╝  ╚═╝╚═════╝  ╚═════╝ ╚═╝  ╚═══╝╚══════╝              ║${NC}\n"
-    printf "${TEAL}║                                                                                                    ║${NC}\n"
-    printf "${TEAL}║${OLIVE}                             Instant Setup. Zero Config. Pure Graph.                                ${TEAL}║${NC}\n"
-    printf "${TEAL}║                                                                                                    ║${NC}\n"
-    printf "${TEAL}║${LIGHTCYAN}                          Built with ♥ ${YELLOW}for${LIGHTCYAN} teams ${ORANGE}who${LIGHTCYAN} think differently.                             ${TEAL}║${NC}\n"
-    printf "${TEAL}║                                                                                                    ║${NC}\n"
-    printf "${TEAL}╚════════════════════════════════════════════════════════════════════════════════════════════════════╝${NC}\n\n"
+    printf "${TEAL}╔══════════════════════════════════════════════════════════════════════════════════════════════════╗${NC}\n"
+    printf "${TEAL}║                                                                                                  ║${NC}\n"
+    printf "${TEAL}║           ██████╗ ██████╗  █████╗ ██████╗ ██╗  ██╗██████╗  ██████╗ ███╗   ██╗███████╗            ║${NC}\n"
+    printf "${TEAL}║          ██╔════╝ ██╔══██╗██╔══██╗██╔══██╗██║  ██║██╔══██╗██╔═══██╗████╗  ██║██╔════╝            ║${NC}\n"
+    printf "${TEAL}║          ██║  ███╗██████╔╝███████║██████╔╝███████║██║  ██║██║   ██║██╔██╗ ██║█████╗              ║${NC}\n"
+    printf "${TEAL}║          ██║   ██║██╔══██╗██╔══██║██╔═══╝ ██╔══██║██║  ██║██║   ██║██║╚██╗██║██╔══╝              ║${NC}\n"
+    printf "${TEAL}║          ╚██████╔╝██║  ██║██║  ██║██║     ██║  ██║██████╔╝╚██████╔╝██║ ╚████║███████╗            ║${NC}\n"
+    printf "${TEAL}║           ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝     ╚═╝  ╚═╝╚═════╝  ╚═════╝ ╚═╝  ╚═══╝╚══════╝            ║${NC}\n"
+    printf "${TEAL}║                                                                                                  ║${NC}\n"
+    printf "${TEAL}║${OLIVE}                             Instant Setup. Zero Config. Pure Graph.                              ${TEAL}║${NC}\n"
+    printf "${TEAL}║                                                                                                  ║${NC}\n"
+    printf "${TEAL}║${LIGHTCYAN}                          Built with ♥ ${YELLOW}for${LIGHTCYAN} teams ${ORANGE}who${LIGHTCYAN} think differently.                           ${TEAL}║${NC}\n"
+    printf "${TEAL}║                                                                                                  ║${NC}\n"
+    printf "${TEAL}╚══════════════════════════════════════════════════════════════════════════════════════════════════╝${NC}\n\n"
 
     # Platform detection
     detect_platform
 
     # Start comprehensive status box (same width as banner)
-    printf "${TEAL}╔════════════════════════════════════════════════════════════════════════════════════════════════════╗${NC}\n"
-    printf "${TEAL}║${LIGHTCYAN}                                    Installation Progress                                           ${TEAL}║${NC}\n"
-    printf "${TEAL}║  ${TEAL}┌──────────────────────────────────────────────────────────────────────────────────────────────┐${TEAL}  ║${NC}\n"
+    printf "${TEAL}╔══════════════════════════════════════════════════════════════════════════════════════════════════╗${NC}\n"
+    printf "${TEAL}║${LIGHTCYAN}                                    Installation Progress                                         ${TEAL}║${NC}\n"
+    printf "${TEAL}║  ${TEAL}┌────────────────────────────────────────────────────────────────────────────────────────────┐${TEAL}  ║${NC}\n"
 
     # Auto-install dependencies if needed
     if ! command -v git >/dev/null 2>&1; then
@@ -305,25 +305,25 @@ install_graphdone() {
     fi
     
     if ! command -v node >/dev/null 2>&1; then
-        printf "${TEAL}║  ${TEAL}│  ${GRAY}▸${NC} Installing Node.js via NVM                                                   ${TEAL}│  ║${NC}\n"
+        printf "${TEAL}║  ${TEAL}│  ${GRAY}▸${NC} Installing Node.js via NVM                                                 ${TEAL}│  ║${NC}\n"
         if install_nodejs >/dev/null 2>&1; then
-            printf "${TEAL}║  ${TEAL}│  ${GREEN}✓${NC} Node.js installed successfully                                                  ${TEAL}│  ║${NC}\n"
+            printf "${TEAL}║  ${TEAL}│  ${GREEN}✓${NC} Node.js installed successfully                                                ${TEAL}│  ║${NC}\n"
         else
-            printf "${TEAL}║  ${TEAL}│  ${GRAY}▸${NC} Node.js installation skipped - will use containers                              ${TEAL}│  ║${NC}\n"
+            printf "${TEAL}║  ${TEAL}│  ${GRAY}▸${NC} Node.js installation skipped - will use containers                            ${TEAL}│  ║${NC}\n"
         fi
     else
-        printf "${TEAL}║  ${TEAL}│  ${GREEN}✓${NC} Node.js already installed                                                                 ${TEAL}│  ║${NC}\n"
+        printf "${TEAL}║  ${TEAL}│  ${GREEN}✓${NC} Node.js already installed                                                               ${TEAL}│  ║${NC}\n"
     fi
     
     if ! command -v docker >/dev/null 2>&1; then
-        printf "${TEAL}║  ${TEAL}│  ${GRAY}▸${NC} Installing Docker                                                            ${TEAL}│  ║${NC}\n"
+        printf "${TEAL}║  ${TEAL}│  ${GRAY}▸${NC} Installing Docker                                                          ${TEAL}│  ║${NC}\n"
         if install_docker >/dev/null 2>&1; then
-            printf "${TEAL}║  ${TEAL}│  ${GREEN}✓${NC} Docker installed successfully                                                  ${TEAL}│  ║${NC}\n"
+            printf "${TEAL}║  ${TEAL}│  ${GREEN}✓${NC} Docker installed successfully                                                ${TEAL}│  ║${NC}\n"
         else
             error "Docker installation failed"
         fi
     else
-        printf "${TEAL}║  ${TEAL}│  ${GREEN}✓${NC} Docker already installed                                                                  ${TEAL}│  ║${NC}\n"
+        printf "${TEAL}║  ${TEAL}│  ${GREEN}✓${NC} Docker already installed                                                                ${TEAL}│  ║${NC}\n"
     fi
     
     # Ensure Docker is running
@@ -351,7 +351,7 @@ install_graphdone() {
         fi
     fi
     
-    printf "${TEAL}║  ${TEAL}│  ${GREEN}✓${NC} Dependencies verified                                                                     ${TEAL}│  ║${NC}\n"
+    printf "${TEAL}║  ${TEAL}│  ${GREEN}✓${NC} Dependencies verified                                                                   ${TEAL}│  ║${NC}\n"
 
     # Installation directory
     INSTALL_DIR="${GRAPHDONE_HOME:-$HOME/graphdone}"
@@ -373,24 +373,24 @@ install_graphdone() {
         PADDING="$PADDING "
         PAD_COUNT=$((PAD_COUNT - 1))
     done
-    printf "${TEAL}║  ${TEAL}│  ${GRAY}▸${NC} %s%s                   ${TEAL}│  ║${NC}\n" "$INSTALL_MSG" "$PADDING"
+    printf "${TEAL}║  ${TEAL}│${GRAY}▸${NC} %s%s                   ${TEAL}│  ║${NC}\n" "$INSTALL_MSG" "$PADDING"
 
     # Download or update
     if [ -d "$INSTALL_DIR" ]; then
-        printf "${TEAL}║  ${TEAL}│  ${GRAY}▸${NC} Updating existing installation                                                            ${TEAL}│  ║${NC}\n"
+        printf "${TEAL}║  ${TEAL}│  ${GRAY}▸${NC} Updating existing installation                                                          ${TEAL}│  ║${NC}\n"
         cd "$INSTALL_DIR" && git pull --quiet >/dev/null 2>&1
-        printf "${TEAL}║  ${TEAL}│  ${GREEN}✓${NC} Updated existing installation                                                             ${TEAL}│  ║${NC}\n"
+        printf "${TEAL}║  ${TEAL}│  ${GREEN}✓${NC} Updated existing installation                                                           ${TEAL}│  ║${NC}\n"
     else
-        printf "${TEAL}║  ${TEAL}│  ${GRAY}▸${NC} Downloading GraphDone from GitHub                                               ${TEAL}│  ║${NC}\n"
+        printf "${TEAL}║  ${TEAL}│  ${GRAY}▸${NC} Downloading GraphDone from GitHub                                             ${TEAL}│  ║${NC}\n"
         git clone --quiet --branch fix/first-start https://github.com/GraphDone/GraphDone-Core.git "$INSTALL_DIR" >/dev/null 2>&1 || git clone --quiet https://github.com/GraphDone/GraphDone-Core.git "$INSTALL_DIR" >/dev/null 2>&1
-        printf "${TEAL}║  ${TEAL}│  ${GREEN}✓${NC} Downloaded GraphDone from GitHub                                                ${TEAL}│  ║${NC}\n"
+        printf "${TEAL}║  ${TEAL}│  ${GREEN}✓${NC} Downloaded GraphDone from GitHub                                              ${TEAL}│  ║${NC}\n"
     fi
 
     cd "$INSTALL_DIR"
 
     # Environment setup
     if [ ! -f ".env" ]; then
-        printf "${TEAL}║  ${TEAL}│  ${GRAY}▸${NC} Configuring environment                                                         ${TEAL}│  ║${NC}\n"
+        printf "${TEAL}║  ${TEAL}│  ${GRAY}▸${NC} Configuring environment                                                       ${TEAL}│  ║${NC}\n"
         cat > .env << 'EOF'
 NODE_ENV=production
 NEO4J_URI=bolt://neo4j:7687
@@ -403,30 +403,30 @@ SSL_ENABLED=true
 SSL_KEY_PATH=./deployment/certs/server-key.pem
 SSL_CERT_PATH=./deployment/certs/server-cert.pem
 EOF
-        printf "${TEAL}║  ${TEAL}│  ${GREEN}✓${NC} Environment configured                                                          ${TEAL}│  ║${NC}\n"
+        printf "${TEAL}║  ${TEAL}│  ${GREEN}✓${NC} Environment configured                                                        ${TEAL}│  ║${NC}\n"
     fi
 
     # TLS certificates
     if [ ! -f "deployment/certs/server-cert.pem" ]; then
-        printf "${TEAL}║  ${TEAL}│  ${GRAY}▸${NC} Generating TLS certificates                                                   ${TEAL}│  ║${NC}\n"
+        printf "${TEAL}║  ${TEAL}│  ${GRAY}▸${NC} Generating TLS certificates                                                 ${TEAL}│  ║${NC}\n"
         mkdir -p deployment/certs || error "Failed to create certificate directory"
         openssl req -x509 -newkey rsa:4096 -nodes -keyout deployment/certs/server-key.pem -out deployment/certs/server-cert.pem -days 365 -subj '/CN=localhost' >/dev/null 2>&1 || error "Failed to generate certificates"
-        printf "${TEAL}║  ${TEAL}│  ${GREEN}✓${NC} TLS certificates generated                                                    ${TEAL}│  ║${NC}\n"
+        printf "${TEAL}║  ${TEAL}│  ${GREEN}✓${NC} TLS certificates generated                                                  ${TEAL}│  ║${NC}\n"
     else
-        printf "${TEAL}║  ${TEAL}│  ${GREEN}✓${NC} TLS certificates already exist                                                            ${TEAL}│  ║${NC}\n"
+        printf "${TEAL}║  ${TEAL}│  ${GREEN}✓${NC} TLS certificates already exist                                                          ${TEAL}│  ║${NC}\n"
     fi
 
     # Check if services are already running
     if check_containers_healthy; then
-        printf "${TEAL}║  ${TEAL}│  ${GREEN}✓${NC} Services already running                                                                  ${TEAL}│  ║${NC}\n"
-        printf "${TEAL}║  ${TEAL}└──────────────────────────────────────────────────────────────────────────────────────────────┘${TEAL}  ║${NC}\n"
+        printf "${TEAL}║  ${TEAL}│  ${GREEN}✓${NC} Services already running                                                                ${TEAL}│  ║${NC}\n"
+        printf "${TEAL}║  ${TEAL}└────────────────────────────────────────────────────────────────────────────────────────────┘${TEAL}  ║${NC}\n"
         # Don't close the box yet - continue with success info
         show_success_in_box
         return 0
     fi
 
     # Container cleanup
-    printf "${TEAL}║  ${TEAL}│  ${GRAY}▸${NC} Preparing containers                                                          ${TEAL}│  ║${NC}\n"
+    printf "${TEAL}║  ${TEAL}│  ${GRAY}▸${NC} Preparing containers                                                        ${TEAL}│  ║${NC}\n"
     # Try both docker-compose and docker compose for compatibility
     if command -v docker-compose >/dev/null 2>&1; then
         DOCKER_COMPOSE="docker-compose"
@@ -437,34 +437,34 @@ EOF
     $DOCKER_COMPOSE -f deployment/docker-compose.registry.yml down --remove-orphans >/dev/null 2>&1 || true
 
     # Smart deployment detection
-    printf "${TEAL}║  ${TEAL}│  ${GRAY}▸${NC} Checking for pre-built images                                                ${TEAL}│  ║${NC}\n"
+    printf "${TEAL}║  ${TEAL}│  ${GRAY}▸${NC} Checking for pre-built images                                              ${TEAL}│  ║${NC}\n"
     if docker pull ghcr.io/graphdone/graphdone-web:fix-first-start >/dev/null 2>&1; then
-        printf "${TEAL}║  ${TEAL}│  ${GREEN}✓${NC} Using pre-built containers                                                    ${TEAL}│  ║${NC}\n"
+        printf "${TEAL}║  ${TEAL}│  ${GREEN}✓${NC} Using pre-built containers                                                  ${TEAL}│  ║${NC}\n"
         COMPOSE_FILE="deployment/docker-compose.registry.yml"
     else
-        printf "${TEAL}║  ${TEAL}│  ${GREEN}✓${NC} Building from source                                                          ${TEAL}│  ║${NC}\n"
+        printf "${TEAL}║  ${TEAL}│  ${GREEN}✓${NC} Building from source                                                        ${TEAL}│  ║${NC}\n"
         COMPOSE_FILE="deployment/docker-compose.yml"
     fi
 
     # Start services
-    printf "${TEAL}║  ${TEAL}│  ${GRAY}▸${NC} Starting GraphDone services                                                   ${TEAL}│  ║${NC}\n"
+    printf "${TEAL}║  ${TEAL}│  ${GRAY}▸${NC} Starting GraphDone services                                                 ${TEAL}│  ║${NC}\n"
     if [ -f "$COMPOSE_FILE" ]; then
         $DOCKER_COMPOSE -f "$COMPOSE_FILE" up -d >/dev/null 2>&1 || error "Failed to start services"
     else
         # Fallback to default compose file
         $DOCKER_COMPOSE -f deployment/docker-compose.yml up -d >/dev/null 2>&1 || error "Failed to start services"
     fi
-    printf "${TEAL}║  ${TEAL}│  ${GREEN}✓${NC} GraphDone services started                                                    ${TEAL}│  ║${NC}\n"
+    printf "${TEAL}║  ${TEAL}│  ${GREEN}✓${NC} GraphDone services started                                                  ${TEAL}│  ║${NC}\n"
 
     # Wait for services to be ready (more reliable than smart-start's 8 second sleep)
     if wait_for_services; then
-        printf "${TEAL}║  ${TEAL}│  ${GREEN}✓${NC} Installation complete                                                        ${TEAL}│  ║${NC}\n"
+        printf "${TEAL}║  ${TEAL}│  ${GREEN}✓${NC} Installation complete                                                      ${TEAL}│  ║${NC}\n"
     else
-        printf "${TEAL}║  ${TEAL}│  ${YELLOW}!${NC} Services started but initialization taking longer                            ${TEAL}│  ║${NC}\n"
+        printf "${TEAL}║  ${TEAL}│  ${YELLOW}!${NC} Services started but initialization taking longer                          ${TEAL}│  ║${NC}\n"
     fi
     
     # Close the Installation Progress inner box
-    printf "${TEAL}║  ${TEAL}└──────────────────────────────────────────────────────────────────────────────────────────────┘${TEAL}  ║${NC}\n"
+    printf "${TEAL}║  ${TEAL}└────────────────────────────────────────────────────────────────────────────────────────────┘${TEAL}  ║${NC}\n"
     
     # Continue with success info in the same box
     show_success_in_box
@@ -483,32 +483,32 @@ show_success_in_box() {
     INSTALL_DIR="${GRAPHDONE_HOME:-$HOME/graphdone}"
     
     # Success section in same box with inner box
-    printf "${TEAL}║                                                                                                    ║${NC}\n"
-    printf "${TEAL}║  ${TEAL}┌──────────────────────────────────────────────────────────────────────────────────────────────┐${TEAL}  ║${NC}\n"
-    printf "${TEAL}║  ${TEAL}│${GREEN}${BOLD}                                      ✓ GraphDone Ready${NC}                                       ${TEAL}│  ║${NC}\n"
-    printf "${TEAL}║  ${TEAL}└──────────────────────────────────────────────────────────────────────────────────────────────┘${TEAL}  ║${NC}\n"
-    printf "${TEAL}║                                                                                                    ║${NC}\n"
+    printf "${TEAL}║                                                                                                  ║${NC}\n"
+    printf "${TEAL}║  ${TEAL}┌────────────────────────────────────────────────────────────────────────────────────────────┐${TEAL}  ║${NC}\n"
+    printf "${TEAL}║  ${TEAL}│${GREEN}${BOLD}                                      ✓ GraphDone Ready${NC}                                     ${TEAL}│  ║${NC}\n"
+    printf "${TEAL}║  ${TEAL}└────────────────────────────────────────────────────────────────────────────────────────────┘${TEAL}  ║${NC}\n"
+    printf "${TEAL}║                                                                                                  ║${NC}\n"
     
     # Access URLs section in same box with inner box
-    printf "${TEAL}║${LIGHTCYAN}                                        Access URLs                                                 ${TEAL}║${NC}\n"
-    printf "${TEAL}║  ${TEAL}┌──────────────────────────────────────────────────────────────────────────────────────────────┐${TEAL}  ║${NC}\n"
-    printf "${TEAL}║  ${TEAL}│  ${CYAN}Web App:${NC}    https://localhost:3128                                                          ${TEAL}│  ║${NC}\n"
-    printf "${TEAL}║  ${TEAL}│  ${CYAN}GraphQL:${NC}    https://localhost:4128/graphql                                                  ${TEAL}│  ║${NC}\n"
-    printf "${TEAL}║  ${TEAL}│  ${CYAN}Database:${NC}   http://localhost:7474                                                           ${TEAL}│  ║${NC}\n"
-    printf "${TEAL}║  ${TEAL}└──────────────────────────────────────────────────────────────────────────────────────────────┘${TEAL}  ║${NC}\n"
-    printf "${TEAL}║                                                                                                    ║${NC}\n"
+    printf "${TEAL}║${LIGHTCYAN}                                        Access URLs                                               ${TEAL}║${NC}\n"
+    printf "${TEAL}║  ${TEAL}┌────────────────────────────────────────────────────────────────────────────────────────────┐${TEAL}  ║${NC}\n"
+    printf "${TEAL}║  ${TEAL}│  ${CYAN}Web App:${NC}    https://localhost:3128                                                        ${TEAL}│  ║${NC}\n"
+    printf "${TEAL}║  ${TEAL}│  ${CYAN}GraphQL:${NC}    https://localhost:4128/graphql                                                ${TEAL}│  ║${NC}\n"
+    printf "${TEAL}║  ${TEAL}│  ${CYAN}Database:${NC}   http://localhost:7474                                                         ${TEAL}│  ║${NC}\n"
+    printf "${TEAL}║  ${TEAL}└────────────────────────────────────────────────────────────────────────────────────────────┘${TEAL}  ║${NC}\n"
+    printf "${TEAL}║                                                                                                  ║${NC}\n"
     
     # Management commands section in same box with inner box
-    printf "${TEAL}║${LIGHTCYAN}                                     Management Commands                                            ${TEAL}║${NC}\n"
-    printf "${TEAL}║  ${TEAL}┌──────────────────────────────────────────────────────────────────────────────────────────────┐${TEAL}  ║${NC}\n"
-    printf "${TEAL}║  ${TEAL}│  ${GRAY}cd %s${NC}                                                           ${TEAL}│  ║${NC}\n" "$INSTALL_DIR"
-    printf "${TEAL}║  ${TEAL}│  ${GRAY}sh public/install.sh stop     ${NC}${GRAY}# Stop services${NC}                                               ${TEAL}│  ║${NC}\n"
-    printf "${TEAL}║  ${TEAL}│  ${GRAY}sh public/install.sh remove   ${NC}${GRAY}# Complete reset${NC}                                              ${TEAL}│  ║${NC}\n"
-    printf "${TEAL}║  ${TEAL}└──────────────────────────────────────────────────────────────────────────────────────────────┘${TEAL}  ║${NC}\n"
-    printf "${TEAL}║                                                                                                    ║${NC}\n"
+    printf "${TEAL}║${LIGHTCYAN}                                     Management Commands                                          ${TEAL}║${NC}\n"
+    printf "${TEAL}║  ${TEAL}┌────────────────────────────────────────────────────────────────────────────────────────────┐${TEAL}  ║${NC}\n"
+    printf "${TEAL}║  ${TEAL}│  ${GRAY}cd %s${NC}                                                         ${TEAL}│  ║${NC}\n" "$INSTALL_DIR"
+    printf "${TEAL}║  ${TEAL}│  ${GRAY}sh public/install.sh stop     ${NC}${GRAY}# Stop services${NC}                                             ${TEAL}│  ║${NC}\n"
+    printf "${TEAL}║  ${TEAL}│  ${GRAY}sh public/install.sh remove   ${NC}${GRAY}# Complete reset${NC}                                            ${TEAL}│  ║${NC}\n"
+    printf "${TEAL}║  ${TEAL}└────────────────────────────────────────────────────────────────────────────────────────────┘${TEAL}  ║${NC}\n"
+    printf "${TEAL}║                                                                                                  ║${NC}\n"
     
     # Close the big box
-    printf "${TEAL}╚════════════════════════════════════════════════════════════════════════════════════════════════════╝${NC}\n\n"
+    printf "${TEAL}╚══════════════════════════════════════════════════════════════════════════════════════════════════╝${NC}\n\n"
 }
 
 # Show success message (old function - no longer used)
