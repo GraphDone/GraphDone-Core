@@ -17,7 +17,7 @@ if [ -t 1 ]; then
     if [ "$(tput colors 2>/dev/null)" -ge 256 ] 2>/dev/null; then
         # 256-color mode
         CYAN='\033[38;5;51m'
-        GREEN='\033[38;5;46m'
+        GREEN='\033[38;5;154m'
         YELLOW='\033[38;5;220m'
         PURPLE='\033[38;5;135m'
         GRAY='\033[38;5;244m'
@@ -25,7 +25,7 @@ if [ -t 1 ]; then
     else
         # Fallback to basic ANSI
         CYAN='\033[0;36m'
-        GREEN='\033[0;32m'
+        GREEN='\033[38;5;154m'
         YELLOW='\033[0;33m'
         PURPLE='\033[0;35m'
         GRAY='\033[0;90m'
@@ -281,20 +281,20 @@ install_graphdone() {
     if [ "$(tput colors 2>/dev/null)" -ge 256 ] 2>/dev/null; then
         # 256-color mode
         TEAL="\033[38;5;37m"     # Cyan/teal color
-        OLIVE="\033[38;5;58m"    # Olive green
+        OLIVE="\033[38;5;143m"    # Light olive green
         LIGHTCYAN="\033[38;5;87m" # Light cyan
         YELLOW="\033[38;5;220m"  # Yellow
         ORANGE="\033[38;5;208m"  # Orange
     else
         # Fallback to basic ANSI colors
         TEAL="\033[0;36m"        # Basic cyan
-        OLIVE="\033[0;33m"       # Basic yellow (closest to olive)
+        OLIVE="\033[0;93m"       # Bright yellow (light olive fallback)
         LIGHTCYAN="\033[0;96m"   # Bright cyan
         YELLOW="\033[0;93m"      # Bright yellow
         ORANGE="\033[0;91m"      # Bright red (closest to orange)
     fi
     NC="\033[0m"      # No Color (reset)
-    GREEN="\033[38;5;46m"   # Bright green for checkmarks (256-color)
+    GREEN="\033[38;5;154m"   # Yellowgreen for checkmarks (256-color, #9acd32)
     GRAY="\033[38;5;244m"   # Gray for progress indicators (256-color)
     CYAN="\033[38;5;51m"    # Cyan for labels (256-color)
     BOLD="\033[1m"          # Bold text
@@ -390,9 +390,9 @@ install_graphdone() {
     INSTALL_MSG="Installing to $DISPLAY_DIR"
     # Calculate padding needed (POSIX-compatible)
     MSG_LEN=$(printf "%s" "$INSTALL_MSG" | wc -c)
-    # Account for ANSI codes and actual display width (90 chars for inner content including the ▸ and space)
+    # Account for ANSI codes and actual display width (88 chars for content after the ▸ and space)
     PADDING=""
-    PAD_COUNT=$((90 - MSG_LEN))
+    PAD_COUNT=$((88 - MSG_LEN))
     while [ $PAD_COUNT -gt 0 ]; do
         PADDING="$PADDING "
         PAD_COUNT=$((PAD_COUNT - 1))
@@ -508,7 +508,7 @@ show_success_in_box() {
         LIGHTCYAN="\033[0;96m"   # Bright cyan
     fi
     NC="\033[0m"      # No Color (reset)
-    GREEN="\033[38;5;46m"   # Bright green for checkmarks (256-color)
+    GREEN="\033[38;5;154m"   # Yellowgreen for checkmarks (256-color, #9acd32)
     GRAY="\033[38;5;244m"   # Gray for progress indicators (256-color)
     CYAN="\033[38;5;51m"    # Cyan for labels (256-color)
     BOLD="\033[1m"          # Bold text
