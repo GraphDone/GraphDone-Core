@@ -1,377 +1,308 @@
 #!/bin/bash
 
-# GraphDone Node.js Auto-Setup Script
-# Sets up Node.js using multiple methods for GraphDone development
+# GraphDone Node.js Auto-Installation Script
+# Installs Node.js LTS using platform-specific methods
+#
+# Installation methods by platform:
+# Linux: NodeSource repository, system package managers
+# macOS: Homebrew, official installer
 
-set -e
+set -euo pipefail
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-CYAN='\033[0;36m'
-NC='\033[0m' # No Color
-
-echo -e "${CYAN}🚀 GraphDone Node.js Auto-Setup${NC}"
-echo "================================="
-
-# Function to check if command exists
-command_exists() {
-    command -v "$1" >/dev/null 2>&1
+# Cleanup function
+cleanup() {
+    rm -f "/tmp/nodesource_setup.sh" 2>/dev/null || true
 }
 
-# Check if Node.js is already available
-if command_exists node && command_exists npm; then
-    echo -e "${GREEN}✅ Node.js is already installed: $(node --version)${NC}"
-    echo -e "${GREEN}✅ npm is available: $(npm --version)${NC}"
-    exit 0
-fi
+# Set up signal handlers
+trap cleanup EXIT INT TERM
 
-echo -e "${YELLOW}⚠️  Node.js not found, installing automatically...${NC}"
+USER=$(whoami)
+
+# Helper function to check if command exists
+command_exists() {
+    command -v "$1" &> /dev/null
+}
+
+# Error handling function
+handle_error() {
+    local exit_code=$?
+    local line_number=$1
+    echo "✗ Error occurred at line ${line_number}, exit code: ${exit_code}" >&2
+    cleanup
+    exit "${exit_code}"
+}
+
+# Set up error handler
+trap 'handle_error ${LINENO}' ERR
 
 # Detect operating system
 detect_os() {
     if [[ "$OSTYPE" == "darwin"* ]]; then
         OS="macos"
-        SHELL_PROFILE="$HOME/.zshrc"  # macOS default shell
-        if [ ! -f "$SHELL_PROFILE" ]; then
-            SHELL_PROFILE="$HOME/.bash_profile"  # Fallback for older macOS
-        fi
     elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
         OS="linux"
-        SHELL_PROFILE="$HOME/.bashrc"
-    elif [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "cygwin" ]] || [[ "$OS" == "Windows_NT" ]]; then
-        OS="windows"
-        # Windows shell profile detection
-        if [ -n "$USERPROFILE" ]; then
-            # PowerShell profile (preferred)
-            SHELL_PROFILE="$USERPROFILE/Documents/PowerShell/Microsoft.PowerShell_profile.ps1"
-            # Git Bash profile (fallback)
-            if [ ! -f "$SHELL_PROFILE" ]; then
-                SHELL_PROFILE="$HOME/.bashrc"
-            fi
-        else
-            SHELL_PROFILE="$HOME/.bashrc"  # Git Bash fallback
-        fi
     else
         OS="unknown"
-        SHELL_PROFILE="$HOME/.bashrc"
+        printf "  ${YELLOW}✗${NC} ${BOLD}Unsupported OS${NC} ${GRAY}${OSTYPE}${NC}\n" >&2
+        printf "  ${BLUE}ⓘ${NC} ${GRAY}Supported: macOS, Linux${NC}\n" >&2
+        exit 1
     fi
 }
 
 detect_os
-echo -e "${CYAN}🖥️  Detected platform: $OS${NC}"
 
-# Platform-specific installation methods
-if [ "$OS" = "macos" ]; then
-    # macOS Method 1: Try Homebrew
-    echo "🔧 Attempting Homebrew installation..."
-    if command_exists brew; then
-        echo -e "${CYAN}📦 Homebrew found, installing Node.js...${NC}"
-        if brew install node; then
-            echo -e "${GREEN}✅ Node.js installed via Homebrew successfully${NC}"
-            # Verify installation
-            if command_exists node; then
-                echo -e "${GREEN}✅ Node.js version: $(node --version)${NC}"
-                echo -e "${GREEN}✅ npm version: $(npm --version)${NC}"
-                echo -e "${GREEN}🎉 Node.js installation completed successfully!${NC}"
-                exit 0
-            fi
-        fi
+# Modern color palette
+if [ -t 1 ]; then
+    if [ "$(tput colors 2>/dev/null)" -ge 256 ] 2>/dev/null; then
+        CYAN='\033[38;5;51m'
+        GREEN='\033[38;5;154m'  
+        YELLOW='\033[38;5;220m'
+        PURPLE='\033[38;5;135m'
+        BLUE='\033[38;5;33m'
+        GRAY='\033[38;5;244m'
+        BOLD='\033[1m'
+        DIM='\033[2m'
+        NC='\033[0m'
     else
-        echo -e "${YELLOW}⚠️  Homebrew not found. Installing Homebrew first...${NC}"
-        echo "🔧 Installing Homebrew (this may take a few minutes)..."
-        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-        
-        # Add Homebrew to PATH for current session
-        if [[ -x "/opt/homebrew/bin/brew" ]]; then
-            # Apple Silicon Mac
-            export PATH="/opt/homebrew/bin:$PATH"
-            eval "$(/opt/homebrew/bin/brew shellenv)"
-        elif [[ -x "/usr/local/bin/brew" ]]; then
-            # Intel Mac
-            export PATH="/usr/local/bin:$PATH"
-            eval "$(/usr/local/bin/brew shellenv)"
-        fi
-        
-        # Try installing Node.js via newly installed Homebrew
-        if command_exists brew && brew install node; then
-            echo -e "${GREEN}✅ Node.js installed via Homebrew successfully${NC}"
-            if command_exists node; then
-                echo -e "${GREEN}✅ Node.js version: $(node --version)${NC}"
-                echo -e "${GREEN}✅ npm version: $(npm --version)${NC}"
-                echo -e "${GREEN}🎉 Node.js installation completed successfully!${NC}"
-                exit 0
-            fi
-        fi
+        CYAN='\033[0;36m'
+        GREEN='\033[0;32m'
+        YELLOW='\033[0;33m' 
+        PURPLE='\033[0;35m'
+        BLUE='\033[0;34m'
+        GRAY='\033[0;90m'
+        BOLD='\033[1m'
+        DIM='\033[2m'
+        NC='\033[0m'
     fi
-    
-    # macOS Method 2: Direct download (if Homebrew fails)
-    echo -e "${YELLOW}📥 Homebrew installation failed, trying direct download...${NC}"
-    echo "🔧 Installing Node.js via official installer..."
-    echo "  1. Visit: https://nodejs.org/en/download/"
-    echo "  2. Download the macOS installer (.pkg)"
-    echo "  3. Run the installer"
-    echo "  4. Restart your terminal"
-    echo "  5. Run: ./start"
-    echo ""
-    read -p "Have you installed Node.js? (y/N): " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]] && command_exists node; then
-        echo -e "${GREEN}✅ Node.js installation confirmed${NC}"
-        exit 0
-    fi
-
-elif [ "$OS" = "windows" ]; then
-    # Windows Method 1: Try Chocolatey
-    echo "🔧 Attempting Chocolatey installation..."
-    if command_exists choco; then
-        echo -e "${CYAN}🍫 Chocolatey found, installing Node.js...${NC}"
-        if choco install nodejs -y; then
-            # Refresh environment to update PATH
-            if command_exists refreshenv; then
-                refreshenv
-            fi
-            # Verify installation
-            if command_exists node && command_exists npm; then
-                echo -e "${GREEN}✅ Node.js installed via Chocolatey successfully${NC}"
-                echo -e "${GREEN}✅ Node.js version: $(node --version)${NC}"
-                echo -e "${GREEN}✅ npm version: $(npm --version)${NC}"
-                echo -e "${GREEN}🎉 Node.js installation completed successfully!${NC}"
-                exit 0
-            fi
-        fi
-    else
-        echo -e "${YELLOW}⚠️  Chocolatey not found. Installing Chocolatey first...${NC}"
-        echo "🔧 Installing Chocolatey (Windows package manager)..."
-        echo "This requires Administrator privileges."
-        echo ""
-        echo "Please run PowerShell as Administrator and execute:"
-        echo 'Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString("https://community.chocolatey.org/install.ps1"))'
-        echo ""
-        read -p "Have you installed Chocolatey? (y/N): " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            # Try installing Node.js via newly installed Chocolatey
-            if command_exists choco && choco install nodejs -y; then
-                if command_exists refreshenv; then
-                    refreshenv
-                fi
-                if command_exists node && command_exists npm; then
-                    echo -e "${GREEN}✅ Node.js installed via Chocolatey successfully${NC}"
-                    echo -e "${GREEN}✅ Node.js version: $(node --version)${NC}"
-                    echo -e "${GREEN}✅ npm version: $(npm --version)${NC}"
-                    echo -e "${GREEN}🎉 Node.js installation completed successfully!${NC}"
-                    exit 0
-                fi
-            fi
-        fi
-    fi
-
-    # Windows Method 2: Try Scoop (alternative package manager)
-    echo -e "${YELLOW}📦 Chocolatey installation failed, trying Scoop...${NC}"
-    if command_exists scoop; then
-        echo -e "${CYAN}🪣 Scoop found, installing Node.js...${NC}"
-        if scoop install nodejs; then
-            # Verify installation
-            if command_exists node && command_exists npm; then
-                echo -e "${GREEN}✅ Node.js installed via Scoop successfully${NC}"
-                echo -e "${GREEN}✅ Node.js version: $(node --version)${NC}"
-                echo -e "${GREEN}✅ npm version: $(npm --version)${NC}"
-                echo -e "${GREEN}🎉 Node.js installation completed successfully!${NC}"
-                exit 0
-            fi
-        fi
-    else
-        echo -e "${YELLOW}⚠️  Scoop not found. You can install Scoop by running:${NC}"
-        echo 'Set-ExecutionPolicy RemoteSigned -Scope CurrentUser; irm get.scoop.sh | iex'
-        echo ""
-        read -p "Try Scoop installation? (y/N): " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            echo "Please install Scoop first, then run this script again."
-        fi
-    fi
-
-    # Windows Method 3: Manual installer download
-    echo -e "${YELLOW}📥 Package managers failed, trying manual download...${NC}"
-    echo "🔧 Installing Node.js via official Windows installer..."
-    echo ""
-    echo "Please follow these steps:"
-    echo "  1. Visit: https://nodejs.org/en/download/"
-    echo "  2. Download the Windows Installer (.msi) - LTS version recommended"
-    echo "  3. Run the installer as Administrator"
-    echo "  4. Follow the installation wizard (accept defaults)"
-    echo "  5. Restart your terminal/command prompt"
-    echo "  6. Run: ./start"
-    echo ""
-    
-    # Try to open the download page automatically
-    if command_exists powershell; then
-        read -p "Open Node.js download page automatically? (y/N): " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            powershell -Command "Start-Process 'https://nodejs.org/en/download/'"
-        fi
-    fi
-    
-    read -p "Have you installed Node.js? (y/N): " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]] && command_exists node; then
-        echo -e "${GREEN}✅ Node.js installation confirmed${NC}"
-        exit 0
-    fi
-
-elif [ "$OS" = "linux" ]; then
-    # Linux Method 1: Try snap without sudo
-    echo "🔧 Attempting snap installation (no sudo)..."
-    if snap install node --classic 2>/dev/null; then
-        echo -e "${GREEN}✅ Node.js installed via snap successfully${NC}"
-        export PATH="/snap/bin:$PATH"
-        
-        # Verify installation
-        if command_exists node; then
-            echo -e "${GREEN}✅ Node.js version: $(node --version)${NC}"
-            echo -e "${GREEN}✅ npm version: $(npm --version)${NC}"
-            
-            # Update shell profile
-            if [ -f "$SHELL_PROFILE" ] && ! grep -q "/snap/bin" "$SHELL_PROFILE"; then
-                echo 'export PATH="/snap/bin:$PATH"' >> "$SHELL_PROFILE"
-                echo -e "${CYAN}📝 Added /snap/bin to $SHELL_PROFILE${NC}"
-            fi
-            
-            echo -e "${GREEN}🎉 Node.js installation completed successfully!${NC}"
-            exit 0
-        fi
-    fi
-    
-    # Linux Method 2: Try snap with sudo
-    echo -e "${YELLOW}⚠️  Standard snap installation failed${NC}"
-    echo "Snap installation requires administrator privileges."
-    read -p "Install Node.js via snap with sudo? (y/N): " -n 1 -r
-    echo
-    
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        echo "🔧 Installing Node.js via snap with sudo..."
-        if sudo snap install node --classic; then
-            echo -e "${GREEN}✅ Node.js installed via snap with sudo${NC}"
-            export PATH="/snap/bin:$PATH"
-            
-            # Verify installation
-            if command_exists node; then
-                echo -e "${GREEN}✅ Node.js version: $(node --version)${NC}"
-                echo -e "${GREEN}✅ npm version: $(npm --version)${NC}"
-                
-                # Update shell profile
-                if [ -f "$SHELL_PROFILE" ] && ! grep -q "/snap/bin" "$SHELL_PROFILE"; then
-                    echo 'export PATH="/snap/bin:$PATH"' >> "$SHELL_PROFILE"
-                    echo -e "${CYAN}📝 Added /snap/bin to $SHELL_PROFILE${NC}"
-                fi
-                
-                echo -e "${GREEN}🎉 Node.js installation completed successfully!${NC}"
-                exit 0
-            fi
-        fi
-    fi
-
-    # Linux Method 3: Try package managers (APT, YUM, DNF)
-    if command_exists apt-get; then
-        # Debian/Ubuntu systems
-        echo -e "${YELLOW}⚠️  Snap installation failed, trying APT package manager...${NC}"
-        echo "Node.js installation via APT requires administrator privileges."
-        read -p "Install Node.js with APT? (y/N): " -n 1 -r
-        echo
-
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            echo "🔧 Installing Node.js via APT..."
-            
-            # Update package index and install Node.js from NodeSource repository
-            echo "📦 Adding NodeSource repository for Node.js 18.x..."
-            curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-            
-            echo "📦 Installing Node.js and npm..."
-            if sudo apt-get install -y nodejs; then
-                # Verify installation
-                if command_exists node && command_exists npm; then
-                    echo -e "${GREEN}✅ Node.js installed via APT successfully${NC}"
-                    echo -e "${GREEN}✅ Node.js version: $(node --version)${NC}"
-                    echo -e "${GREEN}✅ npm version: $(npm --version)${NC}"
-                    echo -e "${GREEN}🎉 Node.js installation completed successfully!${NC}"
-                    exit 0
-                fi
-            else
-                echo -e "${YELLOW}⚠️  APT installation failed, trying alternative methods...${NC}"
-            fi
-        fi
-    elif command_exists yum || command_exists dnf; then
-        # RedHat/Fedora/CentOS systems
-        echo -e "${YELLOW}⚠️  Snap installation failed, trying YUM/DNF package manager...${NC}"
-        echo "Node.js installation via YUM/DNF requires administrator privileges."
-        read -p "Install Node.js with YUM/DNF? (y/N): " -n 1 -r
-        echo
-
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            echo "🔧 Installing Node.js via YUM/DNF..."
-            
-            # Determine package manager
-            PKG_MGR="yum"
-            if command_exists dnf; then
-                PKG_MGR="dnf"
-            fi
-            
-            # Add NodeSource repository and install
-            echo "📦 Adding NodeSource repository for Node.js 18.x..."
-            curl -fsSL https://rpm.nodesource.com/setup_18.x | sudo bash -
-            
-            echo "📦 Installing Node.js and npm..."
-            if sudo $PKG_MGR install -y nodejs; then
-                # Verify installation
-                if command_exists node && command_exists npm; then
-                    echo -e "${GREEN}✅ Node.js installed via $PKG_MGR successfully${NC}"
-                    echo -e "${GREEN}✅ Node.js version: $(node --version)${NC}"
-                    echo -e "${GREEN}✅ npm version: $(npm --version)${NC}"
-                    echo -e "${GREEN}🎉 Node.js installation completed successfully!${NC}"
-                    exit 0
-                fi
-            else
-                echo -e "${YELLOW}⚠️  $PKG_MGR installation failed, trying alternative methods...${NC}"
-            fi
-        fi
-    fi
-    
-fi  # End of Linux-specific methods
-
-# Universal Method: Fallback to nvm (works on all platforms, no sudo needed)
-echo -e "${YELLOW}📦 Falling back to nvm installation (no sudo required)...${NC}"
-
-# Install nvm
-if ! command_exists nvm; then
-    echo "🔧 Installing nvm..."
-    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.4/install.sh | bash
-
-    # Load nvm
-    export NVM_DIR="$HOME/.nvm"
-    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+else
+    CYAN='' GREEN='' YELLOW='' PURPLE='' BLUE='' GRAY='' BOLD='' DIM='' NC=''
 fi
 
-# Install Node.js via nvm
-if command_exists nvm; then
-    echo "🔧 Installing Node.js 18 via nvm..."
-    nvm install 18
-    nvm use 18
-    nvm alias default 18
+echo ""
+printf "${CYAN}${BOLD}📦 Node.js LTS Setup${NC}\n"
+printf "${GRAY}${DIM}──────────────────────────${NC}\n"
 
-    if command_exists node; then
-        echo -e "${GREEN}✅ Node.js version: $(node --version)${NC}"
-        echo -e "${GREEN}✅ npm version: $(npm --version)${NC}"
-        echo -e "${GREEN}🎉 Node.js installation completed via nvm!${NC}"
-        exit 0
+# Function to check if Node.js is installed with correct version
+check_nodejs_installed() {
+    if command -v node &> /dev/null; then
+        local node_version=$(node --version 2>/dev/null | sed 's/v//' | cut -d. -f1 || echo '0')
+        local npm_version=$(npm --version 2>/dev/null | cut -d. -f1 || echo '0')
+        
+        if [ "$node_version" -ge 18 ] && [ "$npm_version" -ge 9 ]; then
+            local node_full=$(node --version 2>/dev/null || echo 'unknown')
+            local npm_full=$(npm --version 2>/dev/null || echo 'unknown')
+            printf "${GREEN}✓${NC} Node.js ${node_full} and npm ${npm_full} already installed\n"
+            return 0
+        else
+            printf "${YELLOW}⚠${NC} Node.js ${node_full:-unknown} found but version requirements not met\n"
+            printf "${GRAY}  Required: Node.js >= 18.0.0, npm >= 9.0.0${NC}\n"
+            return 1
+        fi
+    else
+        printf "${BLUE}◉${NC} Node.js not found - installing LTS version\n"
+        return 1
     fi
-fi
+}
 
-# If all methods failed
-echo -e "${RED}❌ All installation methods failed${NC}"
-echo "Please install Node.js manually:"
-echo "  1. Visit: https://nodejs.org/"
-echo "  2. Or run: curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash - && sudo apt-get install -y nodejs"
-exit 1
+# Function to install Node.js with platform-specific methods
+install_nodejs() {
+    case "${OS}" in
+        "macos")
+            install_nodejs_macos
+            ;;
+        "linux")
+            install_nodejs_linux
+            ;;
+        *)
+            echo "✗ Unsupported operating system: ${OSTYPE}" >&2
+            return 1
+            ;;
+    esac
+}
+
+# macOS Node.js installation
+install_nodejs_macos() {
+    # Check if Homebrew is available
+    if command -v brew &> /dev/null; then
+        # Set environment to avoid prompts
+        export HOMEBREW_NO_AUTO_UPDATE=1
+        export HOMEBREW_NO_ENV_HINTS=1
+        
+        # Install Node.js LTS with minimal output
+        printf "${BLUE}◉${NC} Installing Node.js LTS"
+        
+        # Start installation in background
+        brew install node >/dev/null 2>&1 &
+        install_pid=$!
+        
+        # Show spinner while installing
+        spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+        i=0
+        
+        while kill -0 $install_pid 2>/dev/null; do
+            printf "\r${BLUE}◉${NC} Installing Node.js LTS ${CYAN}${spin:i:1}${NC}"
+            i=$(( (i+1) % ${#spin} ))
+            sleep 0.15
+        done
+        wait $install_pid
+        
+        printf "\r${GREEN}✓${NC} Node.js LTS installed        \n"
+        return 0
+    else
+        # Fallback to official installer
+        printf "${YELLOW}!${NC} Please install from: https://nodejs.org/en/download/prebuilt-installer\n"
+        printf "${CYAN}❯${NC} ${BOLD}Have you installed Node.js?${NC} ${GRAY}[Press Enter when done]${NC}\n"
+        read -r response
+        return 0
+    fi
+}
+
+# Linux Node.js installation
+install_nodejs_linux() {
+    # Try NodeSource repository (recommended for latest LTS)
+    printf "${BLUE}◉${NC} Installing Node.js LTS via NodeSource repository\n"
+    
+    # Download NodeSource setup script
+    printf "${BLUE}◉${NC} ${GRAY}Adding NodeSource repository${NC}"
+    curl -fsSL https://deb.nodesource.com/setup_lts.x > /tmp/nodesource_setup.sh 2>&1 &
+    download_pid=$!
+    
+    # Show spinner while downloading
+    spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+    i=0
+    
+    while kill -0 $download_pid 2>/dev/null; do
+        printf "\r${BLUE}◉${NC} ${GRAY}Adding NodeSource repository${NC} ${CYAN}${spin:i:1}${NC}"
+        i=$(( (i+1) % ${#spin} ))
+        sleep 0.15
+    done
+    wait $download_pid
+    
+    if [ -f "/tmp/nodesource_setup.sh" ]; then
+        # Run the setup script
+        printf "\r${BLUE}◉${NC} ${GRAY}Configuring repository${NC}        \n"
+        if sudo bash /tmp/nodesource_setup.sh >/dev/null 2>&1; then
+            printf "${GREEN}✓${NC} NodeSource repository configured\n"
+            
+            # Install Node.js
+            printf "${BLUE}◉${NC} ${GRAY}Installing Node.js${NC}"
+            sudo apt-get install -y nodejs >/dev/null 2>&1 &
+            install_pid=$!
+            
+            # Show spinner while installing
+            i=0
+            while kill -0 $install_pid 2>/dev/null; do
+                printf "\r${BLUE}◉${NC} ${GRAY}Installing Node.js${NC} ${CYAN}${spin:i:1}${NC}"
+                i=$(( (i+1) % ${#spin} ))
+                sleep 0.15
+            done
+            wait $install_pid
+            
+            printf "\r${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}installed successfully${NC}        \n"
+            cleanup
+            return 0
+        fi
+    fi
+    
+    # Fallback to system package manager
+    printf "\r${YELLOW}!${NC} ${GRAY}Trying system package manager${NC}        \n"
+    if command -v apt-get >/dev/null 2>&1; then
+        printf "${BLUE}◉${NC} Installing via apt-get\n"
+        sudo apt-get update >/dev/null 2>&1
+        sudo apt-get install -y nodejs npm >/dev/null 2>&1
+        return 0
+    elif command -v yum >/dev/null 2>&1; then
+        printf "${BLUE}◉${NC} Installing via yum\n"
+        sudo yum install -y nodejs npm >/dev/null 2>&1
+        return 0
+    elif command -v dnf >/dev/null 2>&1; then
+        printf "${BLUE}◉${NC} Installing via dnf\n"
+        sudo dnf install -y nodejs npm >/dev/null 2>&1
+        return 0
+    else
+        printf "${RED}✗${NC} No supported package manager found\n"
+        printf "${YELLOW}!${NC} ${GRAY}Please install manually from: https://nodejs.org/en/download/package-manager${NC}\n"
+        return 1
+    fi
+}
+
+# Function to verify Node.js installation
+verify_nodejs() {
+    if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
+        local node_version=$(node --version 2>/dev/null || echo "unknown")
+        local npm_version=$(npm --version 2>/dev/null || echo "unknown")
+        local node_major=$(echo "$node_version" | sed 's/v//' | cut -d. -f1 || echo "0")
+        local npm_major=$(echo "$npm_version" | cut -d. -f1 || echo "0")
+        
+        if [ "$node_major" -ge 18 ] && [ "$npm_major" -ge 9 ]; then
+            printf "${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}${node_version}${NC} and ${BOLD}npm${NC} ${GREEN}${npm_version}${NC} ready\n"
+            return 0
+        else
+            printf "${YELLOW}!${NC} Node.js installed but version requirements not met\n"
+            printf "${GRAY}  Found: Node.js ${node_version}, npm ${npm_version}${NC}\n"
+            printf "${GRAY}  Required: Node.js >= 18.0.0, npm >= 9.0.0${NC}\n"
+            return 1
+        fi
+    else
+        printf "${RED}✗${NC} Node.js installation verification failed\n"
+        return 1
+    fi
+}
+
+# Function to update npm if needed
+update_npm() {
+    if command -v npm >/dev/null 2>&1; then
+        local npm_version=$(npm --version 2>/dev/null | cut -d. -f1 || echo "0")
+        if [ "$npm_version" -lt 9 ]; then
+            printf "${BLUE}◉${NC} Updating npm to latest version\n"
+            if npm install -g npm@latest >/dev/null 2>&1; then
+                local npm_new=$(npm --version 2>/dev/null || echo "unknown")
+                printf "${GREEN}✓${NC} npm updated to ${GREEN}${npm_new}${NC}\n"
+                return 0
+            else
+                printf "${RED}✗${NC} npm update failed\n"
+                return 1
+            fi
+        fi
+    fi
+    return 0
+}
+
+# Main execution
+main() {
+    # Skip redundant check if called from install script  
+    if [ "${1:-}" = "--skip-check" ]; then
+        # Skip check message - jump straight to installation
+        true
+    else
+        if check_nodejs_installed; then
+            return 0  # Node.js installed and meets requirements - we're done
+        fi
+    fi
+
+    # Proceed with installation
+    if ! install_nodejs; then
+        printf "${RED}✗${NC} Node.js installation failed\n"
+        exit 1
+    fi
+    
+    # Update npm if needed
+    if ! update_npm; then
+        printf "${YELLOW}!${NC} npm update failed but Node.js is installed\n"
+    fi
+    
+    # Verify final installation
+    if verify_nodejs; then
+        printf "\n${GREEN}✓${NC} Node.js setup complete\n"
+    else
+        printf "\n${YELLOW}!${NC} Node.js installed but may need manual verification\n"
+        exit 1
+    fi
+}
+
+# Execute main function with error handling
+if ! main "$@"; then
+    printf "\n${YELLOW}✗${NC} ${BOLD}Node.js setup${NC} ${YELLOW}failed${NC}\n" >&2
+    exit 1
+fi
