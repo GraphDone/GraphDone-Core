@@ -20,6 +20,7 @@ if [ -t 1 ]; then
         GREEN='\033[38;5;154m'
         YELLOW='\033[38;5;220m'
         PURPLE='\033[38;5;135m'
+        BLUE='\033[38;5;33m'
         GRAY='\033[38;5;244m'
         RED='\033[38;5;196m'
     else
@@ -28,13 +29,15 @@ if [ -t 1 ]; then
         GREEN='\033[38;5;154m'
         YELLOW='\033[0;33m'
         PURPLE='\033[0;35m'
+        BLUE='\033[0;34m'
         GRAY='\033[0;90m'
         RED='\033[0;31m'
     fi
     BOLD='\033[1m'
+    DIM='\033[2m'
     NC='\033[0m'
 else
-    CYAN='' GREEN='' YELLOW='' PURPLE='' GRAY='' RED='' BOLD='' NC=''
+    CYAN='' GREEN='' YELLOW='' PURPLE='' BLUE='' GRAY='' RED='' BOLD='' DIM='' NC=''
 fi
 
 # Clean, minimal functions
@@ -42,6 +45,24 @@ log() { printf "${GRAY}▸${NC} %s\n" "$1"; }
 ok() { printf "${GREEN}✓${NC} %s\n" "$1"; }
 warn() { printf "${YELLOW}!${NC} %s\n" "$1"; }
 error() { printf "${RED}✗${NC} %s\n" "$1" >&2; exit 1; }
+
+
+# Fancy dots spinner function for installation steps
+show_spinner() {
+    pid=$1
+    spin='⠣⠝⠙⠛⠧⠏⠟⠡'
+    i=0
+    
+    while kill -0 $pid 2>/dev/null; do
+        printf " ${YELLOW}${spin:i:1}${NC}"
+        i=$(( (i+1) % ${#spin} ))
+        sleep 0.1
+        printf "\b\b\b"
+    done
+    
+    wait $pid
+    return $?
+}
 
 # Spinner function with progress
 spinner() {
@@ -106,29 +127,273 @@ detect_platform() {
     esac
 }
 
-# Auto-install Node.js if missing
-install_nodejs() {
-    if command -v node >/dev/null 2>&1; then
+
+
+
+# Interactive Node.js check with animated progress
+check_and_prompt_nodejs() {
+    # Add pink color for the circle
+    PINK='\033[38;5;213m'
+    
+    # Pink blinking circle during entire checking process
+    blink_state=0
+    
+    # Continue blinking and adding dots until check is complete
+    for cycle in 1 2 3 4 5 6; do
+        # Toggle blink state
+        if [ $blink_state -eq 0 ]; then
+            circle="${PINK}•${NC}"
+            blink_state=1
+        else
+            circle="${DIM}•${NC}"
+            blink_state=0
+        fi
+        
+        # Build the dots display based on cycle
+        dots_display=""
+        if [ $cycle -ge 3 ]; then
+            dots_display=" ${GRAY}●${NC}"
+        fi
+        if [ $cycle -ge 5 ]; then
+            dots_display="$dots_display ${BLUE}●${NC}"
+        fi
+        if [ $cycle -eq 6 ]; then
+            dots_display="$dots_display ${CYAN}●${NC}"
+            # Perform the check on final cycle - check if Node.js is installed with correct version
+            if command -v node >/dev/null 2>&1; then
+                NODE_VERSION=$(node --version 2>/dev/null | sed 's/v//' | cut -d. -f1 || echo "0")
+                if [ "$NODE_VERSION" -ge 18 ]; then
+                    # Check npm version too
+                    if command -v npm >/dev/null 2>&1; then
+                        NPM_VERSION=$(npm --version 2>/dev/null | cut -d. -f1 || echo "0")
+                        if [ "$NPM_VERSION" -ge 9 ]; then
+                            check_result="current"  # Node.js and npm are current
+                        else
+                            check_result="npm_old"  # Node.js OK but npm outdated
+                        fi
+                    else
+                        check_result="npm_missing"  # Node.js OK but npm missing
+                    fi
+                else
+                    check_result="outdated"  # Node.js outdated
+                fi
+            else
+                check_result="missing"  # Node.js not installed
+            fi
+        fi
+        
+        # Show current state
+        printf "\r$circle ${GRAY}Checking Node.js installation${NC}$dots_display"
+        sleep 0.4
+    done
+    
+    # Smooth transition: show completion state briefly
+    printf " ${GREEN}●${NC}"
+    sleep 0.3
+    
+    if [ "$check_result" = "current" ]; then
+        # Get full version info
+        NODE_VERSION_FULL=$(node --version 2>/dev/null || echo "unknown")
+        NPM_VERSION_FULL=$(npm --version 2>/dev/null || echo "unknown")
+        
+        # Seamless transition - overwrite the checking line directly  
+        printf "\r${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}${NODE_VERSION_FULL}${NC} ${GRAY}and${NC} ${BOLD}npm${NC} ${GREEN}${NPM_VERSION_FULL}${NC} ${GRAY}already installed${NC}"
+        # Add spaces to clear any remaining characters from the previous line
+        printf "                    \n\n"
+        return 0
+    elif [ "$check_result" = "npm_old" ] || [ "$check_result" = "npm_missing" ]; then
+        NODE_VERSION_FULL=$(node --version 2>/dev/null || echo "unknown")
+        printf "\r${YELLOW}⚠${NC} ${BOLD}Node.js${NC} ${GREEN}${NODE_VERSION_FULL}${NC} ${GRAY}OK, but npm needs update${NC}"
+        printf "                    \n\n"
+        
+        printf "${YELLOW}🟡 ${BOLD}npm Update Required${NC}\n"
+        printf "${GRAY}Node.js is current but npm needs to be updated to >= 9.0.0${NC}\n\n"
+        printf "${GREEN}✓${NC} We'll use the dedicated Node.js setup script to update npm\n"
+        printf "${GREEN}✓${NC} Zero manual intervention required\n\n"
+        printf "${CYAN}❯${NC} ${BOLD}Continue with npm update?${NC} ${GRAY}[Press Enter] or Ctrl+C to exit${NC}\n"
+        read -r response
+        
+        # Run the Node.js setup script
+        if sh "scripts/setup_nodejs.sh"; then
+            printf "\n"
+        else
+            printf "${RED}✗${NC} Node.js setup failed\n"
+            exit 1
+        fi
+        return 0
+    elif [ "$check_result" = "outdated" ]; then
+        NODE_VERSION_OLD=$(node --version 2>/dev/null || echo "unknown")
+        printf "\r${YELLOW}⚠${NC} ${BOLD}Node.js${NC} ${YELLOW}${NODE_VERSION_OLD}${NC} ${GRAY}outdated (need >= 18.0.0)${NC}"
+        printf "                    \n\n"
+        
+        printf "${YELLOW}🟡 ${BOLD}Node.js Update Required${NC}\n"
+        printf "${GRAY}GraphDone requires Node.js >= 18.0.0 for optimal performance.${NC}\n\n"
+        printf "${GREEN}✓${NC} We'll use the dedicated Node.js setup script for your platform\n"
+        printf "${GREEN}✓${NC} Automatic installation of latest LTS version\n"
+        printf "${GREEN}✓${NC} Zero manual configuration required\n\n"
+        printf "${CYAN}❯${NC} ${BOLD}Continue with Node.js upgrade?${NC} ${GRAY}[Press Enter] or Ctrl+C to exit${NC}\n"
+        read -r response
+        
+        # Run the Node.js setup script
+        if sh "scripts/setup_nodejs.sh"; then
+            printf "\n"
+        else
+            printf "${RED}✗${NC} Node.js setup failed\n"
+            exit 1
+        fi
         return 0
     fi
     
-    log "Installing Node.js via NVM"
+    printf "\n${YELLOW}🟡 ${BOLD}Node.js Setup Required${NC}\n"
+    printf "${GRAY}GraphDone requires Node.js >= 18.0.0 and npm >= 9.0.0 for development.${NC}\n\n"
+    printf "${GREEN}✓${NC} We'll use the dedicated Node.js setup script for your platform\n"
+    printf "${GREEN}✓${NC} Automatic installation of latest LTS version\n"
+    printf "${GREEN}✓${NC} Includes npm package manager automatically\n"
+    printf "${GREEN}✓${NC} Zero manual configuration required\n\n"
+    printf "${CYAN}❯${NC} ${BOLD}Continue with Node.js installation?${NC} ${GRAY}[Press Enter] or Ctrl+C to exit${NC}\n"
+    read -r response
     
-    # Install NVM
-    if [ ! -d "$HOME/.nvm" ]; then
-        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash >/dev/null 2>&1 || return 1
+    # Run the Node.js setup script (skip redundant check)
+    if sh "scripts/setup_nodejs.sh" --skip-check; then
+        printf "\n"
+    else
+        printf "${RED}✗${NC} Node.js setup failed\n"
+        exit 1
     fi
     
-    # Load NVM
-    export NVM_DIR="$HOME/.nvm"
-    [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-    
-    # Install Node.js 18
-    nvm install 18 >/dev/null 2>&1 && nvm use 18 >/dev/null 2>&1 || return 1
     return 0
 }
 
-# Auto-install Docker if missing
+
+# Interactive Docker check with animated progress like Node.js
+check_and_prompt_docker() {
+    # Add pink color for the circle
+    PINK='\033[38;5;213m'
+    
+    # Pink blinking circle during entire checking process
+    blink_state=0
+    
+    # Continue blinking and adding dots until check is complete
+    for cycle in 1 2 3 4 5 6; do
+        # Toggle blink state
+        if [ $blink_state -eq 0 ]; then
+            circle="${PINK}•${NC}"
+            blink_state=1
+        else
+            circle="${DIM}•${NC}"
+            blink_state=0
+        fi
+        
+        # Build the dots display based on cycle
+        dots_display=""
+        if [ $cycle -ge 3 ]; then
+            dots_display=" ${GRAY}●${NC}"
+        fi
+        if [ $cycle -ge 5 ]; then
+            dots_display="$dots_display ${BLUE}●${NC}"
+        fi
+        if [ $cycle -eq 6 ]; then
+            dots_display="$dots_display ${CYAN}●${NC}"
+            # Perform the check on final cycle - check if Docker is installed AND running
+            if command -v docker >/dev/null 2>&1; then
+                if docker info >/dev/null 2>&1; then
+                    check_result="running"  # Docker is installed and running
+                else
+                    check_result="installed"  # Docker is installed but not running
+                fi
+            else
+                check_result="missing"  # Docker not installed
+            fi
+        fi
+        
+        # Show current state
+        printf "\r$circle ${GRAY}Checking Docker installation${NC}$dots_display"
+        sleep 0.4
+    done
+    
+    # Smooth transition: show completion state briefly
+    printf " ${GREEN}●${NC}"
+    sleep 0.3
+    
+    if [ "$check_result" = "running" ]; then
+        # Get version info
+        DOCKER_VERSION=$(docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "unknown")
+        
+        # Seamless transition - overwrite the checking line directly  
+        printf "\r${GREEN}✓${NC} ${BOLD}Docker${NC} ${GREEN}${DOCKER_VERSION}${NC} ${GRAY}already installed and running${NC}"
+        # Add spaces to clear any remaining characters from the previous line
+        printf "                    \n\n"
+        return 0
+    elif [ "$check_result" = "installed" ]; then
+        # Docker installed but not running - start it
+        DOCKER_VERSION=$(docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "unknown")
+        printf "\r${YELLOW}⚠${NC} ${BOLD}Docker${NC} ${GREEN}${DOCKER_VERSION}${NC} ${GRAY}installed but not running${NC}"
+        printf "                    \n\n"
+        
+        printf "${YELLOW}🟡 ${BOLD}Docker Startup Required${NC}\n"
+        printf "${GRAY}Docker is installed but the daemon is not running.${NC}\n\n"
+        printf "${GREEN}✓${NC} We'll start Docker Desktop automatically\n"
+        printf "${GREEN}✓${NC} Wait for the Linux VM to boot and be ready\n"
+        printf "${GREEN}✓${NC} Zero manual intervention required\n\n"
+        printf "${CYAN}❯${NC} ${BOLD}Continue with Docker startup?${NC} ${GRAY}[Press Enter] or Ctrl+C to exit${NC}\n"
+        read -r response
+        
+        # Run the Docker setup script to start Docker (it handles all output)
+        if sh "scripts/setup_docker.sh"; then
+            # Docker script handles success message
+            printf "\n"
+        else
+            printf "${RED}✗${NC} Docker startup failed\n"
+            exit 1
+        fi
+        return 0
+    fi
+    
+    printf "\n${YELLOW}🟡 ${BOLD}Docker Setup Required${NC}\n"
+    printf "${GRAY}GraphDone uses Docker containers for Neo4j database and Redis cache.${NC}\n\n"
+    printf "${GREEN}✓${NC} We'll use the dedicated Docker setup script for your platform\n"
+    printf "${GREEN}✓${NC} Automatic installation and configuration\n"
+    printf "${GREEN}✓${NC} Proper permissions and service setup\n"
+    printf "${GREEN}✓${NC} Zero manual configuration, automatic setup\n\n"
+    printf "${CYAN}❯${NC} ${BOLD}Continue with Docker installation?${NC} ${GRAY}[Press Enter] or Ctrl+C to exit${NC}\n"
+    read -r response
+    
+    # Run the Docker setup script - it handles everything (skip redundant check)
+    if sh "scripts/setup_docker.sh" --skip-check; then
+        # Docker script handles all success messages
+        printf "\n"
+    else
+        printf "${RED}✗${NC} Docker setup failed\n"
+        exit 1
+    fi
+    
+    return 0
+}
+
+# Install Docker with progress feedback (Linux)
+install_docker_with_progress() {
+    if command -v docker >/dev/null 2>&1; then
+        return 0
+    fi
+    
+    case $PLATFORM in
+        "linux")
+            printf "  ${GRAY}• Downloading Docker installation script...${NC}\n"
+            curl -fsSL https://get.docker.com | sh >/dev/null 2>&1 || return 1
+            printf "  ${GRAY}• Adding user to docker group...${NC}\n"
+            sudo usermod -aG docker "$USER" 2>/dev/null || true
+            printf "  ${GRAY}• Starting Docker service...${NC}\n"
+            sudo systemctl start docker 2>/dev/null || true
+            sudo systemctl enable docker 2>/dev/null || true
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+    return 0
+}
+
+# Auto-install Docker if missing (silent version for progress box)
 install_docker() {
     if command -v docker >/dev/null 2>&1; then
         return 0
@@ -233,10 +498,21 @@ wait_for_services() {
 stop_services() {
     log "Stopping GraphDone services"
     
-    # Stop containers
+    # Beautiful container cleanup like smart-start
+    printf "\n${BOLD}${PURPLE}♻️  CONTAINER CLEANUP${NC}\n"
+    printf "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
+    printf " ${YELLOW}🛑${NC} Stopping running containers...\n"
+
+    # Stop containers with status feedback
     for container in graphdone-neo4j graphdone-redis graphdone-api graphdone-web; do
-        if docker ps -q -f name="$container" >/dev/null 2>&1; then
-            docker stop "$container" >/dev/null 2>&1 || true
+        if docker ps -q -f name="$container" | grep -q .; then
+            if docker stop "$container" &>/dev/null; then
+                printf "   ${GREEN}✓${NC} Stopped $container\n"
+            else
+                printf "   ${RED}✗${NC} Failed to stop $container\n"
+            fi
+        else
+            printf "   ${DIM}✗${NC} ${DIM}Not running $container${NC}\n"
         fi
     done
     
@@ -247,19 +523,36 @@ stop_services() {
         done
     fi
     
-    ok "All services stopped"
+    printf "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
+    printf "${GREEN}✅ Container stop complete!${NC}\n"
 }
 
 # Remove all containers and volumes
 remove_services() {
     log "Removing GraphDone containers and data"
     
-    # Stop first
-    stop_services >/dev/null 2>&1
+    # Stop first (but hide the output since we'll show removal section)
+    printf "\n${BOLD}${PURPLE}♻️  CONTAINER CLEANUP${NC}\n"
+    printf "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
     
-    # Remove containers
+    # Stop containers quietly first
     for container in graphdone-neo4j graphdone-redis graphdone-api graphdone-web; do
-        docker rm "$container" >/dev/null 2>&1 || true
+        docker stop "$container" >/dev/null 2>&1 || true
+    done
+    
+    printf " ${YELLOW}🗑️${NC}  Removing old containers...\n"
+    
+    # Remove containers with status feedback
+    for container in graphdone-neo4j graphdone-redis graphdone-api graphdone-web; do
+        if docker ps -aq -f name="$container" | grep -q .; then
+            if docker rm "$container" &>/dev/null; then
+                printf "   ${GREEN}✓${NC} Removed $container\n"
+            else
+                printf "   ${RED}✗${NC} Failed to remove $container\n"
+            fi
+        else
+            printf "   ${DIM}✓${NC} ${DIM}Already removed $container${NC}\n"
+        fi
     done
     
     # Remove volumes
@@ -268,7 +561,8 @@ remove_services() {
     # Clean build cache
     docker system prune -f >/dev/null 2>&1 || true
     
-    ok "Complete reset finished"
+    printf "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
+    printf "${GREEN}✅ Cleanup complete!${NC}\n"
 }
 
 # Main installation function
@@ -317,104 +611,82 @@ install_graphdone() {
     # Platform detection
     detect_platform
 
-    # Start comprehensive status box (same width as banner)
-    printf "${TEAL}╔══════════════════════════════════════════════════════════════════════════════════════════════════╗${NC}\n"
-    printf "${TEAL}║                                    Installation Progress                                         ║${NC}\n"
-    printf "${TEAL}║  ${TEAL}┌────────────────────────────────────────────────────────────────────────────────────────────┐${TEAL}  ║${NC}\n"
+    # Start installation progress (without outer box wrapper)
+    printf "\n"
 
-    # Auto-install dependencies if needed
+    # Check dependencies and prompt user before installation
     if ! command -v git >/dev/null 2>&1; then
         error "git required but not installed"
     fi
     
-    if ! command -v node >/dev/null 2>&1; then
-        printf "${TEAL}║  ${TEAL}│  ${GRAY}▸${NC} Installing Node.js via NVM                                                 ${TEAL}│  ║${NC}\n"
-        if install_nodejs >/dev/null 2>&1; then
-            printf "${TEAL}║  ${TEAL}│  ${GREEN}✓${NC} Node.js installed successfully                                                ${TEAL}│  ║${NC}\n"
-        else
-            printf "${TEAL}║  ${TEAL}│  ${GRAY}▸${NC} Node.js installation skipped - will use containers                            ${TEAL}│  ║${NC}\n"
-        fi
-    else
-        printf "${TEAL}║  ${TEAL}│  ${GREEN}✓${NC} Node.js already installed                                                               ${TEAL}│  ║${NC}\n"
-    fi
+    # Interactive dependency checks before showing progress box
+    check_and_prompt_nodejs
+    check_and_prompt_docker
     
-    if ! command -v docker >/dev/null 2>&1; then
-        printf "${TEAL}║  ${TEAL}│  ${GRAY}▸${NC} Installing Docker                                                          ${TEAL}│  ║${NC}\n"
-        if install_docker >/dev/null 2>&1; then
-            printf "${TEAL}║  ${TEAL}│  ${GREEN}✓${NC} Docker installed successfully                                                ${TEAL}│  ║${NC}\n"
-        else
-            error "Docker installation failed"
-        fi
-    else
-        printf "${TEAL}║  ${TEAL}│  ${GREEN}✓${NC} Docker already installed                                                                ${TEAL}│  ║${NC}\n"
-    fi
+    # Brief pause for smooth transition
+    sleep 0.5
     
-    # Ensure Docker is running
-    if ! docker ps >/dev/null 2>&1; then
-        case $PLATFORM in
-            "macos")
-                log "Starting Docker Desktop"
-                open -a Docker 2>/dev/null || true
-                ;;
-            "linux")
-                log "Starting Docker service"
-                sudo systemctl start docker 2>/dev/null || true
-                ;;
-        esac
-        
-        # Wait for Docker to start
-        attempts=0
-        while ! docker ps >/dev/null 2>&1 && [ $attempts -lt 10 ]; do
-            sleep 3
-            attempts=$((attempts + 1))
-        done
-        
-        if ! docker ps >/dev/null 2>&1; then
-            error "Docker is not running. Please start Docker and try again"
-        fi
-    fi
-    
-    printf "${TEAL}║  ${TEAL}│  ${GREEN}✓${NC} Dependencies verified                                                                   ${TEAL}│  ║${NC}\n"
+    printf "${GREEN}✓${NC} Dependencies verified\n"
 
-    # Installation directory
+    # Modern installation section with progress
     INSTALL_DIR="${GRAPHDONE_HOME:-$HOME/graphdone}"
-    # Truncate path if too long for display (POSIX-compatible)
-    DISPLAY_DIR="$INSTALL_DIR"
-    # Use expr for POSIX-compatible string length
-    DIR_LENGTH=$(expr length "$DISPLAY_DIR" 2>/dev/null || echo "${#DISPLAY_DIR}")
-    if [ "$DIR_LENGTH" -gt 45 ]; then
-        # Use sed for POSIX-compatible substring
-        DISPLAY_DIR="...$(echo "$INSTALL_DIR" | sed 's/.*\(.\{42\}\)$/\1/')"
-    fi
-    # Format the install directory line with proper padding
-    INSTALL_MSG="Installing to $DISPLAY_DIR"
-    # Calculate padding needed (POSIX-compatible)
-    MSG_LEN=$(printf "%s" "$INSTALL_MSG" | wc -c)
-    # Account for ANSI codes and actual display width (88 chars for content after the ▸ and space)
-    PADDING=""
-    PAD_COUNT=$((88 - MSG_LEN))
-    while [ $PAD_COUNT -gt 0 ]; do
-        PADDING="$PADDING "
-        PAD_COUNT=$((PAD_COUNT - 1))
-    done
-    printf "${TEAL}║  ${TEAL}│  ${GRAY}▸${NC} %s%s${TEAL}│  ║${NC}\n" "$INSTALL_MSG" "$PADDING"
-
-    # Download or update
+    
+    printf "\n${CYAN}${BOLD}📍 Installation Setup${NC}\n"
+    printf "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
+    printf "${BLUE}◉${NC} ${GRAY}Target:${NC} ${BOLD}$INSTALL_DIR${NC}\n"
+    
+    # Download or update with animated progress
     if [ -d "$INSTALL_DIR" ]; then
-        printf "${TEAL}║  ${TEAL}│  ${GRAY}▸${NC} Updating existing installation                                                          ${TEAL}│  ║${NC}\n"
-        cd "$INSTALL_DIR" && git pull --quiet >/dev/null 2>&1
-        printf "${TEAL}║  ${TEAL}│  ${GREEN}✓${NC} Updated existing installation                                                           ${TEAL}│  ║${NC}\n"
+        printf "${BLUE}◉${NC} ${GRAY}Mode:${NC} ${YELLOW}Update existing${NC}\n\n"
+        
+        # Show fetching animation
+        printf "${BLUE}↻${NC} Fetching latest changes"
+        cd "$INSTALL_DIR"
+        
+        # Run git pull in background to show progress
+        git pull --quiet >/dev/null 2>&1 &
+        pull_pid=$!
+        
+        # Animated dots while updating
+        while kill -0 $pull_pid 2>/dev/null; do
+            for dot in "" "." ".." "..."; do
+                printf "\r${BLUE}↻${NC} Fetching latest changes${dot}   "
+                sleep 0.2
+                kill -0 $pull_pid 2>/dev/null || break
+            done
+        done
+        wait $pull_pid
+        
+        printf "\r${GREEN}✓${NC} ${BOLD}Updated${NC} ${GREEN}to latest version${NC}      \n"
     else
-        printf "${TEAL}║  ${TEAL}│  ${GRAY}▸${NC} Downloading GraphDone from GitHub                                             ${TEAL}│  ║${NC}\n"
-        git clone --quiet --branch fix/first-start https://github.com/GraphDone/GraphDone-Core.git "$INSTALL_DIR" >/dev/null 2>&1 || git clone --quiet https://github.com/GraphDone/GraphDone-Core.git "$INSTALL_DIR" >/dev/null 2>&1
-        printf "${TEAL}║  ${TEAL}│  ${GREEN}✓${NC} Downloaded GraphDone from GitHub                                              ${TEAL}│  ║${NC}\n"
+        printf "${BLUE}◉${NC} ${GRAY}Mode:${NC} ${GREEN}Fresh installation${NC}\n\n"
+        
+        # Show download progress
+        printf "${BLUE}📦${NC} Downloading GraphDone"
+        
+        # Clone in background to show progress
+        git clone --quiet --branch fix/first-start https://github.com/GraphDone/GraphDone-Core.git "$INSTALL_DIR" >/dev/null 2>&1 &
+        clone_pid=$!
+        
+        # Animated progress bar
+        while kill -0 $clone_pid 2>/dev/null; do
+            for frame in "⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏"; do
+                printf "\r${BLUE}📦${NC} Downloading GraphDone ${CYAN}${frame}${NC} "
+                sleep 0.1
+                kill -0 $clone_pid 2>/dev/null || break
+            done
+        done
+        wait $clone_pid
+        
+        printf "\r${GREEN}✓${NC} ${BOLD}Downloaded${NC} ${GREEN}GraphDone Core${NC}   \n"
     fi
+    printf "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
 
     cd "$INSTALL_DIR"
 
     # Environment setup
     if [ ! -f ".env" ]; then
-        printf "${TEAL}║  ${TEAL}│  ${GRAY}▸${NC} Configuring environment                                                       ${TEAL}│  ║${NC}\n"
+        printf "${GRAY}▸${NC} Configuring environment\n"
         cat > .env << 'EOF'
 NODE_ENV=production
 NEO4J_URI=bolt://neo4j:7687
@@ -427,70 +699,137 @@ SSL_ENABLED=true
 SSL_KEY_PATH=./deployment/certs/server-key.pem
 SSL_CERT_PATH=./deployment/certs/server-cert.pem
 EOF
-        printf "${TEAL}║  ${TEAL}│  ${GREEN}✓${NC} Environment configured                                                        ${TEAL}│  ║${NC}\n"
+        printf "${GREEN}✓${NC} Environment configured\n"
     fi
 
     # TLS certificates
     if [ ! -f "deployment/certs/server-cert.pem" ]; then
-        printf "${TEAL}║  ${TEAL}│  ${GRAY}▸${NC} Generating TLS certificates                                                 ${TEAL}│  ║${NC}\n"
+        printf "${GRAY}▸${NC} Generating TLS certificates\n"
         mkdir -p deployment/certs || error "Failed to create certificate directory"
         openssl req -x509 -newkey rsa:4096 -nodes -keyout deployment/certs/server-key.pem -out deployment/certs/server-cert.pem -days 365 -subj '/CN=localhost' >/dev/null 2>&1 || error "Failed to generate certificates"
-        printf "${TEAL}║  ${TEAL}│  ${GREEN}✓${NC} TLS certificates generated                                                  ${TEAL}│  ║${NC}\n"
+        printf "${GREEN}✓${NC} TLS certificates generated\n"
     else
-        printf "${TEAL}║  ${TEAL}│  ${GREEN}✓${NC} TLS certificates already exist                                                          ${TEAL}│  ║${NC}\n"
+        printf "${GREEN}✓${NC} TLS certificates already exist\n"
     fi
 
     # Check if services are already running
     if check_containers_healthy; then
-        printf "${TEAL}║  ${TEAL}│  ${GREEN}✓${NC} Services already running                                                                ${TEAL}│  ║${NC}\n"
-        printf "${TEAL}║  ${TEAL}└────────────────────────────────────────────────────────────────────────────────────────────┘${TEAL}  ║${NC}\n"
-        # Don't close the box yet - continue with success info
+        printf "${GREEN}✓${NC} Services already running\n"
         show_success_in_box
         return 0
     fi
 
-    # Container cleanup
-    printf "${TEAL}║  ${TEAL}│  ${GRAY}▸${NC} Preparing containers                                                        ${TEAL}│  ║${NC}\n"
+    # Container preparation with interactive progress
+    printf "\n${CYAN}${BOLD}📦 Container Preparation${NC}\n"
+    printf "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
+    
     # Try both docker-compose and docker compose for compatibility
     if command -v docker-compose >/dev/null 2>&1; then
         DOCKER_COMPOSE="docker-compose"
     else
         DOCKER_COMPOSE="docker compose"
     fi
+    
+    # Clean up existing containers with progress
+    printf "${BLUE}♻${NC} ${GRAY}Cleaning up existing containers${NC}\n"
     $DOCKER_COMPOSE -f deployment/docker-compose.yml down --remove-orphans >/dev/null 2>&1 || true
     $DOCKER_COMPOSE -f deployment/docker-compose.registry.yml down --remove-orphans >/dev/null 2>&1 || true
 
-    # Smart deployment detection
-    printf "${TEAL}║  ${TEAL}│  ${GRAY}▸${NC} Checking for pre-built images                                              ${TEAL}│  ║${NC}\n"
-    if docker pull ghcr.io/graphdone/graphdone-web:fix-first-start >/dev/null 2>&1; then
-        printf "${TEAL}║  ${TEAL}│  ${GREEN}✓${NC} Using pre-built containers                                                  ${TEAL}│  ║${NC}\n"
+    # Smart deployment detection with animated progress
+    printf "${BLUE}🔍${NC} Checking deployment strategy"
+    
+    # Test for pre-built containers in background
+    docker pull ghcr.io/graphdone/graphdone-web:fix-first-start >/dev/null 2>&1 &
+    check_pid=$!
+    
+    # Animated checking
+    dots=""
+    while kill -0 $check_pid 2>/dev/null; do
+        for i in 1 2 3; do
+            printf "\r${BLUE}🔍${NC} Checking deployment strategy${dots}   "
+            dots="${dots}."
+            [ ${#dots} -gt 3 ] && dots=""
+            sleep 0.3
+            kill -0 $check_pid 2>/dev/null || break
+        done
+    done
+    wait $check_pid
+    check_result=$?
+    
+    if [ $check_result -eq 0 ]; then
+        printf "\r${GREEN}✓${NC} ${GRAY}Strategy:${NC} ${BOLD}Pre-built containers${NC} ${GREEN}(fast deployment)${NC}   \n"
         COMPOSE_FILE="deployment/docker-compose.registry.yml"
+        DEPLOYMENT_MODE="registry"
     else
-        printf "${TEAL}║  ${TEAL}│  ${GREEN}✓${NC} Building from source                                                        ${TEAL}│  ║${NC}\n"
+        printf "\r${GREEN}✓${NC} ${GRAY}Strategy:${NC} ${BOLD}Build from source${NC} ${YELLOW}(longer setup)${NC}   \n"
         COMPOSE_FILE="deployment/docker-compose.yml"
+        DEPLOYMENT_MODE="local"
     fi
+    
+    printf "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
 
-    # Start services
-    printf "${TEAL}║  ${TEAL}│  ${GRAY}▸${NC} Starting GraphDone services                                                 ${TEAL}│  ║${NC}\n"
+    # GraphDone service startup with modern progress
+    printf "\n${CYAN}${BOLD}🚀 Starting GraphDone Services${NC}\n"
+    printf "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
+    
+    if [ "$DEPLOYMENT_MODE" = "registry" ]; then
+        printf "${BLUE}◉${NC} ${GRAY}Mode:${NC} ${BOLD}Registry deployment${NC}\n"
+        printf "${BLUE}◉${NC} ${GRAY}Images:${NC} Pre-built containers from ghcr.io/graphdone\n"
+    else
+        printf "${BLUE}◉${NC} ${GRAY}Mode:${NC} ${BOLD}Source build${NC}\n"
+        printf "${BLUE}◉${NC} ${GRAY}Build:${NC} Local container compilation\n"
+    fi
+    
+    printf "\n${BLUE}↻${NC} ${GRAY}Initializing services${NC}"
+    
+    # Start services in background with progress animation
     if [ -f "$COMPOSE_FILE" ]; then
-        $DOCKER_COMPOSE -f "$COMPOSE_FILE" up -d >/dev/null 2>&1 || error "Failed to start services"
+        $DOCKER_COMPOSE -f "$COMPOSE_FILE" up -d >/dev/null 2>&1 &
     else
         # Fallback to default compose file
-        $DOCKER_COMPOSE -f deployment/docker-compose.yml up -d >/dev/null 2>&1 || error "Failed to start services"
+        $DOCKER_COMPOSE -f deployment/docker-compose.yml up -d >/dev/null 2>&1 &
     fi
-    printf "${TEAL}║  ${TEAL}│  ${GREEN}✓${NC} GraphDone services started                                                  ${TEAL}│  ║${NC}\n"
+    
+    startup_pid=$!
+    
+    # Service startup animation with service names
+    services=("neo4j" "redis" "api" "web")
+    spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+    i=0
+    service_index=0
+    
+    while kill -0 $startup_pid 2>/dev/null; do
+        current_service=${services[$((service_index % 4))]}
+        printf "\r${BLUE}↻${NC} ${GRAY}Starting ${BOLD}graphdone-${current_service}${NC} ${CYAN}${spin:i:1}${NC}  "
+        
+        i=$(( (i+1) % ${#spin} ))
+        # Change service name every 8 iterations
+        if [ $((i % 8)) -eq 0 ]; then
+            service_index=$((service_index + 1))
+        fi
+        sleep 0.1
+    done
+    
+    wait $startup_pid
+    startup_result=$?
+    
+    if [ $startup_result -eq 0 ]; then
+        printf "\r${GREEN}✓${NC} ${BOLD}All services started successfully${NC}         \n"
+    else
+        printf "\r${RED}✗${NC} ${BOLD}Service startup failed${NC}         \n"
+        error "Failed to start services"
+    fi
+    
+    printf "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
 
     # Wait for services to be ready (more reliable than smart-start's 8 second sleep)
     if wait_for_services; then
-        printf "${TEAL}║  ${TEAL}│  ${GREEN}✓${NC} Installation complete                                                      ${TEAL}│  ║${NC}\n"
+        printf "${GREEN}✓${NC} Installation complete\n"
     else
-        printf "${TEAL}║  ${TEAL}│  ${YELLOW}!${NC} Services started but initialization taking longer                          ${TEAL}│  ║${NC}\n"
+        printf "${YELLOW}!${NC} Services started but initialization taking longer\n"
     fi
     
-    # Close the Installation Progress inner box
-    printf "${TEAL}║  ${TEAL}└────────────────────────────────────────────────────────────────────────────────────────────┘${TEAL}  ║${NC}\n"
-    
-    # Continue with success info in the same box
+    # Continue with success info
     show_success_in_box
 }
 
