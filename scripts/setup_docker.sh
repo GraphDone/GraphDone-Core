@@ -8,11 +8,36 @@
 # macOS: Docker Desktop, Homebrew
 # Windows: Docker Desktop (WSL)
 
-set -e
+set -euo pipefail
+
+# Cleanup function
+cleanup() {
+    rm -f "/tmp/.docker_just_installed" 2>/dev/null || true
+}
+
+# Set up signal handlers
+trap cleanup EXIT INT TERM
 
 USER=$(whoami)
 DOCKER_SOCK="/var/snap/docker/common/var-lib-docker.sock"
 DOCKER_SOCK_ALT="/var/run/docker.sock"
+
+# Helper function to check if command exists
+command_exists() {
+    command -v "$1" &> /dev/null
+}
+
+# Error handling function
+handle_error() {
+    local exit_code=$?
+    local line_number=$1
+    echo "✗ Error occurred at line ${line_number}, exit code: ${exit_code}" >&2
+    cleanup
+    exit "${exit_code}"
+}
+
+# Set up error handler
+trap 'handle_error ${LINENO}' ERR
 
 # Detect operating system
 detect_os() {
@@ -24,31 +49,60 @@ detect_os() {
         OS="windows"
     else
         OS="unknown"
+        printf "  ${YELLOW}✗${NC} ${BOLD}Unsupported OS${NC} ${GRAY}${OSTYPE}${NC}\n" >&2
+        printf "  ${BLUE}ⓘ${NC} ${GRAY}Supported: macOS, Linux, Windows${NC}\n" >&2
+        exit 1
     fi
 }
 
 detect_os
 
-echo "🐳 GraphDone Docker Setup ($OS)"
-echo "================================="
+# Modern color palette
+if [ -t 1 ]; then
+    if [ "$(tput colors 2>/dev/null)" -ge 256 ] 2>/dev/null; then
+        CYAN='\033[38;5;51m'
+        GREEN='\033[38;5;154m'  
+        YELLOW='\033[38;5;220m'
+        PURPLE='\033[38;5;135m'
+        BLUE='\033[38;5;33m'
+        GRAY='\033[38;5;244m'
+        BOLD='\033[1m'
+        DIM='\033[2m'
+        NC='\033[0m'
+    else
+        CYAN='\033[0;36m'
+        GREEN='\033[0;32m'
+        YELLOW='\033[0;33m' 
+        PURPLE='\033[0;35m'
+        BLUE='\033[0;34m'
+        GRAY='\033[0;90m'
+        BOLD='\033[1m'
+        DIM='\033[2m'
+        NC='\033[0m'
+    fi
+else
+    CYAN='' GREEN='' YELLOW='' PURPLE='' BLUE='' GRAY='' BOLD='' DIM='' NC=''
+fi
+
+echo ""
+printf "${CYAN}${BOLD}🐳 Docker Desktop Setup${NC}\n"
+printf "${GRAY}${DIM}──────────────────────────${NC}\n"
 
 # Function to check if Docker is installed
 check_docker_installed() {
     if command -v docker &> /dev/null; then
-        echo "✅ Docker is already installed: $(docker --version 2>/dev/null || echo 'version unknown')"
+        local version=$(docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo 'unknown')
+        printf "${GREEN}✓${NC} Docker ${version} already installed\n"
         return 0
     else
-        echo "❌ Docker is not installed"
+        printf "${BLUE}◉${NC} Docker not found - installing automatically\n"
         return 1
     fi
 }
 
 # Function to install Docker with platform-specific methods
 install_docker() {
-    echo ""
-    echo "🚀 Installing Docker automatically..."
-
-    case $OS in
+    case "${OS}" in
         "macos")
             install_docker_macos
             ;;
@@ -59,8 +113,7 @@ install_docker() {
             install_docker_windows
             ;;
         *)
-            echo "❌ Unsupported operating system: $OSTYPE"
-            echo "Please install Docker manually from: https://docs.docker.com/get-docker/"
+            echo "✗ Unsupported operating system: ${OSTYPE}" >&2
             return 1
             ;;
     esac
@@ -68,149 +121,164 @@ install_docker() {
 
 # macOS Docker installation
 install_docker_macos() {
-    echo "🍎 Installing Docker Desktop for macOS..."
-    
     # Check if Homebrew is available
     if command -v brew &> /dev/null; then
-        echo "🔧 Method 1: Installing Docker Desktop via Homebrew..."
         # Set environment to avoid prompts and timeouts
         export HOMEBREW_NO_AUTO_UPDATE=1
         export HOMEBREW_NO_ENV_HINTS=1
         
         # Check if Docker.app actually exists, even if Homebrew thinks it's installed
         if [ ! -d "/Applications/Docker.app" ]; then
-            echo "🔧 Homebrew registry issue detected - forcing reinstall..."
-            echo "📥 Docker Desktop will be downloaded (~500MB)"
-            echo "🔑 You will be prompted for your password to install system components"
-            echo "⚠️  You may see a Gatekeeper warning - this is normal for automated installation"
-            echo ""
+            printf "${BLUE}◉${NC} Installing Docker Desktop\n"
             
-            # Run brew command directly (not in background) so it can handle password prompt
-            echo "⏳ Starting installation..."
-            echo "🔐 Please enter your password when prompted:"
-            echo ""
+            # Start installation in background - capture password prompts elegantly
+            (brew reinstall --cask docker-desktop --no-quarantine --force || \
+             brew install --cask docker-desktop --no-quarantine --force) 2>&1 | \
+            while IFS= read -r line; do
+                case "$line" in
+                    *"Password"*|*"password"*)
+                        # Clear any spinner first, then show clean password prompt
+                        printf "\r\033[K\n${YELLOW}◉${NC} ${BOLD}Administrator password required${NC}\n"
+                        printf "%s\n" "$line"
+                        ;;
+                    *"latest version is already installed"*|*"Not upgrading"*|*"outdated dependents"*|*"Warning:"*|*"==>"*)
+                        # Suppress warnings and upgrade messages
+                        ;;
+                    *) 
+                        # Suppress all other verbose output
+                        ;;
+                esac
+            done &
             
-            # Run the actual installation - this will handle password prompt properly
-            if brew reinstall --cask docker-desktop --no-quarantine --force || \
-               brew install --cask docker-desktop --no-quarantine --force; then
-                echo ""
-                echo "✅ Homebrew installation completed! 🎉"
-                echo ""
-                echo "⚠️  Note: The Gatekeeper warning above is normal for automated installation"
-                echo ""
+            # Wait for password entry first, then show progress
+            install_pid=$!
+            password_entered=false
+            
+            # Wait silently until password is entered
+            while kill -0 $install_pid 2>/dev/null && [ "$password_entered" = "false" ]; do
+                if ! ps aux | grep -q "[s]udo.*brew"; then
+                    # Password has been entered, sudo process is gone
+                    password_entered=true
+                    printf "${BLUE}◉${NC} ${GRAY}Preparing installation${NC}${DIM}...${NC}\n"
+                    sleep 0.5  # Brief pause to show preparation message
+                fi
+                sleep 0.2
+            done
+            
+            # Now show download progress with spinner AFTER password
+            if [ "$password_entered" = "true" ]; then
+                spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+                i=0
+                
+                while kill -0 $install_pid 2>/dev/null; do
+                    printf "\r${BLUE}◉${NC} ${GRAY}Downloading Docker Desktop${NC} ${CYAN}${spin:i:1}${NC}"
+                    i=$(( (i+1) % ${#spin} ))
+                    sleep 0.15
+                done
+            fi
+            wait $install_pid
+            
+            printf "\r${GREEN}✓${NC} ${BOLD}Docker Desktop${NC} ${GREEN}installed successfully${NC}\n"
+            
+            if [ -d "/Applications/Docker.app" ]; then
+                # Installation successful - will show message later
+                true
             else
-                echo "⚠️  Homebrew installation encountered issues"
                 # Check if Docker.app was still installed despite the failure
                 if [ ! -d "/Applications/Docker.app" ]; then
-                    echo "❌ Installation failed - falling back to manual method"
                     return 1
                 else
-                    echo "✅ Docker.app found - installation appears successful 📦"
+                    echo "✓ Docker.app found - installation appears successful"
                 fi
             fi
         else
-            echo "📥 Installing Docker Desktop..."
-            brew install --cask docker-desktop --no-quarantine --force
+            brew install --cask docker-desktop --no-quarantine --force 2>&1 | \
+            while IFS= read -r line; do
+                case "$line" in
+                    *"Password"*|*"password"*)
+                        printf "\n$line\n"
+                        ;;
+                    *"latest version is already installed"*|*"Not upgrading"*|*"outdated dependents"*|*"Warning:"*|*"==>"*)
+                        # Suppress warnings and upgrade messages
+                        ;;
+                    *)
+                        # Suppress all other output
+                        ;;
+                esac
+            done
         fi
         
         if [ -d "/Applications/Docker.app" ]; then
-            echo "✅ Docker Desktop installed successfully"
-            echo ""
-            echo "🔄 Starting Docker Desktop for the first time..."
-            open -a Docker
-            echo "🚀 This can take 2-3 minutes on first launch..."
-            echo ""
+            open -a Docker 2>/dev/null || true
+            touch "/tmp/.docker_just_installed"
             
-            # Wait for Docker daemon to be ready with smooth Braille spinner
+            # Smart Docker startup with automatic restart for broken sockets (macOS specific)
             local attempts=0
-            local max_attempts=90  # 3 minutes max
-            local spinner=("⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏")
-            local docker_stages=("Initializing Docker" "Loading components" "Starting engine" "Preparing runtime" "Almost ready")
+            printf "${BLUE}◉${NC} ${GRAY}Starting Docker Desktop${NC}\n"
             
-            while [ $attempts -lt $max_attempts ]; do
-                # Check if docker command is available
-                if command -v docker &> /dev/null && docker info &> /dev/null 2>&1; then
-                    printf "\r✅ Docker Desktop is running! 🐳                                          \n"
-                    echo ""
-                    docker --version
-                    return 0
+            # Wait for Docker to start with enhanced feedback
+            while ! docker ps &> /dev/null && [ $attempts -lt 20 ]; do
+                if [ $attempts -eq 0 ]; then
+                    printf "${BLUE}◉${NC} ${GRAY}Waiting for Docker engine${NC}"
                 fi
-                
-                # Calculate stage and spinner position
-                local spinner_idx=$((attempts % 10))
-                local stage_idx=$((attempts / 18))  # Change stage every 36 seconds
-                if [ $stage_idx -gt 4 ]; then
-                    stage_idx=4
-                fi
-                local elapsed=$((attempts * 2))
-                
-                # Show smooth Braille spinner with stage message
-                printf "\r${spinner[$spinner_idx]} Docker Desktop: ${docker_stages[$stage_idx]}... (${elapsed}s) "
-                
-                sleep 2
+                printf "."
+                sleep 3
                 attempts=$((attempts + 1))
+                
+                # If Docker processes exist but daemon isn't responding, restart
+                if [ $attempts -eq 8 ] && ps aux | grep -q "[D]ocker" && ! docker info &> /dev/null 2>&1; then
+                    printf "\n${YELLOW}!${NC} ${GRAY}Docker processes detected but daemon not responding${NC}\n"
+                    printf "${BLUE}◉${NC} ${GRAY}Restarting Docker Desktop${NC}\n"
+                    pkill -f "Docker" 2>/dev/null || true
+                    sleep 2
+                    open -a Docker 2>/dev/null || true
+                    printf "${BLUE}◉${NC} ${GRAY}Waiting for Docker engine${NC}"
+                fi
             done
             
-            echo "⚠️  Docker Desktop is taking longer than expected to start"
-            echo ""
-            echo "✅ Docker Desktop is installed successfully! 🎉"
-            echo "📋 Next steps:"
-            echo "   1. Look for the Docker whale icon 🐳 in your menu bar"
-            echo "   2. If you don't see it, open Docker from Applications 📱"
-            echo "   3. Wait for Docker to show 'Docker Desktop is running' ✅"
-            echo "   4. Then run: ./start 🚀"
-            echo ""
-            echo "💡 Tip: First startup can take 3-5 minutes depending on your Mac ⏰"
+            if ! docker ps &> /dev/null; then
+                printf "\n${YELLOW}!${NC} ${GRAY}Docker startup taking longer than expected${NC}\n"
+                printf "${YELLOW}!${NC} ${GRAY}Please wait for Docker to fully start, then rerun installer${NC}\n"
+                rm -f "/tmp/.docker_just_installed"
+                return 1
+            else
+                printf "\n${GREEN}✓${NC} ${GRAY}Docker Desktop ready and running${NC}\n"
+                rm -f "/tmp/.docker_just_installed"
+                return 0
+            fi
             return 0
-        else
-            echo "⚠️  Homebrew installation failed, trying manual download..."
         fi
     fi
     
-    # Method 2: Direct download
-    echo "🔧 Method 2: Manual Docker Desktop installation..."
-    echo ""
-    echo "📥 Please install Docker Desktop manually:"
-    echo "  1. Visit: https://docs.docker.com/desktop/install/mac/ 🌐"
-    echo "  2. Download Docker Desktop for Mac ⬇️"
-    echo "  3. Install the .dmg file 💾"
-    echo "  4. Start Docker Desktop from Applications 🚀"
-    echo "  5. Wait for Docker to finish starting ⏳"
-    echo "  6. Run: ./start 🎯"
-    echo ""
+    echo "▶ Manual install: https://docs.docker.com/desktop/install/mac/"
     
     read -p "Have you installed Docker Desktop? (Y/N): " -n 1 -r
     echo
     
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        echo "✅ Docker Desktop installation confirmed"
+        echo "✓ Docker Desktop installation confirmed"
         return 0
     else
-        echo "❌ Please install Docker Desktop and run ./start again"
         return 1
     fi
 }
 
 # Linux Docker installation (existing logic)
 install_docker_linux() {
-    # Method 1: Try snap without sudo first
-    echo "🔧 Method 1: Attempting snap installation (no sudo)..."
+    # Try snap without sudo first
     if snap install docker 2>/dev/null; then
-        echo "✅ Docker installed via snap successfully"
+        echo "✓ Docker installed via snap successfully"
         export PATH="/snap/bin:$PATH"
         return 0
     fi
 
-    # Method 2: Snap with sudo (ask permission)
-    echo "⚠️  Standard snap installation failed"
-    echo "Docker installation requires administrator privileges."
-    read -p "Install Docker with sudo via snap? (Y/N): " -n 1 -r
+    # Snap with sudo
+    read -p "Install with sudo? (Y/N): " -n 1 -r
     echo
 
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        echo "🔧 Method 2: Installing Docker via snap with sudo..."
         if sudo snap install docker; then
-            echo "✅ Docker installed via snap with sudo"
+            echo "✓ Docker installed via snap with sudo"
             export PATH="/snap/bin:$PATH"
             return 0
         fi
@@ -219,52 +287,40 @@ install_docker_linux() {
     # Method 3: Try package manager installation (APT/YUM/DNF)
     if command -v apt-get &> /dev/null; then
         # Debian/Ubuntu systems
-        echo "🔧 Method 3: Trying APT package manager (docker.io)..."
-        echo "This installs the distribution's Docker package."
         read -p "Install Docker via APT? (Y/N): " -n 1 -r
         echo
         
         if [[ $REPLY =~ ^[Yy]$ ]]; then
-            echo "📦 Installing Docker via APT..."
             if sudo apt-get update && sudo apt-get install -y docker.io docker-compose; then
                 # Start Docker service
                 sudo systemctl start docker 2>/dev/null || sudo service docker start
                 sudo systemctl enable docker 2>/dev/null || true
-                echo "✅ Docker installed via APT successfully"
+                echo "✓ Docker installed via APT successfully"
                 return 0
-            else
-                echo "⚠️  APT installation failed, trying official repository..."
             fi
         fi
     elif command -v yum &> /dev/null || command -v dnf &> /dev/null; then
         # RedHat/Fedora/CentOS systems
-        echo "🔧 Method 3: Trying YUM/DNF package manager..."
-        echo "This installs the distribution's Docker package."
         read -p "Install Docker via YUM/DNF? (Y/N): " -n 1 -r
         echo
         
         if [[ $REPLY =~ ^[Yy]$ ]]; then
-            PKG_MGR="yum"
+            local PKG_MGR="yum"
             if command -v dnf &> /dev/null; then
                 PKG_MGR="dnf"
             fi
             
-            echo "📦 Installing Docker via $PKG_MGR..."
             if sudo $PKG_MGR install -y docker docker-compose; then
                 # Start Docker service
                 sudo systemctl start docker
                 sudo systemctl enable docker
-                echo "✅ Docker installed via $PKG_MGR successfully"
+                echo "✓ Docker installed via $PKG_MGR successfully"
                 return 0
-            else
-                echo "⚠️  $PKG_MGR installation failed, trying official repository..."
             fi
         fi
     fi
 
     # Method 4: Official Docker repository (latest version)
-    echo "🔧 Method 4: Installing Docker from official repository (recommended)..."
-    echo "This installs the latest Docker version."
     read -p "Install Docker from official repository? (Y/N): " -n 1 -r
     echo
 
@@ -286,76 +342,41 @@ install_docker_linux() {
 
         # Install Docker
         if sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin; then
-            echo "✅ Docker installed from official repository"
+            echo "✓ Docker installed from official repository"
             return 0
         fi
     fi
 
     # All methods failed
-    echo "❌ All Docker installation methods failed"
-    echo "Please install Docker manually:"
-    echo "  1. Visit: https://docs.docker.com/get-docker/"
-    echo "  2. Or run: curl -fsSL https://get.docker.com -o get-docker.sh && sh get-docker.sh"
+    echo "✗ Installation failed - visit: https://docs.docker.com/get-docker/"
     return 1
 }
 
 # Windows Docker installation
 install_docker_windows() {
-    echo "🪟 Installing Docker Desktop for Windows..."
     
     # Check Windows version compatibility
     if command -v powershell &> /dev/null; then
         local win_version=$(powershell -Command "[System.Environment]::OSVersion.Version.Major" 2>/dev/null)
         if [ "$win_version" = "6" ]; then
             # Windows 6.x = Windows 8/8.1
-            echo ""
-            echo -e "${CYAN}🔧 Windows 8/8.1 Detected - Using Alternative Docker Setup${NC}"
-            echo "Docker Desktop doesn't support Windows 8, but we have alternatives!"
-            echo ""
-            echo "🛠️  Option 1: Docker Toolbox (Recommended for Windows 8)"
-            echo "  • Uses VirtualBox instead of Hyper-V"
-            echo "  • Full Docker functionality in Linux VM"
-            echo "  • GraphDone will work normally"
-            echo ""
-            echo "🛠️  Option 2: Native Windows Development"
-            echo "  • Install Neo4j for Windows directly"
-            echo "  • Skip Docker containers"
-            echo "  • Use Node.js development server"
-            echo ""
-            read -p "Install Docker Toolbox for Windows 8? (Y/N): " -n 1 -r
+            read -p "Install Docker Toolbox? (Y/N): " -n 1 -r
             echo
             if [[ $REPLY =~ ^[Yy]$ ]]; then
-                echo "🔧 Installing Docker Toolbox..."
                 
                 # Try Chocolatey for Docker Toolbox
                 if command_exists choco; then
-                    if choco install docker-toolbox -y; then
-                        echo -e "${GREEN}✅ Docker Toolbox installed via Chocolatey${NC}"
-                        echo ""
-                        echo "🚀 Next steps:"
-                        echo "  1. Start Docker Quickstart Terminal"
-                        echo "  2. Wait for Docker VM to start (2-3 minutes)"
-                        echo "  3. Run: ./start"
+                    if choco install docker-toolbox -y 2>/dev/null; then
+                        echo "✓ Docker Toolbox installed via Chocolatey"
                         return 0
                     fi
                 fi
                 
                 # Manual installation
-                echo "📥 Please install Docker Toolbox manually:"
-                echo "  1. Visit: https://github.com/docker/toolbox/releases"
-                echo "  2. Download: DockerToolbox-X.X.X.exe"
-                echo "  3. Install with default settings"
-                echo "  4. Start Docker Quickstart Terminal"
-                echo "  5. Run: ./start"
+                echo "▶ Install Docker Toolbox: https://github.com/docker/toolbox/releases"
                 return 0
             else
-                echo ""
-                echo "🔧 Setting up for native Windows development..."
-                echo "You'll need to install Neo4j for Windows manually:"
-                echo "  1. Visit: https://neo4j.com/download/"
-                echo "  2. Download Neo4j Desktop or Community Edition"
-                echo "  3. Install and start Neo4j"
-                echo "  4. Run: ./start"
+                echo "▶ Native development: Install Neo4j from https://neo4j.com/download/"
                 return 0
             fi
         fi
@@ -363,102 +384,70 @@ install_docker_windows() {
     
     # Method 1: Try Chocolatey
     if command_exists choco; then
-        echo "🔧 Method 1: Installing Docker Desktop via Chocolatey..."
-        echo "This will download and install Docker Desktop (~500MB)"
         read -p "Install Docker Desktop via Chocolatey? (Y/N): " -n 1 -r
         echo
         
         if [[ $REPLY =~ ^[Yy]$ ]]; then
-            if choco install docker-desktop -y; then
-                echo -e "${GREEN}✅ Docker Desktop installed via Chocolatey${NC}"
-                echo ""
-                echo "🔄 Please start Docker Desktop manually:"
-                echo "  1. Open Docker Desktop from Start Menu"
-                echo "  2. Accept the license agreement"
-                echo "  3. Wait for Docker to start (2-3 minutes)"
-                echo "  4. Enable WSL 2 integration if using WSL"
-                echo ""
+            if choco install docker-desktop -y 2>/dev/null; then
+                echo "✓ Docker Desktop installed via Chocolatey"
                 read -p "Have you started Docker Desktop? (Y/N): " -n 1 -r
                 echo
                 if [[ $REPLY =~ ^[Yy]$ ]]; then
                     # Wait for Docker daemon with timeout
                     local attempts=0
                     local max_attempts=60  # 2 minutes
-                    echo "⏳ Waiting for Docker Desktop to start..."
                     
                     while [ $attempts -lt $max_attempts ]; do
                         if command_exists docker && docker info &> /dev/null; then
-                            echo -e "${GREEN}✅ Docker Desktop is running!${NC}"
-                            docker --version
+                            echo "✓ Docker Desktop is running!"
+                            docker --version 2>/dev/null || echo "Docker version: unknown"
                             return 0
                         fi
                         sleep 2
                         attempts=$((attempts + 1))
-                        if [ $((attempts % 15)) -eq 0 ]; then
-                            echo "⏳ Still waiting for Docker Desktop..."
-                        fi
                     done
                     
-                    echo "⚠️  Docker Desktop is taking longer than expected"
-                    echo "   Please ensure Docker Desktop is running"
+                    echo "! Docker Desktop is taking longer than expected"
                     return 0
                 fi
-            else
-                echo "⚠️  Chocolatey installation failed, trying manual method..."
             fi
         fi
     fi
     
     # Method 2: Try Scoop
     if command_exists scoop; then
-        echo "🔧 Method 2: Installing Docker Desktop via Scoop..."
         read -p "Install Docker Desktop via Scoop? (Y/N): " -n 1 -r
         echo
         
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             # Add extras bucket for Docker Desktop
             scoop bucket add extras 2>/dev/null || true
-            if scoop install docker-desktop; then
-                echo -e "${GREEN}✅ Docker Desktop installed via Scoop${NC}"
-                echo "🔄 Please start Docker Desktop from Start Menu"
+            if scoop install docker-desktop 2>/dev/null; then
+                echo "✓ Docker Desktop installed via Scoop"
                 return 0
-            else
-                echo "⚠️  Scoop installation failed, trying manual method..."
             fi
         fi
     fi
     
     # Method 3: Manual installation
-    echo "🔧 Method 3: Manual Docker Desktop installation..."
-    echo ""
-    echo "📥 Please install Docker Desktop manually:"
-    echo "  1. Visit: https://docs.docker.com/desktop/install/windows/"
-    echo "  2. Download Docker Desktop for Windows"
-    echo "  3. Run the installer as Administrator"
-    echo "  4. Restart your computer if prompted"
-    echo "  5. Start Docker Desktop from Start Menu"
-    echo "  6. Enable WSL 2 integration if using WSL"
-    echo "  7. Run: ./start"
-    echo ""
+    echo "▶ Install Docker Desktop: https://docs.docker.com/desktop/install/windows/"
     
     # Try to open the download page automatically
     if command_exists powershell; then
         read -p "Open Docker Desktop download page? (Y/N): " -n 1 -r
         echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            powershell -Command "Start-Process 'https://docs.docker.com/desktop/install/windows/'"
+        if [[ ${REPLY} =~ ^[Yy]$ ]]; then
+            powershell -Command "Start-Process 'https://docs.docker.com/desktop/install/windows/'" 2>/dev/null || echo "! Failed to open browser"
         fi
     fi
-    echo ""
     
     read -p "Have you installed Docker Desktop? (Y/N): " -n 1 -r
     echo
     
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        echo "✅ Docker Desktop installation confirmed"
+        echo "✓ Docker Desktop installation confirmed"
         return 0
     else
-        echo "❌ Please install Docker Desktop and run ./start again"
         return 1
     fi
 }
@@ -467,60 +456,76 @@ install_docker_windows() {
 check_docker_running() {
     # Try without sudo first (macOS/Docker Desktop doesn't need sudo)
     if docker info &> /dev/null; then
-        echo "✅ Docker daemon is running"
+        printf "${GREEN}✓${NC} ${GRAY}Docker daemon${NC} ${GREEN}running${NC}\n"
         return 0
     # Try with sudo for Linux systems
     elif [ "$OS" = "linux" ] && sudo docker info &> /dev/null; then
-        echo "✅ Docker daemon is running"
+        printf "${GREEN}✓${NC} ${GRAY}Docker daemon${NC} ${GREEN}running${NC}\n"
         return 0
     else
-        echo "❌ Docker daemon is not running"
+        printf "${YELLOW}!${NC} ${GRAY}Docker daemon${NC} ${YELLOW}not running${NC}\n"
         return 1
     fi
 }
 
 # Function to start Docker daemon
 start_docker() {
-    case $OS in
+    case "${OS}" in
         "macos")
-            echo "🔧 Starting Docker Desktop..."
-            open -a Docker
-            echo "⏳ Waiting for Docker Desktop to start..."
-            
-            local attempts=0
-            local max_attempts=60
-            while [ $attempts -lt $max_attempts ]; do
-                if docker info &> /dev/null; then
-                    echo "✅ Docker Desktop started successfully"
-                    return 0
-                fi
+            # Intelligent Docker restart for broken socket issues (common on macOS)
+            if ps aux | grep -q "[D]ocker" && ! docker info &> /dev/null 2>&1; then
+                printf "${YELLOW}!${NC} ${GRAY}Docker processes detected but daemon not responding${NC}\n"
+                printf "${BLUE}◉${NC} ${GRAY}Restarting Docker Desktop to fix broken socket${NC}\n"
+                
+                # Kill all Docker processes to force clean restart
+                pkill -f "Docker" 2>/dev/null || true
                 sleep 2
-                attempts=$((attempts + 1))
-                if [ $((attempts % 15)) -eq 0 ]; then
-                    echo "⏳ Still waiting for Docker Desktop..."
+                
+                printf "${BLUE}◉${NC} ${GRAY}Starting fresh Docker Desktop${NC}\n"
+            else
+                printf "${BLUE}◉${NC} ${GRAY}Starting Docker Desktop${NC}\n"
+            fi
+            
+            open -a Docker 2>/dev/null || true
+            
+            # Wait for Docker to start with enhanced feedback
+            local attempts=0
+            local max_attempts=20  # 60 seconds total
+            
+            while ! docker ps &> /dev/null && [ $attempts -lt $max_attempts ]; do
+                if [ $attempts -eq 0 ]; then
+                    printf "${BLUE}◉${NC} ${GRAY}Waiting for Docker engine${NC}"
                 fi
+                printf "."
+                sleep 3
+                attempts=$((attempts + 1))
             done
             
-            echo "⚠️  Docker Desktop is taking longer than expected to start"
-            echo "   Please wait for Docker Desktop to finish starting"
-            echo "   You can check the Docker Desktop app in your Applications"
-            return 1
+            if ! docker ps &> /dev/null; then
+                printf "\n${YELLOW}!${NC} ${GRAY}Docker startup taking longer than expected${NC}\n"
+                printf "${YELLOW}!${NC} ${GRAY}Please wait for Docker to fully start, then rerun installer${NC}\n"
+                return 1
+            else
+                printf "\n${GREEN}✓${NC} ${GRAY}Docker Desktop ready and running${NC}\n"
+                return 0
+            fi
             ;;
         "linux")
-            echo "🔧 Starting Docker snap service..."
-            sudo snap start docker
-            sleep 3
-
-            if check_docker_running; then
-                echo "✅ Docker daemon started successfully"
+            if sudo snap start docker 2>/dev/null; then
+                sleep 3
+                if check_docker_running; then
+                    echo "✓ Docker daemon started successfully"
+                else
+                    echo "✗ Failed to start Docker daemon" >&2
+                    return 1
+                fi
             else
-                echo "❌ Failed to start Docker daemon"
-                exit 1
+                echo "✗ Failed to start Docker service" >&2
+                return 1
             fi
             ;;
         *)
-            echo "❌ Cannot start Docker automatically on $OS"
-            echo "Please start Docker manually"
+            echo "✗ Cannot start Docker automatically on ${OS}" >&2
             return 1
             ;;
     esac
@@ -528,62 +533,54 @@ start_docker() {
 
 # Function to fix Docker permissions (Linux only)
 fix_docker_permissions() {
-    case $OS in
+    case "${OS}" in
         "macos")
-            echo "✅ Docker Desktop handles permissions automatically on macOS"
             return 0
             ;;
         "linux")
-            echo ""
-            echo "🔧 Setting up Docker permissions for user: $USER"
 
             # Create docker group if it doesn't exist (needed for snap Docker)
             if ! getent group docker >/dev/null; then
-                echo "🔧 Creating docker group..."
                 sudo groupadd docker
             fi
 
             # Add user to docker group
-            echo "📝 Adding $USER to docker group..."
-            sudo usermod -aG docker $USER
+            if ! sudo usermod -aG docker "${USER}" 2>/dev/null; then
+                echo "! Warning: Failed to add user to docker group" >&2
+            fi
 
             # Fix snap docker socket permissions (more permissive for snap)
-            if [ -S "$DOCKER_SOCK" ]; then
-                echo "🔧 Setting permissions on snap docker socket..."
-                sudo chmod 666 "$DOCKER_SOCK"
+            if [ -S "${DOCKER_SOCK}" ]; then
+                sudo chmod 666 "${DOCKER_SOCK}" 2>/dev/null || true
             fi
 
             # Fix standard docker socket permissions with proper group ownership
-            if [ -S "$DOCKER_SOCK_ALT" ]; then
-                echo "🔧 Setting permissions on standard docker socket..."
-                sudo chown root:docker "$DOCKER_SOCK_ALT"
-                sudo chmod 660 "$DOCKER_SOCK_ALT"
+            if [ -S "${DOCKER_SOCK_ALT}" ]; then
+                sudo chown root:docker "${DOCKER_SOCK_ALT}" 2>/dev/null || true
+                sudo chmod 660 "${DOCKER_SOCK_ALT}" 2>/dev/null || true
             fi
 
             # Restart snap docker service to refresh permissions
-            echo "🔄 Restarting snap Docker service..."
-            sudo snap restart docker
+            sudo snap restart docker 2>/dev/null || true
 
             # Wait for socket to be recreated
             sleep 2
 
             # Re-fix socket permissions after restart (critical for snap Docker)
-            if [ -S "$DOCKER_SOCK_ALT" ]; then
-                echo "🔧 Fixing socket ownership after restart..."
-                sudo chown root:docker "$DOCKER_SOCK_ALT"
-                sudo chmod 660 "$DOCKER_SOCK_ALT"
+            if [ -S "${DOCKER_SOCK_ALT}" ]; then
+                sudo chown root:docker "${DOCKER_SOCK_ALT}" 2>/dev/null || true
+                sudo chmod 660 "${DOCKER_SOCK_ALT}" 2>/dev/null || true
             fi
 
             # Also fix snap socket again if it was recreated
-            if [ -S "$DOCKER_SOCK" ]; then
-                echo "🔧 Re-fixing snap socket after restart..."
-                sudo chmod 666 "$DOCKER_SOCK"
+            if [ -S "${DOCKER_SOCK}" ]; then
+                sudo chmod 666 "${DOCKER_SOCK}" 2>/dev/null || true
             fi
 
-            echo "✅ Docker permissions configured"
+            echo "✓ Docker permissions configured"
             ;;
         *)
-            echo "⚠️  Unable to configure Docker permissions on $OS"
+            echo "! Unable to configure Docker permissions on ${OS}" >&2
             return 0
             ;;
     esac
@@ -591,114 +588,84 @@ fix_docker_permissions() {
 
 # Function to test Docker access
 test_docker_access() {
-    echo ""
-    echo "🧪 Testing Docker access..."
 
     if docker ps &> /dev/null; then
-        echo "✅ Docker is working!"
+        echo "✓ Docker is working!"
         return 0
     fi
 
-    case $OS in
+    case "${OS}" in
         "macos")
-            echo "⚠️  Docker Desktop may still be starting up"
-            echo "   Please wait for Docker Desktop to finish starting"
-            echo "   You can check the Docker Desktop app in your Applications"
-            echo "   Then run: ./start"
             return 1
             ;;
         "linux")
-            echo "🔄 Testing group changes..."
             # Check if user is in docker group
             if id -nG "$USER" | grep -qw docker; then
-                echo "✅ User successfully added to docker group"
+                echo "✓ User successfully added to docker group"
 
                 # Try docker test (might work immediately after group add)
                 if docker ps &> /dev/null; then
-                    echo "✅ Docker is working immediately!"
+                    echo "✓ Docker is working immediately!"
                     return 0
                 fi
 
-                echo "⚠️  Docker group membership set but socket access blocked"
-                echo "🔧 Applying direct socket permissions..."
-
                 # Apply direct socket permissions as immediate fix
                 if [ -S "/var/run/docker.sock" ]; then
-                    sudo chmod 666 /var/run/docker.sock
-                    echo "✅ Applied direct socket permissions"
+                    sudo chmod 666 "/var/run/docker.sock" 2>/dev/null
 
                     # Test if this fixed the issue
                     if docker ps &> /dev/null; then
-                        echo "✅ Docker is working with direct permissions!"
+                        echo "✓ Docker is working with direct permissions!"
                         return 0
                     fi
                 fi
 
-                echo "⚠️  Docker permissions still require a new terminal session"
-                echo ""
-                echo "To complete setup:"
-                echo "  1. Close this terminal"
-                echo "  2. Open a new terminal"
-                echo "  3. Run: ./start"
-                echo "  4. Test with: docker ps"
                 return 0  # Success - user was added to group
             else
-                echo "❌ User not found in docker group - attempting to fix..."
+                echo "✗ User not found in docker group - attempting to fix..."
 
                 # Try to fix the issue automatically
-                echo "🔧 Attempting to recreate docker group and add user..."
 
                 # Ensure docker group exists and add user (with error handling)
                 if sudo groupadd docker 2>/dev/null || true; then
-                    echo "✅ Docker group created/verified"
+                    echo "✓ Docker group created/verified"
                 fi
 
-                if sudo usermod -aG docker "$USER"; then
-                    echo "✅ User added to docker group successfully"
+                if sudo usermod -aG docker "${USER}" 2>/dev/null; then
+                    echo "✓ User added to docker group successfully"
 
                     # Verify the fix worked
-                    if id -nG "$USER" | grep -qw docker; then
-                        echo "✅ Group membership verified"
-                        echo "⚠️  Docker permissions require a new terminal session"
+                    if id -nG "${USER}" | grep -qw docker; then
+                        echo "✓ Group membership verified"
+                        echo "! Open new terminal and run: ./install.sh"
                     else
-                        echo "❌ Group add still failed - trying alternative method..."
+                        echo "✗ Group add still failed - trying alternative method..."
 
                         # Alternative method: direct socket permissions
-                        echo "🔧 Using alternative permission method..."
+                        echo "▶ Using alternative permission method..."
                         if [ -S "/var/run/docker.sock" ]; then
-                            sudo chmod 666 /var/run/docker.sock
-                            echo "✅ Applied direct socket permissions"
+                            sudo chmod 666 "/var/run/docker.sock" 2>/dev/null || true
+                            echo "✓ Applied direct socket permissions"
 
                             # Test if this worked
                             if docker ps &> /dev/null; then
-                                echo "✅ Docker is working with direct permissions!"
+                                echo "✓ Docker is working with direct permissions!"
                                 return 0
                             fi
                         fi
 
-                        echo "❌ All automatic fixes failed"
-                        echo "Manual steps required:"
-                        echo "  1. sudo groupadd docker"
-                        echo "  2. sudo usermod -aG docker $USER"
-                        echo "  3. sudo chmod 666 /var/run/docker.sock"
-                        echo "  4. Open new terminal and run: ./start"
+                        echo "✗ Manual fix required - open new terminal and run: ./install.sh"
                         return 1
                     fi
                 else
-                    echo "❌ Failed to add user to docker group"
+                    echo "✗ Failed to add user to docker group"
                     return 1
                 fi
             fi
-            echo ""
-            echo "To complete setup:"
-            echo "  1. Close this terminal"
-            echo "  2. Open a new terminal"
-            echo "  3. Run: ./start"
-            echo "  4. Test with: docker ps"
             return 1
             ;;
         *)
-            echo "❌ Unable to test Docker access on $OS"
+            echo "✗ Unable to test Docker access on ${OS}" >&2
             return 1
             ;;
     esac
@@ -716,30 +683,41 @@ check_sudo_access() {
 
 # Function to request sudo access upfront
 request_sudo() {
-    echo ""
-    echo "🔐 Docker setup requires administrator privileges"
-    echo "Please enter your password to proceed with Docker setup:"
+    echo "◉ Administrator password required for Docker setup:"
 
     # Request sudo access and cache credentials
     if sudo -v; then
-        echo "✅ Administrator access granted"
+        echo "✓ Administrator access granted"
         return 0
     else
-        echo "❌ Administrator access denied"
+        echo "✗ Administrator access denied"
         return 1
     fi
 }
 
 # Main execution
 main() {
-    echo "🔍 Checking Docker installation..."
+    # Skip redundant check if called from install script  
+    if [ "${1:-}" = "--skip-check" ]; then
+        # Skip check message - jump straight to installation
+        true
+    else
+        if check_docker_installed; then
+            # Docker is installed, but check if it's running
+            if check_docker_running; then
+                return 0  # Docker installed AND running - we're done
+            fi
+            # Docker installed but not running - continue to start it
+        fi
+    fi
 
-    if ! check_docker_installed; then
+    # Proceed with installation (check already done if not skipped)
+    if true; then
         # For macOS with Homebrew, we might not need sudo
         if [ "$OS" != "macos" ] || ! command -v brew &> /dev/null; then
             if ! check_sudo_access; then
                 if ! request_sudo; then
-                    echo "❌ Cannot proceed without administrator privileges"
+                    echo "✗ Cannot proceed without administrator privileges"
                     exit 1
                 fi
             fi
@@ -747,65 +725,32 @@ main() {
         install_docker
     fi
 
-    echo ""
-    echo "🔍 Checking Docker daemon..."
-
-    if ! check_docker_running; then
-        # For macOS, we don't need sudo to start Docker Desktop
-        if [ "$OS" != "macos" ]; then
-            if ! check_sudo_access; then
-                if ! request_sudo; then
-                    echo "❌ Cannot start Docker without administrator privileges"
-                    exit 1
-                fi
+    # Start Docker if needed and verify it's ready
+    if command -v docker &>/dev/null; then
+        if ! check_docker_running; then
+            # Skip duplicate startup if we just started it during installation
+            if [ ! -f "/tmp/.docker_just_installed" ]; then
+                start_docker
+            else
+                echo "◉ Docker Desktop starting up..."
             fi
         fi
-        start_docker
+    else
+        echo "✗ Docker not found after installation" >&2
+        return 1
     fi
 
-    echo ""
-    echo "🔍 Checking Docker permissions..."
-
+    # Fix permissions if needed  
     if ! docker ps &> /dev/null 2>&1; then
-        if [ "$OS" = "macos" ]; then
-            echo "⚠️  Docker Desktop may still be starting up or needs manual launch"
-        else
-            echo "❌ Docker requires permission setup"
-            # Need sudo for permission fixes on Linux
-            if ! check_sudo_access; then
-                if ! request_sudo; then
-                    echo "❌ Cannot fix Docker permissions without administrator privileges"
-                    exit 1
-                fi
-            fi
-        fi
-
         fix_docker_permissions
         test_docker_access
-    else
-        echo "✅ Docker permissions are already configured"
     fi
 
-    echo ""
-    echo "🎉 Docker setup complete!"
-    echo ""
-    if docker ps &> /dev/null; then
-        echo "✅ Docker is ready to use!"
-        docker --version
-    else
-        case $OS in
-            "macos")
-                echo "⚠️  Please start Docker Desktop from your Applications folder"
-                echo "   Then run: ./start"
-                ;;
-            "linux")
-                echo "⚠️  Open a new terminal to use Docker without sudo"
-                ;;
-            *)
-                echo "⚠️  Please ensure Docker is running and try again"
-                ;;
-        esac
-    fi
+    printf "\n${GREEN}✓${NC} Docker setup complete\n"
 }
 
-main "$@"
+# Execute main function with error handling
+if ! main "$@"; then
+    printf "\n${YELLOW}✗${NC} ${BOLD}Docker setup${NC} ${YELLOW}failed${NC}\n" >&2
+    exit 1
+fi
