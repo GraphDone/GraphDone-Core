@@ -46,11 +46,59 @@ ok() { printf "${GREEN}✓${NC} %s\n" "$1"; }
 warn() { printf "${YELLOW}!${NC} %s\n" "$1"; }
 error() { printf "${RED}✗${NC} %s\n" "$1" >&2; exit 1; }
 
+# Cache configuration
+CACHE_DIR=".graphdone-cache"
+
+# Check if dependencies are fresh by comparing package.json hashes
+check_deps_fresh() {
+    mkdir -p "$CACHE_DIR"
+    local deps_hash_file="$CACHE_DIR/deps-hash"
+    
+    if [ ! -f "$deps_hash_file" ]; then
+        return 1
+    fi
+    
+    # Generate hash of all package.json files (cross-platform)
+    local current_hash
+    if command -v md5sum >/dev/null 2>&1; then
+        # Linux
+        current_hash=$(find . -name "package.json" -type f -exec md5sum {} \; 2>/dev/null | md5sum | cut -d' ' -f1)
+    elif command -v md5 >/dev/null 2>&1; then
+        # macOS
+        current_hash=$(find . -name "package.json" -type f -exec md5 {} \; 2>/dev/null | md5)
+    else
+        # Fallback - use file modification times
+        current_hash=$(find . -name "package.json" -type f -exec stat -c %Y {} \; 2>/dev/null | sort | md5sum | cut -d' ' -f1 2>/dev/null || echo "fallback")
+    fi
+    local cached_hash=$(cat "$deps_hash_file" 2>/dev/null || echo "")
+    
+    if [ "$current_hash" = "$cached_hash" ]; then
+        return 0
+    fi
+    return 1
+}
+
+# Update dependency hash after successful install
+update_deps_hash() {
+    mkdir -p "$CACHE_DIR"
+    # Cross-platform hash generation
+    if command -v md5sum >/dev/null 2>&1; then
+        # Linux
+        find . -name "package.json" -type f -exec md5sum {} \; 2>/dev/null | md5sum | cut -d' ' -f1 > "$CACHE_DIR/deps-hash"
+    elif command -v md5 >/dev/null 2>&1; then
+        # macOS
+        find . -name "package.json" -type f -exec md5 {} \; 2>/dev/null | md5 > "$CACHE_DIR/deps-hash"
+    else
+        # Fallback
+        echo "fallback" > "$CACHE_DIR/deps-hash"
+    fi
+}
+
 
 # Fancy dots spinner function for installation steps
 show_spinner() {
     pid=$1
-    spin='⠣⠝⠙⠛⠧⠏⠟⠡'
+    spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
     i=0
     
     while kill -0 $pid 2>/dev/null; do
@@ -68,7 +116,7 @@ show_spinner() {
 spinner() {
     pid=$1
     message=$2
-    spin='⣾⣽⣻⢿⡿⣟⣯⣷'
+    spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
     i=0
     
     printf "${GRAY}▸${NC} %s " "$message"
@@ -128,6 +176,153 @@ detect_platform() {
 }
 
 
+
+
+# Interactive Git check with animated progress
+check_and_prompt_git() {
+    # Add pink color for the circle
+    PINK='\033[38;5;213m'
+    
+    # Pink blinking circle during entire checking process
+    blink_state=0
+    
+    # Continue blinking and adding dots until check is complete
+    for cycle in 1 2 3 4 5 6; do
+        # Toggle blink state
+        if [ $blink_state -eq 0 ]; then
+            circle="${PINK}•${NC}"
+            blink_state=1
+        else
+            circle="${DIM}•${NC}"
+            blink_state=0
+        fi
+        
+        # Build the dots display based on cycle
+        dots_display=""
+        if [ $cycle -ge 3 ]; then
+            dots_display=" ${GRAY}●${NC}"
+        fi
+        if [ $cycle -ge 5 ]; then
+            dots_display="$dots_display ${BLUE}●${NC}"
+        fi
+        if [ $cycle -eq 6 ]; then
+            dots_display="$dots_display ${CYAN}●${NC}"
+            # Perform the check on final cycle - check if Git is installed
+            if command -v git >/dev/null 2>&1; then
+                GIT_VERSION=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
+                # Check if it's Apple Git (usually outdated)
+                if echo "$GIT_VERSION" | grep -q "Apple Git"; then
+                    check_result="apple_git"  # Apple's bundled Git - suggest upgrade
+                else
+                    # Check if version is recent (2.45+)
+                    MAJOR=$(echo "$GIT_VERSION" | cut -d. -f1)
+                    MINOR=$(echo "$GIT_VERSION" | cut -d. -f2)
+                    if [ "$MAJOR" -ge 2 ] && [ "$MINOR" -ge 45 ]; then
+                        check_result="current"  # Git is current
+                    else
+                        check_result="outdated"  # Git is outdated
+                    fi
+                fi
+            else
+                check_result="missing"  # Git not installed
+            fi
+        fi
+        
+        # Show current state
+        printf "\r$circle ${GRAY}Checking Git installation${NC}$dots_display"
+        sleep 0.4
+    done
+    
+    # Smooth transition: show completion state briefly
+    printf " ${GREEN}●${NC}"
+    sleep 0.3
+    
+    if [ "$check_result" = "current" ]; then
+        # Get full version info
+        GIT_VERSION_FULL=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
+        
+        # Seamless transition - overwrite the checking line directly  
+        printf "\r${GREEN}✓${NC} ${BOLD}Git${NC} ${GREEN}${GIT_VERSION_FULL}${NC} ${GRAY}already installed${NC}"
+        # Add spaces to clear any remaining characters from the previous line
+        printf "                    \n"
+        return 0
+    elif [ "$check_result" = "apple_git" ]; then
+        GIT_VERSION_OLD=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
+        printf "\r${YELLOW}⚠${NC} ${BOLD}Git${NC} ${YELLOW}${GIT_VERSION_OLD}${NC} ${GRAY}(Apple's bundled version)${NC}"
+        printf "                    \n\n"
+        
+        printf "${YELLOW}🟡 ${BOLD}Git Update Recommended${NC}\n"
+        # Try to fetch latest version from Homebrew
+        LATEST_GIT_VERSION=""
+        if command -v brew >/dev/null 2>&1; then
+            LATEST_GIT_VERSION=$(brew info git 2>/dev/null | head -n 1 | sed 's/.*stable \([0-9.]*\).*/\1/' || echo "")
+        fi
+        if [ -n "$LATEST_GIT_VERSION" ]; then
+            printf "${GRAY}Apple's bundled Git is outdated. Latest version is ${BOLD}${LATEST_GIT_VERSION}${NC}${GRAY}.${NC}\n\n"
+        else
+            printf "${GRAY}Apple's bundled Git is typically outdated. Homebrew provides the latest version.${NC}\n\n"
+        fi
+        printf "${GREEN}✓${NC} Install latest Git via Homebrew\n"
+        printf "${GREEN}✓${NC} Get the newest features and performance improvements\n"
+        printf "${GREEN}✓${NC} Better compatibility with modern repositories\n"
+        printf "${GREEN}✓${NC} Zero manual configuration required\n\n"
+        printf "${CYAN}❯${NC} ${BOLD}Upgrade to latest Git?${NC} ${GRAY}[Press Enter] or 'n' to skip${NC}\n"
+        read -r response
+        
+        if [ "$response" != "n" ] && [ "$response" != "N" ]; then
+            # Run the Git setup script
+            if sh "scripts/setup_git.sh"; then
+                printf "\n"
+            else
+                printf "${RED}✗${NC} Git setup failed\n"
+                printf "${CYAN}ℹ${NC} Continuing with Apple Git...\n"
+            fi
+        else
+            printf "${CYAN}ℹ${NC} Continuing with Apple Git ${GIT_VERSION_OLD}\n"
+        fi
+        return 0
+    elif [ "$check_result" = "outdated" ]; then
+        GIT_VERSION_OLD=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
+        printf "\r${YELLOW}⚠${NC} ${BOLD}Git${NC} ${YELLOW}${GIT_VERSION_OLD}${NC} ${GRAY}outdated (need >= 2.30)${NC}"
+        printf "                    \n\n"
+        
+        printf "${YELLOW}🟡 ${BOLD}Git Update Required${NC}\n"
+        printf "${GRAY}GraphDone requires Git >= 2.30 for modern features.${NC}\n\n"
+        printf "${GREEN}✓${NC} We'll use the dedicated Git setup script for your platform\n"
+        printf "${GREEN}✓${NC} Automatic upgrade to latest version\n"
+        printf "${GREEN}✓${NC} Zero manual configuration required\n\n"
+        printf "${CYAN}❯${NC} ${BOLD}Continue with Git upgrade?${NC} ${GRAY}[Press Enter] or Ctrl+C to exit${NC}\n"
+        read -r response
+        
+        # Run the Git setup script
+        if sh "scripts/setup_git.sh"; then
+            printf "\n"
+        else
+            printf "${RED}✗${NC} Git setup failed\n"
+            exit 1
+        fi
+        return 0
+    fi
+    
+    printf "\n${YELLOW}🟡 ${BOLD}Git Setup Required${NC}\n"
+    printf "${GRAY}GraphDone requires Git for version control and cloning repositories.${NC}\n\n"
+    printf "${GREEN}✓${NC} We'll use the dedicated Git setup script for your platform\n"
+    printf "${GREEN}✓${NC} Automatic installation via package manager\n"
+    printf "${GREEN}✓${NC} Includes latest stable version\n"
+    printf "${GREEN}✓${NC} Zero manual configuration required\n\n"
+    printf "${CYAN}❯${NC} ${BOLD}Continue with Git installation?${NC} ${GRAY}[Press Enter] or Ctrl+C to exit${NC}\n"
+    read -r response
+    
+    # Run the Git setup script (skip redundant check)
+    if sh "scripts/setup_git.sh" --skip-check; then
+        printf "\n"
+    else
+        printf "${RED}✗${NC} Git setup failed\n"
+        exit 1
+    fi
+    
+    return 0
+}
 
 
 # Interactive Node.js check with animated progress
@@ -199,7 +394,7 @@ check_and_prompt_nodejs() {
         # Seamless transition - overwrite the checking line directly  
         printf "\r${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}${NODE_VERSION_FULL}${NC} ${GRAY}and${NC} ${BOLD}npm${NC} ${GREEN}${NPM_VERSION_FULL}${NC} ${GRAY}already installed${NC}"
         # Add spaces to clear any remaining characters from the previous line
-        printf "                    \n\n"
+        printf "                    \n"
         return 0
     elif [ "$check_result" = "npm_old" ] || [ "$check_result" = "npm_missing" ]; then
         NODE_VERSION_FULL=$(node --version 2>/dev/null || echo "unknown")
@@ -322,7 +517,7 @@ check_and_prompt_docker() {
         # Seamless transition - overwrite the checking line directly  
         printf "\r${GREEN}✓${NC} ${BOLD}Docker${NC} ${GREEN}${DOCKER_VERSION}${NC} ${GRAY}already installed and running${NC}"
         # Add spaces to clear any remaining characters from the previous line
-        printf "                    \n\n"
+        printf "                    \n"
         return 0
     elif [ "$check_result" = "installed" ]; then
         # Docker installed but not running - start it
@@ -391,6 +586,73 @@ install_docker_with_progress() {
             ;;
     esac
     return 0
+}
+
+# Smart npm install function with caching and multiple fallback strategies
+smart_npm_install() {
+    local attempt=1
+    local max_attempts=3
+
+    while [ $attempt -le $max_attempts ]; do
+        if [ $attempt -eq 1 ]; then
+            # First attempt: standard npm install (show some output for debugging)
+            if npm install >/dev/null 2>/tmp/npm-error.log; then
+                return 0
+            fi
+            # Log first attempt failure
+            echo "First attempt failed, trying with --legacy-peer-deps..." >> /tmp/npm-debug.log
+        elif [ $attempt -eq 2 ]; then
+            # Second attempt: handle peer dependency conflicts
+            echo "Resolving dependency conflicts..." >> /tmp/npm-debug.log
+            if npm install --legacy-peer-deps >/dev/null 2>>/tmp/npm-error.log; then
+                return 0
+            fi
+            echo "Second attempt failed, trying platform-specific approach..." >> /tmp/npm-debug.log
+        else
+            # Third attempt: handle rollup module issue specifically
+            echo "Installing platform-specific rollup..." >> /tmp/npm-debug.log
+            
+            # Install platform-specific rollup binary
+            local rollup_package=""
+            case "$(uname)" in
+                "Darwin")
+                    # Detect macOS architecture
+                    if [ "$(uname -m)" = "arm64" ]; then
+                        rollup_package="@rollup/rollup-darwin-arm64"
+                    else
+                        rollup_package="@rollup/rollup-darwin-x64"
+                    fi
+                    ;;
+                "Linux")
+                    rollup_package="@rollup/rollup-linux-x64-gnu"
+                    ;;
+                *)
+                    echo "Skipping platform-specific rollup for $(uname)" >> /tmp/npm-debug.log
+                    ;;
+            esac
+            
+            if [ -n "$rollup_package" ]; then
+                if npm install "$rollup_package" --save-dev >/dev/null 2>>/tmp/npm-error.log && npm install --legacy-peer-deps >/dev/null 2>>/tmp/npm-error.log; then
+                    return 0
+                fi
+            else
+                # Try without platform-specific rollup
+                if npm install --legacy-peer-deps >/dev/null 2>>/tmp/npm-error.log; then
+                    return 0
+                fi
+            fi
+        fi
+
+        attempt=$((attempt + 1))
+    done
+
+    # Show error details if all attempts failed
+    echo "All npm install attempts failed. Error details:" >> /tmp/npm-debug.log
+    if [ -f "/tmp/npm-error.log" ]; then
+        cat /tmp/npm-error.log >> /tmp/npm-debug.log
+    fi
+    
+    return 1
 }
 
 # Auto-install Docker if missing (silent version for progress box)
@@ -469,7 +731,7 @@ check_containers_healthy() {
 
 # Wait for services to be ready
 wait_for_services() {
-    spin='⣾⣽⣻⢿⡿⣟⣯⣷'
+    spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
     i=0
     attempts=0
     
@@ -558,6 +820,12 @@ remove_services() {
     # Remove volumes
     docker volume rm graphdone_neo4j_data graphdone_neo4j_logs graphdone_redis_data >/dev/null 2>&1 || true
     
+    # Clean dependency cache
+    if [ -d "$CACHE_DIR" ]; then
+        rm -rf "$CACHE_DIR"
+        printf "   ${GREEN}✓${NC} Dependency cache cleared\n"
+    fi
+    
     # Clean build cache
     docker system prune -f >/dev/null 2>&1 || true
     
@@ -611,22 +879,82 @@ install_graphdone() {
     # Platform detection
     detect_platform
 
-    # Start installation progress (without outer box wrapper)
-    printf "\n"
+    # Installation check section
+    printf "\n${CYAN}${BOLD}🔍 Installation Check${NC}\n"
+    printf "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
+    # Platform display with system name in brackets
+    local platform_name
+    case "$(uname)" in
+        "Darwin")
+            platform_name="(macOS)"
+            ;;
+        "Linux")
+            platform_name="(Linux)"
+            ;;
+        MINGW*|MSYS*|CYGWIN*)
+            platform_name="(Windows)"
+            ;;
+        *)
+            platform_name=""
+            ;;
+    esac
+    
+    printf "${BLUE}◉${NC} ${GRAY}Platform:${NC} ${BOLD}$(uname) $(uname -m)${NC} ${GRAY}${platform_name}${NC}\n"
+    printf "${BLUE}◉${NC} ${GRAY}Shell:${NC} ${BOLD}${SHELL}${NC}\n\n"
 
-    # Check dependencies and prompt user before installation
-    if ! command -v git >/dev/null 2>&1; then
-        error "git required but not installed"
-    fi
+    printf "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n\n"
     
     # Interactive dependency checks before showing progress box
+    check_and_prompt_git
     check_and_prompt_nodejs
+    
+    # Check npm packages right after Node.js (only if we're in an existing installation)
+    if [ -d "$HOME/graphdone" ] && [ -f "$HOME/graphdone/package.json" ]; then
+        cd "$HOME/graphdone"
+        if [ ! -d "node_modules" ] || ! check_deps_fresh; then
+            printf "${GRAY}▸${NC} Installing project dependencies"
+            
+            # Run npm install silently in background
+            smart_npm_install &
+            npm_pid=$!
+            
+            # Show spinner while npm install runs
+            spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+            i=0
+            timeout_count=0
+            max_timeout=3000  # 10 minutes
+            
+            while kill -0 $npm_pid 2>/dev/null && [ $timeout_count -lt $max_timeout ]; do
+                seconds=$((timeout_count / 5))
+                printf "\r${GRAY}▸${NC} Installing project dependencies ${CYAN}${spin:i:1}${NC}"
+                i=$(( (i+1) % ${#spin} ))
+                timeout_count=$((timeout_count + 1))
+                sleep 0.2
+            done
+            
+            wait $npm_pid
+            npm_exit_code=$?
+            
+            if [ $npm_exit_code -eq 0 ]; then
+                update_deps_hash
+                printf "\r${GREEN}✓${NC} Project dependencies installed                    \n"
+            else
+                printf "\r${RED}✗${NC} Failed to install project dependencies\n"
+                # Continue anyway - will try again later
+            fi
+        else
+            printf "${GREEN}✓${NC} Project dependencies up to date (cached)\n"
+        fi
+        cd - >/dev/null 2>&1
+    fi
+    
     check_and_prompt_docker
     
     # Brief pause for smooth transition
     sleep 0.5
     
-    printf "${GREEN}✓${NC} Dependencies verified\n"
+    printf "\n${GREEN}✓${NC} All dependencies verified\n"
+    printf "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
 
     # Modern installation section with progress
     INSTALL_DIR="${GRAPHDONE_HOME:-$HOME/graphdone}"
@@ -712,9 +1040,49 @@ EOF
         printf "${GREEN}✓${NC} TLS certificates already exist\n"
     fi
 
+    # Smart dependency management with MD5 hash-based caching
+    # Only installs if node_modules is missing or package.json has changed
+    # For updates, this was already done during Node.js check
+    # For fresh installs, this happens now after downloading the code
+    if [ ! -d "node_modules" ] || ! check_deps_fresh; then
+        printf "${GRAY}▸${NC} Installing project dependencies"
+        
+        # Run npm install silently in background
+        smart_npm_install &
+        npm_pid=$!
+        
+        # Show spinner while npm install runs
+        spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+        i=0
+        timeout_count=0
+        max_timeout=3000  # 10 minutes
+        
+        while kill -0 $npm_pid 2>/dev/null && [ $timeout_count -lt $max_timeout ]; do
+            seconds=$((timeout_count / 5))
+            printf "\r${GRAY}▸${NC} Installing project dependencies ${CYAN}${spin:i:1}${NC}"
+            i=$(( (i+1) % ${#spin} ))
+            timeout_count=$((timeout_count + 1))
+            sleep 0.2
+        done
+        
+        wait $npm_pid
+        npm_exit_code=$?
+        
+        printf "\r\033[K"  # Clear entire line
+        
+        if [ $npm_exit_code -eq 0 ]; then
+            update_deps_hash
+            printf "${GREEN}✓${NC} Project dependencies installed\n"
+        else
+            printf "${RED}✗${NC} Failed to install project dependencies\n"
+            error "Dependency installation failed"
+        fi
+    fi
+    # If dependencies are cached and up-to-date, nothing is shown (silent)
+
     # Check if services are already running
     if check_containers_healthy; then
-        printf "${GREEN}✓${NC} Services already running\n"
+        printf "${GREEN}✓${NC} Services already running\n\n"
         show_success_in_box
         return 0
     fi
@@ -853,7 +1221,8 @@ show_success_in_box() {
     BOLD="\033[1m"          # Bold text
     INSTALL_DIR="${GRAPHDONE_HOME:-$HOME/graphdone}"
     
-    # Success section in same box with inner box
+    # Open the big success box
+    printf "${TEAL}╔══════════════════════════════════════════════════════════════════════════════════════════════════╗${NC}\n"
     printf "${TEAL}║                                                                                                  ║${NC}\n"
     printf "${TEAL}║  ${TEAL}┌────────────────────────────────────────────────────────────────────────────────────────────┐${TEAL}  ║${NC}\n"
     printf "${TEAL}║  ${TEAL}│${GREEN}${BOLD}                                      ✓ GraphDone Ready${NC}                                     ${TEAL}│  ║${NC}\n"

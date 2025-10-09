@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # GraphDone Node.js Auto-Installation Script
-# Installs Node.js LTS using platform-specific methods
+# Installs Node.js using platform-specific methods
 #
 # Installation methods by platform:
 # Linux: NodeSource repository, system package managers
@@ -80,7 +80,7 @@ else
 fi
 
 echo ""
-printf "${CYAN}${BOLD}📦 Node.js LTS Setup${NC}\n"
+printf "${CYAN}${BOLD}📦 Node.js Setup${NC}\n"
 printf "${GRAY}${DIM}──────────────────────────${NC}\n"
 
 # Function to check if Node.js is installed with correct version
@@ -100,7 +100,7 @@ check_nodejs_installed() {
             return 1
         fi
     else
-        printf "${BLUE}◉${NC} Node.js not found - installing LTS version\n"
+        printf "${BLUE}◉${NC} Node.js not found - installing latest version\n"
         return 1
     fi
 }
@@ -129,8 +129,8 @@ install_nodejs_macos() {
         export HOMEBREW_NO_AUTO_UPDATE=1
         export HOMEBREW_NO_ENV_HINTS=1
         
-        # Install Node.js LTS with minimal output
-        printf "${BLUE}◉${NC} Installing Node.js LTS"
+        # Install Node.js latest with minimal output
+        printf "${BLUE}◉${NC} Installing Node.js (latest)"
         
         # Start installation in background
         brew install node >/dev/null 2>&1 &
@@ -141,13 +141,13 @@ install_nodejs_macos() {
         i=0
         
         while kill -0 $install_pid 2>/dev/null; do
-            printf "\r${BLUE}◉${NC} Installing Node.js LTS ${CYAN}${spin:i:1}${NC}"
+            printf "\r${BLUE}◉${NC} Installing Node.js (latest) ${CYAN}${spin:i:1}${NC}"
             i=$(( (i+1) % ${#spin} ))
             sleep 0.15
         done
         wait $install_pid
         
-        printf "\r${GREEN}✓${NC} Node.js LTS installed        \n"
+        printf "\r${GREEN}✓${NC} Node.js installed                    \n"
         return 0
     else
         # Fallback to official installer
@@ -160,12 +160,12 @@ install_nodejs_macos() {
 
 # Linux Node.js installation
 install_nodejs_linux() {
-    # Try NodeSource repository (recommended for latest LTS)
-    printf "${BLUE}◉${NC} Installing Node.js LTS via NodeSource repository\n"
+    # Try NodeSource repository (recommended for latest version)
+    printf "${BLUE}◉${NC} Installing Node.js via NodeSource repository\n"
     
     # Download NodeSource setup script
     printf "${BLUE}◉${NC} ${GRAY}Adding NodeSource repository${NC}"
-    curl -fsSL https://deb.nodesource.com/setup_lts.x > /tmp/nodesource_setup.sh 2>&1 &
+    curl -fsSL https://deb.nodesource.com/setup_current.x > /tmp/nodesource_setup.sh 2>&1 &
     download_pid=$!
     
     # Show spinner while downloading
