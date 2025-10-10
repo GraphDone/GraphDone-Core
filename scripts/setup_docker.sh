@@ -165,16 +165,53 @@ install_docker_macos() {
                 sleep 0.2
             done
             
-            # Now show download progress with spinner AFTER password
+            # Now show download progress with percentage bar AFTER password
             if [ "$password_entered" = "true" ]; then
-                spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
-                i=0
+                # Simulate progress since brew doesn't provide real percentages
+                percent=0
+                width=40
+                start_time=$(date +%s)
                 
                 while kill -0 $install_pid 2>/dev/null; do
-                    printf "\r${BLUE}◉${NC} ${GRAY}Downloading Docker Desktop${NC} ${CYAN}${spin:i:1}${NC}"
-                    i=$(( (i+1) % ${#spin} ))
-                    sleep 0.15
+                    # Calculate progress (estimate ~2-3 minutes for download)
+                    current_time=$(date +%s)
+                    elapsed=$((current_time - start_time))
+                    
+                    # Increase percent based on time (roughly 180 seconds total)
+                    if [ $elapsed -lt 180 ]; then
+                        percent=$((elapsed * 100 / 180))
+                    else
+                        # Slow down near the end
+                        percent=$((95 + (elapsed - 180) / 20))
+                        if [ $percent -gt 99 ]; then
+                            percent=99
+                        fi
+                    fi
+                    
+                    # Calculate filled and empty portions
+                    filled=$((percent * width / 100))
+                    empty=$((width - filled))
+                    
+                    # Draw progress bar
+                    printf "\r${BLUE}◉${NC} Downloading Docker Desktop ["
+                    
+                    # Draw filled portion
+                    if [ $filled -gt 0 ]; then
+                        printf "${GREEN}%*s${NC}" $filled | tr ' ' '█'
+                    fi
+                    
+                    # Draw empty portion  
+                    if [ $empty -gt 0 ]; then
+                        printf "${GRAY}%*s${NC}" $empty | tr ' ' '░'
+                    fi
+                    
+                    printf "] ${CYAN}%3d%%${NC}" $percent
+                    
+                    sleep 0.5
                 done
+                
+                # Complete the progress bar
+                printf "\r${BLUE}◉${NC} Downloading Docker Desktop [${GREEN}%*s${NC}] ${CYAN}100%%${NC}\n" 40 | tr ' ' '█'
             fi
             wait $install_pid
             
