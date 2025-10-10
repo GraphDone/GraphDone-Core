@@ -228,8 +228,10 @@ check_and_prompt_git() {
             fi
         fi
         
-        # Show current state
-        printf "\r$circle ${GRAY}Checking Git installation${NC}$dots_display"
+        # Show current state - animation only, no box borders
+        printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  $circle ${GRAY}Checking Git installation${NC}$dots_display"
+        # Clear to end of line to avoid artifacts
+        printf "\033[K"
         sleep 0.4
     done
     
@@ -241,10 +243,11 @@ check_and_prompt_git() {
         # Get full version info
         GIT_VERSION_FULL=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
         
-        # Seamless transition - overwrite the checking line directly  
-        printf "\r${GREEN}✓${NC} ${BOLD}Git${NC} ${GREEN}${GIT_VERSION_FULL}${NC} ${GRAY}already installed${NC}"
-        # Add spaces to clear any remaining characters from the previous line
-        printf "                    \n"
+        # Format the line to match last box alignment
+        local git_display="${GREEN}✓${NC} ${BOLD}Git${NC} ${GREEN}${GIT_VERSION_FULL}${NC} ${GRAY}already installed${NC}"
+        local git_plain="✓ Git ${GIT_VERSION_FULL} already installed"
+        local padding=$((90 - ${#git_plain}))
+        printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${git_display}%*s${TEAL}│${NC}  ${TEAL}║${NC}\n" $padding ""
         return 0
     elif [ "$check_result" = "apple_git" ]; then
         GIT_VERSION_OLD=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
@@ -377,8 +380,10 @@ check_and_prompt_nodejs() {
             fi
         fi
         
-        # Show current state
-        printf "\r$circle ${GRAY}Checking Node.js installation${NC}$dots_display"
+        # Show current state - animation only, no box borders
+        printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  $circle ${GRAY}Checking Node.js installation${NC}$dots_display"
+        # Clear to end of line to avoid artifacts
+        printf "\033[K"
         sleep 0.4
     done
     
@@ -391,10 +396,11 @@ check_and_prompt_nodejs() {
         NODE_VERSION_FULL=$(node --version 2>/dev/null || echo "unknown")
         NPM_VERSION_FULL=$(npm --version 2>/dev/null || echo "unknown")
         
-        # Seamless transition - overwrite the checking line directly  
-        printf "\r${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}${NODE_VERSION_FULL}${NC} ${GRAY}and${NC} ${BOLD}npm${NC} ${GREEN}${NPM_VERSION_FULL}${NC} ${GRAY}already installed${NC}"
-        # Add spaces to clear any remaining characters from the previous line
-        printf "                    \n"
+        # Format the line to match last box alignment
+        local node_display="${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}${NODE_VERSION_FULL}${NC} ${GRAY}and${NC} ${BOLD}npm${NC} ${GREEN}${NPM_VERSION_FULL}${NC} ${GRAY}already installed${NC}"
+        local node_plain="✓ Node.js ${NODE_VERSION_FULL} and npm ${NPM_VERSION_FULL} already installed"
+        local padding=$((90 - ${#node_plain}))
+        printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${node_display}%*s${TEAL}│${NC}  ${TEAL}║${NC}\n" $padding ""
         return 0
     elif [ "$check_result" = "npm_old" ] || [ "$check_result" = "npm_missing" ]; then
         NODE_VERSION_FULL=$(node --version 2>/dev/null || echo "unknown")
@@ -501,8 +507,10 @@ check_and_prompt_docker() {
             fi
         fi
         
-        # Show current state
-        printf "\r$circle ${GRAY}Checking Docker installation${NC}$dots_display"
+        # Show current state - animation only, no box borders
+        printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  $circle ${GRAY}Checking Docker installation${NC}$dots_display"
+        # Clear to end of line to avoid artifacts
+        printf "\033[K"
         sleep 0.4
     done
     
@@ -514,10 +522,11 @@ check_and_prompt_docker() {
         # Get version info
         DOCKER_VERSION=$(docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "unknown")
         
-        # Seamless transition - overwrite the checking line directly  
-        printf "\r${GREEN}✓${NC} ${BOLD}Docker${NC} ${GREEN}${DOCKER_VERSION}${NC} ${GRAY}already installed and running${NC}"
-        # Add spaces to clear any remaining characters from the previous line
-        printf "                    \n"
+        # Format the line to match last box alignment  
+        local docker_display="${GREEN}✓${NC} ${BOLD}Docker${NC} ${GREEN}${DOCKER_VERSION}${NC} ${GRAY}already installed and running${NC}"
+        local docker_plain="✓ Docker ${DOCKER_VERSION} already installed and running"
+        local padding=$((90 - ${#docker_plain}))
+        printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${docker_display}%*s${TEAL}│${NC}  ${TEAL}║${NC}\n" $padding ""
         return 0
     elif [ "$check_result" = "installed" ]; then
         # Docker installed but not running - start it
@@ -879,9 +888,12 @@ install_graphdone() {
     # Platform detection
     detect_platform
 
-    # Installation check section
-    printf "\n${CYAN}${BOLD}🔍 Installation Check${NC}\n"
-    printf "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
+    # Installation check section with box
+    printf "\n"
+    printf "${TEAL}╔══════════════════════════════════════════════════════════════════════════════════════════════════╗${NC}\n"
+    printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"
+    printf "${TEAL}║${NC}                                  ${CYAN}${BOLD}🔍 Installation Check${NC}                                           ${TEAL}║${NC}\n"
+    printf "${TEAL}║${NC}  ${TEAL}┌────────────────────────────────────────────────────────────────────────────────────────────┐${TEAL}  ${TEAL}║${NC}\n"
     # Platform display with system name in brackets
     local platform_name
     case "$(uname)" in
@@ -899,76 +911,216 @@ install_graphdone() {
             ;;
     esac
     
-    printf "${BLUE}◉${NC} ${GRAY}Platform:${NC} ${BOLD}$(uname) $(uname -m)${NC} ${GRAY}${platform_name}${NC}\n"
-    printf "${BLUE}◉${NC} ${GRAY}Shell:${NC} ${BOLD}${SHELL}${NC}\n\n"
-
-    printf "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n\n"
+    printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}◉${NC} ${GRAY}Platform:${NC} ${BOLD}$(uname) $(uname -m)${NC} ${GRAY}${platform_name}${NC}%-40s${TEAL}                  │${NC}  ${TEAL}║${NC}\n" " "
+    printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}◉${NC} ${GRAY}Shell:${NC} ${BOLD}${SHELL}${NC}%-60s${TEAL}             │${NC}  ${TEAL}║${NC}\n" " "
+    printf "${TEAL}║${NC}  ${TEAL}└────────────────────────────────────────────────────────────────────────────────────────────┘${TEAL}  ${TEAL}║${NC}\n"
+    printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"
     
-    # Interactive dependency checks before showing progress box
+    # Dependencies section inside box
+    printf "${TEAL}║${NC}                                  ${CYAN}${BOLD}📦 Dependency Check${NC}                                             ${TEAL}║${NC}\n"
+    printf "${TEAL}║${NC}  ${TEAL}┌────────────────────────────────────────────────────────────────────────────────────────────┐${TEAL}  ${TEAL}║${NC}\n"
+    
+    # Run dependency checks inside the box
     check_and_prompt_git
     check_and_prompt_nodejs
     
-    # Check npm packages right after Node.js (only if we're in an existing installation)
-    if [ -d "$HOME/graphdone" ] && [ -f "$HOME/graphdone/package.json" ]; then
+    # Always check for project dependencies after Node.js check
+    # This handles both fresh installations (after code download) and updates
+    GRAPHDONE_CHECK_DIR="${GRAPHDONE_HOME:-$HOME/graphdone}"
+    
+    # For fresh installations, we'll download the code first if needed
+    if [ ! -d "$GRAPHDONE_CHECK_DIR" ]; then
+        # Fresh installation - download code first to check dependencies
+        printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${PINK}•${NC} ${GRAY}Preparing GraphDone installation${NC}"
+        printf "\033[K\n"
+        
+        # Clone the repo quietly to get package.json
+        git clone --quiet --branch fix/first-start https://github.com/GraphDone/GraphDone-Core.git "$GRAPHDONE_CHECK_DIR" >/dev/null 2>&1
+        FRESH_INSTALL=true
+    else
+        FRESH_INSTALL=false
+    fi
+    
+    # Now check dependencies for both fresh and existing installations
+    if [ -f "$GRAPHDONE_CHECK_DIR/package.json" ]; then
+        # Start showing animation immediately while checking in background
+        PINK='\033[38;5;213m'
+        printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${PINK}•${NC} ${GRAY}Checking project dependencies${NC}"
+        # Clear to end of line
+        printf "\033[K"
+        
         cd "$HOME/graphdone"
+        
+        # Check dependencies status in background
+        deps_need_install=false
         if [ ! -d "node_modules" ] || ! check_deps_fresh; then
-            printf "${GRAY}▸${NC} Installing project dependencies"
+            deps_need_install=true
+        fi
+        
+        if [ "$deps_need_install" = true ]; then
+            # Clear the initial message
+            printf "\r\033[K"
+            # Blinking bullet with progressive dots (same as Node.js check)
+            PINK='\033[38;5;213m'
+            blink_state=0
             
             # Run npm install silently in background
             smart_npm_install &
             npm_pid=$!
             
-            # Show spinner while npm install runs
-            spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
-            i=0
-            timeout_count=0
-            max_timeout=3000  # 10 minutes
-            
-            while kill -0 $npm_pid 2>/dev/null && [ $timeout_count -lt $max_timeout ]; do
-                seconds=$((timeout_count / 5))
-                printf "\r${GRAY}▸${NC} Installing project dependencies ${CYAN}${spin:i:1}${NC}"
-                i=$(( (i+1) % ${#spin} ))
-                timeout_count=$((timeout_count + 1))
-                sleep 0.2
+            # Show animation exactly like Node.js check
+            for cycle in 1 2 3 4 5 6 7 8 9 10 11 12; do
+                # Check if npm install is still running
+                if ! kill -0 $npm_pid 2>/dev/null; then
+                    break
+                fi
+                
+                # Toggle blink state for bullet
+                if [ $blink_state -eq 0 ]; then
+                    circle="${PINK}•${NC}"
+                    blink_state=1
+                else
+                    circle="${DIM}•${NC}"
+                    blink_state=0
+                fi
+                
+                # Build the dots display based on cycle (same as Node.js)
+                dots_display=""
+                if [ $cycle -ge 3 ]; then
+                    dots_display=" ${GRAY}●${NC}"
+                fi
+                if [ $cycle -ge 5 ]; then
+                    dots_display="$dots_display ${BLUE}●${NC}"
+                fi
+                if [ $cycle -ge 6 ]; then
+                    dots_display="$dots_display ${CYAN}●${NC}"
+                fi
+                
+                # Show current state - animation only, no box borders
+                printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  $circle ${GRAY}Checking project dependencies${NC}$dots_display"
+                # Clear to end of line to avoid artifacts
+                printf "\033[K"
+                sleep 0.4
             done
+            
+            # Continue waiting if still running (keep same 3 dots, 4th will be completion)
+            while kill -0 $npm_pid 2>/dev/null; do
+                # Toggle blink state for bullet
+                if [ $blink_state -eq 0 ]; then
+                    circle="${PINK}•${NC}"
+                    blink_state=1
+                else
+                    circle="${DIM}•${NC}"
+                    blink_state=0
+                fi
+                
+                # Keep the same 3 dots (4th dot is the completion green dot)
+                dots_display=" ${GRAY}●${NC} ${BLUE}●${NC} ${CYAN}●${NC}"
+                
+                # Show current state - animation only, no box borders
+                printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  $circle ${GRAY}Checking project dependencies${NC}$dots_display"
+                # Clear to end of line to avoid artifacts
+                printf "\033[K"
+                sleep 0.4
+            done
+            
+            # Smooth transition: show completion state briefly
+            printf " ${GREEN}●${NC}"
+            sleep 0.3
             
             wait $npm_pid
             npm_exit_code=$?
             
             if [ $npm_exit_code -eq 0 ]; then
                 update_deps_hash
-                printf "\r${GREEN}✓${NC} Project dependencies installed                    \n"
+                # Format the line to match last box alignment
+                local deps_display="${GREEN}✓${NC} Project dependencies installed"
+                local deps_plain="✓ Project dependencies installed"
+                local padding=$((90 - ${#deps_plain}))
+                printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${deps_display}%*s${TEAL}│${NC}  ${TEAL}║${NC}\n" $padding ""
             else
-                printf "\r${RED}✗${NC} Failed to install project dependencies\n"
+                printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${RED}✗${NC} Failed to install project dependencies%-45s${TEAL}│${NC}  ${TEAL}║${NC}\n" " "
                 # Continue anyway - will try again later
             fi
         else
-            printf "${GREEN}✓${NC} Project dependencies up to date (cached)\n"
+            # Already showed initial message, continue with animation
+            blink_state=0
+            
+            # Continue with animation from where we started
+            for cycle in 1 2 3 4 5; do
+                # Toggle blink state
+                if [ $blink_state -eq 0 ]; then
+                    circle="${PINK}•${NC}"
+                    blink_state=1
+                else
+                    circle="${DIM}•${NC}"
+                    blink_state=0
+                fi
+                
+                # Build the dots display based on cycle (same timing as Node.js)
+                dots_display=""
+                if [ $cycle -ge 3 ]; then
+                    dots_display=" ${GRAY}●${NC}"
+                fi
+                if [ $cycle -ge 5 ]; then
+                    dots_display="$dots_display ${BLUE}●${NC}"
+                fi
+                if [ $cycle -eq 6 ]; then
+                    dots_display="$dots_display ${CYAN}●${NC}"
+                fi
+                
+                # Show current state - animation only, no box borders
+                printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  $circle ${GRAY}Checking project dependencies${NC}$dots_display"
+                # Clear to end of line to avoid artifacts
+                printf "\033[K"
+                sleep 0.4
+            done
+            
+            # Smooth transition: show completion state briefly
+            printf " ${GREEN}●${NC}"
+            sleep 0.3
+            
+            # Format the line to match last box alignment
+            local deps_display="${GREEN}✓${NC} Project dependencies up to date (cached)"
+            local deps_plain="✓ Project dependencies up to date (cached)"
+            local padding=$((90 - ${#deps_plain}))
+            printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${deps_display}%*s${TEAL}│${NC}  ${TEAL}║${NC}\n" $padding ""
         fi
         cd - >/dev/null 2>&1
     fi
     
     check_and_prompt_docker
     
+    # Close the dependencies box
+    printf "${TEAL}║${NC}  ${TEAL}└────────────────────────────────────────────────────────────────────────────────────────────┘${TEAL}  ${TEAL}║${NC}\n"
+    printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"
+    
     # Brief pause for smooth transition
     sleep 0.5
     
-    printf "\n${GREEN}✓${NC} All dependencies verified\n"
-    printf "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
+    printf "${TEAL}║${NC}  ${TEAL}┌────────────────────────────────────────────────────────────────────────────────────────────┐${TEAL}  ${TEAL}║${NC}\n"
+    printf "${TEAL}║${NC}  ${TEAL}│${NC}                           ${GREEN}✓ All dependencies verified${NC}                                      ${TEAL}│${NC}  ${TEAL}║${NC}\n"
+    printf "${TEAL}║${NC}  ${TEAL}└────────────────────────────────────────────────────────────────────────────────────────────┘${TEAL}  ${TEAL}║${NC}\n"
+    printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"
+    printf "${TEAL}╚══════════════════════════════════════════════════════════════════════════════════════════════════╝${NC}\n"
 
     # Modern installation section with progress
     INSTALL_DIR="${GRAPHDONE_HOME:-$HOME/graphdone}"
     
-    printf "\n${CYAN}${BOLD}📍 Installation Setup${NC}\n"
-    printf "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
-    printf "${BLUE}◉${NC} ${GRAY}Target:${NC} ${BOLD}$INSTALL_DIR${NC}\n"
+    printf "\n"
+    printf "${TEAL}╔══════════════════════════════════════════════════════════════════════════════════════════════════╗${NC}\n"
+    printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"
+    printf "${TEAL}║${NC}                                  ${CYAN}${BOLD}📍 Installation Setup${NC}                                           ${TEAL}║${NC}\n"
+    printf "${TEAL}║${NC}  ${TEAL}┌────────────────────────────────────────────────────────────────────────────────────────────┐${TEAL}  ${TEAL}║${NC}\n"
+    printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}◉${NC} ${GRAY}Target:${NC} ${BOLD}$INSTALL_DIR${NC}%-40s${TEAL}          │${NC}  ${TEAL}║${NC}\n" " "
     
     # Download or update with animated progress
     if [ -d "$INSTALL_DIR" ]; then
-        printf "${BLUE}◉${NC} ${GRAY}Mode:${NC} ${YELLOW}Update existing${NC}\n\n"
+        printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}◉${NC} ${GRAY}Mode:${NC} ${YELLOW}Update existing${NC}%-52s${TEAL}               │${NC}  ${TEAL}║${NC}\n" " "
+        printf "${TEAL}║${NC}  ${TEAL}│${NC}                                                                                            ${TEAL}│${NC}  ${TEAL}║${NC}\n"
         
         # Show fetching animation
-        printf "${BLUE}↻${NC} Fetching latest changes"
+        printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}↻${NC} Fetching latest changes"
         cd "$INSTALL_DIR"
         
         # Run git pull in background to show progress
@@ -978,19 +1130,20 @@ install_graphdone() {
         # Animated dots while updating
         while kill -0 $pull_pid 2>/dev/null; do
             for dot in "" "." ".." "..."; do
-                printf "\r${BLUE}↻${NC} Fetching latest changes${dot}   "
+                printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}↻${NC} Fetching latest changes${dot}%-50s${TEAL}│${NC}  ${TEAL}║${NC}" " "
                 sleep 0.2
                 kill -0 $pull_pid 2>/dev/null || break
             done
         done
         wait $pull_pid
         
-        printf "\r${GREEN}✓${NC} ${BOLD}Updated${NC} ${GREEN}to latest version${NC}      \n"
+        printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${GREEN}✓${NC} ${BOLD}Updated${NC} ${GREEN}to latest version${NC}%-48s${TEAL}               │${NC}  ${TEAL}║${NC}\n" " "
     else
-        printf "${BLUE}◉${NC} ${GRAY}Mode:${NC} ${GREEN}Fresh installation${NC}\n\n"
+        printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}◉${NC} ${GRAY}Mode:${NC} ${GREEN}Fresh installation${NC}%-48s${TEAL}│${NC}  ${TEAL}║${NC}\n" " "
+        printf "${TEAL}║${NC}  ${TEAL}│${NC}                                                                                              ${TEAL}│${NC}  ${TEAL}║${NC}\n"
         
         # Show download progress
-        printf "${BLUE}📦${NC} Downloading GraphDone"
+        printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}📦${NC} Downloading GraphDone"
         
         # Clone in background to show progress
         git clone --quiet --branch fix/first-start https://github.com/GraphDone/GraphDone-Core.git "$INSTALL_DIR" >/dev/null 2>&1 &
@@ -999,16 +1152,18 @@ install_graphdone() {
         # Animated progress bar
         while kill -0 $clone_pid 2>/dev/null; do
             for frame in "⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏"; do
-                printf "\r${BLUE}📦${NC} Downloading GraphDone ${CYAN}${frame}${NC} "
+                printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}📦${NC} Downloading GraphDone ${CYAN}${frame}${NC}%-46s${TEAL}│${NC}  ${TEAL}║${NC}" " "
                 sleep 0.1
                 kill -0 $clone_pid 2>/dev/null || break
             done
         done
         wait $clone_pid
         
-        printf "\r${GREEN}✓${NC} ${BOLD}Downloaded${NC} ${GREEN}GraphDone Core${NC}   \n"
+        printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${GREEN}✓${NC} ${BOLD}Downloaded${NC} ${GREEN}GraphDone Core${NC}%-47s${TEAL}│${NC}  ${TEAL}║${NC}\n" " "
     fi
-    printf "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
+    printf "${TEAL}║${NC}  ${TEAL}└────────────────────────────────────────────────────────────────────────────────────────────┘${TEAL}  ${TEAL}║${NC}\n"
+    printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"
+    printf "${TEAL}╚══════════════════════════════════════════════════════════════════════════════════════════════════╝${NC}\n"
 
     cd "$INSTALL_DIR"
 
@@ -1030,40 +1185,92 @@ EOF
         printf "${GREEN}✓${NC} Environment configured\n"
     fi
 
-    # TLS certificates
+    # TLS certificates section with proper box formatting
+    printf "\n"
+    printf "${TEAL}╔══════════════════════════════════════════════════════════════════════════════════════════════════╗${NC}\n"
+    printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"
+    printf "${TEAL}║${NC}                                  ${CYAN}${BOLD}🔐 Security Setup${NC}                                               ${TEAL}║${NC}\n"
+    printf "${TEAL}║${NC}  ${TEAL}┌────────────────────────────────────────────────────────────────────────────────────────────┐${TEAL}  ${TEAL}║${NC}\n"
     if [ ! -f "deployment/certs/server-cert.pem" ]; then
-        printf "${GRAY}▸${NC} Generating TLS certificates\n"
+        printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${GRAY}▸${NC} Generating TLS certificates...%-53s${TEAL}│${NC}  ${TEAL}║${NC}\n" " "
         mkdir -p deployment/certs || error "Failed to create certificate directory"
         openssl req -x509 -newkey rsa:4096 -nodes -keyout deployment/certs/server-key.pem -out deployment/certs/server-cert.pem -days 365 -subj '/CN=localhost' >/dev/null 2>&1 || error "Failed to generate certificates"
-        printf "${GREEN}✓${NC} TLS certificates generated\n"
+        printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${GREEN}✓${NC} TLS certificates generated%-58s${TEAL}│${NC}  ${TEAL}║${NC}\n" " "
     else
-        printf "${GREEN}✓${NC} TLS certificates already exist\n"
+        printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${GREEN}✓${NC} TLS certificates already exist%-54s${TEAL}    │${NC}  ${TEAL}║${NC}\n" " "
     fi
+    printf "${TEAL}║${NC}  ${TEAL}└────────────────────────────────────────────────────────────────────────────────────────────┘${TEAL}  ${TEAL}║${NC}\n"
+    printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"
+    printf "${TEAL}╚══════════════════════════════════════════════════════════════════════════════════════════════════╝${NC}\n"
 
     # Smart dependency management with MD5 hash-based caching
     # Only installs if node_modules is missing or package.json has changed
     # For updates, this was already done during Node.js check
     # For fresh installs, this happens now after downloading the code
     if [ ! -d "node_modules" ] || ! check_deps_fresh; then
-        printf "${GRAY}▸${NC} Installing project dependencies"
+        # Blinking bullet with progressive dots (same as Node.js check)
+        PINK='\033[38;5;213m'
+        blink_state=0
         
         # Run npm install silently in background
         smart_npm_install &
         npm_pid=$!
         
-        # Show spinner while npm install runs
-        spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
-        i=0
-        timeout_count=0
-        max_timeout=3000  # 10 minutes
-        
-        while kill -0 $npm_pid 2>/dev/null && [ $timeout_count -lt $max_timeout ]; do
-            seconds=$((timeout_count / 5))
-            printf "\r${GRAY}▸${NC} Installing project dependencies ${CYAN}${spin:i:1}${NC}"
-            i=$(( (i+1) % ${#spin} ))
-            timeout_count=$((timeout_count + 1))
-            sleep 0.2
+        # Show animation exactly like Node.js check
+        for cycle in 1 2 3 4 5 6 7 8 9 10 11 12; do
+            # Check if npm install is still running
+            if ! kill -0 $npm_pid 2>/dev/null; then
+                break
+            fi
+            
+            # Toggle blink state for bullet
+            if [ $blink_state -eq 0 ]; then
+                circle="${PINK}•${NC}"
+                blink_state=1
+            else
+                circle="${DIM}•${NC}"
+                blink_state=0
+            fi
+            
+            # Build the dots display based on cycle (same as Node.js)
+            dots_display=""
+            if [ $cycle -ge 3 ]; then
+                dots_display=" ${GRAY}●${NC}"
+            fi
+            if [ $cycle -ge 5 ]; then
+                dots_display="$dots_display ${BLUE}●${NC}"
+            fi
+            if [ $cycle -ge 6 ]; then
+                dots_display="$dots_display ${CYAN}●${NC}"
+            fi
+            
+            # Show current state
+            printf "\r$circle ${GRAY}Checking project dependencies${NC}$dots_display"
+            sleep 0.4
         done
+        
+        # Continue waiting if still running (keep same 3 dots, 4th will be completion)
+        while kill -0 $npm_pid 2>/dev/null; do
+            # Toggle blink state for bullet
+            if [ $blink_state -eq 0 ]; then
+                circle="${PINK}•${NC}"
+                blink_state=1
+            else
+                circle="${DIM}•${NC}"
+                blink_state=0
+            fi
+            
+            # Keep the same 3 dots (4th dot is the completion green dot)
+            dots_display=" ${GRAY}●${NC} ${BLUE}●${NC} ${CYAN}●${NC}"
+            
+            # Show current state
+            printf "\r$circle ${GRAY}Checking project dependencies${NC}$dots_display"
+            sleep 0.4
+        done
+        
+        # Smooth transition: show completion state briefly
+        printf " ${GREEN}●${NC}"
+        sleep 0.3
         
         wait $npm_pid
         npm_exit_code=$?
@@ -1080,12 +1287,27 @@ EOF
     fi
     # If dependencies are cached and up-to-date, nothing is shown (silent)
 
+    # Services check section with proper box formatting
+    printf "\n"
+    printf "${TEAL}╔══════════════════════════════════════════════════════════════════════════════════════════════════╗${NC}\n"
+    printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"
+    printf "${TEAL}║${NC}                                  ${CYAN}${BOLD}🐳 Services Status${NC}                                              ${TEAL}║${NC}\n"
+    printf "${TEAL}║${NC}  ${TEAL}┌────────────────────────────────────────────────────────────────────────────────────────────┐${TEAL}  ${TEAL}║${NC}\n"
+    
     # Check if services are already running
     if check_containers_healthy; then
-        printf "${GREEN}✓${NC} Services already running\n\n"
+        printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${GREEN}✓${NC} Services already running%-60s${TEAL}    │${NC}  ${TEAL}║${NC}\n" " "
+        printf "${TEAL}║${NC}  ${TEAL}└────────────────────────────────────────────────────────────────────────────────────────────┘${TEAL}  ${TEAL}║${NC}\n"
+        printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"
+        printf "${TEAL}╚══════════════════════════════════════════════════════════════════════════════════════════════════╝${NC}\n"
+        printf "\n"
         show_success_in_box
         return 0
     fi
+    printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}◉${NC} Starting fresh services...%-57s${TEAL}│${NC}  ${TEAL}║${NC}\n" " "
+    printf "${TEAL}║${NC}  ${TEAL}└────────────────────────────────────────────────────────────────────────────────────────────┘${TEAL}  ${TEAL}║${NC}\n"
+    printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"
+    printf "${TEAL}╚══════════════════════════════════════════════════════════════════════════════════════════════════╝${NC}\n"
 
     # Container preparation with interactive progress
     printf "\n${CYAN}${BOLD}📦 Container Preparation${NC}\n"
