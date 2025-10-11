@@ -275,7 +275,18 @@ check_and_prompt_git() {
         if [ "$response" != "n" ] && [ "$response" != "N" ]; then
             # Run the Git setup script
             if sh "scripts/setup_git.sh"; then
-                printf "\n"
+                # After successful installation, clear all output and show clean result
+                # Clear approximately 27 lines (Git Update section + Git Installation Script)
+                for i in $(seq 1 27); do
+                    printf "\033[F\033[K"  # Move up and clear line
+                done
+                
+                # Get the new Git version and show clean success message
+                NEW_GIT_VERSION=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
+                local git_success="${GREEN}✓${NC} ${BOLD}Git${NC} upgraded to ${GREEN}${NEW_GIT_VERSION}${NC} successfully"
+                local git_success_plain="✓ Git upgraded to ${NEW_GIT_VERSION} successfully"
+                local padding=$((90 - ${#git_success_plain}))
+                printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${git_success}%*s${TEAL}│${NC}  ${TEAL}║${NC}\n" $padding ""
             else
                 printf "${RED}✗${NC} Git setup failed\n"
                 printf "${CYAN}ℹ${NC} Continuing with Apple Git...\n"
