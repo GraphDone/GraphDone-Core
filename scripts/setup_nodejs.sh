@@ -80,8 +80,8 @@ else
 fi
 
 echo ""
-printf "${CYAN}${BOLD}📦 Node.js Setup${NC}\n"
-printf "${GRAY}${DIM}──────────────────────────${NC}\n"
+printf "        ${CYAN}${BOLD}📦 Node.js Setup${NC}\n"
+printf "        ${GRAY}${DIM}──────────────────────────${NC}\n"
 
 # Function to check if Node.js is installed with correct version
 check_nodejs_installed() {
@@ -92,15 +92,15 @@ check_nodejs_installed() {
         if [ "$node_version" -ge 18 ] && [ "$npm_version" -ge 9 ]; then
             local node_full=$(node --version 2>/dev/null || echo 'unknown')
             local npm_full=$(npm --version 2>/dev/null || echo 'unknown')
-            printf "${GREEN}✓${NC} Node.js ${node_full} and npm ${npm_full} already installed\n"
+            printf "        ${GREEN}✓${NC} Node.js ${node_full} and npm ${npm_full} already installed\n"
             return 0
         else
-            printf "${YELLOW}⚠${NC} Node.js ${node_full:-unknown} found but version requirements not met\n"
-            printf "${GRAY}  Required: Node.js >= 18.0.0, npm >= 9.0.0${NC}\n"
+            printf "        ${YELLOW}⚠${NC} Node.js ${node_full:-unknown} found but version requirements not met\n"
+            printf "        ${GRAY}  Required: Node.js >= 18.0.0, npm >= 9.0.0${NC}\n"
             return 1
         fi
     else
-        printf "${BLUE}◉${NC} Node.js not found - installing latest version\n"
+        printf "        ${BLUE}◉${NC} Node.js not found - installing latest version\n"
         return 1
     fi
 }
@@ -130,7 +130,7 @@ install_nodejs_macos() {
         export HOMEBREW_NO_ENV_HINTS=1
         
         # Install Node.js latest with minimal output
-        printf "${BLUE}◉${NC} Installing Node.js (latest)"
+        printf "        ${BLUE}◉${NC} Installing Node.js (latest)"
         
         # Start installation in background
         brew install node >/dev/null 2>&1 &
@@ -141,13 +141,13 @@ install_nodejs_macos() {
         i=0
         
         while kill -0 $install_pid 2>/dev/null; do
-            printf "\r${BLUE}◉${NC} Installing Node.js (latest) ${CYAN}${spin:i:1}${NC}"
+            printf "\r        ${BLUE}◉${NC} Installing Node.js (latest) ${CYAN}${spin:i:1}${NC}"
             i=$(( (i+1) % ${#spin} ))
             sleep 0.15
         done
         wait $install_pid
         
-        printf "\r${GREEN}✓${NC} Node.js installed                    \n"
+        printf "\r        ${GREEN}✓${NC} Node.js installed                    \n"
         return 0
     else
         # Fallback to official installer
@@ -236,7 +236,7 @@ verify_nodejs() {
         local npm_major=$(echo "$npm_version" | cut -d. -f1 || echo "0")
         
         if [ "$node_major" -ge 18 ] && [ "$npm_major" -ge 9 ]; then
-            printf "${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}${node_version}${NC} and ${BOLD}npm${NC} ${GREEN}${npm_version}${NC} ready\n"
+            printf "        ${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}${node_version}${NC} and ${BOLD}npm${NC} ${GREEN}${npm_version}${NC} ready\n"
             return 0
         else
             printf "${YELLOW}!${NC} Node.js installed but version requirements not met\n"
@@ -294,7 +294,7 @@ main() {
     
     # Verify final installation
     if verify_nodejs; then
-        printf "\n${GREEN}✓${NC} Node.js setup complete\n"
+        printf "\n        ${GREEN}✓${NC} Node.js setup complete\n"
     else
         printf "\n${YELLOW}!${NC} Node.js installed but may need manual verification\n"
         exit 1

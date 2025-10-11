@@ -418,16 +418,29 @@ check_and_prompt_nodejs() {
         printf "\r${YELLOW}⚠${NC} ${BOLD}Node.js${NC} ${GREEN}${NODE_VERSION_FULL}${NC} ${GRAY}OK, but npm needs update${NC}"
         printf "                    \n\n"
         
-        printf "${YELLOW}🟡 ${BOLD}npm Update Required${NC}\n"
-        printf "${GRAY}Node.js is current but npm needs to be updated to >= 9.0.0${NC}\n\n"
-        printf "${GREEN}✓${NC} We'll use the dedicated Node.js setup script to update npm\n"
-        printf "${GREEN}✓${NC} Zero manual intervention required\n\n"
-        printf "${CYAN}❯${NC} ${BOLD}Continue with npm update?${NC} ${GRAY}[Press Enter] or Ctrl+C to exit${NC}\n"
+        printf "        ${YELLOW}🟡 ${BOLD}npm Update Required${NC}\n"
+        printf "        ${GRAY}Node.js is current but npm needs to be updated to >= 9.0.0${NC}\n\n"
+        printf "        ${GREEN}✓${NC} We'll use the dedicated Node.js setup script to update npm\n"
+        printf "        ${GREEN}✓${NC} Zero manual intervention required\n\n"
+        printf "        ${CYAN}❯${NC} ${BOLD}Continue with npm update?${NC} ${GRAY}[Press Enter] or Ctrl+C to exit${NC}\n"
+        printf "        "
         read -r response
         
         # Run the Node.js setup script
         if sh "scripts/setup_nodejs.sh"; then
-            printf "\n"
+            # After successful installation, clear all output and show clean result
+            # Clear exactly 15 lines (checking animation + npm Update section + Node.js setup output)
+            for i in $(seq 1 15); do
+                printf "\033[F\033[K"  # Move up and clear line
+            done
+            
+            # Get the new Node.js and npm versions
+            NEW_NODE_VERSION=$(node --version 2>/dev/null || echo "unknown")
+            NEW_NPM_VERSION=$(npm --version 2>/dev/null || echo "unknown")
+            local node_success="${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}${NEW_NODE_VERSION}${NC} and ${BOLD}npm${NC} ${GREEN}${NEW_NPM_VERSION}${NC} updated successfully"
+            local node_success_plain="✓ Node.js ${NEW_NODE_VERSION} and npm ${NEW_NPM_VERSION} updated successfully"
+            local padding=$((90 - ${#node_success_plain}))
+            printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${node_success}%*s${TEAL}│${NC}  ${TEAL}║${NC}\n" $padding ""
         else
             printf "${RED}✗${NC} Node.js setup failed\n"
             exit 1
@@ -438,17 +451,30 @@ check_and_prompt_nodejs() {
         printf "\r${YELLOW}⚠${NC} ${BOLD}Node.js${NC} ${YELLOW}${NODE_VERSION_OLD}${NC} ${GRAY}outdated (need >= 18.0.0)${NC}"
         printf "                    \n\n"
         
-        printf "${YELLOW}🟡 ${BOLD}Node.js Update Required${NC}\n"
-        printf "${GRAY}GraphDone requires Node.js >= 18.0.0 for optimal performance.${NC}\n\n"
-        printf "${GREEN}✓${NC} We'll use the dedicated Node.js setup script for your platform\n"
-        printf "${GREEN}✓${NC} Automatic installation of latest LTS version\n"
-        printf "${GREEN}✓${NC} Zero manual configuration required\n\n"
-        printf "${CYAN}❯${NC} ${BOLD}Continue with Node.js upgrade?${NC} ${GRAY}[Press Enter] or Ctrl+C to exit${NC}\n"
+        printf "        ${YELLOW}🟡 ${BOLD}Node.js Update Required${NC}\n"
+        printf "        ${GRAY}GraphDone requires Node.js >= 18.0.0 for optimal performance.${NC}\n\n"
+        printf "        ${GREEN}✓${NC} We'll use the dedicated Node.js setup script for your platform\n"
+        printf "        ${GREEN}✓${NC} Automatic installation of latest version\n"
+        printf "        ${GREEN}✓${NC} Zero manual configuration required\n\n"
+        printf "        ${CYAN}❯${NC} ${BOLD}Continue with Node.js upgrade?${NC} ${GRAY}[Press Enter] or Ctrl+C to exit${NC}\n"
+        printf "        "
         read -r response
         
         # Run the Node.js setup script
         if sh "scripts/setup_nodejs.sh"; then
-            printf "\n"
+            # After successful installation, clear all output and show clean result
+            # Clear exactly 16 lines (checking animation + Node.js Update section + Node.js setup output)
+            for i in $(seq 1 16); do
+                printf "\033[F\033[K"  # Move up and clear line
+            done
+            
+            # Get the new Node.js and npm versions
+            NEW_NODE_VERSION=$(node --version 2>/dev/null || echo "unknown")
+            NEW_NPM_VERSION=$(npm --version 2>/dev/null || echo "unknown")
+            local node_success="${GREEN}✓${NC} ${BOLD}Node.js${NC} upgraded to ${GREEN}${NEW_NODE_VERSION}${NC} and ${BOLD}npm${NC} ${GREEN}${NEW_NPM_VERSION}${NC} successfully"
+            local node_success_plain="✓ Node.js upgraded to ${NEW_NODE_VERSION} and npm ${NEW_NPM_VERSION} successfully"
+            local padding=$((90 - ${#node_success_plain}))
+            printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${node_success}%*s${TEAL}│${NC}  ${TEAL}║${NC}\n" $padding ""
         else
             printf "${RED}✗${NC} Node.js setup failed\n"
             exit 1
@@ -456,18 +482,31 @@ check_and_prompt_nodejs() {
         return 0
     fi
     
-    printf "\n${YELLOW}🟡 ${BOLD}Node.js Setup Required${NC}\n"
-    printf "${GRAY}GraphDone requires Node.js >= 18.0.0 and npm >= 9.0.0 for development.${NC}\n\n"
-    printf "${GREEN}✓${NC} We'll use the dedicated Node.js setup script for your platform\n"
-    printf "${GREEN}✓${NC} Automatic installation of latest LTS version\n"
-    printf "${GREEN}✓${NC} Includes npm package manager automatically\n"
-    printf "${GREEN}✓${NC} Zero manual configuration required\n\n"
-    printf "${CYAN}❯${NC} ${BOLD}Continue with Node.js installation?${NC} ${GRAY}[Press Enter] or Ctrl+C to exit${NC}\n"
+    printf "\n        ${YELLOW}🟡 ${BOLD}Node.js Setup Required${NC}\n"
+    printf "        ${GRAY}GraphDone requires Node.js >= 18.0.0 and npm >= 9.0.0 for development.${NC}\n\n"
+    printf "        ${GREEN}✓${NC} We'll use the dedicated Node.js setup script for your platform\n"
+    printf "        ${GREEN}✓${NC} Automatic installation of latest version\n"
+    printf "        ${GREEN}✓${NC} Includes npm package manager automatically\n"
+    printf "        ${GREEN}✓${NC} Zero manual configuration required\n\n"
+    printf "        ${CYAN}❯${NC} ${BOLD}Continue with Node.js installation?${NC} ${GRAY}[Press Enter] or Ctrl+C to exit${NC}\n"
+    printf "        "
     read -r response
     
     # Run the Node.js setup script (skip redundant check)
     if sh "scripts/setup_nodejs.sh" --skip-check; then
-        printf "\n"
+        # After successful installation, clear all output and show clean result
+        # Clear exactly 18 lines (checking animation + Node.js Setup section + Node.js setup output)
+        for i in $(seq 1 18); do
+            printf "\033[F\033[K"  # Move up and clear line
+        done
+        
+        # Get the new Node.js and npm versions
+        NEW_NODE_VERSION=$(node --version 2>/dev/null || echo "unknown")
+        NEW_NPM_VERSION=$(npm --version 2>/dev/null || echo "unknown")
+        local node_success="${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}${NEW_NODE_VERSION}${NC} and ${BOLD}npm${NC} ${GREEN}${NEW_NPM_VERSION}${NC} installed successfully"
+        local node_success_plain="✓ Node.js ${NEW_NODE_VERSION} and npm ${NEW_NPM_VERSION} installed successfully"
+        local padding=$((90 - ${#node_success_plain}))
+        printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${node_success}%*s${TEAL}│${NC}  ${TEAL}║${NC}\n" $padding ""
     else
         printf "${RED}✗${NC} Node.js setup failed\n"
         exit 1
@@ -545,18 +584,29 @@ check_and_prompt_docker() {
         printf "\r${YELLOW}⚠${NC} ${BOLD}Docker${NC} ${GREEN}${DOCKER_VERSION}${NC} ${GRAY}installed but not running${NC}"
         printf "                    \n\n"
         
-        printf "${YELLOW}🟡 ${BOLD}Docker Startup Required${NC}\n"
-        printf "${GRAY}Docker is installed but the daemon is not running.${NC}\n\n"
-        printf "${GREEN}✓${NC} We'll start Docker Desktop automatically\n"
-        printf "${GREEN}✓${NC} Wait for the Linux VM to boot and be ready\n"
-        printf "${GREEN}✓${NC} Zero manual intervention required\n\n"
-        printf "${CYAN}❯${NC} ${BOLD}Continue with Docker startup?${NC} ${GRAY}[Press Enter] or Ctrl+C to exit${NC}\n"
+        printf "        ${YELLOW}🟡 ${BOLD}Docker Startup Required${NC}\n"
+        printf "        ${GRAY}Docker is installed but the daemon is not running.${NC}\n\n"
+        printf "        ${GREEN}✓${NC} We'll start Docker Desktop automatically\n"
+        printf "        ${GREEN}✓${NC} Wait for the Linux VM to boot and be ready\n"
+        printf "        ${GREEN}✓${NC} Zero manual intervention required\n\n"
+        printf "        ${CYAN}❯${NC} ${BOLD}Continue with Docker startup?${NC} ${GRAY}[Press Enter] or Ctrl+C to exit${NC}\n"
+        printf "        "
         read -r response
         
         # Run the Docker setup script to start Docker (it handles all output)
         if sh "scripts/setup_docker.sh"; then
-            # Docker script handles success message
-            printf "\n"
+            # After successful startup, clear all output and show clean result
+            # Clear exactly 22 lines (checking animation + Docker Startup section + Docker setup output)
+            for i in $(seq 1 22); do
+                printf "\033[F\033[K"  # Move up and clear line
+            done
+            
+            # Get Docker version and show clean success message
+            DOCKER_VERSION=$(docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "unknown")
+            local docker_success="${GREEN}✓${NC} ${BOLD}Docker${NC} ${GREEN}${DOCKER_VERSION}${NC} started successfully"
+            local docker_success_plain="✓ Docker ${DOCKER_VERSION} started successfully"
+            local padding=$((90 - ${#docker_success_plain}))
+            printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${docker_success}%*s${TEAL}│${NC}  ${TEAL}║${NC}\n" $padding ""
         else
             printf "${RED}✗${NC} Docker startup failed\n"
             exit 1
@@ -564,19 +614,30 @@ check_and_prompt_docker() {
         return 0
     fi
     
-    printf "\n${YELLOW}🟡 ${BOLD}Docker Setup Required${NC}\n"
-    printf "${GRAY}GraphDone uses Docker containers for Neo4j database and Redis cache.${NC}\n\n"
-    printf "${GREEN}✓${NC} We'll use the dedicated Docker setup script for your platform\n"
-    printf "${GREEN}✓${NC} Automatic installation and configuration\n"
-    printf "${GREEN}✓${NC} Proper permissions and service setup\n"
-    printf "${GREEN}✓${NC} Zero manual configuration, automatic setup\n\n"
-    printf "${CYAN}❯${NC} ${BOLD}Continue with Docker installation?${NC} ${GRAY}[Press Enter] or Ctrl+C to exit${NC}\n"
+    printf "\n        ${YELLOW}🟡 ${BOLD}Docker Setup Required${NC}\n"
+    printf "        ${GRAY}GraphDone uses Docker containers for Neo4j database and Redis cache.${NC}\n\n"
+    printf "        ${GREEN}✓${NC} We'll use the dedicated Docker setup script for your platform\n"
+    printf "        ${GREEN}✓${NC} Automatic installation and configuration\n"
+    printf "        ${GREEN}✓${NC} Proper permissions and service setup\n"
+    printf "        ${GREEN}✓${NC} Zero manual configuration, automatic setup\n\n"
+    printf "        ${CYAN}❯${NC} ${BOLD}Continue with Docker installation?${NC} ${GRAY}[Press Enter] or Ctrl+C to exit${NC}\n"
+    printf "        "
     read -r response
     
     # Run the Docker setup script - it handles everything (skip redundant check)
     if sh "scripts/setup_docker.sh" --skip-check; then
-        # Docker script handles all success messages
-        printf "\n"
+        # After successful installation, clear all output and show clean result
+        # Clear exactly 26 lines (checking animation + Docker Setup section + Docker setup output)
+        for i in $(seq 1 26); do
+            printf "\033[F\033[K"  # Move up and clear line
+        done
+        
+        # Get Docker version and show clean success message
+        DOCKER_VERSION=$(docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "unknown")
+        local docker_success="${GREEN}✓${NC} ${BOLD}Docker${NC} ${GREEN}${DOCKER_VERSION}${NC} installed and running successfully"
+        local docker_success_plain="✓ Docker ${DOCKER_VERSION} installed and running successfully"
+        local padding=$((90 - ${#docker_success_plain}))
+        printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${docker_success}%*s${TEAL}│${NC}  ${TEAL}║${NC}\n" $padding ""
     else
         printf "${RED}✗${NC} Docker setup failed\n"
         exit 1
@@ -755,16 +816,15 @@ wait_for_services() {
     i=0
     attempts=0
     
-    printf "${GRAY}▸${NC} Waiting for services to initialize"
+    printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${GRAY}▸${NC} Waiting for services to initialize%-54s${TEAL}│${NC}  ${TEAL}║${NC}\n" " "
     
     while [ $attempts -lt 180 ]; do  # 180 attempts = ~3 minutes
         if check_containers_healthy; then
             printf "\r\033[K"  # Clear entire line
-            printf "${GREEN}✓${NC} Services are ready and healthy\n"
             return 0
         fi
         
-        printf "\r${GRAY}▸${NC} Waiting for services to initialize ${YELLOW}${spin:i:1}${NC} (%ds)" $attempts
+        printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${GRAY}▸${NC} Waiting for services to initialize ${YELLOW}${spin:i:1}${NC} (%ds)%-35s${TEAL}│${NC}  ${TEAL}║${NC}" $attempts " "
         i=$(( (i+1) % ${#spin} ))
         attempts=$((attempts + 1))
         sleep 1
@@ -1302,7 +1362,7 @@ EOF
     printf "\n"
     printf "${TEAL}╔══════════════════════════════════════════════════════════════════════════════════════════════════╗${NC}\n"
     printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"
-    printf "${TEAL}║${NC}                                  ${CYAN}${BOLD}🐳 Services Status${NC}                                              ${TEAL}║${NC}\n"
+    printf "${TEAL}║${NC}                                  ${CYAN}${BOLD}⚡ Services Status${NC}                                              ${TEAL}║${NC}\n"
     printf "${TEAL}║${NC}  ${TEAL}┌────────────────────────────────────────────────────────────────────────────────────────────┐${TEAL}  ${TEAL}║${NC}\n"
     
     # Check if services are already running
@@ -1315,14 +1375,16 @@ EOF
         show_success_in_box
         return 0
     fi
-    printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}◉${NC} Starting fresh services...%-57s${TEAL}│${NC}  ${TEAL}║${NC}\n" " "
+    printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}◉${NC} Starting fresh services...%-57s${TEAL}     │${NC}  ${TEAL}║${NC}\n" " "
     printf "${TEAL}║${NC}  ${TEAL}└────────────────────────────────────────────────────────────────────────────────────────────┘${TEAL}  ${TEAL}║${NC}\n"
     printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"
     printf "${TEAL}╚══════════════════════════════════════════════════════════════════════════════════════════════════╝${NC}\n"
 
     # Container preparation with interactive progress
-    printf "\n${CYAN}${BOLD}📦 Container Preparation${NC}\n"
-    printf "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
+    printf "\n${TEAL}╔══════════════════════════════════════════════════════════════════════════════════════════════════╗${NC}\n"
+    printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"
+    printf "${TEAL}║${NC}                                  ${CYAN}${BOLD}📦 Container Preparation${NC}                                        ${TEAL}║${NC}\n"
+    printf "${TEAL}║${NC}  ${TEAL}┌────────────────────────────────────────────────────────────────────────────────────────────┐${TEAL}  ║${NC}\n"
     
     # Try both docker-compose and docker compose for compatibility
     if command -v docker-compose >/dev/null 2>&1; then
@@ -1332,12 +1394,12 @@ EOF
     fi
     
     # Clean up existing containers with progress
-    printf "${BLUE}♻${NC} ${GRAY}Cleaning up existing containers${NC}\n"
+    printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}♻${NC} ${GRAY}Cleaning up existing containers${NC}%-50s${TEAL}       │${NC}  ${TEAL}║${NC}\n" " "
     $DOCKER_COMPOSE -f deployment/docker-compose.yml down --remove-orphans >/dev/null 2>&1 || true
     $DOCKER_COMPOSE -f deployment/docker-compose.registry.yml down --remove-orphans >/dev/null 2>&1 || true
 
     # Smart deployment detection with animated progress
-    printf "${BLUE}🔍${NC} Checking deployment strategy"
+    printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}🔍${NC} Checking deployment strategy"
     
     # Test for pre-built containers in background
     docker pull ghcr.io/graphdone/graphdone-web:fix-first-start >/dev/null 2>&1 &
@@ -1347,7 +1409,7 @@ EOF
     dots=""
     while kill -0 $check_pid 2>/dev/null; do
         for i in 1 2 3; do
-            printf "\r${BLUE}🔍${NC} Checking deployment strategy${dots}   "
+            printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}🔍${NC} Checking deployment strategy${dots}%-40s${TEAL}    │${NC}  ${TEAL}║${NC}" " "
             dots="${dots}."
             [ ${#dots} -gt 3 ] && dots=""
             sleep 0.3
@@ -1358,30 +1420,34 @@ EOF
     check_result=$?
     
     if [ $check_result -eq 0 ]; then
-        printf "\r${GREEN}✓${NC} ${GRAY}Strategy:${NC} ${BOLD}Pre-built containers${NC} ${GREEN}(fast deployment)${NC}   \n"
+        printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${GREEN}✓${NC} ${GRAY}Strategy:${NC} ${BOLD}Pre-built containers${NC} ${GREEN}(fast deployment)${NC}%-33s${TEAL}       │${NC}  ${TEAL}║${NC}\n" " "
         COMPOSE_FILE="deployment/docker-compose.registry.yml"
         DEPLOYMENT_MODE="registry"
     else
-        printf "\r${GREEN}✓${NC} ${GRAY}Strategy:${NC} ${BOLD}Build from source${NC} ${YELLOW}(longer setup)${NC}   \n"
+        printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${GREEN}✓${NC} ${GRAY}Strategy:${NC} ${BOLD}Build from source${NC} ${YELLOW}(longer setup)${NC}%-37s${TEAL}        │${NC}  ${TEAL}║${NC}\n" " "
         COMPOSE_FILE="deployment/docker-compose.yml"
         DEPLOYMENT_MODE="local"
     fi
     
-    printf "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
+    printf "${TEAL}║${NC}  ${TEAL}└────────────────────────────────────────────────────────────────────────────────────────────┘${NC}  ${TEAL}║${NC}\n"
+    printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"
+    printf "${TEAL}╚══════════════════════════════════════════════════════════════════════════════════════════════════╝${NC}\n"
 
     # GraphDone service startup with modern progress
-    printf "\n${CYAN}${BOLD}🚀 Starting GraphDone Services${NC}\n"
-    printf "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
+    printf "\n${TEAL}╔══════════════════════════════════════════════════════════════════════════════════════════════════╗${NC}\n"
+    printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"
+    printf "${TEAL}║${NC}                                  ${CYAN}${BOLD}🚀 Starting GraphDone Services${NC}                                  ${TEAL}║${NC}\n"
+    printf "${TEAL}║${NC}  ${TEAL}┌────────────────────────────────────────────────────────────────────────────────────────────┐${TEAL}  ${TEAL}║${NC}\n"
     
     if [ "$DEPLOYMENT_MODE" = "registry" ]; then
-        printf "${BLUE}◉${NC} ${GRAY}Mode:${NC} ${BOLD}Registry deployment${NC}\n"
-        printf "${BLUE}◉${NC} ${GRAY}Images:${NC} Pre-built containers from ghcr.io/graphdone\n"
+        printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}◉${NC} ${GRAY}Mode:${NC} ${BOLD}Registry deployment${NC}%-62s${TEAL} │${NC}  ${TEAL}║${NC}\n" " "
+        printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}◉${NC} ${GRAY}Images:${NC} Pre-built containers from ghcr.io/graphdone%-35s${TEAL}  │${NC}  ${TEAL}║${NC}\n" " "
     else
-        printf "${BLUE}◉${NC} ${GRAY}Mode:${NC} ${BOLD}Source build${NC}\n"
-        printf "${BLUE}◉${NC} ${GRAY}Build:${NC} Local container compilation\n"
+        printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}◉${NC} ${GRAY}Mode:${NC} ${BOLD}Source build${NC}%-68s${TEAL}│${NC}  ${TEAL}║${NC}\n" " "
+        printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}◉${NC} ${GRAY}Build:${NC} Local container compilation%-55s${TEAL}│${NC}  ${TEAL}║${NC}\n" " "
     fi
     
-    printf "\n${BLUE}↻${NC} ${GRAY}Initializing services${NC}"
+    printf "${TEAL}║${NC}  ${TEAL}│${NC}%-92s${TEAL}│${NC}  ${TEAL}║${NC}\n" " "
     
     # Start services in background with progress animation
     if [ -f "$COMPOSE_FILE" ]; then
@@ -1399,9 +1465,13 @@ EOF
     i=0
     service_index=0
     
+    # Print the initial line
+    printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}⚡${NC} ${GRAY}Starting services${NC}%-70s${TEAL}│${NC}  ${TEAL}║${NC}\n" " "
+    
     while kill -0 $startup_pid 2>/dev/null; do
         current_service=${services[$((service_index % 4))]}
-        printf "\r${BLUE}↻${NC} ${GRAY}Starting ${BOLD}graphdone-${current_service}${NC} ${CYAN}${spin:i:1}${NC}  "
+        # Only update the service name and spinner, not the whole line
+        printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}▶${NC} ${GRAY}Starting ${BOLD}graphdone-${current_service}${NC} ${CYAN}${spin:i:1}${NC}%-52s${TEAL}│${NC}  ${TEAL}║${NC}" " "
         
         i=$(( (i+1) % ${#spin} ))
         # Change service name every 8 iterations
@@ -1415,20 +1485,24 @@ EOF
     startup_result=$?
     
     if [ $startup_result -eq 0 ]; then
-        printf "\r${GREEN}✓${NC} ${BOLD}All services started successfully${NC}         \n"
+        printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${GREEN}✓${NC} ${BOLD}All services started successfully${NC}%-55s${TEAL}│${NC}  ${TEAL}║${NC}\n" " "
     else
-        printf "\r${RED}✗${NC} ${BOLD}Service startup failed${NC}         \n"
+        printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${RED}✗${NC} ${BOLD}Service startup failed${NC}%-67s${TEAL}│${NC}  ${TEAL}║${NC}\n" " "
         error "Failed to start services"
     fi
     
-    printf "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
-
     # Wait for services to be ready (more reliable than smart-start's 8 second sleep)
+    printf "${TEAL}║${NC}  ${TEAL}│${NC}%-92s${TEAL}│${NC}  ${TEAL}║${NC}\n" " "
     if wait_for_services; then
-        printf "${GREEN}✓${NC} Installation complete\n"
+        printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${GREEN}✓${NC} Services are ready and healthy%-58s${TEAL}│${NC}  ${TEAL}║${NC}\n" " "
+        printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${GREEN}✓${NC} Installation complete%-67s${TEAL}│${NC}  ${TEAL}║${NC}\n" " "
     else
-        printf "${YELLOW}!${NC} Services started but initialization taking longer\n"
+        printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${YELLOW}!${NC} Services started but initialization taking longer%-53s${TEAL}│${NC}  ${TEAL}║${NC}\n" " "
     fi
+    
+    printf "${TEAL}║${NC}  ${TEAL}└────────────────────────────────────────────────────────────────────────────────────────────┘${TEAL}  ${TEAL}║${NC}\n"
+    printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"
+    printf "${TEAL}╚══════════════════════════════════════════════════════════════════════════════════════════════════╝${NC}\n"
     
     # Continue with success info
     show_success_in_box
