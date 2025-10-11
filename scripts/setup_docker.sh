@@ -85,17 +85,17 @@ else
 fi
 
 echo ""
-printf "${CYAN}${BOLD}🐳 Docker Desktop Setup${NC}\n"
-printf "${GRAY}${DIM}──────────────────────────${NC}\n"
+printf "        ${CYAN}${BOLD}🐳 Docker Desktop Setup${NC}\n"
+printf "        ${GRAY}${DIM}──────────────────────────${NC}\n"
 
 # Function to check if Docker is installed
 check_docker_installed() {
     if command -v docker &> /dev/null; then
         local version=$(docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo 'unknown')
-        printf "${GREEN}✓${NC} Docker ${version} already installed\n"
+        printf "        ${GREEN}✓${NC} Docker ${version} already installed\n"
         return 0
     else
-        printf "${BLUE}◉${NC} Docker not found - installing automatically\n"
+        printf "        ${BLUE}◉${NC} Docker not found - installing automatically\n"
         return 1
     fi
 }
@@ -129,7 +129,7 @@ install_docker_macos() {
         
         # Check if Docker.app actually exists, even if Homebrew thinks it's installed
         if [ ! -d "/Applications/Docker.app" ]; then
-            printf "${BLUE}◉${NC} Installing Docker Desktop\n"
+            printf "        ${BLUE}◉${NC} Installing Docker Desktop\n"
             
             # Start installation in background - capture password prompts elegantly
             (brew reinstall --cask docker-desktop --no-quarantine --force || \
@@ -137,9 +137,9 @@ install_docker_macos() {
             while IFS= read -r line; do
                 case "$line" in
                     *"Password"*|*"password"*)
-                        # Clear any spinner first, then show clean password prompt
-                        printf "\r\033[K\n${YELLOW}◉${NC} ${BOLD}Administrator password required${NC}\n"
-                        printf "%s\n" "$line"
+                        # Clear current line and show clean password prompt with proper alignment
+                        printf "\r\033[K        ${YELLOW}◉${NC} ${BOLD}Administrator password required${NC}\n"
+                        printf "        ${GRAY}%s${NC}\n" "$line"
                         ;;
                     *"latest version is already installed"*|*"Not upgrading"*|*"outdated dependents"*|*"Warning:"*|*"==>"*)
                         # Suppress warnings and upgrade messages
@@ -159,7 +159,7 @@ install_docker_macos() {
                 if ! ps aux | grep -q "[s]udo.*brew"; then
                     # Password has been entered, sudo process is gone
                     password_entered=true
-                    printf "${BLUE}◉${NC} ${GRAY}Preparing installation${NC}${DIM}...${NC}\n"
+                    printf "        ${BLUE}◉${NC} ${GRAY}Preparing installation${NC}${DIM}...${NC}\n"
                     sleep 0.5  # Brief pause to show preparation message
                 fi
                 sleep 0.2
@@ -193,16 +193,20 @@ install_docker_macos() {
                     empty=$((width - filled))
                     
                     # Draw progress bar
-                    printf "\r${BLUE}◉${NC} Downloading Docker Desktop ["
+                    printf "\r        ${BLUE}◉${NC} Downloading Docker Desktop ["
                     
                     # Draw filled portion
                     if [ $filled -gt 0 ]; then
-                        printf "${GREEN}%*s${NC}" $filled | tr ' ' '█'
+                        printf "${GREEN}"
+                        for ((j=0; j<filled; j++)); do printf "█"; done
+                        printf "${NC}"
                     fi
                     
                     # Draw empty portion  
                     if [ $empty -gt 0 ]; then
-                        printf "${GRAY}%*s${NC}" $empty | tr ' ' '░'
+                        printf "${GRAY}"
+                        for ((k=0; k<empty; k++)); do printf "░"; done
+                        printf "${NC}"
                     fi
                     
                     printf "] ${CYAN}%3d%%${NC}" $percent
@@ -210,12 +214,14 @@ install_docker_macos() {
                     sleep 0.5
                 done
                 
-                # Complete the progress bar
-                printf "\r${BLUE}◉${NC} Downloading Docker Desktop [${GREEN}%*s${NC}] ${CYAN}100%%${NC}\n" 40 | tr ' ' '█'
+                # Complete the progress bar - clear line first to avoid overlap
+                printf "\r\033[K        ${BLUE}◉${NC} Downloading Docker Desktop [${GREEN}"
+                for ((j=0; j<40; j++)); do printf "█"; done
+                printf "${NC}] ${CYAN}100%%${NC}\n"
             fi
             wait $install_pid
             
-            printf "\r${GREEN}✓${NC} ${BOLD}Docker Desktop${NC} ${GREEN}installed successfully${NC}\n"
+            printf "\r\033[K        ${GREEN}✓${NC} ${BOLD}Docker Desktop${NC} ${GREEN}installed successfully${NC}\n"
             
             if [ -d "/Applications/Docker.app" ]; then
                 # Installation successful - will show message later
@@ -251,12 +257,12 @@ install_docker_macos() {
             
             # Smart Docker startup with automatic restart for broken sockets (macOS specific)
             local attempts=0
-            printf "${BLUE}◉${NC} ${GRAY}Starting Docker Desktop${NC}\n"
+            printf "        ${BLUE}◉${NC} ${GRAY}Starting Docker Desktop${NC}\n"
             
             # Wait for Docker to start with enhanced feedback
             while ! docker ps &> /dev/null && [ $attempts -lt 20 ]; do
                 if [ $attempts -eq 0 ]; then
-                    printf "${BLUE}◉${NC} ${GRAY}Waiting for Docker engine${NC}"
+                    printf "        ${BLUE}◉${NC} ${GRAY}Waiting for Docker engine${NC}"
                 fi
                 printf "."
                 sleep 3
@@ -269,7 +275,7 @@ install_docker_macos() {
                     pkill -f "Docker" 2>/dev/null || true
                     sleep 2
                     open -a Docker 2>/dev/null || true
-                    printf "${BLUE}◉${NC} ${GRAY}Waiting for Docker engine${NC}"
+                    printf "        ${BLUE}◉${NC} ${GRAY}Waiting for Docker engine${NC}"
                 fi
             done
             
@@ -279,7 +285,7 @@ install_docker_macos() {
                 rm -f "/tmp/.docker_just_installed"
                 return 1
             else
-                printf "\n${GREEN}✓${NC} ${GRAY}Docker Desktop ready and running${NC}\n"
+                printf "\n        ${GREEN}✓${NC} ${GRAY}Docker Desktop ready and running${NC}\n"
                 rm -f "/tmp/.docker_just_installed"
                 return 0
             fi
@@ -520,7 +526,7 @@ start_docker() {
                 
                 printf "${BLUE}◉${NC} ${GRAY}Starting fresh Docker Desktop${NC}\n"
             else
-                printf "${BLUE}◉${NC} ${GRAY}Starting Docker Desktop${NC}\n"
+                printf "        ${BLUE}◉${NC} ${GRAY}Starting Docker Desktop${NC}\n"
             fi
             
             open -a Docker 2>/dev/null || true
@@ -531,7 +537,7 @@ start_docker() {
             
             while ! docker ps &> /dev/null && [ $attempts -lt $max_attempts ]; do
                 if [ $attempts -eq 0 ]; then
-                    printf "${BLUE}◉${NC} ${GRAY}Waiting for Docker engine${NC}"
+                    printf "        ${BLUE}◉${NC} ${GRAY}Waiting for Docker engine${NC}"
                 fi
                 printf "."
                 sleep 3
@@ -543,7 +549,7 @@ start_docker() {
                 printf "${YELLOW}!${NC} ${GRAY}Please wait for Docker to fully start, then rerun installer${NC}\n"
                 return 1
             else
-                printf "\n${GREEN}✓${NC} ${GRAY}Docker Desktop ready and running${NC}\n"
+                printf "\n        ${GREEN}✓${NC} ${GRAY}Docker Desktop ready and running${NC}\n"
                 return 0
             fi
             ;;
@@ -783,7 +789,7 @@ main() {
         test_docker_access
     fi
 
-    printf "\n${GREEN}✓${NC} Docker setup complete\n"
+    printf "\n        ${GREEN}✓${NC} Docker setup complete\n"
 }
 
 # Execute main function with error handling
