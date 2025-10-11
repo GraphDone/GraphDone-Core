@@ -28,10 +28,10 @@ else
 fi
 
 # Helper functions
-log_info() { printf "${CYAN}ℹ${NC} $1\n"; }
-log_success() { printf "${GREEN}✓${NC} $1\n"; }
-log_warning() { printf "${YELLOW}⚠${NC} $1\n"; }
-log_error() { printf "${RED}✗${NC} $1\n" >&2; }
+log_info() { printf "        ${CYAN}ℹ${NC} $1\n"; }
+log_success() { printf "        ${GREEN}✓${NC} $1\n"; }
+log_warning() { printf "        ${YELLOW}⚠${NC} $1\n"; }
+log_error() { printf "        ${RED}✗${NC} $1\n" >&2; }
 
 # Platform detection
 detect_platform() {
@@ -57,7 +57,7 @@ check_git_installed() {
         if command -v git >/dev/null 2>&1; then
             GIT_VERSION=$(git --version | sed 's/git version //')
             CURRENT_VERSION=$(echo "$GIT_VERSION" | sed 's/ (Apple Git.*)//' | sed 's/[^0-9.]//g')
-            printf "${GREEN}✓${NC} ${BOLD}Git${NC} ${GREEN}v${GIT_VERSION}${NC} is already installed\n"
+            printf "        ${GREEN}✓${NC} ${BOLD}Git${NC} ${GREEN}v${GIT_VERSION}${NC} is already installed\n"
             
             # Try to get latest version from Homebrew
             LATEST_VERSION=""
@@ -68,7 +68,7 @@ check_git_installed() {
             # Check if it's Apple Git - always update Apple Git
             if echo "$GIT_VERSION" | grep -q "Apple Git"; then
                 if [ -n "$LATEST_VERSION" ]; then
-                    printf "${YELLOW}⚠${NC} Detected Apple's bundled Git. Latest version available: ${BOLD}${LATEST_VERSION}${NC}\n"
+                    printf "        ${YELLOW}⚠${NC} Detected Apple's bundled Git. Latest version available: ${BOLD}${LATEST_VERSION}${NC}\n"
                 else
                     log_warning "Detected Apple's bundled Git. Installing latest version via Homebrew..."
                 fi
@@ -81,7 +81,7 @@ check_git_installed() {
                         log_info "Git version is current (${LATEST_VERSION}). No update needed."
                         exit 0
                     else
-                        printf "${YELLOW}⚠${NC} Git ${CURRENT_VERSION} is outdated. Latest version: ${BOLD}${LATEST_VERSION}${NC}\n"
+                        printf "        ${YELLOW}⚠${NC} Git ${CURRENT_VERSION} is outdated. Latest version: ${BOLD}${LATEST_VERSION}${NC}\n"
                     fi
                 else
                     # Fallback to version check if can't get latest
@@ -109,7 +109,7 @@ install_git_macos() {
     # Check if Homebrew is available
     if command -v brew >/dev/null 2>&1; then
         # Show a spinner while installing
-        printf "${CYAN}ℹ ${NC}Downloading and installing Git "
+        printf "        ${CYAN}ℹ ${NC}Downloading and installing Git "
         
         # Install or upgrade Git (suppress all output)
         if brew list git &>/dev/null; then
@@ -125,7 +125,7 @@ install_git_macos() {
         spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
         i=0
         while kill -0 $brew_pid 2>/dev/null; do
-            printf "\r${CYAN}ℹ ${NC}Downloading and installing Git ${CYAN}${spin:i:1}${NC}"
+            printf "\r        ${CYAN}ℹ ${NC}Downloading and installing Git ${CYAN}${spin:i:1}${NC}"
             i=$(( (i+1) % ${#spin} ))
             sleep 0.1
         done
@@ -141,7 +141,7 @@ install_git_macos() {
             # Verify installation and get version
             if command -v git >/dev/null 2>&1; then
                 GIT_VERSION=$(git --version | sed 's/git version //')
-                printf "${GREEN}✓${NC} Git ${GREEN}v${GIT_VERSION}${NC} installed successfully\n"
+                printf "        ${GREEN}✓${NC} Git ${GREEN}v${GIT_VERSION}${NC} installed successfully\n"
             else
                 log_error "Git installation via Homebrew failed"
                 exit 1
@@ -162,7 +162,7 @@ install_git_macos() {
             # Git should be available now
             if command -v git >/dev/null 2>&1; then
                 GIT_VERSION=$(git --version | sed 's/git version //')
-                printf "${GREEN}✓${NC} Git ${GREEN}v${GIT_VERSION}${NC} available via Xcode tools\n"
+                printf "        ${GREEN}✓${NC} Git ${GREEN}v${GIT_VERSION}${NC} available via Xcode tools\n"
             else
                 log_error "Git not found despite Xcode tools being installed"
                 exit 1
@@ -287,8 +287,8 @@ configure_git() {
 
 # Main installation flow
 main() {
-    printf "\n${BOLD}${BLUE}🔧 Git Installation Script${NC}\n"
-    printf "${GRAY}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n\n"
+    printf "\n        ${BOLD}${BLUE}🔧 Git Installation Script${NC}\n"
+    printf "        ${GRAY}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n\n"
     
     # Detect platform
     detect_platform
@@ -318,9 +318,9 @@ main() {
     # Configure Git
     configure_git
     
-    printf "\n${GRAY}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
-    printf "${GREEN}✓${NC} ${BOLD}Git setup completed successfully!${NC}\n"
-    printf "${GRAY}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n\n"
+    printf "\n        ${GRAY}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
+    printf "        ${GREEN}✓${NC} ${BOLD}Git setup completed successfully!${NC}\n"
+    printf "        ${GRAY}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n\n"
 }
 
 # Run main function

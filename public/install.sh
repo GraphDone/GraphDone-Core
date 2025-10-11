@@ -251,25 +251,25 @@ check_and_prompt_git() {
         return 0
     elif [ "$check_result" = "apple_git" ]; then
         GIT_VERSION_OLD=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
-        printf "\r${YELLOW}⚠${NC} ${BOLD}Git${NC} ${YELLOW}${GIT_VERSION_OLD}${NC} ${GRAY}(Apple's bundled version)${NC}"
-        printf "                    \n\n"
+        printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${YELLOW}⚠${NC} ${BOLD}Git${NC} ${YELLOW}${GIT_VERSION_OLD}${NC} ${GRAY}(Apple's bundled version)${NC}%-40s${TEAL}│${NC}  ${TEAL}║${NC}\n" " "
         
-        printf "${YELLOW}🟡 ${BOLD}Git Update Recommended${NC}\n"
+        printf "        ${YELLOW}🟡 ${BOLD}Git Update Recommended${NC}\n"
         # Try to fetch latest version from Homebrew
         LATEST_GIT_VERSION=""
         if command -v brew >/dev/null 2>&1; then
             LATEST_GIT_VERSION=$(brew info git 2>/dev/null | head -n 1 | sed 's/.*stable \([0-9.]*\).*/\1/' || echo "")
         fi
         if [ -n "$LATEST_GIT_VERSION" ]; then
-            printf "${GRAY}Apple's bundled Git is outdated. Latest version is ${BOLD}${LATEST_GIT_VERSION}${NC}${GRAY}.${NC}\n\n"
+            printf "        ${GRAY}Apple's bundled Git is outdated. Latest version is ${BOLD}${LATEST_GIT_VERSION}${NC}${GRAY}.${NC}\n\n"
         else
-            printf "${GRAY}Apple's bundled Git is typically outdated. Homebrew provides the latest version.${NC}\n\n"
+            printf "        ${GRAY}Apple's bundled Git is typically outdated. Homebrew provides the latest version.${NC}\n\n"
         fi
-        printf "${GREEN}✓${NC} Install latest Git via Homebrew\n"
-        printf "${GREEN}✓${NC} Get the newest features and performance improvements\n"
-        printf "${GREEN}✓${NC} Better compatibility with modern repositories\n"
-        printf "${GREEN}✓${NC} Zero manual configuration required\n\n"
-        printf "${CYAN}❯${NC} ${BOLD}Upgrade to latest Git?${NC} ${GRAY}[Press Enter] or 'n' to skip${NC}\n"
+        printf "        ${GREEN}✓${NC} Install latest Git via Homebrew\n"
+        printf "        ${GREEN}✓${NC} Get the newest features and performance improvements\n"
+        printf "        ${GREEN}✓${NC} Better compatibility with modern repositories\n"
+        printf "        ${GREEN}✓${NC} Zero manual configuration required\n\n"
+        printf "        ${CYAN}❯${NC} ${BOLD}Upgrade to latest Git?${NC} ${GRAY}[Press Enter] or 'n' to skip${NC}\n"
+        printf "        "
         read -r response
         
         if [ "$response" != "n" ] && [ "$response" != "N" ]; then
