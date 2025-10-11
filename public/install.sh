@@ -997,19 +997,26 @@ install_graphdone() {
     
     # Always check for project dependencies after Node.js check
     # This handles both fresh installations (after code download) and updates
-    GRAPHDONE_CHECK_DIR="${GRAPHDONE_HOME:-$HOME/graphdone}"
-    
-    # For fresh installations, we'll download the code first if needed
-    if [ ! -d "$GRAPHDONE_CHECK_DIR" ]; then
-        # Fresh installation - download code first to check dependencies
-        printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${PINK}•${NC} ${GRAY}Preparing GraphDone installation${NC}"
-        printf "\033[K\n"
-        
-        # Clone the repo quietly to get package.json
-        git clone --quiet --branch fix/first-start https://github.com/GraphDone/GraphDone-Core.git "$GRAPHDONE_CHECK_DIR" >/dev/null 2>&1
-        FRESH_INSTALL=true
-    else
+    # Smart path detection: check if we're already in a GraphDone directory
+    if [ -f "package.json" ] && grep -q "\"name\": \"graphdone\"" package.json 2>/dev/null; then
+        # We're running from within GraphDone directory (local run)
+        GRAPHDONE_CHECK_DIR="$(pwd)"
         FRESH_INSTALL=false
+    else
+        # Fresh installation or running from outside - use standard location
+        GRAPHDONE_CHECK_DIR="${GRAPHDONE_HOME:-$HOME/graphdone}"
+        
+        # For fresh installations, download the code first if needed
+        if [ ! -d "$GRAPHDONE_CHECK_DIR" ]; then
+            printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${PINK}•${NC} ${GRAY}Preparing GraphDone installation${NC}"
+            printf "\033[K\n"
+            
+            # Clone the repo quietly to get package.json
+            git clone --quiet --branch fix/first-start https://github.com/GraphDone/GraphDone-Core.git "$GRAPHDONE_CHECK_DIR" >/dev/null 2>&1
+            FRESH_INSTALL=true
+        else
+            FRESH_INSTALL=false
+        fi
     fi
     
     # Now check dependencies for both fresh and existing installations
@@ -1020,7 +1027,7 @@ install_graphdone() {
         # Clear to end of line
         printf "\033[K"
         
-        cd "$HOME/graphdone"
+        cd "$GRAPHDONE_CHECK_DIR"
         
         # Check dependencies status in background
         deps_need_install=false
@@ -1176,7 +1183,7 @@ install_graphdone() {
     printf "${TEAL}╚══════════════════════════════════════════════════════════════════════════════════════════════════╝${NC}\n"
 
     # Modern installation section with progress
-    INSTALL_DIR="${GRAPHDONE_HOME:-$HOME/graphdone}"
+    INSTALL_DIR="$GRAPHDONE_CHECK_DIR"
     
     printf "\n"
     printf "${TEAL}╔══════════════════════════════════════════════════════════════════════════════════════════════════╗${NC}\n"
@@ -1526,7 +1533,7 @@ show_success_in_box() {
     GRAY="\033[38;5;244m"   # Gray for progress indicators (256-color)
     CYAN="\033[38;5;51m"    # Cyan for labels (256-color)
     BOLD="\033[1m"          # Bold text
-    INSTALL_DIR="${GRAPHDONE_HOME:-$HOME/graphdone}"
+    INSTALL_DIR="$GRAPHDONE_CHECK_DIR"
     
     # Open the big success box
     printf "${TEAL}╔══════════════════════════════════════════════════════════════════════════════════════════════════╗${NC}\n"
