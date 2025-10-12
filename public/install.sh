@@ -943,6 +943,18 @@ install_graphdone() {
     
     printf "${TEAL}╔══════════════════════════════════════════════════════════════════════════════════════════════════╗${NC}\n"
     printf "${TEAL}║                                                                                                  ║${NC}\n"
+    printf "${TEAL}║${NC}                ${TEAL}${BOLD}██     ██ ███████ ██       ██████  ██████  ███    ███ ███████${NC}                     ${TEAL}║${NC}\n"
+    printf "${TEAL}║${NC}                ${TEAL}${BOLD}██     ██ ██      ██      ██      ██    ██ ████  ████ ██${NC}                          ${TEAL}║${NC}\n"
+    printf "${TEAL}║${NC}                ${TEAL}${BOLD}██  █  ██ █████   ██      ██      ██    ██ ██ ████ ██ █████${NC}                       ${TEAL}║${NC}\n"
+    printf "${TEAL}║${NC}                ${TEAL}${BOLD}██ ███ ██ ██      ██      ██      ██    ██ ██  ██  ██ ██${NC}                          ${TEAL}║${NC}\n"
+    printf "${TEAL}║${NC}                 ${TEAL}${BOLD}███ ███  ███████ ███████  ██████  ██████  ██      ██ ███████${NC}                     ${TEAL}║${NC}\n"
+    printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"
+    printf "${TEAL}║${NC}                                      ${TEAL}${BOLD}████████  ██████${NC}                                            ${TEAL}║${NC}\n"
+    printf "${TEAL}║${NC}                                         ${TEAL}${BOLD}██    ██    ██${NC}                                           ${TEAL}║${NC}\n"
+    printf "${TEAL}║${NC}                                         ${TEAL}${BOLD}██    ██    ██${NC}                                           ${TEAL}║${NC}\n"
+    printf "${TEAL}║${NC}                                         ${TEAL}${BOLD}██    ██    ██${NC}                                           ${TEAL}║${NC}\n"
+    printf "${TEAL}║${NC}                                         ${TEAL}${BOLD}██     ██████${NC}                                            ${TEAL}║${NC}\n"
+    printf "${TEAL}║                                                                                                  ║${NC}\n"
     printf "${TEAL}║           ██████╗ ██████╗  █████╗ ██████╗ ██╗  ██╗██████╗  ██████╗ ███╗   ██╗███████╗            ║${NC}\n"
     printf "${TEAL}║          ██╔════╝ ██╔══██╗██╔══██╗██╔══██╗██║  ██║██╔══██╗██╔═══██╗████╗  ██║██╔════╝            ║${NC}\n"
     printf "${TEAL}║          ██║  ███╗██████╔╝███████║██████╔╝███████║██║  ██║██║   ██║██╔██╗ ██║█████╗              ║${NC}\n"
@@ -1190,7 +1202,12 @@ install_graphdone() {
     printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"
     printf "${TEAL}║${NC}                                  ${CYAN}${BOLD}📍 Installation Setup${NC}                                           ${TEAL}║${NC}\n"
     printf "${TEAL}║${NC}  ${TEAL}┌────────────────────────────────────────────────────────────────────────────────────────────┐${TEAL}  ${TEAL}║${NC}\n"
-    printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}◉${NC} ${GRAY}Target:${NC} ${BOLD}$INSTALL_DIR${NC}%-40s${TEAL}          │${NC}  ${TEAL}║${NC}\n" " "
+    # Calculate proper padding for full path (need 90 chars total for content area)
+    target_text="◉ Target: $INSTALL_DIR"
+    target_length=${#target_text}
+    target_padding=$((90 - target_length))
+    if [ $target_padding -lt 0 ]; then target_padding=0; fi
+    printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}◉${NC} ${GRAY}Target:${NC} ${BOLD}$INSTALL_DIR${NC}%*s${TEAL}│${NC}  ${TEAL}║${NC}\n" $target_padding " "
     
     # Download or update with animated progress
     if [ -d "$INSTALL_DIR" ]; then
