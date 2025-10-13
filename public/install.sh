@@ -1319,11 +1319,10 @@ install_graphdone() {
     
     printf "  ${GREEN}✓ All dependencies verified${NC}\n"
 
-    printf "\n"
-    printf "                                  ${CYAN}${BOLD}💥 Environment Setup${NC}\n"
-
     # Environment setup
     if [ ! -f ".env" ]; then
+        printf "\n"
+        printf "                                  ${CYAN}${BOLD}💥 Environment Setup${NC}\n"
         printf "  ${GRAY}▸${NC} Configuring environment\n"
         cat > .env << 'EOF'
 NODE_ENV=production
