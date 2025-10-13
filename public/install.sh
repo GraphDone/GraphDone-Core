@@ -1140,13 +1140,16 @@ install_graphdone() {
         done
         wait $clone_pid
         
+        # Clear the line completely to prevent spinner artifacts
+        printf "\r\033[K"
+        
         # Success line with exact 88-character content area
         success_content="${GREEN}✓${NC} ${BOLD}Downloaded${NC} ${GREEN}GraphDone${NC}"
         success_plain="✓ Downloaded GraphDone"
         success_spaces=$((88 - ${#success_plain}))
         if [ $success_spaces -lt 0 ]; then success_spaces=0; fi
         success_padding=$(printf "%*s" $success_spaces "")
-        printf "\r  ${success_content}\n"
+        printf "  ${success_content}\n"
     fi
 
     cd "$INSTALL_DIR"
