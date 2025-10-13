@@ -270,7 +270,7 @@ check_and_prompt_git() {
         printf "        ${GREEN}✓${NC} Zero manual configuration required\n\n"
         printf "        ${CYAN}❯${NC} ${BOLD}Upgrade to latest Git?${NC} ${GRAY}[Press Enter] or 'n' to skip${NC}\n"
         printf "        "
-        read -r response
+        read -r response < /dev/tty 2>/dev/null || response="" < /dev/tty 2>/dev/null || response="n"
         
         if [ "$response" != "n" ] && [ "$response" != "N" ]; then
             # Run the Git setup script
@@ -306,7 +306,7 @@ check_and_prompt_git() {
         printf "${GREEN}✓${NC} Automatic upgrade to latest version\n"
         printf "${GREEN}✓${NC} Zero manual configuration required\n\n"
         printf "${CYAN}❯${NC} ${BOLD}Continue with Git upgrade?${NC} ${GRAY}[Press Enter] or Ctrl+C to exit${NC}\n"
-        read -r response
+        read -r response < /dev/tty 2>/dev/null || response="" < /dev/tty 2>/dev/null || response="n"
         
         # Run the Git setup script
         if sh "scripts/setup_git.sh"; then
@@ -325,7 +325,7 @@ check_and_prompt_git() {
     printf "${GREEN}✓${NC} Includes latest stable version\n"
     printf "${GREEN}✓${NC} Zero manual configuration required\n\n"
     printf "${CYAN}❯${NC} ${BOLD}Continue with Git installation?${NC} ${GRAY}[Press Enter] or Ctrl+C to exit${NC}\n"
-    read -r response
+    read -r response < /dev/tty 2>/dev/null || response=""
     
     # Run the Git setup script (skip redundant check)
     if sh "scripts/setup_git.sh" --skip-check; then
@@ -424,7 +424,7 @@ check_and_prompt_nodejs() {
         printf "        ${GREEN}✓${NC} Zero manual intervention required\n\n"
         printf "        ${CYAN}❯${NC} ${BOLD}Continue with npm update?${NC} ${GRAY}[Press Enter] or Ctrl+C to exit${NC}\n"
         printf "        "
-        read -r response
+        read -r response < /dev/tty 2>/dev/null || response="" < /dev/tty 2>/dev/null || response="n"
         
         # Run the Node.js setup script
         if sh "scripts/setup_nodejs.sh"; then
@@ -458,7 +458,7 @@ check_and_prompt_nodejs() {
         printf "        ${GREEN}✓${NC} Zero manual configuration required\n\n"
         printf "        ${CYAN}❯${NC} ${BOLD}Continue with Node.js upgrade?${NC} ${GRAY}[Press Enter] or Ctrl+C to exit${NC}\n"
         printf "        "
-        read -r response
+        read -r response < /dev/tty 2>/dev/null || response="" < /dev/tty 2>/dev/null || response="n"
         
         # Run the Node.js setup script
         if sh "scripts/setup_nodejs.sh"; then
@@ -490,7 +490,7 @@ check_and_prompt_nodejs() {
     printf "        ${GREEN}✓${NC} Zero manual configuration required\n\n"
     printf "        ${CYAN}❯${NC} ${BOLD}Continue with Node.js installation?${NC} ${GRAY}[Press Enter] or Ctrl+C to exit${NC}\n"
     printf "        "
-    read -r response
+    read -r response < /dev/tty 2>/dev/null || response=""
     
     # Run the Node.js setup script (skip redundant check)
     if sh "scripts/setup_nodejs.sh" --skip-check; then
@@ -591,7 +591,7 @@ check_and_prompt_docker() {
         printf "        ${GREEN}✓${NC} Zero manual intervention required\n\n"
         printf "        ${CYAN}❯${NC} ${BOLD}Continue with Docker startup?${NC} ${GRAY}[Press Enter] or Ctrl+C to exit${NC}\n"
         printf "        "
-        read -r response
+        read -r response < /dev/tty 2>/dev/null || response="" < /dev/tty 2>/dev/null || response="n"
         
         # Run the Docker setup script to start Docker (it handles all output)
         if sh "scripts/setup_docker.sh"; then
@@ -622,7 +622,7 @@ check_and_prompt_docker() {
     printf "        ${GREEN}✓${NC} Zero manual configuration, automatic setup\n\n"
     printf "        ${CYAN}❯${NC} ${BOLD}Continue with Docker installation?${NC} ${GRAY}[Press Enter] or Ctrl+C to exit${NC}\n"
     printf "        "
-    read -r response
+    read -r response < /dev/tty 2>/dev/null || response=""
     
     # Run the Docker setup script - it handles everything (skip redundant check)
     if sh "scripts/setup_docker.sh" --skip-check; then
