@@ -1117,9 +1117,6 @@ install_graphdone() {
         mode_padding=$(printf "%*s" $mode_spaces "")
         echo "  ${mode_content}"
         
-        # Empty line
-        echo ""
-        
         # Show download progress
         printf "  ${BLUE}📦${NC} Downloading GraphDone"
         
@@ -1144,8 +1141,8 @@ install_graphdone() {
         wait $clone_pid
         
         # Success line with exact 88-character content area
-        success_content="${GREEN}✓${NC} ${BOLD}Downloaded${NC} ${GREEN}GraphDone Core${NC}"
-        success_plain="✓ Downloaded GraphDone Core"
+        success_content="${GREEN}✓${NC} ${BOLD}Downloaded${NC} ${GREEN}GraphDone${NC}"
+        success_plain="✓ Downloaded GraphDone"
         success_spaces=$((88 - ${#success_plain}))
         if [ $success_spaces -lt 0 ]; then success_spaces=0; fi
         success_padding=$(printf "%*s" $success_spaces "")
