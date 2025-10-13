@@ -1000,17 +1000,8 @@ install_graphdone() {
     printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}◉${NC} ${GRAY}Shell:${NC} ${BOLD}${SHELL}${NC}%-60s${TEAL}             │${NC}  ${TEAL}║${NC}\n" " "
     printf "${TEAL}║${NC}  ${TEAL}└────────────────────────────────────────────────────────────────────────────────────────────┘${TEAL}  ${TEAL}║${NC}\n"
     printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"
-    
-    # Dependencies section inside box
-    printf "${TEAL}║${NC}                                  ${CYAN}${BOLD}📦 Dependency Check${NC}                                             ${TEAL}║${NC}\n"
-    printf "${TEAL}║${NC}  ${TEAL}┌────────────────────────────────────────────────────────────────────────────────────────────┐${TEAL}  ${TEAL}║${NC}\n"
-    
-    # Run dependency checks inside the box
-    check_and_prompt_git
-    check_and_prompt_nodejs
-    
-    # Always check for project dependencies after Node.js check
-    # This handles both fresh installations (after code download) and updates
+    printf "${TEAL}╚══════════════════════════════════════════════════════════════════════════════════════════════════╝${NC}\n"
+
     # Smart path detection: check if we're already in a GraphDone directory
     if [ -f "package.json" ] && grep -q "\"name\": \"graphdone\"" package.json 2>/dev/null; then
         # We're running from within GraphDone directory (local run)
@@ -1019,19 +1010,90 @@ install_graphdone() {
     else
         # Fresh installation or running from outside - use standard location
         GRAPHDONE_CHECK_DIR="${GRAPHDONE_HOME:-$HOME/graphdone}"
-        
-        # For fresh installations, download the code first if needed
-        if [ ! -d "$GRAPHDONE_CHECK_DIR" ]; then
-            printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${PINK}•${NC} ${GRAY}Preparing GraphDone installation${NC}"
-            printf "\033[K\n"
-            
-            # Clone the repo quietly to get package.json
-            git clone --quiet --branch fix/first-start https://github.com/GraphDone/GraphDone-Core.git "$GRAPHDONE_CHECK_DIR" >/dev/null 2>&1
-            FRESH_INSTALL=true
-        else
-            FRESH_INSTALL=false
-        fi
+        FRESH_INSTALL=true
     fi
+
+    # Modern installation section with progress
+    INSTALL_DIR="$GRAPHDONE_CHECK_DIR"
+    
+    printf "\n"
+    printf "${TEAL}╔══════════════════════════════════════════════════════════════════════════════════════════════════╗${NC}\n"
+    printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"
+    printf "${TEAL}║${NC}                                  ${CYAN}${BOLD}📍 Installation Setup${NC}                                           ${TEAL}║${NC}\n"
+    printf "${TEAL}║${NC}  ${TEAL}┌────────────────────────────────────────────────────────────────────────────────────────────┐${TEAL}  ${TEAL}║${NC}\n"
+    # Calculate proper padding for full path (need 90 chars total for content area)
+    target_text="◉ Target: $INSTALL_DIR"
+    target_length=${#target_text}
+    target_padding=$((90 - target_length))
+    if [ $target_padding -lt 0 ]; then target_padding=0; fi
+    printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}◉${NC} ${GRAY}Target:${NC} ${BOLD}$INSTALL_DIR${NC}%*s${TEAL}│${NC}  ${TEAL}║${NC}\n" $target_padding " "
+    
+    # Download or update with animated progress
+    if [ -d "$INSTALL_DIR" ]; then
+        printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}◉${NC} ${GRAY}Mode:${NC} ${YELLOW}Update existing${NC}%-52s${TEAL}               │${NC}  ${TEAL}║${NC}\n" " "
+        printf "${TEAL}║${NC}  ${TEAL}│${NC}                                                                                            ${TEAL}│${NC}  ${TEAL}║${NC}\n"
+        
+        # Show fetching animation
+        printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}↻${NC} Fetching latest changes"
+        cd "$INSTALL_DIR"
+        
+        # Run git pull in background to show progress
+        git pull --quiet >/dev/null 2>&1 &
+        pull_pid=$!
+        
+        # Animated dots while updating
+        while kill -0 $pull_pid 2>/dev/null; do
+            for dot in "" "." ".." "..."; do
+                printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}↻${NC} Fetching latest changes${dot}%-50s${TEAL}│${NC}  ${TEAL}║${NC}" " "
+                sleep 0.2
+                kill -0 $pull_pid 2>/dev/null || break
+            done
+        done
+        wait $pull_pid
+        
+        printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${GREEN}✓${NC} ${BOLD}Updated${NC} ${GREEN}to latest version${NC}%-48s${TEAL}               │${NC}  ${TEAL}║${NC}\n" " "
+    else
+        printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}◉${NC} ${GRAY}Mode:${NC} ${GREEN}Fresh installation${NC}%-48s${TEAL}│${NC}  ${TEAL}║${NC}\n" " "
+        printf "${TEAL}║${NC}  ${TEAL}│${NC}                                                                                              ${TEAL}│${NC}  ${TEAL}║${NC}\n"
+        
+        # Show download progress
+        printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}📦${NC} Downloading GraphDone"
+        
+        # Clone in background to show progress
+        git clone --quiet --branch fix/first-start https://github.com/GraphDone/GraphDone-Core.git "$INSTALL_DIR" >/dev/null 2>&1 &
+        clone_pid=$!
+        
+        # Animated progress bar
+        while kill -0 $clone_pid 2>/dev/null; do
+            for frame in "⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏"; do
+                printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}📦${NC} Downloading GraphDone ${CYAN}${frame}${NC}%-46s${TEAL}│${NC}  ${TEAL}║${NC}" " "
+                sleep 0.1
+                kill -0 $clone_pid 2>/dev/null || break
+            done
+        done
+        wait $clone_pid
+        
+        printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${GREEN}✓${NC} ${BOLD}Downloaded${NC} ${GREEN}GraphDone Core${NC}%-47s${TEAL}│${NC}  ${TEAL}║${NC}\n" " "
+    fi
+    printf "${TEAL}║${NC}  ${TEAL}└────────────────────────────────────────────────────────────────────────────────────────────┘${TEAL}  ${TEAL}║${NC}\n"
+    printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"
+    printf "${TEAL}╚══════════════════════════════════════════════════════════════════════════════════════════════════╝${NC}\n"
+
+    cd "$INSTALL_DIR"
+
+    printf "\n"
+    printf "${TEAL}╔══════════════════════════════════════════════════════════════════════════════════════════════════╗${NC}\n"
+    printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"
+
+    # Dependencies section inside box
+    printf "${TEAL}║${NC}                                  ${CYAN}${BOLD}📦 Dependency Check${NC}                                             ${TEAL}║${NC}\n"
+    printf "${TEAL}║${NC}  ${TEAL}┌────────────────────────────────────────────────────────────────────────────────────────────┐${TEAL}  ${TEAL}║${NC}\n"
+    
+    # Run dependency checks inside the box
+    check_and_prompt_git
+    check_and_prompt_nodejs
+    
+    # Project dependencies check (repository already downloaded in Installation Setup)
     
     # Now check dependencies for both fresh and existing installations
     if [ -f "$GRAPHDONE_CHECK_DIR/package.json" ]; then
@@ -1195,74 +1257,6 @@ install_graphdone() {
     printf "${TEAL}║${NC}  ${TEAL}└────────────────────────────────────────────────────────────────────────────────────────────┘${TEAL}  ${TEAL}║${NC}\n"
     printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"
     printf "${TEAL}╚══════════════════════════════════════════════════════════════════════════════════════════════════╝${NC}\n"
-
-    # Modern installation section with progress
-    INSTALL_DIR="$GRAPHDONE_CHECK_DIR"
-    
-    printf "\n"
-    printf "${TEAL}╔══════════════════════════════════════════════════════════════════════════════════════════════════╗${NC}\n"
-    printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"
-    printf "${TEAL}║${NC}                                  ${CYAN}${BOLD}📍 Installation Setup${NC}                                           ${TEAL}║${NC}\n"
-    printf "${TEAL}║${NC}  ${TEAL}┌────────────────────────────────────────────────────────────────────────────────────────────┐${TEAL}  ${TEAL}║${NC}\n"
-    # Calculate proper padding for full path (need 90 chars total for content area)
-    target_text="◉ Target: $INSTALL_DIR"
-    target_length=${#target_text}
-    target_padding=$((90 - target_length))
-    if [ $target_padding -lt 0 ]; then target_padding=0; fi
-    printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}◉${NC} ${GRAY}Target:${NC} ${BOLD}$INSTALL_DIR${NC}%*s${TEAL}│${NC}  ${TEAL}║${NC}\n" $target_padding " "
-    
-    # Download or update with animated progress
-    if [ -d "$INSTALL_DIR" ]; then
-        printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}◉${NC} ${GRAY}Mode:${NC} ${YELLOW}Update existing${NC}%-52s${TEAL}               │${NC}  ${TEAL}║${NC}\n" " "
-        printf "${TEAL}║${NC}  ${TEAL}│${NC}                                                                                            ${TEAL}│${NC}  ${TEAL}║${NC}\n"
-        
-        # Show fetching animation
-        printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}↻${NC} Fetching latest changes"
-        cd "$INSTALL_DIR"
-        
-        # Run git pull in background to show progress
-        git pull --quiet >/dev/null 2>&1 &
-        pull_pid=$!
-        
-        # Animated dots while updating
-        while kill -0 $pull_pid 2>/dev/null; do
-            for dot in "" "." ".." "..."; do
-                printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}↻${NC} Fetching latest changes${dot}%-50s${TEAL}│${NC}  ${TEAL}║${NC}" " "
-                sleep 0.2
-                kill -0 $pull_pid 2>/dev/null || break
-            done
-        done
-        wait $pull_pid
-        
-        printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${GREEN}✓${NC} ${BOLD}Updated${NC} ${GREEN}to latest version${NC}%-48s${TEAL}               │${NC}  ${TEAL}║${NC}\n" " "
-    else
-        printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}◉${NC} ${GRAY}Mode:${NC} ${GREEN}Fresh installation${NC}%-48s${TEAL}│${NC}  ${TEAL}║${NC}\n" " "
-        printf "${TEAL}║${NC}  ${TEAL}│${NC}                                                                                              ${TEAL}│${NC}  ${TEAL}║${NC}\n"
-        
-        # Show download progress
-        printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}📦${NC} Downloading GraphDone"
-        
-        # Clone in background to show progress
-        git clone --quiet --branch fix/first-start https://github.com/GraphDone/GraphDone-Core.git "$INSTALL_DIR" >/dev/null 2>&1 &
-        clone_pid=$!
-        
-        # Animated progress bar
-        while kill -0 $clone_pid 2>/dev/null; do
-            for frame in "⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏"; do
-                printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}📦${NC} Downloading GraphDone ${CYAN}${frame}${NC}%-46s${TEAL}│${NC}  ${TEAL}║${NC}" " "
-                sleep 0.1
-                kill -0 $clone_pid 2>/dev/null || break
-            done
-        done
-        wait $clone_pid
-        
-        printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${GREEN}✓${NC} ${BOLD}Downloaded${NC} ${GREEN}GraphDone Core${NC}%-47s${TEAL}│${NC}  ${TEAL}║${NC}\n" " "
-    fi
-    printf "${TEAL}║${NC}  ${TEAL}└────────────────────────────────────────────────────────────────────────────────────────────┘${TEAL}  ${TEAL}║${NC}\n"
-    printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"
-    printf "${TEAL}╚══════════════════════════════════════════════════════════════════════════════════════════════════╝${NC}\n"
-
-    cd "$INSTALL_DIR"
 
     # Environment setup
     if [ ! -f ".env" ]; then
