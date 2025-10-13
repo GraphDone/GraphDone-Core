@@ -229,7 +229,7 @@ check_and_prompt_git() {
         fi
         
         # Show current state - animation only, no box borders
-        printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  $circle ${GRAY}Checking Git installation${NC}$dots_display"
+        printf "\r  $circle ${GRAY}Checking Git installation${NC}$dots_display"
         # Clear to end of line to avoid artifacts
         printf "\033[K"
         sleep 0.4
@@ -247,11 +247,11 @@ check_and_prompt_git() {
         local git_display="${GREEN}✓${NC} ${BOLD}Git${NC} ${GREEN}${GIT_VERSION_FULL}${NC} ${GRAY}already installed${NC}"
         local git_plain="✓ Git ${GIT_VERSION_FULL} already installed"
         local padding=$((90 - ${#git_plain}))
-        printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${git_display}%*s${TEAL}│${NC}  ${TEAL}║${NC}\n" $padding ""
+        printf "\r  ${git_display}%*s\n" $padding ""
         return 0
     elif [ "$check_result" = "apple_git" ]; then
         GIT_VERSION_OLD=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
-        printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${YELLOW}⚠${NC} ${BOLD}Git${NC} ${YELLOW}${GIT_VERSION_OLD}${NC} ${GRAY}(Apple's bundled version)${NC}%-40s${TEAL}│${NC}  ${TEAL}║${NC}\n" " "
+        printf "\r  ${YELLOW}⚠${NC} ${BOLD}Git${NC} ${YELLOW}${GIT_VERSION_OLD}${NC} ${GRAY}(Apple's bundled version)${NC}%-40s\n" " "
         
         printf "        ${YELLOW}🟡 ${BOLD}Git Update Recommended${NC}\n"
         # Try to fetch latest version from Homebrew
@@ -286,7 +286,7 @@ check_and_prompt_git() {
                 local git_success="${GREEN}✓${NC} ${BOLD}Git${NC} upgraded to ${GREEN}${NEW_GIT_VERSION}${NC} successfully"
                 local git_success_plain="✓ Git upgraded to ${NEW_GIT_VERSION} successfully"
                 local padding=$((90 - ${#git_success_plain}))
-                printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${git_success}%*s${TEAL}│${NC}  ${TEAL}║${NC}\n" $padding ""
+                printf "  ${git_success}%*s\n" $padding ""
             else
                 printf "${RED}✗${NC} Git setup failed\n"
                 printf "${CYAN}ℹ${NC} Continuing with Apple Git...\n"
@@ -392,7 +392,7 @@ check_and_prompt_nodejs() {
         fi
         
         # Show current state - animation only, no box borders
-        printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  $circle ${GRAY}Checking Node.js installation${NC}$dots_display"
+        printf "\r  $circle ${GRAY}Checking Node.js installation${NC}$dots_display"
         # Clear to end of line to avoid artifacts
         printf "\033[K"
         sleep 0.4
@@ -411,7 +411,7 @@ check_and_prompt_nodejs() {
         local node_display="${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}${NODE_VERSION_FULL}${NC} ${GRAY}and${NC} ${BOLD}npm${NC} ${GREEN}${NPM_VERSION_FULL}${NC} ${GRAY}already installed${NC}"
         local node_plain="✓ Node.js ${NODE_VERSION_FULL} and npm ${NPM_VERSION_FULL} already installed"
         local padding=$((90 - ${#node_plain}))
-        printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${node_display}%*s${TEAL}│${NC}  ${TEAL}║${NC}\n" $padding ""
+        printf "\r  ${node_display}%*s\n" $padding ""
         return 0
     elif [ "$check_result" = "npm_old" ] || [ "$check_result" = "npm_missing" ]; then
         NODE_VERSION_FULL=$(node --version 2>/dev/null || echo "unknown")
@@ -440,7 +440,7 @@ check_and_prompt_nodejs() {
             local node_success="${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}${NEW_NODE_VERSION}${NC} and ${BOLD}npm${NC} ${GREEN}${NEW_NPM_VERSION}${NC} updated successfully"
             local node_success_plain="✓ Node.js ${NEW_NODE_VERSION} and npm ${NEW_NPM_VERSION} updated successfully"
             local padding=$((90 - ${#node_success_plain}))
-            printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${node_success}%*s${TEAL}│${NC}  ${TEAL}║${NC}\n" $padding ""
+            printf "  ${node_success}%*s\n" $padding ""
         else
             printf "${RED}✗${NC} Node.js setup failed\n"
             exit 1
@@ -474,7 +474,7 @@ check_and_prompt_nodejs() {
             local node_success="${GREEN}✓${NC} ${BOLD}Node.js${NC} upgraded to ${GREEN}${NEW_NODE_VERSION}${NC} and ${BOLD}npm${NC} ${GREEN}${NEW_NPM_VERSION}${NC} successfully"
             local node_success_plain="✓ Node.js upgraded to ${NEW_NODE_VERSION} and npm ${NEW_NPM_VERSION} successfully"
             local padding=$((90 - ${#node_success_plain}))
-            printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${node_success}%*s${TEAL}│${NC}  ${TEAL}║${NC}\n" $padding ""
+            printf "  ${node_success}%*s\n" $padding ""
         else
             printf "${RED}✗${NC} Node.js setup failed\n"
             exit 1
@@ -506,7 +506,7 @@ check_and_prompt_nodejs() {
         local node_success="${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}${NEW_NODE_VERSION}${NC} and ${BOLD}npm${NC} ${GREEN}${NEW_NPM_VERSION}${NC} installed successfully"
         local node_success_plain="✓ Node.js ${NEW_NODE_VERSION} and npm ${NEW_NPM_VERSION} installed successfully"
         local padding=$((90 - ${#node_success_plain}))
-        printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${node_success}%*s${TEAL}│${NC}  ${TEAL}║${NC}\n" $padding ""
+        printf "  ${node_success}%*s\n" $padding ""
     else
         printf "${RED}✗${NC} Node.js setup failed\n"
         exit 1
@@ -558,7 +558,7 @@ check_and_prompt_docker() {
         fi
         
         # Show current state - animation only, no box borders
-        printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  $circle ${GRAY}Checking Docker installation${NC}$dots_display"
+        printf "\r  $circle ${GRAY}Checking Docker installation${NC}$dots_display"
         # Clear to end of line to avoid artifacts
         printf "\033[K"
         sleep 0.4
@@ -576,7 +576,7 @@ check_and_prompt_docker() {
         local docker_display="${GREEN}✓${NC} ${BOLD}Docker${NC} ${GREEN}${DOCKER_VERSION}${NC} ${GRAY}already installed and running${NC}"
         local docker_plain="✓ Docker ${DOCKER_VERSION} already installed and running"
         local padding=$((90 - ${#docker_plain}))
-        printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${docker_display}%*s${TEAL}│${NC}  ${TEAL}║${NC}\n" $padding ""
+        printf "\r  ${docker_display}%*s\n" $padding ""
         return 0
     elif [ "$check_result" = "installed" ]; then
         # Docker installed but not running - start it
@@ -606,7 +606,7 @@ check_and_prompt_docker() {
             local docker_success="${GREEN}✓${NC} ${BOLD}Docker${NC} ${GREEN}${DOCKER_VERSION}${NC} started successfully"
             local docker_success_plain="✓ Docker ${DOCKER_VERSION} started successfully"
             local padding=$((90 - ${#docker_success_plain}))
-            printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${docker_success}%*s${TEAL}│${NC}  ${TEAL}║${NC}\n" $padding ""
+            printf "  ${docker_success}%*s\n" $padding ""
         else
             printf "${RED}✗${NC} Docker startup failed\n"
             exit 1
@@ -637,7 +637,7 @@ check_and_prompt_docker() {
         local docker_success="${GREEN}✓${NC} ${BOLD}Docker${NC} ${GREEN}${DOCKER_VERSION}${NC} installed and running successfully"
         local docker_success_plain="✓ Docker ${DOCKER_VERSION} installed and running successfully"
         local padding=$((90 - ${#docker_success_plain}))
-        printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${docker_success}%*s${TEAL}│${NC}  ${TEAL}║${NC}\n" $padding ""
+        printf "  ${docker_success}%*s\n" $padding ""
     else
         printf "${RED}✗${NC} Docker setup failed\n"
         exit 1
@@ -816,7 +816,7 @@ wait_for_services() {
     i=0
     attempts=0
     
-    printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${GRAY}▸${NC} Waiting for services to initialize%-54s${TEAL}│${NC}  ${TEAL}║${NC}\n" " "
+    printf "  ${GRAY}▸${NC} Waiting for services to initialize%-54s\n" " "
     
     while [ $attempts -lt 180 ]; do  # 180 attempts = ~3 minutes
         if check_containers_healthy; then
@@ -824,7 +824,7 @@ wait_for_services() {
             return 0
         fi
         
-        printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${GRAY}▸${NC} Waiting for services to initialize ${YELLOW}${spin:i:1}${NC} (%ds)%-35s${TEAL}│${NC}  ${TEAL}║${NC}" $attempts " "
+        printf "\r  ${GRAY}▸${NC} Waiting for services to initialize ${YELLOW}${spin:i:1}${NC} (%ds)%-35s" $attempts " "
         i=$(( (i+1) % ${#spin} ))
         attempts=$((attempts + 1))
         sleep 1
@@ -975,10 +975,7 @@ install_graphdone() {
 
     # Installation check section with box
     printf "\n"
-    printf "${TEAL}╔══════════════════════════════════════════════════════════════════════════════════════════════════╗${NC}\n"
-    printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"
-    printf "${TEAL}║${NC}                                  ${CYAN}${BOLD}🔍 Installation Check${NC}                                           ${TEAL}║${NC}\n"
-    printf "${TEAL}║${NC}  ${TEAL}┌────────────────────────────────────────────────────────────────────────────────────────────┐${TEAL}  ${TEAL}║${NC}\n"
+    printf "                                  ${CYAN}${BOLD}🔍 Installation Check${NC}\n"
     # Platform display with system name in brackets
     local platform_name
     case "$(uname)" in
@@ -996,11 +993,8 @@ install_graphdone() {
             ;;
     esac
     
-    printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}◉${NC} ${GRAY}Platform:${NC} ${BOLD}$(uname) $(uname -m)${NC} ${GRAY}${platform_name}${NC}%-40s${TEAL}                  │${NC}  ${TEAL}║${NC}\n" " "
-    printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}◉${NC} ${GRAY}Shell:${NC} ${BOLD}${SHELL}${NC}%-60s${TEAL}             │${NC}  ${TEAL}║${NC}\n" " "
-    printf "${TEAL}║${NC}  ${TEAL}└────────────────────────────────────────────────────────────────────────────────────────────┘${TEAL}  ${TEAL}║${NC}\n"
-    printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"
-    printf "${TEAL}╚══════════════════════════════════════════════════════════════════════════════════════════════════╝${NC}\n"
+    printf "  ${BLUE}◉${NC} ${GRAY}Platform:${NC} ${BOLD}$(uname) $(uname -m)${NC} ${GRAY}${platform_name}${NC}\n"
+    printf "  ${BLUE}◉${NC} ${GRAY}Shell:${NC} ${BOLD}${SHELL}${NC}\n"
 
     # Smart path detection: check if we're already in a GraphDone directory
     if [ -f "package.json" ] && grep -q "\"name\": \"graphdone\"" package.json 2>/dev/null; then
@@ -1017,17 +1011,14 @@ install_graphdone() {
     INSTALL_DIR="$GRAPHDONE_CHECK_DIR"
     
     printf "\n"
-    printf "${TEAL}╔══════════════════════════════════════════════════════════════════════════════════════════════════╗${NC}\n"
-    printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"
-    printf "${TEAL}║${NC}                                  ${CYAN}${BOLD}📍 Installation Setup${NC}                                           ${TEAL}║${NC}\n"
-    printf "${TEAL}║${NC}  ${TEAL}┌────────────────────────────────────────────────────────────────────────────────────────────┐${TEAL}  ${TEAL}║${NC}\n"
+    printf "                                  ${CYAN}${BOLD}📍 Installation Setup${NC}\n"
     # Target line with exact 88-character content area
     target_content="${BLUE}◉${NC} ${GRAY}Target:${NC} ${BOLD}$INSTALL_DIR${NC}"
     target_plain="◉ Target: $INSTALL_DIR"
     target_spaces=$((88 - ${#target_plain}))
     if [ $target_spaces -lt 0 ]; then target_spaces=0; fi
     target_padding=$(printf "%*s" $target_spaces "")
-    echo "${TEAL}║${NC}  ${TEAL}│${NC}  ${target_content}${target_padding}${TEAL}  │${NC}  ${TEAL}║${NC}"
+    echo "  ${target_content}"
     
     # Download or update with animated progress
     if [ -d "$INSTALL_DIR" ]; then
@@ -1037,33 +1028,76 @@ install_graphdone() {
         mode_spaces=$((88 - ${#mode_plain}))
         if [ $mode_spaces -lt 0 ]; then mode_spaces=0; fi
         mode_padding=$(printf "%*s" $mode_spaces "")
-        echo "${TEAL}║${NC}  ${TEAL}│${NC}  ${mode_content}${mode_padding}${TEAL}  │${NC}  ${TEAL}║${NC}"
+        echo "  ${mode_content}"
         
-        # Empty line with exact 88 spaces
-        echo "${TEAL}║${NC}  ${TEAL}│${NC}  $(printf "%88s" "")${TEAL}  │${NC}  ${TEAL}║${NC}"
-        
-        # Show fetching animation
-        printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}↻${NC} Fetching latest changes"
         cd "$INSTALL_DIR"
         
         # Run git pull in background to show progress
         git pull --quiet >/dev/null 2>&1 &
         pull_pid=$!
         
-        # Animated dots while updating
-        while kill -0 $pull_pid 2>/dev/null; do
-            for dot in "" "." ".." "..."; do
-                # Update line with exact 88-character content area
-                update_content="${BLUE}↻${NC} Fetching latest changes${dot}"
-                update_plain="↻ Fetching latest changes${dot}"
-                update_spaces=$((88 - ${#update_plain}))
-                if [ $update_spaces -lt 0 ]; then update_spaces=0; fi
-                update_padding=$(printf "%*s" $update_spaces "")
-                printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${update_content}${update_padding}${TEAL}│${NC}  ${TEAL}║${NC}"
-                sleep 0.2
-                kill -0 $pull_pid 2>/dev/null || break
-            done
+        # Add pink color for the circle
+        PINK='\033[38;5;213m'
+        
+        # Pink blinking circle during entire fetching process
+        blink_state=0
+        
+        # Continue blinking and adding dots until fetch is complete
+        for cycle in 1 2 3 4 5 6; do
+            # Toggle blink state
+            if [ $blink_state -eq 0 ]; then
+                circle="${PINK}•${NC}"
+                blink_state=1
+            else
+                circle="${DIM}•${NC}"
+                blink_state=0
+            fi
+            
+            # Build the dots display based on cycle
+            dots_display=""
+            if [ $cycle -ge 3 ]; then
+                dots_display=" ${GRAY}●${NC}"
+            fi
+            if [ $cycle -ge 5 ]; then
+                dots_display="$dots_display ${BLUE}●${NC}"
+            fi
+            if [ $cycle -eq 6 ]; then
+                dots_display="$dots_display ${CYAN}●${NC}"
+            fi
+            
+            # Show current state - animation only, no box borders
+            printf "\r  $circle ${GRAY}Fetching latest changes${NC}$dots_display"
+            # Clear to end of line to avoid artifacts
+            printf "\033[K"
+            sleep 0.4
+            
+            # Break if fetch is complete
+            kill -0 $pull_pid 2>/dev/null || break
         done
+        
+        # Continue waiting if still running
+        while kill -0 $pull_pid 2>/dev/null; do
+            # Toggle blink state
+            if [ $blink_state -eq 0 ]; then
+                circle="${PINK}•${NC}"
+                blink_state=1
+            else
+                circle="${DIM}•${NC}"
+                blink_state=0
+            fi
+            
+            # Keep the full dots display
+            dots_display=" ${GRAY}●${NC} ${BLUE}●${NC} ${CYAN}●${NC}"
+            
+            # Show current state
+            printf "\r  $circle ${GRAY}Fetching latest changes${NC}$dots_display"
+            printf "\033[K"
+            sleep 0.4
+        done
+        
+        # Smooth transition: show completion state briefly
+        printf " ${GREEN}●${NC}"
+        sleep 0.3
         wait $pull_pid
         
         # Success line with exact 88-character content area
@@ -1072,7 +1106,8 @@ install_graphdone() {
         success_spaces=$((88 - ${#success_plain}))
         if [ $success_spaces -lt 0 ]; then success_spaces=0; fi
         success_padding=$(printf "%*s" $success_spaces "")
-        printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${success_content}${success_padding}${TEAL}  │${NC}  ${TEAL}║${NC}\n"
+        printf "\r  ${success_content}"
+        printf "\033[K\n"
     else
         # Mode line with exact 88-character content area
         mode_content="${BLUE}◉${NC} ${GRAY}Mode:${NC} ${GREEN}Fresh installation${NC}"
@@ -1080,13 +1115,13 @@ install_graphdone() {
         mode_spaces=$((88 - ${#mode_plain}))
         if [ $mode_spaces -lt 0 ]; then mode_spaces=0; fi
         mode_padding=$(printf "%*s" $mode_spaces "")
-        echo "${TEAL}║${NC}  ${TEAL}│${NC}  ${mode_content}${mode_padding}${TEAL}  │${NC}  ${TEAL}║${NC}"
+        echo "  ${mode_content}"
         
-        # Empty line with exact 88 spaces
-        echo "${TEAL}║${NC}  ${TEAL}│${NC}  $(printf "%88s" "")${TEAL}  │${NC}  ${TEAL}║${NC}"
+        # Empty line
+        echo ""
         
         # Show download progress
-        printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}📦${NC} Downloading GraphDone"
+        printf "  ${BLUE}📦${NC} Downloading GraphDone"
         
         # Clone in background to show progress
         git clone --quiet --branch fix/first-start https://github.com/GraphDone/GraphDone-Core.git "$INSTALL_DIR" >/dev/null 2>&1 &
@@ -1094,14 +1129,14 @@ install_graphdone() {
         
         # Animated progress bar
         while kill -0 $clone_pid 2>/dev/null; do
-            for frame in "⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏"; do
+            for spinner in "⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏"; do
                 # Download line with exact 88-character content area
-                download_content="${BLUE}📦${NC} Downloading GraphDone ${CYAN}${frame}${NC}"
-                download_plain="📦 Downloading GraphDone ${frame}"
+                download_content="${BLUE}📦${NC} Downloading GraphDone ${CYAN}${spinner}${NC}"
+                download_plain="📦 Downloading GraphDone ${spinner}"
                 download_spaces=$((88 - ${#download_plain}))
                 if [ $download_spaces -lt 0 ]; then download_spaces=0; fi
                 download_padding=$(printf "%*s" $download_spaces "")
-                printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${download_content}${download_padding}${TEAL}│${NC}  ${TEAL}║${NC}"
+                printf "\r  ${download_content}"
                 sleep 0.1
                 kill -0 $clone_pid 2>/dev/null || break
             done
@@ -1114,21 +1149,13 @@ install_graphdone() {
         success_spaces=$((88 - ${#success_plain}))
         if [ $success_spaces -lt 0 ]; then success_spaces=0; fi
         success_padding=$(printf "%*s" $success_spaces "")
-        printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${success_content}${success_padding}${TEAL}  │${NC}  ${TEAL}║${NC}\n"
+        printf "\r  ${success_content}\n"
     fi
-    printf "${TEAL}║${NC}  ${TEAL}└────────────────────────────────────────────────────────────────────────────────────────────┘${TEAL}  ${TEAL}║${NC}\n"
-    printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"
-    printf "${TEAL}╚══════════════════════════════════════════════════════════════════════════════════════════════════╝${NC}\n"
 
     cd "$INSTALL_DIR"
 
     printf "\n"
-    printf "${TEAL}╔══════════════════════════════════════════════════════════════════════════════════════════════════╗${NC}\n"
-    printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"
-
-    # Dependencies section inside box
-    printf "${TEAL}║${NC}                                  ${CYAN}${BOLD}📦 Dependency Check${NC}                                             ${TEAL}║${NC}\n"
-    printf "${TEAL}║${NC}  ${TEAL}┌────────────────────────────────────────────────────────────────────────────────────────────┐${TEAL}  ${TEAL}║${NC}\n"
+    printf "                                  ${CYAN}${BOLD}📦 Dependency Check${NC}\n"
     
     # Run dependency checks inside the box
     check_and_prompt_git
@@ -1140,7 +1167,7 @@ install_graphdone() {
     if [ -f "$GRAPHDONE_CHECK_DIR/package.json" ]; then
         # Start showing animation immediately while checking in background
         PINK='\033[38;5;213m'
-        printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${PINK}•${NC} ${GRAY}Checking project dependencies${NC}"
+        printf "  ${PINK}•${NC} ${GRAY}Checking project dependencies${NC}"
         # Clear to end of line
         printf "\033[K"
         
@@ -1192,7 +1219,7 @@ install_graphdone() {
                 fi
                 
                 # Show current state - animation only, no box borders
-                printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  $circle ${GRAY}Checking project dependencies${NC}$dots_display"
+                printf "\r  $circle ${GRAY}Checking project dependencies${NC}$dots_display"
                 # Clear to end of line to avoid artifacts
                 printf "\033[K"
                 sleep 0.4
@@ -1213,7 +1240,7 @@ install_graphdone() {
                 dots_display=" ${GRAY}●${NC} ${BLUE}●${NC} ${CYAN}●${NC}"
                 
                 # Show current state - animation only, no box borders
-                printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  $circle ${GRAY}Checking project dependencies${NC}$dots_display"
+                printf "\r  $circle ${GRAY}Checking project dependencies${NC}$dots_display"
                 # Clear to end of line to avoid artifacts
                 printf "\033[K"
                 sleep 0.4
@@ -1232,9 +1259,9 @@ install_graphdone() {
                 local deps_display="${GREEN}✓${NC} Project dependencies installed"
                 local deps_plain="✓ Project dependencies installed"
                 local padding=$((90 - ${#deps_plain}))
-                printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${deps_display}%*s${TEAL}│${NC}  ${TEAL}║${NC}\n" $padding ""
+                printf "\r  ${deps_display}%*s\n" $padding ""
             else
-                printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${RED}✗${NC} Failed to install project dependencies%-45s${TEAL}│${NC}  ${TEAL}║${NC}\n" " "
+                printf "\r  ${RED}✗${NC} Failed to install project dependencies%-45s\n" " "
                 # Continue anyway - will try again later
             fi
         else
@@ -1265,7 +1292,7 @@ install_graphdone() {
                 fi
                 
                 # Show current state - animation only, no box borders
-                printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  $circle ${GRAY}Checking project dependencies${NC}$dots_display"
+                printf "\r  $circle ${GRAY}Checking project dependencies${NC}$dots_display"
                 # Clear to end of line to avoid artifacts
                 printf "\033[K"
                 sleep 0.4
@@ -1279,25 +1306,18 @@ install_graphdone() {
             local deps_display="${GREEN}✓${NC} Project dependencies up to date (cached)"
             local deps_plain="✓ Project dependencies up to date (cached)"
             local padding=$((90 - ${#deps_plain}))
-            printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${deps_display}%*s${TEAL}│${NC}  ${TEAL}║${NC}\n" $padding ""
+            printf "\r  ${deps_display}%*s\n" $padding ""
         fi
         cd - >/dev/null 2>&1
     fi
     
     check_and_prompt_docker
     
-    # Close the dependencies box
-    printf "${TEAL}║${NC}  ${TEAL}└────────────────────────────────────────────────────────────────────────────────────────────┘${TEAL}  ${TEAL}║${NC}\n"
-    printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"
     
     # Brief pause for smooth transition
     sleep 0.5
     
-    printf "${TEAL}║${NC}  ${TEAL}┌────────────────────────────────────────────────────────────────────────────────────────────┐${TEAL}  ${TEAL}║${NC}\n"
-    printf "${TEAL}║${NC}  ${TEAL}│${NC}                           ${GREEN}✓ All dependencies verified${NC}                                      ${TEAL}│${NC}  ${TEAL}║${NC}\n"
-    printf "${TEAL}║${NC}  ${TEAL}└────────────────────────────────────────────────────────────────────────────────────────────┘${TEAL}  ${TEAL}║${NC}\n"
-    printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"
-    printf "${TEAL}╚══════════════════════════════════════════════════════════════════════════════════════════════════╝${NC}\n"
+    printf "  ${GREEN}✓ All dependencies verified${NC}\n"
 
     # Environment setup
     if [ ! -f ".env" ]; then
@@ -1317,23 +1337,16 @@ EOF
         printf "${GREEN}✓${NC} Environment configured\n"
     fi
 
-    # TLS certificates section with proper box formatting
     printf "\n"
-    printf "${TEAL}╔══════════════════════════════════════════════════════════════════════════════════════════════════╗${NC}\n"
-    printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"
-    printf "${TEAL}║${NC}                                  ${CYAN}${BOLD}🔐 Security Setup${NC}                                               ${TEAL}║${NC}\n"
-    printf "${TEAL}║${NC}  ${TEAL}┌────────────────────────────────────────────────────────────────────────────────────────────┐${TEAL}  ${TEAL}║${NC}\n"
+    printf "                                  ${CYAN}${BOLD}🔐 Security Setup${NC}\n"
     if [ ! -f "deployment/certs/server-cert.pem" ]; then
-        printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${GRAY}▸${NC} Generating TLS certificates...%-53s${TEAL}│${NC}  ${TEAL}║${NC}\n" " "
+        printf "  ${GRAY}▸${NC} Generating TLS certificates...\n"
         mkdir -p deployment/certs || error "Failed to create certificate directory"
         openssl req -x509 -newkey rsa:4096 -nodes -keyout deployment/certs/server-key.pem -out deployment/certs/server-cert.pem -days 365 -subj '/CN=localhost' >/dev/null 2>&1 || error "Failed to generate certificates"
-        printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${GREEN}✓${NC} TLS certificates generated%-58s${TEAL}│${NC}  ${TEAL}║${NC}\n" " "
+        printf "  ${GREEN}✓${NC} TLS certificates generated\n"
     else
-        printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${GREEN}✓${NC} TLS certificates already exist%-54s${TEAL}    │${NC}  ${TEAL}║${NC}\n" " "
+        printf "  ${GREEN}✓${NC} TLS certificates already exist\n"
     fi
-    printf "${TEAL}║${NC}  ${TEAL}└────────────────────────────────────────────────────────────────────────────────────────────┘${TEAL}  ${TEAL}║${NC}\n"
-    printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"
-    printf "${TEAL}╚══════════════════════════════════════════════════════════════════════════════════════════════════╝${NC}\n"
 
     # Smart dependency management with MD5 hash-based caching
     # Only installs if node_modules is missing or package.json has changed
@@ -1419,33 +1432,20 @@ EOF
     fi
     # If dependencies are cached and up-to-date, nothing is shown (silent)
 
-    # Services check section with proper box formatting
     printf "\n"
-    printf "${TEAL}╔══════════════════════════════════════════════════════════════════════════════════════════════════╗${NC}\n"
-    printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"
-    printf "${TEAL}║${NC}                                  ${CYAN}${BOLD}⚡ Services Status${NC}                                              ${TEAL}║${NC}\n"
-    printf "${TEAL}║${NC}  ${TEAL}┌────────────────────────────────────────────────────────────────────────────────────────────┐${TEAL}  ${TEAL}║${NC}\n"
+    printf "                                  ${CYAN}${BOLD}🔧 Services Status${NC}\n"
     
     # Check if services are already running
     if check_containers_healthy; then
-        printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${GREEN}✓${NC} Services already running%-60s${TEAL}    │${NC}  ${TEAL}║${NC}\n" " "
-        printf "${TEAL}║${NC}  ${TEAL}└────────────────────────────────────────────────────────────────────────────────────────────┘${TEAL}  ${TEAL}║${NC}\n"
-        printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"
-        printf "${TEAL}╚══════════════════════════════════════════════════════════════════════════════════════════════════╝${NC}\n"
+        printf "  ${GREEN}✓${NC} Services already running\n"
         printf "\n"
         show_success_in_box
         return 0
     fi
-    printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}◉${NC} Starting fresh services...%-57s${TEAL}     │${NC}  ${TEAL}║${NC}\n" " "
-    printf "${TEAL}║${NC}  ${TEAL}└────────────────────────────────────────────────────────────────────────────────────────────┘${TEAL}  ${TEAL}║${NC}\n"
-    printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"
-    printf "${TEAL}╚══════════════════════════════════════════════════════════════════════════════════════════════════╝${NC}\n"
+    printf "  ${BLUE}◉${NC} Starting fresh services...\n"
 
-    # Container preparation with interactive progress
-    printf "\n${TEAL}╔══════════════════════════════════════════════════════════════════════════════════════════════════╗${NC}\n"
-    printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"
-    printf "${TEAL}║${NC}                                  ${CYAN}${BOLD}📦 Container Preparation${NC}                                        ${TEAL}║${NC}\n"
-    printf "${TEAL}║${NC}  ${TEAL}┌────────────────────────────────────────────────────────────────────────────────────────────┐${TEAL}  ║${NC}\n"
+    printf "\n"
+    printf "                                  ${CYAN}${BOLD}🐳 Container Preparation${NC}\n"
     
     # Try both docker-compose and docker compose for compatibility
     if command -v docker-compose >/dev/null 2>&1; then
@@ -1455,60 +1455,130 @@ EOF
     fi
     
     # Clean up existing containers with progress
-    printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}♻${NC} ${GRAY}Cleaning up existing containers${NC}%-50s${TEAL}       │${NC}  ${TEAL}║${NC}\n" " "
+    printf "  ${BLUE}♻${NC} Cleaning up existing containers\n"
     $DOCKER_COMPOSE -f deployment/docker-compose.yml down --remove-orphans >/dev/null 2>&1 || true
     $DOCKER_COMPOSE -f deployment/docker-compose.registry.yml down --remove-orphans >/dev/null 2>&1 || true
+    
+    # Check for port conflicts and resolve them
+    printf "  ${BLUE}🔍${NC} Checking for port conflicts\n"
+    GRAPHDONE_PORTS="3127 3128 4127 4128 6379 7474 7687"
+    CONFLICTS_FOUND=false
+    
+    for port in $GRAPHDONE_PORTS; do
+        if lsof -ti:$port >/dev/null 2>&1; then
+            if [ "$CONFLICTS_FOUND" = false ]; then
+                printf "  ${YELLOW}⚠${NC} Port conflicts detected, resolving...\n"
+                CONFLICTS_FOUND=true
+            fi
+            printf "    ${RED}✗${NC} Port $port is in use, killing process...\n"
+            lsof -ti:$port | xargs kill -9 >/dev/null 2>&1 || true
+            sleep 0.5
+            # Verify port is now free
+            if lsof -ti:$port >/dev/null 2>&1; then
+                printf "    ${RED}⚠${NC} Port $port still in use (may be system process)\n"
+            else
+                printf "    ${GREEN}✓${NC} Port $port freed\n"
+            fi
+        fi
+    done
+    
+    if [ "$CONFLICTS_FOUND" = false ]; then
+        printf "  ${GREEN}✓${NC} No port conflicts detected\n"
+    fi
 
     # Smart deployment detection with animated progress
-    printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}🔍${NC} Checking deployment strategy"
-    
     # Test for pre-built containers in background
     docker pull ghcr.io/graphdone/graphdone-web:fix-first-start >/dev/null 2>&1 &
     check_pid=$!
     
-    # Animated checking
-    dots=""
-    while kill -0 $check_pid 2>/dev/null; do
-        for i in 1 2 3; do
-            printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}🔍${NC} Checking deployment strategy${dots}%-40s${TEAL}    │${NC}  ${TEAL}║${NC}" " "
-            dots="${dots}."
-            [ ${#dots} -gt 3 ] && dots=""
-            sleep 0.3
-            kill -0 $check_pid 2>/dev/null || break
-        done
+    # Add pink color for the circle
+    PINK='\033[38;5;213m'
+    
+    # Pink blinking circle during entire checking process
+    blink_state=0
+    
+    # Continue blinking and adding dots until check is complete
+    for cycle in 1 2 3 4 5 6; do
+        # Toggle blink state
+        if [ $blink_state -eq 0 ]; then
+            circle="${PINK}•${NC}"
+            blink_state=1
+        else
+            circle="${DIM}•${NC}"
+            blink_state=0
+        fi
+        
+        # Build the dots display based on cycle
+        dots_display=""
+        if [ $cycle -ge 3 ]; then
+            dots_display=" ${GRAY}●${NC}"
+        fi
+        if [ $cycle -ge 5 ]; then
+            dots_display="$dots_display ${BLUE}●${NC}"
+        fi
+        if [ $cycle -eq 6 ]; then
+            dots_display="$dots_display ${CYAN}●${NC}"
+        fi
+        
+        # Show current state - animation only, no box borders
+        printf "\r  $circle ${GRAY}Checking deployment strategy${NC}$dots_display"
+        # Clear to end of line to avoid artifacts
+        printf "\033[K"
+        sleep 0.4
+        
+        # Break if check is complete
+        kill -0 $check_pid 2>/dev/null || break
     done
+    
+    # Continue waiting if still running
+    while kill -0 $check_pid 2>/dev/null; do
+        # Toggle blink state
+        if [ $blink_state -eq 0 ]; then
+            circle="${PINK}•${NC}"
+            blink_state=1
+        else
+            circle="${DIM}•${NC}"
+            blink_state=0
+        fi
+        
+        # Keep the full dots display
+        dots_display=" ${GRAY}●${NC} ${BLUE}●${NC} ${CYAN}●${NC}"
+        
+        # Show current state
+        printf "\r  $circle ${GRAY}Checking deployment strategy${NC}$dots_display"
+        printf "\033[K"
+        sleep 0.4
+    done
+    
+    # Smooth transition: show completion state briefly
+    printf " ${GREEN}●${NC}"
+    sleep 0.3
+    
     wait $check_pid
     check_result=$?
     
     if [ $check_result -eq 0 ]; then
-        printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${GREEN}✓${NC} ${GRAY}Strategy:${NC} ${BOLD}Pre-built containers${NC} ${GREEN}(fast deployment)${NC}%-33s${TEAL}       │${NC}  ${TEAL}║${NC}\n" " "
+        printf "\r  ${GREEN}✓${NC} ${GRAY}Strategy:${NC} ${BOLD}Pre-built containers${NC} ${GREEN}(fast deployment)${NC}\n"
         COMPOSE_FILE="deployment/docker-compose.registry.yml"
         DEPLOYMENT_MODE="registry"
     else
-        printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${GREEN}✓${NC} ${GRAY}Strategy:${NC} ${BOLD}Build from source${NC} ${YELLOW}(longer setup)${NC}%-37s${TEAL}        │${NC}  ${TEAL}║${NC}\n" " "
+        printf "\r  ${GREEN}✓${NC} ${GRAY}Strategy:${NC} ${BOLD}Build from source${NC} ${YELLOW}(longer setup)${NC}\n"
         COMPOSE_FILE="deployment/docker-compose.yml"
         DEPLOYMENT_MODE="local"
     fi
     
-    printf "${TEAL}║${NC}  ${TEAL}└────────────────────────────────────────────────────────────────────────────────────────────┘${NC}  ${TEAL}║${NC}\n"
-    printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"
-    printf "${TEAL}╚══════════════════════════════════════════════════════════════════════════════════════════════════╝${NC}\n"
 
-    # GraphDone service startup with modern progress
-    printf "\n${TEAL}╔══════════════════════════════════════════════════════════════════════════════════════════════════╗${NC}\n"
-    printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"
-    printf "${TEAL}║${NC}                                  ${CYAN}${BOLD}🚀 Starting GraphDone Services${NC}                                  ${TEAL}║${NC}\n"
-    printf "${TEAL}║${NC}  ${TEAL}┌────────────────────────────────────────────────────────────────────────────────────────────┐${TEAL}  ${TEAL}║${NC}\n"
+    printf "\n"
+    printf "                                  ${CYAN}${BOLD}🚀 Starting GraphDone Services${NC}\n"
     
     if [ "$DEPLOYMENT_MODE" = "registry" ]; then
-        printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}◉${NC} ${GRAY}Mode:${NC} ${BOLD}Registry deployment${NC}%-62s${TEAL} │${NC}  ${TEAL}║${NC}\n" " "
-        printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}◉${NC} ${GRAY}Images:${NC} Pre-built containers from ghcr.io/graphdone%-35s${TEAL}  │${NC}  ${TEAL}║${NC}\n" " "
+        printf "  ${BLUE}◉${NC} ${GRAY}Mode:${NC} ${BOLD}Registry deployment${NC}\n"
+        printf "  ${BLUE}◉${NC} ${GRAY}Images:${NC} Pre-built containers from ghcr.io/graphdone\n"
     else
-        printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}◉${NC} ${GRAY}Mode:${NC} ${BOLD}Source build${NC}%-68s${TEAL}│${NC}  ${TEAL}║${NC}\n" " "
-        printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}◉${NC} ${GRAY}Build:${NC} Local container compilation%-55s${TEAL}│${NC}  ${TEAL}║${NC}\n" " "
+        printf "  ${BLUE}◉${NC} ${GRAY}Mode:${NC} ${BOLD}Source build${NC}\n"
+        printf "  ${BLUE}◉${NC} ${GRAY}Build:${NC} Local container compilation\n"
     fi
     
-    printf "${TEAL}║${NC}  ${TEAL}│${NC}%-92s${TEAL}│${NC}  ${TEAL}║${NC}\n" " "
     
     # Start services in background with progress animation
     if [ -f "$COMPOSE_FILE" ]; then
@@ -1527,12 +1597,12 @@ EOF
     service_index=0
     
     # Print the initial line
-    printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}⚡${NC} ${GRAY}Starting services${NC}%-70s${TEAL}│${NC}  ${TEAL}║${NC}\n" " "
+    printf "  ${BLUE}⚡${NC} ${GRAY}Starting services${NC}\n"
     
     while kill -0 $startup_pid 2>/dev/null; do
         current_service=${services[$((service_index % 4))]}
         # Only update the service name and spinner, not the whole line
-        printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}▶${NC} ${GRAY}Starting ${BOLD}graphdone-${current_service}${NC} ${CYAN}${spin:i:1}${NC}%-52s${TEAL}│${NC}  ${TEAL}║${NC}" " "
+        printf "\r  ${BLUE}▶${NC} ${GRAY}Starting ${BOLD}graphdone-${current_service}${NC} ${CYAN}${spin:i:1}${NC}%-52s" " "
         
         i=$(( (i+1) % ${#spin} ))
         # Change service name every 8 iterations
@@ -1546,24 +1616,19 @@ EOF
     startup_result=$?
     
     if [ $startup_result -eq 0 ]; then
-        printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${GREEN}✓${NC} ${BOLD}All services started successfully${NC}%-55s${TEAL}│${NC}  ${TEAL}║${NC}\n" " "
+        printf "\r  ${GREEN}✓${NC} ${BOLD}All services started successfully${NC}\n"
     else
-        printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${RED}✗${NC} ${BOLD}Service startup failed${NC}%-67s${TEAL}│${NC}  ${TEAL}║${NC}\n" " "
+        printf "\r  ${RED}✗${NC} ${BOLD}Service startup failed${NC}\n"
         error "Failed to start services"
     fi
     
     # Wait for services to be ready (more reliable than smart-start's 8 second sleep)
-    printf "${TEAL}║${NC}  ${TEAL}│${NC}%-92s${TEAL}│${NC}  ${TEAL}║${NC}\n" " "
     if wait_for_services; then
-        printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${GREEN}✓${NC} Services are ready and healthy%-58s${TEAL}│${NC}  ${TEAL}║${NC}\n" " "
-        printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${GREEN}✓${NC} Installation complete%-67s${TEAL}│${NC}  ${TEAL}║${NC}\n" " "
+        printf "  ${GREEN}✓${NC} Services are ready and healthy\n"
+        printf "  ${GREEN}✓${NC} Installation complete\n"
     else
-        printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${YELLOW}!${NC} Services started but initialization taking longer%-53s${TEAL}│${NC}  ${TEAL}║${NC}\n" " "
+        printf "  ${YELLOW}!${NC} Services started but initialization taking longer\n"
     fi
-    
-    printf "${TEAL}║${NC}  ${TEAL}└────────────────────────────────────────────────────────────────────────────────────────────┘${TEAL}  ${TEAL}║${NC}\n"
-    printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"
-    printf "${TEAL}╚══════════════════════════════════════════════════════════════════════════════════════════════════╝${NC}\n"
     
     # Continue with success info
     show_success_in_box
@@ -1590,19 +1655,20 @@ show_success_in_box() {
     INSTALL_DIR="$GRAPHDONE_CHECK_DIR"
     
     # Open the big success box
+    printf "\n\n"
     printf "${TEAL}╔══════════════════════════════════════════════════════════════════════════════════════════════════╗${NC}\n"
     printf "${TEAL}║                                                                                                  ║${NC}\n"
     printf "${TEAL}║  ${TEAL}┌────────────────────────────────────────────────────────────────────────────────────────────┐${TEAL}  ║${NC}\n"
-    printf "${TEAL}║  ${TEAL}│${GREEN}${BOLD}                                      ✓ GraphDone Ready${NC}                                     ${TEAL}│  ║${NC}\n"
+    printf "${TEAL}║  ${TEAL}│${GREEN}${BOLD}                                      ✓ GraphDone Ready${NC}                                     ${TEAL}│${NC}  ${TEAL}║${NC}\n"
     printf "${TEAL}║  ${TEAL}└────────────────────────────────────────────────────────────────────────────────────────────┘${TEAL}  ║${NC}\n"
     printf "${TEAL}║                                                                                                  ║${NC}\n"
     
     # Access URLs section in same box with inner box
     printf "${TEAL}║                                        Access URLs                                               ║${NC}\n"
     printf "${TEAL}║  ${TEAL}┌────────────────────────────────────────────────────────────────────────────────────────────┐${TEAL}  ║${NC}\n"
-    printf "${TEAL}║  ${TEAL}│  ${CYAN}Web App:${NC}    https://localhost:3128                                                        ${TEAL}│  ║${NC}\n"
-    printf "${TEAL}║  ${TEAL}│  ${CYAN}GraphQL:${NC}    https://localhost:4128/graphql                                                ${TEAL}│  ║${NC}\n"
-    printf "${TEAL}║  ${TEAL}│  ${CYAN}Database:${NC}   http://localhost:7474                                                         ${TEAL}│  ║${NC}\n"
+    printf "${TEAL}║  ${TEAL}│  ${CYAN}Web App:${NC}    https://localhost:3128                                                        ${TEAL}│${NC}  ${TEAL}║${NC}\n"
+    printf "${TEAL}║  ${TEAL}│  ${CYAN}GraphQL:${NC}    https://localhost:4128/graphql                                                ${TEAL}│${NC}  ${TEAL}║${NC}\n"
+    printf "${TEAL}║  ${TEAL}│  ${CYAN}Database:${NC}   http://localhost:7474                                                         ${TEAL}│${NC}  ${TEAL}║${NC}\n"
     printf "${TEAL}║  ${TEAL}└────────────────────────────────────────────────────────────────────────────────────────────┘${TEAL}  ║${NC}\n"
     printf "${TEAL}║                                                                                                  ║${NC}\n"
     
@@ -1623,9 +1689,9 @@ show_success_in_box() {
         CD_PADDING="$CD_PADDING "
         PAD_COUNT=$((PAD_COUNT - 1))
     done
-    printf "${TEAL}║  ${TEAL}│  ${GRAY}%s${NC}%s${TEAL}│  ║${NC}\n" "$CD_CMD" "$CD_PADDING"
-    printf "${TEAL}║  ${TEAL}│  ${GRAY}sh public/install.sh stop     ${NC}${GRAY}# Stop services${NC}                                             ${TEAL}│  ║${NC}\n"
-    printf "${TEAL}║  ${TEAL}│  ${GRAY}sh public/install.sh remove   ${NC}${GRAY}# Complete reset${NC}                                            ${TEAL}│  ║${NC}\n"
+    printf "${TEAL}║  ${TEAL}│  ${GRAY}%s${NC}%s${TEAL}│${NC}  ${TEAL}║${NC}\n" "$CD_CMD" "$CD_PADDING"
+    printf "${TEAL}║  ${TEAL}│  ${GRAY}sh public/install.sh stop     ${NC}${GRAY}# Stop services${NC}                                             ${TEAL}│${NC}  ${TEAL}║${NC}\n"
+    printf "${TEAL}║  ${TEAL}│  ${GRAY}sh public/install.sh remove   ${NC}${GRAY}# Complete reset${NC}                                            ${TEAL}│${NC}  ${TEAL}║${NC}\n"
     printf "${TEAL}║  ${TEAL}└────────────────────────────────────────────────────────────────────────────────────────────┘${TEAL}  ║${NC}\n"
     printf "${TEAL}║                                                                                                  ║${NC}\n"
     
