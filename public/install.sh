@@ -1027,7 +1027,7 @@ install_graphdone() {
     target_spaces=$((88 - ${#target_plain}))
     if [ $target_spaces -lt 0 ]; then target_spaces=0; fi
     target_padding=$(printf "%*s" $target_spaces "")
-    echo "${TEAL}║${NC}  ${TEAL}│${NC}  ${target_content}${target_padding}${TEAL}│${NC}  ${TEAL}║${NC}"
+    echo "${TEAL}║${NC}  ${TEAL}│${NC}  ${target_content}${target_padding}${TEAL}  │${NC}  ${TEAL}║${NC}"
     
     # Download or update with animated progress
     if [ -d "$INSTALL_DIR" ]; then
@@ -1037,10 +1037,10 @@ install_graphdone() {
         mode_spaces=$((88 - ${#mode_plain}))
         if [ $mode_spaces -lt 0 ]; then mode_spaces=0; fi
         mode_padding=$(printf "%*s" $mode_spaces "")
-        echo "${TEAL}║${NC}  ${TEAL}│${NC}  ${mode_content}${mode_padding}${TEAL}│${NC}  ${TEAL}║${NC}"
+        echo "${TEAL}║${NC}  ${TEAL}│${NC}  ${mode_content}${mode_padding}${TEAL}  │${NC}  ${TEAL}║${NC}"
         
         # Empty line with exact 88 spaces
-        echo "${TEAL}║${NC}  ${TEAL}│${NC}  $(printf "%88s" "")${TEAL}│${NC}  ${TEAL}║${NC}"
+        echo "${TEAL}║${NC}  ${TEAL}│${NC}  $(printf "%88s" "")${TEAL}  │${NC}  ${TEAL}║${NC}"
         
         # Show fetching animation
         printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}↻${NC} Fetching latest changes"
@@ -1072,7 +1072,7 @@ install_graphdone() {
         success_spaces=$((88 - ${#success_plain}))
         if [ $success_spaces -lt 0 ]; then success_spaces=0; fi
         success_padding=$(printf "%*s" $success_spaces "")
-        printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${success_content}${success_padding}${TEAL}│${NC}  ${TEAL}║${NC}\n"
+        printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${success_content}${success_padding}${TEAL}  │${NC}  ${TEAL}║${NC}\n"
     else
         # Mode line with exact 88-character content area
         mode_content="${BLUE}◉${NC} ${GRAY}Mode:${NC} ${GREEN}Fresh installation${NC}"
@@ -1080,10 +1080,10 @@ install_graphdone() {
         mode_spaces=$((88 - ${#mode_plain}))
         if [ $mode_spaces -lt 0 ]; then mode_spaces=0; fi
         mode_padding=$(printf "%*s" $mode_spaces "")
-        echo "${TEAL}║${NC}  ${TEAL}│${NC}  ${mode_content}${mode_padding}${TEAL}│${NC}  ${TEAL}║${NC}"
+        echo "${TEAL}║${NC}  ${TEAL}│${NC}  ${mode_content}${mode_padding}${TEAL}  │${NC}  ${TEAL}║${NC}"
         
         # Empty line with exact 88 spaces
-        echo "${TEAL}║${NC}  ${TEAL}│${NC}  $(printf "%88s" "")${TEAL}│${NC}  ${TEAL}║${NC}"
+        echo "${TEAL}║${NC}  ${TEAL}│${NC}  $(printf "%88s" "")${TEAL}  │${NC}  ${TEAL}║${NC}"
         
         # Show download progress
         printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}📦${NC} Downloading GraphDone"
@@ -1114,7 +1114,7 @@ install_graphdone() {
         success_spaces=$((88 - ${#success_plain}))
         if [ $success_spaces -lt 0 ]; then success_spaces=0; fi
         success_padding=$(printf "%*s" $success_spaces "")
-        printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${success_content}${success_padding}${TEAL}│${NC}  ${TEAL}║${NC}\n"
+        printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${success_content}${success_padding}${TEAL}  │${NC}  ${TEAL}║${NC}\n"
     fi
     printf "${TEAL}║${NC}  ${TEAL}└────────────────────────────────────────────────────────────────────────────────────────────┘${TEAL}  ${TEAL}║${NC}\n"
     printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"
