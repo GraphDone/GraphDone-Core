@@ -289,7 +289,7 @@ check_and_prompt_git() {
                 printf "  ${git_success}%*s\n" $padding ""
             else
                 printf "${RED}✗${NC} Git setup failed\n"
-                printf "${CYAN}ℹ${NC} Continuing with Apple Git...\n"
+                printf "${CYAN}ℹ${NC} Continuing with Apple Git\n"
             fi
         else
             printf "${CYAN}ℹ${NC} Continuing with Apple Git ${GIT_VERSION_OLD}\n"
@@ -654,11 +654,11 @@ install_docker_with_progress() {
     
     case $PLATFORM in
         "linux")
-            printf "  ${GRAY}• Downloading Docker installation script...${NC}\n"
+            printf "  ${GRAY}• Downloading Docker installation script${NC}\n"
             curl -fsSL https://get.docker.com | sh >/dev/null 2>&1 || return 1
-            printf "  ${GRAY}• Adding user to docker group...${NC}\n"
+            printf "  ${GRAY}• Adding user to docker group${NC}\n"
             sudo usermod -aG docker "$USER" 2>/dev/null || true
-            printf "  ${GRAY}• Starting Docker service...${NC}\n"
+            printf "  ${GRAY}• Starting Docker service${NC}\n"
             sudo systemctl start docker 2>/dev/null || true
             sudo systemctl enable docker 2>/dev/null || true
             ;;
@@ -681,17 +681,17 @@ smart_npm_install() {
                 return 0
             fi
             # Log first attempt failure
-            echo "First attempt failed, trying with --legacy-peer-deps..." >> /tmp/npm-debug.log
+            echo "First attempt failed, trying with --legacy-peer-deps" >> /tmp/npm-debug.log
         elif [ $attempt -eq 2 ]; then
             # Second attempt: handle peer dependency conflicts
-            echo "Resolving dependency conflicts..." >> /tmp/npm-debug.log
+            echo "Resolving dependency conflicts" >> /tmp/npm-debug.log
             if npm install --legacy-peer-deps >/dev/null 2>>/tmp/npm-error.log; then
                 return 0
             fi
-            echo "Second attempt failed, trying platform-specific approach..." >> /tmp/npm-debug.log
+            echo "Second attempt failed, trying platform-specific approach" >> /tmp/npm-debug.log
         else
             # Third attempt: handle rollup module issue specifically
-            echo "Installing platform-specific rollup..." >> /tmp/npm-debug.log
+            echo "Installing platform-specific rollup" >> /tmp/npm-debug.log
             
             # Install platform-specific rollup binary
             local rollup_package=""
@@ -843,7 +843,7 @@ stop_services() {
     # Beautiful container cleanup like smart-start
     printf "\n${BOLD}${PURPLE}♻️  CONTAINER CLEANUP${NC}\n"
     printf "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
-    printf " ${YELLOW}🛑${NC} Stopping running containers...\n"
+    printf " ${YELLOW}🛑${NC} Stopping running containers\n"
 
     # Stop containers with status feedback
     for container in graphdone-neo4j graphdone-redis graphdone-api graphdone-web; do
@@ -882,7 +882,7 @@ remove_services() {
         docker stop "$container" >/dev/null 2>&1 || true
     done
     
-    printf " ${YELLOW}🗑️${NC}  Removing old containers...\n"
+    printf " ${YELLOW}🗑️${NC}  Removing old containers\n"
     
     # Remove containers with status feedback
     for container in graphdone-neo4j graphdone-redis graphdone-api graphdone-web; do
@@ -1319,9 +1319,12 @@ install_graphdone() {
     
     printf "  ${GREEN}✓ All dependencies verified${NC}\n"
 
+    printf "\n"
+    printf "                                  ${CYAN}${BOLD}💥 Environment Setup${NC}\n"
+
     # Environment setup
     if [ ! -f ".env" ]; then
-        printf "${GRAY}▸${NC} Configuring environment\n"
+        printf "  ${GRAY}▸${NC} Configuring environment\n"
         cat > .env << 'EOF'
 NODE_ENV=production
 NEO4J_URI=bolt://neo4j:7687
@@ -1334,13 +1337,13 @@ SSL_ENABLED=true
 SSL_KEY_PATH=./deployment/certs/server-key.pem
 SSL_CERT_PATH=./deployment/certs/server-cert.pem
 EOF
-        printf "${GREEN}✓${NC} Environment configured\n"
+        printf "  ${GREEN}✓${NC} Environment configured\n"
     fi
 
     printf "\n"
     printf "                                  ${CYAN}${BOLD}🔐 Security Setup${NC}\n"
     if [ ! -f "deployment/certs/server-cert.pem" ]; then
-        printf "  ${GRAY}▸${NC} Generating TLS certificates...\n"
+        printf "  ${GRAY}▸${NC} Generating TLS certificates\n"
         mkdir -p deployment/certs || error "Failed to create certificate directory"
         openssl req -x509 -newkey rsa:4096 -nodes -keyout deployment/certs/server-key.pem -out deployment/certs/server-cert.pem -days 365 -subj '/CN=localhost' >/dev/null 2>&1 || error "Failed to generate certificates"
         printf "  ${GREEN}✓${NC} TLS certificates generated\n"
@@ -1442,7 +1445,7 @@ EOF
         show_success_in_box
         return 0
     fi
-    printf "  ${BLUE}◉${NC} Starting fresh services...\n"
+    printf "  ${BLUE}◉${NC} Starting fresh services\n"
 
     printf "\n"
     printf "                                  ${CYAN}${BOLD}🐳 Container Preparation${NC}\n"
@@ -1467,10 +1470,10 @@ EOF
     for port in $GRAPHDONE_PORTS; do
         if lsof -ti:$port >/dev/null 2>&1; then
             if [ "$CONFLICTS_FOUND" = false ]; then
-                printf "  ${YELLOW}⚠${NC} Port conflicts detected, resolving...\n"
+                printf "  ${YELLOW}⚠${NC} Port conflicts detected, resolving\n"
                 CONFLICTS_FOUND=true
             fi
-            printf "    ${RED}✗${NC} Port $port is in use, killing process...\n"
+            printf "    ${RED}✗${NC} Port $port is in use, killing process\n"
             lsof -ti:$port | xargs kill -9 >/dev/null 2>&1 || true
             sleep 0.5
             # Verify port is now free
