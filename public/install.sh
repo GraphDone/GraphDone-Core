@@ -1021,17 +1021,26 @@ install_graphdone() {
     printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"
     printf "${TEAL}║${NC}                                  ${CYAN}${BOLD}📍 Installation Setup${NC}                                           ${TEAL}║${NC}\n"
     printf "${TEAL}║${NC}  ${TEAL}┌────────────────────────────────────────────────────────────────────────────────────────────┐${TEAL}  ${TEAL}║${NC}\n"
-    # Calculate proper padding for full path (need 90 chars total for content area)
-    target_text="◉ Target: $INSTALL_DIR"
-    target_length=${#target_text}
-    target_padding=$((90 - target_length))
-    if [ $target_padding -lt 0 ]; then target_padding=0; fi
-    printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}◉${NC} ${GRAY}Target:${NC} ${BOLD}$INSTALL_DIR${NC}%*s${TEAL}│${NC}  ${TEAL}║${NC}\n" $target_padding " "
+    # Target line with exact 88-character content area
+    target_content="${BLUE}◉${NC} ${GRAY}Target:${NC} ${BOLD}$INSTALL_DIR${NC}"
+    target_plain="◉ Target: $INSTALL_DIR"
+    target_spaces=$((88 - ${#target_plain}))
+    if [ $target_spaces -lt 0 ]; then target_spaces=0; fi
+    target_padding=$(printf "%*s" $target_spaces "")
+    echo "${TEAL}║${NC}  ${TEAL}│${NC}  ${target_content}${target_padding}${TEAL}│${NC}  ${TEAL}║${NC}"
     
     # Download or update with animated progress
     if [ -d "$INSTALL_DIR" ]; then
-        printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}◉${NC} ${GRAY}Mode:${NC} ${YELLOW}Update existing${NC}%-52s${TEAL}               │${NC}  ${TEAL}║${NC}\n" " "
-        printf "${TEAL}║${NC}  ${TEAL}│${NC}                                                                                            ${TEAL}│${NC}  ${TEAL}║${NC}\n"
+        # Mode line with exact 88-character content area
+        mode_content="${BLUE}◉${NC} ${GRAY}Mode:${NC} ${YELLOW}Update existing${NC}"
+        mode_plain="◉ Mode: Update existing"
+        mode_spaces=$((88 - ${#mode_plain}))
+        if [ $mode_spaces -lt 0 ]; then mode_spaces=0; fi
+        mode_padding=$(printf "%*s" $mode_spaces "")
+        echo "${TEAL}║${NC}  ${TEAL}│${NC}  ${mode_content}${mode_padding}${TEAL}│${NC}  ${TEAL}║${NC}"
+        
+        # Empty line with exact 88 spaces
+        echo "${TEAL}║${NC}  ${TEAL}│${NC}  $(printf "%88s" "")${TEAL}│${NC}  ${TEAL}║${NC}"
         
         # Show fetching animation
         printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}↻${NC} Fetching latest changes"
@@ -1044,17 +1053,37 @@ install_graphdone() {
         # Animated dots while updating
         while kill -0 $pull_pid 2>/dev/null; do
             for dot in "" "." ".." "..."; do
-                printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}↻${NC} Fetching latest changes${dot}%-50s${TEAL}│${NC}  ${TEAL}║${NC}" " "
+                # Update line with exact 88-character content area
+                update_content="${BLUE}↻${NC} Fetching latest changes${dot}"
+                update_plain="↻ Fetching latest changes${dot}"
+                update_spaces=$((88 - ${#update_plain}))
+                if [ $update_spaces -lt 0 ]; then update_spaces=0; fi
+                update_padding=$(printf "%*s" $update_spaces "")
+                printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${update_content}${update_padding}${TEAL}│${NC}  ${TEAL}║${NC}"
                 sleep 0.2
                 kill -0 $pull_pid 2>/dev/null || break
             done
         done
         wait $pull_pid
         
-        printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${GREEN}✓${NC} ${BOLD}Updated${NC} ${GREEN}to latest version${NC}%-48s${TEAL}               │${NC}  ${TEAL}║${NC}\n" " "
+        # Success line with exact 88-character content area
+        success_content="${GREEN}✓${NC} ${BOLD}Updated${NC} ${GREEN}to latest version${NC}"
+        success_plain="✓ Updated to latest version"
+        success_spaces=$((88 - ${#success_plain}))
+        if [ $success_spaces -lt 0 ]; then success_spaces=0; fi
+        success_padding=$(printf "%*s" $success_spaces "")
+        printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${success_content}${success_padding}${TEAL}│${NC}  ${TEAL}║${NC}\n"
     else
-        printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}◉${NC} ${GRAY}Mode:${NC} ${GREEN}Fresh installation${NC}%-48s${TEAL}│${NC}  ${TEAL}║${NC}\n" " "
-        printf "${TEAL}║${NC}  ${TEAL}│${NC}                                                                                              ${TEAL}│${NC}  ${TEAL}║${NC}\n"
+        # Mode line with exact 88-character content area
+        mode_content="${BLUE}◉${NC} ${GRAY}Mode:${NC} ${GREEN}Fresh installation${NC}"
+        mode_plain="◉ Mode: Fresh installation"
+        mode_spaces=$((88 - ${#mode_plain}))
+        if [ $mode_spaces -lt 0 ]; then mode_spaces=0; fi
+        mode_padding=$(printf "%*s" $mode_spaces "")
+        echo "${TEAL}║${NC}  ${TEAL}│${NC}  ${mode_content}${mode_padding}${TEAL}│${NC}  ${TEAL}║${NC}"
+        
+        # Empty line with exact 88 spaces
+        echo "${TEAL}║${NC}  ${TEAL}│${NC}  $(printf "%88s" "")${TEAL}│${NC}  ${TEAL}║${NC}"
         
         # Show download progress
         printf "${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}📦${NC} Downloading GraphDone"
@@ -1066,14 +1095,26 @@ install_graphdone() {
         # Animated progress bar
         while kill -0 $clone_pid 2>/dev/null; do
             for frame in "⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏"; do
-                printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${BLUE}📦${NC} Downloading GraphDone ${CYAN}${frame}${NC}%-46s${TEAL}│${NC}  ${TEAL}║${NC}" " "
+                # Download line with exact 88-character content area
+                download_content="${BLUE}📦${NC} Downloading GraphDone ${CYAN}${frame}${NC}"
+                download_plain="📦 Downloading GraphDone ${frame}"
+                download_spaces=$((88 - ${#download_plain}))
+                if [ $download_spaces -lt 0 ]; then download_spaces=0; fi
+                download_padding=$(printf "%*s" $download_spaces "")
+                printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${download_content}${download_padding}${TEAL}│${NC}  ${TEAL}║${NC}"
                 sleep 0.1
                 kill -0 $clone_pid 2>/dev/null || break
             done
         done
         wait $clone_pid
         
-        printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${GREEN}✓${NC} ${BOLD}Downloaded${NC} ${GREEN}GraphDone Core${NC}%-47s${TEAL}│${NC}  ${TEAL}║${NC}\n" " "
+        # Success line with exact 88-character content area
+        success_content="${GREEN}✓${NC} ${BOLD}Downloaded${NC} ${GREEN}GraphDone Core${NC}"
+        success_plain="✓ Downloaded GraphDone Core"
+        success_spaces=$((88 - ${#success_plain}))
+        if [ $success_spaces -lt 0 ]; then success_spaces=0; fi
+        success_padding=$(printf "%*s" $success_spaces "")
+        printf "\r${TEAL}║${NC}  ${TEAL}│${NC}  ${success_content}${success_padding}${TEAL}│${NC}  ${TEAL}║${NC}\n"
     fi
     printf "${TEAL}║${NC}  ${TEAL}└────────────────────────────────────────────────────────────────────────────────────────────┘${TEAL}  ${TEAL}║${NC}\n"
     printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"
