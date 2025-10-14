@@ -12,6 +12,33 @@
 
 set -e
 
+# Temporary files for cleanup
+TEMP_FILES=""
+CLEANUP_NEEDED=false
+
+# Cleanup function for graceful exit
+cleanup() {
+    if [ "$CLEANUP_NEEDED" = true ]; then
+        printf "\n${YELLOW}Cleaning up...${NC}\n"
+        
+        # Clean temp files
+        for temp_file in $TEMP_FILES; do
+            if [ -f "$temp_file" ]; then
+                rm -f "$temp_file" 2>/dev/null || true
+            fi
+        done
+        
+        # Clean npm temp logs
+        rm -f /tmp/npm-error.log /tmp/npm-debug.log 2>/dev/null || true
+        
+        printf "${GREEN}✓ Cleanup complete${NC}\n"
+    fi
+}
+
+# Trap handlers for graceful exit
+trap 'cleanup; exit 130' INT TERM
+trap 'cleanup' EXIT
+
 # Modern color palette using 256-color codes for better compatibility
 if [ -t 1 ]; then
     if [ "$(tput colors 2>/dev/null)" -ge 256 ] 2>/dev/null; then
@@ -44,7 +71,63 @@ fi
 log() { printf "${GRAY}▸${NC} %s\n" "$1"; }
 ok() { printf "${GREEN}✓${NC} %s\n" "$1"; }
 warn() { printf "${YELLOW}!${NC} %s\n" "$1"; }
-error() { printf "${RED}✗${NC} %s\n" "$1" >&2; exit 1; }
+error() { 
+    printf "${RED}✗${NC} %s\n" "$1" >&2
+    CLEANUP_NEEDED=true
+    cleanup
+    exit 1
+}
+
+# Check disk space (requires at least 5GB free)
+check_disk_space() {
+    local required_gb=5
+    local available_gb=0
+    
+    if command -v df >/dev/null 2>&1; then
+        # Get available space in GB (cross-platform)
+        if [ "$(uname)" = "Darwin" ]; then
+            # macOS: df shows 512-byte blocks by default
+            available_gb=$(df -g . 2>/dev/null | awk 'NR==2 {print int($4)}' || echo "0")
+        else
+            # Linux: use -BG for gigabytes
+            available_gb=$(df -BG . 2>/dev/null | awk 'NR==2 {gsub(/G/,"",$4); print int($4)}' || echo "0")
+        fi
+        
+        if [ "$available_gb" -lt "$required_gb" ]; then
+            warn "Low disk space: ${available_gb}GB available (${required_gb}GB recommended)"
+            printf "${CYAN}ℹ${NC} Continue anyway? ${GRAY}[y/N]${NC} "
+            read -r response < /dev/tty 2>/dev/null || response="n"
+            if [ "$response" != "y" ] && [ "$response" != "Y" ]; then
+                error "Installation cancelled due to low disk space"
+            fi
+        fi
+    fi
+}
+
+# Check network connectivity
+check_network() {
+    local test_url="https://github.com"
+    
+    if command -v curl >/dev/null 2>&1; then
+        if ! curl -sf --max-time 5 "$test_url" >/dev/null 2>&1; then
+            warn "Network connectivity test failed"
+            printf "${CYAN}ℹ${NC} This may cause download failures. Continue? ${GRAY}[y/N]${NC} "
+            read -r response < /dev/tty 2>/dev/null || response="n"
+            if [ "$response" != "y" ] && [ "$response" != "Y" ]; then
+                error "Installation cancelled - network required"
+            fi
+        fi
+    elif command -v wget >/dev/null 2>&1; then
+        if ! wget -q --timeout=5 --spider "$test_url" 2>/dev/null; then
+            warn "Network connectivity test failed"
+            printf "${CYAN}ℹ${NC} This may cause download failures. Continue? ${GRAY}[y/N]${NC} "
+            read -r response < /dev/tty 2>/dev/null || response="n"
+            if [ "$response" != "y" ] && [ "$response" != "Y" ]; then
+                error "Installation cancelled - network required"
+            fi
+        fi
+    fi
+}
 
 # Cache configuration
 CACHE_DIR=".graphdone-cache"
@@ -64,11 +147,17 @@ check_deps_fresh() {
         # Linux
         current_hash=$(find . -name "package.json" -type f -exec md5sum {} \; 2>/dev/null | md5sum | cut -d' ' -f1)
     elif command -v md5 >/dev/null 2>&1; then
-        # macOS
-        current_hash=$(find . -name "package.json" -type f -exec md5 {} \; 2>/dev/null | md5)
+        # macOS - use -q for quiet mode (raw hash output only)
+        current_hash=$(find . -name "package.json" -type f -exec md5 -q {} \; 2>/dev/null | sort | md5 -q)
     else
-        # Fallback - use file modification times
-        current_hash=$(find . -name "package.json" -type f -exec stat -c %Y {} \; 2>/dev/null | sort | md5sum | cut -d' ' -f1 2>/dev/null || echo "fallback")
+        # Fallback - use file modification times with OS-specific stat
+        if [ "$(uname)" = "Darwin" ]; then
+            # macOS stat format
+            current_hash=$(find . -name "package.json" -type f -exec stat -f %m {} \; 2>/dev/null | sort | md5 -q 2>/dev/null || echo "fallback")
+        else
+            # Linux stat format
+            current_hash=$(find . -name "package.json" -type f -exec stat -c %Y {} \; 2>/dev/null | sort | md5sum | cut -d' ' -f1 2>/dev/null || echo "fallback")
+        fi
     fi
     local cached_hash=$(cat "$deps_hash_file" 2>/dev/null || echo "")
     
@@ -86,8 +175,8 @@ update_deps_hash() {
         # Linux
         find . -name "package.json" -type f -exec md5sum {} \; 2>/dev/null | md5sum | cut -d' ' -f1 > "$CACHE_DIR/deps-hash"
     elif command -v md5 >/dev/null 2>&1; then
-        # macOS
-        find . -name "package.json" -type f -exec md5 {} \; 2>/dev/null | md5 > "$CACHE_DIR/deps-hash"
+        # macOS - use -q for quiet mode (raw hash output only)
+        find . -name "package.json" -type f -exec md5 -q {} \; 2>/dev/null | sort | md5 -q > "$CACHE_DIR/deps-hash"
     else
         # Fallback
         echo "fallback" > "$CACHE_DIR/deps-hash"
@@ -254,9 +343,9 @@ check_and_prompt_git() {
         printf "\r  ${YELLOW}⚠${NC} ${BOLD}Git${NC} ${YELLOW}${GIT_VERSION_OLD}${NC} ${GRAY}(Apple's bundled version)${NC}%-40s\n" " "
         
         printf "        ${YELLOW}🟡 ${BOLD}Git Update Recommended${NC}\n"
-        # Try to fetch latest version from Homebrew
+        # Try to fetch latest version from Homebrew (macOS only)
         LATEST_GIT_VERSION=""
-        if command -v brew >/dev/null 2>&1; then
+        if [ "$(uname)" = "Darwin" ] && command -v brew >/dev/null 2>&1; then
             LATEST_GIT_VERSION=$(brew info git 2>/dev/null | head -n 1 | sed 's/.*stable \([0-9.]*\).*/\1/' || echo "")
         fi
         if [ -n "$LATEST_GIT_VERSION" ]; then
@@ -277,8 +366,10 @@ check_and_prompt_git() {
             if sh "scripts/setup_git.sh"; then
                 # After successful installation, clear all output and show clean result
                 # Clear approximately 27 lines (Git Update section + Git Installation Script)
-                for i in $(seq 1 27); do
+                i=1
+                while [ $i -le 27 ]; do
                     printf "\033[F\033[K"  # Move up and clear line
+                    i=$((i + 1))
                 done
                 
                 # Get the new Git version and show clean success message
@@ -430,8 +521,10 @@ check_and_prompt_nodejs() {
         if sh "scripts/setup_nodejs.sh"; then
             # After successful installation, clear all output and show clean result
             # Clear exactly 15 lines (checking animation + npm Update section + Node.js setup output)
-            for i in $(seq 1 15); do
+            i=1
+            while [ $i -le 15 ]; do
                 printf "\033[F\033[K"  # Move up and clear line
+                i=$((i + 1))
             done
             
             # Get the new Node.js and npm versions
@@ -464,8 +557,10 @@ check_and_prompt_nodejs() {
         if sh "scripts/setup_nodejs.sh"; then
             # After successful installation, clear all output and show clean result
             # Clear exactly 16 lines (checking animation + Node.js Update section + Node.js setup output)
-            for i in $(seq 1 16); do
+            i=1
+            while [ $i -le 16 ]; do
                 printf "\033[F\033[K"  # Move up and clear line
+                i=$((i + 1))
             done
             
             # Get the new Node.js and npm versions
@@ -496,8 +591,10 @@ check_and_prompt_nodejs() {
     if sh "scripts/setup_nodejs.sh" --skip-check; then
         # After successful installation, clear all output and show clean result
         # Clear exactly 18 lines (checking animation + Node.js Setup section + Node.js setup output)
-        for i in $(seq 1 18); do
+        i=1
+        while [ $i -le 18 ]; do
             printf "\033[F\033[K"  # Move up and clear line
+            i=$((i + 1))
         done
         
         # Get the new Node.js and npm versions
@@ -597,8 +694,10 @@ check_and_prompt_docker() {
         if sh "scripts/setup_docker.sh"; then
             # After successful startup, clear all output and show clean result
             # Clear exactly 22 lines (checking animation + Docker Startup section + Docker setup output)
-            for i in $(seq 1 22); do
+            i=1
+            while [ $i -le 22 ]; do
                 printf "\033[F\033[K"  # Move up and clear line
+                i=$((i + 1))
             done
             
             # Get Docker version and show clean success message
@@ -628,8 +727,10 @@ check_and_prompt_docker() {
     if sh "scripts/setup_docker.sh" --skip-check; then
         # After successful installation, clear all output and show clean result
         # Clear exactly 26 lines (checking animation + Docker Setup section + Docker setup output)
-        for i in $(seq 1 26); do
+        i=1
+        while [ $i -le 26 ]; do
             printf "\033[F\033[K"  # Move up and clear line
+            i=$((i + 1))
         done
         
         # Get Docker version and show clean success message
@@ -673,25 +774,31 @@ install_docker_with_progress() {
 smart_npm_install() {
     local attempt=1
     local max_attempts=3
+    local npm_error_log="/tmp/npm-error-$$.log"
+    local npm_debug_log="/tmp/npm-debug-$$.log"
+    
+    # Track temp files for cleanup
+    TEMP_FILES="$TEMP_FILES $npm_error_log $npm_debug_log"
+    CLEANUP_NEEDED=true
 
     while [ $attempt -le $max_attempts ]; do
         if [ $attempt -eq 1 ]; then
             # First attempt: standard npm install (show some output for debugging)
-            if npm install >/dev/null 2>/tmp/npm-error.log; then
+            if npm install >/dev/null 2>"$npm_error_log"; then
                 return 0
             fi
             # Log first attempt failure
-            echo "First attempt failed, trying with --legacy-peer-deps" >> /tmp/npm-debug.log
+            echo "First attempt failed, trying with --legacy-peer-deps" >> "$npm_debug_log"
         elif [ $attempt -eq 2 ]; then
             # Second attempt: handle peer dependency conflicts
-            echo "Resolving dependency conflicts" >> /tmp/npm-debug.log
-            if npm install --legacy-peer-deps >/dev/null 2>>/tmp/npm-error.log; then
+            echo "Resolving dependency conflicts" >> "$npm_debug_log"
+            if npm install --legacy-peer-deps >/dev/null 2>>"$npm_error_log"; then
                 return 0
             fi
-            echo "Second attempt failed, trying platform-specific approach" >> /tmp/npm-debug.log
+            echo "Second attempt failed, trying platform-specific approach" >> "$npm_debug_log"
         else
             # Third attempt: handle rollup module issue specifically
-            echo "Installing platform-specific rollup" >> /tmp/npm-debug.log
+            echo "Installing platform-specific rollup" >> "$npm_debug_log"
             
             # Install platform-specific rollup binary
             local rollup_package=""
@@ -708,17 +815,17 @@ smart_npm_install() {
                     rollup_package="@rollup/rollup-linux-x64-gnu"
                     ;;
                 *)
-                    echo "Skipping platform-specific rollup for $(uname)" >> /tmp/npm-debug.log
+                    echo "Skipping platform-specific rollup for $(uname)" >> "$npm_debug_log"
                     ;;
             esac
             
             if [ -n "$rollup_package" ]; then
-                if npm install "$rollup_package" --save-dev >/dev/null 2>>/tmp/npm-error.log && npm install --legacy-peer-deps >/dev/null 2>>/tmp/npm-error.log; then
+                if npm install "$rollup_package" --save-dev >/dev/null 2>>"$npm_error_log" && npm install --legacy-peer-deps >/dev/null 2>>"$npm_error_log"; then
                     return 0
                 fi
             else
                 # Try without platform-specific rollup
-                if npm install --legacy-peer-deps >/dev/null 2>>/tmp/npm-error.log; then
+                if npm install --legacy-peer-deps >/dev/null 2>>"$npm_error_log"; then
                     return 0
                 fi
             fi
@@ -728,9 +835,9 @@ smart_npm_install() {
     done
 
     # Show error details if all attempts failed
-    echo "All npm install attempts failed. Error details:" >> /tmp/npm-debug.log
-    if [ -f "/tmp/npm-error.log" ]; then
-        cat /tmp/npm-error.log >> /tmp/npm-debug.log
+    echo "All npm install attempts failed. Error details:" >> "$npm_debug_log"
+    if [ -f "$npm_error_log" ]; then
+        cat "$npm_error_log" >> "$npm_debug_log"
     fi
     
     return 1
@@ -861,7 +968,10 @@ stop_services() {
     # Kill development processes
     if command -v lsof >/dev/null 2>&1; then
         for port in 3127 3128 4127 4128; do
-            lsof -ti:$port 2>/dev/null | xargs kill -9 2>/dev/null || true
+            pids=$(lsof -ti:$port 2>/dev/null)
+            if [ -n "$pids" ]; then
+                echo "$pids" | xargs kill -9 2>/dev/null || true
+            fi
         done
     fi
     
@@ -972,6 +1082,20 @@ install_graphdone() {
 
     # Platform detection
     detect_platform
+    
+    # Pre-flight checks
+    printf "\n"
+    printf "                                  ${CYAN}${BOLD}🔍 Pre-flight Checks${NC}\n"
+    
+    # Check disk space
+    printf "  ${BLUE}◉${NC} ${GRAY}Checking disk space...${NC}"
+    check_disk_space
+    printf "\r  ${GREEN}✓${NC} ${GRAY}Disk space:${NC} ${BOLD}Sufficient${NC}\n"
+    
+    # Check network connectivity
+    printf "  ${BLUE}◉${NC} ${GRAY}Checking network...${NC}"
+    check_network
+    printf "\r  ${GREEN}✓${NC} ${GRAY}Network:${NC} ${BOLD}Connected${NC}\n"
 
     # Installation check section with box
     printf "\n"
@@ -1345,8 +1469,20 @@ EOF
         printf "  ${GRAY}▸${NC} Generating TLS certificates\n"
         mkdir -p deployment/certs || error "Failed to create certificate directory"
         openssl req -x509 -newkey rsa:4096 -nodes -keyout deployment/certs/server-key.pem -out deployment/certs/server-cert.pem -days 365 -subj '/CN=localhost' >/dev/null 2>&1 || error "Failed to generate certificates"
-        printf "  ${GREEN}✓${NC} TLS certificates generated\n"
+        
+        # Set proper permissions: 600 for private key, 644 for certificate
+        chmod 600 deployment/certs/server-key.pem 2>/dev/null || true
+        chmod 644 deployment/certs/server-cert.pem 2>/dev/null || true
+        
+        printf "  ${GREEN}✓${NC} TLS certificates generated with secure permissions\n"
     else
+        # Verify and fix permissions on existing certificates
+        if [ -f "deployment/certs/server-key.pem" ]; then
+            chmod 600 deployment/certs/server-key.pem 2>/dev/null || true
+        fi
+        if [ -f "deployment/certs/server-cert.pem" ]; then
+            chmod 644 deployment/certs/server-cert.pem 2>/dev/null || true
+        fi
         printf "  ${GREEN}✓${NC} TLS certificates already exist\n"
     fi
 
@@ -1473,7 +1609,10 @@ EOF
                 CONFLICTS_FOUND=true
             fi
             printf "    ${RED}✗${NC} Port $port is in use, killing process\n"
-            lsof -ti:$port | xargs kill -9 >/dev/null 2>&1 || true
+            pids=$(lsof -ti:$port 2>/dev/null)
+            if [ -n "$pids" ]; then
+                echo "$pids" | xargs kill -9 >/dev/null 2>&1 || true
+            fi
             sleep 0.5
             # Verify port is now free
             if lsof -ti:$port >/dev/null 2>&1; then
@@ -1631,6 +1770,9 @@ EOF
     else
         printf "  ${YELLOW}!${NC} Services started but initialization taking longer\n"
     fi
+    
+    # Installation successful - disable cleanup trap for normal files
+    CLEANUP_NEEDED=false
     
     # Continue with success info
     show_success_in_box
