@@ -1446,7 +1446,7 @@ install_graphdone() {
     # Environment setup
     if [ ! -f ".env" ]; then
         printf "\n"
-        printf "${TEAL}────────────────────────────────────${NC}  ${CYAN}${BOLD}✳️ Environment Configuration${NC}  ${TEAL}────────────────────────────────────${NC}\n"
+        printf "${TEAL}────────────────────────────────────${NC}  ${CYAN}${BOLD}✳️  Environment Configuration${NC}  ${TEAL}─────────────────────────────────${NC}\n"
         printf "  ${GRAY}▸${NC} Configuring environment\n"
         cat > .env << 'EOF'
 NODE_ENV=production
@@ -1738,7 +1738,7 @@ EOF
     service_index=0
     
     # Print the initial line
-    printf "  ${BLUE}⚡${NC} ${GRAY}Starting services${NC}\n"
+    printf "  ${BLUE}◉${NC} ${GRAY}Starting services${NC}\n"
     
     while kill -0 $startup_pid 2>/dev/null; do
         current_service=${services[$((service_index % 4))]}
