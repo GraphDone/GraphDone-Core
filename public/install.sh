@@ -678,7 +678,7 @@ check_and_prompt_docker() {
     elif [ "$check_result" = "installed" ]; then
         # Docker installed but not running - start it
         DOCKER_VERSION=$(docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "unknown")
-        printf "\r${YELLOW}⚠${NC} ${BOLD}Docker${NC} ${GREEN}${DOCKER_VERSION}${NC} ${GRAY}installed but not running${NC}"
+        printf "\n  ${YELLOW}⚠${NC} ${BOLD}Docker${NC} ${GREEN}${DOCKER_VERSION}${NC} ${GRAY}installed but not running${NC}"
         printf "                    \n\n"
         
         printf "        ${YELLOW}🟡 ${BOLD}Docker Startup Required${NC}\n"
@@ -1085,7 +1085,7 @@ install_graphdone() {
     
     # Pre-flight checks
     printf "\n"
-    printf "                                  ${CYAN}${BOLD}🔍 Pre-flight Checks${NC}\n"
+    printf "${TEAL}────────────────────────────────────${NC}  ${CYAN}${BOLD}🔍 Pre-flight Checks${NC}  ${TEAL}────────────────────────────────────${NC}\n"
     
     # Check disk space
     printf "  ${BLUE}◉${NC} ${GRAY}Checking disk space...${NC}"
@@ -1099,7 +1099,7 @@ install_graphdone() {
 
     # Installation check section with box
     printf "\n"
-    printf "                                  ${CYAN}${BOLD}🔍 Installation Check${NC}\n"
+    printf "${TEAL}────────────────────────────────────${NC}  ${CYAN}${BOLD}🔍 Installation Check${NC}  ${TEAL}───────────────────────────────────${NC}\n"
     # Platform display with system name in brackets
     local platform_name
     case "$(uname)" in
@@ -1135,7 +1135,7 @@ install_graphdone() {
     INSTALL_DIR="$GRAPHDONE_CHECK_DIR"
     
     printf "\n"
-    printf "                                  ${CYAN}${BOLD}📍 Installation Setup${NC}\n"
+    printf "${TEAL}────────────────────────────────────${NC}  ${CYAN}${BOLD}📍 Installation Setup${NC}  ${TEAL}───────────────────────────────────${NC}\n"
     # Target line with exact 88-character content area
     target_content="${BLUE}◉${NC} ${GRAY}Target:${NC} ${BOLD}$INSTALL_DIR${NC}"
     target_plain="◉ Target: $INSTALL_DIR"
@@ -1279,7 +1279,7 @@ install_graphdone() {
     cd "$INSTALL_DIR"
 
     printf "\n"
-    printf "                                  ${CYAN}${BOLD}📦 Dependency Check${NC}\n"
+    printf "${TEAL}─────────────────────────────────────${NC}  ${CYAN}${BOLD}📦 Dependency Check${NC}  ${TEAL}────────────────────────────────────${NC}\n"
     
     # Run dependency checks inside the box
     check_and_prompt_git
@@ -1446,7 +1446,7 @@ install_graphdone() {
     # Environment setup
     if [ ! -f ".env" ]; then
         printf "\n"
-        printf "                                  ${CYAN}${BOLD}💥 Environment Setup${NC}\n"
+        printf "${TEAL}──────────────────────────────────────${NC}  ${CYAN}${BOLD}💥 Environment Setup${NC}  ${TEAL}──────────────────────────────────${NC}\n"
         printf "  ${GRAY}▸${NC} Configuring environment\n"
         cat > .env << 'EOF'
 NODE_ENV=production
@@ -1464,7 +1464,7 @@ EOF
     fi
 
     printf "\n"
-    printf "                                  ${CYAN}${BOLD}🔐 Security Setup${NC}\n"
+    printf "${TEAL}───────────────────────────────────────${NC}  ${CYAN}${BOLD}🔐 Security Setup${NC}  ${TEAL}────────────────────────────────────${NC}\n"
     if [ ! -f "deployment/certs/server-cert.pem" ]; then
         printf "  ${GRAY}▸${NC} Generating TLS certificates\n"
         mkdir -p deployment/certs || error "Failed to create certificate directory"
@@ -1571,7 +1571,7 @@ EOF
     # If dependencies are cached and up-to-date, nothing is shown (silent)
 
     printf "\n"
-    printf "                                  ${CYAN}${BOLD}🔧 Services Status${NC}\n"
+    printf "${TEAL}────────────────────────────────────${NC}  ${CYAN}${BOLD}🔧 Services Status${NC}  ${TEAL}─────────────────────────────────────${NC}\n"
     
     # Check if services are already running
     if check_containers_healthy; then
@@ -1583,7 +1583,7 @@ EOF
     printf "  ${BLUE}◉${NC} Starting fresh services\n"
 
     printf "\n"
-    printf "                                  ${CYAN}${BOLD}🐳 Container Preparation${NC}\n"
+    printf "${TEAL}──────────────────────────────────${NC}  ${CYAN}${BOLD}🐳 Container Preparation${NC}  ${TEAL}──────────────────────────────────${NC}\n"
     
     # Try both docker-compose and docker compose for compatibility
     if command -v docker-compose >/dev/null 2>&1; then
@@ -1710,7 +1710,7 @@ EOF
     
 
     printf "\n"
-    printf "                                  ${CYAN}${BOLD}🚀 Starting GraphDone Services${NC}\n"
+    printf "${TEAL}──────────────────────────────────${NC}  ${CYAN}${BOLD}🚀 Starting GraphDone Services${NC}  ${TEAL}───────────────────────────────${NC}\n"
     
     if [ "$DEPLOYMENT_MODE" = "registry" ]; then
         printf "  ${BLUE}◉${NC} ${GRAY}Mode:${NC} ${BOLD}Registry deployment${NC}\n"
