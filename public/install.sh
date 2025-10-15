@@ -243,7 +243,10 @@ run_with_spinner() {
     return $?
 }
 
-# Platform detection
+# ============================================================================
+# PLATFORM DETECTION
+# ============================================================================
+
 detect_platform() {
     case "$(uname)" in
         Darwin*)
@@ -335,7 +338,7 @@ check_and_prompt_git() {
         # Format the line to match last box alignment
         local git_display="${GREEN}✓${NC} ${BOLD}Git${NC} ${GREEN}${GIT_VERSION_FULL}${NC} ${GRAY}already installed${NC}"
         local git_plain="✓ Git ${GIT_VERSION_FULL} already installed"
-        local padding=$((90 - ${#git_plain}))
+        local padding=$((88 - ${#git_plain}))
         printf "\r  ${git_display}%*s\n" $padding ""
         return 0
     elif [ "$check_result" = "apple_git" ]; then
@@ -376,7 +379,7 @@ check_and_prompt_git() {
                 NEW_GIT_VERSION=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
                 local git_success="${GREEN}✓${NC} ${BOLD}Git${NC} upgraded to ${GREEN}${NEW_GIT_VERSION}${NC} successfully"
                 local git_success_plain="✓ Git upgraded to ${NEW_GIT_VERSION} successfully"
-                local padding=$((90 - ${#git_success_plain}))
+                local padding=$((88 - ${#git_success_plain}))
                 printf "  ${git_success}%*s\n" $padding ""
             else
                 printf "${RED}✗${NC} Git setup failed\n"
@@ -409,18 +412,33 @@ check_and_prompt_git() {
         return 0
     fi
     
-    printf "\n${YELLOW}🟡 ${BOLD}Git Setup Required${NC}\n"
-    printf "${GRAY}GraphDone requires Git for version control and cloning repositories.${NC}\n\n"
-    printf "${GREEN}✓${NC} We'll use the dedicated Git setup script for your platform\n"
-    printf "${GREEN}✓${NC} Automatic installation via package manager\n"
-    printf "${GREEN}✓${NC} Includes latest stable version\n"
-    printf "${GREEN}✓${NC} Zero manual configuration required\n\n"
-    printf "${CYAN}❯${NC} ${BOLD}Continue with Git installation?${NC} ${GRAY}[Press Enter] or Ctrl+C to exit${NC}\n"
+    printf "\n        ${YELLOW}🟡 ${BOLD}Git Setup Required${NC}\n"
+    printf "        ${GRAY}GraphDone requires Git for version control and cloning repositories.${NC}\n\n"
+    printf "        ${GREEN}✓${NC} We'll use the dedicated Git setup script for your platform\n"
+    printf "        ${GREEN}✓${NC} Automatic installation via package manager\n"
+    printf "        ${GREEN}✓${NC} Includes latest stable version\n"
+    printf "        ${GREEN}✓${NC} Zero manual configuration required\n\n"
+    printf "        ${CYAN}❯${NC} ${BOLD}Continue with Git installation?${NC} ${GRAY}[Press Enter] or Ctrl+C to exit${NC}\n"
+    printf "        "
     read -r response < /dev/tty 2>/dev/null || response=""
     
     # Run the Git setup script (skip redundant check)
     if sh "scripts/setup_git.sh" --skip-check; then
-        printf "\n"
+        # After successful installation, clear all output and show clean result
+        # Clear approximately 23 lines (Checking line + Git Setup section + Installation Script)
+        i=1
+        while [ $i -le 23 ]; do
+            printf "\033[F\033[K"  # Move up and clear line
+            i=$((i + 1))
+        done
+        
+        # Get the new Git version and show clean success message
+        NEW_GIT_VERSION=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
+        local git_success="${GREEN}✓${NC} ${BOLD}Git${NC} ${GREEN}${NEW_GIT_VERSION}${NC} installed successfully"
+        local git_success_plain="✓ Git ${NEW_GIT_VERSION} installed successfully"
+        
+        # Display aligned with other dependency checks (2 spaces indent)
+        printf "  %b\n" "$git_success"
     else
         printf "${RED}✗${NC} Git setup failed\n"
         exit 1
@@ -501,7 +519,7 @@ check_and_prompt_nodejs() {
         # Format the line to match last box alignment
         local node_display="${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}${NODE_VERSION_FULL}${NC} ${GRAY}and${NC} ${BOLD}npm${NC} ${GREEN}${NPM_VERSION_FULL}${NC} ${GRAY}already installed${NC}"
         local node_plain="✓ Node.js ${NODE_VERSION_FULL} and npm ${NPM_VERSION_FULL} already installed"
-        local padding=$((90 - ${#node_plain}))
+        local padding=$((88 - ${#node_plain}))
         printf "\r  ${node_display}%*s\n" $padding ""
         return 0
     elif [ "$check_result" = "npm_old" ] || [ "$check_result" = "npm_missing" ]; then
@@ -532,7 +550,7 @@ check_and_prompt_nodejs() {
             NEW_NPM_VERSION=$(npm --version 2>/dev/null || echo "unknown")
             local node_success="${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}${NEW_NODE_VERSION}${NC} and ${BOLD}npm${NC} ${GREEN}${NEW_NPM_VERSION}${NC} updated successfully"
             local node_success_plain="✓ Node.js ${NEW_NODE_VERSION} and npm ${NEW_NPM_VERSION} updated successfully"
-            local padding=$((90 - ${#node_success_plain}))
+            local padding=$((88 - ${#node_success_plain}))
             printf "  ${node_success}%*s\n" $padding ""
         else
             printf "${RED}✗${NC} Node.js setup failed\n"
@@ -568,7 +586,7 @@ check_and_prompt_nodejs() {
             NEW_NPM_VERSION=$(npm --version 2>/dev/null || echo "unknown")
             local node_success="${GREEN}✓${NC} ${BOLD}Node.js${NC} upgraded to ${GREEN}${NEW_NODE_VERSION}${NC} and ${BOLD}npm${NC} ${GREEN}${NEW_NPM_VERSION}${NC} successfully"
             local node_success_plain="✓ Node.js upgraded to ${NEW_NODE_VERSION} and npm ${NEW_NPM_VERSION} successfully"
-            local padding=$((90 - ${#node_success_plain}))
+            local padding=$((88 - ${#node_success_plain}))
             printf "  ${node_success}%*s\n" $padding ""
         else
             printf "${RED}✗${NC} Node.js setup failed\n"
@@ -602,7 +620,7 @@ check_and_prompt_nodejs() {
         NEW_NPM_VERSION=$(npm --version 2>/dev/null || echo "unknown")
         local node_success="${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}${NEW_NODE_VERSION}${NC} and ${BOLD}npm${NC} ${GREEN}${NEW_NPM_VERSION}${NC} installed successfully"
         local node_success_plain="✓ Node.js ${NEW_NODE_VERSION} and npm ${NEW_NPM_VERSION} installed successfully"
-        local padding=$((90 - ${#node_success_plain}))
+        local padding=$((88 - ${#node_success_plain}))
         printf "  ${node_success}%*s\n" $padding ""
     else
         printf "${RED}✗${NC} Node.js setup failed\n"
@@ -672,7 +690,7 @@ check_and_prompt_docker() {
         # Format the line to match last box alignment  
         local docker_display="${GREEN}✓${NC} ${BOLD}Docker${NC} ${GREEN}${DOCKER_VERSION}${NC} ${GRAY}already installed and running${NC}"
         local docker_plain="✓ Docker ${DOCKER_VERSION} already installed and running"
-        local padding=$((90 - ${#docker_plain}))
+        local padding=$((88 - ${#docker_plain}))
         printf "\r  ${docker_display}%*s\n" $padding ""
         return 0
     elif [ "$check_result" = "installed" ]; then
@@ -704,7 +722,7 @@ check_and_prompt_docker() {
             DOCKER_VERSION=$(docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "unknown")
             local docker_success="${GREEN}✓${NC} ${BOLD}Docker${NC} ${GREEN}${DOCKER_VERSION}${NC} started successfully"
             local docker_success_plain="✓ Docker ${DOCKER_VERSION} started successfully"
-            local padding=$((90 - ${#docker_success_plain}))
+            local padding=$((88 - ${#docker_success_plain}))
             printf "  ${docker_success}%*s\n" $padding ""
         else
             printf "${RED}✗${NC} Docker startup failed\n"
@@ -737,7 +755,7 @@ check_and_prompt_docker() {
         DOCKER_VERSION=$(docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "unknown")
         local docker_success="${GREEN}✓${NC} ${BOLD}Docker${NC} ${GREEN}${DOCKER_VERSION}${NC} installed and running successfully"
         local docker_success_plain="✓ Docker ${DOCKER_VERSION} installed and running successfully"
-        local padding=$((90 - ${#docker_success_plain}))
+        local padding=$((88 - ${#docker_success_plain}))
         printf "  ${docker_success}%*s\n" $padding ""
     else
         printf "${RED}✗${NC} Docker setup failed\n"
@@ -770,7 +788,10 @@ install_docker_with_progress() {
     return 0
 }
 
-# Smart npm install function with caching and multiple fallback strategies
+# ============================================================================
+# NPM INSTALL - PLATFORM SPECIFIC ROLLUP PACKAGES
+# ============================================================================
+
 smart_npm_install() {
     local attempt=1
     local max_attempts=3
@@ -783,11 +804,10 @@ smart_npm_install() {
 
     while [ $attempt -le $max_attempts ]; do
         if [ $attempt -eq 1 ]; then
-            # First attempt: standard npm install (show some output for debugging)
+            # First attempt: standard npm install
             if npm install >/dev/null 2>"$npm_error_log"; then
                 return 0
             fi
-            # Log first attempt failure
             echo "First attempt failed, trying with --legacy-peer-deps" >> "$npm_debug_log"
         elif [ $attempt -eq 2 ]; then
             # Second attempt: handle peer dependency conflicts
@@ -797,22 +817,26 @@ smart_npm_install() {
             fi
             echo "Second attempt failed, trying platform-specific approach" >> "$npm_debug_log"
         else
-            # Third attempt: handle rollup module issue specifically
+            # Third attempt: platform-specific rollup binaries
             echo "Installing platform-specific rollup" >> "$npm_debug_log"
             
-            # Install platform-specific rollup binary
             local rollup_package=""
             case "$(uname)" in
-                "Darwin")
-                    # Detect macOS architecture
+                Darwin*)
+                    # macOS: detect architecture
                     if [ "$(uname -m)" = "arm64" ]; then
                         rollup_package="@rollup/rollup-darwin-arm64"
                     else
                         rollup_package="@rollup/rollup-darwin-x64"
                     fi
                     ;;
-                "Linux")
+                Linux*)
+                    # Linux: x64 GNU
                     rollup_package="@rollup/rollup-linux-x64-gnu"
+                    ;;
+                MINGW*|MSYS*|CYGWIN*)
+                    # Windows: x64
+                    rollup_package="@rollup/rollup-win32-x64-msvc"
                     ;;
                 *)
                     echo "Skipping platform-specific rollup for $(uname)" >> "$npm_debug_log"
@@ -824,7 +848,6 @@ smart_npm_install() {
                     return 0
                 fi
             else
-                # Try without platform-specific rollup
                 if npm install --legacy-peer-deps >/dev/null 2>>"$npm_error_log"; then
                     return 0
                 fi
@@ -1135,6 +1158,21 @@ install_graphdone() {
     INSTALL_DIR="$GRAPHDONE_CHECK_DIR"
     
     printf "\n"
+    printf "${TEAL}────────────────────────────────────${NC}  ${CYAN}${BOLD}🔰 Dependency Checks${NC}  ${TEAL}────-───────────────────────────────────${NC}\n"
+    
+    # Run dependency checks BEFORE trying to download/update code
+    check_and_prompt_git
+    check_and_prompt_nodejs
+    
+    
+    check_and_prompt_docker
+    
+    # Brief pause for smooth transition
+    sleep 0.5
+    
+    printf "  ${GREEN}✓ All dependencies verified${NC}\n"
+    
+    printf "\n"
     printf "${TEAL}────────────────────────────────────${NC}  ${CYAN}${BOLD}📡 Code Installation${NC}  ${TEAL}────-───────────────────────────────────${NC}\n"
     # Target line with exact 88-character content area
     target_content="${BLUE}◉${NC} ${GRAY}Target:${NC} ${BOLD}$INSTALL_DIR${NC}"
@@ -1278,170 +1316,128 @@ install_graphdone() {
 
     cd "$INSTALL_DIR"
 
-    printf "\n"
-    printf "${TEAL}────────────────────────────────────${NC}  ${CYAN}${BOLD}🔰 Dependency Checks${NC}  ${TEAL}────-───────────────────────────────────${NC}\n"
+    # Project dependencies check and install (after code is downloaded)
+    # First show checking animation
+    PINK='\033[38;5;213m'
+    blink_state=0
     
-    # Run dependency checks inside the box
-    check_and_prompt_git
-    check_and_prompt_nodejs
-    
-    # Project dependencies check (repository already downloaded in Installation Setup)
-    
-    # Now check dependencies for both fresh and existing installations
-    if [ -f "$GRAPHDONE_CHECK_DIR/package.json" ]; then
-        # Start showing animation immediately while checking in background
-        PINK='\033[38;5;213m'
-        printf "  ${PINK}•${NC} ${GRAY}Checking project dependencies${NC}"
-        # Clear to end of line
-        printf "\033[K"
-        
-        cd "$GRAPHDONE_CHECK_DIR"
-        
-        # Check dependencies status in background
-        deps_need_install=false
-        if [ ! -d "node_modules" ] || ! check_deps_fresh; then
-            deps_need_install=true
-        fi
-        
-        if [ "$deps_need_install" = true ]; then
-            # Clear the initial message
-            printf "\r\033[K"
-            # Blinking bullet with progressive dots (same as Node.js check)
-            PINK='\033[38;5;213m'
-            blink_state=0
-            
-            # Run npm install silently in background
-            smart_npm_install &
-            npm_pid=$!
-            
-            # Show animation exactly like Node.js check
-            for cycle in 1 2 3 4 5 6 7 8 9 10 11 12; do
-                # Check if npm install is still running
-                if ! kill -0 $npm_pid 2>/dev/null; then
-                    break
-                fi
-                
-                # Toggle blink state for bullet
-                if [ $blink_state -eq 0 ]; then
-                    circle="${PINK}•${NC}"
-                    blink_state=1
-                else
-                    circle="${DIM}•${NC}"
-                    blink_state=0
-                fi
-                
-                # Build the dots display based on cycle (same as Node.js)
-                dots_display=""
-                if [ $cycle -ge 3 ]; then
-                    dots_display=" ${GRAY}●${NC}"
-                fi
-                if [ $cycle -ge 5 ]; then
-                    dots_display="$dots_display ${BLUE}●${NC}"
-                fi
-                if [ $cycle -ge 6 ]; then
-                    dots_display="$dots_display ${CYAN}●${NC}"
-                fi
-                
-                # Show current state - animation only, no box borders
-                printf "\r  $circle ${GRAY}Checking project dependencies${NC}$dots_display"
-                # Clear to end of line to avoid artifacts
-                printf "\033[K"
-                sleep 0.4
-            done
-            
-            # Continue waiting if still running (keep same 3 dots, 4th will be completion)
-            while kill -0 $npm_pid 2>/dev/null; do
-                # Toggle blink state for bullet
-                if [ $blink_state -eq 0 ]; then
-                    circle="${PINK}•${NC}"
-                    blink_state=1
-                else
-                    circle="${DIM}•${NC}"
-                    blink_state=0
-                fi
-                
-                # Keep the same 3 dots (4th dot is the completion green dot)
-                dots_display=" ${GRAY}●${NC} ${BLUE}●${NC} ${CYAN}●${NC}"
-                
-                # Show current state - animation only, no box borders
-                printf "\r  $circle ${GRAY}Checking project dependencies${NC}$dots_display"
-                # Clear to end of line to avoid artifacts
-                printf "\033[K"
-                sleep 0.4
-            done
-            
-            # Smooth transition: show completion state briefly
-            printf " ${GREEN}●${NC}"
-            sleep 0.3
-            
-            wait $npm_pid
-            npm_exit_code=$?
-            
-            if [ $npm_exit_code -eq 0 ]; then
-                update_deps_hash
-                # Format the line to match last box alignment
-                local deps_display="${GREEN}✓${NC} Project dependencies installed"
-                local deps_plain="✓ Project dependencies installed"
-                local padding=$((90 - ${#deps_plain}))
-                printf "\r  ${deps_display}%*s\n" $padding ""
-            else
-                printf "\r  ${RED}✗${NC} Failed to install project dependencies%-45s\n" " "
-                # Continue anyway - will try again later
-            fi
+    # Initial check animation (like Git/Node.js)
+    for cycle in 1 2 3 4 5 6; do
+        # Toggle blink state
+        if [ $blink_state -eq 0 ]; then
+            circle="${PINK}•${NC}"
+            blink_state=1
         else
-            # Already showed initial message, continue with animation
+            circle="${DIM}•${NC}"
             blink_state=0
-            
-            # Continue with animation from where we started
-            for cycle in 1 2 3 4 5; do
-                # Toggle blink state
-                if [ $blink_state -eq 0 ]; then
-                    circle="${PINK}•${NC}"
-                    blink_state=1
-                else
-                    circle="${DIM}•${NC}"
-                    blink_state=0
-                fi
-                
-                # Build the dots display based on cycle (same timing as Node.js)
-                dots_display=""
-                if [ $cycle -ge 3 ]; then
-                    dots_display=" ${GRAY}●${NC}"
-                fi
-                if [ $cycle -ge 5 ]; then
-                    dots_display="$dots_display ${BLUE}●${NC}"
-                fi
-                if [ $cycle -eq 6 ]; then
-                    dots_display="$dots_display ${CYAN}●${NC}"
-                fi
-                
-                # Show current state - animation only, no box borders
-                printf "\r  $circle ${GRAY}Checking project dependencies${NC}$dots_display"
-                # Clear to end of line to avoid artifacts
-                printf "\033[K"
-                sleep 0.4
-            done
-            
-            # Smooth transition: show completion state briefly
-            printf " ${GREEN}●${NC}"
-            sleep 0.3
-            
-            # Format the line to match last box alignment
-            local deps_display="${GREEN}✓${NC} Project dependencies up to date (cached)"
-            local deps_plain="✓ Project dependencies up to date (cached)"
-            local padding=$((90 - ${#deps_plain}))
-            printf "\r  ${deps_display}%*s\n" $padding ""
         fi
-        cd - >/dev/null 2>&1
+        
+        # Build the dots display based on cycle
+        dots_display=""
+        if [ $cycle -ge 3 ]; then
+            dots_display=" ${GRAY}●${NC}"
+        fi
+        if [ $cycle -ge 5 ]; then
+            dots_display="$dots_display ${BLUE}●${NC}"
+        fi
+        if [ $cycle -eq 6 ]; then
+            dots_display="$dots_display ${CYAN}●${NC}"
+        fi
+        
+        # Show checking animation
+        printf "\r  $circle ${GRAY}Checking project dependencies${NC}$dots_display"
+        printf "\033[K"
+        sleep 0.4
+    done
+    
+    # Smooth transition
+    printf " ${GREEN}●${NC}"
+    sleep 0.3
+    
+    # Now check if we need to install
+    if [ ! -d "node_modules" ] || ! check_deps_fresh; then
+        # Clear the checking line and show installing
+        printf "\r\033[K"
+        
+        blink_state=0
+        
+        # Run npm install silently in background
+        smart_npm_install &
+        npm_pid=$!
+        
+        # Show installing animation
+        for cycle in 1 2 3 4 5 6 7 8 9 10 11 12; do
+            # Check if npm install is still running
+            if ! kill -0 $npm_pid 2>/dev/null; then
+                break
+            fi
+            
+            # Toggle blink state for bullet
+            if [ $blink_state -eq 0 ]; then
+                circle="${PINK}•${NC}"
+                blink_state=1
+            else
+                circle="${DIM}•${NC}"
+                blink_state=0
+            fi
+            
+            # Build the dots display based on cycle
+            dots_display=""
+            if [ $cycle -ge 3 ]; then
+                dots_display=" ${GRAY}●${NC}"
+            fi
+            if [ $cycle -ge 5 ]; then
+                dots_display="$dots_display ${BLUE}●${NC}"
+            fi
+            if [ $cycle -ge 6 ]; then
+                dots_display="$dots_display ${CYAN}●${NC}"
+            fi
+            
+            # Show current state
+            printf "\r  $circle ${GRAY}Installing project dependencies${NC}$dots_display"
+            sleep 0.4
+        done
+        
+        # Continue waiting if still running
+        while kill -0 $npm_pid 2>/dev/null; do
+            # Toggle blink state for bullet
+            if [ $blink_state -eq 0 ]; then
+                circle="${PINK}•${NC}"
+                blink_state=1
+            else
+                circle="${DIM}•${NC}"
+                blink_state=0
+            fi
+            
+            # Keep the same 3 dots
+            dots_display=" ${GRAY}●${NC} ${BLUE}●${NC} ${CYAN}●${NC}"
+            
+            # Show current state
+            printf "\r  $circle ${GRAY}Installing project dependencies${NC}$dots_display"
+            sleep 0.4
+        done
+        
+        # Smooth transition: show completion state briefly
+        printf " ${GREEN}●${NC}"
+        sleep 0.3
+        
+        wait $npm_pid
+        npm_exit_code=$?
+        
+        printf "\r\033[K"  # Clear entire line
+        
+        if [ $npm_exit_code -eq 0 ]; then
+            update_deps_hash
+            printf "  ${GREEN}✓${NC} Project dependencies installed%-60s\n" " "
+        else
+            printf "  ${RED}✗${NC} Failed to install project dependencies%-50s\n" " "
+            error "Dependency installation failed"
+        fi
+    else
+        # Dependencies are cached and up-to-date
+        printf "\r\033[K"
+        printf "  ${GREEN}✓${NC} Project dependencies up to date (cached)%-35s\n" " "
     fi
-    
-    check_and_prompt_docker
-    
-    
-    # Brief pause for smooth transition
-    sleep 0.5
-    
-    printf "  ${GREEN}✓ All dependencies verified${NC}\n"
 
     # Environment setup
     if [ ! -f ".env" ]; then
@@ -1489,88 +1485,6 @@ EOF
     # Smart dependency management with MD5 hash-based caching
     # Only installs if node_modules is missing or package.json has changed
     # For updates, this was already done during Node.js check
-    # For fresh installs, this happens now after downloading the code
-    if [ ! -d "node_modules" ] || ! check_deps_fresh; then
-        # Blinking bullet with progressive dots (same as Node.js check)
-        PINK='\033[38;5;213m'
-        blink_state=0
-        
-        # Run npm install silently in background
-        smart_npm_install &
-        npm_pid=$!
-        
-        # Show animation exactly like Node.js check
-        for cycle in 1 2 3 4 5 6 7 8 9 10 11 12; do
-            # Check if npm install is still running
-            if ! kill -0 $npm_pid 2>/dev/null; then
-                break
-            fi
-            
-            # Toggle blink state for bullet
-            if [ $blink_state -eq 0 ]; then
-                circle="${PINK}•${NC}"
-                blink_state=1
-            else
-                circle="${DIM}•${NC}"
-                blink_state=0
-            fi
-            
-            # Build the dots display based on cycle (same as Node.js)
-            dots_display=""
-            if [ $cycle -ge 3 ]; then
-                dots_display=" ${GRAY}●${NC}"
-            fi
-            if [ $cycle -ge 5 ]; then
-                dots_display="$dots_display ${BLUE}●${NC}"
-            fi
-            if [ $cycle -ge 6 ]; then
-                dots_display="$dots_display ${CYAN}●${NC}"
-            fi
-            
-            # Show current state
-            printf "\r$circle ${GRAY}Checking project dependencies${NC}$dots_display"
-            sleep 0.4
-        done
-        
-        # Continue waiting if still running (keep same 3 dots, 4th will be completion)
-        while kill -0 $npm_pid 2>/dev/null; do
-            # Toggle blink state for bullet
-            if [ $blink_state -eq 0 ]; then
-                circle="${PINK}•${NC}"
-                blink_state=1
-            else
-                circle="${DIM}•${NC}"
-                blink_state=0
-            fi
-            
-            # Keep the same 3 dots (4th dot is the completion green dot)
-            dots_display=" ${GRAY}●${NC} ${BLUE}●${NC} ${CYAN}●${NC}"
-            
-            # Show current state
-            printf "\r$circle ${GRAY}Checking project dependencies${NC}$dots_display"
-            sleep 0.4
-        done
-        
-        # Smooth transition: show completion state briefly
-        printf " ${GREEN}●${NC}"
-        sleep 0.3
-        
-        wait $npm_pid
-        npm_exit_code=$?
-        
-        printf "\r\033[K"  # Clear entire line
-        
-        if [ $npm_exit_code -eq 0 ]; then
-            update_deps_hash
-            printf "${GREEN}✓${NC} Project dependencies installed\n"
-        else
-            printf "${RED}✗${NC} Failed to install project dependencies\n"
-            error "Dependency installation failed"
-        fi
-    fi
-    # If dependencies are cached and up-to-date, nothing is shown (silent)
-
-    printf "\n"
     printf "${TEAL}────────────────────────────────────${NC}  ${CYAN}${BOLD}💹 Services Status${NC}  ${TEAL}──────────────────────────────────────────${NC}\n"
     
     # Check if services are already running
@@ -1731,8 +1645,8 @@ EOF
     
     startup_pid=$!
     
-    # Service startup animation with service names
-    services=("neo4j" "redis" "api" "web")
+    # Service startup animation with service names (POSIX-compliant)
+    services="neo4j redis api web"
     spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
     i=0
     service_index=0
@@ -1741,7 +1655,11 @@ EOF
     printf "  ${BLUE}◉${NC} ${GRAY}Starting services${NC}\n"
     
     while kill -0 $startup_pid 2>/dev/null; do
-        current_service=${services[$((service_index % 4))]}
+        # Get current service from space-separated list
+        set -- $services
+        shift $((service_index % 4))
+        current_service=$1
+        
         # Only update the service name and spinner, not the whole line
         printf "\r  ${BLUE}▶${NC} ${GRAY}Starting ${BOLD}graphdone-${current_service}${NC} ${CYAN}${spin:i:1}${NC}%-52s" " "
         
