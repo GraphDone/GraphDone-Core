@@ -19,12 +19,13 @@ if [ -t 1 ]; then
     GREEN='\033[0;32m'
     YELLOW='\033[1;33m'
     BLUE='\033[0;34m'
+    LIGHTCORAL='\033[38;5;210m'  # Light coral (256-color palette)
     CYAN='\033[0;36m'
     GRAY='\033[0;90m'
     BOLD='\033[1m'
     NC='\033[0m'
 else
-    RED='' GREEN='' YELLOW='' BLUE='' CYAN='' GRAY='' BOLD='' NC=''
+    RED='' GREEN='' YELLOW='' BLUE='' LIGHTCORAL='' CYAN='' GRAY='' BOLD='' NC=''
 fi
 
 # Helper functions
@@ -32,6 +33,23 @@ log_info() { printf "        ${CYAN}ℹ${NC} $1\n"; }
 log_success() { printf "        ${GREEN}✓${NC} $1\n"; }
 log_warning() { printf "        ${YELLOW}⚠${NC} $1\n"; }
 log_error() { printf "        ${RED}✗${NC} $1\n" >&2; }
+
+# Spinner helper
+get_spinner_char() {
+    case $1 in
+        0) printf "⠋" ;;
+        1) printf "⠙" ;;
+        2) printf "⠹" ;;
+        3) printf "⠸" ;;
+        4) printf "⠼" ;;
+        5) printf "⠴" ;;
+        6) printf "⠦" ;;
+        7) printf "⠧" ;;
+        8) printf "⠇" ;;
+        9) printf "⠏" ;;
+        *) printf "⠋" ;;
+    esac
+}
 
 # Platform detection
 detect_platform() {
@@ -180,13 +198,51 @@ install_git_macos() {
 
 # Install Git on Linux
 install_git_linux() {
-    log_info "Installing Git for Linux..."
+    # Check if Git is already installed and current
+    if command -v git >/dev/null 2>&1; then
+        GIT_VERSION=$(git --version | sed 's/git version //')
+        MAJOR=$(echo "$GIT_VERSION" | sed 's/[^0-9.].*//g' | cut -d. -f1)
+        MINOR=$(echo "$GIT_VERSION" | sed 's/[^0-9.].*//g' | cut -d. -f2)
+        
+        if [ "$MAJOR" -ge 2 ] && [ "$MINOR" -ge 30 ]; then
+            # Git is already current, skip installation
+            return 0
+        fi
+    fi
     
     # Detect package manager and install
     if command -v apt-get >/dev/null 2>&1; then
-        log_info "Using apt to install Git..."
-        sudo apt-get update -qq
-        sudo apt-get install -y git
+        # Everything in background to show spinner immediately
+        (
+            # Check if PPA already added
+            if ! grep -q "^deb.*git-core/ppa" /etc/apt/sources.list /etc/apt/sources.list.d/* 2>/dev/null; then
+                # Add PPA non-interactively
+                sudo add-apt-repository -y ppa:git-core/ppa < /dev/null >/dev/null 2>&1
+            fi
+            
+            # Update and install silently
+            sudo apt-get update -qq >/dev/null 2>&1
+            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y git >/dev/null 2>&1
+        ) &
+        install_pid=$!
+        
+        # Show spinner while installing
+        spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+        i=0
+        while kill -0 $install_pid 2>/dev/null; do
+            printf "\r        ${BLUE}◉${NC} Installing latest Git ${CYAN}$(get_spinner_char "$i")${NC}\033[K"
+            i=$(( (i+1) % 10 ))
+            sleep 0.1
+        done
+        
+        wait $install_pid
+        install_result=$?
+        printf "\r\033[K"
+        
+        if [ $install_result -ne 0 ]; then
+            log_error "Git installation failed"
+            exit 1
+        fi
         
     elif command -v yum >/dev/null 2>&1; then
         log_info "Using yum to install Git..."
@@ -268,7 +324,6 @@ install_git_windows() {
 
 # Configure Git with sensible defaults
 configure_git() {
-    log_info "Configuring Git with recommended settings..."
     
     # Only set if not already configured
     if [ -z "$(git config --global user.name)" ]; then
@@ -287,7 +342,7 @@ configure_git() {
 
 # Main installation flow
 main() {
-    printf "\n        ${BOLD}${BLUE}🔧 Git Installation Script${NC}\n"
+    printf "\n        ${BOLD}${LIGHTCORAL}🔧 Git Installation Script${NC}\n"
     printf "        ${GRAY}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n\n"
     
     # Detect platform
