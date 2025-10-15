@@ -1,30 +1,29 @@
 #!/bin/bash
-
+# ============================================================================
 # GraphDone Node.js Auto-Installation Script
-# Installs Node.js using platform-specific methods
+# ============================================================================
 #
-# Installation methods by platform:
-# Linux: NodeSource repository, system package managers
-# macOS: Homebrew, official installer
+# Platform Support:
+#   ✓ macOS    - Homebrew
+#   ✓ Linux    - NodeSource repository, apt, yum, dnf
+#   ✓ Windows  - Chocolatey, Scoop, Winget, or manual installer
+#
+# Installation methods:
+#   macOS:  Homebrew (latest Node.js)
+#   Linux:  NodeSource repository (latest) or system package manager
 
 set -euo pipefail
 
-# Cleanup function
+# ============================================================================
+# CLEANUP AND ERROR HANDLING
+# ============================================================================
+
 cleanup() {
     rm -f "/tmp/nodesource_setup.sh" 2>/dev/null || true
 }
 
-# Set up signal handlers
 trap cleanup EXIT INT TERM
 
-USER=$(whoami)
-
-# Helper function to check if command exists
-command_exists() {
-    command -v "$1" &> /dev/null
-}
-
-# Error handling function
 handle_error() {
     local exit_code=$?
     local line_number=$1
@@ -33,26 +32,39 @@ handle_error() {
     exit "${exit_code}"
 }
 
-# Set up error handler
 trap 'handle_error ${LINENO}' ERR
 
-# Detect operating system
+USER=$(whoami)
+
+command_exists() {
+    command -v "$1" &> /dev/null
+}
+
+# ============================================================================
+# PLATFORM DETECTION
+# ============================================================================
+
 detect_os() {
     if [[ "$OSTYPE" == "darwin"* ]]; then
         OS="macos"
     elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
         OS="linux"
+    elif [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "cygwin" ]]; then
+        OS="windows"
     else
         OS="unknown"
         printf "  ${YELLOW}✗${NC} ${BOLD}Unsupported OS${NC} ${GRAY}${OSTYPE}${NC}\n" >&2
-        printf "  ${BLUE}ⓘ${NC} ${GRAY}Supported: macOS, Linux${NC}\n" >&2
+        printf "  ${BLUE}ⓘ${NC} ${GRAY}Supported: macOS, Linux, Windows${NC}\n" >&2
         exit 1
     fi
 }
 
 detect_os
 
-# Modern color palette
+# ============================================================================
+# COLORS
+# ============================================================================
+
 if [ -t 1 ]; then
     if [ "$(tput colors 2>/dev/null)" -ge 256 ] 2>/dev/null; then
         CYAN='\033[38;5;51m'
@@ -82,6 +94,10 @@ fi
 echo ""
 printf "        ${CYAN}${BOLD}📦 Node.js Setup${NC}\n"
 printf "        ${GRAY}${DIM}──────────────────────────${NC}\n"
+
+# ============================================================================
+# VERSION CHECK (Cross-platform)
+# ============================================================================
 
 # Function to check if Node.js is installed with correct version
 check_nodejs_installed() {
@@ -114,12 +130,19 @@ install_nodejs() {
         "linux")
             install_nodejs_linux
             ;;
+        "windows")
+            install_nodejs_windows
+            ;;
         *)
             echo "✗ Unsupported operating system: ${OSTYPE}" >&2
             return 1
             ;;
     esac
 }
+
+# ============================================================================
+# macOS INSTALLATION
+# ============================================================================
 
 # macOS Node.js installation
 install_nodejs_macos() {
@@ -157,6 +180,10 @@ install_nodejs_macos() {
         return 0
     fi
 }
+
+# ============================================================================
+# LINUX INSTALLATION
+# ============================================================================
 
 # Linux Node.js installation
 install_nodejs_linux() {
@@ -227,6 +254,118 @@ install_nodejs_linux() {
     fi
 }
 
+# ============================================================================
+# WINDOWS INSTALLATION
+# ============================================================================
+
+# Windows Node.js installation
+install_nodejs_windows() {
+    printf "        ${BLUE}◉${NC} Installing Node.js for Windows\n"
+    
+    # Check if Chocolatey is available
+    if command -v choco &> /dev/null; then
+        printf "        ${BLUE}◉${NC} Using Chocolatey to install Node.js"
+        
+        # Install Node.js via Chocolatey
+        choco install nodejs -y >/dev/null 2>&1 &
+        install_pid=$!
+        
+        # Show spinner while installing
+        spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+        i=0
+        
+        while kill -0 $install_pid 2>/dev/null; do
+            printf "\r        ${BLUE}◉${NC} Using Chocolatey to install Node.js ${CYAN}${spin:i:1}${NC}"
+            i=$(( (i+1) % ${#spin} ))
+            sleep 0.15
+        done
+        wait $install_pid
+        
+        printf "\r        ${GREEN}✓${NC} Node.js installed via Chocolatey                    \n"
+        
+        # Refresh environment variables
+        printf "        ${BLUE}◉${NC} Refreshing environment variables\n"
+        export PATH="/c/Program Files/nodejs:$PATH"
+        
+        return 0
+        
+    # Check if Winget is available (Windows 10/11)
+    elif command -v winget &> /dev/null; then
+        printf "        ${BLUE}◉${NC} Using winget to install Node.js"
+        
+        # Install Node.js via winget
+        winget install -e --id OpenJS.NodeJS >/dev/null 2>&1 &
+        install_pid=$!
+        
+        # Show spinner while installing
+        spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+        i=0
+        
+        while kill -0 $install_pid 2>/dev/null; do
+            printf "\r        ${BLUE}◉${NC} Using winget to install Node.js ${CYAN}${spin:i:1}${NC}"
+            i=$(( (i+1) % ${#spin} ))
+            sleep 0.15
+        done
+        wait $install_pid
+        
+        printf "\r        ${GREEN}✓${NC} Node.js installed via winget                    \n"
+        
+        # Refresh environment variables
+        printf "        ${BLUE}◉${NC} Refreshing environment variables\n"
+        export PATH="/c/Program Files/nodejs:$PATH"
+        
+        return 0
+        
+    # Check if Scoop is available
+    elif command -v scoop &> /dev/null; then
+        printf "        ${BLUE}◉${NC} Using Scoop to install Node.js"
+        
+        # Install Node.js via Scoop
+        scoop install nodejs >/dev/null 2>&1 &
+        install_pid=$!
+        
+        # Show spinner while installing
+        spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+        i=0
+        
+        while kill -0 $install_pid 2>/dev/null; do
+            printf "\r        ${BLUE}◉${NC} Using Scoop to install Node.js ${CYAN}${spin:i:1}${NC}"
+            i=$(( (i+1) % ${#spin} ))
+            sleep 0.15
+        done
+        wait $install_pid
+        
+        printf "\r        ${GREEN}✓${NC} Node.js installed via Scoop                    \n"
+        return 0
+        
+    else
+        # No package manager available - prompt for manual installation
+        printf "        ${YELLOW}!${NC} No package manager found (Chocolatey, Winget, or Scoop)\n"
+        printf "        ${BLUE}ℹ${NC} ${GRAY}Please install Node.js manually:${NC}\n"
+        printf "        ${GRAY}  1. Download from: https://nodejs.org/en/download${NC}\n"
+        printf "        ${GRAY}  2. Run the installer (MSI)${NC}\n"
+        printf "        ${GRAY}  3. Restart your terminal${NC}\n"
+        printf "        ${GRAY}  4. Run this script again${NC}\n\n"
+        
+        printf "        ${CYAN}❯${NC} ${BOLD}Have you installed Node.js?${NC} ${GRAY}[Press Enter when done]${NC}\n"
+        printf "        "
+        read -r response
+        
+        # Check if Node.js is now available
+        if command -v node &> /dev/null; then
+            printf "        ${GREEN}✓${NC} Node.js detected\n"
+            return 0
+        else
+            printf "        ${RED}✗${NC} Node.js still not found. Please restart terminal.\n"
+            return 1
+        fi
+    fi
+}
+
+# ============================================================================
+# VERIFICATION (Cross-platform)
+# ============================================================================
+
 # Function to verify Node.js installation
 verify_nodejs() {
     if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
@@ -268,6 +407,10 @@ update_npm() {
     fi
     return 0
 }
+
+# ============================================================================
+# MAIN EXECUTION
+# ============================================================================
 
 # Main execution
 main() {
