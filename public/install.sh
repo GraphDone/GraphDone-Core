@@ -1048,7 +1048,7 @@ remove_services() {
 
 # Main installation function
 install_graphdone() {
-    # Beautiful GraphDone header
+    # Beautiful GraphDone header with Copilot-style animation
     clear
     printf "\n\n"
     # Use 256-color mode for better compatibility (38;5;XXX format)
@@ -1074,33 +1074,34 @@ install_graphdone() {
     CYAN="\033[38;5;51m"    # Cyan for labels (256-color)
     BOLD="\033[1m"          # Bold text
     
-    printf "${TEAL}╔══════════════════════════════════════════════════════════════════════════════════════════════════╗${NC}\n"
-    printf "${TEAL}║                                                                                                  ║${NC}\n"
-    printf "${TEAL}║                  ${TEAL}${BOLD}██     ██ ███████╗██╗      ██████╗ ██████╗ ███╗   ███╗███████╗${NC}                  ${TEAL}║${NC}\n"
-    printf "${TEAL}║                  ${TEAL}${BOLD}██     ██ ██╔════╝██║     ██╔════╝██╔═══██╗████╗ ████║██╔════╝${NC}                  ${TEAL}║${NC}\n"
-    printf "${TEAL}║                  ${TEAL}${BOLD}██  █  ██ █████╗  ██║     ██║     ██║   ██║██╔████╔██║█████╗${NC}                    ${TEAL}║${NC}\n"
-    printf "${TEAL}║                  ${TEAL}${BOLD}██ ███ ██ ██╔══╝  ██║     ██║     ██║   ██║██║╚██╔╝██║██╔══╝${NC}                    ${TEAL}║${NC}\n"
-    printf "${TEAL}║                  ${TEAL}${BOLD}╚███╔███╔╝███████╗███████╗╚██████╗╚██████╔╝██║ ╚═╝ ██║███████╗${NC}                  ${TEAL}║${NC}\n"
-    printf "${TEAL}║                  ${TEAL}${BOLD} ╚══╝╚══╝ ╚══════╝╚══════╝ ╚═════╝ ╚═════╝   ╚══════╝╚═══════╝${NC}                  ${TEAL}║${NC}\n"
-    printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"
-    printf "${TEAL}║${NC}                                      ${TEAL}${BOLD}████████╗ ██████╗${NC}                                           ${TEAL}║${NC}\n"
-    printf "${TEAL}║${NC}                                      ${TEAL}${BOLD}╚══██╔══╝██╔═══██╗${NC}                                          ${TEAL}║${NC}\n"
-    printf "${TEAL}║${NC}                                         ${TEAL}${BOLD}██║   ██║   ██║${NC}                                          ${TEAL}║${NC}\n"
-    printf "${TEAL}║${NC}                                         ${TEAL}${BOLD}██║   ██║   ██║${NC}                                          ${TEAL}║${NC}\n"
-    printf "${TEAL}║${NC}                                         ${TEAL}${BOLD}██║   ╚██████╔╝${NC}                                          ${TEAL}║${NC}\n"
-    printf "${TEAL}║${NC}                                         ${TEAL}${BOLD}╚═╝    ╚═════╝${NC}                                           ${TEAL}║${NC}\n"
-    printf "${TEAL}║                                                                                                  ║${NC}\n"
-    printf "${TEAL}║           ██████╗ ██████╗  █████╗ ██████╗ ██╗  ██╗██████╗  ██████╗ ███╗   ██╗███████╗            ║${NC}\n"
-    printf "${TEAL}║          ██╔════╝ ██╔══██╗██╔══██╗██╔══██╗██║  ██║██╔══██╗██╔═══██╗████╗  ██║██╔════╝            ║${NC}\n"
-    printf "${TEAL}║          ██║  ███╗██████╔╝███████║██████╔╝███████║██║  ██║██║   ██║██╔██╗ ██║█████╗              ║${NC}\n"
-    printf "${TEAL}║          ██║   ██║██╔══██╗██╔══██║██╔═══╝ ██╔══██║██║  ██║██║   ██║██║╚██╗██║██╔══╝              ║${NC}\n"
-    printf "${TEAL}║          ╚██████╔╝██║  ██║██║  ██║██║     ██║  ██║██████╔╝╚██████╔╝██║ ╚████║███████╗            ║${NC}\n"
-    printf "${TEAL}║           ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝     ╚═╝  ╚═╝╚═════╝  ╚═════╝ ╚═╝  ╚═══╝╚══════╝            ║${NC}\n"
-    printf "${TEAL}║                                                                                                  ║${NC}\n"
-    printf "${TEAL}║${NC}${OLIVE}                             Instant Setup. Zero Config. Pure Graph.                              ${NC}${TEAL}║${NC}\n"
-    printf "${TEAL}║                                                                                                  ║${NC}\n"
-    printf "${TEAL}║${LIGHTCYAN}                          Built with ♥ ${YELLOW}for${LIGHTCYAN} teams ${ORANGE}who${LIGHTCYAN} think differently.                           ${TEAL}║${NC}\n"
-    printf "${TEAL}║                                                                                                  ║${NC}\n"
+    # Animate banner with Copilot-style line-by-line reveal
+    printf "${TEAL}╔══════════════════════════════════════════════════════════════════════════════════════════════════╗${NC}\n"; sleep 0.03
+    printf "${TEAL}║                                                                                                  ║${NC}\n"; sleep 0.03
+    printf "${TEAL}║                  ${TEAL}${BOLD}██     ██ ███████╗██╗      ██████╗ ██████╗ ███╗   ███╗███████╗${NC}                  ${TEAL}║${NC}\n"; sleep 0.03
+    printf "${TEAL}║                  ${TEAL}${BOLD}██     ██ ██╔════╝██║     ██╔════╝██╔═══██╗████╗ ████║██╔════╝${NC}                  ${TEAL}║${NC}\n"; sleep 0.03
+    printf "${TEAL}║                  ${TEAL}${BOLD}██  █  ██ █████╗  ██║     ██║     ██║   ██║██╔████╔██║█████╗${NC}                    ${TEAL}║${NC}\n"; sleep 0.03
+    printf "${TEAL}║                  ${TEAL}${BOLD}██ ███ ██ ██╔══╝  ██║     ██║     ██║   ██║██║╚██╔╝██║██╔══╝${NC}                    ${TEAL}║${NC}\n"; sleep 0.03
+    printf "${TEAL}║                  ${TEAL}${BOLD}╚███╔███╔╝███████╗███████╗╚██████╗╚██████╔╝██║ ╚═╝ ██║███████╗${NC}                  ${TEAL}║${NC}\n"; sleep 0.03
+    printf "${TEAL}║                  ${TEAL}${BOLD} ╚══╝╚══╝ ╚══════╝╚══════╝ ╚═════╝ ╚═════╝   ╚══════╝╚═══════╝${NC}                  ${TEAL}║${NC}\n"; sleep 0.03
+    printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"; sleep 0.03
+    printf "${TEAL}║${NC}                                      ${TEAL}${BOLD}████████╗ ██████╗${NC}                                           ${TEAL}║${NC}\n"; sleep 0.03
+    printf "${TEAL}║${NC}                                      ${TEAL}${BOLD}╚══██╔══╝██╔═══██╗${NC}                                          ${TEAL}║${NC}\n"; sleep 0.03
+    printf "${TEAL}║${NC}                                         ${TEAL}${BOLD}██║   ██║   ██║${NC}                                          ${TEAL}║${NC}\n"; sleep 0.03
+    printf "${TEAL}║${NC}                                         ${TEAL}${BOLD}██║   ██║   ██║${NC}                                          ${TEAL}║${NC}\n"; sleep 0.03
+    printf "${TEAL}║${NC}                                         ${TEAL}${BOLD}██║   ╚██████╔╝${NC}                                          ${TEAL}║${NC}\n"; sleep 0.03
+    printf "${TEAL}║${NC}                                         ${TEAL}${BOLD}╚═╝    ╚═════╝${NC}                                           ${TEAL}║${NC}\n"; sleep 0.03
+    printf "${TEAL}║                                                                                                  ║${NC}\n"; sleep 0.03
+    printf "${TEAL}║           ██████╗ ██████╗  █████╗ ██████╗ ██╗  ██╗██████╗  ██████╗ ███╗   ██╗███████╗            ║${NC}\n"; sleep 0.03
+    printf "${TEAL}║          ██╔════╝ ██╔══██╗██╔══██╗██╔══██╗██║  ██║██╔══██╗██╔═══██╗████╗  ██║██╔════╝            ║${NC}\n"; sleep 0.03
+    printf "${TEAL}║          ██║  ███╗██████╔╝███████║██████╔╝███████║██║  ██║██║   ██║██╔██╗ ██║█████╗              ║${NC}\n"; sleep 0.03
+    printf "${TEAL}║          ██║   ██║██╔══██╗██╔══██║██╔═══╝ ██╔══██║██║  ██║██║   ██║██║╚██╗██║██╔══╝              ║${NC}\n"; sleep 0.03
+    printf "${TEAL}║          ╚██████╔╝██║  ██║██║  ██║██║     ██║  ██║██████╔╝╚██████╔╝██║ ╚████║███████╗            ║${NC}\n"; sleep 0.03
+    printf "${TEAL}║           ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝     ╚═╝  ╚═╝╚═════╝  ╚═════╝ ╚═╝  ╚═══╝╚══════╝            ║${NC}\n"; sleep 0.03
+    printf "${TEAL}║                                                                                                  ║${NC}\n"; sleep 0.03
+    printf "${TEAL}║${NC}${OLIVE}                             Instant Setup. Zero Config. Pure Graph.                              ${NC}${TEAL}║${NC}\n"; sleep 0.05
+    printf "${TEAL}║                                                                                                  ║${NC}\n"; sleep 0.03
+    printf "${TEAL}║${LIGHTCYAN}                          Built with ♥ ${YELLOW}for${LIGHTCYAN} teams ${ORANGE}who${LIGHTCYAN} think differently.                           ${TEAL}║${NC}\n"; sleep 0.05
+    printf "${TEAL}║                                                                                                  ║${NC}\n"; sleep 0.03
     printf "${TEAL}╚══════════════════════════════════════════════════════════════════════════════════════════════════╝${NC}\n\n"
 
     # Platform detection
