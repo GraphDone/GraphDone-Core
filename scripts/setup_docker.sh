@@ -1,33 +1,30 @@
 #!/bin/bash
-
+# ============================================================================
 # GraphDone Docker Auto-Installation Script
-# Installs Docker using platform-specific methods and sets up proper permissions
+# ============================================================================
+#
+# Platform Support:
+#   ✓ macOS    - Docker Desktop via Homebrew
+#   ✓ Linux    - Docker Engine via Snap or official repository
+#   ✓ Windows  - Docker Desktop (WSL)
 #
 # Installation methods by platform:
-# Linux: Snap, Official repository
-# macOS: Docker Desktop, Homebrew
-# Windows: Docker Desktop (WSL)
+#   Linux:  Snap package manager or Docker's official repository
+#   macOS:  Homebrew cask or manual Docker Desktop
+#   Windows: Docker Desktop with WSL2 backend
 
 set -euo pipefail
 
-# Cleanup function
+# ============================================================================
+# CLEANUP AND ERROR HANDLING
+# ============================================================================
+
 cleanup() {
     rm -f "/tmp/.docker_just_installed" 2>/dev/null || true
 }
 
-# Set up signal handlers
 trap cleanup EXIT INT TERM
 
-USER=$(whoami)
-DOCKER_SOCK="/var/snap/docker/common/var-lib-docker.sock"
-DOCKER_SOCK_ALT="/var/run/docker.sock"
-
-# Helper function to check if command exists
-command_exists() {
-    command -v "$1" &> /dev/null
-}
-
-# Error handling function
 handle_error() {
     local exit_code=$?
     local line_number=$1
@@ -36,10 +33,20 @@ handle_error() {
     exit "${exit_code}"
 }
 
-# Set up error handler
 trap 'handle_error ${LINENO}' ERR
 
-# Detect operating system
+USER=$(whoami)
+DOCKER_SOCK="/var/snap/docker/common/var-lib-docker.sock"
+DOCKER_SOCK_ALT="/var/run/docker.sock"
+
+command_exists() {
+    command -v "$1" &> /dev/null
+}
+
+# ============================================================================
+# PLATFORM DETECTION
+# ============================================================================
+
 detect_os() {
     if [[ "$OSTYPE" == "darwin"* ]]; then
         OS="macos"
@@ -57,7 +64,10 @@ detect_os() {
 
 detect_os
 
-# Modern color palette
+# ============================================================================
+# COLORS
+# ============================================================================
+
 if [ -t 1 ]; then
     if [ "$(tput colors 2>/dev/null)" -ge 256 ] 2>/dev/null; then
         CYAN='\033[38;5;51m'
@@ -87,6 +97,10 @@ fi
 echo ""
 printf "        ${CYAN}${BOLD}🐳 Docker Desktop Setup${NC}\n"
 printf "        ${GRAY}${DIM}──────────────────────────${NC}\n"
+
+# ============================================================================
+# VERSION CHECK (Cross-platform)
+# ============================================================================
 
 # Function to check if Docker is installed
 check_docker_installed() {
@@ -306,6 +320,10 @@ install_docker_macos() {
     fi
 }
 
+# ============================================================================
+# LINUX INSTALLATION
+# ============================================================================
+
 # Linux Docker installation (existing logic)
 install_docker_linux() {
     # Try snap without sudo first
@@ -394,6 +412,10 @@ install_docker_linux() {
     echo "✗ Installation failed - visit: https://docs.docker.com/get-docker/"
     return 1
 }
+
+# ============================================================================
+# WINDOWS INSTALLATION
+# ============================================================================
 
 # Windows Docker installation
 install_docker_windows() {
@@ -494,6 +516,10 @@ install_docker_windows() {
         return 1
     fi
 }
+
+# ============================================================================
+# DOCKER DAEMON CHECK (Cross-platform)
+# ============================================================================
 
 # Function to check if Docker daemon is running
 check_docker_running() {
@@ -737,6 +763,10 @@ request_sudo() {
         return 1
     fi
 }
+
+# ============================================================================
+# MAIN EXECUTION
+# ============================================================================
 
 # Main execution
 main() {
