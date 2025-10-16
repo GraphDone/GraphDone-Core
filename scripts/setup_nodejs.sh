@@ -81,6 +81,7 @@ if [ -t 1 ]; then
         YELLOW='\033[38;5;220m'
         PURPLE='\033[38;5;135m'
         BLUE='\033[38;5;33m'
+        PALEGREEN='\033[38;2;152;251;152m'  # Palegreen (#98fb98)
         GRAY='\033[38;5;244m'
         BOLD='\033[1m'
         DIM='\033[2m'
@@ -91,18 +92,25 @@ if [ -t 1 ]; then
         YELLOW='\033[0;33m' 
         PURPLE='\033[0;35m'
         BLUE='\033[0;34m'
+        PALEGREEN='\033[0;32m'  # Fallback to green
         GRAY='\033[0;90m'
         BOLD='\033[1m'
         DIM='\033[2m'
         NC='\033[0m'
     fi
 else
-    CYAN='' GREEN='' YELLOW='' PURPLE='' BLUE='' GRAY='' BOLD='' DIM='' NC=''
+    CYAN='' GREEN='' YELLOW='' PURPLE='' BLUE='' PALEGREEN='' GRAY='' BOLD='' DIM='' NC=''
 fi
 
-echo ""
-printf "        ${CYAN}${BOLD}📦 Node.js Setup${NC}\n"
-printf "        ${GRAY}${DIM}──────────────────────────${NC}\n"
+# Track output lines for install.sh to clear later
+OUTPUT_LINES=0
+
+echo "" >&2
+OUTPUT_LINES=$((OUTPUT_LINES + 1))
+printf "        ${PALEGREEN}${BOLD}📦 Node.js Installation${NC}\n" >&2
+OUTPUT_LINES=$((OUTPUT_LINES + 1))
+printf "        ${GRAY}${DIM}──────────────────────────${NC}\n" >&2
+OUTPUT_LINES=$((OUTPUT_LINES + 1))
 
 # ============================================================================
 # SPINNER FUNCTION (POSIX-compatible)
@@ -113,7 +121,7 @@ show_spinner() {
     local msg="$2"
     local i=0
     local spin_char
-    
+
     while kill -0 "$pid" 2>/dev/null; do
         case $((i % 10)) in
             0) spin_char='⠋' ;;
@@ -127,7 +135,7 @@ show_spinner() {
             8) spin_char='⠇' ;;
             9) spin_char='⠏' ;;
         esac
-        printf "\r        ${GRAY}%s${NC} ${CYAN}%s${NC}" "$msg" "$spin_char"
+        printf "\r        ${GRAY}%s${NC} ${CYAN}%s${NC}" "$msg" "$spin_char" >&2
         i=$((i + 1))
         sleep 0.15
     done
@@ -144,19 +152,23 @@ check_nodejs_installed() {
     if command -v node > /dev/null 2>&1; then
         local node_version=$(node --version 2>/dev/null | sed 's/v//' | cut -d. -f1 || echo '0')
         local npm_version=$(npm --version 2>/dev/null | cut -d. -f1 || echo '0')
-        
+
         if [ "$node_version" -ge 18 ] && [ "$npm_version" -ge 9 ]; then
             local node_full=$(node --version 2>/dev/null || echo 'unknown')
             local npm_full=$(npm --version 2>/dev/null || echo 'unknown')
-            printf "        ${GREEN}✓${NC} Node.js ${node_full} and npm ${npm_full} already installed\n"
+            printf "        ${GREEN}✓${NC} Node.js ${node_full} and npm ${npm_full} already installed\n" >&2
+            OUTPUT_LINES=$((OUTPUT_LINES + 1))
             return 0
         else
-            printf "        ${YELLOW}⚠${NC} Node.js ${node_full:-unknown} found but version requirements not met\n"
-            printf "        ${GRAY}  Required: Node.js >= 18.0.0, npm >= 9.0.0${NC}\n"
+            printf "        ${YELLOW}⚠${NC} Node.js ${node_full:-unknown} found but version requirements not met\n" >&2
+            OUTPUT_LINES=$((OUTPUT_LINES + 1))
+            printf "        ${GRAY}  Required: Node.js >= 18.0.0, npm >= 9.0.0${NC}\n" >&2
+            OUTPUT_LINES=$((OUTPUT_LINES + 1))
             return 1
         fi
     else
-        printf "        ${BLUE}◉${NC} Node.js not found - installing latest version\n"
+        printf "        ${BLUE}◉${NC} Node.js not found - installing latest version\n" >&2
+        OUTPUT_LINES=$((OUTPUT_LINES + 1))
         return 1
     fi
 }
@@ -188,31 +200,34 @@ install_nodejs_macos() {
         # Set environment to avoid prompts
         export HOMEBREW_NO_AUTO_UPDATE=1
         export HOMEBREW_NO_ENV_HINTS=1
-        
+
         # Install Node.js latest with minimal output
-        printf "        ${BLUE}◉${NC} Installing Node.js (latest)"
-        
+        printf "        ${BLUE}◉${NC} Installing Node.js (latest)" >&2
+
         # Start installation in background
         brew install node >/dev/null 2>&1 &
         install_pid=$!
-        
+
         # Show spinner while installing
         spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
         i=0
-        
+
         while kill -0 $install_pid 2>/dev/null; do
-            printf "\r        ${BLUE}◉${NC} Installing Node.js (latest) ${CYAN}.${NC}"
+            printf "\r        ${BLUE}◉${NC} Installing Node.js (latest) ${CYAN}.${NC}" >&2
             i=$(( (i+1) % 10 ))
             sleep 0.15
         done
         wait $install_pid
-        
-        printf "\r        ${GREEN}✓${NC} Node.js installed                    \n"
+
+        printf "\r        ${GREEN}✓${NC} Node.js installed                    \n" >&2
+        OUTPUT_LINES=$((OUTPUT_LINES + 1))
         return 0
     else
         # Fallback to official installer
-        printf "${YELLOW}!${NC} Please install from: https://nodejs.org/en/download/prebuilt-installer\n"
-        printf "${CYAN}❯${NC} ${BOLD}Have you installed Node.js?${NC} ${GRAY}[Press Enter when done]${NC}\n"
+        printf "${YELLOW}!${NC} Please install from: https://nodejs.org/en/download/prebuilt-installer\n" >&2
+        OUTPUT_LINES=$((OUTPUT_LINES + 1))
+        printf "${CYAN}❯${NC} ${BOLD}Have you installed Node.js?${NC} ${GRAY}[Press Enter when done]${NC}\n" >&2
+        OUTPUT_LINES=$((OUTPUT_LINES + 1))
         read -r response
         return 0
     fi
@@ -224,50 +239,60 @@ install_nodejs_macos() {
 
 # Linux Node.js installation via nvm
 install_nodejs_linux() {
-    printf "        ${BLUE}◉${NC} Installing Node.js via nvm (Node Version Manager)\n"
-    
+    printf "        ${BLUE}◉${NC} Installing Node.js via nvm (Node Version Manager)\n" >&2
+    OUTPUT_LINES=$((OUTPUT_LINES + 1))
+
     # Check if nvm is already installed
     if [ -s "$HOME/.nvm/nvm.sh" ]; then
-        printf "        ${GREEN}✓${NC} nvm already installed\n"
+        printf "        ${GREEN}✓${NC} nvm already installed\n" >&2
+        OUTPUT_LINES=$((OUTPUT_LINES + 1))
     else
-        printf "        ${GRAY}Installing nvm${NC}"
+        printf "        ${GRAY}Installing nvm${NC}" >&2
         curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/master/install.sh 2>/dev/null | bash &
         show_spinner $! "Installing nvm"
-        
+
         if [ -s "$HOME/.nvm/nvm.sh" ]; then
-            printf "\r        ${GREEN}✓${NC} nvm installed successfully                    \n"
+            printf "\r        ${GREEN}✓${NC} nvm installed successfully                    \n" >&2
+            OUTPUT_LINES=$((OUTPUT_LINES + 1))
         else
-            printf "\r        ${RED}✗${NC} nvm installation failed                    \n"
+            printf "\r        ${RED}✗${NC} nvm installation failed                    \n" >&2
+            OUTPUT_LINES=$((OUTPUT_LINES + 1))
             return 1
         fi
     fi
-    
+
     # Load nvm
     export NVM_DIR="$HOME/.nvm"
     [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-    
+
     if ! command -v nvm > /dev/null 2>&1; then
-        printf "        ${RED}✗${NC} Could not load nvm\n"
+        printf "        ${RED}✗${NC} Could not load nvm\n" >&2
+        OUTPUT_LINES=$((OUTPUT_LINES + 1))
         return 1
     fi
-    
-    printf "        ${GRAY}Installing Node.js 22 (LTS)${NC}"
-    
+
+    printf "        ${GRAY}Installing Node.js 22 (LTS)${NC}" >&2
+
     # Install Node.js 22 LTS (run in background for spinner)
     (nvm install 22 && nvm use 22 && nvm alias default 22) > /dev/null 2>&1 &
     show_spinner $! "Installing Node.js 22 (LTS)"
-    
+
     # Reload to get node in PATH
     [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-    
+
     if command -v node > /dev/null 2>&1; then
-        printf "\r        ${GREEN}✓${NC} Node.js $(node --version) and npm $(npm --version) installed                    \n"
-        printf "        ${GRAY}  💡 To use Node.js in new terminals, add to your ~/.bashrc or ~/.zshrc:${NC}\n"
-        printf "        ${GRAY}     export NVM_DIR=\"\$HOME/.nvm\"${NC}\n"
-        printf "        ${GRAY}     [ -s \"\$NVM_DIR/nvm.sh\" ] && \\. \"\$NVM_DIR/nvm.sh\"${NC}\n"
+        printf "\r        ${GREEN}✓${NC} Node.js $(node --version) and npm $(npm --version) installed                    \n" >&2
+        OUTPUT_LINES=$((OUTPUT_LINES + 1))
+        printf "        ${GRAY}  💡 To use Node.js in new terminals, add to your ~/.bashrc or ~/.zshrc:${NC}\n" >&2
+        OUTPUT_LINES=$((OUTPUT_LINES + 1))
+        printf "        ${GRAY}     export NVM_DIR=\"\$HOME/.nvm\"${NC}\n" >&2
+        OUTPUT_LINES=$((OUTPUT_LINES + 1))
+        printf "        ${GRAY}     [ -s \"\$NVM_DIR/nvm.sh\" ] && \\. \"\$NVM_DIR/nvm.sh\"${NC}\n" >&2
+        OUTPUT_LINES=$((OUTPUT_LINES + 1))
         return 0
     else
-        printf "\r        ${RED}✗${NC} Node.js installation failed                    \n"
+        printf "\r        ${RED}✗${NC} Node.js installation failed                    \n" >&2
+        OUTPUT_LINES=$((OUTPUT_LINES + 1))
         return 1
     fi
 }
@@ -284,18 +309,23 @@ verify_nodejs() {
         local npm_version=$(npm --version 2>/dev/null || echo "unknown")
         local node_major=$(echo "$node_version" | sed 's/v//' | cut -d. -f1 || echo "0")
         local npm_major=$(echo "$npm_version" | cut -d. -f1 || echo "0")
-        
+
         if [ "$node_major" -ge 18 ] && [ "$npm_major" -ge 9 ]; then
-            printf "        ${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}${node_version}${NC} and ${BOLD}npm${NC} ${GREEN}${npm_version}${NC} ready\n"
+            printf "        ${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}${node_version}${NC} and ${BOLD}npm${NC} ${GREEN}${npm_version}${NC} ready\n" >&2
+            OUTPUT_LINES=$((OUTPUT_LINES + 1))
             return 0
         else
-            printf "${YELLOW}!${NC} Node.js installed but version requirements not met\n"
-            printf "${GRAY}  Found: Node.js ${node_version}, npm ${npm_version}${NC}\n"
-            printf "${GRAY}  Required: Node.js >= 18.0.0, npm >= 9.0.0${NC}\n"
+            printf "${YELLOW}!${NC} Node.js installed but version requirements not met\n" >&2
+            OUTPUT_LINES=$((OUTPUT_LINES + 1))
+            printf "${GRAY}  Found: Node.js ${node_version}, npm ${npm_version}${NC}\n" >&2
+            OUTPUT_LINES=$((OUTPUT_LINES + 1))
+            printf "${GRAY}  Required: Node.js >= 18.0.0, npm >= 9.0.0${NC}\n" >&2
+            OUTPUT_LINES=$((OUTPUT_LINES + 1))
             return 1
         fi
     else
-        printf "${RED}✗${NC} Node.js installation verification failed\n"
+        printf "${RED}✗${NC} Node.js installation verification failed\n" >&2
+        OUTPUT_LINES=$((OUTPUT_LINES + 1))
         return 1
     fi
 }
@@ -305,13 +335,16 @@ update_npm() {
     if command -v npm >/dev/null 2>&1; then
         local npm_version=$(npm --version 2>/dev/null | cut -d. -f1 || echo "0")
         if [ "$npm_version" -lt 9 ]; then
-            printf "${BLUE}◉${NC} Updating npm to latest version\n"
+            printf "${BLUE}◉${NC} Updating npm to latest version\n" >&2
+            OUTPUT_LINES=$((OUTPUT_LINES + 1))
             if npm install -g npm@latest >/dev/null 2>&1; then
                 local npm_new=$(npm --version 2>/dev/null || echo "unknown")
-                printf "${GREEN}✓${NC} npm updated to ${GREEN}${npm_new}${NC}\n"
+                printf "${GREEN}✓${NC} npm updated to ${GREEN}${npm_new}${NC}\n" >&2
+                OUTPUT_LINES=$((OUTPUT_LINES + 1))
                 return 0
             else
-                printf "${RED}✗${NC} npm update failed\n"
+                printf "${RED}✗${NC} npm update failed\n" >&2
+                OUTPUT_LINES=$((OUTPUT_LINES + 1))
                 return 1
             fi
         fi
@@ -325,34 +358,46 @@ update_npm() {
 
 # Main execution
 main() {
-    # Skip redundant check if called from install script  
+    # Skip redundant check if called from install script
     if [ "${1:-}" = "--skip-check" ]; then
         # Skip check message - jump straight to installation
         true
     else
         if check_nodejs_installed; then
+            # Output line count to stdout for install.sh
+            echo "$OUTPUT_LINES"
             return 0  # Node.js installed and meets requirements - we're done
         fi
     fi
 
     # Proceed with installation
     if ! install_nodejs; then
-        printf "${RED}✗${NC} Node.js installation failed\n"
+        printf "${RED}✗${NC} Node.js installation failed\n" >&2
+        OUTPUT_LINES=$((OUTPUT_LINES + 1))
+        # Output line count even on failure
+        echo "$OUTPUT_LINES"
         exit 1
     fi
-    
+
     # Update npm if needed
     if ! update_npm; then
-        printf "${YELLOW}!${NC} npm update failed but Node.js is installed\n"
+        printf "${YELLOW}!${NC} npm update failed but Node.js is installed\n" >&2
+        OUTPUT_LINES=$((OUTPUT_LINES + 1))
     fi
-    
+
     # Verify final installation
     if verify_nodejs; then
-        printf "\n        ${GREEN}✓${NC} Node.js setup complete\n"
+        printf "\n        ${GREEN}✓${NC} Node.js setup complete\n" >&2
+        OUTPUT_LINES=$((OUTPUT_LINES + 2))  # \n counts as 1 line
     else
-        printf "\n${YELLOW}!${NC} Node.js installed but may need manual verification\n"
+        printf "\n${YELLOW}!${NC} Node.js installed but may need manual verification\n" >&2
+        OUTPUT_LINES=$((OUTPUT_LINES + 2))
+        echo "$OUTPUT_LINES"
         exit 1
     fi
+
+    # Output line count to stdout for install.sh
+    echo "$OUTPUT_LINES"
 }
 
 # Execute main function with error handling
