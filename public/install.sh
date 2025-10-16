@@ -255,12 +255,6 @@ detect_platform() {
         Linux*)
             PLATFORM="linux"
             ;;
-        *BSD*)
-            PLATFORM="bsd"
-            ;;
-        MINGW*|MSYS*|CYGWIN*)
-            PLATFORM="windows"
-            ;;
         *)
             PLATFORM="unknown"
             ;;
@@ -859,10 +853,6 @@ smart_npm_install() {
                     # Linux: x64 GNU
                     rollup_package="@rollup/rollup-linux-x64-gnu"
                     ;;
-                MINGW*|MSYS*|CYGWIN*)
-                    # Windows: x64
-                    rollup_package="@rollup/rollup-win32-x64-msvc"
-                    ;;
                 *)
                     echo "Skipping platform-specific rollup for $(uname)" >> "$npm_debug_log"
                     ;;
@@ -891,7 +881,7 @@ smart_npm_install() {
     return 1
 }
 
-# Auto-install Docker if missing (silent version for progress box)
+# Auto-install Docker if missing (delegates to dedicated script)
 install_docker() {
     if command -v docker >/dev/null 2>&1; then
         return 0
@@ -899,23 +889,13 @@ install_docker() {
     
     log "Installing Docker"
     
-    case $PLATFORM in
-        "macos")
-            warn "Please install Docker Desktop from https://docker.com/products/docker-desktop"
-            return 1
-            ;;
-        "linux")
-            # Install Docker on Linux
-            curl -fsSL https://get.docker.com | sh >/dev/null 2>&1 || return 1
-            # Add user to docker group
-            sudo usermod -aG docker "$USER" 2>/dev/null || true
-            ;;
-        *)
-            warn "Please install Docker manually from https://docker.com"
-            return 1
-            ;;
-    esac
-    return 0
+    # Run the Docker setup script (same pattern as Git/Node.js)
+    if sh "scripts/setup_docker.sh"; then
+        return 0
+    else
+        warn "Docker installation failed"
+        return 1
+    fi
 }
 
 # Check if containers are healthy (using smart-start approach)
@@ -1171,9 +1151,6 @@ install_graphdone() {
             ;;
         "Linux")
             platform_name="(Linux)"
-            ;;
-        MINGW*|MSYS*|CYGWIN*)
-            platform_name="(Windows)"
             ;;
         *)
             platform_name=""
