@@ -82,7 +82,8 @@ run_setup_script() {
 }
 
 # Modern color palette using 256-color codes for better compatibility
-if [ -t 1 ]; then
+# Check stderr (fd 2) instead of stdout since we output to >&2
+if [ -t 2 ]; then
     if [ "$(tput colors 2>/dev/null)" -ge 256 ] 2>/dev/null; then
         # 256-color mode
         CYAN='\033[38;5;51m'
@@ -112,8 +113,8 @@ fi
 # Clean, minimal functions
 log() { printf "${GRAY}▸${NC} %s\n" "$1"; }
 ok() { printf "${GREEN}✓${NC} %s\n" "$1"; }
-warn() { printf "${YELLOW}!${NC} %s\n" "$1"; }
-error() { 
+warn() { printf "${YELLOW}⚠${NC} %s\n" "$1"; }
+error() {
     printf "${RED}✗${NC} %s\n" "$1" >&2
     CLEANUP_NEEDED=true
     cleanup
@@ -438,7 +439,18 @@ check_and_prompt_git() {
                 printf "${CYAN}ℹ${NC} Continuing with Apple Git\n"
             fi
         else
-            printf "${CYAN}ℹ${NC} Continuing with Apple Git ${GIT_VERSION_OLD}\n"
+            # Clear all prompt lines
+            i=1
+            while [ $i -le "$PROMPT_LINES" ]; do
+                printf "\033[F\033[K"  # Move up and clear line
+                i=$((i + 1))
+            done
+
+            # Show clean summary line
+            local git_info="${GREEN}✓${NC} ${BOLD}Git${NC} ${GREEN}${GIT_VERSION_OLD}${NC} ${GRAY}ready${NC}"
+            local git_plain="✓ Git ${GIT_VERSION_OLD} ready"
+            local padding=$((88 - ${#git_plain}))
+            printf "  ${git_info}%*s\n" $padding ""
         fi
         return 0
     elif [ "$check_result" = "outdated" ]; then
@@ -446,9 +458,10 @@ check_and_prompt_git() {
         PROMPT_LINES=0
 
         GIT_VERSION_OLD=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
-        printf "\r${YELLOW}⚠${NC} ${BOLD}Git${NC} ${YELLOW}${GIT_VERSION_OLD}${NC} ${GRAY}outdated (need >= 2.30)${NC}"
-        printf "                    \n\n"
-        PROMPT_LINES=$((PROMPT_LINES + 2))  # line + \n
+        printf "\r  ${YELLOW}⚠${NC} ${BOLD}Git${NC} ${YELLOW}${GIT_VERSION_OLD}${NC} ${GRAY}outdated (need >= 2.30)${NC}%-40s\n" " "
+        PROMPT_LINES=$((PROMPT_LINES + 1))
+        printf "\n"
+        PROMPT_LINES=$((PROMPT_LINES + 1))
 
         printf "${YELLOW}🟡 ${BOLD}Git Update Required${NC}\n"
         PROMPT_LINES=$((PROMPT_LINES + 1))
@@ -491,11 +504,15 @@ check_and_prompt_git() {
         return 0
     fi
     
-    # Track prompt lines (including animation line still on screen)
-    PROMPT_LINES=1
+    # Track prompt lines
+    PROMPT_LINES=0
 
-    printf "\n        ${YELLOW}🟡 ${BOLD}Git Setup Required${NC}\n"
-    PROMPT_LINES=$((PROMPT_LINES + 2))  # \n + line
+    printf "\r  ${YELLOW}⚠${NC} ${BOLD}Git${NC} ${GRAY}not installed${NC}%-40s\n" " "
+    PROMPT_LINES=$((PROMPT_LINES + 1))
+    printf "\n"
+    PROMPT_LINES=$((PROMPT_LINES + 1))
+    printf "        ${YELLOW}🟡 ${BOLD}Git Setup Required${NC}\n"
+    PROMPT_LINES=$((PROMPT_LINES + 1))
     printf "        ${GRAY}GraphDone requires Git for version control and cloning repositories.${NC}\n\n"
     PROMPT_LINES=$((PROMPT_LINES + 2))  # line + \n
     printf "        ${GREEN}✓${NC} We'll use the dedicated Git setup script for your platform\n"
@@ -626,9 +643,10 @@ check_and_prompt_nodejs() {
         PROMPT_LINES=0
 
         NODE_VERSION_FULL=$(node --version 2>/dev/null || echo "unknown")
-        printf "\r${YELLOW}⚠${NC} ${BOLD}Node.js${NC} ${GREEN}${NODE_VERSION_FULL}${NC} ${GRAY}OK, but npm needs update${NC}"
-        printf "                    \n\n"
-        PROMPT_LINES=$((PROMPT_LINES + 2))  # line + \n
+        printf "\r  ${YELLOW}⚠${NC} ${BOLD}Node.js${NC} ${GREEN}${NODE_VERSION_FULL}${NC} ${GRAY}OK, but npm needs update${NC}%-40s\n" " "
+        PROMPT_LINES=$((PROMPT_LINES + 1))
+        printf "\n"
+        PROMPT_LINES=$((PROMPT_LINES + 1))
 
         printf "        ${YELLOW}🟡 ${BOLD}npm Update Required${NC}\n"
         PROMPT_LINES=$((PROMPT_LINES + 1))
@@ -679,9 +697,10 @@ check_and_prompt_nodejs() {
         PROMPT_LINES=0
 
         NODE_VERSION_OLD=$(node --version 2>/dev/null || echo "unknown")
-        printf "\r${YELLOW}⚠${NC} ${BOLD}Node.js${NC} ${YELLOW}${NODE_VERSION_OLD}${NC} ${GRAY}outdated (need >= 18.0.0)${NC}"
-        printf "                    \n\n"
-        PROMPT_LINES=$((PROMPT_LINES + 2))  # line + \n
+        printf "\r  ${YELLOW}⚠${NC} ${BOLD}Node.js${NC} ${YELLOW}${NODE_VERSION_OLD}${NC} ${GRAY}outdated (need >= 18.0.0)${NC}%-40s\n" " "
+        PROMPT_LINES=$((PROMPT_LINES + 1))
+        printf "\n"
+        PROMPT_LINES=$((PROMPT_LINES + 1))
 
         printf "        ${YELLOW}🟡 ${BOLD}Node.js Update Required${NC}\n"
         PROMPT_LINES=$((PROMPT_LINES + 1))
@@ -731,11 +750,15 @@ check_and_prompt_nodejs() {
         return 0
     fi
     
-    # Track prompt lines (including animation line still on screen)
-    PROMPT_LINES=1
+    # Track prompt lines
+    PROMPT_LINES=0
 
-    printf "\n        ${YELLOW}🟡 ${BOLD}Node.js Setup Required${NC}\n"
-    PROMPT_LINES=$((PROMPT_LINES + 2))  # \n + line
+    printf "\r  ${YELLOW}⚠${NC} ${BOLD}Node.js${NC} ${GRAY}not installed${NC}%-40s\n" " "
+    PROMPT_LINES=$((PROMPT_LINES + 1))
+    printf "\n"
+    PROMPT_LINES=$((PROMPT_LINES + 1))
+    printf "        ${YELLOW}🟡 ${BOLD}Node.js Setup Required${NC}\n"
+    PROMPT_LINES=$((PROMPT_LINES + 1))
     printf "        ${GRAY}GraphDone requires Node.js >= 18.0.0 and npm >= 9.0.0 for development.${NC}\n\n"
     PROMPT_LINES=$((PROMPT_LINES + 2))  # line + \n
     printf "        ${GREEN}✓${NC} We'll use the dedicated Node.js setup script for your platform\n"
@@ -854,10 +877,10 @@ check_and_prompt_docker() {
         PROMPT_LINES=0
 
         DOCKER_VERSION=$(docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "unknown")
-        printf "\n  ${YELLOW}⚠${NC} ${BOLD}Docker${NC} ${GREEN}${DOCKER_VERSION}${NC} ${GRAY}installed but not running${NC}"
-        PROMPT_LINES=$((PROMPT_LINES + 2))  # \n + line
-        printf "                    \n\n"
-        PROMPT_LINES=$((PROMPT_LINES + 2))  # line + \n
+        printf "\r  ${YELLOW}⚠${NC} ${BOLD}Docker${NC} ${GREEN}${DOCKER_VERSION}${NC} ${GRAY}installed but not running${NC}%-40s\n" " "
+        PROMPT_LINES=$((PROMPT_LINES + 1))
+        printf "\n"
+        PROMPT_LINES=$((PROMPT_LINES + 1))
 
         printf "        ${YELLOW}🟡 ${BOLD}Docker Startup Required${NC}\n"
         PROMPT_LINES=$((PROMPT_LINES + 1))
@@ -900,11 +923,15 @@ check_and_prompt_docker() {
         return 0
     fi
     
-    # Track prompt lines (including animation line still on screen)
-    PROMPT_LINES=1
+    # Track prompt lines
+    PROMPT_LINES=0
 
-    printf "\n        ${YELLOW}🟡 ${BOLD}Docker Setup Required${NC}\n"
-    PROMPT_LINES=$((PROMPT_LINES + 2))  # \n + line
+    printf "\r  ${YELLOW}⚠${NC} ${BOLD}Docker${NC} ${GRAY}not installed${NC}%-40s\n" " "
+    PROMPT_LINES=$((PROMPT_LINES + 1))
+    printf "\n"
+    PROMPT_LINES=$((PROMPT_LINES + 1))
+    printf "        ${YELLOW}🟡 ${BOLD}Docker Setup Required${NC}\n"
+    PROMPT_LINES=$((PROMPT_LINES + 1))
     printf "        ${GRAY}GraphDone uses Docker containers for Neo4j database and Redis cache.${NC}\n\n"
     PROMPT_LINES=$((PROMPT_LINES + 2))  # line + \n
     printf "        ${GREEN}✓${NC} We'll use the dedicated Docker setup script for your platform\n"
