@@ -1260,7 +1260,7 @@ install_graphdone() {
     
     # Pre-flight checks
     printf "\n"
-    printf "${TEAL}────────────────────────────────────${NC}  ${CYAN}${BOLD}✈️  Pre-flight Checks${NC}  ${TEAL}─────-──────────────────────────────────${NC}\n"
+    printf "${TEAL}────────────────────────────────────${NC}  ${CYAN}${BOLD}✈️  Pre-flight Checks${NC}  ${TEAL}────────────────────────────────────────${NC}\n"
     
     # Check disk space
     printf "  ${BLUE}◉${NC} ${GRAY}Checking disk space...${NC}"
@@ -1274,7 +1274,7 @@ install_graphdone() {
 
     # Installation check section with box
     printf "\n"
-    printf "${TEAL}────────────────────────────────────${NC}  ${CYAN}${BOLD}🖥️  System Information${NC}  ${TEAL}────-──────────────────────────────────${NC}\n"
+    printf "${TEAL}────────────────────────────────────${NC}  ${CYAN}${BOLD}🖥️  System Information${NC}  ${TEAL}───────────────────────────────────────${NC}\n"
     # Platform display with system name in brackets
     local platform_name
     case "$(uname)" in
@@ -1307,7 +1307,7 @@ install_graphdone() {
     INSTALL_DIR="$GRAPHDONE_CHECK_DIR"
     
     printf "\n"
-    printf "${TEAL}────────────────────────────────────${NC}  ${CYAN}${BOLD}🔰 Dependency Checks${NC}  ${TEAL}────-───────────────────────────────────${NC}\n"
+    printf "${TEAL}────────────────────────────────────${NC}  ${CYAN}${BOLD}🔰 Dependency Checks${NC}  ${TEAL}────────────────────────────────────────${NC}\n"
     
     # Run dependency checks BEFORE trying to download/update code
     check_and_prompt_git
@@ -1320,7 +1320,7 @@ install_graphdone() {
     printf "  ${GREEN}✓ All dependencies verified${NC}\n"
     
     printf "\n"
-    printf "${TEAL}────────────────────────────────────${NC}  ${CYAN}${BOLD}📡 Code Installation${NC}  ${TEAL}────-───────────────────────────────────${NC}\n"
+    printf "${TEAL}────────────────────────────────────${NC}  ${CYAN}${BOLD}📡 Code Installation${NC}  ${TEAL}────────────────────────────────────────${NC}\n"
     # Target line with exact 88-character content area
     target_content="${BLUE}◉${NC} ${GRAY}Target:${NC} ${BOLD}$INSTALL_DIR${NC}"
     target_plain="◉ Target: $INSTALL_DIR"
@@ -1589,7 +1589,7 @@ install_graphdone() {
     # Environment setup
     if [ ! -f ".env" ]; then
         printf "\n"
-        printf "${TEAL}────────────────────────────────────${NC}  ${CYAN}${BOLD}✳️  Environment Configuration${NC}  ${TEAL}───────────-────────────────────${NC}\n"
+        printf "${TEAL}────────────────────────────────────${NC}  ${CYAN}${BOLD}✳️  Environment Configuration${NC}  ${TEAL}───────────────────────────────${NC}\n"
         printf "  ${GRAY}▸${NC} Configuring environment\n"
         cat > .env << 'EOF'
 NODE_ENV=production
@@ -1607,7 +1607,7 @@ EOF
     fi
 
     printf "\n"
-    printf "${TEAL}────────────────────────────────────${NC}  ${CYAN}${BOLD}🔐 Security Initialization${NC}  ${TEAL}─────────-────────────────────────${NC}\n"
+    printf "${TEAL}────────────────────────────────────${NC}  ${CYAN}${BOLD}🔐 Security Initialization${NC}  ${TEAL}──────────────────────────────────${NC}\n"
     if [ ! -f "deployment/certs/server-cert.pem" ]; then
         printf "  ${GRAY}▸${NC} Generating TLS certificates\n"
         mkdir -p deployment/certs || error "Failed to create certificate directory"
@@ -1628,7 +1628,7 @@ EOF
         fi
         printf "  ${GREEN}✓${NC} TLS certificates already exist\n"
     fi
-
+    printf "\n"
     # Smart dependency management with MD5 hash-based caching
     # Only installs if node_modules is missing or package.json has changed
     # For updates, this was already done during Node.js check
@@ -1888,7 +1888,7 @@ show_success_in_box() {
     printf "${TEAL}╔══════════════════════════════════════════════════════════════════════════════════════════════════╗${NC}\n"
     printf "${TEAL}║                                                                                                  ║${NC}\n"
     printf "${TEAL}║  ${TEAL}┌────────────────────────────────────────────────────────────────────────────────────────────┐${TEAL}  ║${NC}\n"
-    printf "${TEAL}║  ${TEAL}│${GREEN}${BOLD}                                    ✓ GraphDone Ready 🏆${NC}                                    ${TEAL}│${NC}  ${TEAL}║${NC}\n"
+    printf "${TEAL}║  ${TEAL}│${GREEN}${BOLD}                                   🏆 GraphDone Ready ✓${NC}                                     ${TEAL}│${NC}  ${TEAL}║${NC}\n"
     printf "${TEAL}║  ${TEAL}└────────────────────────────────────────────────────────────────────────────────────────────┘${TEAL}  ║${NC}\n"
     printf "${TEAL}║                                                                                                  ║${NC}\n"
     
