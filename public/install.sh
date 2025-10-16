@@ -336,10 +336,15 @@ check_and_prompt_git() {
         printf "\r  ${git_display}%*s\n" $padding ""
         return 0
     elif [ "$check_result" = "apple_git" ]; then
+        # Track prompt lines
+        PROMPT_LINES=0
+
         GIT_VERSION_OLD=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
         printf "\r  ${YELLOW}⚠${NC} ${BOLD}Git${NC} ${YELLOW}${GIT_VERSION_OLD}${NC} ${GRAY}(Apple's bundled version)${NC}%-40s\n" " "
-        
+        PROMPT_LINES=$((PROMPT_LINES + 1))
+
         printf "        ${YELLOW}🟡 ${BOLD}Git Update Recommended${NC}\n"
+        PROMPT_LINES=$((PROMPT_LINES + 1))
         # Try to fetch latest version from Homebrew (macOS only)
         LATEST_GIT_VERSION=""
         if [ "$(uname)" = "Darwin" ] && command -v brew >/dev/null 2>&1; then
@@ -347,24 +352,35 @@ check_and_prompt_git() {
         fi
         if [ -n "$LATEST_GIT_VERSION" ]; then
             printf "        ${GRAY}Apple's bundled Git is outdated. Latest version is ${BOLD}${LATEST_GIT_VERSION}${NC}${GRAY}.${NC}\n\n"
+            PROMPT_LINES=$((PROMPT_LINES + 2))  # line + \n
         else
             printf "        ${GRAY}Apple's bundled Git is typically outdated. Homebrew provides the latest version.${NC}\n\n"
+            PROMPT_LINES=$((PROMPT_LINES + 2))  # line + \n
         fi
+
         printf "        ${GREEN}✓${NC} Install latest Git via Homebrew\n"
+        PROMPT_LINES=$((PROMPT_LINES + 1))
         printf "        ${GREEN}✓${NC} Get the newest features and performance improvements\n"
+        PROMPT_LINES=$((PROMPT_LINES + 1))
         printf "        ${GREEN}✓${NC} Better compatibility with modern repositories\n"
+        PROMPT_LINES=$((PROMPT_LINES + 1))
         printf "        ${GREEN}✓${NC} Zero manual configuration required\n\n"
+        PROMPT_LINES=$((PROMPT_LINES + 2))  # line + \n
         printf "        ${CYAN}❯${NC} ${BOLD}Upgrade to latest Git?${NC} ${GRAY}[Press Enter] or 'n' to skip${NC}\n"
+        PROMPT_LINES=$((PROMPT_LINES + 1))
         printf "        "
+        PROMPT_LINES=$((PROMPT_LINES + 1))
         read -r response < /dev/tty 2>/dev/null || response="" < /dev/tty 2>/dev/null || response="n"
-        
+
         if [ "$response" != "n" ] && [ "$response" != "N" ]; then
-            # Run the Git setup script
-            if sh "scripts/setup_git.sh"; then
+            # Run the Git setup script and capture line count from stdout
+            SETUP_LINES=$(sh "scripts/setup_git.sh")
+            if [ $? -eq 0 ]; then
                 # After successful installation, clear all output and show clean result
-                # Clear approximately 27 lines (Git Update section + Git Installation Script)
+                # Clear both prompt lines and setup script output
+                TOTAL_LINES=$((PROMPT_LINES + SETUP_LINES))
                 i=1
-                while [ $i -le 27 ]; do
+                while [ $i -le "$TOTAL_LINES" ]; do
                     printf "\033[F\033[K"  # Move up and clear line
                     i=$((i + 1))
                 done
@@ -384,21 +400,48 @@ check_and_prompt_git() {
         fi
         return 0
     elif [ "$check_result" = "outdated" ]; then
+        # Track prompt lines
+        PROMPT_LINES=0
+
         GIT_VERSION_OLD=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
         printf "\r${YELLOW}⚠${NC} ${BOLD}Git${NC} ${YELLOW}${GIT_VERSION_OLD}${NC} ${GRAY}outdated (need >= 2.30)${NC}"
         printf "                    \n\n"
-        
+        PROMPT_LINES=$((PROMPT_LINES + 2))  # line + \n
+
         printf "${YELLOW}🟡 ${BOLD}Git Update Required${NC}\n"
+        PROMPT_LINES=$((PROMPT_LINES + 1))
         printf "${GRAY}GraphDone requires Git >= 2.30 for modern features.${NC}\n\n"
+        PROMPT_LINES=$((PROMPT_LINES + 2))  # line + \n
         printf "${GREEN}✓${NC} We'll use the dedicated Git setup script for your platform\n"
+        PROMPT_LINES=$((PROMPT_LINES + 1))
         printf "${GREEN}✓${NC} Automatic upgrade to latest version\n"
+        PROMPT_LINES=$((PROMPT_LINES + 1))
         printf "${GREEN}✓${NC} Zero manual configuration required\n\n"
+        PROMPT_LINES=$((PROMPT_LINES + 2))  # line + \n
         printf "${CYAN}❯${NC} ${BOLD}Continue with Git upgrade?${NC} ${GRAY}[Press Enter] or Ctrl+C to exit${NC}\n"
+        PROMPT_LINES=$((PROMPT_LINES + 1))
+        printf "        "
+        PROMPT_LINES=$((PROMPT_LINES + 1))
         read -r response < /dev/tty 2>/dev/null || response="" < /dev/tty 2>/dev/null || response="n"
-        
-        # Run the Git setup script
-        if sh "scripts/setup_git.sh"; then
-            printf "\n"
+
+        # Run the Git setup script and capture line count from stdout
+        SETUP_LINES=$(sh "scripts/setup_git.sh")
+        if [ $? -eq 0 ]; then
+            # After successful installation, clear all output and show clean result
+            # Clear both prompt lines and setup script output
+            TOTAL_LINES=$((PROMPT_LINES + SETUP_LINES))
+            i=1
+            while [ $i -le "$TOTAL_LINES" ]; do
+                printf "\033[F\033[K"  # Move up and clear line
+                i=$((i + 1))
+            done
+
+            # Get the new Git version and show clean success message
+            NEW_GIT_VERSION=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
+            local git_success="${GREEN}✓${NC} ${BOLD}Git${NC} upgraded to ${GREEN}${NEW_GIT_VERSION}${NC} successfully"
+            local git_success_plain="✓ Git upgraded to ${NEW_GIT_VERSION} successfully"
+            local padding=$((88 - ${#git_success_plain}))
+            printf "  ${git_success}%*s\n" $padding ""
         else
             printf "${RED}✗${NC} Git setup failed\n"
             exit 1
@@ -406,22 +449,35 @@ check_and_prompt_git() {
         return 0
     fi
     
+    # Track prompt lines (including animation line still on screen)
+    PROMPT_LINES=1
+
     printf "\n        ${YELLOW}🟡 ${BOLD}Git Setup Required${NC}\n"
+    PROMPT_LINES=$((PROMPT_LINES + 2))  # \n + line
     printf "        ${GRAY}GraphDone requires Git for version control and cloning repositories.${NC}\n\n"
+    PROMPT_LINES=$((PROMPT_LINES + 2))  # line + \n
     printf "        ${GREEN}✓${NC} We'll use the dedicated Git setup script for your platform\n"
+    PROMPT_LINES=$((PROMPT_LINES + 1))
     printf "        ${GREEN}✓${NC} Automatic installation via package manager\n"
+    PROMPT_LINES=$((PROMPT_LINES + 1))
     printf "        ${GREEN}✓${NC} Includes latest stable version\n"
+    PROMPT_LINES=$((PROMPT_LINES + 1))
     printf "        ${GREEN}✓${NC} Zero manual configuration required\n\n"
+    PROMPT_LINES=$((PROMPT_LINES + 2))  # line + \n
     printf "        ${CYAN}❯${NC} ${BOLD}Continue with Git installation?${NC} ${GRAY}[Press Enter] or Ctrl+C to exit${NC}\n"
+    PROMPT_LINES=$((PROMPT_LINES + 1))
     printf "        "
+    PROMPT_LINES=$((PROMPT_LINES + 1))
     read -r response < /dev/tty 2>/dev/null || response=""
-    
-    # Run the Git setup script (skip redundant check)
-    if sh "scripts/setup_git.sh" --skip-check; then
+
+    # Run the Git setup script (skip redundant check) and capture line count from stdout
+    SETUP_LINES=$(sh "scripts/setup_git.sh" --skip-check)
+    if [ $? -eq 0 ]; then
         # After successful installation, clear all output and show clean result
-        # Clear approximately 23 lines (Checking line + Git Setup section + Installation Script)
+        # Clear both prompt lines and setup script output
+        TOTAL_LINES=$((PROMPT_LINES + SETUP_LINES))
         i=1
-        while [ $i -le 23 ]; do
+        while [ $i -le "$TOTAL_LINES" ]; do
             printf "\033[F\033[K"  # Move up and clear line
             i=$((i + 1))
         done
@@ -524,24 +580,36 @@ check_and_prompt_nodejs() {
         printf "\r  ${node_display}%*s\n" $padding ""
         return 0
     elif [ "$check_result" = "npm_old" ] || [ "$check_result" = "npm_missing" ]; then
+        # Track prompt lines
+        PROMPT_LINES=0
+
         NODE_VERSION_FULL=$(node --version 2>/dev/null || echo "unknown")
         printf "\r${YELLOW}⚠${NC} ${BOLD}Node.js${NC} ${GREEN}${NODE_VERSION_FULL}${NC} ${GRAY}OK, but npm needs update${NC}"
         printf "                    \n\n"
-        
+        PROMPT_LINES=$((PROMPT_LINES + 2))  # line + \n
+
         printf "        ${YELLOW}🟡 ${BOLD}npm Update Required${NC}\n"
+        PROMPT_LINES=$((PROMPT_LINES + 1))
         printf "        ${GRAY}Node.js is current but npm needs to be updated to >= 9.0.0${NC}\n\n"
+        PROMPT_LINES=$((PROMPT_LINES + 2))  # line + \n
         printf "        ${GREEN}✓${NC} We'll use the dedicated Node.js setup script to update npm\n"
+        PROMPT_LINES=$((PROMPT_LINES + 1))
         printf "        ${GREEN}✓${NC} Zero manual intervention required\n\n"
+        PROMPT_LINES=$((PROMPT_LINES + 2))  # line + \n
         printf "        ${CYAN}❯${NC} ${BOLD}Continue with npm update?${NC} ${GRAY}[Press Enter] or Ctrl+C to exit${NC}\n"
+        PROMPT_LINES=$((PROMPT_LINES + 1))
         printf "        "
+        PROMPT_LINES=$((PROMPT_LINES + 1))
         read -r response < /dev/tty 2>/dev/null || response="" < /dev/tty 2>/dev/null || response="n"
-        
-        # Run the Node.js setup script
-        if sh "scripts/setup_nodejs.sh"; then
+
+        # Run the Node.js setup script and capture line count from stdout
+        SETUP_LINES=$(sh "scripts/setup_nodejs.sh")
+        if [ $? -eq 0 ]; then
             # After successful installation, clear all output and show clean result
-            # Clear exactly 15 lines (checking animation + npm Update section + Node.js setup output)
+            # Clear both prompt lines and setup script output
+            TOTAL_LINES=$((PROMPT_LINES + SETUP_LINES))
             i=1
-            while [ $i -le 15 ]; do
+            while [ $i -le "$TOTAL_LINES" ]; do
                 printf "\033[F\033[K"  # Move up and clear line
                 i=$((i + 1))
             done
@@ -565,25 +633,38 @@ check_and_prompt_nodejs() {
         fi
         return 0
     elif [ "$check_result" = "outdated" ]; then
+        # Track prompt lines
+        PROMPT_LINES=0
+
         NODE_VERSION_OLD=$(node --version 2>/dev/null || echo "unknown")
         printf "\r${YELLOW}⚠${NC} ${BOLD}Node.js${NC} ${YELLOW}${NODE_VERSION_OLD}${NC} ${GRAY}outdated (need >= 18.0.0)${NC}"
         printf "                    \n\n"
-        
+        PROMPT_LINES=$((PROMPT_LINES + 2))  # line + \n
+
         printf "        ${YELLOW}🟡 ${BOLD}Node.js Update Required${NC}\n"
+        PROMPT_LINES=$((PROMPT_LINES + 1))
         printf "        ${GRAY}GraphDone requires Node.js >= 18.0.0 for optimal performance.${NC}\n\n"
+        PROMPT_LINES=$((PROMPT_LINES + 2))  # line + \n
         printf "        ${GREEN}✓${NC} We'll use the dedicated Node.js setup script for your platform\n"
+        PROMPT_LINES=$((PROMPT_LINES + 1))
         printf "        ${GREEN}✓${NC} Automatic installation of latest version\n"
+        PROMPT_LINES=$((PROMPT_LINES + 1))
         printf "        ${GREEN}✓${NC} Zero manual configuration required\n\n"
+        PROMPT_LINES=$((PROMPT_LINES + 2))  # line + \n
         printf "        ${CYAN}❯${NC} ${BOLD}Continue with Node.js upgrade?${NC} ${GRAY}[Press Enter] or Ctrl+C to exit${NC}\n"
+        PROMPT_LINES=$((PROMPT_LINES + 1))
         printf "        "
+        PROMPT_LINES=$((PROMPT_LINES + 1))
         read -r response < /dev/tty 2>/dev/null || response="" < /dev/tty 2>/dev/null || response="n"
-        
-        # Run the Node.js setup script
-        if sh "scripts/setup_nodejs.sh"; then
+
+        # Run the Node.js setup script and capture line count from stdout
+        SETUP_LINES=$(sh "scripts/setup_nodejs.sh")
+        if [ $? -eq 0 ]; then
             # After successful installation, clear all output and show clean result
-            # Clear exactly 16 lines (checking animation + Node.js Update section + Node.js setup output)
+            # Clear both prompt lines and setup script output
+            TOTAL_LINES=$((PROMPT_LINES + SETUP_LINES))
             i=1
-            while [ $i -le 16 ]; do
+            while [ $i -le "$TOTAL_LINES" ]; do
                 printf "\033[F\033[K"  # Move up and clear line
                 i=$((i + 1))
             done
@@ -608,22 +689,35 @@ check_and_prompt_nodejs() {
         return 0
     fi
     
+    # Track prompt lines (including animation line still on screen)
+    PROMPT_LINES=1
+
     printf "\n        ${YELLOW}🟡 ${BOLD}Node.js Setup Required${NC}\n"
+    PROMPT_LINES=$((PROMPT_LINES + 2))  # \n + line
     printf "        ${GRAY}GraphDone requires Node.js >= 18.0.0 and npm >= 9.0.0 for development.${NC}\n\n"
+    PROMPT_LINES=$((PROMPT_LINES + 2))  # line + \n
     printf "        ${GREEN}✓${NC} We'll use the dedicated Node.js setup script for your platform\n"
+    PROMPT_LINES=$((PROMPT_LINES + 1))
     printf "        ${GREEN}✓${NC} Automatic installation of latest version\n"
+    PROMPT_LINES=$((PROMPT_LINES + 1))
     printf "        ${GREEN}✓${NC} Includes npm package manager automatically\n"
+    PROMPT_LINES=$((PROMPT_LINES + 1))
     printf "        ${GREEN}✓${NC} Zero manual configuration required\n\n"
+    PROMPT_LINES=$((PROMPT_LINES + 2))  # line + \n
     printf "        ${CYAN}❯${NC} ${BOLD}Continue with Node.js installation?${NC} ${GRAY}[Press Enter] or Ctrl+C to exit${NC}\n"
+    PROMPT_LINES=$((PROMPT_LINES + 1))
     printf "        "
+    PROMPT_LINES=$((PROMPT_LINES + 1))
     read -r response < /dev/tty 2>/dev/null || response=""
-    
-    # Run the Node.js setup script (will check if already installed)
-    if sh "scripts/setup_nodejs.sh"; then
+
+    # Run the Node.js setup script (will check if already installed) and capture line count from stdout
+    SETUP_LINES=$(sh "scripts/setup_nodejs.sh")
+    if [ $? -eq 0 ]; then
         # After successful installation, clear all output and show clean result
-        # Clear 24 lines (checking animation + prompts + nvm installation output)
+        # Clear both prompt lines and setup script output
+        TOTAL_LINES=$((PROMPT_LINES + SETUP_LINES))
         i=1
-        while [ $i -le 24 ]; do
+        while [ $i -le "$TOTAL_LINES" ]; do
             printf "\033[F\033[K"  # Move up and clear line
             i=$((i + 1))
         done
@@ -714,25 +808,39 @@ check_and_prompt_docker() {
         return 0
     elif [ "$check_result" = "installed" ]; then
         # Docker installed but not running - start it
+        # Track prompt lines
+        PROMPT_LINES=0
+
         DOCKER_VERSION=$(docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "unknown")
         printf "\n  ${YELLOW}⚠${NC} ${BOLD}Docker${NC} ${GREEN}${DOCKER_VERSION}${NC} ${GRAY}installed but not running${NC}"
+        PROMPT_LINES=$((PROMPT_LINES + 2))  # \n + line
         printf "                    \n\n"
-        
+        PROMPT_LINES=$((PROMPT_LINES + 2))  # line + \n
+
         printf "        ${YELLOW}🟡 ${BOLD}Docker Startup Required${NC}\n"
+        PROMPT_LINES=$((PROMPT_LINES + 1))
         printf "        ${GRAY}Docker is installed but the daemon is not running.${NC}\n\n"
+        PROMPT_LINES=$((PROMPT_LINES + 2))  # line + \n
         printf "        ${GREEN}✓${NC} We'll start Docker Desktop automatically\n"
+        PROMPT_LINES=$((PROMPT_LINES + 1))
         printf "        ${GREEN}✓${NC} Wait for the Linux VM to boot and be ready\n"
+        PROMPT_LINES=$((PROMPT_LINES + 1))
         printf "        ${GREEN}✓${NC} Zero manual intervention required\n\n"
+        PROMPT_LINES=$((PROMPT_LINES + 2))  # line + \n
         printf "        ${CYAN}❯${NC} ${BOLD}Continue with Docker startup?${NC} ${GRAY}[Press Enter] or Ctrl+C to exit${NC}\n"
+        PROMPT_LINES=$((PROMPT_LINES + 1))
         printf "        "
+        PROMPT_LINES=$((PROMPT_LINES + 1))
         read -r response < /dev/tty 2>/dev/null || response="" < /dev/tty 2>/dev/null || response="n"
-        
-        # Run the Docker setup script to start Docker (it handles all output)
-        if sh "scripts/setup_docker.sh"; then
+
+        # Run the Docker setup script to start Docker and capture line count from stdout
+        SETUP_LINES=$(sh "scripts/setup_docker.sh")
+        if [ $? -eq 0 ]; then
             # After successful startup, clear all output and show clean result
-            # Clear exactly 22 lines (checking animation + Docker Startup section + Docker setup output)
+            # Clear both prompt lines and setup script output
+            TOTAL_LINES=$((PROMPT_LINES + SETUP_LINES))
             i=1
-            while [ $i -le 22 ]; do
+            while [ $i -le "$TOTAL_LINES" ]; do
                 printf "\033[F\033[K"  # Move up and clear line
                 i=$((i + 1))
             done
@@ -750,22 +858,35 @@ check_and_prompt_docker() {
         return 0
     fi
     
+    # Track prompt lines (including animation line still on screen)
+    PROMPT_LINES=1
+
     printf "\n        ${YELLOW}🟡 ${BOLD}Docker Setup Required${NC}\n"
+    PROMPT_LINES=$((PROMPT_LINES + 2))  # \n + line
     printf "        ${GRAY}GraphDone uses Docker containers for Neo4j database and Redis cache.${NC}\n\n"
+    PROMPT_LINES=$((PROMPT_LINES + 2))  # line + \n
     printf "        ${GREEN}✓${NC} We'll use the dedicated Docker setup script for your platform\n"
+    PROMPT_LINES=$((PROMPT_LINES + 1))
     printf "        ${GREEN}✓${NC} Automatic installation and configuration\n"
+    PROMPT_LINES=$((PROMPT_LINES + 1))
     printf "        ${GREEN}✓${NC} Proper permissions and service setup\n"
+    PROMPT_LINES=$((PROMPT_LINES + 1))
     printf "        ${GREEN}✓${NC} Zero manual configuration, automatic setup\n\n"
+    PROMPT_LINES=$((PROMPT_LINES + 2))  # line + \n
     printf "        ${CYAN}❯${NC} ${BOLD}Continue with Docker installation?${NC} ${GRAY}[Press Enter] or Ctrl+C to exit${NC}\n"
+    PROMPT_LINES=$((PROMPT_LINES + 1))
     printf "        "
+    PROMPT_LINES=$((PROMPT_LINES + 1))
     read -r response < /dev/tty 2>/dev/null || response=""
-    
-    # Run the Docker setup script - it handles everything (skip redundant check)
-    if sh "scripts/setup_docker.sh" --skip-check; then
+
+    # Run the Docker setup script - it handles everything (skip redundant check) and capture line count from stdout
+    SETUP_LINES=$(sh "scripts/setup_docker.sh" --skip-check)
+    if [ $? -eq 0 ]; then
         # After successful installation, clear all output and show clean result
-        # Clear exactly 17 lines (checking animation + Docker Setup section + Docker setup output)
+        # Clear both prompt lines and setup script output
+        TOTAL_LINES=$((PROMPT_LINES + SETUP_LINES))
         i=1
-        while [ $i -le 17 ]; do
+        while [ $i -le "$TOTAL_LINES" ]; do
             printf "\033[F\033[K"  # Move up and clear line
             i=$((i + 1))
         done
@@ -1062,7 +1183,7 @@ remove_services() {
     docker system prune -f >/dev/null 2>&1 || true
     
     printf "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
-    printf "${GREEN}✅ Cleanup complete!${NC}\n"
+    printf "${GREEN}✓ Cleanup complete!${NC}\n"
 }
 
 # Main installation function
@@ -1180,8 +1301,6 @@ install_graphdone() {
     # Run dependency checks BEFORE trying to download/update code
     check_and_prompt_git
     check_and_prompt_nodejs
-    
-    
     check_and_prompt_docker
     
     # Brief pause for smooth transition
@@ -1556,6 +1675,12 @@ EOF
     
     if [ "$CONFLICTS_FOUND" = false ]; then
         printf "  ${GREEN}✓${NC} No port conflicts detected\n"
+    fi
+
+    # If ports were freed, give Docker daemon time to stabilize
+    if [ "$CONFLICTS_FOUND" = true ]; then
+        printf "  ${BLUE}⏳${NC} Waiting for Docker daemon to stabilize...\n"
+        sleep 3
     fi
 
     # Smart deployment detection with animated progress
