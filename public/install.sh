@@ -1191,6 +1191,16 @@ install_graphdone() {
     # Beautiful GraphDone header with Copilot-style animation
     clear
     printf "\n\n"
+    
+    # Fetch latest version from GitHub releases
+    GRAPHDONE_VERSION="v0.3.1-alpha"  # Fallback version
+    if command -v curl >/dev/null 2>&1; then
+        LATEST_VERSION=$(curl -sf --max-time 3 https://api.github.com/repos/GraphDone/GraphDone-Core/releases/latest 2>/dev/null | grep -o '"tag_name": *"[^"]*"' | sed 's/"tag_name": *"\(.*\)"/\1/' 2>/dev/null)
+        if [ -n "$LATEST_VERSION" ]; then
+            GRAPHDONE_VERSION="$LATEST_VERSION"
+        fi
+    fi
+    
     # Use 256-color mode for better compatibility (38;5;XXX format)
     # or fallback to basic ANSI if terminal doesn't support it
     if [ "$(tput colors 2>/dev/null)" -ge 256 ] 2>/dev/null; then
@@ -1217,12 +1227,12 @@ install_graphdone() {
     # Animate banner with Copilot-style line-by-line reveal
     printf "${TEAL}╔══════════════════════════════════════════════════════════════════════════════════════════════════╗${NC}\n"; sleep 0.03
     printf "${TEAL}║                                                                                                  ║${NC}\n"; sleep 0.03
-    printf "${TEAL}║                  ${TEAL}${BOLD}╔██     ██╗ ███████╗██╗      ██████╗ ██████╗ ███╗   ███╗███████╗${NC}                ${TEAL}║${NC}\n"; sleep 0.03
-    printf "${TEAL}║                  ${TEAL}${BOLD}║██     ██║ ██╔════╝██║     ██╔════╝██╔═══██╗████╗ ████║██╔════╝${NC}                ${TEAL}║${NC}\n"; sleep 0.03
-    printf "${TEAL}║                  ${TEAL}${BOLD}║██  █  ██║ █████╗  ██║     ██║     ██║   ██║██╔████╔██║█████╗${NC}                  ${TEAL}║${NC}\n"; sleep 0.03
-    printf "${TEAL}║                  ${TEAL}${BOLD}║██ ███ ██║ ██╔══╝  ██║     ██║     ██║   ██║██║╚██╔╝██║██╔══╝${NC}                  ${TEAL}║${NC}\n"; sleep 0.03
-    printf "${TEAL}║                  ${TEAL}${BOLD}╚═███╔███╔╝ ███████╗███████╗╚██████╗╚██████╔╝██║ ╚═╝ ██║███████╗${NC}                ${TEAL}║${NC}\n"; sleep 0.03
-    printf "${TEAL}║                  ${TEAL}${BOLD}  ╚══╝╚══╝  ╚══════╝╚══════╝ ╚═════╝ ╚═════╝   ╚══════╝╚═══════╝${NC}                ${TEAL}║${NC}\n"; sleep 0.03
+    printf "${TEAL}║                  ${TEAL}${BOLD}██╗    ██╗███████╗██╗      ██████╗ ██████╗ ███╗   ███╗███████╗${NC}                  ${TEAL}║${NC}\n"; sleep 0.03
+    printf "${TEAL}║                  ${TEAL}${BOLD}██║    ██║██╔════╝██║     ██╔════╝██╔═══██╗████╗ ████║██╔════╝${NC}                  ${TEAL}║${NC}\n"; sleep 0.03
+    printf "${TEAL}║                  ${TEAL}${BOLD}██║ █╗ ██║█████╗  ██║     ██║     ██║   ██║██╔████╔██║█████╗${NC}                    ${TEAL}║${NC}\n"; sleep 0.03
+    printf "${TEAL}║                  ${TEAL}${BOLD}██║███╗██║██╔══╝  ██║     ██║     ██║   ██║██║╚██╔╝██║██╔══╝${NC}                    ${TEAL}║${NC}\n"; sleep 0.03
+    printf "${TEAL}║                  ${TEAL}${BOLD}╚███╔███╔╝███████╗███████╗╚██████╗╚██████╔╝██║ ╚═╝ ██║███████╗${NC}                  ${TEAL}║${NC}\n"; sleep 0.03
+    printf "${TEAL}║                   ${TEAL}${BOLD}╚══╝╚══╝ ╚══════╝╚══════╝ ╚═════╝ ╚═════╝ ╚═╝     ╚═╝╚══════╝${NC}                  ${TEAL}║${NC}\n"; sleep 0.03
     printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"; sleep 0.03
     printf "${TEAL}║${NC}                                      ${TEAL}${BOLD}████████╗ ██████╗${NC}                                           ${TEAL}║${NC}\n"; sleep 0.03
     printf "${TEAL}║${NC}                                      ${TEAL}${BOLD}╚══██╔══╝██╔═══██╗${NC}                                          ${TEAL}║${NC}\n"; sleep 0.03
@@ -1242,8 +1252,9 @@ install_graphdone() {
     printf "${TEAL}║                                                                                                  ║${NC}\n"; sleep 0.03
     printf "${TEAL}║${LIGHTCYAN}                          Built with ♥ ${YELLOW}for${LIGHTCYAN} teams ${ORANGE}who${LIGHTCYAN} think differently.                           ${TEAL}║${NC}\n"; sleep 0.05
     printf "${TEAL}║                                                                                                  ║${NC}\n"; sleep 0.03
+    printf "${TEAL}║${NC}                                                                            ${GRAY}Version: ${GRAPHDONE_VERSION}${NC} ${TEAL}║${NC}\n"; sleep 0.03
     printf "${TEAL}╚══════════════════════════════════════════════════════════════════════════════════════════════════╝${NC}\n\n"
-
+    
     # Platform detection
     detect_platform
     
