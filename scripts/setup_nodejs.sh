@@ -74,13 +74,14 @@ detect_os
 # COLORS
 # ============================================================================
 
-if [ -t 1 ]; then
+if [ -t 2 ]; then
     if [ "$(tput colors 2>/dev/null)" -ge 256 ] 2>/dev/null; then
         CYAN='\033[38;5;51m'
-        GREEN='\033[38;5;154m'  
+        GREEN='\033[38;5;154m'
         YELLOW='\033[38;5;220m'
         PURPLE='\033[38;5;135m'
         BLUE='\033[38;5;33m'
+        VIOLET='\033[38;5;213m'  # Violet (256-color palette)
         PALEGREEN='\033[38;2;152;251;152m'  # Palegreen (#98fb98)
         GRAY='\033[38;5;244m'
         BOLD='\033[1m'
@@ -89,9 +90,10 @@ if [ -t 1 ]; then
     else
         CYAN='\033[0;36m'
         GREEN='\033[0;32m'
-        YELLOW='\033[0;33m' 
+        YELLOW='\033[0;33m'
         PURPLE='\033[0;35m'
         BLUE='\033[0;34m'
+        VIOLET='\033[0;35m'  # Magenta (basic ANSI)
         PALEGREEN='\033[0;32m'  # Fallback to green
         GRAY='\033[0;90m'
         BOLD='\033[1m'
@@ -99,7 +101,7 @@ if [ -t 1 ]; then
         NC='\033[0m'
     fi
 else
-    CYAN='' GREEN='' YELLOW='' PURPLE='' BLUE='' PALEGREEN='' GRAY='' BOLD='' DIM='' NC=''
+    CYAN='' GREEN='' YELLOW='' PURPLE='' BLUE='' VIOLET='' PALEGREEN='' GRAY='' BOLD='' DIM='' NC=''
 fi
 
 # Track output lines for install.sh to clear later
@@ -135,7 +137,7 @@ show_spinner() {
             8) spin_char='⠇' ;;
             9) spin_char='⠏' ;;
         esac
-        printf "\r        ${GRAY}%s${NC} ${CYAN}%s${NC}" "$msg" "$spin_char" >&2
+        printf "\r        ${VIOLET}◉${NC} %s ${CYAN}%s${NC}" "$msg" "$spin_char" >&2
         i=$((i + 1))
         sleep 0.15
     done
@@ -167,7 +169,7 @@ check_nodejs_installed() {
             return 1
         fi
     else
-        printf "        ${BLUE}◉${NC} Node.js not found - installing latest version\n" >&2
+        printf "        ${VIOLET}◉${NC} Node.js not found - installing latest version\n" >&2
         OUTPUT_LINES=$((OUTPUT_LINES + 1))
         return 1
     fi
@@ -202,7 +204,7 @@ install_nodejs_macos() {
         export HOMEBREW_NO_ENV_HINTS=1
 
         # Install Node.js latest with minimal output
-        printf "        ${BLUE}◉${NC} Installing Node.js (latest)" >&2
+        printf "        ${VIOLET}◉${NC} Installing Node.js (latest)" >&2
 
         # Start installation in background
         brew install node >/dev/null 2>&1 &
@@ -213,9 +215,9 @@ install_nodejs_macos() {
         i=0
 
         while kill -0 $install_pid 2>/dev/null; do
-            printf "\r        ${BLUE}◉${NC} Installing Node.js (latest) ${CYAN}.${NC}" >&2
-            i=$(( (i+1) % 10 ))
-            sleep 0.15
+            printf "\r        ${VIOLET}◉${NC} Installing Node.js (latest) ${CYAN}${spin:i:1}${NC}" >&2
+            i=$(( (i+1) % ${#spin} ))
+            sleep 0.1
         done
         wait $install_pid
 
@@ -239,7 +241,7 @@ install_nodejs_macos() {
 
 # Linux Node.js installation via nvm
 install_nodejs_linux() {
-    printf "        ${BLUE}◉${NC} Installing Node.js via nvm (Node Version Manager)\n" >&2
+    printf "        ${VIOLET}◉${NC} Installing Node.js via nvm (Node Version Manager)\n" >&2
     OUTPUT_LINES=$((OUTPUT_LINES + 1))
 
     # Check if nvm is already installed
@@ -247,7 +249,7 @@ install_nodejs_linux() {
         printf "        ${GREEN}✓${NC} nvm already installed\n" >&2
         OUTPUT_LINES=$((OUTPUT_LINES + 1))
     else
-        printf "        ${GRAY}Installing nvm${NC}" >&2
+        printf "        ${VIOLET}◉${NC} Installing nvm" >&2
         curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/master/install.sh 2>/dev/null | bash &
         show_spinner $! "Installing nvm"
 
@@ -271,7 +273,7 @@ install_nodejs_linux() {
         return 1
     fi
 
-    printf "        ${GRAY}Installing Node.js 22 (LTS)${NC}" >&2
+    printf "        ${VIOLET}◉${NC} Installing Node.js 22 (LTS)" >&2
 
     # Install Node.js 22 LTS (run in background for spinner)
     (nvm install 22 && nvm use 22 && nvm alias default 22) > /dev/null 2>&1 &
@@ -335,7 +337,7 @@ update_npm() {
     if command -v npm >/dev/null 2>&1; then
         local npm_version=$(npm --version 2>/dev/null | cut -d. -f1 || echo "0")
         if [ "$npm_version" -lt 9 ]; then
-            printf "${BLUE}◉${NC} Updating npm to latest version\n" >&2
+            printf "${VIOLET}◉${NC} Updating npm to latest version\n" >&2
             OUTPUT_LINES=$((OUTPUT_LINES + 1))
             if npm install -g npm@latest >/dev/null 2>&1; then
                 local npm_new=$(npm --version 2>/dev/null || echo "unknown")
