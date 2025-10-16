@@ -6,12 +6,10 @@
 # Platform Support:
 #   ✓ macOS    - Homebrew
 #   ✓ Linux    - nvm (Node Version Manager)
-#   ✓ Windows  - Chocolatey, Scoop, Winget, or manual installer
 #
 # Installation methods:
 #   macOS:   Homebrew (latest Node.js)
 #   Linux:   nvm (Node.js 22 LTS, no sudo required)
-#   Windows: Chocolatey/Winget/Scoop
 
 set -eu
 if [ -n "${BASH_VERSION:-}" ]; then
@@ -61,13 +59,10 @@ detect_os() {
         linux-gnu*|Linux)
             OS="linux"
             ;;
-        msys|cygwin|MINGW*|MSYS*|CYGWIN*)
-            OS="windows"
-            ;;
         *)
             OS="unknown"
             printf "  ${YELLOW}✗${NC} ${BOLD}Unsupported OS${NC} ${GRAY}${os_type}${NC}\n" >&2
-            printf "  ${BLUE}ⓘ${NC} ${GRAY}Supported: macOS, Linux, Windows${NC}\n" >&2
+            printf "  ${BLUE}ⓘ${NC} ${GRAY}Supported: macOS, Linux${NC}\n" >&2
             exit 1
             ;;
     esac
@@ -175,9 +170,6 @@ install_nodejs() {
         "linux")
             install_nodejs_linux
             ;;
-        "windows")
-            install_nodejs_windows
-            ;;
         *)
             echo "✗ Unsupported operating system: ${OSTYPE}" >&2
             return 1
@@ -280,113 +272,6 @@ install_nodejs_linux() {
     fi
 }
 
-# ============================================================================
-# WINDOWS INSTALLATION
-# ============================================================================
-
-# Windows Node.js installation
-install_nodejs_windows() {
-    printf "        ${BLUE}◉${NC} Installing Node.js for Windows\n"
-    
-    # Check if Chocolatey is available
-    if command -v choco > /dev/null 2>&1; then
-        printf "        ${BLUE}◉${NC} Using Chocolatey to install Node.js"
-        
-        # Install Node.js via Chocolatey
-        choco install nodejs -y >/dev/null 2>&1 &
-        install_pid=$!
-        
-        # Show spinner while installing
-        spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
-        i=0
-        
-        while kill -0 $install_pid 2>/dev/null; do
-            printf "\r        ${BLUE}◉${NC} Using Chocolatey to install Node.js ${CYAN}.${NC}"
-            i=$(( (i+1) % 10 ))
-            sleep 0.15
-        done
-        wait $install_pid
-        
-        printf "\r        ${GREEN}✓${NC} Node.js installed via Chocolatey                    \n"
-        
-        # Refresh environment variables
-        printf "        ${BLUE}◉${NC} Refreshing environment variables\n"
-        export PATH="/c/Program Files/nodejs:$PATH"
-        
-        return 0
-        
-    # Check if Winget is available (Windows 10/11)
-    elif command -v winget > /dev/null 2>&1; then
-        printf "        ${BLUE}◉${NC} Using winget to install Node.js"
-        
-        # Install Node.js via winget
-        winget install -e --id OpenJS.NodeJS >/dev/null 2>&1 &
-        install_pid=$!
-        
-        # Show spinner while installing
-        spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
-        i=0
-        
-        while kill -0 $install_pid 2>/dev/null; do
-            printf "\r        ${BLUE}◉${NC} Using winget to install Node.js ${CYAN}.${NC}"
-            i=$(( (i+1) % 10 ))
-            sleep 0.15
-        done
-        wait $install_pid
-        
-        printf "\r        ${GREEN}✓${NC} Node.js installed via winget                    \n"
-        
-        # Refresh environment variables
-        printf "        ${BLUE}◉${NC} Refreshing environment variables\n"
-        export PATH="/c/Program Files/nodejs:$PATH"
-        
-        return 0
-        
-    # Check if Scoop is available
-    elif command -v scoop > /dev/null 2>&1; then
-        printf "        ${BLUE}◉${NC} Using Scoop to install Node.js"
-        
-        # Install Node.js via Scoop
-        scoop install nodejs >/dev/null 2>&1 &
-        install_pid=$!
-        
-        # Show spinner while installing
-        spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
-        i=0
-        
-        while kill -0 $install_pid 2>/dev/null; do
-            printf "\r        ${BLUE}◉${NC} Using Scoop to install Node.js ${CYAN}.${NC}"
-            i=$(( (i+1) % 10 ))
-            sleep 0.15
-        done
-        wait $install_pid
-        
-        printf "\r        ${GREEN}✓${NC} Node.js installed via Scoop                    \n"
-        return 0
-        
-    else
-        # No package manager available - prompt for manual installation
-        printf "        ${YELLOW}!${NC} No package manager found (Chocolatey, Winget, or Scoop)\n"
-        printf "        ${BLUE}ℹ${NC} ${GRAY}Please install Node.js manually:${NC}\n"
-        printf "        ${GRAY}  1. Download from: https://nodejs.org/en/download${NC}\n"
-        printf "        ${GRAY}  2. Run the installer (MSI)${NC}\n"
-        printf "        ${GRAY}  3. Restart your terminal${NC}\n"
-        printf "        ${GRAY}  4. Run this script again${NC}\n\n"
-        
-        printf "        ${CYAN}❯${NC} ${BOLD}Have you installed Node.js?${NC} ${GRAY}[Press Enter when done]${NC}\n"
-        printf "        "
-        read -r response
-        
-        # Check if Node.js is now available
-        if command -v node > /dev/null 2>&1; then
-            printf "        ${GREEN}✓${NC} Node.js detected\n"
-            return 0
-        else
-            printf "        ${RED}✗${NC} Node.js still not found. Please restart terminal.\n"
-            return 1
-        fi
-    fi
-}
 
 # ============================================================================
 # VERIFICATION (Cross-platform)

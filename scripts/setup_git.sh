@@ -4,7 +4,7 @@
 # Features:
 #   ✓ Detects existing Git installations
 #   ✓ Installs latest Git via package managers
-#   ✓ Cross-platform support (macOS, Linux, Windows)
+#   ✓ Cross-platform support (macOS, Linux)
 #   ✓ Automatic version verification
 #
 # Usage:
@@ -59,9 +59,6 @@ detect_platform() {
             ;;
         Linux*)
             PLATFORM="linux"
-            ;;
-        MINGW*|MSYS*|CYGWIN*)
-            PLATFORM="windows"
             ;;
         *)
             PLATFORM="unknown"
@@ -280,47 +277,6 @@ install_git_linux() {
     fi
 }
 
-# Install Git on Windows
-install_git_windows() {
-    log_info "Installing Git for Windows..."
-    
-    # Check if running in Git Bash (Git already installed)
-    if [ -n "$MSYSTEM" ]; then
-        if command -v git >/dev/null 2>&1; then
-            GIT_VERSION=$(git --version | sed 's/git version //')
-            log_success "Git ${GREEN}v${GIT_VERSION}${NC} is already available in Git Bash"
-            exit 0
-        fi
-    fi
-    
-    # Check if Chocolatey is available
-    if command -v choco >/dev/null 2>&1; then
-        log_info "Using Chocolatey to install Git..."
-        choco install git -y
-        
-    # Check if Scoop is available
-    elif command -v scoop >/dev/null 2>&1; then
-        log_info "Using Scoop to install Git..."
-        scoop install git
-        
-    else
-        log_error "No package manager found (Chocolatey or Scoop)"
-        log_info "Please install Git manually:"
-        log_info "  1. Download from: https://git-scm.com/download/win"
-        log_info "  2. Run the installer"
-        log_info "  3. Restart your terminal"
-        log_info "  4. Run this script again"
-        exit 1
-    fi
-    
-    # Verify installation
-    if command -v git >/dev/null 2>&1; then
-        GIT_VERSION=$(git --version | sed 's/git version //')
-        log_success "Git ${GREEN}v${GIT_VERSION}${NC} installed successfully"
-    else
-        log_warning "Git installed but not in PATH. Please restart your terminal."
-    fi
-}
 
 # Configure Git with sensible defaults
 configure_git() {
@@ -359,9 +315,6 @@ main() {
             ;;
         linux)
             install_git_linux
-            ;;
-        windows)
-            install_git_windows
             ;;
         *)
             log_error "Unsupported platform: $PLATFORM"
