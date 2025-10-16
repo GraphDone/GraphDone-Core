@@ -96,8 +96,6 @@ check_docker() {
             else
                 printf "        ${YELLOW}⚠${NC} Docker is installed but not running\n" >&2
                 OUTPUT_LINES=$((OUTPUT_LINES + 1))
-                printf "        ${GRAY}  Please start Docker manually${NC}\n" >&2
-                OUTPUT_LINES=$((OUTPUT_LINES + 1))
                 return 1
             fi
         fi
@@ -218,7 +216,7 @@ install_docker_macos() {
         OUTPUT_LINES=$((OUTPUT_LINES + 1))
 
         # Launch Docker Desktop
-        open -a Docker &
+        open -a Docker &>/dev/null 2>&1 || open /Applications/Docker.app &
 
         # Show brief startup spinner (1 second)
         for j in $(seq 1 7); do
