@@ -191,8 +191,8 @@ show_spinner() {
     i=0
     
     while kill -0 $pid 2>/dev/null; do
-        printf " ${YELLOW}${spin:i:1}${NC}"
-        i=$(( (i+1) % ${#spin} ))
+        printf " ${YELLOW}.${NC}"
+        i=$(( (i+1) % 10 ))
         sleep 0.1
         printf "\b\b\b"
     done
@@ -210,8 +210,8 @@ spinner() {
     
     printf "${GRAY}▸${NC} %s " "$message"
     while kill -0 $pid 2>/dev/null; do
-        printf "\r${GRAY}▸${NC} %s ${YELLOW}${spin:i:1}${NC}" "$message"
-        i=$(( (i+1) % ${#spin} ))
+        printf "\r${GRAY}▸${NC} %s ${YELLOW}.${NC}" "$message"
+        i=$(( (i+1) % 10 ))
         sleep 0.1
     done
     
@@ -477,6 +477,13 @@ check_and_prompt_nodejs() {
         fi
         if [ $cycle -eq 6 ]; then
             dots_display="$dots_display ${CYAN}●${NC}"
+            
+            # Try to load nvm if available (to detect nvm-installed Node.js)
+            if [ -s "$HOME/.nvm/nvm.sh" ]; then
+                export NVM_DIR="$HOME/.nvm"
+                . "$NVM_DIR/nvm.sh" >/dev/null 2>&1
+            fi
+            
             # Perform the check on final cycle - check if Node.js is installed with correct version
             if command -v node >/dev/null 2>&1; then
                 NODE_VERSION=$(node --version 2>/dev/null | sed 's/v//' | cut -d. -f1 || echo "0")
@@ -546,6 +553,12 @@ check_and_prompt_nodejs() {
             done
             
             # Get the new Node.js and npm versions
+            # Load nvm to get Node.js version (if installed via nvm)
+            if [ -s "$HOME/.nvm/nvm.sh" ]; then
+                export NVM_DIR="$HOME/.nvm"
+                . "$NVM_DIR/nvm.sh" 2>/dev/null
+            fi
+
             NEW_NODE_VERSION=$(node --version 2>/dev/null || echo "unknown")
             NEW_NPM_VERSION=$(npm --version 2>/dev/null || echo "unknown")
             local node_success="${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}${NEW_NODE_VERSION}${NC} and ${BOLD}npm${NC} ${GREEN}${NEW_NPM_VERSION}${NC} updated successfully"
@@ -582,6 +595,12 @@ check_and_prompt_nodejs() {
             done
             
             # Get the new Node.js and npm versions
+            # Load nvm to get Node.js version (if installed via nvm)
+            if [ -s "$HOME/.nvm/nvm.sh" ]; then
+                export NVM_DIR="$HOME/.nvm"
+                . "$NVM_DIR/nvm.sh" 2>/dev/null
+            fi
+
             NEW_NODE_VERSION=$(node --version 2>/dev/null || echo "unknown")
             NEW_NPM_VERSION=$(npm --version 2>/dev/null || echo "unknown")
             local node_success="${GREEN}✓${NC} ${BOLD}Node.js${NC} upgraded to ${GREEN}${NEW_NODE_VERSION}${NC} and ${BOLD}npm${NC} ${GREEN}${NEW_NPM_VERSION}${NC} successfully"
@@ -605,15 +624,21 @@ check_and_prompt_nodejs() {
     printf "        "
     read -r response < /dev/tty 2>/dev/null || response=""
     
-    # Run the Node.js setup script (skip redundant check)
-    if sh "scripts/setup_nodejs.sh" --skip-check; then
+    # Run the Node.js setup script (will check if already installed)
+    if sh "scripts/setup_nodejs.sh"; then
         # After successful installation, clear all output and show clean result
-        # Clear exactly 18 lines (checking animation + Node.js Setup section + Node.js setup output)
+        # Clear 24 lines (checking animation + prompts + nvm installation output)
         i=1
-        while [ $i -le 18 ]; do
+        while [ $i -le 24 ]; do
             printf "\033[F\033[K"  # Move up and clear line
             i=$((i + 1))
         done
+        
+        # Load nvm to get Node.js version (if installed via nvm)
+        if [ -s "$HOME/.nvm/nvm.sh" ]; then
+            export NVM_DIR="$HOME/.nvm"
+            . "$NVM_DIR/nvm.sh" 2>/dev/null
+        fi
         
         # Get the new Node.js and npm versions
         NEW_NODE_VERSION=$(node --version 2>/dev/null || echo "unknown")
@@ -744,9 +769,9 @@ check_and_prompt_docker() {
     # Run the Docker setup script - it handles everything (skip redundant check)
     if sh "scripts/setup_docker.sh" --skip-check; then
         # After successful installation, clear all output and show clean result
-        # Clear exactly 26 lines (checking animation + Docker Setup section + Docker setup output)
+        # Clear exactly 17 lines (checking animation + Docker Setup section + Docker setup output)
         i=1
-        while [ $i -le 26 ]; do
+        while [ $i -le 17 ]; do
             printf "\033[F\033[K"  # Move up and clear line
             i=$((i + 1))
         done
@@ -954,8 +979,22 @@ wait_for_services() {
             return 0
         fi
         
-        printf "\r  ${GRAY}▸${NC} Waiting for services to initialize ${YELLOW}${spin:i:1}${NC} (%ds)%-35s" $attempts " "
-        i=$(( (i+1) % ${#spin} ))
+        # Get spinner character
+        case $((i % 10)) in
+            0) spin_char='⠋' ;;
+            1) spin_char='⠙' ;;
+            2) spin_char='⠹' ;;
+            3) spin_char='⠸' ;;
+            4) spin_char='⠼' ;;
+            5) spin_char='⠴' ;;
+            6) spin_char='⠦' ;;
+            7) spin_char='⠧' ;;
+            8) spin_char='⠇' ;;
+            9) spin_char='⠏' ;;
+        esac
+        
+        printf "\r  ${GRAY}▸${NC} Waiting for services to initialize ${YELLOW}%s${NC} (%ds)%-35s" "$spin_char" $attempts " "
+        i=$(( (i+1) % 10 ))
         attempts=$((attempts + 1))
         sleep 1
     done
@@ -1661,10 +1700,24 @@ EOF
         shift $((service_index % 4))
         current_service=$1
         
-        # Only update the service name and spinner, not the whole line
-        printf "\r  ${BLUE}▶${NC} ${GRAY}Starting ${BOLD}graphdone-${current_service}${NC} ${CYAN}${spin:i:1}${NC}%-52s" " "
+        # Get spinner character
+        case $((i % 10)) in
+            0) spin_char='⠋' ;;
+            1) spin_char='⠙' ;;
+            2) spin_char='⠹' ;;
+            3) spin_char='⠸' ;;
+            4) spin_char='⠼' ;;
+            5) spin_char='⠴' ;;
+            6) spin_char='⠦' ;;
+            7) spin_char='⠧' ;;
+            8) spin_char='⠇' ;;
+            9) spin_char='⠏' ;;
+        esac
         
-        i=$(( (i+1) % ${#spin} ))
+        # Only update the service name and spinner, not the whole line
+        printf "\r  ${BLUE}▶${NC} ${GRAY}Starting ${BOLD}graphdone-${current_service}${NC} ${CYAN}%s${NC}%-52s" "$spin_char" " "
+        
+        i=$(( (i+1) % 10 ))
         # Change service name every 8 iterations
         if [ $((i % 8)) -eq 0 ]; then
             service_index=$((service_index + 1))
