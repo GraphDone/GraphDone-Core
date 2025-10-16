@@ -1873,9 +1873,6 @@ EOF
     i=0
     service_index=0
     
-    # Print the initial line
-    printf "  ${BLUE}◉${NC} ${GRAY}Starting services${NC}\n"
-    
     while kill -0 $startup_pid 2>/dev/null; do
         # Get current service from space-separated list
         set -- $services
