@@ -39,6 +39,48 @@ cleanup() {
 trap 'cleanup; exit 130' INT TERM
 trap 'cleanup' EXIT
 
+# GitHub repository details
+GITHUB_REPO="GraphDone/GraphDone-Core"
+GITHUB_BRANCH="fix/first-start"
+
+# Helper function to run setup scripts (local or download from GitHub)
+run_setup_script() {
+    local script_name="$1"
+    shift
+    local script_args="$@"
+
+    # Check if script exists locally
+    if [ -f "scripts/$script_name" ]; then
+        # Run local script
+        sh "scripts/$script_name" $script_args
+    else
+        # Download from GitHub and run
+        local github_url="https://raw.githubusercontent.com/${GITHUB_REPO}/${GITHUB_BRANCH}/scripts/${script_name}"
+        local temp_script="/tmp/${script_name}.$$"
+
+        if command -v curl >/dev/null 2>&1; then
+            curl -fsSL "$github_url" -o "$temp_script" 2>/dev/null || return 1
+        elif command -v wget >/dev/null 2>&1; then
+            wget -q "$github_url" -O "$temp_script" 2>/dev/null || return 1
+        else
+            return 1
+        fi
+
+        # Add to cleanup list
+        TEMP_FILES="$TEMP_FILES $temp_script"
+        CLEANUP_NEEDED=true
+
+        # Run downloaded script
+        sh "$temp_script" $script_args
+        local result=$?
+
+        # Clean up temp script
+        rm -f "$temp_script" 2>/dev/null || true
+
+        return $result
+    fi
+}
+
 # Modern color palette using 256-color codes for better compatibility
 if [ -t 1 ]; then
     if [ "$(tput colors 2>/dev/null)" -ge 256 ] 2>/dev/null; then
@@ -374,7 +416,7 @@ check_and_prompt_git() {
 
         if [ "$response" != "n" ] && [ "$response" != "N" ]; then
             # Run the Git setup script and capture line count from stdout
-            SETUP_LINES=$(sh "scripts/setup_git.sh")
+            SETUP_LINES=$(run_setup_script "setup_git.sh")
             if [ $? -eq 0 ]; then
                 # After successful installation, clear all output and show clean result
                 # Clear both prompt lines and setup script output
@@ -425,7 +467,7 @@ check_and_prompt_git() {
         read -r response < /dev/tty 2>/dev/null || response="" < /dev/tty 2>/dev/null || response="n"
 
         # Run the Git setup script and capture line count from stdout
-        SETUP_LINES=$(sh "scripts/setup_git.sh")
+        SETUP_LINES=$(run_setup_script "setup_git.sh")
         if [ $? -eq 0 ]; then
             # After successful installation, clear all output and show clean result
             # Clear both prompt lines and setup script output
@@ -471,7 +513,7 @@ check_and_prompt_git() {
     read -r response < /dev/tty 2>/dev/null || response=""
 
     # Run the Git setup script (skip redundant check) and capture line count from stdout
-    SETUP_LINES=$(sh "scripts/setup_git.sh" --skip-check)
+    SETUP_LINES=$(run_setup_script "setup_git.sh" --skip-check)
     if [ $? -eq 0 ]; then
         # After successful installation, clear all output and show clean result
         # Clear both prompt lines and setup script output
@@ -603,7 +645,7 @@ check_and_prompt_nodejs() {
         read -r response < /dev/tty 2>/dev/null || response="" < /dev/tty 2>/dev/null || response="n"
 
         # Run the Node.js setup script and capture line count from stdout
-        SETUP_LINES=$(sh "scripts/setup_nodejs.sh")
+        SETUP_LINES=$(run_setup_script "setup_nodejs.sh")
         if [ $? -eq 0 ]; then
             # After successful installation, clear all output and show clean result
             # Clear both prompt lines and setup script output
@@ -658,7 +700,7 @@ check_and_prompt_nodejs() {
         read -r response < /dev/tty 2>/dev/null || response="" < /dev/tty 2>/dev/null || response="n"
 
         # Run the Node.js setup script and capture line count from stdout
-        SETUP_LINES=$(sh "scripts/setup_nodejs.sh")
+        SETUP_LINES=$(run_setup_script "setup_nodejs.sh")
         if [ $? -eq 0 ]; then
             # After successful installation, clear all output and show clean result
             # Clear both prompt lines and setup script output
@@ -711,7 +753,7 @@ check_and_prompt_nodejs() {
     read -r response < /dev/tty 2>/dev/null || response=""
 
     # Run the Node.js setup script (will check if already installed) and capture line count from stdout
-    SETUP_LINES=$(sh "scripts/setup_nodejs.sh")
+    SETUP_LINES=$(run_setup_script "setup_nodejs.sh")
     if [ $? -eq 0 ]; then
         # After successful installation, clear all output and show clean result
         # Clear both prompt lines and setup script output
@@ -834,7 +876,7 @@ check_and_prompt_docker() {
         read -r response < /dev/tty 2>/dev/null || response="" < /dev/tty 2>/dev/null || response="n"
 
         # Run the Docker setup script to start Docker and capture line count from stdout
-        SETUP_LINES=$(sh "scripts/setup_docker.sh")
+        SETUP_LINES=$(run_setup_script "setup_docker.sh")
         if [ $? -eq 0 ]; then
             # After successful startup, clear all output and show clean result
             # Clear both prompt lines and setup script output
@@ -880,7 +922,7 @@ check_and_prompt_docker() {
     read -r response < /dev/tty 2>/dev/null || response=""
 
     # Run the Docker setup script - it handles everything (skip redundant check) and capture line count from stdout
-    SETUP_LINES=$(sh "scripts/setup_docker.sh" --skip-check)
+    SETUP_LINES=$(run_setup_script "setup_docker.sh" --skip-check)
     if [ $? -eq 0 ]; then
         # After successful installation, clear all output and show clean result
         # Clear both prompt lines and setup script output
@@ -1011,7 +1053,7 @@ install_docker() {
     log "Installing Docker"
     
     # Run the Docker setup script (same pattern as Git/Node.js)
-    if sh "scripts/setup_docker.sh"; then
+    if run_setup_script "setup_docker.sh"; then
         return 0
     else
         warn "Docker installation failed"
