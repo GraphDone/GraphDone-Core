@@ -1217,12 +1217,12 @@ install_graphdone() {
     # Animate banner with Copilot-style line-by-line reveal
     printf "${TEAL}╔══════════════════════════════════════════════════════════════════════════════════════════════════╗${NC}\n"; sleep 0.03
     printf "${TEAL}║                                                                                                  ║${NC}\n"; sleep 0.03
-    printf "${TEAL}║                  ${TEAL}${BOLD}██     ██ ███████╗██╗      ██████╗ ██████╗ ███╗   ███╗███████╗${NC}                  ${TEAL}║${NC}\n"; sleep 0.03
-    printf "${TEAL}║                  ${TEAL}${BOLD}██     ██ ██╔════╝██║     ██╔════╝██╔═══██╗████╗ ████║██╔════╝${NC}                  ${TEAL}║${NC}\n"; sleep 0.03
-    printf "${TEAL}║                  ${TEAL}${BOLD}██  █  ██ █████╗  ██║     ██║     ██║   ██║██╔████╔██║█████╗${NC}                    ${TEAL}║${NC}\n"; sleep 0.03
-    printf "${TEAL}║                  ${TEAL}${BOLD}██ ███ ██ ██╔══╝  ██║     ██║     ██║   ██║██║╚██╔╝██║██╔══╝${NC}                    ${TEAL}║${NC}\n"; sleep 0.03
-    printf "${TEAL}║                  ${TEAL}${BOLD}╚███╔███╔╝███████╗███████╗╚██████╗╚██████╔╝██║ ╚═╝ ██║███████╗${NC}                  ${TEAL}║${NC}\n"; sleep 0.03
-    printf "${TEAL}║                  ${TEAL}${BOLD} ╚══╝╚══╝ ╚══════╝╚══════╝ ╚═════╝ ╚═════╝   ╚══════╝╚═══════╝${NC}                  ${TEAL}║${NC}\n"; sleep 0.03
+    printf "${TEAL}║                  ${TEAL}${BOLD}╔██     ██╗ ███████╗██╗      ██████╗ ██████╗ ███╗   ███╗███████╗${NC}                ${TEAL}║${NC}\n"; sleep 0.03
+    printf "${TEAL}║                  ${TEAL}${BOLD}║██     ██║ ██╔════╝██║     ██╔════╝██╔═══██╗████╗ ████║██╔════╝${NC}                ${TEAL}║${NC}\n"; sleep 0.03
+    printf "${TEAL}║                  ${TEAL}${BOLD}║██  █  ██║ █████╗  ██║     ██║     ██║   ██║██╔████╔██║█████╗${NC}                  ${TEAL}║${NC}\n"; sleep 0.03
+    printf "${TEAL}║                  ${TEAL}${BOLD}║██ ███ ██║ ██╔══╝  ██║     ██║     ██║   ██║██║╚██╔╝██║██╔══╝${NC}                  ${TEAL}║${NC}\n"; sleep 0.03
+    printf "${TEAL}║                  ${TEAL}${BOLD}╚═███╔███╔╝ ███████╗███████╗╚██████╗╚██████╔╝██║ ╚═╝ ██║███████╗${NC}                ${TEAL}║${NC}\n"; sleep 0.03
+    printf "${TEAL}║                  ${TEAL}${BOLD}  ╚══╝╚══╝  ╚══════╝╚══════╝ ╚═════╝ ╚═════╝   ╚══════╝╚═══════╝${NC}                ${TEAL}║${NC}\n"; sleep 0.03
     printf "${TEAL}║${NC}                                                                                                  ${TEAL}║${NC}\n"; sleep 0.03
     printf "${TEAL}║${NC}                                      ${TEAL}${BOLD}████████╗ ██████╗${NC}                                           ${TEAL}║${NC}\n"; sleep 0.03
     printf "${TEAL}║${NC}                                      ${TEAL}${BOLD}╚══██╔══╝██╔═══██╗${NC}                                          ${TEAL}║${NC}\n"; sleep 0.03
