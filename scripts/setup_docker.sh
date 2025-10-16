@@ -1,7 +1,7 @@
 #!/bin/sh
 # GraphDone Docker Setup Script (POSIX-compatible)
 # Linux: Docker Engine via official repository
-# macOS/Windows: Manual Docker Desktop installation required
+# macOS: Docker Desktop via Homebrew (automatic)
 
 set -eu
 
@@ -150,6 +150,51 @@ install_docker_apt() {
     return 0
 }
 
+# Install Docker on macOS
+install_docker_macos() {
+    printf "        ${BLUE}◉${NC} Installing Docker Desktop via Homebrew\n"
+    
+    # Check if Homebrew is available
+    if ! command -v brew >/dev/null 2>&1; then
+        printf "        ${RED}✗${NC} Homebrew not found\n"
+        printf "        ${GRAY}  Install Homebrew first: /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\"${NC}\n"
+        return 1
+    fi
+    
+    # Set environment to avoid prompts
+    export HOMEBREW_NO_AUTO_UPDATE=1
+    export HOMEBREW_NO_ENV_HINTS=1
+    
+    # Install Docker Desktop with spinner
+    brew install --cask docker >/dev/null 2>&1 &
+    show_spinner $! "Installing Docker Desktop"
+    
+    if [ $? -eq 0 ]; then
+        printf "\r        ${GREEN}✓${NC} Docker Desktop installed successfully                    \n"
+        printf "        ${BLUE}◉${NC} Starting Docker Desktop...\n"
+        
+        # Launch Docker Desktop
+        open -a Docker &
+        
+        # Wait for Docker to start
+        printf "        ${GRAY}Waiting for Docker to start...${NC}\n"
+        for i in $(seq 1 30); do
+            if docker ps >/dev/null 2>&1; then
+                printf "        ${GREEN}✓${NC} Docker is running\n"
+                return 0
+            fi
+            sleep 2
+        done
+        
+        printf "        ${YELLOW}!${NC} Docker Desktop installed but may take time to start\n"
+        printf "        ${GRAY}  Please wait for Docker Desktop to finish launching${NC}\n"
+        return 0
+    else
+        printf "\r        ${RED}✗${NC} Docker Desktop installation failed                    \n"
+        return 1
+    fi
+}
+
 # Main
 printf "\n        ${CYAN}${BOLD}🐳 Docker Setup${NC}\n"
 printf "        ${GRAY}──────────────────────────${NC}\n"
@@ -165,9 +210,7 @@ case "$OS" in
         install_docker_linux
         ;;
     macos)
-        printf "        ${YELLOW}!${NC} macOS detected\n"
-        printf "        ${GRAY}  Please install Docker Desktop from: https://www.docker.com/products/docker-desktop${NC}\n"
-        exit 1
+        install_docker_macos
         ;;
     *)
         printf "        ${RED}✗${NC} Unsupported OS\n"
