@@ -1,18 +1,22 @@
-#!/bin/bash
+#!/bin/sh
 # ============================================================================
 # GraphDone Node.js Auto-Installation Script
 # ============================================================================
 #
 # Platform Support:
 #   ✓ macOS    - Homebrew
-#   ✓ Linux    - NodeSource repository, apt, yum, dnf
+#   ✓ Linux    - nvm (Node Version Manager)
 #   ✓ Windows  - Chocolatey, Scoop, Winget, or manual installer
 #
 # Installation methods:
-#   macOS:  Homebrew (latest Node.js)
-#   Linux:  NodeSource repository (latest) or system package manager
+#   macOS:   Homebrew (latest Node.js)
+#   Linux:   nvm (Node.js 22 LTS, no sudo required)
+#   Windows: Chocolatey/Winget/Scoop
 
-set -euo pipefail
+set -eu
+if [ -n "${BASH_VERSION:-}" ]; then
+    set -o pipefail
+fi
 
 # ============================================================================
 # CLEANUP AND ERROR HANDLING
@@ -24,20 +28,22 @@ cleanup() {
 
 trap cleanup EXIT INT TERM
 
-handle_error() {
-    local exit_code=$?
-    local line_number=$1
-    echo "✗ Error occurred at line ${line_number}, exit code: ${exit_code}" >&2
-    cleanup
-    exit "${exit_code}"
-}
-
-trap 'handle_error ${LINENO}' ERR
+# Only set ERR trap if running in bash (not available in POSIX sh)
+if [ -n "${BASH_VERSION:-}" ]; then
+    handle_error() {
+        local exit_code=$?
+        local line_number=$1
+        echo "✗ Error occurred at line ${line_number}, exit code: ${exit_code}" >&2
+        cleanup
+        exit "${exit_code}"
+    }
+    trap 'handle_error ${LINENO}' ERR
+fi
 
 USER=$(whoami)
 
 command_exists() {
-    command -v "$1" &> /dev/null
+    command -v "$1" > /dev/null 2>&1
 }
 
 # ============================================================================
@@ -45,18 +51,26 @@ command_exists() {
 # ============================================================================
 
 detect_os() {
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        OS="macos"
-    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-        OS="linux"
-    elif [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "cygwin" ]]; then
-        OS="windows"
-    else
-        OS="unknown"
-        printf "  ${YELLOW}✗${NC} ${BOLD}Unsupported OS${NC} ${GRAY}${OSTYPE}${NC}\n" >&2
-        printf "  ${BLUE}ⓘ${NC} ${GRAY}Supported: macOS, Linux, Windows${NC}\n" >&2
-        exit 1
-    fi
+    # Get OS type - use OSTYPE if available (Bash), otherwise use uname
+    local os_type="${OSTYPE:-$(uname -s 2>/dev/null || echo 'unknown')}"
+    
+    case "$os_type" in
+        darwin*|Darwin)
+            OS="macos"
+            ;;
+        linux-gnu*|Linux)
+            OS="linux"
+            ;;
+        msys|cygwin|MINGW*|MSYS*|CYGWIN*)
+            OS="windows"
+            ;;
+        *)
+            OS="unknown"
+            printf "  ${YELLOW}✗${NC} ${BOLD}Unsupported OS${NC} ${GRAY}${os_type}${NC}\n" >&2
+            printf "  ${BLUE}ⓘ${NC} ${GRAY}Supported: macOS, Linux, Windows${NC}\n" >&2
+            exit 1
+            ;;
+    esac
 }
 
 detect_os
@@ -96,12 +110,43 @@ printf "        ${CYAN}${BOLD}📦 Node.js Setup${NC}\n"
 printf "        ${GRAY}${DIM}──────────────────────────${NC}\n"
 
 # ============================================================================
+# SPINNER FUNCTION (POSIX-compatible)
+# ============================================================================
+
+show_spinner() {
+    local pid=$1
+    local msg="$2"
+    local i=0
+    local spin_char
+    
+    while kill -0 "$pid" 2>/dev/null; do
+        case $((i % 10)) in
+            0) spin_char='⠋' ;;
+            1) spin_char='⠙' ;;
+            2) spin_char='⠹' ;;
+            3) spin_char='⠸' ;;
+            4) spin_char='⠼' ;;
+            5) spin_char='⠴' ;;
+            6) spin_char='⠦' ;;
+            7) spin_char='⠧' ;;
+            8) spin_char='⠇' ;;
+            9) spin_char='⠏' ;;
+        esac
+        printf "\r        ${GRAY}%s${NC} ${CYAN}%s${NC}" "$msg" "$spin_char"
+        i=$((i + 1))
+        sleep 0.15
+    done
+    wait "$pid"
+    return $?
+}
+
+# ============================================================================
 # VERSION CHECK (Cross-platform)
 # ============================================================================
 
 # Function to check if Node.js is installed with correct version
 check_nodejs_installed() {
-    if command -v node &> /dev/null; then
+    if command -v node > /dev/null 2>&1; then
         local node_version=$(node --version 2>/dev/null | sed 's/v//' | cut -d. -f1 || echo '0')
         local npm_version=$(npm --version 2>/dev/null | cut -d. -f1 || echo '0')
         
@@ -147,7 +192,7 @@ install_nodejs() {
 # macOS Node.js installation
 install_nodejs_macos() {
     # Check if Homebrew is available
-    if command -v brew &> /dev/null; then
+    if command -v brew > /dev/null 2>&1; then
         # Set environment to avoid prompts
         export HOMEBREW_NO_AUTO_UPDATE=1
         export HOMEBREW_NO_ENV_HINTS=1
@@ -164,8 +209,8 @@ install_nodejs_macos() {
         i=0
         
         while kill -0 $install_pid 2>/dev/null; do
-            printf "\r        ${BLUE}◉${NC} Installing Node.js (latest) ${CYAN}${spin:i:1}${NC}"
-            i=$(( (i+1) % ${#spin} ))
+            printf "\r        ${BLUE}◉${NC} Installing Node.js (latest) ${CYAN}.${NC}"
+            i=$(( (i+1) % 10 ))
             sleep 0.15
         done
         wait $install_pid
@@ -185,71 +230,52 @@ install_nodejs_macos() {
 # LINUX INSTALLATION
 # ============================================================================
 
-# Linux Node.js installation
+# Linux Node.js installation via nvm
 install_nodejs_linux() {
-    # Try NodeSource repository (recommended for latest version)
-    printf "${BLUE}◉${NC} Installing Node.js via NodeSource repository\n"
+    printf "        ${BLUE}◉${NC} Installing Node.js via nvm (Node Version Manager)\n"
     
-    # Download NodeSource setup script
-    printf "${BLUE}◉${NC} ${GRAY}Adding NodeSource repository${NC}"
-    curl -fsSL https://deb.nodesource.com/setup_current.x > /tmp/nodesource_setup.sh 2>&1 &
-    download_pid=$!
-    
-    # Show spinner while downloading
-    spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
-    i=0
-    
-    while kill -0 $download_pid 2>/dev/null; do
-        printf "\r${BLUE}◉${NC} ${GRAY}Adding NodeSource repository${NC} ${CYAN}${spin:i:1}${NC}"
-        i=$(( (i+1) % ${#spin} ))
-        sleep 0.15
-    done
-    wait $download_pid
-    
-    if [ -f "/tmp/nodesource_setup.sh" ]; then
-        # Run the setup script
-        printf "\r${BLUE}◉${NC} ${GRAY}Configuring repository${NC}        \n"
-        if sudo bash /tmp/nodesource_setup.sh >/dev/null 2>&1; then
-            printf "${GREEN}✓${NC} NodeSource repository configured\n"
-            
-            # Install Node.js
-            printf "${BLUE}◉${NC} ${GRAY}Installing Node.js${NC}"
-            sudo apt-get install -y nodejs >/dev/null 2>&1 &
-            install_pid=$!
-            
-            # Show spinner while installing
-            i=0
-            while kill -0 $install_pid 2>/dev/null; do
-                printf "\r${BLUE}◉${NC} ${GRAY}Installing Node.js${NC} ${CYAN}${spin:i:1}${NC}"
-                i=$(( (i+1) % ${#spin} ))
-                sleep 0.15
-            done
-            wait $install_pid
-            
-            printf "\r${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}installed successfully${NC}        \n"
-            cleanup
-            return 0
+    # Check if nvm is already installed
+    if [ -s "$HOME/.nvm/nvm.sh" ]; then
+        printf "        ${GREEN}✓${NC} nvm already installed\n"
+    else
+        printf "        ${GRAY}Installing nvm${NC}"
+        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/master/install.sh 2>/dev/null | bash &
+        show_spinner $! "Installing nvm"
+        
+        if [ -s "$HOME/.nvm/nvm.sh" ]; then
+            printf "\r        ${GREEN}✓${NC} nvm installed successfully                    \n"
+        else
+            printf "\r        ${RED}✗${NC} nvm installation failed                    \n"
+            return 1
         fi
     fi
     
-    # Fallback to system package manager
-    printf "\r${YELLOW}!${NC} ${GRAY}Trying system package manager${NC}        \n"
-    if command -v apt-get >/dev/null 2>&1; then
-        printf "${BLUE}◉${NC} Installing via apt-get\n"
-        sudo apt-get update >/dev/null 2>&1
-        sudo apt-get install -y nodejs npm >/dev/null 2>&1
-        return 0
-    elif command -v yum >/dev/null 2>&1; then
-        printf "${BLUE}◉${NC} Installing via yum\n"
-        sudo yum install -y nodejs npm >/dev/null 2>&1
-        return 0
-    elif command -v dnf >/dev/null 2>&1; then
-        printf "${BLUE}◉${NC} Installing via dnf\n"
-        sudo dnf install -y nodejs npm >/dev/null 2>&1
+    # Load nvm
+    export NVM_DIR="$HOME/.nvm"
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+    
+    if ! command -v nvm > /dev/null 2>&1; then
+        printf "        ${RED}✗${NC} Could not load nvm\n"
+        return 1
+    fi
+    
+    printf "        ${GRAY}Installing Node.js 22 (LTS)${NC}"
+    
+    # Install Node.js 22 LTS (run in background for spinner)
+    (nvm install 22 && nvm use 22 && nvm alias default 22) > /dev/null 2>&1 &
+    show_spinner $! "Installing Node.js 22 (LTS)"
+    
+    # Reload to get node in PATH
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+    
+    if command -v node > /dev/null 2>&1; then
+        printf "\r        ${GREEN}✓${NC} Node.js $(node --version) and npm $(npm --version) installed                    \n"
+        printf "        ${GRAY}  💡 To use Node.js in new terminals, add to your ~/.bashrc or ~/.zshrc:${NC}\n"
+        printf "        ${GRAY}     export NVM_DIR=\"\$HOME/.nvm\"${NC}\n"
+        printf "        ${GRAY}     [ -s \"\$NVM_DIR/nvm.sh\" ] && \\. \"\$NVM_DIR/nvm.sh\"${NC}\n"
         return 0
     else
-        printf "${RED}✗${NC} No supported package manager found\n"
-        printf "${YELLOW}!${NC} ${GRAY}Please install manually from: https://nodejs.org/en/download/package-manager${NC}\n"
+        printf "\r        ${RED}✗${NC} Node.js installation failed                    \n"
         return 1
     fi
 }
@@ -263,7 +289,7 @@ install_nodejs_windows() {
     printf "        ${BLUE}◉${NC} Installing Node.js for Windows\n"
     
     # Check if Chocolatey is available
-    if command -v choco &> /dev/null; then
+    if command -v choco > /dev/null 2>&1; then
         printf "        ${BLUE}◉${NC} Using Chocolatey to install Node.js"
         
         # Install Node.js via Chocolatey
@@ -275,8 +301,8 @@ install_nodejs_windows() {
         i=0
         
         while kill -0 $install_pid 2>/dev/null; do
-            printf "\r        ${BLUE}◉${NC} Using Chocolatey to install Node.js ${CYAN}${spin:i:1}${NC}"
-            i=$(( (i+1) % ${#spin} ))
+            printf "\r        ${BLUE}◉${NC} Using Chocolatey to install Node.js ${CYAN}.${NC}"
+            i=$(( (i+1) % 10 ))
             sleep 0.15
         done
         wait $install_pid
@@ -290,7 +316,7 @@ install_nodejs_windows() {
         return 0
         
     # Check if Winget is available (Windows 10/11)
-    elif command -v winget &> /dev/null; then
+    elif command -v winget > /dev/null 2>&1; then
         printf "        ${BLUE}◉${NC} Using winget to install Node.js"
         
         # Install Node.js via winget
@@ -302,8 +328,8 @@ install_nodejs_windows() {
         i=0
         
         while kill -0 $install_pid 2>/dev/null; do
-            printf "\r        ${BLUE}◉${NC} Using winget to install Node.js ${CYAN}${spin:i:1}${NC}"
-            i=$(( (i+1) % ${#spin} ))
+            printf "\r        ${BLUE}◉${NC} Using winget to install Node.js ${CYAN}.${NC}"
+            i=$(( (i+1) % 10 ))
             sleep 0.15
         done
         wait $install_pid
@@ -317,7 +343,7 @@ install_nodejs_windows() {
         return 0
         
     # Check if Scoop is available
-    elif command -v scoop &> /dev/null; then
+    elif command -v scoop > /dev/null 2>&1; then
         printf "        ${BLUE}◉${NC} Using Scoop to install Node.js"
         
         # Install Node.js via Scoop
@@ -329,8 +355,8 @@ install_nodejs_windows() {
         i=0
         
         while kill -0 $install_pid 2>/dev/null; do
-            printf "\r        ${BLUE}◉${NC} Using Scoop to install Node.js ${CYAN}${spin:i:1}${NC}"
-            i=$(( (i+1) % ${#spin} ))
+            printf "\r        ${BLUE}◉${NC} Using Scoop to install Node.js ${CYAN}.${NC}"
+            i=$(( (i+1) % 10 ))
             sleep 0.15
         done
         wait $install_pid
@@ -352,7 +378,7 @@ install_nodejs_windows() {
         read -r response
         
         # Check if Node.js is now available
-        if command -v node &> /dev/null; then
+        if command -v node > /dev/null 2>&1; then
             printf "        ${GREEN}✓${NC} Node.js detected\n"
             return 0
         else
