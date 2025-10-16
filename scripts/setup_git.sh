@@ -17,19 +17,36 @@ set -e
 OUTPUT_LINES=0
 
 # Colors for output
-if [ -t 1 ]; then
-    RED='\033[0;31m'
-    GREEN='\033[0;32m'
-    YELLOW='\033[1;33m'
-    BLUE='\033[0;34m'
-    LIGHTCORAL='\033[38;5;210m'  # Light coral (256-color palette)
-    PALEGREEN='\033[38;2;152;251;152m'  # Palegreen (#98fb98)
-    CYAN='\033[0;36m'
-    GRAY='\033[0;90m'
-    BOLD='\033[1m'
-    NC='\033[0m'
+if [ -t 2 ]; then
+    if [ "$(tput colors 2>/dev/null)" -ge 256 ] 2>/dev/null; then
+        # 256-color mode
+        RED='\033[0;31m'
+        GREEN='\033[0;32m'
+        YELLOW='\033[1;33m'
+        BLUE='\033[0;34m'
+        VIOLET='\033[38;5;213m'  # Violet (256-color palette)
+        LIGHTCORAL='\033[38;5;210m'  # Light coral (256-color palette)
+        PALEGREEN='\033[38;2;152;251;152m'  # Palegreen (#98fb98)
+        CYAN='\033[0;36m'
+        GRAY='\033[0;90m'
+        BOLD='\033[1m'
+        NC='\033[0m'
+    else
+        # Fallback to basic ANSI
+        RED='\033[0;31m'
+        GREEN='\033[0;32m'
+        YELLOW='\033[1;33m'
+        BLUE='\033[0;34m'
+        VIOLET='\033[0;35m'  # Magenta (basic ANSI)
+        LIGHTCORAL='\033[0;31m'  # Fallback to red
+        PALEGREEN='\033[0;32m'  # Fallback to green
+        CYAN='\033[0;36m'
+        GRAY='\033[0;90m'
+        BOLD='\033[1m'
+        NC='\033[0m'
+    fi
 else
-    RED='' GREEN='' YELLOW='' BLUE='' LIGHTCORAL='' PALEGREEN='' CYAN='' GRAY='' BOLD='' NC=''
+    RED='' GREEN='' YELLOW='' BLUE='' VIOLET='' LIGHTCORAL='' PALEGREEN='' CYAN='' GRAY='' BOLD='' NC=''
 fi
 
 # Helper functions - redirect to stderr and track line counts
@@ -133,7 +150,7 @@ install_git_macos() {
     # Check if Homebrew is available
     if command -v brew >/dev/null 2>&1; then
         # Show a spinner while installing
-        printf "        ${CYAN}ℹ ${NC}Downloading and installing Git " >&2
+        printf "        ${VIOLET}◉${NC} Downloading and installing Git " >&2
         
         # Install or upgrade Git (suppress all output)
         if brew list git &>/dev/null; then
@@ -149,7 +166,7 @@ install_git_macos() {
         spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
         i=0
         while kill -0 $brew_pid 2>/dev/null; do
-            printf "\r        ${CYAN}ℹ ${NC}Downloading and installing Git ${CYAN}${spin:i:1}${NC}" >&2
+            printf "\r        ${VIOLET}◉${NC} Downloading and installing Git ${CYAN}${spin:i:1}${NC}" >&2
             i=$(( (i+1) % ${#spin} ))
             sleep 0.1
         done
@@ -238,7 +255,7 @@ install_git_linux() {
         spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
         i=0
         while kill -0 $install_pid 2>/dev/null; do
-            printf "\r        ${BLUE}◉${NC} Installing latest Git ${CYAN}$(get_spinner_char "$i")${NC}\033[K" >&2
+            printf "\r        ${VIOLET}◉${NC} Installing latest Git ${CYAN}$(get_spinner_char "$i")${NC}\033[K" >&2
             i=$(( (i+1) % 10 ))
             sleep 0.1
         done
