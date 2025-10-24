@@ -149,10 +149,103 @@ rm -rf ~/.graphdone
 
 ## Security Considerations
 
-1. **HTTPS Only**: Always serve the script over HTTPS
-2. **Integrity**: Consider adding SHA256 checksum verification
-3. **Version Pinning**: Allow users to specify versions
-4. **No Root**: Script runs without sudo by default
+### Script Verification
+
+**Before running the one-liner installation**, verify the script:
+
+```bash
+# Option 1: Review before running
+curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/install.sh | less
+
+# Option 2: Download, inspect, then execute
+curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/install.sh -o install.sh
+cat install.sh  # Review contents
+sh install.sh
+
+# Option 3: Verify with checksums (recommended for production)
+curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/install.sh.sha256 -o install.sh.sha256
+curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/install.sh -o install.sh
+sha256sum -c install.sh.sha256  # Verify integrity
+sh install.sh
+```
+
+### What the Script Does
+
+**Safe operations:**
+- ✅ Installs to `~/graphdone` (user-owned, visible directory)
+- ✅ Never requires sudo for core installation
+- ✅ Only requests permission for system dependencies (Docker, Git)
+- ✅ All source code is open and auditable on GitHub
+- ✅ No telemetry or data collection
+- ✅ Uses official Docker images from GitHub Container Registry
+
+**Expected behavior:**
+- ⚠️ Generates self-signed TLS certificates (browser warnings are normal)
+- ⚠️ Creates `~/.graphdone-cache/` for dependency caching
+- ⚠️ Modifies shell profile (.bashrc/.zshrc) to add paths (only if installing Node.js)
+
+### Production Security
+
+For production deployments:
+
+1. **Change Default Passwords**
+   ```bash
+   # Edit deployment/.env
+   NEO4J_PASSWORD=your-secure-password-here
+   JWT_SECRET=your-secure-jwt-secret-here
+   ```
+
+2. **Use CA-Signed Certificates**
+   ```bash
+   # Replace self-signed certificates
+   cp /path/to/your/certificate.crt deployment/certs/server-cert.pem
+   cp /path/to/your/private-key.key deployment/certs/server-key.pem
+   chmod 644 deployment/certs/server-cert.pem
+   chmod 600 deployment/certs/server-key.pem
+   ```
+
+3. **Network Security**
+   - Use firewall to restrict Neo4j ports (7474, 7687) to localhost
+   - Enable TLS for Neo4j Bolt connections (see Neo4j docs)
+   - Use reverse proxy (nginx, Caddy) for additional security layers
+   - Consider VPN for remote access instead of public exposure
+
+4. **Authentication**
+   - GraphDone uses SQLite for authentication by default
+   - Supports JWT tokens with configurable expiration
+   - See [docs/guides/sqlite-deployment-modes.md](./guides/sqlite-deployment-modes.md)
+
+### Neo4j Configuration Notes
+
+GraphDone disables Neo4j's strict configuration validation (`NEO4J_server_config_strict__validation_enabled: "false"`) to handle plugin installation quirks. See explanation below.
+
+#### Why Strict Validation is Disabled
+
+**The Issue:** Neo4j's automatic plugin downloader (used for GDS and APOC plugins) occasionally writes malformed entries to `neo4j.conf` during first-time installation. With strict validation enabled, Neo4j refuses to start.
+
+**Our Solution:** Disable strict validation to allow reliable first-time setup across all platforms.
+
+**Is This Safe?**
+- ✅ Yes - our configuration is minimal and well-tested
+- ✅ Health checks verify Neo4j is functioning correctly
+- ✅ Plugins are official Neo4j libraries (GDS, APOC)
+- ✅ Neo4j runs in isolated Docker container
+- ✅ Production deployments don't expose Neo4j externally
+
+**Trade-offs:**
+- ⚠️ Won't catch configuration typos (acceptable - we use version-controlled config)
+- ⚠️ Malformed entries won't prevent startup (acceptable - health checks catch real issues)
+
+See [deployment/docker-compose.yml](../deployment/docker-compose.yml) for full Neo4j configuration.
+
+### Best Practices
+
+1. **HTTPS Only**: Always serve installation script over HTTPS
+2. **Integrity Checks**: Use SHA256 checksums for production deployments
+3. **Version Pinning**: Specify version tags for reproducible deployments
+4. **No Root**: Script runs without sudo by default (secure by design)
+5. **Audit Regularly**: Review logs and container security updates
+6. **Backup Strategy**: Schedule regular backups of Neo4j data volume
 
 ## Comparison with Ollama
 
