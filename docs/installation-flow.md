@@ -400,6 +400,62 @@ gantt
 
 ---
 
+## 🔒 Security Verification Flow
+
+**Best Practice**: Verify the installation script before running.
+
+### Verification Options
+
+```bash
+# Option 1: Review before running (recommended)
+curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/install.sh | less
+
+# Option 2: Download, inspect, then execute
+curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/install.sh -o install.sh
+cat install.sh
+sh install.sh
+
+# Option 3: Verify with checksums (production environments)
+curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/install.sh.sha256 -o install.sh.sha256
+curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/install.sh -o install.sh
+sha256sum -c install.sh.sha256
+sh install.sh
+```
+
+### What the Script Does
+
+**Safe Operations:**
+- ✅ Installs to `~/graphdone` (user-owned, visible directory)
+- ✅ Never requires sudo for core installation
+- ✅ Only requests permission for system dependencies
+- ✅ All source code is open and auditable
+- ✅ No telemetry or data collection
+
+**Expected Behavior:**
+- ⚠️ Generates self-signed TLS certificates (browser warnings are normal)
+- ⚠️ Creates `~/.graphdone-cache/` for dependency caching
+- ⚠️ May modify shell profile if installing Node.js
+
+### Neo4j Configuration Note
+
+GraphDone disables Neo4j's strict configuration validation to handle plugin installation:
+
+```yaml
+NEO4J_server_config_strict__validation_enabled: "false"
+```
+
+**Why?** Neo4j's automatic plugin downloader (GDS, APOC) occasionally writes malformed entries to `neo4j.conf` during first-time installation. With strict validation enabled, Neo4j refuses to start.
+
+**Is this safe?**
+- ✅ Configuration is minimal and well-tested
+- ✅ Health checks verify functionality
+- ✅ Neo4j runs in isolated Docker container
+- ✅ Not exposed externally in production
+
+See [docs/deployment.md](./deployment.md#neo4j-configuration-notes) for complete details.
+
+---
+
 ## Professional Design Features
 
 ### 🎯 **Optimized for Readability**
