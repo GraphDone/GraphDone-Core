@@ -150,7 +150,7 @@ check_disk_space() {
 # Check network connectivity
 check_network() {
     local test_url="https://github.com"
-    
+
     if command -v curl >/dev/null 2>&1; then
         if ! curl -sf --max-time 5 "$test_url" >/dev/null 2>&1; then
             warn "Network connectivity test failed"
@@ -169,6 +169,55 @@ check_network() {
                 error "Installation cancelled - network required"
             fi
         fi
+    fi
+}
+
+# Test download speed using CloudFlare's speed test
+test_download_speed() {
+    if ! command -v curl >/dev/null 2>&1; then
+        echo "N/A"
+        return
+    fi
+
+    # Download 10MB file from CloudFlare CDN and measure speed
+    local speed_bytes=$(curl -o /dev/null -s -w '%{speed_download}' --max-time 8 \
+        "https://speed.cloudflare.com/__down?bytes=10000000" 2>/dev/null)
+
+    if [ -n "$speed_bytes" ] && [ "$speed_bytes" != "0" ] && [ "$speed_bytes" != "0.000" ]; then
+        # Convert bytes/sec to Mbps
+        local speed_mbps=$(awk "BEGIN {printf \"%.1f\", $speed_bytes * 8 / 1000000}")
+        if [ "$speed_mbps" != "0.0" ]; then
+            echo "${speed_mbps}"
+        else
+            echo "N/A"
+        fi
+    else
+        echo "N/A"
+    fi
+}
+
+# Test upload speed using CloudFlare's speed test
+test_upload_speed() {
+    if ! command -v curl >/dev/null 2>&1; then
+        echo "N/A"
+        return
+    fi
+
+    # Upload 5MB of data to CloudFlare and measure speed
+    local speed_bytes=$(dd if=/dev/zero bs=1024 count=5120 2>/dev/null | \
+        curl -o /dev/null -s -w '%{speed_upload}' --max-time 8 \
+        -X POST --data-binary @- "https://speed.cloudflare.com/__up" 2>/dev/null)
+
+    if [ -n "$speed_bytes" ] && [ "$speed_bytes" != "0" ] && [ "$speed_bytes" != "0.000" ]; then
+        # Convert bytes/sec to Mbps
+        local speed_mbps=$(awk "BEGIN {printf \"%.1f\", $speed_bytes * 8 / 1000000}")
+        if [ "$speed_mbps" != "0.0" ]; then
+            echo "${speed_mbps}"
+        else
+            echo "N/A"
+        fi
+    else
+        echo "N/A"
     fi
 }
 
@@ -304,8 +353,64 @@ detect_platform() {
     esac
 }
 
+# Get macOS version name from version number
+get_macos_name() {
+    local version="$1"
+    local major=$(echo "$version" | cut -d. -f1)
+    local minor=$(echo "$version" | cut -d. -f2)
 
+    case "$major" in
+        15) echo "Sequoia" ;;
+        14) echo "Sonoma" ;;
+        13) echo "Ventura" ;;
+        12) echo "Monterey" ;;
+        11) echo "Big Sur" ;;
+        10)
+            case "$minor" in
+                15) echo "Catalina" ;;
+                14) echo "Mojave" ;;
+                13) echo "High Sierra" ;;
+                12) echo "Sierra" ;;
+                11) echo "El Capitan" ;;
+                10) echo "Yosemite" ;;
+                *) echo "" ;;
+            esac
+            ;;
+        *) echo "" ;;
+    esac
+}
 
+# Get macOS version and compatibility status
+get_macos_info() {
+    if [ "$PLATFORM" = "macos" ]; then
+        MACOS_VERSION=$(sw_vers -productVersion 2>/dev/null)
+        if [ -z "$MACOS_VERSION" ]; then
+            MACOS_VERSION="unknown"
+            MACOS_NAME=""
+            MACOS_COMPATIBLE="unknown"
+            return 0
+        fi
+
+        # Get the macOS codename
+        MACOS_NAME=$(get_macos_name "$MACOS_VERSION")
+
+        local major=$(echo "$MACOS_VERSION" | cut -d. -f1)
+        local minor=$(echo "$MACOS_VERSION" | cut -d. -f2)
+
+        # Docker Desktop requires macOS 10.15 (Catalina) or later
+        # macOS 11+ uses single version number (Big Sur onwards)
+        if [ "$major" -ge 11 ]; then
+            # macOS 11 Big Sur or later - fully supported
+            MACOS_COMPATIBLE="yes"
+        elif [ "$major" -eq 10 ] && [ "$minor" -ge 15 ]; then
+            # macOS 10.15 Catalina or later - supported
+            MACOS_COMPATIBLE="yes"
+        else
+            # macOS older than 10.15
+            MACOS_COMPATIBLE="no"
+        fi
+    fi
+}
 
 # Interactive Git check with animated progress
 check_and_prompt_git() {
@@ -1326,20 +1431,143 @@ install_graphdone() {
     
     # Platform detection
     detect_platform
-    
+
+    # Get macOS version info (silent - displayed later in System Information)
+    get_macos_info
+
     # Pre-flight checks
     printf "\n"
     printf "${TEAL}────────────────────────────────────${NC}  ${CYAN}${BOLD}✈️  Pre-flight Checks${NC}  ${TEAL}────────────────────────────────────────${NC}\n"
-    
-    # Check disk space
-    printf "  ${BLUE}◉${NC} ${GRAY}Checking disk space...${NC}"
-    check_disk_space
-    printf "\r  ${GREEN}✓${NC} ${GRAY}Disk space:${NC} ${BOLD}Sufficient${NC}\n"
-    
-    # Check network connectivity
-    printf "  ${BLUE}◉${NC} ${GRAY}Checking network...${NC}"
-    check_network
-    printf "\r  ${GREEN}✓${NC} ${GRAY}Network:${NC} ${BOLD}Connected${NC}\n"
+
+    # Check network connectivity with 4-dot animation
+    check_network &
+    network_pid=$!
+
+    for cycle in 1 2 3 4 5 6; do
+        # Check if network check is still running
+        if ! kill -0 $network_pid 2>/dev/null; then
+            break
+        fi
+
+        # Build the dots display based on cycle
+        dots_display=""
+        if [ $cycle -ge 2 ]; then
+            dots_display=" ${GRAY}●${NC}"
+        fi
+        if [ $cycle -ge 3 ]; then
+            dots_display="$dots_display ${BLUE}●${NC}"
+        fi
+        if [ $cycle -ge 4 ]; then
+            dots_display="$dots_display ${CYAN}●${NC}"
+        fi
+        if [ $cycle -ge 5 ]; then
+            dots_display="$dots_display ${GREEN}●${NC}"
+        fi
+
+        printf "\r  ${BLUE}◉${NC} ${GRAY}Checking network${NC}$dots_display"
+        printf "\033[K"
+        sleep 0.5
+    done
+
+    wait $network_pid
+
+    # Show all 4 dots completed
+    printf "\r  ${BLUE}◉${NC} ${GRAY}Checking network${NC} ${GRAY}●${NC} ${BLUE}●${NC} ${CYAN}●${NC} ${GREEN}●${NC}"
+    sleep 0.3
+
+    printf "\r\033[K  ${GREEN}✓${NC} ${GRAY}Network:${NC} ${BOLD}Connected${NC}\n"
+
+    # Test download speed with 4-dot animation
+    local download_tmp="/tmp/graphdone_download_$$"
+    (test_download_speed > "$download_tmp") &
+    download_pid=$!
+
+    for cycle in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16; do
+        # Check if speed test is still running
+        if ! kill -0 $download_pid 2>/dev/null; then
+            break
+        fi
+
+        # Build the dots display based on cycle
+        dots_display=""
+        if [ $cycle -ge 3 ]; then
+            dots_display=" ${GRAY}●${NC}"
+        fi
+        if [ $cycle -ge 5 ]; then
+            dots_display="$dots_display ${BLUE}●${NC}"
+        fi
+        if [ $cycle -ge 7 ]; then
+            dots_display="$dots_display ${CYAN}●${NC}"
+        fi
+        if [ $cycle -ge 9 ]; then
+            dots_display="$dots_display ${GREEN}●${NC}"
+        fi
+
+        printf "\r  ${BLUE}◉${NC} ${GRAY}Testing download speed${NC}$dots_display"
+        printf "\033[K"
+        sleep 0.5
+    done
+
+    wait $download_pid
+
+    # Show all 4 dots completed
+    printf "\r  ${BLUE}◉${NC} ${GRAY}Testing download speed${NC} ${GRAY}●${NC} ${BLUE}●${NC} ${CYAN}●${NC} ${GREEN}●${NC}"
+    sleep 0.3
+
+    download_speed=$(cat "$download_tmp" 2>/dev/null || echo "N/A")
+    rm -f "$download_tmp"
+
+    if [ "$download_speed" != "N/A" ]; then
+        printf "\r\033[K  ${GREEN}✓${NC} ${GRAY}Download:${NC} ${BOLD}${download_speed} Mbps${NC}\n"
+    else
+        printf "\r\033[K  ${YELLOW}◉${NC} ${GRAY}Download:${NC} ${BOLD}Unable to test${NC}\n"
+    fi
+
+    # Test upload speed with 4-dot animation
+    local upload_tmp="/tmp/graphdone_upload_$$"
+    (test_upload_speed > "$upload_tmp") &
+    upload_pid=$!
+
+    for cycle in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16; do
+        # Check if speed test is still running
+        if ! kill -0 $upload_pid 2>/dev/null; then
+            break
+        fi
+
+        # Build the dots display based on cycle
+        dots_display=""
+        if [ $cycle -ge 3 ]; then
+            dots_display=" ${GRAY}●${NC}"
+        fi
+        if [ $cycle -ge 5 ]; then
+            dots_display="$dots_display ${BLUE}●${NC}"
+        fi
+        if [ $cycle -ge 7 ]; then
+            dots_display="$dots_display ${CYAN}●${NC}"
+        fi
+        if [ $cycle -ge 9 ]; then
+            dots_display="$dots_display ${GREEN}●${NC}"
+        fi
+
+        printf "\r  ${BLUE}◉${NC} ${GRAY}Testing upload speed${NC}$dots_display"
+        printf "\033[K"
+        sleep 0.5
+    done
+
+    wait $upload_pid
+
+    # Show all 4 dots completed
+    printf "\r  ${BLUE}◉${NC} ${GRAY}Testing upload speed${NC} ${GRAY}●${NC} ${BLUE}●${NC} ${CYAN}●${NC} ${GREEN}●${NC}"
+    sleep 0.3
+
+    upload_speed=$(cat "$upload_tmp" 2>/dev/null || echo "N/A")
+    rm -f "$upload_tmp"
+
+    if [ "$upload_speed" != "N/A" ]; then
+        printf "\r\033[K  ${GREEN}✓${NC} ${GRAY}Upload:${NC} ${BOLD}${upload_speed} Mbps${NC}\n"
+    else
+        printf "\r\033[K  ${YELLOW}◉${NC} ${GRAY}Upload:${NC} ${BOLD}Unable to test${NC}\n"
+    fi
 
     # Installation check section with box
     printf "\n"
@@ -1359,7 +1587,94 @@ install_graphdone() {
     esac
     
     printf "  ${BLUE}◉${NC} ${GRAY}Platform:${NC} ${BOLD}$(uname) $(uname -m)${NC} ${GRAY}${platform_name}${NC}\n"
+
+    # Show macOS version with compatibility indicator
+    if [ "$PLATFORM" = "macos" ] && [ -n "$MACOS_VERSION" ]; then
+        # Build version string with name if available
+        if [ -n "$MACOS_NAME" ]; then
+            local version_display="${MACOS_VERSION} ${GRAY}(${MACOS_NAME})${NC}"
+        else
+            local version_display="${MACOS_VERSION}"
+        fi
+
+        if [ "$MACOS_COMPATIBLE" = "yes" ]; then
+            printf "  ${BLUE}◉${NC} ${GRAY}macOS:${NC} ${BOLD}${version_display}${NC} ${GREEN}✓${NC}\n"
+        elif [ "$MACOS_COMPATIBLE" = "no" ]; then
+            printf "  ${BLUE}◉${NC} ${GRAY}macOS:${NC} ${BOLD}${version_display}${NC} ${YELLOW}⚠ Requires 10.15+${NC}\n"
+        else
+            printf "  ${BLUE}◉${NC} ${GRAY}macOS:${NC} ${BOLD}${version_display}${NC}\n"
+        fi
+
+        # Show chip information (Apple Silicon or Intel)
+        local chip_info=$(sysctl -n machdep.cpu.brand_string 2>/dev/null)
+        if echo "$chip_info" | grep -q "Apple"; then
+            # Extract Apple chip name (M1, M2, M3, etc.)
+            local chip_name=$(echo "$chip_info" | grep -o "Apple M[0-9].*" | cut -d' ' -f1-2)
+            printf "  ${BLUE}◉${NC} ${GRAY}Chip:${NC} ${BOLD}${chip_name}${NC}\n"
+        else
+            # Intel processor - show model
+            local intel_model=$(echo "$chip_info" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | cut -d'@' -f1)
+            printf "  ${BLUE}◉${NC} ${GRAY}Chip:${NC} ${BOLD}${intel_model}${NC}\n"
+        fi
+
+        # Show RAM
+        local ram_gb=$(( $(sysctl -n hw.memsize 2>/dev/null || echo 0) / 1024 / 1024 / 1024 ))
+        if [ "$ram_gb" -gt 0 ]; then
+            printf "  ${BLUE}◉${NC} ${GRAY}RAM:${NC} ${BOLD}${ram_gb} GB${NC}\n"
+        fi
+
+        # Show disk space using diskutil
+        if command -v diskutil >/dev/null 2>&1; then
+            diskutil info / 2>/dev/null | awk -F': *' '/Container Free Space/ {
+                split($2, arr, " ")
+                printf "  \033[34m◉\033[0m \033[90mDisk Available:\033[0m \033[1m%s %s\033[0m\n", arr[1], arr[2]
+            }'
+        fi
+    elif [ "$PLATFORM" = "linux" ]; then
+        # Show Linux distribution
+        if [ -f /etc/os-release ]; then
+            local distro_name=$(grep "^PRETTY_NAME=" /etc/os-release | cut -d'"' -f2)
+            if [ -n "$distro_name" ]; then
+                printf "  ${BLUE}◉${NC} ${GRAY}Distribution:${NC} ${BOLD}${distro_name}${NC}\n"
+            fi
+        fi
+
+        # Show chip information (like macOS)
+        local cpu_model=$(grep "^model name" /proc/cpuinfo 2>/dev/null | head -1 | cut -d':' -f2 | sed 's/^[[:space:]]*//')
+        if [ -n "$cpu_model" ]; then
+            printf "  ${BLUE}◉${NC} ${GRAY}Chip:${NC} ${BOLD}${cpu_model}${NC}\n"
+        fi
+
+        # Show RAM
+        local ram_total=$(grep "^MemTotal:" /proc/meminfo 2>/dev/null | awk '{print int($2/1024/1024)}')
+        if [ -n "$ram_total" ] && [ "$ram_total" -gt 0 ]; then
+            printf "  ${BLUE}◉${NC} ${GRAY}RAM:${NC} ${BOLD}${ram_total} GB${NC}\n"
+        fi
+
+        # Show disk space
+        local disk_avail=$(df -h / 2>/dev/null | awk 'NR==2 {print $4}')
+        if [ -n "$disk_avail" ]; then
+            printf "  ${BLUE}◉${NC} ${GRAY}Disk Available:${NC} ${BOLD}${disk_avail}${NC}\n"
+        fi
+    fi
+
     printf "  ${BLUE}◉${NC} ${GRAY}Shell:${NC} ${BOLD}${SHELL}${NC}\n"
+
+    # Check macOS compatibility and prompt if needed
+    if [ "$MACOS_COMPATIBLE" = "no" ]; then
+        printf "\n"
+        printf "${YELLOW}⚠${NC}  ${BOLD}Compatibility Warning${NC}\n"
+        printf "  ${GRAY}Docker Desktop requires macOS 10.15 (Catalina) or later${NC}\n"
+        printf "  ${GRAY}Your version (${BOLD}${MACOS_VERSION}${NC}${GRAY}) may not be fully supported${NC}\n"
+        printf "\n"
+        printf "  ${CYAN}ℹ${NC} Continue installation anyway? ${GRAY}[y/N]${NC} "
+        read -r response < /dev/tty 2>/dev/null || response="n"
+        if [ "$response" != "y" ] && [ "$response" != "Y" ]; then
+            printf "\n"
+            error "Installation cancelled - please upgrade to macOS 10.15 or later"
+        fi
+        printf "  ${YELLOW}⚠${NC} Proceeding with potentially incompatible macOS version\n"
+    fi
 
     # Smart path detection: check if we're already in a GraphDone directory
     if [ -f "package.json" ] && grep -q "\"name\": \"graphdone\"" package.json 2>/dev/null; then
