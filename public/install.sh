@@ -1652,7 +1652,7 @@ install_graphdone() {
         fi
 
         # Show disk space
-        local disk_avail=$(df -h / 2>/dev/null | awk 'NR==2 {print $4}')
+        local disk_avail=$(df -h / 2>/dev/null | awk 'NR==2 {print $4}' | sed 's/G$/ GB/; s/M$/ MB/; s/T$/ TB/; s/K$/ KB/')
         if [ -n "$disk_avail" ]; then
             printf "  ${BLUE}◉${NC} ${GRAY}Disk Available:${NC} ${BOLD}${disk_avail}${NC}\n"
         fi
