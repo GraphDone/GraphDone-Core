@@ -49,12 +49,12 @@ GraphDone is built on the belief that:
 ### 🚀 One-Line Install (Like Ollama!)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/start.sh | sh
+curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/install.sh | sh
 ```
 
 Or with wget:
 ```bash
-wget -qO- https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/start.sh | sh
+wget -qO- https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/install.sh | sh
 ```
 
 This will:
@@ -63,6 +63,40 @@ This will:
 - Generate TLS certificates for HTTPS
 - Start all services with smart detection
 - Open https://localhost:3128 when ready
+
+#### 🔒 Security Best Practices
+
+**Before running the one-liner installation**, we recommend verifying the script:
+
+```bash
+# Option 1: Review the script first
+curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/install.sh | less
+
+# Option 2: Download, inspect, then run
+curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/install.sh -o install.sh
+cat install.sh  # Review the contents
+sh install.sh   # Run after verification
+
+# Option 3: Verify with checksums (for paranoid users)
+curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/install.sh.sha256 -o install.sh.sha256
+curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/install.sh -o install.sh
+sha256sum -c install.sh.sha256  # Verify integrity
+sh install.sh
+```
+
+**What the installation script does:**
+- ✅ Installs to `~/graphdone` (visible, user-owned directory)
+- ✅ Never requires sudo for core installation
+- ✅ Only asks for permission when installing system dependencies (Docker, Git)
+- ✅ All source code is open and auditable
+- ✅ No telemetry or data collection
+- ⚠️ Generates self-signed TLS certificates (you'll see browser warnings - this is expected)
+
+**For production deployments**, see our [Security & Deployment Guide](./docs/deployment.md) for:
+- Using CA-signed certificates instead of self-signed
+- Changing default passwords
+- Network security configuration
+- Authentication best practices
 
 ### Prerequisites
 

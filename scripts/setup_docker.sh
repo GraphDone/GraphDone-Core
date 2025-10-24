@@ -206,17 +206,27 @@ install_docker_macos() {
     # Set environment to avoid prompts
     export HOMEBREW_NO_AUTO_UPDATE=1
     export HOMEBREW_NO_ENV_HINTS=1
-    
-    # Install Docker Desktop with spinner
-    brew install --cask docker >/dev/null 2>&1 &
-    show_spinner $! "Installing Docker Desktop"
 
-    if [ $? -eq 0 ]; then
+    # Install Docker Desktop with spinner (only if not already installed)
+    if [ -d "/Applications/Docker.app" ]; then
+        # Docker Desktop already installed, skip brew install
+        :
+    else
+        # Install Docker Desktop
+        brew install --cask docker >/dev/null 2>&1 &
+        show_spinner $! "Installing Docker Desktop"
+
+        if [ $? -ne 0 ]; then
+            printf "\r        ${RED}✗${NC} Docker Desktop installation failed                    \n" >&2
+            OUTPUT_LINES=$((OUTPUT_LINES + 1))
+            return 1
+        fi
         printf "\r        ${GREEN}✓${NC} Docker Desktop installed successfully                    \n" >&2
         OUTPUT_LINES=$((OUTPUT_LINES + 1))
+    fi
 
-        # Launch Docker Desktop
-        open -a Docker &>/dev/null 2>&1 || open /Applications/Docker.app &
+    # Launch Docker Desktop
+    open -a Docker &>/dev/null 2>&1 || open /Applications/Docker.app &
 
         # Show brief startup spinner (1 second)
         for j in $(seq 1 7); do
@@ -272,16 +282,11 @@ install_docker_macos() {
         # Clear spinner line if timeout
         printf "\r\033[K" >&2
 
-        printf "        ${YELLOW}⚠${NC} Docker Desktop installed but may take time to start\n" >&2
+        printf "        ${YELLOW}⚠${NC} Docker Desktop may take additional time to start\n" >&2
         OUTPUT_LINES=$((OUTPUT_LINES + 1))
         printf "        ${GRAY}  Please wait for Docker Desktop to finish launching${NC}\n" >&2
         OUTPUT_LINES=$((OUTPUT_LINES + 1))
         return 0
-    else
-        printf "\r        ${RED}✗${NC} Docker Desktop installation failed                    \n" >&2
-        OUTPUT_LINES=$((OUTPUT_LINES + 1))
-        return 1
-    fi
 }
 
 # Main
@@ -289,7 +294,7 @@ install_docker_macos() {
 if [ "${1:-}" != "--skip-check" ]; then
     printf "\n        ${PALEGREEN}${BOLD}🐳 Docker Setup Installation${NC}\n" >&2
     OUTPUT_LINES=$((OUTPUT_LINES + 2))  # \n + line
-    printf "        ${GRAY}──────────────────────────${NC}\n" >&2
+    printf "        ${GRAY}─────────────────────────────────${NC}\n" >&2
     OUTPUT_LINES=$((OUTPUT_LINES + 1))
 
     # Check if already installed
