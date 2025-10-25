@@ -1245,9 +1245,7 @@ wait_for_services() {
     spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
     i=0
     attempts=0
-    
-    printf "  ${GRAY}▸${NC} Waiting for services to initialize%-54s\n" " "
-    
+
     while [ $attempts -lt 180 ]; do  # 180 attempts = ~3 minutes
         if check_containers_healthy; then
             printf "\r\033[K"  # Clear entire line
