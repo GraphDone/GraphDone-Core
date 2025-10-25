@@ -211,13 +211,25 @@ install_nodejs_macos() {
         install_pid=$!
 
         # Show spinner while installing
-        spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
         i=0
+        spin_char=""
 
         while kill -0 $install_pid 2>/dev/null; do
-            printf "\r        ${VIOLET}◉${NC} Installing Node.js (latest) ${CYAN}${spin:i:1}${NC}" >&2
-            i=$(( (i+1) % ${#spin} ))
-            sleep 0.1
+            case $((i % 10)) in
+                0) spin_char='⠋' ;;
+                1) spin_char='⠙' ;;
+                2) spin_char='⠹' ;;
+                3) spin_char='⠸' ;;
+                4) spin_char='⠼' ;;
+                5) spin_char='⠴' ;;
+                6) spin_char='⠦' ;;
+                7) spin_char='⠧' ;;
+                8) spin_char='⠇' ;;
+                9) spin_char='⠏' ;;
+            esac
+            printf "\r        ${VIOLET}◉${NC} Installing Node.js (latest) ${BOLD}${CYAN}%s${NC}" "$spin_char" >&2
+            i=$((i + 1))
+            sleep 0.15
         done
         wait $install_pid
 
