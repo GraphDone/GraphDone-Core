@@ -212,7 +212,16 @@ install_docker_macos() {
         return $?
     fi
 
-    # Show choice to user
+    # Check if running in non-interactive mode (e.g., curl | sh)
+    if [ ! -t 0 ]; then
+        # Non-interactive: auto-select OrbStack
+        printf "        ${BLUE}◉${NC} Non-interactive mode: installing ${BOLD}OrbStack${NC} ${GRAY}(recommended)${NC}\n" >&2
+        OUTPUT_LINES=$((OUTPUT_LINES + 1))
+        install_orbstack
+        return $?
+    fi
+
+    # Interactive mode: show choice to user
     printf "\n" >&2
     OUTPUT_LINES=$((OUTPUT_LINES + 1))
     printf "        ${CYAN}${BOLD}Choose Docker Runtime:${NC}\n" >&2
