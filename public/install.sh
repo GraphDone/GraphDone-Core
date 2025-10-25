@@ -967,12 +967,19 @@ check_and_prompt_docker() {
     sleep 0.3
     
     if [ "$check_result" = "running" ]; then
-        # Get version info
+        # Get version info and detect runtime
         DOCKER_VERSION=$(docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "unknown")
-        
-        # Format the line to match last box alignment  
-        local docker_display="${GREEN}✓${NC} ${BOLD}Docker${NC} ${GREEN}${DOCKER_VERSION}${NC} ${GRAY}already installed and running${NC}"
-        local docker_plain="✓ Docker ${DOCKER_VERSION} already installed and running"
+        if [ -d "/Applications/OrbStack.app" ] || command -v orbstack >/dev/null 2>&1; then
+            DOCKER_RUNTIME="OrbStack"
+        elif [ -d "/Applications/Docker.app" ]; then
+            DOCKER_RUNTIME="Docker Desktop"
+        else
+            DOCKER_RUNTIME="Docker"
+        fi
+
+        # Format the line to match last box alignment
+        local docker_display="${GREEN}✓${NC} ${BOLD}${DOCKER_RUNTIME}${NC} ${GREEN}${DOCKER_VERSION}${NC} ${GRAY}already installed and running${NC}"
+        local docker_plain="✓ ${DOCKER_RUNTIME} ${DOCKER_VERSION} already installed and running"
         local padding=$((88 - ${#docker_plain}))
         printf "\r  ${docker_display}%*s\n" $padding ""
         return 0
@@ -981,17 +988,26 @@ check_and_prompt_docker() {
         # Track prompt lines
         PROMPT_LINES=0
 
+        # Detect which Docker runtime is installed
         DOCKER_VERSION=$(docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "unknown")
-        printf "\r  ${YELLOW}⚠${NC} ${BOLD}Docker${NC} ${GREEN}${DOCKER_VERSION}${NC} ${GRAY}installed but not running${NC}%-40s\n" " "
+        if [ -d "/Applications/OrbStack.app" ] || command -v orbstack >/dev/null 2>&1; then
+            DOCKER_RUNTIME="OrbStack"
+        elif [ -d "/Applications/Docker.app" ]; then
+            DOCKER_RUNTIME="Docker Desktop"
+        else
+            DOCKER_RUNTIME="Docker"
+        fi
+
+        printf "\r  ${YELLOW}⚠${NC} ${BOLD}${DOCKER_RUNTIME}${NC} ${GREEN}${DOCKER_VERSION}${NC} ${GRAY}installed but not running${NC}%-40s\n" " "
         PROMPT_LINES=$((PROMPT_LINES + 1))
         printf "\n"
         PROMPT_LINES=$((PROMPT_LINES + 1))
 
         printf "        ${YELLOW}🟡 ${BOLD}Docker Startup Required${NC}\n"
         PROMPT_LINES=$((PROMPT_LINES + 1))
-        printf "        ${GRAY}Docker is installed but the daemon is not running.${NC}\n\n"
+        printf "        ${GRAY}${DOCKER_RUNTIME} is installed but the daemon is not running.${NC}\n\n"
         PROMPT_LINES=$((PROMPT_LINES + 2))  # line + \n
-        printf "        ${GREEN}✓${NC} We'll start Docker Desktop automatically\n"
+        printf "        ${GREEN}✓${NC} We'll start ${DOCKER_RUNTIME} automatically\n"
         PROMPT_LINES=$((PROMPT_LINES + 1))
         printf "        ${GREEN}✓${NC} Wait for the Linux VM to boot and be ready\n"
         PROMPT_LINES=$((PROMPT_LINES + 1))
@@ -1015,10 +1031,10 @@ check_and_prompt_docker() {
                 i=$((i + 1))
             done
             
-            # Get Docker version and show clean success message
+            # Get Docker version and runtime name, show clean success message
             DOCKER_VERSION=$(docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "unknown")
-            local docker_success="${GREEN}✓${NC} ${BOLD}Docker${NC} ${GREEN}${DOCKER_VERSION}${NC} started successfully"
-            local docker_success_plain="✓ Docker ${DOCKER_VERSION} started successfully"
+            local docker_success="${GREEN}✓${NC} ${BOLD}${DOCKER_RUNTIME}${NC} ${GREEN}${DOCKER_VERSION}${NC} started successfully"
+            local docker_success_plain="✓ ${DOCKER_RUNTIME} ${DOCKER_VERSION} started successfully"
             local padding=$((88 - ${#docker_success_plain}))
             printf "  ${docker_success}%*s\n" $padding ""
         else
@@ -1057,18 +1073,29 @@ check_and_prompt_docker() {
     SETUP_LINES=$(run_setup_script "setup_docker.sh" --skip-check)
     if [ $? -eq 0 ]; then
         # After successful installation, clear all output and show clean result
-        # Clear both prompt lines and setup script output
+        # Clear prompt lines + setup script output
         TOTAL_LINES=$((PROMPT_LINES + SETUP_LINES))
         i=1
         while [ $i -le "$TOTAL_LINES" ]; do
             printf "\033[F\033[K"  # Move up and clear line
             i=$((i + 1))
         done
-        
-        # Get Docker version and show clean success message
+
+        # Clear the "Docker not installed" warning line from the dependency check
+        printf "\033[F\033[K"
+
+        # Get Docker version and detect runtime, show clean success message
         DOCKER_VERSION=$(docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "unknown")
-        local docker_success="${GREEN}✓${NC} ${BOLD}Docker${NC} ${GREEN}${DOCKER_VERSION}${NC} installed and running successfully"
-        local docker_success_plain="✓ Docker ${DOCKER_VERSION} installed and running successfully"
+        if [ -d "/Applications/OrbStack.app" ] || command -v orbstack >/dev/null 2>&1; then
+            DOCKER_RUNTIME="OrbStack"
+        elif [ -d "/Applications/Docker.app" ]; then
+            DOCKER_RUNTIME="Docker Desktop"
+        else
+            DOCKER_RUNTIME="Docker"
+        fi
+
+        local docker_success="${GREEN}✓${NC} ${BOLD}${DOCKER_RUNTIME}${NC} ${GREEN}${DOCKER_VERSION}${NC} installed and running successfully"
+        local docker_success_plain="✓ ${DOCKER_RUNTIME} ${DOCKER_VERSION} installed and running successfully"
         local padding=$((88 - ${#docker_success_plain}))
         printf "  ${docker_success}%*s\n" $padding ""
     else
@@ -2041,7 +2068,7 @@ EOF
     $DOCKER_COMPOSE -f deployment/docker-compose.registry.yml down --remove-orphans >/dev/null 2>&1 || true
     
     # Check for port conflicts and resolve them
-    printf "  ${BLUE}🔍${NC} Checking for port conflicts\n"
+    printf "  ${BLUE}◉${NC} Checking for port conflicts\n"
     GRAPHDONE_PORTS="3127 3128 4127 4128 6379 7474 7687"
     CONFLICTS_FOUND=false
     
@@ -2070,8 +2097,8 @@ EOF
         printf "  ${GREEN}✓${NC} No port conflicts detected\n"
     else
         # If ports were freed, give Docker daemon time to stabilize
-        printf "  ${BLUE}⏳${NC} Waiting for Docker daemon to stabilize...\n"
-        sleep 3
+        printf "  ${BLUE}⏳${NC} Waiting for Docker daemon to stabilize\n"
+        sleep 5
 
         # Ensure Docker daemon is ready before pulling images
         i=0
@@ -2101,7 +2128,7 @@ EOF
                 8) spin_char='⠇' ;;
                 9) spin_char='⠏' ;;
             esac
-            printf "\r  ${BLUE}◉${NC} Waiting for Docker to be ready ${CYAN}%s${NC}" "$spin_char"
+            printf "\r  ${YELLOW}◉${NC} Waiting for Docker to be ready ${YELLOW}%s${NC}" "$spin_char"
             i=$((i + 1))
             sleep 0.15
         done

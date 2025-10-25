@@ -59,7 +59,7 @@ show_spinner() {
             8) spin_char='⠇' ;;
             9) spin_char='⠏' ;;
         esac
-        printf "\r        ${VIOLET}◉${NC} %s ${CYAN}%s${NC}" "$msg" "$spin_char" >&2
+        printf "\r        ${YELLOW}◉${NC} %s ${YELLOW}%s${NC}" "$msg" "$spin_char" >&2
         i=$((i + 1))
         sleep 0.15
     done
@@ -221,12 +221,12 @@ install_docker_macos() {
         return $?
     fi
 
-    # Interactive mode: show choice to user
+    # Interactive mode: show info and simple yes/no prompt
     printf "\n" >&2
     OUTPUT_LINES=$((OUTPUT_LINES + 1))
     printf "        ${CYAN}${BOLD}Choose Docker Runtime:${NC}\n" >&2
     OUTPUT_LINES=$((OUTPUT_LINES + 1))
-    printf "        ${GRAY}─────────────────────────────────${NC}\n" >&2
+    printf "\n" >&2
     OUTPUT_LINES=$((OUTPUT_LINES + 1))
     printf "        ${GREEN}1)${NC} ${BOLD}OrbStack${NC} ${GRAY}(Recommended)${NC}\n" >&2
     OUTPUT_LINES=$((OUTPUT_LINES + 1))
@@ -250,22 +250,17 @@ install_docker_macos() {
     OUTPUT_LINES=$((OUTPUT_LINES + 1))
     printf "\n" >&2
     OUTPUT_LINES=$((OUTPUT_LINES + 1))
-    printf "        ${YELLOW}Enter choice [1-2] (default: 1):${NC} " >&2
+    printf "        ${YELLOW}❯ Install OrbStack? ${GRAY}(Y = OrbStack, n = Docker Desktop)${NC} [Y/n] or Ctrl+C to exit${NC}\n" >&2
     OUTPUT_LINES=$((OUTPUT_LINES + 1))
+    printf "        " >&2
 
-    read -r choice
-    choice=${choice:-1}
+    read -r response || response=""
 
-    case "$choice" in
-        1)
-            install_orbstack
-            ;;
-        2)
+    case "$response" in
+        [nN]|[nN][oO])
             install_docker_desktop
             ;;
         *)
-            printf "        ${RED}✗${NC} Invalid choice, installing OrbStack (recommended)\n" >&2
-            OUTPUT_LINES=$((OUTPUT_LINES + 1))
             install_orbstack
             ;;
     esac
@@ -315,7 +310,7 @@ start_orbstack() {
                 6) spin_char='⠦' ;;
                 *) spin_char='⠋' ;;
             esac
-            printf "\r        ${VIOLET}◉${NC} Starting OrbStack ${CYAN}%s${NC}" "$spin_char" >&2
+            printf "\r        ${YELLOW}◉${NC} Starting OrbStack ${YELLOW}%s${NC}" "$spin_char" >&2
             sleep 0.15
         done
     fi
@@ -347,7 +342,7 @@ start_orbstack() {
             8) spin_char='⠇' ;;
             9) spin_char='⠏' ;;
         esac
-        printf "\r        ${VIOLET}◉${NC} Waiting for OrbStack to start ${CYAN}%s${NC}" "$spin_char" >&2
+        printf "\r        ${YELLOW}◉${NC} Waiting for OrbStack to start ${YELLOW}%s${NC}" "$spin_char" >&2
         i=$((i + 1))
         sleep 0.15
     done
@@ -396,7 +391,7 @@ start_docker_desktop() {
                 6) spin_char='⠦' ;;
                 *) spin_char='⠋' ;;
             esac
-            printf "\r        ${VIOLET}◉${NC} Starting Docker Desktop ${CYAN}%s${NC}" "$spin_char" >&2
+            printf "\r        ${YELLOW}◉${NC} Starting Docker Desktop ${YELLOW}%s${NC}" "$spin_char" >&2
             sleep 0.15
         done
 
@@ -430,7 +425,7 @@ start_docker_desktop() {
                 8) spin_char='⠇' ;;
                 9) spin_char='⠏' ;;
             esac
-            printf "\r        ${VIOLET}◉${NC} Waiting for Docker to start ${CYAN}%s${NC}" "$spin_char" >&2
+            printf "\r        ${YELLOW}◉${NC} Waiting for Docker to start ${YELLOW}%s${NC}" "$spin_char" >&2
             i=$((i + 1))
             sleep 0.15
         done
