@@ -108,7 +108,7 @@ check_git_installed() {
                     printf "        ${YELLOW}⚠${NC} Detected Apple's bundled Git. Latest version available: ${BOLD}${LATEST_VERSION}${NC}\n" >&2
                     OUTPUT_LINES=$((OUTPUT_LINES + 1))
                 else
-                    log_warning "Detected Apple's bundled Git. Installing latest version via Homebrew..."
+                    log_warning "Detected Apple's bundled Git. Installing latest version via Homebrew"
                 fi
                 # Don't exit, continue to installation
             else
@@ -133,19 +133,19 @@ check_git_installed() {
                         echo "$OUTPUT_LINES"
                         exit 0
                     else
-                        log_warning "Git version is outdated. Updating to latest..."
+                        log_warning "Git version is outdated. Updating to latest"
                     fi
                 fi
             fi
         else
-            log_info "Git not found. Installing..."
+            log_info "Git not found. Installing"
         fi
     fi
 }
 
 # Install Git on macOS
 install_git_macos() {
-    log_info "Installing latest Git via Homebrew..."
+    log_info "Installing latest Git via Homebrew"
 
     # Check if Homebrew is available
     if command -v brew >/dev/null 2>&1; then
@@ -194,7 +194,7 @@ install_git_macos() {
         fi
     else
         # No Homebrew, try Xcode Command Line Tools
-        log_info "Homebrew not found. Installing Xcode Command Line Tools..."
+        log_info "Homebrew not found. Installing Xcode Command Line Tools"
         log_info "This includes Git and other development tools."
         
         # Check if Xcode tools are already installed
@@ -211,7 +211,7 @@ install_git_macos() {
                 exit 1
             fi
         else
-            log_info "Triggering Xcode Command Line Tools installation..."
+            log_info "Triggering Xcode Command Line Tools installation"
             xcode-select --install
             
             log_warning "Please complete the Xcode installer that just opened."
@@ -270,23 +270,23 @@ install_git_linux() {
         fi
         
     elif command -v yum >/dev/null 2>&1; then
-        log_info "Using yum to install Git..."
+        log_info "Using yum to install Git"
         sudo yum install -y git
         
     elif command -v dnf >/dev/null 2>&1; then
-        log_info "Using dnf to install Git..."
+        log_info "Using dnf to install Git"
         sudo dnf install -y git
         
     elif command -v pacman >/dev/null 2>&1; then
-        log_info "Using pacman to install Git..."
+        log_info "Using pacman to install Git"
         sudo pacman -S --noconfirm git
         
     elif command -v zypper >/dev/null 2>&1; then
-        log_info "Using zypper to install Git..."
+        log_info "Using zypper to install Git"
         sudo zypper install -y git
         
     elif command -v apk >/dev/null 2>&1; then
-        log_info "Using apk to install Git..."
+        log_info "Using apk to install Git"
         sudo apk add --no-cache git
         
     else
@@ -311,7 +311,7 @@ configure_git() {
     
     # Only set if not already configured
     if [ -z "$(git config --global user.name)" ]; then
-        log_info "Setting up Git identity (can be changed later)..."
+        log_info "Setting up Git identity (can be changed later)"
         git config --global user.name "GraphDone User"
         git config --global user.email "user@graphdone.local"
     fi
