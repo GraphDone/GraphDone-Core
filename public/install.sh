@@ -1309,7 +1309,7 @@ wait_for_services() {
             9) spin_char='⠏' ;;
         esac
         
-        printf "\r  ${GRAY}▸${NC} Waiting for services to initialize ${YELLOW}%s${NC} (%ds)%-35s" "$spin_char" $attempts " "
+        printf "\r  ${GRAY}▸${NC} Waiting for services to initialize ${BOLD}${CYAN}%s${NC} (%ds)%-35s" "$spin_char" $attempts " "
         i=$(( (i+1) % 10 ))
         attempts=$((attempts + 1))
         sleep 1
@@ -2159,7 +2159,7 @@ EOF
                 8) spin_char='⠇' ;;
                 9) spin_char='⠏' ;;
             esac
-            printf "\r  ${YELLOW}◉${NC} Waiting for Docker to be ready ${YELLOW}%s${NC}" "$spin_char"
+            printf "\r  ${YELLOW}◉${NC} Waiting for Docker to be ready ${BOLD}${CYAN}%s${NC}" "$spin_char"
             i=$((i + 1))
             sleep 0.15
         done
@@ -2303,7 +2303,7 @@ EOF
         esac
         
         # Only update the service name and spinner, not the whole line
-        printf "\r  ${BLUE}▶${NC} ${GRAY}Starting ${BOLD}graphdone-${current_service}${NC} ${CYAN}%s${NC}%-52s" "$spin_char" " "
+        printf "\r  ${BLUE}▶${NC} ${GRAY}Starting ${BOLD}graphdone-${current_service}${NC} ${BOLD}${CYAN}%s${NC}%-52s" "$spin_char" " "
         
         i=$(( (i+1) % 10 ))
         # Change service name every 8 iterations
