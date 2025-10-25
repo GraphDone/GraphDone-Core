@@ -2090,16 +2090,31 @@ EOF
     
     for port in $GRAPHDONE_PORTS; do
         if lsof -ti:$port >/dev/null 2>&1; then
+            # Check if process is a Docker container (don't kill those)
+            process_info=$(lsof -i:$port 2>/dev/null | grep -v COMMAND | head -1)
+            if echo "$process_info" | grep -q "docker\|com.docke"; then
+                # This is a Docker process, skip it (docker-compose will handle cleanup)
+                continue
+            fi
+
             if [ "$CONFLICTS_FOUND" = false ]; then
                 printf "  ${YELLOW}⚠${NC} Port conflicts detected, resolving\n"
                 CONFLICTS_FOUND=true
             fi
-            printf "    ${RED}✗${NC} Port $port is in use, killing process\n"
+            printf "    ${YELLOW}⚠${NC} Port $port is in use by non-Docker process\n"
             pids=$(lsof -ti:$port 2>/dev/null)
             if [ -n "$pids" ]; then
-                echo "$pids" | xargs kill -9 >/dev/null 2>&1 || true
+                # Try graceful shutdown first (SIGTERM)
+                echo "$pids" | xargs kill -15 >/dev/null 2>&1 || true
+                sleep 1
+                # Check if still running
+                if lsof -ti:$port >/dev/null 2>&1; then
+                    # Force kill if graceful didn't work
+                    printf "    ${RED}✗${NC} Forcing process termination on port $port\n"
+                    echo "$pids" | xargs kill -9 >/dev/null 2>&1 || true
+                    sleep 0.5
+                fi
             fi
-            sleep 0.5
             # Verify port is now free
             if lsof -ti:$port >/dev/null 2>&1; then
                 printf "    ${RED}⚠${NC} Port $port still in use (may be system process)\n"
