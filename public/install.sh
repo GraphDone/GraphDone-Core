@@ -2068,12 +2068,50 @@ EOF
     
     if [ "$CONFLICTS_FOUND" = false ]; then
         printf "  ${GREEN}✓${NC} No port conflicts detected\n"
-    fi
-
-    # If ports were freed, give Docker daemon time to stabilize
-    if [ "$CONFLICTS_FOUND" = true ]; then
+    else
+        # If ports were freed, give Docker daemon time to stabilize
         printf "  ${BLUE}⏳${NC} Waiting for Docker daemon to stabilize...\n"
         sleep 3
+
+        # Ensure Docker daemon is ready before pulling images
+        i=0
+        attempts=0
+        max_attempts=60
+        while [ $attempts -lt $max_attempts ]; do
+            # Check Docker status every 13 spinner cycles (roughly 2 seconds)
+            if [ $((i % 13)) -eq 0 ]; then
+                { docker info >/dev/null 2>&1; } 2>/dev/null && docker_ready=0 || docker_ready=1
+                if [ $docker_ready -eq 0 ]; then
+                    printf "\r  ${GREEN}✓${NC} Docker is ready                    \n"
+                    break
+                fi
+                attempts=$((attempts + 1))
+            fi
+
+            # Show spinner
+            case $((i % 10)) in
+                0) spin_char='⠋' ;;
+                1) spin_char='⠙' ;;
+                2) spin_char='⠹' ;;
+                3) spin_char='⠸' ;;
+                4) spin_char='⠼' ;;
+                5) spin_char='⠴' ;;
+                6) spin_char='⠦' ;;
+                7) spin_char='⠧' ;;
+                8) spin_char='⠇' ;;
+                9) spin_char='⠏' ;;
+            esac
+            printf "\r  ${BLUE}◉${NC} Waiting for Docker to be ready ${CYAN}%s${NC}" "$spin_char"
+            i=$((i + 1))
+            sleep 0.15
+        done
+
+        if [ $attempts -ge $max_attempts ]; then
+            printf "\r\033[K"
+            printf "  ${RED}⚠${NC} Docker daemon not responding after 2 minutes\n"
+            printf "  ${YELLOW}⚠${NC} Please ensure Docker/OrbStack is running and try again\n"
+            exit 1
+        fi
     fi
 
     # Smart deployment detection with animated progress
