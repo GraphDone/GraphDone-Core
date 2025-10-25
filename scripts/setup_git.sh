@@ -55,23 +55,6 @@ log_success() { printf "        ${GREEN}✓${NC} $1\n" >&2; OUTPUT_LINES=$((OUTP
 log_warning() { printf "        ${YELLOW}⚠${NC} $1\n" >&2; OUTPUT_LINES=$((OUTPUT_LINES + 1)); }
 log_error() { printf "        ${RED}✗${NC} $1\n" >&2; OUTPUT_LINES=$((OUTPUT_LINES + 1)); }
 
-# Spinner helper
-get_spinner_char() {
-    case $1 in
-        0) printf "⠋" ;;
-        1) printf "⠙" ;;
-        2) printf "⠹" ;;
-        3) printf "⠸" ;;
-        4) printf "⠼" ;;
-        5) printf "⠴" ;;
-        6) printf "⠦" ;;
-        7) printf "⠧" ;;
-        8) printf "⠇" ;;
-        9) printf "⠏" ;;
-        *) printf "⠋" ;;
-    esac
-}
-
 # Platform detection
 detect_platform() {
     case "$(uname)" in
@@ -252,11 +235,23 @@ install_git_linux() {
         install_pid=$!
         
         # Show spinner while installing
-        spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
         i=0
+        spin_char=""
         while kill -0 $install_pid 2>/dev/null; do
-            printf "\r        ${VIOLET}◉${NC} Installing latest Git ${CYAN}$(get_spinner_char "$i")${NC}\033[K" >&2
-            i=$(( (i+1) % 10 ))
+            case $((i % 10)) in
+                0) spin_char='⠋' ;;
+                1) spin_char='⠙' ;;
+                2) spin_char='⠹' ;;
+                3) spin_char='⠸' ;;
+                4) spin_char='⠼' ;;
+                5) spin_char='⠴' ;;
+                6) spin_char='⠦' ;;
+                7) spin_char='⠧' ;;
+                8) spin_char='⠇' ;;
+                9) spin_char='⠏' ;;
+            esac
+            printf "\r        ${VIOLET}◉${NC} Installing latest Git ${BOLD}${CYAN}%s${NC}\033[K" "$spin_char" >&2
+            i=$((i + 1))
             sleep 0.1
         done
 
