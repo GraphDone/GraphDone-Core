@@ -139,7 +139,7 @@ check_disk_space() {
         if [ "$available_gb" -lt "$required_gb" ]; then
             warn "Low disk space: ${available_gb}GB available (${required_gb}GB recommended)"
             printf "${CYAN}ℹ${NC} Continue anyway? ${GRAY}[y/N]${NC} "
-            read -r response < /dev/tty 2>/dev/null || response="n"
+            read -r response || response="n"
             if [ "$response" != "y" ] && [ "$response" != "Y" ]; then
                 error "Installation cancelled due to low disk space"
             fi
@@ -155,7 +155,7 @@ check_network() {
         if ! curl -sf --max-time 5 "$test_url" >/dev/null 2>&1; then
             warn "Network connectivity test failed"
             printf "${CYAN}ℹ${NC} This may cause download failures. Continue? ${GRAY}[y/N]${NC} "
-            read -r response < /dev/tty 2>/dev/null || response="n"
+            read -r response || response="n"
             if [ "$response" != "y" ] && [ "$response" != "Y" ]; then
                 error "Installation cancelled - network required"
             fi
@@ -164,7 +164,7 @@ check_network() {
         if ! wget -q --timeout=5 --spider "$test_url" 2>/dev/null; then
             warn "Network connectivity test failed"
             printf "${CYAN}ℹ${NC} This may cause download failures. Continue? ${GRAY}[y/N]${NC} "
-            read -r response < /dev/tty 2>/dev/null || response="n"
+            read -r response || response="n"
             if [ "$response" != "y" ] && [ "$response" != "Y" ]; then
                 error "Installation cancelled - network required"
             fi
@@ -518,7 +518,7 @@ check_and_prompt_git() {
         PROMPT_LINES=$((PROMPT_LINES + 1))
         printf "        "
         PROMPT_LINES=$((PROMPT_LINES + 1))
-        read -r response < /dev/tty 2>/dev/null || response="" < /dev/tty 2>/dev/null || response="n"
+        read -r response || response="" || response="n"
 
         if [ "$response" != "n" ] && [ "$response" != "N" ]; then
             # Run the Git setup script and capture line count from stdout
@@ -582,7 +582,7 @@ check_and_prompt_git() {
         PROMPT_LINES=$((PROMPT_LINES + 1))
         printf "        "
         PROMPT_LINES=$((PROMPT_LINES + 1))
-        read -r response < /dev/tty 2>/dev/null || response="" < /dev/tty 2>/dev/null || response="n"
+        read -r response || response="" || response="n"
 
         # Run the Git setup script and capture line count from stdout
         SETUP_LINES=$(run_setup_script "setup_git.sh")
@@ -632,7 +632,7 @@ check_and_prompt_git() {
     PROMPT_LINES=$((PROMPT_LINES + 1))
     printf "        "
     PROMPT_LINES=$((PROMPT_LINES + 1))
-    read -r response < /dev/tty 2>/dev/null || response=""
+    read -r response || response=""
 
     # Run the Git setup script (skip redundant check) and capture line count from stdout
     SETUP_LINES=$(run_setup_script "setup_git.sh" --skip-check)
@@ -765,7 +765,7 @@ check_and_prompt_nodejs() {
         PROMPT_LINES=$((PROMPT_LINES + 1))
         printf "        "
         PROMPT_LINES=$((PROMPT_LINES + 1))
-        read -r response < /dev/tty 2>/dev/null || response="" < /dev/tty 2>/dev/null || response="n"
+        read -r response || response="" || response="n"
 
         # Run the Node.js setup script and capture line count from stdout
         SETUP_LINES=$(run_setup_script "setup_nodejs.sh")
@@ -821,7 +821,7 @@ check_and_prompt_nodejs() {
         PROMPT_LINES=$((PROMPT_LINES + 1))
         printf "        "
         PROMPT_LINES=$((PROMPT_LINES + 1))
-        read -r response < /dev/tty 2>/dev/null || response="" < /dev/tty 2>/dev/null || response="n"
+        read -r response || response="" || response="n"
 
         # Run the Node.js setup script and capture line count from stdout
         SETUP_LINES=$(run_setup_script "setup_nodejs.sh")
@@ -878,7 +878,7 @@ check_and_prompt_nodejs() {
     PROMPT_LINES=$((PROMPT_LINES + 1))
     printf "        "
     PROMPT_LINES=$((PROMPT_LINES + 1))
-    read -r response < /dev/tty 2>/dev/null || response=""
+    read -r response || response=""
 
     # Run the Node.js setup script (will check if already installed) and capture line count from stdout
     SETUP_LINES=$(run_setup_script "setup_nodejs.sh")
@@ -1017,7 +1017,7 @@ check_and_prompt_docker() {
         PROMPT_LINES=$((PROMPT_LINES + 1))
         printf "        "
         PROMPT_LINES=$((PROMPT_LINES + 1))
-        read -r response < /dev/tty 2>/dev/null || response="" < /dev/tty 2>/dev/null || response="n"
+        read -r response || response="" || response="n"
 
         # Run the Docker setup script to start Docker and capture line count from stdout
         SETUP_LINES=$(run_setup_script "setup_docker.sh")
@@ -1076,7 +1076,7 @@ check_and_prompt_docker() {
     PROMPT_LINES=$((PROMPT_LINES + 1))
     printf "        "
     PROMPT_LINES=$((PROMPT_LINES + 1))
-    read -r response < /dev/tty 2>/dev/null || response=""
+    read -r response || response=""
 
     # Run the Docker setup script - it handles everything (skip redundant check) and capture line count from stdout
     SETUP_LINES=$(run_setup_script "setup_docker.sh" --skip-check)
@@ -1709,7 +1709,7 @@ install_graphdone() {
         printf "  ${GRAY}Your version (${BOLD}${MACOS_VERSION}${NC}${GRAY}) may not be fully supported${NC}\n"
         printf "\n"
         printf "  ${CYAN}ℹ${NC} Continue installation anyway? ${GRAY}[y/N]${NC} "
-        read -r response < /dev/tty 2>/dev/null || response="n"
+        read -r response || response="n"
         if [ "$response" != "y" ] && [ "$response" != "Y" ]; then
             printf "\n"
             error "Installation cancelled - please upgrade to macOS 10.15 or later"
@@ -2278,7 +2278,6 @@ EOF
     
     # Service startup animation with service names (POSIX-compliant)
     services="neo4j redis api web"
-    spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
     i=0
     service_index=0
     
@@ -2287,7 +2286,7 @@ EOF
         set -- $services
         shift $((service_index % 4))
         current_service=$1
-        
+        spin_char=""
         # Get spinner character
         case $((i % 10)) in
             0) spin_char='⠋' ;;
@@ -2303,14 +2302,14 @@ EOF
         esac
         
         # Only update the service name and spinner, not the whole line
-        printf "\r  ${BLUE}▶${NC} ${GRAY}Starting ${BOLD}graphdone-${current_service}${NC} ${BOLD}${CYAN}%s${NC}%-52s" "$spin_char" " "
-        
-        i=$(( (i+1) % 10 ))
+        printf "\r  ${VIOLET}◉${NC} Starting graphdone-${current_service} ${BOLD}${CYAN}%s${NC}" "$spin_char"
+
+        i=$((i + 1))
         # Change service name every 8 iterations
         if [ $((i % 8)) -eq 0 ]; then
             service_index=$((service_index + 1))
         fi
-        sleep 0.1
+        sleep 0.15
     done
     
     wait $startup_pid
