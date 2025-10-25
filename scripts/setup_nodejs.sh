@@ -137,7 +137,7 @@ show_spinner() {
             8) spin_char='⠇' ;;
             9) spin_char='⠏' ;;
         esac
-        printf "\r        ${VIOLET}◉${NC} %s ${CYAN}%s${NC}" "$msg" "$spin_char" >&2
+        printf "\r        ${VIOLET}◉${NC} %s ${BOLD}${CYAN}%s${NC}" "$msg" "$spin_char" >&2
         i=$((i + 1))
         sleep 0.15
     done

@@ -59,7 +59,7 @@ show_spinner() {
             8) spin_char='⠇' ;;
             9) spin_char='⠏' ;;
         esac
-        printf "\r        ${YELLOW}◉${NC} %s ${YELLOW}%s${NC}" "$msg" "$spin_char" >&2
+        printf "\r        ${YELLOW}◉${NC} %s ${BOLD}${CYAN}%s${NC}" "$msg" "$spin_char" >&2
         i=$((i + 1))
         sleep 0.15
     done
@@ -310,7 +310,7 @@ start_orbstack() {
                 6) spin_char='⠦' ;;
                 *) spin_char='⠋' ;;
             esac
-            printf "\r        ${YELLOW}◉${NC} Starting OrbStack ${YELLOW}%s${NC}" "$spin_char" >&2
+            printf "\r        ${YELLOW}◉${NC} Starting OrbStack ${BOLD}${CYAN}%s${NC}" "$spin_char" >&2
             sleep 0.15
         done
     fi
@@ -342,7 +342,7 @@ start_orbstack() {
             8) spin_char='⠇' ;;
             9) spin_char='⠏' ;;
         esac
-        printf "\r        ${YELLOW}◉${NC} Waiting for OrbStack to start ${YELLOW}%s${NC}" "$spin_char" >&2
+        printf "\r        ${YELLOW}◉${NC} Waiting for OrbStack to start ${BOLD}${CYAN}%s${NC}" "$spin_char" >&2
         i=$((i + 1))
         sleep 0.15
     done
@@ -358,8 +358,8 @@ install_docker_desktop() {
     export HOMEBREW_NO_AUTO_UPDATE=1
     export HOMEBREW_NO_ENV_HINTS=1
 
-    # Install Docker Desktop
-    brew install docker >/dev/null 2>&1 &
+    # Install Docker Desktop (as cask, not formula)
+    brew install --cask docker >/dev/null 2>&1 &
     show_spinner $! "Installing Docker Desktop"
 
     if [ $? -ne 0 ]; then
@@ -391,7 +391,7 @@ start_docker_desktop() {
                 6) spin_char='⠦' ;;
                 *) spin_char='⠋' ;;
             esac
-            printf "\r        ${YELLOW}◉${NC} Starting Docker Desktop ${YELLOW}%s${NC}" "$spin_char" >&2
+            printf "\r        ${YELLOW}◉${NC} Starting Docker Desktop ${BOLD}${CYAN}%s${NC}" "$spin_char" >&2
             sleep 0.15
         done
 
@@ -425,7 +425,7 @@ start_docker_desktop() {
                 8) spin_char='⠇' ;;
                 9) spin_char='⠏' ;;
             esac
-            printf "\r        ${YELLOW}◉${NC} Waiting for Docker to start ${YELLOW}%s${NC}" "$spin_char" >&2
+            printf "\r        ${YELLOW}◉${NC} Waiting for Docker to start ${BOLD}${CYAN}%s${NC}" "$spin_char" >&2
             i=$((i + 1))
             sleep 0.15
         done
