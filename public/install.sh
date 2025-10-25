@@ -1023,14 +1023,23 @@ check_and_prompt_docker() {
         SETUP_LINES=$(run_setup_script "setup_docker.sh")
         if [ $? -eq 0 ]; then
             # After successful startup, clear all output and show clean result
-            # Clear both prompt lines and setup script output
-            TOTAL_LINES=$((PROMPT_LINES + SETUP_LINES))
+            # Clear setup script output first
             i=1
-            while [ $i -le "$TOTAL_LINES" ]; do
+            while [ $i -le "$SETUP_LINES" ]; do
                 printf "\033[F\033[K"  # Move up and clear line
                 i=$((i + 1))
             done
-            
+
+            # Now clear all prompt lines EXCEPT the first one (the warning line we want to replace)
+            i=1
+            while [ $i -lt "$PROMPT_LINES" ]; do
+                printf "\033[F\033[K"  # Move up and clear line
+                i=$((i + 1))
+            done
+
+            # Move up one more time and clear the warning line
+            printf "\033[F\033[K"
+
             # Get Docker version and runtime name, show clean success message
             DOCKER_VERSION=$(docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "unknown")
             local docker_success="${GREEN}✓${NC} ${BOLD}${DOCKER_RUNTIME}${NC} ${GREEN}${DOCKER_VERSION}${NC} started successfully"
@@ -1073,17 +1082,24 @@ check_and_prompt_docker() {
     SETUP_LINES=$(run_setup_script "setup_docker.sh" --skip-check)
     if [ $? -eq 0 ]; then
         # After successful installation, clear all output and show clean result
-        # Clear prompt lines + setup script output
-        TOTAL_LINES=$((PROMPT_LINES + SETUP_LINES))
+        # Clear setup script output first
         i=1
-        while [ $i -le "$TOTAL_LINES" ]; do
+        while [ $i -le "$SETUP_LINES" ]; do
             printf "\033[F\033[K"  # Move up and clear line
             i=$((i + 1))
         done
 
-        # Clear the "Docker not installed" warning line from the dependency check
+        # Now clear all prompt lines EXCEPT the first one (the warning line we want to replace)
+        i=1
+        while [ $i -lt "$PROMPT_LINES" ]; do
+            printf "\033[F\033[K"  # Move up and clear line
+            i=$((i + 1))
+        done
+
+        # Move up one more time and clear the warning line
         printf "\033[F\033[K"
 
+        # Cursor is now at the position where warning line was - print success message
         # Get Docker version and detect runtime, show clean success message
         DOCKER_VERSION=$(docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "unknown")
         if [ -d "/Applications/OrbStack.app" ] || command -v orbstack >/dev/null 2>&1; then
