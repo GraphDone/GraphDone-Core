@@ -146,12 +146,24 @@ install_git_macos() {
         
         # Show spinner while brew is running
         brew_pid=$!
-        spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
         i=0
+        spin_char=""
         while kill -0 $brew_pid 2>/dev/null; do
-            printf "\r        ${VIOLET}◉${NC} Downloading and installing Git ${CYAN}${spin:i:1}${NC}" >&2
-            i=$(( (i+1) % ${#spin} ))
-            sleep 0.1
+            case $((i % 10)) in
+                0) spin_char='⠋' ;;
+                1) spin_char='⠙' ;;
+                2) spin_char='⠹' ;;
+                3) spin_char='⠸' ;;
+                4) spin_char='⠼' ;;
+                5) spin_char='⠴' ;;
+                6) spin_char='⠦' ;;
+                7) spin_char='⠧' ;;
+                8) spin_char='⠇' ;;
+                9) spin_char='⠏' ;;
+            esac
+            printf "\r        ${VIOLET}◉${NC} Downloading and installing Git ${BOLD}${CYAN}%s${NC}" "$spin_char" >&2
+            i=$((i + 1))
+            sleep 0.15
         done
 
         # Wait for brew to complete
@@ -252,7 +264,7 @@ install_git_linux() {
             esac
             printf "\r        ${VIOLET}◉${NC} Installing latest Git ${BOLD}${CYAN}%s${NC}\033[K" "$spin_char" >&2
             i=$((i + 1))
-            sleep 0.1
+            sleep 0.15
         done
 
         wait $install_pid
