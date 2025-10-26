@@ -14,7 +14,6 @@
 set -e
 
 # Track output lines for install.sh to clear later
-OUTPUT_LINES=0
 
 # Colors for output
 if [ -t 2 ]; then
@@ -49,11 +48,11 @@ else
     RED='' GREEN='' YELLOW='' BLUE='' VIOLET='' LIGHTCORAL='' PALEGREEN='' CYAN='' GRAY='' BOLD='' NC=''
 fi
 
-# Helper functions - redirect to stderr and track line counts
-log_info() { printf "        ${CYAN}ℹ${NC} $1\n" >&2; OUTPUT_LINES=$((OUTPUT_LINES + 1)); }
-log_success() { printf "        ${GREEN}✓${NC} $1\n" >&2; OUTPUT_LINES=$((OUTPUT_LINES + 1)); }
-log_warning() { printf "        ${YELLOW}⚠${NC} $1\n" >&2; OUTPUT_LINES=$((OUTPUT_LINES + 1)); }
-log_error() { printf "        ${RED}✗${NC} $1\n" >&2; OUTPUT_LINES=$((OUTPUT_LINES + 1)); }
+# Helper functions - redirect to stderr
+log_info() { printf "        ${CYAN}ℹ${NC} $1\n" >&2; }
+log_success() { printf "        ${GREEN}✓${NC} $1\n" >&2; }
+log_warning() { printf "        ${YELLOW}⚠${NC} $1\n" >&2; }
+log_error() { printf "        ${RED}✗${NC} $1\n" >&2; }
 
 # Platform detection
 detect_platform() {
@@ -77,7 +76,6 @@ check_git_installed() {
             GIT_VERSION=$(git --version | sed 's/git version //')
             CURRENT_VERSION=$(echo "$GIT_VERSION" | sed 's/ (Apple Git.*)//' | sed 's/[^0-9.]//g')
             printf "        ${GREEN}✓${NC} ${BOLD}Git${NC} ${GREEN}v${GIT_VERSION}${NC} is already installed\n" >&2
-            OUTPUT_LINES=$((OUTPUT_LINES + 1))
 
             # Try to get latest version from Homebrew
             LATEST_VERSION=""
@@ -89,7 +87,6 @@ check_git_installed() {
             if echo "$GIT_VERSION" | grep -q "Apple Git"; then
                 if [ -n "$LATEST_VERSION" ]; then
                     printf "        ${YELLOW}⚠${NC} Detected Apple's bundled Git. Latest version available: ${BOLD}${LATEST_VERSION}${NC}\n" >&2
-                    OUTPUT_LINES=$((OUTPUT_LINES + 1))
                 else
                     log_warning "Detected Apple's bundled Git. Installing latest version via Homebrew"
                 fi
@@ -100,11 +97,9 @@ check_git_installed() {
                     # Compare versions
                     if [ "$CURRENT_VERSION" = "$LATEST_VERSION" ]; then
                         log_info "Git version is current (${LATEST_VERSION}). No update needed."
-                        echo "$OUTPUT_LINES"
                         exit 0
                     else
                         printf "        ${YELLOW}⚠${NC} Git ${CURRENT_VERSION} is outdated. Latest version: ${BOLD}${LATEST_VERSION}${NC}\n" >&2
-                        OUTPUT_LINES=$((OUTPUT_LINES + 1))
                     fi
                 else
                     # Fallback to version check if can't get latest
@@ -113,7 +108,6 @@ check_git_installed() {
 
                     if [ "$MAJOR_VERSION" -ge 2 ] && [ "$MINOR_VERSION" -ge 45 ]; then
                         log_info "Git version appears current. No update needed."
-                        echo "$OUTPUT_LINES"
                         exit 0
                     else
                         log_warning "Git version is outdated. Updating to latest"
@@ -178,7 +172,6 @@ install_git_macos() {
             if command -v git >/dev/null 2>&1; then
                 GIT_VERSION=$(git --version | sed 's/git version //')
                 printf "        ${GREEN}✓${NC} Git ${GREEN}v${GIT_VERSION}${NC} installed successfully\n" >&2
-                OUTPUT_LINES=$((OUTPUT_LINES + 1))
             else
                 log_error "Git installation via Homebrew failed"
                 exit 1
@@ -200,7 +193,6 @@ install_git_macos() {
             if command -v git >/dev/null 2>&1; then
                 GIT_VERSION=$(git --version | sed 's/git version //')
                 printf "        ${GREEN}✓${NC} Git ${GREEN}v${GIT_VERSION}${NC} available via Xcode tools\n" >&2
-                OUTPUT_LINES=$((OUTPUT_LINES + 1))
             else
                 log_error "Git not found despite Xcode tools being installed"
                 exit 1
@@ -333,10 +325,8 @@ configure_git() {
 
 # Main installation flow
 main() {
-    printf "\n        ${BOLD}${PALEGREEN}🔧 Git Setup Installation${NC}\n" >&2
-    OUTPUT_LINES=$((OUTPUT_LINES + 2))  # \n + line
+    printf "\n        ${BOLD}${PALEGREEN}🔧 Git Installation Setup${NC}\n" >&2
     printf "        ${GRAY}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n\n" >&2
-    OUTPUT_LINES=$((OUTPUT_LINES + 2))  # line + \n
 
     # Detect platform
     detect_platform
@@ -356,7 +346,6 @@ main() {
         *)
             log_error "Unsupported platform: $PLATFORM"
             log_info "Please install Git manually from: https://git-scm.com"
-            echo "$OUTPUT_LINES"  # Output line count
             exit 1
             ;;
     esac
@@ -365,14 +354,10 @@ main() {
     configure_git
 
     printf "\n        ${GRAY}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n" >&2
-    OUTPUT_LINES=$((OUTPUT_LINES + 2))  # \n + line
     printf "        ${GREEN}✓${NC} ${BOLD}Git setup completed successfully!${NC}\n" >&2
-    OUTPUT_LINES=$((OUTPUT_LINES + 1))
     printf "        ${GRAY}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n\n" >&2
-    OUTPUT_LINES=$((OUTPUT_LINES + 2))  # line + \n
 
     # Output line count to stdout for install.sh
-    echo "$OUTPUT_LINES"
 }
 
 # Run main function
