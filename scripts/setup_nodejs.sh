@@ -112,7 +112,7 @@ log_error() { printf "        ${RED}✗${NC} $1\n" >&2; }
 
 echo "" >&2
 printf "        ${PALEGREEN}${BOLD}📦 Node.js Installation Setup${NC}\n" >&2
-printf "       ${GRAY}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n\n" >&2
+printf "        ${GRAY}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n\n" >&2
 
 # ============================================================================
 # SPINNER FUNCTION (POSIX-compatible)
@@ -372,7 +372,9 @@ main() {
 
     # Verify final installation
     if verify_nodejs; then
-        printf "\n        ${GREEN}✓${NC} Node.js setup complete\n" >&2
+        printf "\n        ${GRAY}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n" >&2
+        printf "        ${GREEN}✓${NC} ${BOLD}Node.js setup completed successfully!${NC}\n" >&2
+        printf "        ${GRAY}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n\n" >&2
     else
         printf "\n${YELLOW}!${NC} Node.js installed but may need manual verification\n" >&2
         exit 1
