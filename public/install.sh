@@ -81,28 +81,6 @@ run_setup_script() {
     fi
 }
 
-clear_installation_output() {
-    local setup_lines="${1:-0}"
-    local prompt_lines="${2:-0}"
-    local i=1
-
-    # Clear setup script output (installation progress lines)
-    while [ $i -le "$setup_lines" ]; do
-        printf "\033[F\033[K" >&2
-        i=$((i + 1))
-    done
-
-    # Clear prompt lines except the first one (warning line to be replaced)
-    i=1
-    while [ $i -lt "$prompt_lines" ]; do
-        printf "\033[F\033[K" >&2
-        i=$((i + 1))
-    done
-
-    # Clear the warning line itself
-    printf "\033[F\033[K" >&2
-}
-
 # Modern color palette using 256-color codes for better compatibility
 # Check stderr (fd 2) instead of stdout since we output to >&2
 if [ -t 2 ]; then
@@ -545,39 +523,35 @@ check_and_prompt_git() {
         read -r response || response="" || response="n"
 
         if [ "$response" != "n" ] && [ "$response" != "N" ]; then
-            # Run the Git setup script and capture line count from stdout
-            SETUP_LINES=$(run_setup_script "setup_git.sh")
+            # Run the Git setup script (output goes to stderr, user sees all progress)
+            run_setup_script "setup_git.sh" >/dev/null
             if [ $? -eq 0 ]; then
-                # After successful installation, clear all output and show clean result
-                # Clear both prompt lines and setup script output
-                TOTAL_LINES=$((PROMPT_LINES + SETUP_LINES))
-                i=1
-                while [ $i -le "$TOTAL_LINES" ]; do
-                    printf "\033[F\033[K"  # Move up and clear line
-                    i=$((i + 1))
-                done
+                # Success! Now collapse all the verbose output
+                # Restore cursor to saved position (right after the header)
+                printf "\033[u"
+                # Clear from cursor to end of screen
+                printf "\033[J"
                 
-                # Get the new Git version and show clean success message
+                # Print clean summary line
                 NEW_GIT_VERSION=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
                 printf "  ${GREEN}✓${NC} ${BOLD}Git${NC} upgraded to ${GREEN}${NEW_GIT_VERSION}${NC} successfully\n"
+                
+                # Save cursor position again for the next check
+                printf "\033[s"
             else
                 printf "${RED}✗${NC} Git setup failed\n"
                 printf "${CYAN}ℹ${NC} Continuing with Apple Git\n"
             fi
         else
-            # Clear all prompt lines
-            i=1
-            while [ $i -le "$PROMPT_LINES" ]; do
-                printf "\033[F\033[K"  # Move up and clear line
-                i=$((i + 1))
-            done
-
-            # Show clean summary line
+            # User skipped - restore cursor and show clean summary
+            printf "\033[u"
+            printf "\033[J"
             printf "  ${GREEN}✓${NC} ${BOLD}Git${NC} ${GREEN}${GIT_VERSION_OLD}${NC} ${GRAY}ready${NC}\n"
+            printf "\033[s"
         fi
         return 0
     elif [ "$check_result" = "outdated" ]; then
-        # Track prompt lines
+        # Track prompt lines (still needed for display, but not for clearing)
         PROMPT_LINES=0
 
         GIT_VERSION_OLD=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
@@ -589,34 +563,29 @@ check_and_prompt_git() {
         printf "${YELLOW}🟡 ${BOLD}Git Update Required${NC}\n"
         PROMPT_LINES=$((PROMPT_LINES + 1))
         printf "${GRAY}GraphDone requires Git >= 2.30 for modern features.${NC}\n\n"
-        PROMPT_LINES=$((PROMPT_LINES + 2))  # line + \n
+        PROMPT_LINES=$((PROMPT_LINES + 2))
         printf "${GREEN}✓${NC} We'll use the dedicated Git setup script for your platform\n"
         PROMPT_LINES=$((PROMPT_LINES + 1))
         printf "${GREEN}✓${NC} Automatic upgrade to latest version\n"
         PROMPT_LINES=$((PROMPT_LINES + 1))
         printf "${GREEN}✓${NC} Zero manual configuration required\n\n"
-        PROMPT_LINES=$((PROMPT_LINES + 2))  # line + \n
+        PROMPT_LINES=$((PROMPT_LINES + 2))
         printf "${CYAN}❯${NC} ${BOLD}Continue with Git upgrade?${NC} ${GRAY}[Press Enter] or Ctrl+C to exit${NC}\n"
         PROMPT_LINES=$((PROMPT_LINES + 1))
         printf "        "
         PROMPT_LINES=$((PROMPT_LINES + 1))
         read -r response || response="" || response="n"
 
-        # Run the Git setup script and capture line count from stdout
-        SETUP_LINES=$(run_setup_script "setup_git.sh")
+        # Run the Git setup script
+        run_setup_script "setup_git.sh" >/dev/null
         if [ $? -eq 0 ]; then
-            # After successful installation, clear all output and show clean result
-            # Clear both prompt lines and setup script output
-            TOTAL_LINES=$((PROMPT_LINES + SETUP_LINES))
-            i=1
-            while [ $i -le "$TOTAL_LINES" ]; do
-                printf "\033[F\033[K"  # Move up and clear line
-                i=$((i + 1))
-            done
-
-            # Get the new Git version and show clean success message
+            # Restore cursor and clear, then show summary
+            printf "\033[u"
+            printf "\033[J"
+            
             NEW_GIT_VERSION=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
             printf "  ${GREEN}✓${NC} ${BOLD}Git${NC} upgraded to ${GREEN}${NEW_GIT_VERSION}${NC} successfully\n"
+            printf "\033[s"
         else
             printf "${RED}✗${NC} Git setup failed\n"
             exit 1
@@ -624,7 +593,7 @@ check_and_prompt_git() {
         return 0
     fi
     
-    # Track prompt lines
+    # Track prompt lines (for display, not clearing)
     PROMPT_LINES=0
 
     printf "\r  ${YELLOW}⚠${NC} ${BOLD}Git${NC} ${GRAY}not installed${NC}%-40s\n" " "
@@ -634,7 +603,7 @@ check_and_prompt_git() {
     printf "        ${YELLOW}🟡 ${BOLD}Git Setup Required${NC}\n"
     PROMPT_LINES=$((PROMPT_LINES + 1))
     printf "        ${GRAY}GraphDone requires Git for version control and cloning repositories.${NC}\n\n"
-    PROMPT_LINES=$((PROMPT_LINES + 2))  # line + \n
+    PROMPT_LINES=$((PROMPT_LINES + 2))
     printf "        ${GREEN}✓${NC} We'll use the dedicated Git setup script for your platform\n"
     PROMPT_LINES=$((PROMPT_LINES + 1))
     printf "        ${GREEN}✓${NC} Automatic installation via package manager\n"
@@ -642,28 +611,23 @@ check_and_prompt_git() {
     printf "        ${GREEN}✓${NC} Includes latest stable version\n"
     PROMPT_LINES=$((PROMPT_LINES + 1))
     printf "        ${GREEN}✓${NC} Zero manual configuration required\n\n"
-    PROMPT_LINES=$((PROMPT_LINES + 2))  # line + \n
+    PROMPT_LINES=$((PROMPT_LINES + 2))
     printf "        ${CYAN}❯${NC} ${BOLD}Continue with Git installation?${NC} ${GRAY}[Press Enter] or Ctrl+C to exit${NC}\n"
     PROMPT_LINES=$((PROMPT_LINES + 1))
     printf "        "
     PROMPT_LINES=$((PROMPT_LINES + 1))
     read -r response || response=""
 
-    # Run the Git setup script (skip redundant check) and capture line count from stdout
-    SETUP_LINES=$(run_setup_script "setup_git.sh" --skip-check)
+    # Run the Git setup script (skip redundant check)
+    run_setup_script "setup_git.sh" --skip-check >/dev/null
     if [ $? -eq 0 ]; then
-        # After successful installation, clear all output and show clean result
-        # Clear both prompt lines and setup script output
-        TOTAL_LINES=$((PROMPT_LINES + SETUP_LINES))
-        i=1
-        while [ $i -le "$TOTAL_LINES" ]; do
-            printf "\033[F\033[K"  # Move up and clear line
-            i=$((i + 1))
-        done
+        # Restore cursor and clear, then show summary
+        printf "\033[u"
+        printf "\033[J"
         
-        # Get the new Git version and show clean success message
         NEW_GIT_VERSION=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
         printf "  ${GREEN}✓${NC} ${BOLD}Git${NC} ${GREEN}${NEW_GIT_VERSION}${NC} installed successfully\n"
+        printf "\033[s"
     else
         printf "${RED}✗${NC} Git setup failed\n"
         exit 1
@@ -750,6 +714,7 @@ check_and_prompt_nodejs() {
         
         # Format the line to match last box alignment
         printf "\r  ${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}${NODE_VERSION_FULL}${NC} ${GRAY}and${NC} ${BOLD}npm${NC} ${GREEN}${NPM_VERSION_FULL}${NC} ${GRAY}already installed${NC}\033[K\n"
+        printf "033[s"
         return 0
     elif [ "$check_result" = "npm_old" ] || [ "$check_result" = "npm_missing" ]; then
         # Track prompt lines
@@ -776,16 +741,13 @@ check_and_prompt_nodejs() {
         read -r response || response="" || response="n"
 
         # Run the Node.js setup script and capture line count from stdout
-        SETUP_LINES=$(run_setup_script "setup_nodejs.sh")
+        run_setup_script "setup_nodejs.sh" >/dev/null
         if [ $? -eq 0 ]; then
             # After successful installation, clear all output and show clean result
             # Clear both prompt lines and setup script output
-            TOTAL_LINES=$((PROMPT_LINES + SETUP_LINES))
-            i=1
-            while [ $i -le "$TOTAL_LINES" ]; do
-                printf "\033[F\033[K"  # Move up and clear line
-                i=$((i + 1))
-            done
+            # Restore cursor and clear
+                printf "\033[u"
+                printf "\033[J"
             
             # Get the new Node.js and npm versions
             # Load nvm to get Node.js version (if installed via nvm)
@@ -797,6 +759,7 @@ check_and_prompt_nodejs() {
             NEW_NODE_VERSION=$(node --version 2>/dev/null || echo "unknown")
             NEW_NPM_VERSION=$(npm --version 2>/dev/null || echo "unknown")
             printf "  ${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}${NEW_NODE_VERSION}${NC} and ${BOLD}npm${NC} ${GREEN}${NEW_NPM_VERSION}${NC} updated successfully\n"
+                printf "033[s"
         else
             printf "${RED}✗${NC} Node.js setup failed\n"
             exit 1
@@ -829,16 +792,13 @@ check_and_prompt_nodejs() {
         read -r response || response="" || response="n"
 
         # Run the Node.js setup script and capture line count from stdout
-        SETUP_LINES=$(run_setup_script "setup_nodejs.sh")
+        run_setup_script "setup_nodejs.sh" >/dev/null
         if [ $? -eq 0 ]; then
             # After successful installation, clear all output and show clean result
             # Clear both prompt lines and setup script output
-            TOTAL_LINES=$((PROMPT_LINES + SETUP_LINES))
-            i=1
-            while [ $i -le "$TOTAL_LINES" ]; do
-                printf "\033[F\033[K"  # Move up and clear line
-                i=$((i + 1))
-            done
+            # Restore cursor and clear
+                printf "\033[u"
+                printf "\033[J"
             
             # Get the new Node.js and npm versions
             # Load nvm to get Node.js version (if installed via nvm)
@@ -850,6 +810,7 @@ check_and_prompt_nodejs() {
             NEW_NODE_VERSION=$(node --version 2>/dev/null || echo "unknown")
             NEW_NPM_VERSION=$(npm --version 2>/dev/null || echo "unknown")
             printf "  ${GREEN}✓${NC} ${BOLD}Node.js${NC} upgraded to ${GREEN}${NEW_NODE_VERSION}${NC} and ${BOLD}npm${NC} ${GREEN}${NEW_NPM_VERSION}${NC} successfully\n"
+                printf "033[s"
         else
             printf "${RED}✗${NC} Node.js setup failed\n"
             exit 1
@@ -883,16 +844,13 @@ check_and_prompt_nodejs() {
     read -r response || response=""
 
     # Run the Node.js setup script (will check if already installed) and capture line count from stdout
-    SETUP_LINES=$(run_setup_script "setup_nodejs.sh")
+    run_setup_script "setup_nodejs.sh" >/dev/null
     if [ $? -eq 0 ]; then
         # After successful installation, clear all output and show clean result
         # Clear both prompt lines and setup script output
-        TOTAL_LINES=$((PROMPT_LINES + SETUP_LINES))
-        i=1
-        while [ $i -le "$TOTAL_LINES" ]; do
-            printf "\033[F\033[K"  # Move up and clear line
-            i=$((i + 1))
-        done
+        # Restore cursor and clear
+                printf "\033[u"
+                printf "\033[J"
         
         # Load nvm to get Node.js version (if installed via nvm)
         if [ -s "$HOME/.nvm/nvm.sh" ]; then
@@ -904,6 +862,8 @@ check_and_prompt_nodejs() {
         NEW_NODE_VERSION=$(node --version 2>/dev/null || echo "unknown")
         NEW_NPM_VERSION=$(npm --version 2>/dev/null || echo "unknown")
         printf "  ${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}${NEW_NODE_VERSION}${NC} and ${BOLD}npm${NC} ${GREEN}${NEW_NPM_VERSION}${NC} installed successfully\n"
+                printf "\033[s"
+                printf "\033[s"
     else
         printf "${RED}✗${NC} Node.js setup failed\n"
         exit 1
@@ -984,6 +944,7 @@ check_and_prompt_docker() {
             DOCKER_VERSION=$(docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "installed")
         fi
 
+        printf "033[s"
         printf "\r  ${GREEN}✓${NC} ${BOLD}${DOCKER_RUNTIME}${NC} ${GREEN}${DOCKER_VERSION}${NC} ${GRAY}already installed and running${NC}\033[K\n"
         return 0
     elif [ "$check_result" = "installed" ]; then
@@ -1023,15 +984,17 @@ check_and_prompt_docker() {
         PROMPT_LINES=$((PROMPT_LINES + 1))
         read -r response || response="" || response="n"
 
-        # Run the Docker setup script to start Docker and capture line count from stdout
-        SETUP_LINES=$(run_setup_script "setup_docker.sh")
+        # Run the Docker setup script to start Docker
+        run_setup_script "setup_docker.sh" >/dev/null
         if [ $? -eq 0 ]; then
-            # After successful startup, clear all output and show clean result
-            clear_installation_output "$SETUP_LINES" "$PROMPT_LINES"
+            # After successful startup, restore cursor and show clean result
+            printf "\033[u"
+            printf "\033[J"
 
             # Get Docker version and runtime name, show clean success message
             DOCKER_VERSION=$(docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "unknown")
             printf "  ${GREEN}✓${NC} ${BOLD}${DOCKER_RUNTIME}${NC} ${GREEN}${DOCKER_VERSION}${NC} started successfully\n"
+            printf "\033[s"
         else
             printf "${RED}✗${NC} Docker startup failed\n"
             exit 1
@@ -1064,8 +1027,8 @@ check_and_prompt_docker() {
     PROMPT_LINES=$((PROMPT_LINES + 1))
     read -r response || response=""
 
-    # Run the Docker setup script - it handles everything (skip redundant check) and capture line count from stdout
-    SETUP_LINES=$(run_setup_script "setup_docker.sh")
+    # Run the Docker setup script - it handles everything
+    run_setup_script "setup_docker.sh" >/dev/null
 
     if [ $? -eq 0 ]; then
         # Add OrbStack bin to PATH immediately after installation (for docker command access)
@@ -1074,8 +1037,9 @@ check_and_prompt_docker() {
         fi
 
 
-        # After successful installation, clear all output and show clean result
-        clear_installation_output "$SETUP_LINES" "$PROMPT_LINES"
+        # After successful installation, restore cursor and show clean result
+        printf "\033[u"
+        printf "\033[J"
 
         # Detect runtime and get version
         if [ -d "/Applications/OrbStack.app" ] || command -v orb >/dev/null 2>&1; then
@@ -1091,6 +1055,7 @@ check_and_prompt_docker() {
         fi
 
         printf "  ${GREEN}✓${NC} ${BOLD}${DOCKER_RUNTIME}${NC} ${GREEN}${DOCKER_VERSION}${NC} installed and running successfully\n"
+        printf "033[s"
     else
         printf "${RED}✗${NC} Docker setup failed\n"
         exit 1
@@ -1711,6 +1676,10 @@ install_graphdone() {
     
     printf "\n"
     printf "${TEAL}────────────────────────────────────${NC}  ${CYAN}${BOLD}🔰 Dependency Checks${NC}  ${TEAL}────────────────────────────────────────${NC}\n"
+    
+    # Save cursor position right after the header - this is our "safe point"
+    # Everything below this can be cleared and rewritten without touching the header
+    printf "\033[s"
     
     # Run dependency checks BEFORE trying to download/update code
     check_and_prompt_git
