@@ -12,14 +12,20 @@
 
 set -e
 
-# Create logs directory
-LOG_DIR="$HOME/.graphdone/logs"
-mkdir -p "$LOG_DIR" 2>/dev/null || LOG_DIR="/tmp/graphdone-logs"
-mkdir -p "$LOG_DIR" 2>/dev/null || true
+# Create logs directory - prefer local logs/ folder, fallback to home directory
+if [ -d "$(pwd)/logs" ]; then
+    LOG_DIR="$(pwd)/logs"
+elif [ -w "$HOME" ]; then
+    LOG_DIR="$HOME/.graphdone/logs"
+    mkdir -p "$LOG_DIR" 2>/dev/null || true
+else
+    LOG_DIR="/tmp/graphdone-logs"
+    mkdir -p "$LOG_DIR" 2>/dev/null || true
+fi
 
-# Log file with timestamp
-INSTALL_TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-INSTALL_LOG="$LOG_DIR/install-${INSTALL_TIMESTAMP}.log"
+# Professional log file naming with timestamp
+INSTALL_TIMESTAMP=$(date +%Y-%m-%d_%H-%M-%S)
+INSTALL_LOG="$LOG_DIR/installation-${INSTALL_TIMESTAMP}.log"
 
 # Temporary files for cleanup
 TEMP_FILES=""
@@ -504,7 +510,7 @@ check_and_prompt_git() {
         fi
         
         # Run setup script silently, log to temp file
-        local log_file="$LOG_DIR/git_setup_${INSTALL_TIMESTAMP}.log"
+        local log_file="$LOG_DIR/git-setup-${INSTALL_TIMESTAMP}.log"
         run_setup_script "setup_git.sh" >"$log_file" 2>&1 &
         local setup_pid=$!
         
@@ -572,7 +578,7 @@ check_and_prompt_git() {
         # Run the Git setup script with spinner
         printf "\r  ${YELLOW}◉${NC} Upgrading Git..."
         
-        local log_file="$LOG_DIR/git_setup_${INSTALL_TIMESTAMP}.log"
+        local log_file="$LOG_DIR/git-setup-${INSTALL_TIMESTAMP}.log"
         run_setup_script "setup_git.sh" >"$log_file" 2>&1 &
         local setup_pid=$!
         
@@ -632,7 +638,7 @@ check_and_prompt_git() {
     # Run the Git setup script with spinner
     printf "\r  ${YELLOW}◉${NC} Installing Git..."
     
-    local log_file="$LOG_DIR/git_setup_${INSTALL_TIMESTAMP}.log"
+    local log_file="$LOG_DIR/git-setup-${INSTALL_TIMESTAMP}.log"
     run_setup_script "setup_git.sh" --skip-check >"$log_file" 2>&1 &
     local setup_pid=$!
     
@@ -831,7 +837,7 @@ check_and_prompt_nodejs() {
     
 
     # Run setup script silently with spinner
-    local log_file="$LOG_DIR/nodejs_setup_${INSTALL_TIMESTAMP}.log"
+    local log_file="$LOG_DIR/nodejs-setup-${INSTALL_TIMESTAMP}.log"
     run_setup_script "setup_nodejs.sh" >"$log_file" 2>&1 &
     local setup_pid=$!
     
@@ -1001,7 +1007,7 @@ check_and_prompt_docker() {
     fi
     
     # Run Docker setup script with spinner
-    local log_file="$LOG_DIR/docker_setup_${INSTALL_TIMESTAMP}.log"
+    local log_file="$LOG_DIR/docker-setup-${INSTALL_TIMESTAMP}.log"
     run_setup_script "setup_docker.sh" >"$log_file" 2>&1 &
     local setup_pid=$!
     
@@ -1686,7 +1692,6 @@ install_graphdone() {
     sleep 0.5
     
     printf "  ${GREEN}✓ All dependencies verified${NC}\n"
-    printf "  ${GRAY}Installation logs: ${NC}${LOG_DIR}${GRAY}\n"
     
     printf "\n"
     printf "${TEAL}────────────────────────────────────${NC}  ${CYAN}${BOLD}📡 Code Installation${NC}  ${TEAL}────────────────────────────────────────${NC}\n"
