@@ -12,6 +12,15 @@
 
 set -e
 
+# Create logs directory
+LOG_DIR="$HOME/.graphdone/logs"
+mkdir -p "$LOG_DIR" 2>/dev/null || LOG_DIR="/tmp/graphdone-logs"
+mkdir -p "$LOG_DIR" 2>/dev/null || true
+
+# Log file with timestamp
+INSTALL_TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+INSTALL_LOG="$LOG_DIR/install-${INSTALL_TIMESTAMP}.log"
+
 # Temporary files for cleanup
 TEMP_FILES=""
 CLEANUP_NEEDED=false
@@ -488,48 +497,61 @@ check_and_prompt_git() {
     elif [ "$check_result" = "apple_git" ]; then
 
         GIT_VERSION_OLD=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
-        printf "\r  ${YELLOW}⚠${NC} ${BOLD}Git${NC} ${YELLOW}${GIT_VERSION_OLD}${NC} ${GRAY}(Apple's bundled version)${NC}\033[K\n" " "
-
-        printf "        ${YELLOW}🟡 ${BOLD}Git Update Recommended${NC}\n"
         # Try to fetch latest version from Homebrew (macOS only)
         LATEST_GIT_VERSION=""
         if [ "$(uname)" = "Darwin" ] && command -v brew >/dev/null 2>&1; then
             LATEST_GIT_VERSION=$(brew info git 2>/dev/null | head -n 1 | sed 's/.*stable \([0-9.]*\).*/\1/' || echo "")
         fi
-        if [ -n "$LATEST_GIT_VERSION" ]; then
-            printf "        ${GRAY}Apple's bundled Git is outdated. Latest version is ${BOLD}${LATEST_GIT_VERSION}${NC}${GRAY}.${NC}\n\n"
-        else
-            printf "        ${GRAY}Apple's bundled Git is typically outdated. Homebrew provides the latest version.${NC}\n\n"
-        fi
-
-        printf "        ${GREEN}✓${NC} Install latest Git via Homebrew\n"
-        printf "        ${GREEN}✓${NC} Get the newest features and performance improvements\n"
-        printf "        ${GREEN}✓${NC} Better compatibility with modern repositories\n"
-        printf "        ${GREEN}✓${NC} Zero manual configuration required\n\n"
-        printf "        ${CYAN}❯${NC} ${BOLD}Upgrade to latest Git?${NC} ${GRAY}[Press Enter] or Ctrl+C to exit${NC}\n"
-        printf "        "
-        read -r response || response="" || response="n"
-
-        if [ "$response" != "n" ] && [ "$response" != "N" ]; then
-            # Run the Git setup script (output goes to stderr, user sees all progress)
-            run_setup_script "setup_git.sh" >/dev/null
-            if [ $? -eq 0 ]; then
-                # Success! Now collapse all the verbose output
-                # Restore cursor to saved position (right after the header)
-                # Clear from cursor to end of screen
-                
-                # Print clean summary line
-                NEW_GIT_VERSION=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
-                printf "  ${GREEN}✓${NC} ${BOLD}Git${NC} upgraded to ${GREEN}${NEW_GIT_VERSION}${NC} successfully\n"
-                
-                # Save cursor position again for the next check
+        
+        # Run setup script silently, log to temp file
+        local log_file="$LOG_DIR/git_setup_${INSTALL_TIMESTAMP}.log"
+        run_setup_script "setup_git.sh" >"$log_file" 2>&1 &
+        local setup_pid=$!
+        
+        # Spinner while installing
+        local i=0
+        local spin_char=""
+        while kill -0 $setup_pid 2>/dev/null; do
+            case $((i % 10)) in
+                0) spin_char='⠋' ;;
+                1) spin_char='⠙' ;;
+                2) spin_char='⠹' ;;
+                3) spin_char='⠸' ;;
+                4) spin_char='⠼' ;;
+                5) spin_char='⠴' ;;
+                6) spin_char='⠦' ;;
+                7) spin_char='⠧' ;;
+                8) spin_char='⠇' ;;
+                9) spin_char='⠏' ;;
+            esac
+            if [ -n "$LATEST_GIT_VERSION" ]; then
+                printf "\r  ${YELLOW}⚠${NC} ${BOLD}Git${NC} ${YELLOW}${GIT_VERSION_OLD}${NC} ${GRAY}outdated, upgrading to ${GREEN}${LATEST_GIT_VERSION}${NC} ${BOLD}${CYAN}%s${NC}\033[K" "$spin_char"
             else
-                printf "${RED}✗${NC} Git setup failed\n"
-                printf "${CYAN}ℹ${NC} Continuing with Apple Git\n"
+                printf "\r  ${YELLOW}⚠${NC} ${BOLD}Git${NC} ${YELLOW}${GIT_VERSION_OLD}${NC} ${GRAY}outdated, upgrading${NC} ${BOLD}${CYAN}%s${NC}\033[K" "$spin_char"
             fi
+            i=$((i + 1))
+            sleep 0.15
+        done
+        
+        # Get result
+        wait $setup_pid
+        local result=$?
+        
+        # Clear line and show result
+        printf "\r\033[K"
+        
+        if [ $result -eq 0 ]; then
+            # Log saved to: $log_file
+            NEW_GIT_VERSION=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
+            printf "  ${GREEN}✓${NC} ${BOLD}Git${NC} upgraded to ${GREEN}${NEW_GIT_VERSION}${NC} successfully\n"
         else
-            # User skipped - restore cursor and show clean summary
-            printf "  ${GREEN}✓${NC} ${BOLD}Git${NC} ${GREEN}${GIT_VERSION_OLD}${NC} ${GRAY}ready${NC}\n"
+            printf "${RED}✗${NC} Git setup failed\n"
+            if [ -f "$log_file" ]; then
+                printf "\n${BOLD}Last 15 lines from log:${NC}\n"
+                tail -15 "$log_file"
+                # Log saved to: $log_file
+            fi
+            printf "${CYAN}ℹ${NC} Continuing with Apple Git\n"
         fi
         return 0
     elif [ "$check_result" = "outdated" ]; then
@@ -547,15 +569,48 @@ check_and_prompt_git() {
         printf "        "
         read -r response || response="" || response="n"
 
-        # Run the Git setup script
-        run_setup_script "setup_git.sh" >/dev/null
-        if [ $? -eq 0 ]; then
-            # Restore cursor and clear, then show summary
-            
+        # Run the Git setup script with spinner
+        printf "\r  ${YELLOW}◉${NC} Upgrading Git..."
+        
+        local log_file="$LOG_DIR/git_setup_${INSTALL_TIMESTAMP}.log"
+        run_setup_script "setup_git.sh" >"$log_file" 2>&1 &
+        local setup_pid=$!
+        
+        local i=0
+        local spin_char=""
+        while kill -0 $setup_pid 2>/dev/null; do
+            case $((i % 10)) in
+                0) spin_char='⠋' ;;
+                1) spin_char='⠙' ;;
+                2) spin_char='⠹' ;;
+                3) spin_char='⠸' ;;
+                4) spin_char='⠼' ;;
+                5) spin_char='⠴' ;;
+                6) spin_char='⠦' ;;
+                7) spin_char='⠧' ;;
+                8) spin_char='⠇' ;;
+                9) spin_char='⠏' ;;
+            esac
+            printf "\r  ${YELLOW}◉${NC} Upgrading Git ${BOLD}${CYAN}%s${NC}" "$spin_char"
+            i=$((i + 1))
+            sleep 0.15
+        done
+        
+        wait $setup_pid
+        local result=$?
+        printf "\r\033[K"
+        
+        if [ $result -eq 0 ]; then
+            # Log saved to: $log_file
             NEW_GIT_VERSION=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
             printf "  ${GREEN}✓${NC} ${BOLD}Git${NC} upgraded to ${GREEN}${NEW_GIT_VERSION}${NC} successfully\n"
         else
             printf "${RED}✗${NC} Git setup failed\n"
+            if [ -f "$log_file" ]; then
+                printf "\n${BOLD}Last 15 lines from log:${NC}\n"
+                tail -15 "$log_file"
+                # Log saved to: $log_file
+            fi
             exit 1
         fi
         return 0
@@ -574,15 +629,48 @@ check_and_prompt_git() {
     printf "        "
     read -r response || response=""
 
-    # Run the Git setup script (skip redundant check)
-    run_setup_script "setup_git.sh" --skip-check >/dev/null
-    if [ $? -eq 0 ]; then
-        # Restore cursor and clear, then show summary
-        
+    # Run the Git setup script with spinner
+    printf "\r  ${YELLOW}◉${NC} Installing Git..."
+    
+    local log_file="$LOG_DIR/git_setup_${INSTALL_TIMESTAMP}.log"
+    run_setup_script "setup_git.sh" --skip-check >"$log_file" 2>&1 &
+    local setup_pid=$!
+    
+    local i=0
+    local spin_char=""
+    while kill -0 $setup_pid 2>/dev/null; do
+        case $((i % 10)) in
+            0) spin_char='⠋' ;;
+            1) spin_char='⠙' ;;
+            2) spin_char='⠹' ;;
+            3) spin_char='⠸' ;;
+            4) spin_char='⠼' ;;
+            5) spin_char='⠴' ;;
+            6) spin_char='⠦' ;;
+            7) spin_char='⠧' ;;
+            8) spin_char='⠇' ;;
+            9) spin_char='⠏' ;;
+        esac
+        printf "\r  ${YELLOW}◉${NC} Installing Git ${BOLD}${CYAN}%s${NC}" "$spin_char"
+        i=$((i + 1))
+        sleep 0.15
+    done
+    
+    wait $setup_pid
+    local result=$?
+    printf "\r\033[K"
+    
+    if [ $result -eq 0 ]; then
+        # Log saved to: $log_file
         NEW_GIT_VERSION=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
         printf "  ${GREEN}✓${NC} ${BOLD}Git${NC} ${GREEN}${NEW_GIT_VERSION}${NC} installed successfully\n"
     else
         printf "${RED}✗${NC} Git setup failed\n"
+        if [ -f "$log_file" ]; then
+            printf "\n${BOLD}Last 15 lines from log:${NC}\n"
+            tail -15 "$log_file"
+            # Log saved to: $log_file
+        fi
         exit 1
     fi
     
@@ -742,23 +830,38 @@ check_and_prompt_nodejs() {
     fi
     
 
-    printf "\r  ${YELLOW}⚠${NC} ${BOLD}Node.js${NC} ${GRAY}not installed${NC}\033[K\n" " "
-    printf "\n"
-    printf "        ${YELLOW}🟡 ${BOLD}Node.js Setup Required${NC}\n"
-    printf "        ${GRAY}GraphDone requires Node.js >= 18.0.0 and npm >= 9.0.0 for development.${NC}\n\n"
-    printf "        ${GREEN}✓${NC} We'll use the dedicated Node.js setup script for your platform\n"
-    printf "        ${GREEN}✓${NC} Automatic installation of latest version\n"
-    printf "        ${GREEN}✓${NC} Includes npm package manager automatically\n"
-    printf "        ${GREEN}✓${NC} Zero manual configuration required\n\n"
-    printf "        ${CYAN}❯${NC} ${BOLD}Continue with Node.js installation?${NC} ${GRAY}[Press Enter] or Ctrl+C to exit${NC}\n"
-    printf "        "
-    read -r response || response=""
-
-    run_setup_script "setup_nodejs.sh" >/dev/null
-    if [ $? -eq 0 ]; then
-        # After successful installation, clear all output and show clean result
-        # Clear both prompt lines and setup script output
-        # Restore cursor and clear
+    # Run setup script silently with spinner
+    local log_file="$LOG_DIR/nodejs_setup_${INSTALL_TIMESTAMP}.log"
+    run_setup_script "setup_nodejs.sh" >"$log_file" 2>&1 &
+    local setup_pid=$!
+    
+    # Spinner while installing
+    local i=0
+    local spin_char=""
+    while kill -0 $setup_pid 2>/dev/null; do
+        case $((i % 10)) in
+            0) spin_char='⠋' ;;
+            1) spin_char='⠙' ;;
+            2) spin_char='⠹' ;;
+            3) spin_char='⠸' ;;
+            4) spin_char='⠼' ;;
+            5) spin_char='⠴' ;;
+            6) spin_char='⠦' ;;
+            7) spin_char='⠧' ;;
+            8) spin_char='⠇' ;;
+            9) spin_char='⠏' ;;
+        esac
+        printf "\r  ${YELLOW}⚠${NC} ${BOLD}Node.js${NC} ${GRAY}not installed, installing latest version${NC} ${BOLD}${CYAN}%s${NC}\033[K" "$spin_char"
+        i=$((i + 1))
+        sleep 0.15
+    done
+    
+    wait $setup_pid
+    local result=$?
+    printf "\r\033[K"
+    
+    if [ $result -eq 0 ]; then
+        # Log saved to: $log_file
         
         # Load nvm to get Node.js version (if installed via nvm)
         if [ -s "$HOME/.nvm/nvm.sh" ]; then
@@ -766,12 +869,16 @@ check_and_prompt_nodejs() {
             . "$NVM_DIR/nvm.sh" 2>/dev/null
         fi
         
-        # Get the new Node.js and npm versions
         NEW_NODE_VERSION=$(node --version 2>/dev/null || echo "unknown")
         NEW_NPM_VERSION=$(npm --version 2>/dev/null || echo "unknown")
         printf "  ${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}${NEW_NODE_VERSION}${NC} and ${BOLD}npm${NC} ${GREEN}${NEW_NPM_VERSION}${NC} installed successfully\n"
     else
         printf "${RED}✗${NC} Node.js setup failed\n"
+        if [ -f "$log_file" ]; then
+            printf "\n${BOLD}Last 15 lines from log:${NC}\n"
+            tail -15 "$log_file"
+            # Log saved to: $log_file
+        fi
         exit 1
     fi
     
@@ -893,38 +1000,48 @@ check_and_prompt_docker() {
         return 0
     fi
     
-    printf "\r  ${YELLOW}⚠${NC} ${BOLD}Docker${NC} ${GRAY}not installed${NC}\033[K\n" " "
-    printf "\n"
-    printf "        ${YELLOW}🟡 ${BOLD}Docker Setup Required${NC}\n"
-    printf "        ${GRAY}GraphDone uses Docker containers for Neo4j database and Redis cache.${NC}\n\n"
-    printf "        ${GREEN}✓${NC} We'll use the dedicated Docker setup script for your platform\n"
-    printf "        ${GREEN}✓${NC} Automatic installation and configuration\n"
-    printf "        ${GREEN}✓${NC} Proper permissions and service setup\n"
-    printf "        ${GREEN}✓${NC} Zero manual configuration, automatic setup\n\n"
-    printf "        ${CYAN}❯${NC} ${BOLD}Continue with Docker installation?${NC} ${GRAY}[Press Enter] or Ctrl+C to exit${NC}\n"
-    printf "        "
-    read -r response || response=""
+    # Run Docker setup script with spinner
+    local log_file="$LOG_DIR/docker_setup_${INSTALL_TIMESTAMP}.log"
+    run_setup_script "setup_docker.sh" >"$log_file" 2>&1 &
+    local setup_pid=$!
+    
+    # Spinner while installing
+    local i=0
+    local spin_char=""
+    while kill -0 $setup_pid 2>/dev/null; do
+        case $((i % 10)) in
+            0) spin_char='⠋' ;;
+            1) spin_char='⠙' ;;
+            2) spin_char='⠹' ;;
+            3) spin_char='⠸' ;;
+            4) spin_char='⠼' ;;
+            5) spin_char='⠴' ;;
+            6) spin_char='⠦' ;;
+            7) spin_char='⠧' ;;
+            8) spin_char='⠇' ;;
+            9) spin_char='⠏' ;;
+        esac
+        printf "\r  ${YELLOW}⚠${NC} ${BOLD}Docker${NC} ${GRAY}not installed, installing OrbStack Docker${NC} ${BOLD}${CYAN}%s${NC}\033[K" "$spin_char"
+        i=$((i + 1))
+        sleep 0.15
+    done
+    
+    wait $setup_pid
+    local result=$?
+    printf "\r\033[K"
 
-    # Run the Docker setup script - it handles everything
-    run_setup_script "setup_docker.sh" >/dev/null
-
-    if [ $? -eq 0 ]; then
-        # Add OrbStack bin to PATH immediately after installation (for docker command access)
+    if [ $result -eq 0 ]; then
+        # Log saved to: $log_file
+        
+        # Add OrbStack bin to PATH immediately after installation
         if [ -d "$HOME/.orbstack/bin" ]; then
             export PATH="$HOME/.orbstack/bin:$PATH"
         fi
-
-
-        # After successful installation, restore cursor and show clean result
 
         # Detect runtime and get version
         if [ -d "/Applications/OrbStack.app" ] || command -v orb >/dev/null 2>&1; then
             DOCKER_RUNTIME="OrbStack Docker"
             DOCKER_VERSION=$(orb version 2>/dev/null | grep "Version:" | cut -d' ' -f2 || docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "installed")
-        # DISABLED: Docker Desktop support
-        # elif [ -d "/Applications/Docker.app" ]; then
-        #     DOCKER_RUNTIME="Docker Desktop"
-        #     DOCKER_VERSION=$(docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "installed")
         else
             DOCKER_RUNTIME="Docker"
             DOCKER_VERSION=$(docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "installed")
@@ -933,6 +1050,11 @@ check_and_prompt_docker() {
         printf "  ${GREEN}✓${NC} ${BOLD}${DOCKER_RUNTIME}${NC} ${GREEN}${DOCKER_VERSION}${NC} installed and running successfully\n"
     else
         printf "${RED}✗${NC} Docker setup failed\n"
+        if [ -f "$log_file" ]; then
+            printf "\n${BOLD}Last 15 lines from log:${NC}\n"
+            tail -15 "$log_file"
+            # Log saved to: $log_file
+        fi
         exit 1
     fi
     
@@ -1564,6 +1686,7 @@ install_graphdone() {
     sleep 0.5
     
     printf "  ${GREEN}✓ All dependencies verified${NC}\n"
+    printf "  ${GRAY}Installation logs: ${NC}${LOG_DIR}${GRAY}\n"
     
     printf "\n"
     printf "${TEAL}────────────────────────────────────${NC}  ${CYAN}${BOLD}📡 Code Installation${NC}  ${TEAL}────────────────────────────────────────${NC}\n"
