@@ -115,6 +115,8 @@ if [ -t 2 ]; then
         BLUE='\033[38;5;33m'
         GRAY='\033[38;5;244m'
         RED='\033[38;5;196m'
+        CADETBLUE='\033[38;5;73m'
+        DARKSEAGREEN='\033[38;5;108m'
     else
         # Fallback to basic ANSI
         CYAN='\033[0;36m'
@@ -124,12 +126,14 @@ if [ -t 2 ]; then
         BLUE='\033[0;34m'
         GRAY='\033[0;90m'
         RED='\033[0;31m'
+        CADETBLUE='\033[0;36m'
+        DARKSEAGREEN='\033[0;32m'
     fi
     BOLD='\033[1m'
     DIM='\033[2m'
     NC='\033[0m'
 else
-    CYAN='' GREEN='' YELLOW='' PURPLE='' BLUE='' GRAY='' RED='' BOLD='' DIM='' NC=''
+    CYAN='' GREEN='' YELLOW='' PURPLE='' BLUE='' GRAY='' RED='' CADETBLUE='' DARKSEAGREEN='' BOLD='' DIM='' NC=''
 fi
 
 # Clean, minimal functions
@@ -419,7 +423,8 @@ get_macos_info() {
         local major=$(echo "$MACOS_VERSION" | cut -d. -f1)
         local minor=$(echo "$MACOS_VERSION" | cut -d. -f2)
 
-        # Docker Desktop requires macOS 10.15 (Catalina) or later
+        # DISABLED: Docker Desktop system requirement check
+        # # Docker Desktop requires macOS 10.15 (Catalina) or later
         # macOS 11+ uses single version number (Big Sur onwards)
         if [ "$major" -ge 11 ]; then
             # macOS 11 Big Sur or later - fully supported
@@ -500,10 +505,7 @@ check_and_prompt_git() {
         GIT_VERSION_FULL=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
         
         # Format the line to match last box alignment
-        local git_display="${GREEN}✓${NC} ${BOLD}Git${NC} ${GREEN}${GIT_VERSION_FULL}${NC} ${GRAY}already installed${NC}"
-        local git_plain="✓ Git ${GIT_VERSION_FULL} already installed"
-        local padding=$((88 - ${#git_plain}))
-        printf "\r  ${git_display}%*s\n" $padding ""
+        printf "\r  ${GREEN}✓${NC} ${BOLD}Git${NC} ${GREEN}${GIT_VERSION_FULL}${NC} ${GRAY}already installed${NC}\033[K\n"
         return 0
     elif [ "$check_result" = "apple_git" ]; then
         # Track prompt lines
@@ -557,10 +559,7 @@ check_and_prompt_git() {
                 
                 # Get the new Git version and show clean success message
                 NEW_GIT_VERSION=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
-                local git_success="${GREEN}✓${NC} ${BOLD}Git${NC} upgraded to ${GREEN}${NEW_GIT_VERSION}${NC} successfully"
-                local git_success_plain="✓ Git upgraded to ${NEW_GIT_VERSION} successfully"
-                local padding=$((88 - ${#git_success_plain}))
-                printf "  ${git_success}%*s\n" $padding ""
+                printf "  ${GREEN}✓${NC} ${BOLD}Git${NC} upgraded to ${GREEN}${NEW_GIT_VERSION}${NC} successfully\n"
             else
                 printf "${RED}✗${NC} Git setup failed\n"
                 printf "${CYAN}ℹ${NC} Continuing with Apple Git\n"
@@ -574,10 +573,7 @@ check_and_prompt_git() {
             done
 
             # Show clean summary line
-            local git_info="${GREEN}✓${NC} ${BOLD}Git${NC} ${GREEN}${GIT_VERSION_OLD}${NC} ${GRAY}ready${NC}"
-            local git_plain="✓ Git ${GIT_VERSION_OLD} ready"
-            local padding=$((88 - ${#git_plain}))
-            printf "  ${git_info}%*s\n" $padding ""
+            printf "  ${GREEN}✓${NC} ${BOLD}Git${NC} ${GREEN}${GIT_VERSION_OLD}${NC} ${GRAY}ready${NC}\n"
         fi
         return 0
     elif [ "$check_result" = "outdated" ]; then
@@ -620,10 +616,7 @@ check_and_prompt_git() {
 
             # Get the new Git version and show clean success message
             NEW_GIT_VERSION=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
-            local git_success="${GREEN}✓${NC} ${BOLD}Git${NC} upgraded to ${GREEN}${NEW_GIT_VERSION}${NC} successfully"
-            local git_success_plain="✓ Git upgraded to ${NEW_GIT_VERSION} successfully"
-            local padding=$((88 - ${#git_success_plain}))
-            printf "  ${git_success}%*s\n" $padding ""
+            printf "  ${GREEN}✓${NC} ${BOLD}Git${NC} upgraded to ${GREEN}${NEW_GIT_VERSION}${NC} successfully\n"
         else
             printf "${RED}✗${NC} Git setup failed\n"
             exit 1
@@ -670,11 +663,7 @@ check_and_prompt_git() {
         
         # Get the new Git version and show clean success message
         NEW_GIT_VERSION=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
-        local git_success="${GREEN}✓${NC} ${BOLD}Git${NC} ${GREEN}${NEW_GIT_VERSION}${NC} installed successfully"
-        local git_success_plain="✓ Git ${NEW_GIT_VERSION} installed successfully"
-        
-        # Display aligned with other dependency checks (2 spaces indent)
-        printf "  %b\n" "$git_success"
+        printf "  ${GREEN}✓${NC} ${BOLD}Git${NC} ${GREEN}${NEW_GIT_VERSION}${NC} installed successfully\n"
     else
         printf "${RED}✗${NC} Git setup failed\n"
         exit 1
@@ -760,10 +749,7 @@ check_and_prompt_nodejs() {
         NPM_VERSION_FULL=$(npm --version 2>/dev/null || echo "unknown")
         
         # Format the line to match last box alignment
-        local node_display="${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}${NODE_VERSION_FULL}${NC} ${GRAY}and${NC} ${BOLD}npm${NC} ${GREEN}${NPM_VERSION_FULL}${NC} ${GRAY}already installed${NC}"
-        local node_plain="✓ Node.js ${NODE_VERSION_FULL} and npm ${NPM_VERSION_FULL} already installed"
-        local padding=$((88 - ${#node_plain}))
-        printf "\r  ${node_display}%*s\n" $padding ""
+        printf "\r  ${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}${NODE_VERSION_FULL}${NC} ${GRAY}and${NC} ${BOLD}npm${NC} ${GREEN}${NPM_VERSION_FULL}${NC} ${GRAY}already installed${NC}\033[K\n"
         return 0
     elif [ "$check_result" = "npm_old" ] || [ "$check_result" = "npm_missing" ]; then
         # Track prompt lines
@@ -810,10 +796,7 @@ check_and_prompt_nodejs() {
 
             NEW_NODE_VERSION=$(node --version 2>/dev/null || echo "unknown")
             NEW_NPM_VERSION=$(npm --version 2>/dev/null || echo "unknown")
-            local node_success="${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}${NEW_NODE_VERSION}${NC} and ${BOLD}npm${NC} ${GREEN}${NEW_NPM_VERSION}${NC} updated successfully"
-            local node_success_plain="✓ Node.js ${NEW_NODE_VERSION} and npm ${NEW_NPM_VERSION} updated successfully"
-            local padding=$((88 - ${#node_success_plain}))
-            printf "  ${node_success}%*s\n" $padding ""
+            printf "  ${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}${NEW_NODE_VERSION}${NC} and ${BOLD}npm${NC} ${GREEN}${NEW_NPM_VERSION}${NC} updated successfully\n"
         else
             printf "${RED}✗${NC} Node.js setup failed\n"
             exit 1
@@ -866,10 +849,7 @@ check_and_prompt_nodejs() {
 
             NEW_NODE_VERSION=$(node --version 2>/dev/null || echo "unknown")
             NEW_NPM_VERSION=$(npm --version 2>/dev/null || echo "unknown")
-            local node_success="${GREEN}✓${NC} ${BOLD}Node.js${NC} upgraded to ${GREEN}${NEW_NODE_VERSION}${NC} and ${BOLD}npm${NC} ${GREEN}${NEW_NPM_VERSION}${NC} successfully"
-            local node_success_plain="✓ Node.js upgraded to ${NEW_NODE_VERSION} and npm ${NEW_NPM_VERSION} successfully"
-            local padding=$((88 - ${#node_success_plain}))
-            printf "  ${node_success}%*s\n" $padding ""
+            printf "  ${GREEN}✓${NC} ${BOLD}Node.js${NC} upgraded to ${GREEN}${NEW_NODE_VERSION}${NC} and ${BOLD}npm${NC} ${GREEN}${NEW_NPM_VERSION}${NC} successfully\n"
         else
             printf "${RED}✗${NC} Node.js setup failed\n"
             exit 1
@@ -923,10 +903,7 @@ check_and_prompt_nodejs() {
         # Get the new Node.js and npm versions
         NEW_NODE_VERSION=$(node --version 2>/dev/null || echo "unknown")
         NEW_NPM_VERSION=$(npm --version 2>/dev/null || echo "unknown")
-        local node_success="${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}${NEW_NODE_VERSION}${NC} and ${BOLD}npm${NC} ${GREEN}${NEW_NPM_VERSION}${NC} installed successfully"
-        local node_success_plain="✓ Node.js ${NEW_NODE_VERSION} and npm ${NEW_NPM_VERSION} installed successfully"
-        local padding=$((88 - ${#node_success_plain}))
-        printf "  ${node_success}%*s\n" $padding ""
+        printf "  ${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}${NEW_NODE_VERSION}${NC} and ${BOLD}npm${NC} ${GREEN}${NEW_NPM_VERSION}${NC} installed successfully\n"
     else
         printf "${RED}✗${NC} Node.js setup failed\n"
         exit 1
@@ -966,15 +943,13 @@ check_and_prompt_docker() {
         if [ $cycle -eq 6 ]; then
             dots_display="$dots_display ${CYAN}●${NC}"
             # Perform the check on final cycle - check if Docker is installed AND running
-            # First check for OrbStack Docker (which provides Docker)
-            if command -v orbstack >/dev/null 2>&1 || [ -d "/Applications/OrbStack.app" ]; then
-                check_result="running"  # OrbStack Docker is running (provides Docker)
+            # Verify Docker daemon is actually running by testing connectivity
+            if docker info >/dev/null 2>&1; then
+                check_result="running"  # Docker daemon is responsive
             elif command -v docker >/dev/null 2>&1; then
-                if docker info >/dev/null 2>&1; then
-                    check_result="running"  # Docker is installed and running
-                else
-                    check_result="installed"  # Docker is installed but not running
-                fi
+                check_result="installed"  # Docker is installed but not running
+            elif command -v orbstack >/dev/null 2>&1 || [ -d "/Applications/OrbStack.app" ]; then
+                check_result="installed"  # OrbStack installed but daemon not responding
             else
                 check_result="missing"  # Docker not installed
             fi
@@ -998,17 +973,18 @@ check_and_prompt_docker() {
 
         # Detect which Docker runtime is installed
         if [ -d "/Applications/OrbStack.app" ] || command -v orb >/dev/null 2>&1; then
-            DOCKER_RUNTIME="OrbStack"
+            DOCKER_RUNTIME="OrbStack Docker"
             DOCKER_VERSION=$(orb version 2>/dev/null | grep "Version:" | cut -d' ' -f2 || docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "installed")
-        elif [ -d "/Applications/Docker.app" ]; then
-            DOCKER_RUNTIME="Docker Desktop"
-            DOCKER_VERSION=$(docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "installed")
+        # DISABLED: Docker Desktop support
+        # elif [ -d "/Applications/Docker.app" ]; then
+        #     DOCKER_RUNTIME="Docker Desktop"
+        #     DOCKER_VERSION=$(docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "installed")
         else
-            DOCKER_RUNTIME="Docker"
+            DOCKER_RUNTIME="OrbStack Docker"
             DOCKER_VERSION=$(docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "installed")
         fi
 
-        printf "\r  ${GREEN}✓${NC} ${BOLD}${DOCKER_RUNTIME}${NC} ${GREEN}${DOCKER_VERSION}${NC} ${GRAY}already installed and running${NC}\n"
+        printf "\r  ${GREEN}✓${NC} ${BOLD}${DOCKER_RUNTIME}${NC} ${GREEN}${DOCKER_VERSION}${NC} ${GRAY}already installed and running${NC}\033[K\n"
         return 0
     elif [ "$check_result" = "installed" ]; then
         # Docker installed but not running - start it
@@ -1018,9 +994,10 @@ check_and_prompt_docker() {
         # Detect which Docker runtime is installed
         DOCKER_VERSION=$(docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "unknown")
         if [ -d "/Applications/OrbStack.app" ] || command -v orbstack >/dev/null 2>&1; then
-            DOCKER_RUNTIME="OrbStack"
-        elif [ -d "/Applications/Docker.app" ]; then
-            DOCKER_RUNTIME="Docker Desktop"
+            DOCKER_RUNTIME="OrbStack Docker"
+        # DISABLED: Docker Desktop support
+        # elif [ -d "/Applications/Docker.app" ]; then
+        #     DOCKER_RUNTIME="Docker Desktop"
         else
             DOCKER_RUNTIME="Docker"
         fi
@@ -1065,7 +1042,7 @@ check_and_prompt_docker() {
     # Track prompt lines
     PROMPT_LINES=0
 
-    printf "\r  ${YELLOW}⚠${NC} ${BOLD}Docker${NC} ${GRAY}not installed${NC}\n"
+    printf "\r  ${YELLOW}⚠${NC} ${BOLD}Docker${NC} ${GRAY}not installed${NC}%-40s\n" " "
     PROMPT_LINES=$((PROMPT_LINES + 1))
     printf "\n"
     PROMPT_LINES=$((PROMPT_LINES + 1))
@@ -1089,6 +1066,7 @@ check_and_prompt_docker() {
 
     # Run the Docker setup script - it handles everything (skip redundant check) and capture line count from stdout
     SETUP_LINES=$(run_setup_script "setup_docker.sh")
+
     if [ $? -eq 0 ]; then
         # Add OrbStack bin to PATH immediately after installation (for docker command access)
         if [ -d "$HOME/.orbstack/bin" ]; then
@@ -1101,20 +1079,18 @@ check_and_prompt_docker() {
 
         # Detect runtime and get version
         if [ -d "/Applications/OrbStack.app" ] || command -v orb >/dev/null 2>&1; then
-            DOCKER_RUNTIME="OrbStack"
+            DOCKER_RUNTIME="OrbStack Docker"
             DOCKER_VERSION=$(orb version 2>/dev/null | grep "Version:" | cut -d' ' -f2 || docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "installed")
-        elif [ -d "/Applications/Docker.app" ]; then
-            DOCKER_RUNTIME="Docker Desktop"
-            DOCKER_VERSION=$(docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "installed")
+        # DISABLED: Docker Desktop support
+        # elif [ -d "/Applications/Docker.app" ]; then
+        #     DOCKER_RUNTIME="Docker Desktop"
+        #     DOCKER_VERSION=$(docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "installed")
         else
             DOCKER_RUNTIME="Docker"
             DOCKER_VERSION=$(docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "installed")
         fi
 
-        local docker_success="${GREEN}✓${NC} ${BOLD}${DOCKER_RUNTIME}${NC} ${GREEN}${DOCKER_VERSION}${NC} installed and running successfully"
-        local docker_success_plain="✓ ${DOCKER_RUNTIME} ${DOCKER_VERSION} installed and running successfully"
-        local padding=$((88 - ${#docker_success_plain}))
-        printf "  ${docker_success}%*s\n" $padding ""
+        printf "  ${GREEN}✓${NC} ${BOLD}${DOCKER_RUNTIME}${NC} ${GREEN}${DOCKER_VERSION}${NC} installed and running successfully\n"
     else
         printf "${RED}✗${NC} Docker setup failed\n"
         exit 1
@@ -1468,7 +1444,7 @@ install_graphdone() {
     printf "${TEAL}║                                                                                                  ║${NC}\n"; sleep 0.03
     printf "${TEAL}║${LIGHTCYAN}                          Built with ♥ ${YELLOW}for${LIGHTCYAN} teams ${ORANGE}who${LIGHTCYAN} think differently.                           ${TEAL}║${NC}\n"; sleep 0.05
     printf "${TEAL}║                                                                                                  ║${NC}\n"; sleep 0.03
-    printf "${TEAL}║${NC}                                                                            ${GRAY}Version: ${GRAPHDONE_VERSION}${NC} ${TEAL}║${NC}\n"; sleep 0.03
+    printf "${TEAL}║${NC}                                                                            ${DARKSEAGREEN}Version: ${CADETBLUE}${GRAPHDONE_VERSION}${NC} ${TEAL}║${NC}\n"; sleep 0.03
     printf "${TEAL}╚══════════════════════════════════════════════════════════════════════════════════════════════════╝${NC}\n\n"
     
     # Platform detection
@@ -1706,7 +1682,8 @@ install_graphdone() {
     if [ "$MACOS_COMPATIBLE" = "no" ]; then
         printf "\n"
         printf "${YELLOW}⚠${NC}  ${BOLD}Compatibility Warning${NC}\n"
-        printf "  ${GRAY}Docker Desktop requires macOS 10.15 (Catalina) or later${NC}\n"
+        # DISABLED: Docker Desktop support
+        # printf "  ${GRAY}Docker Desktop requires macOS 10.15 (Catalina) or later${NC}\n"
         printf "  ${GRAY}Your version (${BOLD}${MACOS_VERSION}${NC}${GRAY}) may not be fully supported${NC}\n"
         printf "\n"
         printf "  ${CYAN}ℹ${NC} Continue installation anyway? ${GRAY}[y/N]${NC} "
@@ -2168,7 +2145,8 @@ EOF
         if [ $attempts -ge $max_attempts ]; then
             printf "\r\033[K"
             printf "  ${RED}⚠${NC} Docker daemon not responding after 2 minutes\n"
-            printf "  ${YELLOW}⚠${NC} Please ensure Docker Desktop/OrbStack Docker is running and try again\n"
+            # DISABLED: Docker Desktop support
+            printf "  ${YELLOW}⚠${NC} Please ensure OrbStack Docker is running and try again\n"
             exit 1
         fi
     fi

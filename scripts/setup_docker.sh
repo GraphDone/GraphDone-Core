@@ -1,7 +1,7 @@
 #!/bin/sh
 # GraphDone Docker Setup Script (POSIX-compatible)
 # Linux: Docker Engine via official repository
-# macOS: OrbStack Docker (recommended) or Docker Desktop - user choice
+# macOS: OrbStack Docker (recommended)
 
 set -eu
 
@@ -199,36 +199,39 @@ install_docker_macos() {
         return 1
     fi
 
-    # Check if OrbStack Docker or Docker Desktop already installed
+    # Check if OrbStack Docker already installed
     if command -v orbstack >/dev/null 2>&1 || [ -d "/Applications/OrbStack.app" ]; then
         printf "        ${GREEN}✓${NC} OrbStack Docker already installed\n" >&2
         OUTPUT_LINES=$((OUTPUT_LINES + 1))
         start_orbstack
         return $?
-    elif [ -d "/Applications/Docker.app" ]; then
-        printf "        ${GREEN}✓${NC} Docker Desktop already installed\n" >&2
-        OUTPUT_LINES=$((OUTPUT_LINES + 1))
-        start_docker_desktop
-        return $?
     fi
 
-    # Check if running in non-interactive mode (e.g., curl | sh)
-    if [ ! -t 0 ]; then
-        # Non-interactive: auto-select OrbStack
-        printf "        ${BLUE}◉${NC} Installing ${BOLD}OrbStack Docker${NC} ${GRAY}(recommended)${NC}\n" >&2
-        OUTPUT_LINES=$((OUTPUT_LINES + 1))
-        install_orbstack
-        return $?
-    fi
+    # DISABLED: Docker Desktop support
+    # elif [ -d "/Applications/Docker.app" ]; then
+    #     printf "        ${GREEN}✓${NC} Docker Desktop already installed\n" >&2
+    #     OUTPUT_LINES=$((OUTPUT_LINES + 1))
+    #     start_docker_desktop
+    #     return $?
+    # fi
 
-    # Interactive mode: show info and simple yes/no prompt
+    # DISABLED: Non-interactive mode check - always show interactive prompt
+    # if [ ! -t 0 ]; then
+    #     # Non-interactive: auto-select OrbStack
+    #     printf "        ${BLUE}◉${NC} Installing ${BOLD}OrbStack Docker${NC} ${GRAY}(recommended)${NC}\n" >&2
+    #     OUTPUT_LINES=$((OUTPUT_LINES + 1))
+    #     install_orbstack
+    #     return $?
+    # fi
+
+    # Display OrbStack Docker information with feature highlights
     printf "\n" >&2
     OUTPUT_LINES=$((OUTPUT_LINES + 1))
-    printf "        ${CYAN}${BOLD}Choose Docker Runtime:${NC}\n" >&2
+    printf "        ${CYAN}${BOLD}Installing OrbStack Docker${NC}\n" >&2
     OUTPUT_LINES=$((OUTPUT_LINES + 1))
     printf "\n" >&2
     OUTPUT_LINES=$((OUTPUT_LINES + 1))
-    printf "        ${GREEN}1)${NC} ${BOLD}OrbStack Docker${NC} ${GRAY}(Recommended)${NC}\n" >&2
+    printf "        ${BOLD}OrbStack Docker${NC} ${GRAY}(Recommended)${NC}\n" >&2
     OUTPUT_LINES=$((OUTPUT_LINES + 1))
     printf "           ${GRAY}• 2-3x faster than Docker Desktop${NC}\n" >&2
     OUTPUT_LINES=$((OUTPUT_LINES + 1))
@@ -240,30 +243,31 @@ install_docker_macos() {
     OUTPUT_LINES=$((OUTPUT_LINES + 1))
     printf "\n" >&2
     OUTPUT_LINES=$((OUTPUT_LINES + 1))
-    printf "        ${GREEN}2)${NC} ${BOLD}Docker Desktop${NC}\n" >&2
-    OUTPUT_LINES=$((OUTPUT_LINES + 1))
-    printf "           ${GRAY}• Traditional Docker runtime${NC}\n" >&2
-    OUTPUT_LINES=$((OUTPUT_LINES + 1))
-    printf "           ${GRAY}• Widely used, well-tested${NC}\n" >&2
-    OUTPUT_LINES=$((OUTPUT_LINES + 1))
-    printf "           ${GRAY}• Requires license for companies${NC}\n" >&2
-    OUTPUT_LINES=$((OUTPUT_LINES + 1))
-    printf "\n" >&2
-    OUTPUT_LINES=$((OUTPUT_LINES + 1))
-    printf "        ${YELLOW}❯${NC} Choose runtime: ${GRAY}(1 or 2, default: 1)${NC}\n" >&2
-    OUTPUT_LINES=$((OUTPUT_LINES + 1))
-    printf "        " >&2
+    # DISABLED: Docker Desktop support
+    # printf "        ${GREEN}2)${NC} ${BOLD}Docker Desktop${NC}\n" >&2
+    # OUTPUT_LINES=$((OUTPUT_LINES + 1))
+    # printf "           ${GRAY}• Traditional Docker runtime${NC}\n" >&2
+    # OUTPUT_LINES=$((OUTPUT_LINES + 1))
+    # printf "           ${GRAY}• Widely used, well-tested${NC}\n" >&2
+    # OUTPUT_LINES=$((OUTPUT_LINES + 1))
+    # printf "           ${GRAY}• Requires license for companies${NC}\n" >&2
+    # OUTPUT_LINES=$((OUTPUT_LINES + 1))
+    # printf "\n" >&2
+    # OUTPUT_LINES=$((OUTPUT_LINES + 1))
+    # printf "        ${YELLOW}❯${NC} Choose runtime: ${GRAY}(1 or 2, default: 1)${NC}\n" >&2
+    # OUTPUT_LINES=$((OUTPUT_LINES + 1))
+    # printf "        " >&2
 
-    read -r response || response=""
+    # read -r response || response=""
 
-    case "$response" in
-        [nN]|[nN][oO])
-            install_docker_desktop
-            ;;
-        *)
-            install_orbstack
-            ;;
-    esac
+    # case "$response" in
+    #     [nN]|[nN][oO])
+    #         install_docker_desktop
+    #         ;;
+    #     *)
+    install_orbstack
+    #     ;;
+    # esac
 }
 
 # Install OrbStack Docker
@@ -279,10 +283,11 @@ install_orbstack() {
     if [ $? -ne 0 ]; then
         printf "\r        ${RED}✗${NC} OrbStack Docker installation failed\n" >&2
         OUTPUT_LINES=$((OUTPUT_LINES + 1))
-        printf "        ${YELLOW}⚠${NC} Falling back to Docker Desktop\n" >&2
-        OUTPUT_LINES=$((OUTPUT_LINES + 1))
-        install_docker_desktop
-        return $?
+        # DISABLED: Docker Desktop fallback
+        # printf "        ${YELLOW}⚠${NC} Falling back to Docker Desktop\n" >&2
+        # OUTPUT_LINES=$((OUTPUT_LINES + 1))
+        # install_docker_desktop
+        return 1
     fi
     printf "\r        ${GREEN}✓${NC} OrbStack Docker installed successfully\n" >&2
     OUTPUT_LINES=$((OUTPUT_LINES + 1))
@@ -352,93 +357,93 @@ start_orbstack() {
     return 0
 }
 
-# Install Docker Desktop
-install_docker_desktop() {
-    # Set environment to avoid prompts
-    export HOMEBREW_NO_AUTO_UPDATE=1
-    export HOMEBREW_NO_ENV_HINTS=1
+# DISABLED: Docker Desktop support
+# install_docker_desktop() {
+#     # Set environment to avoid prompts
+#     export HOMEBREW_NO_AUTO_UPDATE=1
+#     export HOMEBREW_NO_ENV_HINTS=1
+#
+#     # Install Docker Desktop (as cask, not formula)
+#     brew install --cask docker >/dev/null 2>&1 &
+#     show_spinner $! "Installing Docker Desktop"
+#
+#     if [ $? -ne 0 ]; then
+#         printf "\r        ${RED}✗${NC} Docker Desktop installation failed\n" >&2
+#         OUTPUT_LINES=$((OUTPUT_LINES + 1))
+#         return 1
+#     fi
+#     printf "\r        ${GREEN}✓${NC} Docker Desktop installed successfully\n" >&2
+#     OUTPUT_LINES=$((OUTPUT_LINES + 1))
+#
+#     start_docker_desktop
+#     return $?
+# }
 
-    # Install Docker Desktop (as cask, not formula)
-    brew install --cask docker >/dev/null 2>&1 &
-    show_spinner $! "Installing Docker Desktop"
-
-    if [ $? -ne 0 ]; then
-        printf "\r        ${RED}✗${NC} Docker Desktop installation failed\n" >&2
-        OUTPUT_LINES=$((OUTPUT_LINES + 1))
-        return 1
-    fi
-    printf "\r        ${GREEN}✓${NC} Docker Desktop installed successfully\n" >&2
-    OUTPUT_LINES=$((OUTPUT_LINES + 1))
-
-    start_docker_desktop
-    return $?
-}
-
-# Start Docker Desktop
-start_docker_desktop() {
-    # Launch Docker Desktop
-    open -a Docker &>/dev/null 2>&1 || open /Applications/Docker.app &
-
-        # Show brief startup spinner (1 second)
-        for j in $(seq 1 7); do
-            case $((j % 10)) in
-                0) spin_char='⠋' ;;
-                1) spin_char='⠙' ;;
-                2) spin_char='⠹' ;;
-                3) spin_char='⠸' ;;
-                4) spin_char='⠼' ;;
-                5) spin_char='⠴' ;;
-                6) spin_char='⠦' ;;
-                *) spin_char='⠋' ;;
-            esac
-            printf "\r        ${YELLOW}◉${NC} Starting Docker Desktop ${BOLD}${CYAN}%s${NC}" "$spin_char" >&2
-            sleep 0.15
-        done
-
-        # Wait for Docker to start with spinner (up to 2 minutes)
-        i=0
-        attempts=0
-        max_attempts=60
-        while [ $attempts -lt $max_attempts ]; do
-            # Check Docker status every 13 spinner cycles (roughly 2 seconds)
-            if [ $((i % 13)) -eq 0 ]; then
-                # Suppress "Killed: 9" messages by redirecting all error output
-                { docker ps >/dev/null 2>&1; } 2>/dev/null && docker_ready=0 || docker_ready=1
-                if [ $docker_ready -eq 0 ]; then
-                    printf "\r        ${GREEN}✓${NC} Docker is running                    \n" >&2
-                    OUTPUT_LINES=$((OUTPUT_LINES + 1))
-                    return 0
-                fi
-                attempts=$((attempts + 1))
-            fi
-
-            # Show spinner (same pattern as show_spinner function)
-            case $((i % 10)) in
-                0) spin_char='⠋' ;;
-                1) spin_char='⠙' ;;
-                2) spin_char='⠹' ;;
-                3) spin_char='⠸' ;;
-                4) spin_char='⠼' ;;
-                5) spin_char='⠴' ;;
-                6) spin_char='⠦' ;;
-                7) spin_char='⠧' ;;
-                8) spin_char='⠇' ;;
-                9) spin_char='⠏' ;;
-            esac
-            printf "\r        ${YELLOW}◉${NC} Waiting for Docker to start ${BOLD}${CYAN}%s${NC}" "$spin_char" >&2
-            i=$((i + 1))
-            sleep 0.15
-        done
-
-        # Clear spinner line if timeout
-        printf "\r\033[K" >&2
-
-        printf "        ${YELLOW}⚠${NC} Docker Desktop may take additional time to start\n" >&2
-        OUTPUT_LINES=$((OUTPUT_LINES + 1))
-        printf "        ${GRAY}  Please wait for Docker Desktop to finish launching${NC}\n" >&2
-        OUTPUT_LINES=$((OUTPUT_LINES + 1))
-        return 0
-}
+# DISABLED: Docker Desktop support
+# start_docker_desktop() {
+#     # Launch Docker Desktop
+#     open -a Docker &>/dev/null 2>&1 || open /Applications/Docker.app &
+#
+#         # Show brief startup spinner (1 second)
+#         for j in $(seq 1 7); do
+#             case $((j % 10)) in
+#                 0) spin_char='⠋' ;;
+#                 1) spin_char='⠙' ;;
+#                 2) spin_char='⠹' ;;
+#                 3) spin_char='⠸' ;;
+#                 4) spin_char='⠼' ;;
+#                 5) spin_char='⠴' ;;
+#                 6) spin_char='⠦' ;;
+#                 *) spin_char='⠋' ;;
+#             esac
+#             printf "\r        ${YELLOW}◉${NC} Starting Docker Desktop ${BOLD}${CYAN}%s${NC}" "$spin_char" >&2
+#             sleep 0.15
+#         done
+#
+#         # Wait for Docker to start with spinner (up to 2 minutes)
+#         i=0
+#         attempts=0
+#         max_attempts=60
+#         while [ $attempts -lt $max_attempts ]; do
+#             # Check Docker status every 13 spinner cycles (roughly 2 seconds)
+#             if [ $((i % 13)) -eq 0 ]; then
+#                 # Suppress "Killed: 9" messages by redirecting all error output
+#                 { docker ps >/dev/null 2>&1; } 2>/dev/null && docker_ready=0 || docker_ready=1
+#                 if [ $docker_ready -eq 0 ]; then
+#                     printf "\r        ${GREEN}✓${NC} Docker is running\n" >&2
+#                     OUTPUT_LINES=$((OUTPUT_LINES + 1))
+#                     return 0
+#                 fi
+#                 attempts=$((attempts + 1))
+#             fi
+#
+#             # Show spinner (same pattern as show_spinner function)
+#             case $((i % 10)) in
+#                 0) spin_char='⠋' ;;
+#                 1) spin_char='⠙' ;;
+#                 2) spin_char='⠹' ;;
+#                 3) spin_char='⠸' ;;
+#                 4) spin_char='⠼' ;;
+#                 5) spin_char='⠴' ;;
+#                 6) spin_char='⠦' ;;
+#                 7) spin_char='⠧' ;;
+#                 8) spin_char='⠇' ;;
+#                 9) spin_char='⠏' ;;
+#             esac
+#             printf "\r        ${YELLOW}◉${NC} Waiting for Docker to start ${BOLD}${CYAN}%s${NC}" "$spin_char" >&2
+#             i=$((i + 1))
+#             sleep 0.15
+#         done
+#
+#         # Clear spinner line if timeout
+#         printf "\r\033[K" >&2
+#
+#         printf "        ${YELLOW}⚠${NC} Docker Desktop may take additional time to start\n" >&2
+#         OUTPUT_LINES=$((OUTPUT_LINES + 1))
+#         printf "        ${GRAY}  Please wait for Docker Desktop to finish launching${NC}\n" >&2
+#         OUTPUT_LINES=$((OUTPUT_LINES + 1))
+#         return 0
+# }
 
 # Main
 # Skip redundant check if called from install script
