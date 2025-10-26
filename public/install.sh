@@ -12,18 +12,9 @@
 
 set -e
 
-# Create logs directory - prefer local logs/ folder, fallback to home directory
-if [ -d "$(pwd)/logs" ] && [ -w "$(pwd)/logs" ]; then
-    LOG_DIR="$(pwd)/logs"
-else
-    # Use home directory for curl/wget installations
-    LOG_DIR="$HOME/.graphdone/logs"
-    mkdir -p "$LOG_DIR" 2>/dev/null || {
-        # Fallback to /tmp if home not writable
-        LOG_DIR="/tmp/graphdone-logs"
-        mkdir -p "$LOG_DIR" 2>/dev/null || true
-    }
-fi
+# Create logs directory in home
+LOG_DIR="$HOME/graphdone-logs"
+mkdir -p "$LOG_DIR" 2>/dev/null || true
 
 # Professional log file naming with timestamp
 INSTALL_TIMESTAMP=$(date +%Y-%m-%d_%H-%M-%S)
