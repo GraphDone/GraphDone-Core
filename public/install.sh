@@ -520,7 +520,7 @@ check_and_prompt_git() {
                 
                 # Print clean summary line
                 NEW_GIT_VERSION=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
-                printf "        ${GREEN}✓${NC} ${BOLD}Git${NC} upgraded to ${GREEN}${NEW_GIT_VERSION}${NC} successfully\n"
+                printf "  ${GREEN}✓${NC} ${BOLD}Git${NC} upgraded to ${GREEN}${NEW_GIT_VERSION}${NC} successfully\n"
                 
                 # Save cursor position again for the next check
             else
@@ -553,7 +553,7 @@ check_and_prompt_git() {
             # Restore cursor and clear, then show summary
             
             NEW_GIT_VERSION=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
-            printf "        ${GREEN}✓${NC} ${BOLD}Git${NC} upgraded to ${GREEN}${NEW_GIT_VERSION}${NC} successfully\n"
+            printf "  ${GREEN}✓${NC} ${BOLD}Git${NC} upgraded to ${GREEN}${NEW_GIT_VERSION}${NC} successfully\n"
         else
             printf "${RED}✗${NC} Git setup failed\n"
             exit 1
@@ -580,7 +580,7 @@ check_and_prompt_git() {
         # Restore cursor and clear, then show summary
         
         NEW_GIT_VERSION=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
-        printf "        ${GREEN}✓${NC} ${BOLD}Git${NC} ${GREEN}${NEW_GIT_VERSION}${NC} installed successfully\n"
+        printf "  ${GREEN}✓${NC} ${BOLD}Git${NC} ${GREEN}${NEW_GIT_VERSION}${NC} installed successfully\n"
     else
         printf "${RED}✗${NC} Git setup failed\n"
         exit 1
@@ -697,7 +697,7 @@ check_and_prompt_nodejs() {
 
             NEW_NODE_VERSION=$(node --version 2>/dev/null || echo "unknown")
             NEW_NPM_VERSION=$(npm --version 2>/dev/null || echo "unknown")
-            printf "        ${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}${NEW_NODE_VERSION}${NC} and ${BOLD}npm${NC} ${GREEN}${NEW_NPM_VERSION}${NC} updated successfully\n"
+            printf "  ${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}${NEW_NODE_VERSION}${NC} and ${BOLD}npm${NC} ${GREEN}${NEW_NPM_VERSION}${NC} updated successfully\n"
         else
             printf "${RED}✗${NC} Node.js setup failed\n"
             exit 1
@@ -733,7 +733,7 @@ check_and_prompt_nodejs() {
 
             NEW_NODE_VERSION=$(node --version 2>/dev/null || echo "unknown")
             NEW_NPM_VERSION=$(npm --version 2>/dev/null || echo "unknown")
-            printf "        ${GREEN}✓${NC} ${BOLD}Node.js${NC} upgraded to ${GREEN}${NEW_NODE_VERSION}${NC} and ${BOLD}npm${NC} ${GREEN}${NEW_NPM_VERSION}${NC} successfully\n"
+            printf "  ${GREEN}✓${NC} ${BOLD}Node.js${NC} upgraded to ${GREEN}${NEW_NODE_VERSION}${NC} and ${BOLD}npm${NC} ${GREEN}${NEW_NPM_VERSION}${NC} successfully\n"
         else
             printf "${RED}✗${NC} Node.js setup failed\n"
             exit 1
@@ -742,7 +742,7 @@ check_and_prompt_nodejs() {
     fi
     
 
-    printf "\r      ${YELLOW}⚠${NC} ${BOLD}Node.js${NC} ${GRAY}not installed${NC}\033[K\n" " "
+    printf "\r  ${YELLOW}⚠${NC} ${BOLD}Node.js${NC} ${GRAY}not installed${NC}\033[K\n" " "
     printf "\n"
     printf "        ${YELLOW}🟡 ${BOLD}Node.js Setup Required${NC}\n"
     printf "        ${GRAY}GraphDone requires Node.js >= 18.0.0 and npm >= 9.0.0 for development.${NC}\n\n"
@@ -769,7 +769,7 @@ check_and_prompt_nodejs() {
         # Get the new Node.js and npm versions
         NEW_NODE_VERSION=$(node --version 2>/dev/null || echo "unknown")
         NEW_NPM_VERSION=$(npm --version 2>/dev/null || echo "unknown")
-        printf "        ${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}${NEW_NODE_VERSION}${NC} and ${BOLD}npm${NC} ${GREEN}${NEW_NPM_VERSION}${NC} installed successfully\n"
+        printf "  ${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}${NEW_NODE_VERSION}${NC} and ${BOLD}npm${NC} ${GREEN}${NEW_NPM_VERSION}${NC} installed successfully\n"
     else
         printf "${RED}✗${NC} Node.js setup failed\n"
         exit 1
@@ -885,7 +885,7 @@ check_and_prompt_docker() {
 
             # Get Docker version and runtime name, show clean success message
             DOCKER_VERSION=$(docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "unknown")
-            printf "        ${GREEN}✓${NC} ${BOLD}${DOCKER_RUNTIME}${NC} ${GREEN}${DOCKER_VERSION}${NC} started successfully\n"
+            printf "  ${GREEN}✓${NC} ${BOLD}${DOCKER_RUNTIME}${NC} ${GREEN}${DOCKER_VERSION}${NC} started successfully\n"
         else
             printf "${RED}✗${NC} Docker startup failed\n"
             exit 1
@@ -893,8 +893,7 @@ check_and_prompt_docker() {
         return 0
     fi
     
-
-    printf "\r      ${YELLOW}⚠${NC} ${BOLD}Docker${NC} ${GRAY}not installed${NC}\033[K\n" " "
+    printf "\r  ${YELLOW}⚠${NC} ${BOLD}Docker${NC} ${GRAY}not installed${NC}\033[K\n" " "
     printf "\n"
     printf "        ${YELLOW}🟡 ${BOLD}Docker Setup Required${NC}\n"
     printf "        ${GRAY}GraphDone uses Docker containers for Neo4j database and Redis cache.${NC}\n\n"
@@ -931,7 +930,7 @@ check_and_prompt_docker() {
             DOCKER_VERSION=$(docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "installed")
         fi
 
-        printf "        ${GREEN}✓${NC} ${BOLD}${DOCKER_RUNTIME}${NC} ${GREEN}${DOCKER_VERSION}${NC} installed and running successfully\n"
+        printf "  ${GREEN}✓${NC} ${BOLD}${DOCKER_RUNTIME}${NC} ${GREEN}${DOCKER_VERSION}${NC} installed and running successfully\n"
     else
         printf "${RED}✗${NC} Docker setup failed\n"
         exit 1
