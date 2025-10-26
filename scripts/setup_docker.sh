@@ -1,7 +1,7 @@
 #!/bin/sh
 # GraphDone Docker Setup Script (POSIX-compatible)
 # Linux: Docker Engine via official repository
-# macOS: OrbStack (recommended) or Docker Desktop - user choice
+# macOS: OrbStack Docker (recommended) or Docker Desktop - user choice
 
 set -eu
 
@@ -194,14 +194,14 @@ install_docker_macos() {
     if ! command -v brew >/dev/null 2>&1; then
         printf "        ${RED}✗${NC} Homebrew not found\n" >&2
         OUTPUT_LINES=$((OUTPUT_LINES + 1))
-        printf "        ${GRAY}  Install Homebrew first: /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\"${NC}\n" >&2
+        printf "        ${GRAY}  See: https://brew.sh to install Homebrew${NC}\n" >&2
         OUTPUT_LINES=$((OUTPUT_LINES + 1))
         return 1
     fi
 
-    # Check if OrbStack or Docker Desktop already installed
+    # Check if OrbStack Docker or Docker Desktop already installed
     if command -v orbstack >/dev/null 2>&1 || [ -d "/Applications/OrbStack.app" ]; then
-        printf "        ${GREEN}✓${NC} OrbStack already installed\n" >&2
+        printf "        ${GREEN}✓${NC} OrbStack Docker already installed\n" >&2
         OUTPUT_LINES=$((OUTPUT_LINES + 1))
         start_orbstack
         return $?
@@ -215,7 +215,7 @@ install_docker_macos() {
     # Check if running in non-interactive mode (e.g., curl | sh)
     if [ ! -t 0 ]; then
         # Non-interactive: auto-select OrbStack
-        printf "        ${BLUE}◉${NC} Non-interactive mode: installing ${BOLD}OrbStack${NC} ${GRAY}(recommended)${NC}\n" >&2
+        printf "        ${BLUE}◉${NC} Installing ${BOLD}OrbStack Docker${NC} ${GRAY}(recommended)${NC}\n" >&2
         OUTPUT_LINES=$((OUTPUT_LINES + 1))
         install_orbstack
         return $?
@@ -228,13 +228,13 @@ install_docker_macos() {
     OUTPUT_LINES=$((OUTPUT_LINES + 1))
     printf "\n" >&2
     OUTPUT_LINES=$((OUTPUT_LINES + 1))
-    printf "        ${GREEN}1)${NC} ${BOLD}OrbStack${NC} ${GRAY}(Recommended)${NC}\n" >&2
+    printf "        ${GREEN}1)${NC} ${BOLD}OrbStack Docker${NC} ${GRAY}(Recommended)${NC}\n" >&2
     OUTPUT_LINES=$((OUTPUT_LINES + 1))
     printf "           ${GRAY}• 2-3x faster than Docker Desktop${NC}\n" >&2
     OUTPUT_LINES=$((OUTPUT_LINES + 1))
     printf "           ${GRAY}• 70%% less CPU, 50%% less memory${NC}\n" >&2
     OUTPUT_LINES=$((OUTPUT_LINES + 1))
-    printf "           ${GRAY}• Starts in 2-5 seconds${NC}\n" >&2
+    printf "           ${GRAY}• Starts quickly (2-5 seconds)${NC}\n" >&2
     OUTPUT_LINES=$((OUTPUT_LINES + 1))
     printf "           ${GRAY}• Free for personal use${NC}\n" >&2
     OUTPUT_LINES=$((OUTPUT_LINES + 1))
@@ -250,7 +250,7 @@ install_docker_macos() {
     OUTPUT_LINES=$((OUTPUT_LINES + 1))
     printf "\n" >&2
     OUTPUT_LINES=$((OUTPUT_LINES + 1))
-    printf "        ${YELLOW}❯ Install OrbStack? ${GRAY}(Y = OrbStack, n = Docker Desktop)${NC} [Y/n] or Ctrl+C to exit${NC}\n" >&2
+    printf "        ${YELLOW}❯${NC} Choose runtime: ${GRAY}(1 or 2, default: 1)${NC}\n" >&2
     OUTPUT_LINES=$((OUTPUT_LINES + 1))
     printf "        " >&2
 
@@ -266,36 +266,36 @@ install_docker_macos() {
     esac
 }
 
-# Install OrbStack
+# Install OrbStack Docker
 install_orbstack() {
     # Set environment to avoid prompts
     export HOMEBREW_NO_AUTO_UPDATE=1
     export HOMEBREW_NO_ENV_HINTS=1
 
-    # Install OrbStack
+    # Install OrbStack Docker
     brew install orbstack >/dev/null 2>&1 &
-    show_spinner $! "Installing OrbStack"
+    show_spinner $! "Installing OrbStack Docker"
 
     if [ $? -ne 0 ]; then
-        printf "\r        ${RED}✗${NC} OrbStack installation failed                    \n" >&2
+        printf "\r        ${RED}✗${NC} OrbStack Docker installation failed\n" >&2
         OUTPUT_LINES=$((OUTPUT_LINES + 1))
         printf "        ${YELLOW}⚠${NC} Falling back to Docker Desktop\n" >&2
         OUTPUT_LINES=$((OUTPUT_LINES + 1))
         install_docker_desktop
         return $?
     fi
-    printf "\r        ${GREEN}✓${NC} OrbStack installed successfully                    \n" >&2
+    printf "\r        ${GREEN}✓${NC} OrbStack Docker installed successfully\n" >&2
     OUTPUT_LINES=$((OUTPUT_LINES + 1))
 
     start_orbstack
     return $?
 }
 
-# Start OrbStack
+# Start OrbStack Docker
 start_orbstack() {
-    # Check if OrbStack is already running
+    # Check if OrbStack Docker is already running
     if ! pgrep -f "OrbStack.app" >/dev/null 2>&1; then
-        # Launch OrbStack
+        # Launch OrbStack Docker
         open -a OrbStack &>/dev/null 2>&1 || open /Applications/OrbStack.app &
 
         # Brief startup spinner
@@ -310,7 +310,7 @@ start_orbstack() {
                 6) spin_char='⠦' ;;
                 *) spin_char='⠋' ;;
             esac
-            printf "\r        ${YELLOW}◉${NC} Starting OrbStack ${BOLD}${CYAN}%s${NC}" "$spin_char" >&2
+            printf "\r        ${YELLOW}◉${NC} Starting OrbStack Docker ${BOLD}${CYAN}%s${NC}" "$spin_char" >&2
             sleep 0.15
         done
     fi
@@ -323,7 +323,7 @@ start_orbstack() {
         if [ $((i % 13)) -eq 0 ]; then
             { docker ps >/dev/null 2>&1; } 2>/dev/null && docker_ready=0 || docker_ready=1
             if [ $docker_ready -eq 0 ]; then
-                printf "\r        ${GREEN}✓${NC} OrbStack is running                    \n" >&2
+                printf "\r        ${GREEN}✓${NC} OrbStack Docker is running\n" >&2
                 OUTPUT_LINES=$((OUTPUT_LINES + 1))
                 return 0
             fi
@@ -342,12 +342,12 @@ start_orbstack() {
             8) spin_char='⠇' ;;
             9) spin_char='⠏' ;;
         esac
-        printf "\r        ${YELLOW}◉${NC} Waiting for OrbStack to start ${BOLD}${CYAN}%s${NC}" "$spin_char" >&2
+        printf "\r        ${YELLOW}◉${NC} Waiting for OrbStack Docker to start ${BOLD}${CYAN}%s${NC}" "$spin_char" >&2
         i=$((i + 1))
         sleep 0.15
     done
 
-    printf "\r        ${GREEN}✓${NC} OrbStack started (may need a moment to initialize)                    \n" >&2
+    printf "\r        ${GREEN}✓${NC} OrbStack Docker started (may need a moment to initialize)\n" >&2
     OUTPUT_LINES=$((OUTPUT_LINES + 1))
     return 0
 }
@@ -363,11 +363,11 @@ install_docker_desktop() {
     show_spinner $! "Installing Docker Desktop"
 
     if [ $? -ne 0 ]; then
-        printf "\r        ${RED}✗${NC} Docker Desktop installation failed                    \n" >&2
+        printf "\r        ${RED}✗${NC} Docker Desktop installation failed\n" >&2
         OUTPUT_LINES=$((OUTPUT_LINES + 1))
         return 1
     fi
-    printf "\r        ${GREEN}✓${NC} Docker Desktop installed successfully                    \n" >&2
+    printf "\r        ${GREEN}✓${NC} Docker Desktop installed successfully\n" >&2
     OUTPUT_LINES=$((OUTPUT_LINES + 1))
 
     start_docker_desktop

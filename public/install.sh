@@ -81,6 +81,28 @@ run_setup_script() {
     fi
 }
 
+clear_installation_output() {
+    local setup_lines="${1:-0}"
+    local prompt_lines="${2:-0}"
+    local i=1
+
+    # Clear setup script output (installation progress lines)
+    while [ $i -le "$setup_lines" ]; do
+        printf "\033[F\033[K" >&2
+        i=$((i + 1))
+    done
+
+    # Clear prompt lines except the first one (warning line to be replaced)
+    i=1
+    while [ $i -lt "$prompt_lines" ]; do
+        printf "\033[F\033[K" >&2
+        i=$((i + 1))
+    done
+
+    # Clear the warning line itself
+    printf "\033[F\033[K" >&2
+}
+
 # Modern color palette using 256-color codes for better compatibility
 # Check stderr (fd 2) instead of stdout since we output to >&2
 if [ -t 2 ]; then
@@ -944,7 +966,10 @@ check_and_prompt_docker() {
         if [ $cycle -eq 6 ]; then
             dots_display="$dots_display ${CYAN}●${NC}"
             # Perform the check on final cycle - check if Docker is installed AND running
-            if command -v docker >/dev/null 2>&1; then
+            # First check for OrbStack Docker (which provides Docker)
+            if command -v orbstack >/dev/null 2>&1 || [ -d "/Applications/OrbStack.app" ]; then
+                check_result="running"  # OrbStack Docker is running (provides Docker)
+            elif command -v docker >/dev/null 2>&1; then
                 if docker info >/dev/null 2>&1; then
                     check_result="running"  # Docker is installed and running
                 else
@@ -961,27 +986,29 @@ check_and_prompt_docker() {
         printf "\033[K"
         sleep 0.4
     done
-    
-    # Smooth transition: show completion state briefly
-    printf " ${GREEN}●${NC}"
-    sleep 0.3
-    
+
+    # Move to fresh line before printing status
+    printf "\r\033[K"
+
     if [ "$check_result" = "running" ]; then
-        # Get version info and detect runtime
-        DOCKER_VERSION=$(docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "unknown")
-        if [ -d "/Applications/OrbStack.app" ] || command -v orbstack >/dev/null 2>&1; then
-            DOCKER_RUNTIME="OrbStack"
-        elif [ -d "/Applications/Docker.app" ]; then
-            DOCKER_RUNTIME="Docker Desktop"
-        else
-            DOCKER_RUNTIME="Docker"
+        # Add OrbStack bin to PATH if available (for version detection)
+        if [ -d "$HOME/.orbstack/bin" ]; then
+            export PATH="$HOME/.orbstack/bin:$PATH"
         fi
 
-        # Format the line to match last box alignment
-        local docker_display="${GREEN}✓${NC} ${BOLD}${DOCKER_RUNTIME}${NC} ${GREEN}${DOCKER_VERSION}${NC} ${GRAY}already installed and running${NC}"
-        local docker_plain="✓ ${DOCKER_RUNTIME} ${DOCKER_VERSION} already installed and running"
-        local padding=$((88 - ${#docker_plain}))
-        printf "\r  ${docker_display}%*s\n" $padding ""
+        # Detect which Docker runtime is installed
+        if [ -d "/Applications/OrbStack.app" ] || command -v orb >/dev/null 2>&1; then
+            DOCKER_RUNTIME="OrbStack"
+            DOCKER_VERSION=$(orb version 2>/dev/null | grep "Version:" | cut -d' ' -f2 || docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "installed")
+        elif [ -d "/Applications/Docker.app" ]; then
+            DOCKER_RUNTIME="Docker Desktop"
+            DOCKER_VERSION=$(docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "installed")
+        else
+            DOCKER_RUNTIME="Docker"
+            DOCKER_VERSION=$(docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "installed")
+        fi
+
+        printf "\r  ${GREEN}✓${NC} ${BOLD}${DOCKER_RUNTIME}${NC} ${GREEN}${DOCKER_VERSION}${NC} ${GRAY}already installed and running${NC}\n"
         return 0
     elif [ "$check_result" = "installed" ]; then
         # Docker installed but not running - start it
@@ -998,7 +1025,7 @@ check_and_prompt_docker() {
             DOCKER_RUNTIME="Docker"
         fi
 
-        printf "\r  ${YELLOW}⚠${NC} ${BOLD}${DOCKER_RUNTIME}${NC} ${GREEN}${DOCKER_VERSION}${NC} ${GRAY}installed but not running${NC}%-40s\n" " "
+        printf "\r  ${YELLOW}⚠${NC} ${BOLD}${DOCKER_RUNTIME}${NC} ${GREEN}${DOCKER_VERSION}${NC} ${GRAY}installed but not running${NC}\n"
         PROMPT_LINES=$((PROMPT_LINES + 1))
         printf "\n"
         PROMPT_LINES=$((PROMPT_LINES + 1))
@@ -1023,29 +1050,11 @@ check_and_prompt_docker() {
         SETUP_LINES=$(run_setup_script "setup_docker.sh")
         if [ $? -eq 0 ]; then
             # After successful startup, clear all output and show clean result
-            # Clear setup script output first
-            i=1
-            while [ $i -le "$SETUP_LINES" ]; do
-                printf "\033[F\033[K"  # Move up and clear line
-                i=$((i + 1))
-            done
-
-            # Now clear all prompt lines EXCEPT the first one (the warning line we want to replace)
-            i=1
-            while [ $i -lt "$PROMPT_LINES" ]; do
-                printf "\033[F\033[K"  # Move up and clear line
-                i=$((i + 1))
-            done
-
-            # Move up one more time and clear the warning line
-            printf "\033[F\033[K"
+            clear_installation_output "$SETUP_LINES" "$PROMPT_LINES"
 
             # Get Docker version and runtime name, show clean success message
             DOCKER_VERSION=$(docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "unknown")
-            local docker_success="${GREEN}✓${NC} ${BOLD}${DOCKER_RUNTIME}${NC} ${GREEN}${DOCKER_VERSION}${NC} started successfully"
-            local docker_success_plain="✓ ${DOCKER_RUNTIME} ${DOCKER_VERSION} started successfully"
-            local padding=$((88 - ${#docker_success_plain}))
-            printf "  ${docker_success}%*s\n" $padding ""
+            printf "  ${GREEN}✓${NC} ${BOLD}${DOCKER_RUNTIME}${NC} ${GREEN}${DOCKER_VERSION}${NC} started successfully\n"
         else
             printf "${RED}✗${NC} Docker startup failed\n"
             exit 1
@@ -1056,7 +1065,7 @@ check_and_prompt_docker() {
     # Track prompt lines
     PROMPT_LINES=0
 
-    printf "\r  ${YELLOW}⚠${NC} ${BOLD}Docker${NC} ${GRAY}not installed${NC}%-40s\n" " "
+    printf "\r  ${YELLOW}⚠${NC} ${BOLD}Docker${NC} ${GRAY}not installed${NC}\n"
     PROMPT_LINES=$((PROMPT_LINES + 1))
     printf "\n"
     PROMPT_LINES=$((PROMPT_LINES + 1))
@@ -1079,35 +1088,27 @@ check_and_prompt_docker() {
     read -r response || response=""
 
     # Run the Docker setup script - it handles everything (skip redundant check) and capture line count from stdout
-    SETUP_LINES=$(run_setup_script "setup_docker.sh" --skip-check)
+    SETUP_LINES=$(run_setup_script "setup_docker.sh")
     if [ $? -eq 0 ]; then
+        # Add OrbStack bin to PATH immediately after installation (for docker command access)
+        if [ -d "$HOME/.orbstack/bin" ]; then
+            export PATH="$HOME/.orbstack/bin:$PATH"
+        fi
+
+
         # After successful installation, clear all output and show clean result
-        # Clear setup script output first
-        i=1
-        while [ $i -le "$SETUP_LINES" ]; do
-            printf "\033[F\033[K"  # Move up and clear line
-            i=$((i + 1))
-        done
+        clear_installation_output "$SETUP_LINES" "$PROMPT_LINES"
 
-        # Now clear all prompt lines EXCEPT the first one (the warning line we want to replace)
-        i=1
-        while [ $i -lt "$PROMPT_LINES" ]; do
-            printf "\033[F\033[K"  # Move up and clear line
-            i=$((i + 1))
-        done
-
-        # Move up one more time and clear the warning line
-        printf "\033[F\033[K"
-
-        # Cursor is now at the position where warning line was - print success message
-        # Get Docker version and detect runtime, show clean success message
-        DOCKER_VERSION=$(docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "unknown")
-        if [ -d "/Applications/OrbStack.app" ] || command -v orbstack >/dev/null 2>&1; then
+        # Detect runtime and get version
+        if [ -d "/Applications/OrbStack.app" ] || command -v orb >/dev/null 2>&1; then
             DOCKER_RUNTIME="OrbStack"
+            DOCKER_VERSION=$(orb version 2>/dev/null | grep "Version:" | cut -d' ' -f2 || docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "installed")
         elif [ -d "/Applications/Docker.app" ]; then
             DOCKER_RUNTIME="Docker Desktop"
+            DOCKER_VERSION=$(docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "installed")
         else
             DOCKER_RUNTIME="Docker"
+            DOCKER_VERSION=$(docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "installed")
         fi
 
         local docker_success="${GREEN}✓${NC} ${BOLD}${DOCKER_RUNTIME}${NC} ${GREEN}${DOCKER_VERSION}${NC} installed and running successfully"
@@ -2140,7 +2141,7 @@ EOF
             if [ $((i % 13)) -eq 0 ]; then
                 { docker info >/dev/null 2>&1; } 2>/dev/null && docker_ready=0 || docker_ready=1
                 if [ $docker_ready -eq 0 ]; then
-                    printf "\r  ${GREEN}✓${NC} Docker is ready                    \n"
+                    printf "\r  ${GREEN}✓${NC} Docker is ready \n"
                     break
                 fi
                 attempts=$((attempts + 1))
@@ -2167,7 +2168,7 @@ EOF
         if [ $attempts -ge $max_attempts ]; then
             printf "\r\033[K"
             printf "  ${RED}⚠${NC} Docker daemon not responding after 2 minutes\n"
-            printf "  ${YELLOW}⚠${NC} Please ensure Docker/OrbStack is running and try again\n"
+            printf "  ${YELLOW}⚠${NC} Please ensure Docker Desktop/OrbStack Docker is running and try again\n"
             exit 1
         fi
     fi
