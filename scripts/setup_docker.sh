@@ -207,7 +207,6 @@ install_docker_macos() {
     # fi
 
     # Display OrbStack Docker information with feature highlights
-    printf "\n" >&2
     printf "        ${CYAN}${BOLD}Installing OrbStack Docker${NC}\n" >&2
     printf "\n" >&2
     printf "        ${BOLD}OrbStack Docker${NC} ${GRAY}(Recommended)${NC}\n" >&2
@@ -427,5 +426,9 @@ case "$OS" in
         exit 1
         ;;
 esac
+
+printf "\n        ${GRAY}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n" >&2
+printf "        ${GREEN}✓${NC} ${BOLD}Docker setup completed successfully!${NC}\n" >&2
+printf "        ${GRAY}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n\n" >&2
 
 # Output line count to stdout for install.sh
