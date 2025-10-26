@@ -6,7 +6,6 @@
 set -eu
 
 # Track output lines for install.sh to clear later
-OUTPUT_LINES=0
 
 # Colors
 if [ -t 2 ]; then
@@ -38,6 +37,12 @@ if [ -t 2 ]; then
 else
     RED='' GREEN='' YELLOW='' BLUE='' VIOLET='' CYAN='' PALEGREEN='' GRAY='' BOLD='' NC=''
 fi
+
+# Helper functions - redirect to stderr
+log_info() { printf "        ${CYAN}ℹ${NC} $1\n" >&2; }
+log_success() { printf "        ${GREEN}✓${NC} $1\n" >&2; }
+log_warning() { printf "        ${YELLOW}⚠${NC} $1\n" >&2; }
+log_error() { printf "        ${RED}✗${NC} $1\n" >&2; }
 
 # Spinner function
 show_spinner() {
@@ -85,17 +90,14 @@ check_docker() {
         docker_version=$(docker --version 2>/dev/null | cut -d' ' -f3 | sed 's/,//')
         if [ -n "$docker_version" ]; then
             printf "        ${GREEN}✓${NC} Docker %s already installed\n" "$docker_version" >&2
-            OUTPUT_LINES=$((OUTPUT_LINES + 1))
 
             # Check if running (suppress "Killed" messages)
             { docker ps >/dev/null 2>&1; } 2>/dev/null && docker_running=0 || docker_running=1
             if [ $docker_running -eq 0 ]; then
                 printf "        ${GREEN}✓${NC} Docker is running\n" >&2
-                OUTPUT_LINES=$((OUTPUT_LINES + 1))
                 return 0
             else
                 printf "        ${YELLOW}⚠${NC} Docker is installed but not running\n" >&2
-                OUTPUT_LINES=$((OUTPUT_LINES + 1))
                 return 1
             fi
         fi
@@ -106,22 +108,18 @@ check_docker() {
 # Install Docker on Linux
 install_docker_linux() {
     printf "        ${VIOLET}◉${NC} Installing Docker via snap\n" >&2
-    OUTPUT_LINES=$((OUTPUT_LINES + 1))
 
     # Check if snap is available
     if ! command -v snap >/dev/null 2>&1; then
         printf "        ${YELLOW}⚠${NC} Snap not found, using apt method\n" >&2
-        OUTPUT_LINES=$((OUTPUT_LINES + 1))
         install_docker_apt
         return $?
     fi
 
     # Request sudo password upfront
     printf "        ${VIOLET}◉${NC} Requesting administrative privileges\n" >&2
-    OUTPUT_LINES=$((OUTPUT_LINES + 1))
     if ! sudo -v; then
         printf "        ${RED}✗${NC} Failed to obtain sudo privileges\n" >&2
-        OUTPUT_LINES=$((OUTPUT_LINES + 1))
         return 1
     fi
     
@@ -131,11 +129,9 @@ install_docker_linux() {
 
     if [ $? -eq 0 ]; then
         printf "\r        ${GREEN}✓${NC} Docker installed successfully via snap                    \n" >&2
-        OUTPUT_LINES=$((OUTPUT_LINES + 1))
         return 0
     else
         printf "\r        ${YELLOW}⚠${NC} Snap installation failed, trying apt method\n" >&2
-        OUTPUT_LINES=$((OUTPUT_LINES + 1))
         install_docker_apt
         return $?
     fi
@@ -144,27 +140,22 @@ install_docker_linux() {
 # Install Docker via apt (fallback)
 install_docker_apt() {
     printf "        ${VIOLET}◉${NC} Installing Docker Engine via apt\n" >&2
-    OUTPUT_LINES=$((OUTPUT_LINES + 1))
 
     # Update package index
     printf "        ${VIOLET}◉${NC} Updating package lists\n" >&2
-    OUTPUT_LINES=$((OUTPUT_LINES + 1))
     sudo apt-get update >/dev/null 2>&1
 
     # Install prerequisites
     printf "        ${VIOLET}◉${NC} Installing prerequisites\n" >&2
-    OUTPUT_LINES=$((OUTPUT_LINES + 1))
     sudo apt-get install -y ca-certificates curl gnupg lsb-release >/dev/null 2>&1
 
     # Add Docker GPG key
     printf "        ${VIOLET}◉${NC} Adding Docker GPG key\n" >&2
-    OUTPUT_LINES=$((OUTPUT_LINES + 1))
     sudo mkdir -p /etc/apt/keyrings
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg >/dev/null 2>&1
 
     # Add Docker repository
     printf "        ${VIOLET}◉${NC} Adding Docker repository\n" >&2
-    OUTPUT_LINES=$((OUTPUT_LINES + 1))
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | \
         sudo tee /etc/apt/sources.list.d/docker.list >/dev/null
 
@@ -173,18 +164,14 @@ install_docker_apt() {
 
     # Install Docker
     printf "        ${VIOLET}◉${NC} Installing Docker Engine\n" >&2
-    OUTPUT_LINES=$((OUTPUT_LINES + 1))
     sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin >/dev/null 2>&1
 
     # Add user to docker group
     printf "        ${VIOLET}◉${NC} Adding user to docker group\n" >&2
-    OUTPUT_LINES=$((OUTPUT_LINES + 1))
     sudo usermod -aG docker "$USER"
 
     printf "        ${GREEN}✓${NC} Docker installed successfully\n" >&2
-    OUTPUT_LINES=$((OUTPUT_LINES + 1))
     printf "        ${YELLOW}⚠${NC} ${GRAY}Please log out and back in for group changes to take effect${NC}\n" >&2
-    OUTPUT_LINES=$((OUTPUT_LINES + 1))
     return 0
 }
 
@@ -193,16 +180,13 @@ install_docker_macos() {
     # Check if Homebrew is available
     if ! command -v brew >/dev/null 2>&1; then
         printf "        ${RED}✗${NC} Homebrew not found\n" >&2
-        OUTPUT_LINES=$((OUTPUT_LINES + 1))
         printf "        ${GRAY}  See: https://brew.sh to install Homebrew${NC}\n" >&2
-        OUTPUT_LINES=$((OUTPUT_LINES + 1))
         return 1
     fi
 
     # Check if OrbStack Docker already installed
     if command -v orbstack >/dev/null 2>&1 || [ -d "/Applications/OrbStack.app" ]; then
         printf "        ${GREEN}✓${NC} OrbStack Docker already installed\n" >&2
-        OUTPUT_LINES=$((OUTPUT_LINES + 1))
         start_orbstack
         return $?
     fi
@@ -210,7 +194,6 @@ install_docker_macos() {
     # DISABLED: Docker Desktop support
     # elif [ -d "/Applications/Docker.app" ]; then
     #     printf "        ${GREEN}✓${NC} Docker Desktop already installed\n" >&2
-    #     OUTPUT_LINES=$((OUTPUT_LINES + 1))
     #     start_docker_desktop
     #     return $?
     # fi
@@ -219,43 +202,27 @@ install_docker_macos() {
     # if [ ! -t 0 ]; then
     #     # Non-interactive: auto-select OrbStack
     #     printf "        ${BLUE}◉${NC} Installing ${BOLD}OrbStack Docker${NC} ${GRAY}(recommended)${NC}\n" >&2
-    #     OUTPUT_LINES=$((OUTPUT_LINES + 1))
     #     install_orbstack
     #     return $?
     # fi
 
     # Display OrbStack Docker information with feature highlights
     printf "\n" >&2
-    OUTPUT_LINES=$((OUTPUT_LINES + 1))
     printf "        ${CYAN}${BOLD}Installing OrbStack Docker${NC}\n" >&2
-    OUTPUT_LINES=$((OUTPUT_LINES + 1))
     printf "\n" >&2
-    OUTPUT_LINES=$((OUTPUT_LINES + 1))
     printf "        ${BOLD}OrbStack Docker${NC} ${GRAY}(Recommended)${NC}\n" >&2
-    OUTPUT_LINES=$((OUTPUT_LINES + 1))
     printf "           ${GRAY}• 2-3x faster than Docker Desktop${NC}\n" >&2
-    OUTPUT_LINES=$((OUTPUT_LINES + 1))
     printf "           ${GRAY}• 70%% less CPU, 50%% less memory${NC}\n" >&2
-    OUTPUT_LINES=$((OUTPUT_LINES + 1))
     printf "           ${GRAY}• Starts quickly (2-5 seconds)${NC}\n" >&2
-    OUTPUT_LINES=$((OUTPUT_LINES + 1))
     printf "           ${GRAY}• Free for personal use${NC}\n" >&2
-    OUTPUT_LINES=$((OUTPUT_LINES + 1))
     printf "\n" >&2
-    OUTPUT_LINES=$((OUTPUT_LINES + 1))
     # DISABLED: Docker Desktop support
     # printf "        ${GREEN}2)${NC} ${BOLD}Docker Desktop${NC}\n" >&2
-    # OUTPUT_LINES=$((OUTPUT_LINES + 1))
     # printf "           ${GRAY}• Traditional Docker runtime${NC}\n" >&2
-    # OUTPUT_LINES=$((OUTPUT_LINES + 1))
     # printf "           ${GRAY}• Widely used, well-tested${NC}\n" >&2
-    # OUTPUT_LINES=$((OUTPUT_LINES + 1))
     # printf "           ${GRAY}• Requires license for companies${NC}\n" >&2
-    # OUTPUT_LINES=$((OUTPUT_LINES + 1))
     # printf "\n" >&2
-    # OUTPUT_LINES=$((OUTPUT_LINES + 1))
     # printf "        ${YELLOW}❯${NC} Choose runtime: ${GRAY}(1 or 2, default: 1)${NC}\n" >&2
-    # OUTPUT_LINES=$((OUTPUT_LINES + 1))
     # printf "        " >&2
 
     # read -r response || response=""
@@ -282,15 +249,12 @@ install_orbstack() {
 
     if [ $? -ne 0 ]; then
         printf "\r        ${RED}✗${NC} OrbStack Docker installation failed\n" >&2
-        OUTPUT_LINES=$((OUTPUT_LINES + 1))
         # DISABLED: Docker Desktop fallback
         # printf "        ${YELLOW}⚠${NC} Falling back to Docker Desktop\n" >&2
-        # OUTPUT_LINES=$((OUTPUT_LINES + 1))
         # install_docker_desktop
         return 1
     fi
     printf "\r        ${GREEN}✓${NC} OrbStack Docker installed successfully\n" >&2
-    OUTPUT_LINES=$((OUTPUT_LINES + 1))
 
     start_orbstack
     return $?
@@ -328,8 +292,7 @@ start_orbstack() {
         if [ $((i % 13)) -eq 0 ]; then
             { docker ps >/dev/null 2>&1; } 2>/dev/null && docker_ready=0 || docker_ready=1
             if [ $docker_ready -eq 0 ]; then
-                printf "\r        ${GREEN}✓${NC} OrbStack Docker is running\n" >&2
-                OUTPUT_LINES=$((OUTPUT_LINES + 1))
+                printf "\r        ${GREEN}✓${NC} OrbStack Docker is running                          \n" >&2
                 return 0
             fi
             attempts=$((attempts + 1))
@@ -352,8 +315,7 @@ start_orbstack() {
         sleep 0.15
     done
 
-    printf "\r        ${GREEN}✓${NC} OrbStack Docker started (may need a moment to initialize)\n" >&2
-    OUTPUT_LINES=$((OUTPUT_LINES + 1))
+    printf "\r        ${GREEN}✓${NC} OrbStack Docker started (may need a moment to initialize)          \n" >&2
     return 0
 }
 
@@ -369,11 +331,9 @@ start_orbstack() {
 #
 #     if [ $? -ne 0 ]; then
 #         printf "\r        ${RED}✗${NC} Docker Desktop installation failed\n" >&2
-#         OUTPUT_LINES=$((OUTPUT_LINES + 1))
 #         return 1
 #     fi
 #     printf "\r        ${GREEN}✓${NC} Docker Desktop installed successfully\n" >&2
-#     OUTPUT_LINES=$((OUTPUT_LINES + 1))
 #
 #     start_docker_desktop
 #     return $?
@@ -411,7 +371,6 @@ start_orbstack() {
 #                 { docker ps >/dev/null 2>&1; } 2>/dev/null && docker_ready=0 || docker_ready=1
 #                 if [ $docker_ready -eq 0 ]; then
 #                     printf "\r        ${GREEN}✓${NC} Docker is running\n" >&2
-#                     OUTPUT_LINES=$((OUTPUT_LINES + 1))
 #                     return 0
 #                 fi
 #                 attempts=$((attempts + 1))
@@ -439,9 +398,7 @@ start_orbstack() {
 #         printf "\r\033[K" >&2
 #
 #         printf "        ${YELLOW}⚠${NC} Docker Desktop may take additional time to start\n" >&2
-#         OUTPUT_LINES=$((OUTPUT_LINES + 1))
 #         printf "        ${GRAY}  Please wait for Docker Desktop to finish launching${NC}\n" >&2
-#         OUTPUT_LINES=$((OUTPUT_LINES + 1))
 #         return 0
 # }
 
@@ -449,13 +406,10 @@ start_orbstack() {
 # Skip redundant check if called from install script
 if [ "${1:-}" != "--skip-check" ]; then
     printf "\n        ${PALEGREEN}${BOLD}🐳 Docker Setup Installation${NC}\n" >&2
-    OUTPUT_LINES=$((OUTPUT_LINES + 2))  # \n + line
-    printf "        ${GRAY}─────────────────────────────────${NC}\n" >&2
-    OUTPUT_LINES=$((OUTPUT_LINES + 1))
+    printf "        ${GRAY}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n\n" >&2
 
     # Check if already installed
     if check_docker; then
-        echo "$OUTPUT_LINES"
         exit 0
     fi
 fi
@@ -470,11 +424,8 @@ case "$OS" in
         ;;
     *)
         printf "        ${RED}✗${NC} Unsupported OS\n" >&2
-        OUTPUT_LINES=$((OUTPUT_LINES + 1))
-        echo "$OUTPUT_LINES"
         exit 1
         ;;
 esac
 
 # Output line count to stdout for install.sh
-echo "$OUTPUT_LINES"
