@@ -528,26 +528,26 @@ check_and_prompt_git() {
             if [ $? -eq 0 ]; then
                 # Success! Now collapse all the verbose output
                 # Restore cursor to saved position (right after the header)
-                printf "\033[u"
+                printf "\033[u" >&2
                 # Clear from cursor to end of screen
-                printf "\033[J"
+                printf "\033[J" >&2
                 
                 # Print clean summary line
                 NEW_GIT_VERSION=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
                 printf "  ${GREEN}✓${NC} ${BOLD}Git${NC} upgraded to ${GREEN}${NEW_GIT_VERSION}${NC} successfully\n"
                 
                 # Save cursor position again for the next check
-                printf "\033[s"
+                printf "\033[s" >&2
             else
                 printf "${RED}✗${NC} Git setup failed\n"
                 printf "${CYAN}ℹ${NC} Continuing with Apple Git\n"
             fi
         else
             # User skipped - restore cursor and show clean summary
-            printf "\033[u"
-            printf "\033[J"
+            printf "\033[u" >&2
+            printf "\033[J" >&2
             printf "  ${GREEN}✓${NC} ${BOLD}Git${NC} ${GREEN}${GIT_VERSION_OLD}${NC} ${GRAY}ready${NC}\n"
-            printf "\033[s"
+            printf "\033[s" >&2
         fi
         return 0
     elif [ "$check_result" = "outdated" ]; then
@@ -580,12 +580,12 @@ check_and_prompt_git() {
         run_setup_script "setup_git.sh" >/dev/null
         if [ $? -eq 0 ]; then
             # Restore cursor and clear, then show summary
-            printf "\033[u"
-            printf "\033[J"
+            printf "\033[u" >&2
+            printf "\033[J" >&2
             
             NEW_GIT_VERSION=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
             printf "  ${GREEN}✓${NC} ${BOLD}Git${NC} upgraded to ${GREEN}${NEW_GIT_VERSION}${NC} successfully\n"
-            printf "\033[s"
+            printf "\033[s" >&2
         else
             printf "${RED}✗${NC} Git setup failed\n"
             exit 1
@@ -622,12 +622,12 @@ check_and_prompt_git() {
     run_setup_script "setup_git.sh" --skip-check >/dev/null
     if [ $? -eq 0 ]; then
         # Restore cursor and clear, then show summary
-        printf "\033[u"
-        printf "\033[J"
+        printf "\033[u" >&2
+        printf "\033[J" >&2
         
         NEW_GIT_VERSION=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
         printf "  ${GREEN}✓${NC} ${BOLD}Git${NC} ${GREEN}${NEW_GIT_VERSION}${NC} installed successfully\n"
-        printf "\033[s"
+        printf "\033[s" >&2
     else
         printf "${RED}✗${NC} Git setup failed\n"
         exit 1
@@ -714,7 +714,7 @@ check_and_prompt_nodejs() {
         
         # Format the line to match last box alignment
         printf "\r  ${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}${NODE_VERSION_FULL}${NC} ${GRAY}and${NC} ${BOLD}npm${NC} ${GREEN}${NPM_VERSION_FULL}${NC} ${GRAY}already installed${NC}\033[K\n"
-        printf "033[s"
+        printf "\033[s" >&2
         return 0
     elif [ "$check_result" = "npm_old" ] || [ "$check_result" = "npm_missing" ]; then
         # Track prompt lines
@@ -746,8 +746,8 @@ check_and_prompt_nodejs() {
             # After successful installation, clear all output and show clean result
             # Clear both prompt lines and setup script output
             # Restore cursor and clear
-                printf "\033[u"
-                printf "\033[J"
+                printf "\033[u" >&2
+                printf "\033[J" >&2
             
             # Get the new Node.js and npm versions
             # Load nvm to get Node.js version (if installed via nvm)
@@ -759,7 +759,7 @@ check_and_prompt_nodejs() {
             NEW_NODE_VERSION=$(node --version 2>/dev/null || echo "unknown")
             NEW_NPM_VERSION=$(npm --version 2>/dev/null || echo "unknown")
             printf "  ${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}${NEW_NODE_VERSION}${NC} and ${BOLD}npm${NC} ${GREEN}${NEW_NPM_VERSION}${NC} updated successfully\n"
-                printf "033[s"
+                printf "\033[s" >&2
         else
             printf "${RED}✗${NC} Node.js setup failed\n"
             exit 1
@@ -797,8 +797,8 @@ check_and_prompt_nodejs() {
             # After successful installation, clear all output and show clean result
             # Clear both prompt lines and setup script output
             # Restore cursor and clear
-                printf "\033[u"
-                printf "\033[J"
+                printf "\033[u" >&2
+                printf "\033[J" >&2
             
             # Get the new Node.js and npm versions
             # Load nvm to get Node.js version (if installed via nvm)
@@ -810,7 +810,7 @@ check_and_prompt_nodejs() {
             NEW_NODE_VERSION=$(node --version 2>/dev/null || echo "unknown")
             NEW_NPM_VERSION=$(npm --version 2>/dev/null || echo "unknown")
             printf "  ${GREEN}✓${NC} ${BOLD}Node.js${NC} upgraded to ${GREEN}${NEW_NODE_VERSION}${NC} and ${BOLD}npm${NC} ${GREEN}${NEW_NPM_VERSION}${NC} successfully\n"
-                printf "033[s"
+                printf "\033[s" >&2
         else
             printf "${RED}✗${NC} Node.js setup failed\n"
             exit 1
@@ -849,8 +849,8 @@ check_and_prompt_nodejs() {
         # After successful installation, clear all output and show clean result
         # Clear both prompt lines and setup script output
         # Restore cursor and clear
-                printf "\033[u"
-                printf "\033[J"
+                printf "\033[u" >&2
+                printf "\033[J" >&2
         
         # Load nvm to get Node.js version (if installed via nvm)
         if [ -s "$HOME/.nvm/nvm.sh" ]; then
@@ -862,8 +862,8 @@ check_and_prompt_nodejs() {
         NEW_NODE_VERSION=$(node --version 2>/dev/null || echo "unknown")
         NEW_NPM_VERSION=$(npm --version 2>/dev/null || echo "unknown")
         printf "  ${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}${NEW_NODE_VERSION}${NC} and ${BOLD}npm${NC} ${GREEN}${NEW_NPM_VERSION}${NC} installed successfully\n"
-                printf "\033[s"
-                printf "\033[s"
+                printf "\033[s" >&2
+                printf "\033[s" >&2
     else
         printf "${RED}✗${NC} Node.js setup failed\n"
         exit 1
@@ -944,7 +944,7 @@ check_and_prompt_docker() {
             DOCKER_VERSION=$(docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "installed")
         fi
 
-        printf "033[s"
+        printf "\033[s" >&2
         printf "\r  ${GREEN}✓${NC} ${BOLD}${DOCKER_RUNTIME}${NC} ${GREEN}${DOCKER_VERSION}${NC} ${GRAY}already installed and running${NC}\033[K\n"
         return 0
     elif [ "$check_result" = "installed" ]; then
@@ -988,13 +988,13 @@ check_and_prompt_docker() {
         run_setup_script "setup_docker.sh" >/dev/null
         if [ $? -eq 0 ]; then
             # After successful startup, restore cursor and show clean result
-            printf "\033[u"
-            printf "\033[J"
+            printf "\033[u" >&2
+            printf "\033[J" >&2
 
             # Get Docker version and runtime name, show clean success message
             DOCKER_VERSION=$(docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "unknown")
             printf "  ${GREEN}✓${NC} ${BOLD}${DOCKER_RUNTIME}${NC} ${GREEN}${DOCKER_VERSION}${NC} started successfully\n"
-            printf "\033[s"
+            printf "\033[s" >&2
         else
             printf "${RED}✗${NC} Docker startup failed\n"
             exit 1
@@ -1038,8 +1038,8 @@ check_and_prompt_docker() {
 
 
         # After successful installation, restore cursor and show clean result
-        printf "\033[u"
-        printf "\033[J"
+        printf "\033[u" >&2
+        printf "\033[J" >&2
 
         # Detect runtime and get version
         if [ -d "/Applications/OrbStack.app" ] || command -v orb >/dev/null 2>&1; then
@@ -1055,7 +1055,7 @@ check_and_prompt_docker() {
         fi
 
         printf "  ${GREEN}✓${NC} ${BOLD}${DOCKER_RUNTIME}${NC} ${GREEN}${DOCKER_VERSION}${NC} installed and running successfully\n"
-        printf "033[s"
+        printf "\033[s" >&2
     else
         printf "${RED}✗${NC} Docker setup failed\n"
         exit 1
@@ -1679,7 +1679,7 @@ install_graphdone() {
     
     # Save cursor position right after the header - this is our "safe point"
     # Everything below this can be cleared and rewritten without touching the header
-    printf "\033[s"
+    printf "\033[s" >&2
     
     # Run dependency checks BEFORE trying to download/update code
     check_and_prompt_git
