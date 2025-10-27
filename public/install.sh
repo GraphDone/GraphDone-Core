@@ -1105,13 +1105,14 @@ request_sudo_linux() {
         # Piped from curl/wget - try to reconnect to terminal
         if [ -c /dev/tty ]; then
             exec < /dev/tty
-            printf "  ${VIOLET}◉${NC} Requesting administrative privileges for installations\r"
+            # In piped mode, use newline instead of carriage return
+            printf "  ${VIOLET}◉${NC} Requesting administrative privileges for installations\n"
             if ! sudo -p "  Password: " -v 2>&1; then
-                printf "\n  ${RED}✗${NC} Failed to obtain sudo privileges\n"
+                printf "  ${RED}✗${NC} Failed to obtain sudo privileges\n"
                 return 1
             fi
-            # Clear line and replace with success message
-            printf "\r\033[K  ${GREEN}✓${NC} Administrative access granted\n\n"
+            # Just show success on next line (can't reliably clear in piped mode)
+            printf "  ${GREEN}✓${NC} Administrative access granted\n\n"
         else
             # No terminal available - continue without upfront sudo
             # Each command will prompt individually
