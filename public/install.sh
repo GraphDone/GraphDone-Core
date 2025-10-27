@@ -1815,27 +1815,49 @@ install_graphdone() {
         mode_padding=$(printf "%*s" $mode_spaces "")
         echo "  ${mode_content}"
         
+        # Clean up broken/incomplete directory if it exists
+        if [ -d "$INSTALL_DIR" ]; then
+            printf "  ${YELLOW}⚠${NC} Cleaning up incomplete installation\n"
+            rm -rf "$INSTALL_DIR"
+        fi
+        
         # Show download progress
         printf "  ${BLUE}📦${NC} Downloading GraphDone"
         
-        # Clone in background to show progress
-        git clone --quiet --branch fix/first-start https://github.com/GraphDone/GraphDone-Core.git "$INSTALL_DIR" >/dev/null 2>&1 &
+        # Clone with progress - redirect to log file to capture any errors
+        local clone_log="$LOG_DIR/git-clone-${INSTALL_TIMESTAMP}.log"
+        git clone --progress --branch fix/first-start https://github.com/GraphDone/GraphDone-Core.git "$INSTALL_DIR" >"$clone_log" 2>&1 &
         clone_pid=$!
         
-        # Animated progress bar
+        # Single loop with timeout (no nested loops to avoid race conditions)
+        local elapsed=0
+        local max_wait=300  # 5 minutes max
+        local spinner_chars="⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+        
         while kill -0 $clone_pid 2>/dev/null; do
-            for spinner in "⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏"; do
-                # Download line with exact 88-character content area
-                download_content="${BLUE}📦${NC} Downloading GraphDone ${CYAN}${spinner}${NC}"
-                download_plain="📦 Downloading GraphDone ${spinner}"
-                download_spaces=$((88 - ${#download_plain}))
-                if [ $download_spaces -lt 0 ]; then download_spaces=0; fi
-                download_padding=$(printf "%*s" $download_spaces "")
-                printf "\r  ${download_content}"
-                sleep 0.1
-                kill -0 $clone_pid 2>/dev/null || break
-            done
+            # Check timeout
+            if [ $elapsed -ge $max_wait ]; then
+                kill -9 $clone_pid 2>/dev/null || true
+                wait $clone_pid 2>/dev/null || true
+                printf "\r\033[K"
+                printf "  ${RED}✗${NC} ${BOLD}Download timed out after 5 minutes${NC}\n"
+                if [ -f "$clone_log" ]; then
+                    printf "\n${BOLD}Last 15 lines from log:${NC}\n"
+                    tail -15 "$clone_log"
+                fi
+                rm -rf "$INSTALL_DIR" 2>/dev/null || true
+                error "Git clone timed out - check network connection"
+            fi
+            
+            # Show spinner (rotate through characters)
+            local char_index=$((elapsed % 10))
+            local spinner_char=$(printf "%s" "$spinner_chars" | cut -c$((char_index + 1)))
+            printf "\r  ${BLUE}📦${NC} Downloading GraphDone ${CYAN}${spinner_char}${NC}"
+            
+            sleep 0.1
+            elapsed=$((elapsed + 1))
         done
+        
         wait $clone_pid
         clone_result=$?
         
@@ -1845,6 +1867,12 @@ install_graphdone() {
         # Check if clone succeeded
         if [ $clone_result -ne 0 ] || [ ! -d "$INSTALL_DIR/.git" ]; then
             printf "  ${RED}✗${NC} ${BOLD}Failed to download GraphDone${NC}\n"
+            if [ -f "$clone_log" ]; then
+                printf "\n${BOLD}Last 20 lines from clone log:${NC}\n"
+                tail -20 "$clone_log"
+            fi
+            # Clean up partial clone
+            rm -rf "$INSTALL_DIR" 2>/dev/null || true
             error "Git clone failed - check network connection and try again"
         fi
         
