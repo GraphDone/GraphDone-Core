@@ -2,14 +2,14 @@
 # ============================================================================
 # GraphDone Docker Setup Script
 # ============================================================================
-# 
+#
 # Platform Support:
 #   ✓ macOS    - OrbStack Docker (recommended)
 #   ✓ Linux    - Docker Engine via Snap (preferred), apt-get, dnf, or yum
 #
 # Installation methods:
 #   macOS:   OrbStack via Homebrew (fast, light, free)
-#   Linux:   Docker via Snap (simplest), apt-get (Ubuntu/Debian), 
+#   Linux:   Docker via Snap (simplest), apt-get (Ubuntu/Debian),
 #            dnf (Fedora), or yum (RHEL/CentOS)
 # ============================================================================
 
@@ -22,7 +22,7 @@
 #   - Command: brew install --cask orbstack
 #   - Installs: OrbStack (Docker + Kubernetes alternative)
 #   - Version: Latest stable (e.g., 1.7.3)
-#   - Benefits: 
+#   - Benefits:
 #     - Faster than Docker Desktop (2-3x)
 #     - Lighter on resources (70% less CPU, 50% less memory)
 #     - Starts quickly (2-5 seconds)
@@ -111,7 +111,7 @@
 #   4. Download and add Docker GPG key
 #   5. Add Docker repository to sources.list.d
 #   6. Update package index with Docker repo
-#   7. Install: docker-ce, docker-ce-cli, containerd.io, 
+#   7. Install: docker-ce, docker-ce-cli, containerd.io,
 #              docker-buildx-plugin, docker-compose-plugin
 #   8. Add current user to docker group (usermod -aG docker $USER)
 #   9. Display logout message (group changes require re-login)
@@ -133,7 +133,7 @@
 # Detailed Flow:
 #   1. Install dnf-plugins-core
 #   2. Add Docker repository (docker-ce.repo)
-#   3. Install: docker-ce, docker-ce-cli, containerd.io, 
+#   3. Install: docker-ce, docker-ce-cli, containerd.io,
 #              docker-buildx-plugin, docker-compose-plugin
 #   4. Start Docker daemon (systemctl start docker)
 #   5. Enable Docker on boot (systemctl enable docker)
@@ -158,7 +158,7 @@
 # Detailed Flow:
 #   1. Install yum-utils
 #   2. Add Docker repository (docker-ce.repo)
-#   3. Install: docker-ce, docker-ce-cli, containerd.io, 
+#   3. Install: docker-ce, docker-ce-cli, containerd.io,
 #              docker-buildx-plugin, docker-compose-plugin
 #   4. Start Docker daemon (systemctl start docker)
 #   5. Enable Docker on boot (systemctl enable docker)
@@ -235,7 +235,7 @@ show_spinner() {
     msg="$2"
     i=0
     spin_char=""
-    
+
     while kill -0 "$pid" 2>/dev/null; do
         case $((i % 10)) in
             0) spin_char='⠋' ;;
@@ -295,19 +295,16 @@ check_docker() {
 # ============================================================================
 install_docker_linux() {
     # ------------------------------------------------------------------------
+    # Note: Sudo access already requested by parent install.sh
+    # ------------------------------------------------------------------------
+
+    # ------------------------------------------------------------------------
     # METHOD 1: Snap Installation (Preferred - simplest)
     # ------------------------------------------------------------------------
     # Check if snap is available
     if command -v snap >/dev/null 2>&1; then
         printf "        ${VIOLET}◉${NC} Installing Docker via snap\n" >&2
-        
-        # Request sudo password upfront (required for snap install)
-        printf "        ${VIOLET}◉${NC} Requesting administrative privileges\n" >&2
-        if ! sudo -v; then
-            printf "        ${RED}✗${NC} Failed to obtain sudo privileges\n" >&2
-            return 1
-        fi
-        
+
         # Install Docker via snap with spinner
         # Command: snap install docker
         # Installs: Docker Engine + CLI + containerd
@@ -321,7 +318,7 @@ install_docker_linux() {
             printf "\r        ${YELLOW}⚠${NC} Snap installation failed, trying distribution-specific method\n" >&2
         fi
     fi
-    
+
     # ------------------------------------------------------------------------
     # METHOD 2: Distribution-specific package manager (Fallback)
     # ------------------------------------------------------------------------
@@ -558,7 +555,7 @@ install_docker_macos() {
     #         install_docker_desktop
     #         ;;
     #     *)
-    
+
     # ------------------------------------------------------------------------
     # Install OrbStack via Homebrew
     # ------------------------------------------------------------------------
