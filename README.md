@@ -62,7 +62,7 @@ wget -qO- https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public
 2. **System Detection** - Detects platform (macOS 10.15+, Linux distros)
 3. **Dependency Installation** - Installs Git, Node.js 18+, Docker if needed
    - macOS: Uses Homebrew + OrbStack (Docker alternative)
-   - Linux: Uses apt/dnf/yum + Docker Engine (15+ distributions supported)
+   - Linux: Smart sudo authentication (works with curl/wget pipes), uses apt/dnf/yum + Docker Engine (15+ distributions supported)
 4. **Code Setup** - Clones repository to `~/graphdone`, installs npm dependencies
 5. **Security Config** - Generates self-signed TLS certificates for HTTPS
 6. **Service Deployment** - Starts Neo4j, Redis, GraphQL API, React Web App
@@ -95,8 +95,9 @@ sh install.sh
 
 **What the installation script does:**
 - ✅ Installs to `~/graphdone` (visible, user-owned directory)
-- ✅ Never requires sudo for core installation
-- ✅ Only asks for permission when installing system dependencies (Docker, Git)
+- ✅ Smart sudo handling - works with curl/wget pipes and local execution
+- ✅ Only requests administrative privileges once for system dependencies (Docker, Git)
+- ✅ Sudo access kept alive during installation, cleared on exit for security
 - ✅ All source code is open and auditable
 - ✅ No telemetry or data collection
 - ⚠️ Generates self-signed TLS certificates (you'll see browser warnings - this is expected)
