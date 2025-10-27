@@ -1104,14 +1104,17 @@ request_sudo_linux() {
     else
         # Piped from curl/wget - try to reconnect to terminal
         if [ -c /dev/tty ]; then
+            # Reconnect FIRST, before printing anything
             exec < /dev/tty
-            # In piped mode, use newline instead of carriage return
+            exec > /dev/tty
+            exec 2> /dev/tty
+            
+            # NOW print the message after stdin/stdout are reconnected
             printf "  ${VIOLET}◉${NC} Requesting administrative privileges for installations\n"
-            if ! sudo -p "  Password: " -v 2>&1; then
+            if ! sudo -p "  Password: " -v; then
                 printf "  ${RED}✗${NC} Failed to obtain sudo privileges\n"
                 return 1
             fi
-            # Just show success on next line (can't reliably clear in piped mode)
             printf "  ${GREEN}✓${NC} Administrative access granted\n\n"
         else
             # No terminal available - continue without upfront sudo
