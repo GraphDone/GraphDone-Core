@@ -972,28 +972,50 @@ check_and_prompt_docker() {
             DOCKER_RUNTIME="Docker"
         fi
 
-        printf "\r  ${YELLOW}⚠${NC} ${BOLD}${DOCKER_RUNTIME}${NC} ${GREEN}${DOCKER_VERSION}${NC} ${GRAY}installed but not running${NC}\n"
-        printf "\n"
+        printf "\r  ${YELLOW}⚠${NC} ${BOLD}${DOCKER_RUNTIME}${NC} ${GREEN}${DOCKER_VERSION}${NC} ${GRAY}installed but not running, starting${NC}\033[K\n"
 
-        printf "        ${YELLOW}🟡 ${BOLD}Docker Startup Required${NC}\n"
-        printf "        ${GRAY}${DOCKER_RUNTIME} is installed but the daemon is not running.${NC}\n\n"
-        printf "        ${GREEN}✓${NC} We'll start ${DOCKER_RUNTIME} automatically\n"
-        printf "        ${GREEN}✓${NC} Wait for the Linux VM to boot and be ready\n"
-        printf "        ${GREEN}✓${NC} Zero manual intervention required\n\n"
-        printf "        ${CYAN}❯${NC} ${BOLD}Continue with Docker startup?${NC} ${GRAY}[Press Enter] or Ctrl+C to exit${NC}\n"
-        printf "        "
-        read -r response || response="" || response="n"
-
-        # Run the Docker setup script to start Docker
-        run_setup_script "setup_docker.sh" >/dev/null
-        if [ $? -eq 0 ]; then
-            # After successful startup, restore cursor and show clean result
-
+        # Move to previous line for spinner to replace the warning
+        printf "\033[1A"
+        
+        # Run the Docker setup script to start Docker with spinner
+        local log_file="$LOG_DIR/docker-setup-${INSTALL_TIMESTAMP}.log"
+        run_setup_script "setup_docker.sh" >"$log_file" 2>&1 &
+        local setup_pid=$!
+        
+        # Spinner while starting
+        local i=0
+        local spin_char=""
+        while kill -0 $setup_pid 2>/dev/null; do
+            case $((i % 10)) in
+                0) spin_char='⠋' ;;
+                1) spin_char='⠙' ;;
+                2) spin_char='⠹' ;;
+                3) spin_char='⠸' ;;
+                4) spin_char='⠼' ;;
+                5) spin_char='⠴' ;;
+                6) spin_char='⠦' ;;
+                7) spin_char='⠧' ;;
+                8) spin_char='⠇' ;;
+                9) spin_char='⠏' ;;
+            esac
+            printf "\r  ${YELLOW}◉${NC} Starting ${DOCKER_RUNTIME} ${BOLD}${CYAN}%s${NC}\033[K" "$spin_char"
+            i=$((i + 1))
+            sleep 0.15
+        done
+        
+        wait $setup_pid
+        local result=$?
+        
+        if [ $result -eq 0 ]; then
             # Get Docker version and runtime name, show clean success message
             DOCKER_VERSION=$(docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "unknown")
-            printf "  ${GREEN}✓${NC} ${BOLD}${DOCKER_RUNTIME}${NC} ${GREEN}${DOCKER_VERSION}${NC} started successfully\n"
+            printf "\r  ${GREEN}✓${NC} ${BOLD}${DOCKER_RUNTIME}${NC} ${GREEN}${DOCKER_VERSION}${NC} started successfully\033[K\n"
         else
-            printf "${RED}✗${NC} Docker startup failed\n"
+            printf "  ${RED}✗${NC} Docker startup failed\n"
+            if [ -f "$log_file" ]; then
+                printf "\n${BOLD}Last 15 lines from log:${NC}\n"
+                tail -15 "$log_file"
+            fi
             exit 1
         fi
         return 0
