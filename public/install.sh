@@ -1104,18 +1104,21 @@ request_sudo_linux() {
     else
         # Piped from curl/wget - try to reconnect to terminal
         if [ -c /dev/tty ]; then
-            # Reconnect FIRST, before printing anything
-            exec < /dev/tty
-            exec > /dev/tty
-            exec 2> /dev/tty
+            # Temporarily redirect to /dev/tty for sudo prompt only
+            (
+                exec < /dev/tty
+                exec > /dev/tty
+                exec 2> /dev/tty
+                
+                printf "  ${VIOLET}◉${NC} Requesting administrative privileges for installations\n"
+                if ! sudo -p "  Password: " -v; then
+                    printf "  ${RED}✗${NC} Failed to obtain sudo privileges\n"
+                    exit 1
+                fi
+                printf "  ${GREEN}✓${NC} Administrative access granted\n\n"
+            ) || return 1
             
-            # NOW print the message after stdin/stdout are reconnected
-            printf "  ${VIOLET}◉${NC} Requesting administrative privileges for installations\n"
-            if ! sudo -p "  Password: " -v; then
-                printf "  ${RED}✗${NC} Failed to obtain sudo privileges\n"
-                return 1
-            fi
-            printf "  ${GREEN}✓${NC} Administrative access granted\n\n"
+            # After subshell exits, stdin/stdout/stderr are restored automatically
         else
             # No terminal available - continue without upfront sudo
             # Each command will prompt individually
