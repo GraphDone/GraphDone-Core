@@ -41,7 +41,7 @@ The installation script performs 9 automated steps:
 - Shell environment validation
 
 ### 3. Dependency Installation
-Automatically installs missing dependencies:
+Automatically installs missing dependencies with smart sudo authentication:
 
 **macOS:**
 - Git via Homebrew
@@ -49,6 +49,13 @@ Automatically installs missing dependencies:
 - OrbStack (lightweight Docker alternative) via Homebrew
 
 **Linux (15+ distributions):**
+- **Smart Sudo Management**:
+  - Checks if sudo is already cached (no prompt if recently authenticated)
+  - Works with curl/wget pipes via `/dev/tty` reconnection
+  - Works with local execution (`sh install.sh`)
+  - Requests administrative privileges once upfront
+  - Keeps sudo alive (60-second refresh) during installation
+  - Automatically clears sudo cache on exit for security
 - Git via apt-get/dnf/yum
 - Node.js 22 LTS via nvm
 - Docker Engine via Snap (preferred) or apt-get/dnf/yum
