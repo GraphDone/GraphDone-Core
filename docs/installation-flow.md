@@ -50,7 +50,26 @@ flowchart TD
     CheckLinux -->|No| Exit3([Exit: Unsupported Linux])
     CheckLinux -->|Yes| Section3[Section 3: Dependency Checks]
     
-    Section3 --> CheckGit{Git Installed?}
+    Section3 --> LinuxSudo{Linux Platform?}
+    LinuxSudo -->|Yes| CheckSudoCached{Sudo Cached?}
+    LinuxSudo -->|No| CheckGit
+    
+    CheckSudoCached -->|Yes| UseCachedSudo[Use existing sudo session]
+    CheckSudoCached -->|No| CheckInteractive{Interactive Terminal?}
+    
+    CheckInteractive -->|Yes| SudoPromptLocal[Request sudo password locally]
+    CheckInteractive -->|No| CheckTTY{/dev/tty Available?}
+    
+    CheckTTY -->|Yes| SudoPromptPipe[Reconnect to /dev/tty, request sudo]
+    CheckTTY -->|No| SkipSudo[Skip upfront sudo, prompt per command]
+    
+    UseCachedSudo --> StartSudoKeeper[Start 60s sudo keep-alive loop]
+    SudoPromptLocal --> StartSudoKeeper
+    SudoPromptPipe --> StartSudoKeeper
+    SkipSudo --> CheckGit
+    StartSudoKeeper --> CheckGit
+    
+    CheckGit{Git Installed?}
     CheckGit -->|No| InstallGit[Install Git]
     CheckGit -->|Yes| CheckNode
     
@@ -545,3 +564,176 @@ See [docs/deployment.md](./deployment.md#neo4j-configuration-notes) for complete
 - **Clear node shapes** that indicate purpose (rectangles=actions, diamonds=decisions)
 - **Logical flow direction** (top-down for processes, left-right for recovery)
 - **Grouped elements** with subtle background differentiation
+---
+
+## 🔐 Smart Sudo Authentication (Linux)
+
+GraphDone implements intelligent sudo management that works seamlessly across all installation methods (curl/wget pipes and local execution).
+
+### Authentication Flow
+
+```mermaid
+flowchart TD
+    Start[Linux Dependency Installation] --> CheckCached{Sudo Already<br/>Cached?}
+    
+    CheckCached -->|Yes| UseCached[Use Existing Session]
+    CheckCached -->|No| CheckInteractive{Interactive<br/>Terminal?}
+    
+    UseCached --> StartKeeper[Start 60s Keep-Alive Loop]
+    
+    CheckInteractive -->|Yes - Local| PromptLocal[Show: Requesting privileges<br/>Prompt: Password]
+    CheckInteractive -->|No - Piped| CheckTTY{/dev/tty<br/>Available?}
+    
+    PromptLocal --> LocalAuth{Auth<br/>Success?}
+    LocalAuth -->|Yes| ReplaceMsg[Replace line with:<br/>✓ Administrative access granted]
+    LocalAuth -->|No| Fail[Show error, exit]
+    
+    CheckTTY -->|Yes| Reconnect[Redirect stdin/stdout/stderr<br/>to /dev/tty in subshell]
+    CheckTTY -->|No| SkipUpfront[Skip upfront sudo<br/>Each command prompts individually]
+    
+    Reconnect --> PromptPipe[Show: Requesting privileges<br/>Prompt: Password]
+    PromptPipe --> PipeAuth{Auth<br/>Success?}
+    PipeAuth -->|Yes| RestoreIO[Subshell exits<br/>File descriptors restored]
+    PipeAuth -->|No| Fail
+    
+    ReplaceMsg --> StartKeeper
+    RestoreIO --> StartKeeper
+    SkipUpfront --> InstallDeps[Install Dependencies]
+    
+    StartKeeper --> SetTrap[Set EXIT trap:<br/>sudo -k to clear cache]
+    SetTrap --> InstallDeps
+    
+    InstallDeps --> Complete[Installation Continues]
+    
+    classDef startNode fill:#3B82F6,stroke:#1D4ED8,stroke-width:2px,color:#FFFFFF
+    classDef processNode fill:#10B981,stroke:#059669,stroke-width:2px,color:#FFFFFF
+    classDef decisionNode fill:#F59E0B,stroke:#D97706,stroke-width:2px,color:#FFFFFF
+    classDef successNode fill:#22C55E,stroke:#16A34A,stroke-width:3px,color:#FFFFFF
+    classDef errorNode fill:#EF4444,stroke:#DC2626,stroke-width:2px,color:#FFFFFF
+    classDef securityNode fill:#8B5CF6,stroke:#7C3AED,stroke-width:2px,color:#FFFFFF
+    
+    class Start startNode
+    class PromptLocal,PromptPipe,Reconnect,RestoreIO,ReplaceMsg,StartKeeper,SetTrap,InstallDeps processNode
+    class CheckCached,CheckInteractive,CheckTTY,LocalAuth,PipeAuth decisionNode
+    class Complete successNode
+    class Fail errorNode
+    class UseCached,SkipUpfront securityNode
+```
+
+### Key Features
+
+#### 1. **Smart Detection**
+- Checks if sudo is already cached (user authenticated recently)
+- No prompt needed if sudo session is fresh
+- Reduces interruptions during installation
+
+#### 2. **Universal Compatibility**
+Works with all installation methods:
+
+| Method | How It Works |
+|--------|-------------|
+| **Local execution** (`sh install.sh`) | Normal prompt, clean line replacement |
+| **curl pipe** (`curl ... \| sh`) | Reconnects to `/dev/tty` in subshell |
+| **wget pipe** (`wget ... \| sh`) | Same as curl, automatic fallback |
+| **No TTY** (rare) | Skips upfront sudo, each command prompts |
+
+#### 3. **Secure Session Management**
+- **Single authentication**: Request sudo once upfront
+- **Keep-alive loop**: Refreshes sudo every 60 seconds during installation
+- **Automatic cleanup**: `EXIT` trap clears sudo cache when script exits
+- **No lingering permissions**: Security-first design
+
+#### 4. **Clean User Experience**
+
+**Interactive Mode** (local execution):
+```
+────────────────────  🔰 Dependency Checks  ────────────────────
+
+  ✓ Administrative access granted
+
+  • Checking Git installation...
+```
+
+**Piped Mode** (curl/wget):
+```
+────────────────────  🔰 Dependency Checks  ────────────────────
+
+  ◉ Requesting administrative privileges for installations
+  Password: 
+  ✓ Administrative access granted
+
+  • Checking Git installation...
+```
+
+### Technical Implementation
+
+#### File Descriptor Management (Piped Mode)
+
+```bash
+# Wrap in subshell to auto-restore file descriptors
+(
+    exec < /dev/tty   # Reconnect stdin to terminal
+    exec > /dev/tty   # Reconnect stdout to terminal  
+    exec 2> /dev/tty  # Reconnect stderr to terminal
+    
+    # Now sudo can prompt for password
+    sudo -p "  Password: " -v
+    
+    # Show success message
+    printf "  ✓ Administrative access granted\n"
+)
+# After subshell exits, stdin/stdout/stderr automatically restored
+# Rest of installation output goes to original streams (curl/wget)
+```
+
+#### Keep-Alive Background Process
+
+```bash
+# Refresh sudo every 60 seconds
+(while true; do 
+    sudo -n true
+    sleep 60
+    kill -0 "$$" || exit  # Exit if parent died
+done 2>/dev/null) &
+
+SUDO_KEEPER_PID=$!
+```
+
+#### Security Trap
+
+```bash
+# Clear sudo cache on exit (success or failure)
+trap 'sudo -k; kill $SUDO_KEEPER_PID 2>/dev/null' EXIT
+```
+
+### Why This Approach?
+
+**Industry Standard**: Used by professional installers like Homebrew, Docker, etc.
+
+**Benefits**:
+- ✅ Single password prompt (smooth UX)
+- ✅ Works everywhere (local, curl, wget)
+- ✅ Secure (clears cache on exit)
+- ✅ Efficient (no multiple prompts)
+- ✅ Transparent (shows what's happening)
+
+**Alternatives Considered**:
+- ❌ Multiple prompts per command (annoying)
+- ❌ Hardcode sudo in commands (doesn't work with pipes)
+- ❌ Skip sudo management (broken on curl/wget)
+- ❌ Cache sudo indefinitely (security risk)
+
+### Troubleshooting
+
+#### "Failed to obtain sudo privileges"
+- **Cause**: Incorrect password or sudo not configured
+- **Solution**: Check password, verify user in sudoers file
+
+#### Terminal hangs after password
+- **Cause**: File descriptors not restored (fixed in v0.3.1-alpha)
+- **Solution**: Update to latest version
+
+#### Multiple password prompts
+- **Cause**: Upfront sudo failed, falling back to per-command prompts
+- **Solution**: This is expected behavior when `/dev/tty` unavailable
+
