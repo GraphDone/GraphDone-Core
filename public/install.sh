@@ -1697,7 +1697,7 @@ install_graphdone() {
     echo "  ${target_content}"
     
     # Download or update with animated progress
-    if [ -d "$INSTALL_DIR" ]; then
+    if [ -d "$INSTALL_DIR/.git" ]; then
         # Mode line with exact 88-character content area
         mode_content="${BLUE}◉${NC} ${GRAY}Mode:${NC} ${YELLOW}Update existing${NC}"
         mode_plain="◉ Mode: Update existing"
@@ -1815,9 +1815,16 @@ install_graphdone() {
             done
         done
         wait $clone_pid
+        clone_result=$?
         
         # Clear the line completely to prevent spinner artifacts
         printf "\r\033[K"
+        
+        # Check if clone succeeded
+        if [ $clone_result -ne 0 ] || [ ! -d "$INSTALL_DIR/.git" ]; then
+            printf "  ${RED}✗${NC} ${BOLD}Failed to download GraphDone${NC}\n"
+            error "Git clone failed - check network connection and try again"
+        fi
         
         # Success line with exact 88-character content area
         success_content="${GREEN}✓${NC} ${BOLD}Downloaded${NC} ${GREEN}GraphDone${NC}"
