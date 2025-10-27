@@ -1070,8 +1070,10 @@ check_and_prompt_git_macos() {
 # ============================================================================
 # LINUX SUDO REQUEST - request_sudo_linux()
 # ============================================================================
-# Request sudo privileges once at the beginning for all Linux installations
-# Follows Homebrew pattern: single upfront prompt, security trap on exit
+# Smart sudo management that works everywhere:
+# - Checks if sudo already cached (no prompt needed)
+# - Only prompts if necessary
+# - Works with curl/wget pipes AND local execution
 # ============================================================================
 request_sudo_linux() {
     # Check if we're on Linux
@@ -1079,20 +1081,49 @@ request_sudo_linux() {
         return 0
     fi
 
-    # Request sudo access once
-    printf "  ${VIOLET}◉${NC} Requesting administrative privileges for installations\n"
-    if ! sudo -v; then
-        printf "  ${RED}✗${NC} Failed to obtain sudo privileges\n"
-        return 1
+    # First, silently check if we already have sudo access
+    if sudo -n true 2>/dev/null; then
+        # Already have sudo - no prompt needed!
+        # Keep sudo alive in background
+        (while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null) &
+        SUDO_KEEPER_PID=$!
+        trap 'sudo -k; kill $SUDO_KEEPER_PID 2>/dev/null' EXIT
+        return 0
     fi
 
-    # Keep sudo alive in background (refresh every 60 seconds)
+    # Need to authenticate - check if we can prompt
+    if [ -t 0 ]; then
+        # Interactive terminal - can prompt normally
+        printf "  ${VIOLET}◉${NC} Requesting administrative privileges for installations\r"
+        if ! sudo -p "  Password: " -v </dev/tty 2>&1; then
+            printf "\n  ${RED}✗${NC} Failed to obtain sudo privileges\n"
+            return 1
+        fi
+        # Clear line and replace with success message
+        printf "\r\033[K  ${GREEN}✓${NC} Administrative access granted\n\n"
+    else
+        # Piped from curl/wget - try to reconnect to terminal
+        if [ -c /dev/tty ]; then
+            exec < /dev/tty
+            printf "  ${VIOLET}◉${NC} Requesting administrative privileges for installations\r"
+            if ! sudo -p "  Password: " -v 2>&1; then
+                printf "\n  ${RED}✗${NC} Failed to obtain sudo privileges\n"
+                return 1
+            fi
+            # Clear line and replace with success message
+            printf "\r\033[K  ${GREEN}✓${NC} Administrative access granted\n\n"
+        else
+            # No terminal available - continue without upfront sudo
+            # Each command will prompt individually
+            return 0
+        fi
+    fi
+
+    # Keep sudo alive in background
     (while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null) &
     SUDO_KEEPER_PID=$!
-
-    # Clear sudo cache on exit for security
     trap 'sudo -k; kill $SUDO_KEEPER_PID 2>/dev/null' EXIT
-
+    
     return 0
 }
 
