@@ -1,16 +1,249 @@
 #!/bin/sh
-# GraphDone Installation Script - Professional One-Liner Setup
+# ============================================================================
+# ============================================================================
 # 
-# Usage with curl:
+#                    GraphDone Installation Script
+#             Professional One-Command Setup for All Platforms
+# 
+# ============================================================================
+# ============================================================================
+#
+# 📖 DESCRIPTION
+# ============================================================================
+#   Automated installer for GraphDone - a graph-native project management
+#   system that reimagines work coordination through dependencies and 
+#   democratic prioritization. Handles complete setup from dependency 
+#   installation to running services with beautiful CLI progress feedback.
+#
+#   Features:
+#   • Zero-config installation (just one command!)
+#   • Automatic dependency management (Git, Node.js, Docker)
+#   • Cross-platform support (macOS + Linux)
+#   • Beautiful animated CLI interface
+#   • Smart retry logic for network issues
+#   • HTTPS/TLS security out of the box
+#   • Health checks for all services
+#
+# 🚀 QUICK START
+# ============================================================================
+#   # Option 1: Direct install with curl
 #   curl -fsSL https://graphdone.com/install.sh | sh
 #
-# Usage with wget:
+#   # Option 2: Direct install with wget
 #   wget -qO- https://graphdone.com/install.sh | sh
 #
-# Or download and run:
+#   # Option 3: Download first, then run
 #   wget https://graphdone.com/install.sh && sh install.sh
+#
+# 💻 SUPPORTED PLATFORMS
+# ============================================================================
+#   macOS:
+#   ✓ macOS 10.15+ Catalina
+#   ✓ macOS 11.x Big Sur
+#   ✓ macOS 12.x Monterey
+#   ✓ macOS 13.x Ventura
+#   ✓ macOS 14.x Sonoma
+#
+#   Linux Distributions (15+):
+#   ✓ Ubuntu 20.04+, 22.04+, 24.04+
+#   ✓ Debian 10+, 11+, 12+
+#   ✓ Fedora 38+, 39+, 40+
+#   ✓ RHEL 8+, 9+
+#   ✓ CentOS 8+, Stream 9
+#   ✓ Rocky Linux 8+, 9+
+#   ✓ AlmaLinux 8+, 9+
+#   ✓ Linux Mint 20+, 21+
+#   ✓ Pop!_OS 22.04+
+#   ✓ Elementary OS 6+, 7+
+#   ✓ Arch Linux (rolling)
+#   ✓ Manjaro (rolling)
+#   ✓ openSUSE Leap 15+, Tumbleweed
+#
+# 📋 INSTALLATION WORKFLOW (9 SECTIONS)
+# ============================================================================
+#   Section 1: Pre-flight Checks
+#   └─ Network connectivity test
+#   └─ Disk space validation (5GB minimum)
+#   └─ Download speed test (CloudFlare CDN)
+#   └─ Upload speed test (CloudFlare)
+#
+#   Section 2: System Information
+#   └─ Platform detection (macOS/Linux)
+#   └─ OS version and compatibility check
+#   └─ Architecture detection (x86_64/arm64)
+#   └─ Shell environment display
+#
+#   Section 3: Dependency Checks
+#   └─ Git: Checks version, installs/upgrades if needed
+#   └─ Node.js: Ensures 18+, installs via Homebrew (macOS) or nvm (Linux)
+#   └─ Docker: Installs OrbStack (macOS) or Docker Engine (Linux)
+#
+#   Section 4: Code Installation
+#   └─ Clones GraphDone repository from GitHub
+#   └─ Installs npm dependencies with smart retry logic
+#   └─ Handles package conflicts automatically
+#
+#   Section 5: Environment Configuration
+#   └─ Creates .env file from template
+#   └─ Configures Neo4j credentials
+#   └─ Sets up Redis connection
+#   └─ Configures API and Web URLs
+#
+#   Section 6: Security Initialization
+#   └─ Generates self-signed TLS certificates
+#   └─ Sets proper file permissions (600 for keys, 644 for certs)
+#   └─ Enables HTTPS for API and Web
+#
+#   Section 7: Services Status
+#   └─ Checks if containers are already running
+#   └─ Validates container health status
+#   └─ Tests Neo4j and Redis connectivity
+#
+#   Section 8: Container Cleanup
+#   └─ Stops old containers gracefully
+#   └─ Removes orphaned containers
+#   └─ Cleans up Docker volumes
+#
+#   Section 9: Service Deployment
+#   └─ Starts Neo4j database (port 7474, 7687)
+#   └─ Starts Redis cache (port 6379)
+#   └─ Starts GraphQL API (port 4128 HTTPS)
+#   └─ Starts React Web App (port 3128 HTTPS)
+#   └─ Waits for all services to be healthy (60s timeout)
+#
+# 🏗️ FILE STRUCTURE (7 MAJOR COMPONENTS)
+# ============================================================================
+#   Component 1: Helper Functions & Utilities (Lines 62-470)
+#   ├─ Logging functions (log, ok, warn, error)
+#   ├─ System validation (disk space, network)
+#   ├─ Network speed tests (download/upload)
+#   ├─ Dependency management (hash-based caching)
+#   ├─ UI elements (spinners, progress bars)
+#   └─ Platform detection (macOS/Linux)
+#
+#   Component 2: Git Installation (Lines 471-1075)
+#   ├─ macOS: Homebrew installation
+#   ├─ Linux: apt-get, dnf, yum support
+#   └─ Version checking and upgrades
+#
+#   Component 3: Node.js Installation (Lines 1076-1750)
+#   ├─ macOS: Homebrew installation (latest stable)
+#   ├─ Linux: nvm installation (Node.js 22 LTS)
+#   └─ npm version validation
+#
+#   Component 4: Docker Installation (Lines 1751-2280)
+#   ├─ macOS: OrbStack via Homebrew
+#   ├─ Linux: Snap (preferred), apt-get, dnf, yum
+#   └─ Daemon startup and health checks
+#
+#   Component 5: Service Management (Lines 2281-2610)
+#   ├─ Container health checks
+#   ├─ Service wait logic (60s timeout)
+#   ├─ Stop services command
+#   └─ Remove services command (complete reset)
+#
+#   Component 6: Main Installation Orchestrator (Lines 2611-3600)
+#   ├─ Animated banner display
+#   ├─ Platform compatibility checks
+#   ├─ Dependency installation workflow
+#   ├─ Repository cloning
+#   ├─ Docker Compose deployment
+#   └─ Health verification
+#
+#   Component 7: Success UI & Command Handler (Lines 3601-3700)
+#   ├─ Beautiful success message with URLs
+#   ├─ Management commands display
+#   └─ CLI argument processing (install/stop/remove)
+#
+# ⌨️  COMMAND REFERENCE
+# ============================================================================
+#   Install GraphDone:
+#     sh install.sh
+#     sh install.sh install
+#
+#   Stop all services:
+#     sh install.sh stop
+#
+#   Complete cleanup (removes containers, volumes, images):
+#     sh install.sh remove
+#
+# 📊 EXIT CODES
+# ============================================================================
+#   0  - Success (GraphDone installed and running)
+#   1  - Failure (Installation failed - see error message)
+#   130 - Interrupted (User pressed Ctrl+C)
+#
+# 📦 SYSTEM REQUIREMENTS
+# ============================================================================
+#   Disk Space:  5GB minimum free space
+#   Memory:      4GB RAM minimum (8GB recommended)
+#   Network:     Internet connection required
+#   OS:          macOS 10.15+ or modern Linux distribution
+#   Shell:       POSIX-compatible shell (sh, bash, zsh, dash)
+#
+# 🌐 AFTER INSTALLATION
+# ============================================================================
+#   Your GraphDone instance will be available at:
+#
+#   Web Application:
+#     https://localhost:3128
+#     (Main interface for managing work items and graph visualization)
+#
+#   GraphQL API:
+#     https://localhost:4128/graphql
+#     (Apollo GraphQL Playground for API exploration)
+#
+#   Neo4j Database Browser:
+#     http://localhost:7474
+#     Username: neo4j
+#     Password: graphdone_password
+#     (Cypher query interface for direct database access)
+#
+# 🔧 TROUBLESHOOTING
+# ============================================================================
+#   Installation logs are saved to:
+#     ~/graphdone-logs/installation-YYYY-MM-DD_HH-MM-SS.log
+#
+#   Common issues:
+#   • Port conflicts: Stop services using ports 3128, 4128, 7474, 7687, 6379
+#   • Docker not starting: Ensure Docker Desktop or OrbStack is running
+#   • Permission errors: Script requires sudo for system package installation
+#   • Network errors: Check firewall settings and internet connectivity
+#
+# 📄 LICENSE & LINKS
+# ============================================================================
+#   Repository: https://github.com/GraphDone/GraphDone-Core
+#   License:    MIT
+#   Docs:       https://graphdone.com/docs
+#   Issues:     https://github.com/GraphDone/GraphDone-Core/issues
+#
+# ============================================================================
+# ============================================================================
 
 set -e
+
+# ############################################################################
+# ############################################################################
+# ##                                                                        ##
+# ##              HELPER FUNCTIONS & UTILITIES COMPONENT                    ##
+# ##                                                                        ##
+# ############################################################################
+# ############################################################################
+#
+# This section contains all utility functions used throughout the installer.
+# 
+# Categories:
+#   - Logging & Output: log(), ok(), warn(), error()
+#   - System Checks: check_disk_space(), check_network()
+#   - Network Tests: test_download_speed(), test_upload_speed()
+#   - Dependencies: check_deps_fresh(), update_deps_hash()
+#   - UI Elements: show_spinner(), spinner(), run_with_spinner()
+#   - Platform Detection: detect_platform(), get_macos_name(), get_macos_info()
+#   - Cleanup: cleanup(), run_setup_script()
+#
+# These functions provide the foundation for the installation process.
+#
+# ############################################################################
 
 # Create logs directory in home
 LOG_DIR="$HOME/graphdone-logs"
@@ -133,6 +366,10 @@ error() {
     exit 1
 }
 
+# ─────────────────────────────────────────────────────────────────────────
+# SYSTEM VALIDATION FUNCTIONS
+# ─────────────────────────────────────────────────────────────────────────
+
 # Check disk space (requires at least 5GB free)
 check_disk_space() {
     local required_gb=5
@@ -184,6 +421,10 @@ check_network() {
     fi
 }
 
+# ─────────────────────────────────────────────────────────────────────────
+# NETWORK SPEED TEST FUNCTIONS
+# ─────────────────────────────────────────────────────────────────────────
+
 # Test download speed using CloudFlare's speed test
 test_download_speed() {
     if ! command -v curl >/dev/null 2>&1; then
@@ -232,6 +473,10 @@ test_upload_speed() {
         echo "N/A"
     fi
 }
+
+# ─────────────────────────────────────────────────────────────────────────
+# DEPENDENCY MANAGEMENT FUNCTIONS
+# ─────────────────────────────────────────────────────────────────────────
 
 # Cache configuration
 CACHE_DIR=".graphdone-cache"
@@ -287,6 +532,10 @@ update_deps_hash() {
     fi
 }
 
+
+# ─────────────────────────────────────────────────────────────────────────
+# UI & SPINNER FUNCTIONS
+# ─────────────────────────────────────────────────────────────────────────
 
 # Fancy dots spinner function for installation steps
 show_spinner() {
@@ -347,9 +596,9 @@ run_with_spinner() {
     return $?
 }
 
-# ============================================================================
-# PLATFORM DETECTION
-# ============================================================================
+# ─────────────────────────────────────────────────────────────────────────
+# PLATFORM DETECTION FUNCTIONS
+# ─────────────────────────────────────────────────────────────────────────
 
 detect_platform() {
     case "$(uname)" in
@@ -425,8 +674,137 @@ get_macos_info() {
     fi
 }
 
-# Interactive Git check with animated progress
-check_and_prompt_git() {
+# ############################################################################
+# ############################################################################
+# ##                                                                        ##
+# ##                     GIT INSTALLATION COMPONENT                         ##
+# ##                                                                        ##
+# ############################################################################
+# ############################################################################
+#
+# This section handles Git installation and upgrades for both macOS and Linux.
+# 
+# Components:
+#   - macOS Git installation (check_and_prompt_git_macos)
+#   - Linux Git installation (check_and_prompt_git_linux)
+#   - Unified dispatcher (check_and_prompt_git)
+#
+# Supported platforms:
+#   macOS:  Homebrew installation (latest Git)
+#   Linux:  apt-get (Ubuntu/Debian), dnf (Fedora), yum (RHEL/CentOS)
+#
+# ############################################################################
+
+# ============================================================================
+# GIT INSTALLATION CHECK - All Cases (macOS)
+# ============================================================================
+# Detects Git status and automatically installs/upgrades as needed.
+#
+# CASE 1: Current Git (>= 2.45)
+#   - Condition: Git installed AND version >= 2.45
+#   - Action: Skip installation (already current)
+#   - Example: "git version 2.51.1"
+#
+# CASE 2: Apple Git (macOS bundled)
+#   - Condition: Git installed AND version contains "Apple Git"
+#   - Action: Auto-upgrade to Homebrew Git (no prompt)
+#   - Example: "git version 2.39.3 (Apple Git-146)"
+#   - When: Fresh macOS with Xcode Command Line Tools
+#
+# CASE 3: Outdated Git (< 2.45)
+#   - Condition: Git installed AND version < 2.45 AND NOT Apple Git
+#   - Action: Auto-upgrade to latest (no prompt)
+#   - Example: "git version 2.30.0" or "git version 1.9.5"
+#   - When: Old Homebrew/apt installation not updated
+#
+# CASE 4: Missing Git
+#   - Condition: Git not installed
+#   - Action: Auto-install latest (no prompt)
+#   - When: Fresh system or Git never installed
+#
+# Decision Flow:
+#   Git installed? 
+#     NO  → CASE 4 (Missing)
+#     YES → Contains "Apple Git"?
+#             YES → CASE 2 (Apple Git)
+#             NO  → Version >= 2.45?
+#                     YES → CASE 1 (Current)
+#                     NO  → CASE 3 (Outdated)
+#
+# All cases log to: $HOME/graphdone-logs/git-setup-YYYY-MM-DD_HH-MM-SS.log
+# ============================================================================
+
+# ============================================================================
+# GIT INSTALLATION CHECK - All Cases (Linux)
+# ============================================================================
+# Detects Git status and automatically installs/upgrades as needed on Linux.
+#
+# CASE 1: Current Git (>= 2.30)
+#   - Condition: Git installed AND version >= 2.30
+#   - Action: Skip installation (already current)
+#   - Example: "git version 2.34.1"
+#   - Note: Linux uses 2.30 as minimum (vs 2.45 for macOS) for compatibility
+#
+# CASE 2: Outdated Git (< 2.30)
+#   - Condition: Git installed AND version < 2.30
+#   - Action: Auto-upgrade to latest (no prompt)
+#   - Example: "git version 1.8.3.1" (CentOS 7 default)
+#   - When: Old system package not updated
+#
+# CASE 3: Missing Git
+#   - Condition: Git not installed
+#   - Action: Auto-install latest (no prompt)
+#   - When: Fresh system or minimal installation
+#
+# Decision Flow:
+#   Git installed?
+#     NO  → CASE 3 (Missing)
+#     YES → Version >= 2.30?
+#             YES → CASE 1 (Current)
+#             NO  → CASE 2 (Outdated)
+#
+# Package Manager Detection (in order of checking):
+#   1. apt-get (Ubuntu/Debian)
+#      - Adds git-core PPA for latest version
+#      - Command: sudo add-apt-repository -y ppa:git-core/ppa
+#      - Then: sudo apt-get update && sudo apt-get install -y git
+#      - Version: Latest stable (e.g., 2.43.0)
+#
+#   2. yum (RHEL/CentOS)
+#      - Command: sudo yum install -y git
+#      - Version: Distribution-provided (may be older)
+#
+#   3. dnf (Fedora)
+#      - Command: sudo dnf install -y git
+#      - Version: Latest in Fedora repos
+#
+#   4. pacman (Arch Linux)
+#      - Command: sudo pacman -S --noconfirm git
+#      - Version: Latest stable (Arch rolling release)
+#
+#   5. zypper (openSUSE)
+#      - Command: sudo zypper install -y git
+#      - Version: Distribution-provided
+#
+#   6. apk (Alpine Linux)
+#      - Command: sudo apk add --no-cache git
+#      - Version: Latest in Alpine repos
+#
+# Features:
+#   - Fully automated, no user prompts
+#   - Animated spinner shows progress
+#   - Version verification after installation
+#   - Logs to: $HOME/graphdone-logs/git-setup-YYYY-MM-DD_HH-MM-SS.log
+#
+# Exit codes from setup_git.sh:
+#   0 - Success (Git installed/upgraded or already current)
+#   1 - Failure (No supported package manager or installation failed)
+# ============================================================================
+
+# ============================================================================
+# MACOS GIT CHECK FUNCTION - check_and_prompt_git_macos()
+# ============================================================================
+check_and_prompt_git_macos() {
     # Add pink color for the circle
     PINK='\033[38;5;213m'
     
@@ -486,6 +864,9 @@ check_and_prompt_git() {
     printf " ${GREEN}●${NC}"
     sleep 0.3
     
+    # ========================================================================
+    # CASE 1: Current Git (>= 2.45) - Already installed, skip installation
+    # ========================================================================
     if [ "$check_result" = "current" ]; then
         # Get full version info
         GIT_VERSION_FULL=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
@@ -493,6 +874,10 @@ check_and_prompt_git() {
         # Format the line to match last box alignment
         printf "\r  ${GREEN}✓${NC} ${BOLD}Git${NC} ${GREEN}${GIT_VERSION_FULL}${NC} ${GRAY}already installed${NC}\033[K\n"
         return 0
+    
+    # ========================================================================
+    # CASE 2: Apple Git - Auto-upgrade to Homebrew Git (no prompt)
+    # ========================================================================
     elif [ "$check_result" = "apple_git" ]; then
 
         GIT_VERSION_OLD=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
@@ -553,28 +938,25 @@ check_and_prompt_git() {
             printf "${CYAN}ℹ${NC} Continuing with Apple Git\n"
         fi
         return 0
+    
+    # ========================================================================
+    # CASE 3: Outdated Git (< 2.45) - Auto-upgrade to latest (no prompt)
+    # ========================================================================
     elif [ "$check_result" = "outdated" ]; then
 
         GIT_VERSION_OLD=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
-        printf "\r  ${YELLOW}⚠${NC} ${BOLD}Git${NC} ${YELLOW}${GIT_VERSION_OLD}${NC} ${GRAY}outdated (need >= 2.30)${NC}\033[K\n" " "
-        printf "\n"
-
-        printf "${YELLOW}🟡 ${BOLD}Git Update Required${NC}\n"
-        printf "${GRAY}GraphDone requires Git >= 2.30 for modern features.${NC}\n\n"
-        printf "${GREEN}✓${NC} We'll use the dedicated Git setup script for your platform\n"
-        printf "${GREEN}✓${NC} Automatic upgrade to latest version\n"
-        printf "${GREEN}✓${NC} Zero manual configuration required\n\n"
-        printf "${CYAN}❯${NC} ${BOLD}Continue with Git upgrade?${NC} ${GRAY}[Press Enter] or Ctrl+C to exit${NC}\n"
-        printf "        "
-        read -r response || response="" || response="n"
-
-        # Run the Git setup script with spinner
-        printf "\r  ${YELLOW}◉${NC} Upgrading Git..."
+        # Try to fetch latest version from Homebrew (macOS only)
+        LATEST_GIT_VERSION=""
+        if [ "$(uname)" = "Darwin" ] && command -v brew >/dev/null 2>&1; then
+            LATEST_GIT_VERSION=$(brew info git 2>/dev/null | head -n 1 | sed 's/.*stable \([0-9.]*\).*/\1/' || echo "")
+        fi
         
+        # Run setup script silently, log to temp file
         local log_file="$LOG_DIR/git-setup-${INSTALL_TIMESTAMP}.log"
         run_setup_script "setup_git.sh" >"$log_file" 2>&1 &
         local setup_pid=$!
         
+        # Spinner while installing
         local i=0
         local spin_char=""
         while kill -0 $setup_pid 2>/dev/null; do
@@ -590,13 +972,20 @@ check_and_prompt_git() {
                 8) spin_char='⠇' ;;
                 9) spin_char='⠏' ;;
             esac
-            printf "\r  ${YELLOW}◉${NC} Upgrading Git ${BOLD}${CYAN}%s${NC}" "$spin_char"
+            if [ -n "$LATEST_GIT_VERSION" ]; then
+                printf "\r  ${YELLOW}⚠${NC} ${BOLD}Git${NC} ${YELLOW}${GIT_VERSION_OLD}${NC} ${GRAY}outdated, upgrading to ${GREEN}${LATEST_GIT_VERSION}${NC} ${BOLD}${CYAN}%s${NC}\033[K" "$spin_char"
+            else
+                printf "\r  ${YELLOW}⚠${NC} ${BOLD}Git${NC} ${YELLOW}${GIT_VERSION_OLD}${NC} ${GRAY}outdated, upgrading${NC} ${BOLD}${CYAN}%s${NC}\033[K" "$spin_char"
+            fi
             i=$((i + 1))
             sleep 0.15
         done
         
+        # Get result
         wait $setup_pid
         local result=$?
+        
+        # Clear line and show result
         printf "\r\033[K"
         
         if [ $result -eq 0 ]; then
@@ -615,26 +1004,21 @@ check_and_prompt_git() {
         return 0
     fi
     
-
-    printf "\r  ${YELLOW}⚠${NC} ${BOLD}Git${NC} ${GRAY}not installed${NC}\033[K\n" " "
-    printf "\n"
-    printf "        ${YELLOW}🟡 ${BOLD}Git Setup Required${NC}\n"
-    printf "        ${GRAY}GraphDone requires Git for version control and cloning repositories.${NC}\n\n"
-    printf "        ${GREEN}✓${NC} We'll use the dedicated Git setup script for your platform\n"
-    printf "        ${GREEN}✓${NC} Automatic installation via package manager\n"
-    printf "        ${GREEN}✓${NC} Includes latest stable version\n"
-    printf "        ${GREEN}✓${NC} Zero manual configuration required\n\n"
-    printf "        ${CYAN}❯${NC} ${BOLD}Continue with Git installation?${NC} ${GRAY}[Press Enter] or Ctrl+C to exit${NC}\n"
-    printf "        "
-    read -r response || response=""
-
-    # Run the Git setup script with spinner
-    printf "\r  ${YELLOW}◉${NC} Installing Git..."
+    # ========================================================================
+    # CASE 4: Missing Git - Auto-install latest version (no prompt)
+    # ========================================================================
+    # Fetch latest version from Homebrew (macOS only)
+    LATEST_GIT_VERSION=""
+    if [ "$(uname)" = "Darwin" ] && command -v brew >/dev/null 2>&1; then
+        LATEST_GIT_VERSION=$(brew info git 2>/dev/null | head -n 1 | sed 's/.*stable \([0-9.]*\).*/\1/' || echo "")
+    fi
     
+    # Run setup script silently, log to temp file
     local log_file="$LOG_DIR/git-setup-${INSTALL_TIMESTAMP}.log"
     run_setup_script "setup_git.sh" --skip-check >"$log_file" 2>&1 &
     local setup_pid=$!
     
+    # Spinner while installing
     local i=0
     local spin_char=""
     while kill -0 $setup_pid 2>/dev/null; do
@@ -650,13 +1034,20 @@ check_and_prompt_git() {
             8) spin_char='⠇' ;;
             9) spin_char='⠏' ;;
         esac
-        printf "\r  ${YELLOW}◉${NC} Installing Git ${BOLD}${CYAN}%s${NC}" "$spin_char"
+        if [ -n "$LATEST_GIT_VERSION" ]; then
+            printf "\r  ${YELLOW}⚠${NC} ${BOLD}Git${NC} ${GRAY}not installed, installing ${GREEN}${LATEST_GIT_VERSION}${NC} ${BOLD}${CYAN}%s${NC}\033[K" "$spin_char"
+        else
+            printf "\r  ${YELLOW}⚠${NC} ${BOLD}Git${NC} ${GRAY}not installed, installing latest version${NC} ${BOLD}${CYAN}%s${NC}\033[K" "$spin_char"
+        fi
         i=$((i + 1))
         sleep 0.15
     done
     
+    # Get result
     wait $setup_pid
     local result=$?
+    
+    # Clear line and show result
     printf "\r\033[K"
     
     if [ $result -eq 0 ]; then
@@ -676,9 +1067,10 @@ check_and_prompt_git() {
     return 0
 }
 
-
-# Interactive Node.js check with animated progress
-check_and_prompt_nodejs() {
+# ============================================================================
+# LINUX GIT CHECK FUNCTION - check_and_prompt_git_linux()
+# ============================================================================
+check_and_prompt_git_linux() {
     # Add pink color for the circle
     PINK='\033[38;5;213m'
     
@@ -707,37 +1099,30 @@ check_and_prompt_nodejs() {
         if [ $cycle -eq 6 ]; then
             dots_display="$dots_display ${CYAN}●${NC}"
             
-            # Try to load nvm if available (to detect nvm-installed Node.js)
-            if [ -s "$HOME/.nvm/nvm.sh" ]; then
-                export NVM_DIR="$HOME/.nvm"
-                . "$NVM_DIR/nvm.sh" >/dev/null
-            fi
-            
-            # Perform the check on final cycle - check if Node.js is installed with correct version
-            if command -v node >/dev/null 2>&1; then
-                NODE_VERSION=$(node --version 2>/dev/null | sed 's/v//' | cut -d. -f1 || echo "0")
-                if [ "$NODE_VERSION" -ge 18 ]; then
-                    # Check npm version too
-                    if command -v npm >/dev/null 2>&1; then
-                        NPM_VERSION=$(npm --version 2>/dev/null | cut -d. -f1 || echo "0")
-                        if [ "$NPM_VERSION" -ge 9 ]; then
-                            check_result="current"  # Node.js and npm are current
-                        else
-                            check_result="npm_old"  # Node.js OK but npm outdated
-                        fi
-                    else
-                        check_result="npm_missing"  # Node.js OK but npm missing
-                    fi
+            # ============================================================
+            # LINUX VERSION CHECK: Git version detection
+            # ============================================================
+            # Check if Git is installed
+            if command -v git >/dev/null 2>&1; then
+                GIT_VERSION=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
+                
+                # Linux: Check if version >= 2.45 (same threshold as macOS for consistency)
+                # Note: setup_git.sh uses 2.30 internally, but unified check uses 2.45
+                MAJOR=$(echo "$GIT_VERSION" | sed 's/[^0-9.].*//g' | cut -d. -f1)
+                MINOR=$(echo "$GIT_VERSION" | sed 's/[^0-9.].*//g' | cut -d. -f2)
+                
+                if [ "$MAJOR" -ge 2 ] && [ "$MINOR" -ge 45 ]; then
+                    check_result="current"  # LINUX CASE 1: Git >= 2.45 (current)
                 else
-                    check_result="outdated"  # Node.js outdated
+                    check_result="outdated"  # LINUX CASE 2: Git < 2.45 (outdated)
                 fi
             else
-                check_result="missing"  # Node.js not installed
+                check_result="missing"  # LINUX CASE 3: Git not installed
             fi
         fi
         
         # Show current state - animation only, no box borders
-        printf "\r  $circle ${GRAY}Checking Node.js installation${NC}$dots_display"
+        printf "\r  $circle ${GRAY}Checking Git installation${NC}$dots_display"
         # Clear to end of line to avoid artifacts
         printf "\033[K"
         sleep 0.4
@@ -747,94 +1132,94 @@ check_and_prompt_nodejs() {
     printf " ${GREEN}●${NC}"
     sleep 0.3
     
+    # ========================================================================
+    # LINUX CASE 1: Current Git (>= 2.45) - Already installed, skip
+    # ========================================================================
     if [ "$check_result" = "current" ]; then
         # Get full version info
-        NODE_VERSION_FULL=$(node --version 2>/dev/null || echo "unknown")
-        NPM_VERSION_FULL=$(npm --version 2>/dev/null || echo "unknown")
+        GIT_VERSION_FULL=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
         
-        # Format the line to match last box alignment
-        printf "\r  ${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}${NODE_VERSION_FULL}${NC} ${GRAY}and${NC} ${BOLD}npm${NC} ${GREEN}${NPM_VERSION_FULL}${NC} ${GRAY}already installed${NC}\033[K\n"
+        # Format the line to match box alignment
+        printf "\r  ${GREEN}✓${NC} ${BOLD}Git${NC} ${GREEN}${GIT_VERSION_FULL}${NC} ${GRAY}already installed${NC}\033[K\n"
         return 0
-    elif [ "$check_result" = "npm_old" ] || [ "$check_result" = "npm_missing" ]; then
-
-        NODE_VERSION_FULL=$(node --version 2>/dev/null || echo "unknown")
-        printf "\r  ${YELLOW}⚠${NC} ${BOLD}Node.js${NC} ${GREEN}${NODE_VERSION_FULL}${NC} ${GRAY}OK, but npm needs update${NC}\033[K\n" " "
-        printf "\n"
-
-        printf "        ${YELLOW}🟡 ${BOLD}npm Update Required${NC}\n"
-        printf "        ${GRAY}Node.js is current but npm needs to be updated to >= 9.0.0${NC}\n\n"
-        printf "        ${GREEN}✓${NC} We'll use the dedicated Node.js setup script to update npm\n"
-        printf "        ${GREEN}✓${NC} Zero manual intervention required\n\n"
-        printf "        ${CYAN}❯${NC} ${BOLD}Continue with npm update?${NC} ${GRAY}[Press Enter] or Ctrl+C to exit${NC}\n"
-        printf "        "
-        read -r response || response="" || response="n"
-
-        run_setup_script "setup_nodejs.sh" >/dev/null
-        if [ $? -eq 0 ]; then
-            # After successful installation, clear all output and show clean result
-            # Clear both prompt lines and setup script output
-            # Restore cursor and clear
-            
-            # Get the new Node.js and npm versions
-            # Load nvm to get Node.js version (if installed via nvm)
-            if [ -s "$HOME/.nvm/nvm.sh" ]; then
-                export NVM_DIR="$HOME/.nvm"
-                . "$NVM_DIR/nvm.sh" 2>/dev/null
-            fi
-
-            NEW_NODE_VERSION=$(node --version 2>/dev/null || echo "unknown")
-            NEW_NPM_VERSION=$(npm --version 2>/dev/null || echo "unknown")
-            printf "  ${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}${NEW_NODE_VERSION}${NC} and ${BOLD}npm${NC} ${GREEN}${NEW_NPM_VERSION}${NC} updated successfully\n"
-        else
-            printf "${RED}✗${NC} Node.js setup failed\n"
-            exit 1
-        fi
-        return 0
+    
+    # ========================================================================
+    # LINUX CASE 2: Outdated Git (< 2.45) - Auto-upgrade (no prompt)
+    # ========================================================================
     elif [ "$check_result" = "outdated" ]; then
-
-        NODE_VERSION_OLD=$(node --version 2>/dev/null || echo "unknown")
-        printf "\r  ${YELLOW}⚠${NC} ${BOLD}Node.js${NC} ${YELLOW}${NODE_VERSION_OLD}${NC} ${GRAY}outdated (need >= 18.0.0)${NC}\033[K\n" " "
-        printf "\n"
-
-        printf "        ${YELLOW}🟡 ${BOLD}Node.js Update Required${NC}\n"
-        printf "        ${GRAY}GraphDone requires Node.js >= 18.0.0 for optimal performance.${NC}\n\n"
-        printf "        ${GREEN}✓${NC} We'll use the dedicated Node.js setup script for your platform\n"
-        printf "        ${GREEN}✓${NC} Automatic installation of latest version\n"
-        printf "        ${GREEN}✓${NC} Zero manual configuration required\n\n"
-        printf "        ${CYAN}❯${NC} ${BOLD}Continue with Node.js upgrade?${NC} ${GRAY}[Press Enter] or Ctrl+C to exit${NC}\n"
-        printf "        "
-        read -r response || response="" || response="n"
-
-        run_setup_script "setup_nodejs.sh" >/dev/null
-        if [ $? -eq 0 ]; then
-            # After successful installation, clear all output and show clean result
-            # Clear both prompt lines and setup script output
-            # Restore cursor and clear
-            
-            # Get the new Node.js and npm versions
-            # Load nvm to get Node.js version (if installed via nvm)
-            if [ -s "$HOME/.nvm/nvm.sh" ]; then
-                export NVM_DIR="$HOME/.nvm"
-                . "$NVM_DIR/nvm.sh" 2>/dev/null
-            fi
-
-            NEW_NODE_VERSION=$(node --version 2>/dev/null || echo "unknown")
-            NEW_NPM_VERSION=$(npm --version 2>/dev/null || echo "unknown")
-            printf "  ${GREEN}✓${NC} ${BOLD}Node.js${NC} upgraded to ${GREEN}${NEW_NODE_VERSION}${NC} and ${BOLD}npm${NC} ${GREEN}${NEW_NPM_VERSION}${NC} successfully\n"
+        GIT_VERSION_OLD=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
+        
+        # Run setup script silently, log to temp file
+        # setup_git.sh will detect package manager automatically:
+        #   - apt-get (Ubuntu/Debian) - adds git-core PPA for latest
+        #   - yum (RHEL/CentOS)
+        #   - dnf (Fedora)
+        #   - pacman (Arch Linux)
+        #   - zypper (openSUSE)
+        #   - apk (Alpine Linux)
+        local log_file="$LOG_DIR/git-setup-${INSTALL_TIMESTAMP}.log"
+        run_setup_script "setup_git.sh" >"$log_file" 2>&1 &
+        local setup_pid=$!
+        
+        # Spinner while installing via package manager
+        local i=0
+        local spin_char=""
+        while kill -0 $setup_pid 2>/dev/null; do
+            case $((i % 10)) in
+                0) spin_char='⠋' ;;
+                1) spin_char='⠙' ;;
+                2) spin_char='⠹' ;;
+                3) spin_char='⠸' ;;
+                4) spin_char='⠼' ;;
+                5) spin_char='⠴' ;;
+                6) spin_char='⠦' ;;
+                7) spin_char='⠧' ;;
+                8) spin_char='⠇' ;;
+                9) spin_char='⠏' ;;
+            esac
+            printf "\r  ${YELLOW}⚠${NC} ${BOLD}Git${NC} ${YELLOW}${GIT_VERSION_OLD}${NC} ${GRAY}outdated, upgrading${NC} ${BOLD}${CYAN}%s${NC}\033[K" "$spin_char"
+            i=$((i + 1))
+            sleep 0.15
+        done
+        
+        # Get result from setup_git.sh
+        wait $setup_pid
+        local result=$?
+        
+        # Clear line and show result
+        printf "\r\033[K"
+        
+        if [ $result -eq 0 ]; then
+            # Log saved to: $log_file
+            NEW_GIT_VERSION=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
+            printf "  ${GREEN}✓${NC} ${BOLD}Git${NC} upgraded to ${GREEN}${NEW_GIT_VERSION}${NC} successfully\n"
         else
-            printf "${RED}✗${NC} Node.js setup failed\n"
+            printf "${RED}✗${NC} Git setup failed\n"
+            if [ -f "$log_file" ]; then
+                printf "\n${BOLD}Last 15 lines from log:${NC}\n"
+                tail -15 "$log_file"
+            fi
             exit 1
         fi
         return 0
     fi
     
-
-    # Run setup script silently with spinner
-    local log_file="$LOG_DIR/nodejs-setup-${INSTALL_TIMESTAMP}.log"
-    run_setup_script "setup_nodejs.sh" >"$log_file" 2>&1 &
+    # ========================================================================
+    # LINUX CASE 3: Missing Git - Auto-install latest version (no prompt)
+    # ========================================================================
+    # Run setup script silently, log to temp file
+    # setup_git.sh will detect and use appropriate package manager:
+    #   1. apt-get (Ubuntu/Debian) - adds git-core PPA for latest
+    #   2. yum (RHEL/CentOS)
+    #   3. dnf (Fedora)
+    #   4. pacman (Arch Linux)
+    #   5. zypper (openSUSE)
+    #   6. apk (Alpine Linux)
+    local log_file="$LOG_DIR/git-setup-${INSTALL_TIMESTAMP}.log"
+    run_setup_script "setup_git.sh" --skip-check >"$log_file" 2>&1 &
     local setup_pid=$!
     
-    # Spinner while installing
+    # Spinner while installing via package manager
     local i=0
     local spin_char=""
     while kill -0 $setup_pid 2>/dev/null; do
@@ -850,7 +1235,402 @@ check_and_prompt_nodejs() {
             8) spin_char='⠇' ;;
             9) spin_char='⠏' ;;
         esac
-        printf "\r  ${YELLOW}⚠${NC} ${BOLD}Node.js${NC} ${GRAY}not installed, installing latest version${NC} ${BOLD}${CYAN}%s${NC}\033[K" "$spin_char"
+        printf "\r  ${YELLOW}⚠${NC} ${BOLD}Git${NC} ${GRAY}not installed, installing latest version${NC} ${BOLD}${CYAN}%s${NC}\033[K" "$spin_char"
+        i=$((i + 1))
+        sleep 0.15
+    done
+    
+    # Get result from setup_git.sh
+    wait $setup_pid
+    local result=$?
+    
+    # Clear line and show result
+    printf "\r\033[K"
+    
+    if [ $result -eq 0 ]; then
+        # Log saved to: $log_file
+        NEW_GIT_VERSION=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
+        printf "  ${GREEN}✓${NC} ${BOLD}Git${NC} ${GREEN}${NEW_GIT_VERSION}${NC} installed successfully\n"
+    else
+        printf "${RED}✗${NC} Git setup failed\n"
+        if [ -f "$log_file" ]; then
+            printf "\n${BOLD}Last 15 lines from log:${NC}\n"
+            tail -15 "$log_file"
+        fi
+        exit 1
+    fi
+    
+    return 0
+}
+
+# ============================================================================
+# UNIFIED GIT CHECK - Delegates to platform-specific function
+# ============================================================================
+check_and_prompt_git() {
+    if [ "$(uname)" = "Darwin" ]; then
+        check_and_prompt_git_macos
+    else
+        check_and_prompt_git_linux
+    fi
+}
+
+
+# ############################################################################
+# ############################################################################
+# ##                                                                        ##
+# ##                   NODE.JS INSTALLATION COMPONENT                       ##
+# ##                                                                        ##
+# ############################################################################
+# ############################################################################
+#
+# This section handles Node.js and npm installation/upgrades for both macOS 
+# and Linux.
+# 
+# Components:
+#   - macOS Node.js installation (check_and_prompt_nodejs_macos)
+#   - Linux Node.js installation (check_and_prompt_nodejs_linux)
+#   - Unified dispatcher (check_and_prompt_nodejs)
+#
+# Supported platforms:
+#   macOS:  Homebrew installation (latest Node.js + npm)
+#   Linux:  nvm (Node Version Manager) - Node.js 22 LTS
+#
+# ############################################################################
+
+# ============================================================================
+# NODE.JS INSTALLATION CHECK - All Cases (macOS)
+# ============================================================================
+# Detects Node.js status and automatically installs/upgrades as needed.
+#
+# CASE 1: Current Node.js (>= 18) + npm (>= 9)
+#   - Condition: Node.js >= 18 AND npm >= 9
+#   - Action: Skip installation (already current)
+#   - Example: "Node.js v22.11.0 and npm 10.9.0"
+#
+# CASE 2: Current Node.js (>= 18) but outdated/missing npm
+#   - Condition: Node.js >= 18 AND (npm < 9 OR npm missing)
+#   - Action: Update npm via setup_nodejs.sh (no prompt)
+#   - Example: "Node.js v20.0.0 OK, but npm needs update"
+#   - When: npm was corrupted or manually removed
+#
+# CASE 3: Outdated Node.js (< 18)
+#   - Condition: Node.js installed AND version < 18
+#   - Action: Upgrade to latest LTS (no prompt)
+#   - Example: "Node.js v16.20.0 outdated (need >= 18.0.0)"
+#   - When: Old Homebrew installation not updated
+#
+# CASE 4: Missing Node.js
+#   - Condition: Node.js not installed
+#   - Action: Auto-install latest LTS (no prompt)
+#   - When: Fresh system or Node.js never installed
+#
+# Decision Flow:
+#   Node.js installed?
+#     NO  → CASE 4 (Missing)
+#     YES → Version >= 18?
+#             NO  → CASE 3 (Outdated)
+#             YES → npm >= 9?
+#                     YES → CASE 1 (Current)
+#                     NO  → CASE 2 (npm outdated/missing)
+#
+# macOS Installation Method:
+#   - Uses Homebrew: brew install node
+#   - Installs both Node.js and npm together
+#   - Version: Latest stable (e.g., 22.11.0)
+#   - Benefits: Always up-to-date, easy to maintain
+#
+# All cases log to: $HOME/graphdone-logs/nodejs-setup-YYYY-MM-DD_HH-MM-SS.log
+# ============================================================================
+
+# ============================================================================
+# NODE.JS INSTALLATION CHECK - All Cases (Linux)
+# ============================================================================
+# Detects Node.js status and automatically installs/upgrades as needed on Linux.
+#
+# CASE 1: Current Node.js (>= 18) + npm (>= 9)
+#   - Condition: Node.js >= 18 AND npm >= 9
+#   - Action: Skip installation (already current)
+#   - Example: "Node.js v22.11.0 and npm 10.9.0"
+#
+# CASE 2: Current Node.js (>= 18) but outdated/missing npm
+#   - Condition: Node.js >= 18 AND (npm < 9 OR npm missing)
+#   - Action: Update npm via setup_nodejs.sh (no prompt)
+#   - Example: "Node.js v20.0.0 OK, but npm needs update"
+#   - When: npm was corrupted or manually removed
+#
+# CASE 3: Outdated Node.js (< 18)
+#   - Condition: Node.js installed AND version < 18
+#   - Action: Upgrade to latest LTS (no prompt)
+#   - Example: "Node.js v14.21.3 outdated (need >= 18.0.0)"
+#   - When: Old system package not updated
+#
+# CASE 4: Missing Node.js
+#   - Condition: Node.js not installed
+#   - Action: Auto-install latest LTS (no prompt)
+#   - When: Fresh system or minimal installation
+#
+# Decision Flow:
+#   Node.js installed?
+#     NO  → CASE 4 (Missing)
+#     YES → Version >= 18?
+#             NO  → CASE 3 (Outdated)
+#             YES → npm >= 9?
+#                     YES → CASE 1 (Current)
+#                     NO  → CASE 2 (npm outdated/missing)
+#
+# Linux Installation Method:
+#   - Uses nvm (Node Version Manager)
+#   - Command: curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+#   - Then: nvm install 22 (LTS version)
+#   - Version: Node.js 22 LTS + npm 10.x
+#   - Benefits: No sudo required, user-level installation, multiple versions support
+#   - Location: $HOME/.nvm/
+#
+# Features:
+#   - Fully automated installation
+#   - NO user prompts for any case (auto-install/upgrade)
+#   - Animated spinner shows progress
+#   - Version verification after installation
+#   - Logs to: $HOME/graphdone-logs/nodejs-setup-YYYY-MM-DD_HH-MM-SS.log
+#
+# Exit codes from setup_nodejs.sh:
+#   0 - Success (Node.js installed/upgraded or already current)
+#   1 - Failure (Installation failed or unsupported platform)
+# ============================================================================
+
+# ============================================================================
+# MACOS NODE.JS CHECK FUNCTION - check_and_prompt_nodejs_macos()
+# ============================================================================
+check_and_prompt_nodejs_macos() {
+    # Add pink color for the circle
+    PINK='\033[38;5;213m'
+    
+    # Pink blinking circle during entire checking process
+    blink_state=0
+    
+    # Continue blinking and adding dots until check is complete
+    for cycle in 1 2 3 4 5 6; do
+        # Toggle blink state
+        if [ $blink_state -eq 0 ]; then
+            circle="${PINK}•${NC}"
+            blink_state=1
+        else
+            circle="${DIM}•${NC}"
+            blink_state=0
+        fi
+        
+        # Build the dots display based on cycle
+        dots_display=""
+        if [ $cycle -ge 3 ]; then
+            dots_display=" ${GRAY}●${NC}"
+        fi
+        if [ $cycle -ge 5 ]; then
+            dots_display="$dots_display ${BLUE}●${NC}"
+        fi
+        if [ $cycle -eq 6 ]; then
+            dots_display="$dots_display ${CYAN}●${NC}"
+            
+            # ============================================================
+            # MACOS VERSION CHECK: Node.js and npm version detection
+            # ============================================================
+            # Try to load nvm if available (to detect nvm-installed Node.js)
+            # macOS can have Node.js installed via Homebrew or nvm
+            if [ -s "$HOME/.nvm/nvm.sh" ]; then
+                export NVM_DIR="$HOME/.nvm"
+                . "$NVM_DIR/nvm.sh" >/dev/null
+            fi
+            
+            # Check if Node.js is installed with correct version
+            if command -v node >/dev/null 2>&1; then
+                NODE_VERSION=$(node --version 2>/dev/null | sed 's/v//' | cut -d. -f1 || echo "0")
+                if [ "$NODE_VERSION" -ge 18 ]; then
+                    # Node.js is current (>= 18), check npm version
+                    if command -v npm >/dev/null 2>&1; then
+                        NPM_VERSION=$(npm --version 2>/dev/null | cut -d. -f1 || echo "0")
+                        if [ "$NPM_VERSION" -ge 9 ]; then
+                            check_result="current"  # macOS CASE 1: Node.js >= 18 + npm >= 9
+                        else
+                            check_result="npm_old"  # macOS CASE 2: Node.js OK but npm < 9
+                        fi
+                    else
+                        check_result="npm_missing"  # macOS CASE 2: Node.js OK but npm missing
+                    fi
+                else
+                    check_result="outdated"  # macOS CASE 3: Node.js < 18
+                fi
+            else
+                check_result="missing"  # macOS CASE 4: Node.js not installed
+            fi
+        fi
+        
+        # Show current state - animation only, no box borders
+        printf "\r  $circle ${GRAY}Checking Node.js installation${NC}$dots_display"
+        # Clear to end of line to avoid artifacts
+        printf "\033[K"
+        sleep 0.4
+    done
+    
+    # Smooth transition: show completion state briefly
+    printf " ${GREEN}●${NC}"
+    sleep 0.3
+    
+    # ========================================================================
+    # MACOS CASE 1: Current Node.js (>= 18) + npm (>= 9) - Skip installation
+    # ========================================================================
+    if [ "$check_result" = "current" ]; then
+        # Get full version info
+        NODE_VERSION_FULL=$(node --version 2>/dev/null || echo "unknown")
+        NPM_VERSION_FULL=$(npm --version 2>/dev/null || echo "unknown")
+        
+        # Format the line to match last box alignment
+        printf "\r  ${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}${NODE_VERSION_FULL}${NC} ${GRAY}and${NC} ${BOLD}npm${NC} ${GREEN}${NPM_VERSION_FULL}${NC} ${GRAY}already installed${NC}\033[K\n"
+        return 0
+    
+    # ========================================================================
+    # MACOS CASE 2: Node.js OK but npm outdated/missing - Update npm (no prompt)
+    # ========================================================================
+    elif [ "$check_result" = "npm_old" ] || [ "$check_result" = "npm_missing" ]; then
+        NODE_VERSION_FULL=$(node --version 2>/dev/null || echo "unknown")
+        
+        # Run setup script silently, log to temp file
+        local log_file="$LOG_DIR/nodejs-setup-${INSTALL_TIMESTAMP}.log"
+        run_setup_script "setup_nodejs.sh" >"$log_file" 2>&1 &
+        local setup_pid=$!
+        
+        # Spinner while updating npm
+        local i=0
+        local spin_char=""
+        while kill -0 $setup_pid 2>/dev/null; do
+            case $((i % 10)) in
+                0) spin_char='⠋' ;;
+                1) spin_char='⠙' ;;
+                2) spin_char='⠹' ;;
+                3) spin_char='⠸' ;;
+                4) spin_char='⠼' ;;
+                5) spin_char='⠴' ;;
+                6) spin_char='⠦' ;;
+                7) spin_char='⠧' ;;
+                8) spin_char='⠇' ;;
+                9) spin_char='⠏' ;;
+            esac
+            printf "\r  ${YELLOW}⚠${NC} ${BOLD}Node.js${NC} ${GREEN}${NODE_VERSION_FULL}${NC} ${GRAY}OK, updating npm${NC} ${BOLD}${CYAN}%s${NC}\033[K" "$spin_char"
+            i=$((i + 1))
+            sleep 0.15
+        done
+        
+        # Get result
+        wait $setup_pid
+        local result=$?
+        
+        # Clear line and show result
+        printf "\r\033[K"
+        
+        if [ $result -eq 0 ]; then
+            # Load nvm to get Node.js version (if installed via nvm)
+            if [ -s "$HOME/.nvm/nvm.sh" ]; then
+                export NVM_DIR="$HOME/.nvm"
+                . "$NVM_DIR/nvm.sh" 2>/dev/null
+            fi
+
+            NEW_NODE_VERSION=$(node --version 2>/dev/null || echo "unknown")
+            NEW_NPM_VERSION=$(npm --version 2>/dev/null || echo "unknown")
+            printf "  ${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}${NEW_NODE_VERSION}${NC} and ${BOLD}npm${NC} ${GREEN}${NEW_NPM_VERSION}${NC} updated successfully\n"
+        else
+            printf "${RED}✗${NC} Node.js setup failed\n"
+            if [ -f "$log_file" ]; then
+                printf "\n${BOLD}Last 15 lines from log:${NC}\n"
+                tail -15 "$log_file"
+            fi
+            exit 1
+        fi
+        return 0
+    
+    # ========================================================================
+    # MACOS CASE 3: Outdated Node.js (< 18) - Upgrade to LTS (no prompt)
+    # ========================================================================
+    elif [ "$check_result" = "outdated" ]; then
+        NODE_VERSION_OLD=$(node --version 2>/dev/null || echo "unknown")
+        
+        # Run setup script silently, log to temp file
+        local log_file="$LOG_DIR/nodejs-setup-${INSTALL_TIMESTAMP}.log"
+        run_setup_script "setup_nodejs.sh" >"$log_file" 2>&1 &
+        local setup_pid=$!
+        
+        # Spinner while upgrading
+        local i=0
+        local spin_char=""
+        while kill -0 $setup_pid 2>/dev/null; do
+            case $((i % 10)) in
+                0) spin_char='⠋' ;;
+                1) spin_char='⠙' ;;
+                2) spin_char='⠹' ;;
+                3) spin_char='⠸' ;;
+                4) spin_char='⠼' ;;
+                5) spin_char='⠴' ;;
+                6) spin_char='⠦' ;;
+                7) spin_char='⠧' ;;
+                8) spin_char='⠇' ;;
+                9) spin_char='⠏' ;;
+            esac
+            printf "\r  ${YELLOW}⚠${NC} ${BOLD}Node.js${NC} ${YELLOW}${NODE_VERSION_OLD}${NC} ${GRAY}outdated, upgrading${NC} ${BOLD}${CYAN}%s${NC}\033[K" "$spin_char"
+            i=$((i + 1))
+            sleep 0.15
+        done
+        
+        # Get result
+        wait $setup_pid
+        local result=$?
+        
+        # Clear line and show result
+        printf "\r\033[K"
+        
+        if [ $result -eq 0 ]; then
+            # Load nvm to get Node.js version (if installed via nvm)
+            if [ -s "$HOME/.nvm/nvm.sh" ]; then
+                export NVM_DIR="$HOME/.nvm"
+                . "$NVM_DIR/nvm.sh" 2>/dev/null
+            fi
+
+            NEW_NODE_VERSION=$(node --version 2>/dev/null || echo "unknown")
+            NEW_NPM_VERSION=$(npm --version 2>/dev/null || echo "unknown")
+            printf "  ${GREEN}✓${NC} ${BOLD}Node.js${NC} upgraded to ${GREEN}${NEW_NODE_VERSION}${NC} and ${BOLD}npm${NC} ${GREEN}${NEW_NPM_VERSION}${NC} successfully\n"
+        else
+            printf "${RED}✗${NC} Node.js setup failed\n"
+            if [ -f "$log_file" ]; then
+                printf "\n${BOLD}Last 15 lines from log:${NC}\n"
+                tail -15 "$log_file"
+            fi
+            exit 1
+        fi
+        return 0
+    fi
+    
+    # ========================================================================
+    # MACOS CASE 4: Missing Node.js - Auto-install via Homebrew (no prompt)
+    # ========================================================================
+    # Run setup script silently with spinner
+    # setup_nodejs.sh will use Homebrew to install Node.js and npm together
+    local log_file="$LOG_DIR/nodejs-setup-${INSTALL_TIMESTAMP}.log"
+    run_setup_script "setup_nodejs.sh" >"$log_file" 2>&1 &
+    local setup_pid=$!
+    
+    # Spinner while installing via Homebrew
+    local i=0
+    local spin_char=""
+    while kill -0 $setup_pid 2>/dev/null; do
+        case $((i % 10)) in
+            0) spin_char='⠋' ;;
+            1) spin_char='⠙' ;;
+            2) spin_char='⠹' ;;
+            3) spin_char='⠸' ;;
+            4) spin_char='⠼' ;;
+            5) spin_char='⠴' ;;
+            6) spin_char='⠦' ;;
+            7) spin_char='⠧' ;;
+            8) spin_char='⠇' ;;
+            9) spin_char='⠏' ;;
+        esac
+        printf "\r  ${YELLOW}⚠${NC} ${BOLD}Node.js${NC} ${GRAY}not installed, installing via Homebrew${NC} ${BOLD}${CYAN}%s${NC}\033[K" "$spin_char"
         i=$((i + 1))
         sleep 0.15
     done
@@ -862,7 +1642,7 @@ check_and_prompt_nodejs() {
     if [ $result -eq 0 ]; then
         # Log saved to: $log_file
         
-        # Load nvm to get Node.js version (if installed via nvm)
+        # Load nvm to get Node.js version (if installed via nvm - though Homebrew is default on macOS)
         if [ -s "$HOME/.nvm/nvm.sh" ]; then
             export NVM_DIR="$HOME/.nvm"
             . "$NVM_DIR/nvm.sh" 2>/dev/null
@@ -884,9 +1664,10 @@ check_and_prompt_nodejs() {
     return 0
 }
 
-
-# Interactive Docker check with animated progress like Node.js
-check_and_prompt_docker() {
+# ============================================================================
+# LINUX NODE.JS CHECK FUNCTION - check_and_prompt_nodejs_linux()
+# ============================================================================
+check_and_prompt_nodejs_linux() {
     # Add pink color for the circle
     PINK='\033[38;5;213m'
     
@@ -914,16 +1695,434 @@ check_and_prompt_docker() {
         fi
         if [ $cycle -eq 6 ]; then
             dots_display="$dots_display ${CYAN}●${NC}"
-            # Perform the check on final cycle - check if Docker is installed AND running
+            
+            # ============================================================
+            # LINUX VERSION CHECK: Node.js and npm version detection
+            # ============================================================
+            # Try to load nvm if available (Linux uses nvm for Node.js)
+            if [ -s "$HOME/.nvm/nvm.sh" ]; then
+                export NVM_DIR="$HOME/.nvm"
+                . "$NVM_DIR/nvm.sh" >/dev/null
+            fi
+            
+            # Check if Node.js is installed with correct version
+            if command -v node >/dev/null 2>&1; then
+                NODE_VERSION=$(node --version 2>/dev/null | sed 's/v//' | cut -d. -f1 || echo "0")
+                if [ "$NODE_VERSION" -ge 18 ]; then
+                    # Node.js is current (>= 18), check npm version
+                    if command -v npm >/dev/null 2>&1; then
+                        NPM_VERSION=$(npm --version 2>/dev/null | cut -d. -f1 || echo "0")
+                        if [ "$NPM_VERSION" -ge 9 ]; then
+                            check_result="current"  # LINUX CASE 1: Node.js >= 18 + npm >= 9
+                        else
+                            check_result="npm_old"  # LINUX CASE 2: Node.js OK but npm < 9
+                        fi
+                    else
+                        check_result="npm_missing"  # LINUX CASE 2: Node.js OK but npm missing
+                    fi
+                else
+                    check_result="outdated"  # LINUX CASE 3: Node.js < 18
+                fi
+            else
+                check_result="missing"  # LINUX CASE 4: Node.js not installed
+            fi
+        fi
+        
+        # Show current state - animation only, no box borders
+        printf "\r  $circle ${GRAY}Checking Node.js installation${NC}$dots_display"
+        # Clear to end of line to avoid artifacts
+        printf "\033[K"
+        sleep 0.4
+    done
+    
+    # Smooth transition: show completion state briefly
+    printf " ${GREEN}●${NC}"
+    sleep 0.3
+    
+    # ========================================================================
+    # LINUX CASE 1: Current Node.js (>= 18) + npm (>= 9) - Skip installation
+    # ========================================================================
+    if [ "$check_result" = "current" ]; then
+        # Get full version info
+        NODE_VERSION_FULL=$(node --version 2>/dev/null || echo "unknown")
+        NPM_VERSION_FULL=$(npm --version 2>/dev/null || echo "unknown")
+        
+        # Format the line to match last box alignment
+        printf "\r  ${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}${NODE_VERSION_FULL}${NC} ${GRAY}and${NC} ${BOLD}npm${NC} ${GREEN}${NPM_VERSION_FULL}${NC} ${GRAY}already installed${NC}\033[K\n"
+        return 0
+    
+    # ========================================================================
+    # LINUX CASE 2: Node.js OK but npm outdated/missing - Update npm (no prompt)
+    # ========================================================================
+    elif [ "$check_result" = "npm_old" ] || [ "$check_result" = "npm_missing" ]; then
+        NODE_VERSION_FULL=$(node --version 2>/dev/null || echo "unknown")
+        
+        # Run setup script silently, log to temp file
+        # setup_nodejs.sh will use nvm to update npm
+        local log_file="$LOG_DIR/nodejs-setup-${INSTALL_TIMESTAMP}.log"
+        run_setup_script "setup_nodejs.sh" >"$log_file" 2>&1 &
+        local setup_pid=$!
+        
+        # Spinner while updating npm via nvm
+        local i=0
+        local spin_char=""
+        while kill -0 $setup_pid 2>/dev/null; do
+            case $((i % 10)) in
+                0) spin_char='⠋' ;;
+                1) spin_char='⠙' ;;
+                2) spin_char='⠹' ;;
+                3) spin_char='⠸' ;;
+                4) spin_char='⠼' ;;
+                5) spin_char='⠴' ;;
+                6) spin_char='⠦' ;;
+                7) spin_char='⠧' ;;
+                8) spin_char='⠇' ;;
+                9) spin_char='⠏' ;;
+            esac
+            printf "\r  ${YELLOW}⚠${NC} ${BOLD}Node.js${NC} ${GREEN}${NODE_VERSION_FULL}${NC} ${GRAY}OK, updating npm${NC} ${BOLD}${CYAN}%s${NC}\033[K" "$spin_char"
+            i=$((i + 1))
+            sleep 0.15
+        done
+        
+        # Get result from setup_nodejs.sh
+        wait $setup_pid
+        local result=$?
+        
+        # Clear line and show result
+        printf "\r\033[K"
+        
+        if [ $result -eq 0 ]; then
+            # Load nvm to get Node.js version (if installed via nvm)
+            if [ -s "$HOME/.nvm/nvm.sh" ]; then
+                export NVM_DIR="$HOME/.nvm"
+                . "$NVM_DIR/nvm.sh" 2>/dev/null
+            fi
+
+            NEW_NODE_VERSION=$(node --version 2>/dev/null || echo "unknown")
+            NEW_NPM_VERSION=$(npm --version 2>/dev/null || echo "unknown")
+            printf "  ${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}${NEW_NODE_VERSION}${NC} and ${BOLD}npm${NC} ${GREEN}${NEW_NPM_VERSION}${NC} updated successfully\n"
+        else
+            printf "${RED}✗${NC} Node.js setup failed\n"
+            if [ -f "$log_file" ]; then
+                printf "\n${BOLD}Last 15 lines from log:${NC}\n"
+                tail -15 "$log_file"
+            fi
+            exit 1
+        fi
+        return 0
+    
+    # ========================================================================
+    # LINUX CASE 3: Outdated Node.js (< 18) - Upgrade to LTS (no prompt)
+    # ========================================================================
+    elif [ "$check_result" = "outdated" ]; then
+        NODE_VERSION_OLD=$(node --version 2>/dev/null || echo "unknown")
+        
+        # Run setup script silently, log to temp file
+        # setup_nodejs.sh will install via nvm
+        local log_file="$LOG_DIR/nodejs-setup-${INSTALL_TIMESTAMP}.log"
+        run_setup_script "setup_nodejs.sh" >"$log_file" 2>&1 &
+        local setup_pid=$!
+        
+        # Spinner while upgrading via nvm
+        local i=0
+        local spin_char=""
+        while kill -0 $setup_pid 2>/dev/null; do
+            case $((i % 10)) in
+                0) spin_char='⠋' ;;
+                1) spin_char='⠙' ;;
+                2) spin_char='⠹' ;;
+                3) spin_char='⠸' ;;
+                4) spin_char='⠼' ;;
+                5) spin_char='⠴' ;;
+                6) spin_char='⠦' ;;
+                7) spin_char='⠧' ;;
+                8) spin_char='⠇' ;;
+                9) spin_char='⠏' ;;
+            esac
+            printf "\r  ${YELLOW}⚠${NC} ${BOLD}Node.js${NC} ${YELLOW}${NODE_VERSION_OLD}${NC} ${GRAY}outdated, upgrading${NC} ${BOLD}${CYAN}%s${NC}\033[K" "$spin_char"
+            i=$((i + 1))
+            sleep 0.15
+        done
+        
+        # Get result from setup_nodejs.sh
+        wait $setup_pid
+        local result=$?
+        
+        # Clear line and show result
+        printf "\r\033[K"
+        
+        if [ $result -eq 0 ]; then
+            # Load nvm to get Node.js version (if installed via nvm)
+            if [ -s "$HOME/.nvm/nvm.sh" ]; then
+                export NVM_DIR="$HOME/.nvm"
+                . "$NVM_DIR/nvm.sh" 2>/dev/null
+            fi
+
+            NEW_NODE_VERSION=$(node --version 2>/dev/null || echo "unknown")
+            NEW_NPM_VERSION=$(npm --version 2>/dev/null || echo "unknown")
+            printf "  ${GREEN}✓${NC} ${BOLD}Node.js${NC} upgraded to ${GREEN}${NEW_NODE_VERSION}${NC} and ${BOLD}npm${NC} ${GREEN}${NEW_NPM_VERSION}${NC} successfully\n"
+        else
+            printf "${RED}✗${NC} Node.js setup failed\n"
+            if [ -f "$log_file" ]; then
+                printf "\n${BOLD}Last 15 lines from log:${NC}\n"
+                tail -15 "$log_file"
+            fi
+            exit 1
+        fi
+        return 0
+    fi
+    
+    # ========================================================================
+    # LINUX CASE 4: Missing Node.js - Auto-install via nvm (no prompt)
+    # ========================================================================
+    # Run setup script silently with spinner
+    # setup_nodejs.sh will:
+    #   1. Install nvm (Node Version Manager) if not present
+    #   2. Install Node.js 22 LTS via nvm
+    #   3. npm comes bundled with Node.js
+    local log_file="$LOG_DIR/nodejs-setup-${INSTALL_TIMESTAMP}.log"
+    run_setup_script "setup_nodejs.sh" >"$log_file" 2>&1 &
+    local setup_pid=$!
+    
+    # Spinner while installing via nvm
+    local i=0
+    local spin_char=""
+    while kill -0 $setup_pid 2>/dev/null; do
+        case $((i % 10)) in
+            0) spin_char='⠋' ;;
+            1) spin_char='⠙' ;;
+            2) spin_char='⠹' ;;
+            3) spin_char='⠸' ;;
+            4) spin_char='⠼' ;;
+            5) spin_char='⠴' ;;
+            6) spin_char='⠦' ;;
+            7) spin_char='⠧' ;;
+            8) spin_char='⠇' ;;
+            9) spin_char='⠏' ;;
+        esac
+        printf "\r  ${YELLOW}⚠${NC} ${BOLD}Node.js${NC} ${GRAY}not installed, installing via nvm${NC} ${BOLD}${CYAN}%s${NC}\033[K" "$spin_char"
+        i=$((i + 1))
+        sleep 0.15
+    done
+    
+    wait $setup_pid
+    local result=$?
+    printf "\r\033[K"
+    
+    if [ $result -eq 0 ]; then
+        # Log saved to: $log_file
+        
+        # Load nvm to get Node.js version (nvm installation on Linux)
+        if [ -s "$HOME/.nvm/nvm.sh" ]; then
+            export NVM_DIR="$HOME/.nvm"
+            . "$NVM_DIR/nvm.sh" 2>/dev/null
+        fi
+        
+        NEW_NODE_VERSION=$(node --version 2>/dev/null || echo "unknown")
+        NEW_NPM_VERSION=$(npm --version 2>/dev/null || echo "unknown")
+        printf "  ${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}${NEW_NODE_VERSION}${NC} and ${BOLD}npm${NC} ${GREEN}${NEW_NPM_VERSION}${NC} installed successfully\n"
+    else
+        printf "${RED}✗${NC} Node.js setup failed\n"
+        if [ -f "$log_file" ]; then
+            printf "\n${BOLD}Last 15 lines from log:${NC}\n"
+            tail -15 "$log_file"
+        fi
+        exit 1
+    fi
+    
+    return 0
+}
+
+# ============================================================================
+# UNIFIED NODE.JS CHECK - Delegates to platform-specific function
+# ============================================================================
+check_and_prompt_nodejs() {
+    if [ "$(uname)" = "Darwin" ]; then
+        check_and_prompt_nodejs_macos
+    else
+        check_and_prompt_nodejs_linux
+    fi
+}
+
+
+# ############################################################################
+# ############################################################################
+# ##                                                                        ##
+# ##                   DOCKER INSTALLATION COMPONENT                        ##
+# ##                                                                        ##
+# ############################################################################
+# ############################################################################
+#
+# This section handles Docker installation and daemon management for both 
+# macOS and Linux.
+# 
+# Components:
+#   - macOS Docker installation (check_and_prompt_docker_macos)
+#   - Linux Docker installation (check_and_prompt_docker_linux)
+#   - Unified dispatcher (check_and_prompt_docker)
+#
+# Supported platforms:
+#   macOS:  OrbStack via Homebrew (Docker Desktop alternative)
+#   Linux:  Snap (preferred), apt-get, dnf, yum (auto-detected)
+#
+# Supported Linux distributions: 15+ (Ubuntu, Debian, Fedora, RHEL, CentOS,
+#   Rocky, AlmaLinux, Mint, Pop!_OS, Elementary, Arch, Manjaro, OpenSUSE)
+#
+# ############################################################################
+
+# ============================================================================
+# DOCKER INSTALLATION CHECK - All Cases (macOS)
+# ============================================================================
+# Detects Docker status and automatically installs/starts as needed.
+#
+# CASE 1: Docker running (daemon responsive)
+#   - Condition: docker info succeeds
+#   - Action: Skip installation (already running)
+#   - Example: "OrbStack Docker 1.7.3 already installed and running"
+#
+# CASE 2: Docker installed but not running
+#   - Condition: docker command exists but docker info fails
+#   - Action: Start Docker daemon (no prompt)
+#   - Example: "OrbStack Docker 27.1.1 installed but not running, starting"
+#   - When: Docker/OrbStack installed but not started
+#
+# CASE 3: Docker not installed
+#   - Condition: docker command not found
+#   - Action: Install OrbStack Docker (no prompt)
+#   - When: Fresh system or Docker never installed
+#
+# Decision Flow:
+#   docker info succeeds?
+#     YES → CASE 1 (Running)
+#     NO  → docker command exists?
+#             YES → CASE 2 (Installed but not running)
+#             NO  → CASE 3 (Not installed)
+#
+# macOS Installation Method:
+#   - Uses OrbStack (recommended alternative to Docker Desktop)
+#   - Command: brew install --cask orbstack
+#   - Version: Latest stable (e.g., 1.7.3)
+#   - Benefits: Faster, lighter, free for personal use
+#   - Note: Docker Desktop support disabled in code
+#
+# All cases log to: $HOME/graphdone-logs/docker-setup-YYYY-MM-DD_HH-MM-SS.log
+# ============================================================================
+
+# ============================================================================
+# DOCKER INSTALLATION CHECK - All Cases (Linux)
+# ============================================================================
+# Detects Docker status and automatically installs/starts as needed on Linux.
+#
+# CASE 1: Docker running (daemon responsive)
+#   - Condition: docker info succeeds
+#   - Action: Skip installation (already running)
+#   - Example: "Docker 24.0.7 already installed and running"
+#
+# CASE 2: Docker installed but not running
+#   - Condition: docker command exists but docker info fails
+#   - Action: Start Docker daemon (no prompt)
+#   - Example: "Docker 24.0.7 installed but not running, starting"
+#   - When: Docker installed but systemd service not started
+#
+# CASE 3: Docker not installed
+#   - Condition: docker command not found
+#   - Action: Install Docker Engine (no prompt)
+#   - When: Fresh system or Docker never installed
+#
+# Decision Flow:
+#   docker info succeeds?
+#     YES → CASE 1 (Running)
+#     NO  → docker command exists?
+#             YES → CASE 2 (Installed but not running)
+#             NO  → CASE 3 (Not installed)
+#
+# Linux Installation Methods (Auto-detected):
+#   METHOD 1: Snap (Preferred - if available)
+#     - Command: snap install docker
+#     - Works on: Ubuntu 16.04+, Debian 9+, Fedora, Arch, Manjaro, OpenSUSE
+#     - Benefits: Single command, automatic updates, cross-distribution
+#
+#   METHOD 2: APT (Ubuntu/Debian - if snap unavailable)
+#     - Uses Docker's official repository
+#     - Supported: Ubuntu 20.04+, Debian 10+, Linux Mint, Pop!_OS
+#     - Installs: docker-ce, docker-ce-cli, containerd.io
+#
+#   METHOD 3: DNF (Fedora - if snap unavailable)
+#     - Uses Docker's official repository
+#     - Supported: Fedora 36+, Fedora Workstation/Server
+#     - Installs: docker-ce, docker-ce-cli, containerd.io
+#
+#   METHOD 4: YUM (RHEL/CentOS - if snap unavailable)
+#     - Uses Docker's official repository
+#     - Supported: RHEL 8+, CentOS 8+, Rocky Linux, AlmaLinux
+#     - Installs: docker-ce, docker-ce-cli, containerd.io
+#
+#   Auto-detection order: snap → apt-get → dnf → yum
+#
+# All methods:
+#   - Require sudo for installation
+#   - Add user to docker group (no sudo for docker commands)
+#   - Start and enable Docker daemon
+#   - Require logout/login for group changes
+#
+# Features:
+#   - Fully automated installation
+#   - NO user prompts for any case
+#   - Animated spinner shows progress
+#   - Version verification after installation
+#   - Automatic daemon startup
+#   - Logs to: $HOME/graphdone-logs/docker-setup-YYYY-MM-DD_HH-MM-SS.log
+#
+# Exit codes from setup_docker.sh:
+#   0 - Success (Docker installed/started or already running)
+#   1 - Failure (Installation failed or unsupported distribution)
+# ============================================================================
+
+# ============================================================================
+# MACOS DOCKER CHECK FUNCTION - check_and_prompt_docker_macos()
+# ============================================================================
+check_and_prompt_docker_macos() {
+    # Add pink color for the circle
+    PINK='\033[38;5;213m'
+    
+    # Pink blinking circle during entire checking process
+    blink_state=0
+    
+    # Continue blinking and adding dots until check is complete
+    for cycle in 1 2 3 4 5 6; do
+        # Toggle blink state
+        if [ $blink_state -eq 0 ]; then
+            circle="${PINK}•${NC}"
+            blink_state=1
+        else
+            circle="${DIM}•${NC}"
+            blink_state=0
+        fi
+        
+        # Build the dots display based on cycle
+        dots_display=""
+        if [ $cycle -ge 3 ]; then
+            dots_display=" ${GRAY}●${NC}"
+        fi
+        if [ $cycle -ge 5 ]; then
+            dots_display="$dots_display ${BLUE}●${NC}"
+        fi
+        if [ $cycle -eq 6 ]; then
+            dots_display="$dots_display ${CYAN}●${NC}"
+            
+            # ============================================================
+            # MACOS VERSION CHECK: Docker installation and status
+            # ============================================================
+            # Check if Docker is installed AND running
             # Verify Docker daemon is actually running by testing connectivity
             if docker info >/dev/null 2>&1; then
-                check_result="running"  # Docker daemon is responsive
+                check_result="running"  # macOS CASE 1: Docker daemon is responsive
             elif command -v docker >/dev/null 2>&1; then
-                check_result="installed"  # Docker is installed but not running
+                check_result="installed"  # macOS CASE 2: Docker installed but not running
             elif command -v orbstack >/dev/null 2>&1 || [ -d "/Applications/OrbStack.app" ]; then
-                check_result="installed"  # OrbStack installed but daemon not responding
+                check_result="installed"  # macOS CASE 2: OrbStack installed but daemon not responding
             else
-                check_result="missing"  # Docker not installed
+                check_result="missing"  # macOS CASE 3: Docker not installed
             fi
         fi
         
@@ -937,6 +2136,9 @@ check_and_prompt_docker() {
     # Move to fresh line before printing status
     printf "\r\033[K"
 
+    # ========================================================================
+    # MACOS CASE 1: Docker running - Skip installation
+    # ========================================================================
     if [ "$check_result" = "running" ]; then
         # Add OrbStack bin to PATH if available (for version detection)
         if [ -d "$HOME/.orbstack/bin" ]; then
@@ -958,6 +2160,10 @@ check_and_prompt_docker() {
 
         printf "\r  ${GREEN}✓${NC} ${BOLD}${DOCKER_RUNTIME}${NC} ${GREEN}${DOCKER_VERSION}${NC} ${GRAY}already installed and running${NC}\033[K\n"
         return 0
+    
+    # ========================================================================
+    # MACOS CASE 2: Docker installed but not running - Start daemon (no prompt)
+    # ========================================================================
     elif [ "$check_result" = "installed" ]; then
         # Docker installed but not running - start it
 
@@ -1021,7 +2227,11 @@ check_and_prompt_docker() {
         return 0
     fi
     
+    # ========================================================================
+    # MACOS CASE 3: Docker not installed - Install OrbStack (no prompt)
+    # ========================================================================
     # Run Docker setup script with spinner
+    # setup_docker.sh will install OrbStack via Homebrew
     local log_file="$LOG_DIR/docker-setup-${INSTALL_TIMESTAMP}.log"
     run_setup_script "setup_docker.sh" >"$log_file" 2>&1 &
     local setup_pid=$!
@@ -1080,6 +2290,189 @@ check_and_prompt_docker() {
     fi
     
     return 0
+}
+
+# ============================================================================
+# LINUX DOCKER CHECK FUNCTION - check_and_prompt_docker_linux()
+# ============================================================================
+check_and_prompt_docker_linux() {
+    # Add pink color for the circle
+    PINK='\033[38;5;213m'
+    
+    # Pink blinking circle during entire checking process
+    blink_state=0
+    
+    # Continue blinking and adding dots until check is complete
+    for cycle in 1 2 3 4 5 6; do
+        # Toggle blink state
+        if [ $blink_state -eq 0 ]; then
+            circle="${PINK}•${NC}"
+            blink_state=1
+        else
+            circle="${DIM}•${NC}"
+            blink_state=0
+        fi
+        
+        # Build the dots display based on cycle
+        dots_display=""
+        if [ $cycle -ge 3 ]; then
+            dots_display=" ${GRAY}●${NC}"
+        fi
+        if [ $cycle -ge 5 ]; then
+            dots_display="$dots_display ${BLUE}●${NC}"
+        fi
+        if [ $cycle -eq 6 ]; then
+            dots_display="$dots_display ${CYAN}●${NC}"
+            
+            # ============================================================
+            # LINUX VERSION CHECK: Docker installation and status
+            # ============================================================
+            # Check if Docker is installed AND running
+            # Verify Docker daemon is actually running by testing connectivity
+            if docker info >/dev/null 2>&1; then
+                check_result="running"  # LINUX CASE 1: Docker daemon is responsive
+            elif command -v docker >/dev/null 2>&1; then
+                check_result="installed"  # LINUX CASE 2: Docker installed but not running
+            else
+                check_result="missing"  # LINUX CASE 3: Docker not installed
+            fi
+        fi
+        
+        # Show current state - animation only, no box borders
+        printf "\r  $circle ${GRAY}Checking Docker installation${NC}$dots_display"
+        # Clear to end of line to avoid artifacts
+        printf "\033[K"
+        sleep 0.4
+    done
+
+    # Move to fresh line before printing status
+    printf "\r\033[K"
+
+    # ========================================================================
+    # LINUX CASE 1: Docker running - Skip installation
+    # ========================================================================
+    if [ "$check_result" = "running" ]; then
+        # Get Docker version
+        DOCKER_VERSION=$(docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "installed")
+
+        printf "\r  ${GREEN}✓${NC} ${BOLD}Docker${NC} ${GREEN}${DOCKER_VERSION}${NC} ${GRAY}already installed and running${NC}\033[K\n"
+        return 0
+    
+    # ========================================================================
+    # LINUX CASE 2: Docker installed but not running - Start daemon (no prompt)
+    # ========================================================================
+    elif [ "$check_result" = "installed" ]; then
+        # Docker installed but not running - start it
+        DOCKER_VERSION=$(docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "unknown")
+
+        printf "\r  ${YELLOW}⚠${NC} ${BOLD}Docker${NC} ${GREEN}${DOCKER_VERSION}${NC} ${GRAY}installed but not running, starting${NC}\033[K\n"
+
+        # Move to previous line for spinner to replace the warning
+        printf "\033[1A"
+        
+        # Run the Docker setup script to start Docker with spinner
+        local log_file="$LOG_DIR/docker-setup-${INSTALL_TIMESTAMP}.log"
+        run_setup_script "setup_docker.sh" >"$log_file" 2>&1 &
+        local setup_pid=$!
+        
+        # Spinner while starting
+        local i=0
+        local spin_char=""
+        while kill -0 $setup_pid 2>/dev/null; do
+            case $((i % 10)) in
+                0) spin_char='⠋' ;;
+                1) spin_char='⠙' ;;
+                2) spin_char='⠹' ;;
+                3) spin_char='⠸' ;;
+                4) spin_char='⠼' ;;
+                5) spin_char='⠴' ;;
+                6) spin_char='⠦' ;;
+                7) spin_char='⠧' ;;
+                8) spin_char='⠇' ;;
+                9) spin_char='⠏' ;;
+            esac
+            printf "\r  ${YELLOW}◉${NC} Starting Docker ${BOLD}${CYAN}%s${NC}\033[K" "$spin_char"
+            i=$((i + 1))
+            sleep 0.15
+        done
+        
+        wait $setup_pid
+        local result=$?
+        
+        if [ $result -eq 0 ]; then
+            # Get Docker version, show clean success message
+            DOCKER_VERSION=$(docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "unknown")
+            printf "\r  ${GREEN}✓${NC} ${BOLD}Docker${NC} ${GREEN}${DOCKER_VERSION}${NC} started successfully\033[K\n"
+        else
+            printf "  ${RED}✗${NC} Docker startup failed\n"
+            if [ -f "$log_file" ]; then
+                printf "\n${BOLD}Last 15 lines from log:${NC}\n"
+                tail -15 "$log_file"
+            fi
+            exit 1
+        fi
+        return 0
+    fi
+    
+    # ========================================================================
+    # LINUX CASE 3: Docker not installed - Install Docker Engine (no prompt)
+    # ========================================================================
+    # Run Docker setup script with spinner
+    # setup_docker.sh will install Docker Engine via official repository
+    local log_file="$LOG_DIR/docker-setup-${INSTALL_TIMESTAMP}.log"
+    run_setup_script "setup_docker.sh" >"$log_file" 2>&1 &
+    local setup_pid=$!
+    
+    # Spinner while installing via package manager
+    local i=0
+    local spin_char=""
+    while kill -0 $setup_pid 2>/dev/null; do
+        case $((i % 10)) in
+            0) spin_char='⠋' ;;
+            1) spin_char='⠙' ;;
+            2) spin_char='⠹' ;;
+            3) spin_char='⠸' ;;
+            4) spin_char='⠼' ;;
+            5) spin_char='⠴' ;;
+            6) spin_char='⠦' ;;
+            7) spin_char='⠧' ;;
+            8) spin_char='⠇' ;;
+            9) spin_char='⠏' ;;
+        esac
+        printf "\r  ${YELLOW}⚠${NC} ${BOLD}Docker${NC} ${GRAY}not installed, installing Docker Engine${NC} ${BOLD}${CYAN}%s${NC}\033[K" "$spin_char"
+        i=$((i + 1))
+        sleep 0.15
+    done
+    
+    wait $setup_pid
+    local result=$?
+    printf "\r\033[K"
+
+    if [ $result -eq 0 ]; then
+        # Get Docker version
+        DOCKER_VERSION=$(docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "installed")
+        printf "  ${GREEN}✓${NC} ${BOLD}Docker${NC} ${GREEN}${DOCKER_VERSION}${NC} installed and running successfully\n"
+    else
+        printf "${RED}✗${NC} Docker setup failed\n"
+        if [ -f "$log_file" ]; then
+            printf "\n${BOLD}Last 15 lines from log:${NC}\n"
+            tail -15 "$log_file"
+        fi
+        exit 1
+    fi
+    
+    return 0
+}
+
+# ============================================================================
+# UNIFIED DOCKER CHECK - Delegates to platform-specific function
+# ============================================================================
+check_and_prompt_docker() {
+    if [ "$(uname)" = "Darwin" ]; then
+        check_and_prompt_docker_macos
+    else
+        check_and_prompt_docker_linux
+    fi
 }
 
 # Install Docker with progress feedback (Linux)
@@ -1195,6 +2588,32 @@ install_docker() {
         return 1
     fi
 }
+
+# ############################################################################
+# ############################################################################
+# ##                                                                        ##
+# ##                  SERVICE MANAGEMENT COMPONENT                          ##
+# ##                                                                        ##
+# ############################################################################
+# ############################################################################
+#
+# This section handles GraphDone service lifecycle management.
+# 
+# Components:
+#   - check_containers_healthy() - Verify all Docker containers are healthy
+#   - wait_for_services() - Wait for services to be ready (60s timeout)
+#   - stop_services() - Stop all GraphDone services
+#   - remove_services() - Complete cleanup and reset
+#
+# Service health checks:
+#   Neo4j:  Container health + cypher-shell connectivity
+#   Redis:  Container health + redis-cli ping
+#   API:    Container running + HTTPS endpoint (port 4128)
+#   Web:    Container running + HTTPS endpoint (port 3128)
+#
+# Used by: install_graphdone(), command-line arguments (stop/remove)
+#
+# ############################################################################
 
 # Check if containers are healthy (using smart-start approach)
 check_containers_healthy() {
@@ -1361,6 +2780,40 @@ remove_services() {
     printf "${GREEN}✓ Cleanup complete!${NC}\n"
 }
 
+# ############################################################################
+# ############################################################################
+# ##                                                                        ##
+# ##              MAIN INSTALLATION ORCHESTRATOR COMPONENT                  ##
+# ##                                                                        ##
+# ############################################################################
+# ############################################################################
+#
+# This section contains the main installation workflow that orchestrates
+# the entire GraphDone setup process.
+# 
+# Components:
+#   - install_graphdone() - Main installation function
+#
+# Installation Flow:
+#   1. Display animated banner with version
+#   2. Detect platform (macOS/Linux)
+#   3. Check macOS compatibility (if macOS)
+#   4. Check system requirements (disk space, network)
+#   5. Install Git (if missing or outdated)
+#   6. Install Node.js (if missing or outdated)
+#   7. Install Docker (if missing or not running)
+#   8. Clone GraphDone repository
+#   9. Install npm dependencies (with smart retry)
+#   10. Start Docker Compose services (Neo4j, Redis, API, Web)
+#   11. Wait for services to be healthy (60s timeout)
+#   12. Show success message with URLs
+#
+# Exit codes:
+#   0 - Success (GraphDone installed and running)
+#   1 - Failure (Installation failed at any step)
+#
+# ############################################################################
+
 # Main installation function
 install_graphdone() {
     # Beautiful GraphDone header with Copilot-style animation
@@ -1399,7 +2852,11 @@ install_graphdone() {
     CYAN="\033[38;5;51m"    # Cyan for labels (256-color)
     BOLD="\033[1m"          # Bold text
     
-    # Animate banner with Copilot-style line-by-line reveal
+    # ─────────────────────────────────────────────────────────────────────
+    # Animated Banner - Professional Reveal Effect
+    # ─────────────────────────────────────────────────────────────────────
+    # Creates a beautiful progressive reveal effect (30ms delay per line)
+    # Smooth, professional line-by-line animation for modern CLI experience
     printf "${TEAL}╔══════════════════════════════════════════════════════════════════════════════════════════════════╗${NC}\n"; sleep 0.03
     printf "${TEAL}║                                                                                                  ║${NC}\n"; sleep 0.03
     printf "${TEAL}║                  ${TEAL}${BOLD}██╗    ██╗███████╗██╗      ██████╗ ██████╗ ███╗   ███╗███████╗${NC}                  ${TEAL}║${NC}\n"; sleep 0.03
@@ -1436,7 +2893,10 @@ install_graphdone() {
     # Get macOS version info (silent - displayed later in System Information)
     get_macos_info
 
-    # Pre-flight checks
+    # ─────────────────────────────────────────────────────────────────────
+    # SECTION 1: Pre-flight Checks
+    # ─────────────────────────────────────────────────────────────────────
+    # Validates system readiness: network, disk space, download/upload speed
     printf "\n"
     printf "${TEAL}────────────────────────────────────${NC}  ${CYAN}${BOLD}✈️  Pre-flight Checks${NC}  ${TEAL}────────────────────────────────────────${NC}\n"
 
@@ -1570,7 +3030,10 @@ install_graphdone() {
         printf "\r\033[K  ${YELLOW}◉${NC} ${GRAY}Upload:${NC} ${BOLD}Unable to test${NC}\n"
     fi
 
-    # Installation check section with box
+    # ─────────────────────────────────────────────────────────────────────
+    # SECTION 2: System Information
+    # ─────────────────────────────────────────────────────────────────────
+    # Displays platform, OS version, architecture, shell
     printf "\n"
     printf "${TEAL}────────────────────────────────────${NC}  ${CYAN}${BOLD}🖥️  System Information${NC}  ${TEAL}───────────────────────────────────────${NC}\n"
     # Platform display with system name in brackets
@@ -1692,6 +3155,10 @@ install_graphdone() {
     # Modern installation section with progress
     INSTALL_DIR="$GRAPHDONE_CHECK_DIR"
     
+    # ─────────────────────────────────────────────────────────────────────
+    # SECTION 3: Dependency Checks
+    # ─────────────────────────────────────────────────────────────────────
+    # Checks and installs Git, Node.js, Docker if needed
     printf "\n"
     printf "${TEAL}────────────────────────────────────${NC}  ${CYAN}${BOLD}🔰 Dependency Checks${NC}  ${TEAL}────────────────────────────────────────${NC}\n"
     
@@ -1708,6 +3175,10 @@ install_graphdone() {
     
     printf "  ${GREEN}✓ All dependencies verified${NC}\n"
     
+    # ─────────────────────────────────────────────────────────────────────
+    # SECTION 4: Code Installation
+    # ─────────────────────────────────────────────────────────────────────
+    # Clones/updates GraphDone repository and installs npm dependencies
     printf "\n"
     printf "${TEAL}────────────────────────────────────${NC}  ${CYAN}${BOLD}📡 Code Installation${NC}  ${TEAL}────────────────────────────────────────${NC}\n"
     # Target line with exact 88-character content area
@@ -2012,6 +3483,10 @@ install_graphdone() {
 
     # Environment setup
     if [ ! -f ".env" ]; then
+        # ─────────────────────────────────────────────────────────────────────
+        # SECTION 5: Environment Configuration
+        # ─────────────────────────────────────────────────────────────────────
+        # Copies .env.example to .env if not exists
         printf "\n"
         printf "${TEAL}────────────────────────────────────${NC}  ${CYAN}${BOLD}✳️  Environment Configuration${NC}  ${TEAL}────────────────────────────────${NC}\n"
         printf "  ${GRAY}▸${NC} Configuring environment\n"
@@ -2030,6 +3505,10 @@ EOF
         printf "  ${GREEN}✓${NC} Environment configured\n"
     fi
 
+    # ─────────────────────────────────────────────────────────────────────
+    # SECTION 6: Security Initialization
+    # ─────────────────────────────────────────────────────────────────────
+    # Generates HTTPS certificates for secure connections
     printf "\n"
     printf "${TEAL}────────────────────────────────────${NC}  ${CYAN}${BOLD}🔐 Security Initialization${NC}  ${TEAL}──────────────────────────────────${NC}\n"
     if [ ! -f "deployment/certs/server-cert.pem" ]; then
@@ -2053,6 +3532,10 @@ EOF
         printf "  ${GREEN}✓${NC} TLS certificates already exist\n"
     fi
     printf "\n"
+    # ─────────────────────────────────────────────────────────────────────
+    # SECTION 7: Services Status
+    # ─────────────────────────────────────────────────────────────────────
+    # Checks if Docker containers are already running
     # Smart dependency management with MD5 hash-based caching
     # Only installs if node_modules is missing or package.json has changed
     # For updates, this was already done during Node.js check
@@ -2067,6 +3550,10 @@ EOF
     fi
     printf "  ${BLUE}◉${NC} Starting fresh services\n"
 
+    # ─────────────────────────────────────────────────────────────────────
+    # SECTION 8: Container Cleanup
+    # ─────────────────────────────────────────────────────────────────────
+    # Stops and removes old containers before fresh deployment
     printf "\n"
     printf "${TEAL}────────────────────────────────────${NC}  ${CYAN}${BOLD}🗑️  Container Cleanup${NC}  ${TEAL}────────────────────────────────────────${NC}\n"
     
@@ -2254,6 +3741,10 @@ EOF
     fi
     
 
+    # ─────────────────────────────────────────────────────────────────────
+    # SECTION 9: Service Deployment
+    # ─────────────────────────────────────────────────────────────────────
+    # Starts Docker Compose services (Neo4j, Redis, API, Web)
     printf "\n"
     printf "${TEAL}────────────────────────────────────${NC}  ${CYAN}${BOLD}🔆 Service Deployment${NC}  ${TEAL}───────────────────────────────────────${NC}\n"
     
@@ -2337,6 +3828,33 @@ EOF
     show_success_in_box
 }
 
+
+# ############################################################################
+# ############################################################################
+# ##                                                                        ##
+# ##              SUCCESS UI & COMMAND HANDLER COMPONENT                    ##
+# ##                                                                        ##
+# ############################################################################
+# ############################################################################
+#
+# This section handles success messages and command-line argument processing.
+# 
+# Components:
+#   - show_success_in_box() - Beautiful success message with URLs and commands
+#   - show_success() - Legacy function (unused)
+#   - Command handler (case statement) - Process install/stop/remove commands
+#
+# Success Message includes:
+#   - GraphDone Ready banner
+#   - Access URLs (Web App, GraphQL API, Database)
+#   - Management commands (cd, stop, remove)
+#
+# Command-line arguments:
+#   install (default) - Run full installation
+#   stop             - Stop all GraphDone services
+#   remove           - Complete cleanup and reset
+#
+# ############################################################################
 
 # Continue the box with success information
 show_success_in_box() {

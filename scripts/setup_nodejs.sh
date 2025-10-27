@@ -10,6 +10,76 @@
 # Installation methods:
 #   macOS:   Homebrew (latest Node.js)
 #   Linux:   nvm (Node.js 22 LTS, no sudo required)
+# ============================================================================
+
+# ============================================================================
+# MACOS NODE.JS INSTALLATION
+# ============================================================================
+# Installs Node.js on macOS using Homebrew
+#
+# Method: Homebrew Installation
+#   - Command: brew install node
+#   - Installs: Latest stable Node.js + npm together
+#   - Version: Latest (e.g., 22.11.0)
+#   - Benefits: Always up-to-date, easy to maintain, includes npm
+#
+# Flow:
+#   1. Check if Homebrew exists (command -v brew)
+#   2. If Homebrew exists:
+#      - Set environment variables to avoid prompts
+#      - Run brew install node in background
+#      - Show animated spinner during installation
+#      - Verify installation and display versions
+#   3. If Homebrew doesn't exist:
+#      - Show manual installation URL (nodejs.org)
+#      - Wait for user to complete installation
+#
+# Exit codes:
+#   0 - Success (Node.js installed successfully)
+#   1 - Failure (Installation failed or Homebrew not found)
+# ============================================================================
+
+# ============================================================================
+# LINUX NODE.JS INSTALLATION
+# ============================================================================
+# Installs Node.js on Linux using nvm (Node Version Manager)
+#
+# Method: nvm Installation
+#   - Step 1: Install nvm if not present
+#     - Command: curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/master/install.sh | bash
+#     - Installs to: $HOME/.nvm/
+#     - No sudo required (user-level installation)
+#
+#   - Step 2: Install Node.js 22 LTS via nvm
+#     - Command: nvm install 22
+#     - Command: nvm use 22
+#     - Command: nvm alias default 22
+#     - Version: Node.js 22 LTS + npm 10.x
+#
+# Flow:
+#   1. Check if nvm already installed ($HOME/.nvm/nvm.sh)
+#   2. If not installed:
+#      - Download and install nvm via curl
+#      - Show animated spinner during installation
+#      - Verify nvm installation
+#   3. Load nvm into current shell
+#   4. Install Node.js 22 LTS:
+#      - Run nvm install/use/alias in background
+#      - Show animated spinner during installation
+#   5. Reload nvm to update PATH
+#   6. Verify Node.js and npm are available
+#   7. Display setup instructions for new terminals
+#
+# Benefits:
+#   - No sudo required (user-level installation)
+#   - Multiple Node.js versions support
+#   - Easy version switching
+#   - Automatic npm inclusion
+#
+# Exit codes:
+#   0 - Success (Node.js installed successfully)
+#   1 - Failure (nvm or Node.js installation failed)
+# ============================================================================
 
 set -eu
 if [ -n "${BASH_VERSION:-}" ]; then
@@ -188,29 +258,35 @@ install_nodejs() {
 }
 
 # ============================================================================
-# macOS INSTALLATION
+# MACOS INSTALLATION FUNCTION - install_nodejs_macos()
 # ============================================================================
-
-# macOS Node.js installation
 install_nodejs_macos() {
-    # Check if Homebrew is available
+    # ------------------------------------------------------------------------
+    # Check if Homebrew is available (macOS package manager)
+    # ------------------------------------------------------------------------
     if command -v brew > /dev/null 2>&1; then
-        # Set environment to avoid prompts
-        export HOMEBREW_NO_AUTO_UPDATE=1
-        export HOMEBREW_NO_ENV_HINTS=1
+        # Set environment to avoid prompts during installation
+        export HOMEBREW_NO_AUTO_UPDATE=1  # Don't auto-update Homebrew itself
+        export HOMEBREW_NO_ENV_HINTS=1    # Don't show environment hints
 
-        # Install Node.js latest with minimal output
+        # Show initial status
         printf "        ${VIOLET}◉${NC} Installing Node.js (latest)" >&2
 
-        # Start installation in background
+        # ------------------------------------------------------------------------
+        # HOMEBREW INSTALLATION: brew install node
+        # ------------------------------------------------------------------------
+        # Start installation in background to show spinner
         brew install node >/dev/null 2>&1 &
         install_pid=$!
 
-        # Show spinner while installing
+        # ------------------------------------------------------------------------
+        # Animated Spinner - Shows progress while Homebrew works
+        # ------------------------------------------------------------------------
         i=0
         spin_char=""
 
         while kill -0 $install_pid 2>/dev/null; do
+            # Cycle through 10 spinner characters (⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏)
             case $((i % 10)) in
                 0) spin_char='⠋' ;;
                 1) spin_char='⠙' ;;
@@ -225,14 +301,21 @@ install_nodejs_macos() {
             esac
             printf "\r        ${VIOLET}◉${NC} Installing Node.js (latest) ${BOLD}${CYAN}%s${NC}" "$spin_char" >&2
             i=$((i + 1))
-            sleep 0.15
+            sleep 0.15  # 150ms per frame = ~6.6 FPS
         done
+        
+        # Wait for Homebrew to complete
         wait $install_pid
 
+        # ------------------------------------------------------------------------
+        # Installation Success - Node.js and npm installed together
+        # ------------------------------------------------------------------------
         printf "\r        ${GREEN}✓${NC} Node.js installed                    \n" >&2
         return 0
     else
-        # Fallback to official installer
+        # ------------------------------------------------------------------------
+        # FALLBACK: Homebrew not available - Show manual installation URL
+        # ------------------------------------------------------------------------
         printf "${YELLOW}!${NC} Please install from: https://nodejs.org/en/download/prebuilt-installer\n" >&2
         printf "${CYAN}❯${NC} ${BOLD}Have you installed Node.js?${NC} ${GRAY}[Press Enter when done]${NC}\n" >&2
         read -r response
@@ -241,21 +324,31 @@ install_nodejs_macos() {
 }
 
 # ============================================================================
-# LINUX INSTALLATION
+# LINUX INSTALLATION FUNCTION - install_nodejs_linux()
 # ============================================================================
-
-# Linux Node.js installation via nvm
 install_nodejs_linux() {
     printf "        ${VIOLET}◉${NC} Installing Node.js via nvm (Node Version Manager)\n" >&2
 
-    # Check if nvm is already installed
+    # ------------------------------------------------------------------------
+    # STEP 1: Check if nvm is already installed
+    # ------------------------------------------------------------------------
     if [ -s "$HOME/.nvm/nvm.sh" ]; then
         printf "        ${GREEN}✓${NC} nvm already installed\n" >&2
     else
+        # --------------------------------------------------------------------
+        # STEP 1a: Install nvm (Node Version Manager)
+        # --------------------------------------------------------------------
+        # Download and run nvm installation script
+        # URL: https://raw.githubusercontent.com/nvm-sh/nvm/master/install.sh
+        # Installs to: $HOME/.nvm/
+        # No sudo required - user-level installation
         printf "        ${VIOLET}◉${NC} Installing nvm" >&2
         curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/master/install.sh 2>/dev/null | bash &
         show_spinner $! "Installing nvm"
 
+        # --------------------------------------------------------------------
+        # Verify nvm Installation
+        # --------------------------------------------------------------------
         if [ -s "$HOME/.nvm/nvm.sh" ]; then
             printf "\r        ${GREEN}✓${NC} nvm installed successfully                    \n" >&2
         else
@@ -264,31 +357,51 @@ install_nodejs_linux() {
         fi
     fi
 
-    # Load nvm
+    # ------------------------------------------------------------------------
+    # STEP 2: Load nvm into current shell
+    # ------------------------------------------------------------------------
     export NVM_DIR="$HOME/.nvm"
     [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 
+    # Verify nvm is loaded
     if ! command -v nvm > /dev/null 2>&1; then
         printf "        ${RED}✗${NC} Could not load nvm\n" >&2
         return 1
     fi
 
+    # ------------------------------------------------------------------------
+    # STEP 3: Install Node.js 22 LTS via nvm
+    # ------------------------------------------------------------------------
     printf "        ${VIOLET}◉${NC} Installing Node.js 22 (LTS)" >&2
 
-    # Install Node.js 22 LTS (run in background for spinner)
+    # Install Node.js 22 LTS and set as default
+    # Commands run in background:
+    #   nvm install 22        - Install Node.js 22 LTS
+    #   nvm use 22            - Use Node.js 22 in current shell
+    #   nvm alias default 22  - Set Node.js 22 as default for new shells
     (nvm install 22 && nvm use 22 && nvm alias default 22) > /dev/null 2>&1 &
     show_spinner $! "Installing Node.js 22 (LTS)"
 
-    # Reload to get node in PATH
+    # ------------------------------------------------------------------------
+    # STEP 4: Reload nvm to update PATH
+    # ------------------------------------------------------------------------
+    # Reload to get node and npm commands in PATH
     [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 
+    # ------------------------------------------------------------------------
+    # STEP 5: Verify Installation Success
+    # ------------------------------------------------------------------------
     if command -v node > /dev/null 2>&1; then
+        # Node.js and npm successfully installed
         printf "\r        ${GREEN}✓${NC} Node.js $(node --version) and npm $(npm --version) installed                    \n" >&2
+        
+        # Display setup instructions for new terminal sessions
         printf "        ${GRAY}  💡 To use Node.js in new terminals, add to your ~/.bashrc or ~/.zshrc:${NC}\n" >&2
         printf "        ${GRAY}     export NVM_DIR=\"\$HOME/.nvm\"${NC}\n" >&2
         printf "        ${GRAY}     [ -s \"\$NVM_DIR/nvm.sh\" ] && \\. \"\$NVM_DIR/nvm.sh\"${NC}\n" >&2
         return 0
     else
+        # Installation failed - node command not found
         printf "\r        ${RED}✗${NC} Node.js installation failed                    \n" >&2
         return 1
     fi

@@ -1,19 +1,19 @@
 # GraphDone Deployment Guide
 
-## Quick Install (Like Ollama!)
+## 🚀 Quick Install (One-Command Setup)
 
-GraphDone can be installed with a single command:
+GraphDone can be installed with a single command on macOS and Linux:
 
-### Using GitHub (Available Now!)
+### Using GitHub (Recommended)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/start.sh | sh
+curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/install.sh | sh
 ```
 
 or using wget:
 
 ```bash
-wget -qO- https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/start.sh | sh
+wget -qO- https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/install.sh | sh
 ```
 
 ### Using Custom Domain (Future)
@@ -21,16 +21,151 @@ wget -qO- https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public
 Once deployed to graphdone.com:
 
 ```bash
-curl -fsSL https://graphdone.com/start.sh | sh
+curl -fsSL https://graphdone.com/install.sh | sh
 ```
 
-This will:
-1. Check for required dependencies (git, docker)
-2. Clone GraphDone to `~/graphdone` (visible directory)
-3. Generate TLS certificates automatically
-4. Configure environment for HTTPS
-5. Start services using smart-start
-6. Provide access at https://localhost:3128
+## 📋 What the Installer Does
+
+The installation script performs 9 automated steps:
+
+### 1. Pre-flight Checks
+- Network connectivity validation
+- Disk space check (5GB minimum required)
+- Download speed test (CloudFlare CDN)
+- Upload speed test
+
+### 2. System Information
+- Platform detection (macOS/Linux)
+- OS version compatibility check
+- Architecture detection (x86_64/arm64)
+- Shell environment validation
+
+### 3. Dependency Installation
+Automatically installs missing dependencies:
+
+**macOS:**
+- Git via Homebrew
+- Node.js 18+ via Homebrew
+- OrbStack (lightweight Docker alternative) via Homebrew
+
+**Linux (15+ distributions):**
+- Git via apt-get/dnf/yum
+- Node.js 22 LTS via nvm
+- Docker Engine via Snap (preferred) or apt-get/dnf/yum
+
+**Supported Linux Distributions:**
+- Ubuntu 20.04+, 22.04+, 24.04+
+- Debian 10+, 11+, 12+
+- Fedora 38+, 39+, 40+
+- RHEL 8+, 9+
+- CentOS 8+, Stream 9
+- Rocky Linux 8+, 9+
+- AlmaLinux 8+, 9+
+- Linux Mint 20+, 21+
+- Pop!_OS 22.04+
+- Elementary OS 6+, 7+
+- Arch Linux, Manjaro
+- openSUSE Leap 15+, Tumbleweed
+
+### 4. Code Installation
+- Clones GraphDone repository to `~/graphdone`
+- Installs npm dependencies with smart retry logic
+- Handles package conflicts automatically
+
+### 5. Environment Configuration
+- Creates `.env` file from template
+- Configures Neo4j credentials
+- Sets up Redis connection
+- Configures API and Web URLs with HTTPS
+
+### 6. Security Initialization
+- Generates self-signed TLS certificates
+- Sets proper file permissions (600 for keys, 644 for certs)
+- Enables HTTPS for API (port 4128) and Web (port 3128)
+
+### 7. Services Status Check
+- Checks if Docker containers are already running
+- Validates container health status
+- Tests Neo4j and Redis connectivity
+
+### 8. Container Cleanup
+- Stops old containers gracefully
+- Removes orphaned containers
+- Cleans up Docker volumes
+
+### 9. Service Deployment
+- Starts Neo4j database (ports 7474, 7687)
+- Starts Redis cache (port 6379)
+- Starts GraphQL API (port 4128 HTTPS)
+- Starts React Web App (port 3128 HTTPS)
+- Waits for all services to be healthy (60s timeout)
+
+## 🌐 After Installation
+
+Your GraphDone instance will be available at:
+
+- **Web Application:** https://localhost:3128
+  - Main interface for managing work items and graph visualization
+- **GraphQL API:** https://localhost:4128/graphql
+  - Apollo GraphQL Playground for API exploration
+- **Neo4j Database Browser:** http://localhost:7474
+  - Username: `neo4j`
+  - Password: `graphdone_password`
+  - Cypher query interface for direct database access
+
+## ⚙️ Management Commands
+
+```bash
+# Stop all GraphDone services
+sh ~/graphdone/public/install.sh stop
+
+# Complete cleanup (removes containers, volumes)
+sh ~/graphdone/public/install.sh remove
+
+# Reinstall/update GraphDone
+sh ~/graphdone/public/install.sh install
+```
+
+## 📊 System Requirements
+
+- **Disk Space:** 5GB minimum free space
+- **Memory:** 4GB RAM minimum (8GB recommended)
+- **Network:** Internet connection required for installation
+- **OS:** macOS 10.15+ or modern Linux distribution
+- **Shell:** POSIX-compatible shell (sh, bash, zsh, dash)
+
+## 🔧 Troubleshooting
+
+### Installation Logs
+
+Logs are automatically saved to:
+```
+~/graphdone-logs/installation-YYYY-MM-DD_HH-MM-SS.log
+```
+
+### Common Issues
+
+**Port Conflicts:**
+- Stop services using ports 3128, 4128, 7474, 7687, 6379
+- Check with: `lsof -i :3128` or `netstat -tuln | grep 3128`
+
+**Docker Not Starting:**
+- Ensure Docker Desktop or OrbStack is running
+- macOS: Check OrbStack status in menu bar
+- Linux: `sudo systemctl status docker`
+
+**Permission Errors:**
+- Script requires sudo for system package installation
+- Ensure your user has sudo privileges
+
+**Network Errors:**
+- Check firewall settings
+- Verify internet connectivity
+- Test with: `curl -I https://github.com`
+
+### Manual Installation
+
+If the automated installer fails, see [Manual Installation Guide](./manual-installation.md)
 
 ## Hosting the Installation Script
 
