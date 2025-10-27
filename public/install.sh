@@ -1,18 +1,18 @@
 #!/bin/sh
 # ============================================================================
 # ============================================================================
-# 
+#
 #                    GraphDone Installation Script
 #             Professional One-Command Setup for All Platforms
-# 
+#
 # ============================================================================
 # ============================================================================
 #
 # 📖 DESCRIPTION
 # ============================================================================
 #   Automated installer for GraphDone - a graph-native project management
-#   system that reimagines work coordination through dependencies and 
-#   democratic prioritization. Handles complete setup from dependency 
+#   system that reimagines work coordination through dependencies and
+#   democratic prioritization. Handles complete setup from dependency
 #   installation to running services with beautiful CLI progress feedback.
 #
 #   Features:
@@ -231,7 +231,7 @@ set -e
 # ############################################################################
 #
 # This section contains all utility functions used throughout the installer.
-# 
+#
 # Categories:
 #   - Logging & Output: log(), ok(), warn(), error()
 #   - System Checks: check_disk_space(), check_network()
@@ -261,17 +261,17 @@ CLEANUP_NEEDED=false
 cleanup() {
     if [ "$CLEANUP_NEEDED" = true ]; then
         printf "\n${YELLOW}Cleaning up...${NC}\n"
-        
+
         # Clean temp files
         for temp_file in $TEMP_FILES; do
             if [ -f "$temp_file" ]; then
                 rm -f "$temp_file" 2>/dev/null || true
             fi
         done
-        
+
         # Clean npm temp logs
         rm -f /tmp/npm-error.log /tmp/npm-debug.log 2>/dev/null || true
-        
+
         printf "${GREEN}✓ Cleanup complete${NC}\n"
     fi
 }
@@ -374,7 +374,7 @@ error() {
 check_disk_space() {
     local required_gb=5
     local available_gb=0
-    
+
     if command -v df >/dev/null 2>&1; then
         # Get available space in GB (cross-platform)
         if [ "$(uname)" = "Darwin" ]; then
@@ -384,7 +384,7 @@ check_disk_space() {
             # Linux: use -BG for gigabytes
             available_gb=$(df -BG . 2>/dev/null | awk 'NR==2 {gsub(/G/,"",$4); print int($4)}' || echo "0")
         fi
-        
+
         if [ "$available_gb" -lt "$required_gb" ]; then
             warn "Low disk space: ${available_gb}GB available (${required_gb}GB recommended)"
             printf "${CYAN}ℹ${NC} Continue anyway? ${GRAY}[y/N]${NC} "
@@ -485,11 +485,11 @@ CACHE_DIR=".graphdone-cache"
 check_deps_fresh() {
     mkdir -p "$CACHE_DIR"
     local deps_hash_file="$CACHE_DIR/deps-hash"
-    
+
     if [ ! -f "$deps_hash_file" ]; then
         return 1
     fi
-    
+
     # Generate hash of all package.json files (cross-platform)
     local current_hash
     if command -v md5sum >/dev/null 2>&1; then
@@ -509,7 +509,7 @@ check_deps_fresh() {
         fi
     fi
     local cached_hash=$(cat "$deps_hash_file" 2>/dev/null || echo "")
-    
+
     if [ "$current_hash" = "$cached_hash" ]; then
         return 0
     fi
@@ -542,14 +542,14 @@ show_spinner() {
     pid=$1
     spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
     i=0
-    
+
     while kill -0 $pid 2>/dev/null; do
         printf " ${YELLOW}.${NC}"
         i=$(( (i+1) % 10 ))
         sleep 0.1
         printf "\b\b\b"
     done
-    
+
     wait $pid
     return $?
 }
@@ -560,17 +560,17 @@ spinner() {
     message=$2
     spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
     i=0
-    
+
     printf "${GRAY}▸${NC} %s " "$message"
     while kill -0 $pid 2>/dev/null; do
         printf "\r${GRAY}▸${NC} %s ${YELLOW}.${NC}" "$message"
         i=$(( (i+1) % 10 ))
         sleep 0.1
     done
-    
+
     wait $pid
     exit_code=$?
-    
+
     # Clear the line completely and rewrite without spinner
     printf "\r\033[K"  # Clear entire line
     if [ $exit_code -eq 0 ]; then
@@ -578,7 +578,7 @@ spinner() {
     else
         printf "${RED}✗${NC} %s\n" "$message"
     fi
-    
+
     return $exit_code
 }
 
@@ -586,11 +586,11 @@ spinner() {
 run_with_spinner() {
     message=$1
     shift
-    
+
     # Run command in background
     "$@" >/dev/null 2>&1 &
     pid=$!
-    
+
     # Show spinner
     spinner $pid "$message"
     return $?
@@ -683,7 +683,7 @@ get_macos_info() {
 # ############################################################################
 #
 # This section handles Git installation and upgrades for both macOS and Linux.
-# 
+#
 # Components:
 #   - macOS Git installation (check_and_prompt_git_macos)
 #   - Linux Git installation (check_and_prompt_git_linux)
@@ -723,7 +723,7 @@ get_macos_info() {
 #   - When: Fresh system or Git never installed
 #
 # Decision Flow:
-#   Git installed? 
+#   Git installed?
 #     NO  → CASE 4 (Missing)
 #     YES → Contains "Apple Git"?
 #             YES → CASE 2 (Apple Git)
@@ -807,10 +807,10 @@ get_macos_info() {
 check_and_prompt_git_macos() {
     # Add pink color for the circle
     PINK='\033[38;5;213m'
-    
+
     # Pink blinking circle during entire checking process
     blink_state=0
-    
+
     # Continue blinking and adding dots until check is complete
     for cycle in 1 2 3 4 5 6; do
         # Toggle blink state
@@ -821,7 +821,7 @@ check_and_prompt_git_macos() {
             circle="${DIM}•${NC}"
             blink_state=0
         fi
-        
+
         # Build the dots display based on cycle
         dots_display=""
         if [ $cycle -ge 3 ]; then
@@ -852,29 +852,29 @@ check_and_prompt_git_macos() {
                 check_result="missing"  # Git not installed
             fi
         fi
-        
+
         # Show current state - animation only, no box borders
         printf "\r  $circle ${GRAY}Checking Git installation${NC}$dots_display"
         # Clear to end of line to avoid artifacts
         printf "\033[K"
         sleep 0.4
     done
-    
+
     # Smooth transition: show completion state briefly
     printf " ${GREEN}●${NC}"
     sleep 0.3
-    
+
     # ========================================================================
     # CASE 1: Current Git (>= 2.45) - Already installed, skip installation
     # ========================================================================
     if [ "$check_result" = "current" ]; then
         # Get full version info
         GIT_VERSION_FULL=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
-        
+
         # Format the line to match last box alignment
         printf "\r  ${GREEN}✓${NC} ${BOLD}Git${NC} ${GREEN}${GIT_VERSION_FULL}${NC} ${GRAY}already installed${NC}\033[K\n"
         return 0
-    
+
     # ========================================================================
     # CASE 2: Apple Git - Auto-upgrade to Homebrew Git (no prompt)
     # ========================================================================
@@ -886,12 +886,12 @@ check_and_prompt_git_macos() {
         if [ "$(uname)" = "Darwin" ] && command -v brew >/dev/null 2>&1; then
             LATEST_GIT_VERSION=$(brew info git 2>/dev/null | head -n 1 | sed 's/.*stable \([0-9.]*\).*/\1/' || echo "")
         fi
-        
+
         # Run setup script silently, log to temp file
         local log_file="$LOG_DIR/git-setup-${INSTALL_TIMESTAMP}.log"
         run_setup_script "setup_git.sh" >"$log_file" 2>&1 &
         local setup_pid=$!
-        
+
         # Spinner while installing
         local i=0
         local spin_char=""
@@ -916,14 +916,14 @@ check_and_prompt_git_macos() {
             i=$((i + 1))
             sleep 0.15
         done
-        
+
         # Get result
         wait $setup_pid
         local result=$?
-        
+
         # Clear line and show result
         printf "\r\033[K"
-        
+
         if [ $result -eq 0 ]; then
             # Log saved to: $log_file
             NEW_GIT_VERSION=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
@@ -938,7 +938,7 @@ check_and_prompt_git_macos() {
             printf "${CYAN}ℹ${NC} Continuing with Apple Git\n"
         fi
         return 0
-    
+
     # ========================================================================
     # CASE 3: Outdated Git (< 2.45) - Auto-upgrade to latest (no prompt)
     # ========================================================================
@@ -950,12 +950,12 @@ check_and_prompt_git_macos() {
         if [ "$(uname)" = "Darwin" ] && command -v brew >/dev/null 2>&1; then
             LATEST_GIT_VERSION=$(brew info git 2>/dev/null | head -n 1 | sed 's/.*stable \([0-9.]*\).*/\1/' || echo "")
         fi
-        
+
         # Run setup script silently, log to temp file
         local log_file="$LOG_DIR/git-setup-${INSTALL_TIMESTAMP}.log"
         run_setup_script "setup_git.sh" >"$log_file" 2>&1 &
         local setup_pid=$!
-        
+
         # Spinner while installing
         local i=0
         local spin_char=""
@@ -980,14 +980,14 @@ check_and_prompt_git_macos() {
             i=$((i + 1))
             sleep 0.15
         done
-        
+
         # Get result
         wait $setup_pid
         local result=$?
-        
+
         # Clear line and show result
         printf "\r\033[K"
-        
+
         if [ $result -eq 0 ]; then
             # Log saved to: $log_file
             NEW_GIT_VERSION=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
@@ -1003,7 +1003,7 @@ check_and_prompt_git_macos() {
         fi
         return 0
     fi
-    
+
     # ========================================================================
     # CASE 4: Missing Git - Auto-install latest version (no prompt)
     # ========================================================================
@@ -1012,12 +1012,12 @@ check_and_prompt_git_macos() {
     if [ "$(uname)" = "Darwin" ] && command -v brew >/dev/null 2>&1; then
         LATEST_GIT_VERSION=$(brew info git 2>/dev/null | head -n 1 | sed 's/.*stable \([0-9.]*\).*/\1/' || echo "")
     fi
-    
+
     # Run setup script silently, log to temp file
     local log_file="$LOG_DIR/git-setup-${INSTALL_TIMESTAMP}.log"
     run_setup_script "setup_git.sh" --skip-check >"$log_file" 2>&1 &
     local setup_pid=$!
-    
+
     # Spinner while installing
     local i=0
     local spin_char=""
@@ -1042,14 +1042,14 @@ check_and_prompt_git_macos() {
         i=$((i + 1))
         sleep 0.15
     done
-    
+
     # Get result
     wait $setup_pid
     local result=$?
-    
+
     # Clear line and show result
     printf "\r\033[K"
-    
+
     if [ $result -eq 0 ]; then
         # Log saved to: $log_file
         NEW_GIT_VERSION=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
@@ -1063,7 +1063,36 @@ check_and_prompt_git_macos() {
         fi
         exit 1
     fi
-    
+
+    return 0
+}
+
+# ============================================================================
+# LINUX SUDO REQUEST - request_sudo_linux()
+# ============================================================================
+# Request sudo privileges once at the beginning for all Linux installations
+# Follows Homebrew pattern: single upfront prompt, security trap on exit
+# ============================================================================
+request_sudo_linux() {
+    # Check if we're on Linux
+    if [ "$(uname)" != "Linux" ]; then
+        return 0
+    fi
+
+    # Request sudo access once
+    printf "  ${VIOLET}◉${NC} Requesting administrative privileges for installations\n"
+    if ! sudo -v; then
+        printf "  ${RED}✗${NC} Failed to obtain sudo privileges\n"
+        return 1
+    fi
+
+    # Keep sudo alive in background (refresh every 60 seconds)
+    (while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null) &
+    SUDO_KEEPER_PID=$!
+
+    # Clear sudo cache on exit for security
+    trap 'sudo -k; kill $SUDO_KEEPER_PID 2>/dev/null' EXIT
+
     return 0
 }
 
@@ -1073,10 +1102,10 @@ check_and_prompt_git_macos() {
 check_and_prompt_git_linux() {
     # Add pink color for the circle
     PINK='\033[38;5;213m'
-    
+
     # Pink blinking circle during entire checking process
     blink_state=0
-    
+
     # Continue blinking and adding dots until check is complete
     for cycle in 1 2 3 4 5 6; do
         # Toggle blink state
@@ -1087,7 +1116,7 @@ check_and_prompt_git_linux() {
             circle="${DIM}•${NC}"
             blink_state=0
         fi
-        
+
         # Build the dots display based on cycle
         dots_display=""
         if [ $cycle -ge 3 ]; then
@@ -1098,19 +1127,19 @@ check_and_prompt_git_linux() {
         fi
         if [ $cycle -eq 6 ]; then
             dots_display="$dots_display ${CYAN}●${NC}"
-            
+
             # ============================================================
             # LINUX VERSION CHECK: Git version detection
             # ============================================================
             # Check if Git is installed
             if command -v git >/dev/null 2>&1; then
                 GIT_VERSION=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
-                
+
                 # Linux: Check if version >= 2.45 (same threshold as macOS for consistency)
                 # Note: setup_git.sh uses 2.30 internally, but unified check uses 2.45
                 MAJOR=$(echo "$GIT_VERSION" | sed 's/[^0-9.].*//g' | cut -d. -f1)
                 MINOR=$(echo "$GIT_VERSION" | sed 's/[^0-9.].*//g' | cut -d. -f2)
-                
+
                 if [ "$MAJOR" -ge 2 ] && [ "$MINOR" -ge 45 ]; then
                     check_result="current"  # LINUX CASE 1: Git >= 2.45 (current)
                 else
@@ -1120,35 +1149,35 @@ check_and_prompt_git_linux() {
                 check_result="missing"  # LINUX CASE 3: Git not installed
             fi
         fi
-        
+
         # Show current state - animation only, no box borders
         printf "\r  $circle ${GRAY}Checking Git installation${NC}$dots_display"
         # Clear to end of line to avoid artifacts
         printf "\033[K"
         sleep 0.4
     done
-    
+
     # Smooth transition: show completion state briefly
     printf " ${GREEN}●${NC}"
     sleep 0.3
-    
+
     # ========================================================================
     # LINUX CASE 1: Current Git (>= 2.45) - Already installed, skip
     # ========================================================================
     if [ "$check_result" = "current" ]; then
         # Get full version info
         GIT_VERSION_FULL=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
-        
+
         # Format the line to match box alignment
         printf "\r  ${GREEN}✓${NC} ${BOLD}Git${NC} ${GREEN}${GIT_VERSION_FULL}${NC} ${GRAY}already installed${NC}\033[K\n"
         return 0
-    
+
     # ========================================================================
     # LINUX CASE 2: Outdated Git (< 2.45) - Auto-upgrade (no prompt)
     # ========================================================================
     elif [ "$check_result" = "outdated" ]; then
         GIT_VERSION_OLD=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
-        
+
         # Run setup script silently, log to temp file
         # setup_git.sh will detect package manager automatically:
         #   - apt-get (Ubuntu/Debian) - adds git-core PPA for latest
@@ -1160,7 +1189,7 @@ check_and_prompt_git_linux() {
         local log_file="$LOG_DIR/git-setup-${INSTALL_TIMESTAMP}.log"
         run_setup_script "setup_git.sh" >"$log_file" 2>&1 &
         local setup_pid=$!
-        
+
         # Spinner while installing via package manager
         local i=0
         local spin_char=""
@@ -1181,14 +1210,14 @@ check_and_prompt_git_linux() {
             i=$((i + 1))
             sleep 0.15
         done
-        
+
         # Get result from setup_git.sh
         wait $setup_pid
         local result=$?
-        
+
         # Clear line and show result
         printf "\r\033[K"
-        
+
         if [ $result -eq 0 ]; then
             # Log saved to: $log_file
             NEW_GIT_VERSION=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
@@ -1203,7 +1232,7 @@ check_and_prompt_git_linux() {
         fi
         return 0
     fi
-    
+
     # ========================================================================
     # LINUX CASE 3: Missing Git - Auto-install latest version (no prompt)
     # ========================================================================
@@ -1218,7 +1247,7 @@ check_and_prompt_git_linux() {
     local log_file="$LOG_DIR/git-setup-${INSTALL_TIMESTAMP}.log"
     run_setup_script "setup_git.sh" --skip-check >"$log_file" 2>&1 &
     local setup_pid=$!
-    
+
     # Spinner while installing via package manager
     local i=0
     local spin_char=""
@@ -1239,14 +1268,14 @@ check_and_prompt_git_linux() {
         i=$((i + 1))
         sleep 0.15
     done
-    
+
     # Get result from setup_git.sh
     wait $setup_pid
     local result=$?
-    
+
     # Clear line and show result
     printf "\r\033[K"
-    
+
     if [ $result -eq 0 ]; then
         # Log saved to: $log_file
         NEW_GIT_VERSION=$(git --version 2>/dev/null | sed 's/git version //' || echo "unknown")
@@ -1259,7 +1288,7 @@ check_and_prompt_git_linux() {
         fi
         exit 1
     fi
-    
+
     return 0
 }
 
@@ -1283,9 +1312,9 @@ check_and_prompt_git() {
 # ############################################################################
 # ############################################################################
 #
-# This section handles Node.js and npm installation/upgrades for both macOS 
+# This section handles Node.js and npm installation/upgrades for both macOS
 # and Linux.
-# 
+#
 # Components:
 #   - macOS Node.js installation (check_and_prompt_nodejs_macos)
 #   - Linux Node.js installation (check_and_prompt_nodejs_linux)
@@ -1404,10 +1433,10 @@ check_and_prompt_git() {
 check_and_prompt_nodejs_macos() {
     # Add pink color for the circle
     PINK='\033[38;5;213m'
-    
+
     # Pink blinking circle during entire checking process
     blink_state=0
-    
+
     # Continue blinking and adding dots until check is complete
     for cycle in 1 2 3 4 5 6; do
         # Toggle blink state
@@ -1418,7 +1447,7 @@ check_and_prompt_nodejs_macos() {
             circle="${DIM}•${NC}"
             blink_state=0
         fi
-        
+
         # Build the dots display based on cycle
         dots_display=""
         if [ $cycle -ge 3 ]; then
@@ -1429,7 +1458,7 @@ check_and_prompt_nodejs_macos() {
         fi
         if [ $cycle -eq 6 ]; then
             dots_display="$dots_display ${CYAN}●${NC}"
-            
+
             # ============================================================
             # MACOS VERSION CHECK: Node.js and npm version detection
             # ============================================================
@@ -1439,7 +1468,7 @@ check_and_prompt_nodejs_macos() {
                 export NVM_DIR="$HOME/.nvm"
                 . "$NVM_DIR/nvm.sh" >/dev/null
             fi
-            
+
             # Check if Node.js is installed with correct version
             if command -v node >/dev/null 2>&1; then
                 NODE_VERSION=$(node --version 2>/dev/null | sed 's/v//' | cut -d. -f1 || echo "0")
@@ -1462,18 +1491,18 @@ check_and_prompt_nodejs_macos() {
                 check_result="missing"  # macOS CASE 4: Node.js not installed
             fi
         fi
-        
+
         # Show current state - animation only, no box borders
         printf "\r  $circle ${GRAY}Checking Node.js installation${NC}$dots_display"
         # Clear to end of line to avoid artifacts
         printf "\033[K"
         sleep 0.4
     done
-    
+
     # Smooth transition: show completion state briefly
     printf " ${GREEN}●${NC}"
     sleep 0.3
-    
+
     # ========================================================================
     # MACOS CASE 1: Current Node.js (>= 18) + npm (>= 9) - Skip installation
     # ========================================================================
@@ -1481,22 +1510,22 @@ check_and_prompt_nodejs_macos() {
         # Get full version info
         NODE_VERSION_FULL=$(node --version 2>/dev/null || echo "unknown")
         NPM_VERSION_FULL=$(npm --version 2>/dev/null || echo "unknown")
-        
+
         # Format the line to match last box alignment
         printf "\r  ${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}${NODE_VERSION_FULL}${NC} ${GRAY}and${NC} ${BOLD}npm${NC} ${GREEN}${NPM_VERSION_FULL}${NC} ${GRAY}already installed${NC}\033[K\n"
         return 0
-    
+
     # ========================================================================
     # MACOS CASE 2: Node.js OK but npm outdated/missing - Update npm (no prompt)
     # ========================================================================
     elif [ "$check_result" = "npm_old" ] || [ "$check_result" = "npm_missing" ]; then
         NODE_VERSION_FULL=$(node --version 2>/dev/null || echo "unknown")
-        
+
         # Run setup script silently, log to temp file
         local log_file="$LOG_DIR/nodejs-setup-${INSTALL_TIMESTAMP}.log"
         run_setup_script "setup_nodejs.sh" >"$log_file" 2>&1 &
         local setup_pid=$!
-        
+
         # Spinner while updating npm
         local i=0
         local spin_char=""
@@ -1517,14 +1546,14 @@ check_and_prompt_nodejs_macos() {
             i=$((i + 1))
             sleep 0.15
         done
-        
+
         # Get result
         wait $setup_pid
         local result=$?
-        
+
         # Clear line and show result
         printf "\r\033[K"
-        
+
         if [ $result -eq 0 ]; then
             # Load nvm to get Node.js version (if installed via nvm)
             if [ -s "$HOME/.nvm/nvm.sh" ]; then
@@ -1544,18 +1573,18 @@ check_and_prompt_nodejs_macos() {
             exit 1
         fi
         return 0
-    
+
     # ========================================================================
     # MACOS CASE 3: Outdated Node.js (< 18) - Upgrade to LTS (no prompt)
     # ========================================================================
     elif [ "$check_result" = "outdated" ]; then
         NODE_VERSION_OLD=$(node --version 2>/dev/null || echo "unknown")
-        
+
         # Run setup script silently, log to temp file
         local log_file="$LOG_DIR/nodejs-setup-${INSTALL_TIMESTAMP}.log"
         run_setup_script "setup_nodejs.sh" >"$log_file" 2>&1 &
         local setup_pid=$!
-        
+
         # Spinner while upgrading
         local i=0
         local spin_char=""
@@ -1576,14 +1605,14 @@ check_and_prompt_nodejs_macos() {
             i=$((i + 1))
             sleep 0.15
         done
-        
+
         # Get result
         wait $setup_pid
         local result=$?
-        
+
         # Clear line and show result
         printf "\r\033[K"
-        
+
         if [ $result -eq 0 ]; then
             # Load nvm to get Node.js version (if installed via nvm)
             if [ -s "$HOME/.nvm/nvm.sh" ]; then
@@ -1604,7 +1633,7 @@ check_and_prompt_nodejs_macos() {
         fi
         return 0
     fi
-    
+
     # ========================================================================
     # MACOS CASE 4: Missing Node.js - Auto-install via Homebrew (no prompt)
     # ========================================================================
@@ -1613,7 +1642,7 @@ check_and_prompt_nodejs_macos() {
     local log_file="$LOG_DIR/nodejs-setup-${INSTALL_TIMESTAMP}.log"
     run_setup_script "setup_nodejs.sh" >"$log_file" 2>&1 &
     local setup_pid=$!
-    
+
     # Spinner while installing via Homebrew
     local i=0
     local spin_char=""
@@ -1634,20 +1663,20 @@ check_and_prompt_nodejs_macos() {
         i=$((i + 1))
         sleep 0.15
     done
-    
+
     wait $setup_pid
     local result=$?
     printf "\r\033[K"
-    
+
     if [ $result -eq 0 ]; then
         # Log saved to: $log_file
-        
+
         # Load nvm to get Node.js version (if installed via nvm - though Homebrew is default on macOS)
         if [ -s "$HOME/.nvm/nvm.sh" ]; then
             export NVM_DIR="$HOME/.nvm"
             . "$NVM_DIR/nvm.sh" 2>/dev/null
         fi
-        
+
         NEW_NODE_VERSION=$(node --version 2>/dev/null || echo "unknown")
         NEW_NPM_VERSION=$(npm --version 2>/dev/null || echo "unknown")
         printf "  ${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}${NEW_NODE_VERSION}${NC} and ${BOLD}npm${NC} ${GREEN}${NEW_NPM_VERSION}${NC} installed successfully\n"
@@ -1660,7 +1689,7 @@ check_and_prompt_nodejs_macos() {
         fi
         exit 1
     fi
-    
+
     return 0
 }
 
@@ -1670,10 +1699,10 @@ check_and_prompt_nodejs_macos() {
 check_and_prompt_nodejs_linux() {
     # Add pink color for the circle
     PINK='\033[38;5;213m'
-    
+
     # Pink blinking circle during entire checking process
     blink_state=0
-    
+
     # Continue blinking and adding dots until check is complete
     for cycle in 1 2 3 4 5 6; do
         # Toggle blink state
@@ -1684,7 +1713,7 @@ check_and_prompt_nodejs_linux() {
             circle="${DIM}•${NC}"
             blink_state=0
         fi
-        
+
         # Build the dots display based on cycle
         dots_display=""
         if [ $cycle -ge 3 ]; then
@@ -1695,7 +1724,7 @@ check_and_prompt_nodejs_linux() {
         fi
         if [ $cycle -eq 6 ]; then
             dots_display="$dots_display ${CYAN}●${NC}"
-            
+
             # ============================================================
             # LINUX VERSION CHECK: Node.js and npm version detection
             # ============================================================
@@ -1704,7 +1733,7 @@ check_and_prompt_nodejs_linux() {
                 export NVM_DIR="$HOME/.nvm"
                 . "$NVM_DIR/nvm.sh" >/dev/null
             fi
-            
+
             # Check if Node.js is installed with correct version
             if command -v node >/dev/null 2>&1; then
                 NODE_VERSION=$(node --version 2>/dev/null | sed 's/v//' | cut -d. -f1 || echo "0")
@@ -1727,18 +1756,18 @@ check_and_prompt_nodejs_linux() {
                 check_result="missing"  # LINUX CASE 4: Node.js not installed
             fi
         fi
-        
+
         # Show current state - animation only, no box borders
         printf "\r  $circle ${GRAY}Checking Node.js installation${NC}$dots_display"
         # Clear to end of line to avoid artifacts
         printf "\033[K"
         sleep 0.4
     done
-    
+
     # Smooth transition: show completion state briefly
     printf " ${GREEN}●${NC}"
     sleep 0.3
-    
+
     # ========================================================================
     # LINUX CASE 1: Current Node.js (>= 18) + npm (>= 9) - Skip installation
     # ========================================================================
@@ -1746,23 +1775,23 @@ check_and_prompt_nodejs_linux() {
         # Get full version info
         NODE_VERSION_FULL=$(node --version 2>/dev/null || echo "unknown")
         NPM_VERSION_FULL=$(npm --version 2>/dev/null || echo "unknown")
-        
+
         # Format the line to match last box alignment
         printf "\r  ${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}${NODE_VERSION_FULL}${NC} ${GRAY}and${NC} ${BOLD}npm${NC} ${GREEN}${NPM_VERSION_FULL}${NC} ${GRAY}already installed${NC}\033[K\n"
         return 0
-    
+
     # ========================================================================
     # LINUX CASE 2: Node.js OK but npm outdated/missing - Update npm (no prompt)
     # ========================================================================
     elif [ "$check_result" = "npm_old" ] || [ "$check_result" = "npm_missing" ]; then
         NODE_VERSION_FULL=$(node --version 2>/dev/null || echo "unknown")
-        
+
         # Run setup script silently, log to temp file
         # setup_nodejs.sh will use nvm to update npm
         local log_file="$LOG_DIR/nodejs-setup-${INSTALL_TIMESTAMP}.log"
         run_setup_script "setup_nodejs.sh" >"$log_file" 2>&1 &
         local setup_pid=$!
-        
+
         # Spinner while updating npm via nvm
         local i=0
         local spin_char=""
@@ -1783,14 +1812,14 @@ check_and_prompt_nodejs_linux() {
             i=$((i + 1))
             sleep 0.15
         done
-        
+
         # Get result from setup_nodejs.sh
         wait $setup_pid
         local result=$?
-        
+
         # Clear line and show result
         printf "\r\033[K"
-        
+
         if [ $result -eq 0 ]; then
             # Load nvm to get Node.js version (if installed via nvm)
             if [ -s "$HOME/.nvm/nvm.sh" ]; then
@@ -1810,19 +1839,19 @@ check_and_prompt_nodejs_linux() {
             exit 1
         fi
         return 0
-    
+
     # ========================================================================
     # LINUX CASE 3: Outdated Node.js (< 18) - Upgrade to LTS (no prompt)
     # ========================================================================
     elif [ "$check_result" = "outdated" ]; then
         NODE_VERSION_OLD=$(node --version 2>/dev/null || echo "unknown")
-        
+
         # Run setup script silently, log to temp file
         # setup_nodejs.sh will install via nvm
         local log_file="$LOG_DIR/nodejs-setup-${INSTALL_TIMESTAMP}.log"
         run_setup_script "setup_nodejs.sh" >"$log_file" 2>&1 &
         local setup_pid=$!
-        
+
         # Spinner while upgrading via nvm
         local i=0
         local spin_char=""
@@ -1843,14 +1872,14 @@ check_and_prompt_nodejs_linux() {
             i=$((i + 1))
             sleep 0.15
         done
-        
+
         # Get result from setup_nodejs.sh
         wait $setup_pid
         local result=$?
-        
+
         # Clear line and show result
         printf "\r\033[K"
-        
+
         if [ $result -eq 0 ]; then
             # Load nvm to get Node.js version (if installed via nvm)
             if [ -s "$HOME/.nvm/nvm.sh" ]; then
@@ -1871,7 +1900,7 @@ check_and_prompt_nodejs_linux() {
         fi
         return 0
     fi
-    
+
     # ========================================================================
     # LINUX CASE 4: Missing Node.js - Auto-install via nvm (no prompt)
     # ========================================================================
@@ -1883,7 +1912,7 @@ check_and_prompt_nodejs_linux() {
     local log_file="$LOG_DIR/nodejs-setup-${INSTALL_TIMESTAMP}.log"
     run_setup_script "setup_nodejs.sh" >"$log_file" 2>&1 &
     local setup_pid=$!
-    
+
     # Spinner while installing via nvm
     local i=0
     local spin_char=""
@@ -1904,20 +1933,20 @@ check_and_prompt_nodejs_linux() {
         i=$((i + 1))
         sleep 0.15
     done
-    
+
     wait $setup_pid
     local result=$?
     printf "\r\033[K"
-    
+
     if [ $result -eq 0 ]; then
         # Log saved to: $log_file
-        
+
         # Load nvm to get Node.js version (nvm installation on Linux)
         if [ -s "$HOME/.nvm/nvm.sh" ]; then
             export NVM_DIR="$HOME/.nvm"
             . "$NVM_DIR/nvm.sh" 2>/dev/null
         fi
-        
+
         NEW_NODE_VERSION=$(node --version 2>/dev/null || echo "unknown")
         NEW_NPM_VERSION=$(npm --version 2>/dev/null || echo "unknown")
         printf "  ${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}${NEW_NODE_VERSION}${NC} and ${BOLD}npm${NC} ${GREEN}${NEW_NPM_VERSION}${NC} installed successfully\n"
@@ -1929,7 +1958,7 @@ check_and_prompt_nodejs_linux() {
         fi
         exit 1
     fi
-    
+
     return 0
 }
 
@@ -1953,9 +1982,9 @@ check_and_prompt_nodejs() {
 # ############################################################################
 # ############################################################################
 #
-# This section handles Docker installation and daemon management for both 
+# This section handles Docker installation and daemon management for both
 # macOS and Linux.
-# 
+#
 # Components:
 #   - macOS Docker installation (check_and_prompt_docker_macos)
 #   - Linux Docker installation (check_and_prompt_docker_linux)
@@ -2084,10 +2113,10 @@ check_and_prompt_nodejs() {
 check_and_prompt_docker_macos() {
     # Add pink color for the circle
     PINK='\033[38;5;213m'
-    
+
     # Pink blinking circle during entire checking process
     blink_state=0
-    
+
     # Continue blinking and adding dots until check is complete
     for cycle in 1 2 3 4 5 6; do
         # Toggle blink state
@@ -2098,7 +2127,7 @@ check_and_prompt_docker_macos() {
             circle="${DIM}•${NC}"
             blink_state=0
         fi
-        
+
         # Build the dots display based on cycle
         dots_display=""
         if [ $cycle -ge 3 ]; then
@@ -2109,7 +2138,7 @@ check_and_prompt_docker_macos() {
         fi
         if [ $cycle -eq 6 ]; then
             dots_display="$dots_display ${CYAN}●${NC}"
-            
+
             # ============================================================
             # MACOS VERSION CHECK: Docker installation and status
             # ============================================================
@@ -2125,7 +2154,7 @@ check_and_prompt_docker_macos() {
                 check_result="missing"  # macOS CASE 3: Docker not installed
             fi
         fi
-        
+
         # Show current state - animation only, no box borders
         printf "\r  $circle ${GRAY}Checking Docker installation${NC}$dots_display"
         # Clear to end of line to avoid artifacts
@@ -2160,7 +2189,7 @@ check_and_prompt_docker_macos() {
 
         printf "\r  ${GREEN}✓${NC} ${BOLD}${DOCKER_RUNTIME}${NC} ${GREEN}${DOCKER_VERSION}${NC} ${GRAY}already installed and running${NC}\033[K\n"
         return 0
-    
+
     # ========================================================================
     # MACOS CASE 2: Docker installed but not running - Start daemon (no prompt)
     # ========================================================================
@@ -2182,12 +2211,12 @@ check_and_prompt_docker_macos() {
 
         # Move to previous line for spinner to replace the warning
         printf "\033[1A"
-        
+
         # Run the Docker setup script to start Docker with spinner
         local log_file="$LOG_DIR/docker-setup-${INSTALL_TIMESTAMP}.log"
         run_setup_script "setup_docker.sh" >"$log_file" 2>&1 &
         local setup_pid=$!
-        
+
         # Spinner while starting
         local i=0
         local spin_char=""
@@ -2208,10 +2237,10 @@ check_and_prompt_docker_macos() {
             i=$((i + 1))
             sleep 0.15
         done
-        
+
         wait $setup_pid
         local result=$?
-        
+
         if [ $result -eq 0 ]; then
             # Get Docker version and runtime name, show clean success message
             DOCKER_VERSION=$(docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "unknown")
@@ -2226,7 +2255,7 @@ check_and_prompt_docker_macos() {
         fi
         return 0
     fi
-    
+
     # ========================================================================
     # MACOS CASE 3: Docker not installed - Install OrbStack (no prompt)
     # ========================================================================
@@ -2235,7 +2264,7 @@ check_and_prompt_docker_macos() {
     local log_file="$LOG_DIR/docker-setup-${INSTALL_TIMESTAMP}.log"
     run_setup_script "setup_docker.sh" >"$log_file" 2>&1 &
     local setup_pid=$!
-    
+
     # Spinner while installing
     local i=0
     local spin_char=""
@@ -2256,14 +2285,14 @@ check_and_prompt_docker_macos() {
         i=$((i + 1))
         sleep 0.15
     done
-    
+
     wait $setup_pid
     local result=$?
     printf "\r\033[K"
 
     if [ $result -eq 0 ]; then
         # Log saved to: $log_file
-        
+
         # Add OrbStack bin to PATH immediately after installation
         if [ -d "$HOME/.orbstack/bin" ]; then
             export PATH="$HOME/.orbstack/bin:$PATH"
@@ -2288,7 +2317,7 @@ check_and_prompt_docker_macos() {
         fi
         exit 1
     fi
-    
+
     return 0
 }
 
@@ -2298,10 +2327,10 @@ check_and_prompt_docker_macos() {
 check_and_prompt_docker_linux() {
     # Add pink color for the circle
     PINK='\033[38;5;213m'
-    
+
     # Pink blinking circle during entire checking process
     blink_state=0
-    
+
     # Continue blinking and adding dots until check is complete
     for cycle in 1 2 3 4 5 6; do
         # Toggle blink state
@@ -2312,7 +2341,7 @@ check_and_prompt_docker_linux() {
             circle="${DIM}•${NC}"
             blink_state=0
         fi
-        
+
         # Build the dots display based on cycle
         dots_display=""
         if [ $cycle -ge 3 ]; then
@@ -2323,7 +2352,7 @@ check_and_prompt_docker_linux() {
         fi
         if [ $cycle -eq 6 ]; then
             dots_display="$dots_display ${CYAN}●${NC}"
-            
+
             # ============================================================
             # LINUX VERSION CHECK: Docker installation and status
             # ============================================================
@@ -2337,7 +2366,7 @@ check_and_prompt_docker_linux() {
                 check_result="missing"  # LINUX CASE 3: Docker not installed
             fi
         fi
-        
+
         # Show current state - animation only, no box borders
         printf "\r  $circle ${GRAY}Checking Docker installation${NC}$dots_display"
         # Clear to end of line to avoid artifacts
@@ -2357,7 +2386,7 @@ check_and_prompt_docker_linux() {
 
         printf "\r  ${GREEN}✓${NC} ${BOLD}Docker${NC} ${GREEN}${DOCKER_VERSION}${NC} ${GRAY}already installed and running${NC}\033[K\n"
         return 0
-    
+
     # ========================================================================
     # LINUX CASE 2: Docker installed but not running - Start daemon (no prompt)
     # ========================================================================
@@ -2369,12 +2398,12 @@ check_and_prompt_docker_linux() {
 
         # Move to previous line for spinner to replace the warning
         printf "\033[1A"
-        
+
         # Run the Docker setup script to start Docker with spinner
         local log_file="$LOG_DIR/docker-setup-${INSTALL_TIMESTAMP}.log"
         run_setup_script "setup_docker.sh" >"$log_file" 2>&1 &
         local setup_pid=$!
-        
+
         # Spinner while starting
         local i=0
         local spin_char=""
@@ -2395,10 +2424,10 @@ check_and_prompt_docker_linux() {
             i=$((i + 1))
             sleep 0.15
         done
-        
+
         wait $setup_pid
         local result=$?
-        
+
         if [ $result -eq 0 ]; then
             # Get Docker version, show clean success message
             DOCKER_VERSION=$(docker --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1 || echo "unknown")
@@ -2413,7 +2442,7 @@ check_and_prompt_docker_linux() {
         fi
         return 0
     fi
-    
+
     # ========================================================================
     # LINUX CASE 3: Docker not installed - Install Docker Engine (no prompt)
     # ========================================================================
@@ -2422,7 +2451,7 @@ check_and_prompt_docker_linux() {
     local log_file="$LOG_DIR/docker-setup-${INSTALL_TIMESTAMP}.log"
     run_setup_script "setup_docker.sh" >"$log_file" 2>&1 &
     local setup_pid=$!
-    
+
     # Spinner while installing via package manager
     local i=0
     local spin_char=""
@@ -2443,7 +2472,7 @@ check_and_prompt_docker_linux() {
         i=$((i + 1))
         sleep 0.15
     done
-    
+
     wait $setup_pid
     local result=$?
     printf "\r\033[K"
@@ -2460,7 +2489,7 @@ check_and_prompt_docker_linux() {
         fi
         exit 1
     fi
-    
+
     return 0
 }
 
@@ -2480,7 +2509,7 @@ install_docker_with_progress() {
     if command -v docker >/dev/null 2>&1; then
         return 0
     fi
-    
+
     case $PLATFORM in
         "linux")
             printf "  ${GRAY}• Downloading Docker installation script${NC}\n"
@@ -2507,7 +2536,7 @@ smart_npm_install() {
     local max_attempts=3
     local npm_error_log="/tmp/npm-error-$$.log"
     local npm_debug_log="/tmp/npm-debug-$$.log"
-    
+
     # Track temp files for cleanup
     TEMP_FILES="$TEMP_FILES $npm_error_log $npm_debug_log"
     CLEANUP_NEEDED=true
@@ -2529,7 +2558,7 @@ smart_npm_install() {
         else
             # Third attempt: platform-specific rollup binaries
             echo "Installing platform-specific rollup" >> "$npm_debug_log"
-            
+
             local rollup_package=""
             case "$(uname)" in
                 Darwin*)
@@ -2548,7 +2577,7 @@ smart_npm_install() {
                     echo "Skipping platform-specific rollup for $(uname)" >> "$npm_debug_log"
                     ;;
             esac
-            
+
             if [ -n "$rollup_package" ]; then
                 if npm install "$rollup_package" --save-dev >/dev/null 2>>"$npm_error_log" && npm install --legacy-peer-deps >/dev/null 2>>"$npm_error_log"; then
                     return 0
@@ -2568,7 +2597,7 @@ smart_npm_install() {
     if [ -f "$npm_error_log" ]; then
         cat "$npm_error_log" >> "$npm_debug_log"
     fi
-    
+
     return 1
 }
 
@@ -2577,9 +2606,9 @@ install_docker() {
     if command -v docker >/dev/null 2>&1; then
         return 0
     fi
-    
+
     log "Installing Docker"
-    
+
     # Run the Docker setup script (same pattern as Git/Node.js)
     if run_setup_script "setup_docker.sh"; then
         return 0
@@ -2598,7 +2627,7 @@ install_docker() {
 # ############################################################################
 #
 # This section handles GraphDone service lifecycle management.
-# 
+#
 # Components:
 #   - check_containers_healthy() - Verify all Docker containers are healthy
 #   - wait_for_services() - Wait for services to be ready (60s timeout)
@@ -2647,7 +2676,7 @@ check_containers_healthy() {
         fi
     fi
 
-    # Check Web container health and endpoint  
+    # Check Web container health and endpoint
     if docker ps --format "{{.Names}}" | grep -q "graphdone-web" 2>/dev/null; then
         # Test the correct web endpoint (HTTP first, then HTTPS)
         if curl -sf --max-time 15 http://localhost:3127 >/dev/null 2>&1 || curl -k -sf --max-time 15 https://localhost:3128 >/dev/null 2>&1; then
@@ -2673,7 +2702,7 @@ wait_for_services() {
             printf "\r\033[K"  # Clear entire line
             return 0
         fi
-        
+
         # Get spinner character
         case $((i % 10)) in
             0) spin_char='⠋' ;;
@@ -2687,13 +2716,13 @@ wait_for_services() {
             8) spin_char='⠇' ;;
             9) spin_char='⠏' ;;
         esac
-        
+
         printf "\r  ${GRAY}▸${NC} Waiting for services to initialize ${BOLD}${CYAN}%s${NC} (%ds)%-35s" "$spin_char" $attempts " "
         i=$(( (i+1) % 10 ))
         attempts=$((attempts + 1))
         sleep 1
     done
-    
+
     printf "\r\033[K"  # Clear entire line
     printf "${YELLOW}!${NC} Services started but initialization is taking longer than 3 minutes\n"
     printf "${GRAY}  Try: docker ps | grep graphdone${NC}\n"
@@ -2703,7 +2732,7 @@ wait_for_services() {
 # Stop all GraphDone services
 stop_services() {
     log "Stopping GraphDone services"
-    
+
     # Beautiful container cleanup like smart-start
     printf "\n${BOLD}${PURPLE}♻️  CONTAINER CLEANUP${NC}\n"
     printf "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
@@ -2721,7 +2750,7 @@ stop_services() {
             printf "   ${DIM}✗${NC} ${DIM}Not running $container${NC}\n"
         fi
     done
-    
+
     # Kill development processes
     if command -v lsof >/dev/null 2>&1; then
         for port in 3127 3128 4127 4128; do
@@ -2731,7 +2760,7 @@ stop_services() {
             fi
         done
     fi
-    
+
     printf "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
     printf "${GREEN}✅ Container stop complete!${NC}\n"
 }
@@ -2739,18 +2768,18 @@ stop_services() {
 # Remove all containers and volumes
 remove_services() {
     log "Removing GraphDone containers and data"
-    
+
     # Stop first (but hide the output since we'll show removal section)
     printf "\n${BOLD}${PURPLE}♻️  CONTAINER CLEANUP${NC}\n"
     printf "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
-    
+
     # Stop containers quietly first
     for container in graphdone-neo4j graphdone-redis graphdone-api graphdone-web; do
         docker stop "$container" >/dev/null 2>&1 || true
     done
-    
+
     printf " ${YELLOW}🗑️${NC}  Removing old containers\n"
-    
+
     # Remove containers with status feedback
     for container in graphdone-neo4j graphdone-redis graphdone-api graphdone-web; do
         if docker ps -aq -f name="$container" | grep -q .; then
@@ -2763,19 +2792,19 @@ remove_services() {
             printf "   ${DIM}✓${NC} ${DIM}Already removed $container${NC}\n"
         fi
     done
-    
+
     # Remove volumes
     docker volume rm graphdone_neo4j_data graphdone_neo4j_logs graphdone_redis_data >/dev/null 2>&1 || true
-    
+
     # Clean dependency cache
     if [ -d "$CACHE_DIR" ]; then
         rm -rf "$CACHE_DIR"
         printf "   ${GREEN}✓${NC} Dependency cache cleared\n"
     fi
-    
+
     # Clean build cache
     docker system prune -f >/dev/null 2>&1 || true
-    
+
     printf "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
     printf "${GREEN}✓ Cleanup complete!${NC}\n"
 }
@@ -2790,7 +2819,7 @@ remove_services() {
 #
 # This section contains the main installation workflow that orchestrates
 # the entire GraphDone setup process.
-# 
+#
 # Components:
 #   - install_graphdone() - Main installation function
 #
@@ -2819,7 +2848,7 @@ install_graphdone() {
     # Beautiful GraphDone header with Copilot-style animation
     clear
     printf "\n\n"
-    
+
     # Fetch latest version from GitHub releases
     GRAPHDONE_VERSION="v0.3.1-alpha"  # Fallback version
     if command -v curl >/dev/null 2>&1; then
@@ -2828,7 +2857,7 @@ install_graphdone() {
             GRAPHDONE_VERSION="$LATEST_VERSION"
         fi
     fi
-    
+
     # Use 256-color mode for better compatibility (38;5;XXX format)
     # or fallback to basic ANSI if terminal doesn't support it
     if [ "$(tput colors 2>/dev/null)" -ge 256 ] 2>/dev/null; then
@@ -2851,7 +2880,7 @@ install_graphdone() {
     GRAY="\033[38;5;244m"   # Gray for progress indicators (256-color)
     CYAN="\033[38;5;51m"    # Cyan for labels (256-color)
     BOLD="\033[1m"          # Bold text
-    
+
     # ─────────────────────────────────────────────────────────────────────
     # Animated Banner - Professional Reveal Effect
     # ─────────────────────────────────────────────────────────────────────
@@ -2886,7 +2915,7 @@ install_graphdone() {
     printf "${TEAL}║                                                                                                  ║${NC}\n"; sleep 0.03
     printf "${TEAL}║${NC}                                                                            ${DARKSEAGREEN}Version: ${CADETBLUE}${GRAPHDONE_VERSION}${NC} ${TEAL}║${NC}\n"; sleep 0.03
     printf "${TEAL}╚══════════════════════════════════════════════════════════════════════════════════════════════════╝${NC}\n\n"
-    
+
     # Platform detection
     detect_platform
 
@@ -3049,7 +3078,7 @@ install_graphdone() {
             platform_name=""
             ;;
     esac
-    
+
     printf "  ${BLUE}◉${NC} ${GRAY}Platform:${NC} ${BOLD}$(uname) $(uname -m)${NC} ${GRAY}${platform_name}${NC}\n"
 
     # Show macOS version with compatibility indicator
@@ -3154,27 +3183,31 @@ install_graphdone() {
 
     # Modern installation section with progress
     INSTALL_DIR="$GRAPHDONE_CHECK_DIR"
-    
+
     # ─────────────────────────────────────────────────────────────────────
     # SECTION 3: Dependency Checks
     # ─────────────────────────────────────────────────────────────────────
     # Checks and installs Git, Node.js, Docker if needed
     printf "\n"
     printf "${TEAL}────────────────────────────────────${NC}  ${CYAN}${BOLD}🔰 Dependency Checks${NC}  ${TEAL}────────────────────────────────────────${NC}\n"
-    
+    printf "\n"
+
+    # Request sudo once for all Linux installations (Homebrew pattern)
+    request_sudo_linux
+
     # Save cursor position right after the header - this is our "safe point"
     # Everything below this can be cleared and rewritten without touching the header
-    
+
     # Run dependency checks BEFORE trying to download/update code
     check_and_prompt_git
     check_and_prompt_nodejs
     check_and_prompt_docker
-    
+
     # Brief pause for smooth transition
     sleep 0.5
-    
+
     printf "  ${GREEN}✓ All dependencies verified${NC}\n"
-    
+
     # ─────────────────────────────────────────────────────────────────────
     # SECTION 4: Code Installation
     # ─────────────────────────────────────────────────────────────────────
@@ -3188,7 +3221,7 @@ install_graphdone() {
     if [ $target_spaces -lt 0 ]; then target_spaces=0; fi
     target_padding=$(printf "%*s" $target_spaces "")
     echo "  ${target_content}"
-    
+
     # Download or update with animated progress
     if [ -d "$INSTALL_DIR/.git" ]; then
         # Mode line with exact 88-character content area
@@ -3198,19 +3231,19 @@ install_graphdone() {
         if [ $mode_spaces -lt 0 ]; then mode_spaces=0; fi
         mode_padding=$(printf "%*s" $mode_spaces "")
         echo "  ${mode_content}"
-        
+
         cd "$INSTALL_DIR"
-        
+
         # Run git pull in background to show progress
         git pull --quiet >/dev/null 2>&1 &
         pull_pid=$!
-        
+
         # Add pink color for the circle
         PINK='\033[38;5;213m'
-        
+
         # Pink blinking circle during entire fetching process
         blink_state=0
-        
+
         # Continue blinking and adding dots until fetch is complete
         for cycle in 1 2 3 4 5 6; do
             # Toggle blink state
@@ -3221,7 +3254,7 @@ install_graphdone() {
                 circle="${DIM}•${NC}"
                 blink_state=0
             fi
-            
+
             # Build the dots display based on cycle
             dots_display=""
             if [ $cycle -ge 3 ]; then
@@ -3233,17 +3266,17 @@ install_graphdone() {
             if [ $cycle -eq 6 ]; then
                 dots_display="$dots_display ${CYAN}●${NC}"
             fi
-            
+
             # Show current state - animation only, no box borders
             printf "\r  $circle ${GRAY}Fetching latest changes${NC}$dots_display"
             # Clear to end of line to avoid artifacts
             printf "\033[K"
             sleep 0.4
-            
+
             # Break if fetch is complete
             kill -0 $pull_pid 2>/dev/null || break
         done
-        
+
         # Continue waiting if still running
         while kill -0 $pull_pid 2>/dev/null; do
             # Toggle blink state
@@ -3254,21 +3287,21 @@ install_graphdone() {
                 circle="${DIM}•${NC}"
                 blink_state=0
             fi
-            
+
             # Keep the full dots display
             dots_display=" ${GRAY}●${NC} ${BLUE}●${NC} ${CYAN}●${NC}"
-            
+
             # Show current state
             printf "\r  $circle ${GRAY}Fetching latest changes${NC}$dots_display"
             printf "\033[K"
             sleep 0.4
         done
-        
+
         # Smooth transition: show completion state briefly
         printf " ${GREEN}●${NC}"
         sleep 0.3
         wait $pull_pid
-        
+
         # Success line with exact 88-character content area
         success_content="${GREEN}✓${NC} ${BOLD}Updated${NC} ${GREEN}to latest version${NC}"
         success_plain="✓ Updated to latest version"
@@ -3285,26 +3318,26 @@ install_graphdone() {
         if [ $mode_spaces -lt 0 ]; then mode_spaces=0; fi
         mode_padding=$(printf "%*s" $mode_spaces "")
         echo "  ${mode_content}"
-        
+
         # Clean up broken/incomplete directory if it exists
         if [ -d "$INSTALL_DIR" ]; then
             printf "  ${YELLOW}⚠${NC} Cleaning up incomplete installation\n"
             rm -rf "$INSTALL_DIR"
         fi
-        
+
         # Show download progress
         printf "  ${BLUE}📦${NC} Downloading GraphDone"
-        
+
         # Clone with progress - redirect to log file to capture any errors
         local clone_log="$LOG_DIR/git-clone-${INSTALL_TIMESTAMP}.log"
         git clone --progress --branch fix/first-start https://github.com/GraphDone/GraphDone-Core.git "$INSTALL_DIR" >"$clone_log" 2>&1 &
         clone_pid=$!
-        
+
         # Single loop with timeout (no nested loops to avoid race conditions)
         local elapsed=0
         local max_wait=300  # 5 minutes max
         local spinner_chars="⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
-        
+
         while kill -0 $clone_pid 2>/dev/null; do
             # Check timeout
             if [ $elapsed -ge $max_wait ]; then
@@ -3319,22 +3352,22 @@ install_graphdone() {
                 rm -rf "$INSTALL_DIR" 2>/dev/null || true
                 error "Git clone timed out - check network connection"
             fi
-            
+
             # Show spinner (rotate through characters)
             local char_index=$((elapsed % 10))
             local spinner_char=$(printf "%s" "$spinner_chars" | cut -c$((char_index + 1)))
             printf "\r  ${BLUE}📦${NC} Downloading GraphDone ${CYAN}${spinner_char}${NC}"
-            
+
             sleep 0.1
             elapsed=$((elapsed + 1))
         done
-        
+
         wait $clone_pid
         clone_result=$?
-        
+
         # Clear the line completely to prevent spinner artifacts
         printf "\r\033[K"
-        
+
         # Check if clone succeeded
         if [ $clone_result -ne 0 ] || [ ! -d "$INSTALL_DIR/.git" ]; then
             printf "  ${RED}✗${NC} ${BOLD}Failed to download GraphDone${NC}\n"
@@ -3346,7 +3379,7 @@ install_graphdone() {
             rm -rf "$INSTALL_DIR" 2>/dev/null || true
             error "Git clone failed - check network connection and try again"
         fi
-        
+
         # Success line with exact 88-character content area
         success_content="${GREEN}✓${NC} ${BOLD}Downloaded${NC} ${GREEN}GraphDone${NC}"
         success_plain="✓ Downloaded GraphDone"
@@ -3362,7 +3395,7 @@ install_graphdone() {
     # First show checking animation
     PINK='\033[38;5;213m'
     blink_state=0
-    
+
     # Initial check animation (like Git/Node.js)
     for cycle in 1 2 3 4 5 6; do
         # Toggle blink state
@@ -3373,7 +3406,7 @@ install_graphdone() {
             circle="${DIM}•${NC}"
             blink_state=0
         fi
-        
+
         # Build the dots display based on cycle
         dots_display=""
         if [ $cycle -ge 3 ]; then
@@ -3385,35 +3418,35 @@ install_graphdone() {
         if [ $cycle -eq 6 ]; then
             dots_display="$dots_display ${CYAN}●${NC}"
         fi
-        
+
         # Show checking animation
         printf "\r  $circle ${GRAY}Checking project dependencies${NC}$dots_display"
         printf "\033[K"
         sleep 0.4
     done
-    
+
     # Smooth transition
     printf " ${GREEN}●${NC}"
     sleep 0.3
-    
+
     # Now check if we need to install
     if [ ! -d "node_modules" ] || ! check_deps_fresh; then
         # Clear the checking line and show installing
         printf "\r\033[K"
-        
+
         blink_state=0
-        
+
         # Run npm install silently in background
         smart_npm_install &
         npm_pid=$!
-        
+
         # Show installing animation
         for cycle in 1 2 3 4 5 6 7 8 9 10 11 12; do
             # Check if npm install is still running
             if ! kill -0 $npm_pid 2>/dev/null; then
                 break
             fi
-            
+
             # Toggle blink state for bullet
             if [ $blink_state -eq 0 ]; then
                 circle="${PINK}•${NC}"
@@ -3422,7 +3455,7 @@ install_graphdone() {
                 circle="${DIM}•${NC}"
                 blink_state=0
             fi
-            
+
             # Build the dots display based on cycle
             dots_display=""
             if [ $cycle -ge 3 ]; then
@@ -3434,12 +3467,12 @@ install_graphdone() {
             if [ $cycle -ge 6 ]; then
                 dots_display="$dots_display ${CYAN}●${NC}"
             fi
-            
+
             # Show current state
             printf "\r  $circle ${GRAY}Installing project dependencies${NC}$dots_display"
             sleep 0.4
         done
-        
+
         # Continue waiting if still running
         while kill -0 $npm_pid 2>/dev/null; do
             # Toggle blink state for bullet
@@ -3450,24 +3483,24 @@ install_graphdone() {
                 circle="${DIM}•${NC}"
                 blink_state=0
             fi
-            
+
             # Keep the same 3 dots
             dots_display=" ${GRAY}●${NC} ${BLUE}●${NC} ${CYAN}●${NC}"
-            
+
             # Show current state
             printf "\r  $circle ${GRAY}Installing project dependencies${NC}$dots_display"
             sleep 0.4
         done
-        
+
         # Smooth transition: show completion state briefly
         printf " ${GREEN}●${NC}"
         sleep 0.3
-        
+
         wait $npm_pid
         npm_exit_code=$?
-        
+
         printf "\r\033[K"  # Clear entire line
-        
+
         if [ $npm_exit_code -eq 0 ]; then
             update_deps_hash
             printf "  ${GREEN}✓${NC} Project dependencies installed%-60s\n" " "
@@ -3515,11 +3548,11 @@ EOF
         printf "  ${GRAY}▸${NC} Generating TLS certificates\n"
         mkdir -p deployment/certs || error "Failed to create certificate directory"
         openssl req -x509 -newkey rsa:4096 -nodes -keyout deployment/certs/server-key.pem -out deployment/certs/server-cert.pem -days 365 -subj '/CN=localhost' >/dev/null 2>&1 || error "Failed to generate certificates"
-        
+
         # Set proper permissions: 600 for private key, 644 for certificate
         chmod 600 deployment/certs/server-key.pem 2>/dev/null || true
         chmod 644 deployment/certs/server-cert.pem 2>/dev/null || true
-        
+
         printf "  ${GREEN}✓${NC} TLS certificates generated with secure permissions\n"
     else
         # Verify and fix permissions on existing certificates
@@ -3540,7 +3573,7 @@ EOF
     # Only installs if node_modules is missing or package.json has changed
     # For updates, this was already done during Node.js check
     printf "${TEAL}────────────────────────────────────${NC}  ${CYAN}${BOLD}💹 Services Status${NC}  ${TEAL}──────────────────────────────────────────${NC}\n"
-    
+
     # Check if services are already running
     if check_containers_healthy; then
         printf "  ${GREEN}✓${NC} Services already running\n"
@@ -3556,24 +3589,24 @@ EOF
     # Stops and removes old containers before fresh deployment
     printf "\n"
     printf "${TEAL}────────────────────────────────────${NC}  ${CYAN}${BOLD}🗑️  Container Cleanup${NC}  ${TEAL}────────────────────────────────────────${NC}\n"
-    
+
     # Try both docker-compose and docker compose for compatibility
     if command -v docker-compose >/dev/null 2>&1; then
         DOCKER_COMPOSE="docker-compose"
     else
         DOCKER_COMPOSE="docker compose"
     fi
-    
+
     # Clean up existing containers with progress
     printf "  ${BLUE}♻${NC} Cleaning up existing containers\n"
     $DOCKER_COMPOSE -f deployment/docker-compose.yml down --remove-orphans >/dev/null 2>&1 || true
     $DOCKER_COMPOSE -f deployment/docker-compose.registry.yml down --remove-orphans >/dev/null 2>&1 || true
-    
+
     # Check for port conflicts and resolve them
     printf "  ${BLUE}◉${NC} Checking for port conflicts\n"
     GRAPHDONE_PORTS="3127 3128 4127 4128 6379 7474 7687"
     CONFLICTS_FOUND=false
-    
+
     for port in $GRAPHDONE_PORTS; do
         if lsof -ti:$port >/dev/null 2>&1; then
             # Check if process is a Docker container (don't kill those)
@@ -3609,7 +3642,7 @@ EOF
             fi
         fi
     done
-    
+
     if [ "$CONFLICTS_FOUND" = false ]; then
         printf "  ${GREEN}✓${NC} No port conflicts detected\n"
     else
@@ -3663,13 +3696,13 @@ EOF
     # Test for pre-built containers in background
     docker pull ghcr.io/graphdone/graphdone-web:fix-first-start >/dev/null 2>&1 &
     check_pid=$!
-    
+
     # Add pink color for the circle
     PINK='\033[38;5;213m'
-    
+
     # Pink blinking circle during entire checking process
     blink_state=0
-    
+
     # Continue blinking and adding dots until check is complete
     for cycle in 1 2 3 4 5 6; do
         # Toggle blink state
@@ -3680,7 +3713,7 @@ EOF
             circle="${DIM}•${NC}"
             blink_state=0
         fi
-        
+
         # Build the dots display based on cycle
         dots_display=""
         if [ $cycle -ge 3 ]; then
@@ -3692,17 +3725,17 @@ EOF
         if [ $cycle -eq 6 ]; then
             dots_display="$dots_display ${CYAN}●${NC}"
         fi
-        
+
         # Show current state - animation only, no box borders
         printf "\r  $circle ${GRAY}Checking deployment strategy${NC}$dots_display"
         # Clear to end of line to avoid artifacts
         printf "\033[K"
         sleep 0.4
-        
+
         # Break if check is complete
         kill -0 $check_pid 2>/dev/null || break
     done
-    
+
     # Continue waiting if still running
     while kill -0 $check_pid 2>/dev/null; do
         # Toggle blink state
@@ -3713,23 +3746,23 @@ EOF
             circle="${DIM}•${NC}"
             blink_state=0
         fi
-        
+
         # Keep the full dots display
         dots_display=" ${GRAY}●${NC} ${BLUE}●${NC} ${CYAN}●${NC}"
-        
+
         # Show current state
         printf "\r  $circle ${GRAY}Checking deployment strategy${NC}$dots_display"
         printf "\033[K"
         sleep 0.4
     done
-    
+
     # Smooth transition: show completion state briefly
     printf " ${GREEN}●${NC}"
     sleep 0.3
-    
+
     wait $check_pid
     check_result=$?
-    
+
     if [ $check_result -eq 0 ]; then
         printf "\r  ${GREEN}✓${NC} ${GRAY}Strategy:${NC} ${BOLD}Pre-built containers${NC} ${GREEN}(fast deployment)${NC}\n"
         COMPOSE_FILE="deployment/docker-compose.registry.yml"
@@ -3739,7 +3772,7 @@ EOF
         COMPOSE_FILE="deployment/docker-compose.yml"
         DEPLOYMENT_MODE="local"
     fi
-    
+
 
     # ─────────────────────────────────────────────────────────────────────
     # SECTION 9: Service Deployment
@@ -3747,7 +3780,7 @@ EOF
     # Starts Docker Compose services (Neo4j, Redis, API, Web)
     printf "\n"
     printf "${TEAL}────────────────────────────────────${NC}  ${CYAN}${BOLD}🔆 Service Deployment${NC}  ${TEAL}───────────────────────────────────────${NC}\n"
-    
+
     if [ "$DEPLOYMENT_MODE" = "registry" ]; then
         printf "  ${BLUE}◉${NC} ${GRAY}Mode:${NC} ${BOLD}Registry deployment${NC}\n"
         printf "  ${BLUE}◉${NC} ${GRAY}Images:${NC} Pre-built containers from ghcr.io/graphdone\n"
@@ -3755,8 +3788,8 @@ EOF
         printf "  ${BLUE}◉${NC} ${GRAY}Mode:${NC} ${BOLD}Source build${NC}\n"
         printf "  ${BLUE}◉${NC} ${GRAY}Build:${NC} Local container compilation\n"
     fi
-    
-    
+
+
     # Start services in background with progress animation
     if [ -f "$COMPOSE_FILE" ]; then
         $DOCKER_COMPOSE -f "$COMPOSE_FILE" up -d >/dev/null 2>&1 &
@@ -3764,14 +3797,14 @@ EOF
         # Fallback to default compose file
         $DOCKER_COMPOSE -f deployment/docker-compose.yml up -d >/dev/null 2>&1 &
     fi
-    
+
     startup_pid=$!
-    
+
     # Service startup animation with service names (POSIX-compliant)
     services="neo4j redis api web"
     i=0
     service_index=0
-    
+
     while kill -0 $startup_pid 2>/dev/null; do
         # Get current service from space-separated list
         set -- $services
@@ -3791,7 +3824,7 @@ EOF
             8) spin_char='⠇' ;;
             9) spin_char='⠏' ;;
         esac
-        
+
         # Only update the service name and spinner, not the whole line
         printf "\r  ${VIOLET}◉${NC} Starting graphdone-${current_service} ${BOLD}${CYAN}%s${NC}" "$spin_char"
 
@@ -3802,17 +3835,17 @@ EOF
         fi
         sleep 0.15
     done
-    
+
     wait $startup_pid
     startup_result=$?
-    
+
     if [ $startup_result -eq 0 ]; then
         printf "\r  ${GREEN}✓${NC} ${BOLD}All services started successfully${NC}\n"
     else
         printf "\r  ${RED}✗${NC} ${BOLD}Service startup failed${NC}\n"
         error "Failed to start services"
     fi
-    
+
     # Wait for services to be ready (more reliable than smart-start's 8 second sleep)
     if wait_for_services; then
         printf "  ${GREEN}✓${NC} Services are ready and healthy\n"
@@ -3820,10 +3853,10 @@ EOF
     else
         printf "  ${YELLOW}!${NC} Services started but initialization taking longer\n"
     fi
-    
+
     # Installation successful - disable cleanup trap for normal files
     CLEANUP_NEEDED=false
-    
+
     # Continue with success info
     show_success_in_box
 }
@@ -3838,7 +3871,7 @@ EOF
 # ############################################################################
 #
 # This section handles success messages and command-line argument processing.
-# 
+#
 # Components:
 #   - show_success_in_box() - Beautiful success message with URLs and commands
 #   - show_success() - Legacy function (unused)
@@ -3874,7 +3907,7 @@ show_success_in_box() {
     CYAN="\033[38;5;51m"    # Cyan for labels (256-color)
     BOLD="\033[1m"          # Bold text
     INSTALL_DIR="$GRAPHDONE_CHECK_DIR"
-    
+
     # Open the big success box
     printf "\n\n"
     printf "${TEAL}╔══════════════════════════════════════════════════════════════════════════════════════════════════╗${NC}\n"
@@ -3883,7 +3916,7 @@ show_success_in_box() {
     printf "${TEAL}║  ${TEAL}│${GREEN}${BOLD}                                   🏆 GraphDone Ready ✓${NC}                                     ${TEAL}│${NC}  ${TEAL}║${NC}\n"
     printf "${TEAL}║  ${TEAL}└────────────────────────────────────────────────────────────────────────────────────────────┘${TEAL}  ║${NC}\n"
     printf "${TEAL}║                                                                                                  ║${NC}\n"
-    
+
     # Access URLs section in same box with inner box
     printf "${TEAL}║                                      🌐 Access URLs                                              ║${NC}\n"
     printf "${TEAL}║  ${TEAL}┌────────────────────────────────────────────────────────────────────────────────────────────┐${TEAL}  ║${NC}\n"
@@ -3892,7 +3925,7 @@ show_success_in_box() {
     printf "${TEAL}║  ${TEAL}│  ${CYAN}Database:${NC}   http://localhost:7474                                                         ${TEAL}│${NC}  ${TEAL}║${NC}\n"
     printf "${TEAL}║  ${TEAL}└────────────────────────────────────────────────────────────────────────────────────────────┘${TEAL}  ║${NC}\n"
     printf "${TEAL}║                                                                                                  ║${NC}\n"
-    
+
     # Management commands section in same box with inner box
     printf "${TEAL}║                                      🧰 Management Commands                                      ║${NC}\n"
     printf "${TEAL}║  ${TEAL}┌────────────────────────────────────────────────────────────────────────────────────────────┐${TEAL}  ║${NC}\n"
@@ -3915,7 +3948,7 @@ show_success_in_box() {
     printf "${TEAL}║  ${TEAL}│  ${GRAY}sh public/install.sh remove   ${NC}${GRAY}# Complete reset${NC}                                            ${TEAL}│${NC}  ${TEAL}║${NC}\n"
     printf "${TEAL}║  ${TEAL}└────────────────────────────────────────────────────────────────────────────────────────────┘${TEAL}  ║${NC}\n"
     printf "${TEAL}║                                                                                                  ║${NC}\n"
-    
+
     # Close the big box
     printf "${TEAL}╚══════════════════════════════════════════════════════════════════════════════════════════════════╝${NC}\n\n"
 }

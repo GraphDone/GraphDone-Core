@@ -207,7 +207,7 @@ install_git_macos() {
     if command -v brew >/dev/null 2>&1; then
         # Show a spinner while installing
         printf "        ${VIOLET}◉${NC} Downloading and installing Git " >&2
-        
+
         # Install or upgrade Git (suppress all output)
         if brew list git &>/dev/null; then
             # Git already installed via Homebrew → Upgrade to latest
@@ -216,7 +216,7 @@ install_git_macos() {
             # Git not installed via Homebrew → Fresh install
             brew install git >/dev/null 2>&1 &
         fi
-        
+
         # --------------------------------------------------------------------
         # Animated Spinner - Shows progress while Homebrew works
         # --------------------------------------------------------------------
@@ -266,7 +266,7 @@ install_git_macos() {
             log_error "Git installation failed"
             exit 1
         fi
-    
+
     # ------------------------------------------------------------------------
     # METHOD 2: Xcode Command Line Tools (Fallback)
     # ------------------------------------------------------------------------
@@ -274,12 +274,12 @@ install_git_macos() {
         # No Homebrew, try Xcode Command Line Tools
         log_info "Homebrew not found. Installing Xcode Command Line Tools"
         log_info "This includes Git and other development tools."
-        
+
         # Check if Xcode tools are already installed
         if xcode-select -p &>/dev/null; then
             # Xcode CLI Tools already installed
             log_info "Xcode Command Line Tools already installed"
-            
+
             # Git should be available now (Apple Git)
             if command -v git >/dev/null 2>&1; then
                 GIT_VERSION=$(git --version | sed 's/git version //')
@@ -292,7 +292,7 @@ install_git_macos() {
             # Xcode CLI Tools not installed - trigger GUI installer
             log_info "Triggering Xcode Command Line Tools installation"
             xcode-select --install
-            
+
             # GUI installer opened - user must complete it manually
             log_warning "Please complete the Xcode installer that just opened."
             log_warning "After installation completes, run this script again."
@@ -334,13 +334,17 @@ install_git_linux() {
         GIT_VERSION=$(git --version | sed 's/git version //')
         MAJOR=$(echo "$GIT_VERSION" | sed 's/[^0-9.].*//g' | cut -d. -f1)
         MINOR=$(echo "$GIT_VERSION" | sed 's/[^0-9.].*//g' | cut -d. -f2)
-        
+
         if [ "$MAJOR" -ge 2 ] && [ "$MINOR" -ge 30 ]; then
             # Git is already current (>= 2.30), skip installation
             return 0
         fi
     fi
-    
+
+    # ------------------------------------------------------------------------
+    # Note: Sudo access already requested by parent install.sh
+    # ------------------------------------------------------------------------
+
     # ------------------------------------------------------------------------
     # PACKAGE MANAGER 1: apt-get (Ubuntu/Debian)
     # ------------------------------------------------------------------------
@@ -352,13 +356,13 @@ install_git_linux() {
                 # Add PPA non-interactively (no user prompts)
                 sudo add-apt-repository -y ppa:git-core/ppa < /dev/null >/dev/null 2>&1
             fi
-            
+
             # Update package lists and install Git
             sudo apt-get update -qq >/dev/null 2>&1
             sudo DEBIAN_FRONTEND=noninteractive apt-get install -y git >/dev/null 2>&1
         ) &
         install_pid=$!
-        
+
         # --------------------------------------------------------------------
         # Animated Spinner - Shows progress while apt-get works
         # --------------------------------------------------------------------
@@ -387,57 +391,57 @@ install_git_linux() {
         wait $install_pid
         install_result=$?
         printf "\r\033[K" >&2  # Clear spinner line
-        
+
         if [ $install_result -ne 0 ]; then
             log_error "Git installation failed"
             exit 1
         fi
-    
+
     # ------------------------------------------------------------------------
     # PACKAGE MANAGER 2: yum (RHEL/CentOS)
     # ------------------------------------------------------------------------
     elif command -v yum >/dev/null 2>&1; then
         log_info "Using yum to install Git"
-        
+
         # Install Git with yum
         sudo yum install -y git >/dev/null 2>&1
-        
+
     # ------------------------------------------------------------------------
     # PACKAGE MANAGER 3: dnf (Fedora)
     # ------------------------------------------------------------------------
     elif command -v dnf >/dev/null 2>&1; then
         log_info "Using dnf to install Git"
-        
+
         # Install Git with dnf
         sudo dnf install -y git >/dev/null 2>&1
-        
+
     # ------------------------------------------------------------------------
     # PACKAGE MANAGER 4: pacman (Arch Linux)
     # ------------------------------------------------------------------------
     elif command -v pacman >/dev/null 2>&1; then
         log_info "Using pacman to install Git"
-        
+
         # Install Git with pacman (--noconfirm = no user prompts)
         sudo pacman -S --noconfirm git >/dev/null 2>&1
-        
+
     # ------------------------------------------------------------------------
     # PACKAGE MANAGER 5: zypper (openSUSE)
     # ------------------------------------------------------------------------
     elif command -v zypper >/dev/null 2>&1; then
         log_info "Using zypper to install Git"
-        
+
         # Install Git with zypper
         sudo zypper install -y git >/dev/null 2>&1
-        
+
     # ------------------------------------------------------------------------
     # PACKAGE MANAGER 6: apk (Alpine Linux)
     # ------------------------------------------------------------------------
     elif command -v apk >/dev/null 2>&1; then
         log_info "Using apk to install Git"
-        
+
         # Install Git with apk (--no-cache = don't cache package index)
         sudo apk add --no-cache git >/dev/null 2>&1
-        
+
     # ------------------------------------------------------------------------
     # No Supported Package Manager Found
     # ------------------------------------------------------------------------
@@ -446,7 +450,7 @@ install_git_linux() {
         log_error "Please install Git manually: https://git-scm.com/downloads"
         exit 1
     fi
-    
+
     # ------------------------------------------------------------------------
     # Verify Installation Success
     # ------------------------------------------------------------------------
@@ -462,19 +466,19 @@ install_git_linux() {
 
 # Configure Git with sensible defaults
 configure_git() {
-    
+
     # Only set if not already configured
     if [ -z "$(git config --global user.name)" ]; then
         log_info "Setting up Git identity (can be changed later)"
         git config --global user.name "GraphDone User"
         git config --global user.email "user@graphdone.local"
     fi
-    
+
     # Set useful defaults
     git config --global init.defaultBranch main 2>/dev/null || true
     git config --global pull.rebase false 2>/dev/null || true
     git config --global core.autocrlf input 2>/dev/null || true
-    
+
     log_success "Git configuration complete"
 }
 
