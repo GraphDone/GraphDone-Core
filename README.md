@@ -57,12 +57,21 @@ Or with wget:
 wget -qO- https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/install.sh | sh
 ```
 
-This will:
-- Install GraphDone to `~/graphdone`
-- Configure environment automatically
-- Generate TLS certificates for HTTPS
-- Start all services with smart detection
-- Open https://localhost:3128 when ready
+**What the installer does:**
+1. **Pre-flight Checks** - Validates network, disk space (5GB), download/upload speeds
+2. **System Detection** - Detects platform (macOS 10.15+, Linux distros)
+3. **Dependency Installation** - Installs Git, Node.js 18+, Docker if needed
+   - macOS: Uses Homebrew + OrbStack (Docker alternative)
+   - Linux: Uses apt/dnf/yum + Docker Engine (15+ distributions supported)
+4. **Code Setup** - Clones repository to `~/graphdone`, installs npm dependencies
+5. **Security Config** - Generates self-signed TLS certificates for HTTPS
+6. **Service Deployment** - Starts Neo4j, Redis, GraphQL API, React Web App
+7. **Health Verification** - Waits for all services to be healthy (60s timeout)
+
+**Access URLs after installation:**
+- 🌐 Web App: https://localhost:3128
+- 🔌 GraphQL API: https://localhost:4128/graphql  
+- 🗄️ Neo4j Browser: http://localhost:7474 (neo4j/graphdone_password)
 
 #### 🔒 Security Best Practices
 

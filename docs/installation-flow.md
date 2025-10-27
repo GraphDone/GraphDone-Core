@@ -1,6 +1,10 @@
 # 🚀 GraphDone Installation Flow
 
-## One-Liner Installation Process
+## One-Command Installation Process
+
+The GraphDone installer (`install.sh`) performs a complete automated setup in 9 sections with beautiful CLI progress feedback.
+
+## 📋 Installation Workflow
 
 ```mermaid
 %%{init: {
@@ -21,54 +25,113 @@
 }}%%
 
 flowchart TD
-    Start([User runs curl/wget]) --> Fetch[Fetch start.sh from GitHub]
-    Fetch --> CheckReq{Check Requirements}
+    Start([User runs curl/wget]) --> Fetch[Fetch install.sh from GitHub]
+    Fetch --> Banner[Display Animated Banner]
+    Banner --> Section1[Section 1: Pre-flight Checks]
     
-    CheckReq -->|Missing| ReqError[Show missing tools<br/>Docker, Git]
-    CheckReq -->|OK| CheckDir{Check ~/graphdone}
+    Section1 --> CheckNetwork{Network OK?}
+    CheckNetwork -->|Fail| NetError[Show network error]
+    CheckNetwork -->|Pass| CheckDisk{Disk Space?}
     
-    ReqError --> Exit([Exit with instructions])
+    CheckDisk -->|< 5GB| DiskWarn[Warn user, ask continue]
+    CheckDisk -->|>= 5GB| SpeedTest[Download/Upload Speed Tests]
+    DiskWarn -->|Cancel| Exit1([Exit])
+    DiskWarn -->|Continue| SpeedTest
     
-    CheckDir -->|Exists| Update[Pull latest changes]
-    CheckDir -->|New| Clone[Clone repository]
+    SpeedTest --> Section2[Section 2: System Information]
+    Section2 --> DetectPlatform{Platform?}
     
-    Update --> CheckEnv
-    Clone --> CheckEnv{Check .env file}
+    DetectPlatform -->|macOS| CheckMacOS{Version >= 10.15?}
+    DetectPlatform -->|Linux| CheckLinux{Supported Distro?}
+    DetectPlatform -->|Other| UnsupportedOS([Exit: Unsupported OS])
     
-    CheckEnv -->|Exists| CheckCerts
-    CheckEnv -->|Missing| CreateEnv[Create .env with<br/>HTTPS config]
+    CheckMacOS -->|No| Exit2([Exit: Upgrade macOS])
+    CheckMacOS -->|Yes| Section3
+    CheckLinux -->|No| Exit3([Exit: Unsupported Linux])
+    CheckLinux -->|Yes| Section3[Section 3: Dependency Checks]
     
-    CreateEnv --> CheckCerts{Check TLS certificates}
+    Section3 --> CheckGit{Git Installed?}
+    CheckGit -->|No| InstallGit[Install Git]
+    CheckGit -->|Yes| CheckNode
     
-    CheckCerts -->|Exist| RunSmartStart
-    CheckCerts -->|Missing| GenCerts[Generate certificates<br/>with OpenSSL]
+    InstallGit -->|macOS| GitHomebrew[Homebrew: brew install git]
+    InstallGit -->|Linux| GitAPT[apt/dnf/yum: install git]
     
-    GenCerts --> RunSmartStart[Run smart-start]
+    GitHomebrew --> CheckNode
+    GitAPT --> CheckNode{Node.js >= 18?}
     
-    RunSmartStart --> SmartDetect{Smart Detection}
+    CheckNode -->|No| InstallNode[Install Node.js]
+    CheckNode -->|Yes| CheckDocker
     
-    SmartDetect -->|Registry OK| PullImages[Pull Docker images<br/>from registry]
-    SmartDetect -->|No Registry| LocalBuild[Build locally<br/>with npm]
+    InstallNode -->|macOS| NodeHomebrew[Homebrew: brew install node]
+    InstallNode -->|Linux| NodeNVM[nvm: install Node 22 LTS]
     
-    PullImages --> StartServices
-    LocalBuild --> StartServices[Start Services]
+    NodeHomebrew --> CheckDocker
+    NodeNVM --> CheckDocker{Docker Running?}
     
-    StartServices --> CheckHealth{Health Check}
+    CheckDocker -->|No| InstallDocker[Install Docker]
+    CheckDocker -->|Yes| Section4
     
-    CheckHealth -->|Pass| Success[GraphDone Ready<br/>https://localhost:3128]
-    CheckHealth -->|Fail| ShowLogs[Show troubleshooting<br/>instructions]
+    InstallDocker -->|macOS| DockerOrbStack[Homebrew: brew install orbstack]
+    InstallDocker -->|Linux| DockerEngine[Snap/apt: install docker]
+    
+    DockerOrbStack --> Section4
+    DockerEngine --> Section4[Section 4: Code Installation]
+    
+    Section4 --> CheckRepo{Repo Exists?}
+    CheckRepo -->|Yes| PullRepo[git pull latest]
+    CheckRepo -->|No| CloneRepo[git clone GraphDone-Core]
+    
+    PullRepo --> NPMInstall
+    CloneRepo --> NPMInstall[npm install dependencies]
+    
+    NPMInstall --> Section5[Section 5: Environment Configuration]
+    Section5 --> CheckEnv{.env Exists?}
+    
+    CheckEnv -->|Yes| Section6
+    CheckEnv -->|No| CreateEnv[Create .env with HTTPS config]
+    
+    CreateEnv --> Section6[Section 6: Security Initialization]
+    Section6 --> CheckCerts{TLS Certs Exist?}
+    
+    CheckCerts -->|Yes| Section7
+    CheckCerts -->|No| GenCerts[Generate self-signed certificates]
+    
+    GenCerts --> Section7[Section 7: Services Status]
+    Section7 --> CheckRunning{Services Running?}
+    
+    CheckRunning -->|Yes| ShowSuccess[Show success message]
+    CheckRunning -->|No| Section8[Section 8: Container Cleanup]
+    
+    Section8 --> StopOld[Stop old containers]
+    StopOld --> RemoveOld[Remove old containers]
+    RemoveOld --> Section9[Section 9: Service Deployment]
+    
+    Section9 --> StartNeo4j[Start Neo4j Database]
+    StartNeo4j --> StartRedis[Start Redis Cache]
+    StartRedis --> StartAPI[Start GraphQL API]
+    StartAPI --> StartWeb[Start React Web App]
+    StartWeb --> HealthCheck{All Healthy?}
+    
+    HealthCheck -->|No| ShowLogs[Show troubleshooting info]
+    HealthCheck -->|Yes| ShowSuccess
+    
+    ShowSuccess --> Complete([Installation Complete!<br/>https://localhost:3128])
+    ShowLogs --> Exit4([Exit with logs])
     
     classDef startNode fill:#3B82F6,stroke:#1D4ED8,stroke-width:2px,color:#FFFFFF
     classDef processNode fill:#10B981,stroke:#059669,stroke-width:2px,color:#FFFFFF
+    classDef sectionNode fill:#8B5CF6,stroke:#7C3AED,stroke-width:3px,color:#FFFFFF
     classDef decisionNode fill:#F59E0B,stroke:#D97706,stroke-width:2px,color:#FFFFFF
     classDef errorNode fill:#EF4444,stroke:#DC2626,stroke-width:2px,color:#FFFFFF
     classDef successNode fill:#22C55E,stroke:#16A34A,stroke-width:3px,color:#FFFFFF
     
     class Start startNode
-    class Fetch,Update,Clone,CreateEnv,GenCerts,RunSmartStart,PullImages,LocalBuild,StartServices processNode
-    class CheckReq,CheckDir,CheckEnv,CheckCerts,SmartDetect,CheckHealth decisionNode
-    class ReqError,Exit,ShowLogs errorNode
-    class Success successNode
+    class Banner,SpeedTest,InstallGit,InstallNode,InstallDocker,GitHomebrew,GitAPT,NodeHomebrew,NodeNVM,DockerOrbStack,DockerEngine,PullRepo,CloneRepo,NPMInstall,CreateEnv,GenCerts,StopOld,RemoveOld,StartNeo4j,StartRedis,StartAPI,StartWeb processNode
+    class Section1,Section2,Section3,Section4,Section5,Section6,Section7,Section8,Section9 sectionNode
+    class CheckNetwork,CheckDisk,DetectPlatform,CheckMacOS,CheckLinux,CheckGit,CheckNode,CheckDocker,CheckRepo,CheckEnv,CheckCerts,CheckRunning,HealthCheck decisionNode
+    class NetError,DiskWarn,UnsupportedOS,Exit1,Exit2,Exit3,Exit4,ShowLogs errorNode
+    class ShowSuccess,Complete successNode
 ```
 
 ## Smart-Start Decision Flow
