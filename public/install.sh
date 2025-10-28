@@ -3156,10 +3156,10 @@ install_graphdone() {
 
         # Show disk space using diskutil
         if command -v diskutil >/dev/null 2>&1; then
-            diskutil info / 2>/dev/null | awk -F': *' '/Container Free Space/ {
-                split($2, arr, " ")
-                printf "  \033[34m◉\033[0m \033[90mDisk Available:\033[0m \033[1m%s %s\033[0m\n", arr[1], arr[2]
-            }'
+            local disk_avail=$(diskutil info / 2>/dev/null | awk -F': *' '/Container Free Space/ {split($2, arr, " "); printf "%s %s", arr[1], arr[2]}')
+            if [ -n "$disk_avail" ]; then
+                printf "  ${BLUE}◉${NC} ${GRAY}Disk Available:${NC} ${BOLD}${disk_avail}${NC}\n"
+            fi
         fi
     elif [ "$PLATFORM" = "linux" ]; then
         # Show Linux distribution
