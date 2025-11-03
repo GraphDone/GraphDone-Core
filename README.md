@@ -46,19 +46,83 @@ GraphDone is built on the belief that:
 
 ## Quick Start
 
+### 🚀 One-Line Install (Like Ollama!)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/install.sh | sh
+```
+
+Or with wget:
+```bash
+wget -qO- https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/install.sh | sh
+```
+
+**What the installer does:**
+1. **Pre-flight Checks** - Validates network, disk space (5GB), download/upload speeds
+2. **System Detection** - Detects platform (macOS 10.15+, Linux distros)
+3. **Dependency Installation** - Installs Git, Node.js 18+, Docker if needed
+   - macOS: Uses Homebrew + OrbStack (Docker alternative)
+   - Linux: Smart sudo authentication (works with curl/wget pipes), uses apt/dnf/yum + Docker Engine (15+ distributions supported)
+4. **Code Setup** - Clones repository to `~/graphdone`, installs npm dependencies
+5. **Security Config** - Generates self-signed TLS certificates for HTTPS
+6. **Service Deployment** - Starts Neo4j, Redis, GraphQL API, React Web App
+7. **Health Verification** - Waits for all services to be healthy (60s timeout)
+
+**Access URLs after installation:**
+- 🌐 Web App: https://localhost:3128
+- 🔌 GraphQL API: https://localhost:4128/graphql  
+- 🗄️ Neo4j Browser: http://localhost:7474 (neo4j/graphdone_password)
+
+#### 🔒 Security Best Practices
+
+**Before running the one-liner installation**, we recommend verifying the script:
+
+```bash
+# Option 1: Review the script first
+curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/install.sh | less
+
+# Option 2: Download, inspect, then run
+curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/install.sh -o install.sh
+cat install.sh  # Review the contents
+sh install.sh   # Run after verification
+
+# Option 3: Verify with checksums (for paranoid users)
+curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/install.sh.sha256 -o install.sh.sha256
+curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/install.sh -o install.sh
+sha256sum -c install.sh.sha256  # Verify integrity
+sh install.sh
+```
+
+**What the installation script does:**
+- ✅ Installs to `~/graphdone` (visible, user-owned directory)
+- ✅ Smart sudo handling - works with curl/wget pipes and local execution
+- ✅ Only requests administrative privileges once for system dependencies (Docker, Git)
+- ✅ Sudo access kept alive during installation, cleared on exit for security
+- ✅ All source code is open and auditable
+- ✅ No telemetry or data collection
+- ⚠️ Generates self-signed TLS certificates (you'll see browser warnings - this is expected)
+
+**For production deployments**, see our [Security & Deployment Guide](./docs/deployment.md) for:
+- Using CA-signed certificates instead of self-signed
+- Changing default passwords
+- Network security configuration
+- Authentication best practices
+
 ### Prerequisites
 
 GraphDone requires:
-- **Node.js 18+** - JavaScript runtime (our setup script can install this automatically)
 - **Docker** - For running Neo4j graph database ([Install Docker](https://docs.docker.com/get-docker/))
 - **Git** - For version control (usually pre-installed)
+- **Node.js 18+** - Optional for development (auto-installed if needed)
 
-### One Command to Rule Them All
+### Manual Installation
 
 ```bash
 git clone https://github.com/GraphDone/GraphDone-Core.git
 cd GraphDone-Core
-./start
+./smart-start  # Intelligent auto-setup
+# or
+./start        # Traditional setup
 ```
 
 That's it! The script will automatically:
