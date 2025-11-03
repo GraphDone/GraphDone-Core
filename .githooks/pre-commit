@@ -1,0 +1,80 @@
+#!/bin/sh
+# Pre-commit hook to block Co-Authored-By lines
+# GraphDone does not use pair programming and maintains clean git logs
+
+# Get the commit message file path
+COMMIT_MSG_FILE="$1"
+
+# Check if we're in the middle of a commit (not a merge/rebase)
+if git rev-parse --verify HEAD >/dev/null 2>&1; then
+    # Get the staged commit message from git
+    COMMIT_MSG=$(git diff --cached --diff-filter=A -z --name-only | xargs -0 cat 2>/dev/null | grep -i "co-authored-by:" || true)
+    
+    # If no staged message, check for message passed via -m flag
+    if [ -z "$COMMIT_MSG" ] && [ -n "$GIT_EDITOR" ]; then
+        COMMIT_MSG=$(echo "$GIT_EDITOR" | grep -i "co-authored-by:" || true)
+    fi
+    
+    # Check the commit message template if it exists
+    if [ -z "$COMMIT_MSG" ] && [ -f ".gitmessage" ]; then
+        COMMIT_MSG=$(grep -i "co-authored-by:" .gitmessage 2>/dev/null || true)
+    fi
+    
+    # For checking the actual commit message being prepared
+    # This catches -m flag commits and editor commits
+    if git diff --cached --quiet; then
+        # No staged changes, skip
+        exit 0
+    fi
+fi
+
+# Function to check commit message
+check_commit_message() {
+    # Check for Co-Authored-By in various formats
+    if echo "$1" | grep -iE "(co-authored-by:|co-author:|coauthor:|pair[- ]programm)" >/dev/null 2>&1; then
+        echo ""
+        echo "❌ ERROR: Commit blocked - Co-Authored-By detected"
+        echo ""
+        echo "GraphDone maintains individual attribution in git logs."
+        echo "Please remove any of the following from your commit message:"
+        echo "  • Co-Authored-By: ..."
+        echo "  • Co-Author: ..."
+        echo "  • References to pair programming"
+        echo ""
+        echo "Each commit should have a single author for clear accountability."
+        echo ""
+        return 1
+    fi
+    return 0
+}
+
+# Main pre-commit check
+# This will be called during the actual commit process
+# The commit message will be checked in the commit-msg hook
+# Here we just set up the environment
+
+# Check if there are any Co-Authored-By lines in staged files' content
+# (in case someone accidentally committed a file with Co-Authored-By in it)
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM)
+if [ -n "$STAGED_FILES" ]; then
+    for FILE in $STAGED_FILES; do
+        # Skip binary files and this hook file itself
+        if [ "$FILE" = ".githooks/pre-commit" ] || [ "$FILE" = ".githooks/commit-msg" ]; then
+            continue
+        fi
+        
+        # Only check text files for accidental Co-Authored-By content
+        if file --mime "$FILE" 2>/dev/null | grep -q "text/"; then
+            if git show ":$FILE" 2>/dev/null | grep -iE "^[^#]*co-authored-by:" >/dev/null 2>&1; then
+                echo ""
+                echo "⚠️  WARNING: File '$FILE' contains 'Co-Authored-By' text"
+                echo "   This may be intentional (documentation, etc.) but please verify."
+                echo ""
+                # Don't block, just warn for file content
+            fi
+        fi
+    done
+fi
+
+# Pre-commit passes, actual message check happens in commit-msg hook
+exit 0
