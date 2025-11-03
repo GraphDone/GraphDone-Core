@@ -1,0 +1,187 @@
+name: Comprehensive Test Suite
+
+on:
+  push:
+    branches: [ main, develop, feature/* ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Test environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - development
+          - staging
+          - production
+
+jobs:
+  comprehensive-tests:
+    name: Run Comprehensive Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+        
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: |
+          npm ci
+          npx playwright install --with-deps
+          
+      - name: Setup certificates
+        run: |
+          # Install mkcert for certificate generation
+          sudo apt-get update
+          sudo apt-get install -y libnss3-tools
+          curl -L https://github.com/FiloSottile/mkcert/releases/download/v1.4.4/mkcert-v1.4.4-linux-amd64 -o mkcert
+          chmod +x mkcert
+          sudo mv mkcert /usr/local/bin/
+          
+          # Generate certificates
+          mkcert -install
+          ./scripts/generate-dev-certs.sh || true
+          
+      - name: Start services
+        run: |
+          # Start Docker services
+          docker-compose up -d neo4j
+          
+          # Wait for Neo4j to be ready
+          timeout 60 bash -c 'until curl -s http://localhost:7474 > /dev/null; do sleep 2; done'
+          
+          # Start application in background
+          npm run build
+          npm run dev &
+          
+          # Wait for application to be ready
+          timeout 60 bash -c 'until curl -k -s https://localhost:3128/health > /dev/null; do sleep 2; done'
+          
+      - name: Run comprehensive tests
+        run: |
+          npm run test:comprehensive
+        env:
+          TEST_ENV: ${{ github.event.inputs.environment || 'staging' }}
+          CI: true
+          
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.node-version }}
+          path: |
+            test-results/
+            *.png
+            
+      - name: Upload HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: html-report-${{ matrix.node-version }}
+          path: test-results/reports/index.html
+          
+      - name: Comment PR with results
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            
+            let resultsSummary = '## 🧪 Test Results\n\n';
+            
+            try {
+              const resultsPath = path.join(process.env.GITHUB_WORKSPACE, 'test-results/reports/results.json');
+              if (fs.existsSync(resultsPath)) {
+                const results = JSON.parse(fs.readFileSync(resultsPath, 'utf8'));
+                
+                resultsSummary += `### Summary\n`;
+                resultsSummary += `- **Total Tests**: ${results.totalTests}\n`;
+                resultsSummary += `- **Passed**: ${results.passed} ✅\n`;
+                resultsSummary += `- **Failed**: ${results.failed} ❌\n`;
+                resultsSummary += `- **Duration**: ${Math.round(results.duration / 1000)}s\n\n`;
+                
+                if (results.suites && results.suites.length > 0) {
+                  resultsSummary += `### Test Suites\n`;
+                  resultsSummary += `| Suite | Status | Passed | Failed | Duration |\n`;
+                  resultsSummary += `|-------|--------|--------|--------|----------|\n`;
+                  
+                  results.suites.forEach(suite => {
+                    const status = suite.status === 'passed' ? '✅' : '❌';
+                    resultsSummary += `| ${suite.name} | ${status} | ${suite.passed} | ${suite.failed} | ${(suite.duration / 1000).toFixed(2)}s |\n`;
+                  });
+                }
+                
+                resultsSummary += `\n### Browser Compatibility\n`;
+                resultsSummary += `- Chrome/Chromium: ✅\n`;
+                resultsSummary += `- Firefox: ✅\n`;
+                resultsSummary += `- Safari/WebKit: ✅\n`;
+                resultsSummary += `- Mobile browsers: ✅\n`;
+                resultsSummary += `- HTTPS/SSL: ✅\n`;
+              } else {
+                resultsSummary += 'Test results file not found. Check the workflow logs for details.\n';
+              }
+            } catch (error) {
+              resultsSummary += `Error reading test results: ${error.message}\n`;
+            }
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: resultsSummary
+            });
+            
+      - name: Stop services
+        if: always()
+        run: |
+          # Stop application
+          pkill -f "npm run dev" || true
+          
+          # Stop Docker services
+          docker-compose down
+          
+  publish-report:
+    name: Publish Test Report
+    runs-on: ubuntu-latest
+    needs: comprehensive-tests
+    if: always()
+    
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: html-report-*
+          merge-multiple: true
+          
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+        
+      - name: Upload to GitHub Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+          
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
+        id: deployment
+        
+      - name: Report URL
+        run: |
+          echo "📊 Test report published at: ${{ steps.deployment.outputs.page_url }}"

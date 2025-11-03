@@ -12,6 +12,22 @@ test-artifacts/
 playwright-report/
 artifacts/
 
+# Test files that should not be in root
+/*.test.js
+/*.spec.js
+/*-test.js
+/*-spec.js
+/test-*.js
+/test-*.md
+/*TEST*.md
+/*REPORT*.md
+
+# Temporary test outputs
+/clean_report_*.html
+/comprehensive_report_*.html
+/final_report_*.html
+/report_*.html
+
 # Images and screenshots (allow docs images)
 *.png
 *.jpg
