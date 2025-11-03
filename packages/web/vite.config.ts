@@ -2,6 +2,8 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
 import { hostname } from 'os';
+import { readFileSync } from 'fs';
+import { existsSync } from 'fs';
 
 export default defineConfig({
   plugins: [react()],
@@ -15,6 +17,18 @@ export default defineConfig({
     host: '0.0.0.0', // Allow external connections
     port: Number(process.env.PORT) || 3127,
     strictPort: true, // Exit if port is already in use instead of trying next available
+    https: process.env.VITE_HTTPS === 'true' ? (() => {
+      const certPath = resolve(__dirname, '../../deployment/certs/server-cert.pem');
+      const keyPath = resolve(__dirname, '../../deployment/certs/server-key.pem');
+      
+      if (existsSync(certPath) && existsSync(keyPath)) {
+        return {
+          cert: readFileSync(certPath),
+          key: readFileSync(keyPath)
+        };
+      }
+      return false;
+    })() : undefined,
     allowedHosts: ['localhost', hostname(), '*.local', '.tailscale'], // Auto-detect hostname + common patterns
     headers: {
       'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -23,16 +37,19 @@ export default defineConfig({
     },
     proxy: {
       '/graphql': {
-        target: process.env.VITE_PROXY_TARGET || 'http://localhost:4127',
-        changeOrigin: true
+        target: process.env.VITE_PROXY_TARGET || (process.env.VITE_HTTPS === 'true' ? 'https://localhost:4128' : 'http://localhost:4127'),
+        changeOrigin: true,
+        secure: false
       },
       '/health': {
-        target: process.env.VITE_PROXY_TARGET || 'http://localhost:4127',
-        changeOrigin: true
+        target: process.env.VITE_PROXY_TARGET || (process.env.VITE_HTTPS === 'true' ? 'https://localhost:4128' : 'http://localhost:4127'),
+        changeOrigin: true,
+        secure: false
       },
       '/mcp': {
-        target: process.env.VITE_PROXY_TARGET || 'http://localhost:4127',
-        changeOrigin: true
+        target: process.env.VITE_PROXY_TARGET || (process.env.VITE_HTTPS === 'true' ? 'https://localhost:4128' : 'http://localhost:4127'),
+        changeOrigin: true,
+        secure: false
       }
     }
   },
