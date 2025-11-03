@@ -68,7 +68,7 @@ jobs:
       - name: Start services
         run: |
           # Start Docker services
-          docker compose -f deployment/docker-compose.yml up -d neo4j
+          docker compose -f deployment/docker-compose.yml up -d graphdone-neo4j
           
           # Wait for Neo4j to be ready
           timeout 60 bash -c 'until curl -s http://localhost:7474 > /dev/null; do sleep 2; done'
