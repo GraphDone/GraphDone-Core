@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, gql } from '@apollo/client';
 import { Eye, EyeOff, ArrowRight, Mail, Lock, Users, Github } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -78,14 +78,32 @@ const GET_SYSTEM_SETTINGS = gql`
 export function LoginForm() {
   const navigate = useNavigate();
   const { login: setAuthUser } = useAuth();
-  
+  const [searchParams] = useSearchParams();
+
   const [formData, setFormData] = useState({
     emailOrUsername: '',
     password: ''
   });
-  
+
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const token = searchParams.get('token');
+    const error = searchParams.get('error');
+
+    if (error) {
+      const errorMessages: Record<string, string> = {
+        google: 'Google authentication failed. Please try again.',
+        linkedin: 'LinkedIn authentication failed. Please try again.',
+        github: 'GitHub authentication failed. Please try again.',
+      };
+      setErrors({ submit: errorMessages[error] || 'OAuth authentication failed. Please try again.' });
+    } else if (token) {
+      localStorage.setItem('token', token);
+      window.location.href = '/';
+    }
+  }, [searchParams]);
 
   // Check if guest access is enabled
   const { data: systemSettings } = useQuery(GET_SYSTEM_SETTINGS);
