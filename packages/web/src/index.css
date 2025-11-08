@@ -179,13 +179,18 @@
   }
 }
 
-/* Lagoon caustics utility classes */
+/* Lagoon caustics utility classes - Simplified static gradient approach */
 .lagoon-caustics {
   position: absolute;
   inset: 0;
   pointer-events: none;
   overflow: hidden;
   z-index: 0;
+  opacity: 0.4;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(59, 130, 246, 0.15), transparent),
+    radial-gradient(ellipse 60% 50% at 80% 50%, rgba(16, 185, 129, 0.12), transparent),
+    radial-gradient(ellipse 60% 50% at 20% 80%, rgba(139, 92, 246, 0.10), transparent);
 }
 
 .caustic-layer {
@@ -228,16 +233,24 @@
   mix-blend-mode: screen;
   filter: blur(0.5px);
   pointer-events: none;
+  will-change: transform;
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  -webkit-transform: translate3d(0, 0, 0);
+  -webkit-font-smoothing: subpixel-antialiased;
+  contain: layout paint;
+  isolation: isolate;
 }
 
 /* Caustic layers with immediate animation start and varied initial positions */
-.caustic-layer-1 { animation: lagoonCaustics1 45s ease-in-out infinite; transform: translateX(-10%) translateY(5%) scale(0.95) rotate(45deg); }
-.caustic-layer-2 { animation: lagoonCaustics2 38s ease-in-out infinite reverse; transform: translateX(15%) translateY(-8%) scale(1.05) rotate(120deg); }
-.caustic-layer-3 { animation: lagoonCaustics3 52s ease-in-out infinite; transform: translateX(-5%) translateY(12%) scale(0.8) rotate(270deg); }
+.caustic-layer-1 { animation: lagoonCaustics1 45s ease-in-out infinite; transform: translate3d(-10%, 5%, 0) scale(0.95) rotate(45deg); }
+.caustic-layer-2 { animation: lagoonCaustics2 38s ease-in-out infinite reverse; transform: translate3d(15%, -8%, 0) scale(1.05) rotate(120deg); }
+.caustic-layer-3 { animation: lagoonCaustics3 52s ease-in-out infinite; transform: translate3d(-5%, 12%, 0) scale(0.8) rotate(270deg); }
 
 /* Additional caustic layers with immediate start, varied positions and reduced opacity for clean effect */
-.caustic-layer-4 { animation: lagoonCaustics1 62s ease-in-out infinite -15s; opacity: 0.4; transform: translateX(20%) translateY(-15%) scale(1.1) rotate(180deg); }
-.caustic-layer-5 { animation: lagoonCaustics2 33s ease-in-out infinite reverse -8s; opacity: 0.5; transform: translateX(-25%) translateY(10%) scale(0.7) rotate(60deg); }
+.caustic-layer-4 { animation: lagoonCaustics1 62s ease-in-out infinite -15s; opacity: 0.4; transform: translate3d(20%, -15%, 0) scale(1.1) rotate(180deg); }
+.caustic-layer-5 { animation: lagoonCaustics2 33s ease-in-out infinite reverse -8s; opacity: 0.5; transform: translate3d(-25%, 10%, 0) scale(0.7) rotate(60deg); }
 .caustic-layer-6 { animation: lagoonCaustics3 71s ease-in-out infinite -22s; opacity: 0.3; transform: translateX(12%) translateY(20%) scale(0.9) rotate(300deg); }
 .caustic-layer-7 { animation: lagoonCaustics1 29s ease-in-out infinite reverse -5s; opacity: 0.6; transform: translateX(-18%) translateY(-5%) scale(1.2) rotate(90deg); }
 .caustic-layer-8 { animation: lagoonCaustics2 58s ease-in-out infinite -30s; opacity: 0.4; transform: translateX(8%) translateY(15%) scale(0.85) rotate(210deg); }
@@ -274,27 +287,51 @@
   pointer-events: none;
   mix-blend-mode: screen;
   filter: blur(0.8px);
+  will-change: background-position;
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  -webkit-transform: translate3d(0, 0, 0);
+  contain: layout paint;
+  isolation: isolate;
 }
 
 /* Additional shimmer variations with immediate start at different animation phases */
-.lagoon-shimmer-2 { animation: lagoonShimmer 34s linear infinite -12s; transform: rotate(15deg); opacity: 0.8; }
-.lagoon-shimmer-3 { animation: lagoonShimmer 42s linear infinite -18s; transform: rotate(-22deg); opacity: 0.6; }
-.lagoon-shimmer-4 { animation: lagoonShimmer 31s linear infinite -8s; transform: rotate(8deg); opacity: 0.7; }
-.lagoon-shimmer-5 { animation: lagoonShimmer 39s linear infinite -25s; transform: rotate(-12deg); opacity: 0.5; }
-.lagoon-shimmer-6 { animation: lagoonShimmer 45s linear infinite -15s; transform: rotate(25deg); opacity: 0.9; }
-.lagoon-shimmer-7 { animation: lagoonShimmer 33s linear infinite -20s; transform: rotate(-18deg); opacity: 0.4; }
-.lagoon-shimmer-8 { animation: lagoonShimmer 38s linear infinite -10s; transform: rotate(11deg); opacity: 0.8; }
-.lagoon-shimmer-9 { animation: lagoonShimmer 41s linear infinite -30s; transform: rotate(-28deg); opacity: 0.6; }
-.lagoon-shimmer-10 { animation: lagoonShimmer 36s linear infinite -5s; transform: rotate(19deg); opacity: 0.5; }
+.lagoon-shimmer-2 { animation: lagoonShimmer 34s linear infinite -12s; transform: rotate(15deg) translateZ(0); opacity: 0.8; }
+.lagoon-shimmer-3 { animation: lagoonShimmer 42s linear infinite -18s; transform: rotate(-22deg) translateZ(0); opacity: 0.6; }
+.lagoon-shimmer-4 { animation: lagoonShimmer 31s linear infinite -8s; transform: rotate(8deg) translateZ(0); opacity: 0.7; }
+.lagoon-shimmer-5 { animation: lagoonShimmer 39s linear infinite -25s; transform: rotate(-12deg) translateZ(0); opacity: 0.5; }
+.lagoon-shimmer-6 { animation: lagoonShimmer 45s linear infinite -15s; transform: rotate(25deg) translateZ(0); opacity: 0.9; }
+.lagoon-shimmer-7 { animation: lagoonShimmer 33s linear infinite -20s; transform: rotate(-18deg) translateZ(0); opacity: 0.4; }
+.lagoon-shimmer-8 { animation: lagoonShimmer 38s linear infinite -10s; transform: rotate(11deg) translateZ(0); opacity: 0.8; }
+.lagoon-shimmer-9 { animation: lagoonShimmer 41s linear infinite -30s; transform: rotate(-28deg) translateZ(0); opacity: 0.6; }
+.lagoon-shimmer-10 { animation: lagoonShimmer 36s linear infinite -5s; transform: rotate(19deg) translateZ(0); opacity: 0.5; }
 
 @layer base {
   html {
     font-family: 'Inter', system-ui, sans-serif;
     scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
-  
+
   body {
     @apply bg-gray-900 text-gray-100;
+    transform: translateZ(0);
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+  }
+
+  /* Optimize backdrop-blur for Chrome performance */
+  .backdrop-blur-sm,
+  .backdrop-blur-md,
+  .backdrop-blur-lg,
+  .backdrop-blur-xl {
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    will-change: backdrop-filter;
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
   }
 
   /* Custom scrollbar */

@@ -185,42 +185,21 @@ export function LoginForm() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Tropical lagoon light scattering background animation - consistent with main app */}
-      <div className="lagoon-caustics">
-        <div className="caustic-layer caustic-layer-1"></div>
-        <div className="caustic-layer caustic-layer-2"></div>
-        <div className="caustic-layer caustic-layer-3"></div>
-        <div className="caustic-layer caustic-layer-4"></div>
-        <div className="caustic-layer caustic-layer-5"></div>
-        <div className="caustic-layer caustic-layer-6"></div>
-        <div className="caustic-layer caustic-layer-7"></div>
-        <div className="caustic-layer caustic-layer-8"></div>
-        <div className="caustic-layer caustic-layer-9"></div>
-        <div className="caustic-layer caustic-layer-10"></div>
-        <div className="lagoon-shimmer lagoon-shimmer-1"></div>
-        <div className="lagoon-shimmer lagoon-shimmer-2"></div>
-        <div className="lagoon-shimmer lagoon-shimmer-3"></div>
-        <div className="lagoon-shimmer lagoon-shimmer-4"></div>
-        <div className="lagoon-shimmer lagoon-shimmer-5"></div>
-        <div className="lagoon-shimmer lagoon-shimmer-6"></div>
-        <div className="lagoon-shimmer lagoon-shimmer-7"></div>
-        <div className="lagoon-shimmer lagoon-shimmer-8"></div>
-        <div className="lagoon-shimmer lagoon-shimmer-9"></div>
-        <div className="lagoon-shimmer lagoon-shimmer-10"></div>
-      </div>
+      {/* Static gradient background - optimized for all browsers */}
+      <div className="lagoon-caustics"></div>
       <div className="max-w-md w-full relative z-10">
         {/* Header */}
-        <div className="text-center mb-8">
-          <Link to="/" className="flex items-center justify-center mb-4 hover:opacity-80 transition-opacity">
-            <img src="/favicon.svg" alt="GraphDone Logo" className="h-12 w-12" />
-            <span className="ml-3 text-3xl font-bold text-gray-100">GraphDone</span>
+        <div className="text-center mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
+          <Link to="/" className="inline-flex items-center justify-center mb-6 hover:opacity-80 transition-all duration-200 hover:scale-105">
+            <img src="/favicon.svg" alt="GraphDone Logo" className="h-14 w-14" />
+            <span className="ml-3 text-4xl font-bold bg-gradient-to-r from-green-300 via-blue-300 to-purple-300 bg-clip-text text-transparent">GraphDone</span>
           </Link>
-          <h1 className="text-2xl font-bold text-gray-100 mb-2">Welcome Back</h1>
-          <p className="text-gray-300">Enter your credentials to join the team</p>
+          <h1 className="text-3xl font-bold text-gray-100 mb-3">Welcome Back</h1>
+          <p className="text-gray-400 text-lg">Enter your credentials to join the team</p>
         </div>
 
         {/* Login Form */}
-        <form onSubmit={handleSubmit} className="bg-gray-800 border border-gray-700 rounded-lg p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="bg-gray-800/50 backdrop-blur-xl border border-gray-700/50 rounded-2xl p-8 space-y-5 shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-700">
           {/* Email/Username Field */}
           <div>
             <label htmlFor="emailOrUsername" className="block text-sm font-medium text-gray-300 mb-1">
@@ -236,8 +215,9 @@ export function LoginForm() {
                 name="emailOrUsername"
                 value={formData.emailOrUsername}
                 onChange={handleChange}
-                className={`w-full pl-10 pr-3 py-2 bg-gray-700 border rounded-lg text-gray-100 focus:outline-none focus:ring-2 ${
-                  errors.emailOrUsername ? 'border-red-500 focus:ring-red-500' : 'border-gray-600 focus:ring-green-500'
+                autoFocus
+                className={`w-full pl-10 pr-4 py-3 bg-gray-700/50 backdrop-blur-sm border rounded-xl text-gray-100 focus:outline-none focus:ring-2 transition-all ${
+                  errors.emailOrUsername ? 'border-red-500/50 focus:ring-red-500/50' : 'border-gray-600/50 focus:ring-green-500/50 focus:border-green-500/50'
                 }`}
                 placeholder="john@example.com or johndoe"
               />
@@ -260,8 +240,8 @@ export function LoginForm() {
                 name="password"
                 value={formData.password}
                 onChange={handleChange}
-                className={`w-full pl-10 pr-10 py-2 bg-gray-700 border rounded-lg text-gray-100 focus:outline-none focus:ring-2 ${
-                  errors.password ? 'border-red-500 focus:ring-red-500' : 'border-gray-600 focus:ring-green-500'
+                className={`w-full pl-10 pr-12 py-3 bg-gray-700/50 backdrop-blur-sm border rounded-xl text-gray-100 focus:outline-none focus:ring-2 transition-all ${
+                  errors.password ? 'border-red-500/50 focus:ring-red-500/50' : 'border-gray-600/50 focus:ring-green-500/50 focus:border-green-500/50'
                 }`}
                 placeholder="••••••••"
               />
@@ -301,17 +281,17 @@ export function LoginForm() {
           <button
             type="submit"
             disabled={loading || guestLoading}
-            className="w-full btn btn-primary flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-green-500/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:translate-y-0 flex items-center justify-center space-x-2"
           >
             {loading ? (
               <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                 <span>Signing in...</span>
               </>
             ) : (
               <>
                 <span>Sign In</span>
-                <ArrowRight className="h-4 w-4" />
+                <ArrowRight className="h-5 w-5" />
               </>
             )}
           </button>
@@ -330,21 +310,17 @@ export function LoginForm() {
             type="button"
             onClick={handleGuestLogin}
             disabled={!isGuestEnabled || loading || guestLoading}
-            className={`w-full btn flex items-center justify-center space-x-2 disabled:cursor-not-allowed ${
-              isGuestEnabled 
-                ? 'btn-secondary disabled:opacity-50' 
-                : 'btn-secondary opacity-50 cursor-not-allowed'
-            }`}
+            className="w-full bg-gray-700/80 hover:bg-gray-600/80 backdrop-blur-sm text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-gray-500/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:translate-y-0 flex items-center justify-center space-x-2"
             title={!isGuestEnabled ? "Guest access has been disabled by the administrator" : undefined}
           >
             {guestLoading ? (
               <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                 <span>Entering Guest Mode...</span>
               </>
             ) : (
               <>
-                <Users className="h-4 w-4" />
+                <Users className="h-5 w-5" />
                 <span>Continue as Guest</span>
               </>
             )}
