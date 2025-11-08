@@ -37,29 +37,8 @@ export function Layout({ children }: LayoutProps) {
         '--sidebar-width': desktopSidebarCollapsed ? '4rem' : '16rem'
       } as React.CSSProperties}
     >
-      {/* Tropical lagoon light scattering background animation - zen mode everywhere */}
-      <div className="lagoon-caustics">
-        <div className="caustic-layer caustic-layer-1"></div>
-        <div className="caustic-layer caustic-layer-2"></div>
-        <div className="caustic-layer caustic-layer-3"></div>
-        <div className="caustic-layer caustic-layer-4"></div>
-        <div className="caustic-layer caustic-layer-5"></div>
-        <div className="caustic-layer caustic-layer-6"></div>
-        <div className="caustic-layer caustic-layer-7"></div>
-        <div className="caustic-layer caustic-layer-8"></div>
-        <div className="caustic-layer caustic-layer-9"></div>
-        <div className="caustic-layer caustic-layer-10"></div>
-        <div className="lagoon-shimmer lagoon-shimmer-1"></div>
-        <div className="lagoon-shimmer lagoon-shimmer-2"></div>
-        <div className="lagoon-shimmer lagoon-shimmer-3"></div>
-        <div className="lagoon-shimmer lagoon-shimmer-4"></div>
-        <div className="lagoon-shimmer lagoon-shimmer-5"></div>
-        <div className="lagoon-shimmer lagoon-shimmer-6"></div>
-        <div className="lagoon-shimmer lagoon-shimmer-7"></div>
-        <div className="lagoon-shimmer lagoon-shimmer-8"></div>
-        <div className="lagoon-shimmer lagoon-shimmer-9"></div>
-        <div className="lagoon-shimmer lagoon-shimmer-10"></div>
-      </div>
+      {/* Static gradient background - optimized for all browsers */}
+      <div className="lagoon-caustics"></div>
       
       {/* Mobile menu button */}
       <div className="lg:hidden relative z-30">
@@ -91,12 +70,14 @@ export function Layout({ children }: LayoutProps) {
           <div className="flex flex-col h-full">
             {/* Logo */}
             <div className={`flex items-center h-16 px-6 border-b border-gray-700 ${desktopSidebarCollapsed ? 'lg:justify-center lg:px-4' : ''}`}>
-              <img src="/favicon.svg" alt="GraphDone Logo" className="h-8 w-8" />
-              {!desktopSidebarCollapsed && (
-                <Link to="/" className="ml-3 text-xl font-bold text-green-300 hover:text-green-400 transition-colors">
-                  GraphDone
-                </Link>
-              )}
+              <Link to="/" className="flex items-center hover:opacity-80 transition-opacity">
+                <img src="/favicon.svg" alt="GraphDone Logo" className="h-8 w-8" />
+                {!desktopSidebarCollapsed && (
+                  <span className="ml-3 text-xl font-bold text-green-300 hover:text-green-400 transition-colors">
+                    GraphDone
+                  </span>
+                )}
+              </Link>
             </div>
 
             {/* Navigation Buttons - Section 2 */}
@@ -203,11 +184,9 @@ export function Layout({ children }: LayoutProps) {
             )}
 
             {/* User Selector */}
-            {!desktopSidebarCollapsed && (
-              <div className="border-t border-gray-700">
-                <UserSelector />
-              </div>
-            )}
+            <div className="border-t border-gray-700">
+              <UserSelector isCollapsed={desktopSidebarCollapsed} />
+            </div>
 
             {/* Status Section - Section 3 */}
             <div className={`p-4 border-t border-gray-700 ${desktopSidebarCollapsed ? 'lg:px-2' : ''}`}>
