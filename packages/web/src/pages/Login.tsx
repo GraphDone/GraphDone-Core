@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { User, Team } from '../types/auth';
 import { LoginSecurityDialog } from '../components/LoginSecurityDialog';
+import { TlsStatusIndicator } from '../components/TlsStatusIndicator';
 
 export function Login() {
   const { availableUsers, availableTeams, login } = useAuth();
@@ -205,6 +206,12 @@ export function Login() {
                 <div className="text-xs text-gray-400 text-center">
                   By continuing, you agree to access graphs and data available to your team and role.
                 </div>
+
+                {!isLoggingIn && (
+                  <div className="text-xs text-gray-500 text-center mt-1">
+                    Press <kbd className="px-1.5 py-0.5 bg-gray-700 border border-gray-600 rounded text-gray-300 font-mono text-xs">Enter</kbd> to continue
+                  </div>
+                )}
               </div>
             ) : (
               <div className="text-center py-12 text-gray-400">
@@ -247,10 +254,13 @@ export function Login() {
       </div>
 
       {/* Security Dialog */}
-      <LoginSecurityDialog 
-        isOpen={showSecurityDialog} 
-        onClose={() => setShowSecurityDialog(false)} 
+      <LoginSecurityDialog
+        isOpen={showSecurityDialog}
+        onClose={() => setShowSecurityDialog(false)}
       />
+
+      {/* TLS/SSL Status Indicator */}
+      <TlsStatusIndicator />
     </div>
   );
 }
