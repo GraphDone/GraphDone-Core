@@ -9,9 +9,8 @@ import { useServer } from 'graphql-ws/lib/use/ws';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import os from 'os';
-// OAuth imports disabled
-// import session from 'express-session';
-// import passport from 'passport';
+import session from 'express-session';
+import passport from 'passport';
 import { Neo4jGraphQL } from '@neo4j/graphql';
 import fetch from 'node-fetch';
 
@@ -23,6 +22,8 @@ import { extractUserFromToken } from './middleware/auth.js';
 import { mergeTypeDefs } from '@graphql-tools/merge';
 import { driver, NEO4J_URI } from './db.js';
 import { sqliteAuthStore } from './auth/sqlite-auth.js';
+import { configureOAuthStrategies } from './auth/oauth-strategies.js';
+import { generateToken } from './utils/auth.js';
 import { createTlsConfig, validateTlsConfig, type TlsConfig } from './config/tls.js';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -129,12 +130,35 @@ async function startServer() {
   }
 
   // Create server (HTTP or HTTPS based on configuration)
-  const server = tlsConfig 
+  const server = tlsConfig
     ? createHttpsServer({ key: tlsConfig.key, cert: tlsConfig.cert }, app)
     : createServer(app);
-    
+
   const serverPort = tlsConfig ? tlsConfig.port : PORT;
   const protocol = tlsConfig ? 'https' : 'http';
+
+  app.use(
+    session({
+      secret: process.env.SESSION_SECRET || 'graphdone-default-secret-change-in-production',
+      resave: false,
+      saveUninitialized: false,
+      cookie: {
+        secure: !!tlsConfig,
+        httpOnly: true,
+        maxAge: 24 * 60 * 60 * 1000,
+      },
+    })
+  );
+
+  app.use(passport.initialize());
+  app.use(passport.session());
+
+  if (process.env.GOOGLE_CLIENT_ID || process.env.LINKEDIN_CLIENT_ID || process.env.GITHUB_CLIENT_ID) {
+    configureOAuthStrategies();
+    console.log('🔐 OAuth strategies configured'); // eslint-disable-line no-console
+  } else {
+    console.log('ℹ️  OAuth disabled (no client IDs configured)'); // eslint-disable-line no-console
+  }
 
   // Initialize SQLite auth system first (for users and config)
   try {
@@ -496,13 +520,13 @@ async function startServer() {
       const mcpStatusUrl = `http://localhost:${process.env.MCP_HEALTH_PORT || 3128}/status`;
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 3000);
-      
-      const response = await fetch(mcpStatusUrl, { 
+
+      const response = await fetch(mcpStatusUrl, {
         method: 'GET',
         signal: controller.signal
       });
       clearTimeout(timeoutId);
-      
+
       if (response.ok) {
         const mcpStatus = await response.json() as Record<string, unknown>;
         res.json({
@@ -522,6 +546,45 @@ async function startServer() {
       });
     }
   });
+
+  app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+
+  app.get(
+    '/auth/google/callback',
+    passport.authenticate('google', { failureRedirect: `${process.env.CLIENT_URL || 'http://localhost:3127'}/login?error=google` }),
+    (req, res) => {
+      const user = req.user as any;
+      const token = generateToken(user.id, user.email, user.role);
+      const clientUrl = process.env.CLIENT_URL || 'http://localhost:3127';
+      res.redirect(`${clientUrl}/login?token=${token}`);
+    }
+  );
+
+  app.get('/auth/linkedin', passport.authenticate('linkedin', { scope: ['r_emailaddress', 'r_liteprofile'] }));
+
+  app.get(
+    '/auth/linkedin/callback',
+    passport.authenticate('linkedin', { failureRedirect: `${process.env.CLIENT_URL || 'http://localhost:3127'}/login?error=linkedin` }),
+    (req, res) => {
+      const user = req.user as any;
+      const token = generateToken(user.id, user.email, user.role);
+      const clientUrl = process.env.CLIENT_URL || 'http://localhost:3127';
+      res.redirect(`${clientUrl}/login?token=${token}`);
+    }
+  );
+
+  app.get('/auth/github', passport.authenticate('github', { scope: ['user:email'] }));
+
+  app.get(
+    '/auth/github/callback',
+    passport.authenticate('github', { failureRedirect: `${process.env.CLIENT_URL || 'http://localhost:3127'}/login?error=github` }),
+    (req, res) => {
+      const user = req.user as any;
+      const token = generateToken(user.id, user.email, user.role);
+      const clientUrl = process.env.CLIENT_URL || 'http://localhost:3127';
+      res.redirect(`${clientUrl}/login?token=${token}`);
+    }
+  );
 
   server.listen(serverPort, '0.0.0.0', async () => {
     const totalTime = Date.now() - startTime;
