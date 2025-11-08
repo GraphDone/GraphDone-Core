@@ -73,9 +73,82 @@ GraphDone supports social login through OAuth 2.0 for:
 **Scopes Required:**
 - `user:email` (email address)
 
-## Step 2: Configure Environment Variables
+## Step 2: Quick Setup for Local Testing
 
-Create or update your `.env` file in the project root:
+### Option A: Interactive Setup (Recommended)
+
+Follow these steps to quickly set up OAuth for local testing:
+
+**1. Google OAuth (5 minutes)**
+
+1. Open https://console.cloud.google.com/
+2. Create a new project or select existing one
+3. Click the navigation menu (☰) → **APIs & Services** → **Credentials**
+4. Click **+ CREATE CREDENTIALS** → **OAuth client ID**
+5. If prompted, configure the OAuth consent screen:
+   - User Type: **External** (for testing)
+   - App name: `GraphDone Local`
+   - User support email: your email
+   - Developer contact: your email
+   - Click **SAVE AND CONTINUE** through all steps
+6. Back on Create OAuth Client ID:
+   - Application type: **Web application**
+   - Name: `GraphDone Local Dev`
+   - Authorized redirect URIs → **+ ADD URI**: `https://localhost:4128/auth/google/callback`
+   - Click **CREATE**
+7. **Copy the Client ID and Client Secret** (you'll use these in Step 3)
+
+**2. LinkedIn OAuth (5 minutes)**
+
+1. Open https://www.linkedin.com/developers/apps
+2. Click **Create app**
+3. Fill in the form:
+   - App name: `GraphDone Local`
+   - LinkedIn Page: Select or create a page (required)
+   - App logo: Optional (can skip)
+   - Check "I have read and agree to these terms"
+   - Click **Create app**
+4. Go to the **Auth** tab
+5. Under **Authorized redirect URLs for your app** → **+ Add redirect URL**:
+   - Add: `https://localhost:4128/auth/linkedin/callback`
+   - Click **Update**
+6. Go to the **Products** tab
+7. Find **Sign In with LinkedIn** → Click **Request access** (usually auto-approved)
+8. Return to **Auth** tab and **copy the Client ID and Client Secret**
+
+**3. GitHub OAuth (2 minutes)**
+
+1. Open https://github.com/settings/developers
+2. Click **OAuth Apps** → **New OAuth App**
+3. Fill in the form:
+   - Application name: `GraphDone Local`
+   - Homepage URL: `http://localhost:3127`
+   - Application description: `Local development for GraphDone`
+   - Authorization callback URL: `https://localhost:4128/auth/github/callback`
+   - Click **Register application**
+4. **Copy the Client ID**
+5. Click **Generate a new client secret**
+6. **Copy the Client Secret** (save it now - you won't see it again!)
+
+### Option B: Use Testing Credentials
+
+For quick testing without setting up real OAuth apps, you can use placeholder credentials. Note that these won't actually work for authentication, but will allow you to see the UI:
+
+```bash
+# These are example placeholders - they won't work for real authentication
+GOOGLE_CLIENT_ID=123456789-abc123def456ghi789.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=GOCSPX-example-secret-not-real
+
+LINKEDIN_CLIENT_ID=86abcdef123456
+LINKEDIN_CLIENT_SECRET=ExampleSecretNotReal123
+
+GITHUB_CLIENT_ID=Iv1.a1b2c3d4e5f6g7h8
+GITHUB_CLIENT_SECRET=example1234567890abcdef1234567890abcdef12
+```
+
+## Step 3: Configure Environment Variables
+
+Update your `.env` file in the project root with the credentials you obtained:
 
 ```bash
 # Google OAuth
