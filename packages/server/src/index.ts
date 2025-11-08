@@ -92,6 +92,7 @@ async function getTotalGraphDoneMemory(): Promise<{ memory: number, label: strin
 }
 
 dotenv.config();
+// OAuth LinkedIn and GitHub credentials updated
 
 const PORT = Number(process.env.PORT) || 4127;
 
@@ -156,6 +157,9 @@ async function startServer() {
   if (process.env.GOOGLE_CLIENT_ID || process.env.LINKEDIN_CLIENT_ID || process.env.GITHUB_CLIENT_ID) {
     configureOAuthStrategies();
     console.log('🔐 OAuth strategies configured'); // eslint-disable-line no-console
+    console.log(`   LinkedIn: ${process.env.LINKEDIN_CLIENT_ID ? '✅' : '❌'}`); // eslint-disable-line no-console
+    console.log(`   GitHub: ${process.env.GITHUB_CLIENT_ID ? '✅' : '❌'}`); // eslint-disable-line no-console
+    console.log(`   Google: ${process.env.GOOGLE_CLIENT_ID ? '✅' : '❌'}`); // eslint-disable-line no-console
   } else {
     console.log('ℹ️  OAuth disabled (no client IDs configured)'); // eslint-disable-line no-console
   }
@@ -553,23 +557,33 @@ async function startServer() {
     '/auth/google/callback',
     passport.authenticate('google', { failureRedirect: `${process.env.CLIENT_URL || 'http://localhost:3127'}/login?error=google` }),
     (req, res) => {
+      console.log('🔐 Google OAuth callback received'); // eslint-disable-line no-console
       const user = req.user as any;
+      console.log('👤 User from OAuth:', user?.email || 'No user'); // eslint-disable-line no-console
       const token = generateToken(user.id, user.email, user.role);
+      console.log('🎫 Generated token:', token?.substring(0, 20) + '...'); // eslint-disable-line no-console
       const clientUrl = process.env.CLIENT_URL || 'http://localhost:3127';
-      res.redirect(`${clientUrl}/login?token=${token}`);
+      const redirectUrl = `${clientUrl}/login?token=${token}`;
+      console.log('↪️  Redirecting to:', redirectUrl); // eslint-disable-line no-console
+      res.redirect(redirectUrl);
     }
   );
 
-  app.get('/auth/linkedin', passport.authenticate('linkedin', { scope: ['r_emailaddress', 'r_liteprofile'] }));
+  app.get('/auth/linkedin', passport.authenticate('linkedin', { scope: ['openid', 'profile', 'email'] }));
 
   app.get(
     '/auth/linkedin/callback',
     passport.authenticate('linkedin', { failureRedirect: `${process.env.CLIENT_URL || 'http://localhost:3127'}/login?error=linkedin` }),
     (req, res) => {
+      console.log('🔐 LinkedIn OAuth callback received'); // eslint-disable-line no-console
       const user = req.user as any;
+      console.log('👤 User from OAuth:', user?.email || 'No user'); // eslint-disable-line no-console
       const token = generateToken(user.id, user.email, user.role);
+      console.log('🎫 Generated token:', token?.substring(0, 20) + '...'); // eslint-disable-line no-console
       const clientUrl = process.env.CLIENT_URL || 'http://localhost:3127';
-      res.redirect(`${clientUrl}/login?token=${token}`);
+      const redirectUrl = `${clientUrl}/login?token=${token}`;
+      console.log('↪️  Redirecting to:', redirectUrl); // eslint-disable-line no-console
+      res.redirect(redirectUrl);
     }
   );
 
@@ -579,10 +593,15 @@ async function startServer() {
     '/auth/github/callback',
     passport.authenticate('github', { failureRedirect: `${process.env.CLIENT_URL || 'http://localhost:3127'}/login?error=github` }),
     (req, res) => {
+      console.log('🔐 GitHub OAuth callback received'); // eslint-disable-line no-console
       const user = req.user as any;
+      console.log('👤 User from OAuth:', user?.email || 'No user'); // eslint-disable-line no-console
       const token = generateToken(user.id, user.email, user.role);
+      console.log('🎫 Generated token:', token?.substring(0, 20) + '...'); // eslint-disable-line no-console
       const clientUrl = process.env.CLIENT_URL || 'http://localhost:3127';
-      res.redirect(`${clientUrl}/login?token=${token}`);
+      const redirectUrl = `${clientUrl}/login?token=${token}`;
+      console.log('↪️  Redirecting to:', redirectUrl); // eslint-disable-line no-console
+      res.redirect(redirectUrl);
     }
   );
 
