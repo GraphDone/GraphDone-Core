@@ -202,12 +202,37 @@ class SQLiteAuthStore {
             FOREIGN KEY (folderId) REFERENCES folders (id) ON DELETE CASCADE,
             FOREIGN KEY (userId) REFERENCES users (id) ON DELETE CASCADE
           )
+        `, (err) => {
+          if (err) {
+            reject(err);
+            return;
+          }
+        });
+
+        // OAuth providers table for social login
+        db.run(`
+          CREATE TABLE IF NOT EXISTS oauth_providers (
+            id TEXT PRIMARY KEY,
+            userId TEXT NOT NULL,
+            provider TEXT NOT NULL, -- 'google', 'linkedin', 'github'
+            providerId TEXT NOT NULL, -- Provider's user ID
+            email TEXT,
+            name TEXT,
+            avatar TEXT,
+            accessToken TEXT,
+            refreshToken TEXT,
+            profile TEXT, -- JSON stringified profile data
+            createdAt TEXT NOT NULL,
+            updatedAt TEXT NOT NULL,
+            UNIQUE (provider, providerId),
+            FOREIGN KEY (userId) REFERENCES users (id) ON DELETE CASCADE
+          )
         `, async (err) => {
           if (err) {
             reject(err);
             return;
           }
-          
+
           try {
             // Create default admin and viewer users
             await this.createDefaultUsers();
@@ -1000,7 +1025,7 @@ class SQLiteAuthStore {
 
         if (!row) {
           const personalFolderId = uuidv4();
-          
+
           db.serialize(() => {
             // Personal root folder
             db.run('INSERT INTO folders (id, name, type, ownerId, color, icon, description, position, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -1025,6 +1050,195 @@ class SQLiteAuthStore {
           });
         } else {
           resolve(); // Folders already exist
+        }
+      });
+    });
+  }
+
+  async findUserByOAuthProvider(provider: string, providerId: string): Promise<User | null> {
+    await this.initialize();
+    const db = await this.getDb();
+
+    return new Promise((resolve, reject) => {
+      const sql = `
+        SELECT u.*, t.id as teamId, t.name as teamName
+        FROM users u
+        LEFT JOIN user_teams ut ON u.id = ut.userId
+        LEFT JOIN teams t ON ut.teamId = t.id
+        INNER JOIN oauth_providers op ON u.id = op.userId
+        WHERE op.provider = ? AND op.providerId = ?
+        AND u.isActive = 1
+      `;
+
+      db.get(sql, [provider, providerId], (err, row: any) => {
+        if (err) {
+          reject(err);
+        } else if (row) {
+          const user: User = {
+            id: row.id,
+            email: row.email,
+            username: row.username,
+            name: row.name,
+            role: row.role,
+            passwordHash: row.passwordHash,
+            createdAt: row.createdAt,
+            updatedAt: row.updatedAt,
+            isActive: Boolean(row.isActive),
+            isEmailVerified: Boolean(row.isEmailVerified),
+            team: row.teamId ? {
+              id: row.teamId,
+              name: row.teamName
+            } : null
+          };
+          resolve(user);
+        } else {
+          resolve(null);
+        }
+      });
+    });
+  }
+
+  async findOrCreateUserFromOAuth(oauthData: {
+    provider: string;
+    providerId: string;
+    email: string;
+    name: string;
+    avatar?: string;
+    accessToken?: string;
+    refreshToken?: string;
+    profile?: any;
+  }): Promise<User> {
+    await this.initialize();
+    const db = await this.getDb();
+
+    const existingUser = await this.findUserByOAuthProvider(oauthData.provider, oauthData.providerId);
+    if (existingUser) {
+      await this.updateOAuthProvider(existingUser.id, oauthData);
+      return existingUser;
+    }
+
+    const userByEmail = await this.findUserByEmailOrUsername(oauthData.email);
+    if (userByEmail) {
+      await this.linkOAuthProvider(userByEmail.id, oauthData);
+      return userByEmail;
+    }
+
+    const userId = uuidv4();
+    const now = new Date().toISOString();
+    const username = oauthData.email.split('@')[0] + '_' + Math.random().toString(36).substring(7);
+    const passwordHash = await bcrypt.hash(uuidv4(), 10);
+
+    return new Promise((resolve, reject) => {
+      db.serialize(() => {
+        db.run(`INSERT INTO users (id, email, username, name, role, passwordHash, createdAt, updatedAt, isActive, isEmailVerified)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [userId, oauthData.email.toLowerCase(), username, oauthData.name, 'USER', passwordHash, now, now, 1, 1],
+          async (err) => {
+            if (err) {
+              reject(err);
+              return;
+            }
+
+            try {
+              await this.linkOAuthProvider(userId, oauthData);
+              const newUser = await this.findUserById(userId);
+              resolve(newUser!);
+            } catch (linkErr) {
+              reject(linkErr);
+            }
+          });
+      });
+    });
+  }
+
+  async linkOAuthProvider(userId: string, oauthData: {
+    provider: string;
+    providerId: string;
+    email?: string;
+    name?: string;
+    avatar?: string;
+    accessToken?: string;
+    refreshToken?: string;
+    profile?: any;
+  }): Promise<void> {
+    await this.initialize();
+    const db = await this.getDb();
+    const oauthId = uuidv4();
+    const now = new Date().toISOString();
+
+    return new Promise((resolve, reject) => {
+      db.run(`INSERT INTO oauth_providers (id, userId, provider, providerId, email, name, avatar, accessToken, refreshToken, profile, createdAt, updatedAt)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [oauthId, userId, oauthData.provider, oauthData.providerId, oauthData.email || null, oauthData.name || null,
+         oauthData.avatar || null, oauthData.accessToken || null, oauthData.refreshToken || null,
+         oauthData.profile ? JSON.stringify(oauthData.profile) : null, now, now],
+        (err) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve();
+          }
+        });
+    });
+  }
+
+  async updateOAuthProvider(userId: string, oauthData: {
+    provider: string;
+    providerId: string;
+    email?: string;
+    name?: string;
+    avatar?: string;
+    accessToken?: string;
+    refreshToken?: string;
+    profile?: any;
+  }): Promise<void> {
+    await this.initialize();
+    const db = await this.getDb();
+    const now = new Date().toISOString();
+
+    return new Promise((resolve, reject) => {
+      db.run(`UPDATE oauth_providers
+              SET email = ?, name = ?, avatar = ?, accessToken = ?, refreshToken = ?, profile = ?, updatedAt = ?
+              WHERE userId = ? AND provider = ? AND providerId = ?`,
+        [oauthData.email || null, oauthData.name || null, oauthData.avatar || null,
+         oauthData.accessToken || null, oauthData.refreshToken || null,
+         oauthData.profile ? JSON.stringify(oauthData.profile) : null, now, userId, oauthData.provider, oauthData.providerId],
+        (err) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve();
+          }
+        });
+    });
+  }
+
+  async unlinkOAuthProvider(userId: string, provider: string): Promise<void> {
+    await this.initialize();
+    const db = await this.getDb();
+
+    return new Promise((resolve, reject) => {
+      db.run('DELETE FROM oauth_providers WHERE userId = ? AND provider = ?', [userId, provider], (err) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve();
+        }
+      });
+    });
+  }
+
+  async getOAuthProviders(userId: string): Promise<any[]> {
+    await this.initialize();
+    const db = await this.getDb();
+
+    return new Promise((resolve, reject) => {
+      db.all('SELECT provider, providerId, email, name, avatar, createdAt FROM oauth_providers WHERE userId = ?',
+        [userId], (err, rows: any[]) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(rows);
         }
       });
     });

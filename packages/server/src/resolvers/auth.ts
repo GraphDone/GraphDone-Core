@@ -175,7 +175,7 @@ export const authResolvers = {
     // Query to check development mode and default credentials status
     developmentInfo: async (_: any, __: any, context: AuthContext) => {
       const isDevelopment = process.env.NODE_ENV !== 'production';
-      
+
       if (!isDevelopment) {
         return {
           isDevelopment: false,
@@ -190,7 +190,7 @@ export const authResolvers = {
         const adminResult = await session.run(
           `MATCH (u:User {username: 'admin'}) RETURN u.passwordHash as passwordHash`
         );
-        
+
         const viewerResult = await session.run(
           `MATCH (u:User {username: 'viewer'}) RETURN u.passwordHash as passwordHash`
         );
@@ -213,14 +213,14 @@ export const authResolvers = {
           }
         }
 
-        // Check if viewer exists and has default password  
+        // Check if viewer exists and has default password
         if (viewerResult.records.length > 0) {
           const viewerPasswordHash = viewerResult.records[0].get('passwordHash');
           const isDefaultPassword = await bcrypt.compare('graphdone', viewerPasswordHash);
           if (isDefaultPassword) {
             defaultAccounts.push({
               username: 'viewer',
-              password: 'graphdone', 
+              password: 'graphdone',
               role: 'VIEWER',
               description: 'Read-only access'
             });
@@ -235,6 +235,22 @@ export const authResolvers = {
         };
       } finally {
         await session.close();
+      }
+    },
+
+    myOAuthProviders: async (_: any, __: any, context: AuthContext) => {
+      if (!context.user) {
+        throw new GraphQLError('Not authenticated', {
+          extensions: { code: 'UNAUTHENTICATED' }
+        });
+      }
+
+      try {
+        const providers = await sqliteAuthStore.getOAuthProviders(context.user.userId);
+        return providers;
+      } catch (error) {
+        console.error('Error fetching OAuth providers:', error);
+        return [];
       }
     }
   },
@@ -956,6 +972,27 @@ export const authResolvers = {
         };
       } finally {
         await session.close();
+      }
+    },
+
+    unlinkOAuthProvider: async (_: any, { provider }: { provider: string }, context: AuthContext) => {
+      if (!context.user) {
+        throw new GraphQLError('Not authenticated', {
+          extensions: { code: 'UNAUTHENTICATED' }
+        });
+      }
+
+      try {
+        await sqliteAuthStore.unlinkOAuthProvider(context.user.userId, provider);
+        return {
+          success: true,
+          message: `${provider} account unlinked successfully`
+        };
+      } catch (error) {
+        console.error('OAuth unlink error:', error);
+        throw new GraphQLError(`Failed to unlink ${provider} account`, {
+          extensions: { code: 'INTERNAL_SERVER_ERROR' }
+        });
       }
     }
   }
