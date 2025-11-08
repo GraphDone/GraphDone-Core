@@ -125,6 +125,20 @@ export const authTypeDefs = gql`
     defaultAccounts: [DefaultAccount!]!
   }
 
+  type OAuthProvider {
+    provider: String!
+    providerId: String!
+    email: String
+    name: String
+    avatar: String
+    createdAt: String!
+  }
+
+  input OAuthLoginInput {
+    provider: String!
+    code: String!
+  }
+
   type Query {
     # Get current user from JWT token
     me: User
@@ -153,6 +167,9 @@ export const authTypeDefs = gql`
     
     # Get graphs in a specific folder
     folderGraphs(folderId: String!): [GraphFolderMapping!]!
+
+    # Get OAuth providers for current user
+    myOAuthProviders: [OAuthProvider!]!
   }
 
   type Mutation {
@@ -216,6 +233,10 @@ export const authTypeDefs = gql`
     
     # Reorder graphs within folder
     reorderGraphsInFolder(folderId: String!, graphOrders: [GraphOrderInput!]!): MessageResponse!
+
+    # OAuth mutations
+    oauthLogin(input: OAuthLoginInput!): AuthPayload!
+    unlinkOAuthProvider(provider: String!): MessageResponse!
   }
   
   input GraphOrderInput {
