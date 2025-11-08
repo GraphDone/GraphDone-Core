@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, gql } from '@apollo/client';
 import { Eye, EyeOff, ArrowRight, CheckCircle } from 'lucide-react';
@@ -47,7 +47,6 @@ export function Signup() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isChecking, setIsChecking] = useState<Record<string, boolean>>({});
   const [availability, setAvailability] = useState<Record<string, boolean>>({});
-
 
   const [signup, { loading }] = useMutation(SIGNUP_MUTATION, {
     onCompleted: (data) => {
@@ -178,6 +177,16 @@ export function Signup() {
       checkAvailability(field, formData[field]);
     }
   };
+
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && !loading && !Object.values(isChecking).some(checking => checking)) {
+        handleSubmit(e as any);
+      }
+    };
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [formData, loading, isChecking]);
 
   const getPasswordStrength = (password: string) => {
     let strength = 0;
@@ -411,8 +420,8 @@ export function Signup() {
         </div>
 
         {/* Role Information */}
-        <div className="mt-8 p-4 bg-gray-800 border border-gray-700 rounded-lg">
-          <h3 className="text-sm font-semibold text-gray-300 mb-2">Your Journey Begins as a Viewer</h3>
+        <div className="mt-8 p-4 bg-gray-800/50 backdrop-blur-xl border border-gray-700/50 rounded-2xl shadow-lg">
+          <h3 className="text-sm font-semibold text-gray-100 mb-2">Your Journey Begins as a Viewer</h3>
           <p className="text-xs text-gray-400">
             All new members start with read-only access. As you contribute and demonstrate value,
             the community may elevate your role to User or even Admin.
