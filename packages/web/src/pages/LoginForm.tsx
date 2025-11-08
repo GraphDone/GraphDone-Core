@@ -100,8 +100,9 @@ export function LoginForm() {
       };
       setErrors({ submit: errorMessages[error] || 'OAuth authentication failed. Please try again.' });
     } else if (token) {
-      localStorage.setItem('token', token);
-      window.location.href = '/';
+      localStorage.setItem('authToken', token);
+      window.history.replaceState({}, '', '/login');
+      window.location.reload();
     }
   }, [searchParams]);
 

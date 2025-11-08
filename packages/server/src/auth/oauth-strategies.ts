@@ -1,6 +1,6 @@
 import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
-import { Strategy as LinkedInStrategy } from 'passport-linkedin-oauth2';
+import { Strategy as OpenIDConnectStrategy } from 'passport-openidconnect';
 import { Strategy as GitHubStrategy } from 'passport-github2';
 import { sqliteAuthStore } from './sqlite-auth';
 
@@ -38,34 +38,42 @@ export function configureOAuthStrategies() {
     )
   );
 
-  passport.use(
-    new LinkedInStrategy(
+  passport.use('linkedin',
+    new OpenIDConnectStrategy(
       {
+        issuer: 'https://www.linkedin.com/oauth',
+        authorizationURL: 'https://www.linkedin.com/oauth/v2/authorization',
+        tokenURL: 'https://www.linkedin.com/oauth/v2/accessToken',
+        userInfoURL: 'https://api.linkedin.com/v2/userinfo',
         clientID: process.env.LINKEDIN_CLIENT_ID || '',
         clientSecret: process.env.LINKEDIN_CLIENT_SECRET || '',
-        callbackURL: process.env.LINKEDIN_CALLBACK_URL || 'https://localhost:4128/auth/linkedin/callback',
-        scope: ['r_emailaddress', 'r_liteprofile'],
+        callbackURL: process.env.LINKEDIN_CALLBACK_URL || 'http://localhost:4127/auth/linkedin/callback',
+        scope: ['openid', 'profile', 'email'],
       },
-      async (_accessToken, _refreshToken, profile, done) => {
+      async (_issuer: string, _profile: any, done: any) => {
         try {
-          const email = profile.emails?.[0]?.value;
+          console.log('🔍 LinkedIn profile received:', JSON.stringify(_profile, null, 2));
+
+          const email = _profile.email || _profile.emails?.[0]?.value || _profile._json?.email;
           if (!email) {
+            console.error('❌ No email in profile. Profile keys:', Object.keys(_profile));
             return done(new Error('No email found in LinkedIn profile'));
           }
 
           const user = await sqliteAuthStore.findOrCreateUserFromOAuth({
             provider: 'linkedin',
-            providerId: profile.id,
+            providerId: _profile.sub || _profile.id,
             email: email,
-            name: profile.displayName || email.split('@')[0],
-            avatar: profile.photos?.[0]?.value,
-            accessToken: _accessToken,
-            refreshToken: _refreshToken,
-            profile: profile._json,
+            name: _profile.name || _profile.displayName || email.split('@')[0],
+            avatar: _profile.picture || _profile.photos?.[0]?.value,
+            accessToken: '',
+            refreshToken: '',
+            profile: _profile,
           });
 
           return done(null, user);
         } catch (error) {
+          console.error('❌ LinkedIn OAuth error:', error);
           return done(error as Error);
         }
       }
