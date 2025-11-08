@@ -1,15 +1,33 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Users, ArrowRight, Shield } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { User, Team } from '../types/auth';
 import { LoginSecurityDialog } from '../components/LoginSecurityDialog';
 
 export function Login() {
   const { availableUsers, availableTeams, login } = useAuth();
+  const navigate = useNavigate();
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [showSecurityDialog, setShowSecurityDialog] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+
+  useEffect(() => {
+    if (availableTeams.length > 0 && !selectedTeam) {
+      setSelectedTeam(availableTeams[0]);
+    }
+  }, [availableTeams, selectedTeam]);
+
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && selectedUser && !isLoggingIn) {
+        handleLogin();
+      }
+    };
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [selectedUser, isLoggingIn]);
 
   const handleUserSelect = (user: User) => {
     setSelectedUser(user);
@@ -17,9 +35,15 @@ export function Login() {
     setSelectedTeam(userTeam || null);
   };
 
-  const handleLogin = () => {
-    if (selectedUser) {
-      login(selectedUser);
+  const handleLogin = async () => {
+    if (selectedUser && !isLoggingIn) {
+      setIsLoggingIn(true);
+      try {
+        await login(selectedUser);
+        navigate('/');
+      } finally {
+        setIsLoggingIn(false);
+      }
     }
   };
 
@@ -36,38 +60,22 @@ export function Login() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4 relative overflow-hidden select-none">
-      {/* Tropical lagoon light scattering background animation */}
-      <div className="lagoon-caustics">
-        <div className="caustic-layer caustic-layer-1"></div>
-        <div className="caustic-layer caustic-layer-2"></div>
-        <div className="caustic-layer caustic-layer-3"></div>
-        <div className="caustic-layer caustic-layer-4"></div>
-        <div className="caustic-layer caustic-layer-5"></div>
-        <div className="caustic-layer caustic-layer-6"></div>
-        <div className="caustic-layer caustic-layer-7"></div>
-        <div className="caustic-layer caustic-layer-8"></div>
-        <div className="caustic-layer caustic-layer-9"></div>
-        <div className="caustic-layer caustic-layer-10"></div>
-        <div className="lagoon-shimmer lagoon-shimmer-1"></div>
-        <div className="lagoon-shimmer lagoon-shimmer-2"></div>
-        <div className="lagoon-shimmer lagoon-shimmer-3"></div>
-        <div className="lagoon-shimmer lagoon-shimmer-4"></div>
-        <div className="lagoon-shimmer lagoon-shimmer-5"></div>
-      </div>
+      {/* Static gradient background - optimized for all browsers */}
+      <div className="lagoon-caustics"></div>
       <div className="max-w-4xl w-full relative z-10">
         {/* Header */}
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center mb-4">
-            <img src="/favicon.svg" alt="GraphDone Logo" className="h-12 w-12" />
-            <span className="ml-3 text-3xl font-bold text-gray-100">GraphDone</span>
-          </div>
-          <h1 className="text-2xl font-bold text-gray-100 mb-2">Welcome Back</h1>
-          <p className="text-gray-300">Select your user account to continue</p>
+        <div className="text-center mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
+          <Link to="/" className="inline-flex items-center justify-center mb-6 hover:opacity-80 transition-all duration-200 hover:scale-105">
+            <img src="/favicon.svg" alt="GraphDone Logo" className="h-14 w-14" />
+            <span className="ml-3 text-4xl font-bold bg-gradient-to-r from-green-300 via-blue-300 to-purple-300 bg-clip-text text-transparent">GraphDone</span>
+          </Link>
+          <h1 className="text-3xl font-bold text-gray-100 mb-3">Welcome Back</h1>
+          <p className="text-gray-400 text-lg">Select your user account to continue</p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
           {/* Team Selection */}
-          <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
+          <div className="bg-gray-800/50 backdrop-blur-xl border border-gray-700/50 rounded-2xl p-6 shadow-2xl hover:shadow-green-500/10 transition-all duration-300">
             <div className="flex items-center mb-4">
               <Users className="h-5 w-5 text-gray-600 mr-2" />
               <h2 className="text-lg font-semibold text-gray-100">Select Team</h2>
@@ -78,10 +86,10 @@ export function Login() {
                 <button
                   key={team.id}
                   onClick={() => setSelectedTeam(team)}
-                  className={`w-full p-3 rounded-lg border-2 text-left transition-all ${
+                  className={`w-full p-4 rounded-xl border-2 text-left transition-all duration-200 hover:scale-[1.02] hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-green-500/50 ${
                     selectedTeam?.id === team.id
-                      ? 'border-green-500 bg-green-900'
-                      : 'border-gray-600 hover:border-gray-500 hover:bg-gray-700'
+                      ? 'border-green-500/50 bg-green-900/30 shadow-lg shadow-green-500/20'
+                      : 'border-gray-600/50 hover:border-green-500/30 hover:bg-gray-700/50 hover:shadow-lg'
                   }`}
                 >
                   <div className="flex items-center space-x-3">
@@ -102,7 +110,7 @@ export function Login() {
           </div>
 
           {/* User Selection */}
-          <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
+          <div className="bg-gray-800/50 backdrop-blur-xl border border-gray-700/50 rounded-2xl p-6 shadow-2xl hover:shadow-blue-500/10 transition-all duration-300">
             <div className="flex items-center mb-4">
               <div className="w-5 h-5 bg-blue-600 rounded-full mr-2"></div>
               <h2 className="text-lg font-semibold text-gray-100">
@@ -116,10 +124,10 @@ export function Login() {
                   <button
                     key={user.id}
                     onClick={() => handleUserSelect(user)}
-                    className={`w-full p-3 rounded-lg border-2 text-left transition-all ${
+                    className={`w-full p-4 rounded-xl border-2 text-left transition-all duration-200 hover:scale-[1.02] hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${
                       selectedUser?.id === user.id
-                        ? 'border-green-500 bg-green-900'
-                        : 'border-gray-600 hover:border-gray-500 hover:bg-gray-700'
+                        ? 'border-blue-500/50 bg-blue-900/30 shadow-lg shadow-blue-500/20'
+                        : 'border-gray-600/50 hover:border-blue-500/30 hover:bg-gray-700/50 hover:shadow-lg'
                     }`}
                   >
                     <div className="flex items-center space-x-3">
@@ -146,7 +154,7 @@ export function Login() {
           </div>
 
           {/* Login Action */}
-          <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
+          <div className="bg-gray-800/50 backdrop-blur-xl border border-gray-700/50 rounded-2xl p-6 shadow-2xl hover:shadow-purple-500/10 transition-all duration-300">
             <h2 className="text-lg font-semibold text-gray-100 mb-4">Continue as</h2>
             
             {selectedUser ? (
@@ -178,10 +186,20 @@ export function Login() {
 
                 <button
                   onClick={handleLogin}
-                  className="w-full btn btn-primary flex items-center justify-center space-x-2"
+                  disabled={isLoggingIn}
+                  className="w-full bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-green-500/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:translate-y-0 flex items-center justify-center space-x-2"
                 >
-                  <span>Continue to GraphDone</span>
-                  <ArrowRight className="h-4 w-4" />
+                  {isLoggingIn ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                      <span>Logging in...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Continue to GraphDone</span>
+                      <ArrowRight className="h-5 w-5" />
+                    </>
+                  )}
                 </button>
 
                 <div className="text-xs text-gray-400 text-center">
