@@ -51,6 +51,7 @@ export function PasswordRequirements({ password, showAll = false }: PasswordRequ
     } else if (password) {
       setShowBox(true);
     }
+    return undefined;
   }, [allRequiredMet, password]);
 
   if (!password) return null;
