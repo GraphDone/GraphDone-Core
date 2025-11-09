@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { Lock, Eye, EyeOff, CheckCircle, XCircle } from 'lucide-react';
 import { TlsStatusIndicator } from '../components/TlsStatusIndicator';
+import { PasswordRequirements } from '../components/PasswordRequirements';
 import { validatePassword, getPasswordStrength } from '../utils/validation';
 
 export function ResetPassword() {
@@ -99,7 +100,7 @@ export function ResetPassword() {
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-5">
-              <div>
+              <div className="relative">
                 <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-1">
                   New Password
                 </label>
@@ -149,6 +150,8 @@ export function ResetPassword() {
                     </div>
                   </div>
                 )}
+
+                <PasswordRequirements password={password} />
               </div>
 
               <div>
@@ -210,15 +213,6 @@ export function ResetPassword() {
                 {passwordsMatch === true && confirmPassword && (
                   <p className="mt-1 text-xs text-teal-400">Passwords match!</p>
                 )}
-              </div>
-
-              <div className="p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
-                <p className="text-xs text-blue-300 font-semibold mb-2">Password Requirements:</p>
-                <ul className="text-xs text-blue-300/80 space-y-1">
-                  <li>• At least 8 characters long</li>
-                  <li>• Contains uppercase and lowercase letters</li>
-                  <li>• Contains at least one number</li>
-                </ul>
               </div>
 
               <button
