@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, gql } from '@apollo/client';
-import { Eye, EyeOff, ArrowRight, CheckCircle, Github } from 'lucide-react';
+import { Eye, EyeOff, ArrowRight, CheckCircle, XCircle, Github } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { TlsStatusIndicator } from '../components/TlsStatusIndicator';
 
@@ -47,6 +47,7 @@ export function Signup() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isChecking, setIsChecking] = useState<Record<string, boolean>>({});
   const [availability, setAvailability] = useState<Record<string, boolean>>({});
+  const [emailValid, setEmailValid] = useState<boolean | null>(null);
 
   const [signup, { loading }] = useMutation(SIGNUP_MUTATION, {
     onCompleted: (data) => {
@@ -160,10 +161,23 @@ export function Signup() {
     });
   };
 
+  const isValidEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
-    
+
+    if (name === 'email') {
+      if (value.length === 0) {
+        setEmailValid(null);
+      } else {
+        setEmailValid(isValidEmail(value));
+      }
+    }
+
     // Clear error for this field
     if (errors[name]) {
       const newErrors = { ...errors };
@@ -309,18 +323,31 @@ export function Signup() {
                 onChange={handleChange}
                 onBlur={() => handleBlur('email')}
                 className={`w-full px-4 py-3 bg-gray-700/50 backdrop-blur-sm border rounded-xl text-gray-100 focus:outline-none focus:ring-2 pr-10 transition-all ${
-                  errors.email ? 'border-red-500/50 focus:ring-red-500/50' : 'border-gray-600/50 focus:ring-teal-500/50 focus:border-teal-500/50'
+                  emailValid === false
+                    ? 'border-red-500/50 focus:ring-red-500/50'
+                    : emailValid === true
+                    ? 'border-teal-500/50 focus:ring-teal-500/50 focus:border-teal-500/50'
+                    : errors.email
+                    ? 'border-red-500/50 focus:ring-red-500/50'
+                    : 'border-gray-600/50 focus:ring-teal-500/50 focus:border-teal-500/50'
                 }`}
                 placeholder="john@example.com"
               />
-              {isChecking.email && (
+              {isChecking.email ? (
                 <div className="absolute right-2 top-2.5 w-5 h-5">
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-teal-500"></div>
                 </div>
-              )}
-              {availability.email && !isChecking.email && (
+              ) : emailValid !== null ? (
+                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                  {emailValid ? (
+                    <CheckCircle className="h-5 w-5 text-teal-400" />
+                  ) : (
+                    <XCircle className="h-5 w-5 text-red-400" />
+                  )}
+                </div>
+              ) : availability.email && !isChecking.email ? (
                 <CheckCircle className="absolute right-2 top-2.5 w-5 h-5 text-teal-500" />
-              )}
+              ) : null}
             </div>
             {errors.email && <p className="mt-1 text-xs text-red-400">{errors.email}</p>}
           </div>
