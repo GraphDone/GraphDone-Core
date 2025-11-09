@@ -4,6 +4,7 @@ import { useMutation, gql } from '@apollo/client';
 import { Eye, EyeOff, ArrowRight, CheckCircle, XCircle, Github } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { TlsStatusIndicator } from '../components/TlsStatusIndicator';
+import { isValidEmail, getPasswordStrength } from '../utils/validation';
 
 const SIGNUP_MUTATION = gql`
   mutation Signup($input: SignupInput!) {
@@ -48,6 +49,7 @@ export function Signup() {
   const [isChecking, setIsChecking] = useState<Record<string, boolean>>({});
   const [availability, setAvailability] = useState<Record<string, boolean>>({});
   const [emailValid, setEmailValid] = useState<boolean | null>(null);
+  const [passwordsMatch, setPasswordsMatch] = useState<boolean | null>(null);
 
   const [signup, { loading }] = useMutation(SIGNUP_MUTATION, {
     onCompleted: (data) => {
@@ -103,12 +105,11 @@ export function Signup() {
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
-    
+
     // Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!formData.email) {
       newErrors.email = 'Email is required';
-    } else if (!emailRegex.test(formData.email)) {
+    } else if (!isValidEmail(formData.email)) {
       newErrors.email = 'Invalid email format';
     }
     
@@ -161,11 +162,6 @@ export function Signup() {
     });
   };
 
-  const isValidEmail = (email: string): boolean => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  };
-
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
@@ -178,7 +174,17 @@ export function Signup() {
       }
     }
 
-    // Clear error for this field
+    if (name === 'password' || name === 'confirmPassword') {
+      const pwd = name === 'password' ? value : formData.password;
+      const confirmPwd = name === 'confirmPassword' ? value : formData.confirmPassword;
+
+      if (pwd && confirmPwd) {
+        setPasswordsMatch(pwd === confirmPwd);
+      } else {
+        setPasswordsMatch(null);
+      }
+    }
+
     if (errors[name]) {
       const newErrors = { ...errors };
       delete newErrors[name];
@@ -201,19 +207,6 @@ export function Signup() {
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [formData, loading, isChecking]);
-
-  const getPasswordStrength = (password: string) => {
-    let strength = 0;
-    if (password.length >= 8) strength++;
-    if (password.length >= 12) strength++;
-    if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength++;
-    if (/\d/.test(password)) strength++;
-    if (/[^a-zA-Z\d]/.test(password)) strength++;
-    
-    if (strength <= 2) return { label: 'Weak', color: 'bg-red-500' };
-    if (strength <= 3) return { label: 'Medium', color: 'bg-yellow-500' };
-    return { label: 'Strong', color: 'bg-green-500' };
-  };
 
   const passwordStrength = getPasswordStrength(formData.password);
 
@@ -300,6 +293,7 @@ export function Signup() {
               name="name"
               value={formData.name}
               onChange={handleChange}
+              autoComplete="name"
               autoFocus
               className={`w-full px-4 py-3 bg-gray-700/50 backdrop-blur-sm border rounded-xl text-gray-100 focus:outline-none focus:ring-2 transition-all ${
                 errors.name ? 'border-red-500/50 focus:ring-red-500/50' : 'border-gray-600/50 focus:ring-teal-500/50 focus:border-teal-500/50'
@@ -322,6 +316,7 @@ export function Signup() {
                 value={formData.email}
                 onChange={handleChange}
                 onBlur={() => handleBlur('email')}
+                autoComplete="email"
                 className={`w-full px-4 py-3 bg-gray-700/50 backdrop-blur-sm border rounded-xl text-gray-100 focus:outline-none focus:ring-2 pr-10 transition-all ${
                   emailValid === false
                     ? 'border-red-500/50 focus:ring-red-500/50'
@@ -365,6 +360,7 @@ export function Signup() {
                 value={formData.username}
                 onChange={handleChange}
                 onBlur={() => handleBlur('username')}
+                autoComplete="username"
                 className={`w-full px-4 py-3 bg-gray-700/50 backdrop-blur-sm border rounded-xl text-gray-100 focus:outline-none focus:ring-2 pr-10 transition-all ${
                   errors.username ? 'border-red-500/50 focus:ring-red-500/50' : 'border-gray-600/50 focus:ring-teal-500/50 focus:border-teal-500/50'
                 }`}
@@ -394,6 +390,7 @@ export function Signup() {
                 name="password"
                 value={formData.password}
                 onChange={handleChange}
+                autoComplete="new-password"
                 className={`w-full px-4 py-3 bg-gray-700/50 backdrop-blur-sm border rounded-xl text-gray-100 focus:outline-none focus:ring-2 pr-12 transition-all ${
                   errors.password ? 'border-red-500/50 focus:ring-red-500/50' : 'border-gray-600/50 focus:ring-teal-500/50 focus:border-teal-500/50'
                 }`}
@@ -417,12 +414,9 @@ export function Signup() {
                   <span className="text-gray-300">{passwordStrength.label}</span>
                 </div>
                 <div className="h-1 bg-gray-700 rounded-full overflow-hidden">
-                  <div 
+                  <div
                     className={`h-full transition-all duration-300 ${passwordStrength.color}`}
-                    style={{ 
-                      width: passwordStrength.label === 'Weak' ? '33%' : 
-                             passwordStrength.label === 'Medium' ? '66%' : '100%' 
-                    }}
+                    style={{ width: passwordStrength.width }}
                   />
                 </div>
               </div>
@@ -440,12 +434,28 @@ export function Signup() {
                 id="confirmPassword"
                 name="confirmPassword"
                 value={formData.confirmPassword}
+                autoComplete="new-password"
                 onChange={handleChange}
-                className={`w-full px-4 py-3 bg-gray-700/50 backdrop-blur-sm border rounded-xl text-gray-100 focus:outline-none focus:ring-2 pr-12 transition-all ${
-                  errors.confirmPassword ? 'border-red-500/50 focus:ring-red-500/50' : 'border-gray-600/50 focus:ring-teal-500/50 focus:border-teal-500/50'
+                className={`w-full px-4 py-3 bg-gray-700/50 backdrop-blur-sm border rounded-xl text-gray-100 focus:outline-none focus:ring-2 pr-16 transition-all ${
+                  passwordsMatch === false
+                    ? 'border-red-500/50 focus:ring-red-500/50'
+                    : passwordsMatch === true
+                    ? 'border-teal-500/50 focus:ring-teal-500/50 focus:border-teal-500/50'
+                    : errors.confirmPassword
+                    ? 'border-red-500/50 focus:ring-red-500/50'
+                    : 'border-gray-600/50 focus:ring-teal-500/50 focus:border-teal-500/50'
                 }`}
                 placeholder="••••••••"
               />
+              {passwordsMatch !== null && formData.confirmPassword && (
+                <div className="absolute inset-y-0 right-12 flex items-center pointer-events-none">
+                  {passwordsMatch ? (
+                    <CheckCircle className="h-5 w-5 text-teal-400" />
+                  ) : (
+                    <XCircle className="h-5 w-5 text-red-400" />
+                  )}
+                </div>
+              )}
               <button
                 type="button"
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
@@ -455,6 +465,12 @@ export function Signup() {
               </button>
             </div>
             {errors.confirmPassword && <p className="mt-1 text-xs text-red-400">{errors.confirmPassword}</p>}
+            {passwordsMatch === false && formData.confirmPassword && !errors.confirmPassword && (
+              <p className="mt-1 text-xs text-red-400">Passwords do not match</p>
+            )}
+            {passwordsMatch === true && formData.confirmPassword && (
+              <p className="mt-1 text-xs text-teal-400">Passwords match!</p>
+            )}
           </div>
 
           {/* Submit Error */}
