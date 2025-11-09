@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Mail, ArrowLeft, CheckCircle } from 'lucide-react';
+import { Mail, ArrowLeft, CheckCircle, XCircle } from 'lucide-react';
 import { TlsStatusIndicator } from '../components/TlsStatusIndicator';
 
 export function ForgotPassword() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [resetSent, setResetSent] = useState(false);
+  const [userExists, setUserExists] = useState<boolean | null>(null);
   const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -40,6 +41,7 @@ export function ForgotPassword() {
 
       if (response.ok) {
         setResetSent(true);
+        setUserExists(data.userExists);
       } else {
         setError(data.error || 'Failed to send reset link');
       }
@@ -69,28 +71,63 @@ export function ForgotPassword() {
         {/* Reset Form */}
         <div className="bg-gray-800/50 backdrop-blur-xl border border-gray-700/50 rounded-2xl p-8 space-y-5 shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-700">
           {resetSent ? (
-            <div className="p-6 bg-teal-900/20 border border-teal-500/30 rounded-xl">
-              <div className="flex items-center justify-center mb-3">
-                <CheckCircle className="h-12 w-12 text-teal-400" />
+            userExists ? (
+              <div className="p-6 bg-teal-900/20 border border-teal-500/30 rounded-xl">
+                <div className="flex items-center justify-center mb-3">
+                  <CheckCircle className="h-12 w-12 text-teal-400" />
+                </div>
+                <h3 className="text-lg font-semibold text-teal-300 text-center mb-2">Check Your Email!</h3>
+                <p className="text-sm text-teal-200/80 text-center mb-4">
+                  We've sent a password reset link to <strong>{email}</strong>
+                </p>
+                <p className="text-xs text-teal-300/60 text-center mb-4">
+                  Click the link in the email to reset your password. The link expires in 1 hour.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setResetSent(false);
+                    setEmail('');
+                    setUserExists(null);
+                  }}
+                  className="mt-2 w-full text-sm text-teal-400 hover:text-teal-300 transition-colors"
+                >
+                  Try a different email
+                </button>
               </div>
-              <h3 className="text-lg font-semibold text-teal-300 text-center mb-2">Check Your Email!</h3>
-              <p className="text-sm text-teal-200/80 text-center mb-4">
-                We've sent a password reset link to <strong>{email}</strong>
-              </p>
-              <p className="text-xs text-teal-300/60 text-center mb-4">
-                Click the link in the email to reset your password. The link expires in 1 hour.
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  setResetSent(false);
-                  setEmail('');
-                }}
-                className="mt-2 w-full text-sm text-teal-400 hover:text-teal-300 transition-colors"
-              >
-                Try a different email
-              </button>
-            </div>
+            ) : (
+              <div className="p-6 bg-red-900/20 border border-red-500/30 rounded-xl">
+                <div className="flex items-center justify-center mb-3">
+                  <XCircle className="h-12 w-12 text-red-400" />
+                </div>
+                <h3 className="text-lg font-semibold text-red-300 text-center mb-2">Email Not Found</h3>
+                <p className="text-sm text-red-200/80 text-center mb-4">
+                  The email <strong>{email}</strong> is not registered in our system.
+                </p>
+                <p className="text-xs text-red-300/60 text-center mb-4">
+                  Please check the email address or create a new account.
+                </p>
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setResetSent(false);
+                      setEmail('');
+                      setUserExists(null);
+                    }}
+                    className="mt-2 w-full text-sm text-red-400 hover:text-red-300 transition-colors"
+                  >
+                    Try a different email
+                  </button>
+                  <Link
+                    to="/signup"
+                    className="block w-full text-center text-sm text-red-400 hover:text-red-300 transition-colors"
+                  >
+                    Create a new account
+                  </Link>
+                </div>
+              </div>
+            )
           ) : (
             <form onSubmit={handleSubmit} className="space-y-5">
               {/* Email Field */}
