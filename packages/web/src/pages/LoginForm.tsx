@@ -276,9 +276,9 @@ export function LoginForm() {
       <div className="max-w-md w-full relative z-10">
         {/* Header */}
         <div className="text-center mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
-          <Link to="/" className="inline-flex items-center justify-center mb-6 hover:opacity-80 transition-all duration-200 hover:scale-105">
-            <img src="/favicon.svg" alt="GraphDone Logo" className="h-14 w-14" />
-            <span className="ml-3 text-4xl font-bold bg-gradient-to-r from-green-300 via-blue-300 to-purple-300 bg-clip-text text-transparent">GraphDone</span>
+          <Link to="/" className="inline-flex items-center justify-center mb-6 hover:opacity-90 transition-all duration-300 hover:scale-105 group">
+            <img src="/favicon.svg" alt="GraphDone Logo" className="h-16 w-16 drop-shadow-lg group-hover:drop-shadow-2xl transition-all duration-300" />
+            <span className="ml-4 text-5xl font-bold bg-gradient-to-r from-teal-400 via-cyan-400 to-blue-500 bg-clip-text text-transparent drop-shadow-2xl tracking-tight">GraphDone</span>
           </Link>
           <h1 className="text-3xl font-bold text-gray-100 mb-3">Welcome Back</h1>
           <p className="text-gray-400 text-lg">Enter your credentials to join the team</p>
@@ -291,10 +291,10 @@ export function LoginForm() {
             <button
               type="button"
               onClick={() => window.location.href = `${import.meta.env.VITE_API_URL || 'https://localhost:4128'}/auth/google`}
-              className="group relative flex items-center justify-center p-3 bg-gray-700/50 hover:bg-gray-700/80 backdrop-blur-sm border border-gray-600/50 hover:border-gray-500 rounded-lg transition-all duration-200"
+              className="group relative flex items-center justify-center p-3 bg-gray-700/50 hover:bg-gray-600/80 backdrop-blur-sm border border-gray-600/50 hover:border-teal-500 hover:shadow-lg hover:shadow-teal-500/30 rounded-lg transition-all duration-200"
               title="Continue with Google"
             >
-              <svg className="h-5 w-5" viewBox="0 0 24 24">
+              <svg className="h-5 w-5 transition-all duration-200 group-hover:scale-110" viewBox="0 0 24 24">
                 <path fill="#EA4335" d="M5.266 9.765A7.077 7.077 0 0 1 12 4.909c1.69 0 3.218.6 4.418 1.582L19.91 3C17.782 1.145 15.055 0 12 0 7.27 0 3.198 2.698 1.24 6.65l4.026 3.115Z"/>
                 <path fill="#34A853" d="M16.04 18.013c-1.09.703-2.474 1.078-4.04 1.078a7.077 7.077 0 0 1-6.723-4.823l-4.04 3.067A11.965 11.965 0 0 0 12 24c2.933 0 5.735-1.043 7.834-3l-3.793-2.987Z"/>
                 <path fill="#4A90E2" d="M19.834 21c2.195-2.048 3.62-5.096 3.62-9 0-.71-.109-1.473-.272-2.182H12v4.637h6.436c-.317 1.559-1.17 2.766-2.395 3.558L19.834 21Z"/>
@@ -305,10 +305,10 @@ export function LoginForm() {
             <button
               type="button"
               onClick={() => window.location.href = `${import.meta.env.VITE_API_URL || 'https://localhost:4128'}/auth/linkedin`}
-              className="group relative flex items-center justify-center p-3 bg-gray-700/50 hover:bg-gray-700/80 backdrop-blur-sm border border-gray-600/50 hover:border-gray-500 rounded-lg transition-all duration-200"
+              className="group relative flex items-center justify-center p-3 bg-gray-700/50 hover:bg-gray-600/80 backdrop-blur-sm border border-gray-600/50 hover:border-teal-500 hover:shadow-lg hover:shadow-teal-500/30 rounded-lg transition-all duration-200"
               title="Continue with LinkedIn"
             >
-              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="#60A5FA">
+              <svg className="h-5 w-5 transition-all duration-200 group-hover:scale-110" viewBox="0 0 24 24" fill="#60A5FA">
                 <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
               </svg>
             </button>
@@ -316,10 +316,10 @@ export function LoginForm() {
             <button
               type="button"
               onClick={() => window.location.href = `${import.meta.env.VITE_API_URL || 'https://localhost:4128'}/auth/github`}
-              className="group relative flex items-center justify-center p-3 bg-gray-700/50 hover:bg-gray-700/80 backdrop-blur-sm border border-gray-600/50 hover:border-gray-500 rounded-lg transition-all duration-200"
+              className="group relative flex items-center justify-center p-3 bg-gray-700/50 hover:bg-gray-600/80 backdrop-blur-sm border border-gray-600/50 hover:border-teal-500 hover:shadow-lg hover:shadow-teal-500/30 rounded-lg transition-all duration-200"
               title="Continue with GitHub"
             >
-              <Github className="h-5 w-5 text-gray-300" />
+              <Github className="h-5 w-5 text-gray-300 transition-all duration-200 group-hover:scale-110" />
             </button>
           </div>
 
@@ -343,7 +343,7 @@ export function LoginForm() {
               }}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 !useMagicLink
-                  ? 'bg-green-600 text-white'
+                  ? 'bg-teal-600 text-white'
                   : 'bg-gray-700/50 text-gray-400 hover:bg-gray-600/50 hover:text-gray-300'
               }`}
             >
@@ -359,7 +359,7 @@ export function LoginForm() {
               }}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 useMagicLink
-                  ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-lg shadow-green-500/30'
+                  ? 'bg-gradient-to-r from-teal-600 to-cyan-600 text-white shadow-lg shadow-teal-500/30'
                   : 'bg-gray-700/50 text-gray-400 hover:bg-gray-600/50 hover:text-gray-300'
               }`}
             >
@@ -371,15 +371,15 @@ export function LoginForm() {
           {/* Magic Link Form */}
           {useMagicLink ? (
             magicLinkSent ? (
-              <div className="p-6 bg-green-900/20 border border-green-500/30 rounded-xl">
+              <div className="p-6 bg-teal-900/20 border border-teal-500/30 rounded-xl">
                 <div className="flex items-center justify-center mb-3">
-                  <Mail className="h-8 w-8 text-green-400" />
+                  <Mail className="h-8 w-8 text-teal-400" />
                 </div>
-                <h3 className="text-lg font-semibold text-green-300 text-center mb-2">Check Your Email!</h3>
-                <p className="text-sm text-green-200/80 text-center mb-4">
+                <h3 className="text-lg font-semibold text-teal-300 text-center mb-2">Check Your Email!</h3>
+                <p className="text-sm text-teal-200/80 text-center mb-4">
                   We've sent a magic link to <strong>{formData.magicLinkEmail}</strong>
                 </p>
-                <p className="text-xs text-green-300/60 text-center">
+                <p className="text-xs text-teal-300/60 text-center">
                   Click the link in the email to sign in. The link expires in 15 minutes.
                 </p>
                 <button
@@ -388,7 +388,7 @@ export function LoginForm() {
                     setMagicLinkSent(false);
                     setFormData({ ...formData, magicLinkEmail: '' });
                   }}
-                  className="mt-4 w-full text-sm text-green-400 hover:text-green-300"
+                  className="mt-4 w-full text-sm text-teal-400 hover:text-teal-300"
                 >
                   Try a different email
                 </button>
@@ -411,7 +411,7 @@ export function LoginForm() {
                       onChange={handleChange}
                       autoFocus
                       className={`w-full pl-10 pr-4 py-3 bg-gray-700/50 backdrop-blur-sm border rounded-xl text-gray-100 focus:outline-none focus:ring-2 transition-all ${
-                        errors.magicLinkEmail ? 'border-red-500/50 focus:ring-red-500/50' : 'border-gray-600/50 focus:ring-blue-500/50 focus:border-blue-500/50'
+                        errors.magicLinkEmail ? 'border-red-500/50 focus:ring-red-500/50' : 'border-gray-600/50 focus:ring-teal-500/50 focus:border-teal-500/50'
                       }`}
                       placeholder="john@example.com"
                     />
@@ -423,7 +423,7 @@ export function LoginForm() {
                   type="button"
                   onClick={handleMagicLinkRequest}
                   disabled={magicLinkLoading}
-                  className="w-full bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:translate-y-0 flex items-center justify-center space-x-2"
+                  className="w-full bg-gradient-to-r from-teal-600 to-blue-600 hover:from-teal-500 hover:to-blue-500 border border-teal-400/50 hover:border-teal-300 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-teal-500/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:translate-y-0 flex items-center justify-center space-x-2"
                 >
                   {magicLinkLoading ? (
                     <>
@@ -464,7 +464,7 @@ export function LoginForm() {
                 onChange={handleChange}
                 autoFocus
                 className={`w-full pl-10 pr-4 py-3 bg-gray-700/50 backdrop-blur-sm border rounded-xl text-gray-100 focus:outline-none focus:ring-2 transition-all ${
-                  errors.emailOrUsername ? 'border-red-500/50 focus:ring-red-500/50' : 'border-gray-600/50 focus:ring-green-500/50 focus:border-green-500/50'
+                  errors.emailOrUsername ? 'border-red-500/50 focus:ring-red-500/50' : 'border-gray-600/50 focus:ring-teal-500/50 focus:border-teal-500/50'
                 }`}
                 placeholder="john@example.com or johndoe"
               />
@@ -488,7 +488,7 @@ export function LoginForm() {
                 value={formData.password}
                 onChange={handleChange}
                 className={`w-full pl-10 pr-12 py-3 bg-gray-700/50 backdrop-blur-sm border rounded-xl text-gray-100 focus:outline-none focus:ring-2 transition-all ${
-                  errors.password ? 'border-red-500/50 focus:ring-red-500/50' : 'border-gray-600/50 focus:ring-green-500/50 focus:border-green-500/50'
+                  errors.password ? 'border-red-500/50 focus:ring-red-500/50' : 'border-gray-600/50 focus:ring-teal-500/50 focus:border-teal-500/50'
                 }`}
                 placeholder="••••••••"
               />
@@ -513,9 +513,9 @@ export function LoginForm() {
                   onChange={(e) => setRememberMe(e.target.checked)}
                   className="sr-only peer"
                 />
-                <div className="w-5 h-5 rounded border-2 border-gray-600 bg-gray-700/50 peer-checked:border-green-500 peer-focus:ring-2 peer-focus:ring-green-500/50 transition-all duration-200 group-hover:border-gray-500 flex items-center justify-center">
+                <div className="w-5 h-5 rounded border-2 border-gray-600 bg-gray-700/50 peer-checked:border-teal-500 peer-focus:ring-2 peer-focus:ring-teal-500/50 transition-all duration-200 group-hover:border-gray-500 flex items-center justify-center">
                   {rememberMe && (
-                    <Check className="h-4 w-4 text-green-500" strokeWidth={3} />
+                    <Check className="h-4 w-4 text-teal-500" strokeWidth={3} />
                   )}
                 </div>
               </div>
@@ -523,7 +523,7 @@ export function LoginForm() {
                 Remember me
               </span>
             </label>
-            <Link to="/forgot-password" className="text-sm text-green-400 hover:text-green-300 transition-colors">
+            <Link to="/forgot-password" className="text-sm text-teal-400 hover:text-teal-300 transition-colors">
               Forgot password?
             </Link>
           </div>
@@ -539,7 +539,7 @@ export function LoginForm() {
           <button
             type="submit"
             disabled={loading || guestLoading}
-            className="w-full bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-green-500/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:translate-y-0 flex items-center justify-center space-x-2"
+            className="w-full bg-gradient-to-r from-teal-600 to-blue-600 hover:from-teal-500 hover:to-blue-500 border border-teal-400/50 hover:border-teal-300 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-teal-500/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:translate-y-0 flex items-center justify-center space-x-2"
           >
             {loading ? (
               <>
@@ -571,7 +571,7 @@ export function LoginForm() {
             type="button"
             onClick={handleGuestLogin}
             disabled={!isGuestEnabled || loading || guestLoading || magicLinkLoading}
-            className="w-full bg-gray-700/80 hover:bg-gray-600/80 backdrop-blur-sm text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-gray-500/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:translate-y-0 flex items-center justify-center space-x-2"
+            className="w-full bg-[#da70d6]/20 hover:bg-[#da70d6]/30 backdrop-blur-sm border border-[#da70d6]/30 hover:border-[#da70d6]/50 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-[#da70d6]/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:translate-y-0 flex items-center justify-center space-x-2"
             title={!isGuestEnabled ? "Guest access has been disabled by the administrator" : undefined}
           >
             {guestLoading ? (
@@ -647,7 +647,7 @@ export function LoginForm() {
         <div className="mt-6 text-center">
           <p className="text-gray-300">
             Don't have an account?{' '}
-            <Link to="/signup" className="text-green-400 hover:text-green-300 font-medium">
+            <Link to="/signup" className="text-teal-400 hover:text-teal-300 font-medium">
               Create one now
             </Link>
           </p>
