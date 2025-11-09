@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, gql } from '@apollo/client';
-import { Eye, EyeOff, ArrowRight, Mail, Lock, Users, Github, Zap, Check, CheckCircle, XCircle } from 'lucide-react';
+import { Eye, EyeOff, ArrowRight, Mail, Lock, Users, Github, Zap, Check, CheckCircle, XCircle, AlertTriangle, Shield } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { TlsStatusIndicator } from '../components/TlsStatusIndicator';
+import { GuestModeDialog } from '../components/GuestModeDialog';
+import { PasswordRequirements } from '../components/PasswordRequirements';
 import { isValidEmail } from '../utils/validation';
 
 const LOGIN_MUTATION = gql`
@@ -95,21 +97,59 @@ export function Signin() {
   const [rememberMe, setRememberMe] = useState(false);
   const [emailValid, setEmailValid] = useState<boolean | null>(null);
   const [magicLinkEmailValid, setMagicLinkEmailValid] = useState<boolean | null>(null);
+  const [loginAttempts, setLoginAttempts] = useState(0);
+  const [lockoutTime, setLockoutTime] = useState<Date | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [showGuestInfo, setShowGuestInfo] = useState(false);
 
   useEffect(() => {
     const token = searchParams.get('token');
     const error = searchParams.get('error');
 
     if (error) {
-      const errorMessages: Record<string, string> = {
-        google: 'Google authentication failed. Please try again.',
-        linkedin: 'LinkedIn authentication failed. Please try again.',
-        github: 'GitHub authentication failed. Please try again.',
-        invalid_magic_link: 'Invalid magic link. Please request a new one.',
-        expired_magic_link: 'Magic link has expired. Please request a new one.',
-        magic_link_failed: 'Magic link authentication failed. Please try again.',
+      const errorMessages: Record<string, { title: string; message: string; action: string }> = {
+        google: {
+          title: 'Google Sign-In Failed',
+          message: 'Unable to authenticate with Google. This may be due to popup blockers, permissions, or account restrictions.',
+          action: 'Check your popup blocker settings and try again. Ensure third-party cookies are enabled.'
+        },
+        linkedin: {
+          title: 'LinkedIn Sign-In Failed',
+          message: 'Unable to authenticate with LinkedIn. Connection may have been cancelled or blocked.',
+          action: 'Try again and ensure you approve the LinkedIn authorization prompt.'
+        },
+        github: {
+          title: 'GitHub Sign-In Failed',
+          message: 'Unable to authenticate with GitHub. This may be due to permissions or network issues.',
+          action: 'Check your GitHub account settings and try again.'
+        },
+        invalid_magic_link: {
+          title: 'Invalid Magic Link',
+          message: 'This magic link is not valid or has already been used.',
+          action: 'Request a new magic link below.'
+        },
+        expired_magic_link: {
+          title: 'Expired Magic Link',
+          message: 'This magic link has expired. Links are valid for 15 minutes.',
+          action: 'Request a new magic link below.'
+        },
+        magic_link_failed: {
+          title: 'Magic Link Failed',
+          message: 'Magic link authentication failed. The link may be invalid or expired.',
+          action: 'Request a new magic link below.'
+        },
       };
-      setErrors({ submit: errorMessages[error] || 'Authentication failed. Please try again.' });
+      const errorDetail = errorMessages[error];
+      if (errorDetail) {
+        setErrors({ 
+          submit: errorDetail.message,
+          submitTitle: errorDetail.title,
+          submitAction: errorDetail.action
+        });
+      } else {
+        setErrors({ submit: 'Authentication failed. Please try again.' });
+      }
     } else if (token) {
       localStorage.setItem('authToken', token);
       window.history.replaceState({}, '', '/login');
@@ -121,7 +161,35 @@ export function Signin() {
       setFormData(prev => ({ ...prev, emailOrUsername: savedUsername }));
       setRememberMe(true);
     }
+
+    const storedAttempts = localStorage.getItem('loginAttempts');
+    const storedLockout = localStorage.getItem('lockoutTime');
+    if (storedAttempts) setLoginAttempts(parseInt(storedAttempts));
+    if (storedLockout) setLockoutTime(new Date(storedLockout));
   }, [searchParams]);
+
+  useEffect(() => {
+    if (resendCooldown > 0) {
+      const timer = setTimeout(() => setResendCooldown(prev => prev - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, [resendCooldown]);
+
+  useEffect(() => {
+    if (lockoutTime && new Date() < lockoutTime) {
+      const timer = setInterval(() => {
+        if (new Date() >= lockoutTime) {
+          setLockoutTime(null);
+          setLoginAttempts(0);
+          localStorage.removeItem('lockoutTime');
+          localStorage.removeItem('loginAttempts');
+        }
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+    return undefined;
+  }, [lockoutTime]);
 
   // Check if guest access is enabled
   const { data: systemSettings } = useQuery(GET_SYSTEM_SETTINGS);
@@ -140,11 +208,25 @@ export function Signin() {
         });
         return;
       }
+      setLoginAttempts(0);
+      localStorage.removeItem('loginAttempts');
+      localStorage.removeItem('lockoutTime');
       setAuthUser(data.login.user, data.login.token);
       navigate('/');
     },
     onError: (error) => {
-      setErrors({ submit: error.message });
+      const newAttempts = loginAttempts + 1;
+      setLoginAttempts(newAttempts);
+      localStorage.setItem('loginAttempts', newAttempts.toString());
+      
+      if (newAttempts >= 5) {
+        const lockout = new Date(Date.now() + 15 * 60 * 1000);
+        setLockoutTime(lockout);
+        localStorage.setItem('lockoutTime', lockout.toISOString());
+        setErrors({ submit: 'Too many failed attempts. Account locked for 15 minutes.' });
+      } else {
+        setErrors({ submit: error.message });
+      }
     }
   });
 
@@ -278,6 +360,7 @@ export function Signin() {
 
       if (response.ok) {
         setMagicLinkSent(true);
+        setResendCooldown(60);
       } else {
         setErrors({ submit: data.error || 'Failed to send magic link' });
       }
@@ -286,6 +369,12 @@ export function Signin() {
     } finally {
       setMagicLinkLoading(false);
     }
+  };
+
+  const handleResendMagicLink = async () => {
+    setMagicLinkSent(false);
+    setResendCooldown(0);
+    await handleMagicLinkRequest({ preventDefault: () => {} } as React.FormEvent);
   };
 
 
@@ -400,7 +489,7 @@ export function Signin() {
           {/* Magic Link Form */}
           {useMagicLink ? (
             magicLinkSent ? (
-              <div className="p-6 bg-teal-900/20 border border-teal-500/30 rounded-xl">
+              <div className="p-6 bg-teal-900/20 border border-teal-500/30 rounded-xl space-y-4">
                 <div className="flex items-center justify-center mb-3">
                   <Mail className="h-8 w-8 text-teal-400" />
                 </div>
@@ -408,19 +497,39 @@ export function Signin() {
                 <p className="text-sm text-teal-200/80 text-center mb-4">
                   We've sent a magic link to <strong>{formData.magicLinkEmail}</strong>
                 </p>
-                <p className="text-xs text-teal-300/60 text-center">
-                  Click the link in the email to sign in. The link expires in 15 minutes.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMagicLinkSent(false);
-                    setFormData({ ...formData, magicLinkEmail: '' });
-                  }}
-                  className="mt-4 w-full text-sm text-teal-400 hover:text-teal-300"
-                >
-                  Try a different email
-                </button>
+                <div className="space-y-2">
+                  <p className="text-xs text-teal-300/60 text-center">
+                    📧 Email typically arrives within 1-2 minutes
+                  </p>
+                  <p className="text-xs text-teal-300/60 text-center">
+                    🔒 The link expires in 15 minutes
+                  </p>
+                  <p className="text-xs text-teal-300/60 text-center">
+                    📂 Don't see it? Check your spam folder after 3 minutes
+                  </p>
+                </div>
+                
+                <div className="pt-4 border-t border-teal-500/20 space-y-2">
+                  <button
+                    type="button"
+                    onClick={handleResendMagicLink}
+                    disabled={resendCooldown > 0}
+                    className="w-full px-4 py-2 bg-teal-700/30 hover:bg-teal-600/40 border border-teal-500/30 text-teal-300 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  >
+                    {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend Magic Link'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMagicLinkSent(false);
+                      setFormData({ ...formData, magicLinkEmail: '' });
+                      setResendCooldown(0);
+                    }}
+                    className="w-full text-sm text-teal-400 hover:text-teal-300"
+                  >
+                    Try a different email
+                  </button>
+                </div>
               </div>
             ) : (
               <>
@@ -509,6 +618,9 @@ export function Signin() {
                 onChange={handleChange}
                 autoComplete="username"
                 autoFocus
+                aria-label="Email address or username"
+                aria-describedby={errors.emailOrUsername ? "emailOrUsername-error" : undefined}
+                aria-invalid={!!errors.emailOrUsername}
                 className={`w-full pl-10 py-3 bg-gray-700/50 backdrop-blur-sm border rounded-xl text-gray-100 focus:outline-none focus:ring-2 transition-all ${
                   emailValid === false
                     ? 'pr-10 border-red-500/50 focus:ring-red-500/50'
@@ -523,14 +635,14 @@ export function Signin() {
               {emailValid !== null && (
                 <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
                   {emailValid ? (
-                    <CheckCircle className="h-5 w-5 text-teal-400" />
+                    <CheckCircle className="h-5 w-5 text-teal-400" aria-label="Valid email format" />
                   ) : (
-                    <XCircle className="h-5 w-5 text-red-400" />
+                    <XCircle className="h-5 w-5 text-red-400" aria-label="Invalid email format" />
                   )}
                 </div>
               )}
             </div>
-            {errors.emailOrUsername && <p className="mt-1 text-xs text-red-400">{errors.emailOrUsername}</p>}
+            {errors.emailOrUsername && <p id="emailOrUsername-error" className="mt-1 text-xs text-red-400" role="alert">{errors.emailOrUsername}</p>}
           </div>
 
           {/* Password Field */}
@@ -549,6 +661,9 @@ export function Signin() {
                 value={formData.password}
                 onChange={handleChange}
                 autoComplete="current-password"
+                aria-label="Password"
+                aria-describedby={errors.password ? "password-error" : undefined}
+                aria-invalid={!!errors.password}
                 className={`w-full pl-10 pr-12 py-3 bg-gray-700/50 backdrop-blur-sm border rounded-xl text-gray-100 focus:outline-none focus:ring-2 transition-all ${
                   errors.password ? 'border-red-500/50 focus:ring-red-500/50' : 'border-gray-600/50 focus:ring-teal-500/50 focus:border-teal-500/50'
                 }`}
@@ -558,11 +673,12 @@ export function Signin() {
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-2 top-2.5 text-gray-400 hover:text-gray-300"
+                aria-label={showPassword ? "Hide password" : "Show password"}
               >
                 {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
               </button>
             </div>
-            {errors.password && <p className="mt-1 text-xs text-red-400">{errors.password}</p>}
+            {errors.password && <p id="password-error" className="mt-1 text-xs text-red-400" role="alert">{errors.password}</p>}
           </div>
 
           {/* Remember Me & Forgot Password */}
@@ -590,10 +706,50 @@ export function Signin() {
             </Link>
           </div>
 
+          {/* Rate Limiting Warning */}
+          {loginAttempts >= 3 && loginAttempts < 5 && !lockoutTime && (
+            <div className="p-3 bg-orange-900/20 border border-orange-500/30 rounded-lg">
+              <div className="flex items-start space-x-2">
+                <AlertTriangle className="h-5 w-5 text-orange-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm text-orange-300 font-medium">
+                    ⚠️ Multiple failed attempts detected
+                  </p>
+                  <p className="text-xs text-orange-200/80 mt-1">
+                    Account will be temporarily locked after {5 - loginAttempts} more failed {5 - loginAttempts === 1 ? 'attempt' : 'attempts'}.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Account Lockout Notice */}
+          {lockoutTime && new Date() < lockoutTime && (
+            <div className="p-3 bg-red-900/20 border border-red-500/30 rounded-lg">
+              <div className="flex items-start space-x-2">
+                <Shield className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm text-red-300 font-medium">
+                    🔒 Account Temporarily Locked
+                  </p>
+                  <p className="text-xs text-red-200/80 mt-1">
+                    Too many failed login attempts. Please wait {Math.ceil((lockoutTime.getTime() - Date.now()) / 60000)} minutes before trying again.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Submit Error */}
-          {errors.submit && (
+          {errors.submit && !lockoutTime && (
             <div className="p-3 bg-red-900 border border-red-700 rounded-lg">
+              {errors.submitTitle && (
+                <p className="text-sm text-red-300 font-semibold mb-1">{errors.submitTitle}</p>
+              )}
               <p className="text-sm text-red-300">{errors.submit}</p>
+              {errors.submitAction && (
+                <p className="text-xs text-red-200/70 mt-2">💡 {errors.submitAction}</p>
+              )}
             </div>
           )}
 
@@ -631,8 +787,8 @@ export function Signin() {
 
           <button
             type="button"
-            onClick={handleGuestLogin}
-            disabled={!isGuestEnabled || loading || guestLoading || magicLinkLoading}
+            onClick={() => setShowGuestInfo(true)}
+            disabled={!isGuestEnabled || loading || guestLoading || magicLinkLoading || (lockoutTime !== null && new Date() < lockoutTime)}
             className="w-full bg-[#da70d6]/20 hover:bg-[#da70d6]/30 backdrop-blur-sm border border-[#da70d6]/30 hover:border-[#da70d6]/50 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-[#da70d6]/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:translate-y-0 flex items-center justify-center space-x-2"
             title={!isGuestEnabled ? "Guest access has been disabled by the administrator" : undefined}
           >
@@ -648,6 +804,13 @@ export function Signin() {
               </>
             )}
           </button>
+
+          {/* Guest Mode Dialog */}
+          <GuestModeDialog 
+            isOpen={showGuestInfo}
+            onClose={() => setShowGuestInfo(false)}
+            onConfirm={handleGuestLogin}
+          />
 
           {/* Guest Mode Info */}
           {isGuestEnabled ? (
