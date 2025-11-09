@@ -76,7 +76,7 @@ const GET_SYSTEM_SETTINGS = gql`
   }
 `;
 
-export function LoginForm() {
+export function Signin() {
   const navigate = useNavigate();
   const { login: setAuthUser } = useAuth();
   const [searchParams] = useSearchParams();
