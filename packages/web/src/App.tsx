@@ -7,7 +7,7 @@ import { Analytics } from './pages/Analytics';
 import { Settings } from './pages/Settings';
 import { Admin } from './pages/Admin';
 import { Backend } from './pages/Backend';
-import { LoginForm } from './pages/LoginForm';
+import { Signin } from './pages/Signin';
 import { Signup } from './pages/Signup';
 import { ForgotPassword } from './pages/ForgotPassword';
 import { ResetPassword } from './pages/ResetPassword';
@@ -83,8 +83,8 @@ function AuthenticatedApp() {
   if (!isAuthenticated) {
     return (
       <Routes>
-        <Route path="/" element={<LoginForm />} />
-        <Route path="/login" element={<LoginForm />} />
+        <Route path="/" element={<Signin />} />
+        <Route path="/login" element={<Signin />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
