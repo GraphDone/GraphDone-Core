@@ -359,8 +359,17 @@ export function Signin() {
       const data = await response.json();
 
       if (response.ok) {
-        setMagicLinkSent(true);
-        setResendCooldown(60);
+        if (data.userExists === false) {
+          setErrors({ magicLinkEmail: 'This email is not registered in our system.' });
+        } else {
+          setMagicLinkSent(true);
+          setResendCooldown(60);
+        }
+      } else if (response.status === 429 && data.rateLimitExceeded) {
+        setErrors({
+          rateLimitError: data.message || 'Too many requests. Please try again later.',
+          rateLimitRetryAfter: data.retryAfter
+        });
       } else {
         setErrors({ submit: data.error || 'Failed to send magic link' });
       }
@@ -570,13 +579,50 @@ export function Signin() {
                       </div>
                     )}
                   </div>
-                  {errors.magicLinkEmail && <p className="mt-1 text-xs text-red-400">{errors.magicLinkEmail}</p>}
+                  {errors.magicLinkEmail && (
+                    <div className="mt-3 p-4 bg-amber-900/20 border border-amber-500/30 rounded-xl">
+                      <p className="text-sm text-amber-300 font-medium mb-2">
+                        ⚠️ Account Not Found
+                      </p>
+                      <p className="text-xs text-amber-200/80 mb-3">
+                        We couldn't find an account with <strong>{formData.magicLinkEmail}</strong>
+                      </p>
+                      <Link
+                        to="/signup"
+                        className="inline-flex items-center text-sm text-teal-400 hover:text-teal-300 font-medium transition-colors"
+                      >
+                        Create a new account →
+                      </Link>
+                    </div>
+                  )}
+
+                  {/* Rate Limit Error */}
+                  {errors.rateLimitError && (
+                    <div className="mt-3 p-4 bg-red-900/20 border border-red-500/30 rounded-xl">
+                      <div className="flex items-start space-x-2">
+                        <Shield className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                          <p className="text-sm text-red-300 font-medium mb-2">
+                            🛡️ Rate Limit Exceeded
+                          </p>
+                          <p className="text-xs text-red-200/80 mb-2">
+                            {errors.rateLimitError}
+                          </p>
+                          {errors.rateLimitRetryAfter && (
+                            <p className="text-xs text-red-300/60">
+                              Please try again in {Math.ceil(parseInt(errors.rateLimitRetryAfter) / 60)} minute{Math.ceil(parseInt(errors.rateLimitRetryAfter) / 60) !== 1 ? 's' : ''}.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <button
                   type="button"
                   onClick={handleMagicLinkRequest}
-                  disabled={magicLinkLoading}
+                  disabled={magicLinkLoading || !!errors.rateLimitError}
                   className="w-full bg-gradient-to-r from-teal-600 to-blue-600 hover:from-teal-500 hover:to-blue-500 border border-teal-400/50 hover:border-teal-300 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-teal-500/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:translate-y-0 flex items-center justify-center space-x-2"
                 >
                   {magicLinkLoading ? (
