@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, gql } from '@apollo/client';
-import { Eye, EyeOff, ArrowRight, CheckCircle, XCircle, Github, Mail } from 'lucide-react';
+import { Eye, EyeOff, ArrowRight, CheckCircle, XCircle, Github, Mail, Info } from 'lucide-react';
 import { TlsStatusIndicator } from '../components/TlsStatusIndicator';
+import { PasswordRequirements } from '../components/PasswordRequirements';
 import { isValidEmail, getPasswordStrength } from '../utils/validation';
 
 const SIGNUP_MUTATION = gql`
@@ -60,6 +61,7 @@ export function Signup() {
   const [signupComplete, setSignupComplete] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
   const [resendMessage, setResendMessage] = useState('');
+  const [resendCooldown, setResendCooldown] = useState(0);
 
   const [signup, { loading }] = useMutation(SIGNUP_MUTATION, {
     onCompleted: (data) => {
@@ -227,7 +229,16 @@ export function Signup() {
         email: formData.email
       }
     });
+    setResendCooldown(60);
   };
+
+  useEffect(() => {
+    if (resendCooldown > 0) {
+      const timer = setTimeout(() => setResendCooldown(prev => prev - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, [resendCooldown]);
 
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
@@ -275,13 +286,18 @@ export function Signup() {
               <button
                 type="button"
                 onClick={handleResendVerificationEmail}
-                disabled={resendLoading}
+                disabled={resendLoading || resendCooldown > 0}
                 className="w-full bg-gray-700/50 hover:bg-gray-600/80 backdrop-blur-sm border border-gray-600/50 hover:border-teal-500 text-teal-400 font-semibold py-3 px-6 rounded-xl transition-all duration-200 hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center space-x-2"
               >
                 {resendLoading ? (
                   <>
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-teal-400"></div>
                     <span>Sending...</span>
+                  </>
+                ) : resendCooldown > 0 ? (
+                  <>
+                    <Mail className="h-5 w-5" />
+                    <span>Resend in {resendCooldown}s</span>
                   </>
                 ) : (
                   <>
@@ -383,12 +399,15 @@ export function Signup() {
               onChange={handleChange}
               autoComplete="name"
               autoFocus
+              aria-label="Full name"
+              aria-describedby={errors.name ? "name-error" : undefined}
+              aria-invalid={!!errors.name}
               className={`w-full px-4 py-3 bg-gray-700/50 backdrop-blur-sm border rounded-xl text-gray-100 focus:outline-none focus:ring-2 transition-all ${
                 errors.name ? 'border-red-500/50 focus:ring-red-500/50' : 'border-gray-600/50 focus:ring-teal-500/50 focus:border-teal-500/50'
               }`}
               placeholder="John Doe"
             />
-            {errors.name && <p className="mt-1 text-xs text-red-400">{errors.name}</p>}
+            {errors.name && <p id="name-error" className="mt-1 text-xs text-red-400" role="alert">{errors.name}</p>}
           </div>
 
           {/* Email Field */}
@@ -463,7 +482,13 @@ export function Signup() {
                 <CheckCircle className="absolute right-2 top-2.5 w-5 h-5 text-teal-500" />
               )}
             </div>
-            {errors.username && <p className="mt-1 text-xs text-red-400">{errors.username}</p>}
+            {errors.username && <p className="mt-1 text-xs text-red-400" role="alert">{errors.username}</p>}
+            {!errors.username && (
+              <p className="mt-1 text-xs text-gray-400 flex items-center">
+                <Info className="h-3 w-3 mr-1 flex-shrink-0" />
+                3-20 characters, letters, numbers, _ and - only
+              </p>
+            )}
           </div>
 
           {/* Password Field */}
@@ -492,7 +517,7 @@ export function Signup() {
                 {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
               </button>
             </div>
-            {errors.password && <p className="mt-1 text-xs text-red-400">{errors.password}</p>}
+            {errors.password && <p className="mt-1 text-xs text-red-400" role="alert">{errors.password}</p>}
             
             {/* Password Strength Indicator */}
             {formData.password && (
@@ -509,6 +534,8 @@ export function Signup() {
                 </div>
               </div>
             )}
+
+            <PasswordRequirements password={formData.password} showAll={!formData.password} />
           </div>
 
           {/* Confirm Password Field */}
