@@ -4,6 +4,7 @@ import { useMutation, useQuery, gql } from '@apollo/client';
 import { Eye, EyeOff, ArrowRight, Mail, Lock, Users, Github, Sparkles, Zap, Check, CheckCircle, XCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { TlsStatusIndicator } from '../components/TlsStatusIndicator';
+import { isValidEmail } from '../utils/validation';
 
 const LOGIN_MUTATION = gql`
   mutation Login($input: LoginInput!) {
@@ -94,6 +95,7 @@ export function LoginForm() {
   const [rememberMe, setRememberMe] = useState(false);
   const [emailValid, setEmailValid] = useState<boolean | null>(null);
   const [magicLinkEmailValid, setMagicLinkEmailValid] = useState<boolean | null>(null);
+  const [oauthLoading, setOauthLoading] = useState<string | null>(null);
 
   useEffect(() => {
     const token = searchParams.get('token');
@@ -193,9 +195,28 @@ export function LoginForm() {
     await guestLogin();
   };
 
-  const isValidEmail = (email: string): boolean => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
+  const handleOAuthLogin = async (provider: 'google' | 'linkedin' | 'github') => {
+    setOauthLoading(provider);
+    setErrors({});
+
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || 'https://localhost:4128';
+      const healthResponse = await fetch(`${apiUrl}/health`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(5000)
+      });
+
+      if (!healthResponse.ok) {
+        throw new Error('Backend unavailable');
+      }
+
+      window.location.href = `${apiUrl}/auth/${provider}`;
+    } catch (error) {
+      setOauthLoading(null);
+      setErrors({
+        submit: `Unable to connect to ${provider.charAt(0).toUpperCase() + provider.slice(1)}. Please try again or use email/password.`
+      });
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -254,8 +275,7 @@ export function LoginForm() {
       return;
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(formData.magicLinkEmail)) {
+    if (!isValidEmail(formData.magicLinkEmail)) {
       setErrors({ magicLinkEmail: 'Please enter a valid email address' });
       return;
     }
@@ -265,9 +285,6 @@ export function LoginForm() {
 
     try {
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:4127';
-      console.log('🔗 Sending magic link request to:', `${apiUrl}/auth/magic-link/request`);
-      console.log('📧 Email:', formData.magicLinkEmail);
-
       const response = await fetch(`${apiUrl}/auth/magic-link/request`, {
         method: 'POST',
         headers: {
@@ -276,9 +293,7 @@ export function LoginForm() {
         body: JSON.stringify({ email: formData.magicLinkEmail }),
       });
 
-      console.log('📨 Response status:', response.status);
       const data = await response.json();
-      console.log('📨 Response data:', data);
 
       if (response.ok) {
         setMagicLinkSent(true);
@@ -286,7 +301,6 @@ export function LoginForm() {
         setErrors({ submit: data.error || 'Failed to send magic link' });
       }
     } catch (error) {
-      console.error('❌ Magic link request error:', error);
       setErrors({ submit: 'Failed to send magic link. Please try again.' });
     } finally {
       setMagicLinkLoading(false);
@@ -443,6 +457,7 @@ export function LoginForm() {
                       name="magicLinkEmail"
                       value={formData.magicLinkEmail}
                       onChange={handleChange}
+                      autoComplete="email"
                       autoFocus
                       className={`w-full pl-10 py-3 bg-gray-700/50 backdrop-blur-sm border rounded-xl text-gray-100 focus:outline-none focus:ring-2 transition-all ${
                         magicLinkEmailValid === false
@@ -511,6 +526,7 @@ export function LoginForm() {
                 name="emailOrUsername"
                 value={formData.emailOrUsername}
                 onChange={handleChange}
+                autoComplete="username"
                 autoFocus
                 className={`w-full pl-10 py-3 bg-gray-700/50 backdrop-blur-sm border rounded-xl text-gray-100 focus:outline-none focus:ring-2 transition-all ${
                   emailValid === false
@@ -551,6 +567,7 @@ export function LoginForm() {
                 name="password"
                 value={formData.password}
                 onChange={handleChange}
+                autoComplete="current-password"
                 className={`w-full pl-10 pr-12 py-3 bg-gray-700/50 backdrop-blur-sm border rounded-xl text-gray-100 focus:outline-none focus:ring-2 transition-all ${
                   errors.password ? 'border-red-500/50 focus:ring-red-500/50' : 'border-gray-600/50 focus:ring-teal-500/50 focus:border-teal-500/50'
                 }`}
