@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Mail, ArrowLeft, CheckCircle, XCircle } from 'lucide-react';
+import { Mail, ArrowLeft, CheckCircle, XCircle, Shield } from 'lucide-react';
 import { TlsStatusIndicator } from '../components/TlsStatusIndicator';
 import { isValidEmail } from '../utils/validation';
 
@@ -10,6 +10,8 @@ export function ForgotPassword() {
   const [resetSent, setResetSent] = useState(false);
   const [error, setError] = useState('');
   const [emailValid, setEmailValid] = useState<boolean | null>(null);
+  const [rateLimitError, setRateLimitError] = useState('');
+  const [rateLimitRetryAfter, setRateLimitRetryAfter] = useState<number | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,6 +28,8 @@ export function ForgotPassword() {
 
     setLoading(true);
     setError('');
+    setRateLimitError('');
+    setRateLimitRetryAfter(null);
 
     try {
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:4127';
@@ -40,7 +44,14 @@ export function ForgotPassword() {
       const data = await response.json();
 
       if (response.ok) {
-        setResetSent(true);
+        if (data.userExists === false) {
+          setError('This email is not registered in our system.');
+        } else {
+          setResetSent(true);
+        }
+      } else if (response.status === 429 && data.rateLimitExceeded) {
+        setRateLimitError(data.message || 'Too many requests. Please try again later.');
+        setRateLimitRetryAfter(data.retryAfter || null);
       } else {
         setError(data.error || 'Failed to send reset link');
       }
@@ -140,13 +151,48 @@ export function ForgotPassword() {
                     </div>
                   )}
                 </div>
-                {error && <p className="mt-1 text-xs text-red-400">{error}</p>}
+                {error && (
+                  <div className="mt-3 p-4 bg-amber-900/20 border border-amber-500/30 rounded-xl">
+                    <p className="text-sm text-amber-300 font-medium mb-2">
+                      ⚠️ Account Not Found
+                    </p>
+                    <p className="text-xs text-amber-200/80 mb-3">
+                      We couldn't find an account with <strong>{email}</strong>
+                    </p>
+                    <Link
+                      to="/signup"
+                      className="inline-flex items-center text-sm text-teal-400 hover:text-teal-300 font-medium transition-colors"
+                    >
+                      Create a new account →
+                    </Link>
+                  </div>
+                )}
+                {rateLimitError && (
+                  <div className="mt-3 p-4 bg-red-900/20 border border-red-500/30 rounded-xl">
+                    <div className="flex items-start space-x-2">
+                      <Shield className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
+                      <div className="flex-1">
+                        <p className="text-sm text-red-300 font-medium mb-2">
+                          🛡️ Rate Limit Exceeded
+                        </p>
+                        <p className="text-xs text-red-200/80 mb-2">
+                          {rateLimitError}
+                        </p>
+                        {rateLimitRetryAfter && (
+                          <p className="text-xs text-red-300/60">
+                            Please try again in {Math.ceil(rateLimitRetryAfter / 60)} minute{Math.ceil(rateLimitRetryAfter / 60) !== 1 ? 's' : ''}.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Submit Button */}
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || !!rateLimitError}
                 className="w-full bg-gradient-to-r from-teal-600 to-blue-600 hover:from-teal-500 hover:to-blue-500 border border-teal-400/50 hover:border-teal-300 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-teal-500/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:translate-y-0 flex items-center justify-center space-x-2"
               >
                 {loading ? (
