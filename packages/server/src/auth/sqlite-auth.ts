@@ -227,6 +227,54 @@ class SQLiteAuthStore {
             UNIQUE (provider, providerId),
             FOREIGN KEY (userId) REFERENCES users (id) ON DELETE CASCADE
           )
+        `);
+
+        // Magic links table for passwordless authentication
+        db.run(`
+          CREATE TABLE IF NOT EXISTS magic_links (
+            id TEXT PRIMARY KEY,
+            email TEXT NOT NULL,
+            token TEXT UNIQUE NOT NULL,
+            expiresAt TEXT NOT NULL,
+            usedAt TEXT NULL,
+            userId TEXT NULL,
+            createdAt TEXT NOT NULL,
+            FOREIGN KEY (userId) REFERENCES users (id) ON DELETE CASCADE
+          )
+        `);
+
+        // Shareable links table for graph sharing
+        db.run(`
+          CREATE TABLE IF NOT EXISTS shareable_links (
+            id TEXT PRIMARY KEY,
+            graphId TEXT NOT NULL,
+            token TEXT UNIQUE NOT NULL,
+            createdBy TEXT NOT NULL,
+            accessLevel TEXT NOT NULL DEFAULT 'VIEW',
+            expiresAt TEXT NULL,
+            maxUses INTEGER NULL,
+            useCount INTEGER DEFAULT 0,
+            isActive BOOLEAN DEFAULT 1,
+            requiresSignIn BOOLEAN DEFAULT 0,
+            createdAt TEXT NOT NULL,
+            updatedAt TEXT NOT NULL,
+            FOREIGN KEY (createdBy) REFERENCES users (id) ON DELETE CASCADE
+          )
+        `);
+
+        // Shareable link access log
+        db.run(`
+          CREATE TABLE IF NOT EXISTS shareable_link_access (
+            id TEXT PRIMARY KEY,
+            linkId TEXT NOT NULL,
+            userId TEXT NULL,
+            guestId TEXT NULL,
+            ipAddress TEXT,
+            userAgent TEXT,
+            accessedAt TEXT NOT NULL,
+            FOREIGN KEY (linkId) REFERENCES shareable_links (id) ON DELETE CASCADE,
+            FOREIGN KEY (userId) REFERENCES users (id) ON DELETE SET NULL
+          )
         `, async (err) => {
           if (err) {
             reject(err);
@@ -234,9 +282,7 @@ class SQLiteAuthStore {
           }
 
           try {
-            // Create default admin and viewer users
             await this.createDefaultUsers();
-            // Create default folder structure
             await this.createDefaultFolders();
             this.initialized = true;
             resolve();
@@ -1243,7 +1289,218 @@ class SQLiteAuthStore {
       });
     });
   }
+
+  async createMagicLink(email: string): Promise<{ id: string; token: string; expiresAt: string }> {
+    await this.initialize();
+    const db = await this.getDb();
+
+    const id = uuidv4();
+    const token = uuidv4() + uuidv4();
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 15 * 60 * 1000);
+    const createdAt = now.toISOString();
+
+    return new Promise((resolve, reject) => {
+      db.run(
+        'INSERT INTO magic_links (id, email, token, expiresAt, createdAt) VALUES (?, ?, ?, ?, ?)',
+        [id, email.toLowerCase(), token, expiresAt.toISOString(), createdAt],
+        (err) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve({ id, token, expiresAt: expiresAt.toISOString() });
+          }
+        }
+      );
+    });
+  }
+
+  async verifyMagicLink(token: string): Promise<{ valid: boolean; email?: string; userId?: string }> {
+    await this.initialize();
+    const db = await this.getDb();
+    const now = new Date().toISOString();
+
+    return new Promise((resolve, reject) => {
+      db.get(
+        'SELECT * FROM magic_links WHERE token = ? AND usedAt IS NULL AND expiresAt > ?',
+        [token, now],
+        async (err, row: any) => {
+          if (err) {
+            reject(err);
+          } else if (row) {
+            db.run('UPDATE magic_links SET usedAt = ? WHERE id = ?', [now, row.id]);
+
+            let user = await this.findUserByEmailOrUsername(row.email);
+            if (!user) {
+              user = await this.createUser({
+                email: row.email,
+                username: row.email.split('@')[0] + '_' + Math.random().toString(36).substring(7),
+                password: uuidv4(),
+                name: row.email.split('@')[0],
+                role: 'USER'
+              });
+            }
+
+            resolve({ valid: true, email: row.email, userId: user.id });
+          } else {
+            resolve({ valid: false });
+          }
+        }
+      );
+    });
+  }
+
+  async createShareableLink(data: {
+    graphId: string;
+    createdBy: string;
+    accessLevel?: 'VIEW' | 'COMMENT' | 'EDIT';
+    expiresAt?: string;
+    maxUses?: number;
+    requiresSignIn?: boolean;
+  }): Promise<{ id: string; token: string }> {
+    await this.initialize();
+    const db = await this.getDb();
+
+    const id = uuidv4();
+    const token = uuidv4().replace(/-/g, '').substring(0, 16);
+    const now = new Date().toISOString();
+
+    return new Promise((resolve, reject) => {
+      db.run(
+        `INSERT INTO shareable_links (id, graphId, token, createdBy, accessLevel, expiresAt, maxUses, requiresSignIn, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          id,
+          data.graphId,
+          token,
+          data.createdBy,
+          data.accessLevel || 'VIEW',
+          data.expiresAt || null,
+          data.maxUses || null,
+          data.requiresSignIn ? 1 : 0,
+          now,
+          now
+        ],
+        (err) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve({ id, token });
+          }
+        }
+      );
+    });
+  }
+
+  async verifyShareableLink(token: string): Promise<{
+    valid: boolean;
+    graphId?: string;
+    accessLevel?: string;
+    requiresSignIn?: boolean;
+  }> {
+    await this.initialize();
+    const db = await this.getDb();
+    const now = new Date().toISOString();
+
+    return new Promise((resolve, reject) => {
+      db.get(
+        `SELECT * FROM shareable_links
+         WHERE token = ?
+         AND isActive = 1
+         AND (expiresAt IS NULL OR expiresAt > ?)
+         AND (maxUses IS NULL OR useCount < maxUses)`,
+        [token, now],
+        (err, row: any) => {
+          if (err) {
+            reject(err);
+          } else if (row) {
+            resolve({
+              valid: true,
+              graphId: row.graphId,
+              accessLevel: row.accessLevel,
+              requiresSignIn: Boolean(row.requiresSignIn)
+            });
+          } else {
+            resolve({ valid: false });
+          }
+        }
+      );
+    });
+  }
+
+  async logShareableLinkAccess(data: {
+    linkId: string;
+    userId?: string;
+    guestId?: string;
+    ipAddress?: string;
+    userAgent?: string;
+  }): Promise<void> {
+    await this.initialize();
+    const db = await this.getDb();
+    const id = uuidv4();
+    const now = new Date().toISOString();
+
+    return new Promise((resolve, reject) => {
+      db.serialize(() => {
+        db.run(
+          `INSERT INTO shareable_link_access (id, linkId, userId, guestId, ipAddress, userAgent, accessedAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [id, data.linkId, data.userId || null, data.guestId || null, data.ipAddress || null, data.userAgent || null, now]
+        );
+
+        db.run(
+          'UPDATE shareable_links SET useCount = useCount + 1 WHERE id = ?',
+          [data.linkId],
+          (err) => {
+            if (err) {
+              reject(err);
+            } else {
+              resolve();
+            }
+          }
+        );
+      });
+    });
+  }
+
+  async getShareableLinks(graphId: string): Promise<any[]> {
+    await this.initialize();
+    const db = await this.getDb();
+
+    return new Promise((resolve, reject) => {
+      db.all(
+        'SELECT * FROM shareable_links WHERE graphId = ? ORDER BY createdAt DESC',
+        [graphId],
+        (err, rows: any[]) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve(rows);
+          }
+        }
+      );
+    });
+  }
+
+  async deactivateShareableLink(linkId: string): Promise<void> {
+    await this.initialize();
+    const db = await this.getDb();
+    const now = new Date().toISOString();
+
+    return new Promise((resolve, reject) => {
+      db.run(
+        'UPDATE shareable_links SET isActive = 0, updatedAt = ? WHERE id = ?',
+        [now, linkId],
+        (err) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve();
+          }
+        }
+      );
+    });
+  }
 }
 
-// Force restart to recreate database
 export const sqliteAuthStore = new SQLiteAuthStore();

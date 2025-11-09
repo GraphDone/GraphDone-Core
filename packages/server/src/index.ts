@@ -25,6 +25,7 @@ import { sqliteAuthStore } from './auth/sqlite-auth.js';
 import { configureOAuthStrategies } from './auth/oauth-strategies.js';
 import { generateToken } from './utils/auth.js';
 import { createTlsConfig, validateTlsConfig, type TlsConfig } from './config/tls.js';
+import { emailService } from './auth/email-service.js';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
@@ -604,6 +605,126 @@ async function startServer() {
       res.redirect(redirectUrl);
     }
   );
+
+  const magicLinkCorsOptions = {
+    origin: process.env.CORS_ORIGIN || 'http://localhost:3127',
+    credentials: true,
+    methods: ['POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+  };
+
+  app.options('/auth/magic-link/request', cors<cors.CorsRequest>(magicLinkCorsOptions));
+
+  app.post('/auth/magic-link/request', cors<cors.CorsRequest>(magicLinkCorsOptions), express.json(), async (req, res) => {
+    try {
+      const { email } = req.body;
+
+      if (!email || typeof email !== 'string') {
+        return res.status(400).json({ error: 'Email is required' });
+      }
+
+      const magicLink = await sqliteAuthStore.createMagicLink(email);
+      await emailService.sendMagicLink(email, magicLink.token);
+
+      console.log(`✉️  Magic link sent to: ${email}`); // eslint-disable-line no-console
+
+      res.json({
+        success: true,
+        message: 'Magic link sent! Check your email.',
+        expiresAt: magicLink.expiresAt
+      });
+    } catch (error) {
+      console.error('❌ Magic link request failed:', error); // eslint-disable-line no-console
+      res.status(500).json({ error: 'Failed to send magic link' });
+    }
+  });
+
+  app.get('/auth/magic-link/verify', async (req, res) => {
+    try {
+      const { token } = req.query;
+
+      if (!token || typeof token !== 'string') {
+        return res.redirect(`${process.env.CLIENT_URL || 'http://localhost:3127'}/login?error=invalid_magic_link`);
+      }
+
+      const result = await sqliteAuthStore.verifyMagicLink(token);
+
+      if (!result.valid || !result.userId) {
+        return res.redirect(`${process.env.CLIENT_URL || 'http://localhost:3127'}/login?error=expired_magic_link`);
+      }
+
+      const jwtToken = generateToken(result.userId, result.email!, 'USER');
+      const clientUrl = process.env.CLIENT_URL || 'http://localhost:3127';
+      const redirectUrl = `${clientUrl}/login?token=${jwtToken}`;
+
+      console.log(`🔐 Magic link verified for: ${result.email}`); // eslint-disable-line no-console
+      res.redirect(redirectUrl);
+    } catch (error) {
+      console.error('❌ Magic link verification failed:', error); // eslint-disable-line no-console
+      res.redirect(`${process.env.CLIENT_URL || 'http://localhost:3127'}/login?error=magic_link_failed`);
+    }
+  });
+
+  app.post('/share/create', cors<cors.CorsRequest>(), express.json(), async (req, res) => {
+    try {
+      const authHeader = req.headers.authorization;
+      const user = extractUserFromToken(authHeader);
+
+      if (!user) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const { graphId, accessLevel, expiresAt, maxUses, requiresSignIn } = req.body;
+
+      if (!graphId) {
+        return res.status(400).json({ error: 'Graph ID is required' });
+      }
+
+      const shareableLink = await sqliteAuthStore.createShareableLink({
+        graphId,
+        createdBy: user.userId,
+        accessLevel: accessLevel || 'VIEW',
+        expiresAt,
+        maxUses,
+        requiresSignIn: requiresSignIn || false
+      });
+
+      const shareUrl = `${process.env.CLIENT_URL || 'http://localhost:3127'}/share/${shareableLink.token}`;
+
+      console.log(`🔗 Shareable link created for graph ${graphId}`); // eslint-disable-line no-console
+
+      res.json({
+        success: true,
+        shareUrl,
+        token: shareableLink.token,
+        accessLevel: accessLevel || 'VIEW'
+      });
+    } catch (error) {
+      console.error('❌ Failed to create shareable link:', error); // eslint-disable-line no-console
+      res.status(500).json({ error: 'Failed to create shareable link' });
+    }
+  });
+
+  app.get('/share/verify/:token', cors<cors.CorsRequest>(), async (req, res) => {
+    try {
+      const { token } = req.params;
+      const result = await sqliteAuthStore.verifyShareableLink(token);
+
+      if (!result.valid) {
+        return res.status(404).json({ error: 'Link not found or expired' });
+      }
+
+      res.json({
+        valid: true,
+        graphId: result.graphId,
+        accessLevel: result.accessLevel,
+        requiresSignIn: result.requiresSignIn
+      });
+    } catch (error) {
+      console.error('❌ Failed to verify shareable link:', error); // eslint-disable-line no-console
+      res.status(500).json({ error: 'Failed to verify link' });
+    }
+  });
 
   server.listen(serverPort, '0.0.0.0', async () => {
     const totalTime = Date.now() - startTime;

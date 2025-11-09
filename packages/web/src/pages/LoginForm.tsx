@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, gql } from '@apollo/client';
-import { Eye, EyeOff, ArrowRight, Mail, Lock, Users, Github } from 'lucide-react';
+import { Eye, EyeOff, ArrowRight, Mail, Lock, Users, Github, Sparkles, Zap } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { TlsStatusIndicator } from '../components/TlsStatusIndicator';
 
@@ -82,10 +82,14 @@ export function LoginForm() {
 
   const [formData, setFormData] = useState({
     emailOrUsername: '',
-    password: ''
+    password: '',
+    magicLinkEmail: ''
   });
 
   const [showPassword, setShowPassword] = useState(false);
+  const [useMagicLink, setUseMagicLink] = useState(false);
+  const [magicLinkSent, setMagicLinkSent] = useState(false);
+  const [magicLinkLoading, setMagicLinkLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -97,8 +101,11 @@ export function LoginForm() {
         google: 'Google authentication failed. Please try again.',
         linkedin: 'LinkedIn authentication failed. Please try again.',
         github: 'GitHub authentication failed. Please try again.',
+        invalid_magic_link: 'Invalid magic link. Please request a new one.',
+        expired_magic_link: 'Magic link has expired. Please request a new one.',
+        magic_link_failed: 'Magic link authentication failed. Please try again.',
       };
-      setErrors({ submit: errorMessages[error] || 'OAuth authentication failed. Please try again.' });
+      setErrors({ submit: errorMessages[error] || 'Authentication failed. Please try again.' });
     } else if (token) {
       localStorage.setItem('authToken', token);
       window.history.replaceState({}, '', '/login');
@@ -185,12 +192,12 @@ export function LoginForm() {
 
   const fillDefaultCredentials = async (username: string, password: string) => {
     setFormData({
+      ...formData,
       emailOrUsername: username,
       password: password
     });
     setErrors({});
-    
-    // Auto-submit for better UX
+
     await login({
       variables: {
         input: {
@@ -199,6 +206,53 @@ export function LoginForm() {
         }
       }
     });
+  };
+
+  const handleMagicLinkRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!formData.magicLinkEmail) {
+      setErrors({ magicLinkEmail: 'Email is required' });
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.magicLinkEmail)) {
+      setErrors({ magicLinkEmail: 'Please enter a valid email address' });
+      return;
+    }
+
+    setMagicLinkLoading(true);
+    setErrors({});
+
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:4127';
+      console.log('🔗 Sending magic link request to:', `${apiUrl}/auth/magic-link/request`);
+      console.log('📧 Email:', formData.magicLinkEmail);
+
+      const response = await fetch(`${apiUrl}/auth/magic-link/request`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: formData.magicLinkEmail }),
+      });
+
+      console.log('📨 Response status:', response.status);
+      const data = await response.json();
+      console.log('📨 Response data:', data);
+
+      if (response.ok) {
+        setMagicLinkSent(true);
+      } else {
+        setErrors({ submit: data.error || 'Failed to send magic link' });
+      }
+    } catch (error) {
+      console.error('❌ Magic link request error:', error);
+      setErrors({ submit: 'Failed to send magic link. Please try again.' });
+    } finally {
+      setMagicLinkLoading(false);
+    }
   };
 
 
@@ -265,8 +319,123 @@ export function LoginForm() {
             </div>
           </div>
 
-          {/* Email/Username Field */}
-          <div>
+          {/* Sign In Method Toggle */}
+          <div className="flex items-center justify-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setUseMagicLink(false);
+                setMagicLinkSent(false);
+                setErrors({});
+              }}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                !useMagicLink
+                  ? 'bg-green-600 text-white'
+                  : 'bg-gray-700/50 text-gray-400 hover:bg-gray-600/50 hover:text-gray-300'
+              }`}
+            >
+              <Lock className="h-4 w-4 inline mr-1" />
+              Password
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setUseMagicLink(true);
+                setMagicLinkSent(false);
+                setErrors({});
+              }}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                useMagicLink
+                  ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-lg shadow-green-500/30'
+                  : 'bg-gray-700/50 text-gray-400 hover:bg-gray-600/50 hover:text-gray-300'
+              }`}
+            >
+              <Zap className="h-4 w-4 inline mr-1" />
+              Passwordless
+            </button>
+          </div>
+
+          {/* Magic Link Form */}
+          {useMagicLink ? (
+            magicLinkSent ? (
+              <div className="p-6 bg-green-900/20 border border-green-500/30 rounded-xl">
+                <div className="flex items-center justify-center mb-3">
+                  <Mail className="h-8 w-8 text-green-400" />
+                </div>
+                <h3 className="text-lg font-semibold text-green-300 text-center mb-2">Check Your Email!</h3>
+                <p className="text-sm text-green-200/80 text-center mb-4">
+                  We've sent a magic link to <strong>{formData.magicLinkEmail}</strong>
+                </p>
+                <p className="text-xs text-green-300/60 text-center">
+                  Click the link in the email to sign in. The link expires in 15 minutes.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMagicLinkSent(false);
+                    setFormData({ ...formData, magicLinkEmail: '' });
+                  }}
+                  className="mt-4 w-full text-sm text-green-400 hover:text-green-300"
+                >
+                  Try a different email
+                </button>
+              </div>
+            ) : (
+              <>
+                <div>
+                  <label htmlFor="magicLinkEmail" className="block text-sm font-medium text-gray-300 mb-1">
+                    Email Address
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Mail className="h-5 w-5 text-gray-400" />
+                    </div>
+                    <input
+                      type="email"
+                      id="magicLinkEmail"
+                      name="magicLinkEmail"
+                      value={formData.magicLinkEmail}
+                      onChange={handleChange}
+                      autoFocus
+                      className={`w-full pl-10 pr-4 py-3 bg-gray-700/50 backdrop-blur-sm border rounded-xl text-gray-100 focus:outline-none focus:ring-2 transition-all ${
+                        errors.magicLinkEmail ? 'border-red-500/50 focus:ring-red-500/50' : 'border-gray-600/50 focus:ring-blue-500/50 focus:border-blue-500/50'
+                      }`}
+                      placeholder="john@example.com"
+                    />
+                  </div>
+                  {errors.magicLinkEmail && <p className="mt-1 text-xs text-red-400">{errors.magicLinkEmail}</p>}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleMagicLinkRequest}
+                  disabled={magicLinkLoading}
+                  className="w-full bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:translate-y-0 flex items-center justify-center space-x-2"
+                >
+                  {magicLinkLoading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                      <span>Sending Link...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Mail className="h-5 w-5" />
+                      <span>Send Link</span>
+                    </>
+                  )}
+                </button>
+
+                <div className="p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
+                  <p className="text-xs text-blue-300 text-center">
+                    We'll email you a secure link to sign in. No password needed.
+                  </p>
+                </div>
+              </>
+            )
+          ) : (
+            <>
+              {/* Email/Username Field */}
+              <div>
             <label htmlFor="emailOrUsername" className="block text-sm font-medium text-gray-300 mb-1">
               Email or Username
             </label>
@@ -361,6 +530,9 @@ export function LoginForm() {
             )}
           </button>
 
+            </>
+          )}
+
           {/* Guest Mode Button */}
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
@@ -374,7 +546,7 @@ export function LoginForm() {
           <button
             type="button"
             onClick={handleGuestLogin}
-            disabled={!isGuestEnabled || loading || guestLoading}
+            disabled={!isGuestEnabled || loading || guestLoading || magicLinkLoading}
             className="w-full bg-gray-700/80 hover:bg-gray-600/80 backdrop-blur-sm text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-gray-500/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:translate-y-0 flex items-center justify-center space-x-2"
             title={!isGuestEnabled ? "Guest access has been disabled by the administrator" : undefined}
           >
