@@ -556,8 +556,8 @@ async function startServer() {
 
   // Rate limiting configuration for authentication endpoints
   const authRateLimiter = rateLimit({
-    windowMs: 60 * 60 * 1000, // 1 hour
-    max: 5, // Max 5 requests per hour per IP
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 5, // Max 5 requests per 15 minutes per IP
     standardHeaders: true,
     legacyHeaders: false,
     skipSuccessfulRequests: false,

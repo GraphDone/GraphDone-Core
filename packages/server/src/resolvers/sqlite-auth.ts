@@ -30,7 +30,7 @@ const signupRateLimits = new Map<string, RateLimitEntry>();
 
 function checkSignupRateLimit(ip: string): { allowed: boolean; retryAfter?: number } {
   const now = Date.now();
-  const windowMs = 60 * 60 * 1000;
+  const windowMs = 15 * 60 * 1000;
   const maxAttempts = 5;
 
   const entry = signupRateLimits.get(ip);
