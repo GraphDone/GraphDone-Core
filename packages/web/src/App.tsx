@@ -9,6 +9,7 @@ import { Admin } from './pages/Admin';
 import { Backend } from './pages/Backend';
 import { LoginForm } from './pages/LoginForm';
 import { Signup } from './pages/Signup';
+import { ForgotPassword } from './pages/ForgotPassword';
 import { InteractiveGraphVisualization } from './components/InteractiveGraphVisualization';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { GraphProvider } from './contexts/GraphContext';
@@ -84,6 +85,7 @@ function AuthenticatedApp() {
         <Route path="/" element={<LoginForm />} />
         <Route path="/login" element={<LoginForm />} />
         <Route path="/signup" element={<Signup />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     );
