@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
-import { Lock, Eye, EyeOff, CheckCircle } from 'lucide-react';
+import { Lock, Eye, EyeOff, CheckCircle, XCircle } from 'lucide-react';
 import { TlsStatusIndicator } from '../components/TlsStatusIndicator';
+import { validatePassword, getPasswordStrength } from '../utils/validation';
 
 export function ResetPassword() {
   const [searchParams] = useSearchParams();
@@ -15,6 +16,7 @@ export function ResetPassword() {
   const [loading, setLoading] = useState(false);
   const [resetComplete, setResetComplete] = useState(false);
   const [error, setError] = useState('');
+  const [passwordsMatch, setPasswordsMatch] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (!token) {
@@ -22,21 +24,7 @@ export function ResetPassword() {
     }
   }, [token, navigate]);
 
-  const validatePassword = (pwd: string): string | null => {
-    if (pwd.length < 8) {
-      return 'Password must be at least 8 characters';
-    }
-    if (!/[A-Z]/.test(pwd)) {
-      return 'Password must contain at least one uppercase letter';
-    }
-    if (!/[a-z]/.test(pwd)) {
-      return 'Password must contain at least one lowercase letter';
-    }
-    if (!/[0-9]/.test(pwd)) {
-      return 'Password must contain at least one number';
-    }
-    return null;
-  };
+  const passwordStrength = getPasswordStrength(password);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -126,9 +114,14 @@ export function ResetPassword() {
                     name="password"
                     value={password}
                     onChange={(e) => {
-                      setPassword(e.target.value);
+                      const newPassword = e.target.value;
+                      setPassword(newPassword);
                       setError('');
+                      if (confirmPassword) {
+                        setPasswordsMatch(newPassword === confirmPassword);
+                      }
                     }}
+                    autoComplete="new-password"
                     autoFocus
                     className={`w-full pl-10 pr-12 py-3 bg-gray-700/50 backdrop-blur-sm border rounded-xl text-gray-100 focus:outline-none focus:ring-2 transition-all ${
                       error ? 'border-red-500/50 focus:ring-red-500/50' : 'border-gray-600/50 focus:ring-teal-500/50 focus:border-teal-500/50'
@@ -143,6 +136,20 @@ export function ResetPassword() {
                     {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
                 </div>
+                {password && (
+                  <div className="mt-2">
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="text-gray-400">Password strength:</span>
+                      <span className="text-gray-300">{passwordStrength.label}</span>
+                    </div>
+                    <div className="h-1 bg-gray-700 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full transition-all duration-300 ${passwordStrength.color}`}
+                        style={{ width: passwordStrength.width }}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -159,14 +166,36 @@ export function ResetPassword() {
                     name="confirmPassword"
                     value={confirmPassword}
                     onChange={(e) => {
-                      setConfirmPassword(e.target.value);
+                      const newConfirmPassword = e.target.value;
+                      setConfirmPassword(newConfirmPassword);
                       setError('');
+                      if (password && newConfirmPassword) {
+                        setPasswordsMatch(password === newConfirmPassword);
+                      } else {
+                        setPasswordsMatch(null);
+                      }
                     }}
-                    className={`w-full pl-10 pr-12 py-3 bg-gray-700/50 backdrop-blur-sm border rounded-xl text-gray-100 focus:outline-none focus:ring-2 transition-all ${
-                      error ? 'border-red-500/50 focus:ring-red-500/50' : 'border-gray-600/50 focus:ring-teal-500/50 focus:border-teal-500/50'
+                    autoComplete="new-password"
+                    className={`w-full pl-10 pr-16 py-3 bg-gray-700/50 backdrop-blur-sm border rounded-xl text-gray-100 focus:outline-none focus:ring-2 transition-all ${
+                      passwordsMatch === false
+                        ? 'border-red-500/50 focus:ring-red-500/50'
+                        : passwordsMatch === true
+                        ? 'border-teal-500/50 focus:ring-teal-500/50 focus:border-teal-500/50'
+                        : error
+                        ? 'border-red-500/50 focus:ring-red-500/50'
+                        : 'border-gray-600/50 focus:ring-teal-500/50 focus:border-teal-500/50'
                     }`}
                     placeholder="Confirm new password"
                   />
+                  {passwordsMatch !== null && confirmPassword && (
+                    <div className="absolute inset-y-0 right-12 flex items-center pointer-events-none">
+                      {passwordsMatch ? (
+                        <CheckCircle className="h-5 w-5 text-teal-400" />
+                      ) : (
+                        <XCircle className="h-5 w-5 text-red-400" />
+                      )}
+                    </div>
+                  )}
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
@@ -176,6 +205,12 @@ export function ResetPassword() {
                   </button>
                 </div>
                 {error && <p className="mt-1 text-xs text-red-400">{error}</p>}
+                {passwordsMatch === false && confirmPassword && !error && (
+                  <p className="mt-1 text-xs text-red-400">Passwords do not match</p>
+                )}
+                {passwordsMatch === true && confirmPassword && (
+                  <p className="mt-1 text-xs text-teal-400">Passwords match!</p>
+                )}
               </div>
 
               <div className="p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
