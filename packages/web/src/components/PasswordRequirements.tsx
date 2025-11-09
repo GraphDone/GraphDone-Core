@@ -1,4 +1,5 @@
 import { Check, X } from 'lucide-react';
+import { useState, useEffect } from 'react';
 
 interface PasswordRequirementsProps {
   password: string;
@@ -6,6 +7,8 @@ interface PasswordRequirementsProps {
 }
 
 export function PasswordRequirements({ password, showAll = false }: PasswordRequirementsProps) {
+  const [showBox, setShowBox] = useState(true);
+
   const requirements = [
     {
       label: '8+ characters',
@@ -35,11 +38,27 @@ export function PasswordRequirements({ password, showAll = false }: PasswordRequ
     }
   ];
 
-  if (!password && !showAll) return null;
+  const allRequiredMet = requirements
+    .filter(req => !req.optional)
+    .every(req => req.met);
+
+  useEffect(() => {
+    if (allRequiredMet && password) {
+      const timer = setTimeout(() => {
+        setShowBox(false);
+      }, 1000);
+      return () => clearTimeout(timer);
+    } else if (password) {
+      setShowBox(true);
+    }
+  }, [allRequiredMet, password]);
+
+  if (!password) return null;
+  if (!showBox) return null;
 
   return (
-    <div className="mt-2 p-3 bg-gray-900/50 border border-gray-600/50 rounded-lg">
-      <p className="text-xs font-medium text-gray-300 mb-2">Password Requirements:</p>
+    <div className="absolute left-full ml-4 top-0 w-56 p-3 bg-gray-800/95 backdrop-blur-xl border border-gray-700/50 rounded-xl shadow-2xl z-50">
+      <p className="text-xs font-semibold text-gray-300 mb-2">Password Requirements</p>
       <ul className="space-y-1.5">
         {requirements.map((req, index) => (
           <li key={index} className="flex items-center space-x-2 text-xs">
@@ -53,9 +72,9 @@ export function PasswordRequirements({ password, showAll = false }: PasswordRequ
               <div className="h-3.5 w-3.5 rounded-full border border-gray-500 flex-shrink-0" />
             )}
             <span className={`${
-              password 
-                ? req.met 
-                  ? 'text-teal-400' 
+              password
+                ? req.met
+                  ? 'text-teal-400'
                   : 'text-gray-400'
                 : 'text-gray-400'
             }`}>

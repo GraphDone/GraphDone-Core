@@ -492,7 +492,7 @@ export function Signup() {
           </div>
 
           {/* Password Field */}
-          <div>
+          <div className="relative">
             <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-1">
               Password
             </label>
