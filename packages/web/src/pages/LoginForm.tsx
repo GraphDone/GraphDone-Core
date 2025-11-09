@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, gql } from '@apollo/client';
-import { Eye, EyeOff, ArrowRight, Mail, Lock, Users, Github, Sparkles, Zap } from 'lucide-react';
+import { Eye, EyeOff, ArrowRight, Mail, Lock, Users, Github, Sparkles, Zap, Check } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { TlsStatusIndicator } from '../components/TlsStatusIndicator';
 
@@ -91,6 +91,7 @@ export function LoginForm() {
   const [magicLinkSent, setMagicLinkSent] = useState(false);
   const [magicLinkLoading, setMagicLinkLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [rememberMe, setRememberMe] = useState(false);
 
   useEffect(() => {
     const token = searchParams.get('token');
@@ -110,6 +111,12 @@ export function LoginForm() {
       localStorage.setItem('authToken', token);
       window.history.replaceState({}, '', '/login');
       window.location.reload();
+    }
+
+    const savedUsername = localStorage.getItem('rememberedUsername');
+    if (savedUsername) {
+      setFormData(prev => ({ ...prev, emailOrUsername: savedUsername }));
+      setRememberMe(true);
     }
   }, [searchParams]);
 
@@ -159,11 +166,17 @@ export function LoginForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
-    
+
+    if (rememberMe) {
+      localStorage.setItem('rememberedUsername', formData.emailOrUsername);
+    } else {
+      localStorage.removeItem('rememberedUsername');
+    }
+
     await login({
       variables: {
         input: {
@@ -274,39 +287,39 @@ export function LoginForm() {
         {/* Login Form */}
         <form onSubmit={handleSubmit} className="bg-gray-800/50 backdrop-blur-xl border border-gray-700/50 rounded-2xl p-8 space-y-5 shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-700">
           {/* Social Login Buttons */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-3 gap-3">
             <button
               type="button"
               onClick={() => window.location.href = `${import.meta.env.VITE_API_URL || 'https://localhost:4128'}/auth/google`}
-              className="group relative flex items-center justify-center px-5 py-4 bg-gray-700/50 hover:bg-gray-600/60 backdrop-blur-sm border-2 border-gray-600/50 hover:border-blue-500/50 rounded-xl transition-all duration-300 hover:scale-[1.05] hover:-translate-y-0.5 hover:shadow-xl hover:shadow-blue-500/30"
+              className="group relative flex items-center justify-center p-3 bg-gray-700/50 hover:bg-gray-700/80 backdrop-blur-sm border border-gray-600/50 hover:border-gray-500 rounded-lg transition-all duration-200"
+              title="Continue with Google"
             >
-              <svg className="h-6 w-6 transition-transform duration-300 group-hover:scale-110" viewBox="0 0 24 24">
+              <svg className="h-5 w-5" viewBox="0 0 24 24">
                 <path fill="#EA4335" d="M5.266 9.765A7.077 7.077 0 0 1 12 4.909c1.69 0 3.218.6 4.418 1.582L19.91 3C17.782 1.145 15.055 0 12 0 7.27 0 3.198 2.698 1.24 6.65l4.026 3.115Z"/>
                 <path fill="#34A853" d="M16.04 18.013c-1.09.703-2.474 1.078-4.04 1.078a7.077 7.077 0 0 1-6.723-4.823l-4.04 3.067A11.965 11.965 0 0 0 12 24c2.933 0 5.735-1.043 7.834-3l-3.793-2.987Z"/>
                 <path fill="#4A90E2" d="M19.834 21c2.195-2.048 3.62-5.096 3.62-9 0-.71-.109-1.473-.272-2.182H12v4.637h6.436c-.317 1.559-1.17 2.766-2.395 3.558L19.834 21Z"/>
                 <path fill="#FBBC05" d="M5.277 14.268A7.12 7.12 0 0 1 4.909 12c0-.782.125-1.533.357-2.235L1.24 6.65A11.934 11.934 0 0 0 0 12c0 1.92.445 3.73 1.237 5.335l4.04-3.067Z"/>
               </svg>
-              <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-blue-500/0 via-purple-500/0 to-blue-500/0 group-hover:from-blue-500/10 group-hover:via-purple-500/10 group-hover:to-blue-500/10 transition-all duration-300"></div>
             </button>
 
             <button
               type="button"
               onClick={() => window.location.href = `${import.meta.env.VITE_API_URL || 'https://localhost:4128'}/auth/linkedin`}
-              className="group relative flex items-center justify-center px-5 py-4 bg-gray-700/50 hover:bg-gray-600/60 backdrop-blur-sm border-2 border-gray-600/50 hover:border-blue-400/60 rounded-xl transition-all duration-300 hover:scale-[1.05] hover:-translate-y-0.5 hover:shadow-xl hover:shadow-blue-500/30"
+              className="group relative flex items-center justify-center p-3 bg-gray-700/50 hover:bg-gray-700/80 backdrop-blur-sm border border-gray-600/50 hover:border-gray-500 rounded-lg transition-all duration-200"
+              title="Continue with LinkedIn"
             >
-              <svg className="h-6 w-6 transition-transform duration-300 group-hover:scale-110" viewBox="0 0 24 24" fill="#0A66C2">
+              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="#60A5FA">
                 <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
               </svg>
-              <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-blue-600/0 to-blue-600/0 group-hover:from-blue-600/10 group-hover:to-blue-600/10 transition-all duration-300"></div>
             </button>
 
             <button
               type="button"
               onClick={() => window.location.href = `${import.meta.env.VITE_API_URL || 'https://localhost:4128'}/auth/github`}
-              className="group relative flex items-center justify-center px-5 py-4 bg-gray-700/50 hover:bg-gray-600/60 backdrop-blur-sm border-2 border-gray-600/50 hover:border-gray-400/60 rounded-xl transition-all duration-300 hover:scale-[1.05] hover:-translate-y-0.5 hover:shadow-xl hover:shadow-purple-500/30"
+              className="group relative flex items-center justify-center p-3 bg-gray-700/50 hover:bg-gray-700/80 backdrop-blur-sm border border-gray-600/50 hover:border-gray-500 rounded-lg transition-all duration-200"
+              title="Continue with GitHub"
             >
-              <Github className="h-6 w-6 text-gray-100 transition-transform duration-300 group-hover:scale-110 group-hover:text-white" />
-              <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-purple-500/0 to-purple-500/0 group-hover:from-purple-500/10 group-hover:to-purple-500/10 transition-all duration-300"></div>
+              <Github className="h-5 w-5 text-gray-300" />
             </button>
           </div>
 
@@ -492,14 +505,25 @@ export function LoginForm() {
 
           {/* Remember Me & Forgot Password */}
           <div className="flex items-center justify-between">
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                className="rounded border-gray-300 text-green-600 shadow-sm focus:border-green-300 focus:ring focus:ring-green-200 focus:ring-opacity-50"
-              />
-              <span className="ml-2 text-sm text-gray-300">Remember me</span>
+            <label className="flex items-center cursor-pointer group">
+              <div className="relative">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-5 h-5 rounded border-2 border-gray-600 bg-gray-700/50 peer-checked:border-green-500 peer-focus:ring-2 peer-focus:ring-green-500/50 transition-all duration-200 group-hover:border-gray-500 flex items-center justify-center">
+                  {rememberMe && (
+                    <Check className="h-4 w-4 text-green-500" strokeWidth={3} />
+                  )}
+                </div>
+              </div>
+              <span className="ml-3 text-sm text-gray-300 group-hover:text-gray-100 transition-colors">
+                Remember me
+              </span>
             </label>
-            <Link to="/forgot-password" className="text-sm text-green-400 hover:text-green-300">
+            <Link to="/forgot-password" className="text-sm text-green-400 hover:text-green-300 transition-colors">
               Forgot password?
             </Link>
           </div>
