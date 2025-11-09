@@ -682,20 +682,95 @@ async function startServer() {
         return res.status(400).json({ error: 'Email is required' });
       }
 
-      // Use magic link functionality for password reset
-      const resetLink = await sqliteAuthStore.createMagicLink(email);
-      await emailService.sendPasswordReset(email, resetLink.token);
+      // Check if user exists
+      const user = await sqliteAuthStore.findUserByEmailOrUsername(email);
 
-      console.log(`🔐 Password reset link sent to: ${email}`); // eslint-disable-line no-console
+      if (user) {
+        // User exists - create reset link and send email
+        const resetLink = await sqliteAuthStore.createMagicLink(email);
+        await emailService.sendPasswordReset(email, resetLink.token);
+        console.log(`🔐 Password reset link sent to: ${email}`); // eslint-disable-line no-console
+      } else {
+        // User doesn't exist - don't send email
+        console.log(`⚠️  Password reset requested for non-existent user: ${email}`); // eslint-disable-line no-console
+      }
 
+      // Return response with userExists flag for different UI messages
       res.json({
         success: true,
-        message: 'Password reset link sent! Check your email.',
-        expiresAt: resetLink.expiresAt
+        userExists: !!user,
+        message: user
+          ? 'Password reset link sent! Check your email.'
+          : 'This email is not registered in our system.',
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString()
       });
     } catch (error) {
       console.error('❌ Password reset request failed:', error); // eslint-disable-line no-console
       res.status(500).json({ error: 'Failed to send reset link' });
+    }
+  });
+
+  app.get('/auth/reset-password', async (req, res) => {
+    try {
+      const { token } = req.query;
+
+      if (!token || typeof token !== 'string') {
+        return res.redirect(`${process.env.CLIENT_URL || 'http://localhost:3127'}/login?error=invalid_reset_link`);
+      }
+
+      const clientUrl = process.env.CLIENT_URL || 'http://localhost:3127';
+      const redirectUrl = `${clientUrl}/reset-password?token=${token}`;
+
+      console.log(`🔐 Password reset link accessed`); // eslint-disable-line no-console
+      res.redirect(redirectUrl);
+    } catch (error) {
+      console.error('❌ Password reset verification failed:', error); // eslint-disable-line no-console
+      res.redirect(`${process.env.CLIENT_URL || 'http://localhost:3127'}/login?error=reset_failed`);
+    }
+  });
+
+  const resetPasswordCorsOptions = {
+    origin: process.env.CORS_ORIGIN || 'http://localhost:3127',
+    credentials: true,
+    methods: ['POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+  };
+
+  app.options('/auth/reset-password', cors<cors.CorsRequest>(resetPasswordCorsOptions));
+
+  app.post('/auth/reset-password', cors<cors.CorsRequest>(resetPasswordCorsOptions), express.json(), async (req, res) => {
+    try {
+      const { token, newPassword } = req.body;
+
+      if (!token || typeof token !== 'string') {
+        return res.status(400).json({ error: 'Reset token is required' });
+      }
+
+      if (!newPassword || typeof newPassword !== 'string') {
+        return res.status(400).json({ error: 'New password is required' });
+      }
+
+      if (newPassword.length < 8) {
+        return res.status(400).json({ error: 'Password must be at least 8 characters' });
+      }
+
+      const result = await sqliteAuthStore.verifyMagicLink(token);
+
+      if (!result.valid || !result.userId) {
+        return res.status(400).json({ error: 'Invalid or expired reset token' });
+      }
+
+      await sqliteAuthStore.updateUserPassword(result.userId, newPassword);
+
+      console.log(`🔐 Password updated successfully for: ${result.email}`); // eslint-disable-line no-console
+
+      res.json({
+        success: true,
+        message: 'Password updated successfully'
+      });
+    } catch (error) {
+      console.error('❌ Password update failed:', error); // eslint-disable-line no-console
+      res.status(500).json({ error: 'Failed to update password' });
     }
   });
 
