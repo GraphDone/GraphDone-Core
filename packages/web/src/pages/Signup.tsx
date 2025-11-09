@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, gql } from '@apollo/client';
-import { Eye, EyeOff, ArrowRight, CheckCircle, XCircle, Github } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
+import { Eye, EyeOff, ArrowRight, CheckCircle, XCircle, Github, Mail } from 'lucide-react';
 import { TlsStatusIndicator } from '../components/TlsStatusIndicator';
 import { isValidEmail, getPasswordStrength } from '../utils/validation';
 
@@ -31,10 +30,18 @@ const CHECK_AVAILABILITY = gql`
   }
 `;
 
+const RESEND_VERIFICATION_EMAIL = gql`
+  mutation ResendVerificationEmail($email: String!) {
+    resendVerificationEmail(email: $email) {
+      success
+      message
+    }
+  }
+`;
+
 export function Signup() {
   const navigate = useNavigate();
-  const { login: setAuthUser } = useAuth();
-  
+
   const [formData, setFormData] = useState({
     email: '',
     username: '',
@@ -42,7 +49,7 @@ export function Signup() {
     confirmPassword: '',
     name: ''
   });
-  
+
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -50,18 +57,31 @@ export function Signup() {
   const [availability, setAvailability] = useState<Record<string, boolean>>({});
   const [emailValid, setEmailValid] = useState<boolean | null>(null);
   const [passwordsMatch, setPasswordsMatch] = useState<boolean | null>(null);
+  const [signupComplete, setSignupComplete] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendMessage, setResendMessage] = useState('');
 
   const [signup, { loading }] = useMutation(SIGNUP_MUTATION, {
     onCompleted: (data) => {
-      // Store token in localStorage
-      localStorage.setItem('authToken', data.signup.token);
-      localStorage.setItem('currentUser', JSON.stringify(data.signup.user));
-      
-      // Navigate to main app
-      navigate('/');
+      setSignupComplete(true);
     },
     onError: (error) => {
       setErrors({ submit: error.message });
+    }
+  });
+
+  const [resendVerificationEmail] = useMutation(RESEND_VERIFICATION_EMAIL, {
+    onCompleted: (data) => {
+      setResendLoading(false);
+      if (data.resendVerificationEmail.success) {
+        setResendMessage('Verification email sent! Check your inbox.');
+      } else {
+        setResendMessage(data.resendVerificationEmail.message || 'Failed to send email. Please try again.');
+      }
+    },
+    onError: () => {
+      setResendLoading(false);
+      setResendMessage('Failed to send email. Please try again.');
     }
   });
 
@@ -198,15 +218,27 @@ export function Signup() {
     }
   };
 
+  const handleResendVerificationEmail = async () => {
+    setResendLoading(true);
+    setResendMessage('');
+
+    await resendVerificationEmail({
+      variables: {
+        email: formData.email
+      }
+    });
+  };
+
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
       if (e.key === 'Enter' && !loading && !Object.values(isChecking).some(checking => checking)) {
-        handleSubmit(e as any);
+        const submitEvent = e as unknown as React.FormEvent;
+        void handleSubmit(submitEvent);
       }
     };
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [formData, loading, isChecking]);
+  }, [formData, loading, isChecking, handleSubmit]);
 
   const passwordStrength = getPasswordStrength(formData.password);
 
@@ -225,8 +257,64 @@ export function Signup() {
           <p className="text-gray-400 text-lg">Join the decentralized project management revolution</p>
         </div>
 
-        {/* Signup Form */}
-        <form onSubmit={handleSubmit} className="bg-gray-800/50 backdrop-blur-xl border border-gray-700/50 rounded-2xl p-8 space-y-5 shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-700">
+        {/* Email Verification Screen or Signup Form */}
+        {signupComplete ? (
+          <div className="bg-gray-800/50 backdrop-blur-xl border border-gray-700/50 rounded-2xl p-8 space-y-5 shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <div className="p-6 bg-teal-900/20 border border-teal-500/30 rounded-xl">
+              <div className="flex items-center justify-center mb-4">
+                <Mail className="h-16 w-16 text-teal-400" />
+              </div>
+              <h3 className="text-2xl font-semibold text-teal-300 text-center mb-3">Check Your Email!</h3>
+              <p className="text-sm text-teal-200/80 text-center mb-4">
+                We've sent a verification link to <strong>{formData.email}</strong>
+              </p>
+              <p className="text-xs text-teal-300/60 text-center mb-6">
+                Click the link in the email to verify your account and complete registration. The link expires in 24 hours.
+              </p>
+
+              <button
+                type="button"
+                onClick={handleResendVerificationEmail}
+                disabled={resendLoading}
+                className="w-full bg-gray-700/50 hover:bg-gray-600/80 backdrop-blur-sm border border-gray-600/50 hover:border-teal-500 text-teal-400 font-semibold py-3 px-6 rounded-xl transition-all duration-200 hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center space-x-2"
+              >
+                {resendLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-teal-400"></div>
+                    <span>Sending...</span>
+                  </>
+                ) : (
+                  <>
+                    <Mail className="h-5 w-5" />
+                    <span>Resend Verification Email</span>
+                  </>
+                )}
+              </button>
+
+              {resendMessage && (
+                <p className={`mt-3 text-xs text-center ${resendMessage.includes('sent') ? 'text-teal-400' : 'text-red-400'}`}>
+                  {resendMessage}
+                </p>
+              )}
+            </div>
+
+            <div className="p-4 bg-blue-900/20 border border-blue-500/30 rounded-lg">
+              <p className="text-xs text-blue-300 text-center">
+                <strong>Didn't receive the email?</strong> Check your spam folder or click the button above to resend.
+              </p>
+            </div>
+
+            <div className="text-center">
+              <Link
+                to="/login"
+                className="text-gray-300 hover:text-teal-400 transition-colors text-sm"
+              >
+                Back to login
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="bg-gray-800/50 backdrop-blur-xl border border-gray-700/50 rounded-2xl p-8 space-y-5 shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-700">
           {/* Social Signup Buttons */}
           <div className="grid grid-cols-3 gap-3">
             <button
@@ -505,26 +593,30 @@ export function Signup() {
             and contribute to the collective intelligence.
           </p>
         </form>
+        )}
 
+        {!signupComplete && (
+          <>
+            {/* Login Link */}
+            <div className="mt-6 text-center">
+              <p className="text-gray-300">
+                Already have an account?{' '}
+                <Link to="/login" className="text-teal-400 hover:text-teal-300 font-medium">
+                  Sign in
+                </Link>
+              </p>
+            </div>
 
-        {/* Login Link */}
-        <div className="mt-6 text-center">
-          <p className="text-gray-300">
-            Already have an account?{' '}
-            <Link to="/login" className="text-teal-400 hover:text-teal-300 font-medium">
-              Sign in
-            </Link>
-          </p>
-        </div>
-
-        {/* Role Information */}
-        <div className="mt-8 p-4 bg-gray-800/50 backdrop-blur-xl border border-gray-700/50 rounded-2xl shadow-lg">
-          <h3 className="text-sm font-semibold text-gray-100 mb-2">Your Journey Begins as a Viewer</h3>
-          <p className="text-xs text-gray-400">
-            All new members start with read-only access. As you contribute and demonstrate value,
-            the community may elevate your role to User or even Admin.
-          </p>
-        </div>
+            {/* Role Information */}
+            <div className="mt-8 p-4 bg-gray-800/50 backdrop-blur-xl border border-gray-700/50 rounded-2xl shadow-lg">
+              <h3 className="text-sm font-semibold text-gray-100 mb-2">Your Journey Begins as a Viewer</h3>
+              <p className="text-xs text-gray-400">
+                All new members start with read-only access. As you contribute and demonstrate value,
+                the community may elevate your role to User or even Admin.
+              </p>
+            </div>
+          </>
+        )}
       </div>
       
       {/* TLS/SSL Status Indicator */}

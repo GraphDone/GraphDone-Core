@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, gql } from '@apollo/client';
-import { Eye, EyeOff, ArrowRight, Mail, Lock, Users, Github, Sparkles, Zap, Check, CheckCircle, XCircle } from 'lucide-react';
+import { Eye, EyeOff, ArrowRight, Mail, Lock, Users, Github, Zap, Check, CheckCircle, XCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { TlsStatusIndicator } from '../components/TlsStatusIndicator';
 import { isValidEmail } from '../utils/validation';
@@ -95,7 +95,6 @@ export function LoginForm() {
   const [rememberMe, setRememberMe] = useState(false);
   const [emailValid, setEmailValid] = useState<boolean | null>(null);
   const [magicLinkEmailValid, setMagicLinkEmailValid] = useState<boolean | null>(null);
-  const [oauthLoading, setOauthLoading] = useState<string | null>(null);
 
   useEffect(() => {
     const token = searchParams.get('token');
@@ -135,6 +134,12 @@ export function LoginForm() {
 
   const [login, { loading }] = useMutation(LOGIN_MUTATION, {
     onCompleted: (data) => {
+      if (!data.login.user.isEmailVerified) {
+        setErrors({
+          submit: 'Please verify your email before logging in. Check your inbox for the verification link.'
+        });
+        return;
+      }
       setAuthUser(data.login.user, data.login.token);
       navigate('/');
     },
@@ -193,30 +198,6 @@ export function LoginForm() {
 
   const handleGuestLogin = async () => {
     await guestLogin();
-  };
-
-  const handleOAuthLogin = async (provider: 'google' | 'linkedin' | 'github') => {
-    setOauthLoading(provider);
-    setErrors({});
-
-    try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'https://localhost:4128';
-      const healthResponse = await fetch(`${apiUrl}/health`, {
-        method: 'GET',
-        signal: AbortSignal.timeout(5000)
-      });
-
-      if (!healthResponse.ok) {
-        throw new Error('Backend unavailable');
-      }
-
-      window.location.href = `${apiUrl}/auth/${provider}`;
-    } catch (error) {
-      setOauthLoading(null);
-      setErrors({
-        submit: `Unable to connect to ${provider.charAt(0).toUpperCase() + provider.slice(1)}. Please try again or use email/password.`
-      });
-    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -300,7 +281,7 @@ export function LoginForm() {
       } else {
         setErrors({ submit: data.error || 'Failed to send magic link' });
       }
-    } catch (error) {
+    } catch {
       setErrors({ submit: 'Failed to send magic link. Please try again.' });
     } finally {
       setMagicLinkLoading(false);
@@ -696,7 +677,7 @@ export function LoginForm() {
                 Quick access for testing. Please change these passwords in production!
               </p>
               <div className="space-y-2">
-                {defaultAccounts.map((account: any) => (
+                {defaultAccounts.map((account: { username: string; password: string; role: string; description: string }) => (
                   <button
                     key={account.username}
                     onClick={() => fillDefaultCredentials(account.username, account.password)}
