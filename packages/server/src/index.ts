@@ -384,6 +384,7 @@ async function startServer() {
           driver: isNeo4jAvailable ? driver : null,
           user,
           isNeo4jAvailable,
+          req,
         };
       },
     })
@@ -671,7 +672,7 @@ async function startServer() {
         console.log(`⚠️  Magic link requested for non-existent user: ${email}`); // eslint-disable-line no-console
       }
 
-      res.json({
+      return res.json({
         success: true,
         userExists: !!user,
         message: user
@@ -681,7 +682,7 @@ async function startServer() {
       });
     } catch (error) {
       console.error('❌ Magic link request failed:', error); // eslint-disable-line no-console
-      res.status(500).json({ error: 'Failed to send magic link' });
+      return res.status(500).json({ error: 'Failed to send magic link' });
     }
   });
 
@@ -742,7 +743,7 @@ async function startServer() {
       }
 
       // Return response with userExists flag for different UI messages
-      res.json({
+      return res.json({
         success: true,
         userExists: !!user,
         message: user
@@ -752,7 +753,7 @@ async function startServer() {
       });
     } catch (error) {
       console.error('❌ Password reset request failed:', error); // eslint-disable-line no-console
-      res.status(500).json({ error: 'Failed to send reset link' });
+      return res.status(500).json({ error: 'Failed to send reset link' });
     }
   });
 
@@ -810,13 +811,13 @@ async function startServer() {
 
       console.log(`🔐 Password updated successfully for: ${result.email}`); // eslint-disable-line no-console
 
-      res.json({
+      return res.json({
         success: true,
         message: 'Password updated successfully'
       });
     } catch (error) {
       console.error('❌ Password update failed:', error); // eslint-disable-line no-console
-      res.status(500).json({ error: 'Failed to update password' });
+      return res.status(500).json({ error: 'Failed to update password' });
     }
   });
 
@@ -848,7 +849,7 @@ async function startServer() {
 
       console.log(`🔗 Shareable link created for graph ${graphId}`); // eslint-disable-line no-console
 
-      res.json({
+      return res.json({
         success: true,
         shareUrl,
         token: shareableLink.token,
@@ -856,7 +857,7 @@ async function startServer() {
       });
     } catch (error) {
       console.error('❌ Failed to create shareable link:', error); // eslint-disable-line no-console
-      res.status(500).json({ error: 'Failed to create shareable link' });
+      return res.status(500).json({ error: 'Failed to create shareable link' });
     }
   });
 
@@ -869,7 +870,7 @@ async function startServer() {
         return res.status(404).json({ error: 'Link not found or expired' });
       }
 
-      res.json({
+      return res.json({
         valid: true,
         graphId: result.graphId,
         accessLevel: result.accessLevel,
@@ -877,7 +878,7 @@ async function startServer() {
       });
     } catch (error) {
       console.error('❌ Failed to verify shareable link:', error); // eslint-disable-line no-console
-      res.status(500).json({ error: 'Failed to verify link' });
+      return res.status(500).json({ error: 'Failed to verify link' });
     }
   });
 
