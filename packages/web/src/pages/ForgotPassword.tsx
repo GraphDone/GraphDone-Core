@@ -9,6 +9,12 @@ export function ForgotPassword() {
   const [resetSent, setResetSent] = useState(false);
   const [userExists, setUserExists] = useState<boolean | null>(null);
   const [error, setError] = useState('');
+  const [emailValid, setEmailValid] = useState<boolean | null>(null);
+
+  const isValidEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -200,15 +206,36 @@ export function ForgotPassword() {
                     name="email"
                     value={email}
                     onChange={(e) => {
-                      setEmail(e.target.value);
+                      const value = e.target.value;
+                      setEmail(value);
                       setError('');
+                      if (value.length === 0) {
+                        setEmailValid(null);
+                      } else {
+                        setEmailValid(isValidEmail(value));
+                      }
                     }}
                     autoFocus
-                    className={`w-full pl-10 pr-4 py-3 bg-gray-700/50 backdrop-blur-sm border rounded-xl text-gray-100 focus:outline-none focus:ring-2 transition-all ${
-                      error ? 'border-red-500/50 focus:ring-red-500/50' : 'border-gray-600/50 focus:ring-teal-500/50 focus:border-teal-500/50'
+                    className={`w-full pl-10 py-3 bg-gray-700/50 backdrop-blur-sm border rounded-xl text-gray-100 focus:outline-none focus:ring-2 transition-all ${
+                      emailValid === false
+                        ? 'pr-10 border-red-500/50 focus:ring-red-500/50'
+                        : emailValid === true
+                        ? 'pr-10 border-teal-500/50 focus:ring-teal-500/50 focus:border-teal-500/50'
+                        : error
+                        ? 'pr-4 border-red-500/50 focus:ring-red-500/50'
+                        : 'pr-4 border-gray-600/50 focus:ring-teal-500/50 focus:border-teal-500/50'
                     }`}
                     placeholder="john@example.com"
                   />
+                  {emailValid !== null && (
+                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                      {emailValid ? (
+                        <CheckCircle className="h-5 w-5 text-teal-400" />
+                      ) : (
+                        <XCircle className="h-5 w-5 text-red-400" />
+                      )}
+                    </div>
+                  )}
                 </div>
                 {error && <p className="mt-1 text-xs text-red-400">{error}</p>}
               </div>
