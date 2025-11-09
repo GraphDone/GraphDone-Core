@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, gql } from '@apollo/client';
-import { Eye, EyeOff, ArrowRight, CheckCircle, XCircle, Github, Mail, Info } from 'lucide-react';
+import { Eye, EyeOff, ArrowRight, CheckCircle, XCircle, Github, Mail, Info, Shield } from 'lucide-react';
 import { TlsStatusIndicator } from '../components/TlsStatusIndicator';
 import { PasswordRequirements } from '../components/PasswordRequirements';
 import { isValidEmail, getPasswordStrength } from '../utils/validation';
@@ -62,13 +62,21 @@ export function Signup() {
   const [resendLoading, setResendLoading] = useState(false);
   const [resendMessage, setResendMessage] = useState('');
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [rateLimitError, setRateLimitError] = useState<string | null>(null);
+  const [rateLimitRetryAfter, setRateLimitRetryAfter] = useState<number | null>(null);
 
   const [signup, { loading }] = useMutation(SIGNUP_MUTATION, {
     onCompleted: (data) => {
       setSignupComplete(true);
     },
     onError: (error) => {
-      setErrors({ submit: error.message });
+      if (error.graphQLErrors?.[0]?.extensions?.rateLimitExceeded) {
+        const retryAfter = error.graphQLErrors[0].extensions.retryAfter as number;
+        setRateLimitError(error.message);
+        setRateLimitRetryAfter(retryAfter);
+      } else {
+        setErrors({ submit: error.message });
+      }
     }
   });
 
@@ -588,8 +596,30 @@ export function Signup() {
             )}
           </div>
 
+          {/* Rate Limit Error */}
+          {rateLimitError && (
+            <div className="p-4 bg-red-900/20 border border-red-500/30 rounded-xl">
+              <div className="flex items-start space-x-2">
+                <Shield className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm text-red-300 font-medium mb-2">
+                    🛡️ Rate Limit Exceeded
+                  </p>
+                  <p className="text-xs text-red-200/80 mb-2">
+                    {rateLimitError}
+                  </p>
+                  {rateLimitRetryAfter && (
+                    <p className="text-xs text-red-300/60">
+                      Please try again in {Math.ceil(rateLimitRetryAfter / 60)} minute(s).
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Submit Error */}
-          {errors.submit && (
+          {errors.submit && !rateLimitError && (
             <div className="p-3 bg-red-900 border border-red-700 rounded-lg">
               <p className="text-sm text-red-300">{errors.submit}</p>
             </div>
