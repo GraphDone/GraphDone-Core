@@ -665,6 +665,40 @@ async function startServer() {
     }
   });
 
+  const forgotPasswordCorsOptions = {
+    origin: process.env.CORS_ORIGIN || 'http://localhost:3127',
+    credentials: true,
+    methods: ['POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+  };
+
+  app.options('/auth/forgot-password', cors<cors.CorsRequest>(forgotPasswordCorsOptions));
+
+  app.post('/auth/forgot-password', cors<cors.CorsRequest>(forgotPasswordCorsOptions), express.json(), async (req, res) => {
+    try {
+      const { email } = req.body;
+
+      if (!email || typeof email !== 'string') {
+        return res.status(400).json({ error: 'Email is required' });
+      }
+
+      // Use magic link functionality for password reset
+      const resetLink = await sqliteAuthStore.createMagicLink(email);
+      await emailService.sendPasswordReset(email, resetLink.token);
+
+      console.log(`🔐 Password reset link sent to: ${email}`); // eslint-disable-line no-console
+
+      res.json({
+        success: true,
+        message: 'Password reset link sent! Check your email.',
+        expiresAt: resetLink.expiresAt
+      });
+    } catch (error) {
+      console.error('❌ Password reset request failed:', error); // eslint-disable-line no-console
+      res.status(500).json({ error: 'Failed to send reset link' });
+    }
+  });
+
   app.post('/share/create', cors<cors.CorsRequest>(), express.json(), async (req, res) => {
     try {
       const authHeader = req.headers.authorization;
