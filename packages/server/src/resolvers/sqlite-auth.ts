@@ -21,6 +21,44 @@ interface UpdateProfileInput {
   metadata?: string;
 }
 
+interface RateLimitEntry {
+  count: number;
+  resetTime: number;
+}
+
+const signupRateLimits = new Map<string, RateLimitEntry>();
+
+function checkSignupRateLimit(ip: string): { allowed: boolean; retryAfter?: number } {
+  const now = Date.now();
+  const windowMs = 60 * 60 * 1000;
+  const maxAttempts = 5;
+
+  const entry = signupRateLimits.get(ip);
+
+  if (!entry || now > entry.resetTime) {
+    signupRateLimits.set(ip, { count: 1, resetTime: now + windowMs });
+    return { allowed: true };
+  }
+
+  if (entry.count >= maxAttempts) {
+    const retryAfter = Math.ceil((entry.resetTime - now) / 1000);
+    return { allowed: false, retryAfter };
+  }
+
+  entry.count++;
+  return { allowed: true };
+}
+
+setInterval(() => {
+  const now = Date.now();
+  const entries = Array.from(signupRateLimits.entries());
+  for (const [ip, entry] of entries) {
+    if (now > entry.resetTime) {
+      signupRateLimits.delete(ip);
+    }
+  }
+}, 5 * 60 * 1000);
+
 // SQLite-only auth resolvers that don't depend on Neo4j
 export const sqliteAuthResolvers = {
   Query: {
@@ -313,12 +351,25 @@ export const sqliteAuthResolvers = {
     },
 
     // Signup mutation
-    signup: async (_: any, { input }: { input: SignupInput }) => {
+    signup: async (_: any, { input }: { input: SignupInput }, context: any) => {
       try {
+        const clientIp = context.req?.ip || context.req?.connection?.remoteAddress || 'unknown';
+
+        const rateLimit = checkSignupRateLimit(clientIp);
+        if (!rateLimit.allowed) {
+          throw new GraphQLError('Too many signup attempts. Please try again later.', {
+            extensions: {
+              code: 'RATE_LIMIT_EXCEEDED',
+              retryAfter: rateLimit.retryAfter,
+              rateLimitExceeded: true
+            }
+          });
+        }
+
         // Check if user already exists
-        const existingUser = await sqliteAuthStore.findUserByEmailOrUsername(input.email) || 
+        const existingUser = await sqliteAuthStore.findUserByEmailOrUsername(input.email) ||
                             await sqliteAuthStore.findUserByEmailOrUsername(input.username);
-        
+
         if (existingUser) {
           throw new GraphQLError('User already exists with that email or username', {
             extensions: { code: 'BAD_USER_INPUT' }

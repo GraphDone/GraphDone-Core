@@ -88,7 +88,7 @@ export function configureOAuthStrategies() {
         callbackURL: process.env.GITHUB_CALLBACK_URL || 'https://localhost:4128/auth/github/callback',
         scope: ['user:email'],
       },
-      async (_accessToken, _refreshToken, profile, done) => {
+      async (_accessToken: string, _refreshToken: string, profile: any, done: any) => {
         try {
           const email = profile.emails?.[0]?.value;
           if (!email) {
