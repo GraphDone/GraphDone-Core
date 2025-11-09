@@ -29,6 +29,7 @@ import { emailService } from './auth/email-service.js';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
+import rateLimit from 'express-rate-limit';
 
 const execAsync = promisify(exec);
 
@@ -552,6 +553,43 @@ async function startServer() {
     }
   });
 
+  // Rate limiting configuration for authentication endpoints
+  const authRateLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: 5, // Max 5 requests per hour per IP
+    standardHeaders: true,
+    legacyHeaders: false,
+    skipSuccessfulRequests: false,
+    handler: (req, res) => {
+      const retryAfter = Math.ceil((req.rateLimit.resetTime?.getTime() || Date.now()) / 1000 - Date.now() / 1000);
+      console.log(`⚠️  Rate limit exceeded for IP: ${req.ip}`); // eslint-disable-line no-console
+      res.status(429).json({
+        error: 'Too many requests',
+        message: `You've exceeded the maximum number of authentication requests. Please try again in ${Math.ceil(retryAfter / 60)} minutes.`,
+        retryAfter,
+        rateLimitExceeded: true
+      });
+    }
+  });
+
+  const strictAuthRateLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 3, // Max 3 requests per 15 minutes per IP
+    standardHeaders: true,
+    legacyHeaders: false,
+    skipSuccessfulRequests: false,
+    handler: (req, res) => {
+      const retryAfter = Math.ceil((req.rateLimit.resetTime?.getTime() || Date.now()) / 1000 - Date.now() / 1000);
+      console.log(`⚠️  Strict rate limit exceeded for IP: ${req.ip}`); // eslint-disable-line no-console
+      res.status(429).json({
+        error: 'Too many requests',
+        message: `Too many authentication attempts. Please wait ${Math.ceil(retryAfter / 60)} minutes before trying again.`,
+        retryAfter,
+        rateLimitExceeded: true
+      });
+    }
+  });
+
   app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 
   app.get(
@@ -615,7 +653,7 @@ async function startServer() {
 
   app.options('/auth/magic-link/request', cors<cors.CorsRequest>(magicLinkCorsOptions));
 
-  app.post('/auth/magic-link/request', cors<cors.CorsRequest>(magicLinkCorsOptions), express.json(), async (req, res) => {
+  app.post('/auth/magic-link/request', authRateLimiter, cors<cors.CorsRequest>(magicLinkCorsOptions), express.json(), async (req, res) => {
     try {
       const { email } = req.body;
 
@@ -623,15 +661,23 @@ async function startServer() {
         return res.status(400).json({ error: 'Email is required' });
       }
 
-      const magicLink = await sqliteAuthStore.createMagicLink(email);
-      await emailService.sendMagicLink(email, magicLink.token);
+      const user = await sqliteAuthStore.findUserByEmailOrUsername(email);
 
-      console.log(`✉️  Magic link sent to: ${email}`); // eslint-disable-line no-console
+      if (user) {
+        const magicLink = await sqliteAuthStore.createMagicLink(email);
+        await emailService.sendMagicLink(email, magicLink.token);
+        console.log(`✉️  Magic link sent to: ${email}`); // eslint-disable-line no-console
+      } else {
+        console.log(`⚠️  Magic link requested for non-existent user: ${email}`); // eslint-disable-line no-console
+      }
 
       res.json({
         success: true,
-        message: 'Magic link sent! Check your email.',
-        expiresAt: magicLink.expiresAt
+        userExists: !!user,
+        message: user
+          ? 'Magic link sent! Check your email.'
+          : 'This email is not registered in our system.',
+        expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString()
       });
     } catch (error) {
       console.error('❌ Magic link request failed:', error); // eslint-disable-line no-console
@@ -674,7 +720,7 @@ async function startServer() {
 
   app.options('/auth/forgot-password', cors<cors.CorsRequest>(forgotPasswordCorsOptions));
 
-  app.post('/auth/forgot-password', cors<cors.CorsRequest>(forgotPasswordCorsOptions), express.json(), async (req, res) => {
+  app.post('/auth/forgot-password', strictAuthRateLimiter, cors<cors.CorsRequest>(forgotPasswordCorsOptions), express.json(), async (req, res) => {
     try {
       const { email } = req.body;
 
