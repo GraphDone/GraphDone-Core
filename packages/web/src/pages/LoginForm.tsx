@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, gql } from '@apollo/client';
-import { Eye, EyeOff, ArrowRight, Mail, Lock, Users, Github, Sparkles, Zap, Check } from 'lucide-react';
+import { Eye, EyeOff, ArrowRight, Mail, Lock, Users, Github, Sparkles, Zap, Check, CheckCircle, XCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { TlsStatusIndicator } from '../components/TlsStatusIndicator';
 
@@ -92,6 +92,8 @@ export function LoginForm() {
   const [magicLinkLoading, setMagicLinkLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [rememberMe, setRememberMe] = useState(false);
+  const [emailValid, setEmailValid] = useState<boolean | null>(null);
+  const [magicLinkEmailValid, setMagicLinkEmailValid] = useState<boolean | null>(null);
 
   useEffect(() => {
     const token = searchParams.get('token');
@@ -191,10 +193,33 @@ export function LoginForm() {
     await guestLogin();
   };
 
+  const isValidEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
-    
+
+    if (name === 'magicLinkEmail') {
+      if (value.length === 0) {
+        setMagicLinkEmailValid(null);
+      } else {
+        setMagicLinkEmailValid(isValidEmail(value));
+      }
+    }
+
+    if (name === 'emailOrUsername') {
+      if (value.length === 0) {
+        setEmailValid(null);
+      } else if (value.includes('@')) {
+        setEmailValid(isValidEmail(value));
+      } else {
+        setEmailValid(null);
+      }
+    }
+
     // Clear error for this field
     if (errors[name]) {
       const newErrors = { ...errors };
@@ -419,11 +444,26 @@ export function LoginForm() {
                       value={formData.magicLinkEmail}
                       onChange={handleChange}
                       autoFocus
-                      className={`w-full pl-10 pr-4 py-3 bg-gray-700/50 backdrop-blur-sm border rounded-xl text-gray-100 focus:outline-none focus:ring-2 transition-all ${
-                        errors.magicLinkEmail ? 'border-red-500/50 focus:ring-red-500/50' : 'border-gray-600/50 focus:ring-teal-500/50 focus:border-teal-500/50'
+                      className={`w-full pl-10 py-3 bg-gray-700/50 backdrop-blur-sm border rounded-xl text-gray-100 focus:outline-none focus:ring-2 transition-all ${
+                        magicLinkEmailValid === false
+                          ? 'pr-10 border-red-500/50 focus:ring-red-500/50'
+                          : magicLinkEmailValid === true
+                          ? 'pr-10 border-teal-500/50 focus:ring-teal-500/50 focus:border-teal-500/50'
+                          : errors.magicLinkEmail
+                          ? 'pr-4 border-red-500/50 focus:ring-red-500/50'
+                          : 'pr-4 border-gray-600/50 focus:ring-teal-500/50 focus:border-teal-500/50'
                       }`}
                       placeholder="john@example.com"
                     />
+                    {magicLinkEmailValid !== null && (
+                      <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                        {magicLinkEmailValid ? (
+                          <CheckCircle className="h-5 w-5 text-teal-400" />
+                        ) : (
+                          <XCircle className="h-5 w-5 text-red-400" />
+                        )}
+                      </div>
+                    )}
                   </div>
                   {errors.magicLinkEmail && <p className="mt-1 text-xs text-red-400">{errors.magicLinkEmail}</p>}
                 </div>
@@ -472,11 +512,26 @@ export function LoginForm() {
                 value={formData.emailOrUsername}
                 onChange={handleChange}
                 autoFocus
-                className={`w-full pl-10 pr-4 py-3 bg-gray-700/50 backdrop-blur-sm border rounded-xl text-gray-100 focus:outline-none focus:ring-2 transition-all ${
-                  errors.emailOrUsername ? 'border-red-500/50 focus:ring-red-500/50' : 'border-gray-600/50 focus:ring-teal-500/50 focus:border-teal-500/50'
+                className={`w-full pl-10 py-3 bg-gray-700/50 backdrop-blur-sm border rounded-xl text-gray-100 focus:outline-none focus:ring-2 transition-all ${
+                  emailValid === false
+                    ? 'pr-10 border-red-500/50 focus:ring-red-500/50'
+                    : emailValid === true
+                    ? 'pr-10 border-teal-500/50 focus:ring-teal-500/50 focus:border-teal-500/50'
+                    : errors.emailOrUsername
+                    ? 'pr-4 border-red-500/50 focus:ring-red-500/50'
+                    : 'pr-4 border-gray-600/50 focus:ring-teal-500/50 focus:border-teal-500/50'
                 }`}
                 placeholder="john@example.com or johndoe"
               />
+              {emailValid !== null && (
+                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                  {emailValid ? (
+                    <CheckCircle className="h-5 w-5 text-teal-400" />
+                  ) : (
+                    <XCircle className="h-5 w-5 text-red-400" />
+                  )}
+                </div>
+              )}
             </div>
             {errors.emailOrUsername && <p className="mt-1 text-xs text-red-400">{errors.emailOrUsername}</p>}
           </div>
