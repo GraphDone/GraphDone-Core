@@ -210,9 +210,9 @@ export function Signup() {
       <div className="max-w-md w-full relative z-10">
         {/* Header */}
         <div className="text-center mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
-          <Link to="/" className="inline-flex items-center justify-center mb-6 hover:opacity-80 transition-all duration-200 hover:scale-105">
-            <img src="/favicon.svg" alt="GraphDone Logo" className="h-14 w-14" />
-            <span className="ml-3 text-4xl font-bold bg-gradient-to-r from-green-300 via-blue-300 to-purple-300 bg-clip-text text-transparent">GraphDone</span>
+          <Link to="/" className="inline-flex items-center justify-center mb-6 hover:opacity-90 transition-all duration-300 hover:scale-105 group">
+            <img src="/favicon.svg" alt="GraphDone Logo" className="h-16 w-16 drop-shadow-lg group-hover:drop-shadow-2xl transition-all duration-300" />
+            <span className="ml-4 text-5xl font-bold bg-gradient-to-r from-teal-400 via-cyan-400 to-blue-500 bg-clip-text text-transparent drop-shadow-2xl tracking-tight">GraphDone</span>
           </Link>
           <h1 className="text-3xl font-bold text-gray-100 mb-3">Create Your Account</h1>
           <p className="text-gray-400 text-lg">Join the decentralized project management revolution</p>
@@ -233,7 +233,7 @@ export function Signup() {
               onChange={handleChange}
               autoFocus
               className={`w-full px-4 py-3 bg-gray-700/50 backdrop-blur-sm border rounded-xl text-gray-100 focus:outline-none focus:ring-2 transition-all ${
-                errors.name ? 'border-red-500/50 focus:ring-red-500/50' : 'border-gray-600/50 focus:ring-green-500/50 focus:border-green-500/50'
+                errors.name ? 'border-red-500/50 focus:ring-red-500/50' : 'border-gray-600/50 focus:ring-teal-500/50 focus:border-teal-500/50'
               }`}
               placeholder="John Doe"
             />
@@ -254,17 +254,17 @@ export function Signup() {
                 onChange={handleChange}
                 onBlur={() => handleBlur('email')}
                 className={`w-full px-4 py-3 bg-gray-700/50 backdrop-blur-sm border rounded-xl text-gray-100 focus:outline-none focus:ring-2 pr-10 transition-all ${
-                  errors.email ? 'border-red-500/50 focus:ring-red-500/50' : 'border-gray-600/50 focus:ring-green-500/50 focus:border-green-500/50'
+                  errors.email ? 'border-red-500/50 focus:ring-red-500/50' : 'border-gray-600/50 focus:ring-teal-500/50 focus:border-teal-500/50'
                 }`}
                 placeholder="john@example.com"
               />
               {isChecking.email && (
                 <div className="absolute right-2 top-2.5 w-5 h-5">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-green-500"></div>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-teal-500"></div>
                 </div>
               )}
               {availability.email && !isChecking.email && (
-                <CheckCircle className="absolute right-2 top-2.5 w-5 h-5 text-green-500" />
+                <CheckCircle className="absolute right-2 top-2.5 w-5 h-5 text-teal-500" />
               )}
             </div>
             {errors.email && <p className="mt-1 text-xs text-red-400">{errors.email}</p>}
@@ -284,17 +284,17 @@ export function Signup() {
                 onChange={handleChange}
                 onBlur={() => handleBlur('username')}
                 className={`w-full px-4 py-3 bg-gray-700/50 backdrop-blur-sm border rounded-xl text-gray-100 focus:outline-none focus:ring-2 pr-10 transition-all ${
-                  errors.username ? 'border-red-500/50 focus:ring-red-500/50' : 'border-gray-600/50 focus:ring-green-500/50 focus:border-green-500/50'
+                  errors.username ? 'border-red-500/50 focus:ring-red-500/50' : 'border-gray-600/50 focus:ring-teal-500/50 focus:border-teal-500/50'
                 }`}
                 placeholder="johndoe"
               />
               {isChecking.username && (
                 <div className="absolute right-2 top-2.5 w-5 h-5">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-green-500"></div>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-teal-500"></div>
                 </div>
               )}
               {availability.username && !isChecking.username && (
-                <CheckCircle className="absolute right-2 top-2.5 w-5 h-5 text-green-500" />
+                <CheckCircle className="absolute right-2 top-2.5 w-5 h-5 text-teal-500" />
               )}
             </div>
             {errors.username && <p className="mt-1 text-xs text-red-400">{errors.username}</p>}
@@ -313,7 +313,7 @@ export function Signup() {
                 value={formData.password}
                 onChange={handleChange}
                 className={`w-full px-4 py-3 bg-gray-700/50 backdrop-blur-sm border rounded-xl text-gray-100 focus:outline-none focus:ring-2 pr-12 transition-all ${
-                  errors.password ? 'border-red-500/50 focus:ring-red-500/50' : 'border-gray-600/50 focus:ring-green-500/50 focus:border-green-500/50'
+                  errors.password ? 'border-red-500/50 focus:ring-red-500/50' : 'border-gray-600/50 focus:ring-teal-500/50 focus:border-teal-500/50'
                 }`}
                 placeholder="••••••••"
               />
@@ -360,7 +360,7 @@ export function Signup() {
                 value={formData.confirmPassword}
                 onChange={handleChange}
                 className={`w-full px-4 py-3 bg-gray-700/50 backdrop-blur-sm border rounded-xl text-gray-100 focus:outline-none focus:ring-2 pr-12 transition-all ${
-                  errors.confirmPassword ? 'border-red-500/50 focus:ring-red-500/50' : 'border-gray-600/50 focus:ring-green-500/50 focus:border-green-500/50'
+                  errors.confirmPassword ? 'border-red-500/50 focus:ring-red-500/50' : 'border-gray-600/50 focus:ring-teal-500/50 focus:border-teal-500/50'
                 }`}
                 placeholder="••••••••"
               />
@@ -386,7 +386,7 @@ export function Signup() {
           <button
             type="submit"
             disabled={loading || Object.keys(isChecking).some(key => isChecking[key])}
-            className="w-full bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-green-500/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:translate-y-0 flex items-center justify-center space-x-2"
+            className="w-full bg-gradient-to-r from-teal-600 to-blue-600 hover:from-teal-500 hover:to-blue-500 border border-teal-400/50 hover:border-teal-300 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-teal-500/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:translate-y-0 flex items-center justify-center space-x-2"
           >
             {loading ? (
               <>
@@ -413,7 +413,7 @@ export function Signup() {
         <div className="mt-6 text-center">
           <p className="text-gray-300">
             Already have an account?{' '}
-            <Link to="/login" className="text-green-400 hover:text-green-300 font-medium">
+            <Link to="/login" className="text-teal-400 hover:text-teal-300 font-medium">
               Sign in
             </Link>
           </p>
