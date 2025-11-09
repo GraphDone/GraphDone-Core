@@ -44,7 +44,7 @@ export function ForgotPassword() {
       } else {
         setError(data.error || 'Failed to send reset link');
       }
-    } catch (error) {
+    } catch {
       setError('Failed to send reset link. Please try again.');
     } finally {
       setLoading(false);
