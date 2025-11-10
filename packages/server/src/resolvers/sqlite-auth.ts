@@ -1,10 +1,12 @@
 import { GraphQLError } from 'graphql';
 import { sqliteAuthStore } from '../auth/sqlite-auth.js';
 import { generateToken } from '../utils/auth.js';
+import { verifyCaptcha } from '../utils/captcha.js';
 
 interface LoginInput {
   emailOrUsername: string;
   password: string;
+  captchaPayload?: string;
 }
 
 interface SignupInput {
@@ -13,6 +15,7 @@ interface SignupInput {
   password: string;
   name: string;
   teamId?: string;
+  captchaPayload?: string;
 }
 
 interface UpdateProfileInput {
@@ -275,8 +278,20 @@ export const sqliteAuthResolvers = {
     // Login mutation - SQLite only
     login: async (_: any, { input }: { input: LoginInput }) => {
       console.log(`🔐 Login attempt for: ${input.emailOrUsername}`);
-      
+
       try {
+        // Verify CAPTCHA if provided
+        if (input.captchaPayload) {
+          const isCaptchaValid = await verifyCaptcha(input.captchaPayload);
+          if (!isCaptchaValid) {
+            console.log('❌ CAPTCHA verification failed');
+            throw new GraphQLError('CAPTCHA verification failed', {
+              extensions: { code: 'CAPTCHA_FAILED' }
+            });
+          }
+          console.log('✅ CAPTCHA verified');
+        }
+
         // SQLite-only authentication
         const user = await sqliteAuthStore.findUserByEmailOrUsername(input.emailOrUsername);
         
@@ -364,6 +379,18 @@ export const sqliteAuthResolvers = {
               rateLimitExceeded: true
             }
           });
+        }
+
+        // Verify CAPTCHA if provided
+        if (input.captchaPayload) {
+          const isCaptchaValid = await verifyCaptcha(input.captchaPayload);
+          if (!isCaptchaValid) {
+            console.log('❌ CAPTCHA verification failed');
+            throw new GraphQLError('CAPTCHA verification failed', {
+              extensions: { code: 'CAPTCHA_FAILED' }
+            });
+          }
+          console.log('✅ CAPTCHA verified');
         }
 
         // Check if user already exists

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
-import { Lock, Eye, EyeOff, CheckCircle, XCircle } from 'lucide-react';
+import { Lock, Eye, EyeOff, CheckCircle, XCircle, ArrowLeft } from 'lucide-react';
 import { TlsStatusIndicator } from '../components/TlsStatusIndicator';
+import { CodeCaptcha } from '../components/CodeCaptcha';
 import { PasswordRequirements } from '../components/PasswordRequirements';
 import { validatePassword, getPasswordStrength } from '../utils/validation';
 
@@ -18,6 +19,7 @@ export function ResetPassword() {
   const [resetComplete, setResetComplete] = useState(false);
   const [error, setError] = useState('');
   const [passwordsMatch, setPasswordsMatch] = useState<boolean | null>(null);
+  const [captchaPayload, setCaptchaPayload] = useState<string>('');
 
   useEffect(() => {
     if (!token) {
@@ -51,7 +53,7 @@ export function ResetPassword() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ token, newPassword: password }),
+        body: JSON.stringify({ token, newPassword: password, captchaPayload }),
       });
 
       const data = await response.json();
@@ -126,7 +128,7 @@ export function ResetPassword() {
                     className={`w-full pl-10 pr-12 py-3 bg-gray-700/50 backdrop-blur-sm border rounded-xl text-gray-100 focus:outline-none focus:ring-2 transition-all ${
                       error ? 'border-red-500/50 focus:ring-red-500/50' : 'border-gray-600/50 focus:ring-teal-500/50 focus:border-teal-500/50'
                     }`}
-                    placeholder="Enter new password"
+                    placeholder="••••••••"
                   />
                   <button
                     type="button"
@@ -187,7 +189,7 @@ export function ResetPassword() {
                         ? 'border-red-500/50 focus:ring-red-500/50'
                         : 'border-gray-600/50 focus:ring-teal-500/50 focus:border-teal-500/50'
                     }`}
-                    placeholder="Confirm new password"
+                    placeholder="••••••••"
                   />
                   {passwordsMatch !== null && confirmPassword && (
                     <div className="absolute inset-y-0 right-12 flex items-center pointer-events-none">
@@ -215,9 +217,15 @@ export function ResetPassword() {
                 )}
               </div>
 
+              {/* CAPTCHA */}
+              <CodeCaptcha
+                onVerified={(code) => setCaptchaPayload(code)}
+                onError={() => setCaptchaPayload('')}
+              />
+
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || !captchaPayload}
                 className="w-full bg-gradient-to-r from-teal-600 to-blue-600 hover:from-teal-500 hover:to-blue-500 border border-teal-400/50 hover:border-teal-300 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-teal-500/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:translate-y-0 flex items-center justify-center space-x-2"
               >
                 {loading ? (
@@ -239,8 +247,9 @@ export function ResetPassword() {
         <div className="mt-6 text-center">
           <Link
             to="/login"
-            className="text-gray-300 hover:text-teal-400 transition-colors text-sm"
+            className="inline-flex items-center text-gray-300 hover:text-teal-400 transition-colors"
           >
+            <ArrowLeft className="h-4 w-4 mr-2" />
             Back to login
           </Link>
         </div>

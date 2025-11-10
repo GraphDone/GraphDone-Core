@@ -30,6 +30,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
 import rateLimit from 'express-rate-limit';
+import { createCaptchaChallenge, verifyCaptcha } from './utils/captcha.js';
 
 const execAsync = promisify(exec);
 
@@ -656,10 +657,16 @@ async function startServer() {
 
   app.post('/auth/magic-link/request', authRateLimiter, cors<cors.CorsRequest>(magicLinkCorsOptions), express.json(), async (req, res) => {
     try {
-      const { email } = req.body;
+      const { email, captchaPayload } = req.body;
 
       if (!email || typeof email !== 'string') {
         return res.status(400).json({ error: 'Email is required' });
+      }
+
+      // Verify CAPTCHA
+      const isCaptchaValid = await verifyCaptcha(captchaPayload);
+      if (!isCaptchaValid) {
+        return res.status(400).json({ error: 'CAPTCHA verification failed' });
       }
 
       const user = await sqliteAuthStore.findUserByEmailOrUsername(email);
@@ -723,10 +730,16 @@ async function startServer() {
 
   app.post('/auth/forgot-password', strictAuthRateLimiter, cors<cors.CorsRequest>(forgotPasswordCorsOptions), express.json(), async (req, res) => {
     try {
-      const { email } = req.body;
+      const { email, captchaPayload } = req.body;
 
       if (!email || typeof email !== 'string') {
         return res.status(400).json({ error: 'Email is required' });
+      }
+
+      // Verify CAPTCHA
+      const isCaptchaValid = await verifyCaptcha(captchaPayload);
+      if (!isCaptchaValid) {
+        return res.status(400).json({ error: 'CAPTCHA verification failed' });
       }
 
       // Check if user exists
@@ -787,7 +800,7 @@ async function startServer() {
 
   app.post('/auth/reset-password', cors<cors.CorsRequest>(resetPasswordCorsOptions), express.json(), async (req, res) => {
     try {
-      const { token, newPassword } = req.body;
+      const { token, newPassword, captchaPayload } = req.body;
 
       if (!token || typeof token !== 'string') {
         return res.status(400).json({ error: 'Reset token is required' });
@@ -799,6 +812,12 @@ async function startServer() {
 
       if (newPassword.length < 8) {
         return res.status(400).json({ error: 'Password must be at least 8 characters' });
+      }
+
+      // Verify CAPTCHA
+      const isCaptchaValid = await verifyCaptcha(captchaPayload);
+      if (!isCaptchaValid) {
+        return res.status(400).json({ error: 'CAPTCHA verification failed' });
       }
 
       const result = await sqliteAuthStore.verifyMagicLink(token);
@@ -879,6 +898,25 @@ async function startServer() {
     } catch (error) {
       console.error('❌ Failed to verify shareable link:', error); // eslint-disable-line no-console
       return res.status(500).json({ error: 'Failed to verify link' });
+    }
+  });
+
+  const captchaCorsOptions = {
+    origin: process.env.CORS_ORIGIN || 'http://localhost:3127',
+    credentials: true,
+    methods: ['GET', 'OPTIONS'],
+    allowedHeaders: ['Content-Type']
+  };
+
+  app.options('/api/captcha/challenge', cors<cors.CorsRequest>(captchaCorsOptions));
+
+  app.get('/api/captcha/challenge', cors<cors.CorsRequest>(captchaCorsOptions), async (_req, res) => {
+    try {
+      const challenge = await createCaptchaChallenge();
+      res.json(challenge);
+    } catch (error) {
+      console.error('❌ CAPTCHA challenge creation failed:', error); // eslint-disable-line no-console
+      res.status(500).json({ error: 'Failed to create CAPTCHA challenge' });
     }
   });
 

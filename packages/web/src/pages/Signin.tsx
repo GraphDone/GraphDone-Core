@@ -7,6 +7,7 @@ import { TlsStatusIndicator } from '../components/TlsStatusIndicator';
 import { GuestModeDialog } from '../components/GuestModeDialog';
 import { PasswordRequirements } from '../components/PasswordRequirements';
 import { isValidEmail } from '../utils/validation';
+import { CodeCaptcha } from '../components/CodeCaptcha';
 
 const LOGIN_MUTATION = gql`
   mutation Login($input: LoginInput!) {
@@ -88,6 +89,8 @@ export function Signin() {
     password: '',
     magicLinkEmail: ''
   });
+  const [captchaPayload, setCaptchaPayload] = useState<string | null>(null);
+  const [magicLinkCaptchaPayload, setMagicLinkCaptchaPayload] = useState<string | null>(null);
 
   const [showPassword, setShowPassword] = useState(false);
   const [useMagicLink, setUseMagicLink] = useState(false);
@@ -272,7 +275,8 @@ export function Signin() {
       variables: {
         input: {
           emailOrUsername: formData.emailOrUsername,
-          password: formData.password
+          password: formData.password,
+          captchaPayload: captchaPayload
         }
       }
     });
@@ -324,7 +328,8 @@ export function Signin() {
       variables: {
         input: {
           emailOrUsername: username,
-          password: password
+          password: password,
+          captchaPayload: captchaPayload
         }
       }
     });
@@ -353,7 +358,10 @@ export function Signin() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email: formData.magicLinkEmail }),
+        body: JSON.stringify({
+          email: formData.magicLinkEmail,
+          captchaPayload: magicLinkCaptchaPayload
+        }),
       });
 
       const data = await response.json();
@@ -619,10 +627,18 @@ export function Signin() {
                   )}
                 </div>
 
+                {/* CAPTCHA for Magic Link */}
+                <div>
+                  <CodeCaptcha
+                    onVerified={(code) => setMagicLinkCaptchaPayload(code)}
+                    className="w-full"
+                  />
+                </div>
+
                 <button
                   type="button"
                   onClick={handleMagicLinkRequest}
-                  disabled={magicLinkLoading || !!errors.rateLimitError}
+                  disabled={magicLinkLoading || !!errors.rateLimitError || !magicLinkCaptchaPayload}
                   className="w-full bg-gradient-to-r from-teal-600 to-blue-600 hover:from-teal-500 hover:to-blue-500 border border-teal-400/50 hover:border-teal-300 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-teal-500/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:translate-y-0 flex items-center justify-center space-x-2"
                 >
                   {magicLinkLoading ? (
@@ -727,6 +743,14 @@ export function Signin() {
             {errors.password && <p id="password-error" className="mt-1 text-xs text-red-400" role="alert">{errors.password}</p>}
           </div>
 
+          {/* CAPTCHA */}
+          <div>
+            <CodeCaptcha
+              onVerified={(code) => setCaptchaPayload(code)}
+              className="w-full"
+            />
+          </div>
+
           {/* Remember Me & Forgot Password */}
           <div className="flex items-center justify-between">
             <label className="flex items-center cursor-pointer group">
@@ -802,7 +826,7 @@ export function Signin() {
           {/* Submit Button */}
           <button
             type="submit"
-            disabled={loading || guestLoading}
+            disabled={loading || guestLoading || !captchaPayload}
             className="w-full bg-gradient-to-r from-teal-600 to-blue-600 hover:from-teal-500 hover:to-blue-500 border border-teal-400/50 hover:border-teal-300 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-teal-500/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:translate-y-0 flex items-center justify-center space-x-2"
           >
             {loading ? (
