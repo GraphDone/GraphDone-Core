@@ -2,7 +2,7 @@ import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import { Strategy as OpenIDConnectStrategy } from 'passport-openidconnect';
 import { Strategy as GitHubStrategy } from 'passport-github2';
-import { sqliteAuthStore } from './sqlite-auth';
+import { sqliteAuthStore } from './sqlite-auth.js';
 
 export function configureOAuthStrategies() {
   passport.use(

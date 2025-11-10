@@ -646,8 +646,9 @@ export function Signup() {
 
           {/* Terms */}
           <p className="text-xs text-gray-400 text-center">
-            By creating an account, you agree to participate in the decentralized graph network
-            and contribute to the collective intelligence.
+            By creating an account, you agree to participate in<br />
+            the decentralized graph network and contribute<br />
+            to the collective intelligence.
           </p>
         </form>
         )}
@@ -661,15 +662,6 @@ export function Signup() {
                 <Link to="/login" className="text-teal-400 hover:text-teal-300 font-medium">
                   Sign in
                 </Link>
-              </p>
-            </div>
-
-            {/* Role Information */}
-            <div className="mt-8 p-4 bg-gray-800/50 backdrop-blur-xl border border-gray-700/50 rounded-2xl shadow-lg">
-              <h3 className="text-sm font-semibold text-gray-100 mb-2">Your Journey Begins as a Viewer</h3>
-              <p className="text-xs text-gray-400">
-                All new members start with read-only access. As you contribute and demonstrate value,
-                the community may elevate your role to User or even Admin.
               </p>
             </div>
           </>
