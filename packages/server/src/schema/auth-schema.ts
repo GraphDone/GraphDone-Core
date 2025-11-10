@@ -23,11 +23,13 @@ export const authTypeDefs = gql`
     password: String!
     name: String!
     teamId: String
+    captchaPayload: String
   }
 
   input LoginInput {
     emailOrUsername: String!
     password: String!
+    captchaPayload: String
   }
 
   input UpdateProfileInput {

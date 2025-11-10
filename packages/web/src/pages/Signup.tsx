@@ -5,6 +5,7 @@ import { Eye, EyeOff, ArrowRight, CheckCircle, XCircle, Github, Mail, Info, Shie
 import { TlsStatusIndicator } from '../components/TlsStatusIndicator';
 import { PasswordRequirements } from '../components/PasswordRequirements';
 import { isValidEmail, getPasswordStrength } from '../utils/validation';
+import { CodeCaptcha } from '../components/CodeCaptcha';
 
 const SIGNUP_MUTATION = gql`
   mutation Signup($input: SignupInput!) {
@@ -50,6 +51,7 @@ export function Signup() {
     confirmPassword: '',
     name: ''
   });
+  const [captchaPayload, setCaptchaPayload] = useState<string | null>(null);
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -186,7 +188,8 @@ export function Signup() {
           email: formData.email,
           username: formData.username,
           password: formData.password,
-          name: formData.name
+          name: formData.name,
+          captchaPayload: captchaPayload
         }
       }
     });
@@ -596,6 +599,14 @@ export function Signup() {
             )}
           </div>
 
+          {/* CAPTCHA */}
+          <div>
+            <CodeCaptcha
+              onVerified={(code) => setCaptchaPayload(code)}
+              className="w-full"
+            />
+          </div>
+
           {/* Rate Limit Error */}
           {rateLimitError && (
             <div className="p-4 bg-red-900/20 border border-red-500/30 rounded-xl">
@@ -628,7 +639,7 @@ export function Signup() {
           {/* Submit Button */}
           <button
             type="submit"
-            disabled={loading || Object.keys(isChecking).some(key => isChecking[key])}
+            disabled={loading || Object.keys(isChecking).some(key => isChecking[key]) || !captchaPayload}
             className="w-full bg-gradient-to-r from-teal-600 to-blue-600 hover:from-teal-500 hover:to-blue-500 border border-teal-400/50 hover:border-teal-300 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-teal-500/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:translate-y-0 flex items-center justify-center space-x-2"
           >
             {loading ? (

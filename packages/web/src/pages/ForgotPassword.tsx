@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Mail, ArrowLeft, CheckCircle, XCircle, Shield } from 'lucide-react';
 import { TlsStatusIndicator } from '../components/TlsStatusIndicator';
+import { CodeCaptcha } from '../components/CodeCaptcha';
 import { isValidEmail } from '../utils/validation';
 
 export function ForgotPassword() {
@@ -12,6 +13,7 @@ export function ForgotPassword() {
   const [emailValid, setEmailValid] = useState<boolean | null>(null);
   const [rateLimitError, setRateLimitError] = useState('');
   const [rateLimitRetryAfter, setRateLimitRetryAfter] = useState<number | null>(null);
+  const [captchaPayload, setCaptchaPayload] = useState<string>('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,7 +40,7 @@ export function ForgotPassword() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, captchaPayload }),
       });
 
       const data = await response.json();
@@ -189,10 +191,16 @@ export function ForgotPassword() {
                 )}
               </div>
 
+              {/* CAPTCHA */}
+              <CodeCaptcha
+                onVerified={(code) => setCaptchaPayload(code)}
+                onError={() => setCaptchaPayload('')}
+              />
+
               {/* Submit Button */}
               <button
                 type="submit"
-                disabled={loading || !!rateLimitError}
+                disabled={loading || !!rateLimitError || !captchaPayload}
                 className="w-full bg-gradient-to-r from-teal-600 to-blue-600 hover:from-teal-500 hover:to-blue-500 border border-teal-400/50 hover:border-teal-300 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-teal-500/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:translate-y-0 flex items-center justify-center space-x-2"
               >
                 {loading ? (
