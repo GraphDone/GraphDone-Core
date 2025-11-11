@@ -516,6 +516,23 @@ async function startServer() {
         nodeEnv: process.env.NODE_ENV || 'development',
         clientUrl: process.env.CLIENT_URL || `http://localhost:${Number(process.env.WEB_PORT) || 3127}`,
         corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:3127'
+      },
+      oauth: {
+        enabled: !!(process.env.GOOGLE_CLIENT_ID || process.env.GITHUB_CLIENT_ID || process.env.LINKEDIN_CLIENT_ID),
+        providers: {
+          google: {
+            enabled: !!process.env.GOOGLE_CLIENT_ID,
+            configured: !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)
+          },
+          github: {
+            enabled: !!process.env.GITHUB_CLIENT_ID,
+            configured: !!(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET)
+          },
+          linkedin: {
+            enabled: !!process.env.LINKEDIN_CLIENT_ID,
+            configured: !!(process.env.LINKEDIN_CLIENT_ID && process.env.LINKEDIN_CLIENT_SECRET)
+          }
+        }
       }
     };
 
