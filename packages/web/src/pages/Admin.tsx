@@ -5,6 +5,8 @@ import { AdminUserManagement } from '../components/AdminUserManagement';
 import { CustomDropdown } from '../components/CustomDropdown';
 import { APP_VERSION } from '../utils/version';
 import { useSystemConfig } from '../hooks/useSystemConfig';
+import { useQuery, useMutation } from '@apollo/client';
+import { GET_OAUTH_PROVIDER_CONFIGS, UPDATE_OAUTH_PROVIDER_CONFIG } from '../lib/queries';
 
 export function Admin() {
   const { currentUser } = useAuth();
@@ -298,28 +300,51 @@ function OAuthProviderManagement() {
   });
 
   const [saved, setSaved] = useState(false);
-  const [loading, setLoading] = useState(false);
+
+  const { data, loading: queryLoading, refetch } = useQuery(GET_OAUTH_PROVIDER_CONFIGS);
+  const [updateOAuthConfig, { loading: mutationLoading }] = useMutation(UPDATE_OAUTH_PROVIDER_CONFIG);
+
+  const loading = queryLoading || mutationLoading;
 
   useEffect(() => {
-    // TODO: Load OAuth provider configuration from backend
-    console.log('Loading OAuth provider configuration...');
-  }, []);
+    if (data?.oauthProviderConfigs) {
+      const loadedProviders = { ...providers };
+      data.oauthProviderConfigs.forEach((config: any) => {
+        if (loadedProviders[config.provider as keyof typeof loadedProviders]) {
+          loadedProviders[config.provider as keyof typeof loadedProviders] = {
+            enabled: config.enabled,
+            clientId: config.clientId || '',
+            clientSecret: config.clientSecret || '',
+            callbackUrl: config.callbackUrl,
+            configured: config.configured,
+          };
+        }
+      });
+      setProviders(loadedProviders);
+    }
+  }, [data]);
 
   const handleSave = async () => {
-    setLoading(true);
     try {
-      // TODO: Save OAuth provider configuration to backend
-      console.log('Saving OAuth provider configuration:', providers);
+      for (const [providerKey, config] of Object.entries(providers)) {
+        await updateOAuthConfig({
+          variables: {
+            input: {
+              provider: providerKey,
+              enabled: config.enabled,
+              clientId: config.clientId,
+              clientSecret: config.clientSecret,
+              callbackUrl: config.callbackUrl,
+            },
+          },
+        });
+      }
 
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
+      await refetch();
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (error) {
       console.error('Failed to save OAuth configuration:', error);
-    } finally {
-      setLoading(false);
     }
   };
 

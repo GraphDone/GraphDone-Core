@@ -381,6 +381,61 @@ export const DELETE_EDGE = gql`
   }
 `;
 
+// OAuth Provider Configuration Queries
+export const GET_OAUTH_PROVIDER_CONFIGS = gql`
+  query GetOAuthProviderConfigs {
+    oauthProviderConfigs {
+      provider
+      enabled
+      clientId
+      clientSecret
+      callbackUrl
+      configured
+      createdAt
+      updatedAt
+    }
+  }
+`;
+
+export const GET_OAUTH_PROVIDER_CONFIG = gql`
+  query GetOAuthProviderConfig($provider: String!) {
+    oauthProviderConfig(provider: $provider) {
+      provider
+      enabled
+      clientId
+      clientSecret
+      callbackUrl
+      configured
+      createdAt
+      updatedAt
+    }
+  }
+`;
+
+export const UPDATE_OAUTH_PROVIDER_CONFIG = gql`
+  mutation UpdateOAuthProviderConfig($input: OAuthProviderConfigInput!) {
+    updateOAuthProviderConfig(input: $input) {
+      provider
+      enabled
+      clientId
+      clientSecret
+      callbackUrl
+      configured
+      createdAt
+      updatedAt
+    }
+  }
+`;
+
+export const DELETE_OAUTH_PROVIDER_CONFIG = gql`
+  mutation DeleteOAuthProviderConfig($provider: String!) {
+    deleteOAuthProviderConfig(provider: $provider) {
+      success
+      message
+    }
+  }
+`;
+
 // Backward compatibility exports
 export const GET_NODES = GET_WORK_ITEMS;
 export const GET_NODE_BY_ID = GET_WORK_ITEM_BY_ID;
