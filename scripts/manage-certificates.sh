@@ -24,15 +24,39 @@ mkdir -p "$CERT_DIR"
 
 case "$MODE" in
   "local")
-    echo -e "${YELLOW}📝 Setting up LOCAL development certificates with mkcert...${NC}"
-    
+    echo -e "${YELLOW}📝 Setting up LOCAL development certificates...${NC}"
+
+    # Check if certificates already exist
+    if [ -f "$CERT_DIR/server-cert.pem" ] && [ -f "$CERT_DIR/server-key.pem" ]; then
+      echo -e "${GREEN}✅ Certificates already exist, skipping generation${NC}"
+      echo "  Certificate: $CERT_DIR/server-cert.pem"
+      echo "  Private key: $CERT_DIR/server-key.pem"
+      exit 0
+    fi
+
     # Check if mkcert is installed
     if ! command -v mkcert &> /dev/null; then
-      echo -e "${RED}❌ mkcert is not installed!${NC}"
-      echo "Please install mkcert first:"
-      echo "  macOS: brew install mkcert"
-      echo "  Linux: https://github.com/FiloSottile/mkcert#installation"
-      exit 1
+      echo -e "${YELLOW}⚠️  mkcert not found, using openssl for self-signed certificates...${NC}"
+      # Generate self-signed certificate with openssl
+      openssl req -x509 -newkey rsa:4096 -nodes \
+        -keyout "$CERT_DIR/server-key.pem" \
+        -out "$CERT_DIR/server-cert.pem" \
+        -days 365 \
+        -subj "/CN=localhost/O=GraphDone Development/C=US" \
+        -addext "subjectAltName=DNS:localhost,DNS:*.localhost,DNS:graphdone.local,IP:127.0.0.1,IP:::1" 2>/dev/null || \
+      openssl req -x509 -newkey rsa:4096 -nodes \
+        -keyout "$CERT_DIR/server-key.pem" \
+        -out "$CERT_DIR/server-cert.pem" \
+        -days 365 \
+        -subj "/CN=localhost/O=GraphDone Development/C=US"
+
+      chmod 600 "$CERT_DIR/server-key.pem"
+      chmod 644 "$CERT_DIR/server-cert.pem"
+      echo -e "${GREEN}✅ Self-signed certificates generated with openssl${NC}"
+      echo "  Certificate: $CERT_DIR/server-cert.pem"
+      echo "  Private key: $CERT_DIR/server-key.pem"
+      echo -e "${YELLOW}Note: Browser will show warnings for self-signed certificates${NC}"
+      exit 0
     fi
     
     # Install local CA if not already installed
