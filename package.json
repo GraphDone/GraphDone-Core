@@ -22,6 +22,7 @@
     "test:e2e:debug": "playwright test --debug",
     "test:all": "npm run test:unit && npm run test:e2e",
     "test:comprehensive": "node tests/run-all-tests.js",
+    "test:pr": "node tests/run-pr-tests.js",
     "test:installation": "./scripts/test-installation-simple.sh",
     "test:https": "node tests/ssl-certificate-analysis.js && node tests/mobile-https-compatibility-test.js",
     "test:report": "open test-results/reports/index.html",
