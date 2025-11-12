@@ -3,7 +3,8 @@
 # GraphDone - Single Entry Point
 # The main launcher for all GraphDone operations
 
-set -e
+# Don't use set -e to allow better error handling
+# set -e
 
 # Colors for better output
 RED='\033[0;31m'
@@ -201,6 +202,157 @@ log_warning() {
 
 log_error() {
     echo -e "${RED}$1${NC}"
+}
+
+# Docker error handling function
+handle_docker_error() {
+    local error_output="$1"
+    local command="$2"
+
+    echo ""
+    log_error "╔════════════════════════════════════════════════════════════════╗"
+    log_error "║                                                                ║"
+    log_error "║                    ❌ Docker Error Detected ❌                  ║"
+    log_error "║                                                                ║"
+    log_error "╚════════════════════════════════════════════════════════════════╝"
+    echo ""
+
+    # Detect specific error types and provide targeted solutions
+    # Check most specific patterns first, then more general ones
+    if echo "$error_output" | grep -qi "Cannot connect to the Docker daemon\|docker.*not running\|Is the docker daemon running"; then
+        log_warning "🔍 Issue: Docker is not running"
+        echo ""
+        echo "Docker daemon is not started."
+        echo ""
+        log_info "${BOLD}Solution:${NC}"
+        echo "  • Start Docker Desktop"
+        echo "  • Wait for it to fully start (check system tray)"
+        echo "  • Then run: ${GREEN}./start${NC}"
+        echo ""
+
+    elif echo "$error_output" | grep -qi "ContainerConfig\|container.*config\|image.*config"; then
+        log_warning "🔍 Issue: Corrupted container state detected"
+        echo ""
+        echo "This happens when Docker containers are in an inconsistent state."
+        echo ""
+        log_info "${BOLD}Quick Fix (Recommended):${NC}"
+        echo "  ${GREEN}./start stop${NC}    # Stop all services"
+        echo "  ${GREEN}./start${NC}         # Start fresh"
+        echo ""
+        log_info "${BOLD}If that doesn't work, try a complete cleanup:${NC}"
+        echo "  ${GREEN}./start remove${NC}  # Remove all containers and data"
+        echo "  ${GREEN}./start setup${NC}   # Fresh installation"
+        echo ""
+
+    elif echo "$error_output" | grep -qi "permission denied\|Got permission denied"; then
+        log_warning "🔍 Issue: Docker permission problem"
+        echo ""
+        echo "Docker requires proper permissions to run."
+        echo ""
+        log_info "${BOLD}Solution:${NC}"
+        echo "  ${GREEN}./scripts/setup_docker.sh${NC}  # Fix Docker permissions"
+        echo "  Then restart your terminal and run: ${GREEN}./start${NC}"
+        echo ""
+
+    elif echo "$error_output" | grep -qi "no such container\|container.*not found"; then
+        log_warning "🔍 Issue: Container not found"
+        echo ""
+        echo "Expected containers are missing."
+        echo ""
+        log_info "${BOLD}Solution:${NC}"
+        echo "  ${GREEN}./start stop${NC}    # Clean up"
+        echo "  ${GREEN}./start${NC}         # Recreate containers"
+        echo ""
+
+    elif echo "$error_output" | grep -qi "port.*already allocated\|address already in use"; then
+        log_warning "🔍 Issue: Port conflict detected"
+        echo ""
+        echo "Another service is using GraphDone's ports (3127, 3128, 4127, 4128, 7474, 7687)."
+        echo ""
+        log_info "${BOLD}Solution:${NC}"
+        echo "  ${GREEN}./start stop${NC}                    # Stop GraphDone services"
+        echo "  ${GREEN}lsof -ti:3127 | xargs kill -9${NC}  # Kill specific port (example)"
+        echo ""
+
+    elif echo "$error_output" | grep -qi "no space left\|disk.*full"; then
+        log_warning "🔍 Issue: Disk space problem"
+        echo ""
+        echo "Not enough disk space for Docker operations."
+        echo ""
+        log_info "${BOLD}Solution:${NC}"
+        echo "  ${GREEN}docker system prune -a${NC}  # Clean up Docker resources"
+        echo "  Then run: ${GREEN}./start${NC}"
+        echo ""
+
+    elif echo "$error_output" | grep -qi "network.*not found\|network.*error"; then
+        log_warning "🔍 Issue: Docker network problem"
+        echo ""
+        echo "Docker network configuration is corrupted."
+        echo ""
+        log_info "${BOLD}Solution:${NC}"
+        echo "  ${GREEN}./start stop${NC}    # Stop services"
+        echo "  ${GREEN}docker network prune${NC}  # Clean up networks"
+        echo "  ${GREEN}./start${NC}         # Restart"
+        echo ""
+
+    elif echo "$error_output" | grep -qi "timeout\|timed out"; then
+        log_warning "🔍 Issue: Docker operation timeout"
+        echo ""
+        echo "Docker operations are taking too long (usually means Docker Desktop is slow)."
+        echo ""
+        log_info "${BOLD}Solution:${NC}"
+        echo "  1. Restart Docker Desktop"
+        echo "  2. Wait 30 seconds for Docker to fully start"
+        echo "  3. Try again: ${GREEN}./start${NC}"
+        echo ""
+
+    else
+        log_warning "🔍 Issue: Unknown Docker error"
+        echo ""
+        echo "An unexpected Docker error occurred."
+        echo ""
+        log_info "${BOLD}General Solutions (try in order):${NC}"
+        echo "  1. ${GREEN}./start stop${NC}     # Stop services"
+        echo "  2. ${GREEN}./start${NC}          # Restart"
+        echo "  3. ${GREEN}./start remove${NC}   # Complete cleanup"
+        echo "  4. ${GREEN}./start setup${NC}    # Fresh installation"
+        echo ""
+    fi
+
+    log_info "${BOLD}Error Details:${NC}"
+    echo "$error_output" | head -20
+    echo ""
+
+    return 1
+}
+
+# Safe Docker command wrapper
+safe_docker() {
+    local description="$1"
+    shift
+    local cmd="$@"
+
+    if [ "$QUIET" = false ]; then
+        echo -n "  ${description}..."
+    fi
+
+    local output
+    local exit_code
+
+    output=$(eval "$cmd" 2>&1) || exit_code=$?
+
+    if [ ${exit_code:-0} -ne 0 ]; then
+        if [ "$QUIET" = false ]; then
+            echo " ❌"
+        fi
+        handle_docker_error "$output" "$cmd"
+        return 1
+    fi
+
+    if [ "$QUIET" = false ]; then
+        echo " ✅"
+    fi
+    return 0
 }
 
 # Function to ensure Node.js is available
@@ -616,11 +768,26 @@ cmd_remove() {
 
 cmd_stop() {
     log_info "🛑 Stopping all services..."
-    
+
+    local stop_success=true
+
     # Stop Docker containers (works on all platforms)
-    docker-compose -f deployment/docker-compose.yml down 2>/dev/null || true
-    docker-compose -f deployment/docker-compose.dev.yml down 2>/dev/null || true
-    
+    log_info "  • Stopping Docker containers..."
+
+    # Try to stop production containers
+    if docker-compose -f deployment/docker-compose.yml ps 2>/dev/null | grep -q "Up"; then
+        if ! docker-compose -f deployment/docker-compose.yml down 2>&1; then
+            log_warning "    ⚠️ Could not stop production containers (may not be running)"
+        fi
+    fi
+
+    # Try to stop dev containers
+    if docker-compose -f deployment/docker-compose.dev.yml ps 2>/dev/null | grep -q "Up"; then
+        if ! docker-compose -f deployment/docker-compose.dev.yml down 2>&1; then
+            log_warning "    ⚠️ Could not stop dev containers (may not be running)"
+        fi
+    fi
+
     # Platform-aware process termination
     case $PLATFORM in
         "windows")
@@ -628,9 +795,9 @@ cmd_stop() {
             # Windows: Use taskkill
             taskkill //F //IM node.exe 2>/dev/null || true
             taskkill //F //IM npm.exe 2>/dev/null || true
-            
+
             # Stop processes on specific ports
-            for port in 3127 4127 7474 7687; do
+            for port in 3127 3128 4127 4128 7474 7687; do
                 local pids=$(netstat -ano | grep ":$port " | awk '{print $5}' | sort -u 2>/dev/null)
                 if [ -n "$pids" ]; then
                     echo "$pids" | xargs -r taskkill //F //PID 2>/dev/null || true
@@ -639,20 +806,22 @@ cmd_stop() {
             ;;
         *)
             # Linux/macOS: Use traditional Unix commands
+            log_info "  • Stopping Node.js processes..."
             pkill -f "npm run dev" 2>/dev/null || true
             pkill -f "vite" 2>/dev/null || true
             pkill -f "tsx.*watch" 2>/dev/null || true
-            
+
             # Clean up any processes on GraphDone ports
             if command -v lsof &> /dev/null; then
-                lsof -ti:3127 | xargs -r kill -9 2>/dev/null || true
-                lsof -ti:4127 | xargs -r kill -9 2>/dev/null || true
-                lsof -ti:7474 | xargs -r kill -9 2>/dev/null || true
-                lsof -ti:7687 | xargs -r kill -9 2>/dev/null || true
+                for port in 3127 3128 4127 4128 7474 7687; do
+                    if lsof -ti:$port >/dev/null 2>&1; then
+                        lsof -ti:$port | xargs -r kill -9 2>/dev/null || true
+                    fi
+                done
             fi
             ;;
     esac
-    
+
     log_success "✅ All services stopped"
 }
 
