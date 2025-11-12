@@ -17,8 +17,9 @@ export function CodeCaptcha({
   onError,
   className = '',
   difficulty = 'easy',
-  style = 'math'
+  style: initialStyle = 'math'
 }: CodeCaptchaProps) {
+  const [currentStyle, setCurrentStyle] = useState<CaptchaStyle>(initialStyle);
   const [code, setCode] = useState('');
   const [userInput, setUserInput] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
@@ -30,10 +31,16 @@ export function CodeCaptcha({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const codeLength = style === 'math' ? 2 : (difficulty === 'easy' ? 4 : difficulty === 'medium' ? 5 : 6);
+  const codeLength = currentStyle === 'math' ? 2 : (difficulty === 'easy' ? 4 : difficulty === 'medium' ? 5 : 6);
+
+  const randomizeStyle = () => {
+    const styles: CaptchaStyle[] = ['math', 'text', 'complex'];
+    const randomStyle = styles[Math.floor(Math.random() * styles.length)];
+    setCurrentStyle(randomStyle);
+  };
 
   const generateCode = () => {
-    if (style === 'math') {
+    if (currentStyle === 'math') {
       const a = Math.floor(Math.random() * 10) + 1;
       const b = Math.floor(Math.random() * 10) + 1;
       const operators = ['+', '-'];
@@ -292,21 +299,21 @@ export function CodeCaptcha({
 
   useEffect(() => {
     generateCode();
-  }, []);
+  }, [currentStyle]);
 
   useEffect(() => {
-    if (code && style !== 'math') {
+    if (code && currentStyle !== 'math') {
       drawCodeImage(code);
     }
-  }, [code, style]);
+  }, [code, currentStyle]);
 
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
 
   const handleVerify = async () => {
-    const isMatch = style === 'math' ? userInput === code : userInput.toUpperCase() === code;
-    console.log('🔐 Verifying CAPTCHA code:', { userInput, code, style, match: isMatch });
+    const isMatch = currentStyle === 'math' ? userInput === code : userInput.toUpperCase() === code;
+    console.log('🔐 Verifying CAPTCHA code:', { userInput, code, style: currentStyle, match: isMatch });
     setIsVerifying(true);
     setError('');
 
@@ -318,7 +325,7 @@ export function CodeCaptcha({
       onVerified(code);
       setIsVerifying(false);
     } else {
-      const errorMsg = style === 'math' ? 'Incorrect answer. Please try again.' : 'Incorrect code. Please try again.';
+      const errorMsg = currentStyle === 'math' ? 'Incorrect answer. Please try again.' : 'Incorrect code. Please try again.';
       console.log('❌ CAPTCHA verification failed:', errorMsg);
       setError(errorMsg);
       onError?.(errorMsg);
@@ -326,7 +333,7 @@ export function CodeCaptcha({
       setShouldShake(true);
       setTimeout(() => setShouldShake(false), 500);
       setTimeout(() => {
-        generateCode();
+        randomizeStyle();
       }, 3000);
     }
   };
@@ -402,10 +409,10 @@ export function CodeCaptcha({
         {/* Code Display */}
         <div className="mb-4">
           <div className="bg-gray-900/60 border border-teal-500/40 rounded-lg p-4 relative overflow-hidden">
-            <div className="relative flex items-center justify-between">
+            <div className="relative flex items-center gap-3">
               {/* Math Problem or Canvas Code Image */}
               <div className="flex-1 flex items-center justify-center">
-                {style === 'math' ? (
+                {currentStyle === 'math' ? (
                   <div className="text-center py-8">
                     <p className="text-sm text-gray-400 mb-2">What is:</p>
                     <p className="text-5xl font-bold text-teal-300 tracking-wider">
@@ -421,20 +428,20 @@ export function CodeCaptcha({
                 )}
               </div>
 
-              {/* Controls Column - Right Side */}
-              <div className="flex flex-col gap-2 ml-3">
-                {/* New Code Button */}
+              {/* Controls Column - Right Side - Centered */}
+              <div className="flex flex-col gap-2 self-center">
+                {/* Reload Button - Randomizes Style */}
                 <button
                   type="button"
-                  onClick={generateCode}
+                  onClick={randomizeStyle}
                   className="p-2 bg-teal-600/20 hover:bg-teal-600/40 border border-teal-500/40 hover:border-teal-400 rounded-lg transition-all duration-200 group"
-                  title="Generate new problem"
+                  title="Try different style"
                 >
                   <span className="text-xl text-teal-400 group-hover:rotate-180 transition-transform duration-300 block">↻</span>
                 </button>
 
-                {/* Listen Button - Only for text style */}
-                {style !== 'math' && (
+                {/* Listen Button - Only for text/complex styles */}
+                {currentStyle !== 'math' && (
                   <button
                     type="button"
                     onClick={speakCode}
@@ -465,7 +472,7 @@ export function CodeCaptcha({
                 value={userInput}
                 onChange={(e) => {
                   const value = e.target.value;
-                  if (style === 'math') {
+                  if (currentStyle === 'math') {
                     setUserInput(value.replace(/[^0-9]/g, '').slice(0, codeLength));
                   } else {
                     setUserInput(value.toUpperCase().slice(0, codeLength));
@@ -479,7 +486,7 @@ export function CodeCaptcha({
                     ? 'border-red-500/50 focus:ring-red-500/50'
                     : 'border-gray-600/50 focus:ring-teal-500/50 focus:border-teal-500/50'
                 } ${shouldShake ? 'animate-shake' : ''}`}
-                placeholder={style === 'math' ? 'Enter Answer' : 'Enter Code'}
+                placeholder={currentStyle === 'math' ? 'Enter Answer' : 'Enter Code'}
                 disabled={isVerifying}
               />
             </div>
