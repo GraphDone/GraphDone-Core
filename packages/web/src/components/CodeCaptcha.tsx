@@ -312,6 +312,10 @@ export function CodeCaptcha({
     inputRef.current?.focus();
   }, []);
 
+  useEffect(() => {
+    console.log('CAPTCHA state:', { currentStyle, codeLength, minLength, userInputLength: userInput.length, isDisabled: userInput.length < minLength });
+  }, [currentStyle, codeLength, minLength, userInput]);
+
   const handleVerify = async () => {
     const isMatch = currentStyle === 'math' ? userInput === code : userInput.toUpperCase() === code;
     console.log('🔐 Verifying CAPTCHA code:', { userInput, code, style: currentStyle, match: isMatch });
@@ -474,7 +478,9 @@ export function CodeCaptcha({
                 onChange={(e) => {
                   const value = e.target.value;
                   if (currentStyle === 'math') {
-                    setUserInput(value.replace(/[^0-9]/g, '').slice(0, codeLength));
+                    const newValue = value.replace(/[^0-9]/g, '').slice(0, codeLength);
+                    setUserInput(newValue);
+                    console.log('Math CAPTCHA input:', { newValue, length: newValue.length, minLength, willEnable: newValue.length >= minLength });
                   } else {
                     setUserInput(value.toUpperCase().slice(0, codeLength));
                   }
@@ -495,9 +501,14 @@ export function CodeCaptcha({
             {/* Verify Button */}
             <button
               type="button"
-              onClick={handleVerify}
+              onClick={() => {
+                console.log('Verify clicked:', { userInput, code, currentStyle, minLength });
+                handleVerify();
+              }}
               disabled={userInput.length < minLength || isVerifying}
               className="bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 disabled:from-gray-700 disabled:to-gray-600 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 hover:scale-[1.02] disabled:scale-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 shadow-lg shadow-teal-500/20"
+              data-testid="captcha-verify-btn"
+              aria-disabled={userInput.length < minLength || isVerifying}
             >
               {isVerifying ? (
                 <>
