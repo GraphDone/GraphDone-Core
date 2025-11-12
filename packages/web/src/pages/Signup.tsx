@@ -66,6 +66,11 @@ export function Signup() {
   const [resendCooldown, setResendCooldown] = useState(0);
   const [rateLimitError, setRateLimitError] = useState<string | null>(null);
   const [rateLimitRetryAfter, setRateLimitRetryAfter] = useState<number | null>(null);
+  const [oauthConfig, setOauthConfig] = useState<{
+    google: { enabled: boolean; configured: boolean };
+    github: { enabled: boolean; configured: boolean };
+    linkedin: { enabled: boolean; configured: boolean };
+  } | null>(null);
 
   const [signup, { loading }] = useMutation(SIGNUP_MUTATION, {
     onCompleted: (data) => {
@@ -244,6 +249,24 @@ export function Signup() {
   };
 
   useEffect(() => {
+    const fetchOAuthConfig = async () => {
+      try {
+        const apiUrl = import.meta.env.VITE_API_URL || 'https://localhost:4128';
+        const response = await fetch(`${apiUrl}/config`);
+        if (response.ok) {
+          const config = await response.json();
+          if (config.oauth && config.oauth.providers) {
+            setOauthConfig(config.oauth.providers);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch OAuth config:', error);
+      }
+    };
+    fetchOAuthConfig();
+  }, []);
+
+  useEffect(() => {
     if (resendCooldown > 0) {
       const timer = setTimeout(() => setResendCooldown(prev => prev - 1), 1000);
       return () => clearTimeout(timer);
@@ -346,44 +369,71 @@ export function Signup() {
           <div className="grid grid-cols-3 gap-3">
             <button
               type="button"
-              onClick={() => window.location.href = `${import.meta.env.VITE_API_URL || 'https://localhost:4128'}/auth/google`}
-              className="group relative flex items-center justify-center p-3 bg-gray-700/50 hover:bg-gray-600/80 backdrop-blur-sm border border-gray-600/50 hover:border-teal-500 hover:shadow-lg hover:shadow-teal-500/30 rounded-lg transition-all duration-200"
-              aria-label="Sign up with Google"
+              onClick={() => oauthConfig?.google.configured && (window.location.href = `${import.meta.env.VITE_API_URL || 'https://localhost:4128'}/auth/google`)}
+              disabled={!oauthConfig?.google.configured}
+              className={`group relative flex items-center justify-center p-3 backdrop-blur-sm border rounded-lg transition-all duration-200 ${
+                oauthConfig?.google.configured
+                  ? 'bg-gray-700/50 hover:bg-gray-600/80 border-gray-600/50 hover:border-teal-500 hover:shadow-lg hover:shadow-teal-500/30 cursor-pointer'
+                  : 'bg-gray-800/30 border-gray-700/30 cursor-not-allowed opacity-50'
+              }`}
+              aria-label={oauthConfig?.google.configured ? 'Sign up with Google' : 'Google signup not configured'}
             >
-              <svg className="h-5 w-5 transition-all duration-200 group-hover:scale-110" viewBox="0 0 24 24">
-                <path fill="#EA4335" d="M5.266 9.765A7.077 7.077 0 0 1 12 4.909c1.69 0 3.218.6 4.418 1.582L19.91 3C17.782 1.145 15.055 0 12 0 7.27 0 3.198 2.698 1.24 6.65l4.026 3.115Z"/>
-                <path fill="#34A853" d="M16.04 18.013c-1.09.703-2.474 1.078-4.04 1.078a7.077 7.077 0 0 1-6.723-4.823l-4.04 3.067A11.965 11.965 0 0 0 12 24c2.933 0 5.735-1.043 7.834-3l-3.793-2.987Z"/>
-                <path fill="#4A90E2" d="M19.834 21c2.195-2.048 3.62-5.096 3.62-9 0-.71-.109-1.473-.272-2.182H12v4.637h6.436c-.317 1.559-1.17 2.766-2.395 3.558L19.834 21Z"/>
-                <path fill="#FBBC05" d="M5.277 14.268A7.12 7.12 0 0 1 4.909 12c0-.782.125-1.533.357-2.235L1.24 6.65A11.934 11.934 0 0 0 0 12c0 1.92.445 3.73 1.237 5.335l4.04-3.067Z"/>
+              <svg className={`h-5 w-5 transition-all duration-200 ${oauthConfig?.google.configured ? 'group-hover:scale-110' : ''}`} viewBox="0 0 24 24">
+                <path fill={oauthConfig?.google.configured ? '#EA4335' : '#666'} d="M5.266 9.765A7.077 7.077 0 0 1 12 4.909c1.69 0 3.218.6 4.418 1.582L19.91 3C17.782 1.145 15.055 0 12 0 7.27 0 3.198 2.698 1.24 6.65l4.026 3.115Z"/>
+                <path fill={oauthConfig?.google.configured ? '#34A853' : '#555'} d="M16.04 18.013c-1.09.703-2.474 1.078-4.04 1.078a7.077 7.077 0 0 1-6.723-4.823l-4.04 3.067A11.965 11.965 0 0 0 12 24c2.933 0 5.735-1.043 7.834-3l-3.793-2.987Z"/>
+                <path fill={oauthConfig?.google.configured ? '#4A90E2' : '#444'} d="M19.834 21c2.195-2.048 3.62-5.096 3.62-9 0-.71-.109-1.473-.272-2.182H12v4.637h6.436c-.317 1.559-1.17 2.766-2.395 3.558L19.834 21Z"/>
+                <path fill={oauthConfig?.google.configured ? '#FBBC05' : '#777'} d="M5.277 14.268A7.12 7.12 0 0 1 4.909 12c0-.782.125-1.533.357-2.235L1.24 6.65A11.934 11.934 0 0 0 0 12c0 1.92.445 3.73 1.237 5.335l4.04-3.067Z"/>
               </svg>
-              <span className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap text-teal-400 text-xs opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                Sign up with Google
+              <span className={`absolute -top-12 left-1/2 -translate-x-1/2 whitespace-nowrap text-xs opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 px-3 py-2 rounded-lg ${
+                oauthConfig?.google.configured
+                  ? 'text-teal-400 bg-gray-900/95 border border-teal-500/30'
+                  : 'text-gray-300 bg-gray-900/95 border border-gray-700/50'
+              }`}>
+                {oauthConfig?.google.configured ? 'Sign up with Google' : 'Run: ./scripts/setup-oauth.sh'}
               </span>
             </button>
 
             <button
               type="button"
-              onClick={() => window.location.href = `${import.meta.env.VITE_API_URL || 'https://localhost:4128'}/auth/linkedin`}
-              className="group relative flex items-center justify-center p-3 bg-gray-700/50 hover:bg-gray-600/80 backdrop-blur-sm border border-gray-600/50 hover:border-teal-500 hover:shadow-lg hover:shadow-teal-500/30 rounded-lg transition-all duration-200"
-              aria-label="Sign up with LinkedIn"
+              onClick={() => oauthConfig?.linkedin.configured && (window.location.href = `${import.meta.env.VITE_API_URL || 'https://localhost:4128'}/auth/linkedin`)}
+              disabled={!oauthConfig?.linkedin.configured}
+              className={`group relative flex items-center justify-center p-3 backdrop-blur-sm border rounded-lg transition-all duration-200 ${
+                oauthConfig?.linkedin.configured
+                  ? 'bg-gray-700/50 hover:bg-gray-600/80 border-gray-600/50 hover:border-teal-500 hover:shadow-lg hover:shadow-teal-500/30 cursor-pointer'
+                  : 'bg-gray-800/30 border-gray-700/30 cursor-not-allowed opacity-50'
+              }`}
+              aria-label={oauthConfig?.linkedin.configured ? 'Sign up with LinkedIn' : 'LinkedIn signup not configured'}
             >
-              <svg className="h-5 w-5 transition-all duration-200 group-hover:scale-110" viewBox="0 0 24 24" fill="#60A5FA">
+              <svg className={`h-5 w-5 transition-all duration-200 ${oauthConfig?.linkedin.configured ? 'group-hover:scale-110' : ''}`} viewBox="0 0 24 24" fill={oauthConfig?.linkedin.configured ? '#60A5FA' : '#555'}>
                 <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
               </svg>
-              <span className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap text-teal-400 text-xs opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                Sign up with LinkedIn
+              <span className={`absolute -top-12 left-1/2 -translate-x-1/2 whitespace-nowrap text-xs opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 px-3 py-2 rounded-lg ${
+                oauthConfig?.linkedin.configured
+                  ? 'text-teal-400 bg-gray-900/95 border border-teal-500/30'
+                  : 'text-gray-300 bg-gray-900/95 border border-gray-700/50'
+              }`}>
+                {oauthConfig?.linkedin.configured ? 'Sign up with LinkedIn' : 'Run: ./scripts/setup-oauth.sh'}
               </span>
             </button>
 
             <button
               type="button"
-              onClick={() => window.location.href = `${import.meta.env.VITE_API_URL || 'https://localhost:4128'}/auth/github`}
-              className="group relative flex items-center justify-center p-3 bg-gray-700/50 hover:bg-gray-600/80 backdrop-blur-sm border border-gray-600/50 hover:border-teal-500 hover:shadow-lg hover:shadow-teal-500/30 rounded-lg transition-all duration-200"
-              aria-label="Sign up with GitHub"
+              onClick={() => oauthConfig?.github.configured && (window.location.href = `${import.meta.env.VITE_API_URL || 'https://localhost:4128'}/auth/github`)}
+              disabled={!oauthConfig?.github.configured}
+              className={`group relative flex items-center justify-center p-3 backdrop-blur-sm border rounded-lg transition-all duration-200 ${
+                oauthConfig?.github.configured
+                  ? 'bg-gray-700/50 hover:bg-gray-600/80 border-gray-600/50 hover:border-teal-500 hover:shadow-lg hover:shadow-teal-500/30 cursor-pointer'
+                  : 'bg-gray-800/30 border-gray-700/30 cursor-not-allowed opacity-50'
+              }`}
+              aria-label={oauthConfig?.github.configured ? 'Sign up with GitHub' : 'GitHub signup not configured'}
             >
-              <Github className="h-5 w-5 text-gray-300 transition-all duration-200 group-hover:scale-110" />
-              <span className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap text-teal-400 text-xs opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                Sign up with GitHub
+              <Github className={`h-5 w-5 transition-all duration-200 ${oauthConfig?.github.configured ? 'text-gray-300 group-hover:scale-110' : 'text-gray-600'}`} />
+              <span className={`absolute -top-12 left-1/2 -translate-x-1/2 whitespace-nowrap text-xs opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 px-3 py-2 rounded-lg ${
+                oauthConfig?.github.configured
+                  ? 'text-teal-400 bg-gray-900/95 border border-teal-500/30'
+                  : 'text-gray-300 bg-gray-900/95 border border-gray-700/50'
+              }`}>
+                {oauthConfig?.github.configured ? 'Sign up with GitHub' : 'Run: ./scripts/setup-oauth.sh'}
               </span>
             </button>
           </div>
