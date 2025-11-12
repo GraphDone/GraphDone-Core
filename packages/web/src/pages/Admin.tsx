@@ -576,7 +576,7 @@ function DatabaseManagement() {
   const updateDatabaseStats = async (debug: string[]) => {
     try {
       debug.push('📊 Fetching graph count...');
-      const graphResponse = await fetch('/graphql', {
+      const graphResponse = await fetch('/api/graphql', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: 'query { graphs { id } }' })
@@ -587,7 +587,7 @@ function DatabaseManagement() {
       debug.push(`✅ Found ${graphCount} graphs`);
 
       debug.push('📊 Fetching node count...');
-      const nodeResponse = await fetch('/graphql', {
+      const nodeResponse = await fetch('/api/graphql', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: 'query { workItems { id } }' })
@@ -598,7 +598,7 @@ function DatabaseManagement() {
       debug.push(`✅ Found ${nodeCount} nodes`);
 
       debug.push('📊 Fetching edge count...');
-      const edgeResponse = await fetch('/graphql', {
+      const edgeResponse = await fetch('/api/graphql', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: 'query { edges { id } }' })
@@ -622,7 +622,7 @@ function DatabaseManagement() {
 
     try {
       // Check for graphs with invalid types
-      const graphResponse = await fetch('/graphql', {
+      const graphResponse = await fetch('/api/graphql', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: 'query { graphs { id name } }' })
@@ -673,7 +673,7 @@ function DatabaseManagement() {
 
     try {
       // Get all graphs to identify test data
-      const graphResponse = await fetch('/graphql', {
+      const graphResponse = await fetch('/api/graphql', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: 'query { graphs { id name } }' })
@@ -696,7 +696,7 @@ function DatabaseManagement() {
 
         for (const graph of testGraphs.slice(0, 50)) { // Limit to 50 at a time to avoid timeout
           try {
-            const deleteResponse = await fetch('/graphql', {
+            const deleteResponse = await fetch('/api/graphql', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ 
@@ -918,7 +918,7 @@ mutation DeleteGraph($id: ID!) {
                 debug.push(`🔍 Executing GraphQL query...`);
                 debug.push(`📝 Query: ${query.substring(0, 100)}${query.length > 100 ? '...' : ''}`);
                 
-                const response = await fetch('/graphql', {
+                const response = await fetch('/api/graphql', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ query })
@@ -1153,7 +1153,7 @@ function SecurityManagement() {
         addDebugMessage('📡 Nginx reverse proxy detected');
         
         // Test backend connectivity through proxy
-        const graphqlResponse = await fetch('/graphql', {
+        const graphqlResponse = await fetch('/api/graphql', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ query: '{ __typename }' })
@@ -1789,7 +1789,7 @@ For more details, see: /docs/tls-ssl-setup.md
                   
                   try {
                     const gqlStart = Date.now();
-                    const gqlResponse = await fetch('/graphql', {
+                    const gqlResponse = await fetch('/api/graphql', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ query: '{ __typename }' })
