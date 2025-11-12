@@ -271,6 +271,51 @@ export const sqliteAuthResolvers = {
         console.error('❌ Get folder graphs error:', error);
         throw new GraphQLError('Failed to get folder graphs');
       }
+    },
+
+    // Get all OAuth provider configurations (Admin only)
+    oauthProviderConfigs: async (_: any, __: any, context: any) => {
+      if (!context.user || context.user.role !== 'ADMIN') {
+        throw new GraphQLError('Unauthorized', {
+          extensions: { code: 'FORBIDDEN' }
+        });
+      }
+
+      try {
+        const configs = await sqliteAuthStore.getAllOAuthProviderConfigs();
+        return configs.map((config: any) => ({
+          ...config,
+          enabled: Boolean(config.enabled),
+          configured: Boolean(config.clientId && config.clientSecret)
+        }));
+      } catch (error: any) {
+        console.error('❌ Get OAuth provider configs error:', error);
+        throw new GraphQLError('Failed to get OAuth provider configurations');
+      }
+    },
+
+    // Get specific OAuth provider configuration (Admin only)
+    oauthProviderConfig: async (_: any, { provider }: { provider: string }, context: any) => {
+      if (!context.user || context.user.role !== 'ADMIN') {
+        throw new GraphQLError('Unauthorized', {
+          extensions: { code: 'FORBIDDEN' }
+        });
+      }
+
+      try {
+        const config = await sqliteAuthStore.getOAuthProviderConfig(provider as any);
+        if (!config) {
+          return null;
+        }
+        return {
+          ...config,
+          enabled: Boolean(config.enabled),
+          configured: Boolean(config.clientId && config.clientSecret)
+        };
+      } catch (error: any) {
+        console.error('❌ Get OAuth provider config error:', error);
+        throw new GraphQLError('Failed to get OAuth provider configuration');
+      }
     }
   },
 
@@ -793,6 +838,55 @@ export const sqliteAuthResolvers = {
       } catch (error: any) {
         console.error('❌ Reorder graphs error:', error);
         throw new GraphQLError('Failed to reorder graphs in folder');
+      }
+    },
+
+    // Update OAuth provider configuration (Admin only)
+    updateOAuthProviderConfig: async (_: any, { input }: { input: { provider: string; enabled: boolean; clientId: string; clientSecret: string; callbackUrl: string } }, context: any) => {
+      if (!context.user || context.user.role !== 'ADMIN') {
+        throw new GraphQLError('Unauthorized', {
+          extensions: { code: 'FORBIDDEN' }
+        });
+      }
+
+      try {
+        await sqliteAuthStore.upsertOAuthProviderConfig({
+          provider: input.provider as any,
+          enabled: input.enabled,
+          clientId: input.clientId,
+          clientSecret: input.clientSecret,
+          callbackUrl: input.callbackUrl
+        });
+
+        const config = await sqliteAuthStore.getOAuthProviderConfig(input.provider as any);
+        return {
+          ...config,
+          enabled: Boolean(config.enabled),
+          configured: Boolean(config.clientId && config.clientSecret)
+        };
+      } catch (error: any) {
+        console.error('❌ Update OAuth provider config error:', error);
+        throw new GraphQLError('Failed to update OAuth provider configuration');
+      }
+    },
+
+    // Delete OAuth provider configuration (Admin only)
+    deleteOAuthProviderConfig: async (_: any, { provider }: { provider: string }, context: any) => {
+      if (!context.user || context.user.role !== 'ADMIN') {
+        throw new GraphQLError('Unauthorized', {
+          extensions: { code: 'FORBIDDEN' }
+        });
+      }
+
+      try {
+        await sqliteAuthStore.deleteOAuthProviderConfig(provider as any);
+        return {
+          success: true,
+          message: 'OAuth provider configuration deleted successfully'
+        };
+      } catch (error: any) {
+        console.error('❌ Delete OAuth provider config error:', error);
+        throw new GraphQLError('Failed to delete OAuth provider configuration');
       }
     }
   }
