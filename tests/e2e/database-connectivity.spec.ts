@@ -1,12 +1,14 @@
 import { test, expect } from '@playwright/test';
+import { getBaseURL, getAPIURL } from '../helpers/auth';
 
 test.describe('Database Connectivity Validation', () => {
   test('should fail properly when Neo4j is unavailable', async ({ page }) => {
     // This test ensures we properly detect and report database failures
     // rather than silently falling back to auth-only mode
-    
+    const apiURL = getAPIURL();
+
     // Navigate to GraphQL endpoint
-    await page.goto('http://localhost:4127/graphql');
+    await page.goto(`${apiURL}/graphql`);
     
     // Check if we're in auth-only mode by looking for error indicators
     const pageContent = await page.content();
@@ -18,9 +20,9 @@ test.describe('Database Connectivity Validation', () => {
     
     if (hasGraphQLPlayground) {
       // Database appears to be working, verify with actual query
-      const response = await page.evaluate(async () => {
+      const response = await page.evaluate(async (apiEndpoint) => {
         try {
-          const result = await fetch('http://localhost:4127/graphql', {
+          const result = await fetch(`${apiEndpoint}/graphql`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -29,9 +31,9 @@ test.describe('Database Connectivity Validation', () => {
           });
           return await result.json();
         } catch (error) {
-          return { error: error.message };
+          return { error: (error as Error).message };
         }
-      });
+      }, apiURL);
       
       // Should either return data or a proper error (not silent failure)
       expect(response).toBeDefined();
@@ -60,8 +62,10 @@ test.describe('Database Connectivity Validation', () => {
   });
 
   test('should provide clear error messages in auth-only mode', async ({ page }) => {
+    const baseURL = getBaseURL();
+
     // Navigate to the web application
-    await page.goto('http://localhost:3127');
+    await page.goto(baseURL);
     
     // Wait for the page to load
     await page.waitForLoadState('networkidle');
@@ -101,8 +105,10 @@ test.describe('Database Connectivity Validation', () => {
   });
 
   test('should validate health check endpoint reflects database status', async ({ page }) => {
+    const apiURL = getAPIURL();
+
     // Check the health endpoint
-    const response = await page.goto('http://localhost:4127/health');
+    const response = await page.goto(`${apiURL}/health`);
     expect(response?.status()).toBe(200);
     
     const healthData = await response?.json();
