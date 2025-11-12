@@ -56,10 +56,13 @@ test_distro() {
     local image=$1
     local name=$2
     local pkg_mgr=$3
-    
+
+    # Create sanitized name for filenames (POSIX-compliant)
+    local name_sanitized=$(printf '%s' "$name" | tr ' ' '_')
+
     TOTAL=$((TOTAL + 1))
     echo "${CYAN}▶${NC} Testing $name ($image)..."
-    
+
     # Create test directory
     local test_dir="/tmp/graphdone-test-$TIMESTAMP"
     mkdir -p "$test_dir"
@@ -86,9 +89,9 @@ EOF
     if docker run --rm \
         -v "$test_dir:/test:ro" \
         "$image" \
-        sh /test/test.sh > "$REPORT_DIR/${name// /_}.log" 2>&1; then
-        
-        if grep -q "INSTALLATION_SCRIPT_TEST: SUCCESS" "$REPORT_DIR/${name// /_}.log"; then
+        sh /test/test.sh > "$REPORT_DIR/$name_sanitized.log" 2>&1; then
+
+        if grep -q "INSTALLATION_SCRIPT_TEST: SUCCESS" "$REPORT_DIR/$name_sanitized.log"; then
             echo "${GREEN}✓${NC} $name - PASSED"
             PASSED=$((PASSED + 1))
             TEST_RESULTS="${TEST_RESULTS}PASS|$name
