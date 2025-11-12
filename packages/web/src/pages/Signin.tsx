@@ -793,14 +793,6 @@ export function Signin() {
             {errors.password && <p id="password-error" className="mt-1 text-xs text-red-400" role="alert">{errors.password}</p>}
           </div>
 
-          {/* CAPTCHA */}
-          <div>
-            <CodeCaptcha
-              onVerified={(code) => setCaptchaPayload(code)}
-              className="w-full"
-            />
-          </div>
-
           {/* Remember Me & Forgot Password */}
           <div className="flex items-center justify-between">
             <label className="flex items-center cursor-pointer group">
@@ -876,7 +868,7 @@ export function Signin() {
           {/* Submit Button */}
           <button
             type="submit"
-            disabled={loading || guestLoading || !captchaPayload}
+            disabled={loading || guestLoading}
             className="w-full bg-gradient-to-r from-teal-600 to-blue-600 hover:from-teal-500 hover:to-blue-500 border border-teal-400/50 hover:border-teal-300 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-teal-500/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:translate-y-0 flex items-center justify-center space-x-2"
           >
             {loading ? (

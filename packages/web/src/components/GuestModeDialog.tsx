@@ -1,5 +1,7 @@
 import { createPortal } from 'react-dom';
 import { X, Users, AlertCircle, Clock, Lock, Eye } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { CodeCaptcha } from './CodeCaptcha';
 
 interface GuestModeDialogProps {
   isOpen: boolean;
@@ -8,6 +10,14 @@ interface GuestModeDialogProps {
 }
 
 export function GuestModeDialog({ isOpen, onClose, onConfirm }: GuestModeDialogProps) {
+  const [guestCaptchaVerified, setGuestCaptchaVerified] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setGuestCaptchaVerified(false);
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   return createPortal(
@@ -92,6 +102,14 @@ export function GuestModeDialog({ isOpen, onClose, onConfirm }: GuestModeDialogP
             </div>
           </div>
 
+          {/* CAPTCHA Verification */}
+          <div>
+            <CodeCaptcha
+              onVerified={() => setGuestCaptchaVerified(true)}
+              className="w-full"
+            />
+          </div>
+
           <div className="p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
             <p className="text-xs text-blue-300">
               💡 <strong>Tip:</strong> Create a free account to unlock full features including editing, collaboration, and persistent workspace!
@@ -111,7 +129,8 @@ export function GuestModeDialog({ isOpen, onClose, onConfirm }: GuestModeDialogP
               onConfirm();
               onClose();
             }}
-            className="flex-1 px-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 border border-purple-400/50 text-white font-semibold rounded-xl transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-purple-500/30"
+            disabled={!guestCaptchaVerified}
+            className="flex-1 px-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 border border-purple-400/50 text-white font-semibold rounded-xl transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-purple-500/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:from-gray-700 disabled:to-gray-600 disabled:border-gray-600"
           >
             Continue as Guest
           </button>
