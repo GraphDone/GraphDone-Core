@@ -130,15 +130,12 @@ export async function getAuthState(page: Page): Promise<AuthState> {
   ).then(results => results.some(visible => visible));
   
   // Determine login state - prioritize explicit indicators
-  const isLoggedIn = !hasLoginForm && (
-    foundIndicators.some(ind => 
-      ind.includes('Logout') || 
-      ind.includes('user-menu') || 
-      ind.includes('graph-selector') ||
-      ind.includes('Graph Viewer')
-    ) ||
-    // If no login form and we're on a non-login page, consider it logged in
-    (!currentUrl.includes('/login') && !hasLoginForm && errors.length === 0)
+  // Must have positive indicators, not just absence of login form
+  const isLoggedIn = !hasLoginForm && foundIndicators.some(ind =>
+    ind.includes('Logout') ||
+    ind.includes('user-menu') ||
+    ind.includes('graph-selector') ||
+    ind.includes('Graph Viewer')
   );
   
   return {
@@ -471,17 +468,17 @@ export async function quickLogin(page: Page, role: 'admin' | 'member' | 'viewer'
  */
 export async function logout(page: Page): Promise<void> {
   console.log('🚪 Logging out...');
-  
+
   const authState = await getAuthState(page);
   if (!authState.isLoggedIn) {
     console.log('✅ Already logged out');
     return;
   }
-  
+
   // Try multiple logout strategies
   const logoutSelectors = [
     'button:has-text("Logout")',
-    'button:has-text("Sign Out")', 
+    'button:has-text("Sign Out")',
     'a:has-text("Logout")',
     '[data-testid="logout"]',
     '[aria-label="Logout"]',
@@ -490,34 +487,48 @@ export async function logout(page: Page): Promise<void> {
     'button[aria-label="User menu"]',
     '[data-testid="user-menu"]'
   ];
-  
+
   for (const selector of logoutSelectors) {
     const element = page.locator(selector).first();
-    if (await element.isVisible({ timeout: 2000 })) {
-      console.log(`   🎯 Found logout element: ${selector}`);
-      await element.click();
-      
-      // If it's a menu, look for logout option
-      if (selector.includes('menu')) {
-        await page.waitForTimeout(500);
-        const logoutOption = page.locator('button:has-text("Logout"), button:has-text("Sign Out")').first();
-        if (await logoutOption.isVisible({ timeout: 3000 })) {
-          await logoutOption.click();
+    try {
+      if (await element.isVisible({ timeout: 2000 })) {
+        console.log(`   🎯 Found logout element: ${selector}`);
+        await element.click();
+
+        // If it's a menu, look for logout option
+        if (selector.includes('menu')) {
+          await page.waitForTimeout(500);
+          const logoutOption = page.locator('button:has-text("Logout"), button:has-text("Sign Out")').first();
+          if (await logoutOption.isVisible({ timeout: 3000 })) {
+            await logoutOption.click();
+          }
         }
-      }
-      
-      // Wait for logout to complete
-      try {
-        await page.waitForURL(/login/, { timeout: 10000 });
-        console.log('✅ Successfully logged out');
+
+        // Wait for logout to complete - either redirect or local storage clear
+        try {
+          await page.waitForURL(/login/, { timeout: 10000 });
+          console.log('✅ Successfully logged out (redirected to login)');
+        } catch {
+          // May not redirect, check if localStorage was cleared
+          await page.waitForTimeout(1000);
+          const hasToken = await page.evaluate(() => {
+            return localStorage.getItem('token') !== null ||
+                   localStorage.getItem('authToken') !== null;
+          });
+          if (!hasToken) {
+            console.log('✅ Successfully logged out (token cleared)');
+          } else {
+            console.log('⚠️  Logout may have completed without redirect or token clear');
+          }
+        }
         return;
-      } catch {
-        console.log('⚠️  Logout may have completed without redirect');
-        return;
       }
+    } catch (e) {
+      // Continue to next selector
+      continue;
     }
   }
-  
+
   console.log('⚠️  No logout button found - may already be logged out');
 }
 
