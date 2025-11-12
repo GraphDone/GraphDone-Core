@@ -14,6 +14,7 @@ const TEST_CONFIG = {
 };
 
 const PR_TEST_SUITES = [
+  // Infrastructure & Setup Tests
   {
     name: 'Installation Script Validation',
     command: './scripts/test-installation-simple.sh',
@@ -29,21 +30,9 @@ const PR_TEST_SUITES = [
     critical: true
   },
   {
-    name: 'Authentication System',
-    command: 'npx playwright test tests/e2e/auth-system-test.spec.ts',
-    priority: 2,
-    critical: true
-  },
-  {
-    name: 'OAuth LinkedIn Integration',
-    command: 'npx playwright test tests/e2e/oauth-linkedin.spec.ts',
-    priority: 3,
-    critical: true
-  },
-  {
     name: 'Docker Error Handling',
     command: './tests/test-error-handling.sh',
-    priority: 4,
+    priority: 2,
     critical: true,
     type: 'shell',
     parser: 'installation'
@@ -51,8 +40,108 @@ const PR_TEST_SUITES = [
   {
     name: 'Database Connectivity',
     command: 'npx playwright test tests/e2e/database-connectivity.spec.ts',
+    priority: 3,
+    critical: true
+  },
+  {
+    name: 'API Health Check',
+    command: 'npx playwright test tests/e2e/api-health.spec.ts',
+    priority: 4,
+    critical: true
+  },
+
+  // Authentication & Authorization Tests
+  {
+    name: 'Authentication System',
+    command: 'npx playwright test tests/e2e/auth-system-test.spec.ts',
     priority: 5,
     critical: true
+  },
+  {
+    name: 'Basic Auth Test',
+    command: 'npx playwright test tests/e2e/auth-basic-test.spec.ts',
+    priority: 6,
+    critical: false
+  },
+  {
+    name: 'OAuth LinkedIn Integration',
+    command: 'npx playwright test tests/e2e/oauth-linkedin.spec.ts',
+    priority: 7,
+    critical: true
+  },
+  {
+    name: 'OAuth Provider Configuration',
+    command: 'npx playwright test tests/e2e/oauth-provider-config.spec.ts',
+    priority: 8,
+    critical: true
+  },
+
+  // Core Functionality Tests
+  {
+    name: 'Basic Workflow',
+    command: 'npx playwright test tests/e2e/basic-workflow.spec.ts',
+    priority: 9,
+    critical: true
+  },
+  {
+    name: 'Add Node Functionality',
+    command: 'npx playwright test tests/e2e/add-node.spec.ts',
+    priority: 10,
+    critical: true
+  },
+  {
+    name: 'Neo4j Core Functionality',
+    command: 'npx playwright test tests/e2e/neo4j-core-functionality.spec.ts',
+    priority: 11,
+    critical: true
+  },
+  {
+    name: 'Graph Real-Time Updates',
+    command: 'npx playwright test tests/e2e/graph-real-time-updates.spec.ts',
+    priority: 12,
+    critical: false
+  },
+
+  // UI Functionality Tests
+  {
+    name: 'UI Basic Functionality',
+    command: 'npx playwright test tests/e2e/ui-basic-functionality.spec.ts',
+    priority: 13,
+    critical: true
+  },
+  {
+    name: 'Graph Visualization',
+    command: 'npx playwright test tests/e2e/verify-improved-visualization.spec.ts',
+    priority: 14,
+    critical: false
+  },
+  {
+    name: 'UI Data Verification',
+    command: 'npx playwright test tests/e2e/verify-ui-data.spec.ts',
+    priority: 15,
+    critical: false
+  },
+
+  // Error Handling Tests
+  {
+    name: 'Graph Error Handling',
+    command: 'npx playwright test tests/e2e/graph-error-handling.spec.ts',
+    priority: 16,
+    critical: false
+  },
+  {
+    name: 'Simple Error Test',
+    command: 'npx playwright test tests/e2e/simple-error-test.spec.ts',
+    priority: 17,
+    critical: false
+  },
+
+  // Comprehensive Integration Tests
+  {
+    name: 'Comprehensive Interaction',
+    command: 'npx playwright test tests/e2e/comprehensive-interaction.spec.ts',
+    priority: 18,
+    critical: false
   }
 ];
 
