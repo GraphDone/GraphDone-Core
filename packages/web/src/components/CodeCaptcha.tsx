@@ -1,16 +1,20 @@
 import { useState, useEffect, useRef } from 'react';
 import { Shield, Volume2, CheckCircle, KeyRound } from 'lucide-react';
 
+type DifficultyLevel = 'easy' | 'medium' | 'hard';
+
 interface CodeCaptchaProps {
   onVerified: (code: string) => void;
   onError?: (error: string) => void;
   className?: string;
+  difficulty?: DifficultyLevel;
 }
 
 export function CodeCaptcha({
   onVerified,
   onError,
-  className = ''
+  className = '',
+  difficulty = 'easy'
 }: CodeCaptchaProps) {
   const [code, setCode] = useState('');
   const [userInput, setUserInput] = useState('');
@@ -22,28 +26,39 @@ export function CodeCaptcha({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Generate robust random 6-character code with guaranteed mix of character types
+  const codeLength = difficulty === 'easy' ? 4 : difficulty === 'medium' ? 5 : 6;
+
   const generateCode = () => {
     const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // Exclude I, O
     const numbers = '23456789'; // Exclude 0, 1
     const specials = '@#$%&*+=?'; // Common special characters
 
-    // Ensure at least one of each type
     const codeArray: string[] = [];
 
-    // Add at least 2 letters
-    codeArray.push(letters.charAt(Math.floor(Math.random() * letters.length)));
-    codeArray.push(letters.charAt(Math.floor(Math.random() * letters.length)));
+    if (difficulty === 'easy') {
+      // Easy: 4 characters, letters and numbers only
+      codeArray.push(letters.charAt(Math.floor(Math.random() * letters.length)));
+      codeArray.push(letters.charAt(Math.floor(Math.random() * letters.length)));
+      codeArray.push(numbers.charAt(Math.floor(Math.random() * numbers.length)));
+      codeArray.push(numbers.charAt(Math.floor(Math.random() * numbers.length)));
+    } else if (difficulty === 'medium') {
+      // Medium: 5 characters, letters and numbers only
+      codeArray.push(letters.charAt(Math.floor(Math.random() * letters.length)));
+      codeArray.push(letters.charAt(Math.floor(Math.random() * letters.length)));
+      codeArray.push(letters.charAt(Math.floor(Math.random() * letters.length)));
+      codeArray.push(numbers.charAt(Math.floor(Math.random() * numbers.length)));
+      codeArray.push(numbers.charAt(Math.floor(Math.random() * numbers.length)));
+    } else {
+      // Hard: 6 characters with special chars
+      codeArray.push(letters.charAt(Math.floor(Math.random() * letters.length)));
+      codeArray.push(letters.charAt(Math.floor(Math.random() * letters.length)));
+      codeArray.push(numbers.charAt(Math.floor(Math.random() * numbers.length)));
+      codeArray.push(numbers.charAt(Math.floor(Math.random() * numbers.length)));
+      codeArray.push(specials.charAt(Math.floor(Math.random() * specials.length)));
+      codeArray.push(specials.charAt(Math.floor(Math.random() * specials.length)));
+    }
 
-    // Add at least 2 numbers
-    codeArray.push(numbers.charAt(Math.floor(Math.random() * numbers.length)));
-    codeArray.push(numbers.charAt(Math.floor(Math.random() * numbers.length)));
-
-    // Add at least 2 special characters
-    codeArray.push(specials.charAt(Math.floor(Math.random() * specials.length)));
-    codeArray.push(specials.charAt(Math.floor(Math.random() * specials.length)));
-
-    // Shuffle the array using Fisher-Yates algorithm for better randomization
+    // Shuffle the array using Fisher-Yates algorithm
     for (let i = codeArray.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [codeArray[i], codeArray[j]] = [codeArray[j], codeArray[i]];
@@ -288,7 +303,7 @@ export function CodeCaptcha({
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && userInput.length === 6) {
+    if (e.key === 'Enter' && userInput.length === codeLength) {
       handleVerify();
     }
   };
@@ -408,10 +423,10 @@ export function CodeCaptcha({
                 id="captcha-input"
                 type="text"
                 value={userInput}
-                onChange={(e) => setUserInput(e.target.value.toUpperCase().slice(0, 6))}
+                onChange={(e) => setUserInput(e.target.value.toUpperCase().slice(0, codeLength))}
                 onKeyPress={handleKeyPress}
                 onPaste={(e) => e.preventDefault()}
-                maxLength={6}
+                maxLength={codeLength}
                 className={`w-full pl-12 pr-4 py-3 bg-gray-700/50 backdrop-blur-sm border rounded-xl text-gray-100 font-mono text-center text-lg tracking-widest focus:outline-none focus:ring-2 transition-all ${
                   error
                     ? 'border-red-500/50 focus:ring-red-500/50'
@@ -426,7 +441,7 @@ export function CodeCaptcha({
             <button
               type="button"
               onClick={handleVerify}
-              disabled={userInput.length !== 6 || isVerifying}
+              disabled={userInput.length !== codeLength || isVerifying}
               className="bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 disabled:from-gray-700 disabled:to-gray-600 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 hover:scale-[1.02] disabled:scale-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 shadow-lg shadow-teal-500/20"
             >
               {isVerifying ? (
