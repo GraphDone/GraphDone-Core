@@ -31,7 +31,8 @@ export function CodeCaptcha({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const codeLength = currentStyle === 'math' ? 2 : (difficulty === 'easy' ? 4 : difficulty === 'medium' ? 5 : 6);
+  const codeLength = currentStyle === 'math' ? 3 : (difficulty === 'easy' ? 4 : difficulty === 'medium' ? 5 : 6);
+  const minLength = currentStyle === 'math' ? 1 : codeLength;
 
   const randomizeStyle = () => {
     const styles: CaptchaStyle[] = ['math', 'text', 'complex'];
@@ -339,7 +340,7 @@ export function CodeCaptcha({
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && userInput.length === codeLength) {
+    if (e.key === 'Enter' && userInput.length >= minLength) {
       handleVerify();
     }
   };
@@ -495,7 +496,7 @@ export function CodeCaptcha({
             <button
               type="button"
               onClick={handleVerify}
-              disabled={userInput.length !== codeLength || isVerifying}
+              disabled={userInput.length < minLength || isVerifying}
               className="bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 disabled:from-gray-700 disabled:to-gray-600 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 hover:scale-[1.02] disabled:scale-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 shadow-lg shadow-teal-500/20"
             >
               {isVerifying ? (
