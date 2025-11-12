@@ -46,6 +46,23 @@ export const TEST_USERS = {
 } as const;
 
 /**
+ * Get base URL for navigation
+ * Supports both environment configuration and defaults
+ */
+export function getBaseURL(): string {
+  return process.env.TEST_URL || 'https://localhost:3128';
+}
+
+/**
+ * Get API URL for GraphQL endpoint
+ */
+export function getAPIURL(): string {
+  const apiPort = process.env.API_PORT || '4128';
+  const protocol = process.env.SSL_ENABLED === 'false' ? 'http' : 'https';
+  return `${protocol}://localhost:${apiPort}`;
+}
+
+/**
  * Authentication state detection
  */
 export interface AuthState {
@@ -218,24 +235,26 @@ async function attemptLogin(
   credentials: LoginCredentials,
   timeout: number
 ): Promise<void> {
+  const baseURL = getBaseURL();
+
   // Step 1: Navigate to application
   console.log('   📍 Navigating to application...');
-  await page.goto('/', { waitUntil: 'domcontentloaded', timeout });
+  await page.goto(`${baseURL}/`, { waitUntil: 'domcontentloaded', timeout });
   await page.waitForTimeout(1500); // Allow React hydration
-  
+
   // Step 2: Check if we need to navigate to login
   const currentUrl = page.url();
   if (!currentUrl.includes('/login')) {
     // Try to find login link or navigate directly
     const loginLink = page.locator('a[href*="login"], button:has-text("Login"), button:has-text("Sign In")').first();
-    
+
     if (await loginLink.isVisible({ timeout: 2000 })) {
       console.log('   🔗 Found login link, clicking...');
       await loginLink.click();
       await page.waitForTimeout(1000);
     } else {
       console.log('   🗺️  No login link found, navigating directly to /login-form');
-      await page.goto('/login-form', { waitUntil: 'domcontentloaded' });
+      await page.goto(`${baseURL}/login-form`, { waitUntil: 'domcontentloaded' });
     }
   }
   
@@ -536,12 +555,13 @@ export async function ensureLoggedIn(
  */
 export async function navigateToWorkspace(page: Page): Promise<void> {
   console.log('🏢 Navigating to workspace...');
-  
+
   // Ensure we're logged in first
   await ensureLoggedIn(page);
-  
-  // Navigate to workspace
-  await page.goto('/workspace', { waitUntil: 'domcontentloaded' });
+
+  // Navigate to workspace with full URL
+  const baseURL = getBaseURL();
+  await page.goto(`${baseURL}/workspace`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(2000); // React hydration
   
   // Wait for workspace core elements
