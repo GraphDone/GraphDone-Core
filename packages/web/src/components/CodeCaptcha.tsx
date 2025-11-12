@@ -2,19 +2,22 @@ import { useState, useEffect, useRef } from 'react';
 import { Shield, Volume2, CheckCircle, KeyRound } from 'lucide-react';
 
 type DifficultyLevel = 'easy' | 'medium' | 'hard';
+type CaptchaStyle = 'math' | 'text' | 'complex';
 
 interface CodeCaptchaProps {
   onVerified: (code: string) => void;
   onError?: (error: string) => void;
   className?: string;
   difficulty?: DifficultyLevel;
+  style?: CaptchaStyle;
 }
 
 export function CodeCaptcha({
   onVerified,
   onError,
   className = '',
-  difficulty = 'easy'
+  difficulty = 'easy',
+  style = 'math'
 }: CodeCaptchaProps) {
   const [code, setCode] = useState('');
   const [userInput, setUserInput] = useState('');
@@ -23,33 +26,61 @@ export function CodeCaptcha({
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
   const [shouldShake, setShouldShake] = useState(false);
+  const [mathProblem, setMathProblem] = useState('');
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const codeLength = difficulty === 'easy' ? 4 : difficulty === 'medium' ? 5 : 6;
+  const codeLength = style === 'math' ? 2 : (difficulty === 'easy' ? 4 : difficulty === 'medium' ? 5 : 6);
 
   const generateCode = () => {
-    const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // Exclude I, O
-    const numbers = '23456789'; // Exclude 0, 1
-    const specials = '@#$%&*+=?'; // Common special characters
+    if (style === 'math') {
+      const a = Math.floor(Math.random() * 10) + 1;
+      const b = Math.floor(Math.random() * 10) + 1;
+      const operators = ['+', '-'];
+      const operator = operators[Math.floor(Math.random() * operators.length)];
+
+      let result: number;
+      if (operator === '+') {
+        result = a + b;
+      } else {
+        if (a < b) {
+          result = b - a;
+          setMathProblem(`${b} ${operator} ${a}`);
+        } else {
+          result = a - b;
+          setMathProblem(`${a} ${operator} ${b}`);
+        }
+      }
+
+      if (operator === '+') {
+        setMathProblem(`${a} ${operator} ${b}`);
+      }
+
+      setCode(String(result));
+      setUserInput('');
+      setError('');
+      setIsVerified(false);
+      return;
+    }
+
+    const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+    const numbers = '23456789';
+    const specials = '@#$%&*+=?';
 
     const codeArray: string[] = [];
 
     if (difficulty === 'easy') {
-      // Easy: 4 characters, letters and numbers only
       codeArray.push(letters.charAt(Math.floor(Math.random() * letters.length)));
       codeArray.push(letters.charAt(Math.floor(Math.random() * letters.length)));
       codeArray.push(numbers.charAt(Math.floor(Math.random() * numbers.length)));
       codeArray.push(numbers.charAt(Math.floor(Math.random() * numbers.length)));
     } else if (difficulty === 'medium') {
-      // Medium: 5 characters, letters and numbers only
       codeArray.push(letters.charAt(Math.floor(Math.random() * letters.length)));
       codeArray.push(letters.charAt(Math.floor(Math.random() * letters.length)));
       codeArray.push(letters.charAt(Math.floor(Math.random() * letters.length)));
       codeArray.push(numbers.charAt(Math.floor(Math.random() * numbers.length)));
       codeArray.push(numbers.charAt(Math.floor(Math.random() * numbers.length)));
     } else {
-      // Hard: 6 characters with special chars
       codeArray.push(letters.charAt(Math.floor(Math.random() * letters.length)));
       codeArray.push(letters.charAt(Math.floor(Math.random() * letters.length)));
       codeArray.push(numbers.charAt(Math.floor(Math.random() * numbers.length)));
@@ -58,7 +89,6 @@ export function CodeCaptcha({
       codeArray.push(specials.charAt(Math.floor(Math.random() * specials.length)));
     }
 
-    // Shuffle the array using Fisher-Yates algorithm
     for (let i = codeArray.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [codeArray[i], codeArray[j]] = [codeArray[j], codeArray[i]];
@@ -265,37 +295,36 @@ export function CodeCaptcha({
   }, []);
 
   useEffect(() => {
-    if (code) {
+    if (code && style !== 'math') {
       drawCodeImage(code);
     }
-  }, [code]);
+  }, [code, style]);
 
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
 
   const handleVerify = async () => {
-    console.log('🔐 Verifying CAPTCHA code:', { userInput, code, match: userInput.toUpperCase() === code });
+    const isMatch = style === 'math' ? userInput === code : userInput.toUpperCase() === code;
+    console.log('🔐 Verifying CAPTCHA code:', { userInput, code, style, match: isMatch });
     setIsVerifying(true);
     setError('');
 
-    // Simulate verification delay
     await new Promise(resolve => setTimeout(resolve, 500));
 
-    if (userInput.toUpperCase() === code) {
+    if (isMatch) {
       console.log('✅ CAPTCHA verified successfully!');
       setIsVerified(true);
       onVerified(code);
       setIsVerifying(false);
     } else {
-      const errorMsg = 'Incorrect code. Please try again.';
+      const errorMsg = style === 'math' ? 'Incorrect answer. Please try again.' : 'Incorrect code. Please try again.';
       console.log('❌ CAPTCHA verification failed:', errorMsg);
       setError(errorMsg);
       onError?.(errorMsg);
       setIsVerifying(false);
       setShouldShake(true);
       setTimeout(() => setShouldShake(false), 500);
-      // Delay before generating new code so user can see error message
       setTimeout(() => {
         generateCode();
       }, 3000);
@@ -374,13 +403,22 @@ export function CodeCaptcha({
         <div className="mb-4">
           <div className="bg-gray-900/60 border border-teal-500/40 rounded-lg p-4 relative overflow-hidden">
             <div className="relative flex items-center justify-between">
-              {/* Canvas Code Image */}
+              {/* Math Problem or Canvas Code Image */}
               <div className="flex-1 flex items-center justify-center">
-                <canvas
-                  ref={canvasRef}
-                  className="w-full h-auto rounded-lg"
-                  style={{ maxWidth: '400px', display: 'block' }}
-                />
+                {style === 'math' ? (
+                  <div className="text-center py-8">
+                    <p className="text-sm text-gray-400 mb-2">What is:</p>
+                    <p className="text-5xl font-bold text-teal-300 tracking-wider">
+                      {mathProblem} = ?
+                    </p>
+                  </div>
+                ) : (
+                  <canvas
+                    ref={canvasRef}
+                    className="w-full h-auto rounded-lg"
+                    style={{ maxWidth: '400px', display: 'block' }}
+                  />
+                )}
               </div>
 
               {/* Controls Column - Right Side */}
@@ -390,21 +428,23 @@ export function CodeCaptcha({
                   type="button"
                   onClick={generateCode}
                   className="p-2 bg-teal-600/20 hover:bg-teal-600/40 border border-teal-500/40 hover:border-teal-400 rounded-lg transition-all duration-200 group"
-                  title="Generate new code"
+                  title="Generate new problem"
                 >
                   <span className="text-xl text-teal-400 group-hover:rotate-180 transition-transform duration-300 block">↻</span>
                 </button>
 
-                {/* Listen Button */}
-                <button
-                  type="button"
-                  onClick={speakCode}
-                  disabled={isSpeaking}
-                  className="p-2 bg-teal-600/20 hover:bg-teal-600/40 border border-teal-500/40 hover:border-teal-400 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed group"
-                  title="Listen to code"
-                >
-                  <Volume2 className={`h-5 w-5 text-teal-400 transition-transform ${isSpeaking ? 'animate-pulse' : 'group-hover:scale-110'}`} />
-                </button>
+                {/* Listen Button - Only for text style */}
+                {style !== 'math' && (
+                  <button
+                    type="button"
+                    onClick={speakCode}
+                    disabled={isSpeaking}
+                    className="p-2 bg-teal-600/20 hover:bg-teal-600/40 border border-teal-500/40 hover:border-teal-400 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed group"
+                    title="Listen to code"
+                  >
+                    <Volume2 className={`h-5 w-5 text-teal-400 transition-transform ${isSpeaking ? 'animate-pulse' : 'group-hover:scale-110'}`} />
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -423,7 +463,14 @@ export function CodeCaptcha({
                 id="captcha-input"
                 type="text"
                 value={userInput}
-                onChange={(e) => setUserInput(e.target.value.toUpperCase().slice(0, codeLength))}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (style === 'math') {
+                    setUserInput(value.replace(/[^0-9]/g, '').slice(0, codeLength));
+                  } else {
+                    setUserInput(value.toUpperCase().slice(0, codeLength));
+                  }
+                }}
                 onKeyPress={handleKeyPress}
                 onPaste={(e) => e.preventDefault()}
                 maxLength={codeLength}
@@ -432,7 +479,7 @@ export function CodeCaptcha({
                     ? 'border-red-500/50 focus:ring-red-500/50'
                     : 'border-gray-600/50 focus:ring-teal-500/50 focus:border-teal-500/50'
                 } ${shouldShake ? 'animate-shake' : ''}`}
-                placeholder="Enter Code"
+                placeholder={style === 'math' ? 'Enter Answer' : 'Enter Code'}
                 disabled={isVerifying}
               />
             </div>
