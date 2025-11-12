@@ -30,7 +30,8 @@ test.describe('LinkedIn OAuth Integration', () => {
     console.log('🔷 Testing seamless LinkedIn → GraphDone flow');
 
     // Step 1: User visits GraphDone sign-in page
-    await page.goto('http://localhost:3127/login');
+    const baseURL = process.env.TEST_URL || 'https://localhost:3128';
+    await page.goto(`${baseURL}/login`);
     await page.waitForLoadState('domcontentloaded');
 
     // Step 2: User clicks "Sign in with LinkedIn"
