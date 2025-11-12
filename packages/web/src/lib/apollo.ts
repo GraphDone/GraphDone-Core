@@ -10,18 +10,17 @@ const getGraphQLUrl = () => {
   if (import.meta.env.VITE_GRAPHQL_URL) {
     return import.meta.env.VITE_GRAPHQL_URL;
   }
-  // Use same hostname but port 4127 for GraphQL
-  const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
-  return `${protocol}//${window.location.hostname}:4127/graphql`;
+  // Use /api/graphql through nginx proxy (works with Docker deployment)
+  return `/api/graphql`;
 };
 
 const getWebSocketUrl = () => {
   if (import.meta.env.VITE_GRAPHQL_WS_URL) {
     return import.meta.env.VITE_GRAPHQL_WS_URL;
   }
-  // Use same hostname but port 4127 for WebSocket
+  // Use /api/graphql for WebSocket through nginx proxy
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  return `${protocol}//${window.location.hostname}:4127/graphql`;
+  return `${protocol}//${window.location.host}/api/graphql`;
 };
 
 const httpLink = createHttpLink({
