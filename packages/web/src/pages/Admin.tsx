@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Database, Shield, Download, Upload, Settings2, RefreshCw, AlertCircle, Lock, Key, Globe, CheckCircle, XCircle, AlertTriangle, FileText, Calendar, Server, Network } from 'lucide-react';
+import { Users, Database, Shield, Download, Upload, Settings2, RefreshCw, AlertCircle, Lock, Key, Globe, CheckCircle, XCircle, AlertTriangle, FileText, Calendar, Server, Network, Copy, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { AdminUserManagement } from '../components/AdminUserManagement';
 import { CustomDropdown } from '../components/CustomDropdown';
@@ -26,6 +26,7 @@ export function Admin() {
   const tabs = [
     { id: 'users', name: 'Users', icon: Users, description: 'Manage user roles and permissions' },
     { id: 'settings', name: 'Registration', icon: Settings2, description: 'User registration policies and defaults' },
+    { id: 'oauth', name: 'OAuth Providers', icon: Key, description: 'Configure OAuth authentication providers' },
     { id: 'database', name: 'Database', icon: Database, description: 'Database configuration and maintenance' },
     { id: 'security', name: 'Security', icon: Shield, description: 'Security settings and passwords' },
     { id: 'backup', name: 'Backup & Restore', icon: Download, description: 'System backup and restore' },
@@ -37,6 +38,8 @@ export function Admin() {
         return <AdminUserManagement />;
       case 'settings':
         return <UserManagementSettings />;
+      case 'oauth':
+        return <OAuthProviderManagement />;
       case 'database':
         return <DatabaseManagement />;
       case 'security':
@@ -256,6 +259,251 @@ function UserManagementSettings() {
           >
             Save Settings
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// OAuth Provider Management Component
+function OAuthProviderManagement() {
+  const [providers, setProviders] = useState({
+    google: {
+      enabled: false,
+      clientId: '',
+      clientSecret: '',
+      callbackUrl: 'https://localhost:4128/auth/google/callback',
+      configured: false,
+    },
+    linkedin: {
+      enabled: false,
+      clientId: '',
+      clientSecret: '',
+      callbackUrl: 'https://localhost:4128/auth/linkedin/callback',
+      configured: false,
+    },
+    github: {
+      enabled: false,
+      clientId: '',
+      clientSecret: '',
+      callbackUrl: 'https://localhost:4128/auth/github/callback',
+      configured: false,
+    },
+  });
+
+  const [showSecrets, setShowSecrets] = useState({
+    google: false,
+    linkedin: false,
+    github: false,
+  });
+
+  const [saved, setSaved] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    // TODO: Load OAuth provider configuration from backend
+    console.log('Loading OAuth provider configuration...');
+  }, []);
+
+  const handleSave = async () => {
+    setLoading(true);
+    try {
+      // TODO: Save OAuth provider configuration to backend
+      console.log('Saving OAuth provider configuration:', providers);
+
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (error) {
+      console.error('Failed to save OAuth configuration:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCopyCallback = (url: string) => {
+    navigator.clipboard.writeText(url);
+    console.log('Copied callback URL:', url);
+  };
+
+  const toggleShowSecret = (provider: 'google' | 'linkedin' | 'github') => {
+    setShowSecrets(prev => ({ ...prev, [provider]: !prev[provider] }));
+  };
+
+  const updateProvider = (provider: 'google' | 'linkedin' | 'github', field: string, value: any) => {
+    setProviders(prev => ({
+      ...prev,
+      [provider]: {
+        ...prev[provider],
+        [field]: value,
+        configured: field === 'clientId' || field === 'clientSecret'
+          ? (value && prev[provider].clientId && prev[provider].clientSecret)
+          : prev[provider].configured,
+      },
+    }));
+  };
+
+  const renderProviderConfig = (
+    providerKey: 'google' | 'linkedin' | 'github',
+    providerName: string,
+    providerIcon: React.ReactNode
+  ) => {
+    const provider = providers[providerKey];
+    const showSecret = showSecrets[providerKey];
+
+    return (
+      <div key={providerKey} className="bg-gray-800 border border-gray-700 rounded-lg p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center space-x-3">
+            {providerIcon}
+            <div>
+              <h3 className="text-lg font-semibold text-gray-100">{providerName}</h3>
+              <p className="text-sm text-gray-400">
+                {provider.configured
+                  ? <span className="flex items-center text-green-400"><CheckCircle className="h-4 w-4 mr-1" /> Configured</span>
+                  : <span className="flex items-center text-gray-500"><AlertCircle className="h-4 w-4 mr-1" /> Not configured</span>
+                }
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-2">
+            <span className="text-sm text-gray-400">Enable</span>
+            <input
+              type="checkbox"
+              checked={provider.enabled}
+              onChange={(e) => updateProvider(providerKey, 'enabled', e.target.checked)}
+              className="h-4 w-4 text-green-500 focus:ring-green-500 border-gray-500 bg-gray-700 rounded"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Client ID
+            </label>
+            <input
+              type="text"
+              value={provider.clientId}
+              onChange={(e) => updateProvider(providerKey, 'clientId', e.target.value)}
+              placeholder={`Enter ${providerName} Client ID`}
+              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Client Secret
+            </label>
+            <div className="relative">
+              <input
+                type={showSecret ? 'text' : 'password'}
+                value={provider.clientSecret}
+                onChange={(e) => updateProvider(providerKey, 'clientSecret', e.target.value)}
+                placeholder={`Enter ${providerName} Client Secret`}
+                className="w-full px-3 py-2 pr-10 bg-gray-700 border border-gray-600 rounded-lg text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                type="button"
+                onClick={() => toggleShowSecret(providerKey)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
+              >
+                {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Callback URL
+              <span className="text-gray-500 text-xs ml-2">(Copy this to your OAuth app configuration)</span>
+            </label>
+            <div className="flex items-center space-x-2">
+              <input
+                type="text"
+                value={provider.callbackUrl}
+                readOnly
+                className="flex-1 px-3 py-2 bg-gray-900 border border-gray-600 rounded-lg text-gray-300 cursor-not-allowed"
+              />
+              <button
+                type="button"
+                onClick={() => handleCopyCallback(provider.callbackUrl)}
+                className="px-3 py-2 bg-gray-700 hover:bg-gray-600 border border-gray-600 rounded-lg text-gray-300 transition-colors"
+                title="Copy callback URL"
+              >
+                <Copy className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="max-w-5xl mx-auto px-6 py-8">
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold text-gray-100 mb-2">OAuth Provider Configuration</h2>
+        <p className="text-gray-400">
+          Configure OAuth authentication providers for user sign-in. Users can login using their existing accounts from these providers.
+        </p>
+      </div>
+
+      <div className="space-y-6">
+        {renderProviderConfig('google', 'Google', <Globe className="h-6 w-6 text-red-400" />)}
+        {renderProviderConfig('linkedin', 'LinkedIn', <Network className="h-6 w-6 text-blue-400" />)}
+        {renderProviderConfig('github', 'GitHub', <Server className="h-6 w-6 text-purple-400" />)}
+      </div>
+
+      <div className="mt-8 flex items-center justify-between p-4 bg-gray-800/50 border border-gray-700 rounded-lg">
+        <div className="text-sm text-gray-400">
+          {saved && (
+            <span className="flex items-center text-green-400">
+              <CheckCircle className="h-4 w-4 mr-2" />
+              OAuth configuration saved successfully
+            </span>
+          )}
+        </div>
+        <div className="flex space-x-3">
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors"
+            disabled={loading}
+          >
+            Reset
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={loading}
+            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+          >
+            {loading ? (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              'Save OAuth Configuration'
+            )}
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-6 p-4 bg-yellow-900/20 border border-yellow-600/30 rounded-lg">
+        <div className="flex items-start space-x-3">
+          <AlertTriangle className="h-5 w-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-yellow-200/90">
+            <p className="font-medium mb-1">Setup Instructions:</p>
+            <ol className="list-decimal list-inside space-y-1 text-yellow-200/70">
+              <li>Create an OAuth app in the provider's developer console</li>
+              <li>Copy the Client ID and Client Secret</li>
+              <li>Add the Callback URL to your OAuth app's allowed redirect URIs</li>
+              <li>Paste the credentials here and enable the provider</li>
+              <li>Save the configuration</li>
+            </ol>
+          </div>
         </div>
       </div>
     </div>
