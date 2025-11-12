@@ -300,6 +300,7 @@ function OAuthProviderManagement() {
   });
 
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const { data, loading: queryLoading, refetch } = useQuery(GET_OAUTH_PROVIDER_CONFIGS);
   const [updateOAuthConfig, { loading: mutationLoading }] = useMutation(UPDATE_OAUTH_PROVIDER_CONFIG);
@@ -308,10 +309,33 @@ function OAuthProviderManagement() {
 
   useEffect(() => {
     if (data?.oauthProviderConfigs) {
-      const loadedProviders = { ...providers };
+      const defaultProviders = {
+        google: {
+          enabled: false,
+          clientId: '',
+          clientSecret: '',
+          callbackUrl: 'https://localhost:4128/auth/google/callback',
+          configured: false,
+        },
+        linkedin: {
+          enabled: false,
+          clientId: '',
+          clientSecret: '',
+          callbackUrl: 'https://localhost:4128/auth/linkedin/callback',
+          configured: false,
+        },
+        github: {
+          enabled: false,
+          clientId: '',
+          clientSecret: '',
+          callbackUrl: 'https://localhost:4128/auth/github/callback',
+          configured: false,
+        },
+      };
+
       data.oauthProviderConfigs.forEach((config: any) => {
-        if (loadedProviders[config.provider as keyof typeof loadedProviders]) {
-          loadedProviders[config.provider as keyof typeof loadedProviders] = {
+        if (defaultProviders[config.provider as keyof typeof defaultProviders]) {
+          defaultProviders[config.provider as keyof typeof defaultProviders] = {
             enabled: config.enabled,
             clientId: config.clientId || '',
             clientSecret: config.clientSecret || '',
@@ -320,11 +344,12 @@ function OAuthProviderManagement() {
           };
         }
       });
-      setProviders(loadedProviders);
+      setProviders(defaultProviders);
     }
   }, [data]);
 
   const handleSave = async () => {
+    setError(null);
     try {
       for (const [providerKey, config] of Object.entries(providers)) {
         await updateOAuthConfig({
@@ -343,8 +368,10 @@ function OAuthProviderManagement() {
       await refetch();
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
-    } catch (error) {
-      console.error('Failed to save OAuth configuration:', error);
+    } catch (err: any) {
+      console.error('Failed to save OAuth configuration:', err);
+      setError(err.message || 'Failed to save OAuth configuration');
+      setTimeout(() => setError(null), 5000);
     }
   };
 
@@ -483,11 +510,17 @@ function OAuthProviderManagement() {
       </div>
 
       <div className="mt-8 flex items-center justify-between p-4 bg-gray-800/50 border border-gray-700 rounded-lg">
-        <div className="text-sm text-gray-400">
+        <div className="text-sm">
           {saved && (
             <span className="flex items-center text-green-400">
               <CheckCircle className="h-4 w-4 mr-2" />
               OAuth configuration saved successfully
+            </span>
+          )}
+          {error && (
+            <span className="flex items-center text-red-400">
+              <XCircle className="h-4 w-4 mr-2" />
+              {error}
             </span>
           )}
         </div>
