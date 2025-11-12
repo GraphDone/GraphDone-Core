@@ -262,6 +262,19 @@ class SQLiteAuthStore {
           )
         `);
 
+        // OAuth provider configuration table for admin panel
+        db.run(`
+          CREATE TABLE IF NOT EXISTS oauth_provider_config (
+            provider TEXT PRIMARY KEY, -- 'google', 'linkedin', 'github'
+            enabled BOOLEAN DEFAULT 0,
+            clientId TEXT,
+            clientSecret TEXT,
+            callbackUrl TEXT,
+            createdAt TEXT NOT NULL,
+            updatedAt TEXT NOT NULL
+          )
+        `);
+
         // Shareable link access log
         db.run(`
           CREATE TABLE IF NOT EXISTS shareable_link_access (
@@ -1491,6 +1504,100 @@ class SQLiteAuthStore {
       db.run(
         'UPDATE shareable_links SET isActive = 0, updatedAt = ? WHERE id = ?',
         [now, linkId],
+        (err) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve();
+          }
+        }
+      );
+    });
+  }
+
+  async getOAuthProviderConfig(provider: 'google' | 'linkedin' | 'github'): Promise<any> {
+    const db = await this.getDb();
+
+    return new Promise((resolve, reject) => {
+      db.get(
+        'SELECT provider, enabled, clientId, clientSecret, callbackUrl, createdAt, updatedAt FROM oauth_provider_config WHERE provider = ?',
+        [provider],
+        (err, row) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve(row || null);
+          }
+        }
+      );
+    });
+  }
+
+  async getAllOAuthProviderConfigs(): Promise<any[]> {
+    const db = await this.getDb();
+
+    return new Promise((resolve, reject) => {
+      db.all(
+        'SELECT provider, enabled, clientId, clientSecret, callbackUrl, createdAt, updatedAt FROM oauth_provider_config',
+        [],
+        (err, rows) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve(rows || []);
+          }
+        }
+      );
+    });
+  }
+
+  async upsertOAuthProviderConfig(config: {
+    provider: 'google' | 'linkedin' | 'github';
+    enabled: boolean;
+    clientId: string;
+    clientSecret: string;
+    callbackUrl: string;
+  }): Promise<void> {
+    const db = await this.getDb();
+    const now = new Date().toISOString();
+
+    return new Promise((resolve, reject) => {
+      db.run(
+        `INSERT INTO oauth_provider_config (provider, enabled, clientId, clientSecret, callbackUrl, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(provider) DO UPDATE SET
+           enabled = excluded.enabled,
+           clientId = excluded.clientId,
+           clientSecret = excluded.clientSecret,
+           callbackUrl = excluded.callbackUrl,
+           updatedAt = excluded.updatedAt`,
+        [
+          config.provider,
+          config.enabled ? 1 : 0,
+          config.clientId,
+          config.clientSecret,
+          config.callbackUrl,
+          now,
+          now,
+        ],
+        (err) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve();
+          }
+        }
+      );
+    });
+  }
+
+  async deleteOAuthProviderConfig(provider: 'google' | 'linkedin' | 'github'): Promise<void> {
+    const db = await this.getDb();
+
+    return new Promise((resolve, reject) => {
+      db.run(
+        'DELETE FROM oauth_provider_config WHERE provider = ?',
+        [provider],
         (err) => {
           if (err) {
             reject(err);
