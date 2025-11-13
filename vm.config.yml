@@ -1,0 +1,118 @@
+# GraphDone Multipass VM Configuration
+# This file configures the Multipass VM for running GraphDone
+
+# VM Name
+# Leave empty or set to "graphdone-dev" to auto-generate a random fun name
+# Format: graphdone-vm-{adjective}-{noun}-{4-digit-id}
+# Example: graphdone-vm-happy-turtle-1234
+# Or specify a custom name here:
+name: ""
+
+# VM Resources
+resources:
+  # Number of CPU cores
+  cpus: 4
+
+  # Memory in GB (use suffix like 4G, 8G, etc.)
+  memory: 8G
+
+  # Disk size in GB (use suffix like 20G, 50G, etc.)
+  disk: 30G
+
+# Base Ubuntu image
+# Options: 22.04, 24.04, or specific release names
+image: 24.04
+
+# Tailscale Configuration
+tailscale:
+  # Enable Tailscale integration
+  enabled: false
+
+  # Tailscale auth key (get from https://login.tailscale.com/admin/settings/keys)
+  # IMPORTANT: Use an ephemeral key for security
+  # You can also set this via environment variable: TAILSCALE_AUTH_KEY
+  auth_key: ""
+
+  # Additional Tailscale flags
+  # Example: "--advertise-routes=10.0.0.0/24 --accept-routes"
+  flags: ""
+
+# Network Configuration
+network:
+  # Whether to use a bridged network (provides external IP)
+  # If false, uses NAT (default)
+  bridged: false
+
+  # Bridge interface name (only used if bridged: true)
+  # Common values: eth0, en0, wlan0
+  bridge_interface: "eth0"
+
+# Mount Configuration
+mounts:
+  # Mount host directories into the VM
+  # Format: host_path:vm_path
+  # Example:
+  # - "~/graphdone-data:/home/ubuntu/data"
+  enabled: false
+  paths: []
+
+# Startup Configuration
+startup:
+  # Automatically start VM on host boot
+  auto_start: false
+
+  # Run GraphDone services on VM boot
+  run_on_boot: true
+
+# Development Configuration
+development:
+  # Expose GraphDone services to host
+  expose_services: true
+
+  # Port forwards (host_port:vm_port)
+  ports:
+    - "3127:3127"  # Web UI
+    - "4127:4127"  # GraphQL API
+    - "7474:7474"  # Neo4j Browser
+    - "7687:7687"  # Neo4j Bolt
+
+  # Install development tools in VM
+  dev_tools:
+    - git
+    - curl
+    - wget
+    - htop
+    - vim
+
+# Docker Configuration
+docker:
+  # Install Docker in the VM
+  enabled: true
+
+  # Install Docker Compose
+  compose: true
+
+# Node.js Configuration
+nodejs:
+  # Node.js version to install (18, 20, or latest)
+  version: "20"
+
+  # Install using nvm (recommended)
+  use_nvm: true
+
+# GraphDone Configuration
+graphdone:
+  # Git repository URL
+  repo_url: "https://github.com/GraphDone/GraphDone-Core.git"
+
+  # Git branch to clone
+  branch: "main"
+
+  # Clone destination in VM
+  clone_path: "/home/ubuntu/graphdone"
+
+  # Automatically run setup after clone
+  auto_setup: true
+
+  # Automatically seed database
+  auto_seed: true
