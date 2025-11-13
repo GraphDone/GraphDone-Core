@@ -34,6 +34,7 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
       }
     } : undefined,
     skip: !isOpen || !currentGraph,
+    fetchPolicy: 'network-only',
     onCompleted: (data) => {
       const workItems = data?.workItems || [];
       setNodeCount(workItems.length);
@@ -53,6 +54,7 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
       }
     } : undefined,
     skip: !isOpen || !currentGraph,
+    fetchPolicy: 'network-only',
     onCompleted: (data) => {
       const edges = data?.edges || [];
       const connections: {[key: string]: any[]} = {};
@@ -135,7 +137,7 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
       });
       
       showSuccess(
-        'Node Deleted Successfully!',
+        'Work Item Deleted Successfully!',
         `"${nodeTitle}" has been removed from the graph.`
       );
       
@@ -145,7 +147,7 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
       
     } catch (error) {
       showError(
-        'Failed to Delete Node',
+        'Failed to Delete Work Item',
         error instanceof Error ? error.message : 'Please try again.'
       );
     }
@@ -255,27 +257,33 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
     <div className="fixed inset-0 z-[9999] overflow-y-auto backdrop-blur-sm">
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
         {/* Enhanced Backdrop with gradient */}
-        <div 
-          className="fixed inset-0 transition-opacity bg-gradient-to-br from-red-900/90 via-black/80 to-gray-900/90 animate-in fade-in duration-300"
+        <div
+          className="fixed inset-0 z-0 transition-opacity bg-gradient-to-br from-red-900/90 via-black/80 to-gray-900/90 animate-in fade-in duration-300"
           onClick={onClose}
         />
 
         {/* Enhanced Modal with better styling */}
-        <div className="inline-block align-bottom bg-gradient-to-br from-gray-800 via-gray-800 to-gray-900 rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full border border-red-600/30 animate-in slide-in-from-bottom-4 duration-300 relative">
+        <div className="inline-block align-bottom bg-gradient-to-br from-gray-800 via-gray-800 to-gray-900 rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full border border-red-600/30 animate-in slide-in-from-bottom-4 duration-300 relative z-10">
           {/* Gradient accent line at top - red for danger */}
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-red-500 via-orange-500 to-red-600"></div>
-          
-          {/* Enhanced Header with gradient background */}
-          <div className="flex items-center justify-between px-6 py-5 border-b border-red-600/30 bg-gradient-to-r from-red-900/30 to-gray-900/90 backdrop-blur-sm">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-red-500 via-orange-500 via-pink-500 to-red-600"></div>
+
+          {/* Modern header with glow */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700/30 bg-gradient-to-r from-gray-800/50 to-gray-900/50 backdrop-blur-sm relative">
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-red-600 rounded-xl flex items-center justify-center shadow-lg">
-                <AlertTriangle className="h-5 w-5 text-white" />
+              <div className="w-10 h-10 bg-gradient-to-br from-red-500 via-orange-500 to-red-600 rounded-xl flex items-center justify-center shadow-lg shadow-red-500/30 relative">
+                <div className="absolute inset-0 bg-gradient-to-br from-red-400 to-orange-600 rounded-xl blur opacity-50 animate-pulse"></div>
+                <AlertTriangle className="h-5 w-5 text-white relative z-10" />
               </div>
-              <h3 className="text-xl font-bold bg-gradient-to-r from-red-100 via-orange-100 to-red-200 bg-clip-text text-transparent">Delete Graph</h3>
+              <div>
+                <h3 className="text-lg font-bold bg-gradient-to-r from-white via-red-100 to-orange-100 bg-clip-text text-transparent">
+                  Delete Graph
+                </h3>
+                <p className="text-xs text-gray-400">Permanent removal</p>
+              </div>
             </div>
             <button
               onClick={onClose}
-              className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-xl transition-all duration-200 hover:scale-110"
+              className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-xl transition-all duration-200 hover:scale-110 hover:rotate-90"
             >
               <X className="h-5 w-5" />
             </button>
@@ -284,7 +292,7 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
           {/* Content */}
           <div className="px-8 pt-0 pb-8 max-h-[80vh] overflow-y-auto relative">
             {/* Subtle background pattern */}
-            <div className="absolute inset-0 opacity-5">
+            <div className="absolute inset-0 opacity-5 pointer-events-none">
               <div className="w-full h-full" style={{
                 backgroundImage: `radial-gradient(circle at 1px 1px, rgba(255,255,255,0.15) 1px, transparent 0)`,
                 backgroundSize: '20px 20px'
@@ -309,10 +317,10 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
                   <AlertTriangle className="h-8 w-8 text-orange-400" />
                 </div>
                 <h4 className="text-xl font-semibold text-orange-200 text-center mb-2">
-                  Graph Contains Active Nodes
+                  Graph Contains Active Work Items
                 </h4>
                 <p className="text-gray-300 text-center mb-8">
-                  Cannot delete <strong className="text-white">"{currentGraph.name}"</strong> while it contains nodes
+                  Cannot delete <strong className="text-white">"{currentGraph.name}"</strong> while it contains work items
                 </p>
               </div>
 
@@ -321,9 +329,9 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
                 <div className="flex items-start">
                   <AlertTriangle className="h-6 w-6 text-orange-400 mt-0.5 mr-3 flex-shrink-0" />
                   <div className="flex-1">
-                    <h4 className="text-orange-200 font-semibold mb-3">Delete Nodes First</h4>
+                    <h4 className="text-orange-200 font-semibold mb-3">Delete Work Items First</h4>
                     <p className="text-orange-300 text-sm mb-4">
-                      This graph contains <strong className="text-orange-200">{nodeCount} node{nodeCount !== 1 ? 's' : ''}</strong>. Remove connections first, then delete nodes:
+                      This graph contains <strong className="text-orange-200">{nodeCount} work item{nodeCount !== 1 ? 's' : ''}</strong>. Remove connections first, then delete work items:
                     </p>
                     
                     {/* Global Disconnect All Button */}
@@ -377,15 +385,15 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
                             className="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors flex items-center justify-center space-x-2"
                           >
                             <Trash2 className="h-4 w-4" />
-                            <span>Delete All Unconnected Nodes ({nodes.filter(node => !(nodeConnections[node.id]?.length > 0)).length})</span>
+                            <span>Delete All Unconnected Work Items ({nodes.filter(node => !(nodeConnections[node.id]?.length > 0)).length})</span>
                           </button>
                         ) : (
                           <div className="bg-red-900/30 border border-red-600/50 rounded-lg p-3">
                             <p className="text-red-200 text-sm mb-3">
-                              <strong>Delete {nodes.filter(node => !(nodeConnections[node.id]?.length > 0)).length} unconnected nodes?</strong>
+                              <strong>Delete {nodes.filter(node => !(nodeConnections[node.id]?.length > 0)).length} unconnected work items?</strong>
                             </p>
                             <p className="text-red-300 text-xs mb-3">
-                              This will permanently remove all nodes that have no connections to other nodes. This action cannot be undone.
+                              This will permanently remove all work items that have no connections to other work items. This action cannot be undone.
                             </p>
                             <div className="flex gap-2">
                               <button
@@ -406,8 +414,8 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
                                     
                                     // Single success notification for bulk operation
                                     showSuccess(
-                                      'Nodes Deletion Completed Successfully!',
-                                      `Removed ${unconnectedNodeCount} node${unconnectedNodeCount !== 1 ? 's' : ''} from ${currentGraph.name}.`
+                                      'Work Items Deletion Completed Successfully!',
+                                      `Removed ${unconnectedNodeCount} work item${unconnectedNodeCount !== 1 ? 's' : ''} from ${currentGraph.name}.`
                                     );
                                     
                                     // Update local state
@@ -507,7 +515,7 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
                                 {!hasConnections && (
                                   <div className="flex items-center space-x-2 mb-2">
                                     <CheckCircle className="h-4 w-4 text-green-400" />
-                                    <span className="text-green-300 text-sm">No connections - ready to delete</span>
+                                    <span className="text-green-300 text-sm">No connections - ready to delete work item</span>
                                   </div>
                                 )}
                               </div>
@@ -549,7 +557,7 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
                   <div>
                     <h5 className="text-blue-200 font-semibold mb-2">Why this restriction?</h5>
                     <p className="text-blue-300 text-sm">
-                      This safety measure ensures that you consciously review and delete each node before removing the graph structure. 
+                      This safety measure ensures that you consciously review and delete each work item before removing the graph structure.
                       It prevents accidental loss of important work items and their relationships.
                     </p>
                   </div>
@@ -557,19 +565,19 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
               </div>
 
               {/* Actions */}
-              <div className="flex justify-end space-x-3">
+              <div className="flex justify-end space-x-4 pt-6 border-t border-gradient-to-r from-gray-600/30 via-gray-500/50 to-gray-600/30">
                 <button
                   onClick={onClose}
-                  className="px-6 py-2 text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors"
+                  className="px-6 py-3 text-gray-300 bg-gradient-to-r from-gray-700/80 to-gray-600/80 rounded-xl hover:from-gray-600/80 hover:to-gray-500/80 transition-all duration-300 hover:scale-105 shadow-lg backdrop-blur-sm border border-gray-500/30 hover:border-gray-400/50 hover:text-white font-medium"
                 >
                   Close
                 </button>
                 {nodeCount === 0 && (
                   <button
                     onClick={() => setStep('warning')}
-                    className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center space-x-2"
+                    className="px-8 py-3 bg-gradient-to-r from-red-600 via-orange-600 to-red-600 text-white rounded-xl hover:from-red-500 hover:via-orange-500 hover:to-red-500 transition-all duration-300 shadow-xl hover:shadow-2xl hover:scale-105 transform border border-red-400/30 font-semibold flex items-center space-x-2"
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <Trash2 className="w-5 h-5" />
                     <span>Now Delete Graph</span>
                   </button>
                 )}
@@ -600,7 +608,7 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
                         Graph is empty and ready for deletion
                       </p>
                       <p className="text-green-300 text-sm mt-1">
-                        This graph contains no nodes or edges.
+                        This graph contains no work items or connections.
                       </p>
                     </div>
                   </div>
@@ -640,45 +648,45 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
               </div>
 
               {/* Confirmation Checkboxes */}
-              <div className="space-y-4 mb-6">
-                <label className="flex items-start space-x-3 cursor-pointer">
+              <div className="space-y-3 mb-6">
+                <label className="flex items-start space-x-2 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={understandRisks}
                     onChange={(e) => setUnderstandRisks(e.target.checked)}
-                    className="mt-1 h-4 w-4 text-red-600 focus:ring-red-500 border-gray-600 rounded bg-gray-700"
+                    className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-red-600 focus:ring-red-500 border-gray-600 rounded bg-gray-700 cursor-pointer"
                   />
-                  <span className="text-gray-300 text-sm">
+                  <span className="text-gray-300 text-xs leading-relaxed">
                     I understand that this action cannot be undone and the graph structure will be permanently lost
                   </span>
                 </label>
-                <label className="flex items-start space-x-3 cursor-pointer">
+                <label className="flex items-start space-x-2 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={confirmDeletion}
                     onChange={(e) => setConfirmDeletion(e.target.checked)}
-                    className="mt-1 h-4 w-4 text-red-600 focus:ring-red-500 border-gray-600 rounded bg-gray-700"
+                    className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-red-600 focus:ring-red-500 border-gray-600 rounded bg-gray-700 cursor-pointer"
                   />
-                  <span className="text-gray-300 text-sm">
+                  <span className="text-gray-300 text-xs leading-relaxed">
                     I confirm that I want to delete the empty graph "{currentGraph.name}"
                   </span>
                 </label>
               </div>
 
               {/* Actions */}
-              <div className="flex justify-end space-x-3">
+              <div className="flex justify-end space-x-4 pt-6 border-t border-gradient-to-r from-gray-600/30 via-gray-500/50 to-gray-600/30">
                 <button
                   onClick={onClose}
-                  className="px-4 py-2 text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors"
+                  className="px-6 py-3 text-gray-300 bg-gradient-to-r from-gray-700/80 to-gray-600/80 rounded-xl hover:from-gray-600/80 hover:to-gray-500/80 transition-all duration-300 hover:scale-105 shadow-lg backdrop-blur-sm border border-gray-500/30 hover:border-gray-400/50 hover:text-white font-medium"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={() => setStep('confirm')}
                   disabled={!understandRisks || !confirmDeletion}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                  className="px-8 py-3 bg-gradient-to-r from-red-600 via-orange-600 to-red-600 text-white rounded-xl hover:from-red-500 hover:via-orange-500 hover:to-red-500 transition-all duration-300 shadow-xl hover:shadow-2xl hover:scale-105 transform border border-red-400/30 font-semibold flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:hover:scale-100"
                 >
-                  <AlertTriangle className="w-4 h-4" />
+                  <AlertTriangle className="w-5 h-5" />
                   <span>Continue to Final Step</span>
                 </button>
               </div>
@@ -707,7 +715,7 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
                   <div>
                     <h5 className="text-blue-200 font-semibold mb-2">Deletion Process:</h5>
                     <ol className="text-blue-300 text-sm space-y-1 list-decimal list-inside">
-                      <li>Confirm the graph is empty (no nodes or edges)</li>
+                      <li>Confirm the graph is empty (no work items or connections)</li>
                       <li>Delete the graph structure and metadata</li>
                       <li>Clear all permissions and access rights</li>
                     </ol>
@@ -756,26 +764,29 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
               </div>
 
               {/* Actions */}
-              <div className="flex justify-between">
+              <div className="flex justify-between pt-6 border-t border-gradient-to-r from-gray-600/30 via-gray-500/50 to-gray-600/30">
                 <button
                   onClick={() => setStep('warning')}
-                  className="px-4 py-2 text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors"
+                  className="px-6 py-3 text-gray-300 bg-gradient-to-r from-gray-700/80 to-gray-600/80 rounded-xl hover:from-gray-600/80 hover:to-gray-500/80 transition-all duration-300 hover:scale-105 shadow-lg backdrop-blur-sm border border-gray-500/30 hover:border-gray-400/50 hover:text-white font-medium flex items-center space-x-2"
                 >
-                  Back
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path>
+                  </svg>
+                  <span>Back</span>
                 </button>
-                <div className="flex space-x-3">
+                <div className="flex space-x-4">
                   <button
                     onClick={onClose}
-                    className="px-4 py-2 text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors"
+                    className="px-6 py-3 text-gray-300 bg-gradient-to-r from-gray-700/80 to-gray-600/80 rounded-xl hover:from-gray-600/80 hover:to-gray-500/80 transition-all duration-300 hover:scale-105 shadow-lg backdrop-blur-sm border border-gray-500/30 hover:border-gray-400/50 hover:text-white font-medium"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleDelete}
                     disabled={!isConfirmValid || loading}
-                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                    className="px-8 py-3 bg-gradient-to-r from-red-600 via-orange-600 to-red-600 text-white rounded-xl hover:from-red-500 hover:via-orange-500 hover:to-red-500 transition-all duration-300 shadow-xl hover:shadow-2xl hover:scale-105 transform border border-red-400/30 font-semibold flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:hover:scale-100"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-5 h-5" />
                     <span>{loading ? 'Deleting Forever...' : 'Delete Forever'}</span>
                   </button>
                 </div>
