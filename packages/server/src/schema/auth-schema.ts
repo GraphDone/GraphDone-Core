@@ -23,11 +23,13 @@ export const authTypeDefs = gql`
     password: String!
     name: String!
     teamId: String
+    captchaPayload: String
   }
 
   input LoginInput {
     emailOrUsername: String!
     password: String!
+    captchaPayload: String
   }
 
   input UpdateProfileInput {
@@ -125,6 +127,40 @@ export const authTypeDefs = gql`
     defaultAccounts: [DefaultAccount!]!
   }
 
+  type OAuthProvider {
+    provider: String!
+    providerId: String!
+    email: String
+    name: String
+    avatar: String
+    createdAt: String!
+  }
+
+  input OAuthLoginInput {
+    provider: String!
+    code: String!
+  }
+
+  # OAuth Provider Configuration (Admin Only)
+  type OAuthProviderConfig {
+    provider: String!
+    enabled: Boolean!
+    clientId: String
+    clientSecret: String
+    callbackUrl: String!
+    configured: Boolean!
+    createdAt: String
+    updatedAt: String
+  }
+
+  input OAuthProviderConfigInput {
+    provider: String!
+    enabled: Boolean!
+    clientId: String!
+    clientSecret: String!
+    callbackUrl: String!
+  }
+
   type Query {
     # Get current user from JWT token
     me: User
@@ -153,6 +189,13 @@ export const authTypeDefs = gql`
     
     # Get graphs in a specific folder
     folderGraphs(folderId: String!): [GraphFolderMapping!]!
+
+    # Get OAuth providers for current user
+    myOAuthProviders: [OAuthProvider!]!
+
+    # Get OAuth provider configurations (Admin only)
+    oauthProviderConfigs: [OAuthProviderConfig!]!
+    oauthProviderConfig(provider: String!): OAuthProviderConfig
   }
 
   type Mutation {
@@ -216,6 +259,14 @@ export const authTypeDefs = gql`
     
     # Reorder graphs within folder
     reorderGraphsInFolder(folderId: String!, graphOrders: [GraphOrderInput!]!): MessageResponse!
+
+    # OAuth mutations
+    oauthLogin(input: OAuthLoginInput!): AuthPayload!
+    unlinkOAuthProvider(provider: String!): MessageResponse!
+
+    # OAuth provider configuration mutations (Admin only)
+    updateOAuthProviderConfig(input: OAuthProviderConfigInput!): OAuthProviderConfig!
+    deleteOAuthProviderConfig(provider: String!): MessageResponse!
   }
   
   input GraphOrderInput {

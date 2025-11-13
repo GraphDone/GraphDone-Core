@@ -266,7 +266,7 @@ export function Backend() {
   const updateDatabaseStats = async (debug: string[]) => {
     try {
       debug.push('📊 Fetching graph count...');
-      const graphResponse = await fetch('/graphql', {
+      const graphResponse = await fetch('/api/graphql', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: 'query { graphs { id } }' })
@@ -277,7 +277,7 @@ export function Backend() {
       debug.push(`✅ Found ${graphCount} graphs`);
 
       debug.push('📊 Fetching node count...');
-      const nodeResponse = await fetch('/graphql', {
+      const nodeResponse = await fetch('/api/graphql', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: 'query { workItems { id } }' })
@@ -288,7 +288,7 @@ export function Backend() {
       debug.push(`✅ Found ${nodeCount} nodes`);
 
       debug.push('📊 Fetching edge count...');
-      const edgeResponse = await fetch('/graphql', {
+      const edgeResponse = await fetch('/api/graphql', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: 'query { edges { id } }' })
@@ -312,7 +312,7 @@ export function Backend() {
 
     try {
       // Check for graphs with invalid types
-      const graphResponse = await fetch('/graphql', {
+      const graphResponse = await fetch('/api/graphql', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: 'query { graphs { id name } }' })
@@ -363,7 +363,7 @@ export function Backend() {
 
     try {
       // Get all graphs to identify test data
-      const graphResponse = await fetch('/graphql', {
+      const graphResponse = await fetch('/api/graphql', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: 'query { graphs { id name } }' })
@@ -386,7 +386,7 @@ export function Backend() {
 
         for (const graph of testGraphs.slice(0, 50)) { // Limit to 50 at a time to avoid timeout
           try {
-            const deleteResponse = await fetch('/graphql', {
+            const deleteResponse = await fetch('/api/graphql', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ 
@@ -1026,7 +1026,7 @@ mutation DeleteGraph($id: ID!) {
                         debug.push(`🔍 Executing GraphQL query...`);
                         debug.push(`📝 Query: ${query.substring(0, 100)}${query.length > 100 ? '...' : ''}`);
                         
-                        const response = await fetch('/graphql', {
+                        const response = await fetch('/api/graphql', {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({ query })

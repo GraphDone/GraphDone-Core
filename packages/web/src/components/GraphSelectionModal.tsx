@@ -245,19 +245,7 @@ export function GraphSelectionModal({ isOpen, onClose }: GraphSelectionModalProp
                 </div>
               ) : (
                 <div className="py-12 relative z-10">
-                  {/* Tropical lagoon light scattering background animation - zen mode for empty state */}
-                  <div className="lagoon-caustics absolute inset-0 opacity-30">
-                    <div className="caustic-layer caustic-layer-1"></div>
-                    <div className="caustic-layer caustic-layer-2"></div>
-                    <div className="caustic-layer caustic-layer-3"></div>
-                    <div className="caustic-layer caustic-layer-4"></div>
-                    <div className="caustic-layer caustic-layer-5"></div>
-                    <div className="lagoon-shimmer lagoon-shimmer-1"></div>
-                    <div className="lagoon-shimmer lagoon-shimmer-2"></div>
-                    <div className="lagoon-shimmer lagoon-shimmer-3"></div>
-                    <div className="lagoon-shimmer lagoon-shimmer-4"></div>
-                    <div className="lagoon-shimmer lagoon-shimmer-5"></div>
-                  </div>
+                  <div className="lagoon-caustics"></div>
 
                 <div className="text-center max-w-md mx-auto relative z-20">
                   {/* Icon */}

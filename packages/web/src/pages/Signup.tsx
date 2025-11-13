@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, gql } from '@apollo/client';
-import { Eye, EyeOff, ArrowRight, CheckCircle } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
+import { Eye, EyeOff, ArrowRight, CheckCircle, XCircle, Github, Mail, Info, Shield } from 'lucide-react';
 import { TlsStatusIndicator } from '../components/TlsStatusIndicator';
+import { PasswordRequirements } from '../components/PasswordRequirements';
+import { isValidEmail, getPasswordStrength } from '../utils/validation';
+import { CodeCaptcha } from '../components/CodeCaptcha';
 
 const SIGNUP_MUTATION = gql`
   mutation Signup($input: SignupInput!) {
@@ -30,10 +32,18 @@ const CHECK_AVAILABILITY = gql`
   }
 `;
 
+const RESEND_VERIFICATION_EMAIL = gql`
+  mutation ResendVerificationEmail($email: String!) {
+    resendVerificationEmail(email: $email) {
+      success
+      message
+    }
+  }
+`;
+
 export function Signup() {
   const navigate = useNavigate();
-  const { login: setAuthUser } = useAuth();
-  
+
   const [formData, setFormData] = useState({
     email: '',
     username: '',
@@ -41,25 +51,54 @@ export function Signup() {
     confirmPassword: '',
     name: ''
   });
-  
+  const [captchaPayload, setCaptchaPayload] = useState<string | null>(null);
+
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isChecking, setIsChecking] = useState<Record<string, boolean>>({});
   const [availability, setAvailability] = useState<Record<string, boolean>>({});
-
+  const [emailValid, setEmailValid] = useState<boolean | null>(null);
+  const [passwordsMatch, setPasswordsMatch] = useState<boolean | null>(null);
+  const [signupComplete, setSignupComplete] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendMessage, setResendMessage] = useState('');
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [rateLimitError, setRateLimitError] = useState<string | null>(null);
+  const [rateLimitRetryAfter, setRateLimitRetryAfter] = useState<number | null>(null);
+  const [oauthConfig, setOauthConfig] = useState<{
+    google: { enabled: boolean; configured: boolean };
+    github: { enabled: boolean; configured: boolean };
+    linkedin: { enabled: boolean; configured: boolean };
+  } | null>(null);
 
   const [signup, { loading }] = useMutation(SIGNUP_MUTATION, {
     onCompleted: (data) => {
-      // Store token in localStorage
-      localStorage.setItem('authToken', data.signup.token);
-      localStorage.setItem('currentUser', JSON.stringify(data.signup.user));
-      
-      // Navigate to main app
-      navigate('/');
+      setSignupComplete(true);
     },
     onError: (error) => {
-      setErrors({ submit: error.message });
+      if (error.graphQLErrors?.[0]?.extensions?.rateLimitExceeded) {
+        const retryAfter = error.graphQLErrors[0].extensions.retryAfter as number;
+        setRateLimitError(error.message);
+        setRateLimitRetryAfter(retryAfter);
+      } else {
+        setErrors({ submit: error.message });
+      }
+    }
+  });
+
+  const [resendVerificationEmail] = useMutation(RESEND_VERIFICATION_EMAIL, {
+    onCompleted: (data) => {
+      setResendLoading(false);
+      if (data.resendVerificationEmail.success) {
+        setResendMessage('Verification email sent! Check your inbox.');
+      } else {
+        setResendMessage(data.resendVerificationEmail.message || 'Failed to send email. Please try again.');
+      }
+    },
+    onError: () => {
+      setResendLoading(false);
+      setResendMessage('Failed to send email. Please try again.');
     }
   });
 
@@ -69,7 +108,7 @@ export function Signup() {
     setIsChecking({ ...isChecking, [field]: true });
     
     try {
-      const response = await fetch('/graphql', {
+      const response = await fetch('/api/graphql', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -103,12 +142,11 @@ export function Signup() {
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
-    
+
     // Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!formData.email) {
       newErrors.email = 'Email is required';
-    } else if (!emailRegex.test(formData.email)) {
+    } else if (!isValidEmail(formData.email)) {
       newErrors.email = 'Invalid email format';
     }
     
@@ -155,7 +193,8 @@ export function Signup() {
           email: formData.email,
           username: formData.username,
           password: formData.password,
-          name: formData.name
+          name: formData.name,
+          captchaPayload: captchaPayload
         }
       }
     });
@@ -164,8 +203,26 @@ export function Signup() {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
-    
-    // Clear error for this field
+
+    if (name === 'email') {
+      if (value.length === 0) {
+        setEmailValid(null);
+      } else {
+        setEmailValid(isValidEmail(value));
+      }
+    }
+
+    if (name === 'password' || name === 'confirmPassword') {
+      const pwd = name === 'password' ? value : formData.password;
+      const confirmPwd = name === 'confirmPassword' ? value : formData.confirmPassword;
+
+      if (pwd && confirmPwd) {
+        setPasswordsMatch(pwd === confirmPwd);
+      } else {
+        setPasswordsMatch(null);
+      }
+    }
+
     if (errors[name]) {
       const newErrors = { ...errors };
       delete newErrors[name];
@@ -179,59 +236,217 @@ export function Signup() {
     }
   };
 
-  const getPasswordStrength = (password: string) => {
-    let strength = 0;
-    if (password.length >= 8) strength++;
-    if (password.length >= 12) strength++;
-    if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength++;
-    if (/\d/.test(password)) strength++;
-    if (/[^a-zA-Z\d]/.test(password)) strength++;
-    
-    if (strength <= 2) return { label: 'Weak', color: 'bg-red-500' };
-    if (strength <= 3) return { label: 'Medium', color: 'bg-yellow-500' };
-    return { label: 'Strong', color: 'bg-green-500' };
+  const handleResendVerificationEmail = async () => {
+    setResendLoading(true);
+    setResendMessage('');
+
+    await resendVerificationEmail({
+      variables: {
+        email: formData.email
+      }
+    });
+    setResendCooldown(60);
   };
+
+  useEffect(() => {
+    const fetchOAuthConfig = async () => {
+      try {
+        const apiUrl = import.meta.env.VITE_API_URL || 'https://localhost:4128';
+        const response = await fetch(`${apiUrl}/config`);
+        if (response.ok) {
+          const config = await response.json();
+          if (config.oauth && config.oauth.providers) {
+            setOauthConfig(config.oauth.providers);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch OAuth config:', error);
+      }
+    };
+    fetchOAuthConfig();
+  }, []);
+
+  useEffect(() => {
+    if (resendCooldown > 0) {
+      const timer = setTimeout(() => setResendCooldown(prev => prev - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, [resendCooldown]);
+
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && !loading && !Object.values(isChecking).some(checking => checking)) {
+        const submitEvent = e as unknown as React.FormEvent;
+        void handleSubmit(submitEvent);
+      }
+    };
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [formData, loading, isChecking, handleSubmit]);
 
   const passwordStrength = getPasswordStrength(formData.password);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Tropical lagoon light scattering background animation - consistent with main app */}
-      <div className="lagoon-caustics">
-        <div className="caustic-layer caustic-layer-1"></div>
-        <div className="caustic-layer caustic-layer-2"></div>
-        <div className="caustic-layer caustic-layer-3"></div>
-        <div className="caustic-layer caustic-layer-4"></div>
-        <div className="caustic-layer caustic-layer-5"></div>
-        <div className="caustic-layer caustic-layer-6"></div>
-        <div className="caustic-layer caustic-layer-7"></div>
-        <div className="caustic-layer caustic-layer-8"></div>
-        <div className="caustic-layer caustic-layer-9"></div>
-        <div className="caustic-layer caustic-layer-10"></div>
-        <div className="lagoon-shimmer lagoon-shimmer-1"></div>
-        <div className="lagoon-shimmer lagoon-shimmer-2"></div>
-        <div className="lagoon-shimmer lagoon-shimmer-3"></div>
-        <div className="lagoon-shimmer lagoon-shimmer-4"></div>
-        <div className="lagoon-shimmer lagoon-shimmer-5"></div>
-        <div className="lagoon-shimmer lagoon-shimmer-6"></div>
-        <div className="lagoon-shimmer lagoon-shimmer-7"></div>
-        <div className="lagoon-shimmer lagoon-shimmer-8"></div>
-        <div className="lagoon-shimmer lagoon-shimmer-9"></div>
-        <div className="lagoon-shimmer lagoon-shimmer-10"></div>
-      </div>
+      {/* Static gradient background - optimized for all browsers */}
+      <div className="lagoon-caustics"></div>
       <div className="max-w-md w-full relative z-10">
         {/* Header */}
-        <div className="text-center mb-8">
-          <Link to="/" className="flex items-center justify-center mb-4 hover:opacity-80 transition-opacity">
-            <img src="/favicon.svg" alt="GraphDone Logo" className="h-12 w-12" />
-            <span className="ml-3 text-3xl font-bold text-gray-100">GraphDone</span>
+        <div className="text-center mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
+          <Link to="/" className="inline-flex items-center justify-center mb-6 hover:opacity-90 transition-all duration-300 hover:scale-105 group">
+            <img src="/favicon.svg" alt="GraphDone Logo" className="h-16 w-16 drop-shadow-lg group-hover:drop-shadow-2xl transition-all duration-300" />
+            <span className="ml-4 text-5xl font-bold bg-gradient-to-r from-teal-400 via-cyan-400 to-blue-500 bg-clip-text text-transparent drop-shadow-2xl tracking-tight">GraphDone</span>
           </Link>
-          <h1 className="text-2xl font-bold text-gray-100 mb-2">Create Your Account</h1>
-          <p className="text-gray-300">Join the decentralized project management revolution</p>
+          <h1 className="text-3xl font-bold text-gray-100 mb-3">Create Your Account</h1>
+          <p className="text-gray-400 text-lg">Join the decentralized project management revolution</p>
         </div>
 
-        {/* Signup Form */}
-        <form onSubmit={handleSubmit} className="bg-gray-800 border border-gray-700 rounded-lg p-6 space-y-4">
+        {/* Email Verification Screen or Signup Form */}
+        {signupComplete ? (
+          <div className="bg-gray-800/50 backdrop-blur-xl border border-gray-700/50 rounded-2xl p-8 space-y-5 shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <div className="p-6 bg-teal-900/20 border border-teal-500/30 rounded-xl">
+              <div className="flex items-center justify-center mb-4">
+                <Mail className="h-16 w-16 text-teal-400" />
+              </div>
+              <h3 className="text-2xl font-semibold text-teal-300 text-center mb-3">Check Your Email!</h3>
+              <p className="text-sm text-teal-200/80 text-center mb-4">
+                We've sent a verification link to <strong>{formData.email}</strong>
+              </p>
+              <p className="text-xs text-teal-300/60 text-center mb-6">
+                Click the link in the email to verify your account and complete registration. The link expires in 24 hours.
+              </p>
+
+              <button
+                type="button"
+                onClick={handleResendVerificationEmail}
+                disabled={resendLoading || resendCooldown > 0}
+                className="w-full bg-gray-700/50 hover:bg-gray-600/80 backdrop-blur-sm border border-gray-600/50 hover:border-teal-500 text-teal-400 font-semibold py-3 px-6 rounded-xl transition-all duration-200 hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center space-x-2"
+              >
+                {resendLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-teal-400"></div>
+                    <span>Sending...</span>
+                  </>
+                ) : resendCooldown > 0 ? (
+                  <>
+                    <Mail className="h-5 w-5" />
+                    <span>Resend in {resendCooldown}s</span>
+                  </>
+                ) : (
+                  <>
+                    <Mail className="h-5 w-5" />
+                    <span>Resend Verification Email</span>
+                  </>
+                )}
+              </button>
+
+              {resendMessage && (
+                <p className={`mt-3 text-xs text-center ${resendMessage.includes('sent') ? 'text-teal-400' : 'text-red-400'}`}>
+                  {resendMessage}
+                </p>
+              )}
+            </div>
+
+            <div className="p-4 bg-blue-900/20 border border-blue-500/30 rounded-lg">
+              <p className="text-xs text-blue-300 text-center">
+                <strong>Didn't receive the email?</strong> Check your spam folder or click the button above to resend.
+              </p>
+            </div>
+
+            <div className="text-center">
+              <Link
+                to="/login"
+                className="text-gray-300 hover:text-teal-400 transition-colors text-sm"
+              >
+                Back to login
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="bg-gray-800/50 backdrop-blur-xl border border-gray-700/50 rounded-2xl p-8 space-y-5 shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-700">
+          {/* Social Signup Buttons */}
+          <div className="grid grid-cols-3 gap-3">
+            <button
+              type="button"
+              onClick={() => oauthConfig?.google.configured && (window.location.href = `${import.meta.env.VITE_API_URL || 'https://localhost:4128'}/auth/google`)}
+              disabled={!oauthConfig?.google.configured}
+              className={`group relative flex items-center justify-center p-3 backdrop-blur-sm border rounded-lg transition-all duration-200 ${
+                oauthConfig?.google.configured
+                  ? 'bg-gray-700/50 hover:bg-gray-600/80 border-gray-600/50 hover:border-teal-500 hover:shadow-lg hover:shadow-teal-500/30 cursor-pointer'
+                  : 'bg-gray-800/30 border-gray-700/30 cursor-not-allowed opacity-50'
+              }`}
+              aria-label={oauthConfig?.google.configured ? 'Sign up with Google' : 'Google signup not configured'}
+            >
+              <svg className={`h-5 w-5 transition-all duration-200 ${oauthConfig?.google.configured ? 'group-hover:scale-110' : ''}`} viewBox="0 0 24 24">
+                <path fill={oauthConfig?.google.configured ? '#EA4335' : '#666'} d="M5.266 9.765A7.077 7.077 0 0 1 12 4.909c1.69 0 3.218.6 4.418 1.582L19.91 3C17.782 1.145 15.055 0 12 0 7.27 0 3.198 2.698 1.24 6.65l4.026 3.115Z"/>
+                <path fill={oauthConfig?.google.configured ? '#34A853' : '#555'} d="M16.04 18.013c-1.09.703-2.474 1.078-4.04 1.078a7.077 7.077 0 0 1-6.723-4.823l-4.04 3.067A11.965 11.965 0 0 0 12 24c2.933 0 5.735-1.043 7.834-3l-3.793-2.987Z"/>
+                <path fill={oauthConfig?.google.configured ? '#4A90E2' : '#444'} d="M19.834 21c2.195-2.048 3.62-5.096 3.62-9 0-.71-.109-1.473-.272-2.182H12v4.637h6.436c-.317 1.559-1.17 2.766-2.395 3.558L19.834 21Z"/>
+                <path fill={oauthConfig?.google.configured ? '#FBBC05' : '#777'} d="M5.277 14.268A7.12 7.12 0 0 1 4.909 12c0-.782.125-1.533.357-2.235L1.24 6.65A11.934 11.934 0 0 0 0 12c0 1.92.445 3.73 1.237 5.335l4.04-3.067Z"/>
+              </svg>
+              <span className={`absolute -top-12 left-1/2 -translate-x-1/2 whitespace-nowrap text-xs opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 px-3 py-2 rounded-lg ${
+                oauthConfig?.google.configured
+                  ? 'text-teal-400 bg-gray-900/95 border border-teal-500/30'
+                  : 'text-gray-300 bg-gray-900/95 border border-gray-700/50'
+              }`}>
+                {oauthConfig?.google.configured ? 'Sign up with Google' : 'Run: ./scripts/setup-oauth.sh'}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => oauthConfig?.linkedin.configured && (window.location.href = `${import.meta.env.VITE_API_URL || 'https://localhost:4128'}/auth/linkedin`)}
+              disabled={!oauthConfig?.linkedin.configured}
+              className={`group relative flex items-center justify-center p-3 backdrop-blur-sm border rounded-lg transition-all duration-200 ${
+                oauthConfig?.linkedin.configured
+                  ? 'bg-gray-700/50 hover:bg-gray-600/80 border-gray-600/50 hover:border-teal-500 hover:shadow-lg hover:shadow-teal-500/30 cursor-pointer'
+                  : 'bg-gray-800/30 border-gray-700/30 cursor-not-allowed opacity-50'
+              }`}
+              aria-label={oauthConfig?.linkedin.configured ? 'Sign up with LinkedIn' : 'LinkedIn signup not configured'}
+            >
+              <svg className={`h-5 w-5 transition-all duration-200 ${oauthConfig?.linkedin.configured ? 'group-hover:scale-110' : ''}`} viewBox="0 0 24 24" fill={oauthConfig?.linkedin.configured ? '#60A5FA' : '#555'}>
+                <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+              </svg>
+              <span className={`absolute -top-12 left-1/2 -translate-x-1/2 whitespace-nowrap text-xs opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 px-3 py-2 rounded-lg ${
+                oauthConfig?.linkedin.configured
+                  ? 'text-teal-400 bg-gray-900/95 border border-teal-500/30'
+                  : 'text-gray-300 bg-gray-900/95 border border-gray-700/50'
+              }`}>
+                {oauthConfig?.linkedin.configured ? 'Sign up with LinkedIn' : 'Run: ./scripts/setup-oauth.sh'}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => oauthConfig?.github.configured && (window.location.href = `${import.meta.env.VITE_API_URL || 'https://localhost:4128'}/auth/github`)}
+              disabled={!oauthConfig?.github.configured}
+              className={`group relative flex items-center justify-center p-3 backdrop-blur-sm border rounded-lg transition-all duration-200 ${
+                oauthConfig?.github.configured
+                  ? 'bg-gray-700/50 hover:bg-gray-600/80 border-gray-600/50 hover:border-teal-500 hover:shadow-lg hover:shadow-teal-500/30 cursor-pointer'
+                  : 'bg-gray-800/30 border-gray-700/30 cursor-not-allowed opacity-50'
+              }`}
+              aria-label={oauthConfig?.github.configured ? 'Sign up with GitHub' : 'GitHub signup not configured'}
+            >
+              <Github className={`h-5 w-5 transition-all duration-200 ${oauthConfig?.github.configured ? 'text-gray-300 group-hover:scale-110' : 'text-gray-600'}`} />
+              <span className={`absolute -top-12 left-1/2 -translate-x-1/2 whitespace-nowrap text-xs opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 px-3 py-2 rounded-lg ${
+                oauthConfig?.github.configured
+                  ? 'text-teal-400 bg-gray-900/95 border border-teal-500/30'
+                  : 'text-gray-300 bg-gray-900/95 border border-gray-700/50'
+              }`}>
+                {oauthConfig?.github.configured ? 'Sign up with GitHub' : 'Run: ./scripts/setup-oauth.sh'}
+              </span>
+            </button>
+          </div>
+
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-600" />
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 bg-gray-800 text-gray-400">Or sign up with your credentials</span>
+            </div>
+          </div>
+
           {/* Name Field */}
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-gray-300 mb-1">
@@ -243,12 +458,17 @@ export function Signup() {
               name="name"
               value={formData.name}
               onChange={handleChange}
-              className={`w-full px-3 py-2 bg-gray-700 border rounded-lg text-gray-100 focus:outline-none focus:ring-2 ${
-                errors.name ? 'border-red-500 focus:ring-red-500' : 'border-gray-600 focus:ring-green-500'
+              autoComplete="name"
+              autoFocus
+              aria-label="Full name"
+              aria-describedby={errors.name ? "name-error" : undefined}
+              aria-invalid={!!errors.name}
+              className={`w-full px-4 py-3 bg-gray-700/50 backdrop-blur-sm border rounded-xl text-gray-100 focus:outline-none focus:ring-2 transition-all ${
+                errors.name ? 'border-red-500/50 focus:ring-red-500/50' : 'border-gray-600/50 focus:ring-teal-500/50 focus:border-teal-500/50'
               }`}
               placeholder="John Doe"
             />
-            {errors.name && <p className="mt-1 text-xs text-red-400">{errors.name}</p>}
+            {errors.name && <p id="name-error" className="mt-1 text-xs text-red-400" role="alert">{errors.name}</p>}
           </div>
 
           {/* Email Field */}
@@ -264,19 +484,33 @@ export function Signup() {
                 value={formData.email}
                 onChange={handleChange}
                 onBlur={() => handleBlur('email')}
-                className={`w-full px-3 py-2 bg-gray-700 border rounded-lg text-gray-100 focus:outline-none focus:ring-2 pr-8 ${
-                  errors.email ? 'border-red-500 focus:ring-red-500' : 'border-gray-600 focus:ring-green-500'
+                autoComplete="email"
+                className={`w-full px-4 py-3 bg-gray-700/50 backdrop-blur-sm border rounded-xl text-gray-100 focus:outline-none focus:ring-2 pr-10 transition-all ${
+                  emailValid === false
+                    ? 'border-red-500/50 focus:ring-red-500/50'
+                    : emailValid === true
+                    ? 'border-teal-500/50 focus:ring-teal-500/50 focus:border-teal-500/50'
+                    : errors.email
+                    ? 'border-red-500/50 focus:ring-red-500/50'
+                    : 'border-gray-600/50 focus:ring-teal-500/50 focus:border-teal-500/50'
                 }`}
                 placeholder="john@example.com"
               />
-              {isChecking.email && (
+              {isChecking.email ? (
                 <div className="absolute right-2 top-2.5 w-5 h-5">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-green-500"></div>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-teal-500"></div>
                 </div>
-              )}
-              {availability.email && !isChecking.email && (
-                <CheckCircle className="absolute right-2 top-2.5 w-5 h-5 text-green-500" />
-              )}
+              ) : emailValid !== null ? (
+                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                  {emailValid ? (
+                    <CheckCircle className="h-5 w-5 text-teal-400" />
+                  ) : (
+                    <XCircle className="h-5 w-5 text-red-400" />
+                  )}
+                </div>
+              ) : availability.email && !isChecking.email ? (
+                <CheckCircle className="absolute right-2 top-2.5 w-5 h-5 text-teal-500" />
+              ) : null}
             </div>
             {errors.email && <p className="mt-1 text-xs text-red-400">{errors.email}</p>}
           </div>
@@ -294,25 +528,32 @@ export function Signup() {
                 value={formData.username}
                 onChange={handleChange}
                 onBlur={() => handleBlur('username')}
-                className={`w-full px-3 py-2 bg-gray-700 border rounded-lg text-gray-100 focus:outline-none focus:ring-2 pr-8 ${
-                  errors.username ? 'border-red-500 focus:ring-red-500' : 'border-gray-600 focus:ring-green-500'
+                autoComplete="username"
+                className={`w-full px-4 py-3 bg-gray-700/50 backdrop-blur-sm border rounded-xl text-gray-100 focus:outline-none focus:ring-2 pr-10 transition-all ${
+                  errors.username ? 'border-red-500/50 focus:ring-red-500/50' : 'border-gray-600/50 focus:ring-teal-500/50 focus:border-teal-500/50'
                 }`}
                 placeholder="johndoe"
               />
               {isChecking.username && (
                 <div className="absolute right-2 top-2.5 w-5 h-5">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-green-500"></div>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-teal-500"></div>
                 </div>
               )}
               {availability.username && !isChecking.username && (
-                <CheckCircle className="absolute right-2 top-2.5 w-5 h-5 text-green-500" />
+                <CheckCircle className="absolute right-2 top-2.5 w-5 h-5 text-teal-500" />
               )}
             </div>
-            {errors.username && <p className="mt-1 text-xs text-red-400">{errors.username}</p>}
+            {errors.username && <p className="mt-1 text-xs text-red-400" role="alert">{errors.username}</p>}
+            {!errors.username && (
+              <p className="mt-1 text-xs text-gray-400 flex items-center">
+                <Info className="h-3 w-3 mr-1 flex-shrink-0" />
+                3-20 characters, letters, numbers, _ and - only
+              </p>
+            )}
           </div>
 
           {/* Password Field */}
-          <div>
+          <div className="relative">
             <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-1">
               Password
             </label>
@@ -323,8 +564,9 @@ export function Signup() {
                 name="password"
                 value={formData.password}
                 onChange={handleChange}
-                className={`w-full px-3 py-2 bg-gray-700 border rounded-lg text-gray-100 focus:outline-none focus:ring-2 pr-10 ${
-                  errors.password ? 'border-red-500 focus:ring-red-500' : 'border-gray-600 focus:ring-green-500'
+                autoComplete="new-password"
+                className={`w-full px-4 py-3 bg-gray-700/50 backdrop-blur-sm border rounded-xl text-gray-100 focus:outline-none focus:ring-2 pr-12 transition-all ${
+                  errors.password ? 'border-red-500/50 focus:ring-red-500/50' : 'border-gray-600/50 focus:ring-teal-500/50 focus:border-teal-500/50'
                 }`}
                 placeholder="••••••••"
               />
@@ -336,7 +578,7 @@ export function Signup() {
                 {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
               </button>
             </div>
-            {errors.password && <p className="mt-1 text-xs text-red-400">{errors.password}</p>}
+            {errors.password && <p className="mt-1 text-xs text-red-400" role="alert">{errors.password}</p>}
             
             {/* Password Strength Indicator */}
             {formData.password && (
@@ -346,16 +588,15 @@ export function Signup() {
                   <span className="text-gray-300">{passwordStrength.label}</span>
                 </div>
                 <div className="h-1 bg-gray-700 rounded-full overflow-hidden">
-                  <div 
+                  <div
                     className={`h-full transition-all duration-300 ${passwordStrength.color}`}
-                    style={{ 
-                      width: passwordStrength.label === 'Weak' ? '33%' : 
-                             passwordStrength.label === 'Medium' ? '66%' : '100%' 
-                    }}
+                    style={{ width: passwordStrength.width }}
                   />
                 </div>
               </div>
             )}
+
+            <PasswordRequirements password={formData.password} showAll={!formData.password} />
           </div>
 
           {/* Confirm Password Field */}
@@ -369,12 +610,28 @@ export function Signup() {
                 id="confirmPassword"
                 name="confirmPassword"
                 value={formData.confirmPassword}
+                autoComplete="new-password"
                 onChange={handleChange}
-                className={`w-full px-3 py-2 bg-gray-700 border rounded-lg text-gray-100 focus:outline-none focus:ring-2 pr-10 ${
-                  errors.confirmPassword ? 'border-red-500 focus:ring-red-500' : 'border-gray-600 focus:ring-green-500'
+                className={`w-full px-4 py-3 bg-gray-700/50 backdrop-blur-sm border rounded-xl text-gray-100 focus:outline-none focus:ring-2 pr-16 transition-all ${
+                  passwordsMatch === false
+                    ? 'border-red-500/50 focus:ring-red-500/50'
+                    : passwordsMatch === true
+                    ? 'border-teal-500/50 focus:ring-teal-500/50 focus:border-teal-500/50'
+                    : errors.confirmPassword
+                    ? 'border-red-500/50 focus:ring-red-500/50'
+                    : 'border-gray-600/50 focus:ring-teal-500/50 focus:border-teal-500/50'
                 }`}
                 placeholder="••••••••"
               />
+              {passwordsMatch !== null && formData.confirmPassword && (
+                <div className="absolute inset-y-0 right-12 flex items-center pointer-events-none">
+                  {passwordsMatch ? (
+                    <CheckCircle className="h-5 w-5 text-teal-400" />
+                  ) : (
+                    <XCircle className="h-5 w-5 text-red-400" />
+                  )}
+                </div>
+              )}
               <button
                 type="button"
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
@@ -384,10 +641,46 @@ export function Signup() {
               </button>
             </div>
             {errors.confirmPassword && <p className="mt-1 text-xs text-red-400">{errors.confirmPassword}</p>}
+            {passwordsMatch === false && formData.confirmPassword && !errors.confirmPassword && (
+              <p className="mt-1 text-xs text-red-400">Passwords do not match</p>
+            )}
+            {passwordsMatch === true && formData.confirmPassword && (
+              <p className="mt-1 text-xs text-teal-400">Passwords match!</p>
+            )}
           </div>
 
+          {/* CAPTCHA */}
+          <div>
+            <CodeCaptcha
+              onVerified={(code) => setCaptchaPayload(code)}
+              className="w-full"
+            />
+          </div>
+
+          {/* Rate Limit Error */}
+          {rateLimitError && (
+            <div className="p-4 bg-red-900/20 border border-red-500/30 rounded-xl">
+              <div className="flex items-start space-x-2">
+                <Shield className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm text-red-300 font-medium mb-2">
+                    🛡️ Rate Limit Exceeded
+                  </p>
+                  <p className="text-xs text-red-200/80 mb-2">
+                    {rateLimitError}
+                  </p>
+                  {rateLimitRetryAfter && (
+                    <p className="text-xs text-red-300/60">
+                      Please try again in {Math.ceil(rateLimitRetryAfter / 60)} minute(s).
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Submit Error */}
-          {errors.submit && (
+          {errors.submit && !rateLimitError && (
             <div className="p-3 bg-red-900 border border-red-700 rounded-lg">
               <p className="text-sm text-red-300">{errors.submit}</p>
             </div>
@@ -396,48 +689,44 @@ export function Signup() {
           {/* Submit Button */}
           <button
             type="submit"
-            disabled={loading || Object.keys(isChecking).some(key => isChecking[key])}
-            className="w-full btn btn-primary flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={loading || Object.keys(isChecking).some(key => isChecking[key]) || !captchaPayload}
+            className="w-full bg-gradient-to-r from-teal-600 to-blue-600 hover:from-teal-500 hover:to-blue-500 border border-teal-400/50 hover:border-teal-300 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-teal-500/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:translate-y-0 flex items-center justify-center space-x-2"
           >
             {loading ? (
               <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                 <span>Creating Account...</span>
               </>
             ) : (
               <>
                 <span>Create Account</span>
-                <ArrowRight className="h-4 w-4" />
+                <ArrowRight className="h-5 w-5" />
               </>
             )}
           </button>
 
           {/* Terms */}
           <p className="text-xs text-gray-400 text-center">
-            By creating an account, you agree to participate in the decentralized graph network
-            and contribute to the collective intelligence.
+            By creating an account, you agree to participate in<br />
+            the decentralized graph network and contribute<br />
+            to the collective intelligence.
           </p>
         </form>
+        )}
 
-
-        {/* Login Link */}
-        <div className="mt-6 text-center">
-          <p className="text-gray-300">
-            Already have an account?{' '}
-            <Link to="/login" className="text-green-400 hover:text-green-300 font-medium">
-              Sign in
-            </Link>
-          </p>
-        </div>
-
-        {/* Role Information */}
-        <div className="mt-8 p-4 bg-gray-800 border border-gray-700 rounded-lg">
-          <h3 className="text-sm font-semibold text-gray-300 mb-2">Your Journey Begins as a Viewer</h3>
-          <p className="text-xs text-gray-400">
-            All new members start with read-only access. As you contribute and demonstrate value,
-            the community may elevate your role to User or even Admin.
-          </p>
-        </div>
+        {!signupComplete && (
+          <>
+            {/* Login Link */}
+            <div className="mt-6 text-center">
+              <p className="text-gray-300">
+                Already have an account?{' '}
+                <Link to="/login" className="text-teal-400 hover:text-teal-300 font-medium">
+                  Sign in
+                </Link>
+              </p>
+            </div>
+          </>
+        )}
       </div>
       
       {/* TLS/SSL Status Indicator */}
