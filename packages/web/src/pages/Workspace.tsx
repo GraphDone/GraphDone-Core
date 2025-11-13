@@ -22,6 +22,7 @@ export function Workspace() {
   const [showUpdateGraphModal, setShowUpdateGraphModal] = useState(false);
   const [showDeleteGraphModal, setShowDeleteGraphModal] = useState(false);
   const [showGraphSelectionModal, setShowGraphSelectionModal] = useState(false);
+  const [graphToEdit, setGraphToEdit] = useState<any>(null);
   const [viewMode, setViewMode] = useState<'graph' | 'dashboard' | 'table' | 'cards' | 'kanban' | 'gantt' | 'calendar' | 'activity'>('graph');
   const [showMiniMap, setShowMiniMap] = useState(true);
   const { currentGraph, availableGraphs } = useGraph();
@@ -58,7 +59,6 @@ export function Workspace() {
   const actualNodeCount = workItemsData?.workItems?.length || 0;
   const actualEdgeCount = edgesData?.edges?.length || 0;
 
-
   return (
     <div className="h-screen flex flex-col">
       {/* Header with Graph Context */}
@@ -87,9 +87,12 @@ export function Workspace() {
               
               {/* Graph Selector - Full Featured */}
               <div className="flex-1 min-w-0">
-                <GraphSelector 
+                <GraphSelector
                   onCreateGraph={() => setShowCreateGraphModal(true)}
-                  onEditGraph={(graph) => setShowUpdateGraphModal(true)}
+                  onEditGraph={(graph) => {
+                    setGraphToEdit(graph);
+                    setShowUpdateGraphModal(true);
+                  }}
                   onDeleteGraph={(graph) => setShowDeleteGraphModal(true)}
                 />
               </div>
@@ -432,10 +435,14 @@ export function Workspace() {
       )}
 
       {/* Update Graph Modal */}
-      {showUpdateGraphModal && currentGraph && (
+      {showUpdateGraphModal && graphToEdit && (
         <UpdateGraphModal
           isOpen={showUpdateGraphModal}
-          onClose={() => setShowUpdateGraphModal(false)}
+          graphToEdit={graphToEdit}
+          onClose={() => {
+            setShowUpdateGraphModal(false);
+            setGraphToEdit(null);
+          }}
         />
       )}
 

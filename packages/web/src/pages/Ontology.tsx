@@ -164,7 +164,7 @@ export function Ontology() {
               }`}
             >
               <Brain className="h-4 w-4 inline mr-2" />
-              Node Types
+              Work Item Types
             </button>
             <button
               onClick={() => setActiveTab('relationships')}
@@ -212,7 +212,7 @@ export function Ontology() {
               </div>
             </div>
 
-            {/* Node Types Grid */}
+            {/* Work Item Types Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredTypes.map((nodeType) => (
                 <div key={nodeType.id} className="bg-gray-800 border border-gray-700 rounded-lg p-6 hover:shadow-lg transition-shadow flex flex-col h-full">
@@ -374,7 +374,7 @@ export function Ontology() {
         )}
       </div>
 
-      {/* Node Type Detail Modal */}
+      {/* Work Item Type Detail Modal */}
       {showDetailModal && selectedNodeType && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-gray-800 rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">

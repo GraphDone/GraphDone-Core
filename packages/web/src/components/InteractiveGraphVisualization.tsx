@@ -597,13 +597,13 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     }
   }, [updateWorkItemMutation]);
 
-  // Function to get SVG path for priority icons
+  // Function to get SVG path for priority icons (using correct Lucide icon paths)
   const getPriorityIconSvgPath = (priorityValue: number): string => {
-    if (priorityValue >= 0.8) return 'M12 2L2 7v10c0 5.55 3.84 10 9 11 1.16-.21 2.31-.54 3.42-1.01C16.1 26.46 18.05 25.24 20 23.5 21.95 21.76 23.84 19.54 24 17v-10L12 2z'; // Flame
+    if (priorityValue >= 0.8) return 'M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z'; // Flame
     if (priorityValue >= 0.6) return 'M13 2L3 14h9l-1 8 10-12h-9l1-8z'; // Zap
-    if (priorityValue >= 0.4) return 'M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z'; // Triangle (star-like)
-    if (priorityValue >= 0.2) return 'M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z'; // Circle
-    return 'M12 5v14m-7-7l7 7 7-7'; // ArrowDown
+    if (priorityValue >= 0.4) return 'M12.002 4l-3.091 6.261-6.91 1.01 5 4.87-1.18 6.88 6.18-3.25 6.181 3.25-1.18-6.88 5-4.87-6.91-1.01z'; // Triangle/Star
+    if (priorityValue >= 0.2) return 'M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z'; // Circle
+    return 'M12 5v14m-7-7 7 7 7-7'; // ArrowDown
   };
 
   // Function to get SVG path for status icons  
@@ -1225,13 +1225,13 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     
     try {
       // Generate a unique name that doesn't conflict with existing nodes
-      let nodeTitle = `New Node ${nodeCounter}`;
+      let nodeTitle = `New Work Item ${nodeCounter}`;
       let attempts = 0;
       
       // Check if name already exists and generate a new one if needed
       while (validatedNodes.some(node => node.title.toLowerCase().trim() === nodeTitle.toLowerCase().trim()) && attempts < 100) {
         attempts++;
-        nodeTitle = `New Node ${nodeCounter + attempts}`;
+        nodeTitle = `New Work Item ${nodeCounter + attempts}`;
       }
       
       // Update counter for next node
@@ -1271,13 +1271,13 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
 
       if (result.data) {
         setNodeCounter(prev => prev + 1);
-        showSuccess('Node created successfully');
+        showSuccess('Work item created successfully');
         // Let Apollo's cache update handle the UI update instead of refetch to avoid camera jumping
         // The refetchQueries in the mutation config will handle the data update
       }
     } catch (error) {
-      console.error('[Create Node Error]', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to create node';
+      console.error('[Create Work Item Error]', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create work item';
       showError(errorMessage);
     }
   };
@@ -3563,7 +3563,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
               Transform Your Vision
             </h3>
             <div className="text-gray-200 mb-8 leading-relaxed text-base max-w-md mx-auto">
-              Break free from rigid hierarchies. Create your first node and experience how GraphDone intelligently connects ideas, surfaces priorities, and accelerates meaningful outcomes.
+              Break free from rigid hierarchies. Create your first work item and experience how GraphDone intelligently connects ideas, surfaces priorities, and accelerates meaningful outcomes.
             </div>
             
             <button 
@@ -3573,7 +3573,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
               <div className="w-5 h-5 bg-white/20 rounded-full flex items-center justify-center">
                 <Plus className="h-3 w-3" />
               </div>
-              Create Your First Node
+              Create Your First Work Item
             </button>
           </div>
         </div>
@@ -3760,7 +3760,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
             >
               <Plus className="h-4 w-4 mr-3 flex-shrink-0" />
               <div className="text-left">
-                <div className="font-medium">Add New Node</div>
+                <div className="font-medium">Add New Work Item</div>
                 <div className="text-xs text-gray-400 mt-0.5">Create a standalone node</div>
               </div>
             </button>
@@ -3771,7 +3771,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
               <GitBranch className="h-4 w-4 mr-3 flex-shrink-0" />
               <div className="text-left">
                 <div className="font-medium">Create New & Connect</div>
-                <div className="text-xs text-gray-400 mt-0.5">Add a new node linked to this one</div>
+                <div className="text-xs text-gray-400 mt-0.5">Add a new work item linked to this one</div>
               </div>
             </button>
             <button
@@ -3790,7 +3790,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
             >
               <Unlink className="h-4 w-4 mr-3 flex-shrink-0 text-red-400" />
               <div className="text-left">
-                <div className="font-medium">Disconnect Nodes</div>
+                <div className="font-medium">Disconnect Work Items</div>
                 <div className="text-xs text-gray-400 mt-0.5">Remove connections from this node</div>
               </div>
             </button>
@@ -4044,7 +4044,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       />
 
 
-      {/* Node Details Modal */}
+      {/* Work Item Details Modal */}
       {showNodeDetailsModal && selectedNode && (
         <NodeDetailsModal
           isOpen={showNodeDetailsModal}

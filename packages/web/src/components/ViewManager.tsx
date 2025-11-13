@@ -728,7 +728,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
         )}
       </div>
 
-      {/* Edit Node Modal */}
+      {/* Edit Work Item Modal */}
       {showEditModal && selectedNode && (
         <EditNodeModal
           isOpen={showEditModal}
@@ -737,7 +737,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
         />
       )}
 
-      {/* Delete Node Modal */}
+      {/* Delete Work Item Modal */}
       {showDeleteModal && selectedNode && (
         <DeleteNodeModal
           isOpen={showDeleteModal}

@@ -290,12 +290,12 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
           
           const relationshipLabel = getRelationshipConfig(selectedRelationType as RelationshipType).label;
           showSuccess(
-            'Node Created and Connected Successfully!',
+            'Work Item Created and Connected Successfully!',
             `"${createdNode.title}" has been created with a "${relationshipLabel}" relationship.`
           );
         } else {
           showSuccess(
-            'Node Created Successfully!',
+            'Work Item Created Successfully!',
             `"${createdNode.title}" has been added to your workspace and is now visible in all views.`
           );
         }
@@ -316,7 +316,7 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
     } catch (error) {
       
       // Show more specific error message if available
-      let errorMessage = 'There was an error creating the node. Please try again or contact support if the problem persists.';
+      let errorMessage = 'There was an error creating the work item. Please try again or contact support if the problem persists.';
       if (error instanceof Error) {
         errorMessage = error.message;
       } else if (typeof error === 'object' && error !== null && 'message' in error) {
@@ -349,11 +349,11 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                     {parentNodeId ? 'Create & Connect Work Item' : 'Create New Work Item'}
                   </h2>
                   <p className="text-sm text-gray-300 mt-1">
-                    {parentNodeId 
-                      ? 'Add a new node with automatic connection' 
+                    {parentNodeId
+                      ? 'Add a new work item with automatic connection'
                       : existingNodesData?.workItems?.length > 0
-                        ? 'Add another node to expand your graph'
-                        : 'Add your first node to begin the journey'
+                        ? 'Add another work item to expand your graph'
+                        : 'Add your first work item to begin the journey'
                     }
                   </p>
                 </div>
@@ -376,7 +376,7 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                     <p className="text-sm font-semibold text-blue-200">Connection Setup</p>
                   </div>
                   <p className="text-sm text-blue-100 leading-relaxed">
-                    A new node will be created and automatically connected with your selected relationship type.
+                    A new work item will be created and automatically connected with your selected relationship type.
                   </p>
                 </div>
                 
@@ -433,12 +433,12 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                     ? 'border-red-500 focus:ring-red-500/50 focus:border-red-400' 
                     : 'border-gray-600/50 focus:ring-emerald-500/50 focus:border-emerald-400/70'
                 }`}
-                placeholder="Enter a descriptive title for your node"
+                placeholder="Enter a descriptive title for your work item"
               />
               {isDuplicateName && formData.title.trim() && (
                 <div className="mt-2 flex items-center space-x-2 text-red-400 text-sm">
                   <div className="w-1 h-1 bg-red-400 rounded-full"></div>
-                  <span>A node with this name already exists. Please choose a different name.</span>
+                  <span>A work item with this name already exists. Please choose a different name.</span>
                 </div>
               )}
             </div>
@@ -447,14 +447,14 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
               <div className="flex items-center space-x-2 mb-3">
                 <div className="h-1.5 w-1.5 bg-purple-400 rounded-full"></div>
                 <label className="text-sm font-bold text-gray-100 tracking-wide">
-                  Node Type
+                  Work Item Type
                 </label>
               </div>
               
               <NodeTypeSelector
                 selectedType={formData.type}
                 onTypeChange={(type) => setFormData(prev => ({ ...prev, type }))}
-                placeholder="Select node type"
+                placeholder="Select work item type"
               />
             </div>
 
@@ -543,7 +543,7 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                 value={formData.description}
                 onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                 className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Describe the node"
+                placeholder="Describe the work item"
               />
             </div>
 

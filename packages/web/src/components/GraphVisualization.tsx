@@ -337,7 +337,7 @@ export function GraphVisualization() {
       
       {/* Legend */}
       <div className="absolute top-20 left-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-4">
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Node Types</h3>
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Work Item Types</h3>
         <div className="space-y-1">
           <div className="flex items-center space-x-2">
             <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#8b5cf6' }}></div>
@@ -453,7 +453,7 @@ export function GraphVisualization() {
             className="w-full flex items-center px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
           >
             <Plus className="h-4 w-4 mr-2" />
-            Add Node
+            Add Work Item
           </button>
           <button
             onClick={() => {
@@ -464,7 +464,7 @@ export function GraphVisualization() {
             className="w-full flex items-center px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
           >
             <Edit className="h-4 w-4 mr-2" />
-            Edit Node Details
+            Edit Work Item Details
           </button>
         </div>
       )}
@@ -483,7 +483,7 @@ export function GraphVisualization() {
         />
       )}
       
-      {/* Edit Node Modal */}
+      {/* Edit Work Item Modal */}
       {showEditModal && selectedNodeForEdit && (
         <EditNodeModal
           isOpen={showEditModal}

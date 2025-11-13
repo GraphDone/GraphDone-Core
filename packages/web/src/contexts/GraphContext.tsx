@@ -219,10 +219,10 @@ export function GraphProvider({ children }: GraphProviderProps) {
           // Step 2: Create tutorial work items
           const tutorialWorkItems = [
             {
-              title: 'Welcome to GraphDone! 🎉',
+              title: 'Welcome to GraphDone',
               description: 'GraphDone helps you organize work through natural dependencies instead of rigid hierarchies. Start by exploring this tutorial graph.',
               type: 'MILESTONE',
-              status: 'COMPLETED',
+              status: 'IN_PROGRESS',
               priority: 0.9,
               positionX: 0,
               positionY: -100,
@@ -239,7 +239,7 @@ export function GraphProvider({ children }: GraphProviderProps) {
               title: 'Create your first work item',
               description: 'Click the "+" button or right-click on empty space to create a new work item. Try it now!',
               type: 'TASK',
-              status: 'IN_PROGRESS',
+              status: 'COMPLETED',
               priority: 0.7,
               positionX: -150,
               positionY: 50,
@@ -288,9 +288,11 @@ export function GraphProvider({ children }: GraphProviderProps) {
             }
           ];
 
+          console.log('📝 Creating tutorial work items...', tutorialWorkItems.length, 'items');
           const { data: workItemsData } = await createWorkItemMutation({
             variables: { input: tutorialWorkItems }
           });
+          console.log('✅ Work items created:', workItemsData?.createWorkItems?.workItems?.length || 0);
 
           // Step 3: Create connections between tutorial items
           if (workItemsData?.createWorkItems?.workItems) {
@@ -314,11 +316,25 @@ export function GraphProvider({ children }: GraphProviderProps) {
             ];
 
             await createEdgeMutation({ variables: { input: edges } });
+            console.log('✅ Created 3 edges connecting tutorial items');
           }
+
+          // Step 4: Update graph counts
+          await updateGraphMutation({
+            variables: {
+              id: welcomeGraph.id,
+              input: {
+                nodeCount: 4,
+                edgeCount: 3,
+                lastActivity: new Date().toISOString()
+              }
+            }
+          });
+          console.log('✅ Updated graph counts: 4 nodes, 3 edges');
 
           console.log('✅ Welcome graph created with tutorial content:', welcomeGraph.name);
 
-          // Refetch graphs to show the new graph
+          // Refetch graphs to show the new graph with updated counts
           await refetchGraphs();
         } catch (error) {
           console.error('❌ Failed to create Welcome graph:', error);
