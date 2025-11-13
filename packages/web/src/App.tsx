@@ -7,8 +7,10 @@ import { Analytics } from './pages/Analytics';
 import { Settings } from './pages/Settings';
 import { Admin } from './pages/Admin';
 import { Backend } from './pages/Backend';
-import { LoginForm } from './pages/LoginForm';
+import { Signin } from './pages/Signin';
 import { Signup } from './pages/Signup';
+import { ForgotPassword } from './pages/ForgotPassword';
+import { ResetPassword } from './pages/ResetPassword';
 import { InteractiveGraphVisualization } from './components/InteractiveGraphVisualization';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { GraphProvider } from './contexts/GraphContext';
@@ -21,29 +23,8 @@ function AuthenticatedApp() {
     // Maintain consistent structure during initial load to prevent DOM flash
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4 relative overflow-hidden">
-        {/* Tropical lagoon light scattering background animation - consistent with main app */}
-        <div className="lagoon-caustics">
-          <div className="caustic-layer caustic-layer-1"></div>
-          <div className="caustic-layer caustic-layer-2"></div>
-          <div className="caustic-layer caustic-layer-3"></div>
-          <div className="caustic-layer caustic-layer-4"></div>
-          <div className="caustic-layer caustic-layer-5"></div>
-          <div className="caustic-layer caustic-layer-6"></div>
-          <div className="caustic-layer caustic-layer-7"></div>
-          <div className="caustic-layer caustic-layer-8"></div>
-          <div className="caustic-layer caustic-layer-9"></div>
-          <div className="caustic-layer caustic-layer-10"></div>
-          <div className="lagoon-shimmer lagoon-shimmer-1"></div>
-          <div className="lagoon-shimmer lagoon-shimmer-2"></div>
-          <div className="lagoon-shimmer lagoon-shimmer-3"></div>
-          <div className="lagoon-shimmer lagoon-shimmer-4"></div>
-          <div className="lagoon-shimmer lagoon-shimmer-5"></div>
-          <div className="lagoon-shimmer lagoon-shimmer-6"></div>
-          <div className="lagoon-shimmer lagoon-shimmer-7"></div>
-          <div className="lagoon-shimmer lagoon-shimmer-8"></div>
-          <div className="lagoon-shimmer lagoon-shimmer-9"></div>
-          <div className="lagoon-shimmer lagoon-shimmer-10"></div>
-        </div>
+        {/* Static gradient background - optimized for all browsers */}
+        <div className="lagoon-caustics"></div>
         <div className="max-w-4xl w-full relative z-10">
           <div className="text-center mb-8">
             <div className="flex items-center justify-center mb-4">
@@ -102,9 +83,11 @@ function AuthenticatedApp() {
   if (!isAuthenticated) {
     return (
       <Routes>
-        <Route path="/" element={<LoginForm />} />
-        <Route path="/login" element={<LoginForm />} />
+        <Route path="/" element={<Signin />} />
+        <Route path="/login" element={<Signin />} />
         <Route path="/signup" element={<Signup />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     );

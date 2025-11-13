@@ -46,6 +46,23 @@ export const TEST_USERS = {
 } as const;
 
 /**
+ * Get base URL for navigation
+ * Supports both environment configuration and defaults
+ */
+export function getBaseURL(): string {
+  return process.env.TEST_URL || 'https://localhost:3128';
+}
+
+/**
+ * Get API URL for GraphQL endpoint
+ */
+export function getAPIURL(): string {
+  const apiPort = process.env.API_PORT || '4128';
+  const protocol = process.env.SSL_ENABLED === 'false' ? 'http' : 'https';
+  return `${protocol}://localhost:${apiPort}`;
+}
+
+/**
  * Authentication state detection
  */
 export interface AuthState {
@@ -113,15 +130,12 @@ export async function getAuthState(page: Page): Promise<AuthState> {
   ).then(results => results.some(visible => visible));
   
   // Determine login state - prioritize explicit indicators
-  const isLoggedIn = !hasLoginForm && (
-    foundIndicators.some(ind => 
-      ind.includes('Logout') || 
-      ind.includes('user-menu') || 
-      ind.includes('graph-selector') ||
-      ind.includes('Graph Viewer')
-    ) ||
-    // If no login form and we're on a non-login page, consider it logged in
-    (!currentUrl.includes('/login') && !hasLoginForm && errors.length === 0)
+  // Must have positive indicators, not just absence of login form
+  const isLoggedIn = !hasLoginForm && foundIndicators.some(ind =>
+    ind.includes('Logout') ||
+    ind.includes('user-menu') ||
+    ind.includes('graph-selector') ||
+    ind.includes('Graph Viewer')
   );
   
   return {
@@ -218,24 +232,26 @@ async function attemptLogin(
   credentials: LoginCredentials,
   timeout: number
 ): Promise<void> {
+  const baseURL = getBaseURL();
+
   // Step 1: Navigate to application
   console.log('   📍 Navigating to application...');
-  await page.goto('/', { waitUntil: 'domcontentloaded', timeout });
+  await page.goto(`${baseURL}/`, { waitUntil: 'domcontentloaded', timeout });
   await page.waitForTimeout(1500); // Allow React hydration
-  
+
   // Step 2: Check if we need to navigate to login
   const currentUrl = page.url();
   if (!currentUrl.includes('/login')) {
     // Try to find login link or navigate directly
     const loginLink = page.locator('a[href*="login"], button:has-text("Login"), button:has-text("Sign In")').first();
-    
+
     if (await loginLink.isVisible({ timeout: 2000 })) {
       console.log('   🔗 Found login link, clicking...');
       await loginLink.click();
       await page.waitForTimeout(1000);
     } else {
       console.log('   🗺️  No login link found, navigating directly to /login-form');
-      await page.goto('/login-form', { waitUntil: 'domcontentloaded' });
+      await page.goto(`${baseURL}/login-form`, { waitUntil: 'domcontentloaded' });
     }
   }
   
@@ -452,17 +468,17 @@ export async function quickLogin(page: Page, role: 'admin' | 'member' | 'viewer'
  */
 export async function logout(page: Page): Promise<void> {
   console.log('🚪 Logging out...');
-  
+
   const authState = await getAuthState(page);
   if (!authState.isLoggedIn) {
     console.log('✅ Already logged out');
     return;
   }
-  
+
   // Try multiple logout strategies
   const logoutSelectors = [
     'button:has-text("Logout")',
-    'button:has-text("Sign Out")', 
+    'button:has-text("Sign Out")',
     'a:has-text("Logout")',
     '[data-testid="logout"]',
     '[aria-label="Logout"]',
@@ -471,34 +487,48 @@ export async function logout(page: Page): Promise<void> {
     'button[aria-label="User menu"]',
     '[data-testid="user-menu"]'
   ];
-  
+
   for (const selector of logoutSelectors) {
     const element = page.locator(selector).first();
-    if (await element.isVisible({ timeout: 2000 })) {
-      console.log(`   🎯 Found logout element: ${selector}`);
-      await element.click();
-      
-      // If it's a menu, look for logout option
-      if (selector.includes('menu')) {
-        await page.waitForTimeout(500);
-        const logoutOption = page.locator('button:has-text("Logout"), button:has-text("Sign Out")').first();
-        if (await logoutOption.isVisible({ timeout: 3000 })) {
-          await logoutOption.click();
+    try {
+      if (await element.isVisible({ timeout: 2000 })) {
+        console.log(`   🎯 Found logout element: ${selector}`);
+        await element.click();
+
+        // If it's a menu, look for logout option
+        if (selector.includes('menu')) {
+          await page.waitForTimeout(500);
+          const logoutOption = page.locator('button:has-text("Logout"), button:has-text("Sign Out")').first();
+          if (await logoutOption.isVisible({ timeout: 3000 })) {
+            await logoutOption.click();
+          }
         }
-      }
-      
-      // Wait for logout to complete
-      try {
-        await page.waitForURL(/login/, { timeout: 10000 });
-        console.log('✅ Successfully logged out');
+
+        // Wait for logout to complete - either redirect or local storage clear
+        try {
+          await page.waitForURL(/login/, { timeout: 10000 });
+          console.log('✅ Successfully logged out (redirected to login)');
+        } catch {
+          // May not redirect, check if localStorage was cleared
+          await page.waitForTimeout(1000);
+          const hasToken = await page.evaluate(() => {
+            return localStorage.getItem('token') !== null ||
+                   localStorage.getItem('authToken') !== null;
+          });
+          if (!hasToken) {
+            console.log('✅ Successfully logged out (token cleared)');
+          } else {
+            console.log('⚠️  Logout may have completed without redirect or token clear');
+          }
+        }
         return;
-      } catch {
-        console.log('⚠️  Logout may have completed without redirect');
-        return;
       }
+    } catch (e) {
+      // Continue to next selector
+      continue;
     }
   }
-  
+
   console.log('⚠️  No logout button found - may already be logged out');
 }
 
@@ -536,12 +566,13 @@ export async function ensureLoggedIn(
  */
 export async function navigateToWorkspace(page: Page): Promise<void> {
   console.log('🏢 Navigating to workspace...');
-  
+
   // Ensure we're logged in first
   await ensureLoggedIn(page);
-  
-  // Navigate to workspace
-  await page.goto('/workspace', { waitUntil: 'domcontentloaded' });
+
+  // Navigate to workspace with full URL
+  const baseURL = getBaseURL();
+  await page.goto(`${baseURL}/workspace`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(2000); // React hydration
   
   // Wait for workspace core elements

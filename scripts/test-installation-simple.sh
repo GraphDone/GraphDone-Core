@@ -24,7 +24,7 @@ TEST_RUN_UUID=$(uuidgen 2>/dev/null || cat /proc/sys/kernel/random/uuid 2>/dev/n
 GIT_COMMIT_SHORT=$(cd "$PROJECT_ROOT" && git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 INSTALL_SCRIPT_CRC=$(cksum "$INSTALL_SCRIPT" 2>/dev/null | awk '{print $1}' || echo "unknown")
 HTML_REPORT="$REPORT_DIR/report_${TIMESTAMP}_${GIT_COMMIT_SHORT}.html"
-TEST_RESULTS=()
+TEST_RESULTS=""
 
 # Create directories
 mkdir -p "$REPORT_DIR"
@@ -56,10 +56,13 @@ test_distro() {
     local image=$1
     local name=$2
     local pkg_mgr=$3
-    
+
+    # Create sanitized name for filenames (POSIX-compliant)
+    local name_sanitized=$(printf '%s' "$name" | tr ' ' '_')
+
     TOTAL=$((TOTAL + 1))
     echo "${CYAN}▶${NC} Testing $name ($image)..."
-    
+
     # Create test directory
     local test_dir="/tmp/graphdone-test-$TIMESTAMP"
     mkdir -p "$test_dir"
@@ -86,21 +89,24 @@ EOF
     if docker run --rm \
         -v "$test_dir:/test:ro" \
         "$image" \
-        sh /test/test.sh > "$REPORT_DIR/${name// /_}.log" 2>&1; then
-        
-        if grep -q "INSTALLATION_SCRIPT_TEST: SUCCESS" "$REPORT_DIR/${name// /_}.log"; then
+        sh /test/test.sh > "$REPORT_DIR/$name_sanitized.log" 2>&1; then
+
+        if grep -q "INSTALLATION_SCRIPT_TEST: SUCCESS" "$REPORT_DIR/$name_sanitized.log"; then
             echo "${GREEN}✓${NC} $name - PASSED"
             PASSED=$((PASSED + 1))
-            TEST_RESULTS+=("PASS|$name")
+            TEST_RESULTS="${TEST_RESULTS}PASS|$name
+"
         else
             echo "${RED}✗${NC} $name - FAILED (script error)"
             FAILED=$((FAILED + 1))
-            TEST_RESULTS+=("FAIL|$name|Script execution error")
+            TEST_RESULTS="${TEST_RESULTS}FAIL|$name|Script execution error
+"
         fi
     else
         echo "${RED}✗${NC} $name - FAILED (docker error)"
         FAILED=$((FAILED + 1))
-        TEST_RESULTS+=("FAIL|$name|Docker container error")
+        TEST_RESULTS="${TEST_RESULTS}FAIL|$name|Docker container error
+"
     fi
     
     # Cleanup
@@ -422,19 +428,23 @@ generate_html_report() {
 HTMLEOF
     
     # Generate test results HTML
-    local results_html=""
-    for result in "${TEST_RESULTS[@]}"; do
-        IFS='|' read -r status name error <<< "$result"
+    results_html=""
+    printf '%s\n' "$TEST_RESULTS" | while IFS='|' read -r status name error; do
+        test -z "$status" && continue
         if [ "$status" = "PASS" ]; then
-            results_html="${results_html}<div class='test-item'><div class='test-status pass'>✓</div><div class='test-name'>$name</div></div>"
+            printf '<div class="test-item"><div class="test-status pass">✓</div><div class="test-name">%s</div></div>' "$name"
         else
-            results_html="${results_html}<div class='test-item'><div class='test-status fail'>✗</div><div class='test-name'>$name</div><div class='test-error'>$error</div></div>"
+            printf '<div class="test-item"><div class="test-status fail">✗</div><div class="test-name">%s</div><div class="test-error">%s</div></div>' "$name" "$error"
         fi
-    done
-    
+    done > "$REPORT_DIR/results_fragment.html"
+    results_html=$(cat "$REPORT_DIR/results_fragment.html")
+
+    # Get first 8 chars of UUID (POSIX-compliant)
+    uuid_short=$(printf '%s' "$TEST_RUN_UUID" | cut -c1-8)
+
     # Replace placeholders
     sed -i.bak \
-        -e "s/REPLACE_UUID/${TEST_RUN_UUID:0:8}/g" \
+        -e "s/REPLACE_UUID/$uuid_short/g" \
         -e "s/REPLACE_COMMIT/$GIT_COMMIT_SHORT/g" \
         -e "s/REPLACE_CRC/$INSTALL_SCRIPT_CRC/g" \
         -e "s/REPLACE_TIME/$TIMESTAMP/g" \
