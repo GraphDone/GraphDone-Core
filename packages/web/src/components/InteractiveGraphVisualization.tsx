@@ -1268,14 +1268,17 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       const result = await createNodeMutation({
         variables: { input: [workItemInput] }
       });
-      
+
       if (result.data) {
         setNodeCounter(prev => prev + 1);
+        showSuccess('Node created successfully');
         // Let Apollo's cache update handle the UI update instead of refetch to avoid camera jumping
         // The refetchQueries in the mutation config will handle the data update
       }
-    } catch (_error) {
-      // Error handled by mutation error state
+    } catch (error) {
+      console.error('[Create Node Error]', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create node';
+      showError(errorMessage);
     }
   };
 
@@ -3200,22 +3203,32 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
   // Force reinitialization trigger - incremented when view needs refresh
   const [reinitTrigger, setReinitTrigger] = useState(0);
 
+  // Track previous node count to detect transition from empty to non-empty
+  const prevNodeCountRef = useRef<number>(0);
+
   // Comprehensive reinitialization effect - ONLY when actually needed
   useEffect(() => {
-    console.log('[Graph Debug] Checking if reinitialization needed...', { 
-      nodesLength: nodes.length, 
+    console.log('[Graph Debug] Checking if reinitialization needed...', {
+      nodesLength: nodes.length,
+      prevNodesLength: prevNodeCountRef.current,
       edgesLength: validatedEdges.length,
       trigger: reinitTrigger,
       currentGraph: currentGraph?.id
     });
-    
+
+    // Detect transition from empty to non-empty graph (first node creation)
+    const wasEmpty = prevNodeCountRef.current === 0;
+    const isNowPopulated = nodes.length > 0;
+    const transitioningFromEmpty = wasEmpty && isNowPopulated;
+
     // Only reinitialize if this is truly necessary
-    const shouldReinit = 
+    const shouldReinit =
       !svgRef.current ||
       !containerRef.current ||
       nodes.length === 0 ||
       !d3.select(svgRef.current).select('.main-graph-group').node() ||
-      reinitTrigger > 0;
+      reinitTrigger > 0 ||
+      transitioningFromEmpty; // Force reinit when adding first node to empty graph
     
     if (shouldReinit) {
       console.log('[Graph Debug] Full reinitialization required');
@@ -3229,6 +3242,9 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       // Use selective data updates instead of full reinitialization
       updateVisualizationData();
     }
+
+    // Update previous node count for next comparison
+    prevNodeCountRef.current = nodes.length;
 
     const handleResize = () => {
       if (!containerRef.current || !svgRef.current || !simulationRef.current) return;
@@ -3786,12 +3802,12 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
               <FileText className="h-4 w-4 mr-3" />
               View Details
             </button>
-            <button 
+            <button
               onClick={() => handleEditNode(nodeMenu.node!)}
               className="w-full flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
             >
               <Edit3 className="h-4 w-4 mr-3" />
-              Edit Node Details
+              Edit Work Item Details
             </button>
             <button 
               onClick={() => {
@@ -3803,12 +3819,12 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
               <Crosshair className="h-4 w-4 mr-3" />
               Center on Node
             </button>
-            <button 
+            <button
               onClick={() => handleDeleteNode(nodeMenu.node!)}
               className="w-full flex items-center px-4 py-2 text-sm text-red-400 hover:bg-red-900/50"
             >
               <Trash2 className="h-4 w-4 mr-3" />
-              Delete Node
+              Delete Work Item
             </button>
           </div>
         </div>
@@ -3901,7 +3917,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
               <div className="w-6 h-6 rounded-lg bg-gray-700/50 flex items-center justify-center group-hover:bg-emerald-500/20 transition-all duration-300 ease-out">
                 <Plus className="h-4 w-4 text-gray-400 group-hover:text-emerald-400 transition-colors duration-300" />
               </div>
-              <span className="text-gray-300 font-medium group-hover:text-white transition-colors duration-300">Create Node</span>
+              <span className="text-gray-300 font-medium group-hover:text-white transition-colors duration-300">Create Work Item</span>
               <div className="ml-auto">
                 <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-300 ease-out"></div>
               </div>

@@ -324,7 +324,7 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
       }
       
       showError(
-        'Failed to Create Node',
+        'Failed to Create Work Item',
         errorMessage
       );
     }
@@ -346,7 +346,7 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                 </div>
                 <div>
                   <h2 className="text-xl font-bold bg-gradient-to-r from-emerald-200 to-green-100 bg-clip-text text-transparent">
-                    {parentNodeId ? 'Create & Connect Node' : 'Create New Node'}
+                    {parentNodeId ? 'Create & Connect Work Item' : 'Create New Work Item'}
                   </h2>
                   <p className="text-sm text-gray-300 mt-1">
                     {parentNodeId 
@@ -760,7 +760,7 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                 }`}
               >
                 <ClipboardList className="w-5 h-5" />
-                <span>{creatingWorkItem ? 'Creating...' : (parentNodeId ? 'Create & Connect' : 'Create Node')}</span>
+                <span>{creatingWorkItem ? 'Creating...' : (parentNodeId ? 'Create & Connect' : 'Create Work Item')}</span>
               </button>
             </div>
           </form>
