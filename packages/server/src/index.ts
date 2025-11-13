@@ -18,6 +18,7 @@ import { typeDefs } from './schema/neo4j-schema.js';
 import { authTypeDefs } from './schema/auth-schema.js';
 import { authOnlyTypeDefs } from './schema/auth-only-schema.js';
 import { sqliteAuthResolvers } from './resolvers/sqlite-auth.js';
+import { graphProtectionResolvers } from './resolvers/graph-protection.js';
 import { extractUserFromToken } from './middleware/auth.js';
 import { mergeTypeDefs } from '@graphql-tools/merge';
 import { driver, NEO4J_URI } from './db.js';
@@ -31,6 +32,7 @@ import { promisify } from 'util';
 import fs from 'fs';
 import rateLimit from 'express-rate-limit';
 import { createCaptchaChallenge, verifyCaptcha } from './utils/captcha.js';
+import { createSharedWelcomeGraph, sharedWelcomeGraphExists } from './services/onboarding.js';
 
 const execAsync = promisify(exec);
 
@@ -293,16 +295,40 @@ async function startServer() {
       console.log('ℹ️  Default admin setup completed'); // eslint-disable-line no-console
     }
 
+    // Ensure shared Welcome graph exists for all users
+    try {
+      const welcomeStart = Date.now();
+      const hasWelcome = await sharedWelcomeGraphExists(driver);
+      if (!hasWelcome) {
+        await createSharedWelcomeGraph(driver);
+        const welcomeTime = Date.now() - welcomeStart;
+        console.log(`🎉 Shared Welcome graph created (${welcomeTime}ms)`); // eslint-disable-line no-console
+        steps.push('✅ Created shared Welcome graph for onboarding');
+      } else {
+        console.log('✅ Shared Welcome graph already exists'); // eslint-disable-line no-console
+        steps.push('✅ Verified shared Welcome graph exists');
+      }
+    } catch (welcomeError) {
+      console.error('⚠️  Failed to create Welcome graph:', (welcomeError as Error).message); // eslint-disable-line no-console
+    }
+
     // Merge type definitions (Neo4j schema + auth schema)
     const mergedTypeDefs = mergeTypeDefs([typeDefs, authTypeDefs]);
 
-    // Create Neo4jGraphQL instance for graph data with SQLite auth resolvers override
+    // Create Neo4jGraphQL instance with custom resolvers
     const neoSchema = new Neo4jGraphQL({
       typeDefs: mergedTypeDefs,
       driver,
       resolvers: {
-        // Override auth resolvers to use SQLite instead of Neo4j User nodes
-        ...sqliteAuthResolvers,
+        Mutation: {
+          // Auth resolvers (SQLite-based)
+          ...sqliteAuthResolvers.Mutation,
+          // Graph protection (prevent Welcome graph deletion)
+          ...graphProtectionResolvers.Mutation,
+        },
+        Query: {
+          ...sqliteAuthResolvers.Query,
+        }
       },
     });
 
