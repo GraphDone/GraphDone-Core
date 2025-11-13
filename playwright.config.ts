@@ -37,15 +37,16 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
 
-    {
-      name: 'GraphDone-Core/dev-neo4j/firefox',
-      use: { ...devices['Desktop Firefox'] },
-    },
+    // Commented out until browsers installed with system dependencies
+    // {
+    //   name: 'GraphDone-Core/dev-neo4j/firefox',
+    //   use: { ...devices['Desktop Firefox'] },
+    // },
 
-    {
-      name: 'GraphDone-Core/dev-neo4j/webkit',
-      use: { ...devices['Desktop Safari'] },
-    },
+    // {
+    //   name: 'GraphDone-Core/dev-neo4j/webkit',
+    //   use: { ...devices['Desktop Safari'] },
+    // },
 
     /* Test against mobile viewports. */
     // {
