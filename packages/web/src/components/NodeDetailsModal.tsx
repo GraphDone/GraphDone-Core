@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   X, User, Flag, Edit3, Save, ChevronDown, Plus, Unlink, Trash2,
   GitBranch, ArrowRight, ArrowLeft, Ban, Link2, Folder, Split, Copy, Shield, Bookmark, Package,
@@ -73,6 +73,8 @@ export function NodeDetailsModal({
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const [selectedNodesForConnection, setSelectedNodesForConnection] = useState<string[]>([]);
   const [selectedEdgesForDisconnection, setSelectedEdgesForDisconnection] = useState<string[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
+  const isSavingRef = useRef(false);
   const connectDropdownRef = useRef<HTMLDivElement>(null);
   const disconnectDropdownRef = useRef<HTMLDivElement>(null);
   const datePickerRef = useRef<HTMLDivElement>(null);
@@ -93,6 +95,8 @@ export function NodeDetailsModal({
     }
   }, [isOpen]);
 
+  const handleSaveRef = useRef<(() => Promise<void>) | null>(null);
+
   useEffect(() => {
     if (!isOpen) return;
 
@@ -104,13 +108,14 @@ export function NodeDetailsModal({
       } else if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.stopPropagation();
         e.preventDefault();
-        handleSave();
+        if (handleSaveRef.current) {
+          handleSaveRef.current();
+        }
       }
     };
 
     document.addEventListener('keydown', handleKeyDown, true);
     return () => document.removeEventListener('keydown', handleKeyDown, true);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, onClose]);
 
   useEffect(() => {
@@ -234,7 +239,8 @@ export function NodeDetailsModal({
         variables: currentGraph ? {
           where: { graph: { id: currentGraph.id } }
         } : { where: {} }
-      }
+      },
+      { query: GET_EDGES }
     ],
     awaitRefetchQueries: true,
     onCompleted: (data) => {
@@ -287,24 +293,31 @@ export function NodeDetailsModal({
     }
   });
 
-  const handleSave = async () => {
-    if (!editedNode || !node) return;
+  const handleSave = useCallback(async () => {
+    if (!editedNode || !node || isSavingRef.current) return;
+
+    // Capture current values immediately to prevent stale closures
+    const nodeToSave = { ...editedNode };
+    const currentNodeRef = node;
+
+    isSavingRef.current = true;
+    setIsSaving(true);
 
     try {
       const updateInput: any = {
-        title: editedNode.title,
-        description: editedNode.description,
-        type: editedNode.type,
-        status: editedNode.status,
-        priority: editedNode.priority,
-        tags: editedNode.tags || [],
-        dueDate: editedNode.dueDate,
+        title: nodeToSave.title,
+        description: nodeToSave.description,
+        type: nodeToSave.type,
+        status: nodeToSave.status,
+        priority: nodeToSave.priority,
+        tags: nodeToSave.tags || [],
+        dueDate: nodeToSave.dueDate,
       };
 
       // Handle assignedTo relationship properly for Neo4j GraphQL
-      const currentAssignedToId = typeof node.assignedTo === 'string' ? node.assignedTo : node.assignedTo?.id;
-      const newAssignedToId = typeof editedNode.assignedTo === 'string' ? editedNode.assignedTo : editedNode.assignedTo?.id;
-      
+      const currentAssignedToId = typeof currentNodeRef.assignedTo === 'string' ? currentNodeRef.assignedTo : currentNodeRef.assignedTo?.id;
+      const newAssignedToId = typeof nodeToSave.assignedTo === 'string' ? nodeToSave.assignedTo : nodeToSave.assignedTo?.id;
+
       if (newAssignedToId && newAssignedToId !== currentAssignedToId) {
         // Connect to new user
         updateInput.assignedTo = {
@@ -323,14 +336,21 @@ export function NodeDetailsModal({
 
       await updateWorkItem({
         variables: {
-          where: { id: node.id },
+          where: { id: currentNodeRef.id },
           update: updateInput
         }
       });
     } catch (error) {
       console.error('Failed to update work item:', error);
+    } finally {
+      isSavingRef.current = false;
+      setIsSaving(false);
     }
-  };
+  }, [editedNode, node, updateWorkItem]);
+
+  useEffect(() => {
+    handleSaveRef.current = handleSave;
+  }, [handleSave]);
 
   const handleDelete = async () => {
     if (!node) return;
@@ -606,9 +626,9 @@ export function NodeDetailsModal({
           <div className="flex items-center space-x-1">
             <button
               onClick={handleSave}
-              disabled={updating || !hasChanges}
+              disabled={updating || !hasChanges || isSaving}
               className={`flex items-center space-x-1 px-4 py-2 rounded-lg transition-all duration-300 text-sm font-semibold shadow-lg ${
-                hasChanges && !updating
+                hasChanges && !updating && !isSaving
                   ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:from-green-500 hover:to-emerald-500 hover:scale-105 transform border border-green-400/30'
                   : 'bg-gray-700 text-gray-500 cursor-not-allowed border border-gray-600'
               }`}
@@ -639,7 +659,10 @@ export function NodeDetailsModal({
               id="modal-title"
               type="text"
               value={editedNode?.title || ''}
-              onChange={(e) => setEditedNode(prev => prev ? { ...prev, title: e.target.value } : null)}
+              onChange={(e) => {
+                const newValue = e.target.value;
+                setEditedNode(prev => prev ? { ...prev, title: newValue } : null);
+              }}
               className="text-base font-bold bg-gray-800 border border-gray-600 text-white placeholder-gray-400 mb-1 w-full focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-400 transition-all duration-300 hover:border-gray-500 p-2 rounded-lg shadow-lg cursor-text"
               placeholder="Enter title..."
               autoComplete="off"
