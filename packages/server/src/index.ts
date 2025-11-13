@@ -9,9 +9,8 @@ import { useServer } from 'graphql-ws/lib/use/ws';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import os from 'os';
-// OAuth imports disabled
-// import session from 'express-session';
-// import passport from 'passport';
+import session from 'express-session';
+import passport from 'passport';
 import { Neo4jGraphQL } from '@neo4j/graphql';
 import fetch from 'node-fetch';
 
@@ -23,10 +22,15 @@ import { extractUserFromToken } from './middleware/auth.js';
 import { mergeTypeDefs } from '@graphql-tools/merge';
 import { driver, NEO4J_URI } from './db.js';
 import { sqliteAuthStore } from './auth/sqlite-auth.js';
+import { configureOAuthStrategies } from './auth/oauth-strategies.js';
+import { generateToken } from './utils/auth.js';
 import { createTlsConfig, validateTlsConfig, type TlsConfig } from './config/tls.js';
+import { emailService } from './auth/email-service.js';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
+import rateLimit from 'express-rate-limit';
+import { createCaptchaChallenge, verifyCaptcha } from './utils/captcha.js';
 
 const execAsync = promisify(exec);
 
@@ -91,6 +95,7 @@ async function getTotalGraphDoneMemory(): Promise<{ memory: number, label: strin
 }
 
 dotenv.config();
+// OAuth LinkedIn and GitHub credentials updated
 
 const PORT = Number(process.env.PORT) || 4127;
 
@@ -129,12 +134,38 @@ async function startServer() {
   }
 
   // Create server (HTTP or HTTPS based on configuration)
-  const server = tlsConfig 
+  const server = tlsConfig
     ? createHttpsServer({ key: tlsConfig.key, cert: tlsConfig.cert }, app)
     : createServer(app);
-    
+
   const serverPort = tlsConfig ? tlsConfig.port : PORT;
   const protocol = tlsConfig ? 'https' : 'http';
+
+  app.use(
+    session({
+      secret: process.env.SESSION_SECRET || 'graphdone-default-secret-change-in-production',
+      resave: false,
+      saveUninitialized: false,
+      cookie: {
+        secure: !!tlsConfig,
+        httpOnly: true,
+        maxAge: 24 * 60 * 60 * 1000,
+      },
+    })
+  );
+
+  app.use(passport.initialize());
+  app.use(passport.session());
+
+  if (process.env.GOOGLE_CLIENT_ID || process.env.LINKEDIN_CLIENT_ID || process.env.GITHUB_CLIENT_ID) {
+    configureOAuthStrategies();
+    console.log('🔐 OAuth strategies configured'); // eslint-disable-line no-console
+    console.log(`   LinkedIn: ${process.env.LINKEDIN_CLIENT_ID ? '✅' : '❌'}`); // eslint-disable-line no-console
+    console.log(`   GitHub: ${process.env.GITHUB_CLIENT_ID ? '✅' : '❌'}`); // eslint-disable-line no-console
+    console.log(`   Google: ${process.env.GOOGLE_CLIENT_ID ? '✅' : '❌'}`); // eslint-disable-line no-console
+  } else {
+    console.log('ℹ️  OAuth disabled (no client IDs configured)'); // eslint-disable-line no-console
+  }
 
   // Initialize SQLite auth system first (for users and config)
   try {
@@ -354,6 +385,7 @@ async function startServer() {
           driver: isNeo4jAvailable ? driver : null,
           user,
           isNeo4jAvailable,
+          req,
         };
       },
     })
@@ -484,6 +516,23 @@ async function startServer() {
         nodeEnv: process.env.NODE_ENV || 'development',
         clientUrl: process.env.CLIENT_URL || `http://localhost:${Number(process.env.WEB_PORT) || 3127}`,
         corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:3127'
+      },
+      oauth: {
+        enabled: !!(process.env.GOOGLE_CLIENT_ID || process.env.GITHUB_CLIENT_ID || process.env.LINKEDIN_CLIENT_ID),
+        providers: {
+          google: {
+            enabled: !!process.env.GOOGLE_CLIENT_ID,
+            configured: !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)
+          },
+          github: {
+            enabled: !!process.env.GITHUB_CLIENT_ID,
+            configured: !!(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET)
+          },
+          linkedin: {
+            enabled: !!process.env.LINKEDIN_CLIENT_ID,
+            configured: !!(process.env.LINKEDIN_CLIENT_ID && process.env.LINKEDIN_CLIENT_SECRET)
+          }
+        }
       }
     };
 
@@ -496,13 +545,13 @@ async function startServer() {
       const mcpStatusUrl = `http://localhost:${process.env.MCP_HEALTH_PORT || 3128}/status`;
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 3000);
-      
-      const response = await fetch(mcpStatusUrl, { 
+
+      const response = await fetch(mcpStatusUrl, {
         method: 'GET',
         signal: controller.signal
       });
       clearTimeout(timeoutId);
-      
+
       if (response.ok) {
         const mcpStatus = await response.json() as Record<string, unknown>;
         res.json({
@@ -520,6 +569,371 @@ async function startServer() {
         connected: false,
         error: error instanceof Error ? error.message : 'Connection failed'
       });
+    }
+  });
+
+  // Rate limiting configuration for authentication endpoints
+  const authRateLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 5, // Max 5 requests per 15 minutes per IP
+    standardHeaders: true,
+    legacyHeaders: false,
+    skipSuccessfulRequests: false,
+    handler: (req, res) => {
+      const retryAfter = Math.ceil((req.rateLimit.resetTime?.getTime() || Date.now()) / 1000 - Date.now() / 1000);
+      console.log(`⚠️  Rate limit exceeded for IP: ${req.ip}`); // eslint-disable-line no-console
+      res.status(429).json({
+        error: 'Too many requests',
+        message: `You've exceeded the maximum number of authentication requests. Please try again in ${Math.ceil(retryAfter / 60)} minutes.`,
+        retryAfter,
+        rateLimitExceeded: true
+      });
+    }
+  });
+
+  const strictAuthRateLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 3, // Max 3 requests per 15 minutes per IP
+    standardHeaders: true,
+    legacyHeaders: false,
+    skipSuccessfulRequests: false,
+    handler: (req, res) => {
+      const retryAfter = Math.ceil((req.rateLimit.resetTime?.getTime() || Date.now()) / 1000 - Date.now() / 1000);
+      console.log(`⚠️  Strict rate limit exceeded for IP: ${req.ip}`); // eslint-disable-line no-console
+      res.status(429).json({
+        error: 'Too many requests',
+        message: `Too many authentication attempts. Please wait ${Math.ceil(retryAfter / 60)} minutes before trying again.`,
+        retryAfter,
+        rateLimitExceeded: true
+      });
+    }
+  });
+
+  app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+
+  app.get(
+    '/auth/google/callback',
+    passport.authenticate('google', { failureRedirect: `${process.env.CLIENT_URL || 'http://localhost:3127'}/login?error=google` }),
+    (req, res) => {
+      console.log('🔐 Google OAuth callback received'); // eslint-disable-line no-console
+      const user = req.user as any;
+      console.log('👤 User from OAuth:', user?.email || 'No user'); // eslint-disable-line no-console
+      const token = generateToken(user.id, user.email, user.role);
+      console.log('🎫 Generated token:', token?.substring(0, 20) + '...'); // eslint-disable-line no-console
+      const clientUrl = process.env.CLIENT_URL || 'http://localhost:3127';
+      const redirectUrl = `${clientUrl}/login?token=${token}`;
+      console.log('↪️  Redirecting to:', redirectUrl); // eslint-disable-line no-console
+      res.redirect(redirectUrl);
+    }
+  );
+
+  app.get('/auth/linkedin', passport.authenticate('linkedin', { scope: ['openid', 'profile', 'email'] }));
+
+  app.get(
+    '/auth/linkedin/callback',
+    passport.authenticate('linkedin', { failureRedirect: `${process.env.CLIENT_URL || 'http://localhost:3127'}/login?error=linkedin` }),
+    (req, res) => {
+      console.log('🔐 LinkedIn OAuth callback received'); // eslint-disable-line no-console
+      const user = req.user as any;
+      console.log('👤 User from OAuth:', user?.email || 'No user'); // eslint-disable-line no-console
+      const token = generateToken(user.id, user.email, user.role);
+      console.log('🎫 Generated token:', token?.substring(0, 20) + '...'); // eslint-disable-line no-console
+      const clientUrl = process.env.CLIENT_URL || 'http://localhost:3127';
+      const redirectUrl = `${clientUrl}/login?token=${token}`;
+      console.log('↪️  Redirecting to:', redirectUrl); // eslint-disable-line no-console
+      res.redirect(redirectUrl);
+    }
+  );
+
+  app.get('/auth/github', passport.authenticate('github', { scope: ['user:email'] }));
+
+  app.get(
+    '/auth/github/callback',
+    passport.authenticate('github', { failureRedirect: `${process.env.CLIENT_URL || 'http://localhost:3127'}/login?error=github` }),
+    (req, res) => {
+      console.log('🔐 GitHub OAuth callback received'); // eslint-disable-line no-console
+      const user = req.user as any;
+      console.log('👤 User from OAuth:', user?.email || 'No user'); // eslint-disable-line no-console
+      const token = generateToken(user.id, user.email, user.role);
+      console.log('🎫 Generated token:', token?.substring(0, 20) + '...'); // eslint-disable-line no-console
+      const clientUrl = process.env.CLIENT_URL || 'http://localhost:3127';
+      const redirectUrl = `${clientUrl}/login?token=${token}`;
+      console.log('↪️  Redirecting to:', redirectUrl); // eslint-disable-line no-console
+      res.redirect(redirectUrl);
+    }
+  );
+
+  const magicLinkCorsOptions = {
+    origin: process.env.CORS_ORIGIN || 'http://localhost:3127',
+    credentials: true,
+    methods: ['POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+  };
+
+  app.options('/auth/magic-link/request', cors<cors.CorsRequest>(magicLinkCorsOptions));
+
+  app.post('/auth/magic-link/request', authRateLimiter, cors<cors.CorsRequest>(magicLinkCorsOptions), express.json(), async (req, res) => {
+    try {
+      const { email, captchaPayload } = req.body;
+
+      if (!email || typeof email !== 'string') {
+        return res.status(400).json({ error: 'Email is required' });
+      }
+
+      // Verify CAPTCHA
+      const isCaptchaValid = await verifyCaptcha(captchaPayload);
+      if (!isCaptchaValid) {
+        return res.status(400).json({ error: 'CAPTCHA verification failed' });
+      }
+
+      const user = await sqliteAuthStore.findUserByEmailOrUsername(email);
+
+      if (user) {
+        const magicLink = await sqliteAuthStore.createMagicLink(email);
+        await emailService.sendMagicLink(email, magicLink.token);
+        console.log(`✉️  Magic link sent to: ${email}`); // eslint-disable-line no-console
+      } else {
+        console.log(`⚠️  Magic link requested for non-existent user: ${email}`); // eslint-disable-line no-console
+      }
+
+      return res.json({
+        success: true,
+        userExists: !!user,
+        message: user
+          ? 'Magic link sent! Check your email.'
+          : 'This email is not registered in our system.',
+        expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString()
+      });
+    } catch (error) {
+      console.error('❌ Magic link request failed:', error); // eslint-disable-line no-console
+      return res.status(500).json({ error: 'Failed to send magic link' });
+    }
+  });
+
+  app.get('/auth/magic-link/verify', async (req, res) => {
+    try {
+      const { token } = req.query;
+
+      if (!token || typeof token !== 'string') {
+        return res.redirect(`${process.env.CLIENT_URL || 'http://localhost:3127'}/login?error=invalid_magic_link`);
+      }
+
+      const result = await sqliteAuthStore.verifyMagicLink(token);
+
+      if (!result.valid || !result.userId) {
+        return res.redirect(`${process.env.CLIENT_URL || 'http://localhost:3127'}/login?error=expired_magic_link`);
+      }
+
+      const jwtToken = generateToken(result.userId, result.email!, 'USER');
+      const clientUrl = process.env.CLIENT_URL || 'http://localhost:3127';
+      const redirectUrl = `${clientUrl}/login?token=${jwtToken}`;
+
+      console.log(`🔐 Magic link verified for: ${result.email}`); // eslint-disable-line no-console
+      res.redirect(redirectUrl);
+    } catch (error) {
+      console.error('❌ Magic link verification failed:', error); // eslint-disable-line no-console
+      res.redirect(`${process.env.CLIENT_URL || 'http://localhost:3127'}/login?error=magic_link_failed`);
+    }
+  });
+
+  const forgotPasswordCorsOptions = {
+    origin: process.env.CORS_ORIGIN || 'http://localhost:3127',
+    credentials: true,
+    methods: ['POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+  };
+
+  app.options('/auth/forgot-password', cors<cors.CorsRequest>(forgotPasswordCorsOptions));
+
+  app.post('/auth/forgot-password', strictAuthRateLimiter, cors<cors.CorsRequest>(forgotPasswordCorsOptions), express.json(), async (req, res) => {
+    try {
+      const { email, captchaPayload } = req.body;
+
+      if (!email || typeof email !== 'string') {
+        return res.status(400).json({ error: 'Email is required' });
+      }
+
+      // Verify CAPTCHA
+      const isCaptchaValid = await verifyCaptcha(captchaPayload);
+      if (!isCaptchaValid) {
+        return res.status(400).json({ error: 'CAPTCHA verification failed' });
+      }
+
+      // Check if user exists
+      const user = await sqliteAuthStore.findUserByEmailOrUsername(email);
+
+      if (user) {
+        // User exists - create reset link and send email
+        const resetLink = await sqliteAuthStore.createMagicLink(email);
+        await emailService.sendPasswordReset(email, resetLink.token);
+        console.log(`🔐 Password reset link sent to: ${email}`); // eslint-disable-line no-console
+      } else {
+        // User doesn't exist - don't send email
+        console.log(`⚠️  Password reset requested for non-existent user: ${email}`); // eslint-disable-line no-console
+      }
+
+      // Return response with userExists flag for different UI messages
+      return res.json({
+        success: true,
+        userExists: !!user,
+        message: user
+          ? 'Password reset link sent! Check your email.'
+          : 'This email is not registered in our system.',
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString()
+      });
+    } catch (error) {
+      console.error('❌ Password reset request failed:', error); // eslint-disable-line no-console
+      return res.status(500).json({ error: 'Failed to send reset link' });
+    }
+  });
+
+  app.get('/auth/reset-password', async (req, res) => {
+    try {
+      const { token } = req.query;
+
+      if (!token || typeof token !== 'string') {
+        return res.redirect(`${process.env.CLIENT_URL || 'http://localhost:3127'}/login?error=invalid_reset_link`);
+      }
+
+      const clientUrl = process.env.CLIENT_URL || 'http://localhost:3127';
+      const redirectUrl = `${clientUrl}/reset-password?token=${token}`;
+
+      console.log(`🔐 Password reset link accessed`); // eslint-disable-line no-console
+      res.redirect(redirectUrl);
+    } catch (error) {
+      console.error('❌ Password reset verification failed:', error); // eslint-disable-line no-console
+      res.redirect(`${process.env.CLIENT_URL || 'http://localhost:3127'}/login?error=reset_failed`);
+    }
+  });
+
+  const resetPasswordCorsOptions = {
+    origin: process.env.CORS_ORIGIN || 'http://localhost:3127',
+    credentials: true,
+    methods: ['POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+  };
+
+  app.options('/auth/reset-password', cors<cors.CorsRequest>(resetPasswordCorsOptions));
+
+  app.post('/auth/reset-password', cors<cors.CorsRequest>(resetPasswordCorsOptions), express.json(), async (req, res) => {
+    try {
+      const { token, newPassword, captchaPayload } = req.body;
+
+      if (!token || typeof token !== 'string') {
+        return res.status(400).json({ error: 'Reset token is required' });
+      }
+
+      if (!newPassword || typeof newPassword !== 'string') {
+        return res.status(400).json({ error: 'New password is required' });
+      }
+
+      if (newPassword.length < 8) {
+        return res.status(400).json({ error: 'Password must be at least 8 characters' });
+      }
+
+      // Verify CAPTCHA
+      const isCaptchaValid = await verifyCaptcha(captchaPayload);
+      if (!isCaptchaValid) {
+        return res.status(400).json({ error: 'CAPTCHA verification failed' });
+      }
+
+      const result = await sqliteAuthStore.verifyMagicLink(token);
+
+      if (!result.valid || !result.userId) {
+        return res.status(400).json({ error: 'Invalid or expired reset token' });
+      }
+
+      await sqliteAuthStore.updateUserPassword(result.userId, newPassword);
+
+      console.log(`🔐 Password updated successfully for: ${result.email}`); // eslint-disable-line no-console
+
+      return res.json({
+        success: true,
+        message: 'Password updated successfully'
+      });
+    } catch (error) {
+      console.error('❌ Password update failed:', error); // eslint-disable-line no-console
+      return res.status(500).json({ error: 'Failed to update password' });
+    }
+  });
+
+  app.post('/share/create', cors<cors.CorsRequest>(), express.json(), async (req, res) => {
+    try {
+      const authHeader = req.headers.authorization;
+      const user = extractUserFromToken(authHeader);
+
+      if (!user) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const { graphId, accessLevel, expiresAt, maxUses, requiresSignIn } = req.body;
+
+      if (!graphId) {
+        return res.status(400).json({ error: 'Graph ID is required' });
+      }
+
+      const shareableLink = await sqliteAuthStore.createShareableLink({
+        graphId,
+        createdBy: user.userId,
+        accessLevel: accessLevel || 'VIEW',
+        expiresAt,
+        maxUses,
+        requiresSignIn: requiresSignIn || false
+      });
+
+      const shareUrl = `${process.env.CLIENT_URL || 'http://localhost:3127'}/share/${shareableLink.token}`;
+
+      console.log(`🔗 Shareable link created for graph ${graphId}`); // eslint-disable-line no-console
+
+      return res.json({
+        success: true,
+        shareUrl,
+        token: shareableLink.token,
+        accessLevel: accessLevel || 'VIEW'
+      });
+    } catch (error) {
+      console.error('❌ Failed to create shareable link:', error); // eslint-disable-line no-console
+      return res.status(500).json({ error: 'Failed to create shareable link' });
+    }
+  });
+
+  app.get('/share/verify/:token', cors<cors.CorsRequest>(), async (req, res) => {
+    try {
+      const { token } = req.params;
+      const result = await sqliteAuthStore.verifyShareableLink(token);
+
+      if (!result.valid) {
+        return res.status(404).json({ error: 'Link not found or expired' });
+      }
+
+      return res.json({
+        valid: true,
+        graphId: result.graphId,
+        accessLevel: result.accessLevel,
+        requiresSignIn: result.requiresSignIn
+      });
+    } catch (error) {
+      console.error('❌ Failed to verify shareable link:', error); // eslint-disable-line no-console
+      return res.status(500).json({ error: 'Failed to verify link' });
+    }
+  });
+
+  const captchaCorsOptions = {
+    origin: process.env.CORS_ORIGIN || 'http://localhost:3127',
+    credentials: true,
+    methods: ['GET', 'OPTIONS'],
+    allowedHeaders: ['Content-Type']
+  };
+
+  app.options('/api/captcha/challenge', cors<cors.CorsRequest>(captchaCorsOptions));
+
+  app.get('/api/captcha/challenge', cors<cors.CorsRequest>(captchaCorsOptions), async (_req, res) => {
+    try {
+      const challenge = await createCaptchaChallenge();
+      res.json(challenge);
+    } catch (error) {
+      console.error('❌ CAPTCHA challenge creation failed:', error); // eslint-disable-line no-console
+      res.status(500).json({ error: 'Failed to create CAPTCHA challenge' });
     }
   });
 

@@ -1,10 +1,12 @@
 import { GraphQLError } from 'graphql';
 import { sqliteAuthStore } from '../auth/sqlite-auth.js';
 import { generateToken } from '../utils/auth.js';
+import { verifyCaptcha } from '../utils/captcha.js';
 
 interface LoginInput {
   emailOrUsername: string;
   password: string;
+  captchaPayload?: string;
 }
 
 interface SignupInput {
@@ -13,6 +15,7 @@ interface SignupInput {
   password: string;
   name: string;
   teamId?: string;
+  captchaPayload?: string;
 }
 
 interface UpdateProfileInput {
@@ -20,6 +23,44 @@ interface UpdateProfileInput {
   avatar?: string;
   metadata?: string;
 }
+
+interface RateLimitEntry {
+  count: number;
+  resetTime: number;
+}
+
+const signupRateLimits = new Map<string, RateLimitEntry>();
+
+function checkSignupRateLimit(ip: string): { allowed: boolean; retryAfter?: number } {
+  const now = Date.now();
+  const windowMs = 15 * 60 * 1000;
+  const maxAttempts = 5;
+
+  const entry = signupRateLimits.get(ip);
+
+  if (!entry || now > entry.resetTime) {
+    signupRateLimits.set(ip, { count: 1, resetTime: now + windowMs });
+    return { allowed: true };
+  }
+
+  if (entry.count >= maxAttempts) {
+    const retryAfter = Math.ceil((entry.resetTime - now) / 1000);
+    return { allowed: false, retryAfter };
+  }
+
+  entry.count++;
+  return { allowed: true };
+}
+
+setInterval(() => {
+  const now = Date.now();
+  const entries = Array.from(signupRateLimits.entries());
+  for (const [ip, entry] of entries) {
+    if (now > entry.resetTime) {
+      signupRateLimits.delete(ip);
+    }
+  }
+}, 5 * 60 * 1000);
 
 // SQLite-only auth resolvers that don't depend on Neo4j
 export const sqliteAuthResolvers = {
@@ -230,6 +271,51 @@ export const sqliteAuthResolvers = {
         console.error('❌ Get folder graphs error:', error);
         throw new GraphQLError('Failed to get folder graphs');
       }
+    },
+
+    // Get all OAuth provider configurations (Admin only)
+    oauthProviderConfigs: async (_: any, __: any, context: any) => {
+      if (!context.user || context.user.role !== 'ADMIN') {
+        throw new GraphQLError('Unauthorized', {
+          extensions: { code: 'FORBIDDEN' }
+        });
+      }
+
+      try {
+        const configs = await sqliteAuthStore.getAllOAuthProviderConfigs();
+        return configs.map((config: any) => ({
+          ...config,
+          enabled: Boolean(config.enabled),
+          configured: Boolean(config.clientId && config.clientSecret)
+        }));
+      } catch (error: any) {
+        console.error('❌ Get OAuth provider configs error:', error);
+        throw new GraphQLError('Failed to get OAuth provider configurations');
+      }
+    },
+
+    // Get specific OAuth provider configuration (Admin only)
+    oauthProviderConfig: async (_: any, { provider }: { provider: string }, context: any) => {
+      if (!context.user || context.user.role !== 'ADMIN') {
+        throw new GraphQLError('Unauthorized', {
+          extensions: { code: 'FORBIDDEN' }
+        });
+      }
+
+      try {
+        const config = await sqliteAuthStore.getOAuthProviderConfig(provider as any);
+        if (!config) {
+          return null;
+        }
+        return {
+          ...config,
+          enabled: Boolean(config.enabled),
+          configured: Boolean(config.clientId && config.clientSecret)
+        };
+      } catch (error: any) {
+        console.error('❌ Get OAuth provider config error:', error);
+        throw new GraphQLError('Failed to get OAuth provider configuration');
+      }
     }
   },
 
@@ -237,8 +323,20 @@ export const sqliteAuthResolvers = {
     // Login mutation - SQLite only
     login: async (_: any, { input }: { input: LoginInput }) => {
       console.log(`🔐 Login attempt for: ${input.emailOrUsername}`);
-      
+
       try {
+        // Verify CAPTCHA if provided
+        if (input.captchaPayload) {
+          const isCaptchaValid = await verifyCaptcha(input.captchaPayload);
+          if (!isCaptchaValid) {
+            console.log('❌ CAPTCHA verification failed');
+            throw new GraphQLError('CAPTCHA verification failed', {
+              extensions: { code: 'CAPTCHA_FAILED' }
+            });
+          }
+          console.log('✅ CAPTCHA verified');
+        }
+
         // SQLite-only authentication
         const user = await sqliteAuthStore.findUserByEmailOrUsername(input.emailOrUsername);
         
@@ -313,12 +411,37 @@ export const sqliteAuthResolvers = {
     },
 
     // Signup mutation
-    signup: async (_: any, { input }: { input: SignupInput }) => {
+    signup: async (_: any, { input }: { input: SignupInput }, context: any) => {
       try {
+        const clientIp = context.req?.ip || context.req?.connection?.remoteAddress || 'unknown';
+
+        const rateLimit = checkSignupRateLimit(clientIp);
+        if (!rateLimit.allowed) {
+          throw new GraphQLError('Too many signup attempts. Please try again later.', {
+            extensions: {
+              code: 'RATE_LIMIT_EXCEEDED',
+              retryAfter: rateLimit.retryAfter,
+              rateLimitExceeded: true
+            }
+          });
+        }
+
+        // Verify CAPTCHA if provided
+        if (input.captchaPayload) {
+          const isCaptchaValid = await verifyCaptcha(input.captchaPayload);
+          if (!isCaptchaValid) {
+            console.log('❌ CAPTCHA verification failed');
+            throw new GraphQLError('CAPTCHA verification failed', {
+              extensions: { code: 'CAPTCHA_FAILED' }
+            });
+          }
+          console.log('✅ CAPTCHA verified');
+        }
+
         // Check if user already exists
-        const existingUser = await sqliteAuthStore.findUserByEmailOrUsername(input.email) || 
+        const existingUser = await sqliteAuthStore.findUserByEmailOrUsername(input.email) ||
                             await sqliteAuthStore.findUserByEmailOrUsername(input.username);
-        
+
         if (existingUser) {
           throw new GraphQLError('User already exists with that email or username', {
             extensions: { code: 'BAD_USER_INPUT' }
@@ -715,6 +838,55 @@ export const sqliteAuthResolvers = {
       } catch (error: any) {
         console.error('❌ Reorder graphs error:', error);
         throw new GraphQLError('Failed to reorder graphs in folder');
+      }
+    },
+
+    // Update OAuth provider configuration (Admin only)
+    updateOAuthProviderConfig: async (_: any, { input }: { input: { provider: string; enabled: boolean; clientId: string; clientSecret: string; callbackUrl: string } }, context: any) => {
+      if (!context.user || context.user.role !== 'ADMIN') {
+        throw new GraphQLError('Unauthorized', {
+          extensions: { code: 'FORBIDDEN' }
+        });
+      }
+
+      try {
+        await sqliteAuthStore.upsertOAuthProviderConfig({
+          provider: input.provider as any,
+          enabled: input.enabled,
+          clientId: input.clientId,
+          clientSecret: input.clientSecret,
+          callbackUrl: input.callbackUrl
+        });
+
+        const config = await sqliteAuthStore.getOAuthProviderConfig(input.provider as any);
+        return {
+          ...config,
+          enabled: Boolean(config.enabled),
+          configured: Boolean(config.clientId && config.clientSecret)
+        };
+      } catch (error: any) {
+        console.error('❌ Update OAuth provider config error:', error);
+        throw new GraphQLError('Failed to update OAuth provider configuration');
+      }
+    },
+
+    // Delete OAuth provider configuration (Admin only)
+    deleteOAuthProviderConfig: async (_: any, { provider }: { provider: string }, context: any) => {
+      if (!context.user || context.user.role !== 'ADMIN') {
+        throw new GraphQLError('Unauthorized', {
+          extensions: { code: 'FORBIDDEN' }
+        });
+      }
+
+      try {
+        await sqliteAuthStore.deleteOAuthProviderConfig(provider as any);
+        return {
+          success: true,
+          message: 'OAuth provider configuration deleted successfully'
+        };
+      } catch (error: any) {
+        console.error('❌ Delete OAuth provider config error:', error);
+        throw new GraphQLError('Failed to delete OAuth provider configuration');
       }
     }
   }

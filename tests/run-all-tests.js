@@ -51,39 +51,53 @@ const TEST_SUITES = [
     critical: true
   },
   {
+    name: 'OAuth LinkedIn Integration',
+    command: 'npx playwright test tests/e2e/oauth-linkedin.spec.ts',
+    priority: 3,
+    critical: true
+  },
+  {
+    name: 'Docker Error Handling',
+    command: './tests/test-error-handling.sh',
+    priority: 4,
+    critical: true,
+    type: 'shell',
+    parser: 'installation'
+  },
+  {
     name: 'Database Connectivity',
     command: 'npx playwright test tests/e2e/database-connectivity.spec.ts',
-    priority: 3,
+    priority: 5,
     critical: true
   },
   {
     name: 'UI Basic Functionality',
     command: 'npx playwright test tests/e2e/ui-basic-functionality.spec.ts',
-    priority: 4,
+    priority: 6,
     critical: false
   },
   {
     name: 'Workspace Scrolling',
     command: 'npx playwright test tests/e2e/workspace-scrolling.spec.ts',
-    priority: 5,
+    priority: 7,
     critical: false
   },
   {
     name: 'Graph Operations',
     command: 'npx playwright test tests/e2e/comprehensive-graph-operations.spec.ts',
-    priority: 6,
+    priority: 8,
     critical: false
   },
   {
     name: 'Real-time Updates',
     command: 'npx playwright test tests/e2e/graph-real-time-updates.spec.ts',
-    priority: 7,
+    priority: 9,
     critical: false
   },
   {
     name: 'Comprehensive Interactions',
     command: 'npx playwright test tests/e2e/comprehensive-interaction.spec.ts',
-    priority: 8,
+    priority: 10,
     critical: false
   }
 ];

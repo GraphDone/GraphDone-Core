@@ -2,7 +2,11 @@ import { useState, useRef, useEffect } from 'react';
 import { ChevronDown, User, Users, LogOut } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
-export function UserSelector() {
+interface UserSelectorProps {
+  isCollapsed?: boolean;
+}
+
+export function UserSelector({ isCollapsed = false }: UserSelectorProps) {
   const { currentUser, currentTeam, availableUsers, availableTeams, switchUser, switchTeam, logout } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'users' | 'teams'>('users');
@@ -55,29 +59,39 @@ export function UserSelector() {
       {/* User selector button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center space-x-3 w-full p-3 text-left hover:bg-gray-700 rounded-lg transition-colors"
+        className={`flex items-center w-full p-3 text-left hover:bg-gray-700 rounded-lg transition-colors ${
+          isCollapsed ? 'justify-center lg:p-2' : 'space-x-3'
+        }`}
       >
         <div className="flex-shrink-0">
-          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-medium">
+          <div className={`bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-medium ${
+            isCollapsed ? 'w-10 h-10 text-base' : 'w-8 h-8 text-sm'
+          }`}>
             {currentUser.avatar || currentUser.name.charAt(0)}
           </div>
         </div>
-        
-        <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium text-gray-100 truncate">
-            {currentUser.name}
-          </div>
-          <div className="text-xs text-gray-400 truncate">
-            {currentTeam?.name} • {currentUser.role}
-          </div>
-        </div>
-        
-        <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+
+        {!isCollapsed && (
+          <>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium text-gray-100 truncate">
+                {currentUser.name}
+              </div>
+              <div className="text-xs text-gray-400 truncate">
+                {currentTeam?.name} • {currentUser.role}
+              </div>
+            </div>
+
+            <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+          </>
+        )}
       </button>
 
       {/* Dropdown menu */}
       {isOpen && (
-        <div className="absolute bottom-full left-0 right-0 mb-2 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-50 max-h-96 overflow-hidden">
+        <div className={`absolute top-full mt-2 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-50 max-h-96 overflow-hidden ${
+          isCollapsed ? 'left-0 w-64' : 'left-0 right-0'
+        }`}>
           {/* Tabs */}
           <div className="flex border-b border-gray-600">
             <button

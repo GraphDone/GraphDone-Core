@@ -2,7 +2,91 @@
 
 # GraphDone Development Runner Script
 
-set -e
+# Don't use set -e to allow better error handling
+# set -e
+
+# Colors for better output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+NC='\033[0m' # No Color
+
+# Docker error handling function
+handle_docker_error() {
+    local error_output="$1"
+    local context="$2"
+
+    echo ""
+    echo -e "${RED}╔════════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${RED}║                                                                ║${NC}"
+    echo -e "${RED}║                    ❌ Docker Error Detected ❌                  ║${NC}"
+    echo -e "${RED}║                                                                ║${NC}"
+    echo -e "${RED}╚════════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+
+    # Detect specific error types and provide targeted solutions
+    # Check most specific patterns first, then more general ones
+    if echo "$error_output" | grep -qi "Cannot connect to the Docker daemon\|docker.*not running\|Is the docker daemon running"; then
+        echo -e "${YELLOW}🔍 Issue: Docker is not running${NC}"
+        echo ""
+        echo -e "${BOLD}Solution:${NC}"
+        echo "  1. Start Docker Desktop"
+        echo "  2. Wait for it to fully start (30+ seconds)"
+        echo "  3. Run: ${GREEN}./start${NC}"
+        echo ""
+
+    elif echo "$error_output" | grep -qi "ContainerConfig\|container.*config\|image.*config"; then
+        echo -e "${YELLOW}🔍 Issue: Corrupted container state detected${NC}"
+        echo ""
+        echo "This happens when Docker containers are in an inconsistent state."
+        echo "This is usually caused by:"
+        echo "  • Containers stopped improperly"
+        echo "  • Partial image downloads"
+        echo "  • Volume mount conflicts"
+        echo ""
+        echo -e "${BOLD}Quick Fix (Recommended):${NC}"
+        echo -e "  ${GREEN}./start stop${NC}     # Stop all services"
+        echo -e "  ${GREEN}./start${NC}          # Start fresh"
+        echo ""
+        echo -e "${BOLD}If that doesn't work:${NC}"
+        echo -e "  ${GREEN}./start remove${NC}   # Complete cleanup (removes data!)"
+        echo -e "  ${GREEN}./start setup${NC}    # Fresh installation"
+        echo ""
+
+    elif echo "$error_output" | grep -qi "network.*not found\|network.*error"; then
+        echo -e "${YELLOW}🔍 Issue: Docker network problem${NC}"
+        echo ""
+        echo -e "${BOLD}Solution:${NC}"
+        echo -e "  ${GREEN}./start stop${NC}"
+        echo -e "  ${GREEN}docker network prune${NC}  # Clean up networks"
+        echo -e "  ${GREEN}./start${NC}"
+        echo ""
+
+    elif echo "$error_output" | grep -qi "port.*already allocated\|address already in use"; then
+        echo -e "${YELLOW}🔍 Issue: Port conflict${NC}"
+        echo ""
+        echo -e "${BOLD}Solution:${NC}"
+        echo -e "  ${GREEN}./start stop${NC}  # Stop GraphDone"
+        echo ""
+
+    else
+        echo -e "${YELLOW}🔍 Issue: Docker error during $context${NC}"
+        echo ""
+        echo -e "${BOLD}Try these steps:${NC}"
+        echo -e "  1. ${GREEN}./start stop${NC}"
+        echo -e "  2. ${GREEN}./start${NC}"
+        echo -e "  3. If still failing: ${GREEN}./start remove${NC} then ${GREEN}./start setup${NC}"
+        echo ""
+    fi
+
+    echo -e "${CYAN}Error Details:${NC}"
+    echo "$error_output" | head -15
+    echo ""
+
+    return 1
+}
 
 # Interactive waiting function for Neo4j startup
 wait_for_neo4j_interactive() {
@@ -172,13 +256,35 @@ case $MODE in
         
         # Clean up any existing Docker containers first
         echo "🧹 Cleaning up any existing Docker containers..."
-        ${DOCKER_SUDO}docker-compose -f deployment/docker-compose.yml down 2>/dev/null || true
-        ${DOCKER_SUDO}docker-compose -f deployment/docker-compose.dev.yml down 2>/dev/null || true
-        
+
+        # Try to stop existing containers with error handling
+        if ! ${DOCKER_SUDO}docker-compose -f deployment/docker-compose.yml down 2>&1 | tee /tmp/docker-cleanup.log; then
+            if grep -qi "ContainerConfig\|network.*error\|cannot connect" /tmp/docker-cleanup.log; then
+                error_output=$(cat /tmp/docker-cleanup.log)
+                handle_docker_error "$error_output" "cleanup"
+                exit 1
+            fi
+        fi
+
+        if ! ${DOCKER_SUDO}docker-compose -f deployment/docker-compose.dev.yml down 2>&1 | tee /tmp/docker-cleanup-dev.log; then
+            if grep -qi "ContainerConfig\|network.*error\|cannot connect" /tmp/docker-cleanup-dev.log; then
+                error_output=$(cat /tmp/docker-cleanup-dev.log)
+                handle_docker_error "$error_output" "cleanup"
+                exit 1
+            fi
+        fi
+
         # Check if database is running
         echo "🔍 Starting database services..."
         echo "🗄️  Starting Neo4j and Redis databases..."
-        ${DOCKER_SUDO}docker-compose -f deployment/docker-compose.dev.yml up -d graphdone-neo4j graphdone-redis
+
+        # Start database containers with error handling
+        if ! ${DOCKER_SUDO}docker-compose -f deployment/docker-compose.dev.yml up -d graphdone-neo4j graphdone-redis 2>&1 | tee /tmp/docker-start.log; then
+            error_output=$(cat /tmp/docker-start.log)
+            handle_docker_error "$error_output" "starting database services"
+            exit 1
+        fi
+
         # Wait for Neo4j with interactive progress
         wait_for_neo4j_interactive "deployment/docker-compose.dev.yml" "graphdone-neo4j"
         
@@ -476,16 +582,49 @@ case $MODE in
             done
         ) &
         PROGRESS_PID=$!
-        
-        # Use main compose file (HTTPS production) 
-        docker-compose -f deployment/docker-compose.yml up --build
-        
+
+        # Use main compose file (HTTPS production) with error handling
+        if ! docker-compose -f deployment/docker-compose.yml up --build 2>&1 | tee /tmp/docker-compose-up.log; then
+            # Stop progress monitor
+            kill $PROGRESS_PID 2>/dev/null || true
+
+            # Check if it's a recognizable error
+            if [ -f /tmp/docker-compose-up.log ]; then
+                error_output=$(cat /tmp/docker-compose-up.log)
+                if echo "$error_output" | grep -qi "ContainerConfig\|network.*error\|cannot connect\|permission denied"; then
+                    handle_docker_error "$error_output" "starting production services"
+                    exit 1
+                fi
+            fi
+
+            echo ""
+            echo -e "${RED}❌ Failed to start GraphDone services${NC}"
+            echo -e "${YELLOW}Try: ${GREEN}./start stop${NC} ${YELLOW}then${NC} ${GREEN}./start${NC}"
+            exit 1
+        fi
+
         # Stop progress monitor
         kill $PROGRESS_PID 2>/dev/null || true
         ;;
-        
+
     "docker-dev")
         echo "🐳 Starting with Docker (development)..."
-        docker-compose -f deployment/docker-compose.dev.yml up --build
+
+        # Start with error handling
+        if ! docker-compose -f deployment/docker-compose.dev.yml up --build 2>&1 | tee /tmp/docker-compose-dev-up.log; then
+            # Check if it's a recognizable error
+            if [ -f /tmp/docker-compose-dev-up.log ]; then
+                error_output=$(cat /tmp/docker-compose-dev-up.log)
+                if echo "$error_output" | grep -qi "ContainerConfig\|network.*error\|cannot connect\|permission denied"; then
+                    handle_docker_error "$error_output" "starting development services"
+                    exit 1
+                fi
+            fi
+
+            echo ""
+            echo -e "${RED}❌ Failed to start GraphDone services${NC}"
+            echo -e "${YELLOW}Try: ${GREEN}./start stop${NC} ${YELLOW}then${NC} ${GREEN}./start${NC}"
+            exit 1
+        fi
         ;;
 esac
