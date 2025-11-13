@@ -7,10 +7,11 @@ import { useNotifications } from '../contexts/NotificationContext';
 interface UpdateGraphModalProps {
   isOpen: boolean;
   onClose: () => void;
+  graphToEdit: any;
 }
 
-export function UpdateGraphModal({ isOpen, onClose }: UpdateGraphModalProps) {
-  const { currentGraph, updateGraph, availableGraphs } = useGraph();
+export function UpdateGraphModal({ isOpen, onClose, graphToEdit }: UpdateGraphModalProps) {
+  const { updateGraph, availableGraphs } = useGraph();
   const { currentTeam } = useAuth();
   const { showSuccess, showError } = useNotifications();
   const [loading, setLoading] = useState(false);
@@ -26,24 +27,25 @@ export function UpdateGraphModal({ isOpen, onClose }: UpdateGraphModalProps) {
   });
 
   const [tagInput, setTagInput] = useState<string>('');
+  const [showReviewConfig, setShowReviewConfig] = useState(true);
 
-  // Initialize form data when modal opens or currentGraph changes
+  // Initialize form data when modal opens or graphToEdit changes
   useEffect(() => {
-    if (currentGraph && isOpen) {
+    if (graphToEdit && isOpen) {
       setFormData({
-        name: currentGraph.name,
-        description: currentGraph.description || '',
-        type: (currentGraph.type as 'PROJECT' | 'WORKSPACE' | 'SUBGRAPH' | 'TEMPLATE') || 'PROJECT',
-        tags: currentGraph.tags || [],
-        defaultRole: currentGraph.defaultRole || 'VIEWER',
-        status: (currentGraph.status as 'ACTIVE' | 'ARCHIVED' | 'DRAFT') || 'ACTIVE',
-        isShared: currentGraph.isShared || false
+        name: graphToEdit.name,
+        description: graphToEdit.description || '',
+        type: (graphToEdit.type as 'PROJECT' | 'WORKSPACE' | 'SUBGRAPH' | 'TEMPLATE') || 'PROJECT',
+        tags: graphToEdit.tags || [],
+        defaultRole: graphToEdit.defaultRole || 'VIEWER',
+        status: (graphToEdit.status as 'ACTIVE' | 'ARCHIVED' | 'DRAFT') || 'ACTIVE',
+        isShared: graphToEdit.isShared || false
       });
       setTagInput('');
     }
-  }, [currentGraph, isOpen]);
+  }, [graphToEdit, isOpen]);
 
-  if (!isOpen || !currentGraph) return null;
+  if (!isOpen || !graphToEdit) return null;
 
   const graphTypes = [
     {
@@ -149,8 +151,8 @@ export function UpdateGraphModal({ isOpen, onClose }: UpdateGraphModalProps) {
     }
 
     // Check for duplicate graph names (excluding current graph)
-    const existingGraph = availableGraphs.find(g => 
-      g.id !== currentGraph.id && 
+    const existingGraph = availableGraphs.find(g =>
+      g.id !== graphToEdit.id &&
       g.name.toLowerCase().trim() === formData.name.toLowerCase().trim()
     );
     if (existingGraph) {
@@ -160,7 +162,7 @@ export function UpdateGraphModal({ isOpen, onClose }: UpdateGraphModalProps) {
 
     setLoading(true);
     try {
-      await updateGraph(currentGraph.id, {
+      await updateGraph(graphToEdit.id, {
         name: formData.name.trim(),
         description: formData.description.trim() || undefined,
         tags: formData.tags,
@@ -199,19 +201,25 @@ export function UpdateGraphModal({ isOpen, onClose }: UpdateGraphModalProps) {
         {/* Enhanced Modal with better styling */}
         <div className="inline-block align-bottom bg-gradient-to-br from-gray-800 via-gray-800 to-gray-900 rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full border border-gray-600/50 animate-in slide-in-from-bottom-4 duration-300 relative">
           {/* Gradient accent line at top */}
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-green-500"></div>
-          
-          {/* Enhanced Header with gradient background */}
-          <div className="flex items-center justify-between px-6 py-5 border-b border-gray-600/50 bg-gradient-to-r from-gray-800/90 to-gray-900/90 backdrop-blur-sm">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-purple-500 via-pink-500 to-green-500"></div>
+
+          {/* Modern header with glow */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700/30 bg-gradient-to-r from-gray-800/50 to-gray-900/50 backdrop-blur-sm relative">
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg">
-                <Save className="h-5 w-5 text-white" />
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-500 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30 relative">
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-400 to-purple-600 rounded-xl blur opacity-50 animate-pulse"></div>
+                <Save className="h-5 w-5 text-white relative z-10" />
               </div>
-              <h3 className="text-xl font-bold bg-gradient-to-r from-white via-green-100 to-blue-100 bg-clip-text text-transparent">Edit Graph</h3>
+              <div>
+                <h3 className="text-lg font-bold bg-gradient-to-r from-white via-blue-100 to-purple-100 bg-clip-text text-transparent">
+                  Edit Graph
+                </h3>
+                <p className="text-xs text-gray-400">Update graph settings</p>
+              </div>
             </div>
             <button
               onClick={onClose}
-              className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-xl transition-all duration-200 hover:scale-110"
+              className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-xl transition-all duration-200 hover:scale-110 hover:rotate-90"
             >
               <X className="h-5 w-5" />
             </button>
@@ -251,112 +259,89 @@ export function UpdateGraphModal({ isOpen, onClose }: UpdateGraphModalProps) {
               </div>
 
               {/* Graph Name */}
-              <div className="group">
-                <label className="block text-sm font-semibold text-gray-200 mb-3 flex items-center space-x-2">
+              <div className="group/input">
+                <label className="block text-sm font-semibold text-gray-200 mb-2 flex items-center space-x-1.5">
                   <span>Graph Name</span>
-                  <span className="text-red-400">*</span>
-                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                  <span className="text-red-400 text-lg">*</span>
                 </label>
                 <div className="relative">
                   <input
                     type="text"
                     value={formData.name}
                     onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                    className="w-full px-4 py-4 bg-gray-800 border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-400 transition-all duration-300 hover:border-gray-500 shadow-lg"
+                    className="w-full px-4 py-3 text-sm bg-gray-800/80 border-2 border-gray-600/50 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-500/70 transition-all duration-200 hover:border-gray-500/70 shadow-inner"
                     placeholder="Enter a descriptive name for your graph"
                     required
                   />
-                  <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-blue-500/5 to-purple-500/5 pointer-events-none group-hover:from-blue-500/10 group-hover:to-purple-500/10 transition-all duration-300"></div>
+                  <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-green-500/5 to-emerald-500/5 pointer-events-none opacity-0 group-hover/input:opacity-100 transition-opacity"></div>
                 </div>
-                <p className="text-xs text-gray-400 mt-2 flex items-center space-x-2">
-                  <span className="w-1.5 h-1.5 bg-blue-400 rounded-full"></span>
-                  <span>Choose a clear, descriptive name that team members will recognize</span>
-                </p>
               </div>
 
               {/* Description */}
               <div className="group">
                 <label className="block text-sm font-semibold text-gray-200 mb-3 flex items-center space-x-2">
                   <span>Description</span>
-                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                 </label>
                 <div className="relative">
                   <textarea
                     value={formData.description}
                     onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                    className="w-full px-4 py-4 bg-gray-800 border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-400 transition-all duration-300 hover:border-gray-500 shadow-lg resize-none"
-                    placeholder="Describe the purpose and scope of your graph"
                     rows={4}
+                    className="w-full px-4 py-4 bg-gray-800 border border-gray-600 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-400 transition-all duration-300 hover:border-gray-500 shadow-lg resize-none"
+                    placeholder="Describe the purpose and scope of this graph"
                   />
                   <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-green-500/5 to-emerald-500/5 pointer-events-none group-hover:from-green-500/10 group-hover:to-emerald-500/10 transition-all duration-300"></div>
                 </div>
-                <p className="text-xs text-gray-400 mt-2 flex items-center space-x-2">
-                  <span className="w-1.5 h-1.5 bg-green-400 rounded-full"></span>
-                  <span>Optional but recommended for team collaboration</span>
-                </p>
               </div>
 
               {/* Tags */}
               <div className="group">
                 <label className="block text-sm font-semibold text-gray-200 mb-3 flex items-center space-x-2">
-                  <span>Tags</span>
-                  <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></div>
+                  <span>Tags (optional)</span>
                 </label>
-                
-                {/* Enhanced Tag Display Area - matching CreateGraphModal */}
                 <div className="relative">
-                  <div className="w-full min-h-[3.5rem] px-4 py-3 bg-gray-800 border border-gray-600 rounded-xl focus-within:ring-2 focus-within:ring-purple-500/50 focus-within:border-purple-400 transition-all duration-300 hover:border-gray-500 shadow-lg">
+                  <div className="w-full min-h-[4rem] px-4 py-4 bg-gray-800 border border-gray-600 rounded-xl focus-within:ring-2 focus-within:ring-purple-500/50 focus-within:border-purple-400 transition-all duration-300 hover:border-gray-500 shadow-lg">
                     <div className="flex flex-wrap gap-2 items-center">
                       {/* Existing Tags */}
                       {formData.tags && formData.tags.slice(0, 5).map((tag, index) => {
-                        const colorIndex = index % colors.length;
-                        const color = colors[colorIndex];
+                        const colorScheme = colors[index % colors.length];
                         return (
-                          <div
+                          <span
                             key={index}
-                            className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold bg-gradient-to-r ${color.bg} ${color.text} border-2 ${color.border} transition-all duration-200 hover:scale-105 shadow-md animate-in slide-in-from-left-2`}
-                            style={{
-                              animationDelay: `${index * 100}ms`
-                            }}
+                            className={`inline-flex items-center px-4 py-2 rounded-xl text-sm font-semibold bg-gradient-to-br ${colorScheme.bg} ${colorScheme.text} border-2 ${colorScheme.border} shadow-lg transform hover:scale-105 transition-all duration-200`}
                           >
-                            <span className="mr-2">{tag}</span>
+                            {tag}
                             <button
                               type="button"
                               onClick={() => removeTag(index)}
-                              className="hover:bg-white/20 rounded-full p-0.5 transition-colors"
+                              className="ml-2 hover:bg-white/20 rounded-full w-5 h-5 flex items-center justify-center transition-all duration-200 hover:rotate-90"
                             >
                               ×
                             </button>
-                          </div>
+                          </span>
                         );
                       })}
-                      
+
                       {/* Tag Input */}
-                      {formData.tags.length < 5 && (
-                        <input
-                          type="text"
-                          value={tagInput}
-                          onChange={handleTagInputChange}
-                          onKeyDown={handleTagInput}
-                          placeholder={formData.tags.length === 0 ? "Type and press comma to add tags (max 5)" : "Add more tags"}
-                          className="flex-1 min-w-[200px] px-2 py-1 bg-transparent border-0 outline-0 text-white placeholder-gray-400 text-sm"
-                        />
-                      )}
+                      <input
+                        type="text"
+                        value={tagInput}
+                        onChange={handleTagInputChange}
+                        onKeyDown={handleTagInput}
+                        placeholder={(!formData.tags || formData.tags.length === 0) ? "Add tags (comma-separated)" : formData.tags.length >= 5 ? "Max 5 tags" : "Add more"}
+                        className="flex-1 min-w-[200px] bg-transparent border-none outline-none text-gray-200 placeholder-gray-500"
+                        disabled={formData.tags && formData.tags.length >= 5}
+                      />
                     </div>
                   </div>
                   <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-purple-500/5 to-pink-500/5 pointer-events-none group-hover:from-purple-500/10 group-hover:to-pink-500/10 transition-all duration-300"></div>
                 </div>
-                <p className="text-xs text-gray-400 mt-2 flex items-center space-x-2">
-                  <span className="w-1.5 h-1.5 bg-purple-400 rounded-full"></span>
-                  <span>Type and press comma to add tags (max 5) • Click × to remove</span>
-                </p>
               </div>
 
               {/* Default Role for Team Members */}
               <div className="group">
                 <label className="block text-sm font-semibold text-gray-200 mb-3 flex items-center space-x-2">
                   <span>Default Role for Team Members</span>
-                  <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
                 </label>
                 <div className="relative">
                   <select
@@ -371,52 +356,109 @@ export function UpdateGraphModal({ isOpen, onClose }: UpdateGraphModalProps) {
                   </select>
                   <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-orange-500/5 to-red-500/5 pointer-events-none group-hover:from-orange-500/10 group-hover:to-red-500/10 transition-all duration-300"></div>
                 </div>
-                <p className="text-xs text-gray-400 mt-2 flex items-center space-x-2">
-                  <span className="w-1.5 h-1.5 bg-orange-400 rounded-full"></span>
-                  <span>Default permission level for new team members joining this graph</span>
-                </p>
               </div>
 
-              {/* Additional Settings */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Privacy Setting */}
-                <div className="group">
-                  <label className="block text-sm font-semibold text-gray-200 mb-3 flex items-center space-x-2">
-                    <span>Privacy</span>
-                    <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse"></div>
-                  </label>
-                  <div className="relative">
-                    <select
-                      value={formData.isShared ? 'shared' : 'private'}
-                      onChange={(e) => setFormData(prev => ({ ...prev, isShared: e.target.value === 'shared' }))}
-                      className="w-full px-4 py-4 bg-gray-800 border border-gray-600 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 transition-all duration-300 hover:border-gray-500 shadow-lg appearance-none"
-                    >
-                      <option value="private" className="bg-gray-800 text-white">Private to team</option>
-                      <option value="shared" className="bg-gray-800 text-white">Shared with others</option>
-                    </select>
-                    <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-indigo-500/5 to-blue-500/5 pointer-events-none group-hover:from-indigo-500/10 group-hover:to-blue-500/10 transition-all duration-300"></div>
-                  </div>
+              {/* Privacy Setting */}
+              <div className="group">
+                <label className="block text-sm font-semibold text-gray-200 mb-3 flex items-center space-x-2">
+                  <span>Privacy</span>
+                </label>
+                <div className="relative">
+                  <select
+                    value={formData.isShared ? 'shared' : 'private'}
+                    onChange={(e) => setFormData(prev => ({ ...prev, isShared: e.target.value === 'shared' }))}
+                    className="w-full px-4 py-4 bg-gray-800 border border-gray-600 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 transition-all duration-300 hover:border-gray-500 shadow-lg appearance-none"
+                  >
+                    <option value="private" className="bg-gray-800 text-white">Private - Only you and invited members</option>
+                    <option value="shared" className="bg-gray-800 text-white">Shared - Everyone in your team</option>
+                  </select>
+                  <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-indigo-500/5 to-blue-500/5 pointer-events-none group-hover:from-indigo-500/10 group-hover:to-blue-500/10 transition-all duration-300"></div>
                 </div>
+              </div>
 
-                {/* Status */}
-                <div className="group">
-                  <label className="block text-sm font-semibold text-gray-200 mb-3 flex items-center space-x-2">
-                    <span>Status</span>
-                    <div className="w-2 h-2 bg-teal-500 rounded-full animate-pulse"></div>
-                  </label>
-                  <div className="relative">
-                    <select
-                      value={formData.status}
-                      onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value as 'ACTIVE' | 'ARCHIVED' | 'DRAFT' }))}
-                      className="w-full px-4 py-4 bg-gray-800 border border-gray-600 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-400 transition-all duration-300 hover:border-gray-500 shadow-lg appearance-none"
-                    >
-                      <option value="DRAFT" className="bg-gray-800 text-white">Draft</option>
-                      <option value="ACTIVE" className="bg-gray-800 text-white">Active</option>
-                      <option value="ARCHIVED" className="bg-gray-800 text-white">Archived</option>
-                    </select>
-                    <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-teal-500/5 to-cyan-500/5 pointer-events-none group-hover:from-teal-500/10 group-hover:to-cyan-500/10 transition-all duration-300"></div>
-                  </div>
+              {/* Status */}
+              <div className="group">
+                <label className="block text-sm font-semibold text-gray-200 mb-3 flex items-center space-x-2">
+                  <span>Status</span>
+                </label>
+                <div className="relative">
+                  <select
+                    value={formData.status || 'DRAFT'}
+                    onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value as any }))}
+                    className="w-full px-4 py-4 bg-gray-800 border border-gray-600 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-400 transition-all duration-300 hover:border-gray-500 shadow-lg appearance-none"
+                  >
+                    <option value="DRAFT" className="bg-gray-800 text-white">Draft - Work in progress</option>
+                    <option value="ACTIVE" className="bg-gray-800 text-white">Active - Published and ready</option>
+                  </select>
+                  <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-teal-500/5 to-cyan-500/5 pointer-events-none group-hover:from-teal-500/10 group-hover:to-cyan-500/10 transition-all duration-300"></div>
                 </div>
+              </div>
+
+              {/* Review Configuration - Modern Collapsible */}
+              <div className="border-2 border-gray-600/40 rounded-2xl overflow-hidden shadow-lg bg-gradient-to-br from-gray-800/40 to-gray-900/40">
+                <button
+                  type="button"
+                  onClick={() => setShowReviewConfig(!showReviewConfig)}
+                  className="w-full p-4 bg-gradient-to-r from-gray-700/40 to-gray-800/40 hover:from-gray-700/60 hover:to-gray-800/60 transition-all duration-200 flex items-center justify-between group"
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-500 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                      <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <h4 className="text-sm font-bold text-white">Review Configuration</h4>
+                  </div>
+                  <svg
+                    className={`w-5 h-5 text-gray-400 transition-transform duration-300 group-hover:text-white ${showReviewConfig ? 'rotate-180' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                  </svg>
+                </button>
+
+                {showReviewConfig && (
+                  <div className="p-5 bg-gray-900/20 border-t border-gray-700/50">
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      <div className="space-y-2">
+                        <div className="flex justify-between p-3 bg-gradient-to-br from-gray-800/60 to-gray-900/60 rounded-xl border border-gray-600/30 hover:border-gray-500/50 transition-colors shadow-sm">
+                          <span className="text-gray-400 font-medium">Type:</span>
+                          <span className="font-semibold text-blue-300 capitalize">{formData.type?.toLowerCase()}</span>
+                        </div>
+                        <div className="flex justify-between p-3 bg-gradient-to-br from-gray-800/60 to-gray-900/60 rounded-xl border border-gray-600/30 hover:border-gray-500/50 transition-colors shadow-sm">
+                          <span className="text-gray-400 font-medium">Privacy:</span>
+                          <span className="font-semibold text-cyan-300">{formData.isShared ? 'Shared' : 'Private'}</span>
+                        </div>
+                        <div className="flex justify-between p-3 bg-gradient-to-br from-gray-800/60 to-gray-900/60 rounded-xl border border-gray-600/30 hover:border-gray-500/50 transition-colors shadow-sm">
+                          <span className="text-gray-400 font-medium">Status:</span>
+                          <span className={`font-semibold ${formData.status === 'ACTIVE' ? 'text-green-300' : 'text-yellow-300'}`}>
+                            {formData.status || 'Draft'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex justify-between p-3 bg-gradient-to-br from-gray-800/60 to-gray-900/60 rounded-xl border border-gray-600/30 hover:border-gray-500/50 transition-colors shadow-sm">
+                          <span className="text-gray-400 font-medium">Team:</span>
+                          <span className="font-semibold text-purple-300">{currentTeam?.name || 'Default'}</span>
+                        </div>
+                        {formData.tags && formData.tags.length > 0 && (
+                          <div className="flex justify-between p-3 bg-gradient-to-br from-gray-800/60 to-gray-900/60 rounded-xl border border-gray-600/30 hover:border-gray-500/50 transition-colors shadow-sm">
+                            <span className="text-gray-400 font-medium">Tags:</span>
+                            <span className="font-semibold text-indigo-300">{formData.tags.length} tag{formData.tags.length !== 1 ? 's' : ''}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between p-3 bg-gradient-to-br from-gray-800/60 to-gray-900/60 rounded-xl border border-gray-600/30 hover:border-gray-500/50 transition-colors shadow-sm">
+                          <span className="text-gray-400 font-medium">Ready:</span>
+                          <span className={`font-semibold ${formData.name ? 'text-green-300' : 'text-red-300'}`}>
+                            {formData.name ? 'Yes' : 'Name Required'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
