@@ -202,16 +202,100 @@ class SQLiteAuthStore {
             FOREIGN KEY (folderId) REFERENCES folders (id) ON DELETE CASCADE,
             FOREIGN KEY (userId) REFERENCES users (id) ON DELETE CASCADE
           )
+        `, (err) => {
+          if (err) {
+            reject(err);
+            return;
+          }
+        });
+
+        // OAuth providers table for social login
+        db.run(`
+          CREATE TABLE IF NOT EXISTS oauth_providers (
+            id TEXT PRIMARY KEY,
+            userId TEXT NOT NULL,
+            provider TEXT NOT NULL, -- 'google', 'linkedin', 'github'
+            providerId TEXT NOT NULL, -- Provider's user ID
+            email TEXT,
+            name TEXT,
+            avatar TEXT,
+            accessToken TEXT,
+            refreshToken TEXT,
+            profile TEXT, -- JSON stringified profile data
+            createdAt TEXT NOT NULL,
+            updatedAt TEXT NOT NULL,
+            UNIQUE (provider, providerId),
+            FOREIGN KEY (userId) REFERENCES users (id) ON DELETE CASCADE
+          )
+        `);
+
+        // Magic links table for passwordless authentication
+        db.run(`
+          CREATE TABLE IF NOT EXISTS magic_links (
+            id TEXT PRIMARY KEY,
+            email TEXT NOT NULL,
+            token TEXT UNIQUE NOT NULL,
+            expiresAt TEXT NOT NULL,
+            usedAt TEXT NULL,
+            userId TEXT NULL,
+            createdAt TEXT NOT NULL,
+            FOREIGN KEY (userId) REFERENCES users (id) ON DELETE CASCADE
+          )
+        `);
+
+        // Shareable links table for graph sharing
+        db.run(`
+          CREATE TABLE IF NOT EXISTS shareable_links (
+            id TEXT PRIMARY KEY,
+            graphId TEXT NOT NULL,
+            token TEXT UNIQUE NOT NULL,
+            createdBy TEXT NOT NULL,
+            accessLevel TEXT NOT NULL DEFAULT 'VIEW',
+            expiresAt TEXT NULL,
+            maxUses INTEGER NULL,
+            useCount INTEGER DEFAULT 0,
+            isActive BOOLEAN DEFAULT 1,
+            requiresSignIn BOOLEAN DEFAULT 0,
+            createdAt TEXT NOT NULL,
+            updatedAt TEXT NOT NULL,
+            FOREIGN KEY (createdBy) REFERENCES users (id) ON DELETE CASCADE
+          )
+        `);
+
+        // OAuth provider configuration table for admin panel
+        db.run(`
+          CREATE TABLE IF NOT EXISTS oauth_provider_config (
+            provider TEXT PRIMARY KEY, -- 'google', 'linkedin', 'github'
+            enabled BOOLEAN DEFAULT 0,
+            clientId TEXT,
+            clientSecret TEXT,
+            callbackUrl TEXT,
+            createdAt TEXT NOT NULL,
+            updatedAt TEXT NOT NULL
+          )
+        `);
+
+        // Shareable link access log
+        db.run(`
+          CREATE TABLE IF NOT EXISTS shareable_link_access (
+            id TEXT PRIMARY KEY,
+            linkId TEXT NOT NULL,
+            userId TEXT NULL,
+            guestId TEXT NULL,
+            ipAddress TEXT,
+            userAgent TEXT,
+            accessedAt TEXT NOT NULL,
+            FOREIGN KEY (linkId) REFERENCES shareable_links (id) ON DELETE CASCADE,
+            FOREIGN KEY (userId) REFERENCES users (id) ON DELETE SET NULL
+          )
         `, async (err) => {
           if (err) {
             reject(err);
             return;
           }
-          
+
           try {
-            // Create default admin and viewer users
             await this.createDefaultUsers();
-            // Create default folder structure
             await this.createDefaultFolders();
             this.initialized = true;
             resolve();
@@ -1000,7 +1084,7 @@ class SQLiteAuthStore {
 
         if (!row) {
           const personalFolderId = uuidv4();
-          
+
           db.serialize(() => {
             // Personal root folder
             db.run('INSERT INTO folders (id, name, type, ownerId, color, icon, description, position, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -1029,7 +1113,501 @@ class SQLiteAuthStore {
       });
     });
   }
+
+  async findUserByOAuthProvider(provider: string, providerId: string): Promise<User | null> {
+    await this.initialize();
+    const db = await this.getDb();
+
+    return new Promise((resolve, reject) => {
+      const sql = `
+        SELECT u.*, t.id as teamId, t.name as teamName
+        FROM users u
+        LEFT JOIN user_teams ut ON u.id = ut.userId
+        LEFT JOIN teams t ON ut.teamId = t.id
+        INNER JOIN oauth_providers op ON u.id = op.userId
+        WHERE op.provider = ? AND op.providerId = ?
+        AND u.isActive = 1
+      `;
+
+      db.get(sql, [provider, providerId], (err, row: any) => {
+        if (err) {
+          reject(err);
+        } else if (row) {
+          const user: User = {
+            id: row.id,
+            email: row.email,
+            username: row.username,
+            name: row.name,
+            role: row.role,
+            passwordHash: row.passwordHash,
+            createdAt: row.createdAt,
+            updatedAt: row.updatedAt,
+            isActive: Boolean(row.isActive),
+            isEmailVerified: Boolean(row.isEmailVerified),
+            team: row.teamId ? {
+              id: row.teamId,
+              name: row.teamName
+            } : null
+          };
+          resolve(user);
+        } else {
+          resolve(null);
+        }
+      });
+    });
+  }
+
+  async findOrCreateUserFromOAuth(oauthData: {
+    provider: string;
+    providerId: string;
+    email: string;
+    name: string;
+    avatar?: string;
+    accessToken?: string;
+    refreshToken?: string;
+    profile?: any;
+  }): Promise<User> {
+    await this.initialize();
+    const db = await this.getDb();
+
+    const existingUser = await this.findUserByOAuthProvider(oauthData.provider, oauthData.providerId);
+    if (existingUser) {
+      await this.updateOAuthProvider(existingUser.id, oauthData);
+      return existingUser;
+    }
+
+    const userByEmail = await this.findUserByEmailOrUsername(oauthData.email);
+    if (userByEmail) {
+      await this.linkOAuthProvider(userByEmail.id, oauthData);
+      return userByEmail;
+    }
+
+    const userId = uuidv4();
+    const now = new Date().toISOString();
+    const username = oauthData.email.split('@')[0] + '_' + Math.random().toString(36).substring(7);
+    const passwordHash = await bcrypt.hash(uuidv4(), 10);
+
+    return new Promise((resolve, reject) => {
+      db.serialize(() => {
+        db.run(`INSERT INTO users (id, email, username, name, role, passwordHash, createdAt, updatedAt, isActive, isEmailVerified)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [userId, oauthData.email.toLowerCase(), username, oauthData.name, 'USER', passwordHash, now, now, 1, 1],
+          async (err) => {
+            if (err) {
+              reject(err);
+              return;
+            }
+
+            try {
+              await this.linkOAuthProvider(userId, oauthData);
+              const newUser = await this.findUserById(userId);
+              resolve(newUser!);
+            } catch (linkErr) {
+              reject(linkErr);
+            }
+          });
+      });
+    });
+  }
+
+  async linkOAuthProvider(userId: string, oauthData: {
+    provider: string;
+    providerId: string;
+    email?: string;
+    name?: string;
+    avatar?: string;
+    accessToken?: string;
+    refreshToken?: string;
+    profile?: any;
+  }): Promise<void> {
+    await this.initialize();
+    const db = await this.getDb();
+    const oauthId = uuidv4();
+    const now = new Date().toISOString();
+
+    return new Promise((resolve, reject) => {
+      db.run(`INSERT INTO oauth_providers (id, userId, provider, providerId, email, name, avatar, accessToken, refreshToken, profile, createdAt, updatedAt)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [oauthId, userId, oauthData.provider, oauthData.providerId, oauthData.email || null, oauthData.name || null,
+         oauthData.avatar || null, oauthData.accessToken || null, oauthData.refreshToken || null,
+         oauthData.profile ? JSON.stringify(oauthData.profile) : null, now, now],
+        (err) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve();
+          }
+        });
+    });
+  }
+
+  async updateOAuthProvider(userId: string, oauthData: {
+    provider: string;
+    providerId: string;
+    email?: string;
+    name?: string;
+    avatar?: string;
+    accessToken?: string;
+    refreshToken?: string;
+    profile?: any;
+  }): Promise<void> {
+    await this.initialize();
+    const db = await this.getDb();
+    const now = new Date().toISOString();
+
+    return new Promise((resolve, reject) => {
+      db.run(`UPDATE oauth_providers
+              SET email = ?, name = ?, avatar = ?, accessToken = ?, refreshToken = ?, profile = ?, updatedAt = ?
+              WHERE userId = ? AND provider = ? AND providerId = ?`,
+        [oauthData.email || null, oauthData.name || null, oauthData.avatar || null,
+         oauthData.accessToken || null, oauthData.refreshToken || null,
+         oauthData.profile ? JSON.stringify(oauthData.profile) : null, now, userId, oauthData.provider, oauthData.providerId],
+        (err) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve();
+          }
+        });
+    });
+  }
+
+  async unlinkOAuthProvider(userId: string, provider: string): Promise<void> {
+    await this.initialize();
+    const db = await this.getDb();
+
+    return new Promise((resolve, reject) => {
+      db.run('DELETE FROM oauth_providers WHERE userId = ? AND provider = ?', [userId, provider], (err) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve();
+        }
+      });
+    });
+  }
+
+  async getOAuthProviders(userId: string): Promise<any[]> {
+    await this.initialize();
+    const db = await this.getDb();
+
+    return new Promise((resolve, reject) => {
+      db.all('SELECT provider, providerId, email, name, avatar, createdAt FROM oauth_providers WHERE userId = ?',
+        [userId], (err, rows: any[]) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(rows);
+        }
+      });
+    });
+  }
+
+  async createMagicLink(email: string): Promise<{ id: string; token: string; expiresAt: string }> {
+    await this.initialize();
+    const db = await this.getDb();
+
+    const id = uuidv4();
+    const token = uuidv4() + uuidv4();
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 15 * 60 * 1000);
+    const createdAt = now.toISOString();
+
+    return new Promise((resolve, reject) => {
+      db.run(
+        'INSERT INTO magic_links (id, email, token, expiresAt, createdAt) VALUES (?, ?, ?, ?, ?)',
+        [id, email.toLowerCase(), token, expiresAt.toISOString(), createdAt],
+        (err) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve({ id, token, expiresAt: expiresAt.toISOString() });
+          }
+        }
+      );
+    });
+  }
+
+  async verifyMagicLink(token: string): Promise<{ valid: boolean; email?: string; userId?: string }> {
+    await this.initialize();
+    const db = await this.getDb();
+    const now = new Date().toISOString();
+
+    return new Promise((resolve, reject) => {
+      db.get(
+        'SELECT * FROM magic_links WHERE token = ? AND usedAt IS NULL AND expiresAt > ?',
+        [token, now],
+        async (err, row: any) => {
+          if (err) {
+            reject(err);
+          } else if (row) {
+            db.run('UPDATE magic_links SET usedAt = ? WHERE id = ?', [now, row.id]);
+
+            let user = await this.findUserByEmailOrUsername(row.email);
+            if (!user) {
+              user = await this.createUser({
+                email: row.email,
+                username: row.email.split('@')[0] + '_' + Math.random().toString(36).substring(7),
+                password: uuidv4(),
+                name: row.email.split('@')[0],
+                role: 'USER'
+              });
+            }
+
+            resolve({ valid: true, email: row.email, userId: user.id });
+          } else {
+            resolve({ valid: false });
+          }
+        }
+      );
+    });
+  }
+
+  async createShareableLink(data: {
+    graphId: string;
+    createdBy: string;
+    accessLevel?: 'VIEW' | 'COMMENT' | 'EDIT';
+    expiresAt?: string;
+    maxUses?: number;
+    requiresSignIn?: boolean;
+  }): Promise<{ id: string; token: string }> {
+    await this.initialize();
+    const db = await this.getDb();
+
+    const id = uuidv4();
+    const token = uuidv4().replace(/-/g, '').substring(0, 16);
+    const now = new Date().toISOString();
+
+    return new Promise((resolve, reject) => {
+      db.run(
+        `INSERT INTO shareable_links (id, graphId, token, createdBy, accessLevel, expiresAt, maxUses, requiresSignIn, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          id,
+          data.graphId,
+          token,
+          data.createdBy,
+          data.accessLevel || 'VIEW',
+          data.expiresAt || null,
+          data.maxUses || null,
+          data.requiresSignIn ? 1 : 0,
+          now,
+          now
+        ],
+        (err) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve({ id, token });
+          }
+        }
+      );
+    });
+  }
+
+  async verifyShareableLink(token: string): Promise<{
+    valid: boolean;
+    graphId?: string;
+    accessLevel?: string;
+    requiresSignIn?: boolean;
+  }> {
+    await this.initialize();
+    const db = await this.getDb();
+    const now = new Date().toISOString();
+
+    return new Promise((resolve, reject) => {
+      db.get(
+        `SELECT * FROM shareable_links
+         WHERE token = ?
+         AND isActive = 1
+         AND (expiresAt IS NULL OR expiresAt > ?)
+         AND (maxUses IS NULL OR useCount < maxUses)`,
+        [token, now],
+        (err, row: any) => {
+          if (err) {
+            reject(err);
+          } else if (row) {
+            resolve({
+              valid: true,
+              graphId: row.graphId,
+              accessLevel: row.accessLevel,
+              requiresSignIn: Boolean(row.requiresSignIn)
+            });
+          } else {
+            resolve({ valid: false });
+          }
+        }
+      );
+    });
+  }
+
+  async logShareableLinkAccess(data: {
+    linkId: string;
+    userId?: string;
+    guestId?: string;
+    ipAddress?: string;
+    userAgent?: string;
+  }): Promise<void> {
+    await this.initialize();
+    const db = await this.getDb();
+    const id = uuidv4();
+    const now = new Date().toISOString();
+
+    return new Promise((resolve, reject) => {
+      db.serialize(() => {
+        db.run(
+          `INSERT INTO shareable_link_access (id, linkId, userId, guestId, ipAddress, userAgent, accessedAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [id, data.linkId, data.userId || null, data.guestId || null, data.ipAddress || null, data.userAgent || null, now]
+        );
+
+        db.run(
+          'UPDATE shareable_links SET useCount = useCount + 1 WHERE id = ?',
+          [data.linkId],
+          (err) => {
+            if (err) {
+              reject(err);
+            } else {
+              resolve();
+            }
+          }
+        );
+      });
+    });
+  }
+
+  async getShareableLinks(graphId: string): Promise<any[]> {
+    await this.initialize();
+    const db = await this.getDb();
+
+    return new Promise((resolve, reject) => {
+      db.all(
+        'SELECT * FROM shareable_links WHERE graphId = ? ORDER BY createdAt DESC',
+        [graphId],
+        (err, rows: any[]) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve(rows);
+          }
+        }
+      );
+    });
+  }
+
+  async deactivateShareableLink(linkId: string): Promise<void> {
+    await this.initialize();
+    const db = await this.getDb();
+    const now = new Date().toISOString();
+
+    return new Promise((resolve, reject) => {
+      db.run(
+        'UPDATE shareable_links SET isActive = 0, updatedAt = ? WHERE id = ?',
+        [now, linkId],
+        (err) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve();
+          }
+        }
+      );
+    });
+  }
+
+  async getOAuthProviderConfig(provider: 'google' | 'linkedin' | 'github'): Promise<any> {
+    const db = await this.getDb();
+
+    return new Promise((resolve, reject) => {
+      db.get(
+        'SELECT provider, enabled, clientId, clientSecret, callbackUrl, createdAt, updatedAt FROM oauth_provider_config WHERE provider = ?',
+        [provider],
+        (err, row) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve(row || null);
+          }
+        }
+      );
+    });
+  }
+
+  async getAllOAuthProviderConfigs(): Promise<any[]> {
+    const db = await this.getDb();
+
+    return new Promise((resolve, reject) => {
+      db.all(
+        'SELECT provider, enabled, clientId, clientSecret, callbackUrl, createdAt, updatedAt FROM oauth_provider_config',
+        [],
+        (err, rows) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve(rows || []);
+          }
+        }
+      );
+    });
+  }
+
+  async upsertOAuthProviderConfig(config: {
+    provider: 'google' | 'linkedin' | 'github';
+    enabled: boolean;
+    clientId: string;
+    clientSecret: string;
+    callbackUrl: string;
+  }): Promise<void> {
+    const db = await this.getDb();
+    const now = new Date().toISOString();
+
+    return new Promise((resolve, reject) => {
+      db.run(
+        `INSERT INTO oauth_provider_config (provider, enabled, clientId, clientSecret, callbackUrl, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(provider) DO UPDATE SET
+           enabled = excluded.enabled,
+           clientId = excluded.clientId,
+           clientSecret = excluded.clientSecret,
+           callbackUrl = excluded.callbackUrl,
+           updatedAt = excluded.updatedAt`,
+        [
+          config.provider,
+          config.enabled ? 1 : 0,
+          config.clientId,
+          config.clientSecret,
+          config.callbackUrl,
+          now,
+          now,
+        ],
+        (err) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve();
+          }
+        }
+      );
+    });
+  }
+
+  async deleteOAuthProviderConfig(provider: 'google' | 'linkedin' | 'github'): Promise<void> {
+    const db = await this.getDb();
+
+    return new Promise((resolve, reject) => {
+      db.run(
+        'DELETE FROM oauth_provider_config WHERE provider = ?',
+        [provider],
+        (err) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve();
+          }
+        }
+      );
+    });
+  }
 }
 
-// Force restart to recreate database
 export const sqliteAuthStore = new SQLiteAuthStore();

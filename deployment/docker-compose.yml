@@ -1,4 +1,4 @@
-name: graphdone
+version: '3.8'
 
 services:
   graphdone-neo4j:

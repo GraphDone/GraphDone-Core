@@ -202,11 +202,81 @@ jobs:
           echo "ℹ️ Build and tests temporarily disabled due to CI Rollup dependency issue"
           echo "ℹ️ Full functionality tested locally and works correctly"
 
+  # PR validation with critical E2E tests
+  pr-validation:
+    name: PR Critical Tests
+    runs-on: ubuntu-latest
+    needs: [lint-and-typecheck, test-core, test-server, test-web]
+    services:
+      neo4j:
+        image: neo4j:5.15-community
+        env:
+          NEO4J_AUTH: neo4j/graphdone_password
+          NEO4J_PLUGINS: '["graph-data-science", "apoc"]'
+          NEO4J_dbms_security_procedures_unrestricted: "gds.*,apoc.*"
+          NEO4J_dbms_security_procedures_allowlist: "gds.*,apoc.*"
+        options: >-
+          --health-cmd "cypher-shell -u neo4j -p graphdone_password 'RETURN 1'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+        ports:
+          - 7474:7474
+          - 7687:7687
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Generate development certificates
+        run: ./scripts/generate-dev-certs.sh
+
+      - name: Start GraphDone services
+        run: |
+          npm run docker:prod &
+          sleep 30
+          echo "Waiting for services to be healthy..."
+          timeout 90 bash -c 'until curl -k https://localhost:4128/health 2>/dev/null; do sleep 2; done'
+
+      - name: Run PR critical tests
+        run: npm run test:pr
+        env:
+          TEST_URL: https://localhost:3128
+          TEST_ENV: production
+          CI: true
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-test-results-${{ github.sha }}
+          path: test-results/
+          retention-days: 7
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-test-report-${{ github.sha }}
+          path: test-results/reports/pr-report.html
+          retention-days: 7
+
   # Build job - validation only (skip actual build due to Rollup CI issue)
   build:
     name: Deployment Validation
     runs-on: ubuntu-latest
-    needs: [lint-and-typecheck, security-scan, test-core, test-server, test-web, test-mcp-server]
+    needs: [lint-and-typecheck, security-scan, test-core, test-server, test-web, test-mcp-server, pr-validation]
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
     steps:
       - name: Checkout code
@@ -266,31 +336,33 @@ jobs:
   ci-success:
     name: CI Success
     runs-on: ubuntu-latest
-    needs: [lint-and-typecheck, security-scan, test-core, test-server, test-web, test-mcp-server]
+    needs: [lint-and-typecheck, security-scan, test-core, test-server, test-web, test-mcp-server, pr-validation]
     if: always()
     steps:
       - name: Check overall status
         run: |
-          # Check if all required jobs passed
           LINT_STATUS="${{ needs.lint-and-typecheck.result }}"
           SECURITY_STATUS="${{ needs.security-scan.result }}"
           CORE_STATUS="${{ needs.test-core.result }}"
           SERVER_STATUS="${{ needs.test-server.result }}"
           WEB_STATUS="${{ needs.test-web.result }}"
           MCP_STATUS="${{ needs.test-mcp-server.result }}"
-          
+          PR_VALIDATION_STATUS="${{ needs.pr-validation.result }}"
+
           echo "📊 CI Pipeline Results:"
           echo "- Lint & TypeCheck: $LINT_STATUS"
-          echo "- Security Scan: $SECURITY_STATUS" 
+          echo "- Security Scan: $SECURITY_STATUS"
           echo "- Core Tests: $CORE_STATUS"
           echo "- Server Tests: $SERVER_STATUS"
           echo "- Web Build: $WEB_STATUS"
           echo "- MCP Tests: $MCP_STATUS"
-          
-          if [[ ("$LINT_STATUS" == "success" || "$LINT_STATUS" == "failure") && "$CORE_STATUS" == "success" && 
-                "$SERVER_STATUS" == "success" && "$WEB_STATUS" == "success" && 
-                "$MCP_STATUS" == "success" ]]; then
+          echo "- PR Validation (E2E): $PR_VALIDATION_STATUS"
+
+          if [[ ("$LINT_STATUS" == "success" || "$LINT_STATUS" == "failure") && "$CORE_STATUS" == "success" &&
+                "$SERVER_STATUS" == "success" && "$WEB_STATUS" == "success" &&
+                "$MCP_STATUS" == "success" && "$PR_VALIDATION_STATUS" == "success" ]]; then
             echo "✅ All essential CI jobs completed successfully!"
+            echo "✅ PR validation tests passed - critical functionality verified"
             echo "Note: Lint warnings and security scan failures don't block CI"
           else
             echo "❌ CI pipeline failed - check individual job results above"

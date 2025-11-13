@@ -175,7 +175,7 @@ export const authResolvers = {
     // Query to check development mode and default credentials status
     developmentInfo: async (_: any, __: any, context: AuthContext) => {
       const isDevelopment = process.env.NODE_ENV !== 'production';
-      
+
       if (!isDevelopment) {
         return {
           isDevelopment: false,
@@ -190,7 +190,7 @@ export const authResolvers = {
         const adminResult = await session.run(
           `MATCH (u:User {username: 'admin'}) RETURN u.passwordHash as passwordHash`
         );
-        
+
         const viewerResult = await session.run(
           `MATCH (u:User {username: 'viewer'}) RETURN u.passwordHash as passwordHash`
         );
@@ -213,14 +213,14 @@ export const authResolvers = {
           }
         }
 
-        // Check if viewer exists and has default password  
+        // Check if viewer exists and has default password
         if (viewerResult.records.length > 0) {
           const viewerPasswordHash = viewerResult.records[0].get('passwordHash');
           const isDefaultPassword = await bcrypt.compare('graphdone', viewerPasswordHash);
           if (isDefaultPassword) {
             defaultAccounts.push({
               username: 'viewer',
-              password: 'graphdone', 
+              password: 'graphdone',
               role: 'VIEWER',
               description: 'Read-only access'
             });
@@ -236,12 +236,27 @@ export const authResolvers = {
       } finally {
         await session.close();
       }
+    },
+
+    myOAuthProviders: async (_: any, __: any, context: AuthContext) => {
+      if (!context.user) {
+        throw new GraphQLError('Not authenticated', {
+          extensions: { code: 'UNAUTHENTICATED' }
+        });
+      }
+
+      try {
+        const providers = await sqliteAuthStore.getOAuthProviders(context.user.userId);
+        return providers;
+      } catch (error) {
+        console.error('Error fetching OAuth providers:', error);
+        return [];
+      }
     }
   },
 
   Mutation: {
-    signup: async (_: any, { input }: { input: SignupInput }, context: AuthContext) => {
-      const session = context.driver.session();
+    signup: async (_: any, { input }: { input: SignupInput }) => {
       try {
         // Validate input
         if (!input.email || !input.username || !input.password || !input.name) {
@@ -250,63 +265,36 @@ export const authResolvers = {
           });
         }
 
-        // Check if email or username already exists
-        const existingUser = await session.run(
-          `MATCH (u:User) 
-           WHERE u.email = $email OR u.username = $username
-           RETURN u`,
-          { 
-            email: input.email.toLowerCase(),
-            username: input.username.toLowerCase()
-          }
-        );
-
-        if (existingUser.records.length > 0) {
-          throw new GraphQLError('Email or username already exists', {
+        // Check if email or username already exists in SQLite
+        const existingUser = await sqliteAuthStore.findUserByEmailOrUsername(input.email);
+        if (existingUser) {
+          throw new GraphQLError('Email already exists', {
             extensions: { code: 'BAD_USER_INPUT' }
           });
         }
 
-        // Hash password
-        const passwordHash = await bcrypt.hash(input.password, BCRYPT_ROUNDS);
-        
-        // Generate verification token
-        const emailVerificationToken = uuidv4();
-        
-        // Create user
-        const userId = uuidv4();
-        const result = await session.run(
-          `CREATE (u:User {
-            id: $userId,
-            email: $email,
-            username: $username,
-            passwordHash: $passwordHash,
-            name: $name,
-            role: 'NODE_WATCHER',
-            isActive: true,
-            isEmailVerified: false,
-            emailVerificationToken: $emailVerificationToken,
-            createdAt: datetime(),
-            updatedAt: datetime()
-          })
-          ${input.teamId ? 'WITH u MATCH (t:Team {id: $teamId}) CREATE (u)-[:MEMBER_OF]->(t)' : ''}
-          RETURN u`,
-          {
-            userId,
-            email: input.email.toLowerCase(),
-            username: input.username.toLowerCase(),
-            passwordHash,
-            name: input.name,
-            emailVerificationToken,
-            teamId: input.teamId
-          }
-        );
+        const existingUsername = await sqliteAuthStore.findUserByEmailOrUsername(input.username);
+        if (existingUsername) {
+          throw new GraphQLError('Username already exists', {
+            extensions: { code: 'BAD_USER_INPUT' }
+          });
+        }
 
-        const user = result.records[0].get('u').properties;
+        // Create user in SQLite with VIEWER role (read-only for new signups)
+        const user = await sqliteAuthStore.createUser({
+          email: input.email,
+          username: input.username,
+          password: input.password,
+          name: input.name,
+          role: 'VIEWER'  // New users start as VIEWER (read-only)
+        });
+
         const token = generateToken(user.id, user.email, user.role);
 
+        console.log(`✅ New user signed up: ${user.username} (${user.role})`);
+
         // TODO: Send verification email
-        
+
         return {
           token,
           user: {
@@ -318,11 +306,10 @@ export const authResolvers = {
         if (error instanceof GraphQLError) {
           throw error;
         }
+        console.error('Signup error:', error);
         throw new GraphQLError('Failed to create account', {
           extensions: { code: 'INTERNAL_SERVER_ERROR' }
         });
-      } finally {
-        await session.close();
       }
     },
 
@@ -985,6 +972,27 @@ export const authResolvers = {
         };
       } finally {
         await session.close();
+      }
+    },
+
+    unlinkOAuthProvider: async (_: any, { provider }: { provider: string }, context: AuthContext) => {
+      if (!context.user) {
+        throw new GraphQLError('Not authenticated', {
+          extensions: { code: 'UNAUTHENTICATED' }
+        });
+      }
+
+      try {
+        await sqliteAuthStore.unlinkOAuthProvider(context.user.userId, provider);
+        return {
+          success: true,
+          message: `${provider} account unlinked successfully`
+        };
+      } catch (error) {
+        console.error('OAuth unlink error:', error);
+        throw new GraphQLError(`Failed to unlink ${provider} account`, {
+          extensions: { code: 'INTERNAL_SERVER_ERROR' }
+        });
       }
     }
   }

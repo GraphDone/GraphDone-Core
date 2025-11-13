@@ -68,18 +68,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
   useEffect(() => {
     const token = localStorage.getItem('authToken');
     const savedUser = localStorage.getItem('currentUser');
-    
-    if (token && savedUser) {
-      try {
-        JSON.parse(savedUser);
-        // Validate token by fetching current user data
-        getMe();
-      } catch (error) {
-        // Invalid saved data, clear it
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('currentUser');
-        setIsInitializing(false);
+
+    if (token) {
+      if (savedUser) {
+        try {
+          JSON.parse(savedUser);
+        } catch (error) {
+          localStorage.removeItem('currentUser');
+        }
       }
+      getMe();
     } else {
       setIsInitializing(false);
     }
