@@ -37,6 +37,12 @@ lerna-debug.log*
 .env.development.local
 .env.test.local
 .env.production.local
+.env.vm
+
+# VM configuration
+/tmp/graphdone-cloud-init.yml
+cloud-init.*.yml
+!cloud-init.template.yml
 
 # IDE
 .vscode/*
