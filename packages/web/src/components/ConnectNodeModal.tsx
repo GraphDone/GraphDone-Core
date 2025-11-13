@@ -341,7 +341,7 @@ export function DisconnectNodeModal({ isOpen, onClose, sourceNode, onAllConnecti
                 </div>
                 <div>
                   <h3 className="text-xl font-bold bg-gradient-to-r from-red-200 to-orange-100 bg-clip-text text-transparent">
-                    Disconnect Node
+                    Disconnect Work Item
                   </h3>
                   <p className="text-sm text-gray-300 mt-1">
                     Remove connections from "{sourceNode.title}"
@@ -1174,7 +1174,7 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
                 </div>
                 <div>
                   <h3 className="text-xl font-bold bg-gradient-to-r from-emerald-200 to-green-100 bg-clip-text text-transparent">
-                    {activeTab === 'connect' ? 'Connect Node' : 'Disconnect Node'}
+                    {activeTab === 'connect' ? 'Connect Work Item' : 'Disconnect Work Item'}
                   </h3>
                   <p className="text-sm text-gray-300 mt-1">
                     {activeTab === 'connect' 
@@ -1747,8 +1747,8 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
                   <CheckCircle className="h-4 w-4 text-emerald-400" />
                 </div>
                 <div>
-                  <h4 className="text-sm font-bold text-gray-100">Available Nodes</h4>
-                  <p className="text-xs text-gray-400">Select nodes to create connections</p>
+                  <h4 className="text-sm font-bold text-gray-100">Available Work Items</h4>
+                  <p className="text-xs text-gray-400">Select work items to create connections</p>
                 </div>
               </div>
               

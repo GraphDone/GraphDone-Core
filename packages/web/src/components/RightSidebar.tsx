@@ -360,14 +360,14 @@ const RightSidebar: React.FC<RightSidebarProps> = ({ currentView, stats }) => {
           </div>
         </div>
 
-        {/* Node Types */}
+        {/* Work Item Types */}
         <div 
           className="bg-gray-800/50 rounded-xl p-6 border border-gray-600/50 hover:border-gray-500/70 hover:bg-gray-800/70 transition-all duration-200 backdrop-blur-sm"
           style={{
             borderLeft: `4px solid ${getDominantNodeTypeColor()}`,
           }}
         >
-          <h3 className="text-xl font-semibold text-white mb-6">Node Types</h3>
+          <h3 className="text-xl font-semibold text-white mb-6">Work Item Types</h3>
           <div className="grid grid-cols-1 gap-3">
             {Object.entries(WORK_ITEM_TYPES).map(([typeKey, typeConfig]) => {
               const count = stats.typeStats[typeKey] || 0;
