@@ -122,7 +122,7 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
     e.preventDefault();
     
     if (!formData.type) {
-      showError('Validation Error', 'Please select a node type.');
+      showError('Validation Error', 'Please select a work item type.');
       return;
     }
     
@@ -172,7 +172,7 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
         const updatedNode = result.data.updateWorkItems.workItems[0];
         
         showSuccess(
-          'Node Updated Successfully!',
+          'Work Item Updated Successfully!',
           `"${updatedNode.title}" has been updated and changes are now visible in all views.`
         );
 
@@ -180,7 +180,7 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
       } else {
         showError(
           'Update Failed',
-          'The node update did not return valid data. Please try again.'
+          'The work item update did not return valid data. Please try again.'
         );
       }
     } catch (error) {
@@ -189,7 +189,7 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
       }
       
       // Show more specific error message if available
-      let errorMessage = 'There was an error updating the node. Please try again or contact support if the problem persists.';
+      let errorMessage = 'There was an error updating the work item. Please try again or contact support if the problem persists.';
       if (error instanceof Error) {
         errorMessage = error.message;
       } else if (typeof error === 'object' && error !== null && 'message' in error) {
@@ -197,7 +197,7 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
       }
       
       showError(
-        'Failed to Update Node',
+        'Failed to Update Work Item',
         errorMessage
       );
     }
@@ -241,19 +241,19 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                 value={formData.title}
                 onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
                 className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter node title..."
+                placeholder="Enter work item title..."
               />
             </div>
             
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Node Type *
+                Work Item Type *
               </label>
               
               <NodeTypeSelector
                 selectedType={formData.type}
                 onTypeChange={(type) => setFormData(prev => ({ ...prev, type }))}
-                placeholder="Select node type..."
+                placeholder="Select work item type..."
               />
             </div>
 
@@ -339,7 +339,7 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                 value={formData.description}
                 onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                 className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Describe the node..."
+                placeholder="Describe the work item..."
               />
             </div>
 
@@ -566,7 +566,7 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                 }`}
               >
                 <Save className="h-5 w-5" />
-                <span>{updatingNode ? 'Updating' : 'Update Node'}</span>
+                <span>{updatingNode ? 'Updating...' : 'Update Work Item'}</span>
               </button>
             </div>
           </form>
