@@ -149,11 +149,20 @@ export function GraphProvider({ children }: GraphProviderProps) {
         }
       }
     } else if (!isLoading && !graphsError && currentUser && !isCreatingWelcomeGraph) {
-      console.log('🎉 No graphs found for user:', currentUser.id, '- Triggering Welcome graph creation');
-      // No graphs available - automatically create Welcome graph for new users
-      setAvailableGraphs([]);
-      setCurrentGraph(null);
-      setIsCreatingWelcomeGraph(true);
+      // Check if shared Welcome graph exists (created by server onboarding service)
+      const hasWelcomeGraph = [...(graphsData?.systemGraphs || []), ...(graphsData?.sharedGraphs || [])]
+        .some(g => g.name === 'Welcome');
+
+      if (!hasWelcomeGraph) {
+        console.log('🎉 No graphs found for user:', currentUser.id, '- Triggering Welcome graph creation');
+        // No graphs available - automatically create Welcome graph for new users
+        setAvailableGraphs([]);
+        setCurrentGraph(null);
+        setIsCreatingWelcomeGraph(true);
+      } else {
+        console.log('✅ Shared Welcome graph already exists, skipping creation');
+        return;
+      }
 
       // Create Welcome graph automatically with tutorial content
       const createWelcomeGraphWithTutorial = async () => {
