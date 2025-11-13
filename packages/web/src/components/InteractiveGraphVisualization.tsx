@@ -1282,6 +1282,57 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     }
   };
 
+  // Helper function to calculate node dimensions (shared between init and update)
+  const getNodeDimensions = useCallback((d: WorkItem) => {
+    // Larger base dimensions by type - increased for 3-line support
+    const baseDimensions = (() => {
+      switch (d.type) {
+        case 'EPIC': return { width: 200, height: 120 };
+        case 'MILESTONE': return { width: 190, height: 115 };
+        case 'FEATURE': return { width: 180, height: 110 };
+        case 'OUTCOME': return { width: 185, height: 115 };
+        case 'TASK': return { width: 170, height: 105 };
+        case 'BUG': return { width: 165, height: 100 };
+        case 'IDEA': return { width: 160, height: 95 };
+        default: return { width: 170, height: 105 };
+      }
+    })();
+
+    // Use base width for consistent layout
+    const width = baseDimensions.width;
+
+    // Calculate actual text wrapping based on word breaks - up to 3 lines
+    const maxCharsPerLine = Math.floor(width / 8); // ~8px per character for more conservative wrapping
+    const words = d.title.split(' ');
+    let lines = 1;
+    let currentLineLength = 0;
+
+    for (const word of words) {
+      const wordLength = word.length;
+      // Check if adding this word would exceed line length
+      if (currentLineLength + wordLength + 1 > maxCharsPerLine && currentLineLength > 0) {
+        lines++;
+        currentLineLength = wordLength;
+        if (lines >= 3) break; // Maximum 3 lines
+      } else {
+        currentLineLength += wordLength + (currentLineLength > 0 ? 1 : 0); // +1 for space
+      }
+    }
+
+    lines = Math.min(lines, 3); // Maximum 3 lines
+
+    // Calculate additional height needed for multiple lines (16px per extra line)
+    const additionalHeight = (lines - 1) * 16;
+    const finalHeight = baseDimensions.height + additionalHeight;
+
+    return {
+      width: width,
+      height: finalHeight,
+      titleLines: lines,
+      maxCharsPerLine: maxCharsPerLine
+    };
+  }, []);
+
   // Smart data update function - only reinitializes when necessary, preserves camera position
   const updateVisualizationData = useCallback(() => {
     if (!simulationRef.current || !svgRef.current) return;
@@ -1313,9 +1364,9 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       return;
     }
 
-    // If counts are the same, just update simulation data (for property changes)
-    console.log('[Graph Debug] Data counts unchanged - updating simulation data only');
-    
+    // If counts are the same, update both simulation data AND DOM elements (for property changes)
+    console.log('[Graph Debug] Data counts unchanged - updating simulation data and DOM elements');
+
     // Update simulation with current data (handles property changes)
     simulation.nodes(nodes as any);
     const linkForce = simulation.force('link') as d3.ForceLink<any, any>;
@@ -1323,11 +1374,83 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       linkForce.links(validatedEdges);
     }
 
+    // UPDATE DOM ELEMENTS: Rebind data and update visual properties
+    // Update node titles
+    const nodeGroups = svg.select('.nodes-group').selectAll('.node');
+    nodeGroups.each(function(d: any) {
+      const nodeGroup = d3.select(this);
+      // Find the updated node data by ID
+      const updatedNode = nodes.find(n => n.id === d.id);
+      if (!updatedNode) return;
+
+      // Update title text elements
+      nodeGroup.selectAll('.node-title-text').remove();
+      const maxCharsPerLine = 18;
+      const maxLines = 2;
+      let lines: string[] = [];
+      const words = updatedNode.title.split(' ');
+      let currentLine = '';
+
+      for (const word of words) {
+        const testLine = currentLine ? `${currentLine} ${word}` : word;
+        if (testLine.length > maxCharsPerLine && currentLine) {
+          lines.push(currentLine);
+          currentLine = word;
+          if (lines.length >= maxLines) break;
+        } else {
+          currentLine = testLine;
+        }
+      }
+      if (currentLine && lines.length < maxLines) {
+        lines.push(currentLine);
+      }
+      if (lines.length === 0) {
+        lines.push(updatedNode.title.substring(0, maxCharsPerLine - 3) + '...');
+      }
+
+      const dimensions = getNodeDimensions(updatedNode);
+      const titleBarHeight = 32;
+      const startY = -dimensions.height / 2 + titleBarHeight + 18;
+      lines.forEach((line, index) => {
+        nodeGroup.append('text')
+          .attr('class', 'node-title-text')
+          .attr('x', 0)
+          .attr('y', startY + (index * 16))
+          .attr('text-anchor', 'middle')
+          .attr('dominant-baseline', 'middle')
+          .text(line)
+          .style('font-size', '14px')
+          .style('font-weight', '600')
+          .style('fill', () => {
+            const isCompleted = updatedNode.status === 'COMPLETED' || updatedNode.status === 'Completed' || updatedNode.status === 'Done' || updatedNode.status === 'DONE';
+            return isCompleted ? '#9ca3af' : '#ffffff';
+          })
+          .style('pointer-events', 'none');
+      });
+
+      // Update node type badge text
+      nodeGroup.select('.node-type-text')
+        .text(() => {
+          const config = getTypeConfig(updatedNode.type as WorkItemType);
+          return config.label.toUpperCase();
+        });
+
+      // Update description
+      nodeGroup.select('.node-description-text')
+        .text(() => {
+          if (!updatedNode.description) return '';
+          const maxDescChars = 25;
+          return updatedNode.description.length > maxDescChars
+            ? updatedNode.description.substring(0, maxDescChars) + '...'
+            : updatedNode.description;
+        });
+    });
+
     // Gentle restart to settle any property changes
     simulation.alpha(0.1).restart();
-    
-    console.log('[Graph Debug] Simulation data updated');
-  }, [nodes, validatedEdges]);
+
+    console.log('[Graph Debug] Simulation data and DOM elements updated');
+  }, [nodes, validatedEdges, getNodeDimensions]);
 
   // Define initializeVisualization function with access to nodes data
   const initializeVisualization = useCallback(() => {
@@ -1870,56 +1993,8 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         }));
 
     // Monopoly-style rectangular nodes with colored title bars
-    const getNodeDimensions = (d: WorkItem) => {
-      // Larger base dimensions by type - increased for 3-line support
-      const baseDimensions = (() => {
-        switch (d.type) {
-          case 'EPIC': return { width: 200, height: 120 };
-          case 'MILESTONE': return { width: 190, height: 115 };
-          case 'FEATURE': return { width: 180, height: 110 };
-          case 'OUTCOME': return { width: 185, height: 115 };
-          case 'TASK': return { width: 170, height: 105 };
-          case 'BUG': return { width: 165, height: 100 };
-          case 'IDEA': return { width: 160, height: 95 };
-          default: return { width: 170, height: 105 };
-        }
-      })();
-      
-      // Use base width for consistent layout
-      const width = baseDimensions.width;
-      
-      // Calculate actual text wrapping based on word breaks - up to 3 lines
-      const maxCharsPerLine = Math.floor(width / 8); // ~8px per character for more conservative wrapping
-      const words = d.title.split(' ');
-      let lines = 1;
-      let currentLineLength = 0;
-      
-      for (const word of words) {
-        const wordLength = word.length;
-        // Check if adding this word would exceed line length
-        if (currentLineLength + wordLength + 1 > maxCharsPerLine && currentLineLength > 0) {
-          lines++;
-          currentLineLength = wordLength;
-          if (lines >= 3) break; // Maximum 3 lines
-        } else {
-          currentLineLength += wordLength + (currentLineLength > 0 ? 1 : 0); // +1 for space
-        }
-      }
-      
-      lines = Math.min(lines, 3); // Maximum 3 lines
-      
-      // Calculate additional height needed for multiple lines (16px per extra line)
-      const additionalHeight = (lines - 1) * 16;
-      const finalHeight = baseDimensions.height + additionalHeight;
-      
-      return { 
-        width: width, 
-        height: finalHeight,
-        titleLines: lines,
-        maxCharsPerLine: maxCharsPerLine
-      };
-    };
-    
+    // getNodeDimensions is now defined outside and shared with updateVisualizationData
+
     // Main node rectangle (dark theme background)
     nodeElements.append('rect')
       .attr('class', (d: WorkItem) => {
@@ -3269,13 +3344,14 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, [
-    nodes.length, 
-    validatedEdges.length, 
+    nodes.length,
+    validatedEdges.length,
     currentGraph?.id, // Re-init when graph changes
     reinitTrigger, // Manual trigger
     loading, // Re-init when loading completes
-    edgesLoading // Re-init when edges loading completes
-    // Removed JSON.stringify dependency - it was triggering reinitialization on every node property change
+    edgesLoading, // Re-init when edges loading completes
+    // Track node property changes for selective updates (only titles, descriptions, types)
+    nodes.map(n => `${n.id}:${n.title}:${n.description}:${n.type}:${n.status}`).join(',')
   ]);
 
   // Manual reinitialization function (expose globally for debugging)
@@ -4045,26 +4121,30 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
 
 
       {/* Work Item Details Modal */}
-      {showNodeDetailsModal && selectedNode && (
-        <NodeDetailsModal
-          isOpen={showNodeDetailsModal}
-          onClose={() => {
-            setShowNodeDetailsModal(false);
-            setSelectedNode(null);
-          }}
-          node={selectedNode}
-          edges={validatedEdges}
-          nodes={validatedNodes}
-          onConnectToExisting={(node) => {
-            setShowNodeDetailsModal(false);
-            handleConnectToExistingNodes(node);
-          }}
-          onDisconnect={(node) => {
-            setShowNodeDetailsModal(false);
-            handleDisconnectNodes(node);
-          }}
-        />
-      )}
+      {showNodeDetailsModal && selectedNode && (() => {
+        // Always get fresh node data by ID from validatedNodes (synced with Apollo cache)
+        const freshNode = validatedNodes.find(n => n.id === selectedNode.id) || selectedNode;
+        return (
+          <NodeDetailsModal
+            isOpen={showNodeDetailsModal}
+            onClose={() => {
+              setShowNodeDetailsModal(false);
+              setSelectedNode(null);
+            }}
+            node={freshNode}
+            edges={validatedEdges}
+            nodes={validatedNodes}
+            onConnectToExisting={(node) => {
+              setShowNodeDetailsModal(false);
+              handleConnectToExistingNodes(node);
+            }}
+            onDisconnect={(node) => {
+              setShowNodeDetailsModal(false);
+              handleDisconnectNodes(node);
+            }}
+          />
+        );
+      })()}
 
 {/* Fullscreen toggle removed - fullscreen mode abandoned */}
 
