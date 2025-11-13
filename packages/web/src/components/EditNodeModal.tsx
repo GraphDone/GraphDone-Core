@@ -218,7 +218,7 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
             <div className="flex items-center space-x-2">
               <Edit className="h-5 w-5 text-blue-500" />
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Edit Node
+                Edit Work Item
               </h2>
             </div>
             <button
