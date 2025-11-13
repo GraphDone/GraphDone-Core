@@ -38,7 +38,7 @@ const nodeTypes: NodeType[] = Object.values(WORK_ITEM_TYPES).map(typeConfig => {
 export function NodeTypeSelector({
   selectedType = '',
   onTypeChange,
-  placeholder = 'Select node type',
+  placeholder = 'Select work item type',
   className = ''
 }: NodeTypeSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);

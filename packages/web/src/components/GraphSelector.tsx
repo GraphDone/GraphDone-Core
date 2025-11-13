@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, Plus, Folder, FolderOpen, FileText, Share2, Eye, Edit3, Crown, Trash2, FolderPlus, ChevronRight, Users, Bot, Settings, Zap } from 'lucide-react';
+import { ChevronDown, Plus, Folder, FolderOpen, FileText, Share2, Eye, Edit3, Crown, Trash2, FolderPlus, ChevronRight, Users, Bot, Settings, Zap, User, Lock } from 'lucide-react';
 import { useQuery } from '@apollo/client';
 import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -18,6 +18,7 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph }: Gra
   const [isOpen, setIsOpen] = useState(false);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['team', 'personal']));
   const [buttonPosition, setButtonPosition] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [hoveredTooltip, setHoveredTooltip] = useState<{ message: string; x: number; y: number } | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
@@ -147,16 +148,17 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph }: Gra
 
     graphHierarchy.forEach(graph => {
       // Determine folder based on graph properties
+      // Priority: System > Template > Personal > Team
       if (graph.type === 'TEMPLATE') {
         folders.templates.push(graph);
+      } else if (graph.name.toLowerCase().includes('system') || graph.name.toLowerCase().includes('welcome') || graph.name.toLowerCase().includes('auto')) {
+        folders.system.push(graph);
       } else if (graph.permissions === 'OWNER' && !graph.isShared) {
         folders.personal.push(graph);
       } else if (graph.isShared) {
         folders.team.push(graph);
       } else if (graph.name.toLowerCase().includes('ai') || graph.name.toLowerCase().includes('bot')) {
         folders.ai.push(graph);
-      } else if (graph.name.toLowerCase().includes('system') || graph.name.toLowerCase().includes('auto')) {
-        folders.system.push(graph);
       } else {
         folders.personal.push(graph);
       }
@@ -181,7 +183,7 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph }: Gra
     const isExpanded = expandedFolders.has(folderId);
     switch (folderId) {
       case 'team': return <Users className={`h-4 w-4 ${isExpanded ? 'text-blue-400' : 'text-gray-400'}`} />;
-      case 'personal': return <Folder className={`h-4 w-4 ${isExpanded ? 'text-green-400' : 'text-gray-400'}`} />;
+      case 'personal': return <User className={`h-4 w-4 ${isExpanded ? 'text-green-400' : 'text-gray-400'}`} />;
       case 'system': return <Settings className={`h-4 w-4 ${isExpanded ? 'text-orange-400' : 'text-gray-400'}`} />;
       case 'ai': return <Bot className={`h-4 w-4 ${isExpanded ? 'text-purple-400' : 'text-gray-400'}`} />;
       case 'templates': return <FileText className={`h-4 w-4 ${isExpanded ? 'text-amber-400' : 'text-gray-400'}`} />;
@@ -240,8 +242,8 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph }: Gra
 
       {/* Dropdown menu with folder structure - Portal based for proper z-index */}
       {isOpen && buttonPosition && createPortal(
-        <div 
-          className="bg-gray-800/95 backdrop-blur-lg border border-gray-600/60 rounded-xl shadow-2xl max-h-96 overflow-hidden min-w-80"
+        <div
+          className="bg-gradient-to-br from-gray-800/98 to-gray-900/98 backdrop-blur-xl border-2 border-gray-600/50 rounded-2xl shadow-2xl max-h-96 overflow-hidden min-w-80"
           style={{
             position: 'fixed',
             top: buttonPosition.top + 8,
@@ -253,7 +255,7 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph }: Gra
         >
           {/* Header with Create Button */}
           <div className="flex items-center justify-between p-4 border-b border-gray-600/60 bg-gradient-to-r from-emerald-500/10 to-green-500/10 backdrop-blur-sm">
-            <span className="text-sm font-semibold bg-gradient-to-r from-emerald-400 to-green-300 bg-clip-text text-transparent">Graph Manager</span>
+            <span className="text-base font-semibold bg-gradient-to-r from-emerald-400 to-green-300 bg-clip-text text-transparent">Graph Controller</span>
             <div className="flex items-center gap-2">
               {onCreateGraph && (
                 <button
@@ -265,95 +267,149 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph }: Gra
                   className="p-1.5 text-gray-400 hover:text-green-300 hover:bg-gray-700/50 rounded transition-all duration-200"
                   title="Create New Graph"
                 >
-                  <FolderPlus className="h-4 w-4" />
+                  <FolderPlus className="h-5 w-5" />
                 </button>
               )}
               <button
                 onClick={() => setIsOpen(false)}
-                className="p-1.5 text-gray-400 hover:bg-gray-700 rounded transition-colors"
+                className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-gray-700/50 rounded transition-all duration-200"
                 title="Close"
               >
-                ✕
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
               </button>
             </div>
           </div>
 
           {/* Folder Structure */}
           <div className="max-h-80 overflow-y-auto">
-            <div className="p-2">
+            <div className="p-2.5 space-y-1">
               {Object.entries(folders).map(([folderId, graphs]) => {
                 if (graphs.length === 0) return null;
-                
+
                 const isExpanded = expandedFolders.has(folderId);
-                
+
                 return (
                   <div key={folderId} className="mb-1">
                     {/* Folder Header */}
                     <button
                       onClick={() => toggleFolder(folderId)}
-                      className="w-full flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-700/50 transition-colors text-left"
+                      className="w-full flex items-center space-x-2.5 p-2.5 rounded-xl hover:bg-gray-700/60 transition-all duration-200 text-left group border border-transparent hover:border-gray-600/40"
                     >
-                      <ChevronRight className={`h-3 w-3 text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                      <ChevronRight className={`h-3.5 w-3.5 text-gray-400 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
                       {getFolderIcon(folderId)}
-                      <span className="text-sm font-medium text-gray-300">{getFolderName(folderId)}</span>
-                      <span className="text-xs text-gray-500">({graphs.length})</span>
+                      <span className="text-sm font-medium text-gray-200 group-hover:text-white flex-1">{getFolderName(folderId)}</span>
+                      <span className="text-xs font-normal text-gray-500 bg-gray-700/50 px-2 py-0.5 rounded-full">{graphs.length}</span>
                     </button>
 
                     {/* Folder Contents */}
                     {isExpanded && (
-                      <div className="ml-4 space-y-1">
+                      <div className="ml-5 mt-1 space-y-1">
                         {graphs.map((graph) => (
-                          <div key={graph.id} className="flex items-center group">
+                          <div key={graph.id} className="flex items-center group/item">
                             <button
                               onClick={() => handleGraphSelect(graph.id)}
-                              className={`flex-1 flex items-center space-x-3 p-2 rounded-lg text-left transition-all duration-200 ${
+                              className={`flex-1 flex items-center space-x-2.5 p-2.5 rounded-xl text-left transition-all duration-200 ${
                                 graph.id === currentGraph?.id
-                                  ? 'bg-gradient-to-r from-emerald-500/20 to-green-500/20 text-emerald-300 border border-emerald-400/30'
-                                  : 'hover:bg-gray-700/40 text-gray-300'
+                                  ? 'bg-gradient-to-r from-emerald-500/25 to-green-500/25 text-emerald-200 border-2 border-emerald-400/40 shadow-lg'
+                                  : 'hover:bg-gray-700/50 text-gray-300 border border-transparent hover:border-gray-600/30'
                               }`}
                             >
                               <div className="flex-shrink-0">
-                                <div className={`w-5 h-5 rounded flex items-center justify-center ${getGraphTypeColor(graph.type)}`}>
+                                <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${getGraphTypeColor(graph.type)} shadow-sm`}>
                                   {getGraphTypeIcon(graph.type)}
                                 </div>
                               </div>
                               <div className="flex-1 min-w-0">
                                 <div className="text-sm font-medium truncate">{graph.name}</div>
-                                <div className="text-xs text-gray-400">
-                                  {graph.id === currentGraph?.id ? actualNodeCount : (graph.nodeCount || 0)} nodes, {graph.id === currentGraph?.id ? actualEdgeCount : (graph.edgeCount || 0)} edges
+                                <div className="text-xs text-gray-400 flex items-center space-x-1.5">
+                                  <span className="flex items-center">
+                                    <span className="font-normal">{graph.id === currentGraph?.id ? actualNodeCount : (graph.nodeCount || 0)}</span>
+                                    <span className="ml-0.5">nodes</span>
+                                  </span>
+                                  <span>•</span>
+                                  <span className="flex items-center">
+                                    <span className="font-normal">{graph.id === currentGraph?.id ? actualEdgeCount : (graph.edgeCount || 0)}</span>
+                                    <span className="ml-0.5">edges</span>
+                                  </span>
                                 </div>
                               </div>
                               {graph.id === currentGraph?.id && (
-                                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse shadow-lg shadow-green-400/50"></div>
                               )}
                             </button>
                             
                             {/* Per-Graph Actions */}
-                            <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
-                              {onEditGraph && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onEditGraph(graph);
-                                  }}
-                                  className="p-1 text-gray-400 hover:text-blue-300 hover:bg-gray-600/50 rounded transition-colors"
-                                  title="Edit Graph"
-                                >
-                                  <Edit3 className="h-3 w-3" />
-                                </button>
-                              )}
-                              {onDeleteGraph && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onDeleteGraph(graph);
-                                  }}
-                                  className="p-1 text-gray-400 hover:text-red-300 hover:bg-gray-600/50 rounded transition-colors"
-                                  title="Delete Graph"
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </button>
-                              )}
+                            <div className="flex items-center space-x-1 opacity-0 group-hover/item:opacity-100 transition-opacity ml-2">
+                              {onEditGraph && (() => {
+                                const isSystemGraph = graph.createdBy === 'system' ||
+                                                    graph.id === 'welcome-graph-shared' ||
+                                                    graph.name?.toLowerCase() === 'welcome';
+                                return (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (!isSystemGraph) {
+                                        onEditGraph(graph);
+                                        setIsOpen(false);
+                                      }
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      if (isSystemGraph) {
+                                        const rect = e.currentTarget.getBoundingClientRect();
+                                        setHoveredTooltip({
+                                          message: '🔒 System graph - Cannot editable',
+                                          x: rect.right + 8,
+                                          y: rect.top + rect.height / 2
+                                        });
+                                      }
+                                    }}
+                                    onMouseLeave={() => setHoveredTooltip(null)}
+                                    className={`p-1.5 rounded-lg transition-all duration-200 ${
+                                      isSystemGraph
+                                        ? 'text-gray-600 cursor-not-allowed'
+                                        : 'text-gray-400 hover:text-blue-400 hover:bg-blue-500/20 hover:scale-110'
+                                    }`}
+                                  >
+                                    <Edit3 className="h-3.5 w-3.5" />
+                                  </button>
+                                );
+                              })()}
+                              {onDeleteGraph && (() => {
+                                const isSystemGraph = graph.createdBy === 'system' ||
+                                                    graph.id === 'welcome-graph-shared' ||
+                                                    graph.name?.toLowerCase() === 'welcome';
+                                return (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (!isSystemGraph) {
+                                        onDeleteGraph(graph);
+                                        setIsOpen(false);
+                                      }
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      if (isSystemGraph) {
+                                        const rect = e.currentTarget.getBoundingClientRect();
+                                        setHoveredTooltip({
+                                          message: '🔒 System graph - Cannot deletable',
+                                          x: rect.right + 8,
+                                          y: rect.top + rect.height / 2
+                                        });
+                                      }
+                                    }}
+                                    onMouseLeave={() => setHoveredTooltip(null)}
+                                    className={`p-1.5 rounded-lg transition-all duration-200 ${
+                                      isSystemGraph
+                                        ? 'text-gray-600 cursor-not-allowed'
+                                        : 'text-gray-400 hover:text-red-400 hover:bg-red-500/20 hover:scale-110'
+                                    }`}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                );
+                              })()}
                             </div>
                           </div>
                         ))}
@@ -386,12 +442,26 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph }: Gra
           {/* Footer */}
           {graphHierarchy.length > 0 && (
             <div className="border-t border-gray-600 p-3 bg-gray-700/50">
-              <div className="flex items-center justify-between text-xs text-gray-400">
-                <span>{graphHierarchy.length} graph{graphHierarchy.length !== 1 ? 's' : ''} total</span>
-                <span>Organized by: Team, Personal, AI, System, Templates</span>
+              <div className="flex items-center justify-between text-xs font-normal text-gray-400">
+                <span>Total: {graphHierarchy.length} Graph{graphHierarchy.length !== 1 ? 's' : ''}</span>
+                <span>Organized by: Team, Personal</span>
               </div>
             </div>
           )}
+        </div>,
+        document.body
+      )}
+
+      {/* Tooltip Portal */}
+      {hoveredTooltip && createPortal(
+        <div
+          className="fixed px-2 py-1 bg-red-600 text-white text-[10px] rounded whitespace-nowrap pointer-events-none z-[9999999999] -translate-y-1/2"
+          style={{
+            left: hoveredTooltip.x,
+            top: hoveredTooltip.y
+          }}
+        >
+          {hoveredTooltip.message}
         </div>,
         document.body
       )}

@@ -32,7 +32,7 @@ export function NodeList() {
             className="btn btn-primary"
           >
             <Plus className="h-4 w-4 mr-2" />
-            Add Node
+            Add Work Item
           </button>
         </div>
       </div>
@@ -120,7 +120,7 @@ export function NodeList() {
                 <p className="mt-2 text-sm text-gray-400">
                   {searchTerm || filterType !== 'all' 
                     ? 'Try adjusting your search or filter criteria.'
-                    : 'Get started by creating your first node to begin building your graph.'
+                    : 'Get started by creating your first work item to begin building your graph.'
                   }
                 </p>
                 {(!searchTerm && filterType === 'all') && (
@@ -129,7 +129,7 @@ export function NodeList() {
                     className="mt-4 btn btn-primary"
                   >
                     <Plus className="h-4 w-4 mr-2" />
-                    Create First Node
+                    Create First Work Item
                   </button>
                 )}
               </div>

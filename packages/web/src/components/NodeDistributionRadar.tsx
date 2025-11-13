@@ -101,7 +101,7 @@ export function NodeDistributionRadar({ className = '', showLegend = true }: Nod
     return (
       <div className={`${className} flex items-center justify-center h-64 text-gray-400`}>
         <div className="text-center">
-          <p className="mb-2">No node data found</p>
+          <p className="mb-2">No work item data found</p>
           <p className="text-sm">Create some work items to see the distribution</p>
         </div>
       </div>
@@ -169,7 +169,7 @@ export function NodeDistributionRadar({ className = '', showLegend = true }: Nod
         </div>
         {showLegend && (
           <div className="mt-6">
-            <h4 className="text-sm font-semibold text-gray-300 mb-3">Node Type Breakdown</h4>
+            <h4 className="text-sm font-semibold text-gray-300 mb-3">Work Item Type Breakdown</h4>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
               {radarData.map((item, index) => {
                 const getIcon = (axis: string) => {

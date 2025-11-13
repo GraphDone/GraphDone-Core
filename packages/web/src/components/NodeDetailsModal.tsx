@@ -206,10 +206,10 @@ export function NodeDetailsModal({
       }
     ],
     onCompleted: () => {
-      showSuccess('Node updated successfully');
+      showSuccess('Work item updated successfully');
     },
     onError: (error) => {
-      showError(`Failed to update node: ${error.message}`);
+      showError(`Failed to update work item: ${error.message}`);
     }
   });
 
@@ -224,11 +224,11 @@ export function NodeDetailsModal({
       { query: GET_EDGES }
     ],
     onCompleted: () => {
-      showSuccess('Node deleted successfully');
+      showSuccess('Work item deleted successfully');
       onClose();
     },
     onError: (error) => {
-      showError(`Failed to delete node: ${error.message}`);
+      showError(`Failed to delete work item: ${error.message}`);
     }
   });
 
@@ -273,7 +273,7 @@ export function NodeDetailsModal({
         }
       });
     } catch (error) {
-      console.error('Failed to update node:', error);
+      console.error('Failed to update work item:', error);
     }
   };
 
@@ -286,8 +286,8 @@ export function NodeDetailsModal({
     if (hasConnections) {
       // Use warning notification (yellow/orange) instead of error (red)
       showWarning(
-        'Cannot Delete Node',
-        `This node has ${nodeConnections.length} connection(s). Please disconnect all relationships first before deleting.`
+        'Cannot Delete Work Item',
+        `This work item has ${nodeConnections.length} connection(s). Please disconnect all relationships first before deleting.`
       );
       return;
     }
@@ -307,7 +307,7 @@ export function NodeDetailsModal({
         }
       });
     } catch (error) {
-      console.error('Failed to delete node:', error);
+      console.error('Failed to delete work item:', error);
     }
   };
 
@@ -485,7 +485,7 @@ export function NodeDetailsModal({
                         <span>{type.label}</span>
                       </div>
                       {currentNode.type === type.value && (
-                        <span className="text-green-400 ml-1">✓</span>
+                        <span className="text-green-400 ml-1"></span>
                       )}
                     </button>
                   ))}
@@ -902,7 +902,7 @@ export function NodeDetailsModal({
             )}
           </div>
 
-            {/* Enhanced Node ID */}
+            {/* Enhanced Work Item ID */}
             <div className="mt-8 pt-6 border-t border-gray-600/50">
               <div className="bg-gradient-to-br from-gray-800/40 to-gray-700/30 border border-gray-600/40 rounded-xl p-5 shadow-lg backdrop-blur-sm">
                 <div className="flex items-center justify-between">
@@ -910,7 +910,7 @@ export function NodeDetailsModal({
                     <div className="p-2 bg-gradient-to-br from-amber-500/20 to-yellow-500/20 rounded-lg border border-amber-500/30">
                       <Star className="h-4 w-4 text-amber-400" />
                     </div>
-                    <span className="text-sm text-gray-300 uppercase font-semibold">Node ID</span>
+                    <span className="text-sm text-gray-300 uppercase font-semibold">Work Item ID</span>
                   </div>
                   <span className="text-xs text-gray-400 font-mono bg-gray-700/50 px-3 py-2 rounded-lg border border-gray-600/40">{currentNode.id}</span>
                 </div>
@@ -1082,7 +1082,7 @@ export function NodeDetailsModal({
                   className="w-full flex items-center justify-center space-x-2 px-5 py-4 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 disabled:from-red-400 disabled:to-rose-400 disabled:cursor-not-allowed text-white rounded-xl transition-all duration-300 text-sm font-semibold shadow-lg hover:scale-105 transform border border-red-400/30"
                 >
                   <Trash2 className="h-4 w-4" />
-                  <span>{deleting ? 'Deleting...' : 'Delete Node'}</span>
+                  <span>{deleting ? 'Deleting...' : 'Delete Work Item'}</span>
                 </button>
               ) : (
                 <div className="space-y-4 p-6 bg-gradient-to-br from-red-900/30 to-red-800/20 border border-red-500/40 rounded-xl shadow-lg backdrop-blur-sm">
@@ -1090,7 +1090,7 @@ export function NodeDetailsModal({
                     Delete "{currentNode.title}"?
                   </div>
                   <div className="text-xs text-red-400 text-center leading-relaxed">
-                    This action cannot be undone and will permanently remove this node.
+                    This action cannot be undone and will permanently remove this work item.
                   </div>
                   
                   {/* Confirmation Checkbox */}

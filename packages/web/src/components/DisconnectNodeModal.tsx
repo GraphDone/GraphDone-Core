@@ -223,7 +223,7 @@ export function DisconnectNodeModal({ isOpen, onClose, sourceNode }: DisconnectN
                 </div>
                 <div>
                   <h3 className="text-xl font-bold bg-gradient-to-r from-red-200 to-orange-100 bg-clip-text text-transparent">
-                    Disconnect Node
+                    Disconnect Work Item
                   </h3>
                   <p className="text-sm text-gray-300 mt-1">
                     Remove connections from "{sourceNode.title}"
