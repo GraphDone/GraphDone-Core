@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useQuery, useMutation, useApolloClient } from '@apollo/client';
 import { useAuth } from './AuthContext';
 import { Graph, GraphHierarchy, CreateGraphInput, GraphContextType, GraphPermissions, ShareSettings } from '../types/graph';
@@ -25,7 +25,7 @@ export function GraphProvider({ children }: GraphProviderProps) {
   const [currentGraph, setCurrentGraph] = useState<Graph | null>(null);
   const [availableGraphs, setAvailableGraphs] = useState<Graph[]>([]);
   const [isCreating, setIsCreating] = useState(false);
-  const welcomeGraphCreated = useRef(false);
+  const [isCreatingWelcomeGraph, setIsCreatingWelcomeGraph] = useState(false);
 
 
   // GraphQL operations - Load graphs for current user only
@@ -97,7 +97,6 @@ export function GraphProvider({ children }: GraphProviderProps) {
       hasGraphsError: !!graphsError,
       hasCurrentUser: !!currentUser,
       currentUserId: currentUser?.id,
-      welcomeGraphCreated: welcomeGraphCreated.current,
       allGraphsCount: allGraphs.length,
       systemGraphsCount: graphsData?.systemGraphs?.length || 0,
       userGraphsCount: graphsData?.userGraphs?.length || 0,
@@ -149,12 +148,12 @@ export function GraphProvider({ children }: GraphProviderProps) {
           localStorage.setItem('currentGraphId', selectedGraph.id);
         }
       }
-    } else if (!isLoading && !graphsError && currentUser && !welcomeGraphCreated.current) {
-      console.log('🎉 Triggering Welcome graph creation for new user:', currentUser.id);
+    } else if (!isLoading && !graphsError && currentUser && !isCreatingWelcomeGraph) {
+      console.log('🎉 No graphs found for user:', currentUser.id, '- Triggering Welcome graph creation');
       // No graphs available - automatically create Welcome graph for new users
       setAvailableGraphs([]);
       setCurrentGraph(null);
-      welcomeGraphCreated.current = true;
+      setIsCreatingWelcomeGraph(true);
 
       // Create Welcome graph automatically with tutorial content
       const createWelcomeGraphWithTutorial = async () => {
@@ -322,8 +321,8 @@ export function GraphProvider({ children }: GraphProviderProps) {
           // Refetch graphs to show the new graph
           await refetchGraphs();
         } catch (error) {
-          console.error('Failed to create Welcome graph:', error);
-          welcomeGraphCreated.current = false; // Allow retry on next load
+          console.error('❌ Failed to create Welcome graph:', error);
+          setIsCreatingWelcomeGraph(false); // Allow retry on next attempt
         }
       };
 
