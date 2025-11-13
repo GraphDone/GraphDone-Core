@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
+import {
   X, User, Flag, Edit3, Save, ChevronDown, Plus, Unlink, Trash2,
   GitBranch, ArrowRight, ArrowLeft, Ban, Link2, Folder, Split, Copy, Shield, Bookmark, Package,
   Sparkles, Hash, Crown, Activity, Gem, Rocket, Star, Brain
@@ -9,6 +9,7 @@ import { UPDATE_WORK_ITEM, GET_WORK_ITEMS, CREATE_EDGE, GET_EDGES, DELETE_EDGE, 
 import { useAuth } from '../contexts/AuthContext';
 import { useGraph } from '../contexts/GraphContext';
 import { useNotifications } from '../contexts/NotificationContext';
+import { useDialog } from '../hooks/useDialogManager';
 import {
   Calendar, Clock,
   Layers, Trophy, Target, ListTodo, AlertTriangle, Lightbulb, Microscope,
@@ -46,20 +47,22 @@ interface NodeDetailsModalProps {
   onDelete?: (node: WorkItem) => void;
 }
 
-export function NodeDetailsModal({ 
-  isOpen, 
-  onClose, 
-  node, 
-  edges = [], 
-  nodes = [], 
+export function NodeDetailsModal({
+  isOpen,
+  onClose,
+  node,
+  edges = [],
+  nodes = [],
   onEdit,
   onConnectToExisting,
   onDisconnect,
-  onDelete 
+  onDelete
 }: NodeDetailsModalProps) {
   const { currentGraph } = useGraph();
+  const { currentUser } = useAuth();
   const { showSuccess, showError, showWarning } = useNotifications();
   const [editedNode, setEditedNode] = useState<WorkItem | null>(null);
+  const [savedNode, setSavedNode] = useState<WorkItem | null>(null);
   const [showTypeDropdown, setShowTypeDropdown] = useState(false);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [showConnectDropdown, setShowConnectDropdown] = useState(false);
@@ -67,20 +70,52 @@ export function NodeDetailsModal({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteConfirmed, setDeleteConfirmed] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const [selectedNodesForConnection, setSelectedNodesForConnection] = useState<string[]>([]);
   const [selectedEdgesForDisconnection, setSelectedEdgesForDisconnection] = useState<string[]>([]);
   const connectDropdownRef = useRef<HTMLDivElement>(null);
   const disconnectDropdownRef = useRef<HTMLDivElement>(null);
   const datePickerRef = useRef<HTMLDivElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  useDialog(isOpen, onClose);
 
   useEffect(() => {
     if (node) {
       setEditedNode({ ...node });
+      setSavedNode({ ...node });
     }
   }, [node]);
 
-  // Close dropdowns when clicking outside
   useEffect(() => {
+    if (isOpen && modalRef.current) {
+      modalRef.current.focus();
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        e.preventDefault();
+        onClose();
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.stopPropagation();
+        e.preventDefault();
+        handleSave();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown, true);
+    return () => document.removeEventListener('keydown', handleKeyDown, true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, onClose]);
+
+  useEffect(() => {
+    if (!showConnectDropdown && !showDisconnectDropdown) return;
+
     function handleClickOutside(event: MouseEvent) {
       if (connectDropdownRef.current && !connectDropdownRef.current.contains(event.target as Node)) {
         setShowConnectDropdown(false);
@@ -90,12 +125,8 @@ export function NodeDetailsModal({
       }
     }
 
-    if (showConnectDropdown || showDisconnectDropdown) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }
-    
-    return () => {}; // Ensure all code paths return a value
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showConnectDropdown, showDisconnectDropdown]);
 
   const [createEdge] = useMutation(CREATE_EDGE, {
@@ -198,18 +229,42 @@ export function NodeDetailsModal({
 
   const [updateWorkItem, { loading: updating }] = useMutation(UPDATE_WORK_ITEM, {
     refetchQueries: [
-      { 
+      {
         query: GET_WORK_ITEMS,
         variables: currentGraph ? {
           where: { graph: { id: currentGraph.id } }
         } : { where: {} }
       }
     ],
-    onCompleted: () => {
+    awaitRefetchQueries: true,
+    onCompleted: (data) => {
+      if (data?.updateWorkItems?.workItems?.[0]) {
+        const updatedNode = data.updateWorkItems.workItems[0];
+        setEditedNode({ ...updatedNode });
+        setSavedNode({ ...updatedNode });
+      }
+
       showSuccess('Work item updated successfully');
     },
     onError: (error) => {
       showError(`Failed to update work item: ${error.message}`);
+      if (node) {
+        setEditedNode({ ...node });
+      }
+    },
+    optimisticResponse: (vars) => {
+      if (!editedNode) return;
+      return {
+        __typename: 'Mutation',
+        updateWorkItems: {
+          __typename: 'UpdateWorkItemsMutationResponse',
+          workItems: [{
+            ...editedNode,
+            __typename: 'WorkItem',
+            updatedAt: new Date().toISOString()
+          }]
+        }
+      };
     }
   });
 
@@ -316,17 +371,17 @@ export function NodeDetailsModal({
 
   const currentNode = editedNode || node;
 
-  // Check if any changes have been made
-  const hasChanges = editedNode && node && (
-    editedNode.title !== node.title ||
-    editedNode.description !== node.description ||
-    editedNode.type !== node.type ||
-    editedNode.status !== node.status ||
-    editedNode.priority !== node.priority ||
-    JSON.stringify(editedNode.tags || []) !== JSON.stringify(node.tags || []) ||
-    (typeof editedNode.assignedTo === 'string' ? editedNode.assignedTo : editedNode.assignedTo?.id) !== 
-    (typeof node.assignedTo === 'string' ? node.assignedTo : node.assignedTo?.id) ||
-    editedNode.dueDate !== node.dueDate
+  // Check if any changes have been made (compare with savedNode instead of node prop)
+  const hasChanges = editedNode && savedNode && (
+    editedNode.title !== savedNode.title ||
+    editedNode.description !== savedNode.description ||
+    editedNode.type !== savedNode.type ||
+    editedNode.status !== savedNode.status ||
+    editedNode.priority !== savedNode.priority ||
+    JSON.stringify(editedNode.tags || []) !== JSON.stringify(savedNode.tags || []) ||
+    (typeof editedNode.assignedTo === 'string' ? editedNode.assignedTo : editedNode.assignedTo?.id) !==
+    (typeof savedNode.assignedTo === 'string' ? savedNode.assignedTo : savedNode.assignedTo?.id) ||
+    editedNode.dueDate !== savedNode.dueDate
   );
 
   // Use the same priority calculation as ListView for consistency
@@ -361,21 +416,28 @@ export function NodeDetailsModal({
   // Use the same priority levels as ListView (0.0-1.0 scale)
   const getPriorityLevel = (priority: number) => {
     const config = getPriorityConfig(priority);
-    return { 
-      label: config.label, 
-      color: `${config.color} ${config.bgColor}`, 
-      flagColor: config.color 
+    return {
+      label: config.label,
+      color: `${config.color} ${config.bgColor}`,
+      borderColor: config.borderColor,
+      flagColor: config.color
     };
   };
 
   const formatDate = (dateString: string) => {
-    // Parse the ISO date string directly to avoid timezone issues
     const date = new Date(dateString);
-    const day = date.getUTCDate();
+    const day = date.getDate();
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const month = monthNames[date.getUTCMonth()];
-    const year = date.getUTCFullYear();
-    return `${day} ${month} ${year}`;
+    const month = monthNames[date.getMonth()];
+    const year = date.getFullYear();
+
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours % 12 || 12;
+    const displayMinutes = minutes.toString().padStart(2, '0');
+
+    return `${day} ${month} ${year}, ${displayHours}:${displayMinutes} ${ampm}`;
   };
 
   const priorityInfo = getPriorityLevel(editedNode?.priority || totalPriority);
@@ -432,13 +494,21 @@ export function NodeDetailsModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-lg z-50 flex items-center justify-center p-4">
-      <div 
-        className="fixed inset-0 cursor-pointer" 
+    <div
+      className="fixed inset-0 bg-black/70 backdrop-blur-lg z-50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-title"
+    >
+      <div
+        className="fixed inset-0 cursor-pointer"
         onClick={onClose}
+        aria-hidden="true"
       />
-      <div 
-        className="relative bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 border border-gray-600/50 shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl animate-in fade-in zoom-in-95 duration-300 ring-1 ring-white/20 overflow-hidden"
+      <div
+        ref={modalRef}
+        tabIndex={-1}
+        className="relative bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 border border-gray-600/50 shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl animate-in fade-in zoom-in-95 duration-300 ring-1 ring-white/20 overflow-hidden focus:outline-none focus:ring-2 focus:ring-blue-500/50"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Gradient accent line at top */}
@@ -453,39 +523,40 @@ export function NodeDetailsModal({
         </div>
 
         {/* Enhanced Header */}
-        <div className="relative flex items-center justify-between p-8 border-b border-gray-600/50 bg-gradient-to-r from-gray-800/30 via-gray-700/20 to-gray-800/30 backdrop-blur-sm">
-          <div className="flex items-center space-x-20">
+        <div className="relative flex items-center justify-between px-3 py-2 border-b border-gray-600/50 bg-gradient-to-r from-gray-800/30 via-gray-700/20 to-gray-800/30 backdrop-blur-sm">
+          <div className="flex items-center space-x-6">
             {/* Enhanced Clickable Type Badge */}
             <div className="relative">
               <button
                 onClick={() => setShowTypeDropdown(!showTypeDropdown)}
-                className={`flex items-center space-x-3 px-5 py-3 rounded-xl text-sm font-semibold hover:scale-105 transition-all duration-200 cursor-pointer shadow-lg backdrop-blur-sm ${getTypeColor(currentNode.type)} border border-opacity-30 hover:border-opacity-50`}
+                className={`w-36 flex items-center justify-between px-3 py-2 rounded-lg text-sm font-semibold hover:scale-105 transition-all duration-200 cursor-pointer shadow-lg backdrop-blur-sm ${getTypeColor(currentNode.type)} border border-opacity-30 hover:border-opacity-50`}
               >
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-1">
                   {getTypeIcon(currentNode.type)}
-                  <span className="bg-gradient-to-r from-white to-gray-100 bg-clip-text text-transparent font-bold">{currentNode.type}</span>
+                  <span className="bg-gradient-to-r from-white to-gray-100 bg-clip-text text-transparent font-bold">{getTypeConfig(currentNode.type as WorkItemType).label}</span>
                 </div>
                 <ChevronDown className="h-4 w-4 opacity-70" />
               </button>
               
-              {/* Enhanced Type Dropdown */}
+              {/* Enhanced Type Dropdown with Staggered Animation */}
               {showTypeDropdown && (
-                <div className="absolute top-full left-0 mt-1 w-56 bg-gray-900 border-2 border-gray-500 rounded-lg shadow-2xl z-[9999] max-h-[350px] overflow-y-auto overflow-x-hidden">
-                  {TYPE_OPTIONS.filter(opt => opt.value !== 'all').map((type) => (
+                <div className="absolute top-full left-0 mt-1 w-36 bg-black/90 backdrop-blur-xl rounded-lg border border-white/10 shadow-2xl z-[9999] max-h-44 overflow-y-auto overflow-x-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                  {TYPE_OPTIONS.filter(opt => opt.value !== 'all').map((type, index) => (
                     <button
                       key={type.value}
                       onClick={() => {
                         setEditedNode(prev => prev ? { ...prev, type: type.value as WorkItemType } : null);
                         setShowTypeDropdown(false);
                       }}
-                      className={`w-full flex items-center justify-between px-4 py-3 hover:bg-gray-800 transition-colors text-left border-b border-gray-600 last:border-b-0 ${getTypeColorScheme(type.value as WorkItemType).text} text-white`}
+                      className={`w-full flex items-center justify-between px-3 py-2 hover:bg-gray-800/50 hover:scale-[1.02] transition-all duration-200 text-left border-b border-gray-700/30 last:border-b-0 ${getTypeColorScheme(type.value as WorkItemType).text} text-white text-sm animate-in fade-in slide-in-from-left-1`}
+                      style={{ animationDelay: `${index * 30}ms` }}
                     >
                       <div className="flex items-center space-x-2">
-                        {type.icon && <type.icon className={`h-4 w-4 ${getTypeColorScheme(type.value as WorkItemType).text}`} />}
+                        {type.icon && <type.icon className={`h-3 w-3 ${getTypeColorScheme(type.value as WorkItemType).text}`} />}
                         <span>{type.label}</span>
                       </div>
                       {currentNode.type === type.value && (
-                        <span className="text-green-400 ml-1"></span>
+                        <span className="text-green-400 text-xs animate-in zoom-in duration-200">✓</span>
                       )}
                     </button>
                   ))}
@@ -497,33 +568,34 @@ export function NodeDetailsModal({
             <div className="relative">
               <button
                 onClick={() => setShowStatusDropdown(!showStatusDropdown)}
-                className={`flex items-center space-x-3 px-5 py-3 rounded-xl text-sm font-semibold hover:scale-105 transition-all duration-200 cursor-pointer shadow-lg backdrop-blur-sm ${getStatusColor(currentNode.status)} border border-opacity-30 hover:border-opacity-50`}
+                className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-semibold hover:scale-105 transition-all duration-200 cursor-pointer shadow-lg backdrop-blur-sm ${getStatusColor(currentNode.status)} border border-opacity-30 hover:border-opacity-50`}
               >
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-1">
                   {getStatusIcon(currentNode.status)}
-                  <span className="bg-gradient-to-r from-white to-gray-100 bg-clip-text text-transparent font-bold">{currentNode.status.replace(/_/g, ' ')}</span>
+                  <span className="bg-gradient-to-r from-white to-gray-100 bg-clip-text text-transparent font-bold">{getStatusConfig(currentNode.status as WorkItemStatus).label}</span>
                 </div>
                 <ChevronDown className="h-4 w-4 opacity-70" />
               </button>
               
-              {/* Enhanced Status Dropdown */}
+              {/* Enhanced Status Dropdown with Staggered Animation */}
               {showStatusDropdown && (
-                <div className="absolute top-full left-0 mt-1 w-56 bg-gray-900 border-2 border-gray-500 rounded-lg shadow-2xl z-[9999] max-h-[350px] overflow-y-auto overflow-x-hidden">
-                  {STATUS_OPTIONS.filter(opt => opt.value !== 'all').map((status) => (
+                <div className="absolute top-full left-0 mt-1 w-40 bg-black/90 backdrop-blur-xl rounded-lg border border-white/10 shadow-2xl z-[9999] max-h-44 overflow-y-auto overflow-x-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                  {STATUS_OPTIONS.filter(opt => opt.value !== 'all').map((status, index) => (
                     <button
                       key={status.value}
                       onClick={() => {
                         setEditedNode(prev => prev ? { ...prev, status: status.value as WorkItemStatus } : null);
                         setShowStatusDropdown(false);
                       }}
-                      className={`w-full flex items-center justify-between px-4 py-3 hover:bg-gray-800 transition-colors text-left border-b border-gray-600 last:border-b-0 ${getStatusColorScheme(status.value as WorkItemStatus).text} text-white`}
+                      className={`w-full flex items-center justify-between px-3 py-2 hover:bg-gray-800/50 hover:scale-[1.02] transition-all duration-200 text-left border-b border-gray-700/30 last:border-b-0 ${getStatusColorScheme(status.value as WorkItemStatus).text} text-white text-sm animate-in fade-in slide-in-from-left-1`}
+                      style={{ animationDelay: `${index * 30}ms` }}
                     >
                       <div className="flex items-center space-x-2">
-                        {status.icon && <status.icon className={`h-4 w-4 ${getStatusColorScheme(status.value as WorkItemStatus).text}`} />}
+                        {status.icon && <status.icon className={`h-3 w-3 ${getStatusColorScheme(status.value as WorkItemStatus).text}`} />}
                         <span>{status.label}</span>
                       </div>
                       {currentNode.status === status.value && (
-                        <span className="text-green-400 ml-2">✓</span>
+                        <span className="text-green-400 text-xs animate-in zoom-in duration-200">✓</span>
                       )}
                     </button>
                   ))}
@@ -531,75 +603,80 @@ export function NodeDetailsModal({
               )}
             </div>
           </div>
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-1">
             <button
               onClick={handleSave}
               disabled={updating || !hasChanges}
-              className={`flex items-center space-x-2 px-6 py-3 rounded-xl transition-all duration-300 text-sm font-semibold shadow-lg ${
+              className={`flex items-center space-x-1 px-4 py-2 rounded-lg transition-all duration-300 text-sm font-semibold shadow-lg ${
                 hasChanges && !updating
                   ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:from-green-500 hover:to-emerald-500 hover:scale-105 transform border border-green-400/30'
                   : 'bg-gray-700 text-gray-500 cursor-not-allowed border border-gray-600'
               }`}
-              title={hasChanges ? "Save Changes" : "No changes to save"}
+              title={hasChanges ? "Save Changes (Ctrl+S)" : "No changes to save"}
+              aria-label={hasChanges ? "Save changes to work item" : "No changes to save"}
             >
               <Save className="h-4 w-4" />
               <span>Save</span>
             </button>
             <button
               onClick={onClose}
-              className="p-3 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-xl transition-all duration-200 hover:scale-110 shadow-lg backdrop-blur-sm"
+              className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg transition-all duration-200 hover:scale-110 shadow-lg backdrop-blur-sm"
+              aria-label="Close modal (ESC)"
+              title="Close (ESC)"
             >
-              <X className="h-5 w-5" />
+              <X className="h-4 w-4" />
             </button>
           </div>
         </div>
 
         {/* Enhanced Content */}
-        <div className="flex p-8 gap-8 bg-gradient-to-br from-gray-800/20 via-transparent to-gray-900/20">
+        <div className="flex px-3 py-2 gap-3 bg-gradient-to-br from-gray-800/20 via-transparent to-gray-900/20">
           {/* Enhanced Left Column - Main Content */}
           <div className="flex-1">
           {/* Enhanced Title - Always Editable */}
-          <div className="mb-6">
+          <div className="mb-2">
             <input
+              id="modal-title"
               type="text"
               value={editedNode?.title || ''}
               onChange={(e) => setEditedNode(prev => prev ? { ...prev, title: e.target.value } : null)}
-              className="text-2xl font-bold bg-gray-800 border border-gray-600 text-white placeholder-gray-400 mb-2 w-full focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-400 transition-all duration-300 hover:border-gray-500 p-4 rounded-xl shadow-lg cursor-text"
+              className="text-base font-bold bg-gray-800 border border-gray-600 text-white placeholder-gray-400 mb-1 w-full focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-400 transition-all duration-300 hover:border-gray-500 p-2 rounded-lg shadow-lg cursor-text"
               placeholder="Enter title..."
               autoComplete="off"
+              aria-label="Work item title"
             />
           </div>
 
           {/* Enhanced Description - Always Editable */}
-          <div className="mb-8">
-            <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4 flex items-center">
-              <div className="p-2 bg-gradient-to-br from-emerald-500/20 to-teal-500/20 rounded-lg mr-3 border border-emerald-500/30">
-                <Edit3 className="h-4 w-4 text-emerald-400" />
+          <div className="mb-2">
+            <h3 className="text-sm font-medium text-gray-300 mb-1 flex items-center">
+              <div className="p-1 bg-gradient-to-br from-emerald-500/20 to-teal-500/20 rounded-lg mr-1 border border-emerald-500/30">
+                <Edit3 className="h-3 w-3 text-emerald-400" />
               </div>
               Description
             </h3>
             <textarea
               value={editedNode?.description || ''}
               onChange={(e) => setEditedNode(prev => prev ? { ...prev, description: e.target.value } : null)}
-              className="w-full text-white bg-gray-800 border border-gray-600 rounded-xl placeholder-gray-400 p-5 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-400 transition-all duration-300 resize-none hover:border-gray-500 shadow-lg cursor-text"
+              className="w-full text-sm text-white bg-gray-800 border border-gray-600 rounded-lg placeholder-gray-400 p-2 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-400 transition-all duration-300 resize-none hover:border-gray-500 shadow-lg cursor-text"
               placeholder="Enter description"
-              rows={4}
+              rows={3}
               autoComplete="off"
             />
           </div>
 
 
           {/* Enhanced Details Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {/* Enhanced Priority - Editable */}
-            <div className="bg-gradient-to-br from-gray-800/30 to-gray-700/20 border border-gray-600/30 rounded-xl p-6 shadow-lg backdrop-blur-sm">
-              <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4 flex items-center">
-                <div className={`p-2 bg-gradient-to-br from-orange-500/20 to-red-500/20 rounded-lg mr-3 border border-orange-500/30`}>
-                  <Flag className={`h-4 w-4 ${priorityInfo.flagColor}`} />
+            <div className="bg-gradient-to-br from-gray-800/30 to-gray-700/20 border border-gray-600/30 rounded-lg p-2 shadow-lg backdrop-blur-sm">
+              <h3 className="text-sm font-medium text-gray-300 mb-1 flex items-center">
+                <div className={`p-1 bg-gradient-to-br from-orange-500/20 to-red-500/20 rounded-lg mr-1 border border-orange-500/30`}>
+                  <Flag className={`h-3 w-3 ${priorityInfo.flagColor}`} />
                 </div>
                 Priority
               </h3>
-              <div className="space-y-4">
+              <div className="space-y-1">
                 <input
                   type="range"
                   min="0"
@@ -607,7 +684,7 @@ export function NodeDetailsModal({
                   step="0.1"
                   value={editedNode?.priority || 0}
                   onChange={(e) => setEditedNode(prev => prev ? { ...prev, priority: parseFloat(e.target.value) } : null)}
-                  className={`w-full h-3 bg-gray-700/50 rounded-xl appearance-none cursor-pointer slider shadow-inner ${
+                  className={`w-full h-2 bg-gray-700/50 rounded-lg appearance-none cursor-pointer slider shadow-inner ${
                     getPriorityConfig(editedNode?.priority || 0).value === 'critical' ? 'accent-red-500' :
                     getPriorityConfig(editedNode?.priority || 0).value === 'high' ? 'accent-orange-500' :
                     getPriorityConfig(editedNode?.priority || 0).value === 'moderate' ? 'accent-yellow-500' :
@@ -623,20 +700,20 @@ export function NodeDetailsModal({
                   }}
                 />
                 <div className="flex items-center justify-between">
-                  <span className={`flex items-center space-x-3 px-4 py-2 rounded-xl text-sm font-semibold shadow-lg ${priorityInfo.color} ${getPriorityColorScheme(editedNode?.priority || 0).background} border border-opacity-30`}>
-                    {getPriorityIconElement(editedNode?.priority || 0, "h-4 w-4")}
+                  <span className={`flex items-center space-x-1 px-2 py-1 rounded-lg text-xs font-semibold border ${priorityInfo.borderColor} ${priorityInfo.color}`}>
+                    {getPriorityIconElement(editedNode?.priority || 0, "h-3 w-3")}
                     <span>{priorityInfo.label}</span>
                   </span>
-                  <span className="text-gray-300 text-sm font-medium bg-gray-700/30 px-3 py-1 rounded-lg">{Math.round((editedNode?.priority || 0) * 100)}%</span>
+                  <span className="text-gray-300 text-xs font-medium bg-gray-700/30 px-2 py-1 rounded-lg">{Math.round((editedNode?.priority || 0) * 100)}%</span>
                 </div>
               </div>
             </div>
 
             {/* Enhanced Assigned To - Editable */}
-            <div className="bg-gradient-to-br from-gray-800/30 to-gray-700/20 border border-gray-600/30 rounded-xl p-6 shadow-lg backdrop-blur-sm">
-              <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4 flex items-center">
-                <div className="p-2 bg-gradient-to-br from-violet-500/20 to-purple-500/20 rounded-lg mr-3 border border-violet-500/30">
-                  <User className="h-4 w-4 text-violet-400" />
+            <div className="bg-gradient-to-br from-gray-800/30 to-gray-700/20 border border-gray-600/30 rounded-lg p-2 shadow-lg backdrop-blur-sm">
+              <h3 className="text-sm font-medium text-gray-300 mb-1 flex items-center">
+                <div className="p-1 bg-gradient-to-br from-violet-500/20 to-purple-500/20 rounded-lg mr-1 border border-violet-500/30">
+                  <User className="h-3 w-3 text-violet-400" />
                 </div>
                 Contributor
               </h3>
@@ -650,7 +727,7 @@ export function NodeDetailsModal({
                       assignedTo: value ? { id: value, name: e.target.selectedOptions[0].text.split(' (')[0], username: value } : undefined 
                     } : null);
                   }}
-                  className="w-full bg-gray-800 border border-gray-600 rounded-xl px-5 py-4 text-white focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-400 transition-all duration-300 appearance-none hover:border-gray-500 shadow-lg font-medium"
+                  className="w-full bg-gray-800 border border-gray-600 rounded-lg px-2 py-1 text-sm text-white focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-400 transition-all duration-300 appearance-none hover:border-gray-500 shadow-lg font-medium"
                 >
                   <option value="">No contributor</option>
                   <option value="user-1">John Doe (@john)</option>
@@ -667,45 +744,45 @@ export function NodeDetailsModal({
             </div>
 
             {/* Enhanced Owner */}
-            <div className="bg-gradient-to-br from-gray-800/30 to-gray-700/20 border border-gray-600/30 rounded-xl p-6 shadow-lg backdrop-blur-sm">
-              <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4 flex items-center">
-                <div className="p-2 bg-gradient-to-br from-amber-500/20 to-yellow-500/20 rounded-lg mr-3 border border-amber-500/30">
-                  <Crown className="h-4 w-4 text-amber-400" />
+            <div className="bg-gradient-to-br from-gray-800/30 to-gray-700/20 border border-gray-600/30 rounded-lg p-2 shadow-lg backdrop-blur-sm">
+              <h3 className="text-sm font-medium text-gray-300 mb-1 flex items-center">
+                <div className="p-1 bg-gradient-to-br from-amber-500/20 to-yellow-500/20 rounded-lg mr-1 border border-amber-500/30">
+                  <Crown className="h-3 w-3 text-amber-400" />
                 </div>
                 Owner
               </h3>
               {currentNode.owner ? (
-                <div className="bg-gradient-to-r from-gray-700/50 to-gray-600/30 border border-gray-600/40 rounded-lg p-4 backdrop-blur-sm">
-                  <div className="text-gray-200 font-medium">{currentNode.owner.name}</div>
-                  <div className="text-gray-400 text-sm mt-1">@{currentNode.owner.username}</div>
+                <div className="bg-gradient-to-r from-gray-700/50 to-gray-600/30 border border-gray-600/40 rounded-lg p-1 backdrop-blur-sm">
+                  <div className="text-gray-200 text-sm font-medium">{currentNode.owner.name}</div>
+                  <div className="text-gray-400 text-xs">@{currentNode.owner.username}</div>
                 </div>
               ) : (
-                <div className="bg-gradient-to-r from-gray-700/50 to-gray-600/30 border border-gray-600/40 rounded-lg p-4 backdrop-blur-sm">
-                  <div className="text-gray-200 font-medium">System Administrator</div>
-                  <div className="text-gray-400 text-sm mt-1">@admin</div>
+                <div className="bg-gradient-to-r from-gray-700/50 to-gray-600/30 border border-gray-600/40 rounded-lg p-1 backdrop-blur-sm">
+                  <div className="text-gray-200 text-sm font-medium">System Administrator</div>
+                  <div className="text-gray-400 text-xs">@admin</div>
                 </div>
               )}
             </div>
 
             {/* Enhanced Due Date - Editable */}
-            <div className="bg-gradient-to-br from-gray-800/30 to-gray-700/20 border border-gray-600/30 rounded-xl p-6 shadow-lg backdrop-blur-sm">
-              <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4 flex items-center">
-                <div className="p-2 bg-gradient-to-br from-teal-500/20 to-cyan-500/20 rounded-lg mr-3 border border-teal-500/30">
-                  <Calendar className="h-4 w-4 text-teal-400" />
+            <div className="bg-gradient-to-br from-gray-800/30 to-gray-700/20 border border-gray-600/30 rounded-lg p-2 shadow-lg backdrop-blur-sm">
+              <h3 className="text-sm font-medium text-gray-300 mb-1 flex items-center">
+                <div className="p-1 bg-gradient-to-br from-teal-500/20 to-cyan-500/20 rounded-lg mr-1 border border-teal-500/30">
+                  <Calendar className="h-3 w-3 text-teal-400" />
                 </div>
-                Due Date
+                Due date
               </h3>
               <input
                 type="date"
                 value={editedNode?.dueDate ? editedNode.dueDate.split('T')[0] : ''}
                 onChange={(e) => {
                   const value = e.target.value;
-                  setEditedNode(prev => prev ? { 
-                    ...prev, 
-                    dueDate: value ? `${value}T23:59:59.999Z` : undefined 
+                  setEditedNode(prev => prev ? {
+                    ...prev,
+                    dueDate: value ? `${value}T23:59:59.999Z` : undefined
                   } : null);
                 }}
-                className="w-full bg-gray-800 border border-gray-600 rounded-xl px-5 py-4 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-400 transition-all duration-300 hover:border-gray-500 shadow-lg font-medium"
+                className="w-full bg-gray-800 border border-gray-600 rounded-lg px-2 py-1 text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-400 transition-all duration-300 hover:border-gray-500 shadow-lg font-medium"
                 placeholder="dd/mm/yyyy"
               />
               {editedNode?.dueDate && (
@@ -718,20 +795,20 @@ export function NodeDetailsModal({
           </div>
 
           {/* Enhanced Tags - Editable */}
-          <div className="mt-8">
-            <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4 flex items-center">
-              <div className="p-2 bg-gradient-to-br from-sky-500/20 to-blue-500/20 rounded-lg mr-3 border border-sky-500/30">
-                <Hash className="h-4 w-4 text-sky-400" />
+          <div className="mt-2">
+            <h3 className="text-sm font-medium text-gray-300 mb-1 flex items-center">
+              <div className="p-1 bg-gradient-to-br from-sky-500/20 to-blue-500/20 rounded-lg mr-1 border border-sky-500/30">
+                <Hash className="h-3 w-3 text-sky-400" />
               </div>
               Tags
             </h3>
-            <div className="bg-gradient-to-br from-gray-800/40 to-gray-700/30 border border-gray-600/40 rounded-xl p-5 shadow-lg backdrop-blur-sm">
-              <div className="flex flex-wrap gap-3">
+            <div className="bg-gradient-to-br from-gray-800/40 to-gray-700/30 border border-gray-600/40 rounded-lg p-2 shadow-lg backdrop-blur-sm">
+              <div className="flex flex-wrap gap-2">
                 {/* Enhanced Existing Tags */}
                 {editedNode?.tags?.map((tag, index) => (
                   <span
                     key={index}
-                    className="flex items-center px-3 py-2 bg-gradient-to-r from-gray-700/60 to-gray-600/40 text-gray-200 rounded-lg text-xs font-medium group hover:from-gray-600/60 hover:to-gray-500/40 transition-all duration-200 hover:scale-105 shadow-md border border-gray-600/30"
+                    className="flex items-center px-2 py-1 bg-gradient-to-r from-gray-700/60 to-gray-600/40 text-gray-200 rounded-lg text-xs font-medium group hover:from-gray-600/60 hover:to-gray-500/40 transition-all duration-200 hover:scale-105 shadow-md border border-gray-600/30"
                   >
                     <span>{tag}</span>
                     <button
@@ -753,7 +830,7 @@ export function NodeDetailsModal({
                     <input
                       type="text"
                       placeholder="Add Tag"
-                      className="text-xs bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-400 transition-all duration-300 min-w-20 shadow-lg font-medium"
+                      className="text-xs bg-gray-800 border border-gray-600 rounded-lg px-2 py-1 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-400 transition-all duration-300 min-w-20 shadow-lg font-medium"
                       style={{ width: `${Math.max(20, 8)}ch` }}
                       onInput={(e) => {
                         const input = e.target as HTMLInputElement;
@@ -782,79 +859,79 @@ export function NodeDetailsModal({
                 )}
               </div>
               {/* Tip for creating tags */}
-              <div className="mt-3 text-xs text-gray-400 italic flex items-center">
+              <div className="mt-2 text-xs text-gray-400 italic flex items-center">
                 <div className="w-1 h-1 bg-sky-400 rounded-full mr-2"></div>
-                Type and press Enter to create tags • Maximum 5 tags allowed
+                Press Enter to add • Max 5 tags
               </div>
             </div>
           </div>
 
-          {/* Enhanced Timestamps */}
-          <div className="mt-8">
-            <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4 flex items-center">
-              <div className="p-2 bg-gradient-to-br from-lime-500/20 to-green-500/20 rounded-lg mr-3 border border-lime-500/30">
-                <Clock className="h-4 w-4 text-lime-400" />
+          {/* Enhanced DateTime */}
+          <div className="mt-2">
+            <h3 className="text-sm font-medium text-gray-300 mb-1 flex items-center">
+              <div className="p-1 bg-gradient-to-br from-lime-500/20 to-green-500/20 rounded-lg mr-1 border border-lime-500/30">
+                <Clock className="h-3 w-3 text-lime-400" />
               </div>
-              Timestamps
+              DateTime
             </h3>
-            <div className="bg-gradient-to-br from-gray-800/40 to-gray-700/30 border border-gray-600/40 rounded-xl p-5 shadow-lg backdrop-blur-sm space-y-3">
+            <div className="bg-gradient-to-br from-gray-800/40 to-gray-700/30 border border-gray-600/40 rounded-lg p-2 shadow-lg backdrop-blur-sm space-y-1">
               {currentNode.createdAt && (
-                <div className="text-sm flex justify-between items-center">
-                  <span className="text-gray-400 font-medium">Created:</span> 
-                  <span className="text-gray-200 font-semibold bg-gray-700/50 px-3 py-1 rounded-lg">{formatDate(currentNode.createdAt)}</span>
+                <div className="text-xs flex justify-between items-center">
+                  <span className="text-gray-400">Created:</span>
+                  <span className="text-gray-200 bg-gray-700/50 px-2 py-0.5 rounded text-xs">{formatDate(currentNode.createdAt)}</span>
                 </div>
               )}
               {currentNode.updatedAt && (
-                <div className="text-sm flex justify-between items-center">
-                  <span className="text-gray-400 font-medium">Updated:</span> 
-                  <span className="text-gray-200 font-semibold bg-gray-700/50 px-3 py-1 rounded-lg">{formatDate(currentNode.updatedAt)}</span>
+                <div className="text-xs flex justify-between items-center">
+                  <span className="text-gray-400">Updated:</span>
+                  <span className="text-gray-200 bg-gray-700/50 px-2 py-0.5 rounded text-xs">{formatDate(currentNode.updatedAt)}</span>
                 </div>
               )}
             </div>
           </div>
 
           {/* Enhanced Connections */}
-          <div className="mt-8">
-            <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-6 flex items-center">
-              <div className="p-2 bg-gradient-to-br from-fuchsia-500/20 to-pink-500/20 rounded-lg mr-3 border border-fuchsia-500/30">
-                <GitBranch className="h-4 w-4 text-fuchsia-400" />
+          <div className="mt-2">
+            <h3 className="text-sm font-medium text-gray-300 mb-1 flex items-center">
+              <div className="p-1 bg-gradient-to-br from-fuchsia-500/20 to-pink-500/20 rounded-lg mr-1 border border-fuchsia-500/30">
+                <GitBranch className="h-3 w-3 text-fuchsia-400" />
               </div>
               Connections ({nodeConnections.length})
             </h3>
-            
+
             {nodeConnections.length === 0 ? (
-              <div className="bg-gradient-to-br from-gray-800/40 to-gray-700/30 border border-gray-600/40 rounded-xl p-8 shadow-lg backdrop-blur-sm text-center">
-                <div className="p-4 bg-gradient-to-br from-gray-700/30 to-gray-600/20 rounded-xl inline-block mb-4 border border-gray-600/30">
-                  <GitBranch className="h-12 w-12 text-gray-500 mx-auto" />
+              <div className="bg-gradient-to-br from-gray-800/40 to-gray-700/30 border border-gray-600/40 rounded-lg p-2 shadow-lg backdrop-blur-sm text-center">
+                <div className="p-2 bg-gradient-to-br from-gray-700/30 to-gray-600/20 rounded-lg inline-block mb-1 border border-gray-600/30">
+                  <GitBranch className="h-8 w-8 text-gray-500 mx-auto" />
                 </div>
-                <p className="text-gray-400 text-sm font-medium mb-2">No connections yet</p>
-                <p className="text-gray-500 text-xs">Connect this node to other nodes to see relationships here</p>
+                <p className="text-gray-400 text-xs font-medium mb-1">No connections yet</p>
+                <p className="text-gray-500 text-[10px]">Use Connect button to link nodes</p>
               </div>
             ) : (
-              
-              <div className="bg-gradient-to-br from-gray-800/40 to-gray-700/30 border border-gray-600/40 rounded-xl p-6 shadow-lg backdrop-blur-sm space-y-6">
+
+              <div className="bg-gradient-to-br from-gray-800/40 to-gray-700/30 border border-gray-600/40 rounded-lg p-1.5 shadow-lg backdrop-blur-sm space-y-1.5">
                 {/* Enhanced Incoming Connections */}
                 {incomingConnections.length > 0 && (
                   <div>
-                    <h4 className="text-sm font-semibold text-gray-300 mb-4 flex items-center">
-                      <div className="p-2 bg-gradient-to-br from-red-500/20 to-pink-500/20 rounded-lg mr-3 border border-red-500/30">
-                        <ArrowRight className="h-4 w-4 text-red-400" />
+                    <h4 className="text-xs font-medium text-gray-400 mb-0.5 flex items-center">
+                      <div className="p-0.5 bg-gradient-to-br from-emerald-500/20 to-green-600/20 rounded mr-1 border border-emerald-500/30">
+                        <ArrowRight className="h-2.5 w-2.5 text-emerald-400" />
                       </div>
                       Incoming ({incomingConnections.length})
                     </h4>
-                    <div className="space-y-3">
-                      {incomingConnections.map((edge) => {
+                    <div className="space-y-0.5">
+                      {incomingConnections.map((edge, index) => {
                         const connectedNode = getConnectedNode(edge.source);
                         return (
-                          <div key={edge.id} className="p-4 bg-gradient-to-r from-red-900/30 to-gray-800/50 border border-red-500/30 rounded-xl hover:from-red-900/40 hover:to-gray-800/60 hover:border-red-400/40 transition-all duration-200 hover:scale-[1.02] shadow-md backdrop-blur-sm">
-                            <div className="flex items-start gap-2">
+                          <div key={edge.id} className="p-1.5 bg-gradient-to-r from-emerald-900/30 to-gray-800/50 border border-emerald-500/30 rounded hover:from-emerald-900/50 hover:to-gray-800/70 hover:border-emerald-400/50 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg shadow-sm backdrop-blur-sm cursor-pointer group animate-in fade-in slide-in-from-left-2" style={{ animationDelay: `${index * 50}ms` }}>
+                            <div className="flex items-center gap-1.5">
                               {connectedNode && (
-                                <div className={`inline-flex items-center space-x-1 px-2 py-1 rounded text-sm font-medium ${getTypeColor(connectedNode.type)}`}>
+                                <div className={`inline-flex items-center space-x-1 px-1.5 py-0.5 rounded text-xs font-medium ${getTypeColor(connectedNode.type)} group-hover:scale-105 transition-transform duration-200`}>
                                   {getTypeIcon(connectedNode.type)}
                                   <span>{connectedNode.title}</span>
                                 </div>
                               )}
-                              <div className={`inline-flex items-center space-x-1 px-2 py-1 rounded text-xs font-medium ${getRelationshipColor(edge.type)} flex-shrink-0`}>
+                              <div className={`inline-flex items-center space-x-0.5 px-1.5 py-0.5 rounded text-xs font-medium ${getRelationshipColor(edge.type)} flex-shrink-0 group-hover:scale-105 transition-transform duration-200`}>
                                 {getRelationshipIcon(edge.type)}
                                 <span className="whitespace-nowrap">{getRelationshipDisplayName(edge.type)}</span>
                               </div>
@@ -869,25 +946,25 @@ export function NodeDetailsModal({
                 {/* Enhanced Outgoing Connections */}
                 {outgoingConnections.length > 0 && (
                   <div>
-                    <h4 className="text-sm font-semibold text-gray-300 mb-4 flex items-center">
-                      <div className="p-2 bg-gradient-to-br from-purple-500/20 to-violet-500/20 rounded-lg mr-3 border border-purple-500/30">
-                        <ArrowLeft className="h-4 w-4 text-purple-400" />
+                    <h4 className="text-xs font-medium text-gray-400 mb-0.5 flex items-center">
+                      <div className="p-0.5 bg-gradient-to-br from-red-500/20 to-rose-600/20 rounded mr-1 border border-red-500/30">
+                        <ArrowLeft className="h-2.5 w-2.5 text-red-400" />
                       </div>
                       Outgoing ({outgoingConnections.length})
                     </h4>
-                    <div className="space-y-3">
-                      {outgoingConnections.map((edge) => {
+                    <div className="space-y-0.5">
+                      {outgoingConnections.map((edge, index) => {
                         const connectedNode = getConnectedNode(edge.target);
                         return (
-                          <div key={edge.id} className="p-4 bg-gradient-to-r from-purple-900/30 to-gray-800/50 border border-purple-500/30 rounded-xl hover:from-purple-900/40 hover:to-gray-800/60 hover:border-purple-400/40 transition-all duration-200 hover:scale-[1.02] shadow-md backdrop-blur-sm">
-                            <div className="flex items-start gap-2">
+                          <div key={edge.id} className="p-1.5 bg-gradient-to-r from-red-900/30 to-gray-800/50 border border-red-500/30 rounded hover:from-red-900/50 hover:to-gray-800/70 hover:border-red-400/50 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg shadow-sm backdrop-blur-sm cursor-pointer group animate-in fade-in slide-in-from-left-2" style={{ animationDelay: `${index * 50}ms` }}>
+                            <div className="flex items-center gap-1.5">
                               {connectedNode && (
-                                <div className={`inline-flex items-center space-x-1 px-2 py-1 rounded text-sm font-medium ${getTypeColor(connectedNode.type)}`}>
+                                <div className={`inline-flex items-center space-x-1 px-1.5 py-0.5 rounded text-xs font-medium ${getTypeColor(connectedNode.type)} group-hover:scale-105 transition-transform duration-200`}>
                                   {getTypeIcon(connectedNode.type)}
                                   <span>{connectedNode.title}</span>
                                 </div>
                               )}
-                              <div className={`inline-flex items-center space-x-1 px-2 py-1 rounded text-xs font-medium ${getRelationshipColor(edge.type)} flex-shrink-0`}>
+                              <div className={`inline-flex items-center space-x-0.5 px-1.5 py-0.5 rounded text-xs font-medium ${getRelationshipColor(edge.type)} flex-shrink-0 group-hover:scale-105 transition-transform duration-200`}>
                                 {getRelationshipIcon(edge.type)}
                                 <span className="whitespace-nowrap">{getRelationshipDisplayName(edge.type)}</span>
                               </div>
@@ -903,42 +980,44 @@ export function NodeDetailsModal({
           </div>
 
             {/* Enhanced Work Item ID */}
-            <div className="mt-8 pt-6 border-t border-gray-600/50">
-              <div className="bg-gradient-to-br from-gray-800/40 to-gray-700/30 border border-gray-600/40 rounded-xl p-5 shadow-lg backdrop-blur-sm">
+            <div className="mt-2 pt-2 border-t border-gray-600/50">
+              <div className="bg-gradient-to-br from-gray-800/40 to-gray-700/30 border border-gray-600/40 rounded-lg p-2 shadow-lg backdrop-blur-sm">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-gradient-to-br from-amber-500/20 to-yellow-500/20 rounded-lg border border-amber-500/30">
-                      <Star className="h-4 w-4 text-amber-400" />
+                  <div className="flex items-center space-x-1">
+                    <div className="p-1 bg-gradient-to-br rounded-lg border" style={{
+                      backgroundImage: 'linear-gradient(to bottom right, rgba(240, 230, 140, 0.2), rgba(218, 165, 32, 0.2))',
+                      borderColor: 'rgba(240, 230, 140, 0.3)'
+                    }}>
+                      <Star className="h-3 w-3" style={{ color: '#f0e68c' }} />
                     </div>
-                    <span className="text-sm text-gray-300 uppercase font-semibold">Work Item ID</span>
+                    <span className="text-xs text-gray-400 font-medium">Work Item ID</span>
                   </div>
-                  <span className="text-xs text-gray-400 font-mono bg-gray-700/50 px-3 py-2 rounded-lg border border-gray-600/40">{currentNode.id}</span>
+                  <span className="text-[10px] text-gray-400 font-mono bg-gray-700/50 px-1.5 py-0.5 rounded border border-gray-600/40">{currentNode.id}</span>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Enhanced Right Column - Action Buttons */}
-          <div className="w-56 flex-shrink-0 relative">
-            <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-6 flex items-center">
-              <div className="p-2 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-lg mr-3 border border-cyan-500/30">
-                <Rocket className="h-4 w-4 text-cyan-400" />
+          <div className="w-36 flex-shrink-0 relative">
+            <h3 className="text-sm font-medium text-gray-300 mb-1 flex items-center">
+              <div className="p-1 bg-gradient-to-br from-indigo-500/20 to-blue-600/20 rounded-lg mr-1 border border-indigo-500/30">
+                <Rocket className="h-3 w-3 text-indigo-400" />
               </div>
               Actions
             </h3>
-            <div className="space-y-4">
+            <div className="space-y-2">
               {/* Enhanced Connect Dropdown */}
               <div className="relative" ref={connectDropdownRef}>
                 <button
                   onClick={() => setShowConnectDropdown(!showConnectDropdown)}
                   disabled={getAvailableNodes().length === 0}
-                  className="w-full flex items-center justify-between space-x-2 px-5 py-4 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white rounded-xl transition-all duration-300 text-sm font-semibold shadow-lg hover:scale-105 transform border border-green-400/30"
+                  className="w-full flex flex-row items-center justify-start gap-2 px-3 py-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-all duration-300 text-xs font-semibold shadow-lg hover:scale-105 transform border border-green-400/30"
+                  aria-label={`Connect to other work items (${getAvailableNodes().length} available)`}
+                  title={getAvailableNodes().length === 0 ? "No work items available to connect" : "Connect to other work items"}
                 >
-                  <div className="flex items-center space-x-2">
-                    <Link2 className="h-4 w-4" />
-                    <span>Connect ({getAvailableNodes().length})</span>
-                  </div>
-                  <ChevronDown className={`h-4 w-4 transition-transform ${showConnectDropdown ? 'rotate-180' : ''}`} />
+                  <Link2 className="h-4 w-4" />
+                  <span className="leading-tight">Connect ({getAvailableNodes().length})</span>
                 </button>
                 
                 {showConnectDropdown && getAvailableNodes().length > 0 && (
@@ -1006,13 +1085,12 @@ export function NodeDetailsModal({
                 <button
                   onClick={() => setShowDisconnectDropdown(!showDisconnectDropdown)}
                   disabled={getConnectedNodes().length === 0}
-                  className="w-full flex items-center justify-between space-x-2 px-5 py-4 bg-gradient-to-r from-yellow-600 to-amber-600 hover:from-yellow-500 hover:to-amber-500 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white rounded-xl transition-all duration-300 text-sm font-semibold shadow-lg hover:scale-105 transform border border-yellow-400/30"
+                  className="w-full flex flex-row items-center justify-start gap-2 px-3 py-2 bg-gradient-to-r from-yellow-600 to-amber-600 hover:from-yellow-500 hover:to-amber-500 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-all duration-300 text-xs font-semibold shadow-lg hover:scale-105 transform border border-yellow-400/30"
+                  aria-label={`Disconnect from work items (${getConnectedNodes().length} connected)`}
+                  title={getConnectedNodes().length === 0 ? "No connections to disconnect" : "Disconnect from work items"}
                 >
-                  <div className="flex items-center space-x-2">
-                    <Unlink className="h-4 w-4" />
-                    <span>Disconnect ({getConnectedNodes().length})</span>
-                  </div>
-                  <ChevronDown className={`h-4 w-4 transition-transform ${showDisconnectDropdown ? 'rotate-180' : ''}`} />
+                  <Unlink className="h-4 w-4" />
+                  <span className="leading-tight">Disconnect ({getConnectedNodes().length})</span>
                 </button>
                 
                 {showDisconnectDropdown && getConnectedNodes().length > 0 && (
@@ -1079,55 +1157,54 @@ export function NodeDetailsModal({
                 <button
                   onClick={handleDelete}
                   disabled={deleting}
-                  className="w-full flex items-center justify-center space-x-2 px-5 py-4 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 disabled:from-red-400 disabled:to-rose-400 disabled:cursor-not-allowed text-white rounded-xl transition-all duration-300 text-sm font-semibold shadow-lg hover:scale-105 transform border border-red-400/30"
+                  className="w-full flex flex-row items-center justify-start gap-2 px-3 py-2 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 disabled:from-red-400 disabled:to-rose-400 disabled:cursor-not-allowed text-white rounded-lg transition-all duration-300 text-xs font-semibold shadow-lg hover:scale-105 transform border border-red-400/30"
+                  aria-label="Delete work item"
+                  title="Delete this work item (requires disconnecting all relationships first)"
                 >
                   <Trash2 className="h-4 w-4" />
-                  <span>{deleting ? 'Deleting...' : 'Delete Work Item'}</span>
+                  <span className="leading-tight">{deleting ? 'Deleting...' : 'Delete'}</span>
                 </button>
               ) : (
-                <div className="space-y-4 p-6 bg-gradient-to-br from-red-900/30 to-red-800/20 border border-red-500/40 rounded-xl shadow-lg backdrop-blur-sm">
-                  <div className="text-sm text-red-300 text-center font-semibold">
-                    Delete "{currentNode.title}"?
-                  </div>
-                  <div className="text-xs text-red-400 text-center leading-relaxed">
-                    This action cannot be undone and will permanently remove this work item.
+                <div className="space-y-2 p-2 bg-gradient-to-br from-red-900/30 to-red-800/20 border border-red-500/40 rounded-lg shadow-lg backdrop-blur-sm">
+                  <div className="text-xs text-red-300 text-center font-semibold">
+                    Delete?
                   </div>
                   
                   {/* Confirmation Checkbox */}
-                  <label className="flex items-center space-x-2 cursor-pointer">
+                  <label className="flex items-center space-x-1 cursor-pointer">
                     <div
                       onClick={() => setDeleteConfirmed(!deleteConfirmed)}
-                      className={`w-4 h-4 min-w-[16px] min-h-[16px] border flex items-center justify-center transition-colors cursor-pointer ${
-                        deleteConfirmed 
-                          ? 'bg-red-600 border-red-600' 
+                      className={`w-3 h-3 min-w-[12px] min-h-[12px] border flex items-center justify-center transition-colors cursor-pointer ${
+                        deleteConfirmed
+                          ? 'bg-red-600 border-red-600'
                           : 'bg-gray-700 border-gray-600 hover:border-gray-500'
                       }`}
                     >
                       {deleteConfirmed && (
-                        <span className="text-white text-xs font-bold">✓</span>
+                        <span className="text-white text-[8px] font-bold">✓</span>
                       )}
                     </div>
-                    <span className="text-xs text-gray-600 dark:text-gray-400">
-                      I understand this action cannot be undone
+                    <span className="text-[10px] text-gray-400 leading-tight">
+                      Confirm
                     </span>
                   </label>
-                  
-                  <div className="grid grid-cols-2 gap-3">
+
+                  <div className="grid grid-cols-2 gap-1">
                     <button
                       onClick={() => {
                         setShowDeleteConfirm(false);
                         setDeleteConfirmed(false);
                       }}
-                      className="px-4 py-3 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-500 hover:to-gray-600 text-white rounded-xl transition-all duration-200 text-sm font-semibold shadow-lg hover:scale-105 transform"
+                      className="px-2 py-1 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-500 hover:to-gray-600 text-white rounded-lg transition-all duration-200 text-xs font-semibold shadow-lg hover:scale-105 transform"
                     >
                       Cancel
                     </button>
                     <button
                       onClick={confirmDelete}
                       disabled={deleting || !deleteConfirmed}
-                      className="px-4 py-3 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 disabled:from-red-400 disabled:to-rose-400 disabled:cursor-not-allowed text-white rounded-xl transition-all duration-200 text-sm font-semibold shadow-lg hover:scale-105 transform"
+                      className="px-2 py-1 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 disabled:from-red-400 disabled:to-rose-400 disabled:cursor-not-allowed text-white rounded-lg transition-all duration-200 text-xs font-semibold shadow-lg hover:scale-105 transform"
                     >
-                      {deleting ? 'Deleting...' : 'Delete'}
+                      {deleting ? 'Del...' : 'Del'}
                     </button>
                   </div>
                 </div>
