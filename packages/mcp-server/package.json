@@ -9,7 +9,7 @@
     "dev": "echo 'MCP server should be started by Claude Code, not npm run dev. Use npm run dev:mcp to start manually.'",
     "dev:start": "tsx watch src/index.ts",
     "start": "node dist/index.js",
-    "test": "vitest --run",
+    "test": "NODE_OPTIONS='--max-old-space-size=4096' vitest --run",
     "test:coverage": "vitest run --coverage", 
     
     "test:input": "vitest --run tests/garbage-input.test.ts",

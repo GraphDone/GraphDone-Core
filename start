@@ -81,6 +81,19 @@ show_help() {
     echo -e "  ${CYAN}stop${NC}         Stop all running services"
     echo -e "  ${CYAN}remove${NC}       Remove GraphDone completely (services, data, dependencies)"
     echo -e "  ${CYAN}status${NC}       Check system status"
+    echo -e "  ${CYAN}vm${NC}           Manage Multipass VMs"
+    echo -e "    ${YELLOW}launch${NC}         Launch a new VM"
+    echo -e "    ${YELLOW}delete${NC}         Delete a VM"
+    echo -e "    ${YELLOW}stop${NC}           Stop a VM"
+    echo -e "    ${YELLOW}start${NC}          Start a VM"
+    echo -e "    ${YELLOW}shell${NC}          Open shell in VM"
+    echo -e "    ${YELLOW}info${NC}           Show VM information"
+    echo -e "    ${YELLOW}list${NC}           List all VMs"
+    echo -e "    ${YELLOW}--name NAME${NC}    Specify VM name"
+    echo -e "    ${YELLOW}--branch BRANCH${NC} Specify Git branch"
+    echo -e "    ${YELLOW}--cpus N${NC}       Number of CPUs"
+    echo -e "    ${YELLOW}--memory SIZE${NC}  Memory size (e.g., 8G)"
+    echo -e "    ${YELLOW}--disk SIZE${NC}    Disk size (e.g., 30G)"
     echo ""
     echo -e "${BOLD}OPTIONS:${NC}"
     echo -e "  ${YELLOW}--help, -h${NC}    Show this help message"
@@ -88,11 +101,16 @@ show_help() {
     echo -e "  ${YELLOW}--no-banner${NC}   Skip the GraphDone banner"
     echo ""
     echo -e "${BOLD}EXAMPLES:${NC}"
-    echo -e "  ${GREEN}./start${NC}              # Start development environment"
-    echo -e "  ${GREEN}./start quick${NC}        # Quick start"
-    echo -e "  ${GREEN}./start clean${NC}        # Clean and restart"
-    echo -e "  ${GREEN}./start test --quiet${NC}  # Run tests quietly"
-    echo -e "  ${GREEN}./start remove${NC}       # Completely remove GraphDone"
+    echo -e "  ${GREEN}./start${NC}                                  # Start development environment"
+    echo -e "  ${GREEN}./start quick${NC}                            # Quick start"
+    echo -e "  ${GREEN}./start clean${NC}                            # Clean and restart"
+    echo -e "  ${GREEN}./start test --quiet${NC}                      # Run tests quietly"
+    echo -e "  ${GREEN}./start remove${NC}                           # Completely remove GraphDone"
+    echo -e "  ${GREEN}./start vm launch${NC}                        # Launch VM with default config"
+    echo -e "  ${GREEN}./start vm launch --branch develop${NC}        # Launch VM with specific branch"
+    echo -e "  ${GREEN}./start vm launch --cpus 8 --memory 16G${NC}   # Launch VM with custom resources"
+    echo -e "  ${GREEN}./start vm shell${NC}                          # Connect to VM shell"
+    echo -e "  ${GREEN}./start vm delete${NC}                         # Delete VM"
     echo ""
     echo -e "${BOLD}PRODUCTION (deploy):${NC}"
     echo -e "  ${CYAN}Web UI:${NC}       https://localhost:3128 (HTTPS)"
@@ -123,7 +141,7 @@ while [[ $# -gt 0 ]]; do
             SKIP_BANNER=true
             shift
             ;;
-        dev|quick|clean|setup|test|build|deploy|stop|remove|status)
+        dev|quick|clean|setup|test|build|deploy|stop|remove|status|vm)
             COMMAND="$1"
             shift
             # Capture remaining arguments for the command
@@ -827,45 +845,66 @@ cmd_stop() {
 
 cmd_status() {
     log_info "📊 Checking system status..."
-    
+
     echo ""
     echo -e "${BOLD}System Status:${NC}"
-    
+
     # Check Node.js
     if command -v node &> /dev/null; then
         echo -e "  ${GREEN}✅${NC} Node.js: $(node --version)"
     else
         echo -e "  ${RED}❌${NC} Node.js: Not found"
     fi
-    
+
     # Check Docker
     if command -v docker &> /dev/null; then
         echo -e "  ${GREEN}✅${NC} Docker: $(docker --version | cut -d' ' -f3 | cut -d',' -f1)"
     else
         echo -e "  ${RED}❌${NC} Docker: Not found"
     fi
-    
+
     # Check services
     echo ""
     echo -e "${BOLD}Services:${NC}"
-    
+
     if curl -s http://localhost:3127 >/dev/null 2>&1; then
         echo -e "  ${GREEN}✅${NC} Web UI: http://localhost:3127"
     else
         echo -e "  ${RED}❌${NC} Web UI: Not running"
     fi
-    
+
     if curl -s http://localhost:4127/graphql >/dev/null 2>&1; then
         echo -e "  ${GREEN}✅${NC} GraphQL API: http://localhost:4127/graphql"
     else
         echo -e "  ${RED}❌${NC} GraphQL API: Not running"
     fi
-    
+
     if curl -s http://localhost:7474 >/dev/null 2>&1; then
         echo -e "  ${GREEN}✅${NC} Neo4j Database: http://localhost:7474"
     else
         echo -e "  ${RED}❌${NC} Neo4j Database: Not running"
     fi
+}
+
+cmd_vm() {
+    show_banner
+    log_info "🖥️  Managing Multipass VMs..."
+
+    # Check if multipass is installed
+    if ! command -v multipass &> /dev/null; then
+        log_error "❌ Multipass is not installed!"
+        echo ""
+        echo "Please install Multipass from: https://multipass.run"
+        echo ""
+        echo "Installation commands:"
+        echo -e "  ${GREEN}macOS:${NC}   brew install --cask multipass"
+        echo -e "  ${GREEN}Ubuntu:${NC}  sudo snap install multipass"
+        echo -e "  ${GREEN}Windows:${NC} Download from https://multipass.run"
+        exit 1
+    fi
+
+    # Pass all arguments to multipass.sh
+    ./tools/multipass.sh "${REMAINING_ARGS[@]}"
 }
 
 # Execute the command
@@ -899,6 +938,9 @@ case $COMMAND in
         ;;
     status)
         cmd_status
+        ;;
+    vm)
+        cmd_vm
         ;;
     *)
         log_error "❌ Unknown command: $COMMAND"
