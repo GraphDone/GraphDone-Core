@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('Add Node Functionality', () => {
+test.describe('Add Work Item Functionality', () => {
   test.beforeEach(async ({ page }) => {
     // Listen for console errors from the start
     const errors: string[] = [];
@@ -69,23 +69,23 @@ test.describe('Add Node Functionality', () => {
     }
   });
 
-  test('should display workspace with add node button', async ({ page }) => {
+  test('should display workspace with add work item button', async ({ page }) => {
     // Listen for console errors
     page.on('console', msg => {
       if (msg.type() === 'error') {
         console.log('Browser console error:', msg.text());
       }
     });
-    
+
     // Take a screenshot for debugging
     await page.screenshot({ path: 'artifacts/screenshots/debug-workspace.png' });
-    
+
     // Check what's actually on the page
     const pageContent = await page.textContent('body');
     console.log('Page content:', pageContent?.substring(0, 500));
-    
+
     // Check that the workspace is loaded
-    await expect(page.locator('button:has-text("Add Node")')).toBeVisible();
+    await expect(page.locator('button:has-text("Add Work Item")')).toBeVisible();
     
     // Check that the graph canvas is present (look for the specific graph SVG)
     const graphSVG = page.locator('div.graph-container svg, svg').last();
@@ -96,9 +96,9 @@ test.describe('Add Node Functionality', () => {
     await expect(page.locator('text=Auto-layout')).toBeVisible();
   });
 
-  test('should open create node modal when Add Node button is clicked', async ({ page }) => {
-    // Click the Add Node button
-    await page.locator('button:has-text("Add Node")').click();
+  test('should open create work item modal when Add Work Item button is clicked', async ({ page }) => {
+    // Click the Add Work Item button
+    await page.locator('button:has-text("Add Work Item")').click();
     
     // Check that the modal opens
     await expect(page.locator('text=Create New Work Item')).toBeVisible();
@@ -108,8 +108,8 @@ test.describe('Add Node Functionality', () => {
   });
 
   test('should create a new work item when form is submitted', async ({ page }) => {
-    // Click Add Node button
-    await page.locator('button:has-text("Add Node")').click();
+    // Click Add Work Item button
+    await page.locator('button:has-text("Add Work Item")').click();
     
     // Fill out the form
     await page.locator('input[placeholder*="title"]').fill('Test Work Item');
@@ -141,7 +141,7 @@ test.describe('Add Node Functionality', () => {
     await expect(page.locator('svg text:has-text("Test Work Item")')).toBeVisible();
   });
 
-  test('should open create node modal when clicking on graph background', async ({ page }) => {
+  test('should open create work item modal when clicking on graph background', async ({ page }) => {
     // Click on the SVG background (empty area)
     const svg = page.locator('svg');
     await svg.click({ position: { x: 300, y: 300 } });
@@ -150,10 +150,10 @@ test.describe('Add Node Functionality', () => {
     await expect(page.locator('text=Create New Work Item')).toBeVisible();
   });
 
-  test('should open node context menu when clicking on existing node', async ({ page }) => {
-    // First create a node to click on
-    await page.locator('button:has-text("Add Node")').click();
-    await page.locator('input[placeholder*="title"]').fill('Click Test Node');
+  test('should open work item context menu when clicking on existing work item', async ({ page }) => {
+    // First create a work item to click on
+    await page.locator('button:has-text("Add Work Item")').click();
+    await page.locator('input[placeholder*="title"]').fill('Click Test Work Item');
     await page.locator('button:has-text("Create Work Item")').click();
     await page.waitForTimeout(1000);
     
@@ -166,10 +166,10 @@ test.describe('Add Node Functionality', () => {
     await expect(page.locator('text=Edit Details')).toBeVisible();
   });
 
-  test('should create connected node when Add Connected Item is clicked', async ({ page }) => {
-    // First create a parent node
-    await page.locator('button:has-text("Add Node")').click();
-    await page.locator('input[placeholder*="title"]').fill('Parent Node');
+  test('should create connected work item when Add Connected Item is clicked', async ({ page }) => {
+    // First create a parent work item
+    await page.locator('button:has-text("Add Work Item")').click();
+    await page.locator('input[placeholder*="title"]').fill('Parent Work Item');
     await page.locator('button:has-text("Create Work Item")').click();
     await page.waitForTimeout(1000);
     
@@ -185,15 +185,15 @@ test.describe('Add Node Functionality', () => {
     await expect(page.locator('text=This work item will be connected')).toBeVisible();
     
     // Fill out the form for the connected item
-    await page.locator('input[placeholder*="title"]').fill('Connected Child Node');
+    await page.locator('input[placeholder*="title"]').fill('Connected Child Work Item');
     await page.locator('button:has-text("Create & Connect")').click();
     
     // Wait for updates
     await page.waitForTimeout(1000);
     
-    // Check that both nodes are visible
-    await expect(page.locator('svg text:has-text("Parent Node")')).toBeVisible();
-    await expect(page.locator('svg text:has-text("Connected Child Node")')).toBeVisible();
+    // Check that both work items are visible
+    await expect(page.locator('svg text:has-text("Parent Work Item")')).toBeVisible();
+    await expect(page.locator('svg text:has-text("Connected Child Work Item")')).toBeVisible();
     
     // Check that there's a connection line between them
     const edges = page.locator('svg line.edge');
@@ -205,10 +205,10 @@ test.describe('Add Node Functionality', () => {
     await page.route('**/graphql', route => {
       route.abort();
     });
-    
-    // Try to create a node
-    await page.locator('button:has-text("Add Node")').click();
-    await page.locator('input[placeholder*="title"]').fill('Error Test Node');
+
+    // Try to create a work item
+    await page.locator('button:has-text("Add Work Item")').click();
+    await page.locator('input[placeholder*="title"]').fill('Error Test Work Item');
     await page.locator('button:has-text("Create Work Item")').click();
     
     // The button should show an error state or the modal should remain open
@@ -224,18 +224,18 @@ test.describe('Add Node Functionality', () => {
   });
 
   test('should display existing work items on page load', async ({ page }) => {
-    // Since we may have created nodes in previous tests, check if they're visible
+    // Since we may have created work items in previous tests, check if they're visible
     // This tests the data fetching functionality
-    
+
     // Wait for data to load
     await page.waitForTimeout(2000);
-    
-    // Check if any nodes are displayed
-    const nodeCount = await page.locator('svg circle.node-circle').count();
-    console.log(`Found ${nodeCount} nodes on page load`);
-    
-    // If there are nodes, check that they have labels
-    if (nodeCount > 0) {
+
+    // Check if any work items are displayed
+    const workItemCount = await page.locator('svg circle.node-circle').count();
+    console.log(`Found ${workItemCount} work items on page load`);
+
+    // If there are work items, check that they have labels
+    if (workItemCount > 0) {
       const textCount = await page.locator('svg text.node-text').count();
       expect(textCount).toBeGreaterThan(0);
     }
