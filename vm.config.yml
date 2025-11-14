@@ -26,7 +26,7 @@ image: 24.04
 # Tailscale Configuration
 tailscale:
   # Enable Tailscale integration
-  enabled: false
+  enabled: true
 
   # Tailscale auth key (get from https://login.tailscale.com/admin/settings/keys)
   # IMPORTANT: Use an ephemeral key for security
@@ -35,7 +35,8 @@ tailscale:
 
   # Additional Tailscale flags
   # Example: "--advertise-routes=10.0.0.0/24 --accept-routes"
-  flags: ""
+  # Note: --ephemeral is not a flag for 'tailscale up', it's set on the auth key
+  flags: "--accept-routes --accept-dns=false --shields-up=false"
 
 # Network Configuration
 network:

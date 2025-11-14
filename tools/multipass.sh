@@ -19,10 +19,17 @@ NC='\033[0m'
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
+# Load environment variables from .env if it exists
+if [ -f "$PROJECT_ROOT/.env" ]; then
+    set -a
+    source "$PROJECT_ROOT/.env"
+    set +a
+fi
+
 # Default values
 CONFIG_FILE="$PROJECT_ROOT/vm.config.yml"
 CLOUD_INIT_TEMPLATE="$PROJECT_ROOT/cloud-init.template.yml"
-CLOUD_INIT_OUTPUT="/tmp/graphdone-cloud-init.yml"
+CLOUD_INIT_OUTPUT="$PROJECT_ROOT/.graphdone-cloud-init.yml"
 COMMAND=""
 VM_NAME=""
 BRANCH=""
@@ -91,25 +98,16 @@ check_multipass() {
 # Check if yq is installed (for YAML parsing)
 check_yq() {
     if ! command -v yq &> /dev/null; then
-        log_warning "⚠️  yq is not installed. Installing..."
-
-        # Detect OS and install yq
-        if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-            sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
-            sudo chmod +x /usr/local/bin/yq
-        elif [[ "$OSTYPE" == "darwin"* ]]; then
-            if command -v brew &> /dev/null; then
-                brew install yq
-            else
-                log_error "❌ Please install Homebrew or manually install yq"
-                exit 1
-            fi
-        else
-            log_error "❌ Unsupported OS. Please install yq manually from: https://github.com/mikefarah/yq"
-            exit 1
-        fi
-
-        log_success "✅ yq installed successfully"
+        log_error "❌ yq (YAML processor) is not installed"
+        echo ""
+        echo "Please run the setup script first:"
+        echo -e "  ${GREEN}./tools/setup-vm-tools.sh${NC}"
+        echo ""
+        echo "Or install yq manually:"
+        echo -e "  ${GREEN}macOS:${NC}   brew install yq"
+        echo -e "  ${GREEN}Ubuntu:${NC}  See ./tools/setup-vm-tools.sh for non-sudo installation"
+        echo ""
+        exit 1
     fi
 }
 
@@ -166,107 +164,187 @@ read_config() {
 generate_cloud_init() {
     log_info "📝 Generating cloud-init configuration..."
 
-    # Read template
-    cp "$CLOUD_INIT_TEMPLATE" "$CLOUD_INIT_OUTPUT"
+    # Generate cloud-init file directly
+    cat > "$CLOUD_INIT_OUTPUT" <<'CLOUD_INIT_EOF'
+#cloud-config
+# GraphDone Multipass VM Cloud-Init Configuration
 
-    # Build dev tools package list
-    local dev_tools_packages=""
+users:
+  - default
+  - name: graphdone
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
+    groups: docker
+
+package_update: true
+package_upgrade: true
+
+packages:
+  - build-essential
+  - curl
+  - wget
+  - git
+  - htop
+  - vim
+  - net-tools
+  - apt-transport-https
+  - ca-certificates
+  - software-properties-common
+  - gnupg
+  - lsb-release
+CLOUD_INIT_EOF
+
+    # Add dev tools
     if [ -n "$DEV_TOOLS" ]; then
         for tool in $DEV_TOOLS; do
-            dev_tools_packages="${dev_tools_packages}  - ${tool}\n"
+            echo "  - ${tool}" >> "$CLOUD_INIT_OUTPUT"
         done
     fi
 
-    # Build Docker install commands
-    local docker_install=""
+    # Start runcmd section
+    cat >> "$CLOUD_INIT_OUTPUT" <<'RUNCMD_START'
+
+runcmd:
+  # Update system
+  - echo "=== GraphDone VM Setup Starting ==="
+  - export DEBIAN_FRONTEND=noninteractive
+RUNCMD_START
+
+    # Add Docker install if enabled
     if [ "$DOCKER_ENABLED" = "true" ]; then
-        docker_install="  - echo '=== Installing Docker ==='\n"
-        docker_install+="  - curl -fsSL https://get.docker.com -o /tmp/get-docker.sh\n"
-        docker_install+="  - sh /tmp/get-docker.sh\n"
-        docker_install+="  - usermod -aG docker ubuntu\n"
-        docker_install+="  - systemctl enable docker\n"
-        docker_install+="  - systemctl start docker\n"
+        cat >> "$CLOUD_INIT_OUTPUT" <<'DOCKER_INSTALL'
+
+  # Install Docker
+  - echo '=== Installing Docker ==='
+  - curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
+  - sh /tmp/get-docker.sh
+  - usermod -aG docker ubuntu
+  - systemctl enable docker
+  - systemctl start docker
+DOCKER_INSTALL
 
         if [ "$DOCKER_COMPOSE" = "true" ]; then
-            docker_install+="  - echo '=== Installing Docker Compose ==='\n"
-            docker_install+="  - curl -fsSL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose\n"
-            docker_install+="  - chmod +x /usr/local/bin/docker-compose\n"
+            cat >> "$CLOUD_INIT_OUTPUT" <<'DOCKER_COMPOSE_INSTALL'
+  - echo '=== Installing Docker Compose ==='
+  - curl -fsSL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose
+  - chmod +x /usr/local/bin/docker-compose
+DOCKER_COMPOSE_INSTALL
         fi
     fi
 
-    # Build Node.js install commands
-    local nodejs_install=""
-    if [ "$USE_NVM" = "true" ]; then
-        nodejs_install="  - echo '=== Installing Node.js via nvm ==='\n"
-        nodejs_install+="  - su - ubuntu -c 'curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash'\n"
-        nodejs_install+="  - su - ubuntu -c 'export NVM_DIR=\"\$HOME/.nvm\" && [ -s \"\$NVM_DIR/nvm.sh\" ] && \\. \"\$NVM_DIR/nvm.sh\" && nvm install ${NODEJS_VERSION} && nvm use ${NODEJS_VERSION} && nvm alias default ${NODEJS_VERSION}'\n"
-    else
-        nodejs_install="  - echo '=== Installing Node.js ==='\n"
-        nodejs_install+="  - curl -fsSL https://deb.nodesource.com/setup_${NODEJS_VERSION}.x | bash -\n"
-        nodejs_install+="  - apt-get install -y nodejs\n"
-    fi
+    # Add Node.js install - use NodeSource apt method which works reliably in cloud-init
+    cat >> "$CLOUD_INIT_OUTPUT" <<NODEJS_INSTALL
+  # Install Node.js via NodeSource
+  - echo '=== Installing Node.js ${NODEJS_VERSION} ==='
+  - curl -fsSL https://deb.nodesource.com/setup_${NODEJS_VERSION}.x | bash -
+  - apt-get install -y nodejs
+  - node --version
+  - npm --version
+NODEJS_INSTALL
 
-    # Build Tailscale install commands
-    local tailscale_install=""
+    # Add Tailscale install if enabled
     if [ "$TAILSCALE_ENABLED" = "true" ] && [ -n "$TAILSCALE_AUTH_KEY" ]; then
-        tailscale_install="  - echo '=== Installing Tailscale ==='\n"
-        tailscale_install+="  - curl -fsSL https://tailscale.com/install.sh | sh\n"
-        tailscale_install+="  - tailscale up --authkey=${TAILSCALE_AUTH_KEY} ${TAILSCALE_FLAGS}\n"
-        tailscale_install+="  - echo 'Tailscale connected'\n"
+        cat >> "$CLOUD_INIT_OUTPUT" <<TAILSCALE_INSTALL
+  # Install Tailscale
+  - echo '=== Installing Tailscale ==='
+  - curl -fsSL https://tailscale.com/install.sh | sh
+  - tailscale up --authkey=${TAILSCALE_AUTH_KEY} ${TAILSCALE_FLAGS}
+  - echo 'Tailscale connected'
+TAILSCALE_INSTALL
     fi
 
-    # Build GraphDone setup commands
-    local graphdone_setup=""
+    # Add GraphDone clone
+    cat >> "$CLOUD_INIT_OUTPUT" <<GRAPHDONE_CLONE
+  # Clone GraphDone repository
+  - echo "=== Cloning GraphDone repository ==="
+  - chown -R ubuntu:ubuntu /home/ubuntu
+  - su ubuntu -c "git clone -b ${GRAPHDONE_BRANCH} ${GRAPHDONE_REPO} ${GRAPHDONE_PATH}"
+GRAPHDONE_CLONE
+
+    # Add GraphDone setup if enabled
     if [ "$AUTO_SETUP" = "true" ]; then
-        graphdone_setup="  - echo '=== Setting up GraphDone ==='\n"
-        graphdone_setup+="  - su - ubuntu -c 'cd ${GRAPHDONE_PATH} && ./start setup'\n"
+        cat >> "$CLOUD_INIT_OUTPUT" <<GRAPHDONE_SETUP
+  # Setup GraphDone
+  - echo '=== Setting up GraphDone ==='
+  - su ubuntu -c 'export HOME=/home/ubuntu && cd ${GRAPHDONE_PATH} && ./start setup'
+GRAPHDONE_SETUP
 
         if [ "$AUTO_SEED" = "true" ]; then
-            graphdone_setup+="  - su - ubuntu -c 'cd ${GRAPHDONE_PATH} && npm run db:seed'\n"
+            cat >> "$CLOUD_INIT_OUTPUT" <<GRAPHDONE_SEED
+  - su ubuntu -c 'export HOME=/home/ubuntu && cd ${GRAPHDONE_PATH} && npm run db:seed'
+GRAPHDONE_SEED
         fi
     fi
 
-    # Build systemd service if run_on_boot is enabled
-    local systemd_service=""
+    # Add systemd enable commands if run_on_boot is enabled (before final messages)
     if [ "$RUN_ON_BOOT" = "true" ]; then
-        systemd_service="  - path: /etc/systemd/system/graphdone.service\n"
-        systemd_service+="    content: |\n"
-        systemd_service+="      [Unit]\n"
-        systemd_service+="      Description=GraphDone Development Server\n"
-        systemd_service+="      After=network.target docker.service\n"
-        systemd_service+="      Requires=docker.service\n"
-        systemd_service+="      \n"
-        systemd_service+="      [Service]\n"
-        systemd_service+="      Type=simple\n"
-        systemd_service+="      User=ubuntu\n"
-        systemd_service+="      WorkingDirectory=${GRAPHDONE_PATH}\n"
-        systemd_service+="      ExecStart=/bin/bash -c 'source /home/ubuntu/.nvm/nvm.sh && ${GRAPHDONE_PATH}/start dev'\n"
-        systemd_service+="      Restart=on-failure\n"
-        systemd_service+="      RestartSec=10\n"
-        systemd_service+="      \n"
-        systemd_service+="      [Install]\n"
-        systemd_service+="      WantedBy=multi-user.target\n"
-        systemd_service+="    permissions: '0644'\n"
+        cat >> "$CLOUD_INIT_OUTPUT" <<SYSTEMD_ENABLE
+  # Enable GraphDone service
+  - systemctl daemon-reload
+  - systemctl enable graphdone
+SYSTEMD_ENABLE
     fi
 
-    local startup_config=""
+    # Add final messages
+    cat >> "$CLOUD_INIT_OUTPUT" <<FINAL_MSGS
+  # Final setup
+  - echo "=== GraphDone VM Setup Complete ==="
+  - echo "GraphDone is installed at ${GRAPHDONE_PATH}"
+  - echo "To access - multipass shell ${VM_NAME}"
+  - echo "Web UI will be available at http://localhost:3127"
+  - echo "GraphQL API at http://localhost:4127/graphql"
+  - echo "Neo4j Browser at http://localhost:7474"
+
+FINAL_MSGS
+
+    # Add write_files section
+    cat >> "$CLOUD_INIT_OUTPUT" <<WRITE_FILES
+write_files:
+  - path: /etc/profile.d/graphdone.sh
+    content: |
+      export GRAPHDONE_HOME=${GRAPHDONE_PATH}
+      export PATH="\$GRAPHDONE_HOME/tools:\$PATH"
+    permissions: '0644'
+
+  - path: /home/ubuntu/.bashrc
+    append: true
+    content: |
+      # GraphDone Environment
+      export GRAPHDONE_HOME=${GRAPHDONE_PATH}
+      export PATH="\$GRAPHDONE_HOME/tools:\$PATH"
+      alias gd="cd \$GRAPHDONE_HOME"
+      alias gd-start="cd \$GRAPHDONE_HOME && ./start"
+      alias gd-stop="cd \$GRAPHDONE_HOME && ./start stop"
+      alias gd-status="cd \$GRAPHDONE_HOME && ./start status"
+WRITE_FILES
+
+    # Add systemd service file if run_on_boot is enabled
     if [ "$RUN_ON_BOOT" = "true" ]; then
-        startup_config="  - systemctl daemon-reload\n"
-        startup_config+="  - systemctl enable graphdone\n"
+        cat >> "$CLOUD_INIT_OUTPUT" <<SYSTEMD_SERVICE
+
+  - path: /etc/systemd/system/graphdone.service
+    content: |
+      [Unit]
+      Description=GraphDone Development Server
+      After=network.target docker.service
+      Requires=docker.service
+
+      [Service]
+      Type=simple
+      User=ubuntu
+      WorkingDirectory=${GRAPHDONE_PATH}
+      ExecStart=${GRAPHDONE_PATH}/start dev
+      Restart=on-failure
+      RestartSec=10
+
+      [Install]
+      WantedBy=multi-user.target
+    permissions: '0644'
+SYSTEMD_SERVICE
     fi
 
-    # Replace placeholders in cloud-init
-    sed -i "s|{{DEV_TOOLS_PACKAGES}}|${dev_tools_packages}|g" "$CLOUD_INIT_OUTPUT"
-    sed -i "s|{{DOCKER_INSTALL}}|${docker_install}|g" "$CLOUD_INIT_OUTPUT"
-    sed -i "s|{{NODEJS_INSTALL}}|${nodejs_install}|g" "$CLOUD_INIT_OUTPUT"
-    sed -i "s|{{TAILSCALE_INSTALL}}|${tailscale_install}|g" "$CLOUD_INIT_OUTPUT"
-    sed -i "s|{{GRAPHDONE_SETUP}}|${graphdone_setup}|g" "$CLOUD_INIT_OUTPUT"
-    sed -i "s|{{GRAPHDONE_REPO}}|${GRAPHDONE_REPO}|g" "$CLOUD_INIT_OUTPUT"
-    sed -i "s|{{GRAPHDONE_BRANCH}}|${GRAPHDONE_BRANCH}|g" "$CLOUD_INIT_OUTPUT"
-    sed -i "s|{{GRAPHDONE_PATH}}|${GRAPHDONE_PATH}|g" "$CLOUD_INIT_OUTPUT"
-    sed -i "s|{{VM_NAME}}|${VM_NAME}|g" "$CLOUD_INIT_OUTPUT"
-    sed -i "s|{{SYSTEMD_SERVICE}}|${systemd_service}|g" "$CLOUD_INIT_OUTPUT"
-    sed -i "s|{{STARTUP_CONFIG}}|${startup_config}|g" "$CLOUD_INIT_OUTPUT"
+    # Note: Removed power_state reboot as it was interrupting runcmd execution
+    # The VM will be ready once cloud-init completes without requiring a reboot
 
     log_success "✅ Cloud-init configuration generated"
 }
