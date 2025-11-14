@@ -420,9 +420,9 @@ test.describe('Comprehensive Graph Operations - Real-Time vs Refresh', () => {
         // Look for context menu
         const createContextOption = page.locator(
           'button:has-text("Create"), ' +
-          'button:has-text("Add Node"), ' +
-          'text="Create Node", ' +
-          'text="Add Node"'
+          'button:has-text("Add Work Item"), ' +
+          'text="Create Work Item", ' +
+          'text="Add Work Item"'
         ).first();
         
         if (await createContextOption.isVisible({ timeout: 3000 })) {

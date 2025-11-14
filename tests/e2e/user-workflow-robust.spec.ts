@@ -80,7 +80,7 @@ test.describe('User Workflow - Node Creation & Refresh Issue', () => {
         await graphArea.click({ button: 'right', position: { x: 400, y: 300 } });
         await page.waitForTimeout(1000);
         
-        const createNodeOption = page.locator('button:has-text("Create Node"), button:has-text("Add Node"), text="Create Node"').first();
+        const createNodeOption = page.locator('button:has-text("Create Work Item"), button:has-text("Add Work Item"), text="Create Work Item"').first();
         if (await createNodeOption.isVisible({ timeout: 3000 })) {
           await createNodeOption.click();
           nodeCreationAttempted = true;
@@ -400,7 +400,7 @@ test.describe('User Workflow - Node Creation & Refresh Issue', () => {
         await graphArea.click({ button: 'right', position: { x: Math.random() * 400 + 200, y: Math.random() * 300 + 200 } });
         await page.waitForTimeout(1000);
         
-        const createOption = page.locator('button:has-text("Create"), button:has-text("Add Node"), text="Create Node"').first();
+        const createOption = page.locator('button:has-text("Create"), button:has-text("Add Work Item"), text="Create Work Item"').first();
         if (await createOption.isVisible({ timeout: 3000 })) {
           await createOption.click();
           

@@ -51,12 +51,12 @@ GraphDone uses a **graph-first approach** where work items exist as connected no
 
 **Quick Node Creation:**
 1. **Right-click** on empty graph space
-2. **Select** "Add Node" from context menu
+2. **Select** "Add Work Item" from context menu
 3. **Choose** node type from comprehensive list
 4. **Fill** essential information and save
 
 **Detailed Node Creation:**
-1. **Click** primary "Add Node" button
+1. **Click** primary "Add Work Item" button
 2. **Complete** the node creation form:
 
    **Essential Fields:**

@@ -466,7 +466,7 @@ export function CodeCaptcha({
         <div className="mb-3">
           <div className="flex gap-3">
             {/* Input Field */}
-            <div className="flex-1 relative">
+            <div className="flex-1 relative min-w-[200px]">
               <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
                 <KeyRound className="h-5 w-5 text-gray-400" />
               </div>
@@ -488,7 +488,7 @@ export function CodeCaptcha({
                 onKeyPress={handleKeyPress}
                 onPaste={(e) => e.preventDefault()}
                 maxLength={codeLength}
-                className={`w-full pl-12 pr-4 py-3 bg-gray-700/50 backdrop-blur-sm border rounded-xl text-gray-100 font-mono text-center text-lg tracking-widest focus:outline-none focus:ring-2 transition-all ${
+                className={`w-full pl-12 pr-4 py-3 bg-gray-700/50 backdrop-blur-sm border rounded-xl text-gray-100 font-mono text-center text-base tracking-wide focus:outline-none focus:ring-2 transition-all ${
                   error
                     ? 'border-red-500/50 focus:ring-red-500/50'
                     : 'border-gray-600/50 focus:ring-teal-500/50 focus:border-teal-500/50'
