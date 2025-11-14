@@ -1,0 +1,203 @@
+--- a/tools/test-vm-e2e.sh
++++ b/tools/test-vm-e2e.sh
+@@ -162,9 +162,12 @@ main() {
+         exit 1
+     fi
++    end_step "vm_launch"
+ 
+     # Step 2: Wait for provisioning
+     log_section "Step 2: Waiting for VM Provisioning"
+     add_to_report "## ⏳ VM Provisioning"
++    start_step "vm_provisioning"
+ 
+     log_info "Waiting for cloud-init to complete..."
+@@ -176,9 +179,12 @@ main() {
+         exit 1
+     fi
++    end_step "vm_provisioning"
+ 
+     # Step 3: Verify GraphDone installation
+     log_section "Step 3: Verifying GraphDone Installation"
+     add_to_report "## 🔍 Installation Verification"
++    start_step "installation_verification"
+ 
+     if multipass exec "$VM_NAME" -- bash -c "cd ~/graphdone && ls -la" > /dev/null 2>&1; then
+@@ -189,9 +195,12 @@ main() {
+         exit 1
+     fi
++    end_step "installation_verification"
+ 
+     # Step 4: Run linting
+     log_section "Step 4: Running Linting"
+     add_to_report "## 🧹 Linting"
++    start_step "linting"
+ 
+     if multipass exec "$VM_NAME" -- bash -c 'cd ~/graphdone && npm run lint' 2>&1 | tee "$REPORT_DIR/lint.log"; then
+@@ -200,9 +209,12 @@ main() {
+         log_warning "Linting had issues (continuing)"
+         add_to_report "⚠️ Linting had issues"
+     fi
++    end_step "linting"
+ 
+     # Step 5: Run type checking
+     log_section "Step 5: Running Type Checking"
+     add_to_report "## 🔤 Type Checking"
++    start_step "typecheck"
+ 
+     if multipass exec "$VM_NAME" -- bash -c 'cd ~/graphdone && npm run typecheck' 2>&1 | tee "$REPORT_DIR/typecheck.log"; then
+@@ -211,9 +223,12 @@ main() {
+         log_warning "Type checking had issues (continuing)"
+         add_to_report "⚠️ Type checking had issues"
+     fi
++    end_step "typecheck"
+ 
+     # Step 6: Run build process
+     log_section "Step 6: Running Build Process"
+     add_to_report "## 🏗️ Build Process"
++    start_step "build"
+ 
+     if multipass exec "$VM_NAME" -- bash -c 'cd ~/graphdone && npm run build' 2>&1 | tee "$REPORT_DIR/build.log"; then
+@@ -226,9 +241,12 @@ main() {
+         add_to_report "\`\`\`"
+         exit 1
+     fi
++    end_step "build"
+ 
+     # Step 7: Run unit tests
+     log_section "Step 7: Running Unit Tests"
+     add_to_report "## 🧪 Unit Tests"
++    start_step "unit_tests"
+ 
+     if multipass exec "$VM_NAME" -- bash -c 'cd ~/graphdone && npm run test' 2>&1 | tee "$REPORT_DIR/unit-tests.log"; then
+@@ -246,9 +264,12 @@ main() {
+         add_to_report "\`\`\`"
+         exit 1
+     fi
++    end_step "unit_tests"
+ 
+     # Step 8: Run E2E tests (if available)
+     log_section "Step 8: Running E2E Tests"
+     add_to_report "## 🎭 E2E Tests"
++    start_step "e2e_tests"
+ 
+     if multipass exec "$VM_NAME" -- bash -c 'cd ~/graphdone && npm run test:e2e:core' 2>&1 | tee "$REPORT_DIR/e2e-tests.log"; then
+@@ -258,6 +279,7 @@ main() {
+         log_warning "E2E tests failed or not available (continuing)"
+         add_to_report "⚠️ E2E tests failed or not available"
+     fi
++    end_step "e2e_tests"
+ 
+     # Step 8.5: Run Visual Regression Screenshot Suite (optional)
+@@ -265,6 +287,7 @@ main() {
+         log_section "Step 8.5: Running Visual Regression Screenshot Suite"
+         add_to_report "## 📸 Visual Regression Screenshots"
++        start_step "visual_regression"
+ 
+         log_info "Capturing screenshots across all device resolutions..."
+@@ -280,11 +303,14 @@ main() {
+             log_warning "Visual regression screenshot capture had issues (continuing)"
+             add_to_report "⚠️ Visual regression screenshot capture incomplete"
+         fi
++        end_step "visual_regression"
+     else
+         log_info "Skipping visual regression screenshots (RUN_VISUAL_REGRESSION=false)"
+     fi
+ 
+     # Step 9: Functional API Testing
+     log_section "Step 9: Functional API Testing"
+     add_to_report "## 🔌 Functional API Tests"
++    start_step "functional_api_tests"
+ 
+     # Start GraphDone services
+@@ -364,9 +390,12 @@ main() {
+             fi
+         fi
+     fi
++    end_step "functional_api_tests"
+ 
+     # Step 10: Copy test artifacts from VM
+     log_section "Step 10: Copying Test Artifacts from VM"
+     add_to_report "## 📦 Test Artifacts"
++    start_step "copy_artifacts"
+ 
+     # Create artifacts directory
+@@ -443,6 +472,7 @@ main() {
+             log_warning "Visual regression directory exists but is empty"
+         fi
+     fi
++    end_step "copy_artifacts"
+ 
+     # Step 11: Collect VM information
+@@ -470,6 +500,46 @@ main() {
+ 
+     # Update report with duration
+     sed -i "s/Test Duration: TBD/Test Duration: ${duration_min}m ${duration_sec}s/" "$REPORT_FILE"
++
++    # Add detailed timing breakdown
++    add_to_report ""
++    add_to_report "---"
++    add_to_report "## ⏱️ Detailed Timing Breakdown"
++    add_to_report ""
++    add_to_report "| Step | Duration | Percentage |"
++    add_to_report "|------|----------|------------|"
++
++    # Calculate total time from steps (excluding overlaps)
++    local steps_total=0
++    for step in "${!STEP_DURATIONS[@]}"; do
++        steps_total=$((steps_total + STEP_DURATIONS[$step]))
++    done
++
++    # Sort and display steps
++    for step in vm_launch vm_provisioning installation_verification linting typecheck build unit_tests e2e_tests visual_regression functional_api_tests copy_artifacts; do
++        if [ -n "${STEP_DURATIONS[$step]}" ]; then
++            local step_duration=${STEP_DURATIONS[$step]}
++            local step_min=$((step_duration / 60))
++            local step_sec=$((step_duration % 60))
++            local percentage=$((step_duration * 100 / steps_total))
++
++            # Format step name
++            local step_label=$(echo "$step" | sed 's/_/ /g' | sed 's/\b\(.\)/\u\1/g')
++
++            add_to_report "| $step_label | ${step_min}m ${step_sec}s | ${percentage}% |"
++        fi
++    done
++
++    add_to_report ""
++    add_to_report "### Performance Insights"
++    add_to_report ""
++
++    # Find slowest step
++    local slowest_step=""
++    local slowest_duration=0
++    for step in "${!STEP_DURATIONS[@]}"; do
++        if [ ${STEP_DURATIONS[$step]} -gt $slowest_duration ]; then
++            slowest_duration=${STEP_DURATIONS[$step]}
++            slowest_step=$step
++        fi
++    done
++
++    if [ -n "$slowest_step" ]; then
++        local slowest_min=$((slowest_duration / 60))
++        local slowest_sec=$((slowest_duration % 60))
++        local slowest_label=$(echo "$slowest_step" | sed 's/_/ /g' | sed 's/\b\(.\)/\u\1/g')
++        add_to_report "**Slowest Step:** $slowest_label (${slowest_min}m ${slowest_sec}s)"
++    fi
++
++    add_to_report ""
++    add_to_report "**Recommendations:**"
++
++    # Add recommendations based on timing
++    if [ ${STEP_DURATIONS[e2e_tests]:-0} -gt 900 ]; then
++        add_to_report "- ⚠️ E2E tests took >15min - consider parallelization or reducing test scope"
++    fi
++
++    if [ ${STEP_DURATIONS[vm_provisioning]:-0} -gt 300 ]; then
++        add_to_report "- ⚠️ VM provisioning took >5min - consider caching dependencies or using prebuilt images"
++    fi
++
++    if [ ${STEP_DURATIONS[build]:-0} -gt 180 ]; then
++        add_to_report "- ⚠️ Build took >3min - consider build caching or optimization"
++    fi
+ 
+     add_to_report "---"
+     add_to_report "## ✅ All Tests Passed"
