@@ -10,6 +10,7 @@ coverage/
 test-results/
 test-artifacts/
 playwright-report/
+test-reports/
 *.png
 *.jpg
 *.jpeg
