@@ -2864,17 +2864,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     .on('contextmenu', (event: MouseEvent, d: any) => {
       event.preventDefault();
       event.stopPropagation();
-      
-      // Context menu disabled - just select the node
-      setSelectedNode(d);
-      lastSelectedNodeRef.current = d; // Track last selected
-      
-      // Apply glow effect
-      applyNodeGlowImmediately(d);
-      
-      // Context menu disabled
-      return;
-      /*
+
       // Show context menu for advanced actions
       const containerRect = containerRef.current?.getBoundingClientRect();
       if (containerRect) {
@@ -2886,8 +2876,126 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
           },
           visible: true
         });
+
+        // Select the node and apply glow effect
+        setSelectedNode(d);
+        lastSelectedNodeRef.current = d;
+        applyNodeGlowImmediately(d);
       }
-      */
+    })
+    .on('touchstart', function(event: TouchEvent, d: any) {
+      // Track touch for long-press detection
+      const element = d3.select(this);
+      const touch = event.touches[0];
+
+      const touchData = {
+        startTime: Date.now(),
+        startX: touch.clientX,
+        startY: touch.clientY,
+        timeout: null as any,
+        moved: false
+      };
+
+      // Store touch data on the element
+      (element.node() as any).__touchData = touchData;
+
+      // Add visual feedback for long-press
+      const feedbackCircle = element.append('circle')
+        .attr('class', 'long-press-feedback')
+        .attr('cx', 0)
+        .attr('cy', 0)
+        .attr('r', 0)
+        .attr('fill', 'none')
+        .attr('stroke', '#3b82f6')
+        .attr('stroke-width', 2)
+        .attr('opacity', 0.6);
+
+      // Animate growing circle for visual feedback
+      feedbackCircle
+        .transition()
+        .duration(500)
+        .attr('r', 30)
+        .attr('opacity', 0);
+
+      // Set timeout for long-press
+      touchData.timeout = setTimeout(() => {
+        if (!touchData.moved) {
+          // Long press detected - show context menu
+          event.preventDefault();
+          const containerRect = containerRef.current?.getBoundingClientRect();
+          if (containerRect) {
+            setNodeMenu({
+              node: d,
+              position: {
+                x: touch.clientX - containerRect.left,
+                y: touch.clientY - containerRect.top
+              },
+              visible: true
+            });
+
+            // Select the node and apply glow effect
+            setSelectedNode(d);
+            lastSelectedNodeRef.current = d;
+            applyNodeGlowImmediately(d);
+
+            // Haptic feedback (if supported)
+            if (navigator.vibrate) {
+              navigator.vibrate(50);
+            }
+          }
+        }
+        feedbackCircle.remove();
+      }, 500);
+    })
+    .on('touchmove', function(event: TouchEvent) {
+      // Track movement to cancel long-press if user is dragging
+      const element = d3.select(this);
+      const touchData = (element.node() as any).__touchData;
+
+      if (touchData) {
+        const touch = event.touches[0];
+        const deltaX = touch.clientX - touchData.startX;
+        const deltaY = touch.clientY - touchData.startY;
+        const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+
+        // If moved more than 10px, cancel long-press
+        if (distance > 10) {
+          touchData.moved = true;
+          if (touchData.timeout) {
+            clearTimeout(touchData.timeout);
+          }
+          // Remove visual feedback
+          element.select('.long-press-feedback').remove();
+        }
+      }
+    })
+    .on('touchend', function() {
+      // Clean up long-press detection
+      const element = d3.select(this);
+      const touchData = (element.node() as any).__touchData;
+
+      if (touchData) {
+        if (touchData.timeout) {
+          clearTimeout(touchData.timeout);
+        }
+        delete (element.node() as any).__touchData;
+      }
+
+      // Remove visual feedback
+      element.select('.long-press-feedback').remove();
+    })
+    .on('touchcancel', function() {
+      // Clean up on touch cancel
+      const element = d3.select(this);
+      const touchData = (element.node() as any).__touchData;
+
+      if (touchData && touchData.timeout) {
+        clearTimeout(touchData.timeout);
+        delete (element.node() as any).__touchData;
+      }
+
+      // Remove visual feedback
+      element.select('.long-press-feedback').remove();
     });
 
     const updateEdgePositions = () => {
@@ -4145,6 +4253,18 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
           />
         );
       })()}
+
+      {/* Create Node Modal */}
+      {showCreateNodeModal && (
+        <CreateNodeModal
+          isOpen={showCreateNodeModal}
+          onClose={handleCloseCreateNodeModal}
+          onSubmit={async (nodeData) => {
+            // Handle node creation
+            handleCloseCreateNodeModal();
+          }}
+        />
+      )}
 
 {/* Fullscreen toggle removed - fullscreen mode abandoned */}
 

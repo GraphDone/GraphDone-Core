@@ -1,13 +1,13 @@
 import React from 'react';
 import { useMutation, useQuery } from '@apollo/client';
-import { X, Link, ChevronDown } from 'lucide-react';
+import { X, Link, ChevronDown, Plus } from 'lucide-react';
 import { CREATE_WORK_ITEM, GET_WORK_ITEMS, GET_EDGES, CREATE_EDGE } from '../lib/queries';
 import { useAuth } from '../contexts/AuthContext';
 import { useGraph } from '../contexts/GraphContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { NodeTypeSelector } from './NodeCategorySelector';
 import { TagInput } from './TagInput';
-import { 
+import {
   RELATIONSHIP_OPTIONS,
   getRelationshipConfig,
   getRelationshipIconElement,
@@ -20,6 +20,7 @@ import {
   getPriorityIconElement,
   ClipboardList
 } from '../constants/workItemConstants';
+import { Edit3, Flag, User, Calendar, Hash, FileText, Layers, Activity, PenTool } from 'lucide-react';
 
 interface WorkItem {
   id: string;
@@ -41,10 +42,11 @@ interface CreateNodeModalProps {
   onClose: () => void;
   parentNodeId?: string; // If provided, creates a connection to this node
   position?: { x: number; y: number; z: number }; // Position for floating nodes
+  onSubmit?: (nodeData: any) => Promise<void>; // Optional callback after node creation
 }
 
 
-export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: CreateNodeModalProps) {
+export function CreateNodeModal({ isOpen, onClose, parentNodeId, position, onSubmit }: CreateNodeModalProps) {
   const { currentUser, currentTeam } = useAuth();
   const { currentGraph } = useGraph();
   const { showSuccess, showError } = useNotifications();
@@ -81,7 +83,7 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
   // Status options from centralized constants (excluding 'all' option)
   const statusOptions = STATUS_OPTIONS.filter(option => option.value !== 'all').map(option => ({
     ...option,
-    icon: option.icon ? <option.icon className="h-6 w-6" /> : null,
+    icon: option.icon ? <option.icon className="h-4 w-4" /> : null,
     background: option.bgColor,
     border: option.borderColor
   }));
@@ -333,79 +335,83 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto backdrop-blur-sm">
-      <div className="flex items-center justify-center min-h-screen px-4">
-        <div className="fixed inset-0 bg-gradient-to-br from-gray-900/80 via-slate-900/90 to-gray-900/80 transition-all duration-300" onClick={onClose} />
-        
-        <div className="relative bg-gradient-to-br from-gray-800 via-gray-800 to-gray-900 rounded-2xl shadow-2xl border border-gray-700/50 max-w-lg w-full transform transition-all duration-300" onClick={(e) => e.stopPropagation()}>
-          <div className="bg-gradient-to-r from-emerald-900/30 via-green-800/25 to-teal-900/30 px-6 py-5 border-b border-green-600/20 backdrop-blur-sm rounded-t-2xl">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <div className="p-2 rounded-xl bg-emerald-500/20 border border-emerald-400/30">
-                  {parentNodeId ? <Link className="h-6 w-6 text-emerald-400" /> : <ClipboardList className="h-6 w-6 text-emerald-400" />}
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold bg-gradient-to-r from-emerald-200 to-green-100 bg-clip-text text-transparent">
-                    {parentNodeId ? 'Create & Connect Work Item' : 'Create New Work Item'}
-                  </h2>
-                  <p className="text-sm text-gray-300 mt-1">
-                    {parentNodeId
-                      ? 'Add a new work item with automatic connection'
-                      : existingNodesData?.workItems?.length > 0
-                        ? 'Add another work item to expand your graph'
-                        : 'Add your first work item to begin the journey'
-                    }
-                  </p>
-                </div>
+    <div className="fixed inset-0 z-[9999] overflow-y-auto backdrop-blur-sm" style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0}}>
+      <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+        <div
+          className="fixed inset-0 transition-opacity bg-gradient-to-br from-gray-900/90 via-black/80 to-gray-800/90 animate-in fade-in duration-300"
+          onClick={onClose}
+        />
+
+        <div className="inline-block w-full max-w-lg p-0 my-8 overflow-hidden text-left align-middle transition-all transform bg-gradient-to-br from-gray-800/98 via-gray-850/98 to-gray-900/98 backdrop-blur-2xl shadow-2xl rounded-2xl border border-gray-600/30 focus-within:ring-2 focus-within:ring-blue-500/50 animate-in slide-in-from-bottom-4 duration-300 relative" onClick={(e) => e.stopPropagation()}>
+          <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-green-500/20 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-purple-500 via-pink-500 to-green-500"></div>
+
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700/30 bg-gradient-to-r from-gray-800/50 to-gray-900/50 backdrop-blur-sm relative">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-green-500 via-emerald-500 to-teal-500 rounded-xl flex items-center justify-center shadow-lg shadow-green-500/30 relative">
+                <div className="absolute inset-0 bg-gradient-to-br from-green-400 to-emerald-600 rounded-xl blur opacity-50 animate-pulse"></div>
+                {parentNodeId ? <Link className="h-5 w-5 text-white relative z-10" /> : <Plus className="h-5 w-5 text-white relative z-10" />}
               </div>
-              <button
-                onClick={onClose}
-                className="p-2 rounded-xl text-gray-400 hover:text-gray-200 hover:bg-gray-700/50 transition-all duration-200"
-              >
-                <X className="h-5 w-5" />
-              </button>
+              <div>
+                <h3 className="text-lg font-bold bg-gradient-to-r from-white via-green-100 to-emerald-100 bg-clip-text text-transparent">
+                  {parentNodeId ? 'Create & Connect Work Item' : 'Create New Work Item'}
+                </h3>
+                <p className="text-xs text-gray-400">
+                  {parentNodeId
+                    ? 'Add a new work item with automatic connection'
+                    : existingNodesData?.workItems?.length > 0
+                      ? 'Add another work item to expand your graph'
+                      : 'Add your first work item to begin the journey'
+                  }
+                </p>
+              </div>
             </div>
+            <button
+              onClick={onClose}
+              className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-xl transition-all duration-200 hover:scale-110 hover:rotate-90"
+            >
+              <X className="h-5 w-5" />
+            </button>
           </div>
-          
-          <form onSubmit={handleSubmit} className="p-6 space-y-6 bg-gradient-to-br from-gray-800/30 to-gray-900/40">
+
+          <div className="max-h-[70vh] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 hover:scrollbar-thumb-gray-500">
+          <form onSubmit={handleSubmit} className="px-3 py-2 space-y-2 relative">
             {parentNodeId && (
-              <div className="space-y-5 mb-6">
-                <div className="bg-gradient-to-r from-blue-900/20 via-indigo-900/15 to-blue-800/20 border border-blue-600/30 rounded-xl p-4 backdrop-blur-sm">
-                  <div className="flex items-center space-x-3 mb-3">
-                    <div className="h-2 w-2 bg-blue-400 rounded-full"></div>
-                    <p className="text-sm font-semibold text-blue-200">Connection Setup</p>
+              <div className="space-y-2 mb-2">
+                <div className="bg-gradient-to-br from-gray-800/30 to-gray-700/20 border border-gray-600/30 rounded-lg p-2 shadow-lg backdrop-blur-sm">
+                  <div className="flex items-center space-x-2 mb-1">
+                    <p className="text-xs font-semibold text-blue-200">Connection Setup</p>
                   </div>
-                  <p className="text-sm text-blue-100 leading-relaxed">
+                  <p className="text-xs text-blue-100 leading-relaxed">
                     A new work item will be created and automatically connected with your selected relationship type.
                   </p>
                 </div>
-                
+
                 <div>
-                  <div className="flex items-center space-x-2 mb-4">
-                    <div className="h-1.5 w-1.5 bg-emerald-400 rounded-full"></div>
-                    <label className="text-sm font-bold text-gray-100 tracking-wide">
+                  <div className="flex items-center space-x-2 mb-1">
+                    <label className="text-base font-bold text-gray-100 tracking-wide">
                       Relationship Type
                     </label>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-2">
                     {RELATIONSHIP_OPTIONS.map((relation) => (
                       <button
                         key={relation.type}
                         type="button"
                         onClick={() => setSelectedRelationType(relation.type)}
-                        className={`p-4 rounded-xl text-left transition-all duration-200 border group ${
+                        className={`p-2 rounded-lg text-left transition-all duration-200 border group ${
                           selectedRelationType === relation.type
                             ? 'bg-gradient-to-br from-blue-600/20 via-blue-700/25 to-blue-800/20 border-blue-400/50 shadow-lg shadow-blue-500/10'
                             : 'bg-gradient-to-br from-gray-700/30 to-gray-800/30 hover:from-gray-600/40 hover:to-gray-700/40 border-gray-600/30 hover:border-gray-500/50 hover:shadow-md'
                         }`}
                       >
-                        <div className="flex items-center space-x-2 mb-1">
-                          {getRelationshipIconElement(relation.type, `h-5 w-5 ${selectedRelationType === relation.type ? 'text-blue-400' : ''}`)}
-                          <span className={`font-medium text-sm ${selectedRelationType === relation.type ? 'text-blue-400' : relation.color}`}>
+                        <div className="flex items-center space-x-1.5 mb-0.5">
+                          {getRelationshipIconElement(relation.type, `h-4 w-4 ${selectedRelationType === relation.type ? 'text-blue-400' : ''}`)}
+                          <span className={`font-medium text-xs ${selectedRelationType === relation.type ? 'text-blue-400' : relation.color}`}>
                             {relation.label}
                           </span>
                         </div>
-                        <p className="text-xs text-gray-400">
+                        <p className="text-[10px] text-gray-400">
                           {relation.description}
                         </p>
                       </button>
@@ -414,43 +420,75 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                 </div>
               </div>
             )}
-            
+
             <div>
-              <div className="flex items-center space-x-2 mb-3">
-                <div className="h-1.5 w-1.5 bg-green-400 rounded-full"></div>
-                <label htmlFor="title" className="text-sm font-bold text-gray-100 tracking-wide">
-                  Title *
-                </label>
-              </div>
+              <label htmlFor="title" className="block text-base font-bold text-gray-100 mb-1 flex items-center">
+                <div className="p-1 bg-gradient-to-br from-blue-500/20 to-indigo-500/20 rounded-lg mr-1 border border-blue-500/30">
+                  <FileText className="h-3 w-3 text-blue-400" />
+                </div>
+                Title *
+              </label>
               <input
                 type="text"
                 id="title"
                 required
                 value={formData.title}
                 onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                className={`w-full border bg-gray-800 text-white rounded-xl px-4 py-3 focus:ring-2 transition-all duration-200 placeholder-gray-400 ${
-                  isDuplicateName 
-                    ? 'border-red-500 focus:ring-red-500/50 focus:border-red-400' 
-                    : 'border-gray-600/50 focus:ring-emerald-500/50 focus:border-emerald-400/70'
+                className={`w-full border-2 bg-gray-800 text-white rounded-lg px-4 py-3 focus:outline-none transition-all duration-200 placeholder-gray-400 text-sm ${
+                  isDuplicateName
+                    ? 'border-red-500 focus:border-red-400'
+                    : 'border-gray-600 focus:!border-green-400'
                 }`}
                 placeholder="Enter a descriptive title for your work item"
               />
               {isDuplicateName && formData.title.trim() && (
-                <div className="mt-2 flex items-center space-x-2 text-red-400 text-sm">
+                <div className="mt-1 flex items-center space-x-2 text-red-400 text-xs">
                   <div className="w-1 h-1 bg-red-400 rounded-full"></div>
                   <span>A work item with this name already exists. Please choose a different name.</span>
                 </div>
               )}
             </div>
-            
+
             <div>
-              <div className="flex items-center space-x-2 mb-3">
-                <div className="h-1.5 w-1.5 bg-purple-400 rounded-full"></div>
-                <label className="text-sm font-bold text-gray-100 tracking-wide">
-                  Work Item Type
-                </label>
-              </div>
-              
+              <label htmlFor="description" className="block text-base font-bold text-gray-100 mb-1 flex items-center">
+                <div className="p-1 bg-gradient-to-br from-emerald-500/20 to-teal-500/20 rounded-lg mr-1 border border-emerald-500/30">
+                  <Edit3 className="h-3 w-3 text-emerald-400" />
+                </div>
+                Description
+              </label>
+              <textarea
+                id="description"
+                rows={2}
+                value={formData.description}
+                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                className="w-full border-2 border-gray-600 bg-gray-800 text-white rounded-lg placeholder-gray-400 px-4 py-3 focus:outline-none focus:!border-green-400 transition-all duration-200 text-sm"
+                placeholder="Describe the work item"
+              />
+            </div>
+
+            {/* Tags */}
+            <div>
+              <label className="block text-base font-bold text-gray-100 mb-1 flex items-center">
+                <div className="p-1 bg-gradient-to-br from-sky-500/20 to-blue-500/20 rounded-lg mr-1 border border-sky-500/30">
+                  <Hash className="h-3 w-3 text-sky-400" />
+                </div>
+                Tags
+              </label>
+              <TagInput
+                tags={formData.tags}
+                onChange={(tags) => setFormData(prev => ({ ...prev, tags }))}
+                maxTags={5}
+              />
+            </div>
+
+            <div>
+              <label className="block text-base font-bold text-gray-100 mb-1 flex items-center">
+                <div className="p-1 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-lg mr-1 border border-purple-500/30">
+                  <PenTool className="h-3 w-3 text-purple-400" />
+                </div>
+                Work Item Type
+              </label>
+
               <NodeTypeSelector
                 selectedType={formData.type}
                 onTypeChange={(type) => setFormData(prev => ({ ...prev, type }))}
@@ -459,38 +497,38 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
             </div>
 
             <div>
-              <div className="flex items-center space-x-2 mb-3">
-                <div className="h-1.5 w-1.5 bg-orange-400 rounded-full"></div>
-                <label className="text-sm font-bold text-gray-100 tracking-wide">
-                  Status
-                </label>
-              </div>
+              <label className="block text-base font-bold text-gray-100 mb-1 flex items-center">
+                <div className="p-1 bg-gradient-to-br from-green-500/20 to-emerald-500/20 rounded-lg mr-1 border border-green-500/30">
+                  <Activity className="h-3 w-3 text-green-400" />
+                </div>
+                Status
+              </label>
               <div className="relative" ref={statusDropdownRef}>
                 <button
                   type="button"
                   onClick={() => setIsStatusOpen(!isStatusOpen)}
-                  className="w-full flex items-center justify-between px-4 py-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm"
+                  className="w-full flex items-center justify-between px-4 py-3 bg-gray-800 border-2 border-gray-600 rounded-lg text-white transition-all duration-200 focus:!border-green-400 focus:outline-none text-sm"
                 >
-                  <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-2">
                     {(() => {
                       const selectedStatus = statusOptions.find(option => option.value === formData.status);
                       return selectedStatus ? (
                         <>
-                          <div className={`${selectedStatus.color} text-lg`}>
+                          <div className={`${selectedStatus.color} text-base`}>
                             {selectedStatus.icon}
                           </div>
-                          <span className="font-semibold text-gray-900 dark:text-gray-100">{selectedStatus.label}</span>
+                          <span className="font-semibold text-gray-900 dark:text-gray-100 text-xs">{selectedStatus.label}</span>
                         </>
                       ) : (
-                        <span className="text-gray-600 dark:text-gray-300 font-medium">Select status</span>
+                        <span className="text-gray-600 dark:text-gray-300 font-medium text-xs">Select status</span>
                       );
                     })()}
                   </div>
-                  <ChevronDown className={`h-5 w-5 text-gray-400 transition-all duration-200 ${isStatusOpen ? 'rotate-180 text-blue-500' : ''}`} />
+                  <ChevronDown className={`h-4 w-4 text-gray-400 transition-all duration-200 ${isStatusOpen ? 'rotate-180 text-green-500' : ''}`} />
                 </button>
 
                 {isStatusOpen && (
-                  <div className="absolute top-full left-0 mt-2 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-50 max-h-80 overflow-y-auto backdrop-blur-sm">
+                  <div className="absolute top-full left-0 mt-1 w-full bg-gray-800/95 backdrop-blur-xl rounded-xl border border-gray-600/30 shadow-2xl z-50 max-h-80 overflow-y-auto">
                     <div className="p-2">
                       {statusOptions.map((option, index) => (
                         <button
@@ -500,27 +538,27 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                             setFormData(prev => ({ ...prev, status: option.value }));
                             setIsStatusOpen(false);
                           }}
-                          className={`w-full px-3 py-3 text-left transition-all duration-200 rounded-lg group ${
-                            formData.status === option.value 
-                              ? `${option.background} ${option.border} ring-1` 
-                              : 'hover:bg-gray-700/30 hover:shadow-sm'
+                          className={`w-full px-3 py-2.5 text-left transition-all duration-200 rounded-lg group ${
+                            formData.status === option.value
+                              ? 'bg-gradient-to-r from-emerald-500/20 to-green-500/20 border-2 border-emerald-400/50 shadow-lg shadow-emerald-500/10'
+                              : 'hover:bg-gray-700/50 border-2 border-transparent hover:border-gray-600/50'
                           } ${index !== 0 ? 'mt-1' : ''}`}
                         >
                           <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-3">
-                              <div className={`${option.color} text-lg`}>
+                            <div className="flex items-center space-x-2.5">
+                              <div className={`${option.color} text-base transition-transform group-hover:scale-110`}>
                                 {option.icon}
                               </div>
-                              <span className={`font-semibold ${
-                                formData.status === option.value 
-                                  ? option.color 
-                                  : 'text-gray-900 dark:text-gray-100'
+                              <span className={`font-semibold text-xs ${
+                                formData.status === option.value
+                                  ? 'text-emerald-400'
+                                  : 'text-gray-100'
                               }`}>
                                 {option.label}
                               </span>
                             </div>
                             {formData.status === option.value && (
-                              <div className={`w-5 h-5 ${option.color} rounded-full flex items-center justify-center text-xs ml-2 flex-shrink-0 shadow-sm`}>
+                              <div className="w-5 h-5 bg-gradient-to-br from-emerald-500 to-green-600 text-white rounded-full flex items-center justify-center text-[10px] ml-1 flex-shrink-0 shadow-lg shadow-emerald-500/30 animate-in zoom-in duration-200">
                                 ✓
                               </div>
                             )}
@@ -532,44 +570,21 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                 )}
               </div>
             </div>
-            
-            <div>
-              <label htmlFor="description" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Description
-              </label>
-              <textarea
-                id="description"
-                rows={3}
-                value={formData.description}
-                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Describe the work item"
-              />
-            </div>
-
-            {/* Tags */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Tags
-              </label>
-              <TagInput
-                tags={formData.tags}
-                onChange={(tags) => setFormData(prev => ({ ...prev, tags }))}
-                maxTags={5}
-              />
-            </div>
 
             {/* Contributor and Due Date Row */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
               <div>
-                <label htmlFor="contributorId" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label htmlFor="contributorId" className="block text-base font-bold text-gray-100 mb-1 flex items-center">
+                  <div className="p-1 bg-gradient-to-br from-violet-500/20 to-purple-500/20 rounded-lg mr-1 border border-violet-500/30">
+                    <User className="h-3 w-3 text-violet-400" />
+                  </div>
                   Contributor
                 </label>
                 <select
                   id="contributorId"
                   value={formData.assignedTo}
                   onChange={(e) => setFormData(prev => ({ ...prev, assignedTo: e.target.value }))}
-                  className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full bg-gray-800 border-2 border-gray-600 rounded-lg px-4 py-3 text-sm text-white focus:outline-none focus:!border-green-400 transition-all duration-200 placeholder-gray-400"
                 >
                   <option value="">No contributor</option>
                   <option value="user-1">John Doe</option>
@@ -581,7 +596,10 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
               </div>
 
               <div>
-                <label htmlFor="dueDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label htmlFor="dueDate" className="block text-base font-bold text-gray-100 mb-1 flex items-center">
+                  <div className="p-1 bg-gradient-to-br from-teal-500/20 to-cyan-500/20 rounded-lg mr-1 border border-teal-500/30">
+                    <Calendar className="h-3 w-3 text-teal-400" />
+                  </div>
                   Due Date
                 </label>
                 <input
@@ -589,118 +607,108 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                   id="dueDate"
                   value={formData.dueDate}
                   onChange={(e) => setFormData(prev => ({ ...prev, dueDate: e.target.value }))}
-                  className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full bg-gray-800 border-2 border-gray-600 rounded-lg px-4 py-3 text-sm text-white focus:outline-none focus:!border-green-400 transition-all duration-200 placeholder-gray-400"
                 />
               </div>
             </div>
             
-            <div className="space-y-3">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Priority Level</label>
-              
-              {/* Professional Priority Guide */}
-              <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 mb-4 shadow-sm">
-                <div className="mb-3">
-                  <div className="text-sm font-semibold text-gray-700 dark:text-gray-300">Priority Level</div>
+            <div className="space-y-1">
+              <label className="block text-base font-bold text-gray-100 mb-1 flex items-center">
+                <div className="p-1 bg-gradient-to-br from-orange-500/20 to-red-500/20 rounded-lg mr-1 border border-orange-500/30">
+                  <Flag className="h-3 w-3 text-orange-400" />
                 </div>
-                
-                <div className="space-y-3">
-                  {/* First Row - 3 items */}
-                  <div className="grid grid-cols-3 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setFormData(prev => ({
-                          ...prev,
-                          priority: 0.9
-                        }));
-                      }}
-                      className="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 border border-red-500/30 text-center hover:shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600 transition-all cursor-pointer"
-                    >
-                      <div className="flex items-center justify-center space-x-1 mb-1">
-                        {getPriorityIconElement(0.9, "w-6 h-6 text-red-500")}
-                        <div className="text-red-500 font-bold text-sm">Critical</div>
-                      </div>
-                      <div className="text-xs font-mono text-gray-400">80% - 100%</div>
-                    </button>
-                    
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setFormData(prev => ({
-                          ...prev,
-                          priority: 0.7
-                        }));
-                      }}
-                      className="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 border border-orange-500/30 text-center hover:shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600 transition-all cursor-pointer"
-                    >
-                      <div className="flex items-center justify-center space-x-1 mb-1">
-                        {getPriorityIconElement(0.7, "w-6 h-6 text-orange-500")}
-                        <div className="text-orange-400 font-bold text-sm">High</div>
-                      </div>
-                      <div className="text-xs font-mono text-gray-400">60% - 79%</div>
-                    </button>
-                    
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setFormData(prev => ({
-                          ...prev,
-                          priority: 0.5
-                        }));
-                      }}
-                      className="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 border border-yellow-500/30 text-center hover:shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600 transition-all cursor-pointer"
-                    >
-                      <div className="flex items-center justify-center space-x-1 mb-1">
-                        {getPriorityIconElement(0.5, "w-6 h-6 text-yellow-500")}
-                        <div className="text-yellow-400 font-bold text-sm">Moderate</div>
-                      </div>
-                      <div className="text-xs font-mono text-gray-400">40% - 59%</div>
-                    </button>
+                Priority Level
+              </label>
+
+              {/* Modern Priority Selector */}
+              <div className="grid grid-cols-5 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, priority: 0.1 }))}
+                  className={`group relative overflow-hidden rounded-xl p-3 border-2 transition-all duration-200 ${
+                    formData.priority < 0.2
+                      ? 'border-gray-500 bg-gray-500/20 shadow-lg shadow-gray-500/20'
+                      : 'border-gray-600 bg-gray-800 hover:border-gray-400 hover:bg-gray-500/10'
+                  }`}
+                >
+                  <div className="flex flex-col items-center space-y-1">
+                    {getPriorityIconElement(0.1, "w-5 h-5 text-gray-500")}
+                    <span className={`text-xs font-semibold ${formData.priority < 0.2 ? 'text-gray-400' : 'text-gray-500'}`}>
+                      Minimal
+                    </span>
                   </div>
-                  
-                  {/* Second Row - 2 items centered */}
-                  <div className="grid grid-cols-2 gap-3 max-w-sm mx-auto">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setFormData(prev => ({
-                          ...prev,
-                          priority: 0.3
-                        }));
-                      }}
-                      className="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 border border-blue-500/30 text-center hover:shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600 transition-all cursor-pointer"
-                    >
-                      <div className="flex items-center justify-center space-x-1 mb-1">
-                        {getPriorityIconElement(0.3, "w-6 h-6 text-blue-500")}
-                        <div className="text-blue-400 font-bold text-sm">Low</div>
-                      </div>
-                      <div className="text-xs font-mono text-gray-400">20% - 39%</div>
-                    </button>
-                    
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setFormData(prev => ({
-                          ...prev,
-                          priority: 0.1
-                        }));
-                      }}
-                      className="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 border border-gray-500/30 text-center hover:shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600 transition-all cursor-pointer"
-                    >
-                      <div className="flex items-center justify-center space-x-1 mb-1">
-                        {getPriorityIconElement(0.1, "w-6 h-6 text-gray-500")}
-                        <div className="text-gray-400 font-bold text-sm">Minimal</div>
-                      </div>
-                      <div className="text-xs font-mono text-gray-400">0% - 19%</div>
-                    </button>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, priority: 0.3 }))}
+                  className={`group relative overflow-hidden rounded-xl p-3 border-2 transition-all duration-200 ${
+                    formData.priority >= 0.2 && formData.priority < 0.4
+                      ? 'border-blue-500 bg-blue-500/20 shadow-lg shadow-blue-500/20'
+                      : 'border-gray-600 bg-gray-800 hover:border-blue-400 hover:bg-blue-500/10'
+                  }`}
+                >
+                  <div className="flex flex-col items-center space-y-1">
+                    {getPriorityIconElement(0.3, "w-5 h-5 text-blue-500")}
+                    <span className={`text-xs font-semibold ${formData.priority >= 0.2 && formData.priority < 0.4 ? 'text-blue-400' : 'text-gray-400'}`}>
+                      Low
+                    </span>
                   </div>
-                </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, priority: 0.5 }))}
+                  className={`group relative overflow-hidden rounded-xl p-3 border-2 transition-all duration-200 ${
+                    formData.priority >= 0.4 && formData.priority < 0.6
+                      ? 'border-yellow-500 bg-yellow-500/20 shadow-lg shadow-yellow-500/20'
+                      : 'border-gray-600 bg-gray-800 hover:border-yellow-400 hover:bg-yellow-500/10'
+                  }`}
+                >
+                  <div className="flex flex-col items-center space-y-1">
+                    {getPriorityIconElement(0.5, "w-5 h-5 text-yellow-500")}
+                    <span className={`text-xs font-semibold ${formData.priority >= 0.4 && formData.priority < 0.6 ? 'text-yellow-400' : 'text-gray-400'}`}>
+                      Medium
+                    </span>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, priority: 0.7 }))}
+                  className={`group relative overflow-hidden rounded-xl p-3 border-2 transition-all duration-200 ${
+                    formData.priority >= 0.6 && formData.priority < 0.8
+                      ? 'border-orange-500 bg-orange-500/20 shadow-lg shadow-orange-500/20'
+                      : 'border-gray-600 bg-gray-800 hover:border-orange-400 hover:bg-orange-500/10'
+                  }`}
+                >
+                  <div className="flex flex-col items-center space-y-1">
+                    {getPriorityIconElement(0.7, "w-5 h-5 text-orange-500")}
+                    <span className={`text-xs font-semibold ${formData.priority >= 0.6 && formData.priority < 0.8 ? 'text-orange-400' : 'text-gray-400'}`}>
+                      High
+                    </span>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, priority: 0.9 }))}
+                  className={`group relative overflow-hidden rounded-xl p-3 border-2 transition-all duration-200 ${
+                    formData.priority >= 0.8
+                      ? 'border-red-500 bg-red-500/20 shadow-lg shadow-red-500/20'
+                      : 'border-gray-600 bg-gray-800 hover:border-red-400 hover:bg-red-500/10'
+                  }`}
+                >
+                  <div className="flex flex-col items-center space-y-1">
+                    {getPriorityIconElement(0.9, "w-5 h-5 text-red-500")}
+                    <span className={`text-xs font-semibold ${formData.priority >= 0.8 ? 'text-red-400' : 'text-gray-400'}`}>
+                      Critical
+                    </span>
+                  </div>
+                </button>
               </div>
-              
+
               <div>
-                <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
-                  Priority Level
-                </label>
                 <input
                   type="range"
                   min="0"
@@ -719,7 +727,7 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                     'accent-gray-500'
                   }`}
                 />
-                <div className={`text-sm text-center font-medium ${
+                <div className={`text-[10px] text-center font-medium ${
                   formData.priority >= 0.8 ? 'text-red-500' :
                   formData.priority >= 0.6 ? 'text-orange-500' :
                   formData.priority >= 0.4 ? 'text-yellow-500' :
@@ -728,11 +736,11 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
                 }`}>
                   {(() => {
                     const PriorityIcon = getCentralizedPriorityIcon(formData.priority);
-                    const priorityConfig = PRIORITY_OPTIONS.find(p => p.value !== 'all' && 
+                    const priorityConfig = PRIORITY_OPTIONS.find(p => p.value !== 'all' &&
                       formData.priority >= p.threshold!.min && formData.priority <= p.threshold!.max);
                     return (
                       <>
-                        {PriorityIcon && <PriorityIcon className="h-6 w-6 inline mr-1" />}
+                        {PriorityIcon && <PriorityIcon className="h-3 w-3 inline mr-0.5" />}
                         {priorityConfig?.label || 'Minimal'} ({Math.round(formData.priority * 100)}%)
                       </>
                     );
@@ -742,28 +750,38 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position }: Cre
               
             </div>
             
-            <div className="flex justify-end space-x-4 pt-6 border-t border-gray-600/50 mt-6">
+            <div className="flex justify-end space-x-2 pt-2 border-t border-gray-700/30">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-6 py-3 text-gray-300 bg-gradient-to-r from-gray-700/50 to-gray-800/50 border border-gray-600/50 rounded-xl hover:from-gray-600/60 hover:to-gray-700/60 hover:border-gray-500/60 transition-all duration-200 font-medium"
+                className="px-4 py-2 text-xs text-gray-300 bg-gray-700/50 rounded-lg hover:bg-gray-600/60 transition-all duration-200 font-medium hover:scale-105 border border-gray-600/30 hover:border-gray-500/50"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={creatingWorkItem || !isFormValid}
-                className={`px-8 py-3 text-white rounded-xl transition-all duration-200 flex items-center space-x-3 font-semibold shadow-lg disabled:shadow-none ${
-                  !isFormValid 
-                    ? 'bg-gray-600/50 cursor-not-allowed opacity-50' 
-                    : 'bg-gradient-to-r from-emerald-600 to-green-700 hover:from-emerald-500 hover:to-green-600 shadow-emerald-500/20'
+                className={`px-4 py-2 text-xs rounded-lg transition-all duration-200 font-semibold flex items-center space-x-1.5 hover:scale-105 shadow-lg ${
+                  !isFormValid || creatingWorkItem
+                    ? 'bg-gray-600/50 text-gray-400 cursor-not-allowed opacity-60'
+                    : 'bg-gradient-to-r from-green-600 via-emerald-600 to-teal-600 text-white hover:from-green-500 hover:via-emerald-500 hover:to-teal-500 shadow-green-500/25 hover:shadow-xl hover:shadow-green-500/40'
                 }`}
               >
-                <ClipboardList className="w-5 h-5" />
-                <span>{creatingWorkItem ? 'Creating...' : (parentNodeId ? 'Create & Connect' : 'Create Work Item')}</span>
+                {creatingWorkItem ? (
+                  <>
+                    <span>Creating...</span>
+                    <div className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+                  </>
+                ) : (
+                  <>
+                    <span>{parentNodeId ? 'Create & Connect' : 'Create Work Item'}</span>
+                    <Plus className="w-3 h-3" />
+                  </>
+                )}
               </button>
             </div>
           </form>
+          </div>
         </div>
       </div>
     </div>
