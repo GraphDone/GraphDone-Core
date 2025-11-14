@@ -274,6 +274,13 @@ GRAPHDONE_SETUP
   - su ubuntu -c 'export HOME=/home/ubuntu && cd ${GRAPHDONE_PATH} && npm run db:seed'
 GRAPHDONE_SEED
         fi
+
+        # Install Playwright browsers for E2E testing
+        cat >> "$CLOUD_INIT_OUTPUT" <<PLAYWRIGHT_INSTALL
+  # Install Playwright browsers
+  - echo '=== Installing Playwright browsers for E2E testing ==='
+  - su ubuntu -c 'export HOME=/home/ubuntu && cd ${GRAPHDONE_PATH} && npx playwright install --with-deps chromium firefox webkit'
+PLAYWRIGHT_INSTALL
     fi
 
     # Add systemd enable and start commands if run_on_boot is enabled (before final messages)
