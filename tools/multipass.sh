@@ -276,12 +276,15 @@ GRAPHDONE_SEED
         fi
     fi
 
-    # Add systemd enable commands if run_on_boot is enabled (before final messages)
+    # Add systemd enable and start commands if run_on_boot is enabled (before final messages)
     if [ "$RUN_ON_BOOT" = "true" ]; then
         cat >> "$CLOUD_INIT_OUTPUT" <<SYSTEMD_ENABLE
-  # Enable GraphDone service
+  # Enable and start GraphDone service
   - systemctl daemon-reload
   - systemctl enable graphdone
+  - systemctl start graphdone
+  - sleep 5
+  - systemctl status graphdone --no-pager || true
 SYSTEMD_ENABLE
     fi
 
