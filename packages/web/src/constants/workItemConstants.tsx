@@ -575,7 +575,7 @@ export const getPriorityColorScheme = (priorityValue: number) => {
 
 // Default values for creating new work items
 export const DEFAULT_NODE_CONFIG = {
-  title: 'New Node', // Default title for new nodes
+  title: 'New Work Item', // Default title for new work items
   type: 'DEFAULT' as WorkItemType, // Default type (generic work item)
   status: 'NOT_STARTED' as WorkItemStatus, // Default status (beginning of workflow)
   priority: 0.0, // Priority score (0.0-1.0)

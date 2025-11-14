@@ -30,6 +30,83 @@ export const GET_GRAPHS = gql`
   }
 `;
 
+export const GET_GRAPHS_BY_USER = gql`
+  query GetGraphsByUser($userId: String!) {
+    userGraphs: graphs(where: { createdBy: $userId }) {
+      id
+      name
+      description
+      type
+      status
+      parentGraphId
+      teamId
+      createdBy
+      tags
+      defaultRole
+      depth
+      path
+      isShared
+      nodeCount
+      edgeCount
+      contributorCount
+      lastActivity
+      settings
+      permissions
+      shareSettings
+      createdAt
+      updatedAt
+    }
+    sharedGraphs: graphs(where: { isShared: true }) {
+      id
+      name
+      description
+      type
+      status
+      parentGraphId
+      teamId
+      createdBy
+      tags
+      defaultRole
+      depth
+      path
+      isShared
+      nodeCount
+      edgeCount
+      contributorCount
+      lastActivity
+      settings
+      permissions
+      shareSettings
+      createdAt
+      updatedAt
+    }
+    systemGraphs: graphs(where: { createdBy: "system" }) {
+      id
+      name
+      description
+      type
+      status
+      parentGraphId
+      teamId
+      createdBy
+      tags
+      defaultRole
+      depth
+      path
+      isShared
+      nodeCount
+      edgeCount
+      contributorCount
+      lastActivity
+      settings
+      permissions
+      shareSettings
+      createdAt
+      updatedAt
+    }
+  }
+`;
+
 export const GET_GRAPHS_BY_TEAM = gql`
   query GetGraphsByTeam($teamId: String!) {
     graphs(where: { teamId: $teamId }) {

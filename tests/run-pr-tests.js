@@ -90,7 +90,7 @@ const PR_TEST_SUITES = [
     critical: true
   },
   {
-    name: 'Add Node Functionality',
+    name: 'Add Work Item Functionality',
     command: 'npx playwright test tests/e2e/add-node.spec.ts',
     priority: 11,
     critical: true
