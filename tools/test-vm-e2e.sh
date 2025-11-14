@@ -105,6 +105,27 @@ cleanup() {
 
 trap cleanup EXIT
 
+# Timing helper functions
+declare -A STEP_TIMES
+declare -A STEP_DURATIONS
+
+start_step() {
+    local step_name="$1"
+    STEP_TIMES["$step_name"]=$(date +%s)
+}
+
+end_step() {
+    local step_name="$1"
+    local end_time=$(date +%s)
+    local start_time=${STEP_TIMES["$step_name"]:-$end_time}
+    local duration=$((end_time - start_time))
+    STEP_DURATIONS["$step_name"]=$duration
+
+    local duration_min=$((duration / 60))
+    local duration_sec=$((duration % 60))
+    log_info "Step completed in ${duration_min}m ${duration_sec}s"
+}
+
 # Main execution
 main() {
     local start_time=$(date +%s)
@@ -116,6 +137,7 @@ main() {
     # Step 1: Launch VM
     log_section "Step 1: Launching Test VM"
     add_to_report "## 🚀 VM Launch"
+    start_step "vm_launch"
 
     log_info "Branch: $BRANCH"
     log_info "Auto-generating VM name with fun naming scheme..."
@@ -139,10 +161,12 @@ main() {
         add_to_report "❌ Failed to launch VM"
         exit 1
     fi
+    end_step "vm_launch"
 
     # Step 2: Wait for provisioning
     log_section "Step 2: Waiting for VM Provisioning"
     add_to_report "## ⏳ VM Provisioning"
+    start_step "vm_provisioning"
 
     log_info "Waiting for cloud-init to complete..."
     if multipass exec "$VM_NAME" -- cloud-init status --wait 2>&1 | tee -a "$REPORT_DIR/cloud-init.log"; then
