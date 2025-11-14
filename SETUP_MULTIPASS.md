@@ -1,6 +1,151 @@
-# GraphDone Multipass VM Testing - Performance Optimization
+# Multipass VM Setup for GraphDone
 
-This document outlines strategies to speed up E2E testing with Multipass VMs.
+Complete guide for using GraphDone's Multipass VM integration for isolated testing and development.
+
+---
+
+## Quick Start
+
+The VM launcher is fully integrated with `./start` for easy discoverability:
+
+### Launch a VM with one command:
+```bash
+./start vm launch
+```
+
+This will:
+1. Create a new Ubuntu 24.04 VM with optimal resources (4 CPUs, 8GB RAM, 30GB disk)
+2. Clone GraphDone code from the configured branch (default: `develop`)
+3. Install all dependencies (Node.js, npm packages, Playwright browsers, Docker)
+4. Run automatic health checks to verify the setup
+5. Display connection information
+
+### Other Common Commands:
+```bash
+./start vm shell         # Open shell in VM
+./start vm list          # List all VMs
+./start vm delete        # Delete a VM
+./start vm info          # Show VM information
+```
+
+### Custom Launch Options:
+```bash
+# Launch with specific branch
+./start vm launch --branch main
+
+# Launch with custom resources
+./start vm launch --cpus 8 --memory 16G --disk 50G
+
+# Launch with custom name
+./start vm launch --name my-test-vm --branch feature-xyz
+```
+
+---
+
+## Health Check
+
+The VM launcher automatically runs health checks after provisioning to verify:
+
+- ✅ GraphDone code cloned successfully
+- ✅ Node.js installed (v18+)
+- ✅ npm dependencies installed
+- ✅ Playwright browsers installed
+- ✅ Docker installed (optional)
+
+The health check output is displayed automatically after launch.
+
+---
+
+## Complete Usage Guide
+
+### Installation
+
+Install Multipass first:
+
+```bash
+# macOS
+brew install --cask multipass
+
+# Ubuntu/Linux
+sudo snap install multipass
+
+# Windows
+# Download from https://multipass.run
+```
+
+### Running E2E Tests in VM
+
+To run comprehensive E2E tests in a VM:
+
+```bash
+./tools/test-vm-e2e.sh <branch-name>
+```
+
+This will:
+- Launch a VM with the specified branch
+- Run linting, typechecking, building
+- Run unit tests
+- Run E2E tests (core suite)
+- Run visual regression screenshot suite (21 devices × 10 screens)
+- Collect all artifacts (screenshots, coverage, Playwright reports)
+- Generate test manifest for GraphDone-DevOps integration
+
+### Configuration
+
+Edit `vm.config.yml` to change default settings:
+
+```yaml
+vm:
+  name: graphdone-vm
+  cpus: 4
+  memory: 8G
+  disk: 30G
+  image: 24.04
+
+graphdone:
+  repository: https://github.com/GraphDone/GraphDone-Core.git
+  branch: develop
+
+setup:
+  auto_setup: true  # Automatically install dependencies on first boot
+```
+
+### Accessing Services
+
+After the VM is launched, you can access GraphDone services:
+
+```bash
+# Get VM IP
+multipass info <vm-name> | grep IPv4
+
+# Access services
+Web UI:       http://<vm-ip>:3127
+GraphQL API:  http://<vm-ip>:4127/graphql
+Neo4j Browser: http://<vm-ip>:7474
+```
+
+### Troubleshooting
+
+**VM stuck in "Starting" state:**
+```bash
+multipass exec <vm-name> -- cloud-init status
+multipass exec <vm-name> -- tail -100 /var/log/cloud-init-output.log
+```
+
+**Dependencies not installed:**
+```bash
+# Wait for cloud-init to complete
+multipass exec <vm-name> -- cloud-init status --wait
+
+# Manually run setup
+multipass exec <vm-name> -- bash -c 'cd ~/graphdone && npm install'
+```
+
+---
+
+## Performance Optimization
+
+This section outlines strategies to speed up E2E testing with Multipass VMs.
 
 ## Current Performance Bottlenecks
 

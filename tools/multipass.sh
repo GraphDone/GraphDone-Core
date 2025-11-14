@@ -405,6 +405,11 @@ launch_vm() {
 
     log_success "✅ VM provisioning complete!"
 
+    # Run health check
+    echo ""
+    run_health_check
+    echo ""
+
     # Show VM info
     show_vm_info
 
@@ -454,6 +459,66 @@ start_vm() {
 shell_vm() {
     log_info "🔌 Connecting to VM shell: $VM_NAME"
     multipass shell "$VM_NAME"
+}
+
+# Run health check
+run_health_check() {
+    log_info "🏥 Running health check..."
+
+    local health_passed=true
+
+    # Check 1: Verify code is cloned
+    log_info "  • Checking if GraphDone code is cloned..."
+    if multipass exec "$VM_NAME" -- bash -c 'test -d ~/graphdone/.git' 2>/dev/null; then
+        log_success "    ✅ GraphDone code cloned successfully"
+    else
+        log_error "    ❌ GraphDone code not found"
+        health_passed=false
+    fi
+
+    # Check 2: Verify Node.js is installed
+    log_info "  • Checking Node.js installation..."
+    local node_version=$(multipass exec "$VM_NAME" -- bash -c 'node --version' 2>/dev/null || echo "")
+    if [ -n "$node_version" ]; then
+        log_success "    ✅ Node.js installed: $node_version"
+    else
+        log_error "    ❌ Node.js not installed"
+        health_passed=false
+    fi
+
+    # Check 3: Verify npm dependencies are installed
+    log_info "  • Checking npm dependencies..."
+    if multipass exec "$VM_NAME" -- bash -c 'test -d ~/graphdone/node_modules' 2>/dev/null; then
+        log_success "    ✅ npm dependencies installed"
+    else
+        log_warning "    ⚠️  npm dependencies not yet installed (may still be installing)"
+    fi
+
+    # Check 4: Verify Playwright browsers
+    log_info "  • Checking Playwright browsers..."
+    if multipass exec "$VM_NAME" -- bash -c 'test -d ~/.cache/ms-playwright' 2>/dev/null; then
+        log_success "    ✅ Playwright browsers installed"
+    else
+        log_warning "    ⚠️  Playwright browsers not yet installed (may still be installing)"
+    fi
+
+    # Check 5: Verify Docker is installed
+    log_info "  • Checking Docker installation..."
+    if multipass exec "$VM_NAME" -- bash -c 'command -v docker' >/dev/null 2>&1; then
+        log_success "    ✅ Docker installed"
+    else
+        log_warning "    ⚠️  Docker not installed (optional)"
+    fi
+
+    # Overall result
+    echo ""
+    if [ "$health_passed" = true ]; then
+        log_success "🎉 Health check passed! VM is ready to use."
+        return 0
+    else
+        log_warning "⚠️  Health check completed with warnings. VM may still be initializing."
+        return 1
+    fi
 }
 
 # Show VM info
