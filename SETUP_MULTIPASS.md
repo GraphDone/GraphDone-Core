@@ -47,12 +47,23 @@ This will:
 The VM launcher automatically runs health checks after provisioning to verify:
 
 - ✅ GraphDone code cloned successfully
-- ✅ Node.js installed (v18+)
+- ✅ Node.js installed (v20+)
 - ✅ npm dependencies installed
 - ✅ Playwright browsers installed
-- ✅ Docker installed (optional)
+- ✅ Docker installed and running
+- ✅ Tailscale connected (if enabled)
 
 The health check output is displayed automatically after launch.
+
+You can also run health checks manually on existing VMs:
+
+```bash
+# Run comprehensive health check
+multipass exec <vm-name> -- bash -c 'cd ~/graphdone && npm run test'
+
+# Check Tailscale status
+multipass exec <vm-name> -- tailscale status
+```
 
 ---
 
@@ -123,6 +134,99 @@ Web UI:       http://<vm-ip>:3127
 GraphQL API:  http://<vm-ip>:4127/graphql
 Neo4j Browser: http://<vm-ip>:7474
 ```
+
+---
+
+## Tailscale Integration
+
+VMs are automatically connected to your Tailscale network for remote access from any device.
+
+### Setup Tailscale Auth Key
+
+**Required:** You must configure a Tailscale auth key before launching VMs.
+
+1. **Generate an auth key** at https://login.tailscale.com/admin/settings/keys
+   - ✅ Check "Ephemeral" (VMs are temporary)
+   - ✅ Set expiration (90 days recommended)
+   - ✅ Copy the key (starts with `tskey-auth-...`)
+
+2. **Add the key to .env file:**
+   ```bash
+   # Edit .env and add:
+   TAILSCALE_AUTH_KEY=tskey-auth-YOUR_KEY_HERE
+   ```
+
+3. **Verify it's loaded:**
+   ```bash
+   source .env
+   echo $TAILSCALE_AUTH_KEY
+   ```
+
+### Accessing VMs via Tailscale
+
+Once a VM is launched with Tailscale configured:
+
+```bash
+# Get Tailscale IP
+multipass exec <vm-name> -- tailscale ip -4
+
+# SSH via Tailscale (from any device on your tailnet)
+ssh ubuntu@<tailscale-ip>
+
+# Or use the hostname
+ssh ubuntu@<vm-name>.your-tailnet.ts.net
+```
+
+### Tailscale Status Check
+
+```bash
+# Check if Tailscale is connected
+multipass exec <vm-name> -- tailscale status
+
+# Get Tailscale IP
+multipass exec <vm-name> -- tailscale ip -4
+
+# View all devices on your tailnet
+multipass exec <vm-name> -- tailscale status
+```
+
+### Manually Configure Tailscale on Existing VM
+
+If a VM was launched before Tailscale was configured:
+
+```bash
+# Source the .env with your auth key
+source .env
+
+# Configure Tailscale on the VM
+multipass exec <vm-name> -- sudo tailscale up \
+  --authkey="$TAILSCALE_AUTH_KEY" \
+  --accept-routes \
+  --accept-dns=false \
+  --shields-up=false
+```
+
+### Disabling Tailscale
+
+If you don't need Tailscale, disable it in `vm.config.yml`:
+
+```yaml
+tailscale:
+  enabled: false  # Change from true to false
+```
+
+### Troubleshooting Tailscale
+
+**Error: "invalid key: API key ... not valid"**
+- Your Tailscale auth key has expired
+- Generate a new key at https://login.tailscale.com/admin/settings/keys
+- Update `.env` with the new key
+- Relaunch VMs or manually reconfigure existing ones
+
+**VM not showing in Tailscale admin:**
+- Check if Tailscale is running: `multipass exec <vm-name> -- systemctl status tailscaled`
+- Check logs: `multipass exec <vm-name> -- journalctl -u tailscaled -n 50`
+- Verify auth key is set: `source .env && echo $TAILSCALE_AUTH_KEY`
 
 ### Troubleshooting
 

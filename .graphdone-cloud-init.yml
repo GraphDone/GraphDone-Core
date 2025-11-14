@@ -59,7 +59,7 @@ runcmd:
   # Clone GraphDone repository
   - echo "=== Cloning GraphDone repository ==="
   - chown -R ubuntu:ubuntu /home/ubuntu
-  - su ubuntu -c "git clone -b develop https://github.com/GraphDone/GraphDone-Core.git /home/ubuntu/graphdone"
+  - su ubuntu -c "git clone -b feature/quick-start-graph-creation https://github.com/GraphDone/GraphDone-Core.git /home/ubuntu/graphdone"
   # Setup GraphDone
   - echo '=== Setting up GraphDone ==='
   - su ubuntu -c 'export HOME=/home/ubuntu && cd /home/ubuntu/graphdone && ./start setup'
@@ -76,7 +76,7 @@ runcmd:
   # Final setup
   - echo "=== GraphDone VM Setup Complete ==="
   - echo "GraphDone is installed at /home/ubuntu/graphdone"
-  - echo "To access - multipass shell graphdone-vm-vibrant-phoenix-8602"
+  - echo "To access - multipass shell graphdone-quick-start"
   - echo "Web UI will be available at http://localhost:3127"
   - echo "GraphQL API at http://localhost:4127/graphql"
   - echo "Neo4j Browser at http://localhost:7474"
