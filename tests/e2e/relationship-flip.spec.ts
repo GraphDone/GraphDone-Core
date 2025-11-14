@@ -48,8 +48,8 @@ test.describe('Relationship Flip Functionality', () => {
       await page.click('svg', { button: 'right', position: { x: 300, y: 300 } });
       await page.waitForTimeout(500);
       
-      // Look for "Create Node" option in context menu
-      const createNodeOption = page.locator('text="Create Node", text="Add Node"').first();
+      // Look for "Create Work Item" option in context menu
+      const createNodeOption = page.locator('text="Create Work Item", text="Add Work Item"').first();
       if (await createNodeOption.isVisible({ timeout: 3000 })) {
         await createNodeOption.click();
         
@@ -64,7 +64,7 @@ test.describe('Relationship Flip Functionality', () => {
       // Create second node
       await page.click('svg', { button: 'right', position: { x: 500, y: 300 } });
       await page.waitForTimeout(500);
-      const createNodeOption2 = page.locator('text="Create Node", text="Add Node"').first();
+      const createNodeOption2 = page.locator('text="Create Work Item", text="Add Work Item"').first();
       if (await createNodeOption2.isVisible({ timeout: 3000 })) {
         await createNodeOption2.click();
         const titleInput2 = page.locator('input[placeholder*="title"], input[placeholder*="name"]').first();

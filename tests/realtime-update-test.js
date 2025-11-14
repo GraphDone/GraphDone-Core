@@ -192,9 +192,9 @@ async function testNodeCreation(page, findings) {
   try {
     // Look for create node button
     const createOptions = [
-      'button:has-text("Add Node")',
-      'button:has-text("Create Node")', 
-      'button:has-text("New Node")',
+      'button:has-text("Add Work Item")',
+      'button:has-text("Create Work Item")', 
+      'button:has-text("New Work Item")',
       'button:has-text("+")',
       '.add-node-button',
       '[data-testid="create-node"]'
