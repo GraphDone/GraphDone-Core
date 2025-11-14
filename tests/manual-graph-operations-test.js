@@ -166,9 +166,9 @@ async function testNodeCrudOperations(page, testResults) {
     
     // Look for create node button/option
     const createOptions = [
-      'button:has-text("Add Node")',
+      'button:has-text("Add Work Item")',
       'button:has-text("Create")',
-      'button:has-text("New Node")',
+      'button:has-text("New Work Item")',
       '.add-node',
       '.create-node',
       'button[data-action="create-node"]'

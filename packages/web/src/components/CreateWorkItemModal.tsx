@@ -5,7 +5,7 @@ import { CREATE_WORK_ITEM, GET_WORK_ITEMS, GET_EDGES, CREATE_EDGE } from '../lib
 import { useAuth } from '../contexts/AuthContext';
 import { useGraph } from '../contexts/GraphContext';
 import { useNotifications } from '../contexts/NotificationContext';
-import { NodeTypeSelector } from './NodeCategorySelector';
+import { WorkItemTypeSelector } from './WorkItemTypeSelector';
 import { TagInput } from './TagInput';
 import {
   RELATIONSHIP_OPTIONS,
@@ -37,21 +37,21 @@ interface WorkItem {
   contributors?: Array<{ id: string; name: string; type: string; }>;
 }
 
-interface CreateNodeModalProps {
+interface CreateWorkItemModalProps {
   isOpen: boolean;
   onClose: () => void;
-  parentNodeId?: string; // If provided, creates a connection to this node
-  position?: { x: number; y: number; z: number }; // Position for floating nodes
-  onSubmit?: (nodeData: any) => Promise<void>; // Optional callback after node creation
+  parentWorkItemId?: string; // If provided, creates a connection to this work item
+  position?: { x: number; y: number; z: number }; // Position for floating work items
+  onSubmit?: (nodeData: any) => Promise<void>; // Optional callback after work item creation
 }
 
 
-export function CreateNodeModal({ isOpen, onClose, parentNodeId, position, onSubmit }: CreateNodeModalProps) {
+export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, position, onSubmit }: CreateWorkItemModalProps) {
   const { currentUser, currentTeam } = useAuth();
   const { currentGraph } = useGraph();
   const { showSuccess, showError } = useNotifications();
 
-  // Query to get existing nodes count for dynamic messaging
+  // Query to get existing work items count for dynamic messaging
   const { data: existingNodesData } = useQuery(GET_WORK_ITEMS, {
     variables: currentGraph ? {
       where: {
@@ -129,20 +129,20 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position, onSub
           }
         }
       },
-      // Refetch all edges if creating a connected node
-      ...(parentNodeId ? [
+      // Refetch all edges if creating a connected work item
+      ...(parentWorkItemId ? [
         { 
           query: GET_EDGES,
           variables: {}
         },
-        // Also refetch edges for the parent node specifically
+        // Also refetch edges for the parent work item specifically
         { 
           query: GET_EDGES,
           variables: {
             where: {
               OR: [
-                { source: { id: parentNodeId } },
-                { target: { id: parentNodeId } }
+                { source: { id: parentWorkItemId } },
+                { target: { id: parentWorkItemId } }
               ]
             }
           }
@@ -210,7 +210,7 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position, onSub
     }
   });
 
-  // Edge creation mutation for connected nodes
+  // Edge creation mutation for connected work items
   const [createEdge] = useMutation(CREATE_EDGE, {
     refetchQueries: [
       { query: GET_EDGES, variables: {} },
@@ -280,11 +280,11 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position, onSub
       if (result.data?.createWorkItems?.workItems?.[0]) {
         const createdNode = result.data.createWorkItems.workItems[0];
         
-        // If parentNodeId is provided, create the edge with the correct relationship type
-        if (parentNodeId) {
+        // If parentWorkItemId is provided, create the edge with the correct relationship type
+        if (parentWorkItemId) {
           const edgeInput = {
             type: selectedRelationType,
-            source: { connect: { where: { node: { id: parentNodeId } } } },
+            source: { connect: { where: { node: { id: parentWorkItemId } } } },
             target: { connect: { where: { node: { id: createdNode.id } } } }
           };
           
@@ -350,14 +350,14 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position, onSub
             <div className="flex items-center space-x-3">
               <div className="w-10 h-10 bg-gradient-to-br from-green-500 via-emerald-500 to-teal-500 rounded-xl flex items-center justify-center shadow-lg shadow-green-500/30 relative">
                 <div className="absolute inset-0 bg-gradient-to-br from-green-400 to-emerald-600 rounded-xl blur opacity-50 animate-pulse"></div>
-                {parentNodeId ? <Link className="h-5 w-5 text-white relative z-10" /> : <Plus className="h-5 w-5 text-white relative z-10" />}
+                {parentWorkItemId ? <Link className="h-5 w-5 text-white relative z-10" /> : <Plus className="h-5 w-5 text-white relative z-10" />}
               </div>
               <div>
                 <h3 className="text-lg font-bold bg-gradient-to-r from-white via-green-100 to-emerald-100 bg-clip-text text-transparent">
-                  {parentNodeId ? 'Create & Connect Work Item' : 'Create New Work Item'}
+                  {parentWorkItemId ? 'Create & Connect Work Item' : 'Create New Work Item'}
                 </h3>
                 <p className="text-xs text-gray-400">
-                  {parentNodeId
+                  {parentWorkItemId
                     ? 'Add a new work item with automatic connection'
                     : existingNodesData?.workItems?.length > 0
                       ? 'Add another work item to expand your graph'
@@ -368,7 +368,7 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position, onSub
             </div>
             <button
               onClick={onClose}
-              className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-xl transition-all duration-200 hover:scale-110 hover:rotate-90"
+              className="p-2 text-gray-400 hover:text-white hover:bg-red-600 rounded-lg transition-all duration-200 hover:scale-110"
             >
               <X className="h-5 w-5" />
             </button>
@@ -376,7 +376,7 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position, onSub
 
           <div className="max-h-[70vh] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 hover:scrollbar-thumb-gray-500">
           <form onSubmit={handleSubmit} className="px-3 py-2 space-y-2 relative">
-            {parentNodeId && (
+            {parentWorkItemId && (
               <div className="space-y-2 mb-2">
                 <div className="bg-gradient-to-br from-gray-800/30 to-gray-700/20 border border-gray-600/30 rounded-lg p-2 shadow-lg backdrop-blur-sm">
                   <div className="flex items-center space-x-2 mb-1">
@@ -489,7 +489,7 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position, onSub
                 Work Item Type
               </label>
 
-              <NodeTypeSelector
+              <WorkItemTypeSelector
                 selectedType={formData.type}
                 onTypeChange={(type) => setFormData(prev => ({ ...prev, type }))}
                 placeholder="Select work item type"
@@ -754,7 +754,7 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position, onSub
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 text-xs text-gray-300 bg-gray-700/50 rounded-lg hover:bg-gray-600/60 transition-all duration-200 font-medium hover:scale-105 border border-gray-600/30 hover:border-gray-500/50"
+                className="px-4 py-2 text-xs text-gray-300 bg-gray-700/50 rounded-lg hover:bg-red-600 hover:text-white transition-all duration-200 font-medium hover:scale-105 border border-gray-600/30 hover:border-red-600"
               >
                 Cancel
               </button>
@@ -774,7 +774,7 @@ export function CreateNodeModal({ isOpen, onClose, parentNodeId, position, onSub
                   </>
                 ) : (
                   <>
-                    <span>{parentNodeId ? 'Create & Connect' : 'Create Work Item'}</span>
+                    <span>{parentWorkItemId ? 'Create & Connect' : 'Create Work Item'}</span>
                     <Plus className="w-3 h-3" />
                   </>
                 )}

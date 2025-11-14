@@ -5,9 +5,9 @@ import { STATUS_OPTIONS, TYPE_OPTIONS, PRIORITY_OPTIONS } from '../constants/wor
 import { useAuth } from '../contexts/AuthContext';
 import { useGraph } from '../contexts/GraphContext';
 import { GET_WORK_ITEMS, GET_EDGES } from '../lib/queries';
-import { EditNodeModal } from './EditNodeModal';
-import { DeleteNodeModal } from './DeleteNodeModal';
-import { NodeDetailsModal } from './NodeDetailsModal';
+import { EditWorkItemModal } from './EditWorkItemModal';
+import { DeleteWorkItemModal } from './DeleteWorkItemModal';
+import { WorkItemDetailsModal } from './WorkItemDetailsModal';
 import Dashboard from './Dashboard';
 import TableView from './TableView';
 import CardView from './CardView';
@@ -730,7 +730,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
 
       {/* Edit Work Item Modal */}
       {showEditModal && selectedNode && (
-        <EditNodeModal
+        <EditWorkItemModal
           isOpen={showEditModal}
           onClose={handleCloseModals}
           node={transformNodeForEdit(selectedNode)}
@@ -739,7 +739,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
 
       {/* Delete Work Item Modal */}
       {showDeleteModal && selectedNode && (
-        <DeleteNodeModal
+        <DeleteWorkItemModal
           isOpen={showDeleteModal}
           onClose={handleCloseModals}
           nodeId={selectedNode.id}
@@ -750,7 +750,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
 
       {/* Node Details Modal */}
       {showNodeDetailsModal && selectedNode && (
-        <NodeDetailsModal
+        <WorkItemDetailsModal
           isOpen={showNodeDetailsModal}
           onClose={handleCloseModals}
           node={selectedNode}
