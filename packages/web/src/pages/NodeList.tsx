@@ -32,7 +32,7 @@ export function NodeList() {
             className="btn btn-primary"
           >
             <Plus className="h-4 w-4 mr-2" />
-            Add Node
+            Add Work Item
           </button>
         </div>
       </div>
@@ -44,7 +44,7 @@ export function NodeList() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <input
               type="text"
-              placeholder="Search nodes..."
+              placeholder="Search work items..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-600 rounded-lg text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-green-500 focus:border-transparent"
@@ -120,7 +120,7 @@ export function NodeList() {
                 <p className="mt-2 text-sm text-gray-400">
                   {searchTerm || filterType !== 'all' 
                     ? 'Try adjusting your search or filter criteria.'
-                    : 'Get started by creating your first node to begin building your graph.'
+                    : 'Get started by creating your first work item to begin building your graph.'
                   }
                 </p>
                 {(!searchTerm && filterType === 'all') && (
@@ -129,7 +129,7 @@ export function NodeList() {
                     className="mt-4 btn btn-primary"
                   >
                     <Plus className="h-4 w-4 mr-2" />
-                    Create First Node
+                    Create First Work Item
                   </button>
                 )}
               </div>
