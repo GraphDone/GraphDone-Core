@@ -48,7 +48,7 @@ export function Ontology() {
   const [showRelationshipModal, setShowRelationshipModal] = useState(false);
   const [relationshipSearchTerm, setRelationshipSearchTerm] = useState('');
 
-  // Generate node types from centralized constants
+  // Generate work item types from centralized constants
   const mockNodeTypes: NodeType[] = Object.entries(WORK_ITEM_TYPES).map(([key, config]) => ({
     id: key.toLowerCase(),
     name: config.label,
@@ -127,7 +127,7 @@ export function Ontology() {
               </span>
             </div>
             <p className="text-sm text-gray-400 mt-1">
-              Define node types, relationships, and schemas for {currentGraph?.name || 'your graphs'}
+              Define work item types, relationships, and schemas for {currentGraph?.name || 'your graphs'}
             </p>
           </div>
           
@@ -200,7 +200,7 @@ export function Ontology() {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Search node types"
+                  placeholder="Search work item types"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-600 rounded-lg text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-green-500 focus:border-transparent"
@@ -361,9 +361,9 @@ export function Ontology() {
         {activeTab === 'templates' && (
           <div className="p-6">
             <div className="text-center py-12">
-              <h3 className="text-lg font-medium text-gray-100 mb-2">Node Templates</h3>
+              <h3 className="text-lg font-medium text-gray-100 mb-2">Work Item Templates</h3>
               <p className="text-gray-400 mb-4">
-                Pre-configured node templates for common patterns
+                Pre-configured work item templates for common patterns
               </p>
               <button className="btn btn-primary">
                 <Plus className="h-4 w-4 mr-2" />

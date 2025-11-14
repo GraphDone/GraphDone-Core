@@ -1,7 +1,7 @@
 import React from 'react';
 import { Plus, Zap, RotateCcw } from 'lucide-react';
 import { GraphVisualization } from '../components/GraphVisualization';
-import { CreateNodeModal } from '../components/CreateNodeModal';
+import { CreateWorkItemModal } from '../components/CreateWorkItemModal';
 
 export function GraphView() {
   const [showCreateModal, setShowCreateModal] = React.useState(false);
@@ -52,9 +52,9 @@ export function GraphView() {
         <GraphVisualization />
       </div>
 
-      {/* Create Node Modal */}
+      {/* Create Work Item Modal */}
       {showCreateModal && (
-        <CreateNodeModal
+        <CreateWorkItemModal
           isOpen={showCreateModal}
           onClose={() => setShowCreateModal(false)}
         />

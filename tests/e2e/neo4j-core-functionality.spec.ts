@@ -54,7 +54,7 @@ test.describe('Neo4j Core Functionality Proof', () => {
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(5000);
     
-    const mainInterfaceLoaded = await page.locator('button:has-text("Add Node")').isVisible();
+    const mainInterfaceLoaded = await page.locator('button:has-text("Add Work Item")').isVisible();
     console.log(`✅ Main interface loaded: ${mainInterfaceLoaded}`);
     
     // Check graph visualization
@@ -77,7 +77,7 @@ test.describe('Neo4j Core Functionality Proof', () => {
     const testTitle = `Core Test ${timestamp}`;
     
     // Create new item
-    await page.locator('button:has-text("Add Node")').click();
+    await page.locator('button:has-text("Add Work Item")').click();
     await expect(page.locator('text=Create New Work Item')).toBeVisible();
     
     await page.locator('input[placeholder*="title"]').fill(testTitle);

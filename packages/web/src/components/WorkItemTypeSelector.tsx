@@ -13,7 +13,7 @@ interface NodeType {
   borderColor: string;
 }
 
-interface NodeTypeSelectorProps {
+interface WorkItemTypeSelectorProps {
   selectedType?: string;
   onTypeChange: (type: string) => void;
   placeholder?: string;
@@ -35,12 +35,12 @@ const nodeTypes: NodeType[] = Object.values(WORK_ITEM_TYPES).map(typeConfig => {
   };
 });
 
-export function NodeTypeSelector({
+export function WorkItemTypeSelector({
   selectedType = '',
   onTypeChange,
   placeholder = 'Select work item type',
   className = ''
-}: NodeTypeSelectorProps) {
+}: WorkItemTypeSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 

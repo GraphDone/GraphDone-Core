@@ -137,14 +137,14 @@ test.describe('Complete User Workflow', () => {
     await svgCanvas.click({ button: 'right', position: { x: 400, y: 300 } });
     await page.waitForTimeout(500);
 
-    let createNodeOption = page.locator('text="Create Node", text="Add Node", button:has-text("Create Node")').first();
+    let createNodeOption = page.locator('text="Create Work Item", text="Add Work Item", button:has-text("Create Work Item")').first();
     if (await createNodeOption.isVisible({ timeout: 3000 })) {
       await createNodeOption.click();
       nodeCreated = true;
     } else {
       // Method 2: Look for toolbar button
       console.log('Trying toolbar create node button...');
-      const toolbarCreateNode = page.locator('button:has-text("Add Node"), button:has-text("Create Node"), [data-testid="create-node"]').first();
+      const toolbarCreateNode = page.locator('button:has-text("Add Work Item"), button:has-text("Create Work Item"), [data-testid="create-node"]').first();
       if (await toolbarCreateNode.isVisible({ timeout: 3000 })) {
         await toolbarCreateNode.click();
         nodeCreated = true;
@@ -280,7 +280,7 @@ test.describe('Complete User Workflow', () => {
     const svgCanvas = page.locator('svg').first();
     await svgCanvas.click({ button: 'right', position: { x: 400, y: 300 } });
 
-    const createNodeOption = page.locator('text="Create Node", text="Add Node"').first();
+    const createNodeOption = page.locator('text="Create Work Item", text="Add Work Item"').first();
     if (await createNodeOption.isVisible({ timeout: 3000 })) {
       await createNodeOption.click();
 
@@ -314,7 +314,7 @@ test.describe('Complete User Workflow', () => {
       const svgCanvas = page.locator('svg').first();
       await svgCanvas.click({ button: 'right', position: { x: 300 + i * 100, y: 300 + i * 50 } });
 
-      const createNodeOption = page.locator('text="Create Node", text="Add Node"').first();
+      const createNodeOption = page.locator('text="Create Work Item", text="Add Work Item"').first();
       if (await createNodeOption.isVisible({ timeout: 3000 })) {
         await createNodeOption.click();
 
