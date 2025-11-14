@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   X, User, Flag, Edit3, Save, ChevronDown, Plus, Unlink, Trash2,
   GitBranch, ArrowRight, ArrowLeft, Ban, Link2, Folder, Split, Copy, Shield, Bookmark, Package,
-  Sparkles, Hash, Crown, Activity, Gem, Rocket, Star, Brain
+  Sparkles, Hash, Crown, Activity, Gem, Rocket, Star, Brain, FileText, Eye, Sparkle
 } from 'lucide-react';
 import { useMutation } from '@apollo/client';
 import { UPDATE_WORK_ITEM, GET_WORK_ITEMS, CREATE_EDGE, GET_EDGES, DELETE_EDGE, DELETE_WORK_ITEM } from '../lib/queries';
@@ -533,7 +533,7 @@ export function NodeDetailsModal({
       >
         {/* Gradient accent line at top */}
         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-green-500 to-purple-500"></div>
-        
+
         {/* Subtle background pattern */}
         <div className="absolute inset-0 opacity-5 pointer-events-none">
           <div className="w-full h-full" style={{
@@ -542,11 +542,50 @@ export function NodeDetailsModal({
           }}></div>
         </div>
 
+        {/* Title Header */}
+        <div className="relative px-4 py-3 bg-gradient-to-r from-gray-800/40 via-gray-700/30 to-gray-800/40 border-b border-gray-600/30">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="p-3 bg-gradient-to-br from-teal-300/60 via-magenta-400/50 to-magenta-300/40 rounded-2xl border border-magenta-200/50">
+                <Eye className="h-6 w-6 text-teal-200" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-white">Work Item Details</h2>
+                <p className="text-sm text-gray-400 mt-0.5">View and edit work item information</p>
+              </div>
+            </div>
+            <div className="flex items-center space-x-1">
+              <button
+                onClick={handleSave}
+                disabled={updating || !hasChanges || isSaving}
+                className={`flex items-center space-x-1 px-4 py-2 rounded-lg transition-all duration-300 text-sm font-semibold shadow-lg ${
+                  hasChanges && !updating && !isSaving
+                    ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:from-green-500 hover:to-emerald-500 hover:scale-105 transform border border-green-400/30'
+                    : 'bg-gray-700 text-gray-500 cursor-not-allowed border border-gray-600'
+                }`}
+                title={hasChanges ? "Save Changes (Ctrl+S)" : "No changes to save"}
+                aria-label={hasChanges ? "Save changes to work item" : "No changes to save"}
+              >
+                <Save className="h-4 w-4" />
+                <span>Save</span>
+              </button>
+              <button
+                onClick={onClose}
+                className="p-2 text-gray-400 hover:text-white hover:bg-red-600 rounded-lg transition-all duration-200 hover:scale-110 shadow-lg backdrop-blur-sm"
+                aria-label="Close modal (ESC)"
+                title="Close (ESC)"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+
         {/* Enhanced Header */}
-        <div className="relative flex items-center justify-between px-3 py-2 border-b border-gray-600/50 bg-gradient-to-r from-gray-800/30 via-gray-700/20 to-gray-800/30 backdrop-blur-sm">
+        <div className="relative flex items-center justify-between px-3 py-2 border-b border-gray-600/50 bg-gradient-to-r from-gray-800/30 via-gray-700/20 to-gray-800/30 backdrop-blur-sm z-10">
           <div className="flex items-center space-x-6">
             {/* Enhanced Clickable Type Badge */}
-            <div className="relative">
+            <div className="relative z-[100000]">
               <button
                 onClick={() => setShowTypeDropdown(!showTypeDropdown)}
                 className={`w-36 flex items-center justify-between px-3 py-2 rounded-lg text-sm font-semibold hover:scale-105 transition-all duration-200 cursor-pointer shadow-lg backdrop-blur-sm ${getTypeColor(currentNode.type)} border border-opacity-30 hover:border-opacity-50`}
@@ -560,32 +599,46 @@ export function NodeDetailsModal({
               
               {/* Enhanced Type Dropdown with Staggered Animation */}
               {showTypeDropdown && (
-                <div className="absolute top-full left-0 mt-1 w-36 bg-black/90 backdrop-blur-xl rounded-lg border border-white/10 shadow-2xl z-[9999] max-h-44 overflow-y-auto overflow-x-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-                  {TYPE_OPTIONS.filter(opt => opt.value !== 'all').map((type, index) => (
-                    <button
-                      key={type.value}
-                      onClick={() => {
-                        setEditedNode(prev => prev ? { ...prev, type: type.value as WorkItemType } : null);
-                        setShowTypeDropdown(false);
-                      }}
-                      className={`w-full flex items-center justify-between px-3 py-2 hover:bg-gray-800/50 hover:scale-[1.02] transition-all duration-200 text-left border-b border-gray-700/30 last:border-b-0 ${getTypeColorScheme(type.value as WorkItemType).text} text-white text-sm animate-in fade-in slide-in-from-left-1`}
-                      style={{ animationDelay: `${index * 30}ms` }}
-                    >
-                      <div className="flex items-center space-x-2">
-                        {type.icon && <type.icon className={`h-3 w-3 ${getTypeColorScheme(type.value as WorkItemType).text}`} />}
-                        <span>{type.label}</span>
-                      </div>
-                      {currentNode.type === type.value && (
-                        <span className="text-green-400 text-xs animate-in zoom-in duration-200">✓</span>
-                      )}
-                    </button>
-                  ))}
+                <div className="absolute top-full left-0 mt-1 w-40 bg-gray-800/95 backdrop-blur-xl rounded-xl border border-gray-600/30 shadow-2xl z-[99999] max-h-48 overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-200">
+                  <div className="p-2">
+                    {TYPE_OPTIONS.filter(opt => opt.value !== 'all').map((type, index) => (
+                      <button
+                        key={type.value}
+                        onClick={() => {
+                          setEditedNode(prev => prev ? { ...prev, type: type.value as WorkItemType } : null);
+                          setShowTypeDropdown(false);
+                        }}
+                        className={`w-full px-3 py-2.5 text-left transition-all duration-200 rounded-lg group ${
+                          currentNode.type === type.value
+                            ? 'bg-gradient-to-r from-emerald-500/20 to-green-500/20 border-2 border-emerald-400/50 shadow-lg shadow-emerald-500/10'
+                            : 'hover:bg-gray-700/50 border-2 border-transparent hover:border-gray-600/50'
+                        } ${index !== 0 ? 'mt-1' : ''}`}
+                        style={{ animationDelay: `${index * 30}ms` }}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2.5">
+                            {type.icon && <type.icon className={`h-4 w-4 ${getTypeColorScheme(type.value as WorkItemType).text} transition-transform group-hover:scale-110`} />}
+                            <span className={`font-semibold text-xs ${
+                              currentNode.type === type.value
+                                ? 'text-emerald-400'
+                                : 'text-gray-100'
+                            }`}>{type.label}</span>
+                          </div>
+                          {currentNode.type === type.value && (
+                            <div className="w-5 h-5 bg-gradient-to-br from-emerald-500 to-green-600 text-white rounded-full flex items-center justify-center text-[10px] ml-1 flex-shrink-0 shadow-lg shadow-emerald-500/30 animate-in zoom-in duration-200">
+                              ✓
+                            </div>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
 
             {/* Enhanced Clickable Status Badge */}
-            <div className="relative">
+            <div className="relative z-[100000]">
               <button
                 onClick={() => setShowStatusDropdown(!showStatusDropdown)}
                 className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-semibold hover:scale-105 transition-all duration-200 cursor-pointer shadow-lg backdrop-blur-sm ${getStatusColor(currentNode.status)} border border-opacity-30 hover:border-opacity-50`}
@@ -599,53 +652,43 @@ export function NodeDetailsModal({
               
               {/* Enhanced Status Dropdown with Staggered Animation */}
               {showStatusDropdown && (
-                <div className="absolute top-full left-0 mt-1 w-40 bg-black/90 backdrop-blur-xl rounded-lg border border-white/10 shadow-2xl z-[9999] max-h-44 overflow-y-auto overflow-x-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-                  {STATUS_OPTIONS.filter(opt => opt.value !== 'all').map((status, index) => (
-                    <button
-                      key={status.value}
-                      onClick={() => {
-                        setEditedNode(prev => prev ? { ...prev, status: status.value as WorkItemStatus } : null);
-                        setShowStatusDropdown(false);
-                      }}
-                      className={`w-full flex items-center justify-between px-3 py-2 hover:bg-gray-800/50 hover:scale-[1.02] transition-all duration-200 text-left border-b border-gray-700/30 last:border-b-0 ${getStatusColorScheme(status.value as WorkItemStatus).text} text-white text-sm animate-in fade-in slide-in-from-left-1`}
-                      style={{ animationDelay: `${index * 30}ms` }}
-                    >
-                      <div className="flex items-center space-x-2">
-                        {status.icon && <status.icon className={`h-3 w-3 ${getStatusColorScheme(status.value as WorkItemStatus).text}`} />}
-                        <span>{status.label}</span>
-                      </div>
-                      {currentNode.status === status.value && (
-                        <span className="text-green-400 text-xs animate-in zoom-in duration-200">✓</span>
-                      )}
-                    </button>
-                  ))}
+                <div className="absolute top-full left-0 mt-1 w-40 bg-gray-800/95 backdrop-blur-xl rounded-xl border border-gray-600/30 shadow-2xl z-[99999] max-h-48 overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-200">
+                  <div className="p-2">
+                    {STATUS_OPTIONS.filter(opt => opt.value !== 'all').map((status, index) => (
+                      <button
+                        key={status.value}
+                        onClick={() => {
+                          setEditedNode(prev => prev ? { ...prev, status: status.value as WorkItemStatus } : null);
+                          setShowStatusDropdown(false);
+                        }}
+                        className={`w-full px-3 py-2.5 text-left transition-all duration-200 rounded-lg group ${
+                          currentNode.status === status.value
+                            ? 'bg-gradient-to-r from-emerald-500/20 to-green-500/20 border-2 border-emerald-400/50 shadow-lg shadow-emerald-500/10'
+                            : 'hover:bg-gray-700/50 border-2 border-transparent hover:border-gray-600/50'
+                        } ${index !== 0 ? 'mt-1' : ''}`}
+                        style={{ animationDelay: `${index * 30}ms` }}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2.5">
+                            {status.icon && <status.icon className={`h-4 w-4 ${getStatusColorScheme(status.value as WorkItemStatus).text} transition-transform group-hover:scale-110`} />}
+                            <span className={`font-semibold text-xs ${
+                              currentNode.status === status.value
+                                ? 'text-emerald-400'
+                                : 'text-gray-100'
+                            }`}>{status.label}</span>
+                          </div>
+                          {currentNode.status === status.value && (
+                            <div className="w-5 h-5 bg-gradient-to-br from-emerald-500 to-green-600 text-white rounded-full flex items-center justify-center text-[10px] ml-1 flex-shrink-0 shadow-lg shadow-emerald-500/30 animate-in zoom-in duration-200">
+                              ✓
+                            </div>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
-          </div>
-          <div className="flex items-center space-x-1">
-            <button
-              onClick={handleSave}
-              disabled={updating || !hasChanges || isSaving}
-              className={`flex items-center space-x-1 px-4 py-2 rounded-lg transition-all duration-300 text-sm font-semibold shadow-lg ${
-                hasChanges && !updating && !isSaving
-                  ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:from-green-500 hover:to-emerald-500 hover:scale-105 transform border border-green-400/30'
-                  : 'bg-gray-700 text-gray-500 cursor-not-allowed border border-gray-600'
-              }`}
-              title={hasChanges ? "Save Changes (Ctrl+S)" : "No changes to save"}
-              aria-label={hasChanges ? "Save changes to work item" : "No changes to save"}
-            >
-              <Save className="h-4 w-4" />
-              <span>Save</span>
-            </button>
-            <button
-              onClick={onClose}
-              className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg transition-all duration-200 hover:scale-110 shadow-lg backdrop-blur-sm"
-              aria-label="Close modal (ESC)"
-              title="Close (ESC)"
-            >
-              <X className="h-4 w-4" />
-            </button>
           </div>
         </div>
 
@@ -655,6 +698,12 @@ export function NodeDetailsModal({
           <div className="flex-1">
           {/* Enhanced Title - Always Editable */}
           <div className="mb-2">
+            <h3 className="text-base font-medium text-gray-300 mb-1 flex items-center">
+              <div className="p-1 bg-gradient-to-br from-blue-500/20 to-indigo-500/20 rounded-lg mr-1 border border-blue-500/30">
+                <FileText className="h-3 w-3 text-blue-400" />
+              </div>
+              Title
+            </h3>
             <input
               id="modal-title"
               type="text"
@@ -663,8 +712,8 @@ export function NodeDetailsModal({
                 const newValue = e.target.value;
                 setEditedNode(prev => prev ? { ...prev, title: newValue } : null);
               }}
-              className="text-base font-bold bg-gray-800 border border-gray-600 text-white placeholder-gray-400 mb-1 w-full focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-400 transition-all duration-300 hover:border-gray-500 p-2 rounded-lg shadow-lg cursor-text"
-              placeholder="Enter title..."
+              className="text-sm bg-gray-800 border-2 border-gray-600 text-white placeholder-gray-400 w-full focus:outline-none focus:!border-green-400 transition-all duration-300 hover:border-gray-500 p-2 rounded-lg shadow-lg cursor-text"
+              placeholder="Enter title"
               autoComplete="off"
               aria-label="Work item title"
             />
@@ -672,7 +721,7 @@ export function NodeDetailsModal({
 
           {/* Enhanced Description - Always Editable */}
           <div className="mb-2">
-            <h3 className="text-sm font-medium text-gray-300 mb-1 flex items-center">
+            <h3 className="text-base font-medium text-gray-300 mb-1 flex items-center">
               <div className="p-1 bg-gradient-to-br from-emerald-500/20 to-teal-500/20 rounded-lg mr-1 border border-emerald-500/30">
                 <Edit3 className="h-3 w-3 text-emerald-400" />
               </div>
@@ -693,7 +742,7 @@ export function NodeDetailsModal({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {/* Enhanced Priority - Editable */}
             <div className="bg-gradient-to-br from-gray-800/30 to-gray-700/20 border border-gray-600/30 rounded-lg p-2 shadow-lg backdrop-blur-sm">
-              <h3 className="text-sm font-medium text-gray-300 mb-1 flex items-center">
+              <h3 className="text-base font-medium text-gray-300 mb-1 flex items-center">
                 <div className={`p-1 bg-gradient-to-br from-orange-500/20 to-red-500/20 rounded-lg mr-1 border border-orange-500/30`}>
                   <Flag className={`h-3 w-3 ${priorityInfo.flagColor}`} />
                 </div>
@@ -734,7 +783,7 @@ export function NodeDetailsModal({
 
             {/* Enhanced Assigned To - Editable */}
             <div className="bg-gradient-to-br from-gray-800/30 to-gray-700/20 border border-gray-600/30 rounded-lg p-2 shadow-lg backdrop-blur-sm">
-              <h3 className="text-sm font-medium text-gray-300 mb-1 flex items-center">
+              <h3 className="text-base font-medium text-gray-300 mb-1 flex items-center">
                 <div className="p-1 bg-gradient-to-br from-violet-500/20 to-purple-500/20 rounded-lg mr-1 border border-violet-500/30">
                   <User className="h-3 w-3 text-violet-400" />
                 </div>
@@ -768,7 +817,7 @@ export function NodeDetailsModal({
 
             {/* Enhanced Owner */}
             <div className="bg-gradient-to-br from-gray-800/30 to-gray-700/20 border border-gray-600/30 rounded-lg p-2 shadow-lg backdrop-blur-sm">
-              <h3 className="text-sm font-medium text-gray-300 mb-1 flex items-center">
+              <h3 className="text-base font-medium text-gray-300 mb-1 flex items-center">
                 <div className="p-1 bg-gradient-to-br from-amber-500/20 to-yellow-500/20 rounded-lg mr-1 border border-amber-500/30">
                   <Crown className="h-3 w-3 text-amber-400" />
                 </div>
@@ -789,7 +838,7 @@ export function NodeDetailsModal({
 
             {/* Enhanced Due Date - Editable */}
             <div className="bg-gradient-to-br from-gray-800/30 to-gray-700/20 border border-gray-600/30 rounded-lg p-2 shadow-lg backdrop-blur-sm">
-              <h3 className="text-sm font-medium text-gray-300 mb-1 flex items-center">
+              <h3 className="text-base font-medium text-gray-300 mb-1 flex items-center">
                 <div className="p-1 bg-gradient-to-br from-teal-500/20 to-cyan-500/20 rounded-lg mr-1 border border-teal-500/30">
                   <Calendar className="h-3 w-3 text-teal-400" />
                 </div>
@@ -819,7 +868,7 @@ export function NodeDetailsModal({
 
           {/* Enhanced Tags - Editable */}
           <div className="mt-2">
-            <h3 className="text-sm font-medium text-gray-300 mb-1 flex items-center">
+            <h3 className="text-base font-medium text-gray-300 mb-1 flex items-center">
               <div className="p-1 bg-gradient-to-br from-sky-500/20 to-blue-500/20 rounded-lg mr-1 border border-sky-500/30">
                 <Hash className="h-3 w-3 text-sky-400" />
               </div>
@@ -891,7 +940,7 @@ export function NodeDetailsModal({
 
           {/* Enhanced DateTime */}
           <div className="mt-2">
-            <h3 className="text-sm font-medium text-gray-300 mb-1 flex items-center">
+            <h3 className="text-base font-medium text-gray-300 mb-1 flex items-center">
               <div className="p-1 bg-gradient-to-br from-lime-500/20 to-green-500/20 rounded-lg mr-1 border border-lime-500/30">
                 <Clock className="h-3 w-3 text-lime-400" />
               </div>
@@ -915,7 +964,7 @@ export function NodeDetailsModal({
 
           {/* Enhanced Connections */}
           <div className="mt-2">
-            <h3 className="text-sm font-medium text-gray-300 mb-1 flex items-center">
+            <h3 className="text-base font-medium text-gray-300 mb-1 flex items-center">
               <div className="p-1 bg-gradient-to-br from-fuchsia-500/20 to-pink-500/20 rounded-lg mr-1 border border-fuchsia-500/30">
                 <GitBranch className="h-3 w-3 text-fuchsia-400" />
               </div>
@@ -1023,7 +1072,7 @@ export function NodeDetailsModal({
 
           {/* Enhanced Right Column - Action Buttons */}
           <div className="w-36 flex-shrink-0 relative">
-            <h3 className="text-sm font-medium text-gray-300 mb-1 flex items-center">
+            <h3 className="text-base font-medium text-gray-300 mb-1 flex items-center">
               <div className="p-1 bg-gradient-to-br from-indigo-500/20 to-blue-600/20 rounded-lg mr-1 border border-indigo-500/30">
                 <Rocket className="h-3 w-3 text-indigo-400" />
               </div>
