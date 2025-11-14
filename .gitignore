@@ -10,6 +10,7 @@ coverage/
 test-results/
 test-artifacts/
 playwright-report/
+test-reports/
 artifacts/
 
 # Test files that should not be in root
@@ -74,6 +75,13 @@ lerna-debug.log*
 .env.development.local
 .env.test.local
 .env.production.local
+.env.vm
+
+# VM configuration
+/tmp/graphdone-cloud-init.yml
+cloud-init.*.yml
+!cloud-init.template.yml
+.graphdone-cloud-init.yml
 
 # IDE
 .vscode/*
