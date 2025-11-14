@@ -39,7 +39,7 @@ const customStyles = `
   }
 `;
 
-interface DeleteNodeModalProps {
+interface DeleteWorkItemModalProps {
   isOpen: boolean;
   onClose: () => void;
   nodeId: string;
@@ -48,7 +48,7 @@ interface DeleteNodeModalProps {
   onOpenDisconnectModal?: () => void;
 }
 
-export function DeleteNodeModal({ isOpen, onClose, nodeId, nodeTitle, nodeType, onOpenDisconnectModal }: DeleteNodeModalProps) {
+export function DeleteWorkItemModal({ isOpen, onClose, nodeId, nodeTitle, nodeType, onOpenDisconnectModal }: DeleteWorkItemModalProps) {
   const { currentTeam } = useAuth();
   const { showSuccess, showError } = useNotifications();
   const [understandRisks, setUnderstandRisks] = useState(false);
@@ -188,7 +188,7 @@ export function DeleteNodeModal({ isOpen, onClose, nodeId, nodeTitle, nodeType, 
       
 
       showSuccess(
-        'Node Deleted Successfully!',
+        'Work Item Deleted Successfully!',
         `"${nodeTitle}" has been permanently removed from the graph and all connected relationships have been cleaned up.`
       );
       
@@ -209,7 +209,7 @@ export function DeleteNodeModal({ isOpen, onClose, nodeId, nodeTitle, nodeType, 
       }
       
       showError(
-        'Failed to Delete Node',
+        'Failed to Delete Work Item',
         errorMessage
       );
     }
@@ -247,7 +247,7 @@ export function DeleteNodeModal({ isOpen, onClose, nodeId, nodeTitle, nodeType, 
                   <AlertTriangle className="h-5 w-5 text-red-400 drop-shadow-lg" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold bg-gradient-to-r from-red-200 to-orange-200 bg-clip-text text-transparent">Delete Node</h3>
+                  <h3 className="text-xl font-bold bg-gradient-to-r from-red-200 to-orange-200 bg-clip-text text-transparent">Delete Work Item</h3>
                   <p className="text-gray-400 text-sm">Permanent removal action</p>
                 </div>
               </div>
@@ -291,10 +291,10 @@ export function DeleteNodeModal({ isOpen, onClose, nodeId, nodeTitle, nodeType, 
                 {/* Modern typography */}
                 <div className="space-y-3">
                   <h4 className="text-2xl font-bold bg-gradient-to-r from-orange-200 to-amber-200 bg-clip-text text-transparent text-center">
-                    Connected Node Detected
+                    Connected Work Item Detected
                   </h4>
                   <p className="text-gray-300 text-center text-lg leading-relaxed max-w-md mx-auto">
-                    This node has <span className="inline-flex items-center px-2 py-1 bg-orange-500/20 border border-orange-400/30 rounded-full text-orange-200 font-semibold text-sm">{nodeConnections.length} active connection{nodeConnections.length !== 1 ? 's' : ''}</span>
+                    This work item has <span className="inline-flex items-center px-2 py-1 bg-orange-500/20 border border-orange-400/30 rounded-full text-orange-200 font-semibold text-sm">{nodeConnections.length} active connection{nodeConnections.length !== 1 ? 's' : ''}</span>
                   </p>
                   <p className="text-gray-400 text-center text-sm">
                     Remove all connections first to enable deletion
@@ -309,7 +309,7 @@ export function DeleteNodeModal({ isOpen, onClose, nodeId, nodeTitle, nodeType, 
                   <div className="flex-1">
                     <h4 className="text-orange-200 font-semibold mb-3">Disconnect Connections First</h4>
                     <p className="text-orange-300 text-sm mb-4">
-                      This node has <strong className="text-orange-200">{nodeConnections.length} connection{nodeConnections.length !== 1 ? 's' : ''}</strong>. Remove them to enable deletion:
+                      This work item has <strong className="text-orange-200">{nodeConnections.length} connection{nodeConnections.length !== 1 ? 's' : ''}</strong>. Remove them to enable deletion:
                     </p>
                     
                     {/* Disconnect All Button */}
@@ -388,7 +388,7 @@ export function DeleteNodeModal({ isOpen, onClose, nodeId, nodeTitle, nodeType, 
                 {/* Professional typography */}
                 <div className="text-center space-y-3 mb-6">
                   <h4 className="text-lg font-semibold text-red-200">
-                    Delete Node Permanently
+                    Delete Work Item Permanently
                   </h4>
                   <div className="space-y-2">
                     <p className="text-sm text-gray-300">
@@ -415,12 +415,12 @@ export function DeleteNodeModal({ isOpen, onClose, nodeId, nodeTitle, nodeType, 
                       <AlertTriangle className="h-4 w-4 text-red-400" />
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-gray-300">Target Node</p>
+                      <p className="text-sm font-medium text-gray-300">Target Work Item</p>
                       <p className="text-xl font-bold text-white">{nodeTitle}</p>
                     </div>
                   </div>
                   <div className="flex items-center justify-between pt-2 border-t border-gray-600/30">
-                    <span className="text-sm text-gray-400">Node Type</span>
+                    <span className="text-sm text-gray-400">Work Item Type</span>
                     <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-blue-400/30 text-blue-200">
                       {nodeType}
                     </span>
@@ -443,8 +443,8 @@ export function DeleteNodeModal({ isOpen, onClose, nodeId, nodeTitle, nodeType, 
                       <p className="text-red-300 text-sm font-medium mb-4">The following will be permanently destroyed:</p>
                       <div className="grid gap-3">
                         {[
-                          "Node data (description, tags, priorities)",
-                          "All connections to other nodes", 
+                          "Work item data (description, tags, priorities)",
+                          "All connections to other work items",
                           "Historical activity and comments",
                           "Assignment and contributor relationships",
                           "Dependencies and references"
@@ -481,7 +481,7 @@ export function DeleteNodeModal({ isOpen, onClose, nodeId, nodeTitle, nodeType, 
                           I understand this action is irreversible
                         </span>
                         <p className="text-gray-400 text-xs">
-                          All node data and relationships will be permanently destroyed
+                          All work item data and relationships will be permanently destroyed
                         </p>
                       </div>
                     </label>

@@ -28,64 +28,107 @@ async function seed() {
     await session.run('MATCH (n) DETACH DELETE n');
     // eslint-disable-next-line no-console
     console.log('✨ Cleared existing data');
-    
-    // Create work items with proper team IDs
+
+    // Create graphs first
+    const graphs = [
+      {
+        id: 'welcome-graph-shared',
+        name: 'Welcome to GraphDone',
+        description: 'A tutorial graph to help you understand GraphDone',
+        isPublic: true,
+        teamId: 'team-1',
+        userId: 'user-1'
+      },
+      {
+        id: 'graph-project-alpha',
+        name: 'Project Alpha',
+        description: 'Main development project',
+        isPublic: false,
+        teamId: 'team-1',
+        userId: 'user-1'
+      },
+      {
+        id: 'graph-test-beta',
+        name: 'Test Graph Beta',
+        description: 'Testing and experimentation',
+        isPublic: false,
+        teamId: 'team-1',
+        userId: 'user-2'
+      }
+    ];
+
+    for (const graph of graphs) {
+      await session.run(
+        `CREATE (g:Graph {
+          id: $id,
+          name: $name,
+          description: $description,
+          isPublic: $isPublic,
+          teamId: $teamId,
+          userId: $userId,
+          createdAt: datetime(),
+          updatedAt: datetime()
+        })`,
+        graph
+      );
+    }
+    // eslint-disable-next-line no-console
+    console.log(`✅ Created ${graphs.length} graphs`);
+
+    // Create work items with proper team IDs and graph assignments
     const workItems = [
-      // Infrastructure & Setup
-      { id: 'wi-1', title: 'Set up Neo4j database', type: 'TASK', status: 'COMPLETED', teamId: 'team-1', userId: 'user-1' },
-      { id: 'wi-2', title: 'Configure GraphQL schema', type: 'TASK', status: 'COMPLETED', teamId: 'team-1', userId: 'user-1' },
-      { id: 'wi-3', title: 'Implement authentication', type: 'TASK', status: 'IN_PROGRESS', teamId: 'team-1', userId: 'user-2' },
-      { id: 'wi-4', title: 'Set up CI/CD pipeline', type: 'TASK', status: 'PLANNED', teamId: 'team-1', userId: 'user-3' },
+      // Welcome Graph Items (tutorial)
+      { id: 'wi-welcome-1', title: 'Welcome to GraphDone!', type: 'MILESTONE', status: 'COMPLETED', teamId: 'team-1', userId: 'user-1', graphId: 'welcome-graph-shared' },
+      { id: 'wi-welcome-2', title: 'Create your first work item', type: 'TASK', status: 'COMPLETED', teamId: 'team-1', userId: 'user-1', graphId: 'welcome-graph-shared' },
+      { id: 'wi-welcome-3', title: 'Connect work items together', type: 'TASK', status: 'IN_PROGRESS', teamId: 'team-1', userId: 'user-1', graphId: 'welcome-graph-shared' },
+      { id: 'wi-welcome-4', title: 'Explore different views', type: 'TASK', status: 'PLANNED', teamId: 'team-1', userId: 'user-1', graphId: 'welcome-graph-shared' },
+
+      // Project Alpha - Infrastructure & Setup
+      { id: 'wi-1', title: 'Set up Neo4j database', type: 'TASK', status: 'COMPLETED', teamId: 'team-1', userId: 'user-1', graphId: 'graph-project-alpha' },
+      { id: 'wi-2', title: 'Configure GraphQL schema', type: 'TASK', status: 'COMPLETED', teamId: 'team-1', userId: 'user-1', graphId: 'graph-project-alpha' },
+      { id: 'wi-3', title: 'Implement authentication', type: 'TASK', status: 'IN_PROGRESS', teamId: 'team-1', userId: 'user-2', graphId: 'graph-project-alpha' },
+      { id: 'wi-4', title: 'Set up CI/CD pipeline', type: 'TASK', status: 'PLANNED', teamId: 'team-1', userId: 'user-3', graphId: 'graph-project-alpha' },
       
-      // Core Features
-      { id: 'wi-5', title: 'Graph visualization system', type: 'MILESTONE', status: 'IN_PROGRESS', teamId: 'team-1', userId: 'user-1' },
-      { id: 'wi-6', title: 'Implement D3.js force layout', type: 'TASK', status: 'COMPLETED', teamId: 'team-1', userId: 'user-2' },
-      { id: 'wi-7', title: 'Add node drag interaction', type: 'TASK', status: 'COMPLETED', teamId: 'team-1', userId: 'user-2' },
-      { id: 'wi-8', title: 'Create edge rendering system', type: 'TASK', status: 'IN_PROGRESS', teamId: 'team-1', userId: 'user-3' },
+      // Project Alpha - Core Features
+      { id: 'wi-5', title: 'Graph visualization system', type: 'MILESTONE', status: 'IN_PROGRESS', teamId: 'team-1', userId: 'user-1', graphId: 'graph-project-alpha' },
+      { id: 'wi-6', title: 'Implement D3.js force layout', type: 'TASK', status: 'COMPLETED', teamId: 'team-1', userId: 'user-2', graphId: 'graph-project-alpha' },
+      { id: 'wi-7', title: 'Add node drag interaction', type: 'TASK', status: 'COMPLETED', teamId: 'team-1', userId: 'user-2', graphId: 'graph-project-alpha' },
+      { id: 'wi-8', title: 'Create edge rendering system', type: 'TASK', status: 'IN_PROGRESS', teamId: 'team-1', userId: 'user-3', graphId: 'graph-project-alpha' },
       
-      // Ideas & Proposals
-      { id: 'wi-9', title: 'AI agent integration', type: 'IDEA', status: 'PROPOSED', teamId: 'team-1', userId: 'user-4' },
-      { id: 'wi-10', title: 'Mobile app development', type: 'IDEA', status: 'PROPOSED', teamId: 'team-1', userId: 'user-5' },
-      { id: 'wi-11', title: 'Real-time collaboration', type: 'IDEA', status: 'PROPOSED', teamId: 'team-1', userId: 'user-1' },
-      
-      // Outcomes
-      { id: 'wi-12', title: 'Production-ready graph system', type: 'OUTCOME', status: 'PLANNED', teamId: 'team-1', userId: 'user-1' },
-      { id: 'wi-13', title: 'Scalable architecture', type: 'OUTCOME', status: 'IN_PROGRESS', teamId: 'team-1', userId: 'user-2' },
-      
-      // Additional tasks for testing
-      { id: 'wi-14', title: 'Write unit tests', type: 'TASK', status: 'IN_PROGRESS', teamId: 'team-1', userId: 'user-3' },
-      { id: 'wi-15', title: 'Performance optimization', type: 'TASK', status: 'PLANNED', teamId: 'team-1', userId: 'user-4' },
-      { id: 'wi-16', title: 'Documentation update', type: 'TASK', status: 'PLANNED', teamId: 'team-1', userId: 'user-5' },
-      
-      // More features
-      { id: 'wi-17', title: 'User dashboard', type: 'MILESTONE', status: 'PLANNED', teamId: 'team-1', userId: 'user-1' },
-      { id: 'wi-18', title: 'Analytics module', type: 'MILESTONE', status: 'PROPOSED', teamId: 'team-1', userId: 'user-2' },
-      { id: 'wi-19', title: 'Export functionality', type: 'TASK', status: 'PROPOSED', teamId: 'team-1', userId: 'user-3' },
-      { id: 'wi-20', title: 'Import from other tools', type: 'TASK', status: 'PROPOSED', teamId: 'team-1', userId: 'user-4' },
-      
-      // Test data variations
-      { id: 'wi-21', title: 'Test WithAPOC', type: 'TASK', status: 'COMPLETED', teamId: 'team-1', userId: 'user-1' },
-      { id: 'wi-22', title: 'testUI Test', type: 'TASK', status: 'IN_PROGRESS', teamId: 'team-1', userId: 'user-2' },
-      { id: 'wi-23', title: 'Form validation testing', type: 'TASK', status: 'PLANNED', teamId: 'team-1', userId: 'user-3' },
-      { id: 'wi-24', title: 'Edge case handling', type: 'TASK', status: 'PROPOSED', teamId: 'team-1', userId: 'user-4' },
-      
-      // Strategic items
-      { id: 'wi-25', title: 'Q1 2024 Planning', type: 'MILESTONE', status: 'COMPLETED', teamId: 'team-1', userId: 'user-1' },
-      { id: 'wi-26', title: 'Product roadmap review', type: 'OUTCOME', status: 'IN_PROGRESS', teamId: 'team-1', userId: 'user-2' },
-      { id: 'wi-27', title: 'Customer feedback analysis', type: 'TASK', status: 'PLANNED', teamId: 'team-1', userId: 'user-3' },
-      { id: 'wi-28', title: 'Market research', type: 'TASK', status: 'PROPOSED', teamId: 'team-1', userId: 'user-4' },
-      
-      // Technical debt
-      { id: 'wi-29', title: 'Refactor graph engine', type: 'TASK', status: 'PLANNED', teamId: 'team-1', userId: 'user-5' },
-      { id: 'wi-30', title: 'Update dependencies', type: 'TASK', status: 'IN_PROGRESS', teamId: 'team-1', userId: 'user-1' },
-      { id: 'wi-31', title: 'Security audit', type: 'MILESTONE', status: 'PLANNED', teamId: 'team-1', userId: 'user-2' },
-      { id: 'wi-32', title: 'Performance benchmarking', type: 'TASK', status: 'PROPOSED', teamId: 'team-1', userId: 'user-3' }
+      // Project Alpha - Ideas & More
+      { id: 'wi-9', title: 'AI agent integration', type: 'IDEA', status: 'PROPOSED', teamId: 'team-1', userId: 'user-4', graphId: 'graph-project-alpha' },
+      { id: 'wi-10', title: 'Mobile app development', type: 'IDEA', status: 'PROPOSED', teamId: 'team-1', userId: 'user-5', graphId: 'graph-project-alpha' },
+      { id: 'wi-11', title: 'Real-time collaboration', type: 'IDEA', status: 'PROPOSED', teamId: 'team-1', userId: 'user-1', graphId: 'graph-project-alpha' },
+      { id: 'wi-12', title: 'Production-ready graph system', type: 'OUTCOME', status: 'PLANNED', teamId: 'team-1', userId: 'user-1', graphId: 'graph-project-alpha' },
+      { id: 'wi-13', title: 'Scalable architecture', type: 'OUTCOME', status: 'IN_PROGRESS', teamId: 'team-1', userId: 'user-2', graphId: 'graph-project-alpha' },
+
+      // Test Graph Beta - Testing items
+      { id: 'wi-14', title: 'Write unit tests', type: 'TASK', status: 'IN_PROGRESS', teamId: 'team-1', userId: 'user-3', graphId: 'graph-test-beta' },
+      { id: 'wi-15', title: 'Performance optimization', type: 'TASK', status: 'PLANNED', teamId: 'team-1', userId: 'user-4', graphId: 'graph-test-beta' },
+      { id: 'wi-16', title: 'Documentation update', type: 'TASK', status: 'PLANNED', teamId: 'team-1', userId: 'user-5', graphId: 'graph-test-beta' },
+      { id: 'wi-17', title: 'User dashboard', type: 'MILESTONE', status: 'PLANNED', teamId: 'team-1', userId: 'user-1', graphId: 'graph-test-beta' },
+      { id: 'wi-18', title: 'Analytics module', type: 'MILESTONE', status: 'PROPOSED', teamId: 'team-1', userId: 'user-2', graphId: 'graph-test-beta' },
+      { id: 'wi-19', title: 'Export functionality', type: 'TASK', status: 'PROPOSED', teamId: 'team-1', userId: 'user-3', graphId: 'graph-test-beta' },
+      { id: 'wi-20', title: 'Import from other tools', type: 'TASK', status: 'PROPOSED', teamId: 'team-1', userId: 'user-4', graphId: 'graph-test-beta' },
+      { id: 'wi-21', title: 'Test WithAPOC', type: 'TASK', status: 'COMPLETED', teamId: 'team-1', userId: 'user-1', graphId: 'graph-test-beta' },
+      { id: 'wi-22', title: 'testUI Test', type: 'TASK', status: 'IN_PROGRESS', teamId: 'team-1', userId: 'user-2', graphId: 'graph-test-beta' },
+      { id: 'wi-23', title: 'Form validation testing', type: 'TASK', status: 'PLANNED', teamId: 'team-1', userId: 'user-3', graphId: 'graph-test-beta' },
+      { id: 'wi-24', title: 'Edge case handling', type: 'TASK', status: 'PROPOSED', teamId: 'team-1', userId: 'user-4', graphId: 'graph-test-beta' },
+      { id: 'wi-25', title: 'Q1 2024 Planning', type: 'MILESTONE', status: 'COMPLETED', teamId: 'team-1', userId: 'user-1', graphId: 'graph-test-beta' },
+      { id: 'wi-26', title: 'Product roadmap review', type: 'OUTCOME', status: 'IN_PROGRESS', teamId: 'team-1', userId: 'user-2', graphId: 'graph-test-beta' },
+      { id: 'wi-27', title: 'Customer feedback analysis', type: 'TASK', status: 'PLANNED', teamId: 'team-1', userId: 'user-3', graphId: 'graph-test-beta' },
+      { id: 'wi-28', title: 'Market research', type: 'TASK', status: 'PROPOSED', teamId: 'team-1', userId: 'user-4', graphId: 'graph-test-beta' },
+      { id: 'wi-29', title: 'Refactor graph engine', type: 'TASK', status: 'PLANNED', teamId: 'team-1', userId: 'user-5', graphId: 'graph-test-beta' },
+      { id: 'wi-30', title: 'Update dependencies', type: 'TASK', status: 'IN_PROGRESS', teamId: 'team-1', userId: 'user-1', graphId: 'graph-test-beta' },
+      { id: 'wi-31', title: 'Security audit', type: 'MILESTONE', status: 'PLANNED', teamId: 'team-1', userId: 'user-2', graphId: 'graph-test-beta' },
+      { id: 'wi-32', title: 'Performance benchmarking', type: 'TASK', status: 'PROPOSED', teamId: 'team-1', userId: 'user-3', graphId: 'graph-test-beta' }
     ];
     
-    // Create work items
+    // Create work items and link to graphs
     for (const item of workItems) {
       await session.run(
-        `CREATE (w:WorkItem {
+        `MATCH (g:Graph {id: $graphId})
+         CREATE (w:WorkItem {
           id: $id,
           title: $title,
           type: $type,
@@ -106,7 +149,8 @@ async function seed() {
           tags: $tags,
           createdAt: datetime(),
           updatedAt: datetime()
-        })`,
+        })
+        CREATE (w)-[:BELONGS_TO]->(g)`,
         {
           ...item,
           description: `Description for ${item.title}`,
@@ -125,12 +169,22 @@ async function seed() {
     
     // Create edges (relationships between work items)
     const edges = [
+      // Welcome graph edges
+      { source: 'wi-welcome-1', target: 'wi-welcome-2', type: 'DEPENDS_ON' },
+      { source: 'wi-welcome-2', target: 'wi-welcome-3', type: 'DEPENDS_ON' },
+      { source: 'wi-welcome-3', target: 'wi-welcome-4', type: 'DEPENDS_ON' },
+
+      // Project Alpha edges
       { source: 'wi-1', target: 'wi-2', type: 'DEPENDS_ON' },
       { source: 'wi-2', target: 'wi-3', type: 'DEPENDS_ON' },
       { source: 'wi-5', target: 'wi-6', type: 'IS_PART_OF' },
       { source: 'wi-5', target: 'wi-7', type: 'IS_PART_OF' },
       { source: 'wi-5', target: 'wi-8', type: 'IS_PART_OF' },
-      { source: 'wi-12', target: 'wi-5', type: 'DEPENDS_ON' }
+      { source: 'wi-12', target: 'wi-5', type: 'DEPENDS_ON' },
+
+      // Test graph edges
+      { source: 'wi-14', target: 'wi-15', type: 'DEPENDS_ON' },
+      { source: 'wi-17', target: 'wi-18', type: 'IS_PART_OF' }
     ];
     
     for (const edge of edges) {

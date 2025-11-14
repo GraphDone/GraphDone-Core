@@ -18,6 +18,7 @@ import { typeDefs } from './schema/neo4j-schema.js';
 import { authTypeDefs } from './schema/auth-schema.js';
 import { authOnlyTypeDefs } from './schema/auth-only-schema.js';
 import { sqliteAuthResolvers } from './resolvers/sqlite-auth.js';
+import { graphProtectionResolvers } from './resolvers/graph-protection.js';
 import { extractUserFromToken } from './middleware/auth.js';
 import { mergeTypeDefs } from '@graphql-tools/merge';
 import { driver, NEO4J_URI } from './db.js';
@@ -293,16 +294,25 @@ async function startServer() {
       console.log('ℹ️  Default admin setup completed'); // eslint-disable-line no-console
     }
 
+    // Welcome graphs are now created per-user on first login (handled by frontend)
+
     // Merge type definitions (Neo4j schema + auth schema)
     const mergedTypeDefs = mergeTypeDefs([typeDefs, authTypeDefs]);
 
-    // Create Neo4jGraphQL instance for graph data with SQLite auth resolvers override
+    // Create Neo4jGraphQL instance with custom resolvers
     const neoSchema = new Neo4jGraphQL({
       typeDefs: mergedTypeDefs,
       driver,
       resolvers: {
-        // Override auth resolvers to use SQLite instead of Neo4j User nodes
-        ...sqliteAuthResolvers,
+        Mutation: {
+          // Auth resolvers (SQLite-based)
+          ...sqliteAuthResolvers.Mutation,
+          // Graph protection (prevent Welcome graph deletion)
+          ...graphProtectionResolvers.Mutation,
+        },
+        Query: {
+          ...sqliteAuthResolvers.Query,
+        }
       },
     });
 

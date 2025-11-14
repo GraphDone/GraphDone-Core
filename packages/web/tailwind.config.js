@@ -27,7 +27,11 @@ export default {
     // Border left hover classes for cards/dashboard
     'hover:border-l-fuchsia-300/60', 'hover:border-l-orange-300/60', 'hover:border-l-indigo-300/60',
     'hover:border-l-green-300/60', 'hover:border-l-red-300/60', 'hover:border-l-sky-300/60',
-    'hover:border-l-yellow-300/60', 'hover:border-l-teal-300/60', 'hover:border-l-gray-300/60'
+    'hover:border-l-yellow-300/60', 'hover:border-l-teal-300/60', 'hover:border-l-gray-300/60',
+    // Focus ring and border classes for inputs
+    'focus:ring-2', 'focus:ring-green-500/50', 'focus:border-green-400',
+    'focus:ring-red-500/50', 'focus:border-red-400',
+    'focus:ring-blue-500', 'focus:border-blue-500'
   ],
   theme: {
     extend: {
@@ -41,6 +45,21 @@ export default {
           'outer': '#93c5fd',
           'periphery': '#dbeafe'
         }
+      },
+      ringWidth: {
+        'DEFAULT': '2px',
+        '0': '0px',
+        '1': '1px',
+        '2': '2px',
+        '4': '4px',
+        '8': '8px',
+      },
+      ringOffsetWidth: {
+        '0': '0px',
+        '1': '1px',
+        '2': '2px',
+        '4': '4px',
+        '8': '8px',
       },
       animation: {
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',

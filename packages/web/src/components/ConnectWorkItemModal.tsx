@@ -37,7 +37,7 @@ import {
   Target
 } from '../constants/workItemConstants';
 
-interface ConnectNodeModalProps {
+interface ConnectWorkItemModalProps {
   isOpen: boolean;
   onClose: () => void;
   sourceNode: {
@@ -50,7 +50,7 @@ interface ConnectNodeModalProps {
 }
 
 // Separate DisconnectNodeModal interface
-interface DisconnectNodeModalProps {
+interface DisconnectWorkItemModalProps {
   isOpen: boolean;
   onClose: () => void;
   sourceNode: {
@@ -64,7 +64,7 @@ interface DisconnectNodeModalProps {
 
 
 // Separate DisconnectNodeModal Component
-export function DisconnectNodeModal({ isOpen, onClose, sourceNode, onAllConnectionsRemoved }: DisconnectNodeModalProps) {
+export function DisconnectWorkItemModal({ isOpen, onClose, sourceNode, onAllConnectionsRemoved }: DisconnectWorkItemModalProps) {
   const { currentGraph } = useGraph();
   const { showSuccess, showError } = useNotifications();
   
@@ -341,7 +341,7 @@ export function DisconnectNodeModal({ isOpen, onClose, sourceNode, onAllConnecti
                 </div>
                 <div>
                   <h3 className="text-xl font-bold bg-gradient-to-r from-red-200 to-orange-100 bg-clip-text text-transparent">
-                    Disconnect Node
+                    Disconnect Work Item
                   </h3>
                   <p className="text-sm text-gray-300 mt-1">
                     Remove connections from "{sourceNode.title}"
@@ -545,7 +545,7 @@ export function DisconnectNodeModal({ isOpen, onClose, sourceNode, onAllConnecti
                 <div className="flex justify-end space-x-4 pt-6 border-t border-gray-600/50">
                   <button
                     onClick={onClose}
-                    className="px-6 py-3 text-gray-300 bg-gradient-to-r from-gray-700/50 to-gray-800/50 border border-gray-600/50 rounded-xl hover:from-gray-600/60 hover:to-gray-700/60 hover:border-gray-500/60 transition-all duration-200 font-medium"
+                    className="px-6 py-3 text-gray-300 bg-gray-700/50 border border-gray-600/50 rounded-xl hover:bg-red-600 hover:text-white hover:border-red-500/50 transition-all duration-200 font-medium hover:scale-105"
                   >
                     Cancel
                   </button>
@@ -621,7 +621,7 @@ export function DisconnectNodeModal({ isOpen, onClose, sourceNode, onAllConnecti
                 <div className="flex justify-end space-x-3">
                   <button
                     onClick={() => setShowDisconnectConfirmation(false)}
-                    className="px-4 py-2 text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors"
+                    className="px-4 py-2 text-gray-300 bg-gray-700 rounded-lg hover:bg-red-600 hover:text-white transition-all duration-200"
                   >
                     Cancel
                   </button>
@@ -643,7 +643,7 @@ export function DisconnectNodeModal({ isOpen, onClose, sourceNode, onAllConnecti
   );
 }
 
-export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'connect', onAllConnectionsRemoved: _onAllConnectionsRemoved }: ConnectNodeModalProps) {
+export function ConnectWorkItemModal({ isOpen, onClose, sourceNode, initialTab = 'connect', onAllConnectionsRemoved: _onAllConnectionsRemoved }: ConnectWorkItemModalProps) {
   const { currentTeam } = useAuth();
   const { currentGraph } = useGraph();
   const { showSuccess, showError } = useNotifications();
@@ -1174,7 +1174,7 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
                 </div>
                 <div>
                   <h3 className="text-xl font-bold bg-gradient-to-r from-emerald-200 to-green-100 bg-clip-text text-transparent">
-                    {activeTab === 'connect' ? 'Connect Node' : 'Disconnect Node'}
+                    {activeTab === 'connect' ? 'Connect Work Item' : 'Disconnect Work Item'}
                   </h3>
                   <p className="text-sm text-gray-300 mt-1">
                     {activeTab === 'connect' 
@@ -1747,8 +1747,8 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
                   <CheckCircle className="h-4 w-4 text-emerald-400" />
                 </div>
                 <div>
-                  <h4 className="text-sm font-bold text-gray-100">Available Nodes</h4>
-                  <p className="text-xs text-gray-400">Select nodes to create connections</p>
+                  <h4 className="text-sm font-bold text-gray-100">Available Work Items</h4>
+                  <p className="text-xs text-gray-400">Select work items to create connections</p>
                 </div>
               </div>
               
@@ -1761,7 +1761,7 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
                       type="text"
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      placeholder="Search nodes by title or type"
+                      placeholder="Search work items by title or type"
                       className="w-full pl-12 pr-4 py-3 bg-gray-800 border border-gray-600/50 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-emerald-400/70 focus:ring-2 focus:ring-emerald-500/20 transition-all duration-200"
                     />
                   </div>
@@ -2114,7 +2114,7 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
               <div className="flex justify-end space-x-4 pt-6 border-t border-gray-600/50 mt-6">
                 <button
                   onClick={onClose}
-                  className="px-6 py-3 text-gray-300 bg-gradient-to-r from-gray-700/50 to-gray-800/50 border border-gray-600/50 rounded-xl hover:from-gray-600/60 hover:to-gray-700/60 hover:border-gray-500/60 transition-all duration-200 font-medium"
+                  className="px-6 py-3 text-gray-300 bg-gray-700/50 border border-gray-600/50 rounded-xl hover:bg-red-600 hover:text-white hover:border-red-500/50 transition-all duration-200 font-medium hover:scale-105"
                 >
                   Cancel
                 </button>
@@ -2378,7 +2378,7 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
                 <div className="flex justify-end space-x-3">
                   <button
                     onClick={() => setShowDisconnectConfirmation(false)}
-                    className="px-4 py-2 text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors"
+                    className="px-4 py-2 text-gray-300 bg-gray-700 rounded-lg hover:bg-red-600 hover:text-white transition-all duration-200"
                   >
                     Cancel
                   </button>

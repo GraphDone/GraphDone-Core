@@ -276,7 +276,7 @@ export function Backend() {
       document.getElementById('graph-count')!.textContent = graphCount.toString();
       debug.push(`✅ Found ${graphCount} graphs`);
 
-      debug.push('📊 Fetching node count...');
+      debug.push('📊 Fetching work item count...');
       const nodeResponse = await fetch('/api/graphql', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

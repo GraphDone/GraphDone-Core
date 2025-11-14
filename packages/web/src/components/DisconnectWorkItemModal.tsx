@@ -17,7 +17,7 @@ import {
   RelationshipType
 } from '../constants/workItemConstants';
 
-interface DisconnectNodeModalProps {
+interface DisconnectWorkItemModalProps {
   isOpen: boolean;
   onClose: () => void;
   sourceNode: {
@@ -27,7 +27,7 @@ interface DisconnectNodeModalProps {
   };
 }
 
-export function DisconnectNodeModal({ isOpen, onClose, sourceNode }: DisconnectNodeModalProps) {
+export function DisconnectWorkItemModal({ isOpen, onClose, sourceNode }: DisconnectWorkItemModalProps) {
   const { currentGraph } = useGraph();
   const { showSuccess, showError } = useNotifications();
   
@@ -223,7 +223,7 @@ export function DisconnectNodeModal({ isOpen, onClose, sourceNode }: DisconnectN
                 </div>
                 <div>
                   <h3 className="text-xl font-bold bg-gradient-to-r from-red-200 to-orange-100 bg-clip-text text-transparent">
-                    Disconnect Node
+                    Disconnect Work Item
                   </h3>
                   <p className="text-sm text-gray-300 mt-1">
                     Remove connections from "{sourceNode.title}"
@@ -351,7 +351,7 @@ export function DisconnectNodeModal({ isOpen, onClose, sourceNode }: DisconnectN
                 <div className="flex justify-end space-x-4 pt-6 border-t border-gray-600/50">
                   <button
                     onClick={onClose}
-                    className="px-6 py-3 text-gray-300 bg-gradient-to-r from-gray-700/50 to-gray-800/50 border border-gray-600/50 rounded-xl hover:from-gray-600/60 hover:to-gray-700/60 hover:border-gray-500/60 transition-all duration-200 font-medium"
+                    className="px-6 py-3 text-gray-300 bg-gray-700/50 border border-gray-600/50 rounded-xl hover:bg-red-600 hover:text-white hover:border-red-500/50 transition-all duration-200 font-medium hover:scale-105"
                   >
                     Cancel
                   </button>
@@ -427,7 +427,7 @@ export function DisconnectNodeModal({ isOpen, onClose, sourceNode }: DisconnectN
                 <div className="flex justify-end space-x-3">
                   <button
                     onClick={() => setShowDisconnectConfirmation(false)}
-                    className="px-4 py-2 text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors"
+                    className="px-4 py-2 text-gray-300 bg-gray-700 rounded-lg hover:bg-red-600 hover:text-white transition-all duration-200"
                   >
                     Cancel
                   </button>

@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import ReactDOM from 'react-dom/client';
+import { createPortal } from 'react-dom';
 import * as d3 from 'd3';
-import { Link2, Edit3, Trash2, Folder, FolderOpen, Plus, FileText, Settings, Maximize2, ArrowLeft, X, GitBranch, Minus, Unlink, Crosshair } from 'lucide-react';
+import { Link2, Edit3, Trash2, Folder, FolderOpen, Plus, FileText, Settings, Maximize2, ArrowLeft, X, GitBranch, Minus, Unlink, Crosshair, GripVertical } from 'lucide-react';
 import {
   getPriorityIconElement,
   getStatusIconElement,
@@ -27,15 +28,15 @@ import { GET_WORK_ITEMS, GET_EDGES, CREATE_EDGE, UPDATE_EDGE, DELETE_EDGE, CREAT
 import { validateGraphData, getValidationSummary, ValidationResult } from '../utils/graphDataValidation';
 import { DEFAULT_NODE_CONFIG } from '../constants/workItemConstants';
 
-import { DeleteNodeModal } from './DeleteNodeModal';
+import { DeleteWorkItemModal } from './DeleteWorkItemModal';
 import { RelationshipEditorWindow } from './RelationshipEditorWindow';
-import { CreateNodeModal } from './CreateNodeModal';
+import { CreateWorkItemModal } from './CreateWorkItemModal';
 import { CreateGraphModal } from './CreateGraphModal';
 import { GraphSelectionModal } from './GraphSelectionModal';
 import { UpdateGraphModal } from './UpdateGraphModal';
 import { DeleteGraphModal } from './DeleteGraphModal';
-import { ConnectNodeModal } from './ConnectNodeModal';
-import { NodeDetailsModal } from './NodeDetailsModal';
+import { ConnectWorkItemModal } from './ConnectWorkItemModal';
+import { WorkItemDetailsModal } from './WorkItemDetailsModal';
 
 import { WorkItem, WorkItemEdge } from '../types/graph';
 import { RelationshipType, RELATIONSHIP_OPTIONS, getRelationshipConfig } from '../constants/workItemConstants';
@@ -65,6 +66,11 @@ interface EdgeMenuState {
   edge: WorkItemEdge | null;
   position: { x: number; y: number };
   visible: boolean;
+}
+
+interface DragState {
+  isDragging: boolean;
+  offset: { x: number; y: number };
 }
 
 interface InteractiveGraphVisualizationProps {
@@ -233,6 +239,21 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
   
   const [nodeMenu, setNodeMenu] = useState<NodeMenuState>({ node: null, position: { x: 0, y: 0 }, visible: false });
   const [edgeMenu, setEdgeMenu] = useState<EdgeMenuState>({ edge: null, position: { x: 0, y: 0 }, visible: false });
+  const [menuDragState, setMenuDragState] = useState<DragState>({ isDragging: false, offset: { x: 0, y: 0 } });
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (nodeMenu.visible) {
+        if (e.key === 'Escape') {
+          setNodeMenu({ node: null, position: { x: 0, y: 0 }, visible: false });
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [nodeMenu.visible]);
+
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionSource, setConnectionSource] = useState<string | null>(null);
   const [selectedRelationType, setSelectedRelationType] = useState<RelationshipType>('DEFAULT_EDGE');
@@ -597,13 +618,13 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     }
   }, [updateWorkItemMutation]);
 
-  // Function to get SVG path for priority icons
+  // Function to get SVG path for priority icons (using correct Lucide icon paths)
   const getPriorityIconSvgPath = (priorityValue: number): string => {
-    if (priorityValue >= 0.8) return 'M12 2L2 7v10c0 5.55 3.84 10 9 11 1.16-.21 2.31-.54 3.42-1.01C16.1 26.46 18.05 25.24 20 23.5 21.95 21.76 23.84 19.54 24 17v-10L12 2z'; // Flame
+    if (priorityValue >= 0.8) return 'M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z'; // Flame
     if (priorityValue >= 0.6) return 'M13 2L3 14h9l-1 8 10-12h-9l1-8z'; // Zap
-    if (priorityValue >= 0.4) return 'M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z'; // Triangle (star-like)
-    if (priorityValue >= 0.2) return 'M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z'; // Circle
-    return 'M12 5v14m-7-7l7 7 7-7'; // ArrowDown
+    if (priorityValue >= 0.4) return 'M12.002 4l-3.091 6.261-6.91 1.01 5 4.87-1.18 6.88 6.18-3.25 6.181 3.25-1.18-6.88 5-4.87-6.91-1.01z'; // Triangle/Star
+    if (priorityValue >= 0.2) return 'M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z'; // Circle
+    return 'M12 5v14m-7-7 7 7 7-7'; // ArrowDown
   };
 
   // Function to get SVG path for status icons  
@@ -1225,13 +1246,13 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     
     try {
       // Generate a unique name that doesn't conflict with existing nodes
-      let nodeTitle = `New Node ${nodeCounter}`;
+      let nodeTitle = `New Work Item ${nodeCounter}`;
       let attempts = 0;
       
       // Check if name already exists and generate a new one if needed
       while (validatedNodes.some(node => node.title.toLowerCase().trim() === nodeTitle.toLowerCase().trim()) && attempts < 100) {
         attempts++;
-        nodeTitle = `New Node ${nodeCounter + attempts}`;
+        nodeTitle = `New Work Item ${nodeCounter + attempts}`;
       }
       
       // Update counter for next node
@@ -1268,16 +1289,70 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       const result = await createNodeMutation({
         variables: { input: [workItemInput] }
       });
-      
+
       if (result.data) {
         setNodeCounter(prev => prev + 1);
+        showSuccess('Work item created successfully');
         // Let Apollo's cache update handle the UI update instead of refetch to avoid camera jumping
         // The refetchQueries in the mutation config will handle the data update
       }
-    } catch (_error) {
-      // Error handled by mutation error state
+    } catch (error) {
+      console.error('[Create Work Item Error]', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create work item';
+      showError(errorMessage);
     }
   };
+
+  // Helper function to calculate node dimensions (shared between init and update)
+  const getNodeDimensions = useCallback((d: WorkItem) => {
+    // Larger base dimensions by type - increased for 3-line support
+    const baseDimensions = (() => {
+      switch (d.type) {
+        case 'EPIC': return { width: 200, height: 120 };
+        case 'MILESTONE': return { width: 190, height: 115 };
+        case 'FEATURE': return { width: 180, height: 110 };
+        case 'OUTCOME': return { width: 185, height: 115 };
+        case 'TASK': return { width: 170, height: 105 };
+        case 'BUG': return { width: 165, height: 100 };
+        case 'IDEA': return { width: 160, height: 95 };
+        default: return { width: 170, height: 105 };
+      }
+    })();
+
+    // Use base width for consistent layout
+    const width = baseDimensions.width;
+
+    // Calculate actual text wrapping based on word breaks - up to 3 lines
+    const maxCharsPerLine = Math.floor(width / 8); // ~8px per character for more conservative wrapping
+    const words = d.title.split(' ');
+    let lines = 1;
+    let currentLineLength = 0;
+
+    for (const word of words) {
+      const wordLength = word.length;
+      // Check if adding this word would exceed line length
+      if (currentLineLength + wordLength + 1 > maxCharsPerLine && currentLineLength > 0) {
+        lines++;
+        currentLineLength = wordLength;
+        if (lines >= 3) break; // Maximum 3 lines
+      } else {
+        currentLineLength += wordLength + (currentLineLength > 0 ? 1 : 0); // +1 for space
+      }
+    }
+
+    lines = Math.min(lines, 3); // Maximum 3 lines
+
+    // Calculate additional height needed for multiple lines (16px per extra line)
+    const additionalHeight = (lines - 1) * 16;
+    const finalHeight = baseDimensions.height + additionalHeight;
+
+    return {
+      width: width,
+      height: finalHeight,
+      titleLines: lines,
+      maxCharsPerLine: maxCharsPerLine
+    };
+  }, []);
 
   // Smart data update function - only reinitializes when necessary, preserves camera position
   const updateVisualizationData = useCallback(() => {
@@ -1310,9 +1385,9 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       return;
     }
 
-    // If counts are the same, just update simulation data (for property changes)
-    console.log('[Graph Debug] Data counts unchanged - updating simulation data only');
-    
+    // If counts are the same, update both simulation data AND DOM elements (for property changes)
+    console.log('[Graph Debug] Data counts unchanged - updating simulation data and DOM elements');
+
     // Update simulation with current data (handles property changes)
     simulation.nodes(nodes as any);
     const linkForce = simulation.force('link') as d3.ForceLink<any, any>;
@@ -1320,11 +1395,83 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       linkForce.links(validatedEdges);
     }
 
+    // UPDATE DOM ELEMENTS: Rebind data and update visual properties
+    // Update node titles
+    const nodeGroups = svg.select('.nodes-group').selectAll('.node');
+    nodeGroups.each(function(d: any) {
+      const nodeGroup = d3.select(this);
+      // Find the updated node data by ID
+      const updatedNode = nodes.find(n => n.id === d.id);
+      if (!updatedNode) return;
+
+      // Update title text elements
+      nodeGroup.selectAll('.node-title-text').remove();
+      const maxCharsPerLine = 18;
+      const maxLines = 2;
+      let lines: string[] = [];
+      const words = updatedNode.title.split(' ');
+      let currentLine = '';
+
+      for (const word of words) {
+        const testLine = currentLine ? `${currentLine} ${word}` : word;
+        if (testLine.length > maxCharsPerLine && currentLine) {
+          lines.push(currentLine);
+          currentLine = word;
+          if (lines.length >= maxLines) break;
+        } else {
+          currentLine = testLine;
+        }
+      }
+      if (currentLine && lines.length < maxLines) {
+        lines.push(currentLine);
+      }
+      if (lines.length === 0) {
+        lines.push(updatedNode.title.substring(0, maxCharsPerLine - 3) + '...');
+      }
+
+      const dimensions = getNodeDimensions(updatedNode);
+      const titleBarHeight = 32;
+      const startY = -dimensions.height / 2 + titleBarHeight + 18;
+      lines.forEach((line, index) => {
+        nodeGroup.append('text')
+          .attr('class', 'node-title-text')
+          .attr('x', 0)
+          .attr('y', startY + (index * 16))
+          .attr('text-anchor', 'middle')
+          .attr('dominant-baseline', 'middle')
+          .text(line)
+          .style('font-size', '14px')
+          .style('font-weight', '600')
+          .style('fill', () => {
+            const isCompleted = updatedNode.status === 'COMPLETED' || updatedNode.status === 'Completed' || updatedNode.status === 'Done' || updatedNode.status === 'DONE';
+            return isCompleted ? '#9ca3af' : '#ffffff';
+          })
+          .style('pointer-events', 'none');
+      });
+
+      // Update node type badge text
+      nodeGroup.select('.node-type-text')
+        .text(() => {
+          const config = getTypeConfig(updatedNode.type as WorkItemType);
+          return config.label.toUpperCase();
+        });
+
+      // Update description
+      nodeGroup.select('.node-description-text')
+        .text(() => {
+          if (!updatedNode.description) return '';
+          const maxDescChars = 25;
+          return updatedNode.description.length > maxDescChars
+            ? updatedNode.description.substring(0, maxDescChars) + '...'
+            : updatedNode.description;
+        });
+    });
+
     // Gentle restart to settle any property changes
     simulation.alpha(0.1).restart();
-    
-    console.log('[Graph Debug] Simulation data updated');
-  }, [nodes, validatedEdges]);
+
+    console.log('[Graph Debug] Simulation data and DOM elements updated');
+  }, [nodes, validatedEdges, getNodeDimensions]);
 
   // Define initializeVisualization function with access to nodes data
   const initializeVisualization = useCallback(() => {
@@ -1867,56 +2014,8 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         }));
 
     // Monopoly-style rectangular nodes with colored title bars
-    const getNodeDimensions = (d: WorkItem) => {
-      // Larger base dimensions by type - increased for 3-line support
-      const baseDimensions = (() => {
-        switch (d.type) {
-          case 'EPIC': return { width: 200, height: 120 };
-          case 'MILESTONE': return { width: 190, height: 115 };
-          case 'FEATURE': return { width: 180, height: 110 };
-          case 'OUTCOME': return { width: 185, height: 115 };
-          case 'TASK': return { width: 170, height: 105 };
-          case 'BUG': return { width: 165, height: 100 };
-          case 'IDEA': return { width: 160, height: 95 };
-          default: return { width: 170, height: 105 };
-        }
-      })();
-      
-      // Use base width for consistent layout
-      const width = baseDimensions.width;
-      
-      // Calculate actual text wrapping based on word breaks - up to 3 lines
-      const maxCharsPerLine = Math.floor(width / 8); // ~8px per character for more conservative wrapping
-      const words = d.title.split(' ');
-      let lines = 1;
-      let currentLineLength = 0;
-      
-      for (const word of words) {
-        const wordLength = word.length;
-        // Check if adding this word would exceed line length
-        if (currentLineLength + wordLength + 1 > maxCharsPerLine && currentLineLength > 0) {
-          lines++;
-          currentLineLength = wordLength;
-          if (lines >= 3) break; // Maximum 3 lines
-        } else {
-          currentLineLength += wordLength + (currentLineLength > 0 ? 1 : 0); // +1 for space
-        }
-      }
-      
-      lines = Math.min(lines, 3); // Maximum 3 lines
-      
-      // Calculate additional height needed for multiple lines (16px per extra line)
-      const additionalHeight = (lines - 1) * 16;
-      const finalHeight = baseDimensions.height + additionalHeight;
-      
-      return { 
-        width: width, 
-        height: finalHeight,
-        titleLines: lines,
-        maxCharsPerLine: maxCharsPerLine
-      };
-    };
-    
+    // getNodeDimensions is now defined outside and shared with updateVisualizationData
+
     // Main node rectangle (dark theme background)
     nodeElements.append('rect')
       .attr('class', (d: WorkItem) => {
@@ -2786,30 +2885,158 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     .on('contextmenu', (event: MouseEvent, d: any) => {
       event.preventDefault();
       event.stopPropagation();
-      
-      // Context menu disabled - just select the node
-      setSelectedNode(d);
-      lastSelectedNodeRef.current = d; // Track last selected
-      
-      // Apply glow effect
-      applyNodeGlowImmediately(d);
-      
-      // Context menu disabled
-      return;
-      /*
+
       // Show context menu for advanced actions
       const containerRect = containerRef.current?.getBoundingClientRect();
       if (containerRect) {
+        const menuWidth = 320;
+        const menuHeight = 500;
+        const padding = 10;
+
+        let x = event.clientX - containerRect.left;
+        let y = event.clientY - containerRect.top;
+
+        if (x + menuWidth > window.innerWidth - padding) {
+          x = window.innerWidth - menuWidth - padding;
+        }
+        if (y + menuHeight > window.innerHeight - padding) {
+          y = window.innerHeight - menuHeight - padding;
+        }
+        if (x < padding) {
+          x = padding;
+        }
+        if (y < padding) {
+          y = padding;
+        }
+
         setNodeMenu({
           node: d,
           position: {
-            x: event.clientX - containerRect.left,
-            y: event.clientY - containerRect.top
+            x,
+            y
           },
           visible: true
         });
+
+        // Select the node and apply glow effect
+        setSelectedNode(d);
+        lastSelectedNodeRef.current = d;
+        applyNodeGlowImmediately(d);
       }
-      */
+    })
+    .on('touchstart', function(event: TouchEvent, d: any) {
+      // Track touch for long-press detection
+      const element = d3.select(this);
+      const touch = event.touches[0];
+
+      const touchData = {
+        startTime: Date.now(),
+        startX: touch.clientX,
+        startY: touch.clientY,
+        timeout: null as any,
+        moved: false
+      };
+
+      // Store touch data on the element
+      (element.node() as any).__touchData = touchData;
+
+      // Add visual feedback for long-press
+      const feedbackCircle = element.append('circle')
+        .attr('class', 'long-press-feedback')
+        .attr('cx', 0)
+        .attr('cy', 0)
+        .attr('r', 0)
+        .attr('fill', 'none')
+        .attr('stroke', '#3b82f6')
+        .attr('stroke-width', 2)
+        .attr('opacity', 0.6);
+
+      // Animate growing circle for visual feedback
+      feedbackCircle
+        .transition()
+        .duration(500)
+        .attr('r', 30)
+        .attr('opacity', 0);
+
+      // Set timeout for long-press
+      touchData.timeout = setTimeout(() => {
+        if (!touchData.moved) {
+          // Long press detected - show context menu
+          event.preventDefault();
+          const containerRect = containerRef.current?.getBoundingClientRect();
+          if (containerRect) {
+            setNodeMenu({
+              node: d,
+              position: {
+                x: touch.clientX - containerRect.left,
+                y: touch.clientY - containerRect.top
+              },
+              visible: true
+            });
+
+            // Select the node and apply glow effect
+            setSelectedNode(d);
+            lastSelectedNodeRef.current = d;
+            applyNodeGlowImmediately(d);
+
+            // Haptic feedback (if supported)
+            if (navigator.vibrate) {
+              navigator.vibrate(50);
+            }
+          }
+        }
+        feedbackCircle.remove();
+      }, 500);
+    })
+    .on('touchmove', function(event: TouchEvent) {
+      // Track movement to cancel long-press if user is dragging
+      const element = d3.select(this);
+      const touchData = (element.node() as any).__touchData;
+
+      if (touchData) {
+        const touch = event.touches[0];
+        const deltaX = touch.clientX - touchData.startX;
+        const deltaY = touch.clientY - touchData.startY;
+        const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+
+        // If moved more than 10px, cancel long-press
+        if (distance > 10) {
+          touchData.moved = true;
+          if (touchData.timeout) {
+            clearTimeout(touchData.timeout);
+          }
+          // Remove visual feedback
+          element.select('.long-press-feedback').remove();
+        }
+      }
+    })
+    .on('touchend', function() {
+      // Clean up long-press detection
+      const element = d3.select(this);
+      const touchData = (element.node() as any).__touchData;
+
+      if (touchData) {
+        if (touchData.timeout) {
+          clearTimeout(touchData.timeout);
+        }
+        delete (element.node() as any).__touchData;
+      }
+
+      // Remove visual feedback
+      element.select('.long-press-feedback').remove();
+    })
+    .on('touchcancel', function() {
+      // Clean up on touch cancel
+      const element = d3.select(this);
+      const touchData = (element.node() as any).__touchData;
+
+      if (touchData && touchData.timeout) {
+        clearTimeout(touchData.timeout);
+        delete (element.node() as any).__touchData;
+      }
+
+      // Remove visual feedback
+      element.select('.long-press-feedback').remove();
     });
 
     const updateEdgePositions = () => {
@@ -3200,22 +3427,32 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
   // Force reinitialization trigger - incremented when view needs refresh
   const [reinitTrigger, setReinitTrigger] = useState(0);
 
+  // Track previous node count to detect transition from empty to non-empty
+  const prevNodeCountRef = useRef<number>(0);
+
   // Comprehensive reinitialization effect - ONLY when actually needed
   useEffect(() => {
-    console.log('[Graph Debug] Checking if reinitialization needed...', { 
-      nodesLength: nodes.length, 
+    console.log('[Graph Debug] Checking if reinitialization needed...', {
+      nodesLength: nodes.length,
+      prevNodesLength: prevNodeCountRef.current,
       edgesLength: validatedEdges.length,
       trigger: reinitTrigger,
       currentGraph: currentGraph?.id
     });
-    
+
+    // Detect transition from empty to non-empty graph (first node creation)
+    const wasEmpty = prevNodeCountRef.current === 0;
+    const isNowPopulated = nodes.length > 0;
+    const transitioningFromEmpty = wasEmpty && isNowPopulated;
+
     // Only reinitialize if this is truly necessary
-    const shouldReinit = 
+    const shouldReinit =
       !svgRef.current ||
       !containerRef.current ||
       nodes.length === 0 ||
       !d3.select(svgRef.current).select('.main-graph-group').node() ||
-      reinitTrigger > 0;
+      reinitTrigger > 0 ||
+      transitioningFromEmpty; // Force reinit when adding first node to empty graph
     
     if (shouldReinit) {
       console.log('[Graph Debug] Full reinitialization required');
@@ -3229,6 +3466,9 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       // Use selective data updates instead of full reinitialization
       updateVisualizationData();
     }
+
+    // Update previous node count for next comparison
+    prevNodeCountRef.current = nodes.length;
 
     const handleResize = () => {
       if (!containerRef.current || !svgRef.current || !simulationRef.current) return;
@@ -3253,13 +3493,14 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, [
-    nodes.length, 
-    validatedEdges.length, 
+    nodes.length,
+    validatedEdges.length,
     currentGraph?.id, // Re-init when graph changes
     reinitTrigger, // Manual trigger
     loading, // Re-init when loading completes
-    edgesLoading // Re-init when edges loading completes
-    // Removed JSON.stringify dependency - it was triggering reinitialization on every node property change
+    edgesLoading, // Re-init when edges loading completes
+    // Track node property changes for selective updates (only titles, descriptions, types)
+    nodes.map(n => `${n.id}:${n.title}:${n.description}:${n.type}:${n.status}`).join(',')
   ]);
 
   // Manual reinitialization function (expose globally for debugging)
@@ -3547,7 +3788,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
               Transform Your Vision
             </h3>
             <div className="text-gray-200 mb-8 leading-relaxed text-base max-w-md mx-auto">
-              Break free from rigid hierarchies. Create your first node and experience how GraphDone intelligently connects ideas, surfaces priorities, and accelerates meaningful outcomes.
+              Break free from rigid hierarchies. Create your first work item and experience how GraphDone intelligently connects ideas, surfaces priorities, and accelerates meaningful outcomes.
             </div>
             
             <button 
@@ -3557,7 +3798,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
               <div className="w-5 h-5 bg-white/20 rounded-full flex items-center justify-center">
                 <Plus className="h-3 w-3" />
               </div>
-              Create Your First Node
+              Create Your First Work Item
             </button>
           </div>
         </div>
@@ -3628,48 +3869,136 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       )}
 
       {/* Node Context Menu */}
-      {nodeMenu.visible && nodeMenu.node && (
-        <>
-          {/* Backdrop for node menu */}
-          <div 
-            className="fixed inset-0 z-40" 
-            onClick={() => setNodeMenu({ node: null, position: { x: 0, y: 0 }, visible: false })}
-          />
+      {nodeMenu.visible && nodeMenu.node && createPortal(
+        <div
+          className="fixed inset-0 bg-black/20 backdrop-blur-sm z-[999999]"
+          onClick={() => setNodeMenu({ node: null, position: { x: 0, y: 0 }, visible: false })}
+          onMouseMove={(e) => {
+            if (menuDragState.isDragging) {
+              const menuWidth = 320;
+              const menuHeight = 500;
+              const padding = 10;
+
+              const newX = Math.max(
+                padding,
+                Math.min(
+                  window.innerWidth - menuWidth - padding,
+                  e.clientX - menuDragState.offset.x
+                )
+              );
+
+              const newY = Math.max(
+                padding,
+                Math.min(
+                  window.innerHeight - menuHeight - padding,
+                  e.clientY - menuDragState.offset.y
+                )
+              );
+
+              setNodeMenu(prev => ({
+                ...prev,
+                position: {
+                  x: newX,
+                  y: newY
+                }
+              }));
+            }
+          }}
+          onMouseUp={() => setMenuDragState({ isDragging: false, offset: { x: 0, y: 0 } })}
+          onTouchMove={(e) => {
+            if (menuDragState.isDragging && e.touches.length > 0) {
+              const touch = e.touches[0];
+              const menuWidth = 320;
+              const menuHeight = 500;
+              const padding = 10;
+
+              const newX = Math.max(
+                padding,
+                Math.min(
+                  window.innerWidth - menuWidth - padding,
+                  touch.clientX - menuDragState.offset.x
+                )
+              );
+
+              const newY = Math.max(
+                padding,
+                Math.min(
+                  window.innerHeight - menuHeight - padding,
+                  touch.clientY - menuDragState.offset.y
+                )
+              );
+
+              setNodeMenu(prev => ({
+                ...prev,
+                position: {
+                  x: newX,
+                  y: newY
+                }
+              }));
+            }
+          }}
+          onTouchEnd={() => setMenuDragState({ isDragging: false, offset: { x: 0, y: 0 } })}
+        >
           <div
-            className="absolute bg-gray-800 border border-gray-600 rounded-lg shadow-lg py-2 z-50 max-h-96 overflow-y-auto"
+            className="absolute bg-black/90 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl overflow-hidden animate-fadeIn"
             style={{
               left: nodeMenu.position.x,
               top: nodeMenu.position.y,
-              minWidth: '250px'
+              minWidth: '320px',
+              maxHeight: '500px',
+              cursor: menuDragState.isDragging ? 'grabbing' : 'default'
             }}
             onClick={(e) => e.stopPropagation()}
         >
-          {/* Node Info Header with Close Button */}
-          <div className="px-4 py-2 border-b border-gray-600">
+          <div
+            className="px-5 py-3 bg-gradient-to-br from-blue-500/20 via-purple-500/10 to-blue-500/5 border-b border-white/10 cursor-grab active:cursor-grabbing"
+            onMouseDown={(e) => {
+              setMenuDragState({
+                isDragging: true,
+                offset: {
+                  x: e.clientX - nodeMenu.position.x,
+                  y: e.clientY - nodeMenu.position.y
+                }
+              });
+            }}
+            onTouchStart={(e) => {
+              if (e.touches.length > 0) {
+                const touch = e.touches[0];
+                setMenuDragState({
+                  isDragging: true,
+                  offset: {
+                    x: touch.clientX - nodeMenu.position.x,
+                    y: touch.clientY - nodeMenu.position.y
+                  }
+                });
+              }
+            }}
+          >
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-              <div
-                className="w-4 h-4 rounded-full"
-                style={{ backgroundColor: getNodeColor(nodeMenu.node) }}
-              />
-              <span className="font-medium text-gray-100">{nodeMenu.node.title}</span>
+              <div className="flex items-center space-x-3">
+                <GripVertical className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                <div
+                  className="w-3 h-3 rounded-full ring-2 ring-white/30 shadow-lg"
+                  style={{ backgroundColor: getNodeColor(nodeMenu.node) }}
+                />
+                <span className="font-semibold text-gray-100 text-base">{nodeMenu.node.title}</span>
               </div>
               <button
                 onClick={() => setNodeMenu(prev => ({ ...prev, visible: false }))}
-                className="p-1 hover:bg-gray-700 rounded transition-colors"
-                title="Close menu"
+                className="p-2 text-gray-400 hover:text-white hover:bg-red-600 rounded-lg transition-all duration-200 hover:scale-110"
+                title="Close menu (ESC)"
               >
-                <X className="h-4 w-4 text-gray-400 hover:text-gray-200" />
+                <X className="h-4 w-4" />
               </button>
             </div>
-            <div className="flex items-center space-x-4 mt-1 text-xs text-gray-500">
+            <div className="flex items-center space-x-3 mt-2">
               <span className="flex items-center">
                 {(() => {
                   const status = nodeMenu.node?.status?.toUpperCase() || '';
-                  const statusIcon = getStatusIconElement(status as any, "h-3 w-3 mr-1");
+                  const statusIcon = getStatusIconElement(status as any, "h-3 w-3 mr-1.5");
                   const getStatusBgColor = () => {
                     const statusConfig = getStatusConfig(status as WorkItemStatus);
-                    return `${statusConfig.color} ${statusConfig.bgColor} px-2 py-0.5 rounded`;
+                    return `${statusConfig.color} ${statusConfig.bgColor} px-2.5 py-1 rounded-lg text-xs font-medium`;
                   };
                   const formatStatus = (status: string) => {
                     return getStatusConfig(status as WorkItemStatus).label;
@@ -3686,12 +4015,12 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
                 {(() => {
                   const getTypeIcon = () => {
                     if (!nodeMenu.node?.type) return null;
-                    return getTypeIconElement(nodeMenu.node.type as any, "h-3 w-3 mr-1");
+                    return getTypeIconElement(nodeMenu.node.type as any, "h-3 w-3 mr-1.5");
                   };
                   const getTypeBgColor = () => {
-                    if (!nodeMenu.node?.type) return 'text-gray-400 bg-gray-400/10 px-2 py-0.5 rounded';
+                    if (!nodeMenu.node?.type) return 'text-gray-400 bg-gray-400/10 px-2.5 py-1 rounded-lg text-xs font-medium';
                     const typeConfig = getTypeConfig(nodeMenu.node.type as any);
-                    return `${typeConfig.color} ${typeConfig.bgColor} px-2 py-0.5 rounded`;
+                    return `${typeConfig.color} ${typeConfig.bgColor} px-2.5 py-1 rounded-lg text-xs font-medium`;
                   };
                   return (
                     <>
@@ -3704,115 +4033,155 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
             </div>
           </div>
 
-          {/* Quick Stats */}
-          <div className="px-4 py-2 border-b border-gray-600">
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className="flex flex-col space-y-1">
+          <div className="px-5 py-3 bg-gradient-to-br from-purple-500/10 via-blue-500/5 to-transparent border-b border-white/5">
+            <div className="flex flex-col space-y-2">
+              <div className="flex items-center justify-between">
                 <div className="flex items-center">
                   {(() => {
                     const priority = nodeMenu.node?.priority || 0;
-                    return getPriorityIconElement(priority, "h-3 w-3 mr-1");
+                    return getPriorityIconElement(priority, "h-4 w-4 mr-2 text-blue-400");
                   })()}
-                  <span className="text-gray-400">Priority:</span>
-                  <span className="ml-1 font-medium">{Math.round((nodeMenu.node?.priority || 0) * 100)}%</span>
+                  <span className="text-gray-300 text-sm">Priority</span>
                 </div>
-                <div className="w-full bg-gray-600 rounded-full h-1.5">
-                  <div 
-                    className={`h-1.5 rounded-full transition-all duration-300 ${
-                      (nodeMenu.node?.priority || 0) >= 0.8 ? 'bg-red-400' :
-                      (nodeMenu.node?.priority || 0) >= 0.6 ? 'bg-orange-400' :
-                      (nodeMenu.node?.priority || 0) >= 0.4 ? 'bg-yellow-400' :
-                      (nodeMenu.node?.priority || 0) >= 0.2 ? 'bg-blue-400' :
-                      'bg-gray-400'
-                    }`}
-                    style={{ width: `${Math.round((nodeMenu.node?.priority || 0) * 100)}%` }}
-                  />
-                </div>
+                <span className="text-white font-semibold text-sm">{Math.round((nodeMenu.node?.priority || 0) * 100)}%</span>
+              </div>
+              <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden">
+                <div
+                  className={`h-2 rounded-full transition-all duration-500 ${
+                    (nodeMenu.node?.priority || 0) >= 0.8 ? 'bg-gradient-to-r from-red-500 to-red-400' :
+                    (nodeMenu.node?.priority || 0) >= 0.6 ? 'bg-gradient-to-r from-orange-500 to-orange-400' :
+                    (nodeMenu.node?.priority || 0) >= 0.4 ? 'bg-gradient-to-r from-yellow-500 to-yellow-400' :
+                    (nodeMenu.node?.priority || 0) >= 0.2 ? 'bg-gradient-to-r from-blue-500 to-blue-400' :
+                    'bg-gradient-to-r from-gray-500 to-gray-400'
+                  }`}
+                  style={{ width: `${Math.round((nodeMenu.node?.priority || 0) * 100)}%` }}
+                />
               </div>
             </div>
           </div>
 
-          {/* Actions */}
-          <div className="py-1">
-            <button
-              onClick={() => {
-                setShowCreateNodeModal(true);
-                setSelectedNode(null);
-                setNodeMenu(prev => ({ ...prev, visible: false }));
-              }}
-              className="w-full flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
-            >
-              <Plus className="h-4 w-4 mr-3 flex-shrink-0" />
-              <div className="text-left">
-                <div className="font-medium">Add New Node</div>
-                <div className="text-xs text-gray-400 mt-0.5">Create a standalone node</div>
-              </div>
-            </button>
-            <button
-              onClick={(e) => handleCreateConnectedNode(nodeMenu.node!, e)}
-              className="w-full flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
-            >
-              <GitBranch className="h-4 w-4 mr-3 flex-shrink-0" />
-              <div className="text-left">
-                <div className="font-medium">Create New & Connect</div>
-                <div className="text-xs text-gray-400 mt-0.5">Add a new node linked to this one</div>
-              </div>
-            </button>
-            <button
-              onClick={() => handleConnectToExistingNodes(nodeMenu.node!)}
-              className="w-full flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
-            >
-              <Link2 className="h-4 w-4 mr-3 flex-shrink-0" />
-              <div className="text-left">
-                <div className="font-medium">Connect to Existing Nodes</div>
-                <div className="text-xs text-gray-400 mt-0.5">Link this to other nodes in graph</div>
-              </div>
-            </button>
-            <button
-              onClick={() => handleDisconnectNodes(nodeMenu.node!)}
-              className="w-full flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700 hover:bg-red-900/20"
-            >
-              <Unlink className="h-4 w-4 mr-3 flex-shrink-0 text-red-400" />
-              <div className="text-left">
-                <div className="font-medium">Disconnect Nodes</div>
-                <div className="text-xs text-gray-400 mt-0.5">Remove connections from this node</div>
-              </div>
-            </button>
-            <div className="border-t border-gray-600 my-1"></div>
-            <button 
-              onClick={() => handleViewNodeDetails(nodeMenu.node!)}
-              className="w-full flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
-            >
-              <FileText className="h-4 w-4 mr-3" />
-              View Details
-            </button>
-            <button 
-              onClick={() => handleEditNode(nodeMenu.node!)}
-              className="w-full flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
-            >
-              <Edit3 className="h-4 w-4 mr-3" />
-              Edit Node Details
-            </button>
-            <button 
-              onClick={() => {
-                centerOnNode(nodeMenu.node!.id);
-                setNodeMenu(prev => ({ ...prev, visible: false }));
-              }}
-              className="w-full flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
-            >
-              <Crosshair className="h-4 w-4 mr-3" />
-              Center on Node
-            </button>
-            <button 
-              onClick={() => handleDeleteNode(nodeMenu.node!)}
-              className="w-full flex items-center px-4 py-2 text-sm text-red-400 hover:bg-red-900/50"
-            >
-              <Trash2 className="h-4 w-4 mr-3" />
-              Delete Node
-            </button>
+          <div className="max-h-[320px] overflow-y-auto py-2">
+            <div className="space-y-1 px-2">
+              {(() => {
+                const connectionCount = edgesData?.edges?.filter((edge: any) =>
+                  edge.source.id === nodeMenu.node?.id || edge.target.id === nodeMenu.node?.id
+                ).length || 0;
+
+                return [
+                  {
+                    icon: Plus,
+                    title: "Add New Work Item",
+                    description: "Create a standalone work item",
+                    onClick: () => {
+                      setShowCreateNodeModal(true);
+                      setSelectedNode(null);
+                      setNodeMenu(prev => ({ ...prev, visible: false }));
+                    },
+                    gradient: "from-green-500/20 via-emerald-500/10 to-green-500/5",
+                    iconColor: "text-green-400"
+                  },
+                  {
+                    icon: GitBranch,
+                    title: "Create New & Connect",
+                    description: "Add a new work item linked to this one",
+                    onClick: (e: React.MouseEvent) => handleCreateConnectedNode(nodeMenu.node!, e),
+                    gradient: "from-blue-500/20 via-cyan-500/10 to-blue-500/5",
+                    iconColor: "text-blue-400"
+                  },
+                  {
+                    icon: Link2,
+                    title: "Connect to Existing Work Items",
+                    description: "Link this to other work items in graph",
+                    onClick: () => handleConnectToExistingNodes(nodeMenu.node!),
+                    gradient: "from-purple-500/20 via-pink-500/10 to-purple-500/5",
+                    iconColor: "text-purple-400",
+                    badge: connectionCount
+                  },
+                  {
+                    icon: Unlink,
+                    title: "Disconnect Work Items",
+                    description: "Remove connections from this work item",
+                    onClick: () => handleDisconnectNodes(nodeMenu.node!),
+                    gradient: "from-orange-500/20 via-red-500/10 to-orange-500/5",
+                    iconColor: "text-orange-400",
+                    badge: connectionCount
+                  }
+                ];
+              })().map((action, index) => (
+                <button
+                  key={index}
+                  onClick={action.onClick}
+                  className={`w-full flex items-center px-4 py-3 rounded-xl bg-gradient-to-br ${action.gradient}
+                    hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 border border-white/5
+                    hover:border-white/20 group animate-fadeIn`}
+                  style={{ animationDelay: `${index * 30}ms` }}
+                >
+                  <action.icon className={`h-5 w-5 mr-3 flex-shrink-0 ${action.iconColor} group-hover:scale-110 transition-transform`} />
+                  <div className="text-left flex-1">
+                    <div className="font-medium text-gray-100 text-sm">{action.title}</div>
+                    <div className="text-xs text-gray-400 mt-0.5">{action.description}</div>
+                  </div>
+                  {action.badge !== undefined && action.badge > 0 && (
+                    <span className="ml-2 px-2 py-0.5 rounded-full bg-white/20 text-white text-xs font-semibold">
+                      {action.badge}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent my-3" />
+
+            <div className="space-y-1 px-2">
+              {[
+                {
+                  icon: FileText,
+                  title: "View Details",
+                  onClick: () => handleViewNodeDetails(nodeMenu.node!),
+                  iconColor: "text-cyan-400"
+                },
+                {
+                  icon: Edit3,
+                  title: "Edit Work Item Details",
+                  onClick: () => handleEditNode(nodeMenu.node!),
+                  iconColor: "text-indigo-400"
+                },
+                {
+                  icon: Crosshair,
+                  title: "Center on Node",
+                  onClick: () => {
+                    centerOnNode(nodeMenu.node!.id);
+                    setNodeMenu(prev => ({ ...prev, visible: false }));
+                  },
+                  iconColor: "text-teal-400"
+                },
+                {
+                  icon: Trash2,
+                  title: "Delete Work Item",
+                  onClick: () => handleDeleteNode(nodeMenu.node!),
+                  iconColor: "text-red-400",
+                  danger: true
+                }
+              ].map((action, index) => (
+                <button
+                  key={index}
+                  onClick={action.onClick}
+                  className={`w-full flex items-center px-4 py-2.5 rounded-xl transition-all duration-200
+                    ${action.danger
+                      ? 'hover:bg-red-500/20 text-red-400 border border-red-500/20 hover:border-red-500/40'
+                      : 'hover:bg-white/5 text-gray-200 border border-transparent hover:border-white/10'
+                    } group animate-fadeIn`}
+                  style={{ animationDelay: `${(index + 4) * 30}ms` }}
+                >
+                  <action.icon className={`h-4 w-4 mr-3 ${action.iconColor} group-hover:scale-110 transition-transform`} />
+                  <span className="text-sm font-medium">{action.title}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
-        </>
+        </div>,
+        document.body
       )}
 
       {/* Edge Context Menu */}
@@ -3901,7 +4270,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
               <div className="w-6 h-6 rounded-lg bg-gray-700/50 flex items-center justify-center group-hover:bg-emerald-500/20 transition-all duration-300 ease-out">
                 <Plus className="h-4 w-4 text-gray-400 group-hover:text-emerald-400 transition-colors duration-300" />
               </div>
-              <span className="text-gray-300 font-medium group-hover:text-white transition-colors duration-300">Create Node</span>
+              <span className="text-gray-300 font-medium group-hover:text-white transition-colors duration-300">Create Work Item</span>
               <div className="ml-auto">
                 <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-300 ease-out"></div>
               </div>
@@ -4028,24 +4397,40 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       />
 
 
-      {/* Node Details Modal */}
-      {showNodeDetailsModal && selectedNode && (
-        <NodeDetailsModal
-          isOpen={showNodeDetailsModal}
-          onClose={() => {
-            setShowNodeDetailsModal(false);
-            setSelectedNode(null);
-          }}
-          node={selectedNode}
-          edges={validatedEdges}
-          nodes={validatedNodes}
-          onConnectToExisting={(node) => {
-            setShowNodeDetailsModal(false);
-            handleConnectToExistingNodes(node);
-          }}
-          onDisconnect={(node) => {
-            setShowNodeDetailsModal(false);
-            handleDisconnectNodes(node);
+      {/* Work Item Details Modal */}
+      {showNodeDetailsModal && selectedNode && (() => {
+        // Always get fresh node data by ID from validatedNodes (synced with Apollo cache)
+        const freshNode = validatedNodes.find(n => n.id === selectedNode.id) || selectedNode;
+        return (
+          <WorkItemDetailsModal
+            isOpen={showNodeDetailsModal}
+            onClose={() => {
+              setShowNodeDetailsModal(false);
+              setSelectedNode(null);
+            }}
+            node={freshNode}
+            edges={validatedEdges}
+            nodes={validatedNodes}
+            onConnectToExisting={(node) => {
+              setShowNodeDetailsModal(false);
+              handleConnectToExistingNodes(node);
+            }}
+            onDisconnect={(node) => {
+              setShowNodeDetailsModal(false);
+              handleDisconnectNodes(node);
+            }}
+          />
+        );
+      })()}
+
+      {/* Create Work Item Modal */}
+      {showCreateNodeModal && (
+        <CreateWorkItemModal
+          isOpen={showCreateNodeModal}
+          onClose={handleCloseCreateNodeModal}
+          onSubmit={async (nodeData) => {
+            // Handle node creation
+            handleCloseCreateNodeModal();
           }}
         />
       )}

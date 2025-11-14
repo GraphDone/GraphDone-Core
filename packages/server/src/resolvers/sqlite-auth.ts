@@ -368,7 +368,7 @@ export const sqliteAuthResolvers = {
 
         const token = generateToken(user.id, user.email, user.role);
         console.log(`✅ Login successful: ${user.username} (${user.role})`);
-        
+
         return {
           token,
           user: {
