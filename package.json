@@ -1,6 +1,6 @@
 {
   "name": "graphdone",
-  "version": "0.2.2-alpha",
+  "version": "0.3.1-alpha",
   "description": "Project management for teams who think differently",
   "private": true,
   "workspaces": [
@@ -22,6 +22,11 @@
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
     "test:all": "npm run test:unit && npm run test:e2e",
+    "test:comprehensive": "node tests/run-all-tests.js",
+    "test:pr": "node tests/run-pr-tests.js",
+    "test:installation": "./scripts/test-installation-simple.sh",
+    "test:https": "node tests/ssl-certificate-analysis.js && node tests/mobile-https-compatibility-test.js",
+    "test:report": "open test-results/reports/index.html",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "clean": "turbo run clean && rm -rf node_modules",
@@ -37,7 +42,7 @@
     "eslint": "^8.54.0",
     "eslint-config-prettier": "^9.0.0",
     "prettier": "^3.1.0",
-    "turbo": "^1.11.0",
+    "turbo": "^1.13.4",
     "typescript": "^5.3.0"
   },
   "engines": {
@@ -48,5 +53,8 @@
     "type": "git",
     "url": "https://github.com/your-org/graphdone.git"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "passport-openidconnect": "^0.1.2"
+  }
 }

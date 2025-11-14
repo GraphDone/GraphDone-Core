@@ -1,12 +1,13 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useQuery } from '@apollo/client';
-import { Search, X, ChevronDown } from 'lucide-react';
+import { Search, X, ChevronDown, BarChart3, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { STATUS_OPTIONS, TYPE_OPTIONS, PRIORITY_OPTIONS } from '../constants/workItemConstants';
 import { useAuth } from '../contexts/AuthContext';
 import { useGraph } from '../contexts/GraphContext';
-import { GET_WORK_ITEMS } from '../lib/queries';
+import { GET_WORK_ITEMS, GET_EDGES } from '../lib/queries';
 import { EditNodeModal } from './EditNodeModal';
 import { DeleteNodeModal } from './DeleteNodeModal';
+import { NodeDetailsModal } from './NodeDetailsModal';
 import Dashboard from './Dashboard';
 import TableView from './TableView';
 import CardView from './CardView';
@@ -23,10 +24,7 @@ interface WorkItem {
   description?: string;
   type: string;
   status: string;
-  priorityExec: number;
-  priorityIndiv: number;
-  priorityComm: number;
-  priorityComp: number;
+  priority: number;
   dueDate?: string;
   tags?: string[];
   metadata?: string;
@@ -36,8 +34,8 @@ interface WorkItem {
   assignedTo?: { id: string; name: string; username: string; };
   graph?: { id: string; name: string; team?: { id: string; name: string; } };
   contributors?: Array<{ id: string; name: string; type: string; }>;
-  dependencies?: Array<{ id: string; title: string; type: string; }>;
-  dependents?: Array<{ id: string; title: string; type: string; }>;
+  dependencies?: Array<{ id: string; title: string; type: string; status: string; }>;
+  dependents?: Array<{ id: string; title: string; type: string; status: string; }>;
 }
 
 type ViewType = 'dashboard' | 'table' | 'cards' | 'kanban' | 'gantt' | 'calendar' | 'activity';
@@ -51,6 +49,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
   const [selectedNode, setSelectedNode] = useState<WorkItem | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showNodeDetailsModal, setShowNodeDetailsModal] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [typeFilter, setTypeFilter] = useState<string>('');
   const [priorityFilter, setPriorityFilter] = useState<string>('');
@@ -59,6 +58,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
   const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
   const [isPriorityDropdownOpen, setIsPriorityDropdownOpen] = useState(false);
   const [isContributorDropdownOpen, setIsContributorDropdownOpen] = useState(false);
+  const [showProjectHealth, setShowProjectHealth] = useState(false);
 
   // Refs for dropdown management
   const statusDropdownRef = useRef<HTMLDivElement>(null);
@@ -83,6 +83,31 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
   });
 
   const workItems: WorkItem[] = data?.workItems || [];
+
+  // Fetch edges to compute connections manually
+  const { data: edgeData } = useQuery(GET_EDGES, {
+    variables: currentGraph ? {
+      where: {
+        OR: [
+          { source: { graph: { id: currentGraph.id } } },
+          { target: { graph: { id: currentGraph.id } } }
+        ]
+      }
+    } : { where: {} },
+    pollInterval: currentGraph ? 5000 : 0,
+    fetchPolicy: currentGraph ? 'cache-and-network' : 'cache-only'
+  });
+
+  const edges = edgeData?.edges || [];
+  
+  // Convert edges to WorkItemEdge format for NodeDetailsModal
+  const workItemEdges = edges.map((edge: { id: string; source: { id: string }; target: { id: string }; type: string; weight: number }) => ({
+    id: edge.id,
+    source: edge.source.id,
+    target: edge.target.id,
+    type: edge.type,
+    strength: edge.weight
+  }));
 
 
   // Convert centralized options to ViewManager format
@@ -159,7 +184,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
   // Handle node actions
   const handleEditNode = (node: WorkItem) => {
     setSelectedNode(node);
-    setShowEditModal(true);
+    setShowNodeDetailsModal(true);
   };
 
   const handleDeleteNode = (node: WorkItem) => {
@@ -171,6 +196,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
     setSelectedNode(null);
     setShowEditModal(false);
     setShowDeleteModal(false);
+    setShowNodeDetailsModal(false);
   };
 
   // Transform node data for EditNodeModal
@@ -180,9 +206,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
     description: node.description || '',
     type: node.type,
     status: node.status,
-    priorityExec: node.priorityExec,
-    priorityIndiv: node.priorityIndiv,
-    priorityComm: node.priorityComm,
+    priority: node.priority,
     dueDate: node.dueDate,
     tags: node.tags || [],
     metadata: node.metadata || '',
@@ -217,7 +241,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
 
     // Priority filter
     if (priorityFilter && priorityFilter !== '' && priorityFilter !== 'All Priorities') {
-      const priority = (node: WorkItem) => node.priorityComp || node.priorityExec || 0;
+      const priority = (node: WorkItem) => node.priority || 0;
       switch (priorityFilter) {
         case 'Critical':
           filtered = filtered.filter(node => priority(node) >= 0.8);
@@ -268,11 +292,11 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
     }, {} as Record<string, number>);
 
     const priorityStats = {
-      critical: filteredNodes.filter(node => (node.priorityComp || node.priorityExec) >= 0.8).length,
-      high: filteredNodes.filter(node => (node.priorityComp || node.priorityExec) >= 0.6 && (node.priorityComp || node.priorityExec) < 0.8).length,
-      moderate: filteredNodes.filter(node => (node.priorityComp || node.priorityExec) >= 0.4 && (node.priorityComp || node.priorityExec) < 0.6).length,
-      low: filteredNodes.filter(node => (node.priorityComp || node.priorityExec) >= 0.2 && (node.priorityComp || node.priorityExec) < 0.4).length,
-      minimal: filteredNodes.filter(node => (node.priorityComp || node.priorityExec) < 0.2).length
+      critical: filteredNodes.filter(node => node.priority >= 0.8).length,
+      high: filteredNodes.filter(node => node.priority >= 0.6 && node.priority < 0.8).length,
+      moderate: filteredNodes.filter(node => node.priority >= 0.4 && node.priority < 0.6).length,
+      low: filteredNodes.filter(node => node.priority >= 0.2 && node.priority < 0.4).length,
+      minimal: filteredNodes.filter(node => node.priority < 0.2).length
     };
 
     return {
@@ -326,11 +350,11 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
       case 'dashboard':
         return <Dashboard filteredNodes={filteredNodes} stats={stats} />;
       case 'table':
-        return <TableView filteredNodes={filteredNodes} handleEditNode={handleEditNode} handleDeleteNode={handleDeleteNode} />;
+        return <TableView filteredNodes={filteredNodes} handleEditNode={handleEditNode} edges={edges} />;
       case 'cards':
-        return <CardView filteredNodes={filteredNodes} handleEditNode={handleEditNode} handleDeleteNode={handleDeleteNode} />;
+        return <CardView filteredNodes={filteredNodes} handleEditNode={handleEditNode} edges={edges} />;
       case 'kanban':
-        return <KanbanView filteredNodes={filteredNodes} handleEditNode={handleEditNode} handleDeleteNode={handleDeleteNode} />;
+        return <KanbanView filteredNodes={filteredNodes} handleEditNode={handleEditNode} edges={edges} />;
       case 'gantt':
         return <GanttChart filteredNodes={filteredNodes} />;
       case 'calendar':
@@ -346,10 +370,10 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
   const shouldShowFilters = ['table', 'cards', 'kanban'].includes(viewMode);
 
   return (
-    <div className="h-full flex flex-col bg-gray-900">
+    <div className="h-full flex flex-col">
       {/* Search and Filter Bar - Only for table, card, kanban views */}
       {shouldShowFilters && (
-        <div className="bg-gray-800 border-b border-gray-700 p-4">
+        <div className="bg-gray-800/90 backdrop-blur-sm border-b border-gray-700/50 p-4">
           <div className="flex flex-col sm:flex-row gap-4 items-center">
             {/* Search Input */}
             <div className="relative w-full sm:w-80 md:w-96 lg:w-[28rem]">
@@ -677,14 +701,31 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
       )}
 
       {/* Main Content Container */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden relative">
         {/* Main Content */}
         <div className="flex-1 overflow-auto">
           {renderView()}
         </div>
 
-        {/* Right Sidebar */}
-        <RightSidebar currentView={viewMode} stats={stats} />
+        {/* Project Health Toggle Button - Floating */}
+        <button
+          onClick={() => setShowProjectHealth(!showProjectHealth)}
+          className="fixed right-4 top-20 z-40 p-3 bg-gray-700/60 hover:bg-gray-700/80 backdrop-blur-sm rounded-lg border border-gray-600/50 hover:border-gray-500/70 transition-all duration-200 group"
+          title={showProjectHealth ? "Hide Project Health" : "Show Project Health"}
+        >
+          {showProjectHealth ? (
+            <PanelRightClose className="h-5 w-5 text-gray-300 group-hover:text-white" />
+          ) : (
+            <BarChart3 className="h-5 w-5 text-gray-300 group-hover:text-white" />
+          )}
+        </button>
+
+        {/* Right Sidebar - Overlay */}
+        {showProjectHealth && (
+          <div className="absolute right-0 top-0 bottom-0 z-30">
+            <RightSidebar currentView={viewMode} stats={stats} />
+          </div>
+        )}
       </div>
 
       {/* Edit Node Modal */}
@@ -704,6 +745,17 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
           nodeId={selectedNode.id}
           nodeTitle={selectedNode.title}
           nodeType={selectedNode.type}
+        />
+      )}
+
+      {/* Node Details Modal */}
+      {showNodeDetailsModal && selectedNode && (
+        <NodeDetailsModal
+          isOpen={showNodeDetailsModal}
+          onClose={handleCloseModals}
+          node={selectedNode}
+          edges={workItemEdges}
+          nodes={filteredNodes}
         />
       )}
     </div>

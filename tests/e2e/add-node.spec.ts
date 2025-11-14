@@ -78,7 +78,7 @@ test.describe('Add Node Functionality', () => {
     });
     
     // Take a screenshot for debugging
-    await page.screenshot({ path: 'debug-workspace.png' });
+    await page.screenshot({ path: 'artifacts/screenshots/debug-workspace.png' });
     
     // Check what's actually on the page
     const pageContent = await page.textContent('body');
