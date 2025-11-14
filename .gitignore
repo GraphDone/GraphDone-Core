@@ -43,6 +43,7 @@ lerna-debug.log*
 /tmp/graphdone-cloud-init.yml
 cloud-init.*.yml
 !cloud-init.template.yml
+.graphdone-cloud-init.yml
 
 # IDE
 .vscode/*
