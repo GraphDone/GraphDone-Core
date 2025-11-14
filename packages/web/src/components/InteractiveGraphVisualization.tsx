@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import ReactDOM from 'react-dom/client';
+import { createPortal } from 'react-dom';
 import * as d3 from 'd3';
-import { Link2, Edit3, Trash2, Folder, FolderOpen, Plus, FileText, Settings, Maximize2, ArrowLeft, X, GitBranch, Minus, Unlink, Crosshair } from 'lucide-react';
+import { Link2, Edit3, Trash2, Folder, FolderOpen, Plus, FileText, Settings, Maximize2, ArrowLeft, X, GitBranch, Minus, Unlink, Crosshair, GripVertical } from 'lucide-react';
 import {
   getPriorityIconElement,
   getStatusIconElement,
@@ -27,15 +28,15 @@ import { GET_WORK_ITEMS, GET_EDGES, CREATE_EDGE, UPDATE_EDGE, DELETE_EDGE, CREAT
 import { validateGraphData, getValidationSummary, ValidationResult } from '../utils/graphDataValidation';
 import { DEFAULT_NODE_CONFIG } from '../constants/workItemConstants';
 
-import { DeleteNodeModal } from './DeleteNodeModal';
+import { DeleteWorkItemModal } from './DeleteWorkItemModal';
 import { RelationshipEditorWindow } from './RelationshipEditorWindow';
-import { CreateNodeModal } from './CreateNodeModal';
+import { CreateWorkItemModal } from './CreateWorkItemModal';
 import { CreateGraphModal } from './CreateGraphModal';
 import { GraphSelectionModal } from './GraphSelectionModal';
 import { UpdateGraphModal } from './UpdateGraphModal';
 import { DeleteGraphModal } from './DeleteGraphModal';
-import { ConnectNodeModal } from './ConnectNodeModal';
-import { NodeDetailsModal } from './NodeDetailsModal';
+import { ConnectWorkItemModal } from './ConnectWorkItemModal';
+import { WorkItemDetailsModal } from './WorkItemDetailsModal';
 
 import { WorkItem, WorkItemEdge } from '../types/graph';
 import { RelationshipType, RELATIONSHIP_OPTIONS, getRelationshipConfig } from '../constants/workItemConstants';
@@ -65,6 +66,11 @@ interface EdgeMenuState {
   edge: WorkItemEdge | null;
   position: { x: number; y: number };
   visible: boolean;
+}
+
+interface DragState {
+  isDragging: boolean;
+  offset: { x: number; y: number };
 }
 
 interface InteractiveGraphVisualizationProps {
@@ -233,6 +239,21 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
   
   const [nodeMenu, setNodeMenu] = useState<NodeMenuState>({ node: null, position: { x: 0, y: 0 }, visible: false });
   const [edgeMenu, setEdgeMenu] = useState<EdgeMenuState>({ edge: null, position: { x: 0, y: 0 }, visible: false });
+  const [menuDragState, setMenuDragState] = useState<DragState>({ isDragging: false, offset: { x: 0, y: 0 } });
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (nodeMenu.visible) {
+        if (e.key === 'Escape') {
+          setNodeMenu({ node: null, position: { x: 0, y: 0 }, visible: false });
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [nodeMenu.visible]);
+
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionSource, setConnectionSource] = useState<string | null>(null);
   const [selectedRelationType, setSelectedRelationType] = useState<RelationshipType>('DEFAULT_EDGE');
@@ -2868,11 +2889,31 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       // Show context menu for advanced actions
       const containerRect = containerRef.current?.getBoundingClientRect();
       if (containerRect) {
+        const menuWidth = 320;
+        const menuHeight = 500;
+        const padding = 10;
+
+        let x = event.clientX - containerRect.left;
+        let y = event.clientY - containerRect.top;
+
+        if (x + menuWidth > window.innerWidth - padding) {
+          x = window.innerWidth - menuWidth - padding;
+        }
+        if (y + menuHeight > window.innerHeight - padding) {
+          y = window.innerHeight - menuHeight - padding;
+        }
+        if (x < padding) {
+          x = padding;
+        }
+        if (y < padding) {
+          y = padding;
+        }
+
         setNodeMenu({
           node: d,
           position: {
-            x: event.clientX - containerRect.left,
-            y: event.clientY - containerRect.top
+            x,
+            y
           },
           visible: true
         });
@@ -3828,48 +3869,136 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       )}
 
       {/* Node Context Menu */}
-      {nodeMenu.visible && nodeMenu.node && (
-        <>
-          {/* Backdrop for node menu */}
-          <div 
-            className="fixed inset-0 z-40" 
-            onClick={() => setNodeMenu({ node: null, position: { x: 0, y: 0 }, visible: false })}
-          />
+      {nodeMenu.visible && nodeMenu.node && createPortal(
+        <div
+          className="fixed inset-0 bg-black/20 backdrop-blur-sm z-[999999]"
+          onClick={() => setNodeMenu({ node: null, position: { x: 0, y: 0 }, visible: false })}
+          onMouseMove={(e) => {
+            if (menuDragState.isDragging) {
+              const menuWidth = 320;
+              const menuHeight = 500;
+              const padding = 10;
+
+              const newX = Math.max(
+                padding,
+                Math.min(
+                  window.innerWidth - menuWidth - padding,
+                  e.clientX - menuDragState.offset.x
+                )
+              );
+
+              const newY = Math.max(
+                padding,
+                Math.min(
+                  window.innerHeight - menuHeight - padding,
+                  e.clientY - menuDragState.offset.y
+                )
+              );
+
+              setNodeMenu(prev => ({
+                ...prev,
+                position: {
+                  x: newX,
+                  y: newY
+                }
+              }));
+            }
+          }}
+          onMouseUp={() => setMenuDragState({ isDragging: false, offset: { x: 0, y: 0 } })}
+          onTouchMove={(e) => {
+            if (menuDragState.isDragging && e.touches.length > 0) {
+              const touch = e.touches[0];
+              const menuWidth = 320;
+              const menuHeight = 500;
+              const padding = 10;
+
+              const newX = Math.max(
+                padding,
+                Math.min(
+                  window.innerWidth - menuWidth - padding,
+                  touch.clientX - menuDragState.offset.x
+                )
+              );
+
+              const newY = Math.max(
+                padding,
+                Math.min(
+                  window.innerHeight - menuHeight - padding,
+                  touch.clientY - menuDragState.offset.y
+                )
+              );
+
+              setNodeMenu(prev => ({
+                ...prev,
+                position: {
+                  x: newX,
+                  y: newY
+                }
+              }));
+            }
+          }}
+          onTouchEnd={() => setMenuDragState({ isDragging: false, offset: { x: 0, y: 0 } })}
+        >
           <div
-            className="absolute bg-gray-800 border border-gray-600 rounded-lg shadow-lg py-2 z-50 max-h-96 overflow-y-auto"
+            className="absolute bg-black/90 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl overflow-hidden animate-fadeIn"
             style={{
               left: nodeMenu.position.x,
               top: nodeMenu.position.y,
-              minWidth: '250px'
+              minWidth: '320px',
+              maxHeight: '500px',
+              cursor: menuDragState.isDragging ? 'grabbing' : 'default'
             }}
             onClick={(e) => e.stopPropagation()}
         >
-          {/* Node Info Header with Close Button */}
-          <div className="px-4 py-2 border-b border-gray-600">
+          <div
+            className="px-5 py-3 bg-gradient-to-br from-blue-500/20 via-purple-500/10 to-blue-500/5 border-b border-white/10 cursor-grab active:cursor-grabbing"
+            onMouseDown={(e) => {
+              setMenuDragState({
+                isDragging: true,
+                offset: {
+                  x: e.clientX - nodeMenu.position.x,
+                  y: e.clientY - nodeMenu.position.y
+                }
+              });
+            }}
+            onTouchStart={(e) => {
+              if (e.touches.length > 0) {
+                const touch = e.touches[0];
+                setMenuDragState({
+                  isDragging: true,
+                  offset: {
+                    x: touch.clientX - nodeMenu.position.x,
+                    y: touch.clientY - nodeMenu.position.y
+                  }
+                });
+              }
+            }}
+          >
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-              <div
-                className="w-4 h-4 rounded-full"
-                style={{ backgroundColor: getNodeColor(nodeMenu.node) }}
-              />
-              <span className="font-medium text-gray-100">{nodeMenu.node.title}</span>
+              <div className="flex items-center space-x-3">
+                <GripVertical className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                <div
+                  className="w-3 h-3 rounded-full ring-2 ring-white/30 shadow-lg"
+                  style={{ backgroundColor: getNodeColor(nodeMenu.node) }}
+                />
+                <span className="font-semibold text-gray-100 text-base">{nodeMenu.node.title}</span>
               </div>
               <button
                 onClick={() => setNodeMenu(prev => ({ ...prev, visible: false }))}
-                className="p-1 hover:bg-gray-700 rounded transition-colors"
-                title="Close menu"
+                className="p-2 text-gray-400 hover:text-white hover:bg-red-600 rounded-lg transition-all duration-200 hover:scale-110"
+                title="Close menu (ESC)"
               >
-                <X className="h-4 w-4 text-gray-400 hover:text-gray-200" />
+                <X className="h-4 w-4" />
               </button>
             </div>
-            <div className="flex items-center space-x-4 mt-1 text-xs text-gray-500">
+            <div className="flex items-center space-x-3 mt-2">
               <span className="flex items-center">
                 {(() => {
                   const status = nodeMenu.node?.status?.toUpperCase() || '';
-                  const statusIcon = getStatusIconElement(status as any, "h-3 w-3 mr-1");
+                  const statusIcon = getStatusIconElement(status as any, "h-3 w-3 mr-1.5");
                   const getStatusBgColor = () => {
                     const statusConfig = getStatusConfig(status as WorkItemStatus);
-                    return `${statusConfig.color} ${statusConfig.bgColor} px-2 py-0.5 rounded`;
+                    return `${statusConfig.color} ${statusConfig.bgColor} px-2.5 py-1 rounded-lg text-xs font-medium`;
                   };
                   const formatStatus = (status: string) => {
                     return getStatusConfig(status as WorkItemStatus).label;
@@ -3886,12 +4015,12 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
                 {(() => {
                   const getTypeIcon = () => {
                     if (!nodeMenu.node?.type) return null;
-                    return getTypeIconElement(nodeMenu.node.type as any, "h-3 w-3 mr-1");
+                    return getTypeIconElement(nodeMenu.node.type as any, "h-3 w-3 mr-1.5");
                   };
                   const getTypeBgColor = () => {
-                    if (!nodeMenu.node?.type) return 'text-gray-400 bg-gray-400/10 px-2 py-0.5 rounded';
+                    if (!nodeMenu.node?.type) return 'text-gray-400 bg-gray-400/10 px-2.5 py-1 rounded-lg text-xs font-medium';
                     const typeConfig = getTypeConfig(nodeMenu.node.type as any);
-                    return `${typeConfig.color} ${typeConfig.bgColor} px-2 py-0.5 rounded`;
+                    return `${typeConfig.color} ${typeConfig.bgColor} px-2.5 py-1 rounded-lg text-xs font-medium`;
                   };
                   return (
                     <>
@@ -3904,115 +4033,155 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
             </div>
           </div>
 
-          {/* Quick Stats */}
-          <div className="px-4 py-2 border-b border-gray-600">
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className="flex flex-col space-y-1">
+          <div className="px-5 py-3 bg-gradient-to-br from-purple-500/10 via-blue-500/5 to-transparent border-b border-white/5">
+            <div className="flex flex-col space-y-2">
+              <div className="flex items-center justify-between">
                 <div className="flex items-center">
                   {(() => {
                     const priority = nodeMenu.node?.priority || 0;
-                    return getPriorityIconElement(priority, "h-3 w-3 mr-1");
+                    return getPriorityIconElement(priority, "h-4 w-4 mr-2 text-blue-400");
                   })()}
-                  <span className="text-gray-400">Priority:</span>
-                  <span className="ml-1 font-medium">{Math.round((nodeMenu.node?.priority || 0) * 100)}%</span>
+                  <span className="text-gray-300 text-sm">Priority</span>
                 </div>
-                <div className="w-full bg-gray-600 rounded-full h-1.5">
-                  <div 
-                    className={`h-1.5 rounded-full transition-all duration-300 ${
-                      (nodeMenu.node?.priority || 0) >= 0.8 ? 'bg-red-400' :
-                      (nodeMenu.node?.priority || 0) >= 0.6 ? 'bg-orange-400' :
-                      (nodeMenu.node?.priority || 0) >= 0.4 ? 'bg-yellow-400' :
-                      (nodeMenu.node?.priority || 0) >= 0.2 ? 'bg-blue-400' :
-                      'bg-gray-400'
-                    }`}
-                    style={{ width: `${Math.round((nodeMenu.node?.priority || 0) * 100)}%` }}
-                  />
-                </div>
+                <span className="text-white font-semibold text-sm">{Math.round((nodeMenu.node?.priority || 0) * 100)}%</span>
+              </div>
+              <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden">
+                <div
+                  className={`h-2 rounded-full transition-all duration-500 ${
+                    (nodeMenu.node?.priority || 0) >= 0.8 ? 'bg-gradient-to-r from-red-500 to-red-400' :
+                    (nodeMenu.node?.priority || 0) >= 0.6 ? 'bg-gradient-to-r from-orange-500 to-orange-400' :
+                    (nodeMenu.node?.priority || 0) >= 0.4 ? 'bg-gradient-to-r from-yellow-500 to-yellow-400' :
+                    (nodeMenu.node?.priority || 0) >= 0.2 ? 'bg-gradient-to-r from-blue-500 to-blue-400' :
+                    'bg-gradient-to-r from-gray-500 to-gray-400'
+                  }`}
+                  style={{ width: `${Math.round((nodeMenu.node?.priority || 0) * 100)}%` }}
+                />
               </div>
             </div>
           </div>
 
-          {/* Actions */}
-          <div className="py-1">
-            <button
-              onClick={() => {
-                setShowCreateNodeModal(true);
-                setSelectedNode(null);
-                setNodeMenu(prev => ({ ...prev, visible: false }));
-              }}
-              className="w-full flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
-            >
-              <Plus className="h-4 w-4 mr-3 flex-shrink-0" />
-              <div className="text-left">
-                <div className="font-medium">Add New Work Item</div>
-                <div className="text-xs text-gray-400 mt-0.5">Create a standalone node</div>
-              </div>
-            </button>
-            <button
-              onClick={(e) => handleCreateConnectedNode(nodeMenu.node!, e)}
-              className="w-full flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
-            >
-              <GitBranch className="h-4 w-4 mr-3 flex-shrink-0" />
-              <div className="text-left">
-                <div className="font-medium">Create New & Connect</div>
-                <div className="text-xs text-gray-400 mt-0.5">Add a new work item linked to this one</div>
-              </div>
-            </button>
-            <button
-              onClick={() => handleConnectToExistingNodes(nodeMenu.node!)}
-              className="w-full flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
-            >
-              <Link2 className="h-4 w-4 mr-3 flex-shrink-0" />
-              <div className="text-left">
-                <div className="font-medium">Connect to Existing Nodes</div>
-                <div className="text-xs text-gray-400 mt-0.5">Link this to other nodes in graph</div>
-              </div>
-            </button>
-            <button
-              onClick={() => handleDisconnectNodes(nodeMenu.node!)}
-              className="w-full flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700 hover:bg-red-900/20"
-            >
-              <Unlink className="h-4 w-4 mr-3 flex-shrink-0 text-red-400" />
-              <div className="text-left">
-                <div className="font-medium">Disconnect Work Items</div>
-                <div className="text-xs text-gray-400 mt-0.5">Remove connections from this node</div>
-              </div>
-            </button>
-            <div className="border-t border-gray-600 my-1"></div>
-            <button 
-              onClick={() => handleViewNodeDetails(nodeMenu.node!)}
-              className="w-full flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
-            >
-              <FileText className="h-4 w-4 mr-3" />
-              View Details
-            </button>
-            <button
-              onClick={() => handleEditNode(nodeMenu.node!)}
-              className="w-full flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
-            >
-              <Edit3 className="h-4 w-4 mr-3" />
-              Edit Work Item Details
-            </button>
-            <button 
-              onClick={() => {
-                centerOnNode(nodeMenu.node!.id);
-                setNodeMenu(prev => ({ ...prev, visible: false }));
-              }}
-              className="w-full flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
-            >
-              <Crosshair className="h-4 w-4 mr-3" />
-              Center on Node
-            </button>
-            <button
-              onClick={() => handleDeleteNode(nodeMenu.node!)}
-              className="w-full flex items-center px-4 py-2 text-sm text-red-400 hover:bg-red-900/50"
-            >
-              <Trash2 className="h-4 w-4 mr-3" />
-              Delete Work Item
-            </button>
+          <div className="max-h-[320px] overflow-y-auto py-2">
+            <div className="space-y-1 px-2">
+              {(() => {
+                const connectionCount = edgesData?.edges?.filter((edge: any) =>
+                  edge.source.id === nodeMenu.node?.id || edge.target.id === nodeMenu.node?.id
+                ).length || 0;
+
+                return [
+                  {
+                    icon: Plus,
+                    title: "Add New Work Item",
+                    description: "Create a standalone work item",
+                    onClick: () => {
+                      setShowCreateNodeModal(true);
+                      setSelectedNode(null);
+                      setNodeMenu(prev => ({ ...prev, visible: false }));
+                    },
+                    gradient: "from-green-500/20 via-emerald-500/10 to-green-500/5",
+                    iconColor: "text-green-400"
+                  },
+                  {
+                    icon: GitBranch,
+                    title: "Create New & Connect",
+                    description: "Add a new work item linked to this one",
+                    onClick: (e: React.MouseEvent) => handleCreateConnectedNode(nodeMenu.node!, e),
+                    gradient: "from-blue-500/20 via-cyan-500/10 to-blue-500/5",
+                    iconColor: "text-blue-400"
+                  },
+                  {
+                    icon: Link2,
+                    title: "Connect to Existing Work Items",
+                    description: "Link this to other work items in graph",
+                    onClick: () => handleConnectToExistingNodes(nodeMenu.node!),
+                    gradient: "from-purple-500/20 via-pink-500/10 to-purple-500/5",
+                    iconColor: "text-purple-400",
+                    badge: connectionCount
+                  },
+                  {
+                    icon: Unlink,
+                    title: "Disconnect Work Items",
+                    description: "Remove connections from this work item",
+                    onClick: () => handleDisconnectNodes(nodeMenu.node!),
+                    gradient: "from-orange-500/20 via-red-500/10 to-orange-500/5",
+                    iconColor: "text-orange-400",
+                    badge: connectionCount
+                  }
+                ];
+              })().map((action, index) => (
+                <button
+                  key={index}
+                  onClick={action.onClick}
+                  className={`w-full flex items-center px-4 py-3 rounded-xl bg-gradient-to-br ${action.gradient}
+                    hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 border border-white/5
+                    hover:border-white/20 group animate-fadeIn`}
+                  style={{ animationDelay: `${index * 30}ms` }}
+                >
+                  <action.icon className={`h-5 w-5 mr-3 flex-shrink-0 ${action.iconColor} group-hover:scale-110 transition-transform`} />
+                  <div className="text-left flex-1">
+                    <div className="font-medium text-gray-100 text-sm">{action.title}</div>
+                    <div className="text-xs text-gray-400 mt-0.5">{action.description}</div>
+                  </div>
+                  {action.badge !== undefined && action.badge > 0 && (
+                    <span className="ml-2 px-2 py-0.5 rounded-full bg-white/20 text-white text-xs font-semibold">
+                      {action.badge}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent my-3" />
+
+            <div className="space-y-1 px-2">
+              {[
+                {
+                  icon: FileText,
+                  title: "View Details",
+                  onClick: () => handleViewNodeDetails(nodeMenu.node!),
+                  iconColor: "text-cyan-400"
+                },
+                {
+                  icon: Edit3,
+                  title: "Edit Work Item Details",
+                  onClick: () => handleEditNode(nodeMenu.node!),
+                  iconColor: "text-indigo-400"
+                },
+                {
+                  icon: Crosshair,
+                  title: "Center on Node",
+                  onClick: () => {
+                    centerOnNode(nodeMenu.node!.id);
+                    setNodeMenu(prev => ({ ...prev, visible: false }));
+                  },
+                  iconColor: "text-teal-400"
+                },
+                {
+                  icon: Trash2,
+                  title: "Delete Work Item",
+                  onClick: () => handleDeleteNode(nodeMenu.node!),
+                  iconColor: "text-red-400",
+                  danger: true
+                }
+              ].map((action, index) => (
+                <button
+                  key={index}
+                  onClick={action.onClick}
+                  className={`w-full flex items-center px-4 py-2.5 rounded-xl transition-all duration-200
+                    ${action.danger
+                      ? 'hover:bg-red-500/20 text-red-400 border border-red-500/20 hover:border-red-500/40'
+                      : 'hover:bg-white/5 text-gray-200 border border-transparent hover:border-white/10'
+                    } group animate-fadeIn`}
+                  style={{ animationDelay: `${(index + 4) * 30}ms` }}
+                >
+                  <action.icon className={`h-4 w-4 mr-3 ${action.iconColor} group-hover:scale-110 transition-transform`} />
+                  <span className="text-sm font-medium">{action.title}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
-        </>
+        </div>,
+        document.body
       )}
 
       {/* Edge Context Menu */}
@@ -4233,7 +4402,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         // Always get fresh node data by ID from validatedNodes (synced with Apollo cache)
         const freshNode = validatedNodes.find(n => n.id === selectedNode.id) || selectedNode;
         return (
-          <NodeDetailsModal
+          <WorkItemDetailsModal
             isOpen={showNodeDetailsModal}
             onClose={() => {
               setShowNodeDetailsModal(false);
@@ -4254,9 +4423,9 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         );
       })()}
 
-      {/* Create Node Modal */}
+      {/* Create Work Item Modal */}
       {showCreateNodeModal && (
-        <CreateNodeModal
+        <CreateWorkItemModal
           isOpen={showCreateNodeModal}
           onClose={handleCloseCreateNodeModal}
           onSubmit={async (nodeData) => {

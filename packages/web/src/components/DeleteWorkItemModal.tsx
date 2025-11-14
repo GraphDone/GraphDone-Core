@@ -39,7 +39,7 @@ const customStyles = `
   }
 `;
 
-interface DeleteNodeModalProps {
+interface DeleteWorkItemModalProps {
   isOpen: boolean;
   onClose: () => void;
   nodeId: string;
@@ -48,7 +48,7 @@ interface DeleteNodeModalProps {
   onOpenDisconnectModal?: () => void;
 }
 
-export function DeleteNodeModal({ isOpen, onClose, nodeId, nodeTitle, nodeType, onOpenDisconnectModal }: DeleteNodeModalProps) {
+export function DeleteWorkItemModal({ isOpen, onClose, nodeId, nodeTitle, nodeType, onOpenDisconnectModal }: DeleteWorkItemModalProps) {
   const { currentTeam } = useAuth();
   const { showSuccess, showError } = useNotifications();
   const [understandRisks, setUnderstandRisks] = useState(false);

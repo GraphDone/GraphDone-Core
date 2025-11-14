@@ -16,7 +16,7 @@ User right-clicks any node and sees:
 
 ```
 ┌─────────────────────────────┐
-│ 📋 Edit Node                │
+│ 📋 Edit Work Item                │
 │ 🔗 Add Relationship         │  
 │ 🎯 Set Priority            │
 │ ─────────────────────────  │

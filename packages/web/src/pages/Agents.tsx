@@ -32,7 +32,7 @@ export function Agents() {
     {
       id: 'agent-1',
       name: 'Priority Analyzer',
-      description: 'Automatically analyzes node priorities and suggests optimizations',
+      description: 'Automatically analyzes work item priorities and suggests optimizations',
       type: 'analyzer',
       status: 'active',
       capabilities: ['priority-calculation', 'dependency-analysis', 'bottleneck-detection'],
@@ -56,7 +56,7 @@ export function Agents() {
     {
       id: 'agent-3',
       name: 'Dependency Validator',
-      description: 'Validates and suggests improvements for node dependencies',
+      description: 'Validates and suggests improvements for work item dependencies',
       type: 'validator',
       status: 'paused',
       capabilities: ['dependency-validation', 'cycle-detection', 'path-optimization'],

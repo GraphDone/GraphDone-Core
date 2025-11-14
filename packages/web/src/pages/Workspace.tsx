@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 import { useQuery } from '@apollo/client';
 import { SafeGraphVisualization } from '../components/SafeGraphVisualization';
 import { GraphSelector } from '../components/GraphSelector';
-import { CreateNodeModal } from '../components/CreateNodeModal';
+import { CreateWorkItemModal } from '../components/CreateWorkItemModal';
 import { CreateGraphModal } from '../components/CreateGraphModal';
 import { GraphSelectionModal } from '../components/GraphSelectionModal';
 import { UpdateGraphModal } from '../components/UpdateGraphModal';
@@ -410,9 +410,9 @@ export function Workspace() {
         document.body
       )}
 
-      {/* Create Node Modal */}
+      {/* Create Work Item Modal */}
       {showCreateModal && (
-        <CreateNodeModal
+        <CreateWorkItemModal
           isOpen={showCreateModal}
           onClose={() => setShowCreateModal(false)}
         />

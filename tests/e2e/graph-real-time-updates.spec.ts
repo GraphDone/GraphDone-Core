@@ -426,7 +426,7 @@ test.describe('Graph Real-Time Update Issues', () => {
         await graphArea.click({ button: 'right', position: { x: 400, y: 300 } });
         await page.waitForTimeout(1000);
         
-        const createOption = page.locator('button:has-text("Create"), text="Create Node", text="Add Node"').first();
+        const createOption = page.locator('button:has-text("Create"), text="Create Work Item", text="Add Work Item"').first();
         if (await createOption.isVisible({ timeout: 3000 })) {
           await createOption.click();
           
