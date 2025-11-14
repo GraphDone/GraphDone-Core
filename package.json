@@ -18,6 +18,7 @@
     "test:e2e": "playwright test",
     "test:e2e:core": "playwright test --grep=\"@core\"",
     "test:e2e:error-handling": "playwright test tests/e2e/graph-error-handling.spec.ts",
+    "test:e2e:visual": "playwright test tests/e2e/visual-regression-suite.spec.ts",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
     "test:all": "npm run test:unit && npm run test:e2e",

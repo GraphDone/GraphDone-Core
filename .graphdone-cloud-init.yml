@@ -59,18 +59,24 @@ runcmd:
   # Clone GraphDone repository
   - echo "=== Cloning GraphDone repository ==="
   - chown -R ubuntu:ubuntu /home/ubuntu
-  - su ubuntu -c "git clone -b main https://github.com/GraphDone/GraphDone-Core.git /home/ubuntu/graphdone"
+  - su ubuntu -c "git clone -b vm_multi-pass https://github.com/GraphDone/GraphDone-Core.git /home/ubuntu/graphdone"
   # Setup GraphDone
   - echo '=== Setting up GraphDone ==='
   - su ubuntu -c 'export HOME=/home/ubuntu && cd /home/ubuntu/graphdone && ./start setup'
   - su ubuntu -c 'export HOME=/home/ubuntu && cd /home/ubuntu/graphdone && npm run db:seed'
-  # Enable GraphDone service
+  # Install Playwright browsers
+  - echo '=== Installing Playwright browsers for E2E testing ==='
+  - su ubuntu -c 'export HOME=/home/ubuntu && cd /home/ubuntu/graphdone && npx playwright install --with-deps chromium firefox webkit'
+  # Enable and start GraphDone service
   - systemctl daemon-reload
   - systemctl enable graphdone
+  - systemctl start graphdone
+  - sleep 5
+  - systemctl status graphdone --no-pager || true
   # Final setup
   - echo "=== GraphDone VM Setup Complete ==="
   - echo "GraphDone is installed at /home/ubuntu/graphdone"
-  - echo "To access - multipass shell graphdone-test-tailscale"
+  - echo "To access - multipass shell graphdone-vm-silver-manatee-8197"
   - echo "Web UI will be available at http://localhost:3127"
   - echo "GraphQL API at http://localhost:4127/graphql"
   - echo "Neo4j Browser at http://localhost:7474"
