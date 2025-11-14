@@ -1,0 +1,86 @@
+#!/bin/sh
+# Commit-msg hook to block Co-Authored-By lines
+# GraphDone does not use pair programming and maintains clean git logs
+
+# First argument is the commit message file
+COMMIT_MSG_FILE="$1"
+
+# Read the commit message
+if [ ! -f "$COMMIT_MSG_FILE" ]; then
+    exit 0
+fi
+
+COMMIT_MSG=$(cat "$COMMIT_MSG_FILE")
+
+# Function to check for co-author patterns
+check_coauthor_patterns() {
+    echo "$1" | grep -iE "(co-authored-by:|co-author:|coauthor:|pair[- ]programm)" >/dev/null 2>&1
+}
+
+# Check for Co-Authored-By and related patterns
+if check_coauthor_patterns "$COMMIT_MSG"; then
+    echo ""
+    echo "════════════════════════════════════════════════════════════════════"
+    echo "                    ❌ COMMIT BLOCKED                               "
+    echo "════════════════════════════════════════════════════════════════════"
+    echo ""
+    echo "Co-authorship attribution detected in commit message."
+    echo ""
+    echo "GraphDone policy: Individual commits only (no pair programming)"
+    echo ""
+    echo "Found in your commit message:"
+    echo "────────────────────────────────────────────────────────────────────"
+    echo "$COMMIT_MSG" | grep -iE "(co-authored-by:|co-author:|coauthor:|pair[- ]programm)" | head -5
+    echo "────────────────────────────────────────────────────────────────────"
+    echo ""
+    echo "Please remove:"
+    echo "  • Co-Authored-By: <name> <email>"
+    echo "  • Co-Author: ..."
+    echo "  • References to pair programming"
+    echo "  • Any collaborative attribution"
+    echo ""
+    echo "Each commit should have a single author for:"
+    echo "  ✓ Clear accountability"
+    echo "  ✓ Clean git history"
+    echo "  ✓ Accurate contribution tracking"
+    echo ""
+    echo "To fix: Edit your commit message and remove co-authorship lines"
+    echo "════════════════════════════════════════════════════════════════════"
+    echo ""
+    exit 1
+fi
+
+# Also check for specific AI assistant attributions that might slip through
+if echo "$COMMIT_MSG" | grep -iE "(claude.*anthropic|generated.*by.*claude|claude.*ai|noreply@anthropic)" >/dev/null 2>&1; then
+    echo ""
+    echo "════════════════════════════════════════════════════════════════════"
+    echo "                    ⚠️  AI ATTRIBUTION DETECTED                      "
+    echo "════════════════════════════════════════════════════════════════════"
+    echo ""
+    echo "Found AI assistant attribution in commit message."
+    echo ""
+    echo "While AI tools may assist with code, commits should be"
+    echo "attributed only to the human developer who reviewed and"
+    echo "submitted the code."
+    echo ""
+    echo "Please remove any lines like:"
+    echo "  • Co-Authored-By: Claude <noreply@anthropic.com>"
+    echo "  • Generated with Claude"
+    echo "  • AI-assisted attribution"
+    echo ""
+    echo "════════════════════════════════════════════════════════════════════"
+    echo ""
+    exit 1
+fi
+
+# Check for suspiciously formatted email addresses that might be bots
+if echo "$COMMIT_MSG" | grep -iE "co-authored-by:.*<.*(bot|action|automated|ci-cd|pipeline).*@.*>" >/dev/null 2>&1; then
+    echo ""
+    echo "⚠️  WARNING: Automated co-author detected"
+    echo "   Blocking bot/automation co-authorship attributions"
+    echo ""
+    exit 1
+fi
+
+# All checks passed
+exit 0

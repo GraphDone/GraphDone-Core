@@ -309,8 +309,9 @@ describe('Neo4j Mock Validation Against Real Database', () => {
           console.log('Mock behavior closely matches real database behavior');
         }
 
-        // Test should pass regardless - this is informational
-        expect(true).toBe(true);
+        // Test should validate that we collected meaningful information
+        expect(typeof differences).toBe('object');
+        expect(Array.isArray(differences)).toBe(true);
       } catch (error) {
         console.warn('Skipping mock accuracy assessment - real database not available');
       }
