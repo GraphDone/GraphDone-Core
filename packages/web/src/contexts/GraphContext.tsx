@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { useQuery, useMutation, useApolloClient } from '@apollo/client';
 import { useAuth } from './AuthContext';
 import { Graph, GraphHierarchy, CreateGraphInput, GraphContextType, GraphPermissions, ShareSettings } from '../types/graph';
@@ -25,7 +25,7 @@ export function GraphProvider({ children }: GraphProviderProps) {
   const [currentGraph, setCurrentGraph] = useState<Graph | null>(null);
   const [availableGraphs, setAvailableGraphs] = useState<Graph[]>([]);
   const [isCreating, setIsCreating] = useState(false);
-  const [isCreatingWelcomeGraph, setIsCreatingWelcomeGraph] = useState(false);
+  const isCreatingWelcomeGraphRef = useRef(false);
 
 
   // GraphQL operations - Load graphs for current user only
@@ -77,6 +77,18 @@ export function GraphProvider({ children }: GraphProviderProps) {
 
   // Load graphs from GraphQL response only
   useEffect(() => {
+    // GUARD: Don't run if we don't have a logged-in user
+    if (!currentUser) {
+      console.log('⏸️  No current user - skipping graph loading');
+      return;
+    }
+
+    // GUARD: Don't run while GraphQL query is loading
+    if (isLoading) {
+      console.log('⏸️  Still loading graphs - waiting...');
+      return;
+    }
+
     // Combine user graphs, shared graphs, and system graphs
     // Remove duplicates by graph ID (some graphs may appear in multiple categories)
     const graphsMap = new Map();
@@ -91,6 +103,7 @@ export function GraphProvider({ children }: GraphProviderProps) {
     });
 
     const allGraphs = Array.from(graphsMap.values());
+    const userGraphs = graphsData?.userGraphs || [];
 
     console.log('🔍 GraphContext useEffect triggered:', {
       isLoading,
@@ -98,11 +111,13 @@ export function GraphProvider({ children }: GraphProviderProps) {
       hasCurrentUser: !!currentUser,
       currentUserId: currentUser?.id,
       allGraphsCount: allGraphs.length,
+      userGraphsCount: userGraphs.length,
       systemGraphsCount: graphsData?.systemGraphs?.length || 0,
-      userGraphsCount: graphsData?.userGraphs?.length || 0,
-      sharedGraphsCount: graphsData?.sharedGraphs?.length || 0
+      sharedGraphsCount: graphsData?.sharedGraphs?.length || 0,
+      isCreatingWelcomeGraph: isCreatingWelcomeGraphRef.current
     });
 
+    // CASE 1: User has graphs - display them
     if (allGraphs.length > 0) {
       // Parse JSON strings in settings, permissions, shareSettings
       const parsedGraphs = allGraphs.map((g: any) => ({
@@ -148,24 +163,41 @@ export function GraphProvider({ children }: GraphProviderProps) {
           localStorage.setItem('currentGraphId', selectedGraph.id);
         }
       }
-    } else if (!isLoading && !graphsError && currentUser && !isCreatingWelcomeGraph) {
-      // Check if shared Welcome graph exists (created by server onboarding service)
-      const hasWelcomeGraph = [...(graphsData?.systemGraphs || []), ...(graphsData?.sharedGraphs || [])]
-        .some(g => g.name === 'Welcome');
+    } else {
+      // CASE 2: User has NO graphs - check if we should create a Welcome graph
 
-      if (!hasWelcomeGraph) {
-        console.log('🎉 No graphs found for user:', currentUser.id, '- Triggering Welcome graph creation');
-        // No graphs available - automatically create Welcome graph for new users
-        setAvailableGraphs([]);
-        setCurrentGraph(null);
-        setIsCreatingWelcomeGraph(true);
-      } else {
-        console.log('✅ Shared Welcome graph already exists, skipping creation');
+      // GUARD: Don't create multiple Welcome graphs (prevent race condition)
+      if (isCreatingWelcomeGraphRef.current) {
+        console.log('⏸️  Already creating Welcome graph - skipping duplicate creation');
         return;
       }
 
-      // Create Welcome graph automatically with tutorial content
-      const createWelcomeGraphWithTutorial = async () => {
+      // Check if user already has a Welcome graph
+      const hasWelcomeGraph = userGraphs.some((g: any) => g.name === 'Welcome');
+
+      console.log('🔍 DEBUG: No graphs found - checking Welcome graph creation', {
+        userGraphsCount: userGraphs.length,
+        allGraphsCount: allGraphs.length,
+        hasWelcomeGraph,
+        isCreatingWelcomeGraph: isCreatingWelcomeGraphRef.current,
+        currentUserId: currentUser.id
+      });
+
+      // CONDITION: Create Welcome graph ONLY if:
+      // 1. User has NO graphs at all (allGraphs.length === 0)
+      // 2. User doesn't already have a Welcome graph (!hasWelcomeGraph)
+      // 3. We're not already creating one (!isCreatingWelcomeGraphRef.current)
+      if (!hasWelcomeGraph && allGraphs.length === 0) {
+        console.log('🎉 Creating Welcome graph for new user:', currentUser.id);
+
+        // Set flag IMMEDIATELY to prevent duplicate creation
+        isCreatingWelcomeGraphRef.current = true;
+
+        setAvailableGraphs([]);
+        setCurrentGraph(null);
+
+        // Create Welcome graph automatically with tutorial content
+        const createWelcomeGraphWithTutorial = async () => {
         console.log('📝 Starting Welcome graph creation process...');
         try {
           // Step 1: Create the Welcome graph
@@ -347,13 +379,25 @@ export function GraphProvider({ children }: GraphProviderProps) {
           await refetchGraphs();
         } catch (error) {
           console.error('❌ Failed to create Welcome graph:', error);
-          setIsCreatingWelcomeGraph(false); // Allow retry on next attempt
+          isCreatingWelcomeGraphRef.current = false; // Allow retry on next attempt
         }
       };
 
-      createWelcomeGraphWithTutorial();
+        createWelcomeGraphWithTutorial();
+      }
     }
-  }, [graphsData, currentTeam, currentUser, isLoading, graphsError, createGraphMutation, createWorkItemMutation, createEdgeMutation, refetchGraphs]);
+  }, [
+    graphsData,
+    currentTeam,
+    currentUser,
+    isLoading,
+    graphsError,
+    createGraphMutation,
+    createWorkItemMutation,
+    createEdgeMutation,
+    updateGraphMutation,
+    refetchGraphs
+  ]);
 
   // Build graph hierarchy
   const graphHierarchy: GraphHierarchy[] = availableGraphs

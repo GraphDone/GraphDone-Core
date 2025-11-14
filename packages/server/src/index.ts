@@ -32,7 +32,6 @@ import { promisify } from 'util';
 import fs from 'fs';
 import rateLimit from 'express-rate-limit';
 import { createCaptchaChallenge, verifyCaptcha } from './utils/captcha.js';
-import { createSharedWelcomeGraph, sharedWelcomeGraphExists } from './services/onboarding.js';
 
 const execAsync = promisify(exec);
 
@@ -295,22 +294,7 @@ async function startServer() {
       console.log('ℹ️  Default admin setup completed'); // eslint-disable-line no-console
     }
 
-    // Ensure shared Welcome graph exists for all users
-    try {
-      const welcomeStart = Date.now();
-      const hasWelcome = await sharedWelcomeGraphExists(driver);
-      if (!hasWelcome) {
-        await createSharedWelcomeGraph(driver);
-        const welcomeTime = Date.now() - welcomeStart;
-        console.log(`🎉 Shared Welcome graph created (${welcomeTime}ms)`); // eslint-disable-line no-console
-        steps.push('✅ Created shared Welcome graph for onboarding');
-      } else {
-        console.log('✅ Shared Welcome graph already exists'); // eslint-disable-line no-console
-        steps.push('✅ Verified shared Welcome graph exists');
-      }
-    } catch (welcomeError) {
-      console.error('⚠️  Failed to create Welcome graph:', (welcomeError as Error).message); // eslint-disable-line no-console
-    }
+    // Welcome graphs are now created per-user on first login (handled by frontend)
 
     // Merge type definitions (Neo4j schema + auth schema)
     const mergedTypeDefs = mergeTypeDefs([typeDefs, authTypeDefs]);
