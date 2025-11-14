@@ -1,0 +1,102 @@
+name: graphdone
+
+services:
+  graphdone-neo4j:
+    container_name: graphdone-neo4j
+    image: ghcr.io/graphdone/graphdone-neo4j:fix-first-start
+    pull_policy: always
+    privileged: true
+    environment:
+      - NEO4J_AUTH=neo4j/graphdone_password
+    ports:
+      - "7474:7474"  # Neo4j Browser
+      - "7687:7687"  # Bolt
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+    healthcheck:
+      test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "graphdone_password", "RETURN 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 8
+      start_period: 60s
+    restart: unless-stopped
+
+  graphdone-redis:
+    container_name: graphdone-redis
+    image: redis:8-alpine
+    privileged: true
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  graphdone-api:
+    container_name: graphdone-api
+    image: ghcr.io/graphdone/graphdone-api:fix-first-start
+    pull_policy: always
+    privileged: true
+    environment:
+      - NODE_ENV=production
+      - NEO4J_URI=bolt://graphdone-neo4j:7687
+      - NEO4J_USER=neo4j
+      - NEO4J_PASSWORD=graphdone_password
+      - PORT=4128
+      - REDIS_URL=redis://graphdone-redis:6379
+      - JWT_SECRET=your-secret-key-change-in-production
+      - SSL_ENABLED=true
+      - SSL_KEY_PATH=/etc/ssl/private/server-key.pem
+      - SSL_CERT_PATH=/etc/ssl/certs/server-cert.pem
+    ports:
+      - "0.0.0.0:4128:4128"
+    depends_on:
+      graphdone-neo4j:
+        condition: service_healthy
+      graphdone-redis:
+        condition: service_healthy
+    volumes:
+      - ./certs/server-cert.pem:/etc/ssl/certs/server-cert.pem:ro
+      - ./certs/server-key.pem:/etc/ssl/private/server-key.pem:ro
+    healthcheck:
+      test: ["CMD", "curl", "-k", "-f", "https://localhost:4128/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  graphdone-web:
+    container_name: graphdone-web
+    image: ghcr.io/graphdone/graphdone-web:fix-first-start
+    pull_policy: always
+    privileged: true
+    environment:
+      - VITE_GRAPHQL_URL=https://localhost:4128/graphql
+      - VITE_GRAPHQL_WS_URL=wss://localhost:4128/graphql
+    ports:
+      - "0.0.0.0:3128:3128"
+    depends_on:
+      - graphdone-api
+    volumes:
+      - ./certs/server-cert.pem:/etc/ssl/certs/server-cert.pem:ro
+      - ./certs/server-key.pem:/etc/ssl/private/server-key.pem:ro
+    healthcheck:
+      test: ["CMD", "curl", "-k", "-f", "https://localhost:3128"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  neo4j_data:
+    driver: local
+  neo4j_logs:
+    driver: local
+  redis_data:
+    driver: local

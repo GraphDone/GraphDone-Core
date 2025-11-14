@@ -661,11 +661,11 @@ agent.subscribe('node.priorityChanged', async (node) => {
 - **Development Infrastructure**: Monorepo, testing, Docker, CI/CD
 - **Documentation**: Comprehensive guides with Mermaid diagrams
 
-### 🚀 **Ready for Development**
+### 🚀 **Ready for Alpha Development**
 ```bash
 # Get started in 30 seconds
 git clone https://github.com/GraphDone/GraphDone-Core.git
-cd graphdone
+cd GraphDone-Core
 ./tools/setup.sh
 ./tools/run.sh
 ```
@@ -690,8 +690,9 @@ Visit http://localhost:3000 to see the working application!
 - Enterprise features and authentication
 - Performance scaling for large graphs
 
-**Production Release**
-- Security hardening and audit compliance
+**Production Release (Future)**
+- Security hardening and audit compliance  
+- TIG Stack Integration (Telegraf, InfluxDB, Grafana) for monitoring GraphDone servers/clusters and general analytics
 - Production deployment and monitoring
 - Third-party integrations and marketplace
 

@@ -1,4 +1,4 @@
-import { verifyToken } from '../resolvers/auth';
+import { verifyToken } from '../utils/auth.js';
 
 export interface AuthUser {
   userId: string;
