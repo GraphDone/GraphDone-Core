@@ -20,7 +20,7 @@ export default defineConfig({
     https: process.env.VITE_HTTPS === 'true' ? (() => {
       const certPath = resolve(__dirname, '../../deployment/certs/server-cert.pem');
       const keyPath = resolve(__dirname, '../../deployment/certs/server-key.pem');
-      
+
       if (existsSync(certPath) && existsSync(keyPath)) {
         return {
           cert: readFileSync(certPath),
@@ -29,7 +29,7 @@ export default defineConfig({
       }
       return false;
     })() : undefined,
-    allowedHosts: ['localhost', hostname(), '*.local', '.tailscale'], // Auto-detect hostname + common patterns
+    allowedHosts: ['localhost', hostname(), '*.local', '.tailscale', '*.ts.net', '.chocolate-perch.ts.net'], // Auto-detect hostname + common patterns + Tailscale
     headers: {
       'Cache-Control': 'no-cache, no-store, must-revalidate',
       'Pragma': 'no-cache',
