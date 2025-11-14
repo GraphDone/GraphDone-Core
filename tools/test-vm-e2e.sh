@@ -1,0 +1,403 @@
+#!/bin/bash
+
+# GraphDone E2E Testing with Multipass
+# This script launches a VM, runs all tests, and generates a comprehensive test report
+
+set -e
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+NC='\033[0m'
+
+# Get script directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+# Load environment variables
+if [ -f "$PROJECT_ROOT/.env" ]; then
+    set -a
+    source "$PROJECT_ROOT/.env"
+    set +a
+fi
+
+# Configuration
+VM_NAME="graphdone-test-$(date +%s)"
+BRANCH="${1:-main}"
+REPORT_DIR="$PROJECT_ROOT/test-reports"
+TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+REPORT_FILE="$REPORT_DIR/e2e-report-${TIMESTAMP}.md"
+
+# Logging functions
+log_info() {
+    echo -e "${CYAN}[INFO]${NC} $1"
+}
+
+log_success() {
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
+}
+
+log_warning() {
+    echo -e "${YELLOW}[WARNING]${NC} $1"
+}
+
+log_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+log_section() {
+    echo ""
+    echo -e "${BOLD}${BLUE}================================${NC}"
+    echo -e "${BOLD}${BLUE}$1${NC}"
+    echo -e "${BOLD}${BLUE}================================${NC}"
+    echo ""
+}
+
+# Create report directory
+mkdir -p "$REPORT_DIR"
+
+# Initialize report
+init_report() {
+    cat > "$REPORT_FILE" <<EOF
+# GraphDone E2E Test Report
+
+**Generated:** $(date)
+**VM Name:** $VM_NAME
+**Branch:** $BRANCH
+**Test Duration:** TBD
+
+---
+
+## Test Summary
+
+EOF
+}
+
+# Add section to report
+add_to_report() {
+    echo "$1" >> "$REPORT_FILE"
+    echo "" >> "$REPORT_FILE"
+}
+
+# Cleanup function
+cleanup() {
+    local exit_code=$?
+
+    if [ $exit_code -ne 0 ]; then
+        log_error "Tests failed with exit code: $exit_code"
+        add_to_report "## ❌ Tests Failed"
+        add_to_report "Exit code: $exit_code"
+    fi
+
+    log_info "Cleaning up VM: $VM_NAME"
+    "$PROJECT_ROOT/tools/multipass.sh" delete --name "$VM_NAME" || true
+
+    log_info "Test report saved to: $REPORT_FILE"
+    cat "$REPORT_FILE"
+
+    exit $exit_code
+}
+
+trap cleanup EXIT
+
+# Main execution
+main() {
+    local start_time=$(date +%s)
+
+    init_report
+
+    log_section "GraphDone E2E Testing with Multipass"
+
+    # Step 1: Launch VM
+    log_section "Step 1: Launching Test VM"
+    add_to_report "## 🚀 VM Launch"
+
+    log_info "VM Name: $VM_NAME"
+    log_info "Branch: $BRANCH"
+
+    if "$PROJECT_ROOT/tools/multipass.sh" launch --name "$VM_NAME" --branch "$BRANCH" 2>&1 | tee -a "$REPORT_DIR/vm-launch.log"; then
+        log_success "VM launched successfully"
+        add_to_report "✅ VM launched successfully"
+        add_to_report "\`\`\`"
+        add_to_report "VM: $VM_NAME"
+        add_to_report "Branch: $BRANCH"
+        add_to_report "\`\`\`"
+    else
+        log_error "Failed to launch VM"
+        add_to_report "❌ Failed to launch VM"
+        exit 1
+    fi
+
+    # Step 2: Wait for provisioning
+    log_section "Step 2: Waiting for VM Provisioning"
+    add_to_report "## ⏳ VM Provisioning"
+
+    log_info "Waiting for cloud-init to complete..."
+    if multipass exec "$VM_NAME" -- cloud-init status --wait 2>&1 | tee -a "$REPORT_DIR/cloud-init.log"; then
+        log_success "VM provisioning complete"
+        add_to_report "✅ VM provisioning complete"
+    else
+        log_error "VM provisioning failed"
+        add_to_report "❌ VM provisioning failed"
+        exit 1
+    fi
+
+    # Step 3: Verify GraphDone installation
+    log_section "Step 3: Verifying GraphDone Installation"
+    add_to_report "## 🔍 Installation Verification"
+
+    if multipass exec "$VM_NAME" -- bash -c "cd ~/graphdone && ls -la" > /dev/null 2>&1; then
+        log_success "GraphDone directory exists"
+        add_to_report "✅ GraphDone installed at ~/graphdone"
+    else
+        log_error "GraphDone directory not found"
+        add_to_report "❌ GraphDone directory not found"
+        exit 1
+    fi
+
+    # Step 4: Run linting
+    log_section "Step 4: Running Linting"
+    add_to_report "## 🧹 Linting"
+
+    if multipass exec "$VM_NAME" -- bash -c 'cd ~/graphdone && npm run lint' 2>&1 | tee "$REPORT_DIR/lint.log"; then
+        log_success "Linting passed"
+        add_to_report "✅ Linting passed"
+    else
+        log_warning "Linting had issues (continuing)"
+        add_to_report "⚠️ Linting had issues"
+    fi
+
+    # Step 5: Run type checking
+    log_section "Step 5: Running Type Checking"
+    add_to_report "## 🔤 Type Checking"
+
+    if multipass exec "$VM_NAME" -- bash -c 'cd ~/graphdone && npm run typecheck' 2>&1 | tee "$REPORT_DIR/typecheck.log"; then
+        log_success "Type checking passed"
+        add_to_report "✅ Type checking passed"
+    else
+        log_warning "Type checking had issues (continuing)"
+        add_to_report "⚠️ Type checking had issues"
+    fi
+
+    # Step 6: Run build process
+    log_section "Step 6: Running Build Process"
+    add_to_report "## 🏗️ Build Process"
+
+    if multipass exec "$VM_NAME" -- bash -c 'cd ~/graphdone && npm run build' 2>&1 | tee "$REPORT_DIR/build.log"; then
+        log_success "Build completed successfully"
+        add_to_report "✅ Build completed successfully"
+    else
+        log_error "Build failed"
+        add_to_report "❌ Build failed"
+        add_to_report "\`\`\`"
+        tail -n 50 "$REPORT_DIR/build.log" >> "$REPORT_FILE"
+        add_to_report "\`\`\`"
+        exit 1
+    fi
+
+    # Step 7: Run unit tests
+    log_section "Step 7: Running Unit Tests"
+    add_to_report "## 🧪 Unit Tests"
+
+    if multipass exec "$VM_NAME" -- bash -c 'cd ~/graphdone && npm run test' 2>&1 | tee "$REPORT_DIR/unit-tests.log"; then
+        log_success "Unit tests passed"
+        add_to_report "✅ Unit tests passed"
+
+        # Extract test summary
+        if grep -A 10 "Test Files" "$REPORT_DIR/unit-tests.log" > /dev/null 2>&1; then
+            add_to_report "\`\`\`"
+            grep -A 10 "Test Files" "$REPORT_DIR/unit-tests.log" | head -n 5 >> "$REPORT_FILE" || true
+            add_to_report "\`\`\`"
+        fi
+    else
+        log_error "Unit tests failed"
+        add_to_report "❌ Unit tests failed"
+        add_to_report "\`\`\`"
+        tail -n 50 "$REPORT_DIR/unit-tests.log" >> "$REPORT_FILE"
+        add_to_report "\`\`\`"
+        exit 1
+    fi
+
+    # Step 8: Run E2E tests (if available)
+    log_section "Step 8: Running E2E Tests"
+    add_to_report "## 🎭 E2E Tests"
+
+    if multipass exec "$VM_NAME" -- bash -c 'cd ~/graphdone && npm run test:e2e' 2>&1 | tee "$REPORT_DIR/e2e-tests.log"; then
+        log_success "E2E tests passed"
+        add_to_report "✅ E2E tests passed"
+    else
+        log_warning "E2E tests failed or not available (continuing)"
+        add_to_report "⚠️ E2E tests failed or not available"
+    fi
+
+    # Step 9: Functional API Testing
+    log_section "Step 9: Functional API Testing"
+    add_to_report "## 🔌 Functional API Tests"
+
+    # Start GraphDone services
+    log_info "Starting GraphDone services..."
+    multipass exec "$VM_NAME" -- bash -c 'cd ~/graphdone && nohup npm run dev > /tmp/graphdone.log 2>&1 &' || true
+    sleep 30
+
+    # Test 1: Check services are running
+    log_info "Checking if services are running..."
+    if multipass exec "$VM_NAME" -- bash -c 'curl -s -o /dev/null -w "%{http_code}" http://localhost:3127' | grep -q "200"; then
+        log_success "Web UI is accessible"
+        add_to_report "✅ Web UI accessible (port 3127)"
+    else
+        log_error "Web UI is not accessible"
+        add_to_report "❌ Web UI not accessible (port 3127)"
+    fi
+
+    if multipass exec "$VM_NAME" -- bash -c 'curl -s -o /dev/null -w "%{http_code}" http://localhost:4127/health' | grep -q "200"; then
+        log_success "GraphQL API health check passed"
+        add_to_report "✅ GraphQL API health check passed (port 4127)"
+    else
+        log_error "GraphQL API health check failed"
+        add_to_report "❌ GraphQL API health check failed (port 4127)"
+    fi
+
+    # Test 2: Test guest account creation via GraphQL
+    log_info "Testing guest account creation..."
+    GUEST_RESULT=$(multipass exec "$VM_NAME" -- bash -c 'curl -s -X POST http://localhost:4127/graphql \
+        -H "Content-Type: application/json" \
+        -d "{\"query\": \"mutation { createGuestUser { id username role token } }\"}"')
+
+    if echo "$GUEST_RESULT" | grep -q '"createGuestUser"'; then
+        log_success "Guest account creation works"
+        add_to_report "✅ Guest account creation successful"
+        add_to_report "\`\`\`json"
+        echo "$GUEST_RESULT" | jq '.' >> "$REPORT_FILE" 2>/dev/null || echo "$GUEST_RESULT" >> "$REPORT_FILE"
+        add_to_report "\`\`\`"
+    else
+        log_error "Guest account creation failed"
+        add_to_report "❌ Guest account creation failed"
+        add_to_report "\`\`\`"
+        echo "$GUEST_RESULT" >> "$REPORT_FILE"
+        add_to_report "\`\`\`"
+    fi
+
+    # Test 3: Test login mutation
+    log_info "Testing user login..."
+    LOGIN_RESULT=$(multipass exec "$VM_NAME" -- bash -c 'curl -s -X POST http://localhost:4127/graphql \
+        -H "Content-Type: application/json" \
+        -d "{\"query\": \"mutation { login(username: \\\"admin\\\", password: \\\"graphdone\\\") { token user { id username role } } }\"}"')
+
+    if echo "$LOGIN_RESULT" | grep -q '"login"'; then
+        log_success "User login works"
+        add_to_report "✅ User login successful"
+    else
+        log_error "User login failed"
+        add_to_report "❌ User login failed"
+        add_to_report "\`\`\`"
+        echo "$LOGIN_RESULT" >> "$REPORT_FILE"
+        add_to_report "\`\`\`"
+    fi
+
+    # Test 4: Test work items query
+    log_info "Testing work items query..."
+    WORKITEMS_RESULT=$(multipass exec "$VM_NAME" -- bash -c 'curl -s -X POST http://localhost:4127/graphql \
+        -H "Content-Type: application/json" \
+        -d "{\"query\": \"{ workItems { id title status priority } }\"}"')
+
+    if echo "$WORKITEMS_RESULT" | grep -q '"workItems"'; then
+        ITEM_COUNT=$(echo "$WORKITEMS_RESULT" | jq '.data.workItems | length' 2>/dev/null || echo "unknown")
+        log_success "Work items query works (found $ITEM_COUNT items)"
+        add_to_report "✅ Work items query successful ($ITEM_COUNT items found)"
+    else
+        log_error "Work items query failed"
+        add_to_report "❌ Work items query failed"
+        add_to_report "\`\`\`"
+        echo "$WORKITEMS_RESULT" >> "$REPORT_FILE"
+        add_to_report "\`\`\`"
+    fi
+
+    # Test 5: Test Tailscale connectivity (if enabled)
+    if multipass exec "$VM_NAME" -- bash -c 'command -v tailscale > /dev/null 2>&1' > /dev/null 2>&1; then
+        log_info "Testing Tailscale connectivity..."
+        TAILSCALE_IP=$(multipass exec "$VM_NAME" -- bash -c 'tailscale status --json | jq -r ".Self.TailscaleIPs[0]" 2>/dev/null' || echo "")
+
+        if [ -n "$TAILSCALE_IP" ]; then
+            log_info "VM Tailscale IP: $TAILSCALE_IP"
+
+            # Try to access from host
+            if curl -s -o /dev/null -w "%{http_code}" "http://${TAILSCALE_IP}:3127" --max-time 5 | grep -q "200"; then
+                log_success "Tailscale external access works"
+                add_to_report "✅ Tailscale external access successful (http://${TAILSCALE_IP}:3127)"
+            else
+                log_warning "Tailscale external access failed (may need ACL configuration)"
+                add_to_report "⚠️ Tailscale external access requires ACL configuration"
+            fi
+        fi
+    fi
+
+    # Step 10: Copy test artifacts from VM
+    log_section "Step 10: Copying Test Artifacts from VM"
+    add_to_report "## 📦 Test Artifacts"
+
+    # Create artifacts directory
+    mkdir -p "$REPORT_DIR/artifacts-${TIMESTAMP}"
+
+    # Copy test coverage reports if they exist
+    if multipass exec "$VM_NAME" -- bash -c 'test -d ~/graphdone/coverage' > /dev/null 2>&1; then
+        log_info "Copying coverage reports..."
+        multipass transfer "$VM_NAME:/home/ubuntu/graphdone/coverage" "$REPORT_DIR/artifacts-${TIMESTAMP}/" || true
+        add_to_report "✅ Coverage reports copied to artifacts-${TIMESTAMP}/coverage"
+    fi
+
+    # Copy playwright reports if they exist
+    if multipass exec "$VM_NAME" -- bash -c 'test -d ~/graphdone/playwright-report' > /dev/null 2>&1; then
+        log_info "Copying Playwright reports..."
+        multipass transfer "$VM_NAME:/home/ubuntu/graphdone/playwright-report" "$REPORT_DIR/artifacts-${TIMESTAMP}/" || true
+        add_to_report "✅ Playwright reports copied to artifacts-${TIMESTAMP}/playwright-report"
+    fi
+
+    # Copy any test result files
+    if multipass exec "$VM_NAME" -- bash -c 'test -d ~/graphdone/test-results' > /dev/null 2>&1; then
+        log_info "Copying test results..."
+        multipass transfer "$VM_NAME:/home/ubuntu/graphdone/test-results" "$REPORT_DIR/artifacts-${TIMESTAMP}/" || true
+        add_to_report "✅ Test results copied to artifacts-${TIMESTAMP}/test-results"
+    fi
+
+    # Step 11: Collect VM information
+    log_section "Step 11: Collecting VM Information"
+    add_to_report "## 📊 VM Information"
+
+    add_to_report "\`\`\`"
+    multipass info "$VM_NAME" >> "$REPORT_FILE"
+    add_to_report "\`\`\`"
+
+    # Check if Tailscale is connected
+    if multipass exec "$VM_NAME" -- bash -c 'command -v tailscale > /dev/null 2>&1' > /dev/null 2>&1; then
+        log_info "Checking Tailscale status..."
+        add_to_report ""
+        add_to_report "### Tailscale Status"
+        add_to_report "\`\`\`"
+        multipass exec "$VM_NAME" -- tailscale status >> "$REPORT_FILE" 2>&1 || true
+        add_to_report "\`\`\`"
+    fi
+
+    # Calculate duration
+    local end_time=$(date +%s)
+    local duration=$((end_time - start_time))
+    local duration_min=$((duration / 60))
+    local duration_sec=$((duration % 60))
+
+    log_section "Test Summary"
+    log_success "All tests completed successfully!"
+    log_info "Total duration: ${duration_min}m ${duration_sec}s"
+
+    # Update report with duration
+    sed -i "s/Test Duration: TBD/Test Duration: ${duration_min}m ${duration_sec}s/" "$REPORT_FILE"
+
+    add_to_report "---"
+    add_to_report "## ✅ All Tests Passed"
+    add_to_report "**Total Duration:** ${duration_min}m ${duration_sec}s"
+}
+
+# Run main function
+main

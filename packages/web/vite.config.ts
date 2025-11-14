@@ -15,7 +15,7 @@ export default defineConfig({
     host: '0.0.0.0', // Allow external connections
     port: Number(process.env.PORT) || 3127,
     strictPort: true, // Exit if port is already in use instead of trying next available
-    allowedHosts: ['localhost', hostname(), '*.local', '.tailscale'], // Auto-detect hostname + common patterns
+    allowedHosts: ['localhost', hostname(), '*.local', '.tailscale', '*.ts.net', '.chocolate-perch.ts.net'], // Auto-detect hostname + common patterns + Tailscale
     proxy: {
       '/graphql': {
         target: 'http://localhost:4127',
