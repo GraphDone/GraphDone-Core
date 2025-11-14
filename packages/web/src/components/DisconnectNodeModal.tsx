@@ -181,19 +181,22 @@ export function DisconnectNodeModal({ isOpen, onClose, sourceNode }: DisconnectN
     }
   };
 
-  // Get all disconnectable connections (Edge entities only)
-  const allConnections: Array<{id: string, type: string, connectedNode: {id: string, title: string, type: string}, direction: 'outgoing' | 'incoming'}> = [];
+  // Get all disconnectable connections (Edge entities only) - deduplicated by edge ID
+  const connectionMap = new Map<string, {id: string, type: string, connectedNode: {id: string, title: string, type: string}, direction: 'outgoing' | 'incoming'}>();
   
   existingEdges.forEach(edge => {
+    // Skip if we've already processed this edge ID
+    if (connectionMap.has(edge.id)) return;
+    
     if (edge.source.id === sourceNode.id) {
-      allConnections.push({
+      connectionMap.set(edge.id, {
         id: edge.id,
         type: edge.type,
         connectedNode: { id: edge.target.id, title: edge.target.title, type: 'unknown' },
         direction: 'outgoing'
       });
     } else if (edge.target.id === sourceNode.id) {
-      allConnections.push({
+      connectionMap.set(edge.id, {
         id: edge.id,
         type: edge.type,
         connectedNode: { id: edge.source.id, title: edge.source.title, type: 'unknown' },
@@ -202,6 +205,7 @@ export function DisconnectNodeModal({ isOpen, onClose, sourceNode }: DisconnectN
     }
   });
 
+  const allConnections = Array.from(connectionMap.values());
   const disconnectableConnections = allConnections.filter(conn => !conn.id.startsWith('workitem-'));
 
   return (

@@ -1067,8 +1067,8 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
     
     // Priority filter logic
     let matchesPriority = true;
-    if (priorityFilter !== 'all' && node.priorityComp !== undefined && node.priorityComp !== null) {
-      const priority = node.priorityComp;
+    if (priorityFilter !== 'all' && node.priority !== undefined && node.priority !== null) {
+      const priority = node.priority;
       switch (priorityFilter) {
         case 'critical': matchesPriority = priority >= 0.8; break;
         case 'high': matchesPriority = priority >= 0.6 && priority < 0.8; break;
@@ -2070,10 +2070,10 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
                               </div>
                               
                               {/* Priority with icon and progress bar */}
-                              {(node.priorityComp !== undefined && node.priorityComp !== null) && (
+                              {(node.priority !== undefined && node.priority !== null) && (
                                 <div className="flex items-center space-x-1">
-                                  <div className={getPriorityColorScheme(node.priorityComp).text}>
-                                    {getPriorityIconElement(node.priorityComp as any)}
+                                  <div className={getPriorityColorScheme(node.priority).text}>
+                                    {getPriorityIconElement(node.priority as any)}
                                   </div>
                                   <span className="text-gray-300 font-medium">Priority</span>
                                   <div className="flex items-center space-x-1">
@@ -2081,13 +2081,13 @@ export function ConnectNodeModal({ isOpen, onClose, sourceNode, initialTab = 'co
                                       <div 
                                         className="h-full transition-all duration-300"
                                         style={{ 
-                                          width: `${Math.round(node.priorityComp * 100)}%`,
-                                          backgroundColor: getPriorityColorScheme(node.priorityComp).hex
+                                          width: `${Math.round(node.priority * 100)}%`,
+                                          backgroundColor: getPriorityColorScheme(node.priority).hex
                                         }}
                                       />
                                     </div>
-                                    <span className={`text-xs font-medium ${getPriorityColorScheme(node.priorityComp).text}`}>
-                                      {Math.round(node.priorityComp * 100)}%
+                                    <span className={`text-xs font-medium ${getPriorityColorScheme(node.priority).text}`}>
+                                      {Math.round(node.priority * 100)}%
                                     </span>
                                   </div>
                                 </div>

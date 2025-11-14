@@ -469,12 +469,12 @@ export function DeleteNodeModal({ isOpen, onClose, nodeId, nodeTitle, nodeType, 
                   </h5>
                   
                   <div className="space-y-4">
-                    <label className="group flex items-start space-x-4 cursor-pointer p-3 rounded-lg hover:bg-gray-700/30 transition-colors">
+                    <label className="group flex items-start space-x-4 cursor-pointer p-3 rounded-lg hover:bg-gray-700/30 transition-colors select-text">
                       <input
                         type="checkbox"
                         checked={understandRisks}
                         onChange={(e) => setUnderstandRisks(e.target.checked)}
-                        className="mt-1 h-5 w-5 text-red-600 focus:ring-red-500 focus:ring-offset-0 border-gray-500 rounded bg-gray-700/80 transition-colors"
+                        className="mt-1 h-5 w-5 text-red-600 focus:ring-red-500 focus:ring-offset-0 border-gray-500 rounded bg-gray-700/80 transition-colors pointer-events-auto"
                       />
                       <div className="space-y-1">
                         <span className="text-gray-200 font-medium text-sm leading-relaxed">
@@ -486,12 +486,12 @@ export function DeleteNodeModal({ isOpen, onClose, nodeId, nodeTitle, nodeType, 
                       </div>
                     </label>
                     
-                    <label className="group flex items-start space-x-4 cursor-pointer p-3 rounded-lg hover:bg-gray-700/30 transition-colors">
+                    <label className="group flex items-start space-x-4 cursor-pointer p-3 rounded-lg hover:bg-gray-700/30 transition-colors select-text">
                       <input
                         type="checkbox"
                         checked={confirmDeletion}
                         onChange={(e) => setConfirmDeletion(e.target.checked)}
-                        className="mt-1 h-5 w-5 text-red-600 focus:ring-red-500 focus:ring-offset-0 border-gray-500 rounded bg-gray-700/80 transition-colors"
+                        className="mt-1 h-5 w-5 text-red-600 focus:ring-red-500 focus:ring-offset-0 border-gray-500 rounded bg-gray-700/80 transition-colors pointer-events-auto"
                       />
                       <div className="space-y-1">
                         <span className="text-gray-200 font-medium text-sm leading-relaxed">
