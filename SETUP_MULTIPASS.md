@@ -1,309 +1,171 @@
-# Setting Up Multipass for GraphDone
+# GraphDone Multipass VM Testing - Performance Optimization
 
-This guide will help you set up Multipass so you can run GraphDone VMs independently.
+This document outlines strategies to speed up E2E testing with Multipass VMs.
 
-## Step 1: Authenticate Multipass
+## Current Performance Bottlenecks
 
-Multipass needs one-time authentication after installation:
+**Full VM Setup Time: ~10-15 minutes**
+- VM Launch: 30s
+- Cloud-init provisioning: 1-2min
+- Node.js installation: 1min
+- GraphDone clone: 30s
+- npm install: 5-8min (largest bottleneck!)
+- Playwright browsers: 2-3min
+- Database seeding: 30s
 
+## Optimization Strategies
+
+### 1. VM Image Caching (Fastest - Recommended)
+
+**Concept:** Pre-build base VMs with all dependencies, clone for testing
+
+**Benefits:**
+- Reduces setup time from 15min → 2min
+- Consistent test environment
+- Parallel test execution possible
+
+**Implementation:**
 ```bash
-multipass authenticate
+# Create base images for common branches
+./tools/create-base-image.sh main
+./tools/create-base-image.sh develop  
+./tools/create-base-image.sh vm_multi-pass
+
+# Use cached image for testing
+./tools/test-vm-e2e.sh main --use-cache
 ```
 
-You'll be prompted to enter a passphrase. This creates a secure connection between your user account and the Multipass service.
+**Cache Invalidation:**
+- Update base images nightly via cron
+- Rebuild on package.json changes
+- Tag images with dependency hash
 
-## Step 2: Install yq (YAML processor)
+### 2. Layered Caching Strategy
 
-Run the automated setup script:
+**Layer 1: Base OS + System Dependencies** (rarely changes)
+- Ubuntu 22.04
+- Docker, Node.js, build-essential
+- Playwright browsers + system deps
+- **Cache duration:** Weeks/months
 
-```bash
-./tools/setup-vm-tools.sh
+**Layer 2: GraphDone Dependencies** (changes weekly)
+- node_modules from package.json
+- Playwright browsers
+- Docker images (Neo4j, Redis)
+- **Cache duration:** 1 week or until package.json changes
+
+**Layer 3: Source Code** (changes frequently)
+- Git clone + checkout specific branch
+- Build artifacts
+- **Cache duration:** Per test run
+
+### 3. Parallel Testing Architecture
+
+```
+┌─────────────────┐
+│  Base Image     │
+│  (cached)       │
+└────────┬────────┘
+         │
+    ┌────┴────┬────────┬────────┐
+    ▼         ▼        ▼        ▼
+  Test VM1  Test VM2  Test VM3  Test VM4
+  (main)    (develop) (PR-123)  (PR-124)
 ```
 
-This will:
-- Verify Multipass is installed and authenticated
-- Install `yq` to `~/.local/bin/` (no sudo required)
-- Add `~/.local/bin` to your PATH if needed
-- Verify everything is working
+Run multiple test VMs in parallel from the same base image.
 
-### Manual yq Installation (if needed)
+### 4. Docker Layer Caching
 
-**macOS:**
+Pre-pull and cache Docker images in the base VM:
 ```bash
-brew install yq
+# In base image creation
+docker pull neo4j:5.15-community
+docker pull redis:7-alpine
 ```
 
-**Ubuntu/Linux (without sudo):**
+### 5. npm Dependency Caching
+
+**Option A: Local npm cache**
 ```bash
-# Create local bin directory
-mkdir -p ~/.local/bin
-
-# Download yq
-wget https://github.com/mikefarah/yq/releases/download/v4.35.1/yq_linux_amd64 \
-  -O ~/.local/bin/yq
-
-# Make executable
-chmod +x ~/.local/bin/yq
-
-# Add to PATH (add this to ~/.bashrc or ~/.zshrc)
-export PATH="$HOME/.local/bin:$PATH"
-
-# Reload your shell or source the file
-source ~/.bashrc
+# Mount host npm cache into VM
+multipass mount ~/.npm graphdone-vm:/home/ubuntu/.npm
 ```
 
-## Step 3: Verify Setup
+**Option B: Verdaccio local npm registry**
+- Run local npm proxy
+- Cache all packages locally
+- Reduces npm install from 8min → 1min
 
-Check that everything is ready:
+### 6. Incremental Updates
 
+Instead of full rebuild, only update what changed:
 ```bash
-# Check Multipass
-multipass list
-
-# Check yq
-yq --version
-
-# Test VM command
-./start vm --help
+# In cached VM
+cd ~/graphdone
+git fetch origin
+git checkout $BRANCH
+git pull
+npm install  # Only installs new deps
+npm run build
 ```
 
-You should see:
-- Multipass list showing no VMs or existing VMs
-- yq version 4.x
-- VM help menu with all commands
-
-## Step 4: Launch Your First VM
-
-```bash
-# Simple launch with defaults
-./start vm launch
-
-# Or with custom settings
-./start vm launch --branch develop --cpus 8 --memory 16G
-```
-
-The VM will:
-1. Get a fun random name (e.g., `graphdone-vm-happy-turtle-1234`)
-2. Provision Ubuntu 24.04
-3. Install Docker, Node.js 20, and all dependencies
-4. Clone GraphDone from your specified branch
-5. Run `./start setup` automatically
-6. Seed the database with test data
-7. Be ready to use in 3-5 minutes
-
-## Step 5: Access Your VM
-
-```bash
-# List all VMs
-./start vm list
-
-# Connect to VM shell
-./start vm shell
-
-# Or specify VM name
-./start vm shell --name graphdone-vm-happy-turtle-1234
-```
-
-Inside the VM, use these shortcuts:
-```bash
-gd           # Go to GraphDone directory
-gd-start     # Start GraphDone
-gd-stop      # Stop GraphDone
-gd-status    # Check status
-```
-
-## Step 6: Access GraphDone Services
-
-Get your VM's IP address:
-
-```bash
-multipass info <your-vm-name> | grep IPv4
-```
-
-Then access services at:
-- **Web UI:** `http://<vm-ip>:3127`
-- **GraphQL API:** `http://<vm-ip>:4127/graphql`
-- **Neo4j Browser:** `http://<vm-ip>:7474`
-
-## Common Issues and Solutions
-
-### "Multipass needs authentication"
-
-```bash
-multipass authenticate
-# Follow the prompts
-```
-
-### "yq not found"
-
-```bash
-# Run setup script
-./tools/setup-vm-tools.sh
-
-# Or install manually (see Step 2)
-```
-
-### "Permission denied" when installing yq
-
-The setup script installs to `~/.local/bin` which doesn't need sudo. If you see this error, make sure you're not using `sudo`:
-
-```bash
-# Don't do this
-sudo ./tools/setup-vm-tools.sh
-
-# Do this instead
-./tools/setup-vm-tools.sh
-```
-
-### PATH not updated
-
-After installing yq, reload your shell:
-
-```bash
-source ~/.bashrc   # or ~/.zshrc for zsh
-```
-
-Or close and reopen your terminal.
-
-### VM won't start
-
-Check Multipass status:
-
-```bash
-multipass list
-multipass info <vm-name>
-```
-
-If the VM is in an error state:
-
-```bash
-./start vm delete --name <vm-name>
-./start vm launch
-```
-
-## Testing the Setup (Without Launching a VM)
-
-You can verify the scripts work without actually launching a VM:
-
-```bash
-# Test script syntax
-bash -n ./tools/multipass.sh
-bash -n ./start
-
-# Test help menus
-./start vm --help
-./tools/multipass.sh --help
-
-# Test random name generation
-bash -c 'source <(grep -A 20 "^ADJECTIVES=" ./tools/multipass.sh); source <(grep -A 6 "^generate_random_name" ./tools/multipass.sh); generate_random_name'
-```
-
-## Tailscale Integration (Optional)
-
-GraphDone VMs can automatically join your Tailscale network for secure mesh networking:
-
-### Setup Tailscale
-
-1. **Get an auth key** from https://login.tailscale.com/admin/settings/keys
-   - Click "Generate auth key"
-   - Enable "Ephemeral" for security (VM will be removed when stopped)
-   - Copy the generated key (starts with `tskey-auth-`)
-
-2. **Add to your `.env` file:**
-   ```bash
-   TAILSCALE_AUTH_KEY=tskey-auth-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-   ```
-
-3. **Enable in `vm.config.yml`:**
-   ```yaml
-   tailscale:
-     enabled: true
-     flags: ""  # Optional: e.g., "--advertise-routes=10.0.0.0/24"
-   ```
-
-4. **Launch VM** - Tailscale will auto-configure:
-   ```bash
-   ./start vm launch
-   ```
-
-### Benefits
-
-- **Secure Access:** Access VM services from anywhere via Tailscale IP
-- **Multi-VM Networking:** VMs can communicate with each other
-- **No Port Forwarding:** Access services directly without complex networking
-- **Persistent Identity:** VMs get consistent Tailscale hostnames
-
-### Usage
-
-After Tailscale is configured, access your VM services via Tailscale hostname:
-```bash
-# Find VM's Tailscale hostname
-tailscale status
-
-# Access GraphDone from any device on your Tailscale network
-http://<vm-tailscale-hostname>:3127
-```
-
-## Advanced: Running Tests Independently
-
-Once setup is complete, Claude Code (or you) can run these commands:
-
-```bash
-# Launch a test VM
-./start vm launch --name test-vm --branch main
-
-# Wait for provisioning (check status)
-multipass exec test-vm -- cloud-init status --wait
-
-# Run tests inside VM
-multipass exec test-vm -- bash -c 'cd ~/graphdone && ./start test'
-
-# Cleanup
-./start vm delete --name test-vm
-```
-
-## Full Automation Script
-
-Save this as `test-vm-full.sh` for completely automated testing:
-
-```bash
-#!/bin/bash
-set -e
-
-VM_NAME="test-$(date +%s)"
-BRANCH="${1:-main}"
-
-echo "🚀 Launching VM: $VM_NAME with branch: $BRANCH"
-./start vm launch --name "$VM_NAME" --branch "$BRANCH"
-
-echo "⏳ Waiting for provisioning..."
-multipass exec "$VM_NAME" -- cloud-init status --wait
-
-echo "🧪 Running tests..."
-multipass exec "$VM_NAME" -- bash -c 'cd ~/graphdone && ./start test'
-
-echo "🧹 Cleaning up..."
-./start vm delete --name "$VM_NAME"
-
-echo "✅ All done!"
-```
-
-Usage:
-```bash
-chmod +x test-vm-full.sh
-./test-vm-full.sh          # Test main branch
-./test-vm-full.sh develop  # Test develop branch
-```
-
-## Next Steps
-
-- Read [VM_QUICKSTART.md](VM_QUICKSTART.md) for quick reference
-- Read [docs/VM_SETUP.md](docs/VM_SETUP.md) for advanced configuration
-- Configure Tailscale for mesh networking
-- Set up multiple VMs for different branches
-
----
-
-**Need Help?**
-
-Run `./start vm --help` or check the documentation at `docs/VM_SETUP.md`.
+## Implementation Priority
+
+1. **Phase 1: Basic Caching** (implement first)
+   - Create base image script ✅
+   - Add `--use-cache` flag to test script
+   - Auto-rebuild base images nightly
+
+2. **Phase 2: Smart Invalidation**
+   - Hash package.json for cache keys
+   - Detect dependency changes
+   - Partial updates when possible
+
+3. **Phase 3: Parallel Testing**
+   - Clone VMs from base image
+   - Run multiple branches simultaneously
+   - Aggregate test results
+
+4. **Phase 4: Advanced Caching**
+   - Local npm registry (Verdaccio)
+   - Docker image pre-caching
+   - Build artifact caching
+
+## Expected Performance Gains
+
+| Strategy | Time Saved | Complexity | Priority |
+|----------|-----------|------------|----------|
+| VM Image Caching | 10-13min | Low | High |
+| npm Cache | 5-7min | Medium | High |
+| Docker Pre-pull | 1-2min | Low | Medium |
+| Parallel Tests | N/A (throughput) | High | Low |
+| Local npm Registry | 6-7min | High | Low |
+
+**Target:** Reduce E2E test time from ~15min to **2-3min** with basic caching.
+
+## Maintenance
+
+**Daily:**
+- Check base image health
+- Clean up old test VMs
+
+**Weekly:**
+- Rebuild base images for active branches
+- Update Playwright browsers
+- Clean npm/Docker caches
+
+**On package.json change:**
+- Trigger base image rebuild
+- Invalidate relevant caches
+
+## Monitoring
+
+Track metrics:
+- VM launch time
+- npm install duration
+- Total test time
+- Cache hit rate
+- Storage usage
+
+Store in test reports for trend analysis.
