@@ -219,7 +219,7 @@ export function UpdateGraphModal({ isOpen, onClose, graphToEdit }: UpdateGraphMo
             </div>
             <button
               onClick={onClose}
-              className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-xl transition-all duration-200 hover:scale-110 hover:rotate-90"
+              className="p-2 text-gray-400 hover:text-white hover:bg-red-600 rounded-lg transition-all duration-200 hover:scale-110"
             >
               <X className="h-5 w-5" />
             </button>
@@ -467,7 +467,7 @@ export function UpdateGraphModal({ isOpen, onClose, graphToEdit }: UpdateGraphMo
               <button
                 type="button"
                 onClick={onClose}
-                className="px-6 py-3 text-gray-300 bg-gradient-to-r from-gray-700/80 to-gray-600/80 rounded-xl hover:from-gray-600/80 hover:to-gray-500/80 transition-all duration-300 hover:scale-105 shadow-lg backdrop-blur-sm border border-gray-500/30 hover:border-gray-400/50 hover:text-white font-medium"
+                className="px-6 py-3 text-gray-300 bg-gradient-to-r from-gray-700/80 to-gray-600/80 rounded-xl hover:bg-red-600 hover:text-white transition-all duration-300 hover:scale-105 shadow-lg backdrop-blur-sm border border-gray-500/30 hover:border-red-600 font-medium"
               >
                 Cancel
               </button>

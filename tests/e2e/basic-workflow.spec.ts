@@ -119,7 +119,7 @@ test.describe('Basic User Workflow', () => {
     await svgCanvas.click({ button: 'right', position: { x: 400, y: 300 } });
     await page.waitForTimeout(1000);
     
-    let createNodeOption = page.locator('button:has-text("Create Node"), button:has-text("Add Node"), text="Create Node"').first();
+    let createNodeOption = page.locator('button:has-text("Create Work Item"), button:has-text("Add Work Item"), text="Create Work Item"').first();
     if (await createNodeOption.isVisible({ timeout: 3000 })) {
       await createNodeOption.click();
       nodeCreated = true;

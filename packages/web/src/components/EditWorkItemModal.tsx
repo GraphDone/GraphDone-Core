@@ -5,7 +5,7 @@ import { UPDATE_WORK_ITEM, GET_WORK_ITEMS } from '../lib/queries';
 import { useAuth } from '../contexts/AuthContext';
 import { useGraph } from '../contexts/GraphContext';
 import { useNotifications } from '../contexts/NotificationContext';
-import { NodeTypeSelector } from './NodeCategorySelector';
+import { WorkItemTypeSelector } from './WorkItemTypeSelector';
 import { TagInput } from './TagInput';
 import { WorkItem } from '../types/graph';
 import {
@@ -14,13 +14,13 @@ import {
   getPriorityIcon as getCentralizedPriorityIcon
 } from '../constants/workItemConstants';
 
-interface EditNodeModalProps {
+interface EditWorkItemModalProps {
   isOpen: boolean;
   onClose: () => void;
   node: WorkItem;
 }
 
-export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
+export function EditWorkItemModal({ isOpen, onClose, node }: EditWorkItemModalProps) {
   const { currentTeam } = useAuth();
   const { currentGraph } = useGraph();
   const { showSuccess, showError } = useNotifications();
@@ -223,7 +223,7 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
             </div>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 dark:text-gray-300 dark:hover:text-gray-100 transition-colors"
+              className="p-2 text-gray-400 hover:text-white hover:bg-red-600 rounded-lg transition-all duration-200 hover:scale-110"
             >
               <X className="h-5 w-5" />
             </button>
@@ -250,7 +250,7 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
                 Work Item Type *
               </label>
               
-              <NodeTypeSelector
+              <WorkItemTypeSelector
                 selectedType={formData.type}
                 onTypeChange={(type) => setFormData(prev => ({ ...prev, type }))}
                 placeholder="Select work item type..."
@@ -552,7 +552,7 @@ export function EditNodeModal({ isOpen, onClose, node }: EditNodeModalProps) {
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 text-base font-medium text-white bg-red-600 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 border border-red-600 dark:border-red-500 rounded-lg transition-colors"
+                className="px-4 py-2 text-base font-medium text-gray-300 bg-gray-700 hover:bg-red-600 hover:text-white border border-gray-600 hover:border-red-600 rounded-lg transition-all duration-200"
               >
                 Cancel
               </button>

@@ -3,8 +3,8 @@ import { useQuery } from '@apollo/client';
 import * as d3 from 'd3';
 import { Plus, Edit } from 'lucide-react';
 import { GET_WORK_ITEMS, GET_EDGES } from '../lib/queries';
-import { CreateNodeModal } from './CreateNodeModal';
-import { EditNodeModal } from './EditNodeModal';
+import { CreateWorkItemModal } from './CreateWorkItemModal';
+import { EditWorkItemModal } from './EditWorkItemModal';
 
 interface WorkItem {
   id: string;
@@ -469,23 +469,23 @@ export function GraphVisualization() {
         </div>
       )}
       
-      {/* Create Node Modal */}
+      {/* Create Work Item Modal */}
       {showCreateModal && (
-        <CreateNodeModal
+        <CreateWorkItemModal
           isOpen={showCreateModal}
           onClose={() => {
             setShowCreateModal(false);
             setSelectedNodeId(undefined);
             setClickPosition(undefined);
           }}
-          parentNodeId={selectedNodeId}
+          parentWorkItemId={selectedNodeId}
           position={clickPosition}
         />
       )}
       
       {/* Edit Work Item Modal */}
       {showEditModal && selectedNodeForEdit && (
-        <EditNodeModal
+        <EditWorkItemModal
           isOpen={showEditModal}
           onClose={() => {
             setShowEditModal(false);

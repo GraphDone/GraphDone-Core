@@ -46,7 +46,7 @@ export function GuestModeDialog({ isOpen, onClose, onConfirm }: GuestModeDialogP
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-gray-400 hover:text-gray-300 rounded-lg hover:bg-gray-700 transition-colors"
+            className="p-2 text-gray-400 hover:text-white hover:bg-red-600 rounded-lg transition-all duration-200 hover:scale-110"
           >
             <X className="h-5 w-5" />
           </button>
@@ -120,7 +120,7 @@ export function GuestModeDialog({ isOpen, onClose, onConfirm }: GuestModeDialogP
         <div className="border-t border-gray-700 p-6 bg-gray-750 flex items-center justify-between gap-3 rounded-b-2xl">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-3 bg-gray-700/50 hover:bg-gray-600/80 border border-gray-600/50 text-gray-300 font-medium rounded-xl transition-all"
+            className="flex-1 px-4 py-3 bg-gray-700/50 hover:bg-red-600 hover:text-white border border-gray-600/50 hover:border-red-600 text-gray-300 font-medium rounded-xl transition-all duration-200"
           >
             Cancel
           </button>

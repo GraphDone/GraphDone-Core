@@ -47,7 +47,7 @@ interface NodeDetailsModalProps {
   onDelete?: (node: WorkItem) => void;
 }
 
-export function NodeDetailsModal({
+export function WorkItemDetailsModal({
   isOpen,
   onClose,
   node,
@@ -176,11 +176,11 @@ export function NodeDetailsModal({
     const isPlural = count > 1;
     
     try {
-      const edgeInputs = selectedNodesForConnection.map(targetNodeId => ({
+      const edgeInputs = selectedNodesForConnection.map(targetWorkItemId => ({
         type: RELATIONSHIP_TYPES.DEFAULT_EDGE.type,
         weight: 1.0,
         source: { connect: { where: { node: { id: currentNode.id } } } },
-        target: { connect: { where: { node: { id: targetNodeId } } } }
+        target: { connect: { where: { node: { id: targetWorkItemId } } } }
       }));
 
       await createEdge({
@@ -1267,7 +1267,7 @@ export function NodeDetailsModal({
                         setShowDeleteConfirm(false);
                         setDeleteConfirmed(false);
                       }}
-                      className="px-2 py-1 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-500 hover:to-gray-600 text-white rounded-lg transition-all duration-200 text-xs font-semibold shadow-lg hover:scale-105 transform"
+                      className="px-2 py-1 bg-gradient-to-r from-gray-600 to-gray-700 hover:bg-red-600 hover:text-white text-white rounded-lg transition-all duration-200 text-xs font-semibold shadow-lg hover:scale-105 transform"
                     >
                       Cancel
                     </button>
