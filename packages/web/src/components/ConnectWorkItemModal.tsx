@@ -1156,68 +1156,75 @@ export function ConnectWorkItemModal({ isOpen, onClose, sourceNode, initialTab =
   const selectedRelation = getRelationshipConfig(selectedRelationType as RelationshipType);
 
   return (
-    <div className="fixed inset-0 z-[9999] overflow-y-auto backdrop-blur-sm">
+    <div className="fixed inset-0 z-[9999] overflow-y-auto backdrop-blur-sm" style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0}}>
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-        <div className="fixed inset-0 bg-gradient-to-br from-gray-900/80 via-slate-900/90 to-gray-900/80 transition-all duration-300" onClick={onClose} />
+        <div
+          className="fixed inset-0 transition-opacity bg-gradient-to-br from-gray-900/90 via-black/80 to-gray-800/90 animate-in fade-in duration-300"
+          onClick={onClose}
+        />
 
-        <div className="relative inline-block align-bottom bg-gradient-to-br from-gray-800 via-gray-800 to-gray-900 rounded-2xl text-left overflow-hidden shadow-2xl border border-gray-700/50 transform transition-all duration-300 hover:shadow-blue-500/10 sm:my-8 sm:align-middle sm:max-w-5xl sm:w-full z-[10000]" onClick={(e) => e.stopPropagation()}>
+        <div className="relative inline-block w-full max-w-5xl p-0 my-8 overflow-hidden text-left align-middle transition-all transform bg-gradient-to-br from-gray-800/98 via-gray-850/98 to-gray-900/98 backdrop-blur-2xl shadow-2xl rounded-2xl border border-gray-600/30 focus-within:ring-2 focus-within:ring-blue-500/50 animate-in slide-in-from-bottom-4 duration-300" onClick={(e) => e.stopPropagation()}>
+          <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-green-500/20 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-purple-500 via-pink-500 to-green-500"></div>
+
           {/* Header with gradient */}
-          <div className="bg-gradient-to-r from-emerald-900/30 via-green-800/25 to-teal-900/30 px-6 py-5 border-b border-emerald-600/20 backdrop-blur-sm">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <div className="p-2 rounded-xl bg-emerald-500/20 border border-emerald-400/30">
-                  {activeTab === 'connect' ? (
-                    <Link2 className="h-6 w-6 text-emerald-400" />
-                  ) : (
-                    <Unlink className="h-6 w-6 text-red-400" />
-                  )}
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold bg-gradient-to-r from-emerald-200 to-green-100 bg-clip-text text-transparent">
-                    {activeTab === 'connect' ? 'Connect Work Item' : 'Disconnect Work Item'}
-                  </h3>
-                  <p className="text-sm text-gray-300 mt-1">
-                    {activeTab === 'connect' 
-                      ? `Create connections from "${sourceNode.title}"` 
-                      : `Remove connections from "${sourceNode.title}"`
-                    }
-                  </p>
-                </div>
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700/30 bg-gradient-to-r from-gray-800/50 to-gray-900/50 backdrop-blur-sm relative">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 via-green-500 to-teal-500 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/30 relative">
+                <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 to-green-600 rounded-xl blur opacity-50 animate-pulse"></div>
+                {activeTab === 'connect' ? (
+                  <Link2 className="h-5 w-5 text-white relative z-10" />
+                ) : (
+                  <Unlink className="h-5 w-5 text-white relative z-10" />
+                )}
               </div>
-              <button
-                onClick={onClose}
-                className="p-2 rounded-xl text-gray-400 hover:text-gray-200 hover:bg-gray-700/50 transition-all duration-200"
-              >
-                <X className="h-5 w-5" />
-              </button>
+              <div>
+                <h3 className="text-lg font-bold bg-gradient-to-r from-white via-emerald-100 to-green-100 bg-clip-text text-transparent">
+                  {activeTab === 'connect' ? 'Connect Work Item' : 'Disconnect Work Item'}
+                </h3>
+                <p className="text-xs text-gray-400">
+                  {activeTab === 'connect'
+                    ? `Create connections from "${sourceNode.title}"`
+                    : `Remove connections from "${sourceNode.title}"`
+                  }
+                </p>
+              </div>
             </div>
-            
-            {/* Tab Navigation */}
-            <div className="mt-4 flex space-x-1 bg-gray-700/30 rounded-xl p-1">
-              <button
-                onClick={() => setActiveTab('connect')}
-                className={`flex-1 flex items-center justify-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                  activeTab === 'connect'
-                    ? 'bg-emerald-600/20 text-emerald-200 border border-emerald-400/30'
-                    : 'text-gray-400 hover:text-gray-300 hover:bg-gray-600/20'
-                }`}
-              >
-                <Link2 className="h-4 w-4" />
-                <span>Connect</span>
-              </button>
-              <button
-                onClick={() => setActiveTab('disconnect')}
-                className={`flex-1 flex items-center justify-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                  activeTab === 'disconnect'
-                    ? 'bg-red-600/20 text-red-200 border border-red-400/30'
-                    : 'text-gray-400 hover:text-gray-300 hover:bg-gray-600/20'
-                }`}
-              >
-                <Unlink className="h-4 w-4" />
-                <span>Disconnect</span>
-              </button>
-            </div>
+            <button
+              onClick={onClose}
+              className="p-2 text-gray-400 hover:text-white hover:bg-red-600 rounded-lg transition-all duration-200 hover:scale-110"
+            >
+              <X className="h-5 w-5" />
+            </button>
           </div>
+
+            {/* Tab Navigation */}
+            <div className="px-6 pt-4">
+              <div className="flex space-x-1 bg-gray-700/30 backdrop-blur-sm rounded-xl p-1">
+                <button
+                  onClick={() => setActiveTab('connect')}
+                  className={`flex-1 flex items-center justify-center space-x-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                    activeTab === 'connect'
+                      ? 'bg-gradient-to-r from-emerald-600/20 to-green-600/20 text-emerald-200 border border-emerald-400/30 shadow-lg shadow-emerald-500/10'
+                      : 'text-gray-400 hover:text-gray-200 hover:bg-gray-600/30'
+                  }`}
+                >
+                  <Link2 className="h-4 w-4" />
+                  <span>Connect</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab('disconnect')}
+                  className={`flex-1 flex items-center justify-center space-x-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                    activeTab === 'disconnect'
+                      ? 'bg-gradient-to-r from-red-600/20 to-orange-600/20 text-red-200 border border-red-400/30 shadow-lg shadow-red-500/10'
+                      : 'text-gray-400 hover:text-gray-200 hover:bg-gray-600/30'
+                  }`}
+                >
+                  <Unlink className="h-4 w-4" />
+                  <span>Disconnect</span>
+                </button>
+              </div>
+            </div>
 
           <div className="flex">
             {activeTab === 'connect' ? (
@@ -2111,41 +2118,49 @@ export function ConnectWorkItemModal({ isOpen, onClose, sourceNode, initialTab =
               </div>
 
               {/* Actions */}
-              <div className="flex justify-end space-x-4 pt-6 border-t border-gray-600/50 mt-6">
+              <div className="flex justify-end space-x-2 pt-6 border-t border-gray-700/30 mt-6">
                 <button
                   onClick={onClose}
-                  className="px-6 py-3 text-gray-300 bg-gray-700/50 border border-gray-600/50 rounded-xl hover:bg-red-600 hover:text-white hover:border-red-500/50 transition-all duration-200 font-medium hover:scale-105"
+                  className="px-4 py-2 text-xs text-gray-300 bg-gray-700/50 rounded-lg hover:bg-red-600 hover:text-white transition-all duration-200 font-medium hover:scale-105 border border-gray-600/30 hover:border-red-600"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleCreateConnections}
                   disabled={selectedNodes.size === 0 || creatingConnection || isRelationshipDisabled(selectedRelationType) || (duplicateWarning && !duplicateWarning.isValid) || false}
-                  className={`px-8 py-3 text-white rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-3 font-semibold shadow-lg disabled:shadow-none ${
-                    duplicateWarning && !duplicateWarning.isValid
-                      ? 'bg-gray-600 cursor-not-allowed'
+                  className={`px-4 py-2 text-xs rounded-lg transition-all duration-200 font-semibold flex items-center space-x-1.5 hover:scale-105 shadow-lg ${
+                    selectedNodes.size === 0 || creatingConnection || isRelationshipDisabled(selectedRelationType) || (duplicateWarning && !duplicateWarning.isValid)
+                      ? 'bg-gray-600/50 text-gray-400 cursor-not-allowed opacity-60'
                       : duplicateWarning && duplicateWarning.isValid
-                        ? 'bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500 shadow-yellow-500/20'
-                        : 'bg-gradient-to-r from-emerald-600 to-green-700 hover:from-emerald-500 hover:to-green-600 shadow-emerald-500/20'
+                        ? 'bg-gradient-to-r from-yellow-600 via-orange-600 to-amber-600 text-white hover:from-yellow-500 hover:via-orange-500 hover:to-amber-500 shadow-yellow-500/25 hover:shadow-xl hover:shadow-yellow-500/40'
+                        : 'bg-gradient-to-r from-emerald-600 via-green-600 to-teal-600 text-white hover:from-emerald-500 hover:via-green-500 hover:to-teal-500 shadow-emerald-500/25 hover:shadow-xl hover:shadow-emerald-500/40'
                   }`}
                   title={
                     duplicateWarning && !duplicateWarning.isValid
                       ? 'Cannot connect: Duplicate relationship detected'
-                      : isRelationshipDisabled(selectedRelationType) 
-                        ? 'This relationship already exists between the selected nodes' 
+                      : isRelationshipDisabled(selectedRelationType)
+                        ? 'This relationship already exists between the selected nodes'
                         : duplicateWarning && duplicateWarning.isValid
                           ? 'Warning: This may create a redundant relationship'
                           : ''
                   }
                 >
-                  <Link2 className="w-5 h-5" />
-                  <span>
-                    {creatingConnection ? 'Connecting...' : 
-                     duplicateWarning && !duplicateWarning.isValid ? 'Blocked - Duplicate' :
-                     isRelationshipDisabled(selectedRelationType) ? 'Already Connected' :
-                     duplicateWarning && duplicateWarning.isValid ? `Connect ${selectedNodes.size} (Warning)` :
-                     `Connect ${selectedNodes.size} Node${selectedNodes.size !== 1 ? 's' : ''}`}
-                  </span>
+                  {creatingConnection ? (
+                    <>
+                      <span>Connecting...</span>
+                      <div className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+                    </>
+                  ) : (
+                    <>
+                      <span>
+                        {duplicateWarning && !duplicateWarning.isValid ? 'Blocked - Duplicate' :
+                         isRelationshipDisabled(selectedRelationType) ? 'Already Connected' :
+                         duplicateWarning && duplicateWarning.isValid ? `Connect ${selectedNodes.size} (Warning)` :
+                         `Connect ${selectedNodes.size} Node${selectedNodes.size !== 1 ? 's' : ''}`}
+                      </span>
+                      <Link2 className="w-3 h-3" />
+                    </>
+                  )}
                 </button>
               </div>
             </div>
@@ -2296,24 +2311,35 @@ export function ConnectWorkItemModal({ isOpen, onClose, sourceNode, initialTab =
                       </div>
 
                       {/* Actions */}
-                      <div className="flex justify-end space-x-4 pt-6 border-t border-gray-600/50">
+                      <div className="flex justify-end space-x-2 pt-6 border-t border-gray-700/30">
                         <button
                           onClick={onClose}
-                          className="px-6 py-3 text-gray-300 bg-gradient-to-r from-gray-700/50 to-gray-800/50 border border-gray-600/50 rounded-xl hover:from-gray-600/60 hover:to-gray-700/60 hover:border-gray-500/60 transition-all duration-200 font-medium"
+                          className="px-4 py-2 text-xs text-gray-300 bg-gray-700/50 rounded-lg hover:bg-red-600 hover:text-white transition-all duration-200 font-medium hover:scale-105 border border-gray-600/30 hover:border-red-600"
                         >
                           Cancel
                         </button>
                         <button
                           onClick={handleDisconnectClick}
                           disabled={selectedConnections.size === 0 || deletingConnection}
-                          className="px-8 py-3 bg-gradient-to-r from-red-600 to-orange-700 hover:from-red-500 hover:to-orange-600 text-white rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-3 font-semibold shadow-lg shadow-red-500/20 disabled:shadow-none"
+                          className={`px-4 py-2 text-xs rounded-lg transition-all duration-200 font-semibold flex items-center space-x-1.5 hover:scale-105 shadow-lg ${
+                            selectedConnections.size === 0 || deletingConnection
+                              ? 'bg-gray-600/50 text-gray-400 cursor-not-allowed opacity-60'
+                              : 'bg-gradient-to-r from-red-600 via-orange-600 to-red-700 text-white hover:from-red-500 hover:via-orange-500 hover:to-red-600 shadow-red-500/25 hover:shadow-xl hover:shadow-red-500/40'
+                          }`}
                         >
-                          <Trash2 className="w-5 h-5" />
-                          <span>
-                            {deletingConnection ? 'Disconnecting...' : 
-                             selectedConnections.size === 0 ? 'Select connections to disconnect' :
-                             `Disconnect ${selectedConnections.size} Connection${selectedConnections.size !== 1 ? 's' : ''}`}
-                          </span>
+                          {deletingConnection ? (
+                            <>
+                              <span>Disconnecting...</span>
+                              <div className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+                            </>
+                          ) : (
+                            <>
+                              <span>
+                                {selectedConnections.size === 0 ? 'Select connections' : `Disconnect ${selectedConnections.size}`}
+                              </span>
+                              <Trash2 className="w-3 h-3" />
+                            </>
+                          )}
                         </button>
                       </div>
                     </>
