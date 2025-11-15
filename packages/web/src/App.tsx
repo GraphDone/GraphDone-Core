@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Layout } from './components/Layout';
+import { DemoBanner } from './components/DemoBanner';
 import { Workspace } from './pages/Workspace';
 import { Ontology } from './pages/Ontology';
 import { Agents } from './pages/Agents';
@@ -58,6 +59,7 @@ function AuthenticatedApp() {
   return (
     <NotificationProvider>
       <GraphProvider>
+        <DemoBanner />
         <Routes>
           <Route path="/graph" element={<div className="h-screen overflow-hidden"><InteractiveGraphVisualization /></div>} />
           <Route path="/*" element={
