@@ -375,7 +375,7 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
           </div>
 
           <div className="max-h-[70vh] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 hover:scrollbar-thumb-gray-500">
-          <form onSubmit={handleSubmit} className="px-3 py-2 space-y-2 relative">
+          <form onSubmit={handleSubmit} className="px-6 py-6 space-y-5 relative">
             {parentWorkItemId && (
               <div className="space-y-2 mb-2">
                 <div className="bg-gradient-to-br from-gray-800/30 to-gray-700/20 border border-gray-600/30 rounded-lg p-2 shadow-lg backdrop-blur-sm">
@@ -434,12 +434,12 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
                 required
                 value={formData.title}
                 onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                className={`w-full border-2 bg-gray-800 text-white rounded-lg px-4 py-3 focus:outline-none transition-all duration-200 placeholder-gray-400 text-sm ${
+                className={`w-full border-2 bg-gray-800/50 text-white rounded-xl px-4 py-3.5 focus:outline-none transition-all duration-300 placeholder-gray-500 text-sm backdrop-blur-sm ${
                   isDuplicateName
-                    ? 'border-red-500 focus:border-red-400'
-                    : 'border-gray-600 focus:!border-green-400'
+                    ? 'border-red-500/50 focus:border-red-400 focus:shadow-lg focus:shadow-red-500/20 focus:bg-gray-800'
+                    : 'border-gray-600/50 focus:!border-green-400 focus:shadow-lg focus:shadow-green-500/20 focus:bg-gray-800 hover:border-gray-500/70'
                 }`}
-                placeholder="Enter a descriptive title for your work item"
+                placeholder="Work item title"
               />
               {isDuplicateName && formData.title.trim() && (
                 <div className="mt-1 flex items-center space-x-2 text-red-400 text-xs">
@@ -458,11 +458,11 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
               </label>
               <textarea
                 id="description"
-                rows={2}
+                rows={3}
                 value={formData.description}
                 onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                className="w-full border-2 border-gray-600 bg-gray-800 text-white rounded-lg placeholder-gray-400 px-4 py-3 focus:outline-none focus:!border-green-400 transition-all duration-200 text-sm"
-                placeholder="Describe the work item"
+                className="w-full border-2 border-gray-600/50 bg-gray-800/50 text-white rounded-xl placeholder-gray-500 px-4 py-3.5 focus:outline-none focus:!border-green-400 focus:shadow-lg focus:shadow-green-500/20 focus:bg-gray-800 hover:border-gray-500/70 transition-all duration-300 text-sm resize-none backdrop-blur-sm"
+                placeholder="Add a description"
               />
             </div>
 
@@ -507,7 +507,7 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
                 <button
                   type="button"
                   onClick={() => setIsStatusOpen(!isStatusOpen)}
-                  className="w-full flex items-center justify-between px-4 py-3 bg-gray-800 border-2 border-gray-600 rounded-lg text-white transition-all duration-200 focus:!border-green-400 focus:outline-none text-sm"
+                  className="w-full flex items-center justify-between px-4 py-3.5 bg-gray-800/50 border-2 border-gray-600/50 rounded-xl text-white transition-all duration-300 focus:!border-green-400 focus:shadow-lg focus:shadow-green-500/20 focus:outline-none hover:border-gray-500/70 hover:bg-gray-800 text-sm backdrop-blur-sm"
                 >
                   <div className="flex items-center space-x-2">
                     {(() => {
@@ -584,7 +584,7 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
                   id="contributorId"
                   value={formData.assignedTo}
                   onChange={(e) => setFormData(prev => ({ ...prev, assignedTo: e.target.value }))}
-                  className="w-full bg-gray-800 border-2 border-gray-600 rounded-lg px-4 py-3 text-sm text-white focus:outline-none focus:!border-green-400 transition-all duration-200 placeholder-gray-400"
+                  className="w-full bg-gray-800/50 border-2 border-gray-600/50 rounded-xl px-4 py-3.5 text-sm text-white focus:outline-none focus:!border-green-400 focus:shadow-lg focus:shadow-green-500/20 hover:border-gray-500/70 hover:bg-gray-800 transition-all duration-300 backdrop-blur-sm cursor-pointer"
                 >
                   <option value="">No contributor</option>
                   <option value="user-1">John Doe</option>
@@ -607,7 +607,7 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
                   id="dueDate"
                   value={formData.dueDate}
                   onChange={(e) => setFormData(prev => ({ ...prev, dueDate: e.target.value }))}
-                  className="w-full bg-gray-800 border-2 border-gray-600 rounded-lg px-4 py-3 text-sm text-white focus:outline-none focus:!border-green-400 transition-all duration-200 placeholder-gray-400"
+                  className="w-full bg-gray-800/50 border-2 border-gray-600/50 rounded-xl px-4 py-3.5 text-sm text-white focus:outline-none focus:!border-green-400 focus:shadow-lg focus:shadow-green-500/20 hover:border-gray-500/70 hover:bg-gray-800 transition-all duration-300 backdrop-blur-sm cursor-pointer"
                 />
               </div>
             </div>
@@ -750,21 +750,21 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
               
             </div>
             
-            <div className="flex justify-end space-x-2 pt-2 border-t border-gray-700/30">
+            <div className="flex justify-end space-x-3 pt-4 border-t border-gray-700/30">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 text-xs text-gray-300 bg-gray-700/50 rounded-lg hover:bg-red-600 hover:text-white transition-all duration-200 font-medium hover:scale-105 border border-gray-600/30 hover:border-red-600"
+                className="px-6 py-3 text-sm text-gray-300 bg-gray-700/50 rounded-xl hover:bg-red-600 hover:text-white transition-all duration-300 font-semibold hover:scale-105 border-2 border-gray-600/30 hover:border-red-600 hover:shadow-lg hover:shadow-red-500/20 active:scale-95"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={creatingWorkItem || !isFormValid}
-                className={`px-4 py-2 text-xs rounded-lg transition-all duration-200 font-semibold flex items-center space-x-1.5 hover:scale-105 shadow-lg ${
+                className={`px-6 py-3 text-sm rounded-xl transition-all duration-300 font-semibold flex items-center space-x-2 shadow-lg ${
                   !isFormValid || creatingWorkItem
-                    ? 'bg-gray-600/50 text-gray-400 cursor-not-allowed opacity-60'
-                    : 'bg-gradient-to-r from-green-600 via-emerald-600 to-teal-600 text-white hover:from-green-500 hover:via-emerald-500 hover:to-teal-500 shadow-green-500/25 hover:shadow-xl hover:shadow-green-500/40'
+                    ? 'bg-gray-600/50 text-gray-400 cursor-not-allowed opacity-60 border-2 border-gray-600/30'
+                    : 'bg-gradient-to-r from-green-600 via-emerald-600 to-teal-600 text-white hover:from-green-500 hover:via-emerald-500 hover:to-teal-500 shadow-green-500/25 hover:shadow-xl hover:shadow-green-500/40 hover:scale-105 active:scale-95 border-2 border-green-500/30'
                 }`}
               >
                 {creatingWorkItem ? (
