@@ -1449,12 +1449,18 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
           .style('pointer-events', 'none');
       });
 
-      // Update node type badge text
+      // Update node type badge text and title bar colors
+      const typeConfig = getTypeConfig(updatedNode.type as WorkItemType);
+      const isNodeCompleted = updatedNode.status === 'COMPLETED' || updatedNode.status === 'Completed' || updatedNode.status === 'Done' || updatedNode.status === 'DONE';
+
       nodeGroup.select('.node-type-text')
-        .text(() => {
-          const config = getTypeConfig(updatedNode.type as WorkItemType);
-          return config.label.toUpperCase();
-        });
+        .text(typeConfig.label.toUpperCase())
+        .style('fill', typeConfig.hexColor);
+
+      // Update title bar colors based on type and status
+      nodeGroup.select('.node-title-bar')
+        .attr('fill', isNodeCompleted ? '#9ca3af' : typeConfig.hexColor)
+        .attr('stroke', isNodeCompleted ? '#6b7280' : typeConfig.hexColor);
 
       // Update description
       nodeGroup.select('.node-description-text')
@@ -1465,6 +1471,93 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
             ? updatedNode.description.substring(0, maxDescChars) + '...'
             : updatedNode.description;
         });
+
+      // Update priority indicators
+      const priority = updatedNode.priority || 0;
+      const priorityPercentage = Math.round(priority * 100);
+      const priorityColor = (() => {
+        if (priority >= 0.8) return '#dc2626';
+        if (priority >= 0.6) return '#f97316';
+        if (priority >= 0.4) return '#eab308';
+        if (priority >= 0.2) return '#3b82f6';
+        return '#6b7280';
+      })();
+
+      const barWidth = 40;
+
+      // Update priority progress bar fill
+      nodeGroup.select('.priority-progress-fill')
+        .attr('width', (barWidth * priorityPercentage) / 100)
+        .attr('fill', priorityColor);
+
+      // Update priority icon
+      const priorityIconPath = getPriorityIconSvgPath(priority);
+      const priorityIconSvg = nodeGroup.select('.priority-icon-svg');
+      priorityIconSvg.selectAll('path').remove();
+      if (priorityIconPath) {
+        priorityIconSvg.append('path')
+          .attr('d', priorityIconPath)
+          .attr('fill', 'none')
+          .attr('stroke', priorityColor)
+          .attr('stroke-width', '2')
+          .attr('stroke-linecap', 'round')
+          .attr('stroke-linejoin', 'round');
+      }
+
+      // Update priority percentage text
+      nodeGroup.select('.priority-percentage-text')
+        .text(`${priorityPercentage}%`)
+        .style('fill', priorityColor);
+
+      // Update status indicators
+      const statusPercentage = getStatusCompletionPercentage(updatedNode.status as WorkItemStatus);
+      const statusColor = getStatusConfig(updatedNode.status as WorkItemStatus).hexColor;
+
+      // Update status progress bar fill
+      nodeGroup.select('.status-progress-fill')
+        .attr('width', (barWidth * statusPercentage) / 100)
+        .attr('fill', statusColor);
+
+      // Update status icon
+      const statusIconPath = getStatusIconSvgPath(updatedNode.status as string);
+      const statusIconSvg = nodeGroup.select('.status-icon-svg');
+      statusIconSvg.selectAll('path').remove();
+      if (statusIconPath) {
+        statusIconSvg.append('path')
+          .attr('d', statusIconPath)
+          .attr('fill', 'none')
+          .attr('stroke', statusColor)
+          .attr('stroke-width', '2')
+          .attr('stroke-linecap', 'round')
+          .attr('stroke-linejoin', 'round');
+      }
+
+      // Update status percentage text
+      nodeGroup.select('.status-percentage-text')
+        .text(`${statusPercentage}%`)
+        .style('fill', statusColor);
+
+      // Update completion checkmark based on status
+      const isCompleted = updatedNode.status === 'COMPLETED' || updatedNode.status === 'Completed' || updatedNode.status === 'Done' || updatedNode.status === 'DONE';
+      const existingCheckmark = nodeGroup.select('.completion-indicator');
+
+      if (isCompleted && existingCheckmark.empty()) {
+        // Add checkmark if status is completed and it doesn't exist
+        nodeGroup.append('text')
+          .attr('class', 'completion-indicator')
+          .attr('text-anchor', 'middle')
+          .attr('dominant-baseline', 'central')
+          .attr('font-size', '96')
+          .attr('font-weight', '900')
+          .attr('fill', '#10b981')
+          .attr('stroke', '#10b981')
+          .attr('stroke-width', '1')
+          .attr('pointer-events', 'none')
+          .text('✓');
+      } else if (!isCompleted && !existingCheckmark.empty()) {
+        // Remove checkmark if status is not completed
+        existingCheckmark.remove();
+      }
     });
 
     // Gentle restart to settle any property changes
