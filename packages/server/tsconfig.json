@@ -4,11 +4,17 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "composite": true,
-    "module": "ESNext",
-    "target": "ES2022"
+    "noEmit": false
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "tests"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "../web",
+    "../mcp-server",
+    "**/*.test.ts",
+    "**/*.spec.ts"
+  ],
   "references": [
     { "path": "../core" }
   ]

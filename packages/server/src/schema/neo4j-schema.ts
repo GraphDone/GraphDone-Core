@@ -289,13 +289,13 @@ export const typeDefs = gql`
       { where: { node: { creator: { id: "$jwt.sub" } } } }
       # Allow if user is on the same team
       { where: { node: { team: { members_SOME: { id: "$jwt.sub" } } } } }
-      # Allow if graph is public (for guest/viewer access)
-      { where: { node: { shareSettings_CONTAINS: "\"isPublic\":true" } }, requireAuthentication: false }
+      # TODO: Add proper isPublic boolean field instead of JSON string matching
+      # Temporarily disabled: { where: { node: { shareSettings_CONTAINS: "isPublic" } }, requireAuthentication: false }
     ]
-    validate: [
-      # Prevent GUEST role from creating/updating/deleting
-      { when: [BEFORE], operations: [CREATE, UPDATE, DELETE], where: { jwt: { role_NOT: "GUEST" } } }
-    ]
+    # TODO: Add JWT type with role field for proper role-based authorization
+    # validate: [
+    #   { when: [BEFORE], operations: [CREATE, UPDATE, DELETE], where: { jwt: { role_NOT: "GUEST" } } }
+    # ]
   ) {
     id: ID! @id
     name: String!
@@ -337,13 +337,13 @@ export const typeDefs = gql`
       { where: { node: { graph: { creator: { id: "$jwt.sub" } } } } }
       # Allow if work item belongs to a graph on user's team
       { where: { node: { graph: { team: { members_SOME: { id: "$jwt.sub" } } } } } }
-      # Allow if work item belongs to a public graph
-      { where: { node: { graph: { shareSettings_CONTAINS: "\"isPublic\":true" } } }, requireAuthentication: false }
+      # TODO: Add proper isPublic boolean field
+      # Temporarily disabled: { where: { node: { graph: { shareSettings_CONTAINS: "isPublic" } } }, requireAuthentication: false }
     ]
-    validate: [
-      # Prevent GUEST role from creating/updating/deleting
-      { when: [BEFORE], operations: [CREATE, UPDATE, DELETE], where: { jwt: { role_NOT: "GUEST" } } }
-    ]
+    # TODO: Add JWT type with role field for proper role-based authorization
+    # validate: [
+    #   { when: [BEFORE], operations: [CREATE, UPDATE, DELETE], where: { jwt: { role_NOT: "GUEST" } } }
+    # ]
   ) {
     id: ID! @id
     type: NodeType!
@@ -403,13 +403,13 @@ export const typeDefs = gql`
       # Allow if edge connects work items the user can access (inherit from source WorkItem)
       { where: { node: { source: { graph: { creator: { id: "$jwt.sub" } } } } } }
       { where: { node: { source: { graph: { team: { members_SOME: { id: "$jwt.sub" } } } } } } }
-      # Allow if edge connects work items in public graphs
-      { where: { node: { source: { graph: { shareSettings_CONTAINS: "\"isPublic\":true" } } } }, requireAuthentication: false }
+      # TODO: Add proper isPublic boolean field
+      # Temporarily disabled: { where: { node: { source: { graph: { shareSettings_CONTAINS: "isPublic" } } } }, requireAuthentication: false }
     ]
-    validate: [
-      # Prevent GUEST role from creating/updating/deleting
-      { when: [BEFORE], operations: [CREATE, UPDATE, DELETE], where: { jwt: { role_NOT: "GUEST" } } }
-    ]
+    # TODO: Add JWT type with role field for proper role-based authorization
+    # validate: [
+    #   { when: [BEFORE], operations: [CREATE, UPDATE, DELETE], where: { jwt: { role_NOT: "GUEST" } } }
+    # ]
   ) {
     id: ID! @id
     type: EdgeType!

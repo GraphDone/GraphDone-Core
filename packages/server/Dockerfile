@@ -3,7 +3,7 @@ FROM node:18-alpine
 WORKDIR /app
 
 # Copy package files
-COPY package.json turbo.json ./
+COPY package.json package-lock.json turbo.json ./
 COPY packages/core/package.json ./packages/core/
 COPY packages/server/package.json ./packages/server/
 
@@ -20,4 +20,6 @@ RUN npm run build
 
 EXPOSE 4000
 
-CMD ["npm", "run", "start"]
+WORKDIR /app/packages/server
+
+CMD ["node", "dist/index.js"]

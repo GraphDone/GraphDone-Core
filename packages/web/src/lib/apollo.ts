@@ -10,18 +10,18 @@ const getGraphQLUrl = () => {
   if (import.meta.env.VITE_GRAPHQL_URL) {
     return import.meta.env.VITE_GRAPHQL_URL;
   }
-  // Use same hostname but port 4127 for GraphQL
+  // Use /graphql path on same host (routed via Traefik)
   const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
-  return `${protocol}//${window.location.hostname}:4127/graphql`;
+  return `${protocol}//${window.location.host}/graphql`;
 };
 
 const getWebSocketUrl = () => {
   if (import.meta.env.VITE_GRAPHQL_WS_URL) {
     return import.meta.env.VITE_GRAPHQL_WS_URL;
   }
-  // Use same hostname but port 4127 for WebSocket
+  // Use /graphql path on same host for WebSocket (routed via Traefik)
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  return `${protocol}//${window.location.hostname}:4127/graphql`;
+  return `${protocol}//${window.location.host}/graphql`;
 };
 
 const httpLink = createHttpLink({
