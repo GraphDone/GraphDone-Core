@@ -88,7 +88,7 @@ export function EditWorkItemModal({ isOpen, onClose, node }: EditWorkItemModalPr
   const [updateWorkItem, { loading: updatingNode }] = useMutation(UPDATE_WORK_ITEM, {
     // Smart cache updates instead of aggressive network fetching
     refetchQueries: [
-      { 
+      {
         query: GET_WORK_ITEMS,
         variables: currentGraph ? {
           where: {
@@ -101,15 +101,48 @@ export function EditWorkItemModal({ isOpen, onClose, node }: EditWorkItemModalPr
     ],
     awaitRefetchQueries: true,
     notifyOnNetworkStatusChange: true,
+    optimisticResponse: (vars) => ({
+      __typename: 'Mutation',
+      updateWorkItems: {
+        __typename: 'UpdateWorkItemsMutationResponse',
+        workItems: [{
+          __typename: 'WorkItem',
+          id: node.id,
+          ...vars.update,
+          title: vars.update.title || node.title,
+          description: vars.update.description || node.description,
+          type: vars.update.type || node.type,
+          status: vars.update.status || node.status,
+          priority: vars.update.priority !== undefined ? vars.update.priority : node.priority,
+          tags: vars.update.tags || node.tags,
+          dueDate: vars.update.dueDate || node.dueDate,
+          assignedTo: node.assignedTo,
+          owner: node.owner,
+          graph: node.graph,
+          contributors: node.contributors,
+          dependencies: node.dependencies,
+          dependents: node.dependents,
+          positionX: node.positionX,
+          positionY: node.positionY,
+          positionZ: node.positionZ,
+          radius: node.radius,
+          theta: node.theta,
+          phi: node.phi,
+          metadata: node.metadata,
+          createdAt: node.createdAt,
+          updatedAt: new Date().toISOString()
+        }]
+      }
+    }),
     update: (cache, { data }) => {
       // Force cache invalidation for immediate UI updates across all views
       if (data?.updateWorkItems?.workItems) {
         // Invalidate all workItems cache to force UI refresh
         cache.evict({ fieldName: 'workItems' });
         cache.gc();
-        
+
         // Also evict root query to ensure complete refresh
-        cache.evict({ 
+        cache.evict({
           id: 'ROOT_QUERY',
           fieldName: 'workItems'
         });
