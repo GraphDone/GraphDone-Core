@@ -1802,70 +1802,61 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       simulation.alpha(0).stop();
     }
     
+    const getNodeLayer = (node: any) => {
+      const typeHierarchy: Record<string, number> = {
+        'OUTCOME': 0,
+        'EPIC': 1,
+        'MILESTONE': 2,
+        'FEATURE': 3,
+        'TASK': 4,
+        'BUG': 5,
+        'IDEA': 6
+      };
+      return typeHierarchy[node.type] || 4;
+    };
+
     simulation
       .force('link', d3.forceLink(validatedEdges)
         .id((d: any) => d.id)
         .distance((d: any) => {
-          const minDistance = Math.min(width, height) * 0.4; // 40% of screen size for minimum
-          const maxDistance = Math.min(width, height) * 0.6; // 60% of screen size for maximum
-          
-          // Calculate current distance between nodes
-          const sourceNode = d.source;
-          const targetNode = d.target;
-          const currentDistance = Math.sqrt(
-            Math.pow(targetNode.x - sourceNode.x, 2) + 
-            Math.pow(targetNode.y - sourceNode.y, 2)
-          );
-          
-          // If current distance exceeds maximum, return maximum to create pulling force
-          if (currentDistance > maxDistance) {
-            return maxDistance;
-          }
-          
-          // Otherwise use minimum as preferred distance
-          return minDistance;
+          const sourceLayer = getNodeLayer(d.source);
+          const targetLayer = getNodeLayer(d.target);
+          const layerDiff = Math.abs(sourceLayer - targetLayer);
+          return layerDiff > 0 ? 250 : 350;
         })
-        .strength((d: any) => {
-          // Calculate current distance between nodes
-          const sourceNode = d.source;
-          const targetNode = d.target;
-          const currentDistance = Math.sqrt(
-            Math.pow(targetNode.x - sourceNode.x, 2) + 
-            Math.pow(targetNode.y - sourceNode.y, 2)
-          );
-          
-          const maxDistance = Math.min(width, height) * 0.6;
-          
-          // Stronger force when edge is too long to create pulling effect
-          if (currentDistance > maxDistance) {
-            return 0.8; // Strong pulling force
-          }
-          
-          // Normal strength otherwise
-          return 0.3;
-        })
+        .strength(0.3)
       )
       .force('charge', d3.forceManyBody()
-        .strength(-100) // Simple, consistent repulsion for all nodes
-        .distanceMax(200) // Reasonable influence range
+        .strength((d: any) => {
+          const layer = getNodeLayer(d);
+          return layer === 1 ? -1200 : -900;
+        })
+        .distanceMax(700)
       )
-      .force('center', d3.forceCenter(centerX, centerY).strength(0.01)) // Minimal centering
-      .force('x', d3.forceX(centerX).strength(0.002)) // Extremely weak horizontal centering for maximum width
-      .force('y', d3.forceY(centerY).strength(0.002)) // Extremely weak vertical centering for maximum height
-      .force('collision', d3.forceCollide(90) // Sufficient collision radius to prevent overlap
-        .strength(0.7) // Moderate collision prevention
-        .iterations(2) // Fewer iterations for stability
+      .force('center', d3.forceCenter(centerX, centerY).strength(0.02))
+      .force('radial', d3.forceRadial((d: any) => {
+        const layer = getNodeLayer(d);
+        return layer * 180 + 100;
+      }, centerX, centerY).strength(0.15))
+      .force('x', d3.forceX(centerX).strength(0.005))
+      .force('y', d3.forceY(centerY).strength(0.005))
+      .force('collision', d3.forceCollide()
+        .radius((d: any) => {
+          const dims = getNodeDimensions(d);
+          return Math.max(dims.width, dims.height) / 2 + 40;
+        })
+        .strength(1)
+        .iterations(4)
       )
-      // Add hierarchical attraction forces (Epic->Milestone, Feature->Task, etc.)
       .force('hierarchy', d3.forceLink()
         .id((d: any) => d.id)
         .links(createHierarchicalLinks(nodes))
-        .distance((d: any) => d.distance || 250) // Much larger hierarchical distance
-        .strength((d: any) => d.strength || 0.05) // Very weak hierarchical strength
+        .distance((d: any) => d.distance || 400)
+        .strength((d: any) => d.strength || 0.02)
       )
-      .alphaTarget(0.05) // Lower alpha target for calmer simulation
-      .alphaDecay(0.015) // Slightly slower decay for better collision resolution
-      .velocityDecay(0.4); // Add velocity decay for smoother movement
+      .alphaTarget(0.02)
+      .alphaDecay(0.025)
+      .velocityDecay(0.6)
 
     // Filter edges based on visible nodes for performance
     // Temporarily show ALL edges for debugging
@@ -1888,7 +1879,22 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       }
     };
 
-    // Helper: Calculate smooth curved path directly between node edges
+    // Helper: Count edges between same nodes for bundle routing
+    const edgeBundleMap = new Map<string, number>();
+    const edgeIndexMap = new Map<string, number>();
+    visibleEdges.forEach((edge: WorkItemEdge) => {
+      const sourceId = typeof edge.source === 'string' ? edge.source : (edge.source as any).id;
+      const targetId = typeof edge.target === 'string' ? edge.target : (edge.target as any).id;
+      const key1 = `${sourceId}-${targetId}`;
+      const key2 = `${targetId}-${sourceId}`;
+      const key = key1 < key2 ? key1 : key2;
+
+      const currentCount = edgeBundleMap.get(key) || 0;
+      edgeIndexMap.set(edge.id, currentCount);
+      edgeBundleMap.set(key, currentCount + 1);
+    });
+
+    // Helper: Calculate smooth curved path with anti-crossing routing
     const linkArc = (d: any) => {
       const dx = d.target.x - d.source.x;
       const dy = d.target.y - d.source.y;
@@ -1916,49 +1922,39 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       const tx = targetHandle.x;
       const ty = targetHandle.y;
 
+      const bundleKey1 = `${d.source.id}-${d.target.id}`;
+      const bundleKey2 = `${d.target.id}-${d.source.id}`;
+      const bundleKey = bundleKey1 < bundleKey2 ? bundleKey1 : bundleKey2;
+      const bundleCount = edgeBundleMap.get(bundleKey) || 1;
+      const edgeIndex = edgeIndexMap.get(d.id) || 0;
+
       const edgeHash = (d.source.id + d.target.id + (d.type || '')).split('').reduce((a: number, b: string) => {
         a = ((a << 5) - a) + b.charCodeAt(0);
         return a & a;
       }, 0);
-      const curveOffset = ((Math.abs(edgeHash) % 60) - 30) * 3.5;
+
+      let curveOffset = 0;
+      if (bundleCount > 1) {
+        const spreadRange = bundleCount * 50;
+        const step = spreadRange / (bundleCount - 1);
+        curveOffset = (edgeIndex * step) - (spreadRange / 2);
+      } else {
+        curveOffset = ((Math.abs(edgeHash) % 80) - 40) * 2.5;
+      }
 
       const distance = Math.sqrt(dx * dx + dy * dy);
-      const controlPointDistance = Math.min(distance * 0.6, 150);
+      const controlPointDistance = Math.min(distance * 0.7, 200);
 
-      let controlX1 = sx;
-      let controlY1 = sy;
-      let controlX2 = tx;
-      let controlY2 = ty;
+      const angle = Math.atan2(dy, dx);
+      const perpAngle = angle + Math.PI / 2;
 
-      if (sourceHandleSide === 'right') {
-        controlX1 = sx + controlPointDistance;
-        controlY1 = sy + curveOffset;
-      } else if (sourceHandleSide === 'left') {
-        controlX1 = sx - controlPointDistance;
-        controlY1 = sy + curveOffset;
-      } else if (sourceHandleSide === 'bottom') {
-        controlX1 = sx + curveOffset;
-        controlY1 = sy + controlPointDistance;
-      } else if (sourceHandleSide === 'top') {
-        controlX1 = sx + curveOffset;
-        controlY1 = sy - controlPointDistance;
-      }
+      const midX = (sx + tx) / 2;
+      const midY = (sy + ty) / 2;
 
-      if (targetHandleSide === 'right') {
-        controlX2 = tx + controlPointDistance;
-        controlY2 = ty - curveOffset;
-      } else if (targetHandleSide === 'left') {
-        controlX2 = tx - controlPointDistance;
-        controlY2 = ty - curveOffset;
-      } else if (targetHandleSide === 'bottom') {
-        controlX2 = tx - curveOffset;
-        controlY2 = ty + controlPointDistance;
-      } else if (targetHandleSide === 'top') {
-        controlX2 = tx - curveOffset;
-        controlY2 = ty - controlPointDistance;
-      }
+      const controlX1 = midX + Math.cos(perpAngle) * curveOffset;
+      const controlY1 = midY + Math.sin(perpAngle) * curveOffset;
 
-      return `M${sx},${sy} C${controlX1},${controlY1} ${controlX2},${controlY2} ${tx},${ty}`;
+      return `M${sx},${sy} Q${controlX1},${controlY1} ${tx},${ty}`;
     };
 
     // Create edges FIRST (so they render under nodes)
@@ -1990,19 +1986,19 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         return config.hexColor;
       })
       .attr('stroke-width', (d: WorkItemEdge) => {
-        // Much thicker for active dialog
         if (editingEdge && editingEdge.edge && editingEdge.edge.id === d.id) {
           return 12;
         }
-        return 3;
+        return 2.5;
       })
       .attr('stroke-opacity', (d: WorkItemEdge) => {
-        // Full opacity for active dialog
         if (editingEdge && editingEdge.edge && editingEdge.edge.id === d.id) {
           return 1;
         }
-        return 0.9;
+        return 0.75;
       })
+      .attr('stroke-linecap', 'round')
+      .attr('stroke-linejoin', 'round')
       .style('filter', (d: WorkItemEdge) => {
         // Apply pulsing glow to edges with active dialogs
         if (editingEdge && editingEdge.edge && editingEdge.edge.id === d.id) {
@@ -3550,64 +3546,42 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
           const tx = targetHandle.x;
           const ty = targetHandle.y;
 
+          const bundleKey1 = `${d.source.id}-${d.target.id}`;
+          const bundleKey2 = `${d.target.id}-${d.source.id}`;
+          const bundleKey = bundleKey1 < bundleKey2 ? bundleKey1 : bundleKey2;
+          const bundleCount = edgeBundleMap.get(bundleKey) || 1;
+          const edgeIndex = edgeIndexMap.get(d.id) || 0;
+
           const edgeHash = (d.source.id + d.target.id + (d.type || '')).split('').reduce((a: number, b: string) => {
             a = ((a << 5) - a) + b.charCodeAt(0);
             return a & a;
           }, 0);
-          const curveOffset = ((Math.abs(edgeHash) % 60) - 30) * 3.5;
+
+          let curveOffset = 0;
+          if (bundleCount > 1) {
+            const spreadRange = bundleCount * 50;
+            const step = spreadRange / (bundleCount - 1);
+            curveOffset = (edgeIndex * step) - (spreadRange / 2);
+          } else {
+            curveOffset = ((Math.abs(edgeHash) % 80) - 40) * 2.5;
+          }
 
           const distance = Math.sqrt(dx * dx + dy * dy);
-          const controlPointDistance = Math.min(distance * 0.6, 150);
+          const angle = Math.atan2(dy, dx);
+          const perpAngle = angle + Math.PI / 2;
 
-          let controlX1 = sx;
-          let controlY1 = sy;
-          let controlX2 = tx;
-          let controlY2 = ty;
+          const midX = (sx + tx) / 2;
+          const midY = (sy + ty) / 2;
 
-          if (sourceHandleSide === 'right') {
-            controlX1 = sx + controlPointDistance;
-            controlY1 = sy + curveOffset;
-          } else if (sourceHandleSide === 'left') {
-            controlX1 = sx - controlPointDistance;
-            controlY1 = sy + curveOffset;
-          } else if (sourceHandleSide === 'bottom') {
-            controlX1 = sx + curveOffset;
-            controlY1 = sy + controlPointDistance;
-          } else if (sourceHandleSide === 'top') {
-            controlX1 = sx + curveOffset;
-            controlY1 = sy - controlPointDistance;
-          }
-
-          if (targetHandleSide === 'right') {
-            controlX2 = tx + controlPointDistance;
-            controlY2 = ty - curveOffset;
-          } else if (targetHandleSide === 'left') {
-            controlX2 = tx - controlPointDistance;
-            controlY2 = ty - curveOffset;
-          } else if (targetHandleSide === 'bottom') {
-            controlX2 = tx - curveOffset;
-            controlY2 = ty + controlPointDistance;
-          } else if (targetHandleSide === 'top') {
-            controlX2 = tx - curveOffset;
-            controlY2 = ty - controlPointDistance;
-          }
+          const controlX = midX + Math.cos(perpAngle) * curveOffset;
+          const controlY = midY + Math.sin(perpAngle) * curveOffset;
 
           const t = 0.5;
-          const curveX = Math.pow(1 - t, 3) * sx +
-                         3 * Math.pow(1 - t, 2) * t * controlX1 +
-                         3 * (1 - t) * Math.pow(t, 2) * controlX2 +
-                         Math.pow(t, 3) * tx;
-          const curveY = Math.pow(1 - t, 3) * sy +
-                         3 * Math.pow(1 - t, 2) * t * controlY1 +
-                         3 * (1 - t) * Math.pow(t, 2) * controlY2 +
-                         Math.pow(t, 3) * ty;
+          const curveX = Math.pow(1 - t, 2) * sx + 2 * (1 - t) * t * controlX + Math.pow(t, 2) * tx;
+          const curveY = Math.pow(1 - t, 2) * sy + 2 * (1 - t) * t * controlY + Math.pow(t, 2) * ty;
 
-          const tangentX = 3 * Math.pow(1 - t, 2) * (controlX1 - sx) +
-                           6 * (1 - t) * t * (controlX2 - controlX1) +
-                           3 * Math.pow(t, 2) * (tx - controlX2);
-          const tangentY = 3 * Math.pow(1 - t, 2) * (controlY1 - sy) +
-                           6 * (1 - t) * t * (controlY2 - controlY1) +
-                           3 * Math.pow(t, 2) * (ty - controlY2);
+          const tangentX = 2 * (1 - t) * (controlX - sx) + 2 * t * (tx - controlX);
+          const tangentY = 2 * (1 - t) * (controlY - sy) + 2 * t * (ty - controlY);
 
           const tangentLength = Math.sqrt(tangentX * tangentX + tangentY * tangentY);
           const normalX = -tangentY / tangentLength;
