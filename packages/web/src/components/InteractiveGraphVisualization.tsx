@@ -73,6 +73,17 @@ interface DragState {
   offset: { x: number; y: number };
 }
 
+// D3 simulation adds these properties to nodes
+interface D3SimulationNode extends WorkItem {
+  x?: number;
+  y?: number;
+  vx?: number;
+  vy?: number;
+  fx?: number | null;
+  fy?: number | null;
+  index?: number;
+}
+
 interface InteractiveGraphVisualizationProps {
   onResetLayout?: () => void;
 }
@@ -1859,18 +1870,106 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     // Filter edges based on visible nodes for performance
     // Temporarily show ALL edges for debugging
     const visibleEdges = validatedEdges;
-    
+
     // Debug: Log edge visibility
-    
+
+    // Helper: Get handle position on node edge (middle of each edge)
+    const getHandlePosition = (node: any, side: string = 'right') => {
+      const dims = getNodeDimensions(node);
+      const halfWidth = dims.width / 2;
+      const halfHeight = dims.height / 2;
+
+      switch(side) {
+        case 'top':    return { x: node.x, y: node.y - halfHeight };
+        case 'right':  return { x: node.x + halfWidth, y: node.y };
+        case 'bottom': return { x: node.x, y: node.y + halfHeight };
+        case 'left':   return { x: node.x - halfWidth, y: node.y };
+        default:       return { x: node.x, y: node.y };
+      }
+    };
+
+    // Helper: Calculate smooth curved path directly between node edges
+    const linkArc = (d: any) => {
+      const dx = d.target.x - d.source.x;
+      const dy = d.target.y - d.source.y;
+      const absDx = Math.abs(dx);
+      const absDy = Math.abs(dy);
+
+      let sourceHandleSide = d.sourceHandle;
+      let targetHandleSide = d.targetHandle;
+
+      if (!sourceHandleSide || !targetHandleSide) {
+        if (absDx > absDy) {
+          sourceHandleSide = dx > 0 ? 'right' : 'left';
+          targetHandleSide = dx > 0 ? 'left' : 'right';
+        } else {
+          sourceHandleSide = dy > 0 ? 'bottom' : 'top';
+          targetHandleSide = dy > 0 ? 'top' : 'bottom';
+        }
+      }
+
+      const sourceHandle = getHandlePosition(d.source, sourceHandleSide);
+      const targetHandle = getHandlePosition(d.target, targetHandleSide);
+
+      const sx = sourceHandle.x;
+      const sy = sourceHandle.y;
+      const tx = targetHandle.x;
+      const ty = targetHandle.y;
+
+      const edgeHash = (d.source.id + d.target.id + (d.type || '')).split('').reduce((a: number, b: string) => {
+        a = ((a << 5) - a) + b.charCodeAt(0);
+        return a & a;
+      }, 0);
+      const curveOffset = ((Math.abs(edgeHash) % 60) - 30) * 3.5;
+
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      const controlPointDistance = Math.min(distance * 0.6, 150);
+
+      let controlX1 = sx;
+      let controlY1 = sy;
+      let controlX2 = tx;
+      let controlY2 = ty;
+
+      if (sourceHandleSide === 'right') {
+        controlX1 = sx + controlPointDistance;
+        controlY1 = sy + curveOffset;
+      } else if (sourceHandleSide === 'left') {
+        controlX1 = sx - controlPointDistance;
+        controlY1 = sy + curveOffset;
+      } else if (sourceHandleSide === 'bottom') {
+        controlX1 = sx + curveOffset;
+        controlY1 = sy + controlPointDistance;
+      } else if (sourceHandleSide === 'top') {
+        controlX1 = sx + curveOffset;
+        controlY1 = sy - controlPointDistance;
+      }
+
+      if (targetHandleSide === 'right') {
+        controlX2 = tx + controlPointDistance;
+        controlY2 = ty - curveOffset;
+      } else if (targetHandleSide === 'left') {
+        controlX2 = tx - controlPointDistance;
+        controlY2 = ty - curveOffset;
+      } else if (targetHandleSide === 'bottom') {
+        controlX2 = tx - curveOffset;
+        controlY2 = ty + controlPointDistance;
+      } else if (targetHandleSide === 'top') {
+        controlX2 = tx - curveOffset;
+        controlY2 = ty - controlPointDistance;
+      }
+
+      return `M${sx},${sy} C${controlX1},${controlY1} ${controlX2},${controlY2} ${tx},${ty}`;
+    };
+
     // Create edges FIRST (so they render under nodes)
     const edgesGroup = g.append('g').attr('class', 'edges-group');
     
-    // Create visible edge lines
+    // Create visible edge lines (curved paths)
     const linkElements = edgesGroup
       .selectAll('.edge')
       .data(visibleEdges)
       .enter()
-      .append('line')
+      .append('path')
       .attr('class', (d: WorkItemEdge) => {
         let classes = 'edge';
         // Add pulsing class if edge dialog is active
@@ -1878,6 +1977,12 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
           classes += ' dialog-active-pulse';
         }
         return classes;
+      })
+      .attr('fill', 'none')
+      .attr('d', linkArc)
+      .attr('marker-end', (d: WorkItemEdge) => {
+        const edgeType = (d.type as string).toLowerCase();
+        return `url(#edge-arrow-${edgeType})`;
       })
       .attr('stroke', (d: WorkItemEdge) => {
         // Use relationship color for active dialog (same as normal)
@@ -1887,23 +1992,23 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       .attr('stroke-width', (d: WorkItemEdge) => {
         // Much thicker for active dialog
         if (editingEdge && editingEdge.edge && editingEdge.edge.id === d.id) {
-          return 10; // Very thick to make it obvious
+          return 12;
         }
-        return (d.strength || 0.8) * 3;
+        return 3;
       })
       .attr('stroke-opacity', (d: WorkItemEdge) => {
         // Full opacity for active dialog
         if (editingEdge && editingEdge.edge && editingEdge.edge.id === d.id) {
           return 1;
         }
-        return 0.7;
+        return 0.9;
       })
       .style('filter', (d: WorkItemEdge) => {
         // Apply pulsing glow to edges with active dialogs
         if (editingEdge && editingEdge.edge && editingEdge.edge.id === d.id) {
           return 'url(#dialog-glow)';
         }
-        return null;
+        return 'url(#edge-glow)';
       })
       .on('mouseenter', function(event: MouseEvent, d: WorkItemEdge) {
         // Skip hover effect if edge has active dialog (glow is already applied)
@@ -1930,20 +2035,22 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         const config = getRelationshipConfig(d.type as RelationshipType);
         d3.select(this)
           .style('stroke', config.hexColor)
-          .style('stroke-width', (d.strength || 0.8) * 3)
-          .style('stroke-opacity', '0.7')
+          .style('stroke-width', '2.5px')
+          .style('stroke-opacity', '0.9')
           .style('filter', null);
       });
     
-    // Create invisible thicker clickable areas for easier interaction
+    // Create invisible thicker clickable areas for easier interaction (curved paths)
     const clickableEdges = edgesGroup
       .selectAll('.edge-clickable')
       .data(visibleEdges)
       .enter()
-      .append('line')
+      .append('path')
       .attr('class', 'edge-clickable')
+      .attr('fill', 'none')
+      .attr('d', linkArc)
       .attr('stroke', 'transparent')
-      .attr('stroke-width', 12)
+      .attr('stroke-width', 15)
       .style('cursor', 'pointer')
       .on('click', (event: MouseEvent, d: WorkItemEdge) => {
         event.stopPropagation();
@@ -1974,15 +2081,15 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         // Highlight the corresponding visible edge
         linkElements
           .filter((edge: WorkItemEdge) => edge.id === d.id)
-          .attr('stroke-width', (d: WorkItemEdge) => ((d.strength || 0.8) * 3) + 2)
+          .attr('stroke-width', 4)
           .attr('stroke-opacity', 1);
       })
       .on('mouseout', function(event: MouseEvent, d: WorkItemEdge) {
         // Reset the corresponding visible edge
         linkElements
           .filter((edge: WorkItemEdge) => edge.id === d.id)
-          .attr('stroke-width', (d: WorkItemEdge) => (d.strength || 0.8) * 3)
-          .attr('stroke-opacity', 0.7);
+          .attr('stroke-width', 2.5)
+          .attr('stroke-opacity', 0.9);
       });
 
     // Create or get defs element for filters
@@ -2005,6 +2112,75 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       .attr('stdDeviation', 3)
       .attr('flood-color', 'rgba(0, 0, 0, 0.4)')
       .attr('flood-opacity', 1);
+
+    // Add glow filter for selected/active handles
+    const handleGlowFilter = filterDefs.append('filter')
+      .attr('id', 'handle-glow')
+      .attr('x', '-100%')
+      .attr('y', '-100%')
+      .attr('width', '300%')
+      .attr('height', '300%');
+
+    handleGlowFilter.append('feGaussianBlur')
+      .attr('in', 'SourceAlpha')
+      .attr('stdDeviation', 3)
+      .attr('result', 'blur');
+
+    handleGlowFilter.append('feFlood')
+      .attr('flood-color', '#10b981')
+      .attr('flood-opacity', 0.7)
+      .attr('result', 'glowColor');
+
+    handleGlowFilter.append('feComposite')
+      .attr('in', 'glowColor')
+      .attr('in2', 'blur')
+      .attr('operator', 'in')
+      .attr('result', 'coloredBlur');
+
+    const feMerge = handleGlowFilter.append('feMerge');
+    feMerge.append('feMergeNode').attr('in', 'coloredBlur');
+    feMerge.append('feMergeNode').attr('in', 'coloredBlur');
+    feMerge.append('feMergeNode').attr('in', 'SourceGraphic');
+
+    // Add subtle glow filter for edges
+    const edgeGlowFilter = filterDefs.append('filter')
+      .attr('id', 'edge-glow')
+      .attr('x', '-50%')
+      .attr('y', '-50%')
+      .attr('width', '200%')
+      .attr('height', '200%');
+
+    edgeGlowFilter.append('feGaussianBlur')
+      .attr('in', 'SourceGraphic')
+      .attr('stdDeviation', 2)
+      .attr('result', 'blur');
+
+    edgeGlowFilter.append('feComposite')
+      .attr('in', 'SourceGraphic')
+      .attr('in2', 'blur')
+      .attr('operator', 'over')
+      .attr('result', 'composite');
+
+    // Create arrow markers for each relationship type with their specific colors
+    RELATIONSHIP_OPTIONS.forEach(option => {
+      const marker = filterDefs.append('marker')
+        .attr('id', `edge-arrow-${option.type.toLowerCase()}`)
+        .attr('viewBox', '0 -5 10 10')
+        .attr('refX', 9)
+        .attr('refY', 0)
+        .attr('markerWidth', 9)
+        .attr('markerHeight', 9)
+        .attr('orient', 'auto');
+
+      marker.append('path')
+        .attr('d', 'M0,-4L8,0L0,4L2,0Z')
+        .attr('fill', option.hexColor)
+        .attr('stroke', option.hexColor)
+        .attr('stroke-width', 0.8)
+        .attr('stroke-linejoin', 'round')
+        .attr('opacity', 1)
+        .style('filter', 'drop-shadow(0px 1px 1px rgba(0,0,0,0.25))');
+    });
 
     // Create nodes AFTER edges (so they render on top)
     const nodeElements = g.append('g')
@@ -2716,27 +2892,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       
     });
 
-    // Create arrow symbols for middle of edges
-    const arrowElements = g.append('g')
-      .attr('class', 'arrows-group')
-      .selectAll('.arrow')
-      .data(validatedEdges)
-      .enter()
-      .append('path')
-      .attr('class', 'arrow')
-      .attr('d', 'M-16,-8 L0,0 L-16,8 L-8,0 Z')
-      .attr('fill', (d: WorkItemEdge) => {
-        // Use the relationship color for consistency with edge stroke
-        const config = getRelationshipConfig(d.type as RelationshipType);
-        return config.hexColor;
-      })
-      .attr('stroke', (d: WorkItemEdge) => {
-        // Always use relationship color for consistency
-        const config = getRelationshipConfig(d.type as RelationshipType);
-        return config.hexColor;
-      })
-      .attr('stroke-width', 1)
-      .attr('opacity', 1);
+    // Arrows are now rendered using SVG markers on the edge paths
 
     // Create edge label groups with rounded rectangles and text (only for visible edges)
     const edgeLabelGroups = g.append('g')
@@ -2892,6 +3048,210 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         }
       });
     }, 150);
+
+    // Add 4 connection handles to each node (middle of each edge)
+    const handleGroups = nodeElements
+      .append('g')
+      .attr('class', 'connection-handles')
+      .style('opacity', 0)
+      .style('pointer-events', 'none');
+
+    // Create 4 handles: top, right, bottom, left
+    const handleSides = ['top', 'right', 'bottom', 'left'];
+
+    handleSides.forEach(side => {
+      handleGroups
+        .append('circle')
+        .attr('class', `handle handle-${side}`)
+        .attr('r', 6)
+        .attr('fill', '#14b8a6')
+        .attr('stroke', '#0d9488')
+        .attr('stroke-width', 2)
+        .attr('cx', (d: WorkItem) => {
+          const dims = getNodeDimensions(d);
+          if (side === 'right') return dims.width / 2;
+          if (side === 'left') return -dims.width / 2;
+          return 0;
+        })
+        .attr('cy', (d: WorkItem) => {
+          const dims = getNodeDimensions(d);
+          if (side === 'top') return -dims.height / 2;
+          if (side === 'bottom') return dims.height / 2;
+          return 0;
+        })
+        .style('cursor', 'crosshair')
+        .on('mouseenter', function() {
+          d3.select(this)
+            .transition()
+            .duration(100)
+            .attr('r', 7)
+            .attr('fill', '#2dd4bf')
+            .attr('stroke', '#14b8a6')
+            .attr('stroke-width', 3);
+        })
+        .on('mouseleave', function() {
+          const isDragging = d3.select(this).classed('dragging');
+          if (!isDragging) {
+            d3.select(this)
+              .transition()
+              .duration(100)
+              .attr('r', 6)
+              .attr('fill', '#14b8a6')
+              .attr('stroke', '#0d9488')
+              .attr('stroke-width', 2);
+          }
+        })
+        .call(d3.drag<SVGCircleElement, D3SimulationNode>()
+          .on('start', function(event, nodeData) {
+            event.sourceEvent.stopPropagation();
+
+            // Store source node and handle
+            const handleClass = d3.select(this).attr('class');
+            const sourceHandle = handleClass.split('handle-')[1];
+            const handlePos = getHandlePosition(nodeData, sourceHandle);
+
+            // Create temporary connection line
+            const tempLine = svg.select('.edges-group')
+              .append('path')
+              .attr('class', 'temp-connection')
+              .attr('fill', 'none')
+              .attr('stroke', '#10b981')
+              .attr('stroke-width', 3)
+              .attr('stroke-dasharray', '8,4')
+              .attr('d', `M${handlePos.x},${handlePos.y}L${handlePos.x},${handlePos.y}`);
+
+            // Store in element data
+            d3.select(this).datum({ ...nodeData, tempLine, sourceHandle } as any);
+
+            // Highlight source handle with pulsing effect and glow
+            d3.select(this)
+              .classed('dragging', true)
+              .style('filter', 'url(#handle-glow)')
+              .transition()
+              .duration(150)
+              .attr('r', 9)
+              .attr('fill', '#10b981')
+              .attr('stroke', '#059669')
+              .attr('stroke-width', 3);
+          })
+          .on('drag', function(event, nodeData) {
+            const datum: any = d3.select(this).datum();
+            const sourceHandle = datum.sourceHandle;
+            const handlePos = getHandlePosition(nodeData, sourceHandle);
+            const [cursorX, cursorY] = d3.pointer(event, g.node());
+
+            // Calculate independent path to cursor based on source handle direction
+            let pathData = '';
+            const gap = 40;
+
+            if (sourceHandle === 'right') {
+              // Exit right from node
+              const controlX = handlePos.x + gap;
+              pathData = `M${handlePos.x},${handlePos.y}L${controlX},${handlePos.y}L${controlX},${cursorY}L${cursorX},${cursorY}`;
+            } else if (sourceHandle === 'left') {
+              // Exit left from node
+              const controlX = handlePos.x - gap;
+              pathData = `M${handlePos.x},${handlePos.y}L${controlX},${handlePos.y}L${controlX},${cursorY}L${cursorX},${cursorY}`;
+            } else if (sourceHandle === 'bottom') {
+              // Exit down from node
+              const controlY = handlePos.y + gap;
+              pathData = `M${handlePos.x},${handlePos.y}L${handlePos.x},${controlY}L${cursorX},${controlY}L${cursorX},${cursorY}`;
+            } else {
+              // Exit up from node (top handle)
+              const controlY = handlePos.y - gap;
+              pathData = `M${handlePos.x},${handlePos.y}L${handlePos.x},${controlY}L${cursorX},${controlY}L${cursorX},${cursorY}`;
+            }
+
+            datum.tempLine.attr('d', pathData);
+          })
+          .on('end', function(event, nodeData) {
+            const datum: any = d3.select(this).datum();
+            const sourceHandle = datum.sourceHandle;
+
+            // Reset handle appearance
+            d3.select(this)
+              .classed('dragging', false)
+              .style('filter', null)
+              .transition()
+              .duration(150)
+              .attr('r', 6)
+              .attr('fill', '#14b8a6')
+              .attr('stroke', '#0d9488')
+              .attr('stroke-width', 2);
+
+            // Find target node and handle under cursor
+            const [cursorX, cursorY] = d3.pointer(event, g.node());
+            let targetNode: D3SimulationNode | null = null;
+            let targetHandle = '';
+
+            nodeElements.each(function(node: D3SimulationNode) {
+              if (node.id !== nodeData.id) {
+                const dims = getNodeDimensions(node);
+                const handles = {
+                  top: { x: node.x || 0, y: (node.y || 0) - dims.height / 2, side: 'top' },
+                  right: { x: (node.x || 0) + dims.width / 2, y: node.y || 0, side: 'right' },
+                  bottom: { x: node.x || 0, y: (node.y || 0) + dims.height / 2, side: 'bottom' },
+                  left: { x: (node.x || 0) - dims.width / 2, y: node.y || 0, side: 'left' }
+                };
+
+                // Check if cursor is near any handle (within 20px)
+                Object.values(handles).forEach(handle => {
+                  const dist = Math.sqrt(
+                    Math.pow(cursorX - handle.x, 2) +
+                    Math.pow(cursorY - handle.y, 2)
+                  );
+                  if (dist < 20) {
+                    targetNode = node;
+                    targetHandle = handle.side;
+                  }
+                });
+              }
+            });
+
+            // Remove temporary line
+            datum.tempLine.remove();
+
+            // Create connection if valid drop
+            if (targetNode && targetHandle) {
+              const target = targetNode as D3SimulationNode;
+              // Check if edge already exists
+              if (!edgeExists(nodeData.id, target.id)) {
+                createEdgeMutation({
+                  variables: {
+                    input: [{
+                      type: 'DEFAULT_EDGE',
+                      weight: 0.8,
+                      source: { connect: { where: { node: { id: nodeData.id } } } },
+                      target: { connect: { where: { node: { id: target.id } } } }
+                    }]
+                  }
+                });
+              }
+            }
+          })
+        );
+    });
+
+    // Show handles on node hover
+    nodeElements
+      .on('mouseenter', function() {
+        d3.select(this)
+          .select('.connection-handles')
+          .style('pointer-events', 'all')
+          .transition()
+          .duration(200)
+          .style('opacity', 1);
+      })
+      .on('mouseleave', function() {
+        d3.select(this)
+          .select('.connection-handles')
+          .transition()
+          .duration(200)
+          .style('opacity', 0)
+          .on('end', function() {
+            d3.select(this).style('pointer-events', 'none');
+          });
+      });
 
     // Node click handling with edge creation
     nodeElements
@@ -3155,49 +3515,109 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     });
 
     const updateEdgePositions = () => {
-      // Update visible edge positions
-      linkElements
-        .attr('x1', (d: any) => d.source.x)
-        .attr('y1', (d: any) => d.source.y)
-        .attr('x2', (d: any) => d.target.x)
-        .attr('y2', (d: any) => d.target.y);
-      
-      // Update clickable edge positions  
-      clickableEdges
-        .attr('x1', (d: any) => d.source.x)
-        .attr('y1', (d: any) => d.source.y)
-        .attr('x2', (d: any) => d.target.x)
-        .attr('y2', (d: any) => d.target.y);
-        
-      // Update arrow positions
-      arrowElements
-        .attr('transform', (d: any) => {
-          const midX = (d.source.x + d.target.x) / 2;
-          const midY = (d.source.y + d.target.y) / 2;
-          const angle = Math.atan2(d.target.y - d.source.y, d.target.x - d.source.x) * 180 / Math.PI;
-          return `translate(${midX},${midY}) rotate(${angle})`;
-        });
+      // Update curved edge paths
+      linkElements.attr('d', linkArc);
+      clickableEdges.attr('d', linkArc);
 
-      // Update edge label group positions to follow edge angles
+      // Arrows are now rendered using SVG markers on the paths
+
+      // Update edge label group positions - positioned off the curved path
       edgeLabelGroups
         .attr('transform', (d: any) => {
-          const midX = (d.source.x + d.target.x) / 2;
-          const midY = (d.source.y + d.target.y) / 2;
-          const angle = Math.atan2(d.target.y - d.source.y, d.target.x - d.source.x) * 180 / Math.PI;
-          
-          // Offset perpendicular to the edge
-          const offsetDistance = 25;
-          const perpAngle = (angle + 90) * Math.PI / 180;
-          const offsetX = Math.cos(perpAngle) * offsetDistance;
-          const offsetY = Math.sin(perpAngle) * offsetDistance;
-          
-          // Keep text readable by limiting rotation
-          let textRotation = angle;
-          if (angle > 90 || angle < -90) {
-            textRotation = angle + 180; // Flip text to keep it readable
+          const dx = d.target.x - d.source.x;
+          const dy = d.target.y - d.source.y;
+          const absDx = Math.abs(dx);
+          const absDy = Math.abs(dy);
+
+          let sourceHandleSide = d.sourceHandle;
+          let targetHandleSide = d.targetHandle;
+
+          if (!sourceHandleSide || !targetHandleSide) {
+            if (absDx > absDy) {
+              sourceHandleSide = dx > 0 ? 'right' : 'left';
+              targetHandleSide = dx > 0 ? 'left' : 'right';
+            } else {
+              sourceHandleSide = dy > 0 ? 'bottom' : 'top';
+              targetHandleSide = dy > 0 ? 'top' : 'bottom';
+            }
           }
-          
-          return `translate(${midX + offsetX},${midY + offsetY}) rotate(${textRotation})`;
+
+          const sourceHandle = getHandlePosition(d.source, sourceHandleSide);
+          const targetHandle = getHandlePosition(d.target, targetHandleSide);
+
+          const sx = sourceHandle.x;
+          const sy = sourceHandle.y;
+          const tx = targetHandle.x;
+          const ty = targetHandle.y;
+
+          const edgeHash = (d.source.id + d.target.id + (d.type || '')).split('').reduce((a: number, b: string) => {
+            a = ((a << 5) - a) + b.charCodeAt(0);
+            return a & a;
+          }, 0);
+          const curveOffset = ((Math.abs(edgeHash) % 60) - 30) * 3.5;
+
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          const controlPointDistance = Math.min(distance * 0.6, 150);
+
+          let controlX1 = sx;
+          let controlY1 = sy;
+          let controlX2 = tx;
+          let controlY2 = ty;
+
+          if (sourceHandleSide === 'right') {
+            controlX1 = sx + controlPointDistance;
+            controlY1 = sy + curveOffset;
+          } else if (sourceHandleSide === 'left') {
+            controlX1 = sx - controlPointDistance;
+            controlY1 = sy + curveOffset;
+          } else if (sourceHandleSide === 'bottom') {
+            controlX1 = sx + curveOffset;
+            controlY1 = sy + controlPointDistance;
+          } else if (sourceHandleSide === 'top') {
+            controlX1 = sx + curveOffset;
+            controlY1 = sy - controlPointDistance;
+          }
+
+          if (targetHandleSide === 'right') {
+            controlX2 = tx + controlPointDistance;
+            controlY2 = ty - curveOffset;
+          } else if (targetHandleSide === 'left') {
+            controlX2 = tx - controlPointDistance;
+            controlY2 = ty - curveOffset;
+          } else if (targetHandleSide === 'bottom') {
+            controlX2 = tx - curveOffset;
+            controlY2 = ty + controlPointDistance;
+          } else if (targetHandleSide === 'top') {
+            controlX2 = tx - curveOffset;
+            controlY2 = ty - controlPointDistance;
+          }
+
+          const t = 0.5;
+          const curveX = Math.pow(1 - t, 3) * sx +
+                         3 * Math.pow(1 - t, 2) * t * controlX1 +
+                         3 * (1 - t) * Math.pow(t, 2) * controlX2 +
+                         Math.pow(t, 3) * tx;
+          const curveY = Math.pow(1 - t, 3) * sy +
+                         3 * Math.pow(1 - t, 2) * t * controlY1 +
+                         3 * (1 - t) * Math.pow(t, 2) * controlY2 +
+                         Math.pow(t, 3) * ty;
+
+          const tangentX = 3 * Math.pow(1 - t, 2) * (controlX1 - sx) +
+                           6 * (1 - t) * t * (controlX2 - controlX1) +
+                           3 * Math.pow(t, 2) * (tx - controlX2);
+          const tangentY = 3 * Math.pow(1 - t, 2) * (controlY1 - sy) +
+                           6 * (1 - t) * t * (controlY2 - controlY1) +
+                           3 * Math.pow(t, 2) * (ty - controlY2);
+
+          const tangentLength = Math.sqrt(tangentX * tangentX + tangentY * tangentY);
+          const normalX = -tangentY / tangentLength;
+          const normalY = tangentX / tangentLength;
+
+          const labelDistance = 25;
+          const offsetX = normalX * labelDistance;
+          const offsetY = normalY * labelDistance;
+
+          return `translate(${curveX + offsetX},${curveY + offsetY})`;
         });
     };
 
