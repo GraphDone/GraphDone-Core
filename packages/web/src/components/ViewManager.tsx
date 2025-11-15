@@ -742,9 +742,9 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
         <DeleteWorkItemModal
           isOpen={showDeleteModal}
           onClose={handleCloseModals}
-          nodeId={selectedNode.id}
-          nodeTitle={selectedNode.title}
-          nodeType={selectedNode.type}
+          workItemId={selectedNode.id}
+          workItemTitle={selectedNode.title}
+          workItemType={selectedNode.type}
         />
       )}
 
