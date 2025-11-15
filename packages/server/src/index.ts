@@ -27,6 +27,7 @@ import { v4 as uuidv4 } from 'uuid';
 dotenv.config();
 
 const PORT = Number(process.env.PORT) || 4127;
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
 async function cleanupDuplicateUsers() {
   const session = driver.session();
@@ -209,11 +210,16 @@ async function startServer() {
   // Merge type definitions
   const mergedTypeDefs = mergeTypeDefs([typeDefs, authTypeDefs]);
 
-  // Create Neo4jGraphQL instance
+  // Create Neo4jGraphQL instance with JWT authorization
   const neoSchema = new Neo4jGraphQL({
     typeDefs: mergedTypeDefs,
     driver,
     resolvers: authResolvers,
+    features: {
+      authorization: {
+        key: JWT_SECRET,
+      },
+    },
   });
 
   const schema = await neoSchema.getSchema();
@@ -258,7 +264,14 @@ async function startServer() {
         const user = extractUserFromToken(req.headers.authorization);
         return {
           driver,
-          user,
+          user, // Keep for custom resolvers
+          jwt: user
+            ? {
+                sub: user.userId, // Map userId to JWT standard 'sub' claim
+                email: user.email,
+                role: user.role,
+              }
+            : null,
         };
       },
     })
