@@ -75,7 +75,7 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
     tags: [] as string[]
   });
 
-  const [selectedRelationType, setSelectedRelationType] = React.useState('DEFAULT_EDGE');
+  const [selectedRelationType, setSelectedRelationType] = React.useState('DEPENDS_ON');
 
   const [isStatusOpen, setIsStatusOpen] = React.useState(false);
   const statusDropdownRef = React.useRef<HTMLDivElement>(null);
@@ -313,7 +313,7 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
           dueDate: '',
           tags: []
         });
-        setSelectedRelationType('DEFAULT_EDGE');
+        setSelectedRelationType('DEPENDS_ON');
       }
     } catch (error) {
       
