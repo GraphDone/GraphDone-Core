@@ -282,7 +282,21 @@ export const typeDefs = gql`
   }
 
   # Graph entity - represents a graph/workspace/project
-  type Graph {
+  type Graph
+  @authorization(
+    filter: [
+      # Allow if user created the graph
+      { where: { node: { creator: { id: "$jwt.sub" } } } }
+      # Allow if user is on the same team
+      { where: { node: { team: { members_SOME: { id: "$jwt.sub" } } } } }
+      # Allow if graph is public (for guest/viewer access)
+      { where: { node: { shareSettings_CONTAINS: "\"isPublic\":true" } }, requireAuthentication: false }
+    ]
+    validate: [
+      # Prevent GUEST role from creating/updating/deleting
+      { when: [BEFORE], operations: [CREATE, UPDATE, DELETE], where: { jwt: { role_NOT: "GUEST" } } }
+    ]
+  ) {
     id: ID! @id
     name: String!
     description: String
@@ -290,7 +304,7 @@ export const typeDefs = gql`
     status: GraphStatus! @default(value: DRAFT)
     parentGraphId: String
     teamId: String # Team ID for backwards compatibility
-    createdBy: String # Creator ID for backwards compatibility  
+    createdBy: String # Creator ID for backwards compatibility
     tags: [String!] # Tags for organization
     defaultRole: String # Default role for team members
     depth: Int! @default(value: 0)
@@ -303,10 +317,10 @@ export const typeDefs = gql`
     settings: String # JSON as string for graph settings
     permissions: String # JSON as string for permissions
     shareSettings: String # JSON as string for share settings
-    
+
     createdAt: DateTime! @timestamp(operations: [CREATE])
     updatedAt: DateTime! @timestamp
-    
+
     # Relationships (optional for backwards compatibility)
     creator: User @relationship(type: "CREATED", direction: IN)
     team: Team @relationship(type: "OWNS_GRAPH", direction: IN)
@@ -316,7 +330,21 @@ export const typeDefs = gql`
   }
 
   # WorkItem entity - represents work items in the graph
-  type WorkItem {
+  type WorkItem
+  @authorization(
+    filter: [
+      # Allow if work item belongs to a graph the user created
+      { where: { node: { graph: { creator: { id: "$jwt.sub" } } } } }
+      # Allow if work item belongs to a graph on user's team
+      { where: { node: { graph: { team: { members_SOME: { id: "$jwt.sub" } } } } } }
+      # Allow if work item belongs to a public graph
+      { where: { node: { graph: { shareSettings_CONTAINS: "\"isPublic\":true" } } }, requireAuthentication: false }
+    ]
+    validate: [
+      # Prevent GUEST role from creating/updating/deleting
+      { when: [BEFORE], operations: [CREATE, UPDATE, DELETE], where: { jwt: { role_NOT: "GUEST" } } }
+    ]
+  ) {
     id: ID! @id
     type: NodeType!
     title: String!
@@ -335,7 +363,7 @@ export const typeDefs = gql`
     dueDate: DateTime
     tags: [String!]
     metadata: String # JSON as string
-    
+
     createdAt: DateTime! @timestamp(operations: [CREATE])
     updatedAt: DateTime! @timestamp
 
@@ -369,12 +397,25 @@ export const typeDefs = gql`
   }
 
   # Edge entity - relationships between nodes
-  type Edge {
+  type Edge
+  @authorization(
+    filter: [
+      # Allow if edge connects work items the user can access (inherit from source WorkItem)
+      { where: { node: { source: { graph: { creator: { id: "$jwt.sub" } } } } } }
+      { where: { node: { source: { graph: { team: { members_SOME: { id: "$jwt.sub" } } } } } } }
+      # Allow if edge connects work items in public graphs
+      { where: { node: { source: { graph: { shareSettings_CONTAINS: "\"isPublic\":true" } } } }, requireAuthentication: false }
+    ]
+    validate: [
+      # Prevent GUEST role from creating/updating/deleting
+      { when: [BEFORE], operations: [CREATE, UPDATE, DELETE], where: { jwt: { role_NOT: "GUEST" } } }
+    ]
+  ) {
     id: ID! @id
     type: EdgeType!
     weight: Float! @default(value: 1.0)
     metadata: String # JSON as string
-    
+
     createdAt: DateTime! @timestamp(operations: [CREATE])
     createdBy: User @relationship(type: "CREATED_EDGE", direction: IN)
 

@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
 import { GraphQLError } from 'graphql';
 import { Driver } from 'neo4j-driver';
+import { canSignup, captureSignupLead, isDemoMode } from '../config/demo.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
@@ -166,6 +167,16 @@ export const authResolvers = {
           });
         }
 
+        // Check if signup is allowed in demo mode
+        if (isDemoMode()) {
+          const signupAllowed = await canSignup(context.driver);
+          if (!signupAllowed) {
+            throw new GraphQLError('Demo instance is at capacity. Please try again later.', {
+              extensions: { code: 'FORBIDDEN' }
+            });
+          }
+        }
+
         // Check if email or username already exists
         const existingUser = await session.run(
           `MATCH (u:User) 
@@ -221,8 +232,17 @@ export const authResolvers = {
         const user = result.records[0].get('u').properties;
         const token = generateToken(user.id, user.email, user.role);
 
+        // Capture lead in demo mode
+        if (isDemoMode()) {
+          await captureSignupLead(user.email, user.name, {
+            username: user.username,
+            role: user.role,
+            teamId: input.teamId,
+          });
+        }
+
         // TODO: Send verification email
-        
+
         return {
           token,
           user: {
