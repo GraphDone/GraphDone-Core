@@ -136,18 +136,61 @@ export function WorkItemDetailsModal({
 
   const [createEdge] = useMutation(CREATE_EDGE, {
     refetchQueries: [{ query: GET_EDGES }],
-    // Remove individual success messages - we'll show a batch message instead
+    awaitRefetchQueries: true,
     onError: (error) => {
       showError(`Failed to create connection: ${error.message}`);
+    },
+    optimisticResponse: (vars) => {
+      const edges = vars.input.map((input: any) => ({
+        __typename: 'Edge',
+        id: `temp-${Date.now()}-${Math.random()}`,
+        type: input.type,
+        weight: input.weight || 1.0,
+        source: {
+          __typename: 'WorkItem',
+          id: input.source.connect.where.node.id,
+          title: node?.title || '',
+          type: node?.type || 'TASK'
+        },
+        target: {
+          __typename: 'WorkItem',
+          id: input.target.connect.where.node.id,
+          title: nodes.find(n => n.id === input.target.connect.where.node.id)?.title || '',
+          type: nodes.find(n => n.id === input.target.connect.where.node.id)?.type || 'TASK'
+        },
+        createdBy: input.createdBy ? {
+          __typename: 'User',
+          id: input.createdBy.connect.where.node.id,
+          name: '',
+          username: ''
+        } : null,
+        createdAt: new Date().toISOString()
+      }));
+
+      return {
+        __typename: 'Mutation',
+        createEdges: {
+          __typename: 'CreateEdgesMutationResponse',
+          edges
+        }
+      };
     }
   });
 
   const [deleteEdge] = useMutation(DELETE_EDGE, {
     refetchQueries: [{ query: GET_EDGES }],
-    // Remove individual success messages - we'll show a batch message instead
+    awaitRefetchQueries: true,
     onError: (error) => {
       showError(`Failed to remove connection: ${error.message}`);
-    }
+    },
+    optimisticResponse: () => ({
+      __typename: 'Mutation',
+      deleteEdges: {
+        __typename: 'DeleteInfo',
+        nodesDeleted: 0,
+        relationshipsDeleted: 1
+      }
+    })
   });
 
   // Toggle node selection for batch connection
@@ -259,14 +302,35 @@ export function WorkItemDetailsModal({
       }
     },
     optimisticResponse: (vars) => {
-      if (!editedNode) return;
+      if (!editedNode || !node) return;
       return {
         __typename: 'Mutation',
         updateWorkItems: {
           __typename: 'UpdateWorkItemsMutationResponse',
           workItems: [{
-            ...editedNode,
             __typename: 'WorkItem',
+            id: node.id,
+            title: vars.update.title !== undefined ? vars.update.title : editedNode.title,
+            description: vars.update.description !== undefined ? vars.update.description : editedNode.description,
+            type: vars.update.type || editedNode.type,
+            status: vars.update.status || editedNode.status,
+            priority: vars.update.priority !== undefined ? vars.update.priority : editedNode.priority,
+            tags: vars.update.tags || editedNode.tags,
+            dueDate: vars.update.dueDate !== undefined ? vars.update.dueDate : editedNode.dueDate,
+            assignedTo: editedNode.assignedTo,
+            owner: editedNode.owner,
+            graph: editedNode.graph,
+            contributors: editedNode.contributors,
+            dependencies: editedNode.dependencies,
+            dependents: editedNode.dependents,
+            positionX: editedNode.positionX,
+            positionY: editedNode.positionY,
+            positionZ: editedNode.positionZ,
+            radius: editedNode.radius,
+            theta: editedNode.theta,
+            phi: editedNode.phi,
+            metadata: editedNode.metadata,
+            createdAt: editedNode.createdAt,
             updatedAt: new Date().toISOString()
           }]
         }
@@ -276,7 +340,7 @@ export function WorkItemDetailsModal({
 
   const [deleteWorkItem, { loading: deleting }] = useMutation(DELETE_WORK_ITEM, {
     refetchQueries: [
-      { 
+      {
         query: GET_WORK_ITEMS,
         variables: currentGraph ? {
           where: { graph: { id: currentGraph.id } }
@@ -284,13 +348,22 @@ export function WorkItemDetailsModal({
       },
       { query: GET_EDGES }
     ],
+    awaitRefetchQueries: true,
     onCompleted: () => {
       showSuccess('Work item deleted successfully');
       onClose();
     },
     onError: (error) => {
       showError(`Failed to delete work item: ${error.message}`);
-    }
+    },
+    optimisticResponse: () => ({
+      __typename: 'Mutation',
+      deleteWorkItems: {
+        __typename: 'DeleteInfo',
+        nodesDeleted: 1,
+        relationshipsDeleted: nodeConnections.length
+      }
+    })
   });
 
   const handleSave = useCallback(async () => {
