@@ -1,6 +1,6 @@
 import React from 'react';
 import { useMutation, useQuery } from '@apollo/client';
-import { X, Link, ChevronDown, Plus } from 'lucide-react';
+import { X, Plus, ArrowDownRight, ChevronDown } from 'lucide-react';
 import { CREATE_WORK_ITEM, GET_WORK_ITEMS, GET_EDGES, CREATE_EDGE } from '../lib/queries';
 import { useAuth } from '../contexts/AuthContext';
 import { useGraph } from '../contexts/GraphContext';
@@ -8,19 +8,12 @@ import { useNotifications } from '../contexts/NotificationContext';
 import { WorkItemTypeSelector } from './WorkItemTypeSelector';
 import { TagInput } from './TagInput';
 import {
-  RELATIONSHIP_OPTIONS,
-  getRelationshipConfig,
-  getRelationshipIconElement,
-  RelationshipType
-} from '../constants/workItemConstants';
-import {
   STATUS_OPTIONS,
   PRIORITY_OPTIONS,
   getPriorityIcon as getCentralizedPriorityIcon,
   getPriorityIconElement,
-  ClipboardList
 } from '../constants/workItemConstants';
-import { Edit3, Flag, User, Calendar, Hash, FileText, Layers, Activity, PenTool } from 'lucide-react';
+import { Edit3, FileText, Flag, User, Calendar, Hash, Activity, PenTool } from 'lucide-react';
 
 interface WorkItem {
   id: string;
@@ -28,30 +21,100 @@ interface WorkItem {
   description?: string;
   type: string;
   status: string;
-  priority: number;
-  assignedTo?: string;
+  priority?: number;
+  assignedTo?: {
+    id: string;
+    name: string;
+    username: string;
+  } | string;
   dueDate?: string;
   tags?: string[];
-  createdAt: string;
-  updatedAt: string;
-  contributors?: Array<{ id: string; name: string; type: string; }>;
+  positionX?: number;
+  positionY?: number;
 }
 
-interface CreateWorkItemModalProps {
+interface CreateChildTaskModalProps {
   isOpen: boolean;
   onClose: () => void;
-  parentWorkItemId?: string; // If provided, creates a connection to this work item
-  position?: { x: number; y: number; z: number }; // Position for floating work items
-  onSubmit?: (nodeData: any) => Promise<void>; // Optional callback after work item creation
+  parentWorkItem: WorkItem;
 }
 
+interface WorkItemCreateInput {
+  title: string;
+  description?: string;
+  type: string;
+  status: string;
+  priority: number;
+  dueDate?: string;
+  tags: string[];
+  positionX: number;
+  positionY: number;
+  positionZ: number;
+  radius: number;
+  theta: number;
+  phi: number;
+  priorityComp: number;
+  assignedTo?: {
+    connect: {
+      where: { node: { id: string } };
+    };
+  };
+  owner: {
+    connect: {
+      where: { node: { id?: string } };
+    };
+  };
+  graph: {
+    connect: {
+      where: { node: { id?: string } };
+    };
+  };
+}
 
-export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, position, onSubmit }: CreateWorkItemModalProps) {
+export function CreateChildTaskModal({ isOpen, onClose, parentWorkItem }: CreateChildTaskModalProps) {
   const { currentUser, currentTeam } = useAuth();
   const { currentGraph } = useGraph();
   const { showSuccess, showError } = useNotifications();
 
-  // Query to get existing work items count for dynamic messaging
+  const childPriority = Math.max(0, (parentWorkItem.priority || 0.5) - 0.1);
+
+  const getAssignedToId = (assignedTo: WorkItem['assignedTo']): string => {
+    if (!assignedTo) return '';
+    if (typeof assignedTo === 'string') return assignedTo;
+    return assignedTo.id;
+  };
+
+  const [formData, setFormData] = React.useState({
+    title: '',
+    description: '',
+    type: 'TASK',
+    status: parentWorkItem.status || 'NOT_STARTED',
+    priority: childPriority,
+    assignedTo: getAssignedToId(parentWorkItem.assignedTo),
+    dueDate: parentWorkItem.dueDate || '',
+    tags: parentWorkItem.tags || [] as string[]
+  });
+
+  const [isStatusOpen, setIsStatusOpen] = React.useState(false);
+  const statusDropdownRef = React.useRef<HTMLDivElement>(null);
+
+  const statusOptions = STATUS_OPTIONS.filter(option => option.value !== 'all').map(option => ({
+    ...option,
+    icon: option.icon ? <option.icon className="h-4 w-4" /> : null,
+    background: option.bgColor,
+    border: option.borderColor
+  }));
+
+  React.useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (statusDropdownRef.current && !statusDropdownRef.current.contains(event.target as Node)) {
+        setIsStatusOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const { data: existingNodesData } = useQuery(GET_WORK_ITEMS, {
     variables: currentGraph ? {
       where: {
@@ -63,154 +126,62 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
     skip: !currentGraph?.id || !isOpen,
     fetchPolicy: 'cache-first'
   });
-  
-  const [formData, setFormData] = React.useState({
-    title: '',
-    description: '',
-    type: 'DEFAULT',
-    priority: 0,
-    status: 'NOT_STARTED',
-    assignedTo: '',
-    dueDate: '',
-    tags: [] as string[]
-  });
 
-  const [selectedRelationType, setSelectedRelationType] = React.useState('DEPENDS_ON');
-
-  const [isStatusOpen, setIsStatusOpen] = React.useState(false);
-  const statusDropdownRef = React.useRef<HTMLDivElement>(null);
-
-  // Status options from centralized constants (excluding 'all' option)
-  const statusOptions = STATUS_OPTIONS.filter(option => option.value !== 'all').map(option => ({
-    ...option,
-    icon: option.icon ? <option.icon className="h-4 w-4" /> : null,
-    background: option.bgColor,
-    border: option.borderColor
-  }));
-
-  // Close status dropdown when clicking outside
-  React.useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (statusDropdownRef.current && !statusDropdownRef.current.contains(event.target as Node)) {
-        setIsStatusOpen(false);
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-
-  // Check for duplicate names
   const existingNodes = existingNodesData?.workItems || [];
-  const isDuplicateName = existingNodes.some((node: any) => 
+  const isDuplicateName = existingNodes.some((node: WorkItem) =>
     node.title.toLowerCase().trim() === formData.title.toLowerCase().trim()
   );
-  
-  // Check if all required fields are filled and no duplicate name
-  const isFormValid = formData.title.trim() !== '' && !isDuplicateName;
 
+  const isFormValid = formData.title.trim() !== '' && !isDuplicateName;
 
   const [createWorkItem, { loading: creatingWorkItem }] = useMutation(CREATE_WORK_ITEM, {
     refetchQueries: [
-      // Refetch work items for graph visualization
-      { 
-        query: GET_WORK_ITEMS,
-        variables: {
-          options: { limit: 100 }
-        }
-      },
-      // Refetch work items for list view
-      { 
-        query: GET_WORK_ITEMS,
-        variables: {
-          where: {
-            teamId: currentTeam?.id || 'team-1'
-          }
-        }
-      },
-      // Refetch all edges if creating a connected work item
-      ...(parentWorkItemId ? [
-        { 
-          query: GET_EDGES,
-          variables: {}
-        },
-        // Also refetch edges for the parent work item specifically
-        { 
-          query: GET_EDGES,
-          variables: {
-            where: {
-              OR: [
-                { source: { id: parentWorkItemId } },
-                { target: { id: parentWorkItemId } }
-              ]
-            }
-          }
-        }
-      ] : [])
+      { query: GET_WORK_ITEMS, variables: { options: { limit: 100 } } },
+      { query: GET_WORK_ITEMS, variables: { where: { teamId: currentTeam?.id || 'team-1' } } },
+      { query: GET_EDGES, variables: {} },
     ],
     awaitRefetchQueries: true,
     update: (cache, { data }) => {
-      // Update Apollo cache for immediate UI refresh
       if (data?.createWorkItems?.workItems) {
         const newNode = data.createWorkItems.workItems[0];
-        
-        // Update cache for GraphVisualization (no team filter)
+
         try {
           const graphData = cache.readQuery({
             query: GET_WORK_ITEMS,
-            variables: {
-              options: { limit: 100 }
-            }
+            variables: { options: { limit: 100 } }
           }) as { workItems: WorkItem[] } | null;
-          
+
           if (graphData) {
             cache.writeQuery({
               query: GET_WORK_ITEMS,
-              variables: {
-                options: { limit: 100 }
-              },
-              data: {
-                workItems: [newNode, ...graphData.workItems]
-              }
+              variables: { options: { limit: 100 } },
+              data: { workItems: [newNode, ...graphData.workItems] }
             });
           }
         } catch {
-          // Silently fail if cache read fails
+          // Cache read can fail if query hasn't been fetched yet - this is expected
         }
 
-        // Update cache for ListView (with team filter)
         try {
           const listData = cache.readQuery({
             query: GET_WORK_ITEMS,
-            variables: {
-              where: {
-                teamId: currentTeam?.id || 'team-1'
-              }
-            }
+            variables: { where: { teamId: currentTeam?.id || 'team-1' } }
           }) as { workItems: WorkItem[] } | null;
-          
+
           if (listData) {
             cache.writeQuery({
               query: GET_WORK_ITEMS,
-              variables: {
-                where: {
-                  teamId: currentTeam?.id || 'team-1'
-                }
-              },
-              data: {
-                workItems: [newNode, ...listData.workItems]
-              }
+              variables: { where: { teamId: currentTeam?.id || 'team-1' } },
+              data: { workItems: [newNode, ...listData.workItems] }
             });
           }
         } catch {
-          // Silently fail if cache read fails
+          // Cache read can fail if query hasn't been fetched yet - this is expected
         }
       }
     }
   });
 
-  // Edge creation mutation for connected work items
   const [createEdge] = useMutation(CREATE_EDGE, {
     refetchQueries: [
       { query: GET_EDGES, variables: {} },
@@ -220,16 +191,13 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    
 
     if (!currentGraph) {
       showError('No Graph Selected', 'Please select a graph before creating work items.');
       return;
     }
-    
+
     try {
-      // Clean up the form data - remove empty strings and null values
       const cleanFormData = {
         title: formData.title.trim(),
         description: formData.description.trim() || undefined,
@@ -239,19 +207,18 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
         dueDate: formData.dueDate || undefined,
         tags: formData.tags || [],
       };
-      
-      const workItemInput: any = {
+
+      const workItemInput: Partial<WorkItemCreateInput> = {
         ...cleanFormData,
-        positionX: position?.x || (400 + Math.random() * 200),
-        positionY: position?.y || (300 + Math.random() * 200),
-        positionZ: position?.z || 0,
+        positionX: (parentWorkItem.positionX || 400) + 150,
+        positionY: (parentWorkItem.positionY || 300) + 100,
+        positionZ: 0,
         radius: 1.0,
         theta: 0.0,
         phi: 0.0,
         priorityComp: formData.priority,
       };
 
-      // Handle assignedTo relationship properly for Neo4j GraphQL
       if (formData.assignedTo) {
         workItemInput.assignedTo = {
           connect: {
@@ -260,13 +227,12 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
         };
       }
 
-      // Add required relationships
       workItemInput.owner = {
         connect: {
           where: { node: { id: currentUser?.id } }
         }
       };
-      
+
       workItemInput.graph = {
         connect: {
           where: { node: { id: currentGraph?.id } }
@@ -279,56 +245,40 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
 
       if (result.data?.createWorkItems?.workItems?.[0]) {
         const createdNode = result.data.createWorkItems.workItems[0];
-        
-        // If parentWorkItemId is provided, create the edge with the correct relationship type
-        if (parentWorkItemId) {
-          const edgeInput = {
-            type: selectedRelationType,
-            source: { connect: { where: { node: { id: parentWorkItemId } } } },
-            target: { connect: { where: { node: { id: createdNode.id } } } }
-          };
-          
-          await createEdge({ variables: { input: [edgeInput] } });
-          
-          const relationshipLabel = getRelationshipConfig(selectedRelationType as RelationshipType).label;
-          showSuccess(
-            'Work Item Created and Connected Successfully!',
-            `"${createdNode.title}" has been created with a "${relationshipLabel}" relationship.`
-          );
-        } else {
-          showSuccess(
-            'Work Item Created Successfully!',
-            `"${createdNode.title}" has been added to your workspace and is now visible in all views.`
-          );
-        }
+
+        const edgeInput = {
+          type: 'DEPENDS_ON',
+          source: { connect: { where: { node: { id: createdNode.id } } } },
+          target: { connect: { where: { node: { id: parentWorkItem.id } } } }
+        };
+
+        await createEdge({ variables: { input: [edgeInput] } });
+
+        showSuccess(
+          'Child Item Created!',
+          `"${createdNode.title}" depends on "${parentWorkItem.title}"`
+        );
 
         onClose();
         setFormData({
           title: '',
           description: '',
-          type: 'DEFAULT',
-          priority: 0,
-          status: 'NOT_STARTED',
-          assignedTo: '',
-          dueDate: '',
-          tags: []
+          type: 'TASK',
+          status: parentWorkItem.status || 'NOT_STARTED',
+          priority: childPriority,
+          assignedTo: getAssignedToId(parentWorkItem.assignedTo),
+          dueDate: parentWorkItem.dueDate || '',
+          tags: parentWorkItem.tags || []
         });
-        setSelectedRelationType('DEPENDS_ON');
       }
     } catch (error) {
-      
-      // Show more specific error message if available
-      let errorMessage = 'There was an error creating the work item. Please try again or contact support if the problem persists.';
+      let errorMessage = 'There was an error creating the child item. Please try again or contact support if the problem persists.';
       if (error instanceof Error) {
         errorMessage = error.message;
       } else if (typeof error === 'object' && error !== null && 'message' in error) {
         errorMessage = String(error.message);
       }
-      
-      showError(
-        'Failed to Create Work Item',
-        errorMessage
-      );
+      showError('Failed to Create Child Item', errorMessage);
     }
   };
 
@@ -342,27 +292,22 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
           onClick={onClose}
         />
 
-        <div className="inline-block w-full max-w-lg p-0 my-8 overflow-hidden text-left align-middle transition-all transform bg-gradient-to-br from-gray-800/98 via-gray-850/98 to-gray-900/98 backdrop-blur-2xl shadow-2xl rounded-2xl border border-gray-600/30 focus-within:ring-2 focus-within:ring-blue-500/50 animate-in slide-in-from-bottom-4 duration-300 relative" onClick={(e) => e.stopPropagation()}>
-          <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-green-500/20 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-purple-500 via-pink-500 to-green-500"></div>
+        <div className="inline-block w-full max-w-lg p-0 my-8 overflow-hidden text-left align-middle transition-all transform bg-gradient-to-br from-gray-800/98 via-gray-850/98 to-gray-900/98 backdrop-blur-2xl shadow-2xl rounded-2xl border border-gray-600/30 focus-within:ring-2 focus-within:ring-emerald-500/50 animate-in slide-in-from-bottom-4 duration-300 relative" onClick={(e) => e.stopPropagation()}>
+          <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-emerald-500/20 via-teal-500/20 to-cyan-500/20 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500"></div>
 
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700/30 bg-gradient-to-r from-gray-800/50 to-gray-900/50 backdrop-blur-sm relative">
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-green-500 via-emerald-500 to-teal-500 rounded-xl flex items-center justify-center shadow-lg shadow-green-500/30 relative">
-                <div className="absolute inset-0 bg-gradient-to-br from-green-400 to-emerald-600 rounded-xl blur opacity-50 animate-pulse"></div>
-                {parentWorkItemId ? <Link className="h-5 w-5 text-white relative z-10" /> : <Plus className="h-5 w-5 text-white relative z-10" />}
+              <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/30 relative">
+                <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 to-teal-600 rounded-xl blur opacity-50 animate-pulse"></div>
+                <ArrowDownRight className="h-5 w-5 text-white relative z-10" />
               </div>
               <div>
-                <h3 className="text-lg font-bold bg-gradient-to-r from-white via-green-100 to-emerald-100 bg-clip-text text-transparent">
-                  {parentWorkItemId ? 'Create & Connect Work Item' : 'Create New Work Item'}
+                <h3 className="text-lg font-bold bg-gradient-to-r from-white via-emerald-100 to-teal-100 bg-clip-text text-transparent">
+                  Create Child Item
                 </h3>
                 <p className="text-xs text-gray-400">
-                  {parentWorkItemId
-                    ? 'Add a new work item with automatic connection'
-                    : existingNodesData?.workItems?.length > 0
-                      ? 'Add another work item to expand your graph'
-                      : 'Add your first work item to begin the journey'
-                  }
+                  Depends on: {parentWorkItem.title}
                 </p>
               </div>
             </div>
@@ -375,147 +320,12 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
           </div>
 
           <div className="max-h-[70vh] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 hover:scrollbar-thumb-gray-500">
+
           <form onSubmit={handleSubmit} className="px-6 py-6 space-y-5 relative">
-            {parentWorkItemId && (
-              <div className="space-y-4 mb-4">
-                <div className="bg-gradient-to-br from-gray-800/40 to-gray-700/30 border border-gray-600/40 rounded-xl p-4 shadow-lg backdrop-blur-sm">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <p className="text-sm font-semibold text-blue-200">Connection Setup</p>
-                  </div>
-                  <p className="text-sm text-blue-100 leading-relaxed">
-                    A new work item will be created and automatically connected with your selected relationship type.
-                  </p>
-                </div>
-
-                <div>
-                  <div className="flex items-center space-x-2 mb-3">
-                    <label className="text-base font-bold text-gray-100 tracking-wide">
-                      Relationship Type
-                    </label>
-                  </div>
-                  <div className="grid grid-cols-4 gap-3">
-                    {RELATIONSHIP_OPTIONS.map((relation, index) => {
-                      const isSelected = selectedRelationType === relation.type;
-                      const shadowClass = relation.hexColor;
-
-                      // Static Tailwind classes for each relationship type
-                      const getSelectedStyles = (type: RelationshipType) => {
-                        const styles: Record<RelationshipType, string> = {
-                          'DEFAULT_EDGE': 'border-gray-400 bg-gradient-to-br from-gray-400/20 to-gray-400/10',
-                          'DEPENDS_ON': 'border-emerald-400 bg-gradient-to-br from-emerald-400/20 to-emerald-400/10',
-                          'BLOCKS': 'border-rose-400 bg-gradient-to-br from-rose-400/20 to-rose-400/10',
-                          'ENABLES': 'border-green-400 bg-gradient-to-br from-green-400/20 to-green-400/10',
-                          'RELATES_TO': 'border-purple-400 bg-gradient-to-br from-purple-400/20 to-purple-400/10',
-                          'IS_PART_OF': 'border-orange-400 bg-gradient-to-br from-orange-400/20 to-orange-400/10',
-                          'FOLLOWS': 'border-indigo-400 bg-gradient-to-br from-indigo-400/20 to-indigo-400/10',
-                          'PARALLEL_WITH': 'border-teal-400 bg-gradient-to-br from-teal-400/20 to-teal-400/10',
-                          'DUPLICATES': 'border-yellow-400 bg-gradient-to-br from-yellow-400/20 to-yellow-400/10',
-                          'CONFLICTS_WITH': 'border-red-500 bg-gradient-to-br from-red-500/20 to-red-500/10',
-                          'VALIDATES': 'border-lime-400 bg-gradient-to-br from-lime-400/20 to-lime-400/10',
-                          'REFERENCES': 'border-fuchsia-400 bg-gradient-to-br from-fuchsia-400/20 to-fuchsia-400/10',
-                          'CONTAINS': 'border-blue-400 bg-gradient-to-br from-blue-400/20 to-blue-400/10',
-                          'SUPERSEDES': 'border-cyan-400 bg-gradient-to-br from-cyan-400/20 to-cyan-400/10',
-                          'EXTENDS': 'border-pink-400 bg-gradient-to-br from-pink-400/20 to-pink-400/10',
-                          'TRIGGERS': 'border-sky-300 bg-gradient-to-br from-sky-300/20 to-sky-300/10',
-                        };
-                        return styles[type] || styles.DEFAULT_EDGE;
-                      };
-
-                      const getHoverStyles = (type: RelationshipType) => {
-                        const hoverStyles: Record<RelationshipType, string> = {
-                          'DEFAULT_EDGE': 'hover:border-gray-400/70 hover:bg-gray-400/10',
-                          'DEPENDS_ON': 'hover:border-emerald-400/70 hover:bg-emerald-400/10',
-                          'BLOCKS': 'hover:border-rose-400/70 hover:bg-rose-400/10',
-                          'ENABLES': 'hover:border-green-400/70 hover:bg-green-400/10',
-                          'RELATES_TO': 'hover:border-purple-400/70 hover:bg-purple-400/10',
-                          'IS_PART_OF': 'hover:border-orange-400/70 hover:bg-orange-400/10',
-                          'FOLLOWS': 'hover:border-indigo-400/70 hover:bg-indigo-400/10',
-                          'PARALLEL_WITH': 'hover:border-teal-400/70 hover:bg-teal-400/10',
-                          'DUPLICATES': 'hover:border-yellow-400/70 hover:bg-yellow-400/10',
-                          'CONFLICTS_WITH': 'hover:border-red-500/70 hover:bg-red-500/10',
-                          'VALIDATES': 'hover:border-lime-400/70 hover:bg-lime-400/10',
-                          'REFERENCES': 'hover:border-fuchsia-400/70 hover:bg-fuchsia-400/10',
-                          'CONTAINS': 'hover:border-blue-400/70 hover:bg-blue-400/10',
-                          'SUPERSEDES': 'hover:border-cyan-400/70 hover:bg-cyan-400/10',
-                          'EXTENDS': 'hover:border-pink-400/70 hover:bg-pink-400/10',
-                          'TRIGGERS': 'hover:border-sky-300/70 hover:bg-sky-300/10',
-                        };
-                        return hoverStyles[type] || hoverStyles.DEFAULT_EDGE;
-                      };
-
-                      // Determine tooltip position based on column (4-column grid)
-                      const columnIndex = index % 4;
-                      const isFirstColumn = columnIndex === 0;
-                      const isLastColumn = columnIndex === 3;
-
-                      const tooltipPositionClass = isFirstColumn
-                        ? 'left-0'
-                        : isLastColumn
-                        ? 'right-0'
-                        : 'left-1/2 -translate-x-1/2';
-
-                      const arrowPositionClass = isFirstColumn
-                        ? 'left-4'
-                        : isLastColumn
-                        ? 'right-4'
-                        : 'left-1/2 -translate-x-1/2';
-
-                      return (
-                        <div key={relation.type} className="relative group/tooltip">
-                          <button
-                            type="button"
-                            onClick={() => setSelectedRelationType(relation.type)}
-                            className={`w-full p-3 rounded-xl transition-all duration-300 border-2 backdrop-blur-sm relative overflow-hidden ${
-                              isSelected
-                                ? `${getSelectedStyles(relation.type)} shadow-lg scale-105`
-                                : `border-gray-600/50 bg-gradient-to-br from-gray-700/40 to-gray-800/40 ${getHoverStyles(relation.type)} hover:shadow-lg hover:scale-105 active:scale-95`
-                            }`}
-                            style={{
-                              animationDelay: `${index * 20}ms`,
-                              ...(isSelected && { boxShadow: `0 10px 25px -5px ${shadowClass}40, 0 8px 10px -6px ${shadowClass}30` })
-                            }}
-                          >
-                            <div className="flex flex-col items-center justify-center space-y-1.5">
-                              <div className={`transition-all duration-300 ${isSelected ? 'scale-110' : 'group-hover:scale-110'}`}>
-                                {getRelationshipIconElement(relation.type, `h-5 w-5`)}
-                              </div>
-                              <span className={`font-semibold text-[10px] text-center leading-tight transition-colors duration-300 ${
-                                isSelected ? relation.color : 'text-gray-300 group-hover:text-white'
-                              }`}>
-                                {relation.label}
-                              </span>
-                            </div>
-                            {isSelected && (
-                              <div
-                                className="absolute top-1 right-1 w-4 h-4 text-white rounded-full flex items-center justify-center text-[8px] shadow-lg animate-in zoom-in duration-200"
-                                style={{ background: shadowClass }}
-                              >
-                                ✓
-                              </div>
-                            )}
-                          </button>
-
-                          {/* Premium Tooltip on Hover */}
-                          <div className={`absolute bottom-full ${tooltipPositionClass} mb-2 px-3 py-2 bg-gradient-to-br from-gray-900/98 to-black/98 backdrop-blur-xl rounded-lg border border-gray-600/50 shadow-2xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all duration-300 pointer-events-none z-50 whitespace-nowrap`}>
-                            <div className="text-xs text-gray-300 leading-relaxed">
-                              {relation.description}
-                            </div>
-                            <div className={`absolute top-full ${arrowPositionClass} -mt-px`}>
-                              <div className="border-4 border-transparent border-t-gray-900/98"></div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            )}
-
             <div>
               <label htmlFor="title" className="block text-base font-bold text-gray-100 mb-1 flex items-center">
-                <div className="p-1 bg-gradient-to-br from-blue-500/20 to-indigo-500/20 rounded-lg mr-1 border border-blue-500/30">
-                  <FileText className="h-3 w-3 text-blue-400" />
+                <div className="p-1 bg-gradient-to-br from-emerald-500/20 to-teal-500/20 rounded-lg mr-1 border border-emerald-500/30">
+                  <FileText className="h-3 w-3 text-emerald-400" />
                 </div>
                 Title *
               </label>
@@ -528,9 +338,9 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
                 className={`w-full border-2 bg-gray-800/50 text-white rounded-xl px-4 py-3.5 focus:outline-none transition-all duration-300 placeholder-gray-500 text-sm backdrop-blur-sm ${
                   isDuplicateName
                     ? 'border-red-500/50 focus:border-red-400 focus:shadow-lg focus:shadow-red-500/20 focus:bg-gray-800'
-                    : 'border-gray-600/50 focus:!border-green-400 focus:shadow-lg focus:shadow-green-500/20 focus:bg-gray-800 hover:border-gray-500/70'
+                    : 'border-gray-600/50 focus:!border-emerald-400 focus:shadow-lg focus:shadow-emerald-500/20 focus:bg-gray-800 hover:border-gray-500/70'
                 }`}
-                placeholder="Work item title"
+                placeholder="What needs to be done?"
               />
               {isDuplicateName && formData.title.trim() && (
                 <div className="mt-1 flex items-center space-x-2 text-red-400 text-xs">
@@ -542,8 +352,8 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
 
             <div>
               <label htmlFor="description" className="block text-base font-bold text-gray-100 mb-1 flex items-center">
-                <div className="p-1 bg-gradient-to-br from-emerald-500/20 to-teal-500/20 rounded-lg mr-1 border border-emerald-500/30">
-                  <Edit3 className="h-3 w-3 text-emerald-400" />
+                <div className="p-1 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-lg mr-1 border border-cyan-500/30">
+                  <Edit3 className="h-3 w-3 text-cyan-400" />
                 </div>
                 Description
               </label>
@@ -552,12 +362,11 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
                 rows={3}
                 value={formData.description}
                 onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                className="w-full border-2 border-gray-600/50 bg-gray-800/50 text-white rounded-xl placeholder-gray-500 px-4 py-3.5 focus:outline-none focus:!border-green-400 focus:shadow-lg focus:shadow-green-500/20 focus:bg-gray-800 hover:border-gray-500/70 transition-all duration-300 text-sm resize-none backdrop-blur-sm"
+                className="w-full border-2 border-gray-600/50 bg-gray-800/50 text-white rounded-xl placeholder-gray-500 px-4 py-3.5 focus:outline-none focus:!border-emerald-400 focus:shadow-lg focus:shadow-emerald-500/20 focus:bg-gray-800 hover:border-gray-500/70 transition-all duration-300 text-sm resize-none backdrop-blur-sm"
                 placeholder="Add a description"
               />
             </div>
 
-            {/* Tags */}
             <div>
               <label className="block text-base font-bold text-gray-100 mb-1 flex items-center">
                 <div className="p-1 bg-gradient-to-br from-sky-500/20 to-blue-500/20 rounded-lg mr-1 border border-sky-500/30">
@@ -579,7 +388,6 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
                 </div>
                 Work Item Type
               </label>
-
               <WorkItemTypeSelector
                 selectedType={formData.type}
                 onTypeChange={(type) => setFormData(prev => ({ ...prev, type }))}
@@ -598,7 +406,7 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
                 <button
                   type="button"
                   onClick={() => setIsStatusOpen(!isStatusOpen)}
-                  className="w-full flex items-center justify-between px-4 py-3.5 bg-gray-800/50 border-2 border-gray-600/50 rounded-xl text-white transition-all duration-300 focus:!border-green-400 focus:shadow-lg focus:shadow-green-500/20 focus:outline-none hover:border-gray-500/70 hover:bg-gray-800 text-sm backdrop-blur-sm"
+                  className="w-full flex items-center justify-between px-4 py-3.5 bg-gray-800/50 border-2 border-gray-600/50 rounded-xl text-white transition-all duration-300 focus:!border-emerald-400 focus:shadow-lg focus:shadow-emerald-500/20 focus:outline-none hover:border-gray-500/70 hover:bg-gray-800 text-sm backdrop-blur-sm"
                 >
                   <div className="flex items-center space-x-2">
                     {(() => {
@@ -615,7 +423,7 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
                       );
                     })()}
                   </div>
-                  <ChevronDown className={`h-4 w-4 text-gray-400 transition-all duration-200 ${isStatusOpen ? 'rotate-180 text-green-500' : ''}`} />
+                  <ChevronDown className={`h-4 w-4 text-gray-400 transition-all duration-200 ${isStatusOpen ? 'rotate-180 text-emerald-500' : ''}`} />
                 </button>
 
                 {isStatusOpen && (
@@ -662,7 +470,6 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
               </div>
             </div>
 
-            {/* Contributor and Due Date Row */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
               <div>
                 <label htmlFor="contributorId" className="block text-base font-bold text-gray-100 mb-1 flex items-center">
@@ -675,7 +482,7 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
                   id="contributorId"
                   value={formData.assignedTo}
                   onChange={(e) => setFormData(prev => ({ ...prev, assignedTo: e.target.value }))}
-                  className="w-full bg-gray-800/50 border-2 border-gray-600/50 rounded-xl px-4 py-3.5 text-sm text-white focus:outline-none focus:!border-green-400 focus:shadow-lg focus:shadow-green-500/20 hover:border-gray-500/70 hover:bg-gray-800 transition-all duration-300 backdrop-blur-sm cursor-pointer"
+                  className="w-full bg-gray-800/50 border-2 border-gray-600/50 rounded-xl px-4 py-3.5 text-sm text-white focus:outline-none focus:!border-emerald-400 focus:shadow-lg focus:shadow-emerald-500/20 hover:border-gray-500/70 hover:bg-gray-800 transition-all duration-300 backdrop-blur-sm cursor-pointer"
                 >
                   <option value="">No contributor</option>
                   <option value="user-1">John Doe</option>
@@ -698,11 +505,11 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
                   id="dueDate"
                   value={formData.dueDate}
                   onChange={(e) => setFormData(prev => ({ ...prev, dueDate: e.target.value }))}
-                  className="w-full bg-gray-800/50 border-2 border-gray-600/50 rounded-xl px-4 py-3.5 text-sm text-white focus:outline-none focus:!border-green-400 focus:shadow-lg focus:shadow-green-500/20 hover:border-gray-500/70 hover:bg-gray-800 transition-all duration-300 backdrop-blur-sm cursor-pointer"
+                  className="w-full bg-gray-800/50 border-2 border-gray-600/50 rounded-xl px-4 py-3.5 text-sm text-white focus:outline-none focus:!border-emerald-400 focus:shadow-lg focus:shadow-emerald-500/20 hover:border-gray-500/70 hover:bg-gray-800 transition-all duration-300 backdrop-blur-sm cursor-pointer"
                 />
               </div>
             </div>
-            
+
             <div className="space-y-1">
               <label className="block text-base font-bold text-gray-100 mb-1 flex items-center">
                 <div className="p-1 bg-gradient-to-br from-orange-500/20 to-red-500/20 rounded-lg mr-1 border border-orange-500/30">
@@ -711,7 +518,6 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
                 Priority Level
               </label>
 
-              {/* Modern Priority Selector */}
               <div className="grid grid-cols-5 gap-2">
                 <button
                   type="button"
@@ -838,9 +644,8 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
                   })()}
                 </div>
               </div>
-              
             </div>
-            
+
             <div className="flex justify-end space-x-3 pt-4 border-t border-gray-700/30">
               <button
                 type="button"
@@ -855,7 +660,7 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
                 className={`px-6 py-3 text-sm rounded-xl transition-all duration-300 font-semibold flex items-center space-x-2 shadow-lg ${
                   !isFormValid || creatingWorkItem
                     ? 'bg-gray-600/50 text-gray-400 cursor-not-allowed opacity-60 border-2 border-gray-600/30'
-                    : 'bg-gradient-to-r from-green-600 via-emerald-600 to-teal-600 text-white hover:from-green-500 hover:via-emerald-500 hover:to-teal-500 shadow-green-500/25 hover:shadow-xl hover:shadow-green-500/40 hover:scale-105 active:scale-95 border-2 border-green-500/30'
+                    : 'bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 text-white hover:from-emerald-500 hover:via-teal-500 hover:to-cyan-500 shadow-emerald-500/25 hover:shadow-xl hover:shadow-emerald-500/40 hover:scale-105 active:scale-95 border-2 border-emerald-500/30'
                 }`}
               >
                 {creatingWorkItem ? (
@@ -865,7 +670,7 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
                   </>
                 ) : (
                   <>
-                    <span>{parentWorkItemId ? 'Create & Connect' : 'Create Work Item'}</span>
+                    <span>Create Child Item</span>
                     <Plus className="w-3 h-3" />
                   </>
                 )}
