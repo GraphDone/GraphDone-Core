@@ -45,6 +45,7 @@ interface NodeDetailsModalProps {
   onConnectToExisting?: (node: WorkItem) => void;
   onDisconnect?: (node: WorkItem) => void;
   onDelete?: (node: WorkItem) => void;
+  readOnly?: boolean;
 }
 
 export function WorkItemDetailsModal({
@@ -56,7 +57,8 @@ export function WorkItemDetailsModal({
   onEdit,
   onConnectToExisting,
   onDisconnect,
-  onDelete
+  onDelete,
+  readOnly = false
 }: NodeDetailsModalProps) {
   const { currentGraph } = useGraph();
   const { currentUser } = useAuth();
@@ -619,29 +621,43 @@ export function WorkItemDetailsModal({
         <div className="relative px-4 py-3 bg-gradient-to-r from-gray-800/40 via-gray-700/30 to-gray-800/40 border-b border-gray-600/30">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="p-3 bg-gradient-to-br from-teal-300/60 via-magenta-400/50 to-magenta-300/40 rounded-2xl border border-magenta-200/50">
-                <Eye className="h-6 w-6 text-teal-200" />
+              <div className={`p-3 rounded-2xl border ${
+                readOnly
+                  ? 'bg-gradient-to-br from-cyan-300/60 via-blue-400/50 to-cyan-300/40 border-cyan-200/50'
+                  : 'bg-gradient-to-br from-teal-300/60 via-magenta-400/50 to-magenta-300/40 border-magenta-200/50'
+              }`}>
+                {readOnly ? (
+                  <Eye className="h-6 w-6 text-cyan-200" />
+                ) : (
+                  <Edit3 className="h-6 w-6 text-teal-200" />
+                )}
               </div>
               <div>
-                <h2 className="text-lg font-bold text-white">Work Item Details</h2>
-                <p className="text-sm text-gray-400 mt-0.5">View and edit work item information</p>
+                <h2 className="text-lg font-bold text-white">
+                  {readOnly ? 'View Work Item' : 'Edit Work Item'}
+                </h2>
+                <p className="text-sm text-gray-400 mt-0.5">
+                  {readOnly ? 'View work item information' : 'View and edit work item information'}
+                </p>
               </div>
             </div>
             <div className="flex items-center space-x-1">
-              <button
-                onClick={handleSave}
-                disabled={updating || !hasChanges || isSaving}
-                className={`flex items-center space-x-1 px-4 py-2 rounded-lg transition-all duration-300 text-sm font-semibold shadow-lg ${
-                  hasChanges && !updating && !isSaving
-                    ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:from-green-500 hover:to-emerald-500 hover:scale-105 transform border border-green-400/30'
-                    : 'bg-gray-700 text-gray-500 cursor-not-allowed border border-gray-600'
-                }`}
-                title={hasChanges ? "Save Changes (Ctrl+S)" : "No changes to save"}
-                aria-label={hasChanges ? "Save changes to work item" : "No changes to save"}
-              >
-                <Save className="h-4 w-4" />
-                <span>Save</span>
-              </button>
+              {!readOnly && (
+                <button
+                  onClick={handleSave}
+                  disabled={updating || !hasChanges || isSaving}
+                  className={`flex items-center space-x-1 px-4 py-2 rounded-lg transition-all duration-300 text-sm font-semibold shadow-lg ${
+                    hasChanges && !updating && !isSaving
+                      ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:from-green-500 hover:to-emerald-500 hover:scale-105 transform border border-green-400/30'
+                      : 'bg-gray-700 text-gray-500 cursor-not-allowed border border-gray-600'
+                  }`}
+                  title={hasChanges ? "Save Changes (Ctrl+S)" : "No changes to save"}
+                  aria-label={hasChanges ? "Save changes to work item" : "No changes to save"}
+                >
+                  <Save className="h-4 w-4" />
+                  <span>Save</span>
+                </button>
+              )}
               <button
                 onClick={onClose}
                 className="p-2 text-gray-400 hover:text-white hover:bg-red-600 rounded-lg transition-all duration-200 hover:scale-110 shadow-lg backdrop-blur-sm"
@@ -660,18 +676,19 @@ export function WorkItemDetailsModal({
             {/* Enhanced Clickable Type Badge */}
             <div className="relative z-[100000]">
               <button
-                onClick={() => setShowTypeDropdown(!showTypeDropdown)}
-                className={`w-36 flex items-center justify-between px-3 py-2 rounded-lg text-sm font-semibold hover:scale-105 transition-all duration-200 cursor-pointer shadow-lg backdrop-blur-sm ${getTypeColor(currentNode.type)} border border-opacity-30 hover:border-opacity-50`}
+                onClick={() => !readOnly && setShowTypeDropdown(!showTypeDropdown)}
+                disabled={readOnly}
+                className={`w-36 flex items-center justify-between px-3 py-2 rounded-lg text-sm font-semibold ${!readOnly ? 'hover:scale-105 cursor-pointer' : 'cursor-default opacity-75'} transition-all duration-200 shadow-lg backdrop-blur-sm ${getTypeColor(currentNode.type)} border border-opacity-30 hover:border-opacity-50`}
               >
                 <div className="flex items-center space-x-1">
                   {getTypeIcon(currentNode.type)}
                   <span className="bg-gradient-to-r from-white to-gray-100 bg-clip-text text-transparent font-bold">{getTypeConfig(currentNode.type as WorkItemType).label}</span>
                 </div>
-                <ChevronDown className="h-4 w-4 opacity-70" />
+                {!readOnly && <ChevronDown className="h-4 w-4 opacity-70" />}
               </button>
-              
+
               {/* Enhanced Type Dropdown with Staggered Animation */}
-              {showTypeDropdown && (
+              {!readOnly && showTypeDropdown && (
                 <div className="absolute top-full left-0 mt-1 w-40 bg-gray-800/95 backdrop-blur-xl rounded-xl border border-gray-600/30 shadow-2xl z-[99999] max-h-48 overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-200">
                   <div className="p-2">
                     {TYPE_OPTIONS.filter(opt => opt.value !== 'all').map((type, index) => (
@@ -713,18 +730,19 @@ export function WorkItemDetailsModal({
             {/* Enhanced Clickable Status Badge */}
             <div className="relative z-[100000]">
               <button
-                onClick={() => setShowStatusDropdown(!showStatusDropdown)}
-                className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-semibold hover:scale-105 transition-all duration-200 cursor-pointer shadow-lg backdrop-blur-sm ${getStatusColor(currentNode.status)} border border-opacity-30 hover:border-opacity-50`}
+                onClick={() => !readOnly && setShowStatusDropdown(!showStatusDropdown)}
+                disabled={readOnly}
+                className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-semibold ${!readOnly ? 'hover:scale-105 cursor-pointer' : 'cursor-default opacity-75'} transition-all duration-200 shadow-lg backdrop-blur-sm ${getStatusColor(currentNode.status)} border border-opacity-30 hover:border-opacity-50`}
               >
                 <div className="flex items-center space-x-1">
                   {getStatusIcon(currentNode.status)}
                   <span className="bg-gradient-to-r from-white to-gray-100 bg-clip-text text-transparent font-bold">{getStatusConfig(currentNode.status as WorkItemStatus).label}</span>
                 </div>
-                <ChevronDown className="h-4 w-4 opacity-70" />
+                {!readOnly && <ChevronDown className="h-4 w-4 opacity-70" />}
               </button>
-              
+
               {/* Enhanced Status Dropdown with Staggered Animation */}
-              {showStatusDropdown && (
+              {!readOnly && showStatusDropdown && (
                 <div className="absolute top-full left-0 mt-1 w-40 bg-gray-800/95 backdrop-blur-xl rounded-xl border border-gray-600/30 shadow-2xl z-[99999] max-h-48 overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-200">
                   <div className="p-2">
                     {STATUS_OPTIONS.filter(opt => opt.value !== 'all').map((status, index) => (
@@ -782,10 +800,16 @@ export function WorkItemDetailsModal({
               type="text"
               value={editedNode?.title || ''}
               onChange={(e) => {
-                const newValue = e.target.value;
-                setEditedNode(prev => prev ? { ...prev, title: newValue } : null);
+                if (!readOnly) {
+                  const newValue = e.target.value;
+                  setEditedNode(prev => prev ? { ...prev, title: newValue } : null);
+                }
               }}
-              className="text-sm bg-gray-800 border-2 border-gray-600 text-white placeholder-gray-400 w-full focus:outline-none focus:!border-green-400 transition-all duration-300 hover:border-gray-500 p-2 rounded-lg shadow-lg cursor-text"
+              disabled={readOnly}
+              readOnly={readOnly}
+              className={`text-sm bg-gray-800 border-2 border-gray-600 text-white placeholder-gray-400 w-full focus:outline-none transition-all duration-300 p-2 rounded-lg shadow-lg ${
+                readOnly ? 'cursor-default opacity-75' : 'focus:!border-green-400 hover:border-gray-500 cursor-text'
+              }`}
               placeholder="Enter title"
               autoComplete="off"
               aria-label="Work item title"
@@ -802,8 +826,16 @@ export function WorkItemDetailsModal({
             </h3>
             <textarea
               value={editedNode?.description || ''}
-              onChange={(e) => setEditedNode(prev => prev ? { ...prev, description: e.target.value } : null)}
-              className="w-full text-sm text-white bg-gray-800 border border-gray-600 rounded-lg placeholder-gray-400 p-2 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-400 transition-all duration-300 resize-none hover:border-gray-500 shadow-lg cursor-text"
+              onChange={(e) => {
+                if (!readOnly) {
+                  setEditedNode(prev => prev ? { ...prev, description: e.target.value } : null);
+                }
+              }}
+              disabled={readOnly}
+              readOnly={readOnly}
+              className={`w-full text-sm text-white bg-gray-800 border border-gray-600 rounded-lg placeholder-gray-400 p-2 focus:outline-none transition-all duration-300 resize-none shadow-lg ${
+                readOnly ? 'cursor-default opacity-75' : 'focus:ring-2 focus:ring-green-500/50 focus:border-green-400 hover:border-gray-500 cursor-text'
+              }`}
               placeholder="Enter description"
               rows={3}
               autoComplete="off"
@@ -828,8 +860,15 @@ export function WorkItemDetailsModal({
                   max="1"
                   step="0.1"
                   value={editedNode?.priority || 0}
-                  onChange={(e) => setEditedNode(prev => prev ? { ...prev, priority: parseFloat(e.target.value) } : null)}
-                  className={`w-full h-2 bg-gray-700/50 rounded-lg appearance-none cursor-pointer slider shadow-inner ${
+                  onChange={(e) => {
+                    if (!readOnly) {
+                      setEditedNode(prev => prev ? { ...prev, priority: parseFloat(e.target.value) } : null);
+                    }
+                  }}
+                  disabled={readOnly}
+                  className={`w-full h-2 bg-gray-700/50 rounded-lg appearance-none shadow-inner ${
+                    readOnly ? 'cursor-default opacity-75' : 'cursor-pointer'
+                  } ${
                     getPriorityConfig(editedNode?.priority || 0).value === 'critical' ? 'accent-red-500' :
                     getPriorityConfig(editedNode?.priority || 0).value === 'high' ? 'accent-orange-500' :
                     getPriorityConfig(editedNode?.priority || 0).value === 'moderate' ? 'accent-yellow-500' :
@@ -866,13 +905,18 @@ export function WorkItemDetailsModal({
                 <select
                   value={typeof editedNode?.assignedTo === 'string' ? editedNode.assignedTo : (editedNode?.assignedTo?.id || '')}
                   onChange={(e) => {
-                    const value = e.target.value;
-                    setEditedNode(prev => prev ? { 
-                      ...prev, 
-                      assignedTo: value ? { id: value, name: e.target.selectedOptions[0].text.split(' (')[0], username: value } : undefined 
-                    } : null);
+                    if (!readOnly) {
+                      const value = e.target.value;
+                      setEditedNode(prev => prev ? {
+                        ...prev,
+                        assignedTo: value ? { id: value, name: e.target.selectedOptions[0].text.split(' (')[0], username: value } : undefined
+                      } : null);
+                    }
                   }}
-                  className="w-full bg-gray-800 border border-gray-600 rounded-lg px-2 py-1 text-sm text-white focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-400 transition-all duration-300 appearance-none hover:border-gray-500 shadow-lg font-medium"
+                  disabled={readOnly}
+                  className={`w-full bg-gray-800 border border-gray-600 rounded-lg px-2 py-1 text-sm text-white focus:outline-none transition-all duration-300 appearance-none shadow-lg font-medium ${
+                    readOnly ? 'cursor-default opacity-75' : 'focus:ring-2 focus:ring-green-500/50 focus:border-green-400 hover:border-gray-500'
+                  }`}
                 >
                   <option value="">No contributor</option>
                   <option value="user-1">John Doe (@john)</option>
@@ -921,13 +965,19 @@ export function WorkItemDetailsModal({
                 type="date"
                 value={editedNode?.dueDate ? editedNode.dueDate.split('T')[0] : ''}
                 onChange={(e) => {
-                  const value = e.target.value;
-                  setEditedNode(prev => prev ? {
-                    ...prev,
-                    dueDate: value ? `${value}T23:59:59.999Z` : undefined
-                  } : null);
+                  if (!readOnly) {
+                    const value = e.target.value;
+                    setEditedNode(prev => prev ? {
+                      ...prev,
+                      dueDate: value ? `${value}T23:59:59.999Z` : undefined
+                    } : null);
+                  }
                 }}
-                className="w-full bg-gray-800 border border-gray-600 rounded-lg px-2 py-1 text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-400 transition-all duration-300 hover:border-gray-500 shadow-lg font-medium"
+                disabled={readOnly}
+                readOnly={readOnly}
+                className={`w-full bg-gray-800 border border-gray-600 rounded-lg px-2 py-1 text-sm text-white placeholder-gray-400 focus:outline-none transition-all duration-300 shadow-lg font-medium ${
+                  readOnly ? 'cursor-default opacity-75' : 'focus:ring-2 focus:ring-green-500/50 focus:border-green-400 hover:border-gray-500'
+                }`}
                 placeholder="dd/mm/yyyy"
               />
               {editedNode?.dueDate && (
@@ -956,25 +1006,28 @@ export function WorkItemDetailsModal({
                     className="flex items-center px-2 py-1 bg-gradient-to-r from-gray-700/60 to-gray-600/40 text-gray-200 rounded-lg text-xs font-medium group hover:from-gray-600/60 hover:to-gray-500/40 transition-all duration-200 hover:scale-105 shadow-md border border-gray-600/30"
                   >
                     <span>{tag}</span>
-                    <button
-                      onClick={() => {
-                        const newTags = editedNode.tags?.filter((_, i) => i !== index) || [];
-                        setEditedNode(prev => prev ? { ...prev, tags: newTags } : null);
-                      }}
-                      className="ml-2 text-gray-400 hover:text-red-400 transition-all duration-200 hover:scale-125"
-                      title="Remove tag"
-                    >
-                      ×
-                    </button>
+                    {!readOnly && (
+                      <button
+                        onClick={() => {
+                          const newTags = editedNode.tags?.filter((_, i) => i !== index) || [];
+                          setEditedNode(prev => prev ? { ...prev, tags: newTags } : null);
+                        }}
+                        className="ml-2 text-gray-400 hover:text-red-400 transition-all duration-200 hover:scale-125"
+                        title="Remove tag"
+                      >
+                        ×
+                      </button>
+                    )}
                   </span>
               ))}
                 
                 {/* Enhanced Inline Add Tag Input */}
-                {(!editedNode?.tags || editedNode.tags.length < 5) && (
+                {(!editedNode?.tags || editedNode.tags.length < 5) && !readOnly && (
                   <div className="flex items-center">
                     <input
                       type="text"
                       placeholder="Add Tag"
+                      disabled={readOnly}
                       className="text-xs bg-gray-800 border border-gray-600 rounded-lg px-2 py-1 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-400 transition-all duration-300 min-w-20 shadow-lg font-medium"
                       style={{ width: `${Math.max(20, 8)}ch` }}
                       onInput={(e) => {

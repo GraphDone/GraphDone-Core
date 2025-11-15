@@ -31,6 +31,7 @@ import { DEFAULT_NODE_CONFIG } from '../constants/workItemConstants';
 import { DeleteWorkItemModal } from './DeleteWorkItemModal';
 import { RelationshipEditorWindow } from './RelationshipEditorWindow';
 import { CreateWorkItemModal } from './CreateWorkItemModal';
+import { CreateChildTaskModal } from './CreateChildTaskModal';
 import { CreateGraphModal } from './CreateGraphModal';
 import { GraphSelectionModal } from './GraphSelectionModal';
 import { UpdateGraphModal } from './UpdateGraphModal';
@@ -272,7 +273,10 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
   const [showDataHealth, setShowDataHealth] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showCreateNodeModal, setShowCreateNodeModal] = useState(false);
+  const [showChildTaskModal, setShowChildTaskModal] = useState(false);
+  const [childTaskParent, setChildTaskParent] = useState<WorkItem | null>(null);
   const [showNodeDetailsModal, setShowNodeDetailsModal] = useState(false);
+  const [isNodeDetailsReadOnly, setIsNodeDetailsReadOnly] = useState(false);
   const [showConnectModal, setShowConnectModal] = useState(false);
   const [connectModalInitialTab, setConnectModalInitialTab] = useState<'connect' | 'disconnect'>('connect');
   const [openedFromDeleteModal, setOpenedFromDeleteModal] = useState(false);
@@ -2419,7 +2423,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       .style('cursor', 'pointer')
       .style('opacity', (currentTransform?.k || 1) >= LOD_THRESHOLDS.FAR ? 0.85 : 0)
       .style('pointer-events', 'all');
-    
+
     // Edit icon background - scales with icon
     const editBg = editIcons.append('rect')
       .attr('class', 'edit-bg')
@@ -2431,6 +2435,10 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       .attr('fill', 'rgba(0, 0, 0, 0.7)')
       .attr('stroke', 'rgba(255, 255, 255, 0.8)')
       .attr('stroke-width', 1);
+
+    // Tooltip for edit icon (on the rect element)
+    editBg.append('title')
+      .text('Edit work item');
     
     // Simple gear using text (emoji) - proper size
     editIcons.append('text')
@@ -2454,14 +2462,14 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
           .attr('fill', 'rgba(59, 130, 246, 0.8)')
           .attr('stroke', '#3b82f6')
           .attr('stroke-width', 2);
-        
+
         // Highlight background
         icon.select('.edit-bg')
           .transition().duration(200)
           .attr('fill', 'rgba(59, 130, 246, 0.9)')
           .attr('stroke', '#3b82f6')
           .attr('stroke-width', 2);
-        
+
         // Scale up text slightly
         icon.select('.edit-gear')
           .transition().duration(200)
@@ -2475,7 +2483,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
           .attr('fill', 'rgba(0, 0, 0, 0.7)')
           .attr('stroke', 'rgba(255, 255, 255, 0.8)')
           .attr('stroke-width', 1);
-        
+
         // Scale text back to normal
         icon.select('.edit-gear')
           .transition().duration(200)
@@ -2505,9 +2513,9 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       .style('cursor', 'pointer')
       .style('opacity', (currentTransform?.k || 1) >= LOD_THRESHOLDS.FAR ? 0.85 : 0)
       .style('pointer-events', 'all');
-    
+
     // Relationship icon background - same as edit icon
-    relationshipIcons.append('rect')
+    const relationshipBg = relationshipIcons.append('rect')
       .attr('class', 'relationship-bg')
       .attr('x', -iconSize/2)
       .attr('y', -iconSize/2)
@@ -2517,6 +2525,10 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       .attr('fill', 'rgba(0, 0, 0, 0.7)')
       .attr('stroke', 'rgba(255, 255, 255, 0.8)')
       .attr('stroke-width', 1);
+
+    // Tooltip for plus icon (on the rect element)
+    relationshipBg.append('title')
+      .text('Create child item');
     
     // Plus sign using text - matching the gear styling
     relationshipIcons.append('text')
@@ -2535,7 +2547,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     relationshipIcons
       .on('mouseenter', function() {
         const icon = d3.select(this);
-        
+
         // Grow background
         icon.select('.relationship-bg')
           .transition().duration(200)
@@ -2543,9 +2555,9 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
           .attr('height', iconSize * 1.2)
           .attr('x', -iconSize * 0.6)
           .attr('y', -iconSize * 0.6)
-          .attr('fill', 'rgba(34, 197, 94, 0.9)') // Green color for relationship creation
+          .attr('fill', 'rgba(34, 197, 94, 0.9)')
           .attr('stroke', 'rgba(255, 255, 255, 1.0)');
-        
+
         // Scale up text slightly
         icon.select('.relationship-plus')
           .transition().duration(200)
@@ -2553,7 +2565,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       })
       .on('mouseleave', function() {
         const icon = d3.select(this);
-        
+
         // Shrink background back
         icon.select('.relationship-bg')
           .transition().duration(200)
@@ -2563,23 +2575,20 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
           .attr('y', -iconSize/2)
           .attr('fill', 'rgba(0, 0, 0, 0.7)')
           .attr('stroke', 'rgba(255, 255, 255, 0.8)');
-        
+
         // Scale text back to normal
         icon.select('.relationship-plus')
           .transition().duration(200)
           .style('font-size', `${iconSize * 1.2}px`);
       });
 
-    // Relationship icon click handler - just opens relationship window
+    // Plus icon click handler - creates child work item
     relationshipIcons.on('click', (event: MouseEvent, d: WorkItem) => {
       event.stopPropagation();
       event.preventDefault();
-      
-      console.log('[Graph Debug] + button clicked, opening relationship window');
-      
-      // Simply open the relationship window - avoid changing selectedNodes to prevent graph refresh
-      setShowRelationshipWindow(true);
-      setEditingEdge(null);
+
+      setChildTaskParent(d);
+      setShowChildTaskModal(true);
     });
 
     // Node title section - with text wrapping
@@ -4186,12 +4195,14 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
 
   const handleViewNodeDetails = (node: WorkItem) => {
     setSelectedNode(node);
+    setIsNodeDetailsReadOnly(true);
     setShowNodeDetailsModal(true);
     setNodeMenu(prev => ({ ...prev, visible: false }));
   };
 
   const handleEditNode = (node: WorkItem) => {
     setSelectedNode(node);
+    setIsNodeDetailsReadOnly(false);
     setShowNodeDetailsModal(true);
     setNodeMenu(prev => ({ ...prev, visible: false }));
   };
@@ -4964,6 +4975,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
             node={freshNode}
             edges={validatedEdges}
             nodes={validatedNodes}
+            readOnly={isNodeDetailsReadOnly}
             onConnectToExisting={(node) => {
               setShowNodeDetailsModal(false);
               handleConnectToExistingNodes(node);
@@ -4987,6 +4999,18 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
             // Handle node creation
             handleCloseCreateNodeModal();
           }}
+        />
+      )}
+
+      {/* Create Child Task Modal */}
+      {showChildTaskModal && childTaskParent && (
+        <CreateChildTaskModal
+          isOpen={showChildTaskModal}
+          onClose={() => {
+            setShowChildTaskModal(false);
+            setChildTaskParent(null);
+          }}
+          parentWorkItem={childTaskParent}
         />
       )}
 
