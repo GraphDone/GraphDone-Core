@@ -4,6 +4,7 @@ import { resolve } from 'path';
 import { hostname } from 'os';
 
 export default defineConfig({
+  base: process.env.BASE_PATH || '/',
   plugins: [react()],
   resolve: {
     alias: {

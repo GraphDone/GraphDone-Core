@@ -11,7 +11,7 @@ import dotenv from 'dotenv';
 // import session from 'express-session';
 // import passport from 'passport';
 import { Neo4jGraphQL } from '@neo4j/graphql';
-import fetch from 'node-fetch';
+// Using native Node.js fetch (available in Node 18+)
 
 import { typeDefs } from './schema/neo4j-schema.js';
 import { authTypeDefs } from './schema/auth-schema.js';

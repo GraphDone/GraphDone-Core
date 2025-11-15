@@ -1,9 +1,12 @@
 FROM node:18-alpine AS builder
 
+# Build argument for base path
+ARG BASE_PATH=/
+
 WORKDIR /app
 
 # Copy package files
-COPY package.json turbo.json ./
+COPY package.json package-lock.json turbo.json ./
 COPY packages/core/package.json ./packages/core/
 COPY packages/web/package.json ./packages/web/
 
@@ -15,7 +18,8 @@ COPY packages/core ./packages/core
 COPY packages/web ./packages/web
 COPY tsconfig.json ./
 
-# Build the application
+# Build the application with BASE_PATH
+ENV BASE_PATH=${BASE_PATH}
 RUN npm run build
 
 # Production stage
@@ -27,6 +31,6 @@ COPY --from=builder /app/packages/web/dist /usr/share/nginx/html
 # Copy nginx configuration
 COPY packages/web/nginx.conf /etc/nginx/conf.d/default.conf
 
-EXPOSE 3000
+EXPOSE 80
 
 CMD ["nginx", "-g", "daemon off;"]

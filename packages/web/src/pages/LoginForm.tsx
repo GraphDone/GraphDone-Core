@@ -269,10 +269,13 @@ export function LoginForm() {
             onClick={handleGuestLogin}
             disabled={!isGuestEnabled || loading || guestLoading}
             className={`w-full btn flex items-center justify-center space-x-2 disabled:cursor-not-allowed ${
-              isGuestEnabled 
-                ? 'btn-secondary disabled:opacity-50' 
+              isGuestEnabled
+                ? 'btn-secondary disabled:opacity-50 animate-pulse shadow-lg shadow-blue-500/50 hover:shadow-blue-400/70 transition-shadow'
                 : 'btn-secondary opacity-50 cursor-not-allowed'
             }`}
+            style={isGuestEnabled ? {
+              animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
+            } : undefined}
             title={!isGuestEnabled ? "Guest access has been disabled by the administrator" : undefined}
           >
             {guestLoading ? (

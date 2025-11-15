@@ -8,7 +8,6 @@
  */
 
 import { useState } from 'react';
-import { XMarkIcon } from '@heroicons/react/24/outline';
 
 const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true';
 
@@ -66,7 +65,9 @@ export function DemoBanner() {
               className="flex p-1.5 rounded-md hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-white transition-colors"
               aria-label="Dismiss demo banner"
             >
-              <XMarkIcon className="h-5 w-5 text-white" />
+              <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
             </button>
           </div>
         </div>
