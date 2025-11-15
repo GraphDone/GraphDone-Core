@@ -940,6 +940,28 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     }, 100); // Small delay to ensure DOM is updated
   }, []);
 
+  // Sync nodeMenu with latest data from Apollo cache for instant updates
+  useEffect(() => {
+    if (nodeMenu.visible && nodeMenu.node && workItems.length > 0) {
+      const updatedNode = workItems.find(n => n.id === nodeMenu.node?.id);
+      if (updatedNode) {
+        const hasChanged =
+          updatedNode.priority !== nodeMenu.node.priority ||
+          updatedNode.status !== nodeMenu.node.status ||
+          updatedNode.type !== nodeMenu.node.type ||
+          updatedNode.title !== nodeMenu.node.title ||
+          updatedNode.description !== nodeMenu.node.description;
+
+        if (hasChanged) {
+          setNodeMenu(prev => ({
+            ...prev,
+            node: updatedNode
+          }));
+        }
+      }
+    }
+  }, [workItems, nodeMenu.visible, nodeMenu.node?.id, nodeMenu.node?.priority, nodeMenu.node?.status, nodeMenu.node?.type, nodeMenu.node?.title, nodeMenu.node?.description]);
+
   // Refetch data when graph changes
   useEffect(() => {
     if (currentGraph) {
@@ -3607,8 +3629,13 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     reinitTrigger, // Manual trigger
     loading, // Re-init when loading completes
     edgesLoading, // Re-init when edges loading completes
-    // Track node property changes for selective updates (only titles, descriptions, types)
-    nodes.map(n => `${n.id}:${n.title}:${n.description}:${n.type}:${n.status}`).join(',')
+    // Track ALL editable node properties for instant visual updates
+    nodes.map(n => {
+      const assignedToId = typeof n.assignedTo === 'string' ? n.assignedTo : n.assignedTo?.id;
+      return `${n.id}:${n.title}:${n.description}:${n.type}:${n.status}:${n.priority}:${JSON.stringify(n.tags)}:${assignedToId}:${n.dueDate}`;
+    }).join(','),
+    // Track edge properties for instant visual updates when relationship type/weight changes
+    validatedEdges.map(e => `${e.source}:${e.target}:${e.type}:${e.weight}`).join(',')
   ]);
 
   // Manual reinitialization function (expose globally for debugging)
@@ -4085,33 +4112,37 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
           >
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -skew-x-12 transform translate-x-full animate-shimmer pointer-events-none"></div>
             <div className="flex items-center justify-between relative z-10">
-              <div className="flex items-center space-x-3">
-                <GripVertical className="h-4 w-4 text-gray-400 flex-shrink-0 drop-shadow-lg" />
-                <div
-                  className="w-3 h-3 rounded-full ring-2 ring-white/40 shadow-lg animate-pulse"
-                  style={{
-                    backgroundColor: getNodeColor(nodeMenu.node),
-                    boxShadow: `0 0 12px ${getNodeColor(nodeMenu.node)}40`
-                  }}
-                />
-                <span className="font-semibold text-gray-100 text-base drop-shadow-md">{nodeMenu.node.title}</span>
+              <div className="flex items-center space-x-3 flex-1 min-w-0">
+                <div className="p-2 bg-gray-700/50 rounded-lg border border-gray-600/30 backdrop-blur-sm">
+                  <GripVertical className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                </div>
+                <div className="flex items-center space-x-2.5 flex-1 min-w-0">
+                  <div
+                    className="w-4 h-4 rounded-full ring-2 ring-white/40 shadow-lg animate-pulse flex-shrink-0"
+                    style={{
+                      backgroundColor: getNodeColor(nodeMenu.node),
+                      boxShadow: `0 0 16px ${getNodeColor(nodeMenu.node)}60`
+                    }}
+                  />
+                  <span className="font-bold text-white text-base drop-shadow-md truncate">{nodeMenu.node.title}</span>
+                </div>
               </div>
               <button
                 onClick={() => setNodeMenu(prev => ({ ...prev, visible: false }))}
-                className="p-2 text-gray-400 hover:text-white hover:bg-red-600/90 rounded-lg transition-all duration-200 hover:scale-110 backdrop-blur-sm shadow-lg hover:shadow-xl hover:shadow-red-500/30"
+                className="p-2 text-gray-400 hover:text-white hover:bg-red-600 rounded-lg transition-all duration-200 hover:scale-110 backdrop-blur-sm border border-gray-600/30 hover:border-red-500 shadow-lg hover:shadow-red-500/40 flex-shrink-0"
                 title="Close menu (ESC)"
               >
-                <X className="h-4 w-4 drop-shadow-lg" />
+                <X className="h-4 w-4" />
               </button>
             </div>
-            <div className="flex items-center space-x-2 mt-1.5">
+            <div className="flex items-center space-x-2 mt-2">
               <span className="flex items-center">
                 {(() => {
                   const status = nodeMenu.node?.status?.toUpperCase() || '';
-                  const statusIcon = getStatusIconElement(status as any, "h-2.5 w-2.5 mr-1");
+                  const statusIcon = getStatusIconElement(status as any, "h-3 w-3 mr-1.5");
                   const getStatusBgColor = () => {
                     const statusConfig = getStatusConfig(status as WorkItemStatus);
-                    return `${statusConfig.color} ${statusConfig.bgColor} px-2 py-0.5 rounded text-[10px] font-medium`;
+                    return `${statusConfig.color} ${statusConfig.bgColor} px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm border border-white/10 backdrop-blur-sm`;
                   };
                   const formatStatus = (status: string) => {
                     return getStatusConfig(status as WorkItemStatus).label;
@@ -4128,12 +4159,12 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
                 {(() => {
                   const getTypeIcon = () => {
                     if (!nodeMenu.node?.type) return null;
-                    return getTypeIconElement(nodeMenu.node.type as any, "h-2.5 w-2.5 mr-1");
+                    return getTypeIconElement(nodeMenu.node.type as any, "h-3 w-3 mr-1.5");
                   };
                   const getTypeBgColor = () => {
-                    if (!nodeMenu.node?.type) return 'text-gray-400 bg-gray-400/10 px-2 py-0.5 rounded text-[10px] font-medium';
+                    if (!nodeMenu.node?.type) return 'text-gray-400 bg-gray-400/10 px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm border border-white/10 backdrop-blur-sm';
                     const typeConfig = getTypeConfig(nodeMenu.node.type as any);
-                    return `${typeConfig.color} ${typeConfig.bgColor} px-2 py-0.5 rounded text-[10px] font-medium`;
+                    return `${typeConfig.color} ${typeConfig.bgColor} px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm border border-white/10 backdrop-blur-sm`;
                   };
                   const getTypeLabel = () => {
                     if (!nodeMenu.node?.type) return 'Unknown';
@@ -4151,26 +4182,30 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
             </div>
           </div>
 
-          <div className="px-4 py-3 bg-gradient-to-br from-teal-500/15 via-cyan-500/10 to-transparent border-b border-white/10 relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-teal-500/5 via-cyan-500/10 to-emerald-500/5"></div>
-            <div className="flex flex-col space-y-1 relative z-10">
+          <div className="px-5 py-4 bg-gradient-to-br from-blue-500/10 via-cyan-500/5 to-transparent border-b border-white/10 relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 via-cyan-500/8 to-emerald-500/5"></div>
+            <div className="flex flex-col space-y-2 relative z-10">
               <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  {(() => {
-                    const priority = nodeMenu.node?.priority || 0;
-                    return getPriorityIconElement(priority, "h-3.5 w-3.5 mr-1.5 text-blue-400");
-                  })()}
-                  <span className="text-gray-300 text-xs">Priority</span>
+                <div className="flex items-center space-x-2">
+                  <div className="p-1.5 bg-blue-500/20 rounded-lg border border-blue-400/30 backdrop-blur-sm">
+                    {(() => {
+                      const priority = nodeMenu.node?.priority || 0;
+                      return getPriorityIconElement(priority, "h-3.5 w-3.5 text-blue-400");
+                    })()}
+                  </div>
+                  <span className="text-gray-200 text-sm font-semibold">Priority</span>
                 </div>
-                <span className="text-white font-semibold text-xs">{Math.round((nodeMenu.node?.priority || 0) * 100)}%</span>
+                <div className="px-3 py-1.5 bg-white/10 rounded-lg border border-white/20 backdrop-blur-sm">
+                  <span className="text-white font-bold text-sm">{Math.round((nodeMenu.node?.priority || 0) * 100)}%</span>
+                </div>
               </div>
-              <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden shadow-inner">
+              <div className="w-full bg-black/30 rounded-full h-2 overflow-hidden shadow-inner border border-white/10">
                 <div
-                  className={`h-1.5 rounded-full transition-all duration-500 ${
-                    (nodeMenu.node?.priority || 0) >= 0.8 ? 'bg-gradient-to-r from-red-500 to-red-400 shadow-[0_0_8px_rgba(239,68,68,0.5)]' :
-                    (nodeMenu.node?.priority || 0) >= 0.6 ? 'bg-gradient-to-r from-orange-500 to-orange-400 shadow-[0_0_8px_rgba(249,115,22,0.5)]' :
-                    (nodeMenu.node?.priority || 0) >= 0.4 ? 'bg-gradient-to-r from-yellow-500 to-yellow-400 shadow-[0_0_8px_rgba(234,179,8,0.5)]' :
-                    (nodeMenu.node?.priority || 0) >= 0.2 ? 'bg-gradient-to-r from-blue-500 to-blue-400 shadow-[0_0_8px_rgba(59,130,246,0.5)]' :
+                  className={`h-2 rounded-full transition-all duration-500 ${
+                    (nodeMenu.node?.priority || 0) >= 0.8 ? 'bg-gradient-to-r from-red-500 to-red-400 shadow-[0_0_12px_rgba(239,68,68,0.6)]' :
+                    (nodeMenu.node?.priority || 0) >= 0.6 ? 'bg-gradient-to-r from-orange-500 to-orange-400 shadow-[0_0_12px_rgba(249,115,22,0.6)]' :
+                    (nodeMenu.node?.priority || 0) >= 0.4 ? 'bg-gradient-to-r from-yellow-500 to-yellow-400 shadow-[0_0_12px_rgba(234,179,8,0.6)]' :
+                    (nodeMenu.node?.priority || 0) >= 0.2 ? 'bg-gradient-to-r from-blue-500 to-blue-400 shadow-[0_0_12px_rgba(59,130,246,0.6)]' :
                     'bg-gradient-to-r from-gray-500 to-gray-400'
                   }`}
                   style={{ width: `${Math.round((nodeMenu.node?.priority || 0) * 100)}%` }}
@@ -4180,7 +4215,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
           </div>
 
           <div className="px-4 py-3 bg-gradient-to-b from-transparent to-black/20 overflow-visible">
-            <div className="grid grid-cols-4 gap-2 overflow-visible">
+            <div className="grid grid-cols-4 gap-4 overflow-visible">
               {(() => {
                 const connectionCount = edgesData?.edges?.filter((edge: any) =>
                   edge.source.id === nodeMenu.node?.id || edge.target.id === nodeMenu.node?.id
@@ -4197,9 +4232,9 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
                       setSelectedNode(null);
                       setNodeMenu(prev => ({ ...prev, visible: false }));
                     },
-                    gradient: "from-emerald-500/30 via-green-500/20 to-lime-500/10",
-                    iconColor: "text-emerald-300",
-                    borderColor: "border-emerald-500/30 hover:border-emerald-400/60"
+                    baseStyle: "border-gray-600/50 bg-gradient-to-br from-gray-700/40 to-gray-800/40",
+                    hoverStyle: "hover:border-emerald-400/70 hover:bg-emerald-400/10",
+                    iconColor: "text-emerald-400"
                   },
                   {
                     icon: GitBranch,
@@ -4207,9 +4242,9 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
                     hover_text: "Create & Connect",
                     description: "Add a new work item linked to this one",
                     onClick: (e: React.MouseEvent) => handleCreateConnectedNode(nodeMenu.node!, e),
-                    gradient: "from-sky-500/30 via-blue-500/20 to-indigo-500/10",
-                    iconColor: "text-sky-300",
-                    borderColor: "border-sky-500/30 hover:border-sky-400/60"
+                    baseStyle: "border-gray-600/50 bg-gradient-to-br from-gray-700/40 to-gray-800/40",
+                    hoverStyle: "hover:border-sky-400/70 hover:bg-sky-400/10",
+                    iconColor: "text-sky-400"
                   },
                   {
                     icon: Link2,
@@ -4217,9 +4252,9 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
                     hover_text: "Connect Existing",
                     description: "Link this to other work items in graph",
                     onClick: () => handleConnectToExistingNodes(nodeMenu.node!),
-                    gradient: "from-violet-500/30 via-purple-500/20 to-fuchsia-500/10",
-                    iconColor: "text-violet-300",
-                    borderColor: "border-violet-500/30 hover:border-violet-400/60",
+                    baseStyle: "border-gray-600/50 bg-gradient-to-br from-gray-700/40 to-gray-800/40",
+                    hoverStyle: "hover:border-purple-400/70 hover:bg-purple-400/10",
+                    iconColor: "text-purple-400",
                     badge: connectionCount
                   },
                   {
@@ -4228,9 +4263,9 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
                     hover_text: "Disconnect",
                     description: "Remove connections from this work item",
                     onClick: () => handleDisconnectNodes(nodeMenu.node!),
-                    gradient: "from-orange-500/30 via-amber-500/20 to-yellow-500/10",
-                    iconColor: "text-orange-300",
-                    borderColor: "border-orange-500/30 hover:border-orange-400/60",
+                    baseStyle: "border-gray-600/50 bg-gradient-to-br from-gray-700/40 to-gray-800/40",
+                    hoverStyle: "hover:border-orange-400/70 hover:bg-orange-400/10",
+                    iconColor: "text-orange-400",
                     badge: connectionCount
                   },
                   {
@@ -4239,9 +4274,9 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
                     hover_text: "View Details",
                     description: "View work item details",
                     onClick: () => handleViewNodeDetails(nodeMenu.node!),
-                    gradient: "from-cyan-500/30 via-teal-500/20 to-blue-500/10",
-                    iconColor: "text-cyan-300",
-                    borderColor: "border-cyan-500/30 hover:border-cyan-400/60"
+                    baseStyle: "border-gray-600/50 bg-gradient-to-br from-gray-700/40 to-gray-800/40",
+                    hoverStyle: "hover:border-cyan-400/70 hover:bg-cyan-400/10",
+                    iconColor: "text-cyan-400"
                   },
                   {
                     icon: Edit3,
@@ -4249,9 +4284,9 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
                     hover_text: "Edit Details",
                     description: "Edit work item details",
                     onClick: () => handleEditNode(nodeMenu.node!),
-                    gradient: "from-indigo-500/30 via-blue-500/20 to-purple-500/10",
-                    iconColor: "text-indigo-300",
-                    borderColor: "border-indigo-500/30 hover:border-indigo-400/60"
+                    baseStyle: "border-gray-600/50 bg-gradient-to-br from-gray-700/40 to-gray-800/40",
+                    hoverStyle: "hover:border-indigo-400/70 hover:bg-indigo-400/10",
+                    iconColor: "text-indigo-400"
                   },
                   {
                     icon: Crosshair,
@@ -4262,9 +4297,9 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
                       centerOnNode(nodeMenu.node!.id);
                       setNodeMenu(prev => ({ ...prev, visible: false }));
                     },
-                    gradient: "from-teal-500/30 via-emerald-500/20 to-green-500/10",
-                    iconColor: "text-teal-300",
-                    borderColor: "border-teal-500/30 hover:border-teal-400/60"
+                    baseStyle: "border-gray-600/50 bg-gradient-to-br from-gray-700/40 to-gray-800/40",
+                    hoverStyle: "hover:border-teal-400/70 hover:bg-teal-400/10",
+                    iconColor: "text-teal-400"
                   },
                   {
                     icon: Trash2,
@@ -4272,31 +4307,33 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
                     hover_text: "Delete",
                     description: "Delete work item permanently",
                     onClick: () => handleDeleteNode(nodeMenu.node!),
-                    gradient: "from-rose-500/30 via-red-500/20 to-pink-500/10",
-                    iconColor: "text-rose-300",
-                    borderColor: "border-rose-500/40 hover:border-rose-400/70"
+                    baseStyle: "border-gray-600/50 bg-gradient-to-br from-gray-700/40 to-gray-800/40",
+                    hoverStyle: "hover:border-rose-400/70 hover:bg-rose-400/10",
+                    iconColor: "text-rose-400"
                   }
                 ];
               })().map((action, index) => (
                 <div key={index} className="relative group">
                   <button
                     onClick={action.onClick}
-                    className={`w-full aspect-square flex flex-col items-center justify-center rounded-xl bg-gradient-to-br ${action.gradient}
-                      hover:scale-105 active:scale-95 transition-all duration-200 border ${action.borderColor}
-                      backdrop-blur-sm animate-fadeIn relative overflow-hidden shadow-lg hover:shadow-xl group-hover:shadow-2xl`}
-                    style={{ animationDelay: `${index * 30}ms` }}
+                    className={`w-full h-20 p-2.5 flex flex-col items-center justify-center space-y-1.5 rounded-xl
+                      hover:scale-105 active:scale-95 transition-all duration-300 border-2
+                      backdrop-blur-sm animate-fadeIn relative overflow-hidden hover:shadow-lg
+                      ${action.baseStyle} ${action.hoverStyle}`}
+                    style={{ animationDelay: `${index * 20}ms` }}
                   >
-                    <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
-                    <action.icon className={`h-5 w-5 ${action.iconColor} group-hover:scale-110 transition-transform relative z-10 drop-shadow-lg`} />
+                    <div className={`transition-all duration-300 ${action.badge !== undefined && action.badge > 0 ? 'scale-110' : 'group-hover:scale-110'}`}>
+                      <action.icon className={`h-5 w-5 ${action.iconColor} transition-transform relative z-10`} />
+                    </div>
+                    <span className={`font-semibold text-[10px] text-center leading-tight transition-colors duration-300 text-gray-300 group-hover:text-white`}>
+                      {action.hover_text}
+                    </span>
                     {action.badge !== undefined && action.badge > 0 && (
-                      <span className="absolute top-1 right-1 px-1.5 py-0.5 rounded-full bg-white/40 backdrop-blur-sm text-white text-[8px] font-bold shadow-lg border border-white/20 z-20">
+                      <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-white/40 backdrop-blur-sm text-white text-[8px] font-bold shadow-lg border border-white/20 z-20 flex items-center justify-center">
                         {action.badge}
                       </span>
                     )}
                   </button>
-                  <div className="absolute top-full mt-0.5 left-1/2 -translate-x-1/2 px-2 py-1 bg-black/95 backdrop-blur-md text-white text-[10px] rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-[9999] shadow-xl border border-white/10">
-                    {action.hover_text}
-                  </div>
                 </div>
               ))}
             </div>

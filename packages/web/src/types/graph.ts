@@ -96,10 +96,23 @@ export interface WorkItem {
   positionX?: number;
   positionY?: number;
   positionZ?: number;
+  radius?: number;
+  theta?: number;
+  phi?: number;
   teamId?: string;
   userId?: string;
   dependencies?: WorkItem[];
   dependents?: WorkItem[];
+  contributors?: Array<{ id: string; name: string; type: string; }>;
+  graph?: {
+    id: string;
+    name: string;
+    team?: {
+      id: string;
+      name: string;
+    };
+  };
+  metadata?: any;
 }
 
 // Import and re-export RelationshipType from central constants file
