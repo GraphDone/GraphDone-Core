@@ -76,7 +76,7 @@ export function CreateChildTaskModal({ isOpen, onClose, parentWorkItem }: Create
   const { currentGraph } = useGraph();
   const { showSuccess, showError } = useNotifications();
 
-  const childPriority = Math.max(0, (parentWorkItem.priority || 0.5) - 0.1);
+  const childPriority = 0.0;
 
   const getAssignedToId = (assignedTo: WorkItem['assignedTo']): string => {
     if (!assignedTo) return '';
