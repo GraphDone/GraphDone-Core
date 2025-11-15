@@ -1,20 +1,20 @@
 import React from 'react';
-import { 
-  ClipboardList, 
-  Calendar, 
-  Clock, 
-  CheckCircle, 
+import {
+  ClipboardList,
+  Calendar,
+  Clock,
+  CheckCircle,
   AlertCircle,
   XCircle,
   Eye,
   Pause,
-  Layers, 
-  Trophy, 
-  Target, 
-  Sparkles, 
-  ListTodo, 
-  AlertTriangle, 
-  Lightbulb, 
+  Layers,
+  Trophy,
+  Target,
+  Sparkles,
+  ListTodo,
+  AlertTriangle,
+  Lightbulb,
   Microscope,
   Flame,
   Zap,
@@ -33,6 +33,9 @@ import {
   Shield,
   Bookmark,
   Package,
+  Replace,
+  Maximize2,
+  Play,
   // Default Icon
   Square,
   Paperclip,
@@ -85,7 +88,10 @@ export {
   Shield,
   Bookmark,
   Package,
-  
+  Replace,
+  Maximize2,
+  Play,
+
   // Default Icon
   Square,
   Paperclip
@@ -605,9 +611,9 @@ export const isValidPriorityLevel = (priority: string): priority is PriorityLeve
 // RELATIONSHIP TYPES SYSTEM
 // ============================
 
-// All possible relationship types between work items
+// All possible relationship types between work items (16 types total)
 // These define how nodes connect to each other in the graph
-export type RelationshipType = 
+export type RelationshipType =
   | 'DEPENDS_ON'      // Source needs target to be completed first
   | 'BLOCKS'          // Source prevents target from progressing
   | 'ENABLES'         // Source makes target easier/possible
@@ -620,6 +626,9 @@ export type RelationshipType =
   | 'VALIDATES'       // Source tests/validates target
   | 'REFERENCES'      // Source references/cites target
   | 'CONTAINS'        // Source contains/encompasses target
+  | 'SUPERSEDES'      // Source replaces target
+  | 'EXTENDS'         // Source extends functionality of target
+  | 'TRIGGERS'        // Source triggers/activates target
   | 'DEFAULT_EDGE';   // Generic connection
 
 export interface RelationshipOption {
@@ -653,8 +662,8 @@ export const RELATIONSHIP_TYPES: Record<RelationshipType, RelationshipOption> = 
     label: 'Blocks',
     description: 'Source node blocks target node',
     icon: Ban,
-    color: 'text-red-400',
-    hexColor: '#f87171'
+    color: 'text-rose-400',
+    hexColor: '#fb7185'
   },
   ENABLES: {
     type: 'ENABLES',
@@ -717,16 +726,16 @@ export const RELATIONSHIP_TYPES: Record<RelationshipType, RelationshipOption> = 
     label: 'Validates',
     description: 'Source node validates target node',
     icon: Shield,
-    color: 'text-emerald-400',
-    hexColor: '#34d399'
+    color: 'text-lime-400',
+    hexColor: '#a3e635'
   },
   REFERENCES: {
     type: 'REFERENCES',
     label: 'References',
     description: 'Source node references target node',
     icon: Bookmark,
-    color: 'text-slate-400',
-    hexColor: '#94a3b8'
+    color: 'text-fuchsia-400',
+    hexColor: '#e879f9'
   },
   CONTAINS: {
     type: 'CONTAINS',
@@ -735,6 +744,30 @@ export const RELATIONSHIP_TYPES: Record<RelationshipType, RelationshipOption> = 
     icon: Package,
     color: 'text-blue-400',
     hexColor: '#60a5fa'
+  },
+  SUPERSEDES: {
+    type: 'SUPERSEDES',
+    label: 'Supersedes',
+    description: 'Source node replaces target node',
+    icon: Replace,
+    color: 'text-cyan-400',
+    hexColor: '#22d3ee'
+  },
+  EXTENDS: {
+    type: 'EXTENDS',
+    label: 'Extends',
+    description: 'Source node extends functionality of target',
+    icon: Maximize2,
+    color: 'text-pink-400',
+    hexColor: '#f472b6'
+  },
+  TRIGGERS: {
+    type: 'TRIGGERS',
+    label: 'Triggers',
+    description: 'Source node triggers/activates target',
+    icon: Play,
+    color: 'text-sky-300',
+    hexColor: '#7dd3fc'
   },
 };
 

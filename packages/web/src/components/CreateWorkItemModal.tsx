@@ -377,45 +377,136 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
           <div className="max-h-[70vh] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 hover:scrollbar-thumb-gray-500">
           <form onSubmit={handleSubmit} className="px-6 py-6 space-y-5 relative">
             {parentWorkItemId && (
-              <div className="space-y-2 mb-2">
-                <div className="bg-gradient-to-br from-gray-800/30 to-gray-700/20 border border-gray-600/30 rounded-lg p-2 shadow-lg backdrop-blur-sm">
-                  <div className="flex items-center space-x-2 mb-1">
-                    <p className="text-xs font-semibold text-blue-200">Connection Setup</p>
+              <div className="space-y-4 mb-4">
+                <div className="bg-gradient-to-br from-gray-800/40 to-gray-700/30 border border-gray-600/40 rounded-xl p-4 shadow-lg backdrop-blur-sm">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <p className="text-sm font-semibold text-blue-200">Connection Setup</p>
                   </div>
-                  <p className="text-xs text-blue-100 leading-relaxed">
+                  <p className="text-sm text-blue-100 leading-relaxed">
                     A new work item will be created and automatically connected with your selected relationship type.
                   </p>
                 </div>
 
                 <div>
-                  <div className="flex items-center space-x-2 mb-1">
+                  <div className="flex items-center space-x-2 mb-3">
                     <label className="text-base font-bold text-gray-100 tracking-wide">
                       Relationship Type
                     </label>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {RELATIONSHIP_OPTIONS.map((relation) => (
-                      <button
-                        key={relation.type}
-                        type="button"
-                        onClick={() => setSelectedRelationType(relation.type)}
-                        className={`p-2 rounded-lg text-left transition-all duration-200 border group ${
-                          selectedRelationType === relation.type
-                            ? 'bg-gradient-to-br from-blue-600/20 via-blue-700/25 to-blue-800/20 border-blue-400/50 shadow-lg shadow-blue-500/10'
-                            : 'bg-gradient-to-br from-gray-700/30 to-gray-800/30 hover:from-gray-600/40 hover:to-gray-700/40 border-gray-600/30 hover:border-gray-500/50 hover:shadow-md'
-                        }`}
-                      >
-                        <div className="flex items-center space-x-1.5 mb-0.5">
-                          {getRelationshipIconElement(relation.type, `h-4 w-4 ${selectedRelationType === relation.type ? 'text-blue-400' : ''}`)}
-                          <span className={`font-medium text-xs ${selectedRelationType === relation.type ? 'text-blue-400' : relation.color}`}>
-                            {relation.label}
-                          </span>
+                  <div className="grid grid-cols-4 gap-3">
+                    {RELATIONSHIP_OPTIONS.map((relation, index) => {
+                      const isSelected = selectedRelationType === relation.type;
+                      const shadowClass = relation.hexColor;
+
+                      // Static Tailwind classes for each relationship type
+                      const getSelectedStyles = (type: RelationshipType) => {
+                        const styles: Record<RelationshipType, string> = {
+                          'DEFAULT_EDGE': 'border-gray-400 bg-gradient-to-br from-gray-400/20 to-gray-400/10',
+                          'DEPENDS_ON': 'border-emerald-400 bg-gradient-to-br from-emerald-400/20 to-emerald-400/10',
+                          'BLOCKS': 'border-rose-400 bg-gradient-to-br from-rose-400/20 to-rose-400/10',
+                          'ENABLES': 'border-green-400 bg-gradient-to-br from-green-400/20 to-green-400/10',
+                          'RELATES_TO': 'border-purple-400 bg-gradient-to-br from-purple-400/20 to-purple-400/10',
+                          'IS_PART_OF': 'border-orange-400 bg-gradient-to-br from-orange-400/20 to-orange-400/10',
+                          'FOLLOWS': 'border-indigo-400 bg-gradient-to-br from-indigo-400/20 to-indigo-400/10',
+                          'PARALLEL_WITH': 'border-teal-400 bg-gradient-to-br from-teal-400/20 to-teal-400/10',
+                          'DUPLICATES': 'border-yellow-400 bg-gradient-to-br from-yellow-400/20 to-yellow-400/10',
+                          'CONFLICTS_WITH': 'border-red-500 bg-gradient-to-br from-red-500/20 to-red-500/10',
+                          'VALIDATES': 'border-lime-400 bg-gradient-to-br from-lime-400/20 to-lime-400/10',
+                          'REFERENCES': 'border-fuchsia-400 bg-gradient-to-br from-fuchsia-400/20 to-fuchsia-400/10',
+                          'CONTAINS': 'border-blue-400 bg-gradient-to-br from-blue-400/20 to-blue-400/10',
+                          'SUPERSEDES': 'border-cyan-400 bg-gradient-to-br from-cyan-400/20 to-cyan-400/10',
+                          'EXTENDS': 'border-pink-400 bg-gradient-to-br from-pink-400/20 to-pink-400/10',
+                          'TRIGGERS': 'border-sky-300 bg-gradient-to-br from-sky-300/20 to-sky-300/10',
+                        };
+                        return styles[type] || styles.DEFAULT_EDGE;
+                      };
+
+                      const getHoverStyles = (type: RelationshipType) => {
+                        const hoverStyles: Record<RelationshipType, string> = {
+                          'DEFAULT_EDGE': 'hover:border-gray-400/70 hover:bg-gray-400/10',
+                          'DEPENDS_ON': 'hover:border-emerald-400/70 hover:bg-emerald-400/10',
+                          'BLOCKS': 'hover:border-rose-400/70 hover:bg-rose-400/10',
+                          'ENABLES': 'hover:border-green-400/70 hover:bg-green-400/10',
+                          'RELATES_TO': 'hover:border-purple-400/70 hover:bg-purple-400/10',
+                          'IS_PART_OF': 'hover:border-orange-400/70 hover:bg-orange-400/10',
+                          'FOLLOWS': 'hover:border-indigo-400/70 hover:bg-indigo-400/10',
+                          'PARALLEL_WITH': 'hover:border-teal-400/70 hover:bg-teal-400/10',
+                          'DUPLICATES': 'hover:border-yellow-400/70 hover:bg-yellow-400/10',
+                          'CONFLICTS_WITH': 'hover:border-red-500/70 hover:bg-red-500/10',
+                          'VALIDATES': 'hover:border-lime-400/70 hover:bg-lime-400/10',
+                          'REFERENCES': 'hover:border-fuchsia-400/70 hover:bg-fuchsia-400/10',
+                          'CONTAINS': 'hover:border-blue-400/70 hover:bg-blue-400/10',
+                          'SUPERSEDES': 'hover:border-cyan-400/70 hover:bg-cyan-400/10',
+                          'EXTENDS': 'hover:border-pink-400/70 hover:bg-pink-400/10',
+                          'TRIGGERS': 'hover:border-sky-300/70 hover:bg-sky-300/10',
+                        };
+                        return hoverStyles[type] || hoverStyles.DEFAULT_EDGE;
+                      };
+
+                      // Determine tooltip position based on column (4-column grid)
+                      const columnIndex = index % 4;
+                      const isFirstColumn = columnIndex === 0;
+                      const isLastColumn = columnIndex === 3;
+
+                      const tooltipPositionClass = isFirstColumn
+                        ? 'left-0'
+                        : isLastColumn
+                        ? 'right-0'
+                        : 'left-1/2 -translate-x-1/2';
+
+                      const arrowPositionClass = isFirstColumn
+                        ? 'left-4'
+                        : isLastColumn
+                        ? 'right-4'
+                        : 'left-1/2 -translate-x-1/2';
+
+                      return (
+                        <div key={relation.type} className="relative group/tooltip">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedRelationType(relation.type)}
+                            className={`w-full p-3 rounded-xl transition-all duration-300 border-2 backdrop-blur-sm relative overflow-hidden ${
+                              isSelected
+                                ? `${getSelectedStyles(relation.type)} shadow-lg scale-105`
+                                : `border-gray-600/50 bg-gradient-to-br from-gray-700/40 to-gray-800/40 ${getHoverStyles(relation.type)} hover:shadow-lg hover:scale-105 active:scale-95`
+                            }`}
+                            style={{
+                              animationDelay: `${index * 20}ms`,
+                              ...(isSelected && { boxShadow: `0 10px 25px -5px ${shadowClass}40, 0 8px 10px -6px ${shadowClass}30` })
+                            }}
+                          >
+                            <div className="flex flex-col items-center justify-center space-y-1.5">
+                              <div className={`transition-all duration-300 ${isSelected ? 'scale-110' : 'group-hover:scale-110'}`}>
+                                {getRelationshipIconElement(relation.type, `h-5 w-5`)}
+                              </div>
+                              <span className={`font-semibold text-[10px] text-center leading-tight transition-colors duration-300 ${
+                                isSelected ? relation.color : 'text-gray-300 group-hover:text-white'
+                              }`}>
+                                {relation.label}
+                              </span>
+                            </div>
+                            {isSelected && (
+                              <div
+                                className="absolute top-1 right-1 w-4 h-4 text-white rounded-full flex items-center justify-center text-[8px] shadow-lg animate-in zoom-in duration-200"
+                                style={{ background: shadowClass }}
+                              >
+                                ✓
+                              </div>
+                            )}
+                          </button>
+
+                          {/* Premium Tooltip on Hover */}
+                          <div className={`absolute bottom-full ${tooltipPositionClass} mb-2 px-3 py-2 bg-gradient-to-br from-gray-900/98 to-black/98 backdrop-blur-xl rounded-lg border border-gray-600/50 shadow-2xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all duration-300 pointer-events-none z-50 whitespace-nowrap`}>
+                            <div className="text-xs text-gray-300 leading-relaxed">
+                              {relation.description}
+                            </div>
+                            <div className={`absolute top-full ${arrowPositionClass} -mt-px`}>
+                              <div className="border-4 border-transparent border-t-gray-900/98"></div>
+                            </div>
+                          </div>
                         </div>
-                        <p className="text-[10px] text-gray-400">
-                          {relation.description}
-                        </p>
-                      </button>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               </div>
