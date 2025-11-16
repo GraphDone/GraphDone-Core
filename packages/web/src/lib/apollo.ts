@@ -7,19 +7,12 @@ import { createClient } from 'graphql-ws';
 
 // Dynamically construct GraphQL URLs based on current host
 const getGraphQLUrl = () => {
-  if (import.meta.env.VITE_GRAPHQL_URL) {
-    return import.meta.env.VITE_GRAPHQL_URL;
-  }
-  // Use /graphql path on same host (routed via Traefik)
-  const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
-  return `${protocol}//${window.location.host}/graphql`;
+  //  ALWAYS use relative path - browser will resolve to current host:port
+  return '/graphql';
 };
 
 const getWebSocketUrl = () => {
-  if (import.meta.env.VITE_GRAPHQL_WS_URL) {
-    return import.meta.env.VITE_GRAPHQL_WS_URL;
-  }
-  // Use /graphql path on same host for WebSocket (routed via Traefik)
+  // Construct WebSocket URL from current location
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   return `${protocol}//${window.location.host}/graphql`;
 };
