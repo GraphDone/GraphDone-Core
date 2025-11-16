@@ -79,8 +79,6 @@ services:
     build:
       context: .
       dockerfile: packages/web/Dockerfile
-      args:
-        - BASE_PATH=/demo
     container_name: graphdone-web
     environment:
       - NODE_ENV=production
@@ -91,13 +89,10 @@ services:
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
-      # Route /demo to the web app
-      - "traefik.http.routers.demo-web.rule=PathPrefix(`/demo`)"
-      - "traefik.http.routers.demo-web.priority=10"
+      # Serve web app at root path
+      - "traefik.http.routers.demo-web.rule=PathPrefix(`/`)"
+      - "traefik.http.routers.demo-web.priority=1"
       - "traefik.http.routers.demo-web.entrypoints=web"
-      # Strip /demo prefix before passing to nginx
-      - "traefik.http.middlewares.demo-strip.stripprefix.prefixes=/demo"
-      - "traefik.http.routers.demo-web.middlewares=demo-strip"
       - "traefik.http.services.demo-web.loadbalancer.server.port=80"
 
 volumes:
