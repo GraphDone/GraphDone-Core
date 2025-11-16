@@ -78,7 +78,7 @@ services:
   web:
     build:
       context: .
-      dockerfile: packages/web/Dockerfile
+      dockerfile: packages/web/Dockerfile.traefik
     container_name: graphdone-web
     environment:
       - NODE_ENV=production
@@ -93,7 +93,7 @@ services:
       - "traefik.http.routers.demo-web.rule=PathPrefix(`/`)"
       - "traefik.http.routers.demo-web.priority=1"
       - "traefik.http.routers.demo-web.entrypoints=web"
-      - "traefik.http.services.demo-web.loadbalancer.server.port=80"
+      - "traefik.http.services.demo-web.loadbalancer.server.port=3000"
 
 volumes:
   neo4j_data:
