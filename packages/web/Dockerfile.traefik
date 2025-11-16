@@ -1,0 +1,39 @@
+FROM node:18-alpine AS builder
+
+# Build argument for base path
+ARG BASE_PATH=/
+
+WORKDIR /app
+
+# Copy package files
+COPY package.json package-lock.json turbo.json ./
+COPY packages/core/package.json ./packages/core/
+COPY packages/web/package.json ./packages/web/
+COPY tsconfig.json ./
+
+# Install dependencies
+RUN npm ci
+
+# Copy source code
+COPY packages/core ./packages/core
+COPY packages/web ./packages/web
+
+# Build the application
+ENV BASE_PATH=${BASE_PATH}
+RUN npm run build
+
+# Production stage - simple Node static server
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Install serve for static file hosting
+RUN npm install -g serve
+
+# Copy built files
+COPY --from=builder /app/packages/web/dist ./dist
+
+EXPOSE 3000
+
+# Serve static files on port 3000
+CMD ["serve", "-s", "dist", "-l", "3000"]
