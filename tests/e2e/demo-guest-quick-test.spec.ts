@@ -4,7 +4,7 @@ import { test, expect, chromium } from '@playwright/test';
  * Quick test with fresh browser context to avoid caching issues
  */
 
-const DEMO_URL = 'http://graphdone-ai-01.chocolate-perch.ts.net:3127';
+const DEMO_URL = 'http://graphdone-ai-01.chocolate-perch.ts.net';
 
 test('quick cache-free guest login test', async () => {
   // Create a completely fresh browser instance

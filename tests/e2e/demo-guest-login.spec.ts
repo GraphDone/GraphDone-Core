@@ -5,7 +5,7 @@ import { test, expect } from '@playwright/test';
  * This test runs against the actual deployed instance at graphdone-ai-01.chocolate-perch.ts.net:3127
  */
 
-const DEMO_URL = 'http://graphdone-ai-01.chocolate-perch.ts.net:3127';
+const DEMO_URL = 'http://graphdone-ai-01.chocolate-perch.ts.net';
 
 test.describe('Demo Server Guest Login', () => {
   test.beforeEach(async ({ page }) => {
