@@ -253,6 +253,23 @@ echo "📦 Building core package..."
 echo "🏗️  Building all packages..."
 npm run build
 
+# Setup Tailscale health monitoring (if Tailscale is installed)
+if command -v tailscale &> /dev/null; then
+    echo "🔧 Setting up Tailscale health monitoring..."
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    if [ -f "$SCRIPT_DIR/../scripts/setup-tailscale-monitor.sh" ]; then
+        if sudo -n true 2>/dev/null; then
+            bash "$SCRIPT_DIR/../scripts/setup-tailscale-monitor.sh"
+        else
+            echo "⚠️  Tailscale monitoring requires sudo. Run manually:"
+            echo "   sudo bash $SCRIPT_DIR/../scripts/setup-tailscale-monitor.sh"
+        fi
+    fi
+else
+    echo "ℹ️  Tailscale not installed - skipping health monitoring setup"
+    echo "   (Install Tailscale and run: sudo bash ./scripts/setup-tailscale-monitor.sh)"
+fi
+
 echo "✅ Setup complete!"
 echo ""
 
