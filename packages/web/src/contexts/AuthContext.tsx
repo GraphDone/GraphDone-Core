@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { useLazyQuery, gql } from '@apollo/client';
+import { useLazyQuery, useMutation, gql } from '@apollo/client';
 import { User, Team, AuthContextType } from '../types/auth';
 
 const ME_QUERY = gql`
@@ -23,17 +23,41 @@ const ME_QUERY = gql`
   }
 `;
 
+const GUEST_LOGIN_MUTATION = gql`
+  mutation GuestLogin {
+    guestLogin {
+      token
+      user {
+        id
+        email
+        username
+        name
+        avatar
+        role
+        isActive
+        isEmailVerified
+        team {
+          id
+          name
+          description
+        }
+      }
+    }
+  }
+`;
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 interface AuthProviderProps {
   children: ReactNode;
+  autoGuestLogin?: boolean;
 }
 
-export function AuthProvider({ children }: AuthProviderProps) {
+export function AuthProvider({ children, autoGuestLogin = false }: AuthProviderProps) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [currentTeam, setCurrentTeam] = useState<Team | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
-  
+
   const [getMe] = useLazyQuery(ME_QUERY, {
     onCompleted: (data) => {
       if (data.me) {
@@ -58,11 +82,27 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   });
 
+  const [performGuestLogin] = useMutation(GUEST_LOGIN_MUTATION, {
+    onCompleted: (data) => {
+      if (data.guestLogin) {
+        setCurrentUser(data.guestLogin.user);
+        setCurrentTeam(data.guestLogin.user.team || null);
+        localStorage.setItem('authToken', data.guestLogin.token);
+        localStorage.setItem('currentUser', JSON.stringify(data.guestLogin.user));
+      }
+      setIsInitializing(false);
+    },
+    onError: (error) => {
+      console.error('Auto guest login failed:', error);
+      setIsInitializing(false);
+    }
+  });
+
   // Load saved user from localStorage and validate token on mount
   useEffect(() => {
     const token = localStorage.getItem('authToken');
     const savedUser = localStorage.getItem('currentUser');
-    
+
     if (token && savedUser) {
       try {
         JSON.parse(savedUser);
@@ -74,10 +114,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
         localStorage.removeItem('currentUser');
         setIsInitializing(false);
       }
+    } else if (autoGuestLogin) {
+      // Auto-login as guest if no token exists and autoGuestLogin is enabled
+      performGuestLogin();
     } else {
       setIsInitializing(false);
     }
-  }, [getMe]);
+  }, [getMe, autoGuestLogin, performGuestLogin]);
 
   const login = (user: User, token?: string) => {
     setCurrentUser(user);
