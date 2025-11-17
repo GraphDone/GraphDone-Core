@@ -7,7 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { McpHealthIndicator } from './McpHealthIndicator';
 import FloatingConsole from './FloatingConsole';
 import { TlsStatusIndicator, TlsSecurityBanner } from './TlsStatusIndicator';
-import { APP_VERSION } from '../utils/version';
+import { APP_VERSION, BUILD_TAG } from '../utils/version';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -271,6 +271,9 @@ export function Layout({ children }: LayoutProps) {
                   )}
                   <p className="text-xs text-gray-400">
                     v{APP_VERSION}
+                  </p>
+                  <p className="text-xs text-gray-500 font-mono">
+                    {BUILD_TAG}
                   </p>
                   <p className="text-xs text-gray-500 mt-1">
                     For teams who think differently

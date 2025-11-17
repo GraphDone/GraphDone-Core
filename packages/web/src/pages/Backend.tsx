@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Server, Database, Globe, Activity, CheckCircle, XCircle, AlertCircle, RefreshCw, Info, Wifi, WifiOff } from 'lucide-react';
-import { APP_VERSION } from '../utils/version';
+import { APP_VERSION, BUILD_TAG } from '../utils/version';
 
 interface ServiceStatus {
   name: string;
@@ -459,6 +459,9 @@ export function Backend() {
               <h1 className="text-2xl font-bold text-gray-100">Backend Status</h1>
               <span className="text-xs bg-gray-800/50 text-gray-400 px-2 py-1 rounded">
                 v{APP_VERSION}
+              </span>
+              <span className="text-xs bg-gray-800/50 text-gray-400 px-2 py-1 rounded font-mono">
+                {BUILD_TAG}
               </span>
             </div>
             <p className="text-sm text-gray-400 mt-1">
