@@ -64,6 +64,13 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,prefix={{branch}}-
 
+      - name: Get Git version info
+        id: git
+        run: |
+          echo "branch=${GITHUB_REF#refs/heads/}" >> $GITHUB_OUTPUT
+          echo "commit=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+          echo "tag=${GITHUB_REF#refs/heads/}-${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
@@ -78,6 +85,9 @@ jobs:
           build-args: |
             VITE_GRAPHQL_URL=https://localhost:4128/graphql
             VITE_GRAPHQL_WS_URL=wss://localhost:4128/graphql
+            GIT_BRANCH=${{ steps.git.outputs.branch }}
+            GIT_COMMIT=${{ steps.git.outputs.commit }}
+            BUILD_TAG=${{ steps.git.outputs.tag }}
 
   build-stack:
     needs: build-and-push
