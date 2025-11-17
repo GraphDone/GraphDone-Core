@@ -211,20 +211,20 @@ fi
 # Start database
 echo "🗄️  Starting Neo4j database..."
 if [ "$DOCKER_SUDO" = "1" ]; then
-    sudo docker-compose -f deployment/docker-compose.yml up -d neo4j redis
+    sudo docker-compose -f deployment/docker-compose.yml up -d graphdone-neo4j graphdone-redis
 else
-    docker-compose -f deployment/docker-compose.yml up -d neo4j redis
+    docker-compose -f deployment/docker-compose.yml up -d graphdone-neo4j graphdone-redis
 fi
 
 # Wait for database to be ready
 echo "⏳ Waiting for Neo4j to be ready..."
 if [ "$DOCKER_SUDO" = "1" ]; then
-    until sudo docker-compose -f deployment/docker-compose.yml exec -T neo4j cypher-shell -u neo4j -p graphdone_password "RETURN 1" 2>/dev/null; do
+    until sudo docker-compose -f deployment/docker-compose.yml exec -T graphdone-neo4j cypher-shell -u neo4j -p graphdone_password "RETURN 1" 2>/dev/null; do
         echo "⏳ Neo4j not ready yet, waiting..."
         sleep 3
     done
 else
-    until docker-compose -f deployment/docker-compose.yml exec -T neo4j cypher-shell -u neo4j -p graphdone_password "RETURN 1" 2>/dev/null; do
+    until docker-compose -f deployment/docker-compose.yml exec -T graphdone-neo4j cypher-shell -u neo4j -p graphdone_password "RETURN 1" 2>/dev/null; do
         echo "⏳ Neo4j not ready yet, waiting..."
         sleep 3
     done
