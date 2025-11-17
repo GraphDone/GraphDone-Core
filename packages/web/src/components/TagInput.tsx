@@ -86,8 +86,8 @@ export function TagInput({
   return (
     <div className="space-y-2">
       <div className={`
-        min-h-[42px] border rounded-lg p-2 flex flex-wrap gap-1.5 items-center
-        ${isInputFocused ? 'ring-2 ring-blue-500 border-blue-500' : 'border-gray-300 dark:border-gray-600'}
+        min-h-[48px] border-2 rounded-lg px-4 py-3 flex flex-wrap gap-1.5 items-center
+        ${isInputFocused ? 'border-green-400' : 'border-gray-600'}
         ${disabled ? 'bg-gray-100 dark:bg-gray-700 cursor-not-allowed' : 'bg-white dark:bg-gray-800'}
         transition-all duration-200
       `}>

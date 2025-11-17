@@ -1,7 +1,8 @@
 {
   "name": "@graphdone/server",
-  "version": "0.2.2-alpha",
+  "version": "0.3.1-alpha",
   "description": "GraphQL API server for GraphDone",
+  "type": "module",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
@@ -12,7 +13,9 @@
     "lint": "eslint src --ext .ts",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist coverage",
-    "db:seed": "tsx src/scripts/seed.ts"
+    "db:seed": "tsx src/scripts/seed.ts",
+    "create-admin": "tsx src/scripts/create-admin.ts",
+    "create-welcome-graphs": "tsx src/scripts/create-welcome-graphs.ts"
   },
   "dependencies": {
     "@apollo/server": "^4.9.0",
@@ -21,11 +24,15 @@
     "@graphql-tools/schema": "^10.0.0",
     "@neo4j/graphql": "^5.5.0",
     "@types/node-fetch": "^2.6.13",
+    "@types/nodemailer": "^7.0.3",
     "@types/passport-github2": "^1.2.9",
+    "@types/sqlite3": "^3.1.11",
+    "altcha-lib": "^1.3.0",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "dotenv": "^16.3.0",
     "express": "^4.18.0",
+    "express-rate-limit": "^8.2.1",
     "express-session": "^1.18.2",
     "graphql": "^16.8.0",
     "graphql-scalars": "^1.22.0",
@@ -34,10 +41,12 @@
     "jsonwebtoken": "^9.0.2",
     "neo4j-driver": "^5.15.0",
     "node-fetch": "^3.3.2",
+    "nodemailer": "^7.0.10",
     "passport": "^0.7.0",
     "passport-github2": "^0.1.12",
     "passport-google-oauth20": "^2.0.0",
     "passport-linkedin-oauth2": "^2.0.0",
+    "sqlite3": "^5.1.7",
     "uuid": "^11.1.0",
     "ws": "^8.14.0"
   },
@@ -48,7 +57,7 @@
     "@types/express-session": "^1.18.2",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/passport": "^1.0.17",
-    "@types/passport-google-oauth20": "^2.0.16",
+    "@types/passport-google-oauth20": "^2.0.17",
     "@types/passport-linkedin-oauth2": "^1.5.6",
     "@types/uuid": "^10.0.0",
     "@types/ws": "^8.5.0",

@@ -1,0 +1,19 @@
+#!/bin/sh
+# Commit-msg hook - blocks co-author attribution
+# Ensures all commits are single-authored
+
+COMMIT_MSG_FILE=$1
+COMMIT_MSG=$(cat "$COMMIT_MSG_FILE")
+
+# Check for co-author patterns (case insensitive)
+if echo "$COMMIT_MSG" | grep -iq "co-authored-by:"; then
+  echo "❌ ERROR: Co-author attribution detected and blocked"
+  echo ""
+  echo "This repository does not permit co-authored commits."
+  echo "Please remove any 'Co-Authored-By:' lines from your commit message."
+  echo ""
+  exit 1
+fi
+
+# Allow commit if no co-author lines found
+exit 0

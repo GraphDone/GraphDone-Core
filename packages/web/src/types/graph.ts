@@ -77,10 +77,7 @@ export interface WorkItem {
   description?: string;
   type: string;
   status: string;
-  priorityExec?: number;
-  priorityIndiv?: number;
-  priorityComm?: number;
-  priorityComp?: number;
+  priority?: number;
   dueDate?: string;
   tags?: string[];
   assignedTo?: {
@@ -99,16 +96,23 @@ export interface WorkItem {
   positionX?: number;
   positionY?: number;
   positionZ?: number;
+  radius?: number;
+  theta?: number;
+  phi?: number;
   teamId?: string;
   userId?: string;
   dependencies?: WorkItem[];
   dependents?: WorkItem[];
-  priority?: {
-    executive: number;
-    individual: number;
-    community: number;
-    computed: number;
+  contributors?: Array<{ id: string; name: string; type: string; }>;
+  graph?: {
+    id: string;
+    name: string;
+    team?: {
+      id: string;
+      name: string;
+    };
   };
+  metadata?: any;
 }
 
 // Import and re-export RelationshipType from central constants file

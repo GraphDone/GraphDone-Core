@@ -45,7 +45,7 @@ export interface WorkItem {
   type: string;
   status: string;
   description?: string;
-  priorityComp?: number;
+  priority?: number;
   dependencies?: Array<{ id: string; title: string; }>;
   dependents?: Array<{ id: string; title: string; }>;
 }

@@ -8,10 +8,7 @@ interface WorkItem {
   description?: string;
   type: string;
   status: string;
-  priorityExec: number;
-  priorityIndiv: number;
-  priorityComm: number;
-  priorityComp: number;
+  priority: number;
   dueDate?: string;
   tags?: string[];
   metadata?: string;
@@ -88,7 +85,7 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ filteredNodes }) => {
     const activityList: ActivityItem[] = [];
     
     filteredNodes.forEach(node => {
-      const priority = node.priorityExec || node.priorityComp || 0;
+      const priority = node.priority || 0;
       const activityPriority = priority >= 0.8 ? 'critical' : 
                               priority >= 0.6 ? 'high' : 
                               priority >= 0.4 ? 'moderate' : 
@@ -377,7 +374,7 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ filteredNodes }) => {
   }, []);
 
   return (
-    <div className="flex flex-col h-full bg-gray-900">
+    <div className="flex flex-col h-full">
       {/* Header */}
       <div className="p-6 border-b border-gray-700">
         <div className="flex items-center justify-between mb-6">
@@ -617,7 +614,7 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ filteredNodes }) => {
               return (
                 <div 
                   key={activity.id} 
-                  className={`bg-gray-800 rounded-lg border transition-all duration-200 cursor-pointer ${
+                  className={`bg-gray-800/50 backdrop-blur-sm rounded-lg border transition-all duration-200 cursor-pointer ${
                     isSelected 
                       ? `${WORK_ITEM_STATUSES.COMPLETED.borderColor} ${WORK_ITEM_STATUSES.COMPLETED.bgColor} shadow-lg shadow-green-500/10` 
                       : 'border-gray-700 hover:border-gray-600 hover:bg-gray-750'
@@ -722,7 +719,7 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ filteredNodes }) => {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="border-t border-gray-700 p-4 bg-gray-800">
+        <div className="border-t border-gray-700/50 p-4 bg-gray-800/50 backdrop-blur-sm">
           <div className="flex items-center justify-between">
             <div className="text-sm text-gray-400">
               Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredActivities.length)} of {filteredActivities.length} activities
