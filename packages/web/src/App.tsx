@@ -82,8 +82,11 @@ function AuthenticatedApp() {
 }
 
 function App() {
+  // Enable auto guest login in demo mode
+  const autoGuestLogin = import.meta.env.VITE_AUTO_GUEST_LOGIN === 'true';
+
   return (
-    <AuthProvider>
+    <AuthProvider autoGuestLogin={autoGuestLogin}>
       <AuthenticatedApp />
     </AuthProvider>
   );
