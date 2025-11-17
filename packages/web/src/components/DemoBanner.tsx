@@ -8,6 +8,7 @@
  */
 
 import { useState } from 'react';
+import { BUILD_TAG } from '../utils/version';
 
 const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true';
 
@@ -49,6 +50,9 @@ export function DemoBanner() {
               </p>
               <p className="text-xs sm:hidden mt-1 opacity-90">
                 Session timeout: 2 hours • Daily reset at 2 AM UTC
+              </p>
+              <p className="text-xs mt-1 opacity-75 font-mono">
+                Build: {BUILD_TAG}
               </p>
             </div>
           </div>

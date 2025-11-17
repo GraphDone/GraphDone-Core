@@ -1,7 +1,10 @@
 FROM node:18-alpine AS builder
 
-# Build argument for base path
+# Build arguments
 ARG BASE_PATH=/
+ARG GIT_BRANCH=unknown
+ARG GIT_COMMIT=unknown
+ARG BUILD_TAG=unknown
 
 WORKDIR /app
 
@@ -18,8 +21,11 @@ COPY packages/core ./packages/core
 COPY packages/web ./packages/web
 COPY tsconfig.json ./
 
-# Build the application with BASE_PATH
+# Build the application with BASE_PATH and version info
 ENV BASE_PATH=${BASE_PATH}
+ENV VITE_GIT_BRANCH=${GIT_BRANCH}
+ENV VITE_GIT_COMMIT=${GIT_COMMIT}
+ENV VITE_BUILD_TAG=${BUILD_TAG}
 RUN npm run build
 
 # Production stage
