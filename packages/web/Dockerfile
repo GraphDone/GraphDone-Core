@@ -5,6 +5,7 @@ ARG BASE_PATH=/
 ARG GIT_BRANCH=unknown
 ARG GIT_COMMIT=unknown
 ARG BUILD_TAG=unknown
+ARG VITE_AUTO_GUEST_LOGIN=false
 
 WORKDIR /app
 
@@ -26,6 +27,7 @@ ENV BASE_PATH=${BASE_PATH}
 ENV VITE_GIT_BRANCH=${GIT_BRANCH}
 ENV VITE_GIT_COMMIT=${GIT_COMMIT}
 ENV VITE_BUILD_TAG=${BUILD_TAG}
+ENV VITE_AUTO_GUEST_LOGIN=${VITE_AUTO_GUEST_LOGIN}
 RUN npm run build
 
 # Production stage
@@ -34,9 +36,13 @@ FROM nginx:alpine
 # Copy built app to nginx
 COPY --from=builder /app/packages/web/dist /usr/share/nginx/html
 
-# Copy nginx configuration
-COPY packages/web/nginx.conf /etc/nginx/conf.d/default.conf
+# Copy nginx configuration template
+COPY packages/web/nginx.conf.template /etc/nginx/conf.d/default.conf.template
+
+# Copy entrypoint script
+COPY packages/web/docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
 
 EXPOSE 80
 
-CMD ["nginx", "-g", "daemon off;"]
+ENTRYPOINT ["/docker-entrypoint.sh"]
