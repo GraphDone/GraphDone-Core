@@ -19,7 +19,7 @@ server {
 
     # Proxy GraphQL requests to backend
     location /graphql {
-        proxy_pass http://graphdone-server:4127/graphql;
+        proxy_pass ${GRAPHQL_BACKEND_URL};
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
