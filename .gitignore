@@ -118,3 +118,10 @@ tsconfig.tsbuildinfo
 
 # Prisma
 prisma/dev.db
+# Environment backup files
+.env.backup
+.env.bak
+.env.*.backup
+.env.*.bak
+*.env.backup
+*.env.bak
