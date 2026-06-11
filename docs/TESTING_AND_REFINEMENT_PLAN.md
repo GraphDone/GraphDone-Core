@@ -9,7 +9,8 @@
 
 | Item | What to do | Exit criteria |
 |------|-----------|---------------|
-| Chaos suite: last failure | One test still fails in the serialized full run (4735+ pass). Identify, fix or quarantine with a written reason. | `npm run test:unit` fully green, 3 consecutive runs |
+| **17 failing PR-critical E2E tests** | The CI gate is honest again (docker compose v2 + build window + health-port fixes) and ran its Playwright suite for the first time in months: 10/33 pass. All 17 failures die in ~2s against the prod HTTPS stack — find the common root cause (likely auth/navigation against `https://localhost:3128`), then burn down the rest. This is the pre-existing debt CLAUDE.md flagged in 2025-09. | `PR Critical Tests` check green on develop |
+| ~~Chaos suite: last failure~~ | ✅ Fixed 2026-06-10: two test bugs (swallowed AssertionErrors; CPU-protection rejections not in the allowed-error regex). Full suite 4,736 pass / 0 fail. | done |
 | Quality tiers on real devices | The governor is unit-tested; it has never been observed on a real phone. Throttle CPU 6x + 3G in devtools, confirm tier drops and effects strip. | Manual checklist + screen recording in PR |
 | Entrance animation under data churn | LIVE-8 runs on first init only; verify polling/subscription updates never re-trigger it or leave nodes at opacity 0. | E2E: graph open → wait 30s with live updates → all nodes opacity 1 |
 | `get_graph_context` against real Neo4j | Tool is mock-tested. Run against seeded dev DB; verify the Cypher (`CALL` subquery syntax) on Neo4j 5.26 and the <2kB budget with 500-node graphs. | Integration test in mcp-server using live driver, CI-gated behind env flag |
