@@ -113,7 +113,6 @@ export const useDialog = (isOpen: boolean, onClose: () => void, options?: Regist
         unsubscribeRef.current = null;
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
   return {

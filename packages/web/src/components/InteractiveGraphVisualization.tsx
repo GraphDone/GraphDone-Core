@@ -1250,6 +1250,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     }
 
     svg.call(zoom);
+    zoomBehaviorRef.current = zoom;
     
     // Restore zoom transform if this is a surgical update
     if (!isFirstInit && currentTransform) {
@@ -1618,6 +1619,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
 
     // Apply zoom behavior to the svg (always, but preserve existing transform)
     svg.call(zoom);
+    zoomBehaviorRef.current = zoom;
     
     // Restore zoom transform if this is a surgical update
     if (!isFirstInit && currentTransform) {
@@ -3278,15 +3280,22 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
           });
       }
 
-      // Update mini-map with current node positions
-      if ((window as any).updateMiniMapPositions && nodes.length > 0) {
-        const positions: {[key: string]: {x: number, y: number}} = {};
-        nodes.forEach((node: any) => {
-          if (node.x !== undefined && node.y !== undefined) {
-            positions[node.id] = { x: node.x, y: node.y };
-          }
-        });
-        (window as any).updateMiniMapPositions(positions);
+      // Update mini-map with current node positions (live simulation objects —
+      // the React-state nodes are different objects since the identity merge)
+      if ((window as any).updateMiniMapPositions) {
+        const simNodesForMap = simulation.nodes() as any[];
+        if (simNodesForMap.length > 0) {
+          const positions: {[key: string]: {x: number, y: number}} = {};
+          const types: {[key: string]: string} = {};
+          simNodesForMap.forEach((node: any) => {
+            if (node.x !== undefined && node.y !== undefined) {
+              positions[node.id] = { x: node.x, y: node.y };
+              types[node.id] = node.type;
+            }
+          });
+          (window as any).updateMiniMapPositions(positions);
+          (window as any).updateMiniMapTypes?.(types);
+        }
       }
         
       // 2) Then every edge, arrow and label re-anchors to the new positions
@@ -3381,61 +3390,73 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
 
   // Store simulation reference for resize handling
   const simulationRef = useRef<d3.Simulation<any, any> | null>(null);
+  const zoomBehaviorRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
   const mousedownNodeRef = useRef<any>(null);
 
   // Fit view to show all nodes
   const fitViewToNodes = useCallback(() => {
-    if (!svgRef.current || !containerRef.current || nodes.length === 0) return;
-    
+    if (!svgRef.current || !containerRef.current) return;
+    // Bounds must come from the LIVE simulation objects (the React-state
+    // nodes are different objects since the identity merge and may hold
+    // stale/initial coordinates — that bug made fit zoom out to a huge box).
+    const simNodes = (simulationRef.current?.nodes() as any[]) || [];
+    if (simNodes.length === 0) return;
+
     const svg = d3.select(svgRef.current);
     const container = containerRef.current;
     const width = container.clientWidth;
     const height = container.clientHeight;
-    
-    // Calculate bounding box of all nodes
+
+    // Bounding box of the actual cards, not just their centers
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    
-    nodes.forEach((node: any) => {
-      const x = node.x || 0;
-      const y = node.y || 0;
-      minX = Math.min(minX, x);
-      maxX = Math.max(maxX, x);
-      minY = Math.min(minY, y);
-      maxY = Math.max(maxY, y);
+    simNodes.forEach((node: any) => {
+      if (typeof node.x !== 'number' || typeof node.y !== 'number') return;
+      const dims = getNodeDimensions(node);
+      minX = Math.min(minX, node.x - dims.width / 2);
+      maxX = Math.max(maxX, node.x + dims.width / 2);
+      minY = Math.min(minY, node.y - dims.height / 2);
+      maxY = Math.max(maxY, node.y + dims.height / 2);
     });
-    
+
     if (!isFinite(minX)) return; // No valid positions
-    
-    // Add padding
-    const padding = 100;
-    minX -= padding;
-    maxX += padding;
-    minY -= padding;
-    maxY += padding;
-    
-    const boundsWidth = maxX - minX;
-    const boundsHeight = maxY - minY;
-    
-    // Calculate scale to fit all nodes
-    const scale = Math.min(
-      width / boundsWidth,
-      height / boundsHeight,
-      2 // Max zoom level
-    );
-    
-    // Calculate translate to center the bounds
-    const centerX = width / 2;
-    const centerY = height / 2;
-    const boundsCenterX = (minX + maxX) / 2;
-    const boundsCenterY = (minY + maxY) / 2;
-    
-    const translateX = centerX - boundsCenterX * scale;
-    const translateY = centerY - boundsCenterY * scale;
-    
-    // Apply the transform
+
+    const padding = 60;
+    minX -= padding; maxX += padding; minY -= padding; maxY += padding;
+
+    const boundsWidth = Math.max(1, maxX - minX);
+    const boundsHeight = Math.max(1, maxY - minY);
+
+    // Fit, but never zoom IN past 1.25 (a 3-node graph shouldn't fill the screen)
+    const scale = Math.min(width / boundsWidth, height / boundsHeight, 1.25);
+
+    const translateX = width / 2 - ((minX + maxX) / 2) * scale;
+    const translateY = height / 2 - ((minY + maxY) / 2) * scale;
     const transform = d3.zoomIdentity.translate(translateX, translateY).scale(scale);
-    svg.call(d3.zoom<SVGSVGElement, unknown>().transform as any, transform);
-  }, [nodes]);
+
+    // Use the component's own zoom behavior so handlers fire and state stays
+    // coherent; animate so the user keeps spatial context.
+    if (zoomBehaviorRef.current) {
+      svg.transition().duration(450).call(zoomBehaviorRef.current.transform as any, transform);
+    } else {
+      svg.call(d3.zoom<SVGSVGElement, unknown>().transform as any, transform);
+    }
+  }, [getNodeDimensions]);
+
+  // Mini-map click → pan the main view to that graph point at current zoom
+  useEffect(() => {
+    (window as any).miniMapNavigate = (graphX: number, graphY: number) => {
+      if (!svgRef.current || !containerRef.current || !zoomBehaviorRef.current) return;
+      const svg = d3.select(svgRef.current);
+      const k = d3.zoomTransform(svgRef.current).k || 1;
+      const w = containerRef.current.clientWidth;
+      const h = containerRef.current.clientHeight;
+      const t = d3.zoomIdentity.translate(w / 2 - graphX * k, h / 2 - graphY * k).scale(k);
+      svg.transition().duration(350).call(zoomBehaviorRef.current.transform as any, t);
+    };
+    return () => {
+      delete (window as any).miniMapNavigate;
+    };
+  }, []);
 
   // Center on specific node
   const centerOnNode = useCallback((nodeId?: string) => {
