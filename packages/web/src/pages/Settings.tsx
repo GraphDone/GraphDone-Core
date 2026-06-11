@@ -3,9 +3,12 @@ import { Save, RotateCcw, Settings as SettingsIcon } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { CustomDropdown } from '../components/CustomDropdown';
 import { APP_VERSION } from '../utils/version';
+import { useAdaptiveQuality } from '../hooks/useAdaptiveQuality';
+import type { QualityTier } from '../lib/adaptiveQuality';
 
 export function Settings() {
   const { currentUser } = useAuth();
+  const { tier, override, setOverride } = useAdaptiveQuality();
   const [settings, setSettings] = React.useState({
     autoLayout: true,
     showPriorityIndicators: true,
@@ -116,6 +119,35 @@ export function Settings() {
                       checked={settings.enableAnimations}
                       onChange={(e) => setSettings(prev => ({ ...prev, enableAnimations: e.target.checked }))}
                       className="h-4 w-4 text-green-500 focus:ring-green-500 border-gray-500 bg-gray-700 rounded"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Performance (ADAPT-6) */}
+              <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
+                <h2 className="text-lg font-semibold text-gray-100 mb-4">Performance</h2>
+                <div className="space-y-4">
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-sm font-medium text-gray-300">Visual Quality</label>
+                      <span className="text-xs bg-gray-700/60 text-green-400 px-2 py-1 rounded">
+                        active: {tier}{override ? '' : ' (auto)'}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-400 mb-2">
+                      Auto adapts to your device and network — effects scale down before responsiveness ever does. Pin a tier if auto guesses wrong.
+                    </p>
+                    <CustomDropdown
+                      options={[
+                        { value: 'AUTO', label: 'Auto (recommended)' },
+                        { value: 'LOW', label: 'Low — fastest, no effects' },
+                        { value: 'MEDIUM', label: 'Medium — glow, light animation' },
+                        { value: 'HIGH', label: 'High — full living graph' },
+                        { value: 'ULTRA', label: 'Ultra — everything on' }
+                      ]}
+                      value={override ?? 'AUTO'}
+                      onChange={(value) => setOverride(value === 'AUTO' ? null : (value as QualityTier))}
                     />
                   </div>
                 </div>
