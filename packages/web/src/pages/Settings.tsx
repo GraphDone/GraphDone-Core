@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Save, RotateCcw, Settings as SettingsIcon } from 'lucide-react';
+import React from 'react';
+import { Settings as SettingsIcon } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { CustomDropdown } from '../components/CustomDropdown';
 import { APP_VERSION } from '../utils/version';
@@ -9,28 +9,6 @@ import type { QualityTier } from '../lib/adaptiveQuality';
 export function Settings() {
   const { currentUser } = useAuth();
   const { tier, override, setOverride } = useAdaptiveQuality();
-  const [settings, setSettings] = React.useState({
-    autoLayout: true,
-    showPriorityIndicators: true,
-    enableAnimations: true,
-    theme: 'light',
-    defaultViewMode: '3d'
-  });
-
-
-  const handleSave = () => {
-    // Save settings functionality to be implemented
-  };
-
-  const handleReset = () => {
-    setSettings({
-      autoLayout: true,
-      showPriorityIndicators: true,
-      enableAnimations: true,
-      theme: 'light',
-      defaultViewMode: '3d'
-    });
-  };
 
   return (
     <div className="h-screen flex flex-col">
@@ -57,73 +35,9 @@ export function Settings() {
         <div className="max-w-4xl mx-auto px-6 py-8">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-semibold text-gray-100">Application Settings</h2>
-              <div className="flex items-center space-x-3">
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={handleReset}
-                >
-                  <RotateCcw className="h-4 w-4 mr-2" />
-                  Reset
-                </button>
-                
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={handleSave}
-                >
-                  <Save className="h-4 w-4 mr-2" />
-                  Save Changes
-                </button>
-              </div>
             </div>
             
             <div className="space-y-8">
-              {/* Graph Visualization */}
-              <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
-                <h2 className="text-lg font-semibold text-gray-100 mb-4">Graph Visualization</h2>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <label className="text-sm font-medium text-gray-300">Auto-layout</label>
-                      <p className="text-sm text-gray-400">Automatically arrange nodes for optimal viewing</p>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={settings.autoLayout}
-                      onChange={(e) => setSettings(prev => ({ ...prev, autoLayout: e.target.checked }))}
-                      className="h-4 w-4 text-green-500 focus:ring-green-500 border-gray-500 bg-gray-700 rounded"
-                    />
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <label className="text-sm font-medium text-gray-300">Priority Indicators</label>
-                      <p className="text-sm text-gray-400">Show visual priority indicators on nodes</p>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={settings.showPriorityIndicators}
-                      onChange={(e) => setSettings(prev => ({ ...prev, showPriorityIndicators: e.target.checked }))}
-                      className="h-4 w-4 text-green-500 focus:ring-green-500 border-gray-500 bg-gray-700 rounded"
-                    />
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <label className="text-sm font-medium text-gray-300">Enable Animations</label>
-                      <p className="text-sm text-gray-400">Smooth transitions and animations in the graph</p>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={settings.enableAnimations}
-                      onChange={(e) => setSettings(prev => ({ ...prev, enableAnimations: e.target.checked }))}
-                      className="h-4 w-4 text-green-500 focus:ring-green-500 border-gray-500 bg-gray-700 rounded"
-                    />
-                  </div>
-                </div>
-              </div>
-
               {/* Performance (ADAPT-6) */}
               <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
                 <h2 className="text-lg font-semibold text-gray-100 mb-4">Performance</h2>
@@ -148,38 +62,6 @@ export function Settings() {
                       ]}
                       value={override ?? 'AUTO'}
                       onChange={(value) => setOverride(value === 'AUTO' ? null : (value as QualityTier))}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Theme */}
-              <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
-                <h2 className="text-lg font-semibold text-gray-100 mb-4">Appearance</h2>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Theme</label>
-                    <CustomDropdown
-                      options={[
-                        { value: 'light', label: 'Light' },
-                        { value: 'dark', label: 'Dark' },
-                        { value: 'auto', label: 'Auto' }
-                      ]}
-                      value={settings.theme}
-                      onChange={(value) => setSettings(prev => ({ ...prev, theme: value }))}
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Default View Mode</label>
-                    <CustomDropdown
-                      options={[
-                        { value: '2d', label: '2D View' },
-                        { value: '3d', label: '3D View' },
-                        { value: 'hybrid', label: 'Hybrid' }
-                      ]}
-                      value={settings.defaultViewMode}
-                      onChange={(value) => setSettings(prev => ({ ...prev, defaultViewMode: value }))}
                     />
                   </div>
                 </div>
