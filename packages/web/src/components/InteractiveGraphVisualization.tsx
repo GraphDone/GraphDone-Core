@@ -40,6 +40,8 @@ import { WorkItemDetailsModal } from './WorkItemDetailsModal';
 
 import { WorkItem, WorkItemEdge } from '../types/graph';
 import { RelationshipType, RELATIONSHIP_OPTIONS, getRelationshipConfig } from '../constants/workItemConstants';
+import { useAdaptiveQuality } from '../hooks/useAdaptiveQuality';
+import { nodeLifeClasses, nodeGlowFilter, isActiveStatus } from '../lib/nodeAnimations';
 
 // LOD thresholds for different zoom levels
 const LOD_THRESHOLDS = {
@@ -85,7 +87,10 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
   const { showSuccess, showError } = useNotifications();
   const navigate = useNavigate();
   const location = useLocation();
-  
+  const { tier: qualityTier, profile: qualityProfile } = useAdaptiveQuality();
+  const qualityProfileRef = useRef(qualityProfile);
+  qualityProfileRef.current = qualityProfile;
+
   // Fullscreen mode abandoned - keeping single view mode
 
   // Prevent body scroll when graph view is active
@@ -2020,6 +2025,10 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     nodeElements.append('rect')
       .attr('class', (d: WorkItem) => {
         let classes = 'node-bg';
+        const lifeClass = nodeLifeClasses(d.status);
+        if (lifeClass) {
+          classes += ` ${lifeClass}`;
+        }
         // Add pulsing class if node dialog is active
         if (nodeMenu.visible && nodeMenu.node && nodeMenu.node.id === d.id) {
           classes += ' dialog-active-pulse';
@@ -2038,7 +2047,10 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         }
         return '#1f2937'; // Dark background consistent with theme
       })
-      .style('filter', 'url(#node-drop-shadow)')
+      .style('filter', (d: WorkItem) => {
+        const typeConfig = getTypeConfig(d.type as WorkItemType);
+        return nodeGlowFilter(d.priority, typeConfig.hexColor, qualityProfileRef.current.glowEffects);
+      })
       .attr('stroke', (d: WorkItem) => {
         // Use node type color for active dialog
         if (nodeMenu.visible && nodeMenu.node && nodeMenu.node.id === d.id) {
@@ -2052,6 +2064,10 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         }
         if (d.status === 'COMPLETED' || d.status === 'Completed' || d.status === 'Done' || d.status === 'DONE') {
           return '#4b5563';
+        }
+        // In-progress work breathes with its type color (LIVE-1)
+        if (isActiveStatus(d.status)) {
+          return getTypeConfig(d.type as WorkItemType).hexColor;
         }
         return '#4b5563'; // Gray border
       })
@@ -3603,7 +3619,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     const isNetworkError = errorMessage.includes('Cannot connect');
     
     return (
-      <div ref={containerRef} className="graph-container relative w-full h-full">
+      <div ref={containerRef} className="graph-container relative w-full h-full" data-quality={qualityTier}>
         <svg ref={svgRef} className="w-full h-full">
           {/* Error message centered in SVG */}
           <foreignObject x="20%" y="30%" width="60%" height="40%">
@@ -3770,7 +3786,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
 
 
   return (
-    <div ref={containerRef} className="graph-container relative w-full h-full overflow-hidden select-none">
+    <div ref={containerRef} className="graph-container relative w-full h-full overflow-hidden select-none" data-quality={qualityTier}>
       <svg 
         ref={svgRef} 
         className="w-full h-full" 
