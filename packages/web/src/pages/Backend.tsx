@@ -228,13 +228,13 @@ export function Backend() {
       setLastUpdate(new Date());
     });
     
-    // Auto-refresh every 15 seconds for more frequent updates
+    // Live page: refresh every 5 seconds
     const interval = setInterval(() => {
       checkServiceHealth().then((result) => {
         setSystemHealth(result);
         setLastUpdate(new Date());
       });
-    }, 15000);
+    }, 5000);
 
     return () => clearInterval(interval);
   }, []);
@@ -429,9 +429,19 @@ export function Backend() {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'healthy': return <CheckCircle className="h-5 w-5 text-green-600" />;
-      case 'degraded': return <AlertCircle className="h-5 w-5 text-yellow-600" />;
-      case 'down': return <XCircle className="h-5 w-5 text-red-600" />;
+      case 'healthy': return (
+        <span className="relative inline-flex">
+          <span className="absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-30 animate-ping" style={{ animationDuration: '2.4s' }} />
+          <CheckCircle className="relative h-5 w-5 text-green-500" />
+        </span>
+      );
+      case 'degraded': return (
+        <span className="relative inline-flex">
+          <span className="absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-40 animate-ping" style={{ animationDuration: '1.2s' }} />
+          <AlertCircle className="relative h-5 w-5 text-yellow-500" />
+        </span>
+      );
+      case 'down': return <XCircle className="h-5 w-5 text-red-500 animate-pulse" />;
       default: return <Activity className="h-5 w-5 text-gray-600" />;
     }
   };

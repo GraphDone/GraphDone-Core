@@ -23,8 +23,8 @@ export function Layout({ children }: LayoutProps) {
   const navigation = [
     { name: 'Workspace', href: '/', icon: Globe, description: 'Main work' },
     { name: 'Ontology', href: '/ontology', icon: Brain, description: 'Node schemas' },
-    { name: 'AI & Agents', href: '/agents', icon: Bot, description: 'AI collaboration' },
-    { name: 'Analytics', href: '/analytics', icon: BarChart3, description: 'Priority insights' },
+    { name: 'AI & Agents', href: '/agents', icon: Bot, description: 'AI collaboration', comingSoon: true },
+    { name: 'Analytics', href: '/analytics', icon: BarChart3, description: 'Priority insights', comingSoon: true },
     { name: 'Settings', href: '/settings', icon: Settings, description: 'User preferences' },
     { name: 'Admin', href: '/admin', icon: Shield, description: 'System administration', restricted: currentUser?.role !== 'ADMIN' },
     { name: 'System', href: '/backend', icon: Server, description: 'Backend status', restricted: currentUser?.role === 'VIEWER' || currentUser?.role === 'GUEST' },
@@ -85,12 +85,14 @@ export function Layout({ children }: LayoutProps) {
               {navigation.map((item) => {
                 const Icon = item.icon;
                 const isActive = location.pathname === item.href;
-                const isRestricted = item.restricted;
+                const isRestricted = item.restricted || (item as { comingSoon?: boolean }).comingSoon;
                 
                 if (isRestricted) {
-                  const restrictionMessage = item.name === 'Admin' 
+                  const restrictionMessage = (item as { comingSoon?: boolean }).comingSoon
+                    ? 'Coming soon'
+                    : item.name === 'Admin'
                     ? 'Admin access required'
-                    : item.name === 'System' 
+                    : item.name === 'System'
                     ? 'User or Admin access required'
                     : 'Access restricted';
                   
