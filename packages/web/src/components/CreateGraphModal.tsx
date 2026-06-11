@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useDialog } from '../hooks/useDialogManager';
 import { X, Folder, FolderOpen, Plus, Copy, FileText } from 'lucide-react';
 import { useGraph } from '../contexts/GraphContext';
@@ -19,6 +19,14 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
   const { showSuccess, showError } = useNotifications();
   
   const [step, setStep] = useState<'type' | 'details' | 'template'>('type');
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (step === 'details') {
+      const t = setTimeout(() => nameInputRef.current?.focus(), 180);
+      return () => clearTimeout(t);
+    }
+    return undefined;
+  }, [step]);
   const [formData, setFormData] = useState<Partial<CreateGraphInput>>({
     type: 'PROJECT',
     parentGraphId,
@@ -122,10 +130,6 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
   );
 
   const handleSubmit = async () => {
-    console.log('=== CREATE GRAPH SUBMISSION START ===');
-    console.log('Current user:', currentUser);
-    console.log('Current team:', currentTeam);
-    console.log('Form data before validation:', formData);
     
     if (!formData.name) {
       console.error('Graph name is required');
@@ -146,8 +150,6 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
     const fallbackTeamId = currentTeam?.id || formData.teamId || 'default-team';
     const fallbackUserId = currentUser?.id || 'default-user';
     
-    console.log('Using team ID:', fallbackTeamId);
-    console.log('Using user ID:', fallbackUserId);
 
     try {
       // Handle copying existing graph
@@ -236,9 +238,9 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
                   {step === 'template' && 'Starting Point'}
                 </h3>
                 <p className="text-xs text-gray-400">
-                  {step === 'type' && 'Step 1 of 3'}
-                  {step === 'template' && 'Step 2 of 3'}
-                  {step === 'details' && 'Step 3 of 3'}
+                  {step === 'type' && 'Step 1 of 2'}
+                  {step === 'template' && 'Optional'}
+                  {step === 'details' && 'Step 2 of 2'}
                 </p>
               </div>
             </div>
@@ -332,7 +334,7 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
                   Cancel
                 </button>
                 <button
-                  onClick={() => setStep('template')}
+                  onClick={() => setStep('details')}
                   className="px-6 py-2.5 text-sm bg-gradient-to-r from-green-600 via-emerald-600 to-teal-600 text-white rounded-xl hover:from-green-500 hover:via-emerald-500 hover:to-teal-500 transition-all duration-200 font-semibold flex items-center space-x-2 hover:scale-105 shadow-lg shadow-green-500/25 hover:shadow-xl hover:shadow-green-500/40"
                 >
                   <span>Continue</span>
@@ -451,7 +453,7 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
 
               <div className="flex justify-between pt-4 border-t border-gray-700/50">
                 <button
-                  onClick={() => setStep('type')}
+                  onClick={() => setStep('details')}
                   className="px-4 py-2 text-sm text-gray-300 bg-gray-700/50 rounded-lg hover:bg-gray-600/50 transition-all duration-200 flex items-center space-x-1.5"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -490,11 +492,17 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
                         console.log('Name input changed to:', e.target.value);
                         setFormData(prev => {
                           const newData = { ...prev, name: e.target.value };
-                          console.log('New form data will be:', newData);
                           return newData;
                         });
                       }}
                       placeholder="Enter a descriptive name for your graph"
+                      ref={nameInputRef}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && formData.name?.trim() && !isCreating) {
+                          e.preventDefault();
+                          handleSubmit();
+                        }
+                      }}
                       className="w-full px-4 py-3 text-sm bg-gray-800/80 border-2 border-gray-600/50 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-500/70 transition-all duration-200 hover:border-gray-500/70 shadow-inner"
                     />
                     <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-green-500/5 to-emerald-500/5 pointer-events-none opacity-0 group-hover/input:opacity-100 transition-opacity"></div>
@@ -700,15 +708,23 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
               </div>
 
               <div className="flex justify-between pt-6 border-t border-gradient-to-r from-gray-600/30 via-gray-500/50 to-gray-600/30 relative z-10">
-                <button
-                  onClick={() => setStep('template')}
-                  className="px-6 py-3 text-gray-300 bg-gradient-to-r from-gray-700/80 to-gray-600/80 rounded-xl hover:from-gray-600/80 hover:to-gray-500/80 transition-all duration-300 hover:scale-105 shadow-lg backdrop-blur-sm border border-gray-500/30 hover:border-gray-400/50 hover:text-white font-medium flex items-center space-x-2"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path>
-                  </svg>
-                  <span>Back</span>
-                </button>
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={() => setStep('type')}
+                    className="px-6 py-3 text-gray-300 bg-gradient-to-r from-gray-700/80 to-gray-600/80 rounded-xl hover:from-gray-600/80 hover:to-gray-500/80 transition-all duration-300 hover:scale-105 shadow-lg backdrop-blur-sm border border-gray-500/30 hover:border-gray-400/50 hover:text-white font-medium flex items-center space-x-2"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path>
+                    </svg>
+                    <span>Back</span>
+                  </button>
+                  <button
+                    onClick={() => setStep('template')}
+                    className="text-sm text-gray-400 hover:text-emerald-300 underline-offset-2 hover:underline transition-colors"
+                  >
+                    Start from a template…
+                  </button>
+                </div>
                 <div className="flex space-x-4">
                   <button
                     onClick={handleClose}
@@ -721,18 +737,8 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      console.log('=== BUTTON CLICK EVENT ===');
-                      console.log('Form data:', formData);
-                      console.log('Form data name:', formData.name);
-                      console.log('Name exists?', !!formData.name);
-                      console.log('Name length:', formData.name?.length);
-                      console.log('isCreating:', isCreating);
-                      console.log('Button should be disabled?', !formData.name?.trim() || isCreating);
                       if (formData.name?.trim() && !isCreating) {
                         handleSubmit();
-                      } else {
-                        console.error('Cannot submit: Name is empty or already creating');
-                        alert('Please ensure you have entered a graph name');
                       }
                     }}
                     disabled={!formData.name?.trim() || isCreating}
