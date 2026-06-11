@@ -38,6 +38,18 @@ export function nodeLifeClasses(status?: string): string {
   return '';
 }
 
+/**
+ * Energy flows along an edge when exactly one endpoint is completed (LIVE-2):
+ * forward (source→target) when the source is done, reverse when the target
+ * is. CSS animates stroke-dashoffset; LOW tier and reduced motion strip it.
+ */
+export function edgeFlowClass(sourceStatus?: string, targetStatus?: string): string {
+  const sourceDone = isCompletedStatus(sourceStatus);
+  const targetDone = isCompletedStatus(targetStatus);
+  if (sourceDone === targetDone) return '';
+  return sourceDone ? 'edge-flowing-forward' : 'edge-flowing-reverse';
+}
+
 /** Priority (0..1) → glow step 0..3. Four visually distinct levels (LIVE-5). */
 export function priorityGlowStep(priority?: number): 0 | 1 | 2 | 3 {
   const p = typeof priority === 'number' && Number.isFinite(priority) ? priority : 0;

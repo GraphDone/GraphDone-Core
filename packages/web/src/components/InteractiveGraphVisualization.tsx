@@ -41,7 +41,7 @@ import { WorkItemDetailsModal } from './WorkItemDetailsModal';
 import { WorkItem, WorkItemEdge } from '../types/graph';
 import { RelationshipType, RELATIONSHIP_OPTIONS, getRelationshipConfig } from '../constants/workItemConstants';
 import { useAdaptiveQuality } from '../hooks/useAdaptiveQuality';
-import { nodeLifeClasses, nodeGlowFilter, isActiveStatus } from '../lib/nodeAnimations';
+import { nodeLifeClasses, nodeGlowFilter, isActiveStatus, edgeFlowClass } from '../lib/nodeAnimations';
 
 // LOD thresholds for different zoom levels
 const LOD_THRESHOLDS = {
@@ -1763,6 +1763,16 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       .append('line')
       .attr('class', (d: WorkItemEdge) => {
         let classes = 'edge';
+        // After force-link binding, source/target are node objects at runtime
+        const src = d.source as unknown as { status?: string };
+        const tgt = d.target as unknown as { status?: string };
+        const flowClass = edgeFlowClass(
+          typeof src === 'object' ? src?.status : undefined,
+          typeof tgt === 'object' ? tgt?.status : undefined
+        );
+        if (flowClass) {
+          classes += ` ${flowClass}`;
+        }
         // Add pulsing class if edge dialog is active
         if (editingEdge && editingEdge.edge && editingEdge.edge.id === d.id) {
           classes += ' dialog-active-pulse';

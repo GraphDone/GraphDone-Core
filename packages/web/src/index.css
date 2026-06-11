@@ -766,3 +766,40 @@ input[type="date"]:focus {
     animation: none;
   }
 }
+
+/* LIVE-2: energy flows along edges away from completed work */
+@keyframes edge-flow-forward {
+  to {
+    stroke-dashoffset: -14;
+  }
+}
+
+@keyframes edge-flow-reverse {
+  to {
+    stroke-dashoffset: 14;
+  }
+}
+
+.graph-container svg .edge-flowing-forward {
+  stroke-dasharray: 8 6;
+  animation: edge-flow-forward 1.2s linear infinite;
+}
+
+.graph-container svg .edge-flowing-reverse {
+  stroke-dasharray: 8 6;
+  animation: edge-flow-reverse 1.2s linear infinite;
+}
+
+.graph-container[data-quality="LOW"] svg .edge-flowing-forward,
+.graph-container[data-quality="LOW"] svg .edge-flowing-reverse {
+  stroke-dasharray: none;
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .graph-container svg .edge-flowing-forward,
+  .graph-container svg .edge-flowing-reverse {
+    stroke-dasharray: none;
+    animation: none;
+  }
+}
