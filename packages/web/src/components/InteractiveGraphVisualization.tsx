@@ -311,7 +311,6 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     } catch {
       showError('Could not undo that — the server refused');
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
