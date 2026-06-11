@@ -101,3 +101,23 @@ Why this exists: everybody hates Jira. GraphDone wins by being **alive, fast eve
 | `phone-constrained` | 2 cores, 2GB | 3g or saveData | LOW |
 
 These profiles are encoded in `packages/web/src/lib/adaptiveQuality.ts` and exercised by its unit tests — change them there and here together.
+
+## Epic 7: The Ontology Layer 🧬
+*One graph engine, many overlapping ontology sets. Requirements management is the first; the meta-model is the backbone. Design: [design/ontology-layer.md](./design/ontology-layer.md).*
+
+| ID | Story | AC | Test mapping | Status |
+|----|-------|----|--------------|--------|
+| ONTO-1 | As a team, I want object/link types defined as data (ontology sets), so GraphDone can model any domain, not just tasks. | ObjectTypeDef/LinkTypeDef/OntologySet nodes; built-in Task set seeds from today's enums; existing graphs unaffected. | `server/src/__tests__/ontology-meta.test.ts` | 💤 |
+| ONTO-2 | As a user or agent, I want every typed write validated against the def (required props, enums, endpoints, cardinality), so coverage metrics can be trusted. | Generic createObject/createTypedLink mutations reject invalid writes with machine-readable errors; provenance stamped. | `ontology-validation.test.ts` | 💤 |
+| ONTO-3 | As a requirements engineer, I want the Requirements Pack (needs, requirements, verifications, risks + DERIVES_FROM/SATISFIES/IMPLEMENTS/VERIFIES/MITIGATES), so I can trace work to intent. | Pack ships as seed data; IMPLEMENTS bridges tasks to requirements. | seed test + e2e | 💤 |
+| ONTO-4 | As a lead, I want coverage reports and suspect-link flags, so I know what's verified, what's orphaned, and what went stale. | coverageReport GraphQL field (% verified, % implemented, orphans both ways); suspect = content changed after link review. | `coverage.test.ts`, trace-matrix e2e | 💤 |
+| ONTO-5 | As a user, I want the graph palette (+ menu, link chips) driven by the active ontology sets, so growing a requirements graph feels identical to growing a task graph. | Grow mode offers the union of active sets' types; Ontology page browses/edits sets. | e2e | 💤 |
+
+## Epic 8: AI-Native Parallel Track 🤖⚡
+*Human observable, human optional. Everything the ontology can do, an agent can do — the same day it ships.*
+
+| ID | Story | AC | Test mapping | Status |
+|----|-------|----|--------------|--------|
+| AINAT-1 | As an agent, I want MCP tools over the ontology (list sets, get defs, create typed objects/links, coverage), so domain work is fully scriptable. | MCP tools land in the same PR as each ONTO story; validation errors are machine-readable. | `mcp-server/tests/ontology-tools.test.ts` | 💤 |
+| AINAT-2 | As a Claude user, I want a GraphDone Skill that runs a full requirements workflow (spec doc → proposed graph → maintained trace links → coverage report), so AI does the bookkeeping while humans watch the living graph. | Skill in skills/; end-to-end demo against dev stack; humans see live updates. | skill smoke script | 💤 |
+| AINAT-3 | As an agent, I want get_graph_context to include the ontology section (active sets, type counts, coverage headline), so one call orients me on any domain graph. | <2.5kB response incl. ontology block. | `context.test.ts` | 💤 |
