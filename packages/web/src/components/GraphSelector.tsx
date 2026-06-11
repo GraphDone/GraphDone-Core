@@ -243,12 +243,14 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph }: Gra
       {/* Dropdown menu with folder structure - Portal based for proper z-index */}
       {isOpen && buttonPosition && createPortal(
         <div
-          className="bg-gradient-to-br from-gray-800/98 to-gray-900/98 backdrop-blur-xl border-2 border-gray-600/50 rounded-2xl shadow-2xl max-h-96 overflow-hidden min-w-80"
+          className="bg-gradient-to-br from-gray-800/98 to-gray-900/98 backdrop-blur-xl border-2 border-gray-600/50 rounded-2xl shadow-2xl overflow-hidden"
           style={{
             position: 'fixed',
             top: buttonPosition.top + 8,
-            left: buttonPosition.left,
-            width: Math.max(buttonPosition.width, 320),
+            // Clamp to the viewport so the dropdown stays usable on phones
+            left: Math.max(8, Math.min(buttonPosition.left, window.innerWidth - Math.min(Math.max(buttonPosition.width, 320), window.innerWidth - 16) - 8)),
+            width: Math.min(Math.max(buttonPosition.width, 320), window.innerWidth - 16),
+            maxHeight: 'min(24rem, 70vh)',
             zIndex: '999999999',
             pointerEvents: 'all'
           }}
@@ -283,7 +285,7 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph }: Gra
           </div>
 
           {/* Folder Structure */}
-          <div className="max-h-80 overflow-y-auto">
+          <div className="overflow-y-auto" style={{ maxHeight: 'min(20rem, 55vh)' }}>
             <div className="p-2.5 space-y-1">
               {Object.entries(folders).map(([folderId, graphs]) => {
                 if (graphs.length === 0) return null;

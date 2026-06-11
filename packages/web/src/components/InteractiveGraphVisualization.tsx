@@ -42,6 +42,9 @@ import { WorkItem, WorkItemEdge } from '../types/graph';
 import { RelationshipType, RELATIONSHIP_OPTIONS, getRelationshipConfig } from '../constants/workItemConstants';
 import { useAdaptiveQuality } from '../hooks/useAdaptiveQuality';
 import { nodeLifeClasses, nodeGlowFilter, isActiveStatus, edgeFlowClass } from '../lib/nodeAnimations';
+import { mergeSimulationNodes, mergeSimulationEdges } from '../lib/graphDataMerge';
+import { edgeLabelPlacement, clearSegment, slideTFromPointer, chooseLabelT } from '../lib/edgeLabelLayout';
+import { PerfMeter } from '../lib/perfMeter';
 
 // LOD thresholds for different zoom levels
 const LOD_THRESHOLDS = {
@@ -1393,11 +1396,20 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     // If counts are the same, update both simulation data AND DOM elements (for property changes)
     console.log('[Graph Debug] Data counts unchanged - updating simulation data and DOM elements');
 
-    // Update simulation with current data (handles property changes)
-    simulation.nodes(nodes as any);
+    // Merge fresh data INTO the live simulation objects instead of swapping
+    // arrays. The DOM is data-bound to these exact objects; replacing them
+    // splits physics from rendering and edges visibly detach from nodes.
+    const simNodes = simulation.nodes() as any[];
+    const nodeMerge = mergeSimulationNodes(simNodes, nodes as any[]);
+    simulation.nodes(nodeMerge.nodes as any);
     const linkForce = simulation.force('link') as d3.ForceLink<any, any>;
     if (linkForce) {
-      linkForce.links(validatedEdges);
+      const edgeMerge = mergeSimulationEdges(
+        linkForce.links() as any[],
+        validatedEdges as any[],
+        nodeMerge.nodes as Array<{ id: string }>
+      );
+      linkForce.links(edgeMerge.edges);
     }
 
     // UPDATE DOM ELEMENTS: Rebind data and update visual properties
@@ -1731,9 +1743,17 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       .force('center', d3.forceCenter(centerX, centerY).strength(0.01)) // Minimal centering
       .force('x', d3.forceX(centerX).strength(0.002)) // Extremely weak horizontal centering for maximum width
       .force('y', d3.forceY(centerY).strength(0.002)) // Extremely weak vertical centering for maximum height
-      .force('collision', d3.forceCollide(90) // Sufficient collision radius to prevent overlap
-        .strength(0.7) // Moderate collision prevention
-        .iterations(2) // Fewer iterations for stability
+      .force('collision', d3.forceCollide()
+        // Radius from the node's actual card geometry: half the diagonal plus
+        // breathing room. A fixed radius smaller than the card guarantees
+        // card-on-card overlap, which also traps edge labels with nowhere
+        // clean to go.
+        .radius((d: any) => {
+          const dims = getNodeDimensions(d);
+          return Math.hypot(dims.width, dims.height) / 2 + 12;
+        })
+        .strength(0.85)
+        .iterations(2)
       )
       // Add hierarchical attraction forces (Epic->Milestone, Feature->Task, etc.)
       .force('hierarchy', d3.forceLink()
@@ -3080,6 +3100,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       element.select('.long-press-feedback').remove();
     });
 
+    let labelAvoidCounter = 0;
     const updateEdgePositions = () => {
       // Update visible edge positions
       linkElements
@@ -3104,41 +3125,67 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
           return `translate(${midX},${midY}) rotate(${angle})`;
         });
 
-      // Update edge label group positions to follow edge angles
+      // Edge labels: auto-centered in the clear span between the two node
+      // cards, pushed off ALL node cards once the simulation settles, and
+      // slidable by the user (d.labelT persists because the data merge keeps
+      // edge object identity stable; d.labelTUser pins a manual slide).
+      labelAvoidCounter++;
+      const runAvoidance = simulation.alpha() < 0.1 && labelAvoidCounter % 15 === 0;
+      const obstacles = runAvoidance
+        ? (simulation.nodes() as any[]).map((n: any) => {
+            const dims = getNodeDimensions(n);
+            return { x: n.x || 0, y: n.y || 0, width: dims.width, height: dims.height };
+          })
+        : null;
+
       edgeLabelGroups
-        .attr('transform', (d: any) => {
-          const midX = (d.source.x + d.target.x) / 2;
-          const midY = (d.source.y + d.target.y) / 2;
-          const angle = Math.atan2(d.target.y - d.source.y, d.target.x - d.source.x) * 180 / Math.PI;
-          
-          // Offset perpendicular to the edge
-          const offsetDistance = 25;
-          const perpAngle = (angle + 90) * Math.PI / 180;
-          const offsetX = Math.cos(perpAngle) * offsetDistance;
-          const offsetY = Math.sin(perpAngle) * offsetDistance;
-          
-          // Keep text readable by limiting rotation
-          let textRotation = angle;
-          if (angle > 90 || angle < -90) {
-            textRotation = angle + 180; // Flip text to keep it readable
+        .attr('transform', function(d: any) {
+          const source = { x: d.source.x || 0, y: d.source.y || 0 };
+          const target = { x: d.target.x || 0, y: d.target.y || 0 };
+          const sourceDims = getNodeDimensions(d.source);
+          const targetDims = getNodeDimensions(d.target);
+
+          if (obstacles && !d.labelTUser) {
+            const bbox = (this as SVGGElement).getBBox();
+            d.labelT = chooseLabelT({
+              source, target, sourceDims, targetDims,
+              obstacles,
+              labelDims: { width: bbox.width || 60, height: bbox.height || 20 }
+            });
           }
-          
-          return `translate(${midX + offsetX},${midY + offsetY}) rotate(${textRotation})`;
+
+          const placement = edgeLabelPlacement({ source, target, sourceDims, targetDims, t: d.labelT });
+          return `translate(${placement.x},${placement.y}) rotate(${placement.rotation})`;
         });
     };
 
-    // Simulation tick
+    // Let users slide a label along its edge, within the clear span.
+    edgeLabelGroups
+      .style('cursor', 'grab')
+      .call(d3.drag<any, any>()
+        .on('start', (event) => {
+          event.sourceEvent?.stopPropagation();
+        })
+        .on('drag', function(event, d: any) {
+          const [px, py] = d3.pointer(event, g.node() as any);
+          const source = { x: d.source.x || 0, y: d.source.y || 0 };
+          const target = { x: d.target.x || 0, y: d.target.y || 0 };
+          const segment = clearSegment(source, target, getNodeDimensions(d.source), getNodeDimensions(d.target));
+          d.labelT = slideTFromPointer({ x: px, y: py }, source, target, segment);
+          d.labelTUser = true;
+          updateEdgePositions();
+        }));
+
+    // Simulation tick. Order matters: nodes move first, then every line,
+    // arrow and label re-anchors to the nodes' new positions — edges can
+    // never lag a frame behind. Every tick is measured (PerfMeter → debug
+    // console + window.__graphPerf) so dynamics work stays evidence-based.
+    const perfMeter = new PerfMeter(240);
+    let lastPerfReport = 0;
     simulation.on('tick', () => {
-      // Allow nodes to move freely without bounds constraints
-      
-      // DEBUG: Log if any nodes are at origin during tick
-      const nodesAtOrigin = nodes.filter((n: any) => (n.x === 0 || n.x === undefined) && (n.y === 0 || n.y === undefined));
-      if (nodesAtOrigin.length > 0) {
-        console.log('[CRITICAL DEBUG] Nodes at origin during tick:', nodesAtOrigin.length, 'out of', nodes.length);
-        console.log('[CRITICAL DEBUG] First few nodes at origin:', nodesAtOrigin.slice(0, 3).map((n: any) => ({id: n.id, x: n.x, y: n.y})));
-      }
-      
-      // Update node positions
+      const tickStart = performance.now();
+
+      // 1) Nodes first
       nodeElements
         .attr('transform', (d: any) => `translate(${d.x || 0},${d.y || 0})`);
 
@@ -3174,8 +3221,28 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         (window as any).updateMiniMapPositions(positions);
       }
         
-      // Always update edges to stay anchored to nodes
+      // 2) Then every edge, arrow and label re-anchors to the new positions
       updateEdgePositions();
+
+      // 3) Measure. The debug console is the source of truth for dynamics.
+      const now = performance.now();
+      perfMeter.tick(now - tickStart);
+      perfMeter.frame(now);
+      if (now - lastPerfReport > 2000) {
+        lastPerfReport = now;
+        const stats = {
+          ...perfMeter.summary(),
+          alpha: Math.round(simulation.alpha() * 1000) / 1000,
+          nodes: nodes.length,
+          edges: validatedEdges.length,
+          quality: qualityProfileRef.current.tier
+        };
+        (window as any).__graphPerf = stats;
+        if ((window as any).debugLog) {
+          const level = stats.avgTickMs > 8 || stats.fps < 30 ? '⚠️' : '✅';
+          (window as any).debugLog('Perf', `${level} fps=${stats.fps} tick avg=${stats.avgTickMs}ms p95=${stats.p95TickMs}ms dropped=${stats.droppedFrames} alpha=${stats.alpha}`, stats);
+        }
+      }
     });
 
     // Update zoom with LOD updates
