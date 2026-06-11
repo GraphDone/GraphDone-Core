@@ -705,3 +705,64 @@ input[type="date"]:focus {
   animation: fadeIn 0.3s ease-out forwards;
   opacity: 0;
 }
+/* ============================================================
+   Living Graph (Epic 1, docs/USER_STORIES.md)
+   Life-state classes come from src/lib/nodeAnimations.ts.
+   Quality gating: [data-quality] is set by useAdaptiveQuality on
+   .graph-container (ADAPT-3); reduced-motion always wins (ADAPT-9).
+   ============================================================ */
+
+/* LIVE-1: in-progress work breathes with a gentle stroke pulse */
+@keyframes node-breathe {
+  0%, 100% {
+    stroke-opacity: 0.45;
+    stroke-width: 1.5;
+  }
+  50% {
+    stroke-opacity: 1;
+    stroke-width: 3;
+  }
+}
+
+.graph-container svg .node-breathing {
+  animation: node-breathe 2s ease-in-out infinite;
+}
+
+/* LIVE-4: blocked work looks visibly stuck — desaturated, dashed ring, slow dim pulse */
+@keyframes node-ache {
+  0%, 100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+.graph-container svg .node-stuck {
+  stroke-dasharray: 6 4;
+  filter: saturate(0.35) url(#node-drop-shadow);
+  animation: node-ache 4s ease-in-out infinite;
+}
+
+/* Completed work settles calmly */
+.graph-container svg .node-settled {
+  opacity: 0.75;
+}
+
+/* ADAPT-3: LOW tier strips all motion and halos before touching interactivity */
+.graph-container[data-quality="LOW"] svg .node-breathing,
+.graph-container[data-quality="LOW"] svg .node-stuck {
+  animation: none;
+}
+
+.graph-container[data-quality="LOW"] svg .node-bg {
+  filter: url(#node-drop-shadow) !important;
+}
+
+/* ADAPT-9: accessibility beats aesthetics at every tier */
+@media (prefers-reduced-motion: reduce) {
+  .graph-container svg .node-breathing,
+  .graph-container svg .node-stuck {
+    animation: none;
+  }
+}
