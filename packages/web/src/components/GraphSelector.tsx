@@ -220,6 +220,7 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph }: Gra
       <button
         ref={buttonRef}
         onClick={toggleDropdown}
+        data-testid="graph-selector"
         className="flex items-center space-x-3 w-full p-3 text-left hover:bg-gray-700/80 rounded-xl transition-all duration-200 hover:scale-[1.02] border border-gray-600/30 hover:border-gray-500/50 shadow-lg hover:shadow-xl backdrop-blur-sm bg-gray-800/50"
       >
         <div className="flex-shrink-0">

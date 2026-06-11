@@ -37,19 +37,20 @@ test.describe('Authentication System Validation', () => {
   test('should handle different user roles', async ({ page }) => {
     console.log('🧪 Testing different user role authentication...');
 
-    // Test member login
-    await login(page, TEST_USERS.MEMBER);
+    // The current stack only seeds admin and viewer accounts (no member),
+    // so exercise multi-role auth with the viewer role.
+    await login(page, TEST_USERS.VIEWER);
     let authState = await getAuthState(page);
-    expect(authState.isLoggedIn, 'Member should be logged in').toBe(true);
+    expect(authState.isLoggedIn, 'Viewer should be logged in').toBe(true);
 
-    // Logout and test viewer
+    // Logout and test admin
     await logout(page);
     authState = await getAuthState(page);
     expect(authState.isLoggedIn, 'Should be logged out').toBe(false);
 
-    await login(page, TEST_USERS.VIEWER);
+    await login(page, TEST_USERS.ADMIN);
     authState = await getAuthState(page);
-    expect(authState.isLoggedIn, 'Viewer should be logged in').toBe(true);
+    expect(authState.isLoggedIn, 'Admin should be logged in').toBe(true);
 
     console.log('✅ Multi-role authentication test passed');
   });
