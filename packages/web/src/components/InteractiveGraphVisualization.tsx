@@ -251,19 +251,6 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
   const [edgeMenu, setEdgeMenu] = useState<EdgeMenuState>({ edge: null, position: { x: 0, y: 0 }, visible: false });
   const [menuDragState, setMenuDragState] = useState<DragState>({ isDragging: false, offset: { x: 0, y: 0 } });
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (nodeMenu.visible) {
-        if (e.key === 'Escape') {
-          setNodeMenu({ node: null, position: { x: 0, y: 0 }, visible: false });
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [nodeMenu.visible]);
-
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionSource, setConnectionSource] = useState<string | null>(null);
   const [selectedRelationType, setSelectedRelationType] = useState<RelationshipType>('DEFAULT_EDGE');
@@ -293,7 +280,31 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
   const [isFlippingEdge, setIsFlippingEdge] = useState(false);
   const [showRelationshipWindow, setShowRelationshipWindow] = useState(false);
   const [selectedNodes, setSelectedNodes] = useState<Set<string>>(new Set());
-  
+
+  // Esc always works: pop one mode level, never trap the user
+  // (docs/design/interaction-model.md, principle 3). Connection mode and the
+  // edge-type selector were keyboard traps before this.
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (isConnecting) {
+        setIsConnecting(false);
+        setConnectionSource(null);
+        return;
+      }
+      if (editingEdge) {
+        setEditingEdge(null);
+        return;
+      }
+      if (nodeMenu.visible) {
+        setNodeMenu({ node: null, position: { x: 0, y: 0 }, visible: false });
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isConnecting, editingEdge, nodeMenu.visible]);
+
   
   // Handle dragging for relationship selector
   useEffect(() => {
@@ -1352,9 +1363,12 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
 
     lines = Math.min(lines, 3); // Maximum 3 lines
 
-    // Calculate additional height needed for multiple lines (16px per extra line)
-    const additionalHeight = (lines - 1) * 16;
-    const finalHeight = baseDimensions.height + additionalHeight;
+    // Height is the SUM of the content rows, not a guess: title bar (28) +
+    // gap (12) + title lines (16 each) + description row (22 when present) +
+    // status/priority block (42) anchored at the bottom. A fixed base height
+    // let long titles overlap the status row.
+    const contentHeight = 28 + 12 + lines * 16 + (d.description ? 22 : 6) + 42;
+    const finalHeight = Math.max(baseDimensions.height, contentHeight);
 
     return {
       width: width,
@@ -1428,10 +1442,11 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       const updatedNode = nodes.find(n => n.id === d.id);
       if (!updatedNode) return;
 
-      // Update title text elements
+      // Update title text elements (must mirror the creation path exactly,
+      // or cards shift layout on every poll)
       nodeGroup.selectAll('.node-title-text').remove();
-      const maxCharsPerLine = 18;
-      const maxLines = 2;
+      const maxCharsPerLine = getNodeDimensions(updatedNode).maxCharsPerLine;
+      const maxLines = 3;
       let lines: string[] = [];
       const words = updatedNode.title.split(' ');
       let currentLine = '';
@@ -1454,7 +1469,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       }
 
       const dimensions = getNodeDimensions(updatedNode);
-      const titleBarHeight = 32;
+      const titleBarHeight = 28;
       const startY = -dimensions.height / 2 + titleBarHeight + 18;
       lines.forEach((line, index) => {
         nodeGroup.append('text')
@@ -1612,14 +1627,22 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     // Add click handler for context menu on background
     background.on('click', function(event: MouseEvent) {
       event.stopPropagation();
-      
+
+      // Clicking empty canvas always exits connection mode — no keyboard traps,
+      // no hunting for the Cancel button (interaction-model.md, principle 3)
+      if (isConnecting) {
+        setIsConnecting(false);
+        setConnectionSource(null);
+        return;
+      }
+
       // Check only the main dialogs that we care about
-      const hasOpenDialogs = 
+      const hasOpenDialogs =
         nodeMenu.visible ||
         edgeMenu.visible ||
         editingEdge !== null ||
         false; // Removed edge details dialog
-      
+
       if (hasOpenDialogs) {
         // Close all dialogs and menus - first click
         setNodeMenu({ node: null, position: { x: 0, y: 0 }, visible: false });
@@ -1734,17 +1757,17 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
           
           const maxDistance = Math.min(width, height) * 0.6;
           
-          // Stronger force when edge is too long to create pulling effect
+          // Firmer pull only when an edge is stretched far too long
           if (currentDistance > maxDistance) {
-            return 0.8; // Strong pulling force
+            return 0.5;
           }
-          
-          // Normal strength otherwise
-          return 0.3;
+
+          // Soft springs otherwise — calm, high-friction feel
+          return 0.2;
         })
       )
       .force('charge', d3.forceManyBody()
-        .strength(-100) // Simple, consistent repulsion for all nodes
+        .strength(-60) // Gentle repulsion; collision force owns overlap prevention
         .distanceMax(200) // Reasonable influence range
       )
       .force('center', d3.forceCenter(centerX, centerY).strength(0.01)) // Minimal centering
@@ -1771,7 +1794,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       )
       .alphaTarget(0) // LIVE-6: physics must REST — perpetual alphaTarget kept nodes drifting forever (unstable hover targets, idle frame burn). CSS owns the idle life now.
       .alphaDecay(0.015) // Slightly slower decay for better collision resolution
-      .velocityDecay(0.4); // Add velocity decay for smoother movement
+      .velocityDecay(0.65); // High friction: nodes glide briefly and settle — no bouncing (user feedback: physics too aggressive)
 
     // Filter edges based on visible nodes for performance
     // Temporarily show ALL edges for debugging
