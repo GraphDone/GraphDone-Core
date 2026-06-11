@@ -120,7 +120,15 @@ test.describe('user smoke: the app works from a user point of view @smoke', () =
     expect(await page.locator('.graph-container svg .edge').count(), 'edge count must grow').toBe(before.edges + 1);
     await expect(page.locator(`text=${name}`).first()).toBeVisible();
 
-    // Clean up what we created (keeps the smoke test re-runnable)
+    // Undo must walk it back: Ctrl+Z undoes the rename, then the creation
+    await page.keyboard.press('Control+z');
+    await page.waitForTimeout(2500);
+    await page.keyboard.press('Control+z');
+    await page.waitForTimeout(5000);
+    expect(await page.locator('.graph-container svg .node').count(), 'undo must remove the created node').toBe(before.nodes);
+    expect(await page.locator('.graph-container svg .edge').count(), 'undo must remove the created edge').toBe(before.edges);
+
+    // Belt-and-braces cleanup in case undo half-failed (keeps re-runnable)
     await page.evaluate(async (title) => {
       const token = localStorage.getItem('authToken') ?? '';
       const find = await fetch('/api/graphql', {
