@@ -803,3 +803,25 @@ input[type="date"]:focus {
     animation: none;
   }
 }
+
+/* LIVE-7: hover illuminates the 1-hop neighborhood; the rest recedes.
+   !important so the dim wins over inline opacity left by D3 transitions. */
+.graph-container svg .dim-for-hover {
+  opacity: 0.16 !important;
+  transition: opacity 0.2s ease;
+}
+
+.graph-container svg .node,
+.graph-container svg .edge,
+.graph-container svg .edge-label-group {
+  transition: opacity 0.2s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .graph-container svg .dim-for-hover,
+  .graph-container svg .node,
+  .graph-container svg .edge,
+  .graph-container svg .edge-label-group {
+    transition: none;
+  }
+}

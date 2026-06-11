@@ -46,6 +46,7 @@ import { mergeSimulationNodes, mergeSimulationEdges } from '../lib/graphDataMerg
 import { edgeLabelPlacement, clearSegment, slideTFromPointer, chooseLabelT } from '../lib/edgeLabelLayout';
 import { PerfMeter } from '../lib/perfMeter';
 import { spawnCelebration } from '../lib/celebration';
+import { buildNeighborhood } from '../lib/graphAdjacency';
 
 // LOD thresholds for different zoom levels
 const LOD_THRESHOLDS = {
@@ -1768,7 +1769,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         .distance((d: any) => d.distance || 250) // Much larger hierarchical distance
         .strength((d: any) => d.strength || 0.05) // Very weak hierarchical strength
       )
-      .alphaTarget(0.05) // Lower alpha target for calmer simulation
+      .alphaTarget(0) // LIVE-6: physics must REST — perpetual alphaTarget kept nodes drifting forever (unstable hover targets, idle frame burn). CSS owns the idle life now.
       .alphaDecay(0.015) // Slightly slower decay for better collision resolution
       .velocityDecay(0.4); // Add velocity decay for smoother movement
 
@@ -2047,9 +2048,9 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
           // Save the new position to the database
           saveNodePosition(d.id, d.fx, d.fy);
           
-          // Gradually reduce simulation energy to let other nodes settle
+          // Let the simulation cool to a full stop after the neighbors settle
           setTimeout(() => {
-            simulation.alphaTarget(0.02);
+            simulation.alphaTarget(0);
           }, 1000);
           mousedownNodeRef.current = null;
         }));
@@ -2066,8 +2067,31 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         .transition()
         .delay((d: WorkItem) => (byRecency.get(d.id) ?? 0) * stagger)
         .duration(300)
-        .style('opacity', 1);
+        .style('opacity', 1)
+        .on('end', function() {
+          // Clear the inline opacity so hover-dim CSS can take over later
+          d3.select(this).style('opacity', null);
+        });
     }
+
+    // LIVE-7: hovering a node illuminates its 1-hop neighborhood — everything
+    // else dims. Precomputed adjacency keeps the handler a Map lookup.
+    const neighborhood = buildNeighborhood(validatedEdges as any);
+    nodeElements
+      .on('mouseenter.neighborhood', function(_event, hovered: any) {
+        if (mousedownNodeRef.current) return;
+        const hood = neighborhood.get(hovered.id);
+        nodeElements.classed('dim-for-hover', (d: any) => d.id !== hovered.id && !hood?.nodes.has(d.id));
+        linkElements.classed('dim-for-hover', (d: any) => !hood?.edges.has(d.id));
+        clickableEdges.classed('dim-for-hover', (d: any) => !hood?.edges.has(d.id));
+        edgeLabelGroups.classed('dim-for-hover', (d: any) => !hood?.edges.has(d.id));
+      })
+      .on('mouseleave.neighborhood', () => {
+        nodeElements.classed('dim-for-hover', false);
+        linkElements.classed('dim-for-hover', false);
+        clickableEdges.classed('dim-for-hover', false);
+        edgeLabelGroups.classed('dim-for-hover', false);
+      });
 
     // Monopoly-style rectangular nodes with colored title bars
     // getNodeDimensions is now defined outside and shared with updateVisualizationData
@@ -3327,7 +3351,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     (simulation as any).restartCollisions = () => {
       simulation.alphaTarget(0.3).restart();
       setTimeout(() => {
-        simulation.alphaTarget(0.05);
+        simulation.alphaTarget(0);
       }, 2000);
     };
   }, [nodes, validatedEdges, handleNodeClick, initializeEmptyVisualization]); // Include handleNodeClick to get fresh connection state
