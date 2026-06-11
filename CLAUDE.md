@@ -351,6 +351,21 @@ npm run dev
 # Server available at: https://localhost:4128/graphql
 ```
 
+## THE GATE — run before claiming anything works
+
+```bash
+TEST_URL=http://localhost:3127 npm run test:smoke
+```
+
+`tests/e2e/user-smoke.spec.ts` sees the app exactly as a user does: login →
+nodes AND edges render → no error chrome → no GraphQL errors reach the client
+→ no uncaught JS errors → the grow flow works → no orphan edges in the DB.
+**Green unit tests do not mean the app works.** This gate exists because of a
+real incident: orphaned Edge records 500'd the edges query and the UI showed
+"Error" with zero edges while every unit test was green. If you touch data,
+the graph, or deletion paths — run the gate. When deleting WorkItems by API,
+ALWAYS delete their edges first (orphan edges break the entire edges query).
+
 ## Story-Driven Development (START HERE)
 
 Development is driven by **[docs/USER_STORIES.md](./docs/USER_STORIES.md)**. The loop:
