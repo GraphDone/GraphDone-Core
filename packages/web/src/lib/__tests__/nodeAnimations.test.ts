@@ -5,7 +5,8 @@ import {
   isCompletedStatus,
   nodeLifeClasses,
   priorityGlowStep,
-  nodeGlowFilter
+  nodeGlowFilter,
+  edgeFlowClass
 } from '../nodeAnimations';
 
 describe('status detection across the legacy case variants', () => {
@@ -67,6 +68,23 @@ describe('priorityGlowStep (LIVE-5): 4 visually distinct steps', () => {
     expect(priorityGlowStep(2)).toBe(3);
     expect(priorityGlowStep(undefined)).toBe(0);
     expect(priorityGlowStep(Number.NaN)).toBe(0);
+  });
+});
+
+describe('edgeFlowClass (LIVE-2): energy flows from completed work', () => {
+  it('flows forward when the source is completed and the target is not', () => {
+    expect(edgeFlowClass('COMPLETED', 'IN_PROGRESS')).toBe('edge-flowing-forward');
+    expect(edgeFlowClass('Done', 'PROPOSED')).toBe('edge-flowing-forward');
+  });
+
+  it('flows in reverse when the target is completed and the source is not', () => {
+    expect(edgeFlowClass('IN_PROGRESS', 'COMPLETED')).toBe('edge-flowing-reverse');
+  });
+
+  it('does not flow between two completed or two open endpoints', () => {
+    expect(edgeFlowClass('COMPLETED', 'DONE')).toBe('');
+    expect(edgeFlowClass('IN_PROGRESS', 'PROPOSED')).toBe('');
+    expect(edgeFlowClass(undefined, undefined)).toBe('');
   });
 });
 
