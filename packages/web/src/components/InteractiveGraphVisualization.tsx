@@ -41,10 +41,11 @@ import { WorkItemDetailsModal } from './WorkItemDetailsModal';
 import { WorkItem, WorkItemEdge } from '../types/graph';
 import { RelationshipType, RELATIONSHIP_OPTIONS, getRelationshipConfig } from '../constants/workItemConstants';
 import { useAdaptiveQuality } from '../hooks/useAdaptiveQuality';
-import { nodeLifeClasses, nodeGlowFilter, isActiveStatus, edgeFlowClass } from '../lib/nodeAnimations';
+import { nodeLifeClasses, nodeGlowFilter, isActiveStatus, isCompletedStatus, edgeFlowClass } from '../lib/nodeAnimations';
 import { mergeSimulationNodes, mergeSimulationEdges } from '../lib/graphDataMerge';
 import { edgeLabelPlacement, clearSegment, slideTFromPointer, chooseLabelT } from '../lib/edgeLabelLayout';
 import { PerfMeter } from '../lib/perfMeter';
+import { spawnCelebration } from '../lib/celebration';
 
 // LOD thresholds for different zoom levels
 const LOD_THRESHOLDS = {
@@ -119,7 +120,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       }
     } : { where: {} },
     fetchPolicy: currentGraph ? 'cache-and-network' : 'cache-only',
-    pollInterval: currentGraph ? 100 : 0,
+    pollInterval: currentGraph ? 2000 : 0,
     errorPolicy: 'all'
   });
 
@@ -134,7 +135,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       }
     } : { where: {} },
     fetchPolicy: currentGraph ? 'cache-and-network' : 'cache-only',
-    pollInterval: currentGraph ? 100 : 0,
+    pollInterval: currentGraph ? 2000 : 0,
     errorPolicy: 'all'
   });
 
@@ -1366,23 +1367,14 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
   const updateVisualizationData = useCallback(() => {
     if (!simulationRef.current || !svgRef.current) return;
     
-    console.log('[Graph Debug] Checking for data changes...');
-    
     const svg = d3.select(svgRef.current);
     const simulation = simulationRef.current;
-    
+
     // Get current data counts from DOM
     const currentNodeCount = svg.select('.nodes-group').selectAll('.node').size();
     const currentEdgeCount = svg.select('.edges-group').selectAll('.edge').size();
     const newNodeCount = nodes.length;
     const newEdgeCount = validatedEdges.length;
-    
-    console.log('[Graph Debug] Data counts:', {
-      currentNodes: currentNodeCount,
-      newNodes: newNodeCount,
-      currentEdges: currentEdgeCount,
-      newEdges: newEdgeCount
-    });
 
     // Check if we need full reinitialization (node/edge count changed)
     const needsReinit = (currentNodeCount !== newNodeCount) || (currentEdgeCount !== newEdgeCount);
@@ -1400,7 +1392,21 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     // arrays. The DOM is data-bound to these exact objects; replacing them
     // splits physics from rendering and edges visibly detach from nodes.
     const simNodes = simulation.nodes() as any[];
+    const prevStatuses = new Map(simNodes.map((n: any) => [n.id, n.status]));
     const nodeMerge = mergeSimulationNodes(simNodes, nodes as any[]);
+
+    // LIVE-3: work that just transitioned to completed celebrates.
+    if (qualityProfileRef.current.particleCelebrations) {
+      const layer = svg.select<SVGGElement>('.main-graph-group');
+      if (!layer.empty()) {
+        for (const id of nodeMerge.changedIds) {
+          const node = nodeMerge.nodes.find((n: any) => n.id === id) as any;
+          if (node && isCompletedStatus(node.status) && !isCompletedStatus(prevStatuses.get(id))) {
+            spawnCelebration(layer, id, node.x || 0, node.y || 0, getTypeConfig(node.type as WorkItemType).hexColor);
+          }
+        }
+      }
+    }
     simulation.nodes(nodeMerge.nodes as any);
     const linkForce = simulation.force('link') as d3.ForceLink<any, any>;
     if (linkForce) {
@@ -3138,6 +3144,9 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
           })
         : null;
 
+      // Labels placed earlier in this pass become obstacles for later ones,
+      // so labels avoid each other as well as every node card.
+      const placedLabels: Array<{ x: number; y: number; width: number; height: number }> = [];
       edgeLabelGroups
         .attr('transform', function(d: any) {
           const source = { x: d.source.x || 0, y: d.source.y || 0 };
@@ -3145,16 +3154,25 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
           const sourceDims = getNodeDimensions(d.source);
           const targetDims = getNodeDimensions(d.target);
 
-          if (obstacles && !d.labelTUser) {
+          let labelW = 60;
+          let labelH = 20;
+          if (obstacles) {
             const bbox = (this as SVGGElement).getBBox();
-            d.labelT = chooseLabelT({
-              source, target, sourceDims, targetDims,
-              obstacles,
-              labelDims: { width: bbox.width || 60, height: bbox.height || 20 }
-            });
+            labelW = bbox.width || 60;
+            labelH = bbox.height || 20;
+            if (!d.labelTUser) {
+              d.labelT = chooseLabelT({
+                source, target, sourceDims, targetDims,
+                obstacles: obstacles.concat(placedLabels),
+                labelDims: { width: labelW, height: labelH }
+              });
+            }
           }
 
           const placement = edgeLabelPlacement({ source, target, sourceDims, targetDims, t: d.labelT });
+          if (obstacles) {
+            placedLabels.push({ x: placement.x, y: placement.y, width: labelW + 8, height: labelH + 8 });
+          }
           return `translate(${placement.x},${placement.y}) rotate(${placement.rotation})`;
         });
     };
@@ -3189,26 +3207,29 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       nodeElements
         .attr('transform', (d: any) => `translate(${d.x || 0},${d.y || 0})`);
 
-      // Ensure text elements are visible and properly positioned after position updates
-      g.selectAll('.node-type-text, .node-title-text, .node-description-text' as any)
-        .style('visibility', 'visible')
-        .style('opacity', function(this: any) {
-          // Restore LOD-appropriate opacity if it was hidden
-          const currentOpacity = parseFloat(d3.select(this).style('opacity')) || 0;
-          if (currentOpacity === 0) {
-            // Get current scale from the svg element
-            const svgElement = svg.node();
-            if (svgElement) {
-              const currentTransform = d3.zoomTransform(svgElement);
-              const scale = currentTransform.k;
-              const classList = d3.select(this as any).attr('class');
-              if (classList?.includes('node-type-text')) return getSmoothedOpacity(scale, LOD_THRESHOLDS.FAR);
-              if (classList?.includes('node-title-text')) return getSmoothedOpacity(scale, LOD_THRESHOLDS.MEDIUM);
-              if (classList?.includes('node-description-text')) return getSmoothedOpacity(scale, LOD_THRESHOLDS.CLOSE);
+      // Restore text visibility OUTSIDE the hot path: reading style() forces
+      // a style recalc per text element; doing it every tick for every node
+      // was the page's main frame killer (measured via PerfMeter). Once per
+      // ~30 ticks is imperceptible and keeps the workaround's behavior.
+      if (labelAvoidCounter % 30 === 0) {
+        g.selectAll('.node-type-text, .node-title-text, .node-description-text' as any)
+          .style('visibility', 'visible')
+          .style('opacity', function(this: any) {
+            const currentOpacity = parseFloat(d3.select(this).style('opacity')) || 0;
+            if (currentOpacity === 0) {
+              const svgElement = svg.node();
+              if (svgElement) {
+                const currentTransform = d3.zoomTransform(svgElement);
+                const scale = currentTransform.k;
+                const classList = d3.select(this as any).attr('class');
+                if (classList?.includes('node-type-text')) return getSmoothedOpacity(scale, LOD_THRESHOLDS.FAR);
+                if (classList?.includes('node-title-text')) return getSmoothedOpacity(scale, LOD_THRESHOLDS.MEDIUM);
+                if (classList?.includes('node-description-text')) return getSmoothedOpacity(scale, LOD_THRESHOLDS.CLOSE);
+              }
             }
-          }
-          return currentOpacity;
-        });
+            return currentOpacity;
+          });
+      }
 
       // Update mini-map with current node positions
       if ((window as any).updateMiniMapPositions && nodes.length > 0) {
@@ -3261,10 +3282,6 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
           y: event.transform.y,
           k: event.transform.k
         };
-        if ((window as any).debugLog) {
-          (window as any).debugLog('Graph', '🔍 Zoom/pan event', viewportUpdate);
-        }
-        console.log('🔍 ZOOM-EVENT viewport update:', viewportUpdate);
         (window as any).updateMiniMapViewport(viewportUpdate);
       }
       
