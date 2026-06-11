@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import ReactDOM from 'react-dom/client';
 import { createPortal } from 'react-dom';
 import * as d3 from 'd3';
-import { Link2, Edit3, Trash2, Folder, FolderOpen, Plus, FileText, Settings, Maximize2, ArrowLeft, X, GitBranch, Minus, Unlink, Crosshair, GripVertical } from 'lucide-react';
+import { Link2, Edit3, Trash2, Folder, FolderOpen, Plus, FileText, Settings, Maximize2, ArrowLeft, X, GitBranch, Minus, Unlink, Crosshair, GripVertical, Undo2 } from 'lucide-react';
 import {
   getPriorityIconElement,
   getStatusIconElement,
@@ -24,7 +24,7 @@ import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { GET_WORK_ITEMS, GET_EDGES, CREATE_EDGE, UPDATE_EDGE, DELETE_EDGE, CREATE_WORK_ITEM, UPDATE_WORK_ITEM } from '../lib/queries';
+import { GET_WORK_ITEMS, GET_EDGES, CREATE_EDGE, UPDATE_EDGE, DELETE_EDGE, CREATE_WORK_ITEM, UPDATE_WORK_ITEM, DELETE_WORK_ITEM } from '../lib/queries';
 import { validateGraphData, getValidationSummary, ValidationResult } from '../utils/graphDataValidation';
 import { DEFAULT_NODE_CONFIG } from '../constants/workItemConstants';
 
@@ -47,6 +47,7 @@ import { edgeLabelPlacement, clearSegment, slideTFromPointer, chooseLabelT } fro
 import { PerfMeter } from '../lib/perfMeter';
 import { spawnCelebration } from '../lib/celebration';
 import { buildNeighborhood } from '../lib/graphAdjacency';
+import { UndoStack } from '../lib/undoStack';
 
 // LOD thresholds for different zoom levels
 const LOD_THRESHOLDS = {
@@ -246,6 +247,13 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       console.error('[Graph Debug] Node update failed:', error);
     }
   });
+
+  const [deleteWorkItemMutation] = useMutation(DELETE_WORK_ITEM, {
+    refetchQueries: [
+      { query: GET_WORK_ITEMS, variables: currentGraph ? { where: { graph: { id: currentGraph.id } } } : { where: {} } },
+      { query: GET_EDGES, variables: currentGraph ? { where: { source: { graph: { id: currentGraph.id } } } } : { where: {} } }
+    ]
+  });
   
   const [nodeMenu, setNodeMenu] = useState<NodeMenuState>({ node: null, position: { x: 0, y: 0 }, visible: false });
   const [edgeMenu, setEdgeMenu] = useState<EdgeMenuState>({ edge: null, position: { x: 0, y: 0 }, visible: false });
@@ -281,7 +289,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
   const [showRelationshipWindow, setShowRelationshipWindow] = useState(false);
   const [selectedNodes, setSelectedNodes] = useState<Set<string>>(new Set());
   // Inline rename: an input floats over the node — no modal (W2)
-  const [inlineEdit, setInlineEdit] = useState<{ nodeId: string; value: string; graphX: number; graphY: number } | null>(null);
+  const [inlineEdit, setInlineEdit] = useState<{ nodeId: string; value: string; original: string; graphX: number; graphY: number } | null>(null);
 
   // D3 handlers are bound once at init and the init effect intentionally
   // avoids re-initialising on mode changes — so handlers would capture STALE
@@ -291,6 +299,32 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
   isConnectingRef.current = isConnecting;
   connectionSourceRef.current = connectionSource;
   const selectedRelationTypeRef = useRef<RelationshipType>('RELATES_TO');
+
+  // FLOW-3: every mutation registers its inverse — experimentation is safe
+  const undoStackRef = useRef(new UndoStack(36));
+  const [undoLabel, setUndoLabel] = useState<string | null>(null);
+  useEffect(() => undoStackRef.current.onChange(() => setUndoLabel(undoStackRef.current.peekLabel())), []);
+  const runUndo = useCallback(async () => {
+    try {
+      const action = await undoStackRef.current.undo();
+      if (action) showSuccess(`Undid: ${action.label}`);
+    } catch {
+      showError('Could not undo that — the server refused');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+        const t = e.target as HTMLElement | null;
+        if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+        e.preventDefault();
+        runUndo();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [runUndo]);
 
   // Esc always works: pop one mode level, never trap the user
   // (docs/design/interaction-model.md, principle 3). Connection mode and the
@@ -939,8 +973,16 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
               target: { connect: { where: { node: { id: node.id } } } },
             }]
           }
-        }).then(() => {
-          // Edge created successfully
+        }).then((result) => {
+          const createdEdgeId = result?.data?.createEdges?.edges?.[0]?.id;
+          if (createdEdgeId) {
+            undoStackRef.current.push({
+              label: 'Connect items',
+              undo: async () => {
+                await deleteEdgeMutation({ variables: { where: { id: createdEdgeId } } });
+              }
+            });
+          }
         }).catch(() => {
           // Error handled by GraphQL
         });
@@ -1384,8 +1426,9 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         const newNode = result.data.createWorkItems?.workItems?.[0];
 
         // Grow mode: wire the new node to its source immediately
+        let grownEdgeId: string | undefined;
         if (newNode?.id && options?.connectFrom) {
-          await createEdgeMutation({
+          const edgeResult = await createEdgeMutation({
             variables: {
               input: [{
                 type: 'IS_PART_OF',
@@ -1394,13 +1437,29 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
                 target: { connect: { where: { node: { id: options.connectFrom.id } } } }
               }]
             }
-          }).catch(() => { /* edge failure shouldn't kill the node */ });
+          }).catch(() => undefined); /* edge failure shouldn't kill the node */
+          grownEdgeId = edgeResult?.data?.createEdges?.edges?.[0]?.id;
+        }
+
+        if (newNode?.id) {
+          const createdId = newNode.id;
+          const edgeToRemove = grownEdgeId;
+          undoStackRef.current.push({
+            label: 'Create item',
+            undo: async () => {
+              // edges first — orphan edges break the whole edges query
+              if (edgeToRemove) {
+                await deleteEdgeMutation({ variables: { where: { id: edgeToRemove } } }).catch(() => {});
+              }
+              await deleteWorkItemMutation({ variables: { where: { id: createdId } } });
+            }
+          });
         }
 
         // The name is the next thing a person wants to set — put them
         // straight into an inline rename, no modal (interaction-model W2/W3)
         if (newNode?.id) {
-          setInlineEdit({ nodeId: newNode.id, value: newNode.title || nodeTitle, graphX: x, graphY: y });
+          setInlineEdit({ nodeId: newNode.id, value: newNode.title || nodeTitle, original: newNode.title || nodeTitle, graphX: x, graphY: y });
         }
         return newNode;
       }
@@ -2224,7 +2283,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       // Double-click a node → rename in place, no modal (W2)
       .on('dblclick.rename', (event: MouseEvent, d: any) => {
         event.stopPropagation();
-        setInlineEdit({ nodeId: d.id, value: d.title || '', graphX: d.x || 0, graphY: d.y || 0 });
+        setInlineEdit({ nodeId: d.id, value: d.title || '', original: d.title || '', graphX: d.x || 0, graphY: d.y || 0 });
       });
 
 
@@ -4063,15 +4122,32 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
   };
 
   const handleDeleteEdge = (edge: WorkItemEdge) => {
-    const sourceTitle = edge.source || 'Unknown';
-    const targetTitle = edge.target || 'Unknown';
-    if (confirm(`Are you sure you want to delete the ${edge.type.toLowerCase()} relationship between "${sourceTitle}" and "${targetTitle}"?`)) {
-      deleteEdgeMutation({
-        variables: {
-          where: { id: edge.id }
+    const src: any = edge.source;
+    const tgt: any = edge.target;
+    const sourceId = typeof src === 'object' ? src?.id : src;
+    const targetId = typeof tgt === 'object' ? tgt?.id : tgt;
+    deleteEdgeMutation({
+      variables: {
+        where: { id: edge.id }
+      }
+    }).then(() => {
+      // Deleting is safe because undo can rebuild it — no confirm() popup
+      undoStackRef.current.push({
+        label: 'Delete relationship',
+        undo: async () => {
+          await createEdgeMutation({
+            variables: {
+              input: [{
+                type: edge.type,
+                weight: edge.strength ?? 0.8,
+                source: { connect: { where: { node: { id: sourceId } } } },
+                target: { connect: { where: { node: { id: targetId } } } }
+              }]
+            }
+          });
         }
       });
-    }
+    });
     setEdgeMenu(prev => ({ ...prev, visible: false }));
   };
 
@@ -4158,10 +4234,20 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         const top = gy * currentTransform.scale + currentTransform.y;
         const commit = () => {
           const title = inlineEdit.value.trim();
+          const previous = inlineEdit.original;
           setInlineEdit(null);
-          if (title) {
+          if (title && title !== previous) {
             updateWorkItemMutation({
               variables: { where: { id: inlineEdit.nodeId }, update: { title } }
+            }).then(() => {
+              undoStackRef.current.push({
+                label: 'Rename item',
+                undo: async () => {
+                  await updateWorkItemMutation({
+                    variables: { where: { id: inlineEdit.nodeId }, update: { title: previous } }
+                  });
+                }
+              });
             }).catch(() => showError('Could not rename item'));
           }
         };
@@ -4564,19 +4650,23 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
           onClick={(e) => e.stopPropagation()}
         >
           <div className="py-2">
-            {/* Reload Button - at the top for recovery */}
+            {/* Undo — first item so touch users always have it one tap away */}
             <button
               onClick={() => {
-                console.log('[Graph Debug] User triggered page reload from context menu');
-                window.location.reload();
+                runUndo();
+                setContextMenuPosition(null);
               }}
-              className="w-full text-left px-4 py-3 hover:bg-red-500/10 text-gray-200 flex items-center space-x-3 transition-all duration-300 ease-out group rounded-lg mx-2 border-b border-white/5 mb-2"
+              disabled={!undoLabel}
+              data-testid="context-undo"
+              className={`w-full text-left px-4 py-3 flex items-center space-x-3 transition-all duration-300 ease-out group rounded-lg mx-2 border-b border-white/5 mb-2 ${undoLabel ? 'hover:bg-amber-500/10 text-gray-200' : 'opacity-40 cursor-not-allowed text-gray-500'}`}
             >
-              <div className="w-6 h-6 rounded-lg bg-gray-700/50 flex items-center justify-center group-hover:bg-red-500/20 transition-all duration-300 ease-out">
-                <ArrowLeft className="h-4 w-4 text-gray-400 group-hover:text-red-400 transition-colors duration-300 transform group-hover:rotate-[-90deg]" />
+              <div className="w-6 h-6 rounded-lg bg-gray-700/50 flex items-center justify-center group-hover:bg-amber-500/20 transition-all duration-300 ease-out">
+                <Undo2 className="h-4 w-4 text-gray-400 group-hover:text-amber-400 transition-colors duration-300" />
               </div>
-              <span className="text-gray-300 font-medium group-hover:text-red-400 transition-colors duration-300">Reload Page</span>
-              <div className="ml-auto text-xs text-gray-500 group-hover:text-red-400">Recovery</div>
+              <span className="font-medium group-hover:text-amber-300 transition-colors duration-300">
+                {undoLabel ? `Undo: ${undoLabel}` : 'Nothing to undo'}
+              </span>
+              <div className="ml-auto text-xs text-gray-500">Ctrl+Z</div>
             </button>
             
             <button
