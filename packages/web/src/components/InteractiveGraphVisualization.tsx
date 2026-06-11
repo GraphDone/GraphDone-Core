@@ -253,7 +253,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
 
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionSource, setConnectionSource] = useState<string | null>(null);
-  const [selectedRelationType, setSelectedRelationType] = useState<RelationshipType>('DEFAULT_EDGE');
+  const [selectedRelationType, setSelectedRelationType] = useState<RelationshipType>('RELATES_TO');
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
   const [showDataHealth, setShowDataHealth] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -280,6 +280,17 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
   const [isFlippingEdge, setIsFlippingEdge] = useState(false);
   const [showRelationshipWindow, setShowRelationshipWindow] = useState(false);
   const [selectedNodes, setSelectedNodes] = useState<Set<string>>(new Set());
+  // Inline rename: an input floats over the node — no modal (W2)
+  const [inlineEdit, setInlineEdit] = useState<{ nodeId: string; value: string; graphX: number; graphY: number } | null>(null);
+
+  // D3 handlers are bound once at init and the init effect intentionally
+  // avoids re-initialising on mode changes — so handlers would capture STALE
+  // mode state. Mirror it into refs that handlers read live.
+  const isConnectingRef = useRef(false);
+  const connectionSourceRef = useRef<string | null>(null);
+  isConnectingRef.current = isConnecting;
+  connectionSourceRef.current = connectionSource;
+  const selectedRelationTypeRef = useRef<RelationshipType>('RELATES_TO');
 
   // Esc always works: pop one mode level, never trap the user
   // (docs/design/interaction-model.md, principle 3). Connection mode and the
@@ -304,6 +315,43 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isConnecting, editingEdge, nodeMenu.visible]);
+
+  // Grow-mode ghost preview: a dashed line + ghost circle follow the cursor
+  // from the source node, so the next click's meaning is always visible.
+  useEffect(() => {
+    if (!isConnecting || !connectionSource || !svgRef.current) return;
+    const svg = d3.select(svgRef.current);
+    const g = svg.select<SVGGElement>('.main-graph-group');
+    if (g.empty()) return;
+    const sourceNode = (simulationRef.current?.nodes() as any[])?.find((n: any) => n.id === connectionSource);
+    if (!sourceNode) return;
+
+    const preview = g.append('g').attr('class', 'grow-preview').style('pointer-events', 'none');
+    const previewLine = preview.append('line')
+      .attr('stroke', '#34d399')
+      .attr('stroke-width', 2)
+      .attr('stroke-dasharray', '6 5')
+      .attr('opacity', 0.8)
+      .attr('x1', sourceNode.x).attr('y1', sourceNode.y)
+      .attr('x2', sourceNode.x).attr('y2', sourceNode.y);
+    const previewGhost = preview.append('circle')
+      .attr('r', 14)
+      .attr('fill', 'rgba(52, 211, 153, 0.15)')
+      .attr('stroke', '#34d399')
+      .attr('stroke-dasharray', '4 4')
+      .attr('stroke-width', 1.5)
+      .attr('cx', sourceNode.x).attr('cy', sourceNode.y);
+    svg.on('mousemove.grow', (event: MouseEvent) => {
+      const [mx, my] = d3.pointer(event, g.node() as any);
+      previewLine.attr('x1', sourceNode.x).attr('y1', sourceNode.y).attr('x2', mx).attr('y2', my);
+      previewGhost.attr('cx', mx).attr('cy', my);
+    });
+
+    return () => {
+      svg.on('mousemove.grow', null);
+      preview.remove();
+    };
+  }, [isConnecting, connectionSource]);
 
   
   // Handle dragging for relationship selector
@@ -867,24 +915,27 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
 
   const handleNodeClick = useCallback((event: MouseEvent, node: WorkItem) => {
     event.stopPropagation();
-    
-    if (isConnecting && connectionSource) {
-      // Complete connection
-      if (connectionSource !== node.id) {
+
+    // Read mode through refs: this handler is bound to D3 elements once and
+    // must see live state without forcing a full re-init.
+    const growSource = connectionSourceRef.current;
+    if (isConnectingRef.current && growSource) {
+      // Complete connection (clicking the source itself just cancels)
+      if (growSource !== node.id) {
         // Check if edge already exists
-        if (edgeExists(connectionSource, node.id)) {
+        if (edgeExists(growSource, node.id)) {
           setIsConnecting(false);
           setConnectionSource(null);
           return;
         }
-        
+
         // Create edge in backend
         createEdgeMutation({
           variables: {
             input: [{
-              type: selectedRelationType,
+              type: selectedRelationTypeRef.current,
               weight: 0.8,
-              source: { connect: { where: { node: { id: connectionSource } } } },
+              source: { connect: { where: { node: { id: growSource } } } },
               target: { connect: { where: { node: { id: node.id } } } },
             }]
           }
@@ -895,7 +946,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         });
         // Don't reinitialize - let refetchQueries handle the update
       }
-      
+
       setIsConnecting(false);
       setConnectionSource(null);
     } else {
@@ -1258,14 +1309,30 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     }
   }, []);
 
+  // Grow-a-child: predict the natural child type for a parent (kid-simple
+  // defaults — the user can retype later with one click)
+  const childTypeFor = (parentType?: string): string => {
+    switch (parentType) {
+      case 'EPIC': return 'FEATURE';
+      case 'MILESTONE': return 'TASK';
+      case 'OUTCOME': return 'FEATURE';
+      case 'FEATURE': return 'TASK';
+      default: return 'TASK';
+    }
+  };
+
   // Inline node creation function
-  const createInlineNode = async (x: number, y: number) => {
+  const createInlineNode = async (
+    x: number,
+    y: number,
+    options?: { type?: string; connectFrom?: { id: string; type?: string } }
+  ) => {
     // Create inline node function
     if (!currentGraph?.id) {
       // No current graph selected
       return;
     }
-    
+
     try {
       // Generate a unique name that doesn't conflict with existing nodes
       let nodeTitle = `New Work Item ${nodeCounter}`;
@@ -1286,7 +1353,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       const workItemInput = {
         title: nodeTitle,
         description: DEFAULT_NODE_CONFIG.description,
-        type: DEFAULT_NODE_CONFIG.type,
+        type: options?.type ?? DEFAULT_NODE_CONFIG.type,
         status: DEFAULT_NODE_CONFIG.status,
         priority: 0.0,
         positionX: x,
@@ -1295,7 +1362,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         radius: 1.0,
         theta: 0.0,
         phi: 0.0,
-        
+
         owner: {
           connect: {
             where: { node: { id: currentUser?.id } }
@@ -1314,15 +1381,35 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
 
       if (result.data) {
         setNodeCounter(prev => prev + 1);
-        showSuccess('Work item created successfully');
-        // Let Apollo's cache update handle the UI update instead of refetch to avoid camera jumping
-        // The refetchQueries in the mutation config will handle the data update
+        const newNode = result.data.createWorkItems?.workItems?.[0];
+
+        // Grow mode: wire the new node to its source immediately
+        if (newNode?.id && options?.connectFrom) {
+          await createEdgeMutation({
+            variables: {
+              input: [{
+                type: 'IS_PART_OF',
+                weight: 0.8,
+                source: { connect: { where: { node: { id: newNode.id } } } },
+                target: { connect: { where: { node: { id: options.connectFrom.id } } } }
+              }]
+            }
+          }).catch(() => { /* edge failure shouldn't kill the node */ });
+        }
+
+        // The name is the next thing a person wants to set — put them
+        // straight into an inline rename, no modal (interaction-model W2/W3)
+        if (newNode?.id) {
+          setInlineEdit({ nodeId: newNode.id, value: newNode.title || nodeTitle, graphX: x, graphY: y });
+        }
+        return newNode;
       }
     } catch (error) {
       console.error('[Create Work Item Error]', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to create work item';
       showError(errorMessage);
     }
+    return undefined;
   };
 
   // Helper function to calculate node dimensions (shared between init and update)
@@ -1630,11 +1717,21 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     background.on('click', function(event: MouseEvent) {
       event.stopPropagation();
 
-      // Clicking empty canvas always exits connection mode — no keyboard traps,
-      // no hunting for the Cancel button (interaction-model.md, principle 3)
-      if (isConnecting) {
+      // Grow mode: clicking empty space is the intuitive "make a new one
+      // HERE, connected" — a kid's first guess is the right one. The new
+      // node lands in inline rename. (Cancel = Esc / right-click / source.)
+      if (isConnectingRef.current) {
+        const growSource = connectionSourceRef.current;
+        const sourceNode = (simulationRef.current?.nodes() as any[])?.find((n: any) => n.id === growSource);
+        const [gx, gy] = d3.pointer(event, g.node() as any);
         setIsConnecting(false);
         setConnectionSource(null);
+        if (growSource) {
+          createInlineNode(gx, gy, {
+            type: childTypeFor(sourceNode?.type),
+            connectFrom: { id: growSource, type: sourceNode?.type }
+          });
+        }
         return;
       }
 
@@ -1668,10 +1765,17 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     // Add right-click handler for context menu
     background.on('contextmenu', function(event: MouseEvent) {
       event.preventDefault();
-      
+
+      // Right-click cancels grow mode (alongside Esc and clicking the source)
+      if (isConnectingRef.current) {
+        setIsConnecting(false);
+        setConnectionSource(null);
+        return;
+      }
+
       // Close all existing dialogs first (exclusive dialog behavior)
       setEditingEdge(null);
-      
+
       const [graphX, graphY] = d3.pointer(event, g.node());
       
       setContextMenuPosition({
@@ -2116,7 +2220,13 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         linkElements.classed('dim-for-hover', false);
         clickableEdges.classed('dim-for-hover', false);
         edgeLabelGroups.classed('dim-for-hover', false);
+      })
+      // Double-click a node → rename in place, no modal (W2)
+      .on('dblclick.rename', (event: MouseEvent, d: any) => {
+        event.stopPropagation();
+        setInlineEdit({ nodeId: d.id, value: d.title || '', graphX: d.x || 0, graphY: d.y || 0 });
       });
+
 
     // Monopoly-style rectangular nodes with colored title bars
     // getNodeDimensions is now defined outside and shared with updateVisualizationData
@@ -2403,12 +2513,16 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     relationshipIcons.on('click', (event: MouseEvent, d: WorkItem) => {
       event.stopPropagation();
       event.preventDefault();
-      
-      console.log('[Graph Debug] + button clicked, opening relationship window');
-      
-      // Simply open the relationship window - avoid changing selectedNodes to prevent graph refresh
-      setShowRelationshipWindow(true);
+
+      // "+" means GROW: enter grow mode wired to this node. Click empty
+      // space → new connected item right there; click another node →
+      // connect to it; Esc / right-click / clicking this node → cancel.
+      // No modals, no instructions-as-UI (interaction-model W3).
+      setNodeMenu({ node: null, position: { x: 0, y: 0 }, visible: false });
       setEditingEdge(null);
+      setShowRelationshipWindow(false);
+      setConnectionSource(d.id);
+      setIsConnecting(true);
     });
 
     // Node title section - with text wrapping
@@ -4024,42 +4138,54 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
 
 
 
-      {/* Connection Mode Indicator */}
+      {/* Grow mode: one friendly hint, no instructions-as-UI, no dropdown.
+          The edge type can be retyped later by clicking its label. */}
       {isConnecting && (
-        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg">
-          <div className="flex items-center space-x-2">
-            <Link2 className="h-4 w-4" />
-            <span>Click target node to create {selectedRelationType.replace('_', ' ')} relationship</span>
-            <button
-              onClick={() => {
-                setIsConnecting(false);
-                setConnectionSource(null);
-              }}
-              className="ml-2 text-blue-200 hover:text-white"
-            >
-              Cancel
-            </button>
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-gray-900/90 backdrop-blur-sm border border-emerald-500/40 text-emerald-100 px-4 py-2 rounded-xl shadow-lg pointer-events-none">
+          <div className="flex items-center space-x-2 text-sm">
+            <Link2 className="h-4 w-4 text-emerald-400" />
+            <span>Click empty space to grow a new item · click a node to connect · Esc to cancel</span>
           </div>
         </div>
       )}
 
-      {/* Relationship Type Selector */}
-      {isConnecting && (
-        <div className="absolute top-16 left-1/2 transform -translate-x-1/2 bg-gray-800 border border-gray-600 rounded-lg shadow-lg p-3">
-          <div className="text-sm font-medium text-green-300 mb-2">Relationship Type:</div>
-          <select
-            value={selectedRelationType}
-            onChange={(e) => setSelectedRelationType(e.target.value as RelationshipType)}
-            className="w-full border border-gray-600 bg-gray-700 text-gray-200 rounded px-2 py-1 text-sm"
+      {/* Inline rename: the input floats over the node — no modal (W2) */}
+      {inlineEdit && (() => {
+        const simNode = (simulationRef.current?.nodes() as any[])?.find((n: any) => n.id === inlineEdit.nodeId);
+        const gx = simNode?.x ?? inlineEdit.graphX;
+        const gy = simNode?.y ?? inlineEdit.graphY;
+        const left = gx * currentTransform.scale + currentTransform.x;
+        const top = gy * currentTransform.scale + currentTransform.y;
+        const commit = () => {
+          const title = inlineEdit.value.trim();
+          setInlineEdit(null);
+          if (title) {
+            updateWorkItemMutation({
+              variables: { where: { id: inlineEdit.nodeId }, update: { title } }
+            }).catch(() => showError('Could not rename item'));
+          }
+        };
+        return (
+          <div
+            className="absolute z-50"
+            style={{ left, top, transform: 'translate(-50%, -50%)' }}
           >
-            {RELATIONSHIP_OPTIONS.map((option) => (
-              <option key={option.type} value={option.type}>
-                {option.label} - {option.description}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
+            <input
+              autoFocus
+              data-testid="inline-rename"
+              value={inlineEdit.value}
+              onFocus={(e) => e.target.select()}
+              onChange={(e) => setInlineEdit({ ...inlineEdit, value: e.target.value })}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commit();
+                if (e.key === 'Escape') setInlineEdit(null);
+              }}
+              onBlur={commit}
+              className="px-3 py-2 rounded-lg bg-gray-900/95 border-2 border-emerald-400 text-white text-sm font-semibold shadow-2xl outline-none min-w-[180px] text-center"
+            />
+          </div>
+        );
+      })()}
 
       {/* Node Context Menu */}
       {nodeMenu.visible && nodeMenu.node && createPortal(
