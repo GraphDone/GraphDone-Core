@@ -349,6 +349,20 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isConnecting, editingEdge, nodeMenu.visible]);
 
+  // The edge being edited glows for the whole session of the editor —
+  // applied reactively (init-time attr checks captured stale editingEdge).
+  useEffect(() => {
+    if (!svgRef.current) return;
+    const svg = d3.select(svgRef.current);
+    const id = editingEdge?.edge?.id ?? null;
+    svg.selectAll('.edge').classed('edge-editing', (d: any) => !!id && d?.id === id);
+    svg.selectAll('.edge-label-group').classed('edge-editing-label', (d: any) => !!id && d?.id === id);
+    return () => {
+      svg.selectAll('.edge').classed('edge-editing', false);
+      svg.selectAll('.edge-label-group').classed('edge-editing-label', false);
+    };
+  }, [editingEdge?.edge?.id]);
+
   // Grow-mode ghost preview: a dashed line + ghost circle follow the cursor
   // from the source node, so the next click's meaning is always visible.
   useEffect(() => {
@@ -2912,6 +2926,9 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       .attr('opacity', 1);
 
     // Create edge label groups with rounded rectangles and text (only for visible edges)
+    // NOTE: this group is appended after the nodes group, so nodes-group is
+    // raised afterwards — node cards and their controls must always stack
+    // above edge labels, or labels steal clicks meant for node buttons.
     const edgeLabelGroups = g.append('g')
       .attr('class', 'edge-labels-group')
       .selectAll('.edge-label-group')
@@ -2925,26 +2942,19 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         event.stopPropagation();
         event.preventDefault(); // Prevent any default behavior
         
-        // Auto-show relationship window when edge is clicked
-        if (!showRelationshipWindow) {
-          setShowRelationshipWindow(true);
-          // Set the selected edge with initial position for new window
-          setEditingEdge({
-            edge: d,
-            position: { x: 200, y: 80 } // Initial position for new window
-          });
-        } else {
-          // Window already visible, just update the edge data (preserve window position)
-          setEditingEdge(prev => prev ? {
-            edge: d,
-            position: prev.position // Keep existing window position
-          } : {
-            edge: d,
-            position: { x: 200, y: 80 }
-          });
-        }
+        // Open the editor, remembering WHERE the edge was clicked so the
+        // window can position itself away from the edge it edits
+        setShowRelationshipWindow(true);
+        setEditingEdge({
+          edge: d,
+          position: { x: event.clientX, y: event.clientY }
+        });
         setDragOffset({ x: 0, y: 0 }); // Reset drag offset
       });
+
+    // Nodes always stack ABOVE edge labels/arrows — labels were stealing
+    // clicks from node controls (the + icon) when they drifted over a card.
+    g.select('.nodes-group').raise();
 
     // Add text labels first to measure their size
     edgeLabelGroups
