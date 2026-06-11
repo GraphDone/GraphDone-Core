@@ -83,6 +83,21 @@ GraphDone follows **democratic development principles** - releases happen when t
 3. **Test with real usage**: Use GraphDone for actual project organization
 4. **Document your improvements**: Help others understand UX decisions
 
+## The Living Graph Era (June 2026 reboot)
+
+The project is active again with a clear thesis: **GraphDone wins where Jira and Jama lose — it's alive, it's fast everywhere, and AI agents are first-class teammates.**
+
+Development is now driven by [docs/USER_STORIES.md](./USER_STORIES.md) — a story-by-story backlog where every feature maps to a test before it's built (TDD). The epics:
+
+1. **The Living Graph** — active work breathes, priority literally glows, energy flows along dependencies, completion celebrates. *(first slice shipped: breathing nodes, priority glow halos)*
+2. **Adaptive Performance** — quality tiers (LOW→ULTRA) computed from device compute + network, with an FPS governor that degrades effects before interactivity. Cellular/Save-Data users get smaller previews and lighter streaming automatically. *(engine shipped: `packages/web/src/lib/adaptiveQuality.ts`)*
+3. **Responsive Everywhere** — phone, tablet, PC; touch gestures; viewport matrix in CI.
+4. **AI-First Platform** — full capability parity between UI and MCP tools; machine-readable errors; `get_graph_context` for one-call agent orientation. *(first tool shipped)*
+5. **Flow & Joy** — quick capture, undo/redo, optimistic everything.
+6. **Together** — presence, live cursors, subscription-driven animation.
+
+How to contribute: pick a 💤 story from USER_STORIES.md, write its test first, make it green, flip the story's status in the same PR. PRs go to `develop`, titled with the story ID (e.g. `LIVE-2: energy flow on edges`).
+
 ## Feedback Priorities
 
 ### Critical for Alpha Success
