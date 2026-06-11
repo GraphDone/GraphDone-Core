@@ -825,3 +825,31 @@ input[type="date"]:focus {
     transition: none;
   }
 }
+
+/* The edge being edited glows for the whole editing session */
+@keyframes edge-editing-pulse {
+  0%, 100% {
+    stroke-opacity: 1;
+    stroke-width: 4;
+  }
+  50% {
+    stroke-opacity: 0.6;
+    stroke-width: 6;
+  }
+}
+
+.graph-container svg .edge.edge-editing {
+  animation: edge-editing-pulse 1.2s ease-in-out infinite;
+  filter: drop-shadow(0 0 6px currentColor);
+}
+
+.graph-container svg .edge-editing-label {
+  filter: drop-shadow(0 0 8px rgba(52, 211, 153, 0.9));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .graph-container svg .edge.edge-editing {
+    animation: none;
+    stroke-width: 5;
+  }
+}
