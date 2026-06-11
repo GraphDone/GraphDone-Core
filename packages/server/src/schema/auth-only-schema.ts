@@ -159,6 +159,26 @@ export const authOnlyTypeDefs = gql`
     defaultAccounts: [DefaultAccount!]!
   }
 
+  # OAuth Provider Configuration (Admin Only)
+  type OAuthProviderConfig {
+    provider: String!
+    enabled: Boolean!
+    clientId: String
+    clientSecret: String
+    callbackUrl: String!
+    configured: Boolean!
+    createdAt: String
+    updatedAt: String
+  }
+
+  input OAuthProviderConfigInput {
+    provider: String!
+    enabled: Boolean!
+    clientId: String!
+    clientSecret: String!
+    callbackUrl: String!
+  }
+
   type Query {
     # Get current user from JWT token
     me: User
@@ -187,6 +207,10 @@ export const authOnlyTypeDefs = gql`
     
     # Get graphs in a specific folder
     folderGraphs(folderId: String!): [GraphFolderMapping!]!
+
+    # Get OAuth provider configurations (Admin only)
+    oauthProviderConfigs: [OAuthProviderConfig!]!
+    oauthProviderConfig(provider: String!): OAuthProviderConfig
   }
 
   type Mutation {
@@ -250,6 +274,10 @@ export const authOnlyTypeDefs = gql`
     
     # Reorder graphs within folder
     reorderGraphsInFolder(folderId: String!, graphOrders: [GraphOrderInput!]!): MessageResponse!
+
+    # OAuth provider configuration mutations (Admin only)
+    updateOAuthProviderConfig(input: OAuthProviderConfigInput!): OAuthProviderConfig!
+    deleteOAuthProviderConfig(provider: String!): MessageResponse!
   }
   
   input GraphOrderInput {
