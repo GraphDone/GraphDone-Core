@@ -2018,6 +2018,21 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
           mousedownNodeRef.current = null;
         }));
 
+    // LIVE-8: wake-up entrance — nodes float in by recency on first open.
+    // Never delays interactivity; skipped at LOW/MEDIUM tier and reduced motion.
+    if (isFirstInit && qualityProfileRef.current.entranceAnimation && visibleNodes.length > 0) {
+      const byRecency = [...visibleNodes]
+        .sort((a, b) => String(b.updatedAt ?? '').localeCompare(String(a.updatedAt ?? '')))
+        .reduce((ranks, node, rank) => ranks.set(node.id, rank), new Map<string, number>());
+      const stagger = Math.min(40, 500 / visibleNodes.length);
+      nodeElements
+        .style('opacity', 0)
+        .transition()
+        .delay((d: WorkItem) => (byRecency.get(d.id) ?? 0) * stagger)
+        .duration(300)
+        .style('opacity', 1);
+    }
+
     // Monopoly-style rectangular nodes with colored title bars
     // getNodeDimensions is now defined outside and shared with updateVisualizationData
 
