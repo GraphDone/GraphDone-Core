@@ -71,15 +71,15 @@ test.describe('Neo4j Working Demonstration', () => {
     
     console.log('✅ UI authentication completed for Product Team');
     
-    // Verify Add Node button is available
-    await expect(page.locator('button:has-text("Add Node")')).toBeVisible();
-    console.log('✅ Add Node functionality is accessible');
+    // Verify Add Work Item button is available
+    await expect(page.locator('button:has-text("Add Work Item")')).toBeVisible();
+    console.log('✅ Add Work Item functionality is accessible');
     
     // Create a new work item with timestamp for uniqueness
     const timestamp = Date.now();
     const itemTitle = `Demo Item ${timestamp}`;
     
-    await page.locator('button:has-text("Add Node")').click();
+    await page.locator('button:has-text("Add Work Item")').click();
     await expect(page.locator('text=Create New Work Item')).toBeVisible();
     
     await page.locator('input[placeholder*="title"]').fill(itemTitle);
@@ -156,7 +156,7 @@ test.describe('Neo4j Working Demonstration', () => {
     const researchTimestamp = Date.now();
     const researchItemTitle = `Research Item ${researchTimestamp}`;
     
-    await page.locator('button:has-text("Add Node")').click();
+    await page.locator('button:has-text("Add Work Item")').click();
     await page.locator('input[placeholder*="title"]').fill(researchItemTitle);
     await page.locator('select').selectOption('IDEA');
     await page.locator('textarea').fill('Research team item for isolation testing');

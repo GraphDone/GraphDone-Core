@@ -433,8 +433,9 @@ describe.skipIf(process.env.CI)('COMPREHENSIVE CHAOS TESTING - 5000+ Attack Vect
         });
       });
     } else {
-      it('should skip database connection chaos (no real database)', () => {
-        expect(true).toBe(true);
+      it.skip('should skip database connection chaos (no real database)', () => {
+        // This test is skipped because no real database is available
+        // The skip will be visible in test output as a clear indicator
       });
     }
   });
@@ -457,10 +458,12 @@ describe.skipIf(process.env.CI)('COMPREHENSIVE CHAOS TESTING - 5000+ Attack Vect
           for (const service of services) {
             try {
               // Intentionally trigger errors and test recovery
-              await service.updateNode(scenario.data as any);
+              const result = await service.updateNode(scenario.data as any);
               
-              // If it doesn't throw, that's also valid (graceful handling)
-              expect(true).toBe(true);
+              // If it doesn't throw, verify graceful handling with proper response
+              expect(result).toBeDefined();
+              expect(result.content).toBeDefined();
+              expect(Array.isArray(result.content)).toBe(true);
             } catch (error: any) {
               // Errors should be well-formed
               expect(error.message).toBeDefined();
@@ -536,13 +539,14 @@ describe.skipIf(process.env.CI)('COMPREHENSIVE CHAOS TESTING - 5000+ Attack Vect
         graphTypes.forEach((graphType, gIndex) => {
           it(`should handle priority ${pIndex} (${priority}) for ${nodeType} in ${graphType}`, async () => {
             try {
-              await mockGraphService.updatePriorities({
+              const result = await mockGraphService.updatePriorities({
                 node_id: `combo-${pIndex}-${nIndex}-${gIndex}`,
                 priority_executive: priority,
                 priority_individual: priority * 0.8,
                 priority_community: priority * 1.2
               });
-              expect(true).toBe(true);
+              expect(result).toBeDefined();
+              expect(result.content).toBeDefined();
             } catch (error: any) {
               expect(error.message).toBeDefined();
             }
@@ -747,7 +751,9 @@ describe.skipIf(process.env.CI)('COMPREHENSIVE CHAOS TESTING - 5000+ Attack Vect
               status: 'COMPLETED' 
             })
           ]);
-          expect(true).toBe(true);
+          // Verify all concurrent operations completed without throwing
+          expect(results).toBeDefined();
+          expect(Array.isArray(results)).toBe(true);
         } catch (error: any) {
           expect(error.message).toBeDefined();
         }

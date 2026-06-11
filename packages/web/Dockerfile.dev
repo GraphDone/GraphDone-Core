@@ -1,15 +1,47 @@
 FROM node:18-alpine
 
+# Install security updates and curl for health checks
+RUN apk update && apk upgrade && apk add --no-cache curl dumb-init
+
+# Create non-root user (use existing node group if available)
+RUN addgroup -g 1001 -S appgroup || true && \
+    adduser -u 1001 -S appuser -G appgroup 2>/dev/null || \
+    adduser -u 1001 -S appuser -G node
+
 WORKDIR /app
 
-# Copy package files first for better caching
-COPY package.json turbo.json ./
+# Install global dependencies as root
+RUN npm install -g turbo
+
+# Copy root package files
+COPY --chown=appuser:appgroup package.json package-lock.json turbo.json tsconfig.json ./
+
+# Copy all package.json files to maintain workspace structure
+COPY --chown=appuser:appgroup packages/core/package.json packages/core/
+COPY --chown=appuser:appgroup packages/server/package.json packages/server/
+COPY --chown=appuser:appgroup packages/web/package.json packages/web/
+COPY --chown=appuser:appgroup packages/mcp-server/package.json packages/mcp-server/
+
+# Install all dependencies
 RUN npm ci
 
-# Create packages directory structure
-RUN mkdir -p packages/core packages/web
+# Copy source code
+COPY --chown=appuser:appgroup packages/ packages/
 
-EXPOSE 3000
+# Build core package first (dependency for web)
+RUN cd packages/core && npm run build
 
-# Development command will be overridden by docker-compose
-CMD ["npm", "run", "dev"]
+# Create directories for volumes with proper permissions
+RUN mkdir -p /app/logs && \
+    chown -R appuser:appgroup /app/logs
+
+EXPOSE 3127
+
+# Switch to non-root user
+USER appuser
+
+# Use dumb-init for proper signal handling
+ENTRYPOINT ["/usr/bin/dumb-init", "--"]
+
+# Development command - skip kill-port in container
+CMD ["npm", "run", "dev:force", "--workspace=@graphdone/web"]
