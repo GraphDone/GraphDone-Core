@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useDialog } from '../hooks/useDialogManager';
 import { X, Folder, FolderOpen, Plus, Copy, FileText } from 'lucide-react';
 import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -12,6 +13,7 @@ interface CreateGraphModalProps {
 }
 
 export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraphModalProps) {
+  useDialog(isOpen, onClose);
   const { currentTeam, currentUser } = useAuth();
   const { createGraph, duplicateGraph, availableGraphs, isCreating } = useGraph();
   const { showSuccess, showError } = useNotifications();

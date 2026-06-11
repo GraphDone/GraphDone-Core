@@ -10,6 +10,13 @@ Welcome to the GraphDone documentation! This directory contains comprehensive gu
 - WebSocket subscriptions
 - Authentication and authorization
 
+### 🌊 Living Graph Era (start here for current development)
+- [User Stories — the backlog that drives development](./USER_STORIES.md) - **Every feature starts here; every story maps to tests**
+- [Interaction Model — the friction-free contract](./design/interaction-model.md) - UX constitution: modes, exits, click budgets
+- [Progressive Streaming design](./design/progressive-streaming.md) - ADAPT-4: scale to huge graphs on slow links
+- [Testing & Refinement Plan](./TESTING_AND_REFINEMENT_PLAN.md) - The never-done loop; current cycle's verification debt
+- [AI Agents Quickstart](./api/AI_AGENTS.md) - 5-minute MCP/GraphQL setup for agent teammates
+
 ### [Developer Guides](./guides/)
 - [Getting Started](./guides/getting-started.md) - Setup and first steps
 - [Architecture Overview](./guides/architecture-overview.md) - System design and technical decisions
