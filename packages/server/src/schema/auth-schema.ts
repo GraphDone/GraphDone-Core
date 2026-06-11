@@ -23,11 +23,13 @@ export const authTypeDefs = gql`
     password: String!
     name: String!
     teamId: String
+    captchaPayload: String
   }
 
   input LoginInput {
     emailOrUsername: String!
     password: String!
+    captchaPayload: String
   }
 
   input UpdateProfileInput {
@@ -54,8 +56,109 @@ export const authTypeDefs = gql`
     role: UserRole!
   }
 
+  # Folder Management Types
+  type Folder {
+    id: String!
+    name: String!
+    parentId: String
+    type: FolderType!
+    ownerId: String
+    ownerName: String
+    color: String
+    icon: String
+    description: String
+    position: Int!
+    isExpanded: Boolean!
+    createdAt: String!
+    updatedAt: String!
+    children: [Folder!]!
+    graphs: [GraphFolderMapping!]!
+  }
+
+  type GraphFolderMapping {
+    graphId: String!
+    folderId: String!
+    position: Int!
+    createdAt: String!
+    updatedAt: String!
+  }
+
+  enum FolderType {
+    USER
+    TEAM
+    SYSTEM
+  }
+
+  input CreateFolderInput {
+    name: String!
+    parentId: String
+    type: FolderType!
+    ownerId: String
+    color: String
+    icon: String
+    description: String
+    position: Int
+  }
+
+  input UpdateFolderInput {
+    name: String
+    parentId: String
+    color: String
+    icon: String
+    description: String
+    position: Int
+    isExpanded: Boolean
+  }
+
   type SystemSettings {
     allowAnonymousGuest: Boolean!
+  }
+
+  type DefaultAccount {
+    username: String!
+    password: String!
+    role: String!
+    description: String!
+  }
+
+  type DevelopmentInfo {
+    isDevelopment: Boolean!
+    hasDefaultCredentials: Boolean!
+    defaultAccounts: [DefaultAccount!]!
+  }
+
+  type OAuthProvider {
+    provider: String!
+    providerId: String!
+    email: String
+    name: String
+    avatar: String
+    createdAt: String!
+  }
+
+  input OAuthLoginInput {
+    provider: String!
+    code: String!
+  }
+
+  # OAuth Provider Configuration (Admin Only)
+  type OAuthProviderConfig {
+    provider: String!
+    enabled: Boolean!
+    clientId: String
+    clientSecret: String
+    callbackUrl: String!
+    configured: Boolean!
+    createdAt: String
+    updatedAt: String
+  }
+
+  input OAuthProviderConfigInput {
+    provider: String!
+    enabled: Boolean!
+    clientId: String!
+    clientSecret: String!
+    callbackUrl: String!
   }
 
   type Query {
@@ -73,6 +176,26 @@ export const authTypeDefs = gql`
     
     # Get public system settings
     systemSettings: SystemSettings!
+    
+    # Get development mode info and default credentials (dev mode only)
+    developmentInfo: DevelopmentInfo!
+    
+    # Folder Management Queries
+    # Get user's folder structure (hierarchical)
+    folders: [Folder!]!
+    
+    # Get specific folder by ID
+    folder(id: String!): Folder
+    
+    # Get graphs in a specific folder
+    folderGraphs(folderId: String!): [GraphFolderMapping!]!
+
+    # Get OAuth providers for current user
+    myOAuthProviders: [OAuthProvider!]!
+
+    # Get OAuth provider configurations (Admin only)
+    oauthProviderConfigs: [OAuthProviderConfig!]!
+    oauthProviderConfig(provider: String!): OAuthProviderConfig
   }
 
   type Mutation {
@@ -114,5 +237,40 @@ export const authTypeDefs = gql`
     
     # Admin user status update (for GRAPH_MASTER only)
     updateUserStatus(userId: String!, isActive: Boolean!): User!
+    
+    # Folder Management Mutations
+    # Create new folder
+    createFolder(input: CreateFolderInput!): Folder!
+    
+    # Update folder properties
+    updateFolder(id: String!, input: UpdateFolderInput!): Folder!
+    
+    # Delete folder (and optionally its contents)
+    deleteFolder(id: String!, moveGraphsTo: String): MessageResponse!
+    
+    # Add graph to folder
+    addGraphToFolder(graphId: String!, folderId: String!, position: Int): MessageResponse!
+    
+    # Remove graph from folder
+    removeGraphFromFolder(graphId: String!, folderId: String!): MessageResponse!
+    
+    # Move graph between folders
+    moveGraphBetweenFolders(graphId: String!, fromFolderId: String!, toFolderId: String!, position: Int): MessageResponse!
+    
+    # Reorder graphs within folder
+    reorderGraphsInFolder(folderId: String!, graphOrders: [GraphOrderInput!]!): MessageResponse!
+
+    # OAuth mutations
+    oauthLogin(input: OAuthLoginInput!): AuthPayload!
+    unlinkOAuthProvider(provider: String!): MessageResponse!
+
+    # OAuth provider configuration mutations (Admin only)
+    updateOAuthProviderConfig(input: OAuthProviderConfigInput!): OAuthProviderConfig!
+    deleteOAuthProviderConfig(provider: String!): MessageResponse!
+  }
+  
+  input GraphOrderInput {
+    graphId: String!
+    position: Int!
   }
 `;

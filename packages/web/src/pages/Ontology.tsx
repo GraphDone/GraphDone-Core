@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Plus, Search, Edit3, Trash2, Eye, Copy, Brain, Settings, X, Calendar, User, Hash } from 'lucide-react';
 import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
+import { APP_VERSION } from '../utils/version';
 import { 
   WORK_ITEM_TYPES, 
   getTypeIconElement, 
@@ -47,7 +48,7 @@ export function Ontology() {
   const [showRelationshipModal, setShowRelationshipModal] = useState(false);
   const [relationshipSearchTerm, setRelationshipSearchTerm] = useState('');
 
-  // Generate node types from centralized constants
+  // Generate work item types from centralized constants
   const mockNodeTypes: NodeType[] = Object.entries(WORK_ITEM_TYPES).map(([key, config]) => ({
     id: key.toLowerCase(),
     name: config.label,
@@ -63,9 +64,7 @@ export function Ontology() {
       { id: 'description', name: 'description', type: 'text' as const, required: false },
       { id: 'type', name: 'type', type: 'text' as const, required: true },
       { id: 'status', name: 'status', type: 'text' as const, required: true },
-      { id: 'priorityExec', name: 'priorityExec', type: 'number' as const, required: false },
-      { id: 'priorityIndiv', name: 'priorityIndiv', type: 'number' as const, required: false },
-      { id: 'priorityComm', name: 'priorityComm', type: 'number' as const, required: false },
+      { id: 'priority', name: 'priority', type: 'number' as const, required: false },
       { id: 'assignedTo', name: 'assignedTo', type: 'text' as const, required: false },
       { id: 'dueDate', name: 'dueDate', type: 'text' as const, required: false },
       { id: 'tags', name: 'tags', type: 'text' as const, required: false }
@@ -118,12 +117,17 @@ export function Ontology() {
   return (
     <div className="h-screen flex flex-col">
       {/* Header */}
-      <div className="bg-gray-900 border-b border-gray-700 px-6 py-4">
+      <div className="bg-gray-900/30 backdrop-blur-md border-b border-gray-700/30 px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-100">Ontology</h1>
+            <div className="flex items-center space-x-3">
+              <h1 className="text-2xl font-bold text-gray-100">Ontology</h1>
+              <span className="text-xs bg-gray-800/50 text-gray-400 px-2 py-1 rounded">
+                v{APP_VERSION}
+              </span>
+            </div>
             <p className="text-sm text-gray-400 mt-1">
-              Define node types, relationships, and schemas for {currentGraph?.name || 'your graphs'}
+              Define work item types, relationships, and schemas for {currentGraph?.name || 'your graphs'}
             </p>
           </div>
           
@@ -148,7 +152,7 @@ export function Ontology() {
       </div>
 
       {/* Tabs */}
-      <div className="bg-gray-900 border-b border-gray-700">
+      <div className="bg-gray-900/20 backdrop-blur-md border-b border-gray-700/30">
         <div className="px-6">
           <nav className="flex space-x-8">
             <button
@@ -160,7 +164,7 @@ export function Ontology() {
               }`}
             >
               <Brain className="h-4 w-4 inline mr-2" />
-              Node Types
+              Work Item Types
             </button>
             <button
               onClick={() => setActiveTab('relationships')}
@@ -196,7 +200,7 @@ export function Ontology() {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Search node types"
+                  placeholder="Search work item types"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-600 rounded-lg text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-green-500 focus:border-transparent"
@@ -208,7 +212,7 @@ export function Ontology() {
               </div>
             </div>
 
-            {/* Node Types Grid */}
+            {/* Work Item Types Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredTypes.map((nodeType) => (
                 <div key={nodeType.id} className="bg-gray-800 border border-gray-700 rounded-lg p-6 hover:shadow-lg transition-shadow flex flex-col h-full">
@@ -357,9 +361,9 @@ export function Ontology() {
         {activeTab === 'templates' && (
           <div className="p-6">
             <div className="text-center py-12">
-              <h3 className="text-lg font-medium text-gray-100 mb-2">Node Templates</h3>
+              <h3 className="text-lg font-medium text-gray-100 mb-2">Work Item Templates</h3>
               <p className="text-gray-400 mb-4">
-                Pre-configured node templates for common patterns
+                Pre-configured work item templates for common patterns
               </p>
               <button className="btn btn-primary">
                 <Plus className="h-4 w-4 mr-2" />
@@ -370,7 +374,7 @@ export function Ontology() {
         )}
       </div>
 
-      {/* Node Type Detail Modal */}
+      {/* Work Item Type Detail Modal */}
       {showDetailModal && selectedNodeType && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-gray-800 rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">

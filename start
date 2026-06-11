@@ -3,7 +3,8 @@
 # GraphDone - Single Entry Point
 # The main launcher for all GraphDone operations
 
-set -e
+# Don't use set -e to allow better error handling
+# set -e
 
 # Colors for better output
 RED='\033[0;31m'
@@ -19,6 +20,43 @@ NC='\033[0m' # No Color
 COMMAND=""
 SKIP_BANNER=false
 QUIET=false
+
+# Platform detection
+detect_platform() {
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        PLATFORM="macos"
+        # macOS shell profile detection
+        if [ -n "$ZSH_VERSION" ] || [ -f "$HOME/.zshrc" ]; then
+            SHELL_PROFILE="$HOME/.zshrc"
+        elif [ -f "$HOME/.bash_profile" ]; then
+            SHELL_PROFILE="$HOME/.bash_profile"
+        else
+            SHELL_PROFILE="$HOME/.bashrc"
+        fi
+    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        PLATFORM="linux"
+        SHELL_PROFILE="$HOME/.bashrc"
+    elif [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "cygwin" ]] || [[ "$OS" == "Windows_NT" ]]; then
+        PLATFORM="windows"
+        # Windows shell profile detection
+        if [ -n "$USERPROFILE" ]; then
+            # PowerShell profile (preferred)
+            SHELL_PROFILE="$USERPROFILE/Documents/PowerShell/Microsoft.PowerShell_profile.ps1"
+            # Git Bash profile (fallback)
+            if [ ! -f "$SHELL_PROFILE" ]; then
+                SHELL_PROFILE="$HOME/.bashrc"
+            fi
+        else
+            SHELL_PROFILE="$HOME/.bashrc"  # Git Bash fallback
+        fi
+    else
+        PLATFORM="unknown"
+        SHELL_PROFILE="$HOME/.bashrc"
+    fi
+}
+
+# Initialize platform detection
+detect_platform
 
 # Help function
 show_help() {
@@ -43,6 +81,19 @@ show_help() {
     echo -e "  ${CYAN}stop${NC}         Stop all running services"
     echo -e "  ${CYAN}remove${NC}       Remove GraphDone completely (services, data, dependencies)"
     echo -e "  ${CYAN}status${NC}       Check system status"
+    echo -e "  ${CYAN}vm${NC}           Manage Multipass VMs"
+    echo -e "    ${YELLOW}launch${NC}         Launch a new VM"
+    echo -e "    ${YELLOW}delete${NC}         Delete a VM"
+    echo -e "    ${YELLOW}stop${NC}           Stop a VM"
+    echo -e "    ${YELLOW}start${NC}          Start a VM"
+    echo -e "    ${YELLOW}shell${NC}          Open shell in VM"
+    echo -e "    ${YELLOW}info${NC}           Show VM information"
+    echo -e "    ${YELLOW}list${NC}           List all VMs"
+    echo -e "    ${YELLOW}--name NAME${NC}    Specify VM name"
+    echo -e "    ${YELLOW}--branch BRANCH${NC} Specify Git branch"
+    echo -e "    ${YELLOW}--cpus N${NC}       Number of CPUs"
+    echo -e "    ${YELLOW}--memory SIZE${NC}  Memory size (e.g., 8G)"
+    echo -e "    ${YELLOW}--disk SIZE${NC}    Disk size (e.g., 30G)"
     echo ""
     echo -e "${BOLD}OPTIONS:${NC}"
     echo -e "  ${YELLOW}--help, -h${NC}    Show this help message"
@@ -50,13 +101,24 @@ show_help() {
     echo -e "  ${YELLOW}--no-banner${NC}   Skip the GraphDone banner"
     echo ""
     echo -e "${BOLD}EXAMPLES:${NC}"
-    echo -e "  ${GREEN}./start${NC}              # Start development environment"
-    echo -e "  ${GREEN}./start quick${NC}        # Quick start"
-    echo -e "  ${GREEN}./start clean${NC}        # Clean and restart"
-    echo -e "  ${GREEN}./start test --quiet${NC}  # Run tests quietly"
-    echo -e "  ${GREEN}./start remove${NC}       # Completely remove GraphDone"
+    echo -e "  ${GREEN}./start${NC}                                  # Start development environment"
+    echo -e "  ${GREEN}./start quick${NC}                            # Quick start"
+    echo -e "  ${GREEN}./start clean${NC}                            # Clean and restart"
+    echo -e "  ${GREEN}./start test --quiet${NC}                      # Run tests quietly"
+    echo -e "  ${GREEN}./start remove${NC}                           # Completely remove GraphDone"
+    echo -e "  ${GREEN}./start vm launch${NC}                        # Launch VM with default config"
+    echo -e "  ${GREEN}./start vm launch --branch develop${NC}        # Launch VM with specific branch"
+    echo -e "  ${GREEN}./start vm launch --cpus 8 --memory 16G${NC}   # Launch VM with custom resources"
+    echo -e "  ${GREEN}./start vm shell${NC}                          # Connect to VM shell"
+    echo -e "  ${GREEN}./start vm delete${NC}                         # Delete VM"
     echo ""
-    echo -e "${BOLD}DEVELOPMENT:${NC}"
+    echo -e "${BOLD}PRODUCTION (deploy):${NC}"
+    echo -e "  ${CYAN}Web UI:${NC}       https://localhost:3128 (HTTPS)"
+    echo -e "  ${CYAN}GraphQL:${NC}     https://localhost:4128/graphql (HTTPS)"
+    echo -e "  ${CYAN}WebSocket:${NC}   wss://localhost:4128/graphql (WSS)"
+    echo -e "  ${CYAN}Database:${NC}    http://localhost:7474 (Neo4j Browser)"
+    echo ""
+    echo -e "${BOLD}DEVELOPMENT (dev):${NC}"
     echo -e "  ${CYAN}Web UI:${NC}       http://localhost:3127"
     echo -e "  ${CYAN}GraphQL:${NC}     http://localhost:4127/graphql"
     echo -e "  ${CYAN}Database:${NC}    http://localhost:7474 (Neo4j Browser)"
@@ -79,7 +141,7 @@ while [[ $# -gt 0 ]]; do
             SKIP_BANNER=true
             shift
             ;;
-        dev|quick|clean|setup|test|build|deploy|stop|remove|status)
+        dev|quick|clean|setup|test|build|deploy|stop|remove|status|vm)
             COMMAND="$1"
             shift
             # Capture remaining arguments for the command
@@ -160,10 +222,164 @@ log_error() {
     echo -e "${RED}$1${NC}"
 }
 
+# Docker error handling function
+handle_docker_error() {
+    local error_output="$1"
+    local command="$2"
+
+    echo ""
+    log_error "╔════════════════════════════════════════════════════════════════╗"
+    log_error "║                                                                ║"
+    log_error "║                    ❌ Docker Error Detected ❌                  ║"
+    log_error "║                                                                ║"
+    log_error "╚════════════════════════════════════════════════════════════════╝"
+    echo ""
+
+    # Detect specific error types and provide targeted solutions
+    # Check most specific patterns first, then more general ones
+    if echo "$error_output" | grep -qi "Cannot connect to the Docker daemon\|docker.*not running\|Is the docker daemon running"; then
+        log_warning "🔍 Issue: Docker is not running"
+        echo ""
+        echo "Docker daemon is not started."
+        echo ""
+        log_info "${BOLD}Solution:${NC}"
+        echo "  • Start Docker Desktop"
+        echo "  • Wait for it to fully start (check system tray)"
+        echo "  • Then run: ${GREEN}./start${NC}"
+        echo ""
+
+    elif echo "$error_output" | grep -qi "ContainerConfig\|container.*config\|image.*config"; then
+        log_warning "🔍 Issue: Corrupted container state detected"
+        echo ""
+        echo "This happens when Docker containers are in an inconsistent state."
+        echo ""
+        log_info "${BOLD}Quick Fix (Recommended):${NC}"
+        echo "  ${GREEN}./start stop${NC}    # Stop all services"
+        echo "  ${GREEN}./start${NC}         # Start fresh"
+        echo ""
+        log_info "${BOLD}If that doesn't work, try a complete cleanup:${NC}"
+        echo "  ${GREEN}./start remove${NC}  # Remove all containers and data"
+        echo "  ${GREEN}./start setup${NC}   # Fresh installation"
+        echo ""
+
+    elif echo "$error_output" | grep -qi "permission denied\|Got permission denied"; then
+        log_warning "🔍 Issue: Docker permission problem"
+        echo ""
+        echo "Docker requires proper permissions to run."
+        echo ""
+        log_info "${BOLD}Solution:${NC}"
+        echo "  ${GREEN}./scripts/setup_docker.sh${NC}  # Fix Docker permissions"
+        echo "  Then restart your terminal and run: ${GREEN}./start${NC}"
+        echo ""
+
+    elif echo "$error_output" | grep -qi "no such container\|container.*not found"; then
+        log_warning "🔍 Issue: Container not found"
+        echo ""
+        echo "Expected containers are missing."
+        echo ""
+        log_info "${BOLD}Solution:${NC}"
+        echo "  ${GREEN}./start stop${NC}    # Clean up"
+        echo "  ${GREEN}./start${NC}         # Recreate containers"
+        echo ""
+
+    elif echo "$error_output" | grep -qi "port.*already allocated\|address already in use"; then
+        log_warning "🔍 Issue: Port conflict detected"
+        echo ""
+        echo "Another service is using GraphDone's ports (3127, 3128, 4127, 4128, 7474, 7687)."
+        echo ""
+        log_info "${BOLD}Solution:${NC}"
+        echo "  ${GREEN}./start stop${NC}                    # Stop GraphDone services"
+        echo "  ${GREEN}lsof -ti:3127 | xargs kill -9${NC}  # Kill specific port (example)"
+        echo ""
+
+    elif echo "$error_output" | grep -qi "no space left\|disk.*full"; then
+        log_warning "🔍 Issue: Disk space problem"
+        echo ""
+        echo "Not enough disk space for Docker operations."
+        echo ""
+        log_info "${BOLD}Solution:${NC}"
+        echo "  ${GREEN}docker system prune -a${NC}  # Clean up Docker resources"
+        echo "  Then run: ${GREEN}./start${NC}"
+        echo ""
+
+    elif echo "$error_output" | grep -qi "network.*not found\|network.*error"; then
+        log_warning "🔍 Issue: Docker network problem"
+        echo ""
+        echo "Docker network configuration is corrupted."
+        echo ""
+        log_info "${BOLD}Solution:${NC}"
+        echo "  ${GREEN}./start stop${NC}    # Stop services"
+        echo "  ${GREEN}docker network prune${NC}  # Clean up networks"
+        echo "  ${GREEN}./start${NC}         # Restart"
+        echo ""
+
+    elif echo "$error_output" | grep -qi "timeout\|timed out"; then
+        log_warning "🔍 Issue: Docker operation timeout"
+        echo ""
+        echo "Docker operations are taking too long (usually means Docker Desktop is slow)."
+        echo ""
+        log_info "${BOLD}Solution:${NC}"
+        echo "  1. Restart Docker Desktop"
+        echo "  2. Wait 30 seconds for Docker to fully start"
+        echo "  3. Try again: ${GREEN}./start${NC}"
+        echo ""
+
+    else
+        log_warning "🔍 Issue: Unknown Docker error"
+        echo ""
+        echo "An unexpected Docker error occurred."
+        echo ""
+        log_info "${BOLD}General Solutions (try in order):${NC}"
+        echo "  1. ${GREEN}./start stop${NC}     # Stop services"
+        echo "  2. ${GREEN}./start${NC}          # Restart"
+        echo "  3. ${GREEN}./start remove${NC}   # Complete cleanup"
+        echo "  4. ${GREEN}./start setup${NC}    # Fresh installation"
+        echo ""
+    fi
+
+    log_info "${BOLD}Error Details:${NC}"
+    echo "$error_output" | head -20
+    echo ""
+
+    return 1
+}
+
+# Safe Docker command wrapper
+safe_docker() {
+    local description="$1"
+    shift
+    local cmd="$@"
+
+    if [ "$QUIET" = false ]; then
+        echo -n "  ${description}..."
+    fi
+
+    local output
+    local exit_code
+
+    output=$(eval "$cmd" 2>&1) || exit_code=$?
+
+    if [ ${exit_code:-0} -ne 0 ]; then
+        if [ "$QUIET" = false ]; then
+            echo " ❌"
+        fi
+        handle_docker_error "$output" "$cmd"
+        return 1
+    fi
+
+    if [ "$QUIET" = false ]; then
+        echo " ✅"
+    fi
+    return 0
+}
+
 # Function to ensure Node.js is available
 ensure_nodejs() {
-    if ! command -v node &> /dev/null || ! command -v npm &> /dev/null; then
-        log_warning "⚠️  Node.js/npm not found in PATH, attempting to load from nvm..."
+    if command -v node &> /dev/null && command -v npm &> /dev/null; then
+        log_success "✅ Node.js found: $(node --version), npm: $(npm --version)"
+        return 0
+    else
+        log_warning "⚠️  Node.js not found - checking for existing installations..."
         
         export NVM_DIR="$HOME/.nvm"
         if [ -s "$NVM_DIR/nvm.sh" ]; then
@@ -180,10 +396,79 @@ ensure_nodejs() {
             
             log_success "✅ Loaded Node.js from nvm: $(node --version)"
         else
-            log_error "❌ Node.js not found and nvm not available."
-            echo "Please restart your terminal or run:"
-            echo "  source ~/.bashrc  # or ~/.zshrc"
-            echo "  ./start"
+            log_warning "🔧 No Node.js installation found. Installing automatically..."
+
+            # Try to install Node.js automatically
+            if [ -f "./scripts/setup_nodejs.sh" ]; then
+                ./scripts/setup_nodejs.sh
+
+                # Platform-aware post-installation setup
+                case $PLATFORM in
+                    "macos")
+                        # macOS: Reload shell profile and update PATH for Homebrew
+                        if [ -f "$SHELL_PROFILE" ]; then
+                            source "$SHELL_PROFILE" 2>/dev/null || true
+                        fi
+                        # Add common macOS Node.js paths
+                        export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+                        ;;
+                    "linux")
+                        # Linux: Reload bashrc and add snap PATH
+                        if [ -f "$SHELL_PROFILE" ]; then
+                            source "$SHELL_PROFILE" 2>/dev/null || true
+                        fi
+                        export PATH="/snap/bin:$PATH"
+                        ;;
+                    "windows")
+                        # Windows: Refresh environment and add common paths
+                        if command -v refreshenv &> /dev/null; then
+                            refreshenv 2>/dev/null || true
+                        fi
+                        # Add common Windows Node.js paths
+                        export PATH="/c/Program Files/nodejs:/c/ProgramData/chocolatey/bin:$PATH"
+                        ;;
+                    *)
+                        # Unknown platform: Try to reload profile
+                        if [ -f "$SHELL_PROFILE" ]; then
+                            source "$SHELL_PROFILE" 2>/dev/null || true
+                        fi
+                        ;;
+                esac
+
+                # Verify Node.js is now available
+                if command -v node &> /dev/null && command -v npm &> /dev/null; then
+                    log_success "✅ Node.js automatically installed: $(node --version)"
+                    return 0
+                fi
+            fi
+
+            # Fallback to platform-aware manual instructions
+            log_error "❌ Could not install Node.js automatically."
+            echo "Please install Node.js manually for $PLATFORM:"
+            echo "  1. Run: ./scripts/setup_nodejs.sh"
+            
+            case $PLATFORM in
+                "macos")
+                    echo "  2. Or install via Homebrew: brew install node"
+                    echo "  3. Or download from: https://nodejs.org/en/download/"
+                    ;;
+                "linux")
+                    echo "  2. Or install via package manager:"
+                    echo "     • Ubuntu/Debian: sudo apt install nodejs npm"
+                    echo "     • Fedora/RHEL: sudo dnf install nodejs npm"
+                    echo "  3. Or download from: https://nodejs.org/en/download/"
+                    ;;
+                "windows")
+                    echo "  2. Or install via Chocolatey: choco install nodejs"
+                    echo "  3. Or install via Scoop: scoop install nodejs"
+                    echo "  4. Or download installer: https://nodejs.org/en/download/"
+                    ;;
+                *)
+                    echo "  2. Visit: https://nodejs.org/en/download/"
+                    ;;
+            esac
+            
+            echo "  ${CYAN}Then restart terminal and run: ./start${NC}"
             exit 1
         fi
     fi
@@ -191,11 +476,39 @@ ensure_nodejs() {
 
 # Command implementations
 cmd_dev() {
+    # Capture start time for end-to-end timing (milliseconds since epoch)
+    # macOS/Windows date doesn't support %3N, so we use Python for milliseconds
+    if command -v python3 &> /dev/null; then
+        GRAPHDONE_START_TIME=$(python3 -c 'import time; print(int(time.time() * 1000))')
+    else
+        # Fallback to seconds * 1000 if Python not available
+        GRAPHDONE_START_TIME=$(($(date +%s) * 1000))
+    fi
+    export GRAPHDONE_START_TIME
+
     show_banner
     log_info "Welcome to GraphDone! Starting development environment..."
-    
+
     ensure_nodejs
-    
+
+    # Check Docker status (required for GraphDone)
+    if ! docker ps &> /dev/null; then
+        # Determine the specific issue
+        if ! command -v docker &> /dev/null; then
+            log_warning "🐳 Docker not installed - setting up Docker..."
+        else
+            log_warning "🐳 Docker permission issue detected - fixing permissions..."
+        fi
+
+        if ! ./scripts/setup_docker.sh; then
+            log_error "❌ Docker setup failed. Please fix Docker issues and try again."
+            exit 1
+        fi
+    else
+        # Docker is working properly
+        log_success "🐳 Docker is running and ready!"
+    fi
+
     # Check if setup is needed
     setup_needed=false
     workspace_repair_needed=false
@@ -226,11 +539,19 @@ cmd_dev() {
     if [ "$setup_needed" = true ]; then
         log_warning "🔧 First time setup detected..."
         log_info "Running initial setup (this may take a few minutes):"
+        log_info "  • Setting up Docker"
         log_info "  • Setting up environment variables"
         log_info "  • Starting database"
         log_info "  • Running migrations"
         log_info "  • Building packages"
-        
+
+        # Setup Docker first
+        log_info "🐳 Setting up Docker..."
+        if ! ./scripts/setup_docker.sh; then
+            log_error "❌ Docker setup failed. Please fix Docker issues and try again."
+            exit 1
+        fi
+
         ./tools/setup.sh
         log_success "✅ Setup complete!"
         
@@ -280,6 +601,14 @@ cmd_setup() {
     show_banner
     log_info "🔧 Running initial setup..."
     ensure_nodejs
+
+    # Setup Docker first (required for GraphDone)
+    log_info "🐳 Setting up Docker..."
+    if ! ./scripts/setup_docker.sh; then
+        log_error "❌ Docker setup failed. Please fix Docker issues and try again."
+        exit 1
+    fi
+
     ./tools/setup.sh
     log_success "✅ Setup complete! Run './start' to start development environment."
 }
@@ -301,10 +630,24 @@ cmd_build() {
 }
 
 cmd_deploy() {
+    # Capture start time for end-to-end timing (milliseconds since epoch)
+    # macOS/Windows date doesn't support %3N, so we use Python for milliseconds
+    if command -v python3 &> /dev/null; then
+        GRAPHDONE_START_TIME=$(python3 -c 'import time; print(int(time.time() * 1000))')
+    else
+        # Fallback to seconds * 1000 if Python not available
+        GRAPHDONE_START_TIME=$(($(date +%s) * 1000))
+    fi
+    export GRAPHDONE_START_TIME
+
     show_banner
-    log_info "🚀 Deploying to production..."
-    ensure_nodejs
-    ./tools/deploy.sh
+    log_info "🚀 Starting production deployment with HTTPS..."
+    log_info "Features enabled:"
+    log_info "  • Full HTTPS encryption (web + API)"
+    log_info "  • Auto-generated SSL certificates"
+    log_info "  • Secure WebSocket connections (WSS)"
+    log_info "  • Production-optimized containers"
+    ./tools/run.sh
 }
 
 cmd_remove() {
@@ -330,26 +673,45 @@ cmd_remove() {
     # Check and stop GraphDone services
     local services_found=false
     
-    # Stop Node.js processes
-    if pgrep -f "node.*3127\|node.*4127\|vite\|tsx.*watch" >/dev/null 2>&1; then
-        log_info "  • Stopping Node.js development servers..."
-        pkill -f "node.*3127" 2>/dev/null || true
-        pkill -f "node.*4127" 2>/dev/null || true
-        pkill -f "vite" 2>/dev/null || true
-        pkill -f "tsx.*watch" 2>/dev/null || true
-        services_found=true
-    fi
-    
-    # Kill processes on GraphDone ports
-    for port in 3127 4127 7474 7687; do
-        if lsof -ti:$port >/dev/null 2>&1; then
-            if [ "$services_found" = false ]; then
-                log_info "  • Stopping services on GraphDone ports..."
+    # Platform-aware process termination
+    case $PLATFORM in
+        "windows")
+            log_info "  • Stopping services on Windows..."
+            # Windows: Use taskkill for process termination
+            taskkill //F //IM node.exe 2>/dev/null || true
+            taskkill //F //IM "npm.exe" 2>/dev/null || true
+            # Stop services on specific ports (Windows netstat approach)
+            for port in 3127 4127 7474 7687; do
+                local pids=$(netstat -ano | grep ":$port " | awk '{print $5}' | sort -u 2>/dev/null)
+                if [ -n "$pids" ]; then
+                    echo "$pids" | xargs -r taskkill //F //PID 2>/dev/null || true
+                fi
+            done
+            services_found=true
+            ;;
+        *)
+            # Linux/macOS: Use traditional Unix commands
+            if pgrep -f "node.*3127\|node.*4127\|vite\|tsx.*watch" >/dev/null 2>&1; then
+                log_info "  • Stopping Node.js development servers..."
+                pkill -f "node.*3127" 2>/dev/null || true
+                pkill -f "node.*4127" 2>/dev/null || true
+                pkill -f "vite" 2>/dev/null || true
+                pkill -f "tsx.*watch" 2>/dev/null || true
                 services_found=true
             fi
-            lsof -ti:$port | xargs -r kill -9 2>/dev/null || true
-        fi
-    done
+            
+            # Kill processes on GraphDone ports
+            for port in 3127 4127 7474 7687; do
+                if command -v lsof &> /dev/null && lsof -ti:$port >/dev/null 2>&1; then
+                    if [ "$services_found" = false ]; then
+                        log_info "  • Stopping services on GraphDone ports..."
+                        services_found=true
+                    fi
+                    lsof -ti:$port | xargs -r kill -9 2>/dev/null || true
+                fi
+            done
+            ;;
+    esac
     
     if [ "$services_found" = false ]; then
         log_info "  • No running GraphDone services found"
@@ -424,53 +786,125 @@ cmd_remove() {
 
 cmd_stop() {
     log_info "🛑 Stopping all services..."
-    docker-compose -f deployment/docker-compose.yml down 2>/dev/null || true
-    docker-compose -f deployment/docker-compose.dev.yml down 2>/dev/null || true
-    pkill -f "npm run dev" 2>/dev/null || true
+
+    local stop_success=true
+
+    # Stop Docker containers (works on all platforms)
+    log_info "  • Stopping Docker containers..."
+
+    # Try to stop production containers
+    if docker-compose -f deployment/docker-compose.yml ps 2>/dev/null | grep -q "Up"; then
+        if ! docker-compose -f deployment/docker-compose.yml down 2>&1; then
+            log_warning "    ⚠️ Could not stop production containers (may not be running)"
+        fi
+    fi
+
+    # Try to stop dev containers
+    if docker-compose -f deployment/docker-compose.dev.yml ps 2>/dev/null | grep -q "Up"; then
+        if ! docker-compose -f deployment/docker-compose.dev.yml down 2>&1; then
+            log_warning "    ⚠️ Could not stop dev containers (may not be running)"
+        fi
+    fi
+
+    # Platform-aware process termination
+    case $PLATFORM in
+        "windows")
+            log_info "  • Stopping Windows processes..."
+            # Windows: Use taskkill
+            taskkill //F //IM node.exe 2>/dev/null || true
+            taskkill //F //IM npm.exe 2>/dev/null || true
+
+            # Stop processes on specific ports
+            for port in 3127 3128 4127 4128 7474 7687; do
+                local pids=$(netstat -ano | grep ":$port " | awk '{print $5}' | sort -u 2>/dev/null)
+                if [ -n "$pids" ]; then
+                    echo "$pids" | xargs -r taskkill //F //PID 2>/dev/null || true
+                fi
+            done
+            ;;
+        *)
+            # Linux/macOS: Use traditional Unix commands
+            log_info "  • Stopping Node.js processes..."
+            pkill -f "npm run dev" 2>/dev/null || true
+            pkill -f "vite" 2>/dev/null || true
+            pkill -f "tsx.*watch" 2>/dev/null || true
+
+            # Clean up any processes on GraphDone ports
+            if command -v lsof &> /dev/null; then
+                for port in 3127 3128 4127 4128 7474 7687; do
+                    if lsof -ti:$port >/dev/null 2>&1; then
+                        lsof -ti:$port | xargs -r kill -9 2>/dev/null || true
+                    fi
+                done
+            fi
+            ;;
+    esac
+
     log_success "✅ All services stopped"
 }
 
 cmd_status() {
     log_info "📊 Checking system status..."
-    
+
     echo ""
     echo -e "${BOLD}System Status:${NC}"
-    
+
     # Check Node.js
     if command -v node &> /dev/null; then
         echo -e "  ${GREEN}✅${NC} Node.js: $(node --version)"
     else
         echo -e "  ${RED}❌${NC} Node.js: Not found"
     fi
-    
+
     # Check Docker
     if command -v docker &> /dev/null; then
         echo -e "  ${GREEN}✅${NC} Docker: $(docker --version | cut -d' ' -f3 | cut -d',' -f1)"
     else
         echo -e "  ${RED}❌${NC} Docker: Not found"
     fi
-    
+
     # Check services
     echo ""
     echo -e "${BOLD}Services:${NC}"
-    
+
     if curl -s http://localhost:3127 >/dev/null 2>&1; then
         echo -e "  ${GREEN}✅${NC} Web UI: http://localhost:3127"
     else
         echo -e "  ${RED}❌${NC} Web UI: Not running"
     fi
-    
+
     if curl -s http://localhost:4127/graphql >/dev/null 2>&1; then
         echo -e "  ${GREEN}✅${NC} GraphQL API: http://localhost:4127/graphql"
     else
         echo -e "  ${RED}❌${NC} GraphQL API: Not running"
     fi
-    
+
     if curl -s http://localhost:7474 >/dev/null 2>&1; then
         echo -e "  ${GREEN}✅${NC} Neo4j Database: http://localhost:7474"
     else
         echo -e "  ${RED}❌${NC} Neo4j Database: Not running"
     fi
+}
+
+cmd_vm() {
+    show_banner
+    log_info "🖥️  Managing Multipass VMs..."
+
+    # Check if multipass is installed
+    if ! command -v multipass &> /dev/null; then
+        log_error "❌ Multipass is not installed!"
+        echo ""
+        echo "Please install Multipass from: https://multipass.run"
+        echo ""
+        echo "Installation commands:"
+        echo -e "  ${GREEN}macOS:${NC}   brew install --cask multipass"
+        echo -e "  ${GREEN}Ubuntu:${NC}  sudo snap install multipass"
+        echo -e "  ${GREEN}Windows:${NC} Download from https://multipass.run"
+        exit 1
+    fi
+
+    # Pass all arguments to multipass.sh
+    ./tools/multipass.sh "${REMAINING_ARGS[@]}"
 }
 
 # Execute the command
@@ -504,6 +938,9 @@ case $COMMAND in
         ;;
     status)
         cmd_status
+        ;;
+    vm)
+        cmd_vm
         ;;
     *)
         log_error "❌ Unknown command: $COMMAND"

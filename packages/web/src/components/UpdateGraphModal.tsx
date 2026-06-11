@@ -7,10 +7,11 @@ import { useNotifications } from '../contexts/NotificationContext';
 interface UpdateGraphModalProps {
   isOpen: boolean;
   onClose: () => void;
+  graphToEdit: any;
 }
 
-export function UpdateGraphModal({ isOpen, onClose }: UpdateGraphModalProps) {
-  const { currentGraph, updateGraph } = useGraph();
+export function UpdateGraphModal({ isOpen, onClose, graphToEdit }: UpdateGraphModalProps) {
+  const { updateGraph, availableGraphs } = useGraph();
   const { currentTeam } = useAuth();
   const { showSuccess, showError } = useNotifications();
   const [loading, setLoading] = useState(false);
@@ -26,24 +27,25 @@ export function UpdateGraphModal({ isOpen, onClose }: UpdateGraphModalProps) {
   });
 
   const [tagInput, setTagInput] = useState<string>('');
+  const [showReviewConfig, setShowReviewConfig] = useState(true);
 
-  // Initialize form data when modal opens or currentGraph changes
+  // Initialize form data when modal opens or graphToEdit changes
   useEffect(() => {
-    if (currentGraph && isOpen) {
+    if (graphToEdit && isOpen) {
       setFormData({
-        name: currentGraph.name,
-        description: currentGraph.description || '',
-        type: (currentGraph.type as 'PROJECT' | 'WORKSPACE' | 'SUBGRAPH' | 'TEMPLATE') || 'PROJECT',
-        tags: currentGraph.tags || [],
-        defaultRole: currentGraph.defaultRole || 'VIEWER',
-        status: (currentGraph.status as 'ACTIVE' | 'ARCHIVED' | 'DRAFT') || 'ACTIVE',
-        isShared: currentGraph.isShared || false
+        name: graphToEdit.name,
+        description: graphToEdit.description || '',
+        type: (graphToEdit.type as 'PROJECT' | 'WORKSPACE' | 'SUBGRAPH' | 'TEMPLATE') || 'PROJECT',
+        tags: graphToEdit.tags || [],
+        defaultRole: graphToEdit.defaultRole || 'VIEWER',
+        status: (graphToEdit.status as 'ACTIVE' | 'ARCHIVED' | 'DRAFT') || 'ACTIVE',
+        isShared: graphToEdit.isShared || false
       });
       setTagInput('');
     }
-  }, [currentGraph, isOpen]);
+  }, [graphToEdit, isOpen]);
 
-  if (!isOpen || !currentGraph) return null;
+  if (!isOpen || !graphToEdit) return null;
 
   const graphTypes = [
     {
@@ -144,12 +146,23 @@ export function UpdateGraphModal({ isOpen, onClose }: UpdateGraphModalProps) {
     e.preventDefault();
     
     if (!formData.name.trim()) {
+      showError('Validation Error', 'Please enter a graph name');
+      return;
+    }
+
+    // Check for duplicate graph names (excluding current graph)
+    const existingGraph = availableGraphs.find(g =>
+      g.id !== graphToEdit.id &&
+      g.name.toLowerCase().trim() === formData.name.toLowerCase().trim()
+    );
+    if (existingGraph) {
+      showError('Duplicate Name', `A graph with the name "${formData.name}" already exists. Please choose a different name.`);
       return;
     }
 
     setLoading(true);
     try {
-      await updateGraph(currentGraph.id, {
+      await updateGraph(graphToEdit.id, {
         name: formData.name.trim(),
         description: formData.description.trim() || undefined,
         tags: formData.tags,
@@ -177,28 +190,54 @@ export function UpdateGraphModal({ isOpen, onClose }: UpdateGraphModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] overflow-y-auto" style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0}}>
+    <div className="fixed inset-0 z-[9999] overflow-y-auto backdrop-blur-sm" style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0}}>
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-        <div className="fixed inset-0 bg-gray-900 bg-opacity-75 transition-opacity" onClick={onClose} />
+        {/* Enhanced Backdrop with gradient */}
+        <div 
+          className="fixed inset-0 transition-opacity bg-gradient-to-br from-gray-900/90 via-black/80 to-gray-800/90 animate-in fade-in duration-300"
+          onClick={onClose}
+        />
 
-        <div className="inline-block align-bottom bg-gray-800 rounded-xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
-          {/* Header */}
-          <div className="bg-gray-800 px-6 py-4 border-b border-gray-600">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-white">Edit Graph</h3>
-              <button
-                onClick={onClose}
-                className="text-gray-400 hover:text-gray-300 transition-colors"
-              >
-                <X className="h-5 w-5" />
-              </button>
+        {/* Enhanced Modal with better styling */}
+        <div className="inline-block align-bottom bg-gradient-to-br from-gray-800 via-gray-800 to-gray-900 rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full border border-gray-600/50 animate-in slide-in-from-bottom-4 duration-300 relative">
+          {/* Gradient accent line at top */}
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-purple-500 via-pink-500 to-green-500"></div>
+
+          {/* Modern header with glow */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700/30 bg-gradient-to-r from-gray-800/50 to-gray-900/50 backdrop-blur-sm relative">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-500 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30 relative">
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-400 to-purple-600 rounded-xl blur opacity-50 animate-pulse"></div>
+                <Save className="h-5 w-5 text-white relative z-10" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold bg-gradient-to-r from-white via-blue-100 to-purple-100 bg-clip-text text-transparent">
+                  Edit Graph
+                </h3>
+                <p className="text-xs text-gray-400">Update graph settings</p>
+              </div>
             </div>
+            <button
+              onClick={onClose}
+              className="p-2 text-gray-400 hover:text-white hover:bg-red-600 rounded-lg transition-all duration-200 hover:scale-110"
+            >
+              <X className="h-5 w-5" />
+            </button>
           </div>
 
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {/* Content */}
+          <div className="px-8 pt-0 pb-8 max-h-[70vh] overflow-y-auto relative">
+            {/* Subtle background pattern */}
+            <div className="absolute inset-0 opacity-5">
+              <div className="w-full h-full" style={{
+                backgroundImage: `radial-gradient(circle at 1px 1px, rgba(255,255,255,0.15) 1px, transparent 0)`,
+                backgroundSize: '20px 20px'
+              }}></div>
+            </div>
+            
+            <form onSubmit={handleSubmit} className="space-y-6 relative z-10">
             {/* Graph Details */}
-            <div className="space-y-4">
+            <div className="space-y-6 mb-8">
               {/* Current Graph Type Display */}
               <div className="bg-gray-700/50 border border-gray-600 rounded-lg p-3 mb-4">
                 <div className="flex items-center space-x-3">
@@ -220,152 +259,229 @@ export function UpdateGraphModal({ isOpen, onClose }: UpdateGraphModalProps) {
               </div>
 
               {/* Graph Name */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Graph Name *
+              <div className="group/input">
+                <label className="block text-sm font-semibold text-gray-200 mb-2 flex items-center space-x-1.5">
+                  <span>Graph Name</span>
+                  <span className="text-red-400 text-lg">*</span>
                 </label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-green-500"
-                  placeholder="Enter a descriptive name for your graph"
-                  required
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                    className="w-full px-4 py-3 text-sm bg-gray-800/80 border-2 border-gray-600/50 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-500/70 transition-all duration-200 hover:border-gray-500/70 shadow-inner"
+                    placeholder="Enter a descriptive name for your graph"
+                    required
+                  />
+                  <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-green-500/5 to-emerald-500/5 pointer-events-none opacity-0 group-hover/input:opacity-100 transition-opacity"></div>
+                </div>
               </div>
 
               {/* Description */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Description
+              <div className="group">
+                <label className="block text-sm font-semibold text-gray-200 mb-3 flex items-center space-x-2">
+                  <span>Description</span>
                 </label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-green-500"
-                  placeholder="Describe the purpose and scope of your graph"
-                  rows={3}
-                />
+                <div className="relative">
+                  <textarea
+                    value={formData.description}
+                    onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                    rows={4}
+                    className="w-full px-4 py-4 bg-gray-800 border border-gray-600 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-400 transition-all duration-300 hover:border-gray-500 shadow-lg resize-none"
+                    placeholder="Describe the purpose and scope of this graph"
+                  />
+                  <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-green-500/5 to-emerald-500/5 pointer-events-none group-hover:from-green-500/10 group-hover:to-emerald-500/10 transition-all duration-300"></div>
+                </div>
               </div>
 
               {/* Tags */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Tags / Categories
+              <div className="group">
+                <label className="block text-sm font-semibold text-gray-200 mb-3 flex items-center space-x-2">
+                  <span>Tags (optional)</span>
                 </label>
-                <div className="space-y-2">
-                  <input
-                    type="text"
-                    value={tagInput}
-                    onChange={handleTagInputChange}
-                    onKeyDown={handleTagInput}
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-green-500"
-                    placeholder="Type and press comma to add tags (max 5)"
-                    disabled={formData.tags.length >= 5}
-                  />
-                  <p className="text-xs text-gray-500">Type and press comma to add tags (max 5)</p>
-                  
-                  {formData.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                      {formData.tags.map((tag, index) => {
-                        const colorIndex = index % colors.length;
-                        const color = colors[colorIndex];
+                <div className="relative">
+                  <div className="w-full min-h-[4rem] px-4 py-4 bg-gray-800 border border-gray-600 rounded-xl focus-within:ring-2 focus-within:ring-purple-500/50 focus-within:border-purple-400 transition-all duration-300 hover:border-gray-500 shadow-lg">
+                    <div className="flex flex-wrap gap-2 items-center">
+                      {/* Existing Tags */}
+                      {formData.tags && formData.tags.slice(0, 5).map((tag, index) => {
+                        const colorScheme = colors[index % colors.length];
                         return (
-                          <div
+                          <span
                             key={index}
-                            className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border-2 bg-gradient-to-r ${color.bg} ${color.text} ${color.border} cursor-pointer hover:scale-105 transition-all duration-200 shadow-sm`}
-                            style={{
-                              clipPath: 'polygon(10px 0%, 100% 0%, calc(100% - 10px) 100%, 0% 100%)'
-                            }}
+                            className={`inline-flex items-center px-4 py-2 rounded-xl text-sm font-semibold bg-gradient-to-br ${colorScheme.bg} ${colorScheme.text} border-2 ${colorScheme.border} shadow-lg transform hover:scale-105 transition-all duration-200`}
                           >
-                            <span className="mr-2">{tag}</span>
+                            {tag}
                             <button
                               type="button"
                               onClick={() => removeTag(index)}
-                              className="hover:bg-white/20 rounded-full p-0.5 transition-colors"
+                              className="ml-2 hover:bg-white/20 rounded-full w-5 h-5 flex items-center justify-center transition-all duration-200 hover:rotate-90"
                             >
                               ×
                             </button>
-                          </div>
+                          </span>
                         );
                       })}
+
+                      {/* Tag Input */}
+                      <input
+                        type="text"
+                        value={tagInput}
+                        onChange={handleTagInputChange}
+                        onKeyDown={handleTagInput}
+                        placeholder={(!formData.tags || formData.tags.length === 0) ? "Add tags (comma-separated)" : formData.tags.length >= 5 ? "Max 5 tags" : "Add more"}
+                        className="flex-1 min-w-[200px] bg-transparent border-none outline-none text-gray-200 placeholder-gray-500"
+                        disabled={formData.tags && formData.tags.length >= 5}
+                      />
                     </div>
-                  )}
+                  </div>
+                  <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-purple-500/5 to-pink-500/5 pointer-events-none group-hover:from-purple-500/10 group-hover:to-pink-500/10 transition-all duration-300"></div>
                 </div>
               </div>
 
               {/* Default Role for Team Members */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Default Role for Team Members
+              <div className="group">
+                <label className="block text-sm font-semibold text-gray-200 mb-3 flex items-center space-x-2">
+                  <span>Default Role for Team Members</span>
                 </label>
-                <select
-                  value={formData.defaultRole}
-                  onChange={(e) => setFormData(prev => ({ ...prev, defaultRole: e.target.value }))}
-                  className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
-                >
-                  <option value="GUEST">Guest - Anonymous demo access (read-only)</option>
-                  <option value="VIEWER">Viewer - Can view graphs and nodes (read-only)</option>
-                  <option value="USER">User - Can create and work on tasks</option>
-                  <option value="ADMIN">Admin - Full system administration access</option>
-                </select>
-                <p className="text-xs text-gray-500 mt-1">Default permission level for new team members joining this graph</p>
+                <div className="relative">
+                  <select
+                    value={formData.defaultRole}
+                    onChange={(e) => setFormData(prev => ({ ...prev, defaultRole: e.target.value }))}
+                    className="w-full px-4 py-4 bg-gray-800 border border-gray-600 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-400 transition-all duration-300 hover:border-gray-500 shadow-lg appearance-none"
+                  >
+                    <option value="GUEST" className="bg-gray-800 text-white">Guest - Anonymous demo access (read-only)</option>
+                    <option value="VIEWER" className="bg-gray-800 text-white">Viewer - Can view graphs and nodes (read-only)</option>
+                    <option value="USER" className="bg-gray-800 text-white">User - Can create and work on tasks</option>
+                    <option value="ADMIN" className="bg-gray-800 text-white">Admin - Full system administration access</option>
+                  </select>
+                  <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-orange-500/5 to-red-500/5 pointer-events-none group-hover:from-orange-500/10 group-hover:to-red-500/10 transition-all duration-300"></div>
+                </div>
               </div>
 
-              {/* Additional Settings */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Privacy Setting */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Privacy
-                  </label>
+              {/* Privacy Setting */}
+              <div className="group">
+                <label className="block text-sm font-semibold text-gray-200 mb-3 flex items-center space-x-2">
+                  <span>Privacy</span>
+                </label>
+                <div className="relative">
                   <select
                     value={formData.isShared ? 'shared' : 'private'}
                     onChange={(e) => setFormData(prev => ({ ...prev, isShared: e.target.value === 'shared' }))}
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-green-500"
+                    className="w-full px-4 py-4 bg-gray-800 border border-gray-600 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 transition-all duration-300 hover:border-gray-500 shadow-lg appearance-none"
                   >
-                    <option value="private">Private to team</option>
-                    <option value="shared">Shared with others</option>
+                    <option value="private" className="bg-gray-800 text-white">Private - Only you and invited members</option>
+                    <option value="shared" className="bg-gray-800 text-white">Shared - Everyone in your team</option>
                   </select>
+                  <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-indigo-500/5 to-blue-500/5 pointer-events-none group-hover:from-indigo-500/10 group-hover:to-blue-500/10 transition-all duration-300"></div>
                 </div>
+              </div>
 
-                {/* Status */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Status
-                  </label>
+              {/* Status */}
+              <div className="group">
+                <label className="block text-sm font-semibold text-gray-200 mb-3 flex items-center space-x-2">
+                  <span>Status</span>
+                </label>
+                <div className="relative">
                   <select
-                    value={formData.status}
-                    onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value as 'ACTIVE' | 'ARCHIVED' | 'DRAFT' }))}
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-green-500"
+                    value={formData.status || 'DRAFT'}
+                    onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value as any }))}
+                    className="w-full px-4 py-4 bg-gray-800 border border-gray-600 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-400 transition-all duration-300 hover:border-gray-500 shadow-lg appearance-none"
                   >
-                    <option value="DRAFT">Draft</option>
-                    <option value="ACTIVE">Active</option>
-                    <option value="ARCHIVED">Archived</option>
+                    <option value="DRAFT" className="bg-gray-800 text-white">Draft - Work in progress</option>
+                    <option value="ACTIVE" className="bg-gray-800 text-white">Active - Published and ready</option>
                   </select>
+                  <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-teal-500/5 to-cyan-500/5 pointer-events-none group-hover:from-teal-500/10 group-hover:to-cyan-500/10 transition-all duration-300"></div>
                 </div>
+              </div>
+
+              {/* Review Configuration - Modern Collapsible */}
+              <div className="border-2 border-gray-600/40 rounded-2xl overflow-hidden shadow-lg bg-gradient-to-br from-gray-800/40 to-gray-900/40">
+                <button
+                  type="button"
+                  onClick={() => setShowReviewConfig(!showReviewConfig)}
+                  className="w-full p-4 bg-gradient-to-r from-gray-700/40 to-gray-800/40 hover:from-gray-700/60 hover:to-gray-800/60 transition-all duration-200 flex items-center justify-between group"
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-500 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                      <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <h4 className="text-sm font-bold text-white">Review Configuration</h4>
+                  </div>
+                  <svg
+                    className={`w-5 h-5 text-gray-400 transition-transform duration-300 group-hover:text-white ${showReviewConfig ? 'rotate-180' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                  </svg>
+                </button>
+
+                {showReviewConfig && (
+                  <div className="p-5 bg-gray-900/20 border-t border-gray-700/50">
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      <div className="space-y-2">
+                        <div className="flex justify-between p-3 bg-gradient-to-br from-gray-800/60 to-gray-900/60 rounded-xl border border-gray-600/30 hover:border-gray-500/50 transition-colors shadow-sm">
+                          <span className="text-gray-400 font-medium">Type:</span>
+                          <span className="font-semibold text-blue-300 capitalize">{formData.type?.toLowerCase()}</span>
+                        </div>
+                        <div className="flex justify-between p-3 bg-gradient-to-br from-gray-800/60 to-gray-900/60 rounded-xl border border-gray-600/30 hover:border-gray-500/50 transition-colors shadow-sm">
+                          <span className="text-gray-400 font-medium">Privacy:</span>
+                          <span className="font-semibold text-cyan-300">{formData.isShared ? 'Shared' : 'Private'}</span>
+                        </div>
+                        <div className="flex justify-between p-3 bg-gradient-to-br from-gray-800/60 to-gray-900/60 rounded-xl border border-gray-600/30 hover:border-gray-500/50 transition-colors shadow-sm">
+                          <span className="text-gray-400 font-medium">Status:</span>
+                          <span className={`font-semibold ${formData.status === 'ACTIVE' ? 'text-green-300' : 'text-yellow-300'}`}>
+                            {formData.status || 'Draft'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex justify-between p-3 bg-gradient-to-br from-gray-800/60 to-gray-900/60 rounded-xl border border-gray-600/30 hover:border-gray-500/50 transition-colors shadow-sm">
+                          <span className="text-gray-400 font-medium">Team:</span>
+                          <span className="font-semibold text-purple-300">{currentTeam?.name || 'Default'}</span>
+                        </div>
+                        {formData.tags && formData.tags.length > 0 && (
+                          <div className="flex justify-between p-3 bg-gradient-to-br from-gray-800/60 to-gray-900/60 rounded-xl border border-gray-600/30 hover:border-gray-500/50 transition-colors shadow-sm">
+                            <span className="text-gray-400 font-medium">Tags:</span>
+                            <span className="font-semibold text-indigo-300">{formData.tags.length} tag{formData.tags.length !== 1 ? 's' : ''}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between p-3 bg-gradient-to-br from-gray-800/60 to-gray-900/60 rounded-xl border border-gray-600/30 hover:border-gray-500/50 transition-colors shadow-sm">
+                          <span className="text-gray-400 font-medium">Ready:</span>
+                          <span className={`font-semibold ${formData.name ? 'text-green-300' : 'text-red-300'}`}>
+                            {formData.name ? 'Yes' : 'Name Required'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Actions */}
-            <div className="flex justify-end space-x-3 pt-4 border-t border-gray-600">
+            <div className="flex justify-end space-x-4 pt-6 border-t border-gradient-to-r from-gray-600/30 via-gray-500/50 to-gray-600/30 relative z-10">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors"
+                className="px-6 py-3 text-gray-300 bg-gradient-to-r from-gray-700/80 to-gray-600/80 rounded-xl hover:bg-red-600 hover:text-white transition-all duration-300 hover:scale-105 shadow-lg backdrop-blur-sm border border-gray-500/30 hover:border-red-600 font-medium"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={loading || !formData.name.trim()}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                className="px-8 py-3 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white rounded-xl hover:from-blue-500 hover:via-indigo-500 hover:to-purple-500 transition-all duration-300 shadow-xl hover:shadow-2xl hover:scale-105 transform border border-blue-400/30 font-semibold flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:hover:scale-100"
               >
-                <Save className="w-4 h-4" />
+                <Save className="w-5 h-5" />
                 <span>{loading ? 'Saving...' : 'Save Changes'}</span>
               </button>
             </div>
           </form>
+          </div>
         </div>
       </div>
     </div>

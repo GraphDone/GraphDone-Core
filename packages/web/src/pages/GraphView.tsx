@@ -1,7 +1,7 @@
 import React from 'react';
 import { Plus, Zap, RotateCcw } from 'lucide-react';
 import { GraphVisualization } from '../components/GraphVisualization';
-import { CreateNodeModal } from '../components/CreateNodeModal';
+import { CreateWorkItemModal } from '../components/CreateWorkItemModal';
 
 export function GraphView() {
   const [showCreateModal, setShowCreateModal] = React.useState(false);
@@ -9,7 +9,7 @@ export function GraphView() {
   return (
     <div className="h-screen flex flex-col">
       {/* Header */}
-      <div className="bg-gray-900 border-b border-gray-700 px-6 py-4">
+      <div className="bg-gray-900/30 backdrop-blur-md border-b border-gray-700/30 px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-100">Graph View</h1>
@@ -41,7 +41,7 @@ export function GraphView() {
               onClick={() => setShowCreateModal(true)}
             >
               <Plus className="h-4 w-4 mr-2" />
-              Add Node
+              Add Work Item
             </button>
           </div>
         </div>
@@ -52,9 +52,9 @@ export function GraphView() {
         <GraphVisualization />
       </div>
 
-      {/* Create Node Modal */}
+      {/* Create Work Item Modal */}
       {showCreateModal && (
-        <CreateNodeModal
+        <CreateWorkItemModal
           isOpen={showCreateModal}
           onClose={() => setShowCreateModal(false)}
         />

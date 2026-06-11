@@ -10,11 +10,35 @@ coverage/
 test-results/
 test-artifacts/
 playwright-report/
+test-reports/
+artifacts/
+
+# Test files that should not be in root
+/*.test.js
+/*.spec.js
+/*-test.js
+/*-spec.js
+/test-*.js
+/test-*.md
+/*TEST*.md
+/*REPORT*.md
+
+# Temporary test outputs
+/clean_report_*.html
+/comprehensive_report_*.html
+/final_report_*.html
+/report_*.html
+
+# Images and screenshots (allow docs images)
 *.png
 *.jpg
 *.jpeg
 *.gif
 *.webp
+!docs/**/*.png
+!docs/**/*.jpg
+!docs/**/*.jpeg
+!docs/**/*.svg
 
 # Production
 build/
@@ -24,7 +48,21 @@ out/
 
 # Misc
 .DS_Store
+# Certificates and cryptographic files
 *.pem
+*.key
+*.crt
+*.csr
+*.p12
+*.pfx
+certs/
+# Include development certificates for automated testing
+!deployment/certs/server-key.pem
+!deployment/certs/server-cert.pem
+# Exclude production certificates
+deployment/certs/*.production.pem
+deployment/certs/*.production.key
+deployment/certs/*.production.crt
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -37,6 +75,13 @@ lerna-debug.log*
 .env.development.local
 .env.test.local
 .env.production.local
+.env.vm
+
+# VM configuration
+/tmp/graphdone-cloud-init.yml
+cloud-init.*.yml
+!cloud-init.template.yml
+.graphdone-cloud-init.yml
 
 # IDE
 .vscode/*
@@ -65,6 +110,7 @@ logs/
 # Cache
 .cache/
 .parcel-cache/
+.graphdone-cache/
 
 # TypeScript
 *.tsbuildinfo

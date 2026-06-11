@@ -13,7 +13,7 @@ interface CreateGraphModalProps {
 
 export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraphModalProps) {
   const { currentTeam, currentUser } = useAuth();
-  const { createGraph, availableGraphs, isCreating } = useGraph();
+  const { createGraph, duplicateGraph, availableGraphs, isCreating } = useGraph();
   const { showSuccess, showError } = useNotifications();
   
   const [step, setStep] = useState<'type' | 'details' | 'template'>('type');
@@ -29,35 +29,56 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
   
   const [tagInput, setTagInput] = useState<string>('');
   const [showTemplates, setShowTemplates] = useState(false);
+  const [showReviewConfig, setShowReviewConfig] = useState(true);
+
+  const colors = [
+    { bg: 'from-blue-600/40 to-indigo-600/40', text: 'text-blue-100', border: 'border-blue-400/60 hover:border-blue-400/80' },
+    { bg: 'from-green-600/40 to-emerald-600/40', text: 'text-green-100', border: 'border-green-400/60 hover:border-green-400/80' },
+    { bg: 'from-purple-600/40 to-violet-600/40', text: 'text-purple-100', border: 'border-purple-400/60 hover:border-purple-400/80' },
+    { bg: 'from-orange-600/40 to-red-600/40', text: 'text-orange-100', border: 'border-orange-400/60 hover:border-orange-400/80' },
+    { bg: 'from-pink-600/40 to-rose-600/40', text: 'text-pink-100', border: 'border-pink-400/60 hover:border-pink-400/80' },
+  ];
 
   const graphTypes = [
     {
       type: 'PROJECT' as const,
       title: 'Project',
       description: 'A main project with goals, tasks, and deliverables',
-      icon: <Folder className="h-8 w-8 text-blue-400" />,
-      color: 'border-blue-500/50 bg-blue-900/20 hover:bg-blue-900/30'
+      icon: <Folder className="h-10 w-10 text-blue-400" />,
+      color: 'border-blue-500/50 bg-gradient-to-br from-blue-900/30 to-blue-800/20 hover:from-blue-900/40 hover:to-blue-800/30',
+      bgGradient: 'from-blue-500/10 to-indigo-500/10',
+      iconBg: 'bg-gradient-to-br from-blue-500/20 to-indigo-600/20',
+      hoverShadow: 'hover:shadow-blue-500/20'
     },
     {
       type: 'WORKSPACE' as const,
       title: 'Workspace',
       description: 'A collaborative space for brainstorming and experimentation',
-      icon: <FolderOpen className="h-8 w-8 text-purple-400" />,
-      color: 'border-purple-500/50 bg-purple-900/20 hover:bg-purple-900/30'
+      icon: <FolderOpen className="h-10 w-10 text-purple-400" />,
+      color: 'border-purple-500/50 bg-gradient-to-br from-purple-900/30 to-purple-800/20 hover:from-purple-900/40 hover:to-purple-800/30',
+      bgGradient: 'from-purple-500/10 to-pink-500/10',
+      iconBg: 'bg-gradient-to-br from-purple-500/20 to-pink-600/20',
+      hoverShadow: 'hover:shadow-purple-500/20'
     },
     {
       type: 'SUBGRAPH' as const,
       title: 'Subgraph',
       description: 'A focused subset within a larger project or workspace',
-      icon: <Plus className="h-8 w-8 text-green-400" />,
-      color: 'border-green-500/50 bg-green-900/20 hover:bg-green-900/30'
+      icon: <Plus className="h-10 w-10 text-green-400" />,
+      color: 'border-green-500/50 bg-gradient-to-br from-green-900/30 to-green-800/20 hover:from-green-900/40 hover:to-green-800/30',
+      bgGradient: 'from-green-500/10 to-emerald-500/10',
+      iconBg: 'bg-gradient-to-br from-green-500/20 to-emerald-600/20',
+      hoverShadow: 'hover:shadow-green-500/20'
     },
     {
       type: 'TEMPLATE' as const,
       title: 'Template',
       description: 'A reusable template for creating similar graphs',
-      icon: <FileText className="h-8 w-8 text-gray-500" />,
+      icon: <FileText className="h-10 w-10 text-gray-500" />,
       color: 'border-gray-600/50 bg-gray-800/20 cursor-not-allowed opacity-60',
+      bgGradient: 'from-gray-700/10 to-gray-600/10',
+      iconBg: 'bg-gray-700/20',
+      hoverShadow: '',
       disabled: true,
       comingSoon: true
     }
@@ -95,7 +116,7 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
   ];
 
   const copyableGraphs = availableGraphs.filter(graph => 
-    graph.teamId === currentTeam?.id && graph.type === formData.type
+    graph.teamId === currentTeam?.id || graph.teamId === 'team-1' || true
   );
 
   const handleSubmit = async () => {
@@ -106,7 +127,16 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
     
     if (!formData.name) {
       console.error('Graph name is required');
-      alert('Please enter a graph name');
+      showError('Validation Error', 'Please enter a graph name');
+      return;
+    }
+    
+    // Check for duplicate graph names
+    const existingGraph = availableGraphs.find(g => 
+      g.name.toLowerCase().trim() === formData.name!.toLowerCase().trim()
+    );
+    if (existingGraph) {
+      showError('Duplicate Name', `A graph with the name "${formData.name}" already exists. Please choose a different name.`);
       return;
     }
     
@@ -118,16 +148,23 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
     console.log('Using user ID:', fallbackUserId);
 
     try {
-      const graphInput = {
-        ...formData,
-        teamId: fallbackTeamId,
-        // Ensure we have a user ID for createdBy field
-        createdBy: fallbackUserId
-      };
-      
-      console.log('Creating graph with data:', graphInput);
-      console.log('Tags in form data:', formData.tags);
-      await createGraph(graphInput as CreateGraphInput);
+      // Handle copying existing graph
+      if (formData.copyFromGraphId && formData.copyFromGraphId !== 'select') {
+        console.log('Duplicating graph:', formData.copyFromGraphId);
+        await duplicateGraph(formData.copyFromGraphId, formData.name!);
+      } else {
+        // Create new graph from scratch
+        const graphInput = {
+          ...formData,
+          teamId: fallbackTeamId,
+          // Ensure we have a user ID for createdBy field
+          createdBy: fallbackUserId
+        };
+        
+        console.log('Creating graph with data:', graphInput);
+        console.log('Tags in form data:', formData.tags);
+        await createGraph(graphInput as CreateGraphInput);
+      }
       
       // Show success notification
       showSuccess(
@@ -169,155 +206,200 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[9999] overflow-y-auto" style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0}}>
+    <div className="fixed inset-0 z-[9999] overflow-y-auto backdrop-blur-sm" style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0}}>
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-        {/* Backdrop */}
+        {/* Enhanced Backdrop with gradient */}
         <div 
-          className="fixed inset-0 transition-opacity bg-black bg-opacity-50"
+          className="fixed inset-0 transition-opacity bg-gradient-to-br from-gray-900/90 via-black/80 to-gray-800/90 animate-in fade-in duration-300"
           onClick={handleClose}
         />
 
-        {/* Modal */}
-        <div className="inline-block w-full max-w-2xl p-0 my-8 overflow-hidden text-left align-middle transition-all transform bg-gray-800 shadow-xl rounded-lg border border-gray-700">
-          {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700 bg-gray-800">
-            <h3 className="text-xl font-semibold text-green-300">
-              {step === 'type' && 'Create New Graph'}
-              {step === 'details' && 'Graph Details'}
-              {step === 'template' && 'Choose Starting Point'}
-            </h3>
+        {/* Modern eye-catching modal */}
+        <div className="inline-block w-full max-w-2xl p-0 my-8 overflow-hidden text-left align-middle transition-all transform bg-gradient-to-br from-gray-800/98 via-gray-850/98 to-gray-900/98 backdrop-blur-2xl shadow-2xl rounded-2xl border border-gray-600/30 animate-in slide-in-from-bottom-4 duration-300 relative">
+          {/* Animated gradient border */}
+          <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-green-500/20 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-purple-500 via-pink-500 to-green-500"></div>
+
+          {/* Modern header with glow */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700/30 bg-gradient-to-r from-gray-800/50 to-gray-900/50 backdrop-blur-sm relative">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-green-500 via-emerald-500 to-teal-500 rounded-xl flex items-center justify-center shadow-lg shadow-green-500/30 relative">
+                <div className="absolute inset-0 bg-gradient-to-br from-green-400 to-emerald-600 rounded-xl blur opacity-50 animate-pulse"></div>
+                <Plus className="h-5 w-5 text-white relative z-10" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold bg-gradient-to-r from-white via-green-100 to-emerald-100 bg-clip-text text-transparent">
+                  {step === 'type' && 'Create New Graph'}
+                  {step === 'details' && 'Graph Details'}
+                  {step === 'template' && 'Starting Point'}
+                </h3>
+                <p className="text-xs text-gray-400">
+                  {step === 'type' && 'Step 1 of 3'}
+                  {step === 'template' && 'Step 2 of 3'}
+                  {step === 'details' && 'Step 3 of 3'}
+                </p>
+              </div>
+            </div>
             <button
               onClick={handleClose}
-              className="p-2 text-gray-400 hover:text-gray-300 hover:bg-gray-700 rounded-lg transition-colors"
+              className="p-2 text-gray-400 hover:text-white hover:bg-red-600 rounded-lg transition-all duration-200 hover:scale-110"
             >
               <X className="h-5 w-5" />
             </button>
           </div>
 
-          {/* Step 1: Choose Type */}
+          {/* Step 1: Choose Type - Eye-catching */}
           {step === 'type' && (
-            <div className="p-6 space-y-6">
-              <p className="text-gray-300">What type of graph would you like to create?</p>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {graphTypes.map((type) => (
+            <div className="px-6 py-5 space-y-4 relative">
+              <div className="mb-4">
+                <p className="text-base font-semibold text-white">What type of graph would you like to create?</p>
+                <p className="text-sm text-gray-400 mt-1">Choose the type that best fits your needs</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                {graphTypes.map((type, index) => (
                   <button
                     key={type.type}
                     onClick={() => type.disabled ? null : setFormData(prev => ({ ...prev, type: type.type }))}
                     disabled={type.disabled}
                     title={type.comingSoon ? "Template functionality coming soon!" : undefined}
-                    className={`p-4 border-2 rounded-lg text-left transition-all relative ${
+                    style={{ animationDelay: `${index * 50}ms` }}
+                    className={`group p-5 border-2 rounded-2xl text-left transition-all duration-300 relative overflow-hidden animate-in slide-in-from-bottom-2 ${
                       formData.type === type.type
-                        ? `${type.color} border-current`
+                        ? 'border-green-500/70 bg-gradient-to-br from-green-900/40 to-emerald-900/30 shadow-xl shadow-green-500/20 scale-105'
                         : type.disabled
-                        ? type.color
-                        : 'border-gray-600 bg-gray-700/50 hover:bg-gray-700 hover:border-gray-500'
+                        ? 'border-gray-700/50 bg-gray-800/30 cursor-not-allowed opacity-50'
+                        : 'border-gray-700/50 bg-gradient-to-br from-gray-800/40 to-gray-900/40 hover:bg-gray-700/50 hover:border-gray-600/70 hover:scale-105 hover:shadow-xl'
                     }`}
                   >
+                    {/* Animated gradient overlay */}
+                    <div className={`absolute inset-0 bg-gradient-to-br ${type.bgGradient} opacity-0 group-hover:opacity-100 transition-opacity duration-300`}></div>
+
                     {type.comingSoon && (
-                      <div className="absolute top-2 right-2 bg-gray-700 text-xs text-gray-400 px-2 py-1 rounded">
-                        Coming Soon
+                      <div className="absolute top-3 right-3 bg-gradient-to-r from-gray-700 to-gray-600 text-[10px] text-gray-300 px-2.5 py-1 rounded-full font-medium shadow-md">
+                        Soon
                       </div>
                     )}
-                    <div className="flex items-center space-x-3 mb-3">
-                      {type.icon}
-                      <h4 className={`font-semibold ${type.disabled ? 'text-gray-500' : 'text-gray-200'}`}>{type.title}</h4>
+
+                    <div className="relative z-10">
+                      <div className="flex items-start space-x-3 mb-3">
+                        <div className={`p-3 rounded-xl ${type.iconBg} flex-shrink-0 shadow-lg group-hover:scale-110 transition-transform duration-300`}>
+                          {type.icon}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className={`font-bold text-base mb-1.5 ${type.disabled ? 'text-gray-500' : 'text-white group-hover:text-white'}`}>
+                            {type.title}
+                          </h4>
+                          <p className={`text-sm leading-snug ${type.disabled ? 'text-gray-600' : 'text-gray-400 group-hover:text-gray-300'}`}>
+                            {type.description}
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                    <p className={`text-sm ${type.disabled ? 'text-gray-500' : 'text-gray-400'}`}>{type.description}</p>
+
+                    {formData.type === type.type && !type.disabled && (
+                      <div className="absolute top-3 right-3 animate-in zoom-in duration-200">
+                        <div className="w-6 h-6 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center shadow-lg shadow-green-500/50">
+                          <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                      </div>
+                    )}
                   </button>
                 ))}
               </div>
 
               {parentGraphId && (
-                <div className="p-4 bg-blue-900/20 border border-blue-600/30 rounded-xl">
-                  <div className="flex items-center space-x-2 text-blue-300">
-                    <Plus className="h-4 w-4" />
-                    <span className="text-sm font-medium">Creating subgraph</span>
+                <div className="relative p-4 bg-gradient-to-br from-blue-900/30 to-blue-800/20 border-2 border-blue-500/40 rounded-xl shadow-lg overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-cyan-500/10"></div>
+                  <div className="relative flex items-center space-x-3 text-blue-200">
+                    <div className="p-2 bg-blue-500/20 rounded-lg">
+                      <Plus className="h-4 w-4 text-blue-300" />
+                    </div>
+                    <span className="text-sm font-semibold">Creating subgraph within parent</span>
                   </div>
-                  <p className="text-sm text-blue-400 mt-1">
-                    This graph will be created as a child of the selected parent graph.
-                  </p>
                 </div>
               )}
 
-              <div className="flex justify-end space-x-3">
+              <div className="flex justify-end space-x-3 pt-5 border-t border-gray-700/30">
                 <button
                   onClick={handleClose}
-                  className="px-4 py-2 text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors"
+                  className="px-5 py-2.5 text-sm text-gray-300 bg-gray-700/50 rounded-xl hover:bg-red-600 hover:text-white transition-all duration-200 font-medium hover:scale-105 border border-gray-600/30 hover:border-red-500/50"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={() => setStep('template')}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  className="px-6 py-2.5 text-sm bg-gradient-to-r from-green-600 via-emerald-600 to-teal-600 text-white rounded-xl hover:from-green-500 hover:via-emerald-500 hover:to-teal-500 transition-all duration-200 font-semibold flex items-center space-x-2 hover:scale-105 shadow-lg shadow-green-500/25 hover:shadow-xl hover:shadow-green-500/40"
                 >
-                  Continue
+                  <span>Continue</span>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path>
+                  </svg>
                 </button>
               </div>
             </div>
           )}
 
-          {/* Step 2: Choose Template/Starting Point */}
+          {/* Step 2: Choose Starting Point - Modern */}
           {step === 'template' && (
-            <div className="p-6 space-y-6">
-              <div>
-                <h4 className="text-lg font-semibold text-gray-200 mb-2">Choose Starting Point</h4>
-                <p className="text-gray-400 text-sm mb-6">Select how you want to create your graph</p>
+            <div className="px-6 py-5 space-y-4">
+              <div className="mb-4">
+                <p className="text-base font-semibold text-white">Choose Starting Point</p>
+                <p className="text-sm text-gray-400 mt-1">Select how you want to create your graph</p>
               </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+              <div className="grid grid-cols-2 gap-4">
                 <button
                   onClick={() => {
                     setShowTemplates(false);
                     setFormData(prev => ({ ...prev, templateId: undefined, copyFromGraphId: undefined }));
                   }}
-                  className={`p-4 border-2 rounded-xl text-center transition-all ${
+                  className={`group p-6 border-2 rounded-2xl text-center transition-all duration-300 relative overflow-hidden ${
                     !showTemplates && !formData.copyFromGraphId
-                      ? 'border-green-500 bg-green-900/20 text-white'
-                      : 'border-gray-600 bg-gray-700/30 text-gray-300 hover:border-gray-500 hover:bg-gray-700/50'
+                      ? 'border-green-500/70 bg-gradient-to-br from-green-900/40 to-emerald-900/30 shadow-xl shadow-green-500/20 scale-105'
+                      : 'border-gray-700/50 bg-gradient-to-br from-gray-800/40 to-gray-900/40 hover:bg-gray-700/50 hover:border-gray-600/70 hover:scale-105 hover:shadow-xl'
                   }`}
                 >
-                  <div className="w-12 h-12 mx-auto mb-3 bg-gray-600 rounded-lg flex items-center justify-center">
-                    <Plus className="h-6 w-6 text-gray-300" />
+                  {/* Gradient overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 to-emerald-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+
+                  <div className="relative z-10">
+                    <div className="w-16 h-16 mx-auto mb-3 bg-gradient-to-br from-green-500/20 to-emerald-600/20 rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
+                      <Plus className="h-8 w-8 text-green-400" />
+                    </div>
+                    <h5 className="font-bold text-white mb-2 text-base">Start Empty</h5>
+                    <p className="text-sm text-gray-400">Create a blank graph from scratch</p>
                   </div>
-                  <h5 className="font-medium mb-1">Start Empty</h5>
-                  <p className="text-xs text-gray-400">Create a blank graph from scratch</p>
+
+                  {!showTemplates && !formData.copyFromGraphId && (
+                    <div className="absolute top-3 right-3 animate-in zoom-in duration-200">
+                      <div className="w-6 h-6 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center shadow-lg shadow-green-500/50">
+                        <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                    </div>
+                  )}
                 </button>
-                
+
                 <button
                   disabled
                   title="Template functionality coming soon!"
-                  className="p-4 border-2 rounded-xl text-center transition-all border-gray-700 bg-gray-800/30 text-gray-500 cursor-not-allowed opacity-60 relative"
+                  className="group p-6 border-2 rounded-2xl text-center transition-all duration-300 relative overflow-hidden border-gray-700/50 bg-gradient-to-br from-gray-800/30 to-gray-900/30 cursor-not-allowed opacity-50"
                 >
-                  <div className="absolute top-2 right-2 bg-gray-700 text-xs text-gray-400 px-2 py-1 rounded">
-                    Coming Soon
+                  <div className="absolute top-3 right-3 bg-gradient-to-r from-gray-700 to-gray-600 text-[10px] text-gray-300 px-2.5 py-1 rounded-full font-medium shadow-md">
+                    Soon
                   </div>
-                  <div className="w-12 h-12 mx-auto mb-3 bg-gray-700/50 rounded-lg flex items-center justify-center">
-                    <FileText className="h-6 w-6 text-gray-500" />
+
+                  <div className="w-16 h-16 mx-auto mb-3 bg-gray-700/30 rounded-2xl flex items-center justify-center">
+                    <FileText className="h-8 w-8 text-gray-500" />
                   </div>
-                  <h5 className="font-medium mb-1">Use Template</h5>
-                  <p className="text-xs text-gray-500">Start with a pre-built template</p>
+                  <h5 className="font-bold text-gray-400 mb-2 text-base">Use Template</h5>
+                  <p className="text-sm text-gray-600">Start with a pre-built template</p>
                 </button>
 
-                {copyableGraphs.length > 0 && (
-                  <button
-                    onClick={() => {
-                      setShowTemplates(false);
-                      setFormData(prev => ({ ...prev, templateId: undefined, copyFromGraphId: 'select' }));
-                    }}
-                    className={`p-4 border-2 rounded-xl text-center transition-all ${
-                      formData.copyFromGraphId
-                        ? 'border-green-500 bg-green-900/20 text-white'
-                        : 'border-gray-600 bg-gray-700/30 text-gray-300 hover:border-gray-500 hover:bg-gray-700/50'
-                    }`}
-                  >
-                    <div className="w-12 h-12 mx-auto mb-3 bg-purple-600/20 rounded-lg flex items-center justify-center">
-                      <Copy className="h-6 w-6 text-purple-400" />
-                    </div>
-                    <h5 className="font-medium mb-1">Copy Existing</h5>
-                    <p className="text-xs text-gray-400">Duplicate an existing graph</p>
-                  </button>
-                )}
               </div>
 
               {/* Templates */}
@@ -364,360 +446,271 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
                 </div>
               )}
 
-              {/* Copy from existing */}
-              {formData.copyFromGraphId && copyableGraphs.length > 0 && (
-                <div className="space-y-4">
-                  <div>
-                    <h4 className="font-medium text-gray-200 mb-1">Choose Graph to Copy</h4>
-                    <p className="text-sm text-gray-400">Select an existing graph to duplicate</p>
-                  </div>
-                  <div className="grid gap-3 max-h-48 overflow-y-auto">
-                    {copyableGraphs.map((graph) => (
-                      <button
-                        key={graph.id}
-                        onClick={() => setFormData(prev => ({ ...prev, copyFromGraphId: graph.id }))}
-                        className={`p-4 border rounded-xl text-left transition-all group ${
-                          formData.copyFromGraphId === graph.id
-                            ? 'border-green-500 bg-green-900/20'
-                            : 'border-gray-600 bg-gray-700/30 hover:bg-gray-700/50 hover:border-gray-500'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-3">
-                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                              graph.type === 'PROJECT' ? 'bg-blue-600/20' :
-                              graph.type === 'WORKSPACE' ? 'bg-purple-600/20' :
-                              graph.type === 'SUBGRAPH' ? 'bg-green-600/20' :
-                              'bg-orange-600/20'
-                            }`}>
-                              <Copy className="h-5 w-5 text-gray-400" />
-                            </div>
-                            <div className="flex-1">
-                              <h5 className="font-medium text-gray-200 group-hover:text-white">{graph.name}</h5>
-                              <p className="text-xs text-gray-400 mt-1 line-clamp-1">{graph.description || 'No description'}</p>
-                              <div className="flex items-center gap-3 mt-2">
-                                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                                  graph.type === 'PROJECT' ? 'bg-blue-600/20 text-blue-300' :
-                                  graph.type === 'WORKSPACE' ? 'bg-purple-600/20 text-purple-300' :
-                                  graph.type === 'SUBGRAPH' ? 'bg-green-600/20 text-green-300' :
-                                  'bg-orange-600/20 text-orange-300'
-                                }`}>
-                                  {graph.type}
-                                </span>
-                                <span className="text-xs text-gray-500">{graph.nodeCount} nodes</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
 
-              <div className="flex justify-between">
+              <div className="flex justify-between pt-4 border-t border-gray-700/50">
                 <button
                   onClick={() => setStep('type')}
-                  className="px-4 py-2 text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors"
+                  className="px-4 py-2 text-sm text-gray-300 bg-gray-700/50 rounded-lg hover:bg-gray-600/50 transition-all duration-200 flex items-center space-x-1.5"
                 >
-                  Back
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path>
+                  </svg>
+                  <span>Back</span>
                 </button>
                 <button
                   onClick={() => setStep('details')}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  className="px-5 py-2 text-sm bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-500 hover:to-emerald-500 transition-all duration-200 font-medium flex items-center space-x-1.5"
                 >
-                  Continue
+                  <span>Continue</span>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path>
+                  </svg>
                 </button>
               </div>
             </div>
           )}
 
-          {/* Step 3: Graph Details */}
+          {/* Step 3: Graph Details - Compact */}
           {step === 'details' && (
-            <div className="p-6 space-y-6">
-              <div className="mb-6">
-                <p className="text-gray-400 text-sm">Provide essential information to set up your graph</p>
-              </div>
-
-              <div className="space-y-5">
+            <div className="px-5 py-4 space-y-4">
+              <div className="space-y-3">
                 {/* Graph Name */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-200 mb-2">
-                    Graph Name *
+                <div className="group/input">
+                  <label className="block text-sm font-semibold text-gray-200 mb-2 flex items-center space-x-1.5">
+                    <span>Graph Name</span>
+                    <span className="text-red-400 text-lg">*</span>
                   </label>
-                  <input
-                    type="text"
-                    value={formData.name || ''}
-                    onChange={(e) => {
-                      console.log('Name input changed to:', e.target.value);
-                      setFormData(prev => {
-                        const newData = { ...prev, name: e.target.value };
-                        console.log('New form data will be:', newData);
-                        return newData;
-                      });
-                    }}
-                    placeholder="Enter a descriptive name for your graph"
-                    className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 placeholder-gray-400 focus:ring-2 focus:ring-green-500 focus:border-green-500 focus:outline-none transition-colors"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Choose a clear, descriptive name that team members will recognize</p>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={formData.name || ''}
+                      onChange={(e) => {
+                        console.log('Name input changed to:', e.target.value);
+                        setFormData(prev => {
+                          const newData = { ...prev, name: e.target.value };
+                          console.log('New form data will be:', newData);
+                          return newData;
+                        });
+                      }}
+                      placeholder="Enter a descriptive name for your graph"
+                      className="w-full px-4 py-3 text-sm bg-gray-800/80 border-2 border-gray-600/50 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-500/70 transition-all duration-200 hover:border-gray-500/70 shadow-inner"
+                    />
+                    <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-green-500/5 to-emerald-500/5 pointer-events-none opacity-0 group-hover/input:opacity-100 transition-opacity"></div>
+                  </div>
                 </div>
 
                 {/* Description */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-200 mb-2">
-                    Description
+                <div className="group">
+                  <label className="block text-sm font-semibold text-gray-200 mb-3 flex items-center space-x-2">
+                    <span>Description</span>
                   </label>
-                  <textarea
-                    value={formData.description || ''}
-                    onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                    placeholder="Describe the purpose and scope of this graph"
-                    rows={4}
-                    className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 placeholder-gray-400 focus:ring-2 focus:ring-green-500 focus:border-green-500 focus:outline-none transition-colors resize-none"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Help team members understand the purpose and context</p>
+                  <div className="relative">
+                    <textarea
+                      value={formData.description || ''}
+                      onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                      rows={4}
+                      className="w-full px-4 py-4 bg-gray-800 border border-gray-600 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-400 transition-all duration-300 hover:border-gray-500 shadow-lg resize-none"
+                      placeholder="Describe the purpose and scope of this graph"
+                    />
+                    <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-green-500/5 to-emerald-500/5 pointer-events-none group-hover:from-green-500/10 group-hover:to-emerald-500/10 transition-all duration-300"></div>
+                  </div>
                 </div>
 
                 {/* Tags */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-200 mb-2">
-                    Tags
+                <div className="group">
+                  <label className="block text-sm font-semibold text-gray-200 mb-3 flex items-center space-x-2">
+                    <span>Tags (optional)</span>
                   </label>
-                  
-                  {/* Tag Display Area */}
-                  <div className="w-full min-h-[3rem] px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg focus-within:ring-2 focus-within:ring-green-500 focus-within:border-green-500 transition-colors">
-                    <div className="flex flex-wrap gap-2 items-center">
-                      {/* Existing Tags */}
-                      {formData.tags && formData.tags.slice(0, 5).map((tag, index) => {
-                        const colors = [
-                          { bg: 'from-blue-600/40 to-indigo-600/40', text: 'text-blue-100', border: 'border-blue-400/60 hover:border-blue-400/80' },
-                          { bg: 'from-green-600/40 to-emerald-600/40', text: 'text-green-100', border: 'border-green-400/60 hover:border-green-400/80' },
-                          { bg: 'from-purple-600/40 to-violet-600/40', text: 'text-purple-100', border: 'border-purple-400/60 hover:border-purple-400/80' },
-                          { bg: 'from-orange-600/40 to-red-600/40', text: 'text-orange-100', border: 'border-orange-400/60 hover:border-orange-400/80' },
-                          { bg: 'from-pink-600/40 to-rose-600/40', text: 'text-pink-100', border: 'border-pink-400/60 hover:border-pink-400/80' },
-                        ];
-                        const colorScheme = colors[index % colors.length];
-                        
-                        return (
-                          <span
-                            key={index}
-                            className={`inline-flex items-center pl-2 pr-3 py-1 text-sm font-medium bg-gradient-to-r ${colorScheme.bg} ${colorScheme.text} border ${colorScheme.border} transition-colors`}
-                            style={{
-                              clipPath: 'polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%, 8px 50%)'
-                            }}
-                          >
-                            {/* Tag Icon */}
-                            <svg className="w-3 h-3 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M17.707 9.293l-5-5A.997.997 0 0012 4H5a3 3 0 00-3 3v6a3 3 0 003 3h7a.997.997 0 00.707-.293l5-5a.999.999 0 000-1.414zM6.5 9.5a1.5 1.5 0 111.5-1.5 1.5 1.5 0 01-1.5 1.5z" clipRule="evenodd" />
-                            </svg>
-                            {tag}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const newTags = formData.tags?.filter((_, i) => i !== index) || [];
-                                setFormData(prev => ({ ...prev, tags: newTags }));
-                                // Don't update tagInput when removing tags - keep it for current typing
-                              }}
-                              className={`ml-2 transition-colors ${colorScheme.text.replace('text-', 'text-')}/60 hover:${colorScheme.text}`}
+                  <div className="relative">
+                    <div className="w-full min-h-[4rem] px-4 py-4 bg-gray-800 border border-gray-600 rounded-xl focus-within:ring-2 focus-within:ring-purple-500/50 focus-within:border-purple-400 transition-all duration-300 hover:border-gray-500 shadow-lg">
+                      <div className="flex flex-wrap gap-2 items-center">
+                        {/* Existing Tags */}
+                        {formData.tags && formData.tags.slice(0, 5).map((tag, index) => {
+                          const colorScheme = colors[index % colors.length];
+                          return (
+                            <span
+                              key={index}
+                              className={`inline-flex items-center px-4 py-2 rounded-xl text-sm font-semibold bg-gradient-to-br ${colorScheme.bg} ${colorScheme.text} border-2 ${colorScheme.border} shadow-lg transform hover:scale-105 transition-all duration-200`}
                             >
-                              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                              </svg>
-                            </button>
-                          </span>
-                        );
-                      })}
-                      
-                      {/* Input Field */}
-                      <input
-                        type="text"
-                        value={tagInput}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          setTagInput(value);
-                          
-                          // Process tags when user types comma or space
-                          if (value.includes(',') || value.includes(' ')) {
-                            const separator = value.includes(',') ? ',' : ' ';
-                            const newTags = value.split(separator).map(tag => tag.trim()).filter(tag => tag.length > 0);
-                            const existingTags = formData.tags || [];
-                            const allTags = [...existingTags, ...newTags.slice(0, -1)]
-                              .filter((tag, index, arr) => arr.indexOf(tag) === index) // Remove duplicates
-                              .slice(0, 5); // Limit to 5 tags
-                            
-                            setFormData(prev => ({ 
-                              ...prev, 
-                              tags: allTags
-                            }));
-                            
-                            // Keep the last part (after last separator) as current input
-                            const remainingInput = newTags[newTags.length - 1] || '';
-                            setTagInput(remainingInput);
-                          }
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ',') {
-                            e.preventDefault();
-                            if (tagInput.trim()) {
+                              {tag}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newTags = formData.tags?.filter((_, i) => i !== index) || [];
+                                  setFormData(prev => ({ ...prev, tags: newTags }));
+                                }}
+                                className="ml-2 hover:bg-white/20 rounded-full w-5 h-5 flex items-center justify-center transition-all duration-200 hover:rotate-90"
+                              >
+                                ×
+                              </button>
+                            </span>
+                          );
+                        })}
+
+                        {/* Input Field */}
+                        <input
+                          type="text"
+                          value={tagInput}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setTagInput(value);
+
+                            if (value.includes(',') || value.includes(' ')) {
+                              const separator = value.includes(',') ? ',' : ' ';
+                              const newTags = value.split(separator).map(tag => tag.trim()).filter(tag => tag.length > 0);
                               const existingTags = formData.tags || [];
-                              const newTag = tagInput.trim();
-                              if (!existingTags.includes(newTag) && existingTags.length < 5) {
-                                setFormData(prev => ({ 
-                                  ...prev, 
-                                  tags: [...existingTags, newTag]
-                                }));
-                              }
-                              setTagInput('');
+                              const allTags = [...existingTags, ...newTags.slice(0, -1)]
+                                .filter((tag, index, arr) => arr.indexOf(tag) === index)
+                                .slice(0, 5);
+
+                              setFormData(prev => ({ ...prev, tags: allTags }));
+                              setTagInput(newTags[newTags.length - 1] || '');
                             }
-                          } else if (e.key === 'Backspace' && tagInput === '' && formData.tags && formData.tags.length > 0) {
-                            // Remove last tag when backspacing on empty input
-                            const newTags = formData.tags.slice(0, -1);
-                            setFormData(prev => ({ ...prev, tags: newTags }));
-                          }
-                        }}
-                        placeholder={(!formData.tags || formData.tags.length === 0) ? "project, frontend, urgent, team-alpha" : formData.tags.length >= 5 ? "Maximum 5 tags reached" : "Add more tags..."}
-                        className="flex-1 min-w-[120px] bg-transparent border-none outline-none text-gray-200 placeholder-gray-400"
-                        disabled={formData.tags && formData.tags.length >= 5}
-                      />
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ',') {
+                              e.preventDefault();
+                              if (tagInput.trim()) {
+                                const existingTags = formData.tags || [];
+                                const newTag = tagInput.trim();
+                                if (!existingTags.includes(newTag) && existingTags.length < 5) {
+                                  setFormData(prev => ({ ...prev, tags: [...existingTags, newTag] }));
+                                }
+                                setTagInput('');
+                              }
+                            } else if (e.key === 'Backspace' && tagInput === '' && formData.tags && formData.tags.length > 0) {
+                              const newTags = formData.tags.slice(0, -1);
+                              setFormData(prev => ({ ...prev, tags: newTags }));
+                            }
+                          }}
+                          placeholder={(!formData.tags || formData.tags.length === 0) ? "Add tags (comma-separated)" : formData.tags.length >= 5 ? "Max 5 tags" : "Add more"}
+                          className="flex-1 min-w-[200px] bg-transparent border-none outline-none text-gray-200 placeholder-gray-500"
+                          disabled={formData.tags && formData.tags.length >= 5}
+                        />
+                      </div>
                     </div>
+                    <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-purple-500/5 to-pink-500/5 pointer-events-none group-hover:from-purple-500/10 group-hover:to-pink-500/10 transition-all duration-300"></div>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">Type and press comma to add tags (max 5) • Click × to remove</p>
                 </div>
 
-                {/* Default Role for Team Members */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-200 mb-2">
-                    Default Role for Team Members
+                {/* Privacy Setting */}
+                <div className="group">
+                  <label className="block text-sm font-semibold text-gray-200 mb-3 flex items-center space-x-2">
+                    <span>Privacy</span>
                   </label>
-                  <select
-                    value={formData.defaultRole || 'VIEWER'}
-                    onChange={(e) => setFormData(prev => ({ ...prev, defaultRole: e.target.value }))}
-                    className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
-                  >
-                    <option value="GUEST">Guest - Anonymous demo access (read-only)</option>
-                    <option value="VIEWER">Viewer - Can view graphs and nodes (read-only)</option>
-                    <option value="USER">User - Can create and work on tasks</option>
-                    <option value="ADMIN">Admin - Full system administration access</option>
-                  </select>
-                  <p className="text-xs text-gray-500 mt-1">Default permission level for new team members joining this graph</p>
-                </div>
-
-                {/* Additional Settings */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Privacy Setting */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-200 mb-2">
-                      Privacy
-                    </label>
+                  <div className="relative">
                     <select
                       value={formData.isShared ? 'shared' : 'private'}
                       onChange={(e) => setFormData(prev => ({ ...prev, isShared: e.target.value === 'shared' }))}
-                      className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
+                      className="w-full px-4 py-4 bg-gray-800 border border-gray-600 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 transition-all duration-300 hover:border-gray-500 shadow-lg appearance-none"
                     >
-                      <option value="private">Private to team</option>
-                      <option value="shared">Shared with others</option>
+                      <option value="private" className="bg-gray-800 text-white">Private - Only you and invited members</option>
+                      <option value="shared" className="bg-gray-800 text-white">Shared - Everyone in your team</option>
                     </select>
+                    <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-indigo-500/5 to-blue-500/5 pointer-events-none group-hover:from-indigo-500/10 group-hover:to-blue-500/10 transition-all duration-300"></div>
                   </div>
+                </div>
 
-                  {/* Initial Status */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-200 mb-2">
-                      Initial Status
-                    </label>
+                {/* Status */}
+                <div className="group">
+                  <label className="block text-sm font-semibold text-gray-200 mb-3 flex items-center space-x-2">
+                    <span>Status</span>
+                  </label>
+                  <div className="relative">
                     <select
                       value={formData.status || 'DRAFT'}
                       onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value as any }))}
-                      className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
+                      className="w-full px-4 py-4 bg-gray-800 border border-gray-600 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-400 transition-all duration-300 hover:border-gray-500 shadow-lg appearance-none"
                     >
-                      <option value="DRAFT">Draft</option>
-                      <option value="ACTIVE">Active</option>
+                      <option value="DRAFT" className="bg-gray-800 text-white">Draft - Work in progress</option>
+                      <option value="ACTIVE" className="bg-gray-800 text-white">Active - Published and ready</option>
                     </select>
+                    <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-teal-500/5 to-cyan-500/5 pointer-events-none group-hover:from-teal-500/10 group-hover:to-cyan-500/10 transition-all duration-300"></div>
                   </div>
                 </div>
 
-                {/* Configuration Summary */}
-                <div className="p-5 bg-gray-700/50 border border-gray-600 rounded-xl">
-                  <h4 className="font-semibold text-gray-200 mb-4 flex items-center">
-                    <div className="w-5 h-5 bg-green-600 rounded-full mr-2"></div>
-                    Review Configuration
-                  </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                    <div className="space-y-3">
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Graph Type:</span>
-                        <span className="font-medium text-gray-200 capitalize">{formData.type?.toLowerCase()}</span>
+                {/* Review Configuration - Modern Collapsible */}
+                <div className="border-2 border-gray-600/40 rounded-2xl overflow-hidden shadow-lg bg-gradient-to-br from-gray-800/40 to-gray-900/40">
+                  <button
+                    type="button"
+                    onClick={() => setShowReviewConfig(!showReviewConfig)}
+                    className="w-full p-4 bg-gradient-to-r from-gray-700/40 to-gray-800/40 hover:from-gray-700/60 hover:to-gray-800/60 transition-all duration-200 flex items-center justify-between group"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-gradient-to-br from-green-500 via-emerald-500 to-teal-500 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                        <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Team:</span>
-                        <span className="font-medium text-gray-200">{currentTeam?.name || 'Default Team'}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Privacy:</span>
-                        <span className="font-medium text-gray-200">{formData.isShared ? 'Shared' : 'Private'}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Status:</span>
-                        <span className={`font-medium ${formData.status === 'ACTIVE' ? 'text-green-300' : 'text-yellow-300'}`}>
-                          {formData.status || 'Draft'}
-                        </span>
-                      </div>
-                      {formData.tags && formData.tags.length > 0 && (
-                        <div className="flex justify-between">
-                          <span className="text-gray-400">Tags:</span>
-                          <span className="font-medium text-blue-300">{formData.tags.length} tag{formData.tags.length !== 1 ? 's' : ''}</span>
+                      <h4 className="text-sm font-bold text-white">Review Configuration</h4>
+                    </div>
+                    <svg
+                      className={`w-5 h-5 text-gray-400 transition-transform duration-300 group-hover:text-white ${showReviewConfig ? 'rotate-180' : ''}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                  </button>
+
+                  {showReviewConfig && (
+                    <div className="p-5 bg-gray-900/20 border-t border-gray-700/50">
+                      <div className="grid grid-cols-2 gap-3 text-xs">
+                        <div className="space-y-2">
+                          <div className="flex justify-between p-3 bg-gradient-to-br from-gray-800/60 to-gray-900/60 rounded-xl border border-gray-600/30 hover:border-gray-500/50 transition-colors shadow-sm">
+                            <span className="text-gray-400 font-medium">Type:</span>
+                            <span className="font-semibold text-blue-300 capitalize">{formData.type?.toLowerCase()}</span>
+                          </div>
+                          <div className="flex justify-between p-3 bg-gradient-to-br from-gray-800/60 to-gray-900/60 rounded-xl border border-gray-600/30 hover:border-gray-500/50 transition-colors shadow-sm">
+                            <span className="text-gray-400 font-medium">Privacy:</span>
+                            <span className="font-semibold text-cyan-300">{formData.isShared ? 'Shared' : 'Private'}</span>
+                          </div>
+                          <div className="flex justify-between p-3 bg-gradient-to-br from-gray-800/60 to-gray-900/60 rounded-xl border border-gray-600/30 hover:border-gray-500/50 transition-colors shadow-sm">
+                            <span className="text-gray-400 font-medium">Status:</span>
+                            <span className={`font-semibold ${formData.status === 'ACTIVE' ? 'text-green-300' : 'text-yellow-300'}`}>
+                              {formData.status || 'Draft'}
+                            </span>
+                          </div>
                         </div>
-                      )}
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Default Role:</span>
-                        <span className="font-medium text-purple-300">{formData.defaultRole || 'VIEWER'}</span>
+                        <div className="space-y-2">
+                          <div className="flex justify-between p-3 bg-gradient-to-br from-gray-800/60 to-gray-900/60 rounded-xl border border-gray-600/30 hover:border-gray-500/50 transition-colors shadow-sm">
+                            <span className="text-gray-400 font-medium">Team:</span>
+                            <span className="font-semibold text-purple-300">{currentTeam?.name || 'Default'}</span>
+                          </div>
+                          {formData.tags && formData.tags.length > 0 && (
+                            <div className="flex justify-between p-3 bg-gradient-to-br from-gray-800/60 to-gray-900/60 rounded-xl border border-gray-600/30 hover:border-gray-500/50 transition-colors shadow-sm">
+                              <span className="text-gray-400 font-medium">Tags:</span>
+                              <span className="font-semibold text-indigo-300">{formData.tags.length} tag{formData.tags.length !== 1 ? 's' : ''}</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between p-3 bg-gradient-to-br from-gray-800/60 to-gray-900/60 rounded-xl border border-gray-600/30 hover:border-gray-500/50 transition-colors shadow-sm">
+                            <span className="text-gray-400 font-medium">Ready:</span>
+                            <span className={`font-semibold ${formData.name ? 'text-green-300' : 'text-red-300'}`}>
+                              {formData.name ? 'Yes' : 'Name Required'}
+                            </span>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                    <div className="space-y-3">
-                      {parentGraphId && (
-                        <div className="flex justify-between">
-                          <span className="text-gray-400">Parent Graph:</span>
-                          <span className="font-medium text-green-300">Connected</span>
-                        </div>
-                      )}
-                      {formData.templateId && formData.templateId !== 'use-template' && (
-                        <div className="flex justify-between">
-                          <span className="text-gray-400">Template:</span>
-                          <span className="font-medium text-blue-300">Applied</span>
-                        </div>
-                      )}
-                      {formData.copyFromGraphId && formData.copyFromGraphId !== 'select' && (
-                        <div className="flex justify-between">
-                          <span className="text-gray-400">Source:</span>
-                          <span className="font-medium text-purple-300">Existing Graph</span>
-                        </div>
-                      )}
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Ready to Create:</span>
-                        <span className={`font-medium ${formData.name ? 'text-green-300' : 'text-red-300'}`}>
-                          {formData.name ? 'Yes' : 'Name Required'}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Button State:</span>
-                        <span className={`font-medium ${!formData.name?.trim() || isCreating ? 'text-red-300' : 'text-green-300'}`}>
-                          {!formData.name?.trim() ? 'Disabled (No Name)' : isCreating ? 'Disabled (Creating)' : 'Enabled'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+                  )}
                 </div>
               </div>
 
-              <div className="flex justify-between pt-4">
+              <div className="flex justify-between pt-6 border-t border-gradient-to-r from-gray-600/30 via-gray-500/50 to-gray-600/30 relative z-10">
                 <button
                   onClick={() => setStep('template')}
-                  className="px-6 py-3 text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors font-medium"
+                  className="px-6 py-3 text-gray-300 bg-gradient-to-r from-gray-700/80 to-gray-600/80 rounded-xl hover:from-gray-600/80 hover:to-gray-500/80 transition-all duration-300 hover:scale-105 shadow-lg backdrop-blur-sm border border-gray-500/30 hover:border-gray-400/50 hover:text-white font-medium flex items-center space-x-2"
                 >
-                  Back
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path>
+                  </svg>
+                  <span>Back</span>
                 </button>
-                <div className="flex space-x-3">
+                <div className="flex space-x-4">
                   <button
                     onClick={handleClose}
-                    className="px-6 py-3 text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors font-medium"
+                    className="px-6 py-3 text-gray-300 bg-gray-700/50 rounded-xl hover:bg-red-600 hover:text-white transition-all duration-300 hover:scale-105 shadow-lg backdrop-blur-sm border border-gray-500/30 hover:border-red-500/50 font-medium"
                   >
                     Cancel
                   </button>
@@ -741,9 +734,25 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
                       }
                     }}
                     disabled={!formData.name?.trim() || isCreating}
-                    className="px-6 py-3 bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500 disabled:from-gray-600 disabled:to-gray-600 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all font-semibold shadow-lg hover:shadow-xl"
+                    className={`px-8 py-3 font-semibold rounded-xl transition-all duration-300 shadow-xl transform flex items-center space-x-2 ${
+                      !formData.name?.trim() || isCreating
+                        ? 'bg-gray-600/50 text-gray-400 cursor-not-allowed opacity-60'
+                        : 'bg-gradient-to-r from-green-600 via-emerald-600 to-teal-600 text-white hover:from-green-500 hover:via-emerald-500 hover:to-teal-500 hover:shadow-2xl hover:scale-105 border border-green-400/30'
+                    }`}
                   >
-                    {isCreating ? 'Creating...' : 'Create Graph'}
+                    {isCreating ? (
+                      <>
+                        <span>Creating...</span>
+                        <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+                      </>
+                    ) : (
+                      <>
+                        <span>Create Graph</span>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                        </svg>
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
