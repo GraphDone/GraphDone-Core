@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useDialog } from '../hooks/useDialogManager';
 import { X, Link2, Search, CheckCircle, ArrowRight, ExternalLink, Filter, CheckCircle2, Trash2, Unlink, ChevronDown } from 'lucide-react';
 import { useQuery, useMutation } from '@apollo/client';
 import { GET_WORK_ITEMS, CREATE_EDGE, GET_EDGES, DELETE_EDGE } from '../lib/queries';
@@ -65,6 +66,7 @@ interface DisconnectWorkItemModalProps {
 
 // Separate DisconnectNodeModal Component
 export function DisconnectWorkItemModal({ isOpen, onClose, sourceNode, onAllConnectionsRemoved }: DisconnectWorkItemModalProps) {
+  useDialog(isOpen, onClose, { exclusive: false });
   const { currentGraph } = useGraph();
   const { showSuccess, showError } = useNotifications();
   
@@ -644,6 +646,7 @@ export function DisconnectWorkItemModal({ isOpen, onClose, sourceNode, onAllConn
 }
 
 export function ConnectWorkItemModal({ isOpen, onClose, sourceNode, initialTab = 'connect', onAllConnectionsRemoved: _onAllConnectionsRemoved }: ConnectWorkItemModalProps) {
+  useDialog(isOpen, onClose);
   const { currentTeam } = useAuth();
   const { currentGraph } = useGraph();
   const { showSuccess, showError } = useNotifications();

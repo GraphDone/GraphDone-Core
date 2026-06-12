@@ -35,7 +35,7 @@ export const TEST_USERS = {
   },
   VIEWER: {
     username: 'viewer',
-    password: 'graphdone', 
+    password: 'viewer123',
     role: 'viewer' as const
   },
   GUEST: {
@@ -742,12 +742,28 @@ export async function createTestGraph(
   await page.waitForTimeout(1000);
   
   // Look for create graph option
-  const createOption = page.locator('button:has-text("Create"), text="Create New Graph", [role="option"]:has-text("Create")').first();
+  const createOption = page.locator('button[title="Create New Graph"], button:has-text("Create"), [role="option"]:has-text("Create")').first();
   await expect(createOption).toBeVisible({ timeout: 5000 });
   await createOption.click();
-  
-  // Fill graph creation form
+  await page.waitForTimeout(1000);
+
+  // Step through the creation wizard (type -> starting point) until the details form appears
   const nameInput = page.locator('input[name="name"], input[placeholder*="name"]').first();
+  for (let step = 0; step < 3; step++) {
+    if (await nameInput.isVisible()) {
+      break;
+    }
+    const continueButton = page.locator('button:has-text("Continue")').first();
+    try {
+      await continueButton.waitFor({ state: 'visible', timeout: 3000 });
+      await continueButton.click();
+      await page.waitForTimeout(500);
+    } catch {
+      break;
+    }
+  }
+
+  // Fill graph creation form
   await expect(nameInput).toBeVisible({ timeout: 5000 });
   await nameInput.fill(testGraphName);
   
@@ -766,7 +782,7 @@ export async function createTestGraph(
   }
   
   // Submit
-  const submitButton = page.locator('button:has-text("Create"), button:has-text("Save")').first();
+  const submitButton = page.locator('button:has-text("Create Graph"), button:has-text("Create"), button:has-text("Save")').first();
   await submitButton.click();
   
   // Wait for creation

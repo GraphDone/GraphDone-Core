@@ -246,8 +246,9 @@ jobs:
         run: |
           npm run docker:prod &
           sleep 30
-          echo "Waiting for services to be healthy..."
-          timeout 90 bash -c 'until curl -k https://localhost:4128/health 2>/dev/null; do sleep 2; done'
+          echo "Waiting for services to be healthy (image build can take several minutes)..."
+          # 4128 is internal to the compose network; nginx on 3128 proxies /health
+          timeout 600 bash -c 'until curl -k https://localhost:3128/health 2>/dev/null; do sleep 5; done'
 
       - name: Run PR critical tests
         run: npm run test:pr

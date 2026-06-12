@@ -59,6 +59,7 @@ export function UserSelector({ isCollapsed = false }: UserSelectorProps) {
       {/* User selector button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
+        data-testid="user-menu"
         className={`flex items-center w-full p-3 text-left hover:bg-gray-700 rounded-lg transition-colors ${
           isCollapsed ? 'justify-center lg:p-2' : 'space-x-3'
         }`}

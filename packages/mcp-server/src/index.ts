@@ -610,6 +610,18 @@ const tools: Tool[] = [
     }
   },
   {
+    name: 'get_graph_context',
+    description: 'Get a compact, token-efficient orientation summary of a graph: node/edge counts by type and status, top blockers, recent activity. Designed as the first call an AI agent makes to orient itself (< 2kB response).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        graphId: { type: 'string', description: 'Graph ID' }
+      },
+      required: ['graphId'],
+      additionalProperties: false
+    }
+  },
+  {
     name: 'update_graph',
     description: 'Update graph metadata and settings',
     inputSchema: {
@@ -782,6 +794,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'get_graph_details':
         return await graphService.getGraphDetails((args || {}) as GetGraphDetailsArgs);
+
+      case 'get_graph_context':
+        return await graphService.getGraphContext((args || {}) as GetGraphDetailsArgs);
 
       case 'update_graph':
         return await graphService.updateGraph((args || {}) as UpdateGraphArgs);

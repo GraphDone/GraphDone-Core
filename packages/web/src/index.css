@@ -705,3 +705,151 @@ input[type="date"]:focus {
   animation: fadeIn 0.3s ease-out forwards;
   opacity: 0;
 }
+/* ============================================================
+   Living Graph (Epic 1, docs/USER_STORIES.md)
+   Life-state classes come from src/lib/nodeAnimations.ts.
+   Quality gating: [data-quality] is set by useAdaptiveQuality on
+   .graph-container (ADAPT-3); reduced-motion always wins (ADAPT-9).
+   ============================================================ */
+
+/* LIVE-1: in-progress work breathes with a gentle stroke pulse */
+@keyframes node-breathe {
+  0%, 100% {
+    stroke-opacity: 0.45;
+    stroke-width: 1.5;
+  }
+  50% {
+    stroke-opacity: 1;
+    stroke-width: 3;
+  }
+}
+
+.graph-container svg .node-breathing {
+  animation: node-breathe 2s ease-in-out infinite;
+}
+
+/* LIVE-4: blocked work looks visibly stuck — desaturated, dashed ring, slow dim pulse */
+@keyframes node-ache {
+  0%, 100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+.graph-container svg .node-stuck {
+  stroke-dasharray: 6 4;
+  filter: saturate(0.35) url(#node-drop-shadow);
+  animation: node-ache 4s ease-in-out infinite;
+}
+
+/* Completed work settles calmly */
+.graph-container svg .node-settled {
+  opacity: 0.75;
+}
+
+/* ADAPT-3: LOW tier strips all motion and halos before touching interactivity */
+.graph-container[data-quality="LOW"] svg .node-breathing,
+.graph-container[data-quality="LOW"] svg .node-stuck {
+  animation: none;
+}
+
+.graph-container[data-quality="LOW"] svg .node-bg {
+  filter: url(#node-drop-shadow) !important;
+}
+
+/* ADAPT-9: accessibility beats aesthetics at every tier */
+@media (prefers-reduced-motion: reduce) {
+  .graph-container svg .node-breathing,
+  .graph-container svg .node-stuck {
+    animation: none;
+  }
+}
+
+/* LIVE-2: energy flows along edges away from completed work */
+@keyframes edge-flow-forward {
+  to {
+    stroke-dashoffset: -14;
+  }
+}
+
+@keyframes edge-flow-reverse {
+  to {
+    stroke-dashoffset: 14;
+  }
+}
+
+.graph-container svg .edge-flowing-forward {
+  stroke-dasharray: 8 6;
+  animation: edge-flow-forward 1.2s linear infinite;
+}
+
+.graph-container svg .edge-flowing-reverse {
+  stroke-dasharray: 8 6;
+  animation: edge-flow-reverse 1.2s linear infinite;
+}
+
+.graph-container[data-quality="LOW"] svg .edge-flowing-forward,
+.graph-container[data-quality="LOW"] svg .edge-flowing-reverse {
+  stroke-dasharray: none;
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .graph-container svg .edge-flowing-forward,
+  .graph-container svg .edge-flowing-reverse {
+    stroke-dasharray: none;
+    animation: none;
+  }
+}
+
+/* LIVE-7: hover illuminates the 1-hop neighborhood; the rest recedes.
+   !important so the dim wins over inline opacity left by D3 transitions. */
+.graph-container svg .dim-for-hover {
+  opacity: 0.16 !important;
+  transition: opacity 0.2s ease;
+}
+
+.graph-container svg .node,
+.graph-container svg .edge,
+.graph-container svg .edge-label-group {
+  transition: opacity 0.2s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .graph-container svg .dim-for-hover,
+  .graph-container svg .node,
+  .graph-container svg .edge,
+  .graph-container svg .edge-label-group {
+    transition: none;
+  }
+}
+
+/* The edge being edited glows for the whole editing session */
+@keyframes edge-editing-pulse {
+  0%, 100% {
+    stroke-opacity: 1;
+    stroke-width: 4;
+  }
+  50% {
+    stroke-opacity: 0.6;
+    stroke-width: 6;
+  }
+}
+
+.graph-container svg .edge.edge-editing {
+  animation: edge-editing-pulse 1.2s ease-in-out infinite;
+  filter: drop-shadow(0 0 6px currentColor);
+}
+
+.graph-container svg .edge-editing-label {
+  filter: drop-shadow(0 0 8px rgba(52, 211, 153, 0.9));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .graph-container svg .edge.edge-editing {
+    animation: none;
+    stroke-width: 5;
+  }
+}
