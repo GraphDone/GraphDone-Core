@@ -7,7 +7,9 @@ export default defineConfig({
     pool: 'forks', // Use forked processes for better isolation
     poolOptions: {
       forks: {
-        singleFork: false, // Allow parallel execution
+        // Chaos suites deliberately exhaust fds/CPU/network; parallel files
+        // starve each other and flake. One fork keeps measurements honest.
+        singleFork: true,
         isolate: true, // Isolate each test file
       },
     },

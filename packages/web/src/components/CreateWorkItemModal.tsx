@@ -1,4 +1,5 @@
 import React from 'react';
+import { useDialog } from '../hooks/useDialogManager';
 import { useMutation, useQuery } from '@apollo/client';
 import { X, Link, ChevronDown, Plus } from 'lucide-react';
 import { CREATE_WORK_ITEM, GET_WORK_ITEMS, GET_EDGES, CREATE_EDGE } from '../lib/queries';
@@ -47,6 +48,7 @@ interface CreateWorkItemModalProps {
 
 
 export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, position, onSubmit }: CreateWorkItemModalProps) {
+  useDialog(isOpen, onClose);
   const { currentUser, currentTeam } = useAuth();
   const { currentGraph } = useGraph();
   const { showSuccess, showError } = useNotifications();

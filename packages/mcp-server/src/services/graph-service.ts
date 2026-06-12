@@ -3278,6 +3278,110 @@ export class GraphService {
     }
   }
 
+  async getGraphContext(args: GetGraphDetailsArgs): Promise<MCPResponse> {
+    const session = this.driver.session();
+    try {
+      const query = `
+        MATCH (g:Graph {id: $graphId})
+        OPTIONAL MATCH (g)<-[:BELONGS_TO]-(w:WorkItem)
+        OPTIONAL MATCH (w)-[e:DEPENDS_ON|BLOCKS|RELATES_TO|CONTAINS|PART_OF]-(:WorkItem)
+        WITH g, collect(DISTINCT w) as items, count(DISTINCT e) as edgeCount
+        CALL {
+          WITH items
+          UNWIND items as i
+          RETURN i.type as type, count(i) as cnt
+        }
+        WITH g, items, edgeCount, collect({type: type, count: cnt}) as typeCounts
+        CALL {
+          WITH items
+          UNWIND items as i
+          RETURN i.status as status, count(i) as cnt
+        }
+        WITH g, items, edgeCount, typeCounts, collect({status: status, count: cnt}) as statusCounts
+        CALL {
+          WITH g
+          OPTIONAL MATCH (g)<-[:BELONGS_TO]-(b:WorkItem)-[r:BLOCKS]->(:WorkItem)
+          WITH b, count(r) as blocksCount
+          WHERE b IS NOT NULL AND blocksCount > 0
+          ORDER BY blocksCount DESC LIMIT 5
+          RETURN collect({id: b.id, title: b.title, blocksCount: blocksCount}) as blockers
+        }
+        CALL {
+          WITH g
+          OPTIONAL MATCH (g)<-[:BELONGS_TO]-(rw:WorkItem)
+          WITH rw WHERE rw IS NOT NULL
+          ORDER BY rw.updatedAt DESC LIMIT 5
+          RETURN collect({id: rw.id, title: rw.title, status: rw.status, type: rw.type, updatedAt: rw.updatedAt}) as recent
+        }
+        RETURN g, size(items) as nodeCount, edgeCount, typeCounts, statusCounts, blockers, recent
+      `;
+
+      const result = await session.run(query, { graphId: args.graphId });
+
+      if (result.records.length === 0) {
+        throw new Error(`Graph with ID ${args.graphId} not found`);
+      }
+
+      const toNum = (v: unknown): number =>
+        typeof (v as { toNumber?: () => number })?.toNumber === 'function'
+          ? (v as { toNumber: () => number }).toNumber()
+          : Number(v) || 0;
+
+      const record = result.records[0];
+      const g = record.get('g').properties;
+      const typeCounts = (record.get('typeCounts') || []) as Array<{ type: string; count: unknown }>;
+      const statusCounts = (record.get('statusCounts') || []) as Array<{ status: string; count: unknown }>;
+      const blockers = (record.get('blockers') || []) as Array<{ id: string; title: string; blocksCount: unknown }>;
+      const recent = (record.get('recent') || []) as Array<{
+        id: string;
+        title: string;
+        status: string;
+        type: string;
+        updatedAt: unknown;
+      }>;
+
+      const byType: Record<string, number> = {};
+      for (const t of typeCounts) {
+        if (t.type) byType[t.type] = toNum(t.count);
+      }
+      const byStatus: Record<string, number> = {};
+      for (const s of statusCounts) {
+        if (s.status) byStatus[s.status] = toNum(s.count);
+      }
+
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify({
+            context: {
+              graph: { id: g.id, name: g.name, status: g.status },
+              counts: {
+                nodes: toNum(record.get('nodeCount')),
+                edges: toNum(record.get('edgeCount')),
+                byType,
+                byStatus
+              },
+              topBlockers: blockers.map(b => ({
+                id: b.id,
+                title: typeof b.title === 'string' ? b.title.slice(0, 80) : b.title,
+                blocksCount: toNum(b.blocksCount)
+              })),
+              recentActivity: recent.map(r => ({
+                id: r.id,
+                title: typeof r.title === 'string' ? r.title.slice(0, 80) : r.title,
+                status: r.status,
+                type: r.type,
+                updatedAt: r.updatedAt?.toString()
+              }))
+            }
+          })
+        }]
+      };
+    } finally {
+      await session.close();
+    }
+  }
+
   async updateGraph(args: UpdateGraphArgs): Promise<MCPResponse> {
     const session = this.driver.session();
     try {

@@ -36,6 +36,14 @@ export default defineConfig({
       'Expires': '0'
     },
     proxy: {
+      // apollo.ts uses the nginx-style /api/graphql path; map it in dev too
+      '/api/graphql': {
+        target: process.env.VITE_PROXY_TARGET || (process.env.VITE_HTTPS === 'true' ? 'https://localhost:4128' : 'http://localhost:4127'),
+        changeOrigin: true,
+        secure: false,
+        ws: true,
+        rewrite: (path) => path.replace(/^\/api/, '')
+      },
       '/graphql': {
         target: process.env.VITE_PROXY_TARGET || (process.env.VITE_HTTPS === 'true' ? 'https://localhost:4128' : 'http://localhost:4127'),
         changeOrigin: true,
