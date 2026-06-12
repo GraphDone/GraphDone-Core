@@ -1,75 +1,68 @@
 import { test, expect } from '@playwright/test';
+import { HEALTH_URL, gqlRequest, apiLogin } from '../helpers/api';
 
+// API health checks, deployment-agnostic: every URL derives from TEST_URL
+// (nginx route layout in production, Vite proxy in dev) and data queries
+// authenticate the same way the UI does. See tests/helpers/api.ts.
 test.describe('GraphQL API Health Tests', () => {
-  const baseUrl = 'http://localhost:4127/graphql';
-  const healthUrl = 'http://localhost:4127/health';
+  let token: string;
+
+  test.beforeAll(async () => {
+    token = await apiLogin();
+  });
 
   test('@core Server health endpoint responds correctly', async () => {
-    const response = await fetch(healthUrl);
+    const response = await fetch(HEALTH_URL);
     expect(response.ok).toBeTruthy();
-    
+
     const health = await response.json();
     expect(health.status).toBeDefined();
     console.log('✅ Server health:', health.status);
   });
 
-  test('GraphQL endpoint returns work items', async () => {
-    const response = await fetch(baseUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        query: '{ workItems { id title status } }'
-      })
-    });
+  test('GraphQL endpoint returns work items for an authenticated user', async () => {
+    const data = await gqlRequest<{ workItems: Array<{ id: string; title: string; status: string }> }>(
+      '{ workItems(options: { limit: 25 }) { id title status } }',
+      undefined,
+      token
+    );
 
-    expect(response.ok).toBeTruthy();
-    const data = await response.json();
-    expect(data.data).toBeDefined();
-    expect(data.data.workItems).toBeDefined();
-    expect(Array.isArray(data.data.workItems)).toBeTruthy();
-    
-    console.log(`✅ Found ${data.data.workItems.length} work items`);
+    expect(data.errors).toBeUndefined();
+    expect(data.data?.workItems).toBeDefined();
+    expect(Array.isArray(data.data!.workItems)).toBeTruthy();
+    console.log(`✅ Found ${data.data!.workItems.length} work items`);
   });
 
-  test('GraphQL endpoint handles team-specific queries', async () => {
-    const response = await fetch(baseUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        query: 'query { workItems(where: { teamId: "team-1" }) { id title type teamId } }'
-      })
-    });
+  test('GraphQL endpoint filters work items by graph', async () => {
+    const graphs = await gqlRequest<{ graphs: Array<{ id: string; name: string }> }>(
+      '{ graphs(options: { limit: 1 }) { id name } }',
+      undefined,
+      token
+    );
+    expect(graphs.data?.graphs).toBeDefined();
+    test.skip(graphs.data!.graphs.length === 0, 'no graphs in database');
 
-    expect(response.ok).toBeTruthy();
-    const data = await response.json();
-    expect(data.data).toBeDefined();
-    expect(data.data.workItems).toBeDefined();
-    
-    // Verify team filtering if items exist
-    if (data.data.workItems.length > 0) {
-      data.data.workItems.forEach(item => {
-        expect(item.teamId).toBe('team-1');
-      });
+    const graphId = graphs.data!.graphs[0].id;
+    const data = await gqlRequest<{ workItems: Array<{ id: string; graph: { id: string } }> }>(
+      `query($where: WorkItemWhere) { workItems(where: $where) { id graph { id } } }`,
+      { where: { graph: { id: graphId } } },
+      token
+    );
+
+    expect(data.errors).toBeUndefined();
+    expect(data.data?.workItems).toBeDefined();
+    for (const item of data.data!.workItems) {
+      expect(item.graph.id).toBe(graphId);
     }
-    
-    console.log(`✅ Team-1 filtered items: ${data.data.workItems.length}`);
+    console.log(`✅ Graph-filtered items: ${data.data!.workItems.length}`);
   });
 
   test('GraphQL endpoint handles invalid queries gracefully', async () => {
-    const response = await fetch(baseUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        query: 'query { invalidField { nonExistentField } }'
-      })
-    });
+    const data = await gqlRequest('query { invalidField { nonExistentField } }', undefined, token);
 
-    expect(response.ok).toBeTruthy();
-    const data = await response.json();
     expect(data.errors).toBeDefined();
     expect(Array.isArray(data.errors)).toBeTruthy();
-    expect(data.errors.length).toBeGreaterThan(0);
-    
+    expect(data.errors!.length).toBeGreaterThan(0);
     console.log('✅ Invalid query properly returned errors');
   });
 });

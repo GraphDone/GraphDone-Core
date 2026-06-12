@@ -133,11 +133,16 @@ test.describe('Admin Database Tab', () => {
   test('should handle API errors gracefully', async ({ page }) => {
     const baseURL = getBaseURL();
 
-    // Intercept and fail GraphQL requests to test error handling
-    await page.route('**/api/graphql', route => route.abort('failed'));
-
     await page.goto(`${baseURL}/admin`);
     await page.click('text="Database"');
+    await page.waitForTimeout(1000);
+
+    // Intercept and fail GraphQL requests to test error handling.
+    // Block only after the tab is open: session verification itself uses /api/graphql now.
+    await page.route('**/api/graphql', route => route.abort('failed'));
+
+    // Refresh stats so the failed requests surface in the UI
+    await page.click('button:has-text("Refresh")');
     await page.waitForTimeout(2000);
 
     // Stats should show "Error" when API fails

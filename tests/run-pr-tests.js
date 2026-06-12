@@ -208,13 +208,13 @@ async function checkPrerequisites() {
   }
 
   try {
-    const https = require('https');
     const url = new URL(TEST_CONFIG.baseUrl);
+    const client = url.protocol === 'http:' ? require('http') : require('https');
 
     await new Promise((resolve, reject) => {
-      https.get({
+      client.get({
         hostname: url.hostname,
-        port: url.port || 443,
+        port: url.port || (url.protocol === 'http:' ? 80 : 443),
         path: '/health',
         rejectUnauthorized: false
       }, (res) => {

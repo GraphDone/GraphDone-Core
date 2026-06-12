@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import ReactDOM from 'react-dom/client';
 import { createPortal } from 'react-dom';
 import * as d3 from 'd3';
-import { Link2, Edit3, Trash2, Folder, FolderOpen, Plus, FileText, Settings, Maximize2, ArrowLeft, X, GitBranch, Minus, Unlink, Crosshair, GripVertical } from 'lucide-react';
+import { Link2, Edit3, Trash2, Folder, FolderOpen, Plus, FileText, Settings, Maximize2, ArrowLeft, X, GitBranch, Minus, Unlink, Crosshair, GripVertical, Undo2 } from 'lucide-react';
 import {
   getPriorityIconElement,
   getStatusIconElement,
@@ -24,7 +24,7 @@ import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { GET_WORK_ITEMS, GET_EDGES, CREATE_EDGE, UPDATE_EDGE, DELETE_EDGE, CREATE_WORK_ITEM, UPDATE_WORK_ITEM } from '../lib/queries';
+import { GET_WORK_ITEMS, GET_EDGES, CREATE_EDGE, UPDATE_EDGE, DELETE_EDGE, CREATE_WORK_ITEM, UPDATE_WORK_ITEM, DELETE_WORK_ITEM } from '../lib/queries';
 import { validateGraphData, getValidationSummary, ValidationResult } from '../utils/graphDataValidation';
 import { DEFAULT_NODE_CONFIG } from '../constants/workItemConstants';
 
@@ -40,6 +40,14 @@ import { WorkItemDetailsModal } from './WorkItemDetailsModal';
 
 import { WorkItem, WorkItemEdge } from '../types/graph';
 import { RelationshipType, RELATIONSHIP_OPTIONS, getRelationshipConfig } from '../constants/workItemConstants';
+import { useAdaptiveQuality } from '../hooks/useAdaptiveQuality';
+import { nodeLifeClasses, nodeGlowFilter, isActiveStatus, isCompletedStatus, edgeFlowClass } from '../lib/nodeAnimations';
+import { mergeSimulationNodes, mergeSimulationEdges } from '../lib/graphDataMerge';
+import { edgeLabelPlacement, clearSegment, slideTFromPointer, chooseLabelT } from '../lib/edgeLabelLayout';
+import { PerfMeter } from '../lib/perfMeter';
+import { spawnCelebration } from '../lib/celebration';
+import { buildNeighborhood } from '../lib/graphAdjacency';
+import { UndoStack } from '../lib/undoStack';
 
 // LOD thresholds for different zoom levels
 const LOD_THRESHOLDS = {
@@ -85,7 +93,10 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
   const { showSuccess, showError } = useNotifications();
   const navigate = useNavigate();
   const location = useLocation();
-  
+  const { tier: qualityTier, profile: qualityProfile } = useAdaptiveQuality();
+  const qualityProfileRef = useRef(qualityProfile);
+  qualityProfileRef.current = qualityProfile;
+
   // Fullscreen mode abandoned - keeping single view mode
 
   // Prevent body scroll when graph view is active
@@ -111,7 +122,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       }
     } : { where: {} },
     fetchPolicy: currentGraph ? 'cache-and-network' : 'cache-only',
-    pollInterval: currentGraph ? 100 : 0,
+    pollInterval: currentGraph ? 2000 : 0,
     errorPolicy: 'all'
   });
 
@@ -126,7 +137,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       }
     } : { where: {} },
     fetchPolicy: currentGraph ? 'cache-and-network' : 'cache-only',
-    pollInterval: currentGraph ? 100 : 0,
+    pollInterval: currentGraph ? 2000 : 0,
     errorPolicy: 'all'
   });
 
@@ -236,27 +247,21 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       console.error('[Graph Debug] Node update failed:', error);
     }
   });
+
+  const [deleteWorkItemMutation] = useMutation(DELETE_WORK_ITEM, {
+    refetchQueries: [
+      { query: GET_WORK_ITEMS, variables: currentGraph ? { where: { graph: { id: currentGraph.id } } } : { where: {} } },
+      { query: GET_EDGES, variables: currentGraph ? { where: { source: { graph: { id: currentGraph.id } } } } : { where: {} } }
+    ]
+  });
   
   const [nodeMenu, setNodeMenu] = useState<NodeMenuState>({ node: null, position: { x: 0, y: 0 }, visible: false });
   const [edgeMenu, setEdgeMenu] = useState<EdgeMenuState>({ edge: null, position: { x: 0, y: 0 }, visible: false });
   const [menuDragState, setMenuDragState] = useState<DragState>({ isDragging: false, offset: { x: 0, y: 0 } });
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (nodeMenu.visible) {
-        if (e.key === 'Escape') {
-          setNodeMenu({ node: null, position: { x: 0, y: 0 }, visible: false });
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [nodeMenu.visible]);
-
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionSource, setConnectionSource] = useState<string | null>(null);
-  const [selectedRelationType, setSelectedRelationType] = useState<RelationshipType>('DEFAULT_EDGE');
+  const [selectedRelationType, setSelectedRelationType] = useState<RelationshipType>('RELATES_TO');
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
   const [showDataHealth, setShowDataHealth] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -283,7 +288,118 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
   const [isFlippingEdge, setIsFlippingEdge] = useState(false);
   const [showRelationshipWindow, setShowRelationshipWindow] = useState(false);
   const [selectedNodes, setSelectedNodes] = useState<Set<string>>(new Set());
-  
+  // Inline rename: an input floats over the node — no modal (W2)
+  const [inlineEdit, setInlineEdit] = useState<{ nodeId: string; value: string; original: string; graphX: number; graphY: number } | null>(null);
+
+  // D3 handlers are bound once at init and the init effect intentionally
+  // avoids re-initialising on mode changes — so handlers would capture STALE
+  // mode state. Mirror it into refs that handlers read live.
+  const isConnectingRef = useRef(false);
+  const connectionSourceRef = useRef<string | null>(null);
+  isConnectingRef.current = isConnecting;
+  connectionSourceRef.current = connectionSource;
+  const selectedRelationTypeRef = useRef<RelationshipType>('RELATES_TO');
+
+  // FLOW-3: every mutation registers its inverse — experimentation is safe
+  const undoStackRef = useRef(new UndoStack(36));
+  const [undoLabel, setUndoLabel] = useState<string | null>(null);
+  useEffect(() => undoStackRef.current.onChange(() => setUndoLabel(undoStackRef.current.peekLabel())), []);
+  const runUndo = useCallback(async () => {
+    try {
+      const action = await undoStackRef.current.undo();
+      if (action) showSuccess(`Undid: ${action.label}`);
+    } catch {
+      showError('Could not undo that — the server refused');
+    }
+  }, []);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+        const t = e.target as HTMLElement | null;
+        if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+        e.preventDefault();
+        runUndo();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [runUndo]);
+
+  // Esc always works: pop one mode level, never trap the user
+  // (docs/design/interaction-model.md, principle 3). Connection mode and the
+  // edge-type selector were keyboard traps before this.
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (isConnecting) {
+        setIsConnecting(false);
+        setConnectionSource(null);
+        return;
+      }
+      if (editingEdge) {
+        setEditingEdge(null);
+        return;
+      }
+      if (nodeMenu.visible) {
+        setNodeMenu({ node: null, position: { x: 0, y: 0 }, visible: false });
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isConnecting, editingEdge, nodeMenu.visible]);
+
+  // The edge being edited glows for the whole session of the editor —
+  // applied reactively (init-time attr checks captured stale editingEdge).
+  useEffect(() => {
+    if (!svgRef.current) return;
+    const svg = d3.select(svgRef.current);
+    const id = editingEdge?.edge?.id ?? null;
+    svg.selectAll('.edge').classed('edge-editing', (d: any) => !!id && d?.id === id);
+    svg.selectAll('.edge-label-group').classed('edge-editing-label', (d: any) => !!id && d?.id === id);
+    return () => {
+      svg.selectAll('.edge').classed('edge-editing', false);
+      svg.selectAll('.edge-label-group').classed('edge-editing-label', false);
+    };
+  }, [editingEdge?.edge?.id]);
+
+  // Grow-mode ghost preview: a dashed line + ghost circle follow the cursor
+  // from the source node, so the next click's meaning is always visible.
+  useEffect(() => {
+    if (!isConnecting || !connectionSource || !svgRef.current) return;
+    const svg = d3.select(svgRef.current);
+    const g = svg.select<SVGGElement>('.main-graph-group');
+    if (g.empty()) return;
+    const sourceNode = (simulationRef.current?.nodes() as any[])?.find((n: any) => n.id === connectionSource);
+    if (!sourceNode) return;
+
+    const preview = g.append('g').attr('class', 'grow-preview').style('pointer-events', 'none');
+    const previewLine = preview.append('line')
+      .attr('stroke', '#34d399')
+      .attr('stroke-width', 2)
+      .attr('stroke-dasharray', '6 5')
+      .attr('opacity', 0.8)
+      .attr('x1', sourceNode.x).attr('y1', sourceNode.y)
+      .attr('x2', sourceNode.x).attr('y2', sourceNode.y);
+    const previewGhost = preview.append('circle')
+      .attr('r', 14)
+      .attr('fill', 'rgba(52, 211, 153, 0.15)')
+      .attr('stroke', '#34d399')
+      .attr('stroke-dasharray', '4 4')
+      .attr('stroke-width', 1.5)
+      .attr('cx', sourceNode.x).attr('cy', sourceNode.y);
+    svg.on('mousemove.grow', (event: MouseEvent) => {
+      const [mx, my] = d3.pointer(event, g.node() as any);
+      previewLine.attr('x1', sourceNode.x).attr('y1', sourceNode.y).attr('x2', mx).attr('y2', my);
+      previewGhost.attr('cx', mx).attr('cy', my);
+    });
+
+    return () => {
+      svg.on('mousemove.grow', null);
+      preview.remove();
+    };
+  }, [isConnecting, connectionSource]);
+
   
   // Handle dragging for relationship selector
   useEffect(() => {
@@ -846,35 +962,46 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
 
   const handleNodeClick = useCallback((event: MouseEvent, node: WorkItem) => {
     event.stopPropagation();
-    
-    if (isConnecting && connectionSource) {
-      // Complete connection
-      if (connectionSource !== node.id) {
+
+    // Read mode through refs: this handler is bound to D3 elements once and
+    // must see live state without forcing a full re-init.
+    const growSource = connectionSourceRef.current;
+    if (isConnectingRef.current && growSource) {
+      // Complete connection (clicking the source itself just cancels)
+      if (growSource !== node.id) {
         // Check if edge already exists
-        if (edgeExists(connectionSource, node.id)) {
+        if (edgeExists(growSource, node.id)) {
           setIsConnecting(false);
           setConnectionSource(null);
           return;
         }
-        
+
         // Create edge in backend
         createEdgeMutation({
           variables: {
             input: [{
-              type: selectedRelationType,
+              type: selectedRelationTypeRef.current,
               weight: 0.8,
-              source: { connect: { where: { node: { id: connectionSource } } } },
+              source: { connect: { where: { node: { id: growSource } } } },
               target: { connect: { where: { node: { id: node.id } } } },
             }]
           }
-        }).then(() => {
-          // Edge created successfully
+        }).then((result) => {
+          const createdEdgeId = result?.data?.createEdges?.edges?.[0]?.id;
+          if (createdEdgeId) {
+            undoStackRef.current.push({
+              label: 'Connect items',
+              undo: async () => {
+                await deleteEdgeMutation({ variables: { where: { id: createdEdgeId } } });
+              }
+            });
+          }
         }).catch(() => {
           // Error handled by GraphQL
         });
         // Don't reinitialize - let refetchQueries handle the update
       }
-      
+
       setIsConnecting(false);
       setConnectionSource(null);
     } else {
@@ -1229,6 +1356,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     }
 
     svg.call(zoom);
+    zoomBehaviorRef.current = zoom;
     
     // Restore zoom transform if this is a surgical update
     if (!isFirstInit && currentTransform) {
@@ -1236,14 +1364,30 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     }
   }, []);
 
+  // Grow-a-child: predict the natural child type for a parent (kid-simple
+  // defaults — the user can retype later with one click)
+  const childTypeFor = (parentType?: string): string => {
+    switch (parentType) {
+      case 'EPIC': return 'FEATURE';
+      case 'MILESTONE': return 'TASK';
+      case 'OUTCOME': return 'FEATURE';
+      case 'FEATURE': return 'TASK';
+      default: return 'TASK';
+    }
+  };
+
   // Inline node creation function
-  const createInlineNode = async (x: number, y: number) => {
+  const createInlineNode = async (
+    x: number,
+    y: number,
+    options?: { type?: string; connectFrom?: { id: string; type?: string } }
+  ) => {
     // Create inline node function
     if (!currentGraph?.id) {
       // No current graph selected
       return;
     }
-    
+
     try {
       // Generate a unique name that doesn't conflict with existing nodes
       let nodeTitle = `New Work Item ${nodeCounter}`;
@@ -1264,7 +1408,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       const workItemInput = {
         title: nodeTitle,
         description: DEFAULT_NODE_CONFIG.description,
-        type: DEFAULT_NODE_CONFIG.type,
+        type: options?.type ?? DEFAULT_NODE_CONFIG.type,
         status: DEFAULT_NODE_CONFIG.status,
         priority: 0.0,
         positionX: x,
@@ -1273,7 +1417,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         radius: 1.0,
         theta: 0.0,
         phi: 0.0,
-        
+
         owner: {
           connect: {
             where: { node: { id: currentUser?.id } }
@@ -1292,15 +1436,52 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
 
       if (result.data) {
         setNodeCounter(prev => prev + 1);
-        showSuccess('Work item created successfully');
-        // Let Apollo's cache update handle the UI update instead of refetch to avoid camera jumping
-        // The refetchQueries in the mutation config will handle the data update
+        const newNode = result.data.createWorkItems?.workItems?.[0];
+
+        // Grow mode: wire the new node to its source immediately
+        let grownEdgeId: string | undefined;
+        if (newNode?.id && options?.connectFrom) {
+          const edgeResult = await createEdgeMutation({
+            variables: {
+              input: [{
+                type: 'IS_PART_OF',
+                weight: 0.8,
+                source: { connect: { where: { node: { id: newNode.id } } } },
+                target: { connect: { where: { node: { id: options.connectFrom.id } } } }
+              }]
+            }
+          }).catch(() => undefined); /* edge failure shouldn't kill the node */
+          grownEdgeId = edgeResult?.data?.createEdges?.edges?.[0]?.id;
+        }
+
+        if (newNode?.id) {
+          const createdId = newNode.id;
+          const edgeToRemove = grownEdgeId;
+          undoStackRef.current.push({
+            label: 'Create item',
+            undo: async () => {
+              // edges first — orphan edges break the whole edges query
+              if (edgeToRemove) {
+                await deleteEdgeMutation({ variables: { where: { id: edgeToRemove } } }).catch(() => {});
+              }
+              await deleteWorkItemMutation({ variables: { where: { id: createdId } } });
+            }
+          });
+        }
+
+        // The name is the next thing a person wants to set — put them
+        // straight into an inline rename, no modal (interaction-model W2/W3)
+        if (newNode?.id) {
+          setInlineEdit({ nodeId: newNode.id, value: newNode.title || nodeTitle, original: newNode.title || nodeTitle, graphX: x, graphY: y });
+        }
+        return newNode;
       }
     } catch (error) {
       console.error('[Create Work Item Error]', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to create work item';
       showError(errorMessage);
     }
+    return undefined;
   };
 
   // Helper function to calculate node dimensions (shared between init and update)
@@ -1342,9 +1523,12 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
 
     lines = Math.min(lines, 3); // Maximum 3 lines
 
-    // Calculate additional height needed for multiple lines (16px per extra line)
-    const additionalHeight = (lines - 1) * 16;
-    const finalHeight = baseDimensions.height + additionalHeight;
+    // Height is the SUM of the content rows, not a guess: title bar (28) +
+    // gap (12) + title lines (16 each) + description row (22 when present) +
+    // status/priority block (42) anchored at the bottom. A fixed base height
+    // let long titles overlap the status row.
+    const contentHeight = 28 + 12 + lines * 16 + (d.description ? 22 : 6) + 42;
+    const finalHeight = Math.max(baseDimensions.height, contentHeight);
 
     return {
       width: width,
@@ -1358,23 +1542,14 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
   const updateVisualizationData = useCallback(() => {
     if (!simulationRef.current || !svgRef.current) return;
     
-    console.log('[Graph Debug] Checking for data changes...');
-    
     const svg = d3.select(svgRef.current);
     const simulation = simulationRef.current;
-    
+
     // Get current data counts from DOM
     const currentNodeCount = svg.select('.nodes-group').selectAll('.node').size();
     const currentEdgeCount = svg.select('.edges-group').selectAll('.edge').size();
     const newNodeCount = nodes.length;
     const newEdgeCount = validatedEdges.length;
-    
-    console.log('[Graph Debug] Data counts:', {
-      currentNodes: currentNodeCount,
-      newNodes: newNodeCount,
-      currentEdges: currentEdgeCount,
-      newEdges: newEdgeCount
-    });
 
     // Check if we need full reinitialization (node/edge count changed)
     const needsReinit = (currentNodeCount !== newNodeCount) || (currentEdgeCount !== newEdgeCount);
@@ -1388,11 +1563,34 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     // If counts are the same, update both simulation data AND DOM elements (for property changes)
     console.log('[Graph Debug] Data counts unchanged - updating simulation data and DOM elements');
 
-    // Update simulation with current data (handles property changes)
-    simulation.nodes(nodes as any);
+    // Merge fresh data INTO the live simulation objects instead of swapping
+    // arrays. The DOM is data-bound to these exact objects; replacing them
+    // splits physics from rendering and edges visibly detach from nodes.
+    const simNodes = simulation.nodes() as any[];
+    const prevStatuses = new Map(simNodes.map((n: any) => [n.id, n.status]));
+    const nodeMerge = mergeSimulationNodes(simNodes, nodes as any[]);
+
+    // LIVE-3: work that just transitioned to completed celebrates.
+    if (qualityProfileRef.current.particleCelebrations) {
+      const layer = svg.select<SVGGElement>('.main-graph-group');
+      if (!layer.empty()) {
+        for (const id of nodeMerge.changedIds) {
+          const node = nodeMerge.nodes.find((n: any) => n.id === id) as any;
+          if (node && isCompletedStatus(node.status) && !isCompletedStatus(prevStatuses.get(id))) {
+            spawnCelebration(layer, id, node.x || 0, node.y || 0, getTypeConfig(node.type as WorkItemType).hexColor);
+          }
+        }
+      }
+    }
+    simulation.nodes(nodeMerge.nodes as any);
     const linkForce = simulation.force('link') as d3.ForceLink<any, any>;
     if (linkForce) {
-      linkForce.links(validatedEdges);
+      const edgeMerge = mergeSimulationEdges(
+        linkForce.links() as any[],
+        validatedEdges as any[],
+        nodeMerge.nodes as Array<{ id: string }>
+      );
+      linkForce.links(edgeMerge.edges);
     }
 
     // UPDATE DOM ELEMENTS: Rebind data and update visual properties
@@ -1404,10 +1602,11 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       const updatedNode = nodes.find(n => n.id === d.id);
       if (!updatedNode) return;
 
-      // Update title text elements
+      // Update title text elements (must mirror the creation path exactly,
+      // or cards shift layout on every poll)
       nodeGroup.selectAll('.node-title-text').remove();
-      const maxCharsPerLine = 18;
-      const maxLines = 2;
+      const maxCharsPerLine = getNodeDimensions(updatedNode).maxCharsPerLine;
+      const maxLines = 3;
       let lines: string[] = [];
       const words = updatedNode.title.split(' ');
       let currentLine = '';
@@ -1430,7 +1629,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       }
 
       const dimensions = getNodeDimensions(updatedNode);
-      const titleBarHeight = 32;
+      const titleBarHeight = 28;
       const startY = -dimensions.height / 2 + titleBarHeight + 18;
       lines.forEach((line, index) => {
         nodeGroup.append('text')
@@ -1579,6 +1778,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
 
     // Apply zoom behavior to the svg (always, but preserve existing transform)
     svg.call(zoom);
+    zoomBehaviorRef.current = zoom;
     
     // Restore zoom transform if this is a surgical update
     if (!isFirstInit && currentTransform) {
@@ -1588,14 +1788,32 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     // Add click handler for context menu on background
     background.on('click', function(event: MouseEvent) {
       event.stopPropagation();
-      
+
+      // Grow mode: clicking empty space is the intuitive "make a new one
+      // HERE, connected" — a kid's first guess is the right one. The new
+      // node lands in inline rename. (Cancel = Esc / right-click / source.)
+      if (isConnectingRef.current) {
+        const growSource = connectionSourceRef.current;
+        const sourceNode = (simulationRef.current?.nodes() as any[])?.find((n: any) => n.id === growSource);
+        const [gx, gy] = d3.pointer(event, g.node() as any);
+        setIsConnecting(false);
+        setConnectionSource(null);
+        if (growSource) {
+          createInlineNode(gx, gy, {
+            type: childTypeFor(sourceNode?.type),
+            connectFrom: { id: growSource, type: sourceNode?.type }
+          });
+        }
+        return;
+      }
+
       // Check only the main dialogs that we care about
-      const hasOpenDialogs = 
+      const hasOpenDialogs =
         nodeMenu.visible ||
         edgeMenu.visible ||
         editingEdge !== null ||
         false; // Removed edge details dialog
-      
+
       if (hasOpenDialogs) {
         // Close all dialogs and menus - first click
         setNodeMenu({ node: null, position: { x: 0, y: 0 }, visible: false });
@@ -1619,10 +1837,17 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     // Add right-click handler for context menu
     background.on('contextmenu', function(event: MouseEvent) {
       event.preventDefault();
-      
+
+      // Right-click cancels grow mode (alongside Esc and clicking the source)
+      if (isConnectingRef.current) {
+        setIsConnecting(false);
+        setConnectionSource(null);
+        return;
+      }
+
       // Close all existing dialogs first (exclusive dialog behavior)
       setEditingEdge(null);
-      
+
       const [graphX, graphY] = d3.pointer(event, g.node());
       
       setContextMenuPosition({
@@ -1710,25 +1935,33 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
           
           const maxDistance = Math.min(width, height) * 0.6;
           
-          // Stronger force when edge is too long to create pulling effect
+          // Firmer pull only when an edge is stretched far too long
           if (currentDistance > maxDistance) {
-            return 0.8; // Strong pulling force
+            return 0.5;
           }
-          
-          // Normal strength otherwise
-          return 0.3;
+
+          // Soft springs otherwise — calm, high-friction feel
+          return 0.2;
         })
       )
       .force('charge', d3.forceManyBody()
-        .strength(-100) // Simple, consistent repulsion for all nodes
+        .strength(-60) // Gentle repulsion; collision force owns overlap prevention
         .distanceMax(200) // Reasonable influence range
       )
       .force('center', d3.forceCenter(centerX, centerY).strength(0.01)) // Minimal centering
       .force('x', d3.forceX(centerX).strength(0.002)) // Extremely weak horizontal centering for maximum width
       .force('y', d3.forceY(centerY).strength(0.002)) // Extremely weak vertical centering for maximum height
-      .force('collision', d3.forceCollide(90) // Sufficient collision radius to prevent overlap
-        .strength(0.7) // Moderate collision prevention
-        .iterations(2) // Fewer iterations for stability
+      .force('collision', d3.forceCollide()
+        // Radius from the node's actual card geometry: half the diagonal plus
+        // breathing room. A fixed radius smaller than the card guarantees
+        // card-on-card overlap, which also traps edge labels with nowhere
+        // clean to go.
+        .radius((d: any) => {
+          const dims = getNodeDimensions(d);
+          return Math.hypot(dims.width, dims.height) / 2 + 12;
+        })
+        .strength(0.85)
+        .iterations(2)
       )
       // Add hierarchical attraction forces (Epic->Milestone, Feature->Task, etc.)
       .force('hierarchy', d3.forceLink()
@@ -1737,9 +1970,9 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         .distance((d: any) => d.distance || 250) // Much larger hierarchical distance
         .strength((d: any) => d.strength || 0.05) // Very weak hierarchical strength
       )
-      .alphaTarget(0.05) // Lower alpha target for calmer simulation
+      .alphaTarget(0) // LIVE-6: physics must REST — perpetual alphaTarget kept nodes drifting forever (unstable hover targets, idle frame burn). CSS owns the idle life now.
       .alphaDecay(0.015) // Slightly slower decay for better collision resolution
-      .velocityDecay(0.4); // Add velocity decay for smoother movement
+      .velocityDecay(0.65); // High friction: nodes glide briefly and settle — no bouncing (user feedback: physics too aggressive)
 
     // Filter edges based on visible nodes for performance
     // Temporarily show ALL edges for debugging
@@ -1758,6 +1991,16 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       .append('line')
       .attr('class', (d: WorkItemEdge) => {
         let classes = 'edge';
+        // After force-link binding, source/target are node objects at runtime
+        const src = d.source as unknown as { status?: string };
+        const tgt = d.target as unknown as { status?: string };
+        const flowClass = edgeFlowClass(
+          typeof src === 'object' ? src?.status : undefined,
+          typeof tgt === 'object' ? tgt?.status : undefined
+        );
+        if (flowClass) {
+          classes += ` ${flowClass}`;
+        }
         // Add pulsing class if edge dialog is active
         if (editingEdge && editingEdge.edge && editingEdge.edge.id === d.id) {
           classes += ' dialog-active-pulse';
@@ -2006,12 +2249,56 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
           // Save the new position to the database
           saveNodePosition(d.id, d.fx, d.fy);
           
-          // Gradually reduce simulation energy to let other nodes settle
+          // Let the simulation cool to a full stop after the neighbors settle
           setTimeout(() => {
-            simulation.alphaTarget(0.02);
+            simulation.alphaTarget(0);
           }, 1000);
           mousedownNodeRef.current = null;
         }));
+
+    // LIVE-8: wake-up entrance — nodes float in by recency on first open.
+    // Never delays interactivity; skipped at LOW/MEDIUM tier and reduced motion.
+    if (isFirstInit && qualityProfileRef.current.entranceAnimation && visibleNodes.length > 0) {
+      const byRecency = [...visibleNodes]
+        .sort((a, b) => String(b.updatedAt ?? '').localeCompare(String(a.updatedAt ?? '')))
+        .reduce((ranks, node, rank) => ranks.set(node.id, rank), new Map<string, number>());
+      const stagger = Math.min(40, 500 / visibleNodes.length);
+      nodeElements
+        .style('opacity', 0)
+        .transition()
+        .delay((d: WorkItem) => (byRecency.get(d.id) ?? 0) * stagger)
+        .duration(300)
+        .style('opacity', 1)
+        .on('end', function() {
+          // Clear the inline opacity so hover-dim CSS can take over later
+          d3.select(this).style('opacity', null);
+        });
+    }
+
+    // LIVE-7: hovering a node illuminates its 1-hop neighborhood — everything
+    // else dims. Precomputed adjacency keeps the handler a Map lookup.
+    const neighborhood = buildNeighborhood(validatedEdges as any);
+    nodeElements
+      .on('mouseenter.neighborhood', function(_event, hovered: any) {
+        if (mousedownNodeRef.current) return;
+        const hood = neighborhood.get(hovered.id);
+        nodeElements.classed('dim-for-hover', (d: any) => d.id !== hovered.id && !hood?.nodes.has(d.id));
+        linkElements.classed('dim-for-hover', (d: any) => !hood?.edges.has(d.id));
+        clickableEdges.classed('dim-for-hover', (d: any) => !hood?.edges.has(d.id));
+        edgeLabelGroups.classed('dim-for-hover', (d: any) => !hood?.edges.has(d.id));
+      })
+      .on('mouseleave.neighborhood', () => {
+        nodeElements.classed('dim-for-hover', false);
+        linkElements.classed('dim-for-hover', false);
+        clickableEdges.classed('dim-for-hover', false);
+        edgeLabelGroups.classed('dim-for-hover', false);
+      })
+      // Double-click a node → rename in place, no modal (W2)
+      .on('dblclick.rename', (event: MouseEvent, d: any) => {
+        event.stopPropagation();
+        setInlineEdit({ nodeId: d.id, value: d.title || '', original: d.title || '', graphX: d.x || 0, graphY: d.y || 0 });
+      });
+
 
     // Monopoly-style rectangular nodes with colored title bars
     // getNodeDimensions is now defined outside and shared with updateVisualizationData
@@ -2020,6 +2307,10 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     nodeElements.append('rect')
       .attr('class', (d: WorkItem) => {
         let classes = 'node-bg';
+        const lifeClass = nodeLifeClasses(d.status);
+        if (lifeClass) {
+          classes += ` ${lifeClass}`;
+        }
         // Add pulsing class if node dialog is active
         if (nodeMenu.visible && nodeMenu.node && nodeMenu.node.id === d.id) {
           classes += ' dialog-active-pulse';
@@ -2038,7 +2329,10 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         }
         return '#1f2937'; // Dark background consistent with theme
       })
-      .style('filter', 'url(#node-drop-shadow)')
+      .style('filter', (d: WorkItem) => {
+        const typeConfig = getTypeConfig(d.type as WorkItemType);
+        return nodeGlowFilter(d.priority, typeConfig.hexColor, qualityProfileRef.current.glowEffects);
+      })
       .attr('stroke', (d: WorkItem) => {
         // Use node type color for active dialog
         if (nodeMenu.visible && nodeMenu.node && nodeMenu.node.id === d.id) {
@@ -2052,6 +2346,10 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         }
         if (d.status === 'COMPLETED' || d.status === 'Completed' || d.status === 'Done' || d.status === 'DONE') {
           return '#4b5563';
+        }
+        // In-progress work breathes with its type color (LIVE-1)
+        if (isActiveStatus(d.status)) {
+          return getTypeConfig(d.type as WorkItemType).hexColor;
         }
         return '#4b5563'; // Gray border
       })
@@ -2287,12 +2585,16 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     relationshipIcons.on('click', (event: MouseEvent, d: WorkItem) => {
       event.stopPropagation();
       event.preventDefault();
-      
-      console.log('[Graph Debug] + button clicked, opening relationship window');
-      
-      // Simply open the relationship window - avoid changing selectedNodes to prevent graph refresh
-      setShowRelationshipWindow(true);
+
+      // "+" means GROW: enter grow mode wired to this node. Click empty
+      // space → new connected item right there; click another node →
+      // connect to it; Esc / right-click / clicking this node → cancel.
+      // No modals, no instructions-as-UI (interaction-model W3).
+      setNodeMenu({ node: null, position: { x: 0, y: 0 }, visible: false });
       setEditingEdge(null);
+      setShowRelationshipWindow(false);
+      setConnectionSource(d.id);
+      setIsConnecting(true);
     });
 
     // Node title section - with text wrapping
@@ -2624,6 +2926,9 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       .attr('opacity', 1);
 
     // Create edge label groups with rounded rectangles and text (only for visible edges)
+    // NOTE: this group is appended after the nodes group, so nodes-group is
+    // raised afterwards — node cards and their controls must always stack
+    // above edge labels, or labels steal clicks meant for node buttons.
     const edgeLabelGroups = g.append('g')
       .attr('class', 'edge-labels-group')
       .selectAll('.edge-label-group')
@@ -2637,26 +2942,19 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         event.stopPropagation();
         event.preventDefault(); // Prevent any default behavior
         
-        // Auto-show relationship window when edge is clicked
-        if (!showRelationshipWindow) {
-          setShowRelationshipWindow(true);
-          // Set the selected edge with initial position for new window
-          setEditingEdge({
-            edge: d,
-            position: { x: 200, y: 80 } // Initial position for new window
-          });
-        } else {
-          // Window already visible, just update the edge data (preserve window position)
-          setEditingEdge(prev => prev ? {
-            edge: d,
-            position: prev.position // Keep existing window position
-          } : {
-            edge: d,
-            position: { x: 200, y: 80 }
-          });
-        }
+        // Open the editor, remembering WHERE the edge was clicked so the
+        // window can position itself away from the edge it edits
+        setShowRelationshipWindow(true);
+        setEditingEdge({
+          edge: d,
+          position: { x: event.clientX, y: event.clientY }
+        });
         setDragOffset({ x: 0, y: 0 }); // Reset drag offset
       });
+
+    // Nodes always stack ABOVE edge labels/arrows — labels were stealing
+    // clicks from node controls (the + icon) when they drifted over a card.
+    g.select('.nodes-group').raise();
 
     // Add text labels first to measure their size
     edgeLabelGroups
@@ -3039,6 +3337,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       element.select('.long-press-feedback').remove();
     });
 
+    let labelAvoidCounter = 0;
     const updateEdgePositions = () => {
       // Update visible edge positions
       linkElements
@@ -3063,78 +3362,146 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
           return `translate(${midX},${midY}) rotate(${angle})`;
         });
 
-      // Update edge label group positions to follow edge angles
+      // Edge labels: auto-centered in the clear span between the two node
+      // cards, pushed off ALL node cards once the simulation settles, and
+      // slidable by the user (d.labelT persists because the data merge keeps
+      // edge object identity stable; d.labelTUser pins a manual slide).
+      labelAvoidCounter++;
+      const runAvoidance = simulation.alpha() < 0.1 && labelAvoidCounter % 15 === 0;
+      const obstacles = runAvoidance
+        ? (simulation.nodes() as any[]).map((n: any) => {
+            const dims = getNodeDimensions(n);
+            return { x: n.x || 0, y: n.y || 0, width: dims.width, height: dims.height };
+          })
+        : null;
+
+      // Labels placed earlier in this pass become obstacles for later ones,
+      // so labels avoid each other as well as every node card.
+      const placedLabels: Array<{ x: number; y: number; width: number; height: number }> = [];
       edgeLabelGroups
-        .attr('transform', (d: any) => {
-          const midX = (d.source.x + d.target.x) / 2;
-          const midY = (d.source.y + d.target.y) / 2;
-          const angle = Math.atan2(d.target.y - d.source.y, d.target.x - d.source.x) * 180 / Math.PI;
-          
-          // Offset perpendicular to the edge
-          const offsetDistance = 25;
-          const perpAngle = (angle + 90) * Math.PI / 180;
-          const offsetX = Math.cos(perpAngle) * offsetDistance;
-          const offsetY = Math.sin(perpAngle) * offsetDistance;
-          
-          // Keep text readable by limiting rotation
-          let textRotation = angle;
-          if (angle > 90 || angle < -90) {
-            textRotation = angle + 180; // Flip text to keep it readable
+        .attr('transform', function(d: any) {
+          const source = { x: d.source.x || 0, y: d.source.y || 0 };
+          const target = { x: d.target.x || 0, y: d.target.y || 0 };
+          const sourceDims = getNodeDimensions(d.source);
+          const targetDims = getNodeDimensions(d.target);
+
+          let labelW = 60;
+          let labelH = 20;
+          if (obstacles) {
+            const bbox = (this as SVGGElement).getBBox();
+            labelW = bbox.width || 60;
+            labelH = bbox.height || 20;
+            if (!d.labelTUser) {
+              d.labelT = chooseLabelT({
+                source, target, sourceDims, targetDims,
+                obstacles: obstacles.concat(placedLabels),
+                labelDims: { width: labelW, height: labelH }
+              });
+            }
           }
-          
-          return `translate(${midX + offsetX},${midY + offsetY}) rotate(${textRotation})`;
+
+          const placement = edgeLabelPlacement({ source, target, sourceDims, targetDims, t: d.labelT });
+          if (obstacles) {
+            placedLabels.push({ x: placement.x, y: placement.y, width: labelW + 8, height: labelH + 8 });
+          }
+          return `translate(${placement.x},${placement.y}) rotate(${placement.rotation})`;
         });
     };
 
-    // Simulation tick
+    // Let users slide a label along its edge, within the clear span.
+    edgeLabelGroups
+      .style('cursor', 'grab')
+      .call(d3.drag<any, any>()
+        .on('start', (event) => {
+          event.sourceEvent?.stopPropagation();
+        })
+        .on('drag', function(event, d: any) {
+          const [px, py] = d3.pointer(event, g.node() as any);
+          const source = { x: d.source.x || 0, y: d.source.y || 0 };
+          const target = { x: d.target.x || 0, y: d.target.y || 0 };
+          const segment = clearSegment(source, target, getNodeDimensions(d.source), getNodeDimensions(d.target));
+          d.labelT = slideTFromPointer({ x: px, y: py }, source, target, segment);
+          d.labelTUser = true;
+          updateEdgePositions();
+        }));
+
+    // Simulation tick. Order matters: nodes move first, then every line,
+    // arrow and label re-anchors to the nodes' new positions — edges can
+    // never lag a frame behind. Every tick is measured (PerfMeter → debug
+    // console + window.__graphPerf) so dynamics work stays evidence-based.
+    const perfMeter = new PerfMeter(240);
+    let lastPerfReport = 0;
     simulation.on('tick', () => {
-      // Allow nodes to move freely without bounds constraints
-      
-      // DEBUG: Log if any nodes are at origin during tick
-      const nodesAtOrigin = nodes.filter((n: any) => (n.x === 0 || n.x === undefined) && (n.y === 0 || n.y === undefined));
-      if (nodesAtOrigin.length > 0) {
-        console.log('[CRITICAL DEBUG] Nodes at origin during tick:', nodesAtOrigin.length, 'out of', nodes.length);
-        console.log('[CRITICAL DEBUG] First few nodes at origin:', nodesAtOrigin.slice(0, 3).map((n: any) => ({id: n.id, x: n.x, y: n.y})));
-      }
-      
-      // Update node positions
+      const tickStart = performance.now();
+
+      // 1) Nodes first
       nodeElements
         .attr('transform', (d: any) => `translate(${d.x || 0},${d.y || 0})`);
 
-      // Ensure text elements are visible and properly positioned after position updates
-      g.selectAll('.node-type-text, .node-title-text, .node-description-text' as any)
-        .style('visibility', 'visible')
-        .style('opacity', function(this: any) {
-          // Restore LOD-appropriate opacity if it was hidden
-          const currentOpacity = parseFloat(d3.select(this).style('opacity')) || 0;
-          if (currentOpacity === 0) {
-            // Get current scale from the svg element
-            const svgElement = svg.node();
-            if (svgElement) {
-              const currentTransform = d3.zoomTransform(svgElement);
-              const scale = currentTransform.k;
-              const classList = d3.select(this as any).attr('class');
-              if (classList?.includes('node-type-text')) return getSmoothedOpacity(scale, LOD_THRESHOLDS.FAR);
-              if (classList?.includes('node-title-text')) return getSmoothedOpacity(scale, LOD_THRESHOLDS.MEDIUM);
-              if (classList?.includes('node-description-text')) return getSmoothedOpacity(scale, LOD_THRESHOLDS.CLOSE);
+      // Restore text visibility OUTSIDE the hot path: reading style() forces
+      // a style recalc per text element; doing it every tick for every node
+      // was the page's main frame killer (measured via PerfMeter). Once per
+      // ~30 ticks is imperceptible and keeps the workaround's behavior.
+      if (labelAvoidCounter % 30 === 0) {
+        g.selectAll('.node-type-text, .node-title-text, .node-description-text' as any)
+          .style('visibility', 'visible')
+          .style('opacity', function(this: any) {
+            const currentOpacity = parseFloat(d3.select(this).style('opacity')) || 0;
+            if (currentOpacity === 0) {
+              const svgElement = svg.node();
+              if (svgElement) {
+                const currentTransform = d3.zoomTransform(svgElement);
+                const scale = currentTransform.k;
+                const classList = d3.select(this as any).attr('class');
+                if (classList?.includes('node-type-text')) return getSmoothedOpacity(scale, LOD_THRESHOLDS.FAR);
+                if (classList?.includes('node-title-text')) return getSmoothedOpacity(scale, LOD_THRESHOLDS.MEDIUM);
+                if (classList?.includes('node-description-text')) return getSmoothedOpacity(scale, LOD_THRESHOLDS.CLOSE);
+              }
             }
-          }
-          return currentOpacity;
-        });
+            return currentOpacity;
+          });
+      }
 
-      // Update mini-map with current node positions
-      if ((window as any).updateMiniMapPositions && nodes.length > 0) {
-        const positions: {[key: string]: {x: number, y: number}} = {};
-        nodes.forEach((node: any) => {
-          if (node.x !== undefined && node.y !== undefined) {
-            positions[node.id] = { x: node.x, y: node.y };
-          }
-        });
-        (window as any).updateMiniMapPositions(positions);
+      // Update mini-map with current node positions (live simulation objects —
+      // the React-state nodes are different objects since the identity merge)
+      if ((window as any).updateMiniMapPositions) {
+        const simNodesForMap = simulation.nodes() as any[];
+        if (simNodesForMap.length > 0) {
+          const positions: {[key: string]: {x: number, y: number}} = {};
+          const types: {[key: string]: string} = {};
+          simNodesForMap.forEach((node: any) => {
+            if (node.x !== undefined && node.y !== undefined) {
+              positions[node.id] = { x: node.x, y: node.y };
+              types[node.id] = node.type;
+            }
+          });
+          (window as any).updateMiniMapPositions(positions);
+          (window as any).updateMiniMapTypes?.(types);
+        }
       }
         
-      // Always update edges to stay anchored to nodes
+      // 2) Then every edge, arrow and label re-anchors to the new positions
       updateEdgePositions();
+
+      // 3) Measure. The debug console is the source of truth for dynamics.
+      const now = performance.now();
+      perfMeter.tick(now - tickStart);
+      perfMeter.frame(now);
+      if (now - lastPerfReport > 2000) {
+        lastPerfReport = now;
+        const stats = {
+          ...perfMeter.summary(),
+          alpha: Math.round(simulation.alpha() * 1000) / 1000,
+          nodes: nodes.length,
+          edges: validatedEdges.length,
+          quality: qualityProfileRef.current.tier
+        };
+        (window as any).__graphPerf = stats;
+        if ((window as any).debugLog) {
+          const level = stats.avgTickMs > 8 || stats.fps < 30 ? '⚠️' : '✅';
+          (window as any).debugLog('Perf', `${level} fps=${stats.fps} tick avg=${stats.avgTickMs}ms p95=${stats.p95TickMs}ms dropped=${stats.droppedFrames} alpha=${stats.alpha}`, stats);
+        }
+      }
     });
 
     // Update zoom with LOD updates
@@ -3153,10 +3520,6 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
           y: event.transform.y,
           k: event.transform.k
         };
-        if ((window as any).debugLog) {
-          (window as any).debugLog('Graph', '🔍 Zoom/pan event', viewportUpdate);
-        }
-        console.log('🔍 ZOOM-EVENT viewport update:', viewportUpdate);
         (window as any).updateMiniMapViewport(viewportUpdate);
       }
       
@@ -3202,68 +3565,80 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     (simulation as any).restartCollisions = () => {
       simulation.alphaTarget(0.3).restart();
       setTimeout(() => {
-        simulation.alphaTarget(0.05);
+        simulation.alphaTarget(0);
       }, 2000);
     };
   }, [nodes, validatedEdges, handleNodeClick, initializeEmptyVisualization]); // Include handleNodeClick to get fresh connection state
 
   // Store simulation reference for resize handling
   const simulationRef = useRef<d3.Simulation<any, any> | null>(null);
+  const zoomBehaviorRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
   const mousedownNodeRef = useRef<any>(null);
 
   // Fit view to show all nodes
   const fitViewToNodes = useCallback(() => {
-    if (!svgRef.current || !containerRef.current || nodes.length === 0) return;
-    
+    if (!svgRef.current || !containerRef.current) return;
+    // Bounds must come from the LIVE simulation objects (the React-state
+    // nodes are different objects since the identity merge and may hold
+    // stale/initial coordinates — that bug made fit zoom out to a huge box).
+    const simNodes = (simulationRef.current?.nodes() as any[]) || [];
+    if (simNodes.length === 0) return;
+
     const svg = d3.select(svgRef.current);
     const container = containerRef.current;
     const width = container.clientWidth;
     const height = container.clientHeight;
-    
-    // Calculate bounding box of all nodes
+
+    // Bounding box of the actual cards, not just their centers
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    
-    nodes.forEach((node: any) => {
-      const x = node.x || 0;
-      const y = node.y || 0;
-      minX = Math.min(minX, x);
-      maxX = Math.max(maxX, x);
-      minY = Math.min(minY, y);
-      maxY = Math.max(maxY, y);
+    simNodes.forEach((node: any) => {
+      if (typeof node.x !== 'number' || typeof node.y !== 'number') return;
+      const dims = getNodeDimensions(node);
+      minX = Math.min(minX, node.x - dims.width / 2);
+      maxX = Math.max(maxX, node.x + dims.width / 2);
+      minY = Math.min(minY, node.y - dims.height / 2);
+      maxY = Math.max(maxY, node.y + dims.height / 2);
     });
-    
+
     if (!isFinite(minX)) return; // No valid positions
-    
-    // Add padding
-    const padding = 100;
-    minX -= padding;
-    maxX += padding;
-    minY -= padding;
-    maxY += padding;
-    
-    const boundsWidth = maxX - minX;
-    const boundsHeight = maxY - minY;
-    
-    // Calculate scale to fit all nodes
-    const scale = Math.min(
-      width / boundsWidth,
-      height / boundsHeight,
-      2 // Max zoom level
-    );
-    
-    // Calculate translate to center the bounds
-    const centerX = width / 2;
-    const centerY = height / 2;
-    const boundsCenterX = (minX + maxX) / 2;
-    const boundsCenterY = (minY + maxY) / 2;
-    
-    const translateX = centerX - boundsCenterX * scale;
-    const translateY = centerY - boundsCenterY * scale;
-    
-    // Apply the transform
+
+    const padding = 60;
+    minX -= padding; maxX += padding; minY -= padding; maxY += padding;
+
+    const boundsWidth = Math.max(1, maxX - minX);
+    const boundsHeight = Math.max(1, maxY - minY);
+
+    // Fit, but never zoom IN past 1.25 (a 3-node graph shouldn't fill the screen)
+    const scale = Math.min(width / boundsWidth, height / boundsHeight, 1.25);
+
+    const translateX = width / 2 - ((minX + maxX) / 2) * scale;
+    const translateY = height / 2 - ((minY + maxY) / 2) * scale;
     const transform = d3.zoomIdentity.translate(translateX, translateY).scale(scale);
-    svg.call(d3.zoom<SVGSVGElement, unknown>().transform as any, transform);
-  }, [nodes]);
+
+    // Use the component's own zoom behavior so handlers fire and state stays
+    // coherent; animate so the user keeps spatial context.
+    if (zoomBehaviorRef.current) {
+      svg.transition().duration(450).call(zoomBehaviorRef.current.transform as any, transform);
+    } else {
+      svg.call(d3.zoom<SVGSVGElement, unknown>().transform as any, transform);
+    }
+  }, [getNodeDimensions]);
+
+  // Mini-map click → pan the main view to that graph point at current zoom
+  useEffect(() => {
+    (window as any).miniMapNavigate = (graphX: number, graphY: number) => {
+      if (!svgRef.current || !containerRef.current || !zoomBehaviorRef.current) return;
+      const svg = d3.select(svgRef.current);
+      const k = d3.zoomTransform(svgRef.current).k || 1;
+      const w = containerRef.current.clientWidth;
+      const h = containerRef.current.clientHeight;
+      const t = d3.zoomIdentity.translate(w / 2 - graphX * k, h / 2 - graphY * k).scale(k);
+      svg.transition().duration(350).call(zoomBehaviorRef.current.transform as any, t);
+    };
+    return () => {
+      delete (window as any).miniMapNavigate;
+    };
+  }, []);
 
   // Center on specific node
   const centerOnNode = useCallback((nodeId?: string) => {
@@ -3603,7 +3978,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     const isNetworkError = errorMessage.includes('Cannot connect');
     
     return (
-      <div ref={containerRef} className="graph-container relative w-full h-full">
+      <div ref={containerRef} className="graph-container relative w-full h-full" data-quality={qualityTier}>
         <svg ref={svgRef} className="w-full h-full">
           {/* Error message centered in SVG */}
           <foreignObject x="20%" y="30%" width="60%" height="40%">
@@ -3756,21 +4131,38 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
   };
 
   const handleDeleteEdge = (edge: WorkItemEdge) => {
-    const sourceTitle = edge.source || 'Unknown';
-    const targetTitle = edge.target || 'Unknown';
-    if (confirm(`Are you sure you want to delete the ${edge.type.toLowerCase()} relationship between "${sourceTitle}" and "${targetTitle}"?`)) {
-      deleteEdgeMutation({
-        variables: {
-          where: { id: edge.id }
+    const src: any = edge.source;
+    const tgt: any = edge.target;
+    const sourceId = typeof src === 'object' ? src?.id : src;
+    const targetId = typeof tgt === 'object' ? tgt?.id : tgt;
+    deleteEdgeMutation({
+      variables: {
+        where: { id: edge.id }
+      }
+    }).then(() => {
+      // Deleting is safe because undo can rebuild it — no confirm() popup
+      undoStackRef.current.push({
+        label: 'Delete relationship',
+        undo: async () => {
+          await createEdgeMutation({
+            variables: {
+              input: [{
+                type: edge.type,
+                weight: edge.strength ?? 0.8,
+                source: { connect: { where: { node: { id: sourceId } } } },
+                target: { connect: { where: { node: { id: targetId } } } }
+              }]
+            }
+          });
         }
       });
-    }
+    });
     setEdgeMenu(prev => ({ ...prev, visible: false }));
   };
 
 
   return (
-    <div ref={containerRef} className="graph-container relative w-full h-full overflow-hidden select-none">
+    <div ref={containerRef} className="graph-container relative w-full h-full overflow-hidden select-none" data-quality={qualityTier}>
       <svg 
         ref={svgRef} 
         className="w-full h-full" 
@@ -3831,42 +4223,64 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
 
 
 
-      {/* Connection Mode Indicator */}
+      {/* Grow mode: one friendly hint, no instructions-as-UI, no dropdown.
+          The edge type can be retyped later by clicking its label. */}
       {isConnecting && (
-        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg">
-          <div className="flex items-center space-x-2">
-            <Link2 className="h-4 w-4" />
-            <span>Click target node to create {selectedRelationType.replace('_', ' ')} relationship</span>
-            <button
-              onClick={() => {
-                setIsConnecting(false);
-                setConnectionSource(null);
-              }}
-              className="ml-2 text-blue-200 hover:text-white"
-            >
-              Cancel
-            </button>
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-gray-900/90 backdrop-blur-sm border border-emerald-500/40 text-emerald-100 px-4 py-2 rounded-xl shadow-lg pointer-events-none">
+          <div className="flex items-center space-x-2 text-sm">
+            <Link2 className="h-4 w-4 text-emerald-400" />
+            <span>Click empty space to grow a new item · click a node to connect · Esc to cancel</span>
           </div>
         </div>
       )}
 
-      {/* Relationship Type Selector */}
-      {isConnecting && (
-        <div className="absolute top-16 left-1/2 transform -translate-x-1/2 bg-gray-800 border border-gray-600 rounded-lg shadow-lg p-3">
-          <div className="text-sm font-medium text-green-300 mb-2">Relationship Type:</div>
-          <select
-            value={selectedRelationType}
-            onChange={(e) => setSelectedRelationType(e.target.value as RelationshipType)}
-            className="w-full border border-gray-600 bg-gray-700 text-gray-200 rounded px-2 py-1 text-sm"
+      {/* Inline rename: the input floats over the node — no modal (W2) */}
+      {inlineEdit && (() => {
+        const simNode = (simulationRef.current?.nodes() as any[])?.find((n: any) => n.id === inlineEdit.nodeId);
+        const gx = simNode?.x ?? inlineEdit.graphX;
+        const gy = simNode?.y ?? inlineEdit.graphY;
+        const left = gx * currentTransform.scale + currentTransform.x;
+        const top = gy * currentTransform.scale + currentTransform.y;
+        const commit = () => {
+          const title = inlineEdit.value.trim();
+          const previous = inlineEdit.original;
+          setInlineEdit(null);
+          if (title && title !== previous) {
+            updateWorkItemMutation({
+              variables: { where: { id: inlineEdit.nodeId }, update: { title } }
+            }).then(() => {
+              undoStackRef.current.push({
+                label: 'Rename item',
+                undo: async () => {
+                  await updateWorkItemMutation({
+                    variables: { where: { id: inlineEdit.nodeId }, update: { title: previous } }
+                  });
+                }
+              });
+            }).catch(() => showError('Could not rename item'));
+          }
+        };
+        return (
+          <div
+            className="absolute z-50"
+            style={{ left, top, transform: 'translate(-50%, -50%)' }}
           >
-            {RELATIONSHIP_OPTIONS.map((option) => (
-              <option key={option.type} value={option.type}>
-                {option.label} - {option.description}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
+            <input
+              autoFocus
+              data-testid="inline-rename"
+              value={inlineEdit.value}
+              onFocus={(e) => e.target.select()}
+              onChange={(e) => setInlineEdit({ ...inlineEdit, value: e.target.value })}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commit();
+                if (e.key === 'Escape') setInlineEdit(null);
+              }}
+              onBlur={commit}
+              className="px-3 py-2 rounded-lg bg-gray-900/95 border-2 border-emerald-400 text-white text-sm font-semibold shadow-2xl outline-none min-w-[180px] text-center"
+            />
+          </div>
+        );
+      })()}
 
       {/* Node Context Menu */}
       {nodeMenu.visible && nodeMenu.node && createPortal(
@@ -4245,19 +4659,23 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
           onClick={(e) => e.stopPropagation()}
         >
           <div className="py-2">
-            {/* Reload Button - at the top for recovery */}
+            {/* Undo — first item so touch users always have it one tap away */}
             <button
               onClick={() => {
-                console.log('[Graph Debug] User triggered page reload from context menu');
-                window.location.reload();
+                runUndo();
+                setContextMenuPosition(null);
               }}
-              className="w-full text-left px-4 py-3 hover:bg-red-500/10 text-gray-200 flex items-center space-x-3 transition-all duration-300 ease-out group rounded-lg mx-2 border-b border-white/5 mb-2"
+              disabled={!undoLabel}
+              data-testid="context-undo"
+              className={`w-full text-left px-4 py-3 flex items-center space-x-3 transition-all duration-300 ease-out group rounded-lg mx-2 border-b border-white/5 mb-2 ${undoLabel ? 'hover:bg-amber-500/10 text-gray-200' : 'opacity-40 cursor-not-allowed text-gray-500'}`}
             >
-              <div className="w-6 h-6 rounded-lg bg-gray-700/50 flex items-center justify-center group-hover:bg-red-500/20 transition-all duration-300 ease-out">
-                <ArrowLeft className="h-4 w-4 text-gray-400 group-hover:text-red-400 transition-colors duration-300 transform group-hover:rotate-[-90deg]" />
+              <div className="w-6 h-6 rounded-lg bg-gray-700/50 flex items-center justify-center group-hover:bg-amber-500/20 transition-all duration-300 ease-out">
+                <Undo2 className="h-4 w-4 text-gray-400 group-hover:text-amber-400 transition-colors duration-300" />
               </div>
-              <span className="text-gray-300 font-medium group-hover:text-red-400 transition-colors duration-300">Reload Page</span>
-              <div className="ml-auto text-xs text-gray-500 group-hover:text-red-400">Recovery</div>
+              <span className="font-medium group-hover:text-amber-300 transition-colors duration-300">
+                {undoLabel ? `Undo: ${undoLabel}` : 'Nothing to undo'}
+              </span>
+              <div className="ml-auto text-xs text-gray-500">Ctrl+Z</div>
             </button>
             
             <button

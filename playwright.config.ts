@@ -69,10 +69,18 @@ export default defineConfig({
     // },
   ],
 
-  /* Run your local dev server before starting the tests */
-  webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:3127',
-    reuseExistingServer: !process.env.CI,
-  },
+  /* Auto-start a dev server ONLY for bare local runs. When TEST_URL is set
+   * (run-pr-tests, CI, ./start test) the stack is externally managed —
+   * webServer must stay off, or CI=true makes Playwright refuse the already
+   * -running server ("port is already used") and every suite dies at
+   * collection. That one interaction silently killed the whole E2E gate. */
+  ...(process.env.TEST_URL
+    ? {}
+    : {
+        webServer: {
+          command: 'npm run dev',
+          url: 'http://localhost:3127',
+          reuseExistingServer: !process.env.CI,
+        },
+      }),
 });
