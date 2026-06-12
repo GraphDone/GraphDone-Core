@@ -263,9 +263,9 @@ graph TB
     end
     
     subgraph "Voice Interactions"
-        VOICE_CREATE[🎤 "Create task..."<br/>Quick node creation]
-        VOICE_PRIORITY[🎤 "Boost priority..."<br/>Priority adjustment]
-        VOICE_STATUS[🎤 "Mark complete..."<br/>Status updates]
+        VOICE_CREATE["🎤 'Create task...'<br/>Quick node creation"]
+        VOICE_PRIORITY["🎤 'Boost priority...'<br/>Priority adjustment"]
+        VOICE_STATUS["🎤 'Mark complete...'<br/>Status updates"]
     end
     
     subgraph "Contextual Actions"
