@@ -95,19 +95,29 @@ export const RelationshipEditorWindow: React.FC<RelationshipEditorWindowProps> =
 
   // Initialize position and auto-calculate height based on content
   useEffect(() => {
-    const sidebarWidth = getComputedStyle(document.documentElement).getPropertyValue('--sidebar-width') || '16rem';
-    const sidebarPixels = sidebarWidth === '4rem' ? 64 : 256;
-    
-    setPosition({ 
-      x: sidebarPixels + 16,
-      y: 180 // Position similar to the old fixed panel
-    });
-    
+    const width = isExpanded ? 450 : 350;
     const contentHeight = calculateContentHeight();
-    setSize({
-      width: isExpanded ? 450 : 350,
-      height: contentHeight
-    });
+    const margin = 24;
+
+    // Never obstruct the edge being edited: the window opens on whichever
+    // side of the click point (≈ the edge) has more horizontal room, and
+    // vertically near the click, clamped to the viewport with a margin.
+    const click = editingEdge?.position;
+    if (click) {
+      const placeRight = click.x < window.innerWidth / 2;
+      const x = placeRight
+        ? Math.min(click.x + 120, window.innerWidth - width - margin)
+        : Math.max(margin, click.x - 120 - width);
+      const y = Math.max(margin, Math.min(click.y - contentHeight / 2, window.innerHeight - contentHeight - margin));
+      setPosition({ x, y });
+    } else {
+      const sidebarWidth = getComputedStyle(document.documentElement).getPropertyValue('--sidebar-width') || '16rem';
+      const sidebarPixels = sidebarWidth === '4rem' ? 64 : 256;
+      setPosition({ x: sidebarPixels + 16, y: 180 });
+    }
+
+    setSize({ width, height: contentHeight });
+    // eslint-disable-next-line
   }, [isExpanded, isVisible, editingEdge, selectedNodes.size]);
 
   // Handle dragging

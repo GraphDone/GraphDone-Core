@@ -351,6 +351,41 @@ npm run dev
 # Server available at: https://localhost:4128/graphql
 ```
 
+## THE GATE — run before claiming anything works
+
+```bash
+TEST_URL=http://localhost:3127 npm run test:smoke
+```
+
+`tests/e2e/user-smoke.spec.ts` sees the app exactly as a user does: login →
+nodes AND edges render → no error chrome → no GraphQL errors reach the client
+→ no uncaught JS errors → the grow flow works → no orphan edges in the DB.
+**Green unit tests do not mean the app works.** This gate exists because of a
+real incident: orphaned Edge records 500'd the edges query and the UI showed
+"Error" with zero edges while every unit test was green. If you touch data,
+the graph, or deletion paths — run the gate. When deleting WorkItems by API,
+ALWAYS delete their edges first (orphan edges break the entire edges query).
+
+## Story-Driven Development (START HERE)
+
+Development is driven by **[docs/USER_STORIES.md](./docs/USER_STORIES.md)**. The loop:
+1. Pick a 💤 story (or continue a 🔨 one).
+2. Write its test first (unit in the package, Playwright in `tests/e2e/`, perf in `tests/perf/`). It must fail.
+3. Implement until green; flip the story status + test link in the same PR.
+4. PR to `develop` titled with the story ID (e.g. `LIVE-2: energy flow on edges`).
+
+### Key modules added in the 2026 reboot
+- `packages/web/src/lib/adaptiveQuality.ts` — quality tiers (LOW→ULTRA) from device+network signals, FPS governor with hysteresis (ADAPT-1..9). Pure logic, fully unit-tested.
+- `packages/web/src/hooks/useAdaptiveQuality.ts` — React wiring: fps sampling, `connection.change` re-detection, persisted manual override. Sets `data-quality` on `.graph-container`.
+- `packages/web/src/lib/nodeAnimations.ts` — living-graph helpers: life-state classes (`node-breathing`/`node-stuck`/`node-settled`), priority glow steps, glow filter strings (LIVE-1/4/5). CSS lives at the end of `index.css`; LOW tier and `prefers-reduced-motion` strip motion via CSS selectors, not JS.
+- MCP `get_graph_context` — compact (<2kB) orientation summary for AI agents (AI-6).
+
+### Dev environment gotchas (learned the hard way)
+- `npm run dev` needs a `.env` (copy `.env.example`) or the server uses the wrong Neo4j password and falls back to auth-only mode.
+- Neo4j first boot downloads GDS+APOC plugins — startup can take minutes; the server retries.
+- The web client talks to `/api/graphql`; the Vite dev proxy maps it (see `vite.config.ts`). Production nginx does the same mapping.
+- mcp-server tests run single-fork on purpose (chaos suites exhaust fds/CPU; parallel files flake).
+
 ## Current Development Priorities
 
 ### 1. Graph View Architecture Refactoring (URGENT - 4,015 lines)

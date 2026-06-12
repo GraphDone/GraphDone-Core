@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useDialog } from '../hooks/useDialogManager';
 import { useMutation, useQuery } from '@apollo/client';
 import { X, Trash2, AlertTriangle, Shield, CheckCircle, GitBranch } from 'lucide-react';
 import { DELETE_WORK_ITEM, GET_WORK_ITEMS, GET_EDGES, DELETE_EDGE } from '../lib/queries';
@@ -49,6 +50,7 @@ interface DeleteWorkItemModalProps {
 }
 
 export function DeleteWorkItemModal({ isOpen, onClose, nodeId, nodeTitle, nodeType, onOpenDisconnectModal }: DeleteWorkItemModalProps) {
+  useDialog(isOpen, onClose);
   const { currentTeam } = useAuth();
   const { showSuccess, showError } = useNotifications();
   const [understandRisks, setUnderstandRisks] = useState(false);

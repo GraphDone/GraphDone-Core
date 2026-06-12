@@ -225,6 +225,40 @@ export function createMockDriver(): Driver {
         };
       }
 
+      // Handle compact graph context query (get_graph_context, AI-6)
+      if (query.includes('typeCounts') && query.includes('statusCounts')) {
+        if (params?.graphId === 'missing-graph-id') {
+          return { records: [] };
+        }
+        return {
+          records: [createMockRecord({
+            g: {
+              properties: {
+                id: params?.graphId || 'test-graph-id',
+                name: 'Test Graph',
+                status: 'ACTIVE'
+              }
+            },
+            nodeCount: { toNumber: () => 12 },
+            edgeCount: { toNumber: () => 7 },
+            typeCounts: [
+              { type: 'TASK', count: { toNumber: () => 8 } },
+              { type: 'BUG', count: { toNumber: () => 4 } }
+            ],
+            statusCounts: [
+              { status: 'IN_PROGRESS', count: { toNumber: () => 5 } },
+              { status: 'BLOCKED', count: { toNumber: () => 2 } }
+            ],
+            blockers: [
+              { id: 'node-1', title: 'Fix auth', blocksCount: { toNumber: () => 3 } }
+            ],
+            recent: [
+              { id: 'node-2', title: 'Polish UI', status: 'IN_PROGRESS', type: 'TASK', updatedAt: { toString: () => '2024-01-02T00:00:00Z' } }
+            ]
+          })]
+        };
+      }
+
       // Handle Graph MATCH operations (list, details)
       if (query.includes('MATCH') && query.includes('Graph')) {
         const mockGraphs = [

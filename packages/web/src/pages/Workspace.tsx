@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import { useQuery } from '@apollo/client';
 import { SafeGraphVisualization } from '../components/SafeGraphVisualization';
 import { GraphSelector } from '../components/GraphSelector';
+import { MiniMap } from '../components/MiniMap';
 import { CreateWorkItemModal } from '../components/CreateWorkItemModal';
 import { CreateGraphModal } from '../components/CreateGraphModal';
 import { GraphSelectionModal } from '../components/GraphSelectionModal';
@@ -386,12 +387,8 @@ export function Workspace() {
           
           {/* Mini-Map Content */}
           <div className="p-3 h-32">
-            <div className="w-full h-full bg-gray-900/50 rounded border border-gray-600 flex items-center justify-center">
-              <div className="text-center text-gray-500">
-                <Map className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                <p className="text-xs">Graph Overview</p>
-                <p className="text-xs opacity-75">Coming Soon</p>
-              </div>
+            <div className="w-full h-full bg-gray-900/50 rounded border border-gray-600 overflow-hidden">
+              <MiniMap />
             </div>
           </div>
         </div>,
