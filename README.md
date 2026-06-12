@@ -2,7 +2,7 @@
 
 > Project management for teams who think differently. Coordinate through dependencies and outcomes, not hierarchies and top-down control.
 
-![GraphDone UI Screenshot](./docs/graphdone_ui.png)
+![GraphDone's living graph — priority glow, breathing nodes, energy flowing along dependencies](./docs/graphdone_ui.png)
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Version](https://img.shields.io/badge/version-0.3.1--alpha-orange.svg)
@@ -15,11 +15,12 @@
 GraphDone reimagines project management as a collaborative graph where work flows through natural dependencies rather than artificial hierarchies. It's designed for high-quality individual contributors who thrive on autonomy, teams that include AI agents, and organizations ready to embrace democratic coordination.
 
 **Key Features:**
-- 🌐 **Graph-native collaboration** - Visualize work as interconnected outcomes and dependencies
-- 📱 **Mobile-first design** - Touch-friendly interface for distributed teams
-- 🤖 **AI agent integration** - Humans and AI coordinate as peers through the same interface
-- 🗳️ **Democratic prioritization** - Anonymous rating system lets good ideas rise organically
-- 🎯 **Hierarchical graph navigation** - Browse from high-level goals down to detailed tasks with dynamic levels of detail
+- 🌊 **A living graph** - in-progress work breathes, priority glows, energy flows along dependencies, completed work celebrates. The graph feels inhabited, not diagrammed
+- ⚡ **Adaptive performance** - quality tiers auto-scale to your device and network (a workstation gets everything; a phone on cellular gets a fast, lighter experience)
+- ✨ **Friction-free by contract** - grow a connected, named item in 2 clicks; undo anything (Ctrl+Z or one tap); every mode exits with Esc or a click-away. Click budgets are enforced by tests
+- 🤖 **AI agents as peers** - a full MCP server and GraphQL API give agents the same powers as the UI; `get_graph_context` orients an agent in one call
+- 🧬 **Ontology-ready backbone** - overlapping ontology sets (task management today; requirements traceability with coverage reports in design) on one graph engine
+- 📱 **Responsive across devices** - desktop-complete today, with a tested viewport matrix; touch-native interactions in active development
 - 🌍 **Open source** - MIT licensed with no vendor lock-in
 
 ## How GraphDone Differs from Traditional PM Tools
@@ -320,6 +321,14 @@ Anyone can propose ideas and assign personal priority. The community validates t
 
 ## Documentation
 
+**Start here — the Living Graph era:**
+- 🌊 **[User Stories — the development contract](./docs/USER_STORIES.md)** - Every feature starts as a story mapped to tests
+- 🧭 **[Interaction Model](./docs/design/interaction-model.md)** - The friction-free UX constitution: modes, exits, click budgets
+- 🧬 **[Ontology Layer design](./docs/design/ontology-layer.md)** - Requirements traceability and beyond, on one graph backbone
+- 🤖 **[AI Agents Quickstart](./docs/api/AI_AGENTS.md)** - 5-minute MCP/GraphQL setup for agent teammates
+- 🔬 **[Testing & Refinement Plan](./docs/TESTING_AND_REFINEMENT_PLAN.md)** - The never-done improvement loop
+
+**Foundations:**
 - 📖 **[Complete Technical Overview](./docs/detailed-overview.md)** - Architecture, implementation details, and visual deep-dive
 - 🎯 **[Project Philosophy](./docs/philosophy.md)** - Core beliefs and design principles  
 - 🚀 **[Getting Started Guide](./docs/guides/getting-started.md)** - Step-by-step setup and first steps
