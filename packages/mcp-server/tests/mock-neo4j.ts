@@ -226,7 +226,7 @@ export function createMockDriver(): Driver {
       }
 
       // Handle compact graph context query (get_graph_context, AI-6)
-      if (query.includes('typeCounts') && query.includes('statusCounts')) {
+      if (query.includes('size(items) as nodeCount') && query.includes('as statuses')) {
         if (params?.graphId === 'missing-graph-id') {
           return { records: [] };
         }
@@ -241,14 +241,8 @@ export function createMockDriver(): Driver {
             },
             nodeCount: { toNumber: () => 12 },
             edgeCount: { toNumber: () => 7 },
-            typeCounts: [
-              { type: 'TASK', count: { toNumber: () => 8 } },
-              { type: 'BUG', count: { toNumber: () => 4 } }
-            ],
-            statusCounts: [
-              { status: 'IN_PROGRESS', count: { toNumber: () => 5 } },
-              { status: 'BLOCKED', count: { toNumber: () => 2 } }
-            ],
+            types: ['TASK', 'TASK', 'TASK', 'TASK', 'TASK', 'TASK', 'TASK', 'TASK', 'BUG', 'BUG', 'BUG', 'BUG'],
+            statuses: ['IN_PROGRESS', 'IN_PROGRESS', 'IN_PROGRESS', 'IN_PROGRESS', 'IN_PROGRESS', 'BLOCKED', 'BLOCKED'],
             blockers: [
               { id: 'node-1', title: 'Fix auth', blocksCount: { toNumber: () => 3 } }
             ],
@@ -307,8 +301,20 @@ export function createMockDriver(): Driver {
         };
       }
       
+      // Handle getNodeDetails relationships query — edges are Edge NODES, so
+      // 'rel' is an Edge node (with .properties.type), 'related' a WorkItem.
+      if (query.includes('e as rel') && query.includes('EDGE_SOURCE|EDGE_TARGET')) {
+        return {
+          records: [createMockRecord({
+            rel: { properties: { id: 'edge-1', type: 'DEPENDS_ON', weight: 1, metadata: '{}' } },
+            related: { properties: { id: 'related-1', title: 'Related Node', type: 'TASK', status: 'ACTIVE' } },
+            direction: 'outgoing'
+          })]
+        };
+      }
+
       // Handle clone operations - return 0 for nodeCount/edgeCount
-      if (query.includes('count(newW)') || query.includes('count(newR)')) {
+      if (query.includes('count(newW)') || query.includes('count(newR)') || query.includes('count(newE)')) {
         return {
           records: [createMockRecord({
             nodeCount: { toNumber: () => 0 },
@@ -328,7 +334,7 @@ export function createMockDriver(): Driver {
     beginTransaction: () => ({
       run: async (query: string, params?: any) => {
         // Handle clone operations within transaction
-        if (query.includes('count(newW)') || query.includes('count(newR)')) {
+        if (query.includes('count(newW)') || query.includes('count(newR)') || query.includes('count(newE)')) {
           return {
             records: [createMockRecord({
               nodeCount: { toNumber: () => 0 },

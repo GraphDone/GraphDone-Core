@@ -14,9 +14,17 @@ test.describe('user smoke: the app works from a user point of view @smoke', () =
   test('login → graph renders nodes AND edges → no errors anywhere', async ({ page }) => {
     const pageErrors: string[] = [];
     const gqlErrors: string[] = [];
+    const serverErrors: string[] = [];
     page.on('pageerror', (e) => pageErrors.push(e.message));
     page.on('response', async (res) => {
-      if (!res.url().includes('graphql')) return;
+      // Any 5xx from our own origin is a server fault the user shouldn't hit —
+      // e.g. /mcp/status used to 503 on every page when MCP was offline (a
+      // NORMAL state), logging a console error site-wide.
+      const url = res.url();
+      if (res.status() >= 500 && (url.includes('localhost:4127') || url.includes('localhost:3127') || url.includes('/api/'))) {
+        serverErrors.push(`${res.status()} ${url.replace(/^https?:\/\/[^/]+/, '')}`);
+      }
+      if (!url.includes('graphql')) return;
       try {
         const body = await res.json();
         if (body?.errors?.length) {
@@ -77,6 +85,15 @@ test.describe('user smoke: the app works from a user point of view @smoke', () =
 
     // 5) No uncaught JS errors
     expect(pageErrors, `uncaught page errors: ${pageErrors[0] ?? ''}`).toEqual([]);
+
+    // 6) Visit the main routes and confirm none of them produce a 5xx from our
+    //    own origin (catches optional-subsystem endpoints returning 503 for a
+    //    normal "offline" state, which logs a console error site-wide).
+    for (const route of ['/settings', '/backend', '/ontology', '/']) {
+      await page.goto(route).catch(() => {});
+      await page.waitForTimeout(2500);
+    }
+    expect(serverErrors, `server 5xx responses during the session: ${serverErrors[0] ?? ''}`).toEqual([]);
   });
 
   test('grow flow stays healthy: + → empty space → connected named node @smoke', async ({ page }) => {
@@ -153,6 +170,63 @@ test.describe('user smoke: the app works from a user point of view @smoke', () =
         body: JSON.stringify({ query: `mutation($id: ID!) { deleteWorkItems(where: { id: $id }) { nodesDeleted } }`, variables: { id } })
       });
     }, name);
+  });
+
+  // A brand-new EMPTY graph (the very first thing a user sees after "Create
+  // Graph") must render its empty-state invitation, NOT crash or show error
+  // chrome. UI counterpart to the get_graph_context "empty graph reported as
+  // not found" bug — the empty case is a first-class state.
+  test('a brand-new empty graph shows the empty-state, not an error @smoke', async ({ page }) => {
+    const pageErrors: string[] = [];
+    page.on('pageerror', (e) => pageErrors.push(e.message));
+
+    await login(page, TEST_USERS.ADMIN);
+    await page.waitForTimeout(2000);
+
+    const graphId = await page.evaluate(async () => {
+      const token = localStorage.getItem('authToken') ?? '';
+      const post = (query: string, variables?: unknown) =>
+        fetch('/api/graphql', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ query, variables }),
+        }).then((r) => r.json());
+      const me = await post('{ me { id } }');
+      const userId = me.data.me.id;
+      const g = await post(
+        `mutation($input: [GraphCreateInput!]!) { createGraphs(input: $input) { graphs { id } } }`,
+        { input: [{ name: `Empty Smoke ${Date.now()}`, type: 'PROJECT', status: 'ACTIVE', createdBy: userId, isShared: true }] }
+      );
+      return g.data.createGraphs.graphs[0].id as string;
+    });
+    expect(graphId, 'empty graph created').toBeTruthy();
+
+    try {
+      await page.evaluate((gid) => localStorage.setItem('currentGraphId', gid), graphId);
+      await page.reload();
+      await page.waitForTimeout(6000);
+
+      await expect(
+        page.locator('text=/Create Your First Work Item|Transform Your Vision/i').first(),
+        'empty graph shows its create-first-item invitation'
+      ).toBeVisible({ timeout: 10000 });
+
+      const errorBadges = await page
+        .locator('.graph-container')
+        .locator('text=/^Error$|not found|failed to load|connection lost/i')
+        .count();
+      expect(errorBadges, 'no error chrome on an empty graph').toBe(0);
+      expect(pageErrors, `uncaught page errors on empty graph: ${pageErrors[0] ?? ''}`).toEqual([]);
+    } finally {
+      await page.evaluate(async (gid) => {
+        const token = localStorage.getItem('authToken') ?? '';
+        await fetch('/api/graphql', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ query: `mutation($id: ID!) { deleteGraphs(where: { id: $id }) { nodesDeleted } }`, variables: { id: gid } }),
+        });
+      }, graphId);
+    }
   });
 
   test('data integrity: no orphan edges in the database @smoke', async ({ page }) => {

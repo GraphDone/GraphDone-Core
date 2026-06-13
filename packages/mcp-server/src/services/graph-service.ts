@@ -15,7 +15,6 @@ import {
   Neo4jParams,
   Neo4jNode,
   Neo4jContributor,
-  Neo4jPathSegment,
   AnalysisResults,
   WorkloadData,
   CapacityAnalysis,
@@ -64,6 +63,7 @@ export interface CreateNodeArgs {
   status?: NodeStatus;
   contributor_ids?: string[];
   metadata?: NodeMetadata;
+  graph_id?: string;
 }
 
 export interface UpdateNodeArgs {
@@ -331,12 +331,12 @@ export class GraphService {
 
         case 'by_priority':
           const minPriority = filters.min_priority || 0;
-          countQuery = `MATCH (n:WorkItem) WHERE n.priorityComputed >= $min_priority RETURN count(n) as total`;
+          countQuery = `MATCH (n:WorkItem) WHERE n.priorityComp >= $min_priority RETURN count(n) as total`;
           query = `
             MATCH (n:WorkItem)
-            WHERE n.priorityComputed >= $min_priority
+            WHERE n.priorityComp >= $min_priority
             RETURN n
-            ORDER BY n.priorityComputed DESC
+            ORDER BY n.priorityComp DESC
             SKIP $offset
             LIMIT $limit
           `;
@@ -349,9 +349,9 @@ export class GraphService {
           }
           query = `
             MATCH (n:WorkItem {id: $node_id})
-            OPTIONAL MATCH (n)-[r1:DEPENDS_ON]->(dep:WorkItem)
-            OPTIONAL MATCH (dependent:WorkItem)-[r2:DEPENDS_ON]->(n)
-            RETURN n, 
+            OPTIONAL MATCH (n)<-[:EDGE_SOURCE]-(:Edge {type: 'DEPENDS_ON'})-[:EDGE_TARGET]->(dep:WorkItem)
+            OPTIONAL MATCH (dependent:WorkItem)<-[:EDGE_SOURCE]-(:Edge {type: 'DEPENDS_ON'})-[:EDGE_TARGET]->(n)
+            RETURN n,
                    COLLECT(DISTINCT dep) as dependencies,
                    COLLECT(DISTINCT dependent) as dependents
           `;
@@ -466,11 +466,17 @@ export class GraphService {
       // Generate truly unique ID to prevent race conditions
       const id = generateUniqueNodeId();
       const now = new Date().toISOString();
-      
+      const graphId = args.graph_id ? sanitizeNodeId(args.graph_id) : null;
+
       // Use write consistency to prevent read-after-write issues
       return await withWriteConsistency(id, 'CREATE', async () => {
 
+      // Attach the node to its graph via BELONGS_TO when a graph_id is given.
+      // Without this a node is orphaned — the web UI lists nodes per-graph
+      // (workItems where graph.id = currentGraph), so an unattached node an AI
+      // creates is invisible to humans.
       const query = `
+        ${graphId ? 'MATCH (g:Graph {id: $graphId})' : ''}
         CREATE (n:WorkItem {
           id: $id,
           title: $title,
@@ -479,19 +485,24 @@ export class GraphService {
           status: $status,
           createdAt: $now,
           updatedAt: $now,
-          priorityExecutive: 0,
-          priorityIndividual: 0,
-          priorityCommunity: 0,
-          priorityComputed: 0,
-          sphericalRadius: 1.0,
-          sphericalTheta: 0,
-          sphericalPhi: 0,
+          positionX: 0,
+          positionY: 0,
+          positionZ: 0,
+          radius: 1.0,
+          theta: 0,
+          phi: 0,
+          priority: 0,
+          priorityComp: 0,
+          priorityExec: 0,
+          priorityIndiv: 0,
+          priorityComm: 0,
           metadata: $metadata
         })
+        ${graphId ? 'MERGE (n)-[:BELONGS_TO]->(g)' : ''}
         RETURN n
       `;
 
-      const params = {
+      const params: Record<string, unknown> = {
         id,
         title,
         description,
@@ -500,8 +511,21 @@ export class GraphService {
         now,
         metadata: JSON.stringify(metadata)
       };
+      if (graphId) params.graphId = graphId;
 
       const result = await session.run(query, params);
+
+      // A graph_id that matches no graph yields zero rows (the MATCH fails) —
+      // surface that instead of silently creating nothing.
+      if (graphId && result.records.length === 0) {
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({ error: `Graph with id '${graphId}' not found`, graph_id: graphId }, null, 2)
+          }],
+          isError: true
+        };
+      }
       const rawNode = result.records[0].get('n').properties;
       
       // Parse metadata back from JSON string for data integrity
@@ -884,24 +908,31 @@ export class GraphService {
         };
       }
 
-      // Create the relationship
+      // Edges are first-class Edge NODES (e)-[:EDGE_SOURCE]->(source),
+      // (e)-[:EDGE_TARGET]->(target) — the SAME model the GraphQL server and
+      // web UI use. (Previously MCP created a direct (source)-[:TYPE]->(target)
+      // relationship, which the web never rendered, so AI-created edges were
+      // invisible to humans.) MERGE on the source/target/type triple keeps it
+      // idempotent like the old code.
       const createQuery = `
         MATCH (source:WorkItem {id: $source_id})
         MATCH (target:WorkItem {id: $target_id})
-        MERGE (source)-[r:${type} {
-          weight: $weight,
-          metadata: $metadata,
-          createdAt: $now
-        }]->(target)
+        MERGE (source)<-[:EDGE_SOURCE]-(r:Edge {type: $type})-[:EDGE_TARGET]->(target)
+        ON CREATE SET r.id = 'edge-' + randomUUID(),
+                      r.weight = $weight,
+                      r.metadata = $metadata,
+                      r.createdAt = datetime()
+        ON MATCH SET r.weight = $weight,
+                     r.metadata = $metadata
         RETURN r, source, target
       `;
 
       const params = {
         source_id,
         target_id,
+        type,
         weight,
-        metadata: JSON.stringify(metadata),
-        now: new Date().toISOString()
+        metadata: JSON.stringify(metadata)
       };
 
       const result = await session.run(createQuery, params);
@@ -931,13 +962,14 @@ export class GraphService {
       const { source_id, target_id, type } = args;
 
       const deleteQuery = `
-        MATCH (source:WorkItem {id: $source_id})-[r:${type}]->(target:WorkItem {id: $target_id})
-        DELETE r
+        MATCH (source:WorkItem {id: $source_id})<-[:EDGE_SOURCE]-(r:Edge {type: $type})-[:EDGE_TARGET]->(target:WorkItem {id: $target_id})
+        WITH r, source, target
+        DETACH DELETE r
         RETURN source, target
       `;
 
-      const result = await session.run(deleteQuery, { source_id, target_id });
-      
+      const result = await session.run(deleteQuery, { source_id, target_id, type });
+
       if (result.records.length === 0) {
         return {
           content: [{
@@ -988,20 +1020,25 @@ export class GraphService {
         RETURN n, COLLECT(DISTINCT c) as contributors
       `;
 
-      // Count relationships
+      // Count relationships — edges are Edge NODES joined via EDGE_SOURCE /
+      // EDGE_TARGET (the same model the web uses), not direct WorkItem rels.
       const relCountQuery = `
         MATCH (n:WorkItem {id: $node_id})
-        OPTIONAL MATCH (n)-[rel]-(related:WorkItem)
-        RETURN count(DISTINCT rel) as totalRelationships
+        OPTIONAL MATCH (n)<-[:EDGE_SOURCE|EDGE_TARGET]-(e:Edge)
+        RETURN count(DISTINCT e) as totalRelationships
       `;
 
       // Get relationships with pagination
       const relationshipsQuery = `
         MATCH (n:WorkItem {id: $node_id})
-        OPTIONAL MATCH (n)-[rel]-(related:WorkItem)
-        RETURN rel, related, 
-               CASE WHEN startNode(rel) = n THEN 'outgoing' ELSE 'incoming' END as direction
-        ORDER BY type(rel), related.title
+        OPTIONAL MATCH (n)<-[se:EDGE_SOURCE|EDGE_TARGET]-(e:Edge)
+        OPTIONAL MATCH (e)-[:EDGE_SOURCE]->(src:WorkItem)
+        OPTIONAL MATCH (e)-[:EDGE_TARGET]->(tgt:WorkItem)
+        WITH e,
+             CASE WHEN type(se) = 'EDGE_SOURCE' THEN 'outgoing' ELSE 'incoming' END as direction,
+             CASE WHEN type(se) = 'EDGE_SOURCE' THEN tgt ELSE src END as related
+        RETURN e as rel, related, direction
+        ORDER BY e.type, related.title
         SKIP $relationships_offset
         LIMIT $relationships_limit
       `;
@@ -1046,12 +1083,12 @@ export class GraphService {
       const relationships = relationshipsResult.records
         .filter(record => record.get('rel') !== null && record.get('related') !== null)
         .map(record => {
-          const rel = record.get('rel');
+          const rel = record.get('rel');           // an Edge NODE
           const related = record.get('related');
           const direction = record.get('direction');
 
           return {
-            type: rel.type,
+            type: rel.properties.type,
             direction,
             target_node: related.properties,
             relationship_properties: rel.properties
@@ -1106,15 +1143,22 @@ export class GraphService {
       const limitInt = typeof limit === 'number' ? Math.floor(limit) : parseInt(String(limit), 10) || 10;
       const offsetInt = typeof offset === 'number' ? Math.floor(offset) : parseInt(String(offset), 10) || 0;
 
-      // Count query to get total number of paths
+      // Edges are Edge NODES, so each logical hop between two WorkItems is two
+      // physical hops (WorkItem)<-[:EDGE_SOURCE]-(:Edge)-[:EDGE_TARGET]->(WorkItem).
+      // Traverse the EDGE_SOURCE/EDGE_TARGET structure (depth doubled) and
+      // project the path back to its WorkItem nodes and Edge nodes.
+      const physicalDepth = maxDepthInt * 2;
       const countQuery = `
-        MATCH path = allShortestPaths((start:WorkItem {id: $start_id})-[*1..${maxDepthInt}]-(end:WorkItem {id: $end_id}))
+        MATCH path = allShortestPaths((start:WorkItem {id: $start_id})-[:EDGE_SOURCE|EDGE_TARGET*1..${physicalDepth}]-(end:WorkItem {id: $end_id}))
         RETURN count(path) as total
       `;
 
       const query = `
-        MATCH path = allShortestPaths((start:WorkItem {id: $start_id})-[*1..${maxDepthInt}]-(end:WorkItem {id: $end_id}))
-        RETURN path, length(path) as pathLength
+        MATCH path = allShortestPaths((start:WorkItem {id: $start_id})-[:EDGE_SOURCE|EDGE_TARGET*1..${physicalDepth}]-(end:WorkItem {id: $end_id}))
+        WITH path,
+             [x IN nodes(path) WHERE x:WorkItem | x] as wnodes,
+             [x IN nodes(path) WHERE x:Edge | x] as wedges
+        RETURN wnodes, wedges, size(wedges) as pathLength
         ORDER BY pathLength ASC
         SKIP $offset
         LIMIT $limit
@@ -1148,20 +1192,12 @@ export class GraphService {
       }
 
       const paths = result.records.map(record => {
-        const path = record.get('path');
         const pathLength = record.get('pathLength')?.toNumber?.() || 0;
-        
-        const nodes = path.segments.map((segment: Neo4jPathSegment, index: number) => {
-          if (index === 0) {
-            return [segment.start.properties, segment.end.properties];
-          } else {
-            return segment.end.properties;
-          }
-        }).flat();
 
-        const relationships = path.segments.map((segment: Neo4jPathSegment) => ({
-          type: segment.relationship.type,
-          properties: segment.relationship.properties
+        const nodes = (record.get('wnodes') || []).map((n: Neo4jNode) => n.properties);
+        const relationships = (record.get('wedges') || []).map((e: Neo4jNode) => ({
+          type: e.properties.type,
+          properties: e.properties
         }));
 
         return { nodes, relationships, length: pathLength };
@@ -1192,16 +1228,23 @@ export class GraphService {
       const limit = Math.floor(Number(args.limit || args.max_cycles || 10));
       const offset = Math.floor(Number(args.offset || 0));
 
+      // DEPENDS_ON edges are Edge NODES, so a logical hop is
+      // (a)<-[:EDGE_SOURCE]-(:Edge)-[:EDGE_TARGET]->(b). Use a quantified path
+      // pattern (Neo4j 5) to find cycles of 2..10 logical hops, then keep only
+      // the WorkItem nodes for the result.
+      const cyclePattern = `(n:WorkItem) ((:WorkItem)<-[:EDGE_SOURCE]-(:Edge {type: 'DEPENDS_ON'})-[:EDGE_TARGET]->(:WorkItem)){2,10} (n)`;
+
       // Count query for total cycles
       const countQuery = `
-        MATCH path = (n:WorkItem)-[:DEPENDS_ON*2..10]->(n)
+        MATCH path = ${cyclePattern}
         RETURN count(path) as total
       `;
 
       // Main query with pagination using parameterized queries
       const query = `
-        MATCH path = (n:WorkItem)-[:DEPENDS_ON*2..10]->(n)
-        RETURN path, length(path) as cycleLength
+        MATCH path = ${cyclePattern}
+        WITH path, [x IN nodes(path) WHERE x:WorkItem | x] as cycleNodes
+        RETURN cycleNodes, size(cycleNodes) - 1 as cycleLength
         ORDER BY cycleLength ASC
         SKIP $offset
         LIMIT $limit
@@ -1217,17 +1260,8 @@ export class GraphService {
       });
       
       const cycles = result.records.map(record => {
-        const path = record.get('path');
         const cycleLength = record.get('cycleLength')?.toNumber?.() || 0;
-        
-        const nodes = path.segments.map((segment: Neo4jPathSegment, index: number) => {
-          if (index === 0) {
-            return [segment.start.properties, segment.end.properties];
-          } else {
-            return segment.end.properties;
-          }
-        }).flat();
-
+        const nodes = (record.get('cycleNodes') || []).map((n: Neo4jNode) => n.properties);
         return { nodes, length: cycleLength };
       });
 
@@ -1607,9 +1641,9 @@ export class GraphService {
             count(n) as total_nodes,
             collect(DISTINCT n.type) as node_types,
             collect(DISTINCT n.status) as statuses,
-            avg(size((n)-[:DEPENDS_ON]->())) as avg_dependencies,
-            max(size((n)-[:DEPENDS_ON]->())) as max_dependencies,
-            count(CASE WHEN size((n)-[:DEPENDS_ON]->()) = 0 THEN 1 END) as isolated_nodes
+            avg(COUNT { (n)<-[:EDGE_SOURCE]-(:Edge {type: 'DEPENDS_ON'})-[:EDGE_TARGET]->(:WorkItem) }) as avg_dependencies,
+            max(COUNT { (n)<-[:EDGE_SOURCE]-(:Edge {type: 'DEPENDS_ON'})-[:EDGE_TARGET]->(:WorkItem) }) as max_dependencies,
+            count(CASE WHEN COUNT { (n)<-[:EDGE_SOURCE]-(:Edge {type: 'DEPENDS_ON'})-[:EDGE_TARGET]->(:WorkItem) } = 0 THEN 1 END) as isolated_nodes
         `;
 
         try {
@@ -1675,7 +1709,7 @@ export class GraphService {
         const query = `
           MATCH (n:WorkItem)
           ${whereClause}
-          OPTIONAL MATCH (n)-[:DEPENDS_ON]->(dep:WorkItem)
+          OPTIONAL MATCH (n)<-[:EDGE_SOURCE]-(:Edge {type: 'DEPENDS_ON'})-[:EDGE_TARGET]->(dep:WorkItem)
           WITH n, collect(dep) as dependencies
           RETURN 
             count(n) as total_nodes,
@@ -1706,7 +1740,7 @@ export class GraphService {
         const query = `
           MATCH (n:WorkItem)
           ${whereClause}
-          OPTIONAL MATCH (n)<-[:DEPENDS_ON]-(dependent:WorkItem)
+          OPTIONAL MATCH (n)<-[:EDGE_TARGET]-(:Edge {type: 'DEPENDS_ON'})-[:EDGE_SOURCE]->(dependent:WorkItem)
           WITH n, count(dependent) as dependent_count
           WHERE dependent_count > 3
           RETURN 
@@ -1834,7 +1868,7 @@ export class GraphService {
       const bottleneckQuery = `
         MATCH (n:WorkItem)
         ${whereClause}
-        OPTIONAL MATCH (n)<-[:DEPENDS_ON]-(dependent:WorkItem)
+        OPTIONAL MATCH (n)<-[:EDGE_TARGET]-(:Edge {type: 'DEPENDS_ON'})-[:EDGE_SOURCE]->(dependent:WorkItem)
         WITH n, collect(dependent) as dependents, count(dependent) as dependent_count
         WHERE dependent_count > 0
         RETURN 
@@ -1853,7 +1887,7 @@ export class GraphService {
       const blockedChainQuery = `
         MATCH (blocked:WorkItem {status: 'BLOCKED'})
         ${whereClause ? whereClause.replace('n.teamId', 'blocked.teamId') : ''}
-        OPTIONAL MATCH (blocked)-[:DEPENDS_ON]->(blocker:WorkItem)
+        OPTIONAL MATCH (blocked)<-[:EDGE_SOURCE]-(:Edge {type: 'DEPENDS_ON'})-[:EDGE_TARGET]->(blocker:WorkItem)
         WHERE blocker.status IN ['PROPOSED', 'PLANNED', 'IN_PROGRESS']
         RETURN 
           blocked.id as blocked_id,
@@ -2168,13 +2202,17 @@ export class GraphService {
         status: $status,
         createdAt: $now,
         updatedAt: $now,
-        priorityExecutive: 0,
-        priorityIndividual: 0,
-        priorityCommunity: 0,
-        priorityComputed: 0,
-        sphericalRadius: 1.0,
-        sphericalTheta: 0,
-        sphericalPhi: 0,
+        positionX: 0,
+        positionY: 0,
+        positionZ: 0,
+        radius: 1.0,
+        theta: 0,
+        phi: 0,
+        priority: 0,
+        priorityComp: 0,
+        priorityExec: 0,
+        priorityIndiv: 0,
+        priorityComm: 0,
         metadata: $metadata
       })
       RETURN n.id as id
@@ -2227,17 +2265,20 @@ export class GraphService {
     const query = `
       MATCH (source:WorkItem {id: $source_id})
       MATCH (target:WorkItem {id: $target_id})
-      CREATE (source)-[r:${type} {
-        weight: $weight,
-        metadata: $metadata,
-        createdAt: datetime()
-      }]->(target)
+      MERGE (source)<-[:EDGE_SOURCE]-(r:Edge {type: $type})-[:EDGE_TARGET]->(target)
+      ON CREATE SET r.id = 'edge-' + randomUUID(),
+                    r.weight = $weight,
+                    r.metadata = $metadata,
+                    r.createdAt = datetime()
+      ON MATCH SET r.weight = $weight,
+                   r.metadata = $metadata
       RETURN r
     `;
 
     const result = await sessionOrTx.run(query, {
       source_id,
       target_id,
+      type,
       weight,
       metadata: JSON.stringify(metadata)
     });
@@ -2253,12 +2294,12 @@ export class GraphService {
     const { source_id, target_id, type } = params;
 
     const query = `
-      MATCH (source:WorkItem {id: $source_id})-[r:${type}]->(target:WorkItem {id: $target_id})
-      DELETE r
+      MATCH (source:WorkItem {id: $source_id})<-[:EDGE_SOURCE]-(r:Edge {type: $type})-[:EDGE_TARGET]->(target:WorkItem {id: $target_id})
+      DETACH DELETE r
       RETURN count(r) as deleted_count
     `;
 
-    const result = await sessionOrTx.run(query, { source_id, target_id });
+    const result = await sessionOrTx.run(query, { source_id, target_id, type });
     const deletedCount = result.records[0]?.get('deleted_count').toNumber() || 0;
 
     if (deletedCount === 0) {
@@ -2515,7 +2556,7 @@ export class GraphService {
       const query = `
         MATCH (c:Contributor {id: $contributorId})-[:CONTRIBUTES_TO]->(w:WorkItem)
         WHERE w.status IN $statusFilter
-        OPTIONAL MATCH (w)-[:DEPENDS_ON]->(dep:WorkItem)
+        OPTIONAL MATCH (w)<-[:EDGE_SOURCE]-(:Edge {type: 'DEPENDS_ON'})-[:EDGE_TARGET]->(dep:WorkItem)
         RETURN w,
                count(dep) as dependencyCount,
                collect(DISTINCT dep.title)[0..3] as sampleDependencies
@@ -3233,7 +3274,7 @@ export class GraphService {
       const query = `
         MATCH (g:Graph {id: $graphId})
         OPTIONAL MATCH (g)<-[:BELONGS_TO]-(w:WorkItem)
-        OPTIONAL MATCH (w)-[e:DEPENDS_ON|BLOCKS|RELATES_TO|CONTAINS|PART_OF]-(:WorkItem)
+        OPTIONAL MATCH (w)<-[:EDGE_SOURCE]-(e:Edge)
         RETURN g,
                count(DISTINCT w) as nodeCount,
                count(DISTINCT e) as edgeCount,
@@ -3289,24 +3330,21 @@ export class GraphService {
       const query = `
         MATCH (g:Graph {id: $graphId})
         OPTIONAL MATCH (g)<-[:BELONGS_TO]-(w:WorkItem)
-        OPTIONAL MATCH (w)-[e:DEPENDS_ON|BLOCKS|RELATES_TO|CONTAINS|PART_OF]-(:WorkItem)
+        // Edges are Edge NODES; count those whose source is in this graph.
+        OPTIONAL MATCH (w)<-[:EDGE_SOURCE]-(e:Edge)
         WITH g, collect(DISTINCT w) as items, count(DISTINCT e) as edgeCount
-        CALL {
-          WITH items
-          UNWIND items as i
-          RETURN i.type as type, count(i) as cnt
-        }
-        WITH g, items, edgeCount, collect({type: type, count: cnt}) as typeCounts
-        CALL {
-          WITH items
-          UNWIND items as i
-          RETURN i.status as status, count(i) as cnt
-        }
-        WITH g, items, edgeCount, typeCounts, collect({status: status, count: cnt}) as statusCounts
+        // Return the raw type/status lists and tally them in JS. A
+        // CALL { UNWIND items ... } subquery returns ZERO rows for an empty
+        // graph (UNWIND of an empty list), which dropped the whole result and
+        // made get_graph_context wrongly report a brand-new empty graph as
+        // "not found".
+        WITH g, items, edgeCount,
+             [x IN items | x.type] as types,
+             [x IN items | x.status] as statuses
         CALL {
           WITH g
-          OPTIONAL MATCH (g)<-[:BELONGS_TO]-(b:WorkItem)-[r:BLOCKS]->(:WorkItem)
-          WITH b, count(r) as blocksCount
+          OPTIONAL MATCH (g)<-[:BELONGS_TO]-(b:WorkItem)<-[:EDGE_SOURCE]-(e:Edge {type: 'BLOCKS'})-[:EDGE_TARGET]->(:WorkItem)
+          WITH b, count(e) as blocksCount
           WHERE b IS NOT NULL AND blocksCount > 0
           ORDER BY blocksCount DESC LIMIT 5
           RETURN collect({id: b.id, title: b.title, blocksCount: blocksCount}) as blockers
@@ -3318,7 +3356,7 @@ export class GraphService {
           ORDER BY rw.updatedAt DESC LIMIT 5
           RETURN collect({id: rw.id, title: rw.title, status: rw.status, type: rw.type, updatedAt: rw.updatedAt}) as recent
         }
-        RETURN g, size(items) as nodeCount, edgeCount, typeCounts, statusCounts, blockers, recent
+        RETURN g, size(items) as nodeCount, edgeCount, types, statuses, blockers, recent
       `;
 
       const result = await session.run(query, { graphId: args.graphId });
@@ -3334,8 +3372,8 @@ export class GraphService {
 
       const record = result.records[0];
       const g = record.get('g').properties;
-      const typeCounts = (record.get('typeCounts') || []) as Array<{ type: string; count: unknown }>;
-      const statusCounts = (record.get('statusCounts') || []) as Array<{ status: string; count: unknown }>;
+      const types = (record.get('types') || []) as Array<string | null>;
+      const statuses = (record.get('statuses') || []) as Array<string | null>;
       const blockers = (record.get('blockers') || []) as Array<{ id: string; title: string; blocksCount: unknown }>;
       const recent = (record.get('recent') || []) as Array<{
         id: string;
@@ -3346,12 +3384,12 @@ export class GraphService {
       }>;
 
       const byType: Record<string, number> = {};
-      for (const t of typeCounts) {
-        if (t.type) byType[t.type] = toNum(t.count);
+      for (const t of types) {
+        if (t) byType[t] = (byType[t] ?? 0) + 1;
       }
       const byStatus: Record<string, number> = {};
-      for (const s of statusCounts) {
-        if (s.status) byStatus[s.status] = toNum(s.count);
+      for (const s of statuses) {
+        if (s) byStatus[s] = (byStatus[s] ?? 0) + 1;
       }
 
       return {
@@ -3590,10 +3628,14 @@ export class GraphService {
         const newGraph = await tx.run(createGraphQuery, {
           newName: args.newName,
           description: `Cloned from: ${sourceGraph.name}`,
-          type: sourceGraph.type,
-          teamId: args.teamId || sourceGraph.teamId,
-          isShared: sourceGraph.isShared,
-          settings: sourceGraph.settings,
+          type: sourceGraph.type ?? 'PROJECT',
+          // Neo4j does not store null-valued properties, so a graph created
+          // without a teamId has NO teamId property — reading it back yields
+          // `undefined`, and the driver rejects an undefined param value with
+          // ParameterMissing. Coalesce to null so clone works for every graph.
+          teamId: args.teamId ?? sourceGraph.teamId ?? null,
+          isShared: sourceGraph.isShared ?? false,
+          settings: sourceGraph.settings ?? '{}',
           sourceGraphId: args.sourceGraphId
         });
 
@@ -3633,19 +3675,23 @@ export class GraphService {
 
           // Clone edges if requested
           if (args.includeEdges !== false && clonedNodes > 0) {
+            // Edges are Edge NODES — clone each source Edge node (with its
+            // real type) between the corresponding cloned WorkItems.
             const cloneEdgesQuery = `
               MATCH (newG:Graph {id: $newGraphId})<-[:BELONGS_TO]-(newW:WorkItem)
               MATCH (sourceG:Graph {id: $sourceGraphId})<-[:BELONGS_TO]-(sourceW:WorkItem)
               WHERE sourceW.id = newW.originalId
-              MATCH (sourceW)-[r:DEPENDS_ON|BLOCKS|RELATES_TO|CONTAINS|PART_OF]->(targetW:WorkItem)-[:BELONGS_TO]->(sourceG)
+              MATCH (sourceW)<-[:EDGE_SOURCE]-(e:Edge)-[:EDGE_TARGET]->(targetW:WorkItem)-[:BELONGS_TO]->(sourceG)
               MATCH (newG)<-[:BELONGS_TO]-(newTargetW:WorkItem)
               WHERE newTargetW.originalId = targetW.id
-              CREATE (newW)-[newR:DEPENDS_ON {
-                type: r.type,
-                weight: r.weight,
-                metadata: r.metadata
-              }]->(newTargetW)
-              RETURN count(newR) as edgeCount
+              CREATE (newW)<-[:EDGE_SOURCE]-(newE:Edge {
+                id: 'edge-' + randomUUID(),
+                type: e.type,
+                weight: e.weight,
+                metadata: e.metadata,
+                createdAt: datetime()
+              })-[:EDGE_TARGET]->(newTargetW)
+              RETURN count(newE) as edgeCount
             `;
 
             const edgesResult = await tx.run(cloneEdgesQuery, { 
