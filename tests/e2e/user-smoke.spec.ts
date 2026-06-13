@@ -171,4 +171,45 @@ test.describe('user smoke: the app works from a user point of view @smoke', () =
     expect((orphans as { queryBroken?: string }).queryBroken, 'edges query must not 500').toBeUndefined();
     expect((orphans as { count: number }).count, 'orphan edges corrupt the whole edges query').toBe(0);
   });
+
+  // Snapshot-authoritative layout: if a user arranges a node and reloads, it
+  // must come back where they left it (the force sim must not drift a placed
+  // node). Tolerance ≤25px. Regression guard for the position-persistence bug.
+  test('layout persistence: an arranged node survives a reload @smoke', async ({ page }) => {
+    await login(page, TEST_USERS.ADMIN);
+    await page.waitForTimeout(6000);
+
+    const nodeSel = '.graph-container svg .node';
+    test.skip((await page.locator(nodeSel).count()) === 0, 'no graph with nodes auto-selected');
+
+    const firstId = await page.evaluate((sel) => (document.querySelector(sel) as any)?.__data__?.id ?? null, nodeSel);
+    test.skip(!firstId, 'could not read a node id');
+
+    // Drag the node by a clear offset so it becomes "placed" and is saved
+    const box = await page.evaluate((id) => {
+      const n = [...document.querySelectorAll('.graph-container svg .node')].find((el: any) => el.__data__?.id === id) as any;
+      const r = (n.querySelector('.node-bg') as Element).getBoundingClientRect();
+      return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+    }, firstId);
+    await page.mouse.move(box.x, box.y);
+    await page.mouse.down();
+    for (let i = 1; i <= 10; i++) await page.mouse.move(box.x + i * 16, box.y + i * 9);
+    await page.mouse.up();
+    await page.waitForTimeout(4000); // settle + save
+
+    const readPos = (id: string) => page.evaluate((nid) => {
+      const n = [...document.querySelectorAll('.graph-container svg .node')].find((el: any) => el.__data__?.id === nid) as any;
+      return n ? { x: Math.round(n.__data__.x), y: Math.round(n.__data__.y) } : null;
+    }, id);
+    const before = await readPos(firstId);
+    expect(before, 'node position readable before reload').not.toBeNull();
+
+    await page.reload();
+    await page.waitForTimeout(9000);
+    const after = await readPos(firstId);
+    expect(after, 'node still present after reload').not.toBeNull();
+
+    const drift = Math.round(Math.hypot(before!.x - after!.x, before!.y - after!.y));
+    expect(drift, `arranged node drifted ${drift}px across reload (tolerance 25px)`).toBeLessThanOrEqual(25);
+  });
 });
