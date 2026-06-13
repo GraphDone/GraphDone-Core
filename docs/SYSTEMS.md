@@ -11,7 +11,10 @@
 | Gate | Command | What it proves |
 |------|---------|----------------|
 | **THE GATE** ✅ | `TEST_URL=http://localhost:3127 npm run test:smoke` | The app works from a user's view: login → nodes **and** edges render → no GraphQL errors reach the client → no uncaught JS → grow + undo work → no orphan edges in the DB. See `tests/e2e/user-smoke.spec.ts`. |
-| Unit suites | `npm run test` (turbo) or `npm run test --workspace=@graphdone/<pkg>` | core 41 · web 91 · server 23 · mcp-server ~4740 |
+| Unit suites | `npm run test` (turbo) or `npm run test --workspace=@graphdone/<pkg>` | core 41 · web 103 · server 23 · mcp-server ~4740 |
+| Living-graph effects | `TEST_URL=http://localhost:3127 npx playwright test tests/e2e/living-graph.spec.ts` | The differentiator actually renders: breathing, glow, energy-flow, blocked-ache, hover-illumination, reduced-motion suppression. Self-seeds a fixture; gated in the smoke job. |
+| Performance budgets (ADAPT-8) | `npm run perf:bundle` + `TEST_URL=… npm run test:perf` | Bundle gzip ≤ 450kB; graph settles to rest, avg tick ≤ 8ms, layout drift ≤ 25px, query p95 ≤ 800ms. Gated in CI. |
+| MCP real-Neo4j contract | `RUN_DB_CONTRACT=1 NEO4J_URI=… npx vitest --run tests/neo4j-contract.test.ts` (in packages/mcp-server) | MCP Cypher (node/edge lifecycle, browse) against a LIVE Neo4j — catches DB drift the mock hides. Gated in CI. |
 | Types | `npm run typecheck` | All packages compile |
 | Lint | `npm run lint` | 0 errors (warnings allowed) |
 | Build | `npm run build` | Production build succeeds |
