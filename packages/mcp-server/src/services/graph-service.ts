@@ -331,12 +331,12 @@ export class GraphService {
 
         case 'by_priority':
           const minPriority = filters.min_priority || 0;
-          countQuery = `MATCH (n:WorkItem) WHERE n.priorityComputed >= $min_priority RETURN count(n) as total`;
+          countQuery = `MATCH (n:WorkItem) WHERE n.priorityComp >= $min_priority RETURN count(n) as total`;
           query = `
             MATCH (n:WorkItem)
-            WHERE n.priorityComputed >= $min_priority
+            WHERE n.priorityComp >= $min_priority
             RETURN n
-            ORDER BY n.priorityComputed DESC
+            ORDER BY n.priorityComp DESC
             SKIP $offset
             LIMIT $limit
           `;
@@ -485,13 +485,17 @@ export class GraphService {
           status: $status,
           createdAt: $now,
           updatedAt: $now,
-          priorityExecutive: 0,
-          priorityIndividual: 0,
-          priorityCommunity: 0,
-          priorityComputed: 0,
-          sphericalRadius: 1.0,
-          sphericalTheta: 0,
-          sphericalPhi: 0,
+          positionX: 0,
+          positionY: 0,
+          positionZ: 0,
+          radius: 1.0,
+          theta: 0,
+          phi: 0,
+          priority: 0,
+          priorityComp: 0,
+          priorityExec: 0,
+          priorityIndiv: 0,
+          priorityComm: 0,
           metadata: $metadata
         })
         ${graphId ? 'MERGE (n)-[:BELONGS_TO]->(g)' : ''}
@@ -2198,13 +2202,17 @@ export class GraphService {
         status: $status,
         createdAt: $now,
         updatedAt: $now,
-        priorityExecutive: 0,
-        priorityIndividual: 0,
-        priorityCommunity: 0,
-        priorityComputed: 0,
-        sphericalRadius: 1.0,
-        sphericalTheta: 0,
-        sphericalPhi: 0,
+        positionX: 0,
+        positionY: 0,
+        positionZ: 0,
+        radius: 1.0,
+        theta: 0,
+        phi: 0,
+        priority: 0,
+        priorityComp: 0,
+        priorityExec: 0,
+        priorityIndiv: 0,
+        priorityComm: 0,
         metadata: $metadata
       })
       RETURN n.id as id

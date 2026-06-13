@@ -245,6 +245,20 @@ describe.skipIf(!RUN)('MCP GraphService — real Neo4j contract', () => {
         { gid: graphId, id }
       );
       expect(r.records[0].get('c').toNumber(), 'node is linked to its graph via BELONGS_TO').toBe(1);
+
+      // The node must carry the CANONICAL schema fields the web reads
+      // (positionX/Y/Z, radius, theta, phi, priority, priorityComp) — not the
+      // old MCP-only names (priorityComputed / sphericalRadius) the web ignores.
+      const fields = await session.run(
+        'MATCH (w:WorkItem {id: $id}) RETURN w.positionX AS px, w.radius AS radius, w.priority AS priority, w.priorityComp AS pc, w.priorityComputed AS legacy',
+        { id }
+      );
+      const rec = fields.records[0];
+      expect(rec.get('px'), 'positionX is set (web reads it)').not.toBeNull();
+      expect(rec.get('radius'), 'radius is set').not.toBeNull();
+      expect(rec.get('priority'), 'priority is set').not.toBeNull();
+      expect(rec.get('pc'), 'priorityComp is set (canonical)').not.toBeNull();
+      expect(rec.get('legacy'), 'no legacy priorityComputed property').toBeNull();
     } finally {
       await session.close();
     }
