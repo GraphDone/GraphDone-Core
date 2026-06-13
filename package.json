@@ -35,7 +35,9 @@
     "docker:dev": "docker compose -f deployment/docker-compose.dev.yml up",
     "docker:prod": "docker compose -f deployment/docker-compose.yml up",
     "test:smoke": "playwright test tests/e2e/user-smoke.spec.ts --reporter=line",
-    "report:showcase": "playwright test --project=showcase && node tests/generate-showcase-report.mjs"
+    "report:showcase": "playwright test --project=showcase && node tests/generate-showcase-report.mjs",
+    "test:perf": "playwright test --project=perf --reporter=line",
+    "perf:bundle": "node tests/perf/check-bundle-size.mjs"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",

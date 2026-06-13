@@ -58,6 +58,44 @@ jobs:
       - name: Run @graphdone/${{ matrix.package }} tests
         run: npm run test --workspace=@graphdone/${{ matrix.package }}
 
+  # ── MCP server against a REAL Neo4j (catches Cypher/DB drift) ──────────────
+  # The unit suites use a mock driver; this runs the MCP GraphService's own
+  # Cypher against a live Neo4j (node/edge lifecycle, browse). It already
+  # caught a real getNodeDetails crash the mock hid.
+  mcp-contract:
+    name: MCP Real-Neo4j Contract
+    runs-on: ubuntu-latest
+    services:
+      neo4j:
+        image: neo4j:5.26.12
+        env:
+          NEO4J_AUTH: neo4j/graphdone_password
+          NEO4J_PLUGINS: '["graph-data-science", "apoc"]'
+          NEO4J_dbms_security_procedures_unrestricted: "gds.*,apoc.*"
+          NEO4J_dbms_security_procedures_allowlist: "gds.*,apoc.*"
+        options: >-
+          --health-cmd "cypher-shell -u neo4j -p graphdone_password 'RETURN 1'"
+          --health-interval 10s --health-timeout 5s --health-retries 30
+        ports:
+          - 7474:7474
+          - 7687:7687
+    env:
+      RUN_DB_CONTRACT: '1'
+      NEO4J_URI: bolt://localhost:7687
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: graphdone_password
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+      - name: Run real-Neo4j contract test
+        run: npx vitest --run tests/neo4j-contract.test.ts
+        working-directory: packages/mcp-server
+
   # ── Production build must actually build ────────────────────────────────────
   build:
     name: Build
@@ -72,6 +110,8 @@ jobs:
         run: npm install --legacy-peer-deps
       - name: Build all packages
         run: npm run build
+      - name: Bundle size budget (ADAPT-8)
+        run: npm run perf:bundle
 
   # ── Security scan (advisory) ───────────────────────────────────────────────
   security-scan:
@@ -140,6 +180,16 @@ jobs:
         run: npm run db:seed
       - name: THE GATE — user smoke suite
         run: npm run test:smoke
+        env:
+          TEST_URL: http://localhost:3127
+          CI: true
+      - name: Living-graph effects render (LIVE-*)
+        run: npx playwright test tests/e2e/living-graph.spec.ts --project="GraphDone-Core/dev-neo4j/chromium" --reporter=line
+        env:
+          TEST_URL: http://localhost:3127
+          CI: true
+      - name: Performance budgets (ADAPT-8)
+        run: npm run test:perf
         env:
           TEST_URL: http://localhost:3127
           CI: true
@@ -269,7 +319,7 @@ jobs:
   ci-success:
     name: CI Success
     runs-on: ubuntu-latest
-    needs: [quality, unit-tests, build, smoke-gate]
+    needs: [quality, unit-tests, mcp-contract, build, smoke-gate]
     if: always()
     steps:
       - name: Verify required jobs passed
@@ -280,6 +330,7 @@ jobs:
           echo "Smoke gate: ${{ needs.smoke-gate.result }}"
           if [[ "${{ needs.quality.result }}" == "success" \
              && "${{ needs.unit-tests.result }}" == "success" \
+             && "${{ needs.mcp-contract.result }}" == "success" \
              && "${{ needs.build.result }}" == "success" \
              && "${{ needs.smoke-gate.result }}" == "success" ]]; then
             echo "✅ CI green — lint, types, every unit suite, the build, and the user smoke gate all passed."

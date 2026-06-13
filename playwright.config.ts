@@ -58,6 +58,16 @@ export default defineConfig({
       },
     },
 
+    /* Performance budgets (ADAPT-8). Lives in tests/perf, run via
+     * `npm run test:perf`. Reads window.__graphPerf / API latency and asserts
+     * budgets. Kept separate from the smoke gate so it can have its own
+     * thresholds and run cadence. */
+    {
+      name: 'perf',
+      testDir: './tests/perf',
+      use: { ...devices['Desktop Chrome'] },
+    },
+
     // Commented out until browsers installed with system dependencies
     // {
     //   name: 'GraphDone-Core/dev-neo4j/firefox',
