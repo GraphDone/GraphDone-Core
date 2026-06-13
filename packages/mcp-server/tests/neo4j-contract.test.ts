@@ -170,11 +170,57 @@ describe.skipIf(!RUN)('MCP GraphService — real Neo4j contract', () => {
     const s2 = driver.session();
     try {
       const r = await s2.run(
-        'MATCH (g:Graph {id: $gid})<-[:BELONGS_TO]-(:WorkItem)-[rel]->(:WorkItem) RETURN type(rel) AS t ORDER BY t',
+        'MATCH (g:Graph {id: $gid})<-[:BELONGS_TO]-(:WorkItem)<-[:EDGE_SOURCE]-(e:Edge)-[:EDGE_TARGET]->(:WorkItem) RETURN e.type AS t ORDER BY t',
         { gid: dstId }
       );
       const types = r.records.map((rec) => rec.get('t')).sort();
       expect(types, 'cloned relationship types are preserved').toEqual(['BLOCKS', 'RELATES_TO']);
+    } finally {
+      await s2.close();
+    }
+  });
+
+  it('createEdge is human-visible: produces an Edge NODE (EDGE_SOURCE/EDGE_TARGET), not a direct rel', async () => {
+    // The whole point of the unify: an edge an AI creates via MCP must be the
+    // SAME representation the GraphQL server/web render — an Edge node — so it
+    // shows up for humans. Previously MCP wrote a direct (a)-[:TYPE]->(b) rel
+    // that the web's `edges` query (which returns Edge nodes) never saw.
+    const a = parse(await svc.createNode({ title: `Edge Vis A ${Date.now()}`, type: 'TASK' } as any)).node.id;
+    const b = parse(await svc.createNode({ title: `Edge Vis B ${Date.now()}`, type: 'TASK' } as any)).node.id;
+    createdNodes.push(a, b);
+
+    await svc.createEdge({ source_id: a, target_id: b, type: 'BLOCKS' } as any);
+
+    const session = driver.session();
+    try {
+      // The Edge node exists exactly as the web GraphQL `edges` query expects
+      const edgeNode = await session.run(
+        'MATCH (e:Edge)-[:EDGE_SOURCE]->(s:WorkItem {id: $a}) MATCH (e)-[:EDGE_TARGET]->(t:WorkItem {id: $b}) RETURN e.type AS type, e.id AS id',
+        { a, b }
+      );
+      expect(edgeNode.records.length, 'an Edge NODE is created (web-visible)').toBe(1);
+      expect(edgeNode.records[0].get('type'), 'edge keeps its type').toBe('BLOCKS');
+      expect(edgeNode.records[0].get('id'), 'edge has an id like server-created edges').toBeTruthy();
+
+      // And NOT a stray direct relationship (the old, web-invisible form)
+      const directRel = await session.run(
+        'MATCH (:WorkItem {id: $a})-[r:BLOCKS]->(:WorkItem {id: $b}) RETURN count(r) AS c',
+        { a, b }
+      );
+      expect(directRel.records[0].get('c').toNumber(), 'no legacy direct relationship').toBe(0);
+    } finally {
+      await session.close();
+    }
+
+    // deleteEdge removes the Edge node cleanly (no orphan Edge left behind)
+    await svc.deleteEdge({ source_id: a, target_id: b, type: 'BLOCKS' } as any);
+    const s2 = driver.session();
+    try {
+      const after = await s2.run(
+        'MATCH (e:Edge)-[:EDGE_SOURCE]->(:WorkItem {id: $a}) RETURN count(e) AS c',
+        { a }
+      );
+      expect(after.records[0].get('c').toNumber(), 'edge node removed on delete').toBe(0);
     } finally {
       await s2.close();
     }
