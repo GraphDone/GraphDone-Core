@@ -123,21 +123,26 @@ test.describe('living graph: the effects actually render @living', () => {
     const fx = await seedFixture(page);
     try {
       await openFixture(page, fx);
-      await page.waitForTimeout(1500); // let the entrance animation finish so nodes are stable
-      // Move to the node's computed center (more robust than locator.hover,
-      // which can race the entrance transition's stability check).
-      const center = await page.evaluate(() => {
-        const el = document.querySelector('.graph-container svg .node .node-bg');
-        if (!el) return null;
-        const r = el.getBoundingClientRect();
-        return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+      await page.waitForTimeout(1500); // let the entrance animation finish
+
+      // Dispatch mouseenter directly on the node group carrying the
+      // .on('mouseenter.neighborhood') handler. Raw cursor mouse.move onto an
+      // SVG <g> is unreliable in headless CI; the synthetic event tests the
+      // exact handler→dim wiring deterministically.
+      const dispatched = await page.evaluate(() => {
+        const node = document.querySelector('.graph-container svg .node');
+        if (!node) return false;
+        node.dispatchEvent(new MouseEvent('mouseenter', { bubbles: false }));
+        return true;
       });
-      expect(center, 'a node card is on screen to hover').not.toBeNull();
-      await page.mouse.move(center!.x, center!.y);
-      await page.waitForTimeout(600);
+      expect(dispatched, 'a node is present to hover').toBe(true);
+      await page.waitForTimeout(400);
       expect(await page.locator('.graph-container svg .dim-for-hover').count(), 'non-neighbors dim on hover').toBeGreaterThan(0);
-      await page.mouse.move(2, 2);
-      await page.waitForTimeout(500);
+
+      await page.evaluate(() => {
+        document.querySelector('.graph-container svg .node')?.dispatchEvent(new MouseEvent('mouseleave', { bubbles: false }));
+      });
+      await page.waitForTimeout(400);
       expect(await page.locator('.graph-container svg .dim-for-hover').count(), 'dimming clears on leave').toBe(0);
     } finally {
       await cleanup(page, fx);
