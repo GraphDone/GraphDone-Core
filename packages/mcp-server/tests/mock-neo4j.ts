@@ -301,8 +301,20 @@ export function createMockDriver(): Driver {
         };
       }
       
+      // Handle getNodeDetails relationships query — edges are Edge NODES, so
+      // 'rel' is an Edge node (with .properties.type), 'related' a WorkItem.
+      if (query.includes('e as rel') && query.includes('EDGE_SOURCE|EDGE_TARGET')) {
+        return {
+          records: [createMockRecord({
+            rel: { properties: { id: 'edge-1', type: 'DEPENDS_ON', weight: 1, metadata: '{}' } },
+            related: { properties: { id: 'related-1', title: 'Related Node', type: 'TASK', status: 'ACTIVE' } },
+            direction: 'outgoing'
+          })]
+        };
+      }
+
       // Handle clone operations - return 0 for nodeCount/edgeCount
-      if (query.includes('count(newW)') || query.includes('count(newR)')) {
+      if (query.includes('count(newW)') || query.includes('count(newR)') || query.includes('count(newE)')) {
         return {
           records: [createMockRecord({
             nodeCount: { toNumber: () => 0 },
@@ -322,7 +334,7 @@ export function createMockDriver(): Driver {
     beginTransaction: () => ({
       run: async (query: string, params?: any) => {
         // Handle clone operations within transaction
-        if (query.includes('count(newW)') || query.includes('count(newR)')) {
+        if (query.includes('count(newW)') || query.includes('count(newR)') || query.includes('count(newE)')) {
           return {
             records: [createMockRecord({
               nodeCount: { toNumber: () => 0 },
