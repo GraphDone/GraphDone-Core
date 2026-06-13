@@ -61,17 +61,17 @@ VITE_ENABLE_3D_VIEW=true
 
 1. **Build and start services:**
    ```bash
-   docker-compose up -d
+   docker compose up -d
    ```
 
 2. **Scale services:**
    ```bash
-   docker-compose up -d --scale server=3
+   docker compose up -d --scale server=3
    ```
 
 3. **View logs:**
    ```bash
-   docker-compose logs -f server
+   docker compose logs -f server
    ```
 
 ### Custom Configuration
@@ -427,13 +427,13 @@ MATCH (n) RETURN count(n);  // Test query
 #### Docker Issues
 ```bash
 # View logs
-docker-compose logs server
+docker compose logs server
 
 # Restart service
-docker-compose restart server
+docker compose restart server
 
 # Rebuild images
-docker-compose build --no-cache
+docker compose build --no-cache
 ```
 
 ## Support

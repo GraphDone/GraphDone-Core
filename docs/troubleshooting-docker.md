@@ -165,7 +165,7 @@ docker logs graphdone-api
 docker logs graphdone-web
 
 # View Docker Compose logs
-docker-compose -f deployment/docker-compose.yml logs
+docker compose -f deployment/docker-compose.yml logs
 ```
 
 ## Complete Reset

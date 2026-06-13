@@ -12,6 +12,7 @@ Welcome to the GraphDone documentation! This directory contains comprehensive gu
 
 ### 🌊 Living Graph Era (start here for current development)
 - [User Stories — the backlog that drives development](./USER_STORIES.md) - **Every feature starts here; every story maps to tests**
+- [Systems Reference](./SYSTEMS.md) - **What's shipped and where it lives** — every subsystem mapped to its code, tests, and story
 - [Interaction Model — the friction-free contract](./design/interaction-model.md) - UX constitution: modes, exits, click budgets
 - [Progressive Streaming design](./design/progressive-streaming.md) - ADAPT-4: scale to huge graphs on slow links
 - [Testing & Refinement Plan](./TESTING_AND_REFINEMENT_PLAN.md) - The never-done loop; current cycle's verification debt
@@ -76,7 +77,7 @@ Welcome to the GraphDone documentation! This directory contains comprehensive gu
 
 ## 🔗 Quick Links
 
-- [Project Philosophy](../philosophy.md)
+- [Project Philosophy](./philosophy.md)
 - [API Documentation](./api/graphql.md)
 - [Deployment Guide](./deployment/README.md)
 

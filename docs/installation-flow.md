@@ -189,7 +189,7 @@ flowchart TD
     TryRegistry -->|Fail| CheckLocal{Check Local Build}
     
     CheckLocal -->|npm exists| LocalMode[Build from Source<br/>npm run build]
-    CheckLocal -->|No npm| DockerMode[Use Docker Compose<br/>docker-compose up]
+    CheckLocal -->|No npm| DockerMode[Use Docker Compose<br/>docker compose up]
     
     RegistryMode --> ConfigureSSL
     LocalMode --> ConfigureSSL
