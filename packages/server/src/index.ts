@@ -569,14 +569,20 @@ async function startServer() {
           ...mcpStatus
         });
       } else {
-        res.status(503).json({
+        // MCP being offline is a NORMAL, expected state (the MCP server is an
+        // optional subsystem). Report it with 200 + connected:false so the
+        // browser doesn't log a failed-resource error on every page that polls
+        // this; the client already treats connected:false as "offline".
+        res.json({
           connected: false,
+          status: 'offline',
           error: 'MCP server returned an error'
         });
       }
     } catch (error) {
-      res.status(503).json({
+      res.json({
         connected: false,
+        status: 'offline',
         error: error instanceof Error ? error.message : 'Connection failed'
       });
     }
