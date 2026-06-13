@@ -172,7 +172,7 @@ Logs are automatically saved to:
 
 ### Manual Installation
 
-If the automated installer fails, see [Manual Installation Guide](./manual-installation.md)
+If the automated installer fails, see [Getting Started — Manual Setup](./guides/getting-started.md)
 
 ## Hosting the Installation Script
 

@@ -556,7 +556,7 @@ For containerized development:
 ./tools/run.sh --docker
 
 # Individual service testing
-docker-compose up -d postgres  # Database only
+docker compose up -d postgres  # Database only
 ```
 
 ### Development Tools Integration
@@ -732,7 +732,7 @@ git push origin feature/your-improvement
 ### Self-Hosted
 ```bash
 # Using Docker Compose
-docker-compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml up -d
 
 # Using Kubernetes
 kubectl apply -f tools/deployment/k8s/

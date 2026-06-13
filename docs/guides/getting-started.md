@@ -47,7 +47,7 @@ cp packages/server/.env.example packages/server/.env
 cp packages/web/.env.example packages/web/.env
 
 # Start database (handled automatically by ./start)
-cd deployment && docker-compose up -d neo4j
+cd deployment && docker compose up -d neo4j
 
 # Database seeding handled automatically by the application
 
@@ -142,7 +142,7 @@ Ensure Neo4j is running:
 ./start
 
 # OR manually start database
-cd deployment && docker-compose up -d neo4j
+cd deployment && docker compose up -d neo4j
 ```
 
 ### Port Already in Use

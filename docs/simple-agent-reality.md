@@ -520,23 +520,23 @@ export default new SmartOllamaClient();
 ### Model Management
 ```bash
 # Option A: Traditional Ollama server management
-docker-compose exec ollama ollama pull qwen2.5:1.5b
-docker-compose exec ollama ollama pull qwen2.5:7b
-docker-compose exec ollama ollama list
-docker-compose exec ollama ollama rm qwen2.5:7b
+docker compose exec ollama ollama pull qwen2.5:1.5b
+docker compose exec ollama ollama pull qwen2.5:7b
+docker compose exec ollama ollama list
+docker compose exec ollama ollama rm qwen2.5:7b
 
 # Option B: Direct model containers (NEW approach)
 # No model management needed - models are pre-built into containers
-docker-compose up qwen-chat qwen-function-calling
+docker compose up qwen-chat qwen-function-calling
 
 # Check model container status
-docker-compose ps | grep qwen
+docker compose ps | grep qwen
 docker logs graphdone-qwen-chat    # See model server logs
 docker logs graphdone-qwen-functions
 
 # Update to newer model versions
-docker-compose pull qwen-chat      # Pull updated model image
-docker-compose up -d qwen-chat     # Restart with new version
+docker compose pull qwen-chat      # Pull updated model image
+docker compose up -d qwen-chat     # Restart with new version
 
 # Resource monitoring
 docker stats graphdone-qwen-chat graphdone-qwen-functions
@@ -560,7 +560,7 @@ docker stats graphdone-qwen-chat graphdone-qwen-functions
 ✅ **Network isolation**: AI model never touches the internet  
 ✅ **Data privacy**: All conversations stay on your Docker network  
 ✅ **Resource limits**: Docker can limit CPU/memory usage  
-✅ **Easy cleanup**: `docker-compose down` removes everything  
+✅ **Easy cleanup**: `docker compose down` removes everything  
 ✅ **Version control**: Lock Ollama version in docker-compose.yml
 
 ## MVP Development Approach

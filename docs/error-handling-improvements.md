@@ -95,7 +95,7 @@ Issue resolved ✅
 Tested with actual ContainerConfig error:
 ```bash
 # Error occurred naturally during development
-docker-compose up --build
+docker compose up --build
 # ERROR: 'ContainerConfig'
 
 # Error handler provided clear guidance
