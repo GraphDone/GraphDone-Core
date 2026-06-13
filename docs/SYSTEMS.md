@@ -15,6 +15,7 @@
 | Types | `npm run typecheck` | All packages compile |
 | Lint | `npm run lint` | 0 errors (warnings allowed) |
 | Build | `npm run build` | Production build succeeds |
+| Showcase report | `TEST_URL=http://localhost:3127 npm run report:showcase` | Records .webm video + screenshots of every mode at all 5 resolutions → `test-artifacts/showcase/index.html` (also an every-PR CI artifact). |
 
 **Why THE GATE exists:** a real incident — orphaned `Edge` records made the
 edges query 500 and the UI showed "Error" with zero edges, while every unit
