@@ -14,9 +14,17 @@ test.describe('user smoke: the app works from a user point of view @smoke', () =
   test('login → graph renders nodes AND edges → no errors anywhere', async ({ page }) => {
     const pageErrors: string[] = [];
     const gqlErrors: string[] = [];
+    const serverErrors: string[] = [];
     page.on('pageerror', (e) => pageErrors.push(e.message));
     page.on('response', async (res) => {
-      if (!res.url().includes('graphql')) return;
+      // Any 5xx from our own origin is a server fault the user shouldn't hit —
+      // e.g. /mcp/status used to 503 on every page when MCP was offline (a
+      // NORMAL state), logging a console error site-wide.
+      const url = res.url();
+      if (res.status() >= 500 && (url.includes('localhost:4127') || url.includes('localhost:3127') || url.includes('/api/'))) {
+        serverErrors.push(`${res.status()} ${url.replace(/^https?:\/\/[^/]+/, '')}`);
+      }
+      if (!url.includes('graphql')) return;
       try {
         const body = await res.json();
         if (body?.errors?.length) {
@@ -77,6 +85,15 @@ test.describe('user smoke: the app works from a user point of view @smoke', () =
 
     // 5) No uncaught JS errors
     expect(pageErrors, `uncaught page errors: ${pageErrors[0] ?? ''}`).toEqual([]);
+
+    // 6) Visit the main routes and confirm none of them produce a 5xx from our
+    //    own origin (catches optional-subsystem endpoints returning 503 for a
+    //    normal "offline" state, which logs a console error site-wide).
+    for (const route of ['/settings', '/backend', '/ontology', '/']) {
+      await page.goto(route).catch(() => {});
+      await page.waitForTimeout(2500);
+    }
+    expect(serverErrors, `server 5xx responses during the session: ${serverErrors[0] ?? ''}`).toEqual([]);
   });
 
   test('grow flow stays healthy: + → empty space → connected named node @smoke', async ({ page }) => {
