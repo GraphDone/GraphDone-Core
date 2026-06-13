@@ -44,7 +44,8 @@ import { useAdaptiveQuality } from '../hooks/useAdaptiveQuality';
 import { nodeLifeClasses, nodeGlowFilter, isActiveStatus, isCompletedStatus, edgeFlowClass } from '../lib/nodeAnimations';
 import { mergeSimulationNodes, mergeSimulationEdges } from '../lib/graphDataMerge';
 import { edgeLabelPlacement, clearSegment, slideTFromPointer, chooseLabelT } from '../lib/edgeLabelLayout';
-import { PerfMeter } from '../lib/perfMeter';
+import { PerfMeter, DriftMeter } from '../lib/perfMeter';
+import { DEFAULT_PHYSICS, collisionRadius, linkDistance, linkMaxDistance, linkStrength } from '../lib/physicsConfig';
 import { spawnCelebration } from '../lib/celebration';
 import { buildNeighborhood } from '../lib/graphAdjacency';
 import { UndoStack } from '../lib/undoStack';
@@ -1964,78 +1965,45 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       simulation.alpha(0).stop();
     }
     
+    // All force parameters come from the single source of truth in
+    // physicsConfig.ts — see that file (and the debug console's drift metrics)
+    // to reason about / tune why nodes settle and drift the way they do.
+    const phys = DEFAULT_PHYSICS;
     simulation
       .force('link', d3.forceLink(validatedEdges)
         .id((d: any) => d.id)
         .distance((d: any) => {
-          const minDistance = Math.min(width, height) * 0.4; // 40% of screen size for minimum
-          const maxDistance = Math.min(width, height) * 0.6; // 60% of screen size for maximum
-          
-          // Calculate current distance between nodes
-          const sourceNode = d.source;
-          const targetNode = d.target;
-          const currentDistance = Math.sqrt(
-            Math.pow(targetNode.x - sourceNode.x, 2) + 
-            Math.pow(targetNode.y - sourceNode.y, 2)
-          );
-          
-          // If current distance exceeds maximum, return maximum to create pulling force
-          if (currentDistance > maxDistance) {
-            return maxDistance;
-          }
-          
-          // Otherwise use minimum as preferred distance
-          return minDistance;
+          const currentDistance = Math.hypot(d.target.x - d.source.x, d.target.y - d.source.y);
+          const maxDistance = linkMaxDistance(width, height, phys);
+          return currentDistance > maxDistance ? maxDistance : linkDistance(width, height, phys);
         })
         .strength((d: any) => {
-          // Calculate current distance between nodes
-          const sourceNode = d.source;
-          const targetNode = d.target;
-          const currentDistance = Math.sqrt(
-            Math.pow(targetNode.x - sourceNode.x, 2) + 
-            Math.pow(targetNode.y - sourceNode.y, 2)
-          );
-          
-          const maxDistance = Math.min(width, height) * 0.6;
-          
-          // Firmer pull only when an edge is stretched far too long
-          if (currentDistance > maxDistance) {
-            return 0.5;
-          }
-
-          // Soft springs otherwise — calm, high-friction feel
-          return 0.2;
+          const currentDistance = Math.hypot(d.target.x - d.source.x, d.target.y - d.source.y);
+          return linkStrength(currentDistance, linkMaxDistance(width, height, phys), phys);
         })
       )
       .force('charge', d3.forceManyBody()
-        .strength(-60) // Gentle repulsion; collision force owns overlap prevention
-        .distanceMax(200) // Reasonable influence range
+        .strength(phys.charge.strength)
+        .distanceMax(phys.charge.distanceMax)
       )
-      .force('center', d3.forceCenter(centerX, centerY).strength(0.01)) // Minimal centering
-      .force('x', d3.forceX(centerX).strength(0.002)) // Extremely weak horizontal centering for maximum width
-      .force('y', d3.forceY(centerY).strength(0.002)) // Extremely weak vertical centering for maximum height
+      .force('center', d3.forceCenter(centerX, centerY).strength(phys.centering.center))
+      .force('x', d3.forceX(centerX).strength(phys.centering.axis))
+      .force('y', d3.forceY(centerY).strength(phys.centering.axis))
       .force('collision', d3.forceCollide()
-        // Radius from the node's actual card geometry: half the diagonal plus
-        // breathing room. A fixed radius smaller than the card guarantees
-        // card-on-card overlap, which also traps edge labels with nowhere
-        // clean to go.
-        .radius((d: any) => {
-          const dims = getNodeDimensions(d);
-          return Math.hypot(dims.width, dims.height) / 2 + 12;
-        })
-        .strength(0.85)
-        .iterations(2)
+        // Radius from the node's actual card geometry (half diagonal + padding).
+        .radius((d: any) => collisionRadius(getNodeDimensions(d), phys))
+        .strength(phys.collision.strength)
+        .iterations(phys.collision.iterations)
       )
-      // Add hierarchical attraction forces (Epic->Milestone, Feature->Task, etc.)
       .force('hierarchy', d3.forceLink()
         .id((d: any) => d.id)
         .links(createHierarchicalLinks(nodes))
-        .distance((d: any) => d.distance || 250) // Much larger hierarchical distance
-        .strength((d: any) => d.strength || 0.05) // Very weak hierarchical strength
+        .distance((d: any) => d.distance || phys.hierarchy.distance)
+        .strength((d: any) => d.strength || phys.hierarchy.strength)
       )
-      .alphaTarget(0) // LIVE-6: physics must REST — perpetual alphaTarget kept nodes drifting forever (unstable hover targets, idle frame burn). CSS owns the idle life now.
-      .alphaDecay(0.015) // Slightly slower decay for better collision resolution
-      .velocityDecay(0.65); // High friction: nodes glide briefly and settle — no bouncing (user feedback: physics too aggressive)
+      .alphaTarget(phys.alpha.restTarget) // LIVE-6: physics rests when settled
+      .alphaDecay(phys.alpha.decay)
+      .velocityDecay(phys.alpha.velocityDecay);
 
     // Filter edges based on visible nodes for performance
     // Temporarily show ALL edges for debugging
@@ -3493,6 +3461,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     // never lag a frame behind. Every tick is measured (PerfMeter → debug
     // console + window.__graphPerf) so dynamics work stays evidence-based.
     const perfMeter = new PerfMeter(240);
+    const driftMeter = new DriftMeter();
     let lastPerfReport = 0;
     simulation.on('tick', () => {
       const tickStart = performance.now();
@@ -3552,17 +3521,24 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       perfMeter.frame(now);
       if (now - lastPerfReport > 2000) {
         lastPerfReport = now;
+        // Drift = node movement, the actual "slip and drift" signal that
+        // frame stats can't show. rmsFromSavedPx near 0 means the layout
+        // matches what's saved (snapshot fidelity).
+        const spatial = driftMeter.sample(simulation.nodes() as any[]);
         const stats = {
           ...perfMeter.summary(),
           alpha: Math.round(simulation.alpha() * 1000) / 1000,
           nodes: nodes.length,
           edges: validatedEdges.length,
-          quality: qualityProfileRef.current.tier
+          quality: qualityProfileRef.current.tier,
+          spatial
         };
         (window as any).__graphPerf = stats;
         if ((window as any).debugLog) {
           const level = stats.avgTickMs > 8 || stats.fps < 30 ? '⚠️' : '✅';
           (window as any).debugLog('Perf', `${level} fps=${stats.fps} tick avg=${stats.avgTickMs}ms p95=${stats.p95TickMs}ms dropped=${stats.droppedFrames} alpha=${stats.alpha}`, stats);
+          const driftLevel = spatial.rmsFromSavedPx > 25 ? '⚠️' : '✅';
+          (window as any).debugLog('Drift', `${driftLevel} moving=${spatial.movingNodes} maxStep=${spatial.maxStepPx}px meanStep=${spatial.meanStepPx}px rmsFromSaved=${spatial.rmsFromSavedPx}px`, spatial);
         }
       }
     });
@@ -3623,7 +3599,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     // graph loads pinned and stays put (snapshot-authoritative).
     const hasUnpinnedNodes = (simulation.nodes() as any[]).some((n: any) => n.fx == null || n.fy == null);
     simulation
-      .alpha(hasUnpinnedNodes ? 0.6 : 0)
+      .alpha(hasUnpinnedNodes ? DEFAULT_PHYSICS.alpha.loadEnergy : 0)
       .alphaDecay(0.015)
       .restart();
 
