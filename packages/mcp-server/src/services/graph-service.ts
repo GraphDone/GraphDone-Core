@@ -3586,10 +3586,14 @@ export class GraphService {
         const newGraph = await tx.run(createGraphQuery, {
           newName: args.newName,
           description: `Cloned from: ${sourceGraph.name}`,
-          type: sourceGraph.type,
-          teamId: args.teamId || sourceGraph.teamId,
-          isShared: sourceGraph.isShared,
-          settings: sourceGraph.settings,
+          type: sourceGraph.type ?? 'PROJECT',
+          // Neo4j does not store null-valued properties, so a graph created
+          // without a teamId has NO teamId property — reading it back yields
+          // `undefined`, and the driver rejects an undefined param value with
+          // ParameterMissing. Coalesce to null so clone works for every graph.
+          teamId: args.teamId ?? sourceGraph.teamId ?? null,
+          isShared: sourceGraph.isShared ?? false,
+          settings: sourceGraph.settings ?? '{}',
           sourceGraphId: args.sourceGraphId
         });
 
@@ -3636,12 +3640,11 @@ export class GraphService {
               MATCH (sourceW)-[r:DEPENDS_ON|BLOCKS|RELATES_TO|CONTAINS|PART_OF]->(targetW:WorkItem)-[:BELONGS_TO]->(sourceG)
               MATCH (newG)<-[:BELONGS_TO]-(newTargetW:WorkItem)
               WHERE newTargetW.originalId = targetW.id
-              CREATE (newW)-[newR:DEPENDS_ON {
-                type: r.type,
-                weight: r.weight,
-                metadata: r.metadata
-              }]->(newTargetW)
-              RETURN count(newR) as edgeCount
+              // Preserve the real relationship type — the previous code
+              // hard-coded :DEPENDS_ON, silently rewriting every BLOCKS /
+              // RELATES_TO / CONTAINS / PART_OF edge into a DEPENDS_ON on clone.
+              CALL apoc.create.relationship(newW, type(r), { weight: r.weight, metadata: r.metadata }, newTargetW) YIELD rel
+              RETURN count(rel) as edgeCount
             `;
 
             const edgesResult = await tx.run(cloneEdgesQuery, { 

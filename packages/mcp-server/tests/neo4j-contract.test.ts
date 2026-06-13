@@ -44,6 +44,9 @@ describe.skipIf(!RUN)('MCP GraphService — real Neo4j contract', () => {
         await session?.run('MATCH (n:WorkItem) WHERE n.id IN $ids DETACH DELETE n', { ids: createdNodes });
       }
       if (createdGraphs.length) {
+        // Also remove any WorkItems that belong to these graphs (clone creates
+        // brand-new node ids we don't otherwise track).
+        await session?.run('MATCH (g:Graph) WHERE g.id IN $ids OPTIONAL MATCH (g)<-[:BELONGS_TO]-(w:WorkItem) DETACH DELETE w', { ids: createdGraphs });
         await session?.run('MATCH (g:Graph) WHERE g.id IN $ids DETACH DELETE g', { ids: createdGraphs });
       }
     } catch { /* ignore */ }
@@ -128,6 +131,53 @@ describe.skipIf(!RUN)('MCP GraphService — real Neo4j contract', () => {
     expect(ctx.counts.nodes, 'two items counted').toBe(2);
     expect(ctx.counts.byType.TASK, 'both items tallied under TASK').toBe(2);
     expect(ctx.counts.byStatus.IN_PROGRESS, 'both items tallied under IN_PROGRESS').toBe(2);
+  });
+
+  it('cloneGraph copies nodes AND preserves each edge type (not all DEPENDS_ON)', async () => {
+    // Regressions this guards:
+    //  1. clone threw ParameterMissing(teamId) because Neo4j never stores a
+    //     null teamId, so reading it back yields undefined.
+    //  2. clone hard-coded :DEPENDS_ON, silently rewriting BLOCKS/RELATES_TO/…
+    const src = parse(await svc.createGraph({ name: `Contract Clone Src ${Date.now()}`, type: 'PROJECT' } as any));
+    const srcId = src.graph.id;
+    createdGraphs.push(srcId);
+
+    const session = driver.session();
+    const mk = async (title: string) => {
+      const id = parse(await svc.createNode({ title, type: 'TASK', status: 'PROPOSED' } as any)).node.id;
+      createdNodes.push(id);
+      await session.run('MATCH (w:WorkItem {id: $id}), (g:Graph {id: $gid}) MERGE (w)-[:BELONGS_TO]->(g)', { id, gid: srcId });
+      return id;
+    };
+    let a: string, b: string, c: string;
+    try {
+      a = await mk(`Clone A ${Date.now()}`);
+      b = await mk(`Clone B ${Date.now()}`);
+      c = await mk(`Clone C ${Date.now()}`);
+    } finally {
+      await session.close();
+    }
+    await svc.createEdge({ source_id: a, target_id: b, type: 'BLOCKS' } as any);
+    await svc.createEdge({ source_id: b, target_id: c, type: 'RELATES_TO' } as any);
+
+    const cloned = parse(await svc.cloneGraph({ sourceGraphId: srcId, newName: `Contract Clone Dst ${Date.now()}` } as any));
+    const dstId = cloned.newGraph.id;
+    createdGraphs.push(dstId);
+    expect(cloned.newGraph.clonedNodes, 'all three nodes cloned').toBe(3);
+    expect(cloned.newGraph.clonedEdges, 'both edges cloned').toBe(2);
+
+    // The cloned edges must keep their real types, not all become DEPENDS_ON
+    const s2 = driver.session();
+    try {
+      const r = await s2.run(
+        'MATCH (g:Graph {id: $gid})<-[:BELONGS_TO]-(:WorkItem)-[rel]->(:WorkItem) RETURN type(rel) AS t ORDER BY t',
+        { gid: dstId }
+      );
+      const types = r.records.map((rec) => rec.get('t')).sort();
+      expect(types, 'cloned relationship types are preserved').toEqual(['BLOCKS', 'RELATES_TO']);
+    } finally {
+      await s2.close();
+    }
   });
 
   it('browseGraph returns well-formed data over a real DB', async () => {
