@@ -734,6 +734,36 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     }
   }, [updateWorkItemMutation]);
 
+  // Durable layout: persist the current position of every node whose live
+  // position has moved away from its last-saved position by more than a pixel.
+  // This makes a physics-laid-out arrangement (and grown/new nodes) survive a
+  // reload, so the snapshot-authoritative load above has accurate positions to
+  // pin to. Called debounced when the sim settles and on page hide.
+  const persistAllPositions = useCallback(() => {
+    const sim = simulationRef.current;
+    if (!sim) return;
+    const moved = (sim.nodes() as any[]).filter((n: any) =>
+      typeof n.x === 'number' && typeof n.y === 'number' &&
+      (Math.abs((n.positionX ?? 0) - n.x) > 1 || Math.abs((n.positionY ?? 0) - n.y) > 1)
+    );
+    moved.forEach((n: any) => {
+      n.positionX = n.x;
+      n.positionY = n.y;
+      saveNodePosition(n.id, n.x, n.y);
+    });
+  }, [saveNodePosition]);
+
+  // Save the settled layout on page hide so a tidy arrangement is never lost
+  // even if the user never dragged a node.
+  useEffect(() => {
+    const handler = () => persistAllPositions();
+    window.addEventListener('pagehide', handler);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') persistAllPositions();
+    });
+    return () => window.removeEventListener('pagehide', handler);
+  }, [persistAllPositions]);
+
   // Function to get SVG path for priority icons (using correct Lucide icon paths)
   const getPriorityIconSvgPath = (priorityValue: number): string => {
     if (priorityValue >= 0.8) return 'M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z'; // Flame
@@ -1157,11 +1187,17 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         edge.source.id === item.id || edge.target.id === item.id
       );
       
+      // Snapshot-authoritative layout: a node the user has positioned
+      // (saved position is not the (0,0) default) loads PINNED via fx/fy, so
+      // the force simulation physically cannot drift a tidy arrangement. New
+      // / never-placed nodes stay free to be laid out, then get saved (and
+      // thus pinned next load) by the autosave below.
+      const isPlaced = !(item.positionX === 0 && item.positionY === 0);
       let x = item.positionX;
       let y = item.positionY;
-      
+
       // If node has never been positioned (0,0) and has no connections, place it on periphery
-      if ((item.positionX === 0 && item.positionY === 0) && !hasConnections) {
+      if (!isPlaced && !hasConnections) {
         const angle = (index / validatedNodes.length) * 2 * Math.PI;
         const radius = Math.min(window.innerWidth, window.innerHeight) * 0.4; // Place on outer ring
         const centerX = 0; // Start from center
@@ -1169,11 +1205,13 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         x = centerX + Math.cos(angle) * radius;
         y = centerY + Math.sin(angle) * radius;
       }
-      
+
       const node = {
         ...item,
         x,
         y,
+        fx: isPlaced ? x : null,
+        fy: isPlaced ? y : null,
         priority: item.priority || 0
       };
       
@@ -1582,6 +1620,20 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         }
       }
     }
+    // Re-assert pins after the merge: mergeSimulationNodes intentionally
+    // strips physics keys (fx/fy) to preserve live velocity, so placed nodes
+    // arriving via a graph-switch or poll would otherwise come back unpinned
+    // and drift. Snapshot-authoritative load must hold here too.
+    if (!layoutReflowingRef.current) {
+      (nodeMerge.nodes as any[]).forEach((node: any) => {
+        const placed = !(((node.positionX ?? 0) === 0) && ((node.positionY ?? 0) === 0));
+        if (placed) {
+          node.fx = node.positionX;
+          node.fy = node.positionY;
+          node.userPinned = true;
+        }
+      });
+    }
     simulation.nodes(nodeMerge.nodes as any);
     const linkForce = simulation.force('link') as d3.ForceLink<any, any>;
     if (linkForce) {
@@ -1858,18 +1910,29 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       });
     });
 
-    // Initialize all nodes at screen center for 2D layout
+    // Snapshot-authoritative init: a node the user has positioned (saved
+    // position != the (0,0) default) is PINNED to that position so the force
+    // simulation cannot drift a tidy layout across reloads. Only brand-new /
+    // never-placed nodes are seeded near center and left free to flow.
+    // (This block used to null every node's fx/fy unconditionally, which is
+    //  why arrangements never survived a reload — the real drift bug.)
     nodes.forEach((node: any) => {
-      // Reset any user pinning/positioning (like Reset Layout button)
-      node.userPinned = false;
       node.userPreferredPosition = null;
       node.userPreferenceVector = null;
-      node.fx = null;
-      node.fy = null;
-      
-      // Set initial position at screen center with some randomness
-      if (!node.x) node.x = centerX + (Math.random() - 0.5) * 100;
-      if (!node.y) node.y = centerY + (Math.random() - 0.5) * 100;
+      const placed = !(((node.positionX ?? 0) === 0) && ((node.positionY ?? 0) === 0));
+      if (placed) {
+        node.userPinned = true;
+        node.x = node.positionX;
+        node.y = node.positionY;
+        node.fx = node.positionX;
+        node.fy = node.positionY;
+      } else {
+        node.userPinned = false;
+        node.fx = null;
+        node.fy = null;
+        if (!node.x) node.x = centerX + (Math.random() - 0.5) * 100;
+        if (!node.y) node.y = centerY + (Math.random() - 0.5) * 100;
+      }
     });
 
     // Viewport culling - only render visible nodes for performance
@@ -3555,11 +3618,18 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         });
     });
 
-    // Configure simulation for stability
+    // Configure simulation for stability. Start hot only if there are
+    // unpinned (new / never-placed) nodes to lay out; an already-arranged
+    // graph loads pinned and stays put (snapshot-authoritative).
+    const hasUnpinnedNodes = (simulation.nodes() as any[]).some((n: any) => n.fx == null || n.fy == null);
     simulation
-      .alpha(0.6) // Lower starting energy for stability
-      .alphaDecay(0.015) // Slower decay for smoother movement
+      .alpha(hasUnpinnedNodes ? 0.6 : 0)
+      .alphaDecay(0.015)
       .restart();
+
+    // When the layout settles, persist it so the arrangement is durable
+    // across reloads (covers physics-laid-out graphs the user never dragged).
+    simulation.on('end.persist', () => persistAllPositions());
     
     // Add method to restart collision detection
     (simulation as any).restartCollisions = () => {
@@ -3573,6 +3643,8 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
   // Store simulation reference for resize handling
   const simulationRef = useRef<d3.Simulation<any, any> | null>(null);
   const zoomBehaviorRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
+  // True only while "Reset layout" is re-flowing — suspends snapshot pinning
+  const layoutReflowingRef = useRef(false);
   const mousedownNodeRef = useRef<any>(null);
 
   // Fit view to show all nodes
@@ -3721,24 +3793,32 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     };
   }, []);
 
-  // Reset layout function
+  // Reset layout = the explicit "re-flow everything" escape hatch. It must
+  // override snapshot-authoritative pinning: clear each node's saved-position
+  // intent (in memory) and unpin, suspend re-pinning while physics rearranges,
+  // then persist the fresh layout once it settles so it becomes the new
+  // authoritative snapshot.
   const resetLayout = useCallback(() => {
+    layoutReflowingRef.current = true;
     nodes.forEach((node: any) => {
       node.userPinned = false;
       node.userPreferredPosition = null;
       node.userPreferenceVector = null;
       node.fx = null;
       node.fy = null;
-      // Clear positioning cache to force recalculation
+      // Treat as unplaced so init/merge won't re-pin to the old spot
+      node.positionX = 0;
+      node.positionY = 0;
       node.targetX = null;
       node.targetY = null;
     });
     initializeVisualization();
-    // Auto-fit after reset
     setTimeout(() => {
       fitViewToNodes();
-    }, 1000);
-  }, [nodes, initializeVisualization, fitViewToNodes]);
+      persistAllPositions();      // the reflowed layout becomes the new snapshot
+      layoutReflowingRef.current = false;
+    }, 2500);
+  }, [nodes, initializeVisualization, fitViewToNodes, persistAllPositions]);
 
   // Auto-fit view when component first mounts with nodes - using stable dependency
   const hasNodes = nodes.length > 0;
