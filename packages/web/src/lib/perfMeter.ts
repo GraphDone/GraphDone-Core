@@ -70,3 +70,65 @@ export class PerfMeter {
     };
   }
 }
+
+export interface DriftSummary {
+  /** largest single-node movement since the previous sample, px */
+  maxStepPx: number;
+  /** mean movement across all nodes since the previous sample, px */
+  meanStepPx: number;
+  /** how many nodes moved more than ~0.5px since the previous sample */
+  movingNodes: number;
+  /** RMS distance of nodes from their saved (positionX/Y) position, px —
+   * the direct measure of "how far has the layout drifted from what was saved" */
+  rmsFromSavedPx: number;
+}
+
+type DriftNode = { id: string; x?: number; y?: number; positionX?: number; positionY?: number };
+
+/**
+ * Quantifies node MOVEMENT — i.e. "slip and drift" — which the PerfMeter
+ * (frame health) deliberately does not. Pure: feed it node positions each
+ * sample. Pinned/settled nodes report ~0 step; an unstable layout reports
+ * persistent non-zero steps, and rmsFromSavedPx shows snapshot fidelity.
+ */
+export class DriftMeter {
+  private prev = new Map<string, { x: number; y: number }>();
+
+  sample(nodes: DriftNode[]): DriftSummary {
+    let maxStep = 0;
+    let sumStep = 0;
+    let moving = 0;
+    let sumSqFromSaved = 0;
+    let counted = 0;
+
+    for (const n of nodes) {
+      if (typeof n.x !== 'number' || typeof n.y !== 'number') continue;
+      counted++;
+      const last = this.prev.get(n.id);
+      if (last) {
+        const step = Math.hypot(n.x - last.x, n.y - last.y);
+        maxStep = Math.max(maxStep, step);
+        sumStep += step;
+        if (step > 0.5) moving++;
+      }
+      this.prev.set(n.id, { x: n.x, y: n.y });
+
+      if (typeof n.positionX === 'number' && typeof n.positionY === 'number') {
+        const d = Math.hypot(n.x - n.positionX, n.y - n.positionY);
+        sumSqFromSaved += d * d;
+      }
+    }
+
+    const round = (v: number) => Math.round(v * 100) / 100;
+    return {
+      maxStepPx: round(maxStep),
+      meanStepPx: counted ? round(sumStep / counted) : 0,
+      movingNodes: moving,
+      rmsFromSavedPx: counted ? round(Math.sqrt(sumSqFromSaved / counted)) : 0,
+    };
+  }
+
+  reset(): void {
+    this.prev.clear();
+  }
+}
