@@ -63,6 +63,7 @@ export interface CreateNodeArgs {
   status?: NodeStatus;
   contributor_ids?: string[];
   metadata?: NodeMetadata;
+  graph_id?: string;
 }
 
 export interface UpdateNodeArgs {
@@ -330,12 +331,12 @@ export class GraphService {
 
         case 'by_priority':
           const minPriority = filters.min_priority || 0;
-          countQuery = `MATCH (n:WorkItem) WHERE n.priorityComputed >= $min_priority RETURN count(n) as total`;
+          countQuery = `MATCH (n:WorkItem) WHERE n.priorityComp >= $min_priority RETURN count(n) as total`;
           query = `
             MATCH (n:WorkItem)
-            WHERE n.priorityComputed >= $min_priority
+            WHERE n.priorityComp >= $min_priority
             RETURN n
-            ORDER BY n.priorityComputed DESC
+            ORDER BY n.priorityComp DESC
             SKIP $offset
             LIMIT $limit
           `;
@@ -465,11 +466,17 @@ export class GraphService {
       // Generate truly unique ID to prevent race conditions
       const id = generateUniqueNodeId();
       const now = new Date().toISOString();
-      
+      const graphId = args.graph_id ? sanitizeNodeId(args.graph_id) : null;
+
       // Use write consistency to prevent read-after-write issues
       return await withWriteConsistency(id, 'CREATE', async () => {
 
+      // Attach the node to its graph via BELONGS_TO when a graph_id is given.
+      // Without this a node is orphaned — the web UI lists nodes per-graph
+      // (workItems where graph.id = currentGraph), so an unattached node an AI
+      // creates is invisible to humans.
       const query = `
+        ${graphId ? 'MATCH (g:Graph {id: $graphId})' : ''}
         CREATE (n:WorkItem {
           id: $id,
           title: $title,
@@ -478,19 +485,24 @@ export class GraphService {
           status: $status,
           createdAt: $now,
           updatedAt: $now,
-          priorityExecutive: 0,
-          priorityIndividual: 0,
-          priorityCommunity: 0,
-          priorityComputed: 0,
-          sphericalRadius: 1.0,
-          sphericalTheta: 0,
-          sphericalPhi: 0,
+          positionX: 0,
+          positionY: 0,
+          positionZ: 0,
+          radius: 1.0,
+          theta: 0,
+          phi: 0,
+          priority: 0,
+          priorityComp: 0,
+          priorityExec: 0,
+          priorityIndiv: 0,
+          priorityComm: 0,
           metadata: $metadata
         })
+        ${graphId ? 'MERGE (n)-[:BELONGS_TO]->(g)' : ''}
         RETURN n
       `;
 
-      const params = {
+      const params: Record<string, unknown> = {
         id,
         title,
         description,
@@ -499,8 +511,21 @@ export class GraphService {
         now,
         metadata: JSON.stringify(metadata)
       };
+      if (graphId) params.graphId = graphId;
 
       const result = await session.run(query, params);
+
+      // A graph_id that matches no graph yields zero rows (the MATCH fails) —
+      // surface that instead of silently creating nothing.
+      if (graphId && result.records.length === 0) {
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({ error: `Graph with id '${graphId}' not found`, graph_id: graphId }, null, 2)
+          }],
+          isError: true
+        };
+      }
       const rawNode = result.records[0].get('n').properties;
       
       // Parse metadata back from JSON string for data integrity
@@ -2177,13 +2202,17 @@ export class GraphService {
         status: $status,
         createdAt: $now,
         updatedAt: $now,
-        priorityExecutive: 0,
-        priorityIndividual: 0,
-        priorityCommunity: 0,
-        priorityComputed: 0,
-        sphericalRadius: 1.0,
-        sphericalTheta: 0,
-        sphericalPhi: 0,
+        positionX: 0,
+        positionY: 0,
+        positionZ: 0,
+        radius: 1.0,
+        theta: 0,
+        phi: 0,
+        priority: 0,
+        priorityComp: 0,
+        priorityExec: 0,
+        priorityIndiv: 0,
+        priorityComm: 0,
         metadata: $metadata
       })
       RETURN n.id as id
