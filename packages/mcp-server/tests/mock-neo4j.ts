@@ -226,7 +226,7 @@ export function createMockDriver(): Driver {
       }
 
       // Handle compact graph context query (get_graph_context, AI-6)
-      if (query.includes('typeCounts') && query.includes('statusCounts')) {
+      if (query.includes('size(items) as nodeCount') && query.includes('as statuses')) {
         if (params?.graphId === 'missing-graph-id') {
           return { records: [] };
         }
@@ -241,14 +241,8 @@ export function createMockDriver(): Driver {
             },
             nodeCount: { toNumber: () => 12 },
             edgeCount: { toNumber: () => 7 },
-            typeCounts: [
-              { type: 'TASK', count: { toNumber: () => 8 } },
-              { type: 'BUG', count: { toNumber: () => 4 } }
-            ],
-            statusCounts: [
-              { status: 'IN_PROGRESS', count: { toNumber: () => 5 } },
-              { status: 'BLOCKED', count: { toNumber: () => 2 } }
-            ],
+            types: ['TASK', 'TASK', 'TASK', 'TASK', 'TASK', 'TASK', 'TASK', 'TASK', 'BUG', 'BUG', 'BUG', 'BUG'],
+            statuses: ['IN_PROGRESS', 'IN_PROGRESS', 'IN_PROGRESS', 'IN_PROGRESS', 'IN_PROGRESS', 'BLOCKED', 'BLOCKED'],
             blockers: [
               { id: 'node-1', title: 'Fix auth', blocksCount: { toNumber: () => 3 } }
             ],
