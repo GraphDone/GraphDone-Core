@@ -30,11 +30,32 @@ export default defineConfig({
     ignoreHTTPSErrors: true,
   },
 
+  /* Where Playwright writes per-test artifacts (videos, screenshots, traces).
+   * The showcase report generator reads from here. */
+  outputDir: 'test-artifacts/playwright-output',
+
   /* Configure projects for major browsers */
   projects: [
     {
       name: 'GraphDone-Core/dev-neo4j/chromium',
+      // The showcase tour runs in its own capture-heavy project below; keep it
+      // out of the default (fast) project so the smoke gate stays quick.
+      testIgnore: /showcase\.spec\.ts/,
       use: { ...devices['Desktop Chrome'] },
+    },
+
+    /* Showcase: records web-friendly .webm video + full-page screenshots of
+     * every mode of operation, across the responsive viewport matrix. Run via
+     * `npm run report:showcase`. Heavy by design — not part of the smoke gate. */
+    {
+      name: 'showcase',
+      testMatch: /showcase\.spec\.ts/,
+      use: {
+        ...devices['Desktop Chrome'],
+        video: 'on',
+        screenshot: 'on',
+        trace: 'retain-on-failure',
+      },
     },
 
     // Commented out until browsers installed with system dependencies
