@@ -226,6 +226,52 @@ describe.skipIf(!RUN)('MCP GraphService — real Neo4j contract', () => {
     }
   });
 
+  it('createNode with graph_id attaches via BELONGS_TO (otherwise the node is invisible per-graph)', async () => {
+    // The web lists nodes per-graph (workItems where graph.id = currentGraph),
+    // so a node created without a graph link is invisible to humans. createNode
+    // must attach to the given graph.
+    const g = parse(await svc.createGraph({ name: `Contract Attach ${Date.now()}`, type: 'PROJECT' } as any));
+    const graphId = g.graph.id;
+    createdGraphs.push(graphId);
+
+    const created = parse(await svc.createNode({ title: `Attached ${Date.now()}`, type: 'TASK', graph_id: graphId } as any));
+    const id = created.node.id;
+    createdNodes.push(id);
+
+    const session = driver.session();
+    try {
+      const r = await session.run(
+        'MATCH (g:Graph {id: $gid})<-[:BELONGS_TO]-(w:WorkItem {id: $id}) RETURN count(*) AS c',
+        { gid: graphId, id }
+      );
+      expect(r.records[0].get('c').toNumber(), 'node is linked to its graph via BELONGS_TO').toBe(1);
+
+      // The node must carry the CANONICAL schema fields the web reads
+      // (positionX/Y/Z, radius, theta, phi, priority, priorityComp) — not the
+      // old MCP-only names (priorityComputed / sphericalRadius) the web ignores.
+      const fields = await session.run(
+        'MATCH (w:WorkItem {id: $id}) RETURN w.positionX AS px, w.radius AS radius, w.priority AS priority, w.priorityComp AS pc, w.priorityComputed AS legacy',
+        { id }
+      );
+      const rec = fields.records[0];
+      expect(rec.get('px'), 'positionX is set (web reads it)').not.toBeNull();
+      expect(rec.get('radius'), 'radius is set').not.toBeNull();
+      expect(rec.get('priority'), 'priority is set').not.toBeNull();
+      expect(rec.get('pc'), 'priorityComp is set (canonical)').not.toBeNull();
+      expect(rec.get('legacy'), 'no legacy priorityComputed property').toBeNull();
+    } finally {
+      await session.close();
+    }
+
+    // get_graph_context should now count this node
+    const ctx = parse(await svc.getGraphContext({ graphId } as any)).context;
+    expect(ctx.counts.nodes, 'attached node shows in the graph context').toBeGreaterThanOrEqual(1);
+
+    // A non-existent graph_id is a clean error, not a silent orphan
+    const bad = await svc.createNode({ title: 'Bad Graph', type: 'TASK', graph_id: 'no-such-graph' } as any);
+    expect((bad as { isError?: boolean }).isError, 'unknown graph_id errors').toBe(true);
+  });
+
   it('browseGraph returns well-formed data over a real DB', async () => {
     const browsed = parse(await svc.browseGraph({ query_type: 'all_nodes', limit: 25 } as any));
     const arr = browsed.nodes ?? browsed.results ?? browsed.workItems;
