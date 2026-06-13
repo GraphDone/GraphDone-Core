@@ -116,6 +116,10 @@ const tools: Tool[] = [
           items: { type: 'string' },
           description: 'Array of contributor IDs'
         },
+        graph_id: {
+          type: 'string',
+          description: 'ID of the graph/project this node belongs to. Strongly recommended: the web UI lists nodes per-graph, so a node created without a graph_id is not shown in any graph view. Use list_graphs / create_graph to obtain one.'
+        },
         metadata: {
           type: 'object',
           description: 'Additional metadata for the node'
