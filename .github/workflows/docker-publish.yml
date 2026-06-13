@@ -102,12 +102,19 @@ jobs:
       - name: Determine tag
         id: tag
         run: |
-          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+          # Must match a tag the build-and-push job actually pushed (see the
+          # docker/metadata-action tags above), or imagetools can't find the
+          # per-image manifests. On PRs metadata pushes `pr-<number>`; on main
+          # it pushes `latest`. The old `${GITHUB_SHA::8}` fallback was never a
+          # pushed tag, so build-stack failed on every PR.
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "tag=pr-${{ github.event.number }}" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
             echo "tag=latest" >> $GITHUB_OUTPUT
           elif [[ "${{ github.ref }}" == refs/heads/* ]]; then
             echo "tag=${GITHUB_REF#refs/heads/}" | sed 's/\//-/g' >> $GITHUB_OUTPUT
           else
-            echo "tag=${GITHUB_SHA::8}" >> $GITHUB_OUTPUT
+            echo "tag=sha-${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
           fi
 
       - name: Create and push manifest for stack
