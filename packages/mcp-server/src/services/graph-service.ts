@@ -3291,18 +3291,14 @@ export class GraphService {
         OPTIONAL MATCH (g)<-[:BELONGS_TO]-(w:WorkItem)
         OPTIONAL MATCH (w)-[e:DEPENDS_ON|BLOCKS|RELATES_TO|CONTAINS|PART_OF]-(:WorkItem)
         WITH g, collect(DISTINCT w) as items, count(DISTINCT e) as edgeCount
-        CALL {
-          WITH items
-          UNWIND items as i
-          RETURN i.type as type, count(i) as cnt
-        }
-        WITH g, items, edgeCount, collect({type: type, count: cnt}) as typeCounts
-        CALL {
-          WITH items
-          UNWIND items as i
-          RETURN i.status as status, count(i) as cnt
-        }
-        WITH g, items, edgeCount, typeCounts, collect({status: status, count: cnt}) as statusCounts
+        // Return the raw type/status lists and tally them in JS. A
+        // CALL { UNWIND items ... } subquery returns ZERO rows for an empty
+        // graph (UNWIND of an empty list), which dropped the whole result and
+        // made get_graph_context wrongly report a brand-new empty graph as
+        // "not found".
+        WITH g, items, edgeCount,
+             [x IN items | x.type] as types,
+             [x IN items | x.status] as statuses
         CALL {
           WITH g
           OPTIONAL MATCH (g)<-[:BELONGS_TO]-(b:WorkItem)-[r:BLOCKS]->(:WorkItem)
@@ -3318,7 +3314,7 @@ export class GraphService {
           ORDER BY rw.updatedAt DESC LIMIT 5
           RETURN collect({id: rw.id, title: rw.title, status: rw.status, type: rw.type, updatedAt: rw.updatedAt}) as recent
         }
-        RETURN g, size(items) as nodeCount, edgeCount, typeCounts, statusCounts, blockers, recent
+        RETURN g, size(items) as nodeCount, edgeCount, types, statuses, blockers, recent
       `;
 
       const result = await session.run(query, { graphId: args.graphId });
@@ -3334,8 +3330,8 @@ export class GraphService {
 
       const record = result.records[0];
       const g = record.get('g').properties;
-      const typeCounts = (record.get('typeCounts') || []) as Array<{ type: string; count: unknown }>;
-      const statusCounts = (record.get('statusCounts') || []) as Array<{ status: string; count: unknown }>;
+      const types = (record.get('types') || []) as Array<string | null>;
+      const statuses = (record.get('statuses') || []) as Array<string | null>;
       const blockers = (record.get('blockers') || []) as Array<{ id: string; title: string; blocksCount: unknown }>;
       const recent = (record.get('recent') || []) as Array<{
         id: string;
@@ -3346,12 +3342,12 @@ export class GraphService {
       }>;
 
       const byType: Record<string, number> = {};
-      for (const t of typeCounts) {
-        if (t.type) byType[t.type] = toNum(t.count);
+      for (const t of types) {
+        if (t) byType[t] = (byType[t] ?? 0) + 1;
       }
       const byStatus: Record<string, number> = {};
-      for (const s of statusCounts) {
-        if (s.status) byStatus[s.status] = toNum(s.count);
+      for (const s of statuses) {
+        if (s) byStatus[s] = (byStatus[s] ?? 0) + 1;
       }
 
       return {
