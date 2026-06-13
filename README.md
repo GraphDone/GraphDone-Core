@@ -293,7 +293,7 @@ curl http://localhost:3128/health  # Test health endpoint
 **Connection errors?**  
 ```bash
 # Verify Neo4j is running
-docker-compose up -d  # Or ./start
+docker compose up -d  # Or ./start
 cypher-shell -u neo4j -p graphdone_password "RETURN 1"
 ```
 
@@ -323,6 +323,7 @@ Anyone can propose ideas and assign personal priority. The community validates t
 
 **Start here — the Living Graph era:**
 - 🌊 **[User Stories — the development contract](./docs/USER_STORIES.md)** - Every feature starts as a story mapped to tests
+- 🗺️ **[Systems Reference](./docs/SYSTEMS.md)** - What's shipped and where it lives (code, tests, story per subsystem)
 - 🧭 **[Interaction Model](./docs/design/interaction-model.md)** - The friction-free UX constitution: modes, exits, click budgets
 - 🧬 **[Ontology Layer design](./docs/design/ontology-layer.md)** - Requirements traceability and beyond, on one graph backbone
 - 🤖 **[AI Agents Quickstart](./docs/api/AI_AGENTS.md)** - 5-minute MCP/GraphQL setup for agent teammates

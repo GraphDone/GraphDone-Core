@@ -76,7 +76,7 @@ Use the provided HTTPS Docker configuration:
 
 # Start with HTTPS configuration
 cd deployment
-docker-compose -f docker-compose.https.yml up
+docker compose -f docker-compose.yml up
 ```
 
 ### Production Docker with HTTPS
@@ -89,13 +89,13 @@ docker-compose -f docker-compose.https.yml up
    ├── certs/
    │   ├── server-key.pem    # Private key
    │   └── server-cert.pem   # Certificate
-   └── docker-compose.https.yml
+   └── docker-compose.yml
    ```
 
 3. **Deploy:**
    ```bash
    cd deployment
-   docker-compose -f docker-compose.https.yml up -d
+   docker compose -f docker-compose.yml up -d
    ```
 
 ## Production Considerations
@@ -298,7 +298,7 @@ GraphDone-Core/
 │   └── test-tls.sh             # TLS validation script
 ├── deployment/
 │   ├── docker-compose.yml      # Standard HTTP Docker config
-│   └── docker-compose.https.yml # HTTPS Docker config
+│   └── docker-compose.yml # HTTPS Docker config
 ├── tests/e2e/
 │   └── tls-integration.spec.ts  # E2E TLS tests
 └── deployment/certs/           # Generated certificates (dev certs gitignored)

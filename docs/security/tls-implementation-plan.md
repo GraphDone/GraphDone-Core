@@ -623,7 +623,7 @@ fi
 
 # Check default passwords
 echo "Checking for default passwords..."
-docker-compose exec graphdone-neo4j cypher-shell -u neo4j -p graphdone_password "RETURN 1" 2>/dev/null && echo "❌ Default Neo4j password detected" || echo "✅ Neo4j password secured"
+docker compose exec graphdone-neo4j cypher-shell -u neo4j -p graphdone_password "RETURN 1" 2>/dev/null && echo "❌ Default Neo4j password detected" || echo "✅ Neo4j password secured"
 
 # Check for default admin in SQLite
 echo "Checking SQLite default users..."
@@ -647,7 +647,7 @@ echo "🔒 Security check complete"
 ./deployment/scripts/security-check.sh
 
 # Deploy with secrets
-docker-compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml up -d
 
 # Verify HTTPS is working
 curl -I https://your-domain.com
