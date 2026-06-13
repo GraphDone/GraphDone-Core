@@ -1040,18 +1040,23 @@ export class GraphService {
       
       const totalRelationships = relCountResult.records[0]?.get('totalRelationships')?.toNumber?.() || 0;
       
-      const relationships = relationshipsResult.records.map(record => {
-        const rel = record.get('rel');
-        const related = record.get('related');
-        const direction = record.get('direction');
-        
-        return {
-          type: rel.type,
-          direction,
-          target_node: related.properties,
-          relationship_properties: rel.properties
-        };
-      });
+      // OPTIONAL MATCH yields one row with rel/related = null for a node that
+      // has no relationships — filter those out, or rel.type throws (the
+      // mock driver returned zero rows and hid this against real Neo4j).
+      const relationships = relationshipsResult.records
+        .filter(record => record.get('rel') !== null && record.get('related') !== null)
+        .map(record => {
+          const rel = record.get('rel');
+          const related = record.get('related');
+          const direction = record.get('direction');
+
+          return {
+            type: rel.type,
+            direction,
+            target_node: related.properties,
+            relationship_properties: rel.properties
+          };
+        });
 
       // Separate dependencies and dependents for backward compatibility
       const dependencies = relationships
