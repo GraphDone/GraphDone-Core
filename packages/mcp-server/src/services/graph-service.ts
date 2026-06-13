@@ -63,6 +63,7 @@ export interface CreateNodeArgs {
   status?: NodeStatus;
   contributor_ids?: string[];
   metadata?: NodeMetadata;
+  graph_id?: string;
 }
 
 export interface UpdateNodeArgs {
@@ -465,11 +466,17 @@ export class GraphService {
       // Generate truly unique ID to prevent race conditions
       const id = generateUniqueNodeId();
       const now = new Date().toISOString();
-      
+      const graphId = args.graph_id ? sanitizeNodeId(args.graph_id) : null;
+
       // Use write consistency to prevent read-after-write issues
       return await withWriteConsistency(id, 'CREATE', async () => {
 
+      // Attach the node to its graph via BELONGS_TO when a graph_id is given.
+      // Without this a node is orphaned — the web UI lists nodes per-graph
+      // (workItems where graph.id = currentGraph), so an unattached node an AI
+      // creates is invisible to humans.
       const query = `
+        ${graphId ? 'MATCH (g:Graph {id: $graphId})' : ''}
         CREATE (n:WorkItem {
           id: $id,
           title: $title,
@@ -487,10 +494,11 @@ export class GraphService {
           sphericalPhi: 0,
           metadata: $metadata
         })
+        ${graphId ? 'MERGE (n)-[:BELONGS_TO]->(g)' : ''}
         RETURN n
       `;
 
-      const params = {
+      const params: Record<string, unknown> = {
         id,
         title,
         description,
@@ -499,8 +507,21 @@ export class GraphService {
         now,
         metadata: JSON.stringify(metadata)
       };
+      if (graphId) params.graphId = graphId;
 
       const result = await session.run(query, params);
+
+      // A graph_id that matches no graph yields zero rows (the MATCH fails) —
+      // surface that instead of silently creating nothing.
+      if (graphId && result.records.length === 0) {
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({ error: `Graph with id '${graphId}' not found`, graph_id: graphId }, null, 2)
+          }],
+          isError: true
+        };
+      }
       const rawNode = result.records[0].get('n').properties;
       
       // Parse metadata back from JSON string for data integrity
