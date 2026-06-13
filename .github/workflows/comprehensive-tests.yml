@@ -1,252 +1,88 @@
 name: Comprehensive Test Suite
 
+# Complements ci.yml (Node 20 + full-stack smoke gate) by proving the real
+# unit suites also pass on the minimum supported Node version, and by
+# validating the installer + deployment config. Runs daily so flakes and
+# dependency drift surface even without a push.
+
 on:
   push:
-    branches: [ main, develop, feature/* ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
   schedule:
-    # Run daily at 2 AM UTC
-    - cron: '0 2 * * *'
+    - cron: '0 2 * * *'   # daily 02:00 UTC
   workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Test environment'
-        required: true
-        default: 'staging'
-        type: choice
-        options:
-          - development
-          - staging
-          - production
 
 permissions:
   contents: read
-  issues: write
   pull-requests: write
-  pages: write
-  id-token: write
 
 jobs:
-  comprehensive-tests:
-    name: Run Comprehensive Tests
+  # Real unit suites across the supported Node range (engines: >=18)
+  unit-matrix:
+    name: Unit Tests (Node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    
+    timeout-minutes: 25
     strategy:
+      fail-fast: false
       matrix:
-        node-version: [18.x, 20.x]
-        
+        node-version: ['18.x', '20.x']
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
-          
+      # npm install (not ci) avoids the rollup optional-deps bug (npm/cli#4828)
       - name: Install dependencies
+        run: npm install --legacy-peer-deps
+      - name: Run all unit suites (core, web, server, mcp-server)
+        run: npm run test
+
+  # Genuinely-real checks: the installer exists, deployment compose parses
+  installer-and-deploy-config:
+    name: Installer & Deploy Config
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Installation script present and executable
         run: |
-          echo "Installing dependencies..."
-          npm ci
-          echo "Dependencies installed successfully"
-          
-      - name: Run installation script tests
-        id: tests
+          test -f public/install.sh || { echo "::error::public/install.sh missing"; exit 1; }
+          test -x public/install.sh || echo "::warning::public/install.sh is not marked executable"
+          echo "✅ installer present"
+      - name: Production docker compose config is valid
         run: |
-          echo "🧪 Testing GraphDone installation script (PR #24)"
-          
-          # Create test results directory
-          mkdir -p test-results/reports
-          
-          # Create a simple test results file
-          cat > test-results/reports/results.json << 'EOF'
-          {
-            "totalTests": 5,
-            "passed": 5,
-            "failed": 0,
-            "duration": 1234,
-            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-            "suites": [
-              {
-                "name": "Installation Script Validation",
-                "status": "passed",
-                "passed": 1,
-                "failed": 0,
-                "duration": 100
-              },
-              {
-                "name": "Docker Compose Configuration",
-                "status": "passed",
-                "passed": 1,
-                "failed": 0,
-                "duration": 50
-              },
-              {
-                "name": "Node.js Dependencies",
-                "status": "passed",
-                "passed": 1,
-                "failed": 0,
-                "duration": 200
-              },
-              {
-                "name": "Certificate Generation Script",
-                "status": "passed",
-                "passed": 1,
-                "failed": 0,
-                "duration": 150
-              },
-              {
-                "name": "Environment Setup",
-                "status": "passed",
-                "passed": 1,
-                "failed": 0,
-                "duration": 100
-              }
-            ]
-          }
-          EOF
-          
-          # Validate the installation script exists and is executable
-          echo "✅ Checking installation script..."
-          if [ -f "public/install.sh" ]; then
-            echo "   Installation script found at public/install.sh"
-            ls -la public/install.sh
-          else
-            echo "   ❌ Installation script not found!"
-            exit 1
-          fi
-          
-          # Validate Docker Compose configuration
-          echo "✅ Validating Docker Compose configuration..."
-          if docker compose -f deployment/docker-compose.yml config > /dev/null 2>&1; then
-            echo "   Docker Compose configuration is valid"
-          else
-            echo "   ❌ Docker Compose configuration is invalid!"
-            exit 1
-          fi
-          
-          # Check package.json scripts
-          echo "✅ Checking package.json scripts..."
-          if npm run --silent | grep -q "test:installation"; then
-            echo "   test:installation script found"
-          fi
-          
-          # Generate HTML report
-          cat > test-results/reports/index.html << 'EOF'
-          <!DOCTYPE html>
-          <html>
-          <head>
-              <title>GraphDone CI Test Results</title>
-              <style>
-                  body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
-                  .header { background: linear-gradient(135deg, #40e0d0 0%, #48d1cc 100%); color: white; padding: 20px; border-radius: 8px; }
-                  h1 { margin: 0; }
-                  .summary { background: white; padding: 20px; margin: 20px 0; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-                  .passed { color: #28a745; font-weight: bold; }
-                  .failed { color: #dc3545; font-weight: bold; }
-                  table { width: 100%; border-collapse: collapse; background: white; }
-                  th { background: #40e0d0; color: white; padding: 12px; text-align: left; }
-                  td { padding: 12px; border-bottom: 1px solid #eee; }
-                  tr:hover { background: #f9f9f9; }
-              </style>
-          </head>
-          <body>
-              <div class="header">
-                  <h1>🧪 GraphDone Installation Script Test Results</h1>
-                  <p>PR #24: One-line installation script validation</p>
-              </div>
-              
-              <div class="summary">
-                  <h2>Summary</h2>
-                  <p>Total Tests: <span class="passed">5</span></p>
-                  <p>Passed: <span class="passed">5 ✅</span></p>
-                  <p>Failed: <span class="failed">0</span></p>
-                  <p>Duration: 0.6s</p>
-              </div>
-              
-              <table>
-                  <tr><th>Test Suite</th><th>Status</th><th>Duration</th></tr>
-                  <tr><td>Installation Script Validation</td><td class="passed">✅ Passed</td><td>100ms</td></tr>
-                  <tr><td>Docker Compose Configuration</td><td class="passed">✅ Passed</td><td>50ms</td></tr>
-                  <tr><td>Node.js Dependencies</td><td class="passed">✅ Passed</td><td>200ms</td></tr>
-                  <tr><td>Certificate Generation Script</td><td class="passed">✅ Passed</td><td>150ms</td></tr>
-                  <tr><td>Environment Setup</td><td class="passed">✅ Passed</td><td>100ms</td></tr>
-              </table>
-          </body>
-          </html>
-          EOF
-          
-          echo ""
-          echo "✅ All installation script tests passed!"
-          echo "   Test results saved to test-results/reports/"
-          
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results-${{ matrix.node-version }}
-          path: test-results/
-            
-      - name: Upload HTML report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: html-report-${{ matrix.node-version }}
-          path: test-results/reports/index.html
-          
-      - name: Comment PR with results
-        if: github.event_name == 'pull_request' && success()
+          docker compose -f deployment/docker-compose.yml config > /dev/null \
+            && echo "✅ deployment/docker-compose.yml is valid" \
+            || { echo "::error::deployment/docker-compose.yml failed to parse"; exit 1; }
+
+  # Honest PR comment derived from real job outcomes (no fabricated numbers)
+  report:
+    name: Report
+    runs-on: ubuntu-latest
+    needs: [unit-matrix, installer-and-deploy-config]
+    if: always() && github.event_name == 'pull_request'
+    steps:
+      - name: Comment PR with real results
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const fs = require('fs');
-            const path = require('path');
-            
-            let resultsSummary = '## 🧪 Test Results\n\n';
-            
-            try {
-              const resultsPath = path.join(process.env.GITHUB_WORKSPACE, 'test-results/reports/results.json');
-              if (fs.existsSync(resultsPath)) {
-                const results = JSON.parse(fs.readFileSync(resultsPath, 'utf8'));
-                
-                resultsSummary += `### Summary\n`;
-                resultsSummary += `- **Total Tests**: ${results.totalTests}\n`;
-                resultsSummary += `- **Passed**: ${results.passed} ✅\n`;
-                resultsSummary += `- **Failed**: ${results.failed} ❌\n`;
-                resultsSummary += `- **Duration**: ${Math.round(results.duration / 1000)}s\n\n`;
-                
-                if (results.suites && results.suites.length > 0) {
-                  resultsSummary += `### Test Suites\n`;
-                  resultsSummary += `| Suite | Status | Passed | Failed | Duration |\n`;
-                  resultsSummary += `|-------|--------|--------|--------|----------|\n`;
-                  
-                  results.suites.forEach(suite => {
-                    const status = suite.status === 'passed' ? '✅' : '❌';
-                    resultsSummary += `| ${suite.name} | ${status} | ${suite.passed} | ${suite.failed} | ${(suite.duration / 1000).toFixed(2)}s |\n`;
-                  });
-                }
-                
-                resultsSummary += `\n### Installation Script Validation\n`;
-                resultsSummary += `- Script Location: ✅ public/install.sh\n`;
-                resultsSummary += `- Docker Config: ✅ Valid\n`;
-                resultsSummary += `- Dependencies: ✅ Installed\n`;
-                resultsSummary += `- Environment: ✅ Configured\n`;
-              } else {
-                resultsSummary += '⚠️ Test results file not found. This may indicate the tests did not complete.\n';
-                resultsSummary += 'Check the workflow logs for details.\n';
-              }
-            } catch (error) {
-              resultsSummary += `⚠️ Error reading test results: ${error.message}\n`;
-              resultsSummary += 'The tests may have encountered an issue. Check the workflow logs.\n';
-            }
-            
-            github.rest.issues.createComment({
+            const unit = '${{ needs.unit-matrix.result }}';
+            const cfg = '${{ needs.installer-and-deploy-config.result }}';
+            const mark = (r) => r === 'success' ? '✅ passed' : (r === 'skipped' ? '⏭️ skipped' : '❌ ' + r);
+            const body = [
+              '## 🧪 Comprehensive Test Suite',
+              '',
+              `- **Unit suites (Node 18.x & 20.x)** — core, web, server, mcp-server: ${mark(unit)}`,
+              `- **Installer & deploy config**: ${mark(cfg)}`,
+              '',
+              '_Full-stack smoke gate runs in the **CI** workflow._',
+            ].join('\n');
+            await github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: resultsSummary
+              body,
             });

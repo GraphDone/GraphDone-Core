@@ -87,7 +87,7 @@ graphdone-api:
 /app/data/auth.db          # Created inside container filesystem
 
 # Problem: Data is lost when container is recreated!
-docker-compose down && docker-compose up
+docker compose down && docker compose up
 # ❌ All users, settings, and auth data disappears
 # ❌ Default admin/viewer users recreated from scratch
 ```
@@ -218,7 +218,7 @@ docker run --rm -v sqlite_auth_data:/data -v $(pwd):/import alpine sh -c \
   "sqlite3 /data/auth.db < /import/auth-export.sql"
 
 # 4. Restart GraphDone API
-docker-compose restart graphdone-api
+docker compose restart graphdone-api
 ```
 
 ## Troubleshooting
@@ -239,7 +239,7 @@ SQLITE_JOURNAL_MODE=WAL
 ```bash
 # Diagnosis: Missing volume mount
 docker volume ls           # Check if sqlite_auth_data exists
-docker-compose logs graphdone-api | grep "Connected to SQLite"
+docker compose logs graphdone-api | grep "Connected to SQLite"
 
 # Solution: Add volume mount to docker-compose.yml
 ```

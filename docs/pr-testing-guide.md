@@ -229,7 +229,7 @@ Add to test runner:
 curl -k https://localhost:4128/health
 
 # If not healthy, check logs
-docker-compose logs graphdone-api
+docker compose logs graphdone-api
 ```
 
 ### "Playwright not found" Error

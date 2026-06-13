@@ -86,7 +86,7 @@ networks:
 EOF
 
 # Start AI infrastructure
-docker-compose -f ai-infrastructure.yml up -d
+docker compose -f ai-infrastructure.yml up -d
 
 # Verify models are running
 curl http://localhost:11434/api/generate -d '{"model":"qwen2.5:1.5b","prompt":"Hello!"}'
