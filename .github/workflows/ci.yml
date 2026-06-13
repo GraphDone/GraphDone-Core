@@ -5,6 +5,9 @@ on:
     branches: [main, develop]
   pull_request:
     branches: [main, develop]
+  schedule:
+    - cron: '0 3 * * *'   # nightly full prod-stack smoke
+  workflow_dispatch:
 
 # Prevent duplicate runs
 concurrency:
@@ -87,14 +90,81 @@ jobs:
         continue-on-error: true
 
   # ── THE GATE: the app works from a user's point of view ────────────────────
-  # Boots the full production Docker stack and runs the user-smoke suite
-  # (login → nodes AND edges render → no GraphQL errors → no orphan edges →
-  # grow + undo work). This is the canonical "does it actually work" check;
-  # the broader PR suite runs alongside as advisory signal.
+  # Fast feedback on every PR: boots the dev stack against a Neo4j service
+  # container and runs the user-smoke suite (login → nodes AND edges render →
+  # no GraphQL errors → no orphan edges → grow + undo work). ~3-4 min vs the
+  # ~45 min cold prod-image build, so it's a gate people actually keep green.
   smoke-gate:
-    name: Smoke Gate (full stack)
+    name: Smoke Gate
     runs-on: ubuntu-latest
     needs: [quality, unit-tests, build]
+    services:
+      neo4j:
+        image: neo4j:5.26.12
+        env:
+          NEO4J_AUTH: neo4j/graphdone_password
+          NEO4J_PLUGINS: '["graph-data-science", "apoc"]'
+          NEO4J_dbms_security_procedures_unrestricted: "gds.*,apoc.*"
+          NEO4J_dbms_security_procedures_allowlist: "gds.*,apoc.*"
+        options: >-
+          --health-cmd "cypher-shell -u neo4j -p graphdone_password 'RETURN 1'"
+          --health-interval 10s --health-timeout 5s --health-retries 30
+        ports:
+          - 7474:7474
+          - 7687:7687
+    env:
+      NEO4J_URI: bolt://localhost:7687
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: graphdone_password
+      JWT_SECRET: ci-smoke-jwt-secret
+      SESSION_SECRET: ci-smoke-session-secret
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+      - name: Build (dev runtime imports built @graphdone/core)
+        run: npm run build
+      - name: Install Playwright (chromium)
+        run: npx playwright install --with-deps chromium
+      - name: Start GraphDone (dev stack)
+        run: |
+          npm run dev > /tmp/dev.log 2>&1 &
+          echo "Waiting for web (3127) and API (4127) to come up..."
+          timeout 240 bash -c 'until curl -sf http://localhost:3127 >/dev/null 2>&1 && curl -sf http://localhost:4127/health >/dev/null 2>&1; do sleep 3; done'
+          echo "Dev stack healthy."
+      - name: Seed demo data
+        run: npm run db:seed
+      - name: THE GATE — user smoke suite
+        run: npm run test:smoke
+        env:
+          TEST_URL: http://localhost:3127
+          CI: true
+      - name: Dump dev log on failure
+        if: failure()
+        run: tail -100 /tmp/dev.log || true
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-results-${{ github.sha }}
+          path: |
+            test-results/
+            test-artifacts/
+          retention-days: 7
+
+  # ── Full production-stack validation (nginx/TLS/Docker) ─────────────────────
+  # Heavy (~45 min cold build), so it runs only on main pushes, the nightly
+  # schedule, and manual dispatch — not on every PR. Same user-smoke suite,
+  # plus the broader PR suite as advisory signal, against the real prod stack.
+  prod-smoke:
+    name: Prod Stack Smoke (main / nightly)
+    runs-on: ubuntu-latest
+    needs: [quality, unit-tests, build]
+    if: github.ref == 'refs/heads/main' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -111,13 +181,12 @@ jobs:
         run: |
           npm run docker:prod &
           echo "Waiting for the stack to be healthy (cold image build can take minutes)..."
-          # nginx publishes 3128 and proxies /health to the internal API
-          timeout 600 bash -c 'until curl -k https://localhost:3128/health 2>/dev/null; do sleep 5; done'
+          timeout 1200 bash -c 'until curl -k https://localhost:3128/health 2>/dev/null; do sleep 5; done'
           echo "Stack healthy."
       - name: Seed demo data
         run: npm run db:seed || echo "seed skipped/failed — smoke still validates the stack"
         continue-on-error: true
-      - name: THE GATE — user smoke suite
+      - name: THE GATE — user smoke suite (prod stack)
         run: npm run test:smoke
         env:
           TEST_URL: https://localhost:3128
@@ -133,7 +202,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: smoke-and-pr-results-${{ github.sha }}
+          name: prod-smoke-results-${{ github.sha }}
           path: |
             test-results/
             test-artifacts/
