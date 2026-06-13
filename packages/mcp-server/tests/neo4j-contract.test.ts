@@ -29,6 +29,7 @@ describe.skipIf(!RUN)('MCP GraphService — real Neo4j contract', () => {
   let driver: Driver;
   let svc: GraphService;
   const createdNodes: string[] = [];
+  const createdGraphs: string[] = [];
 
   beforeAll(async () => {
     driver = neo4j.driver(URI, neo4j.auth.basic(USER, PASS));
@@ -41,6 +42,9 @@ describe.skipIf(!RUN)('MCP GraphService — real Neo4j contract', () => {
     try {
       if (createdNodes.length) {
         await session?.run('MATCH (n:WorkItem) WHERE n.id IN $ids DETACH DELETE n', { ids: createdNodes });
+      }
+      if (createdGraphs.length) {
+        await session?.run('MATCH (g:Graph) WHERE g.id IN $ids DETACH DELETE g', { ids: createdGraphs });
       }
     } catch { /* ignore */ }
     await session?.close();
@@ -79,6 +83,51 @@ describe.skipIf(!RUN)('MCP GraphService — real Neo4j contract', () => {
 
     const delEdge = text(await svc.deleteEdge({ source_id: a, target_id: b, type: 'DEPENDS_ON' } as any)).toLowerCase();
     expect(delEdge).toMatch(/delet|success|true|removed/);
+  });
+
+  it('getGraphContext on a brand-new EMPTY graph returns zero counts, not "not found"', async () => {
+    // Regression: the type/status tally used `CALL { UNWIND items ... }`, and
+    // UNWIND of an empty list yields ZERO rows, which dropped the whole result
+    // row — so an existing empty graph was reported as "not found".
+    const created = parse(await svc.createGraph({ name: `Contract Empty ${Date.now()}`, type: 'PROJECT' } as any));
+    const graphId = created.graph.id;
+    expect(graphId, 'createGraph persists and returns an id').toBeTruthy();
+    createdGraphs.push(graphId);
+
+    const ctx = parse(await svc.getGraphContext({ graphId } as any)).context;
+    expect(ctx.graph.id, 'the empty graph is found by id').toBe(graphId);
+    expect(ctx.counts.nodes, 'empty graph has zero nodes').toBe(0);
+    expect(ctx.counts.edges, 'empty graph has zero edges').toBe(0);
+    expect(ctx.counts.byType, 'no type tallies on an empty graph').toEqual({});
+    expect(ctx.counts.byStatus, 'no status tallies on an empty graph').toEqual({});
+    expect(Array.isArray(ctx.topBlockers) && ctx.topBlockers.length, 'no blockers').toBe(0);
+    expect(Array.isArray(ctx.recentActivity) && ctx.recentActivity.length, 'no recent activity').toBe(0);
+  });
+
+  it('getGraphContext tallies type/status once a graph has items', async () => {
+    const g = parse(await svc.createGraph({ name: `Contract Populated ${Date.now()}`, type: 'PROJECT' } as any));
+    const graphId = g.graph.id;
+    createdGraphs.push(graphId);
+
+    // Attach two TASK/IN_PROGRESS items to this graph
+    const session = driver.session();
+    try {
+      for (const i of [1, 2]) {
+        const id = parse(await svc.createNode({ title: `Pop ${i} ${Date.now()}`, type: 'TASK', status: 'IN_PROGRESS' } as any)).node.id;
+        createdNodes.push(id);
+        await session.run(
+          'MATCH (w:WorkItem {id: $id}), (g:Graph {id: $gid}) MERGE (w)-[:BELONGS_TO]->(g)',
+          { id, gid: graphId }
+        );
+      }
+    } finally {
+      await session.close();
+    }
+
+    const ctx = parse(await svc.getGraphContext({ graphId } as any)).context;
+    expect(ctx.counts.nodes, 'two items counted').toBe(2);
+    expect(ctx.counts.byType.TASK, 'both items tallied under TASK').toBe(2);
+    expect(ctx.counts.byStatus.IN_PROGRESS, 'both items tallied under IN_PROGRESS').toBe(2);
   });
 
   it('browseGraph returns well-formed data over a real DB', async () => {
