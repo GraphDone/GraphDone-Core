@@ -90,7 +90,11 @@ interface InteractiveGraphVisualizationProps {
 export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGraphVisualizationProps = {}) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const { currentGraph, availableGraphs } = useGraph();
+  const { currentGraph, availableGraphs, descendInto } = useGraph();
+  // descendInto from context isn't memoized; hold the latest in a ref so the
+  // D3-bound node click handler can call it without re-binding every render.
+  const descendIntoRef = useRef(descendInto);
+  descendIntoRef.current = descendInto;
   const { currentUser } = useAuth();
   const { showSuccess, showError } = useNotifications();
   const navigate = useNavigate();
@@ -1036,6 +1040,12 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
 
       setIsConnecting(false);
       setConnectionSource(null);
+    } else if (node.subgraphId) {
+      // Altium-style sheet symbol: a plain click descends into its sub-graph.
+      // (Grow/connect is handled above; drag is suppressed by mousedownNodeRef;
+      // edit/relationship icons stopPropagation, so this only fires on a plain
+      // click of a sheet node.) Called via ref to avoid re-binding the handler.
+      descendIntoRef.current(node.subgraphId);
     } else {
       // Handle node selection with 2-item ring buffer
       setSelectedNodes(prev => {

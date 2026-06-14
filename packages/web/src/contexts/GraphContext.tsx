@@ -154,10 +154,17 @@ export function GraphProvider({ children }: GraphProviderProps) {
         graphToSelect = parsedGraphs.find((g: any) => g.id === storedGraphId);
       }
       
-      // Auto-select graph: either previously selected or first available
+      // Auto-select graph: previously selected, else a sensible default.
+      // Pick by identity (Welcome tutorial first, then the System Overview),
+      // never by array position — merge order isn't stable and shared/system
+      // demo graphs must not hijack the fresh-load graph.
       if (parsedGraphs.length > 0) {
         if (!currentGraph || !parsedGraphs.find((g: any) => g.id === currentGraph.id)) {
-          const selectedGraph = graphToSelect || parsedGraphs[0];
+          const preferredDefault =
+            parsedGraphs.find((g: any) => g.name === 'Welcome') ||
+            parsedGraphs.find((g: any) => g.id === 'overview-graph-shared') ||
+            parsedGraphs[0];
+          const selectedGraph = graphToSelect || preferredDefault;
           setCurrentGraph(selectedGraph);
           // Save to localStorage for persistence
           localStorage.setItem('currentGraphId', selectedGraph.id);
@@ -660,8 +667,24 @@ export function GraphProvider({ children }: GraphProviderProps) {
   const getGraphPath = (graphId: string): Graph[] => {
     const graph = availableGraphs.find(g => g.id === graphId);
     if (!graph?.path) return [];
-    
+
     return graph.path.map(pathId => availableGraphs.find(g => g.id === pathId)).filter(Boolean) as Graph[];
+  };
+
+  // Altium-style hierarchy navigation: descend into a node's sub-graph, ascend
+  // back up via the breadcrumb. Both reduce to selectGraph; the breadcrumb is
+  // derived from the target graph's `path` (ancestors) + itself.
+  const descendInto = async (subgraphId: string): Promise<void> => {
+    await selectGraph(subgraphId);
+  };
+
+  const ascendTo = async (graphId: string): Promise<void> => {
+    await selectGraph(graphId);
+  };
+
+  const getBreadcrumb = (): Graph[] => {
+    if (!currentGraph) return [];
+    return [...getGraphPath(currentGraph.id), currentGraph];
   };
 
   const getGraphDepth = (graphId: string): number => {
@@ -718,6 +741,9 @@ export function GraphProvider({ children }: GraphProviderProps) {
     moveGraph,
     getGraphPath,
     getGraphChildren,
+    descendInto,
+    ascendTo,
+    getBreadcrumb,
     shareGraph,
     updatePermissions,
     joinSharedGraph,

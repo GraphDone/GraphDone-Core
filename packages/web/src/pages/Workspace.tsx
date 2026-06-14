@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Share2, Users, Table, Activity, Network, CreditCard, Columns, CalendarDays, GanttChartSquare, LayoutDashboard, Database, AlertTriangle, Map, X, Minimize2, Edit3, Trash2, FolderPlus } from 'lucide-react';
+import { Plus, Share2, Users, Table, Activity, Network, CreditCard, Columns, CalendarDays, GanttChartSquare, LayoutDashboard, Database, AlertTriangle, Map, X, Minimize2, Edit3, Trash2, FolderPlus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useQuery } from '@apollo/client';
 import { SafeGraphVisualization } from '../components/SafeGraphVisualization';
@@ -26,7 +26,8 @@ export function Workspace() {
   const [graphToEdit, setGraphToEdit] = useState<any>(null);
   const [viewMode, setViewMode] = useState<'graph' | 'dashboard' | 'table' | 'cards' | 'kanban' | 'gantt' | 'calendar' | 'activity'>('graph');
   const [showMiniMap, setShowMiniMap] = useState(true);
-  const { currentGraph, availableGraphs } = useGraph();
+  const { currentGraph, availableGraphs, getBreadcrumb, ascendTo } = useGraph();
+  const breadcrumb = getBreadcrumb();
   const { currentTeam, currentUser } = useAuth();
   const { health, loading: healthLoading, error: healthError } = useHealthStatus();
 
@@ -248,6 +249,42 @@ export function Workspace() {
           </div>
         </div>
       </div>
+
+      {/* Hierarchy breadcrumb — shown when we've descended into a sub-graph */}
+      {breadcrumb.length > 1 && (
+        <div
+          data-testid="graph-breadcrumb"
+          className="bg-gray-800/30 backdrop-blur-sm border-b border-gray-700/20 px-4 sm:px-6 lg:px-8 py-2 flex items-center gap-1 text-sm overflow-x-auto"
+        >
+          <button
+            onClick={() => ascendTo(breadcrumb[breadcrumb.length - 2].id)}
+            className="flex items-center gap-1 text-gray-300 hover:text-white px-2 py-1 rounded hover:bg-gray-700/40 transition-colors flex-shrink-0"
+            title="Up one level"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Up
+          </button>
+          <span className="text-gray-600 mx-1">|</span>
+          {breadcrumb.map((g, i) => {
+            const isLast = i === breadcrumb.length - 1;
+            return (
+              <span key={g.id} className="flex items-center gap-1 flex-shrink-0">
+                {i > 0 && <ChevronRight className="h-3.5 w-3.5 text-gray-600" />}
+                {isLast ? (
+                  <span className="text-green-300 font-medium px-1">{g.name}</span>
+                ) : (
+                  <button
+                    onClick={() => ascendTo(g.id)}
+                    className="text-gray-400 hover:text-white px-1 rounded hover:bg-gray-700/40 transition-colors"
+                  >
+                    {g.name}
+                  </button>
+                )}
+              </span>
+            );
+          })}
+        </div>
+      )}
 
       {/* Main Content */}
       <div className="flex-1 relative">
