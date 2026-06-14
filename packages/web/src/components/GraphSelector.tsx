@@ -16,7 +16,16 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph }: Gra
   const { currentGraph, graphHierarchy, selectGraph } = useGraph();
   const { currentTeam, currentUser } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['team', 'personal']));
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['team', 'personal', 'system']));
+  // Which parent graphs are expanded to show their sub-graphs (the hierarchy).
+  const [expandedGraphs, setExpandedGraphs] = useState<Set<string>>(new Set());
+  const toggleGraphExpand = (id: string) => {
+    setExpandedGraphs((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
   const [buttonPosition, setButtonPosition] = useState<{ top: number; left: number; width: number } | null>(null);
   const [hoveredTooltip, setHoveredTooltip] = useState<{ message: string; x: number; y: number } | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -310,7 +319,17 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph }: Gra
                     {isExpanded && (
                       <div className="ml-5 mt-1 space-y-1">
                         {graphs.map((graph) => (
-                          <div key={graph.id} className="flex items-center group/item">
+                          <div key={graph.id}>
+                          <div className="flex items-center group/item">
+                            {graph.children && graph.children.length > 0 && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); toggleGraphExpand(graph.id); }}
+                                className="p-1 mr-0.5 flex-shrink-0 text-gray-400 hover:text-white"
+                                title={`${graph.children.length} sub-graphs`}
+                              >
+                                <ChevronRight className={`h-3.5 w-3.5 transition-transform duration-200 ${expandedGraphs.has(graph.id) ? 'rotate-90' : ''}`} />
+                              </button>
+                            )}
                             <button
                               onClick={() => handleGraphSelect(graph.id)}
                               className={`flex-1 flex items-center space-x-2.5 p-2.5 rounded-xl text-left transition-all duration-200 ${
@@ -414,6 +433,30 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph }: Gra
                                 );
                               })()}
                             </div>
+                          </div>
+                          {graph.children && graph.children.length > 0 && expandedGraphs.has(graph.id) && (
+                            <div className="ml-6 mt-1 space-y-1 border-l border-gray-700/40 pl-2">
+                              {graph.children.map((child: any) => (
+                                <button
+                                  key={child.id}
+                                  onClick={() => handleGraphSelect(child.id)}
+                                  className={`w-full flex items-center space-x-2 p-2 rounded-lg text-left transition-all duration-200 ${
+                                    child.id === currentGraph?.id
+                                      ? 'bg-emerald-500/20 text-emerald-200 border border-emerald-400/40'
+                                      : 'hover:bg-gray-700/50 text-gray-300 border border-transparent'
+                                  }`}
+                                >
+                                  <div className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 ${getGraphTypeColor(child.type)}`}>
+                                    {getGraphTypeIcon(child.type)}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="text-xs font-medium truncate">{child.name}</div>
+                                    <div className="text-[10px] text-gray-400">{child.nodeCount || 0} nodes • {child.edgeCount || 0} edges</div>
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          )}
                           </div>
                         ))}
                       </div>
