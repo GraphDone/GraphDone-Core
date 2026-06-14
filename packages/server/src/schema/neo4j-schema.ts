@@ -313,6 +313,8 @@ export const typeDefs = gql`
     workItems: [WorkItem!]! @relationship(type: "BELONGS_TO", direction: IN)
     subgraphs: [Graph!]! @relationship(type: "PARENT_OF", direction: OUT)
     parentGraph: Graph @relationship(type: "PARENT_OF", direction: IN)
+    # WorkItems (sheet symbols) that drill into this graph
+    drillSources: [WorkItem!]! @relationship(type: "DRILLS_INTO", direction: IN)
   }
 
   # WorkItem entity - represents work items in the graph
@@ -333,12 +335,17 @@ export const typeDefs = gql`
     dueDate: DateTime
     tags: [String!]
     metadata: String # JSON as string
-    
+    # If set, this node is a "sheet symbol" that drills into another graph
+    # (Altium-style hierarchy). Denormalized id for cheap client-side branching.
+    subgraphId: String
+
     createdAt: DateTime! @timestamp(operations: [CREATE])
     updatedAt: DateTime! @timestamp
 
     # Relationships
     owner: User @relationship(type: "OWNS", direction: IN)
+    # The sub-graph this node drills into (sheet symbol -> sub-sheet)
+    subgraph: Graph @relationship(type: "DRILLS_INTO", direction: OUT)
     assignedTo: User @relationship(type: "ASSIGNED_TO", direction: IN)
     graph: Graph @relationship(type: "BELONGS_TO", direction: OUT)
     dependencies: [WorkItem!]! @relationship(type: "DEPENDS_ON", direction: OUT)

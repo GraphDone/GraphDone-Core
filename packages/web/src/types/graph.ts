@@ -100,6 +100,15 @@ export interface WorkItem {
   userId?: string;
   dependencies?: WorkItem[];
   dependents?: WorkItem[];
+  // Altium-style hierarchy: if set, this node drills into another graph
+  subgraphId?: string;
+  subgraph?: {
+    id: string;
+    name: string;
+    nodeCount?: number;
+    edgeCount?: number;
+    type?: string;
+  };
 }
 
 // Import and re-export RelationshipType from central constants file
