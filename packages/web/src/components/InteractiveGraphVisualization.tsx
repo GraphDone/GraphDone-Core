@@ -1208,14 +1208,17 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       let x = item.positionX;
       let y = item.positionY;
 
-      // If node has never been positioned (0,0) and has no connections, place it on periphery
-      if (!isPlaced && !hasConnections) {
-        const angle = (index / validatedNodes.length) * 2 * Math.PI;
-        const radius = Math.min(window.innerWidth, window.innerHeight) * 0.4; // Place on outer ring
-        const centerX = 0; // Start from center
-        const centerY = 0;
-        x = centerX + Math.cos(angle) * radius;
-        y = centerY + Math.sin(angle) * radius;
+      // Unplaced (never-positioned) nodes start on a CLEAN grid spread sized to
+      // the node count, spacing > collision diameter (~224) so there are no
+      // initial overlaps. Physics then REFINES this (links pull connected nodes
+      // together, collision holds the gap) and settles fast & clean — far
+      // better than exploding a pile at the origin. Jitter breaks symmetry.
+      if (!isPlaced) {
+        const cols = Math.max(1, Math.ceil(Math.sqrt(validatedNodes.length)));
+        const spacing = 260;
+        const half = (cols * spacing) / 2;
+        x = (index % cols) * spacing - half + ((index * 13) % 23) - 11;
+        y = Math.floor(index / cols) * spacing - half + ((index * 7) % 19) - 9;
       }
 
       const node = {
@@ -1730,8 +1733,14 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         });
     });
 
-    // Gentle restart to settle any property changes
-    simulation.alpha(0.1).restart();
+    // Physics is one-shot: it settles a graph, then stays idle. A routine
+    // data poll must NOT reheat a fully-placed (frozen) graph — that caused
+    // perpetual drift. Only nudge the sim if there are still-unsettled
+    // (unpinned / never-placed) nodes that actually need to find a spot.
+    const hasUnpinned = (simulation.nodes() as any[]).some((n: any) => n.fx == null || n.fy == null);
+    if (hasUnpinned) {
+      simulation.alpha(0.1).restart();
+    }
 
     console.log('[Graph Debug] Simulation data and DOM elements updated');
   }, [nodes, validatedEdges, getNodeDimensions]);
@@ -1928,7 +1937,10 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     // never-placed nodes are seeded near center and left free to flow.
     // (This block used to null every node's fx/fy unconditionally, which is
     //  why arrangements never survived a reload — the real drift bug.)
-    nodes.forEach((node: any) => {
+    const spreadCols = Math.max(1, Math.ceil(Math.sqrt(nodes.length)));
+    const spreadSpacing = 260; // > collision diameter so the spread has no overlaps
+    const spreadHalf = (spreadCols * spreadSpacing) / 2;
+    nodes.forEach((node: any, i: number) => {
       node.userPreferredPosition = null;
       node.userPreferenceVector = null;
       const placed = !(((node.positionX ?? 0) === 0) && ((node.positionY ?? 0) === 0));
@@ -1942,8 +1954,10 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         node.userPinned = false;
         node.fx = null;
         node.fy = null;
-        if (!node.x) node.x = centerX + (Math.random() - 0.5) * 100;
-        if (!node.y) node.y = centerY + (Math.random() - 0.5) * 100;
+        // Clean grid spread (not a random pile) so physics refines from a
+        // non-overlapping start.
+        if (!node.x) node.x = (i % spreadCols) * spreadSpacing - spreadHalf + ((i * 13) % 23) - 11;
+        if (!node.y) node.y = Math.floor(i / spreadCols) * spreadSpacing - spreadHalf + ((i * 7) % 19) - 9;
       }
     });
 
@@ -3524,7 +3538,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     });
 
     let labelAvoidCounter = 0;
-    const updateEdgePositions = () => {
+    const updateEdgePositions = (forceAvoid = false) => {
       // Border-to-border anchors: the edge starts/ends where the center line
       // crosses each card's border, not at the buried center. Computed once per
       // edge per tick (shared datum) so line, hitbox and arrow agree. The anchor
@@ -3563,7 +3577,9 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       // slidable by the user (d.labelT persists because the data merge keeps
       // edge object identity stable; d.labelTUser pins a manual slide).
       labelAvoidCounter++;
-      const runAvoidance = simulation.alpha() < 0.1 && labelAvoidCounter % 15 === 0;
+      // forceAvoid lets a one-shot caller (layout settle / pinned graphs that
+      // don't tick) run a full label de-overlap pass on demand.
+      const runAvoidance = forceAvoid || (simulation.alpha() < 0.1 && labelAvoidCounter % 15 === 0);
       const obstacles = runAvoidance
         ? (simulation.nodes() as any[]).map((n: any) => {
             const dims = getNodeDimensions(n);
@@ -3763,14 +3779,27 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     // unpinned (new / never-placed) nodes to lay out; an already-arranged
     // graph loads pinned and stays put (snapshot-authoritative).
     const hasUnpinnedNodes = (simulation.nodes() as any[]).some((n: any) => n.fx == null || n.fy == null);
+    if (hasUnpinnedNodes) {
+      // Mark the start of a one-shot layout so we can report how long it took
+      // the physics to settle (a metric for studying the behavior).
+      layoutStartRef.current = performance.now();
+      lastSettleMsRef.current = null;
+    }
     simulation
       .alpha(hasUnpinnedNodes ? DEFAULT_PHYSICS.alpha.loadEnergy : 0)
       .alphaDecay(0.015)
       .restart();
 
-    // When the layout settles, persist it so the arrangement is durable
-    // across reloads (covers physics-laid-out graphs the user never dragged).
-    simulation.on('end.persist', () => persistAllPositions());
+    // When the layout settles: record settle time, persist the arrangement so
+    // it's durable across reloads, run a final edge-label de-overlap pass, and
+    // center the camera. After this the simulation is idle (one-shot physics).
+    simulation.on('end.persist', () => {
+      if (layoutStartRef.current != null && lastSettleMsRef.current == null) {
+        lastSettleMsRef.current = Math.round(performance.now() - layoutStartRef.current);
+      }
+      persistAllPositions();
+      runLabelAvoidanceRef.current?.();
+    });
     
     // Add method to restart collision detection
     (simulation as any).restartCollisions = () => {
@@ -3779,7 +3808,18 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         simulation.alphaTarget(0);
       }, 2000);
     };
+
+    // Expose a one-shot edge-label de-overlap pass + run one shortly after init.
+    // Fully-pinned graphs don't tick, so without this their labels would stay at
+    // the default midpoint and could overlap → clean starting positions need it.
+    runLabelAvoidanceRef.current = () => updateEdgePositions(true);
+    setTimeout(() => updateEdgePositions(true), 500);
   }, [nodes, validatedEdges, handleNodeClick, initializeEmptyVisualization]); // Include handleNodeClick to get fresh connection state
+
+  // One-shot layout instrumentation + the forced label-avoidance hook.
+  const layoutStartRef = useRef<number | null>(null);
+  const lastSettleMsRef = useRef<number | null>(null);
+  const runLabelAvoidanceRef = useRef<(() => void) | null>(null);
 
   // Store simulation reference for resize handling
   const simulationRef = useRef<d3.Simulation<any, any> | null>(null);
@@ -3941,17 +3981,21 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
   // authoritative snapshot.
   const resetLayout = useCallback(() => {
     layoutReflowingRef.current = true;
+    // Unpin + mark unplaced; initializeVisualization will lay the unplaced
+    // nodes out on a CLEAN spread grid (see getUnplacedSpread) so physics
+    // REFINES a non-overlapping start instead of trying to explode a pile.
     nodes.forEach((node: any) => {
       node.userPinned = false;
       node.userPreferredPosition = null;
       node.userPreferenceVector = null;
       node.fx = null;
       node.fy = null;
-      // Treat as unplaced so init/merge won't re-pin to the old spot
       node.positionX = 0;
       node.positionY = 0;
       node.targetX = null;
       node.targetY = null;
+      node.x = 0;
+      node.y = 0;
     });
     initializeVisualization();
     setTimeout(() => {
@@ -3961,51 +4005,88 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     }, 2500);
   }, [nodes, initializeVisualization, fitViewToNodes, persistAllPositions]);
 
-  // Auto-fit view when component first mounts with nodes - using stable dependency
-  const hasNodes = nodes.length > 0;
+  // Comprehensive layout metrics for studying the physics behaviour skeptically:
+  // is the simulation actually idle (not silently reheating), do node cards
+  // overlap, do edge labels overlap, how long did the last layout take to
+  // settle, plus the live drift sample. Exposed for the diagnostic + console.
   useEffect(() => {
-    if (hasNodes && svgRef.current) {
-      // Check if this is the initial load (no previous transform stored)
-      const hasStoredTransform = sessionStorage.getItem('graphViewTransform');
-      if (!hasStoredTransform) {
-        // First time loading - auto fit after simulation settles
-        const timer = setTimeout(() => {
-          fitViewToNodes();
-          // Store the fitted transform
-          if (svgRef.current) {
-            const svg = d3.select(svgRef.current);
-            const transform = d3.zoomTransform(svg.node()!);
-            sessionStorage.setItem('graphViewTransform', JSON.stringify({
-              x: transform.x,
-              y: transform.y,
-              k: transform.k
-            }));
-          }
-        }, 1500);
-        return () => clearTimeout(timer);
-      } else {
-        // Restore previous transform
-        try {
-          const saved = JSON.parse(hasStoredTransform);
-          const timer = setTimeout(() => {
-            if (svgRef.current) {
-              const svg = d3.select(svgRef.current);
-              const transform = d3.zoomIdentity.translate(saved.x, saved.y).scale(saved.k);
-              svg.call(d3.zoom<SVGSVGElement, unknown>().transform as any, transform);
-            }
-          }, 500);
-          return () => clearTimeout(timer);
-        } catch (e) {
-          // If stored transform is invalid, auto-fit
-          const timer = setTimeout(() => {
-            fitViewToNodes();
-          }, 1500);
-          return () => clearTimeout(timer);
+    (window as any).__organizeGraph = () => resetLayout();
+    (window as any).__layoutMetrics = () => {
+      const sim = simulationRef.current;
+      if (!sim) return null;
+      const ns = sim.nodes() as any[];
+      // TRUE visual overlap = the node CARD rectangles intersect (AABB). The
+      // collision radius is the half-diagonal, which over-counts side-by-side
+      // cards that don't actually overlap — this metric measures the real pile.
+      let overlapPairs = 0;
+      let maxOverlap = 0;
+      let proximityPairs = 0; // closer than collision radius (soft crowding)
+      const dims = ns.map((n) => getNodeDimensions(n));
+      for (let i = 0; i < ns.length; i++) {
+        const a = ns[i];
+        const da = dims[i];
+        const ra = collisionRadius(da);
+        for (let j = i + 1; j < ns.length; j++) {
+          const b = ns[j];
+          const db = dims[j];
+          const dx = Math.abs((a.x || 0) - (b.x || 0));
+          const dy = Math.abs((a.y || 0) - (b.y || 0));
+          const ox = (da.width + db.width) / 2 - dx;
+          const oy = (da.height + db.height) / 2 - dy;
+          if (ox > 0 && oy > 0) { overlapPairs++; if (Math.min(ox, oy) > maxOverlap) maxOverlap = Math.min(ox, oy); }
+          if (Math.hypot(dx, dy) < ra + collisionRadius(db)) proximityPairs++;
         }
       }
-    }
-    return undefined;
-  }, [hasNodes]); // Removed fitViewToNodes dependency to prevent camera jumps
+      const labelRects = Array.from(document.querySelectorAll('.graph-container svg .edge-label-group'))
+        .map((g) => (g as SVGGElement).getBoundingClientRect())
+        .filter((r) => r.width > 0 && r.height > 0);
+      let labelOverlaps = 0;
+      for (let i = 0; i < labelRects.length; i++) {
+        for (let j = i + 1; j < labelRects.length; j++) {
+          const a = labelRects[i];
+          const b = labelRects[j];
+          if (a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom) labelOverlaps++;
+        }
+      }
+      const alpha = sim.alpha();
+      // The sim stops ticking once alpha drops past alphaMin (~0.001); at that
+      // point nodes are frozen. (The drift field below is sampled in the tick
+      // loop, so it goes STALE after the sim stops — use atRest, not drift, to
+      // judge "has it stopped moving".)
+      const atRest = alpha <= 0.0015;
+      return {
+        simRunning: !atRest,
+        atRest,
+        alpha: Math.round(alpha * 10000) / 10000,
+        lastSettleMs: lastSettleMsRef.current,
+        nodeCount: ns.length,
+        pinnedCount: ns.filter((n: any) => n.fx != null).length,
+        edgeCount: validatedEdges.length,
+        overlappingNodePairs: overlapPairs,
+        maxNodeOverlapPx: Math.round(maxOverlap),
+        proximityPairs,
+        labelCount: labelRects.length,
+        overlappingLabelPairs: labelOverlaps,
+        drift: (window as any).__graphPerf?.spatial ?? null,
+      };
+    };
+    return () => {
+      delete (window as any).__layoutMetrics;
+      delete (window as any).__organizeGraph;
+    };
+  }, [getNodeDimensions, validatedEdges, resetLayout]);
+
+  // Center the camera on the graph whenever it loads or CHANGES (login, graph
+  // switch, drill-in / ascend). Keyed on the graph id — the old effect keyed on
+  // hasNodes only and restored one global transform, so it never recentered on
+  // a graph change. We wait briefly for the one-shot layout to settle, then fit.
+  const hasNodes = nodes.length > 0;
+  const currentGraphId = currentGraph?.id;
+  useEffect(() => {
+    if (!hasNodes || !svgRef.current) return undefined;
+    const timer = setTimeout(() => fitViewToNodes(), 1500);
+    return () => clearTimeout(timer);
+  }, [hasNodes, currentGraphId, fitViewToNodes]);
 
   // Expose reset function to parent component
   useEffect(() => {
