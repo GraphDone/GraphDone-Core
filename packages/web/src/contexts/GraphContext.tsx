@@ -154,10 +154,17 @@ export function GraphProvider({ children }: GraphProviderProps) {
         graphToSelect = parsedGraphs.find((g: any) => g.id === storedGraphId);
       }
       
-      // Auto-select graph: either previously selected or first available
+      // Auto-select graph: previously selected, else a sensible default.
+      // Pick by identity (Welcome tutorial first, then the System Overview),
+      // never by array position — merge order isn't stable and shared/system
+      // demo graphs must not hijack the fresh-load graph.
       if (parsedGraphs.length > 0) {
         if (!currentGraph || !parsedGraphs.find((g: any) => g.id === currentGraph.id)) {
-          const selectedGraph = graphToSelect || parsedGraphs[0];
+          const preferredDefault =
+            parsedGraphs.find((g: any) => g.name === 'Welcome') ||
+            parsedGraphs.find((g: any) => g.id === 'overview-graph-shared') ||
+            parsedGraphs[0];
+          const selectedGraph = graphToSelect || preferredDefault;
           setCurrentGraph(selectedGraph);
           // Save to localStorage for persistence
           localStorage.setItem('currentGraphId', selectedGraph.id);
