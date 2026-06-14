@@ -38,9 +38,10 @@ export default defineConfig({
   projects: [
     {
       name: 'GraphDone-Core/dev-neo4j/chromium',
-      // The showcase tour runs in its own capture-heavy project below; keep it
-      // out of the default (fast) project so the smoke gate stays quick.
-      testIgnore: /showcase\.spec\.ts/,
+      // The showcase tour and the local-VLM visual eval run in their own
+      // capture-heavy projects below; keep them out of the default (fast)
+      // project so the smoke gate stays quick.
+      testIgnore: [/showcase\.spec\.ts/, /visual-vlm\.spec\.ts/],
       use: { ...devices['Desktop Chrome'] },
     },
 
@@ -65,7 +66,29 @@ export default defineConfig({
     {
       name: 'perf',
       testDir: './tests/perf',
+      // The large-scale sweep is heavy and report-only; it has its own project
+      // so `test:perf` (the budget gate) stays fast.
+      testIgnore: /scale-sweep\.spec\.ts/,
       use: { ...devices['Desktop Chrome'] },
+    },
+
+    /* Large-scale graph creation + performance metric sweep. Seeds graphs of
+     * increasing size and records window.__graphPerf across them. Heavy +
+     * report-only; run via `npm run test:perf:scale`. */
+    {
+      name: 'perf-scale',
+      testDir: './tests/perf',
+      testMatch: /scale-sweep\.spec\.ts/,
+      use: { ...devices['Desktop Chrome'] },
+    },
+
+    /* Local-VLM visual evaluation across personas. Skips unless VLM_ENDPOINTS
+     * is set in .env.test.local. Run via `npm run test:vlm`. */
+    {
+      name: 'vlm',
+      testDir: './tests/e2e',
+      testMatch: /visual-vlm\.spec\.ts/,
+      use: { ...devices['Desktop Chrome'], screenshot: 'on' },
     },
 
     // Commented out until browsers installed with system dependencies
