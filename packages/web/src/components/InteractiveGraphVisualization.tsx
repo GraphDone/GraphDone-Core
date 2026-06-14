@@ -46,6 +46,7 @@ import { mergeSimulationNodes, mergeSimulationEdges } from '../lib/graphDataMerg
 import { edgeLabelPlacement, clearSegment, slideTFromPointer, chooseLabelT } from '../lib/edgeLabelLayout';
 import { PerfMeter, DriftMeter } from '../lib/perfMeter';
 import { DEFAULT_PHYSICS, collisionRadius, linkDistance, linkMaxDistance, linkStrength } from '../lib/physicsConfig';
+import { edgeBorderEndpoints, minEdgeLength } from '../lib/edgeGeometry';
 import { spawnCelebration } from '../lib/celebration';
 import { buildNeighborhood } from '../lib/graphAdjacency';
 import { UndoStack } from '../lib/undoStack';
@@ -1969,13 +1970,47 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     // physicsConfig.ts — see that file (and the debug console's drift metrics)
     // to reason about / tune why nodes settle and drift the way they do.
     const phys = DEFAULT_PHYSICS;
+
+    // Hard minimum-edge-length constraint: connected nodes may never sit closer
+    // than their edge label needs to display (d._minLen, cached by the link
+    // distance accessor = halfDiag(src)+halfDiag(tgt)+labelW+pad). Position-based
+    // like forceCollide, so it's a real floor, not just a spring preference. It
+    // respects pinned nodes (fx set): a free node yields, two pinned nodes hold.
+    const minEdgeForce = () => {
+      for (const e of validatedEdges as any[]) {
+        const s = e.source, t = e.target;
+        if (!s || !t || typeof s.x !== 'number' || typeof t.x !== 'number') continue;
+        const min = e._minLen || 0;
+        if (min <= 0) continue;
+        let dx = t.x - s.x, dy = t.y - s.y;
+        let dist = Math.hypot(dx, dy);
+        if (dist === 0) { dx = 1; dy = 0; dist = 1; } // arbitrary separation dir
+        if (dist >= min) continue;
+        const corr = ((min - dist) / dist) * 0.5; // ease toward the floor
+        const ox = dx * corr, oy = dy * corr;
+        const sFixed = s.fx != null, tFixed = t.fx != null;
+        if (sFixed && tFixed) continue;
+        if (sFixed) { t.x += ox * 2; t.y += oy * 2; }
+        else if (tFixed) { s.x -= ox * 2; s.y -= oy * 2; }
+        else { s.x -= ox; s.y -= oy; t.x += ox; t.y += oy; }
+      }
+    };
+
     simulation
       .force('link', d3.forceLink(validatedEdges)
         .id((d: any) => d.id)
         .distance((d: any) => {
-          const currentDistance = Math.hypot(d.target.x - d.source.x, d.target.y - d.source.y);
+          const currentDistance = Math.hypot((d.target.x || 0) - (d.source.x || 0), (d.target.y || 0) - (d.source.y || 0));
           const maxDistance = linkMaxDistance(width, height, phys);
-          return currentDistance > maxDistance ? maxDistance : linkDistance(width, height, phys);
+          const preferred = currentDistance > maxDistance ? maxDistance : linkDistance(width, height, phys);
+          // Floor: never pull connected nodes closer than their edge label
+          // needs to display — the label width sets a minimum edge length so
+          // it always fits in the border-to-border gap (edgeGeometry.minEdgeLength).
+          const label = getRelationshipConfig(d.type as RelationshipType)?.label || '';
+          const labelW = label.length * 6.2 + 28; // 10px/600 text + icon + padding
+          const minLen = minEdgeLength(getNodeDimensions(d.source), getNodeDimensions(d.target), labelW);
+          d._minLen = minLen; // cached for the hard min-edge constraint below
+          return Math.max(preferred, minLen);
         })
         .strength((d: any) => {
           const currentDistance = Math.hypot(d.target.x - d.source.x, d.target.y - d.source.y);
@@ -1995,6 +2030,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         .strength(phys.collision.strength)
         .iterations(phys.collision.iterations)
       )
+      .force('minEdge', minEdgeForce)
       .force('hierarchy', d3.forceLink()
         .id((d: any) => d.id)
         .links(createHierarchicalLinks(nodes))
@@ -3370,27 +3406,37 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
 
     let labelAvoidCounter = 0;
     const updateEdgePositions = () => {
+      // Border-to-border anchors: the edge starts/ends where the center line
+      // crosses each card's border, not at the buried center. Computed once per
+      // edge per tick (shared datum) so line, hitbox and arrow agree. The anchor
+      // slides around the border as the nodes move — shortest border path.
+      linkElements.each(function (d: any) {
+        d._ep = edgeBorderEndpoints(
+          { x: d.source.x || 0, y: d.source.y || 0 }, getNodeDimensions(d.source),
+          { x: d.target.x || 0, y: d.target.y || 0 }, getNodeDimensions(d.target)
+        );
+      });
+
       // Update visible edge positions
       linkElements
-        .attr('x1', (d: any) => d.source.x)
-        .attr('y1', (d: any) => d.source.y)
-        .attr('x2', (d: any) => d.target.x)
-        .attr('y2', (d: any) => d.target.y);
-      
-      // Update clickable edge positions  
+        .attr('x1', (d: any) => d._ep.x1)
+        .attr('y1', (d: any) => d._ep.y1)
+        .attr('x2', (d: any) => d._ep.x2)
+        .attr('y2', (d: any) => d._ep.y2);
+
+      // Update clickable edge positions
       clickableEdges
-        .attr('x1', (d: any) => d.source.x)
-        .attr('y1', (d: any) => d.source.y)
-        .attr('x2', (d: any) => d.target.x)
-        .attr('y2', (d: any) => d.target.y);
-        
-      // Update arrow positions
+        .attr('x1', (d: any) => d._ep.x1)
+        .attr('y1', (d: any) => d._ep.y1)
+        .attr('x2', (d: any) => d._ep.x2)
+        .attr('y2', (d: any) => d._ep.y2);
+
+      // Arrow sits at the TARGET border, pointing into the node.
       arrowElements
         .attr('transform', (d: any) => {
-          const midX = (d.source.x + d.target.x) / 2;
-          const midY = (d.source.y + d.target.y) / 2;
-          const angle = Math.atan2(d.target.y - d.source.y, d.target.x - d.source.x) * 180 / Math.PI;
-          return `translate(${midX},${midY}) rotate(${angle})`;
+          const ep = d._ep;
+          const angle = Math.atan2(ep.y2 - ep.y1, ep.x2 - ep.x1) * 180 / Math.PI;
+          return `translate(${ep.x2},${ep.y2}) rotate(${angle})`;
         });
 
       // Edge labels: auto-centered in the clear span between the two node
