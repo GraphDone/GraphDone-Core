@@ -1,10 +1,14 @@
 import { driver } from '../db.js';
-import { createHierarchyDemo, hierarchyDemoExists } from '../services/hierarchyDemo.js';
+import { createHierarchyDemo, hierarchyDemoExists, deleteHierarchyDemo } from '../services/hierarchyDemo.js';
 
 async function ensureHierarchyDemo() {
-  console.log('🏗️  Ensuring hierarchical "graphs of graphs" demo exists...\n');
+  const force = process.argv.includes('--force');
+  console.log(`🏗️  Ensuring hierarchical "graphs of graphs" demo exists${force ? ' (force reseed)' : ''}...\n`);
   try {
-    if (await hierarchyDemoExists(driver)) {
+    if (force && (await hierarchyDemoExists(driver))) {
+      await deleteHierarchyDemo(driver);
+    }
+    if (!force && (await hierarchyDemoExists(driver))) {
       console.log('⏭️  Hierarchy demo already exists - skipping creation\n');
     } else {
       const r = await createHierarchyDemo(driver);

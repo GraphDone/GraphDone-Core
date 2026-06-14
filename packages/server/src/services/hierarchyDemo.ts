@@ -57,7 +57,10 @@ function gridPositions(n: number, spacing: number): Array<{ x: number; y: number
 
 /** A connected sub-graph: backbone chain + deterministic forward links (~1.4x). */
 function buildSubgraph(graphId: string, size: number): { nodes: NodeRow[]; edges: EdgeRow[] } {
-  const pos = gridPositions(size, 140);
+  // Spacing must exceed the node-card collision diameter (~224px) so the seeded
+  // layout is non-overlapping on load — a clean starting state with no physics
+  // needed. (140 produced "garbage piles".)
+  const pos = gridPositions(size, 260);
   const nodes: NodeRow[] = Array.from({ length: size }, (_, i) => {
     const type = NODE_TYPES[(i * 7) % NODE_TYPES.length];
     return {
@@ -89,6 +92,37 @@ function chunk<T>(arr: T[], n: number): T[][] {
   const out: T[][] = [];
   for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n));
   return out;
+}
+
+/** Demo graph ids (overview + every sub-graph) — for a clean force-reseed. */
+function demoGraphIds(): string[] {
+  return [OVERVIEW_GRAPH_ID, ...SUBSYSTEMS.map((s) => `subgraph-${s.key}-shared`)];
+}
+
+/** Tear down the demo (edges → work items → graphs, in that order so we never
+ *  leave orphan edges). Used by the --force reseed path. */
+export async function deleteHierarchyDemo(driver: Driver): Promise<void> {
+  const session = driver.session();
+  const ids = demoGraphIds();
+  try {
+    await session.run(
+      `UNWIND $ids AS gid
+       MATCH (g:Graph {id: gid})<-[:BELONGS_TO]-(w:WorkItem)
+       OPTIONAL MATCH (w)<-[:EDGE_SOURCE|EDGE_TARGET]-(e:Edge)
+       DETACH DELETE e`,
+      { ids }
+    );
+    await session.run(
+      `UNWIND $ids AS gid
+       MATCH (g:Graph {id: gid})<-[:BELONGS_TO]-(w:WorkItem)
+       DETACH DELETE w`,
+      { ids }
+    );
+    await session.run(`UNWIND $ids AS gid MATCH (g:Graph {id: gid}) DETACH DELETE g`, { ids });
+    console.log(`🗑️  Removed previous hierarchy demo (${ids.length} graphs)`);
+  } finally {
+    await session.close();
+  }
 }
 
 export async function hierarchyDemoExists(driver: Driver): Promise<boolean> {
