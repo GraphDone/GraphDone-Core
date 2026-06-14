@@ -57,6 +57,25 @@ export function halfDiagonal(dims: Dims): number {
   return Math.hypot(dims.width, dims.height) / 2;
 }
 
+/** A small margin kept around an edge label (px). */
+export const LABEL_MARGIN = 14;
+
+/**
+ * Distance from a card's center to where the edge crosses its border, along
+ * direction (dx,dy) — i.e. how much of the edge the card actually covers at
+ * this angle (NOT the worst-case corner). With direction unknown (0,0), falls
+ * back to the half short-side. Mirrors rectBorderPoint's reach.
+ */
+export function borderReach(dims: Dims, dx: number, dy: number): number {
+  const hw = dims.width / 2;
+  const hh = dims.height / 2;
+  if (dx === 0 && dy === 0) return Math.min(hw, hh);
+  const sx = dx !== 0 ? hw / Math.abs(dx) : Infinity;
+  const sy = dy !== 0 ? hh / Math.abs(dy) : Infinity;
+  const s = Math.min(sx, sy);
+  return Math.hypot(dx * s, dy * s);
+}
+
 export interface MinNeighbor { x: number; y: number; minLen: number; }
 
 /**
@@ -90,20 +109,23 @@ export function clampToMinNeighbors(target: Pt, neighbors: MinNeighbor[], iterat
 }
 
 /**
- * Minimum CENTER-to-CENTER distance so the edge label always fits in the
- * border-to-border gap, at ANY angle. The visible gap = centerLen − proj(src) −
- * proj(tgt); projection peaks at the half-diagonal (edge toward a corner), so
- * requiring centerLen ≥ halfDiag(src) + halfDiag(tgt) + labelWidth + pad
- * guarantees gap ≥ labelWidth regardless of how the nodes are oriented.
- *
- * Returns 0 for a zero-width label (no constraint).
+ * Minimum CENTER-to-CENTER distance so the edge label fits in the
+ * border-to-border gap with just a small margin — NOT an oversized buffer.
+ * The visible gap = centerLen − reach(src) − reach(tgt); using the per-angle
+ * border reach (pass the edge direction dx,dy) makes the gap = labelWidth +
+ * margin exactly. Returns 0 for a zero-width label (no constraint).
  */
 export function minEdgeLength(
   sourceDims: Dims,
   targetDims: Dims,
   labelWidth: number,
-  pad = 16
+  dx = 0,
+  dy = 0,
+  margin = LABEL_MARGIN
 ): number {
   if (!(labelWidth > 0)) return 0;
-  return halfDiagonal(sourceDims) + halfDiagonal(targetDims) + labelWidth + pad;
+  // Center distance whose BORDER-TO-BORDER gap is exactly labelWidth + a small
+  // margin. We use the per-angle border reach (not the half-diagonal), so the
+  // visible edge is just long enough for the label — no excessive buffer.
+  return borderReach(sourceDims, dx, dy) + borderReach(targetDims, dx, dy) + labelWidth + margin;
 }
