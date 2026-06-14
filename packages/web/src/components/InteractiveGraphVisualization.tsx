@@ -46,7 +46,7 @@ import { mergeSimulationNodes, mergeSimulationEdges } from '../lib/graphDataMerg
 import { edgeLabelPlacement, clearSegment, slideTFromPointer, chooseLabelT } from '../lib/edgeLabelLayout';
 import { PerfMeter, DriftMeter } from '../lib/perfMeter';
 import { DEFAULT_PHYSICS, collisionRadius, linkDistance, linkMaxDistance, linkStrength } from '../lib/physicsConfig';
-import { edgeBorderEndpoints, minEdgeLength } from '../lib/edgeGeometry';
+import { edgeBorderEndpoints, minEdgeLength, clampToMinNeighbors } from '../lib/edgeGeometry';
 import { spawnCelebration } from '../lib/celebration';
 import { buildNeighborhood } from '../lib/graphAdjacency';
 import { UndoStack } from '../lib/undoStack';
@@ -2227,6 +2227,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
               const connectedNode = edge.source.id === d.id ? edge.target : edge.source;
               return {
                 node: connectedNode,
+                edge, // keep the edge so the drag clamp can read its _minLen
                 wasFixed: connectedNode.fx !== null || connectedNode.fy !== null
               };
             });
@@ -2245,12 +2246,23 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
           
           // Threshold for switching from cluster movement to edge stretching
           const stretchThreshold = 80; // pixels
-          
-          if (dragDistance < stretchThreshold) {
+          const clustering = dragDistance < stretchThreshold;
+
+          // Drag-time hard clamp: the dragged node may not get closer than the
+          // edge-label minimum to a connected neighbor that ISN'T moving with it
+          // (cluster-co-moving free neighbors keep their distance automatically,
+          // so they're excluded). This is the interactive twin of the minEdge
+          // force, which only governs the auto-layout.
+          const clampNeighbors = (d._connectedNodes || [])
+            .filter((c: any) => !(clustering && !c.wasFixed))
+            .map((c: any) => ({ x: c.node.x || 0, y: c.node.y || 0, minLen: c.edge?._minLen || 0 }));
+          const tgt = clampToMinNeighbors({ x: event.x, y: event.y }, clampNeighbors);
+
+          if (clustering) {
             // Cluster movement - move connected nodes together
-            const deltaX = event.x - d.x;
-            const deltaY = event.y - d.y;
-            
+            const deltaX = tgt.x - d.x;
+            const deltaY = tgt.y - d.y;
+
             d._connectedNodes.forEach(({ node, wasFixed }: { node: any, wasFixed: boolean }) => {
               if (!wasFixed) { // Only move if not already fixed by user previously
                 node.fx = (node.fx || node.x) + deltaX;
@@ -2268,10 +2280,10 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
               }
             });
           }
-          
-          // Move the dragged node
-          d.fx = event.x;
-          d.fy = event.y;
+
+          // Move the dragged node to the clamped target
+          d.fx = tgt.x;
+          d.fy = tgt.y;
           d.x = d.fx;
           d.y = d.fy;
         })
