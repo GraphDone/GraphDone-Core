@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { rectBorderPoint, edgeBorderEndpoints, halfDiagonal, minEdgeLength } from '../edgeGeometry';
+import { rectBorderPoint, edgeBorderEndpoints, halfDiagonal, minEdgeLength, clampToMinNeighbors } from '../edgeGeometry';
 
 describe('rectBorderPoint', () => {
   const dims = { width: 100, height: 60 }; // hw=50, hh=30
@@ -71,5 +71,40 @@ describe('minEdgeLength', () => {
     // diagonals; the remaining gap must still cover the label.
     const gap = min - halfDiagonal(a) - halfDiagonal(b);
     expect(gap).toBeGreaterThanOrEqual(labelW);
+  });
+});
+
+describe('clampToMinNeighbors (drag-time min edge length)', () => {
+  it('leaves a target that is already far enough alone', () => {
+    const p = clampToMinNeighbors({ x: 300, y: 0 }, [{ x: 0, y: 0, minLen: 200 }]);
+    expect(p).toEqual({ x: 300, y: 0 });
+  });
+
+  it('pushes a too-close target out to exactly the min radius', () => {
+    const p = clampToMinNeighbors({ x: 50, y: 0 }, [{ x: 0, y: 0, minLen: 200 }]);
+    expect(Math.hypot(p.x, p.y)).toBeCloseTo(200, 6);
+    expect(p.y).toBeCloseTo(0, 6); // stays on the same ray
+    expect(p.x).toBeCloseTo(200, 6);
+  });
+
+  it('pushes out in a stable direction when the target sits on the neighbor', () => {
+    const p = clampToMinNeighbors({ x: 0, y: 0 }, [{ x: 0, y: 0, minLen: 120 }]);
+    expect(Math.hypot(p.x, p.y)).toBeCloseTo(120, 6);
+  });
+
+  it('respects multiple neighbors (target ends up outside every min radius)', () => {
+    const neighbors = [
+      { x: 0, y: 0, minLen: 150 },
+      { x: 100, y: 0, minLen: 150 },
+    ];
+    const p = clampToMinNeighbors({ x: 50, y: 10 }, neighbors, 8);
+    for (const n of neighbors) {
+      expect(Math.hypot(p.x - n.x, p.y - n.y)).toBeGreaterThanOrEqual(150 - 1e-6);
+    }
+  });
+
+  it('ignores neighbors with no minimum', () => {
+    const p = clampToMinNeighbors({ x: 5, y: 5 }, [{ x: 0, y: 0, minLen: 0 }]);
+    expect(p).toEqual({ x: 5, y: 5 });
   });
 });

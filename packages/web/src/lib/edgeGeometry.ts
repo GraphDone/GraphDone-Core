@@ -57,6 +57,38 @@ export function halfDiagonal(dims: Dims): number {
   return Math.hypot(dims.width, dims.height) / 2;
 }
 
+export interface MinNeighbor { x: number; y: number; minLen: number; }
+
+/**
+ * Clamp a dragged node's target so it never sits closer than `minLen` to any
+ * neighbor — drag-time enforcement of the minimum-edge-length rule. Projects
+ * the target out of each neighbor's min-radius circle; a few passes resolve
+ * multiple neighbors approximately (the cursor simply can't push past the
+ * nearest constraint). Pure — the caller supplies neighbor positions + mins.
+ */
+export function clampToMinNeighbors(target: Pt, neighbors: MinNeighbor[], iterations = 4): Pt {
+  let x = target.x;
+  let y = target.y;
+  for (let i = 0; i < iterations; i++) {
+    let moved = false;
+    for (const n of neighbors) {
+      if (!(n.minLen > 0)) continue;
+      let dx = x - n.x;
+      let dy = y - n.y;
+      let dist = Math.hypot(dx, dy);
+      if (dist === 0) { dx = 1; dy = 0; dist = 1; } // arbitrary push-out direction
+      if (dist < n.minLen) {
+        const s = n.minLen / dist;
+        x = n.x + dx * s;
+        y = n.y + dy * s;
+        moved = true;
+      }
+    }
+    if (!moved) break;
+  }
+  return { x, y };
+}
+
 /**
  * Minimum CENTER-to-CENTER distance so the edge label always fits in the
  * border-to-border gap, at ANY angle. The visible gap = centerLen − proj(src) −
