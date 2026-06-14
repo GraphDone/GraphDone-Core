@@ -2398,6 +2398,24 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     // Monopoly-style rectangular nodes with colored title bars
     // getNodeDimensions is now defined outside and shared with updateVisualizationData
 
+    // Sheet-symbol "stack" — offset rects BEHIND the card imply this node opens
+    // a whole sub-graph (Altium-style hierarchical sheet). Rendered first so the
+    // main card sits on top. Only for nodes that drill into a sub-graph.
+    [10, 5].forEach((off) => {
+      nodeElements.filter((d: WorkItem) => !!d.subgraphId).append('rect')
+        .attr('class', 'node-subgraph-stack')
+        .attr('x', (d: WorkItem) => -getNodeDimensions(d).width / 2 + off)
+        .attr('y', (d: WorkItem) => -getNodeDimensions(d).height / 2 + off)
+        .attr('width', (d: WorkItem) => getNodeDimensions(d).width)
+        .attr('height', (d: WorkItem) => getNodeDimensions(d).height)
+        .attr('rx', 8)
+        .attr('fill', '#1f2937')
+        .attr('stroke', '#6366f1')
+        .attr('stroke-width', 1.5)
+        .style('opacity', 0.45)
+        .style('pointer-events', 'none');
+    });
+
     // Main node rectangle (dark theme background)
     nodeElements.append('rect')
       .attr('class', (d: WorkItem) => {
@@ -2442,6 +2460,10 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         if (d.status === 'COMPLETED' || d.status === 'Completed' || d.status === 'Done' || d.status === 'DONE') {
           return '#4b5563';
         }
+        // Sheet symbols (drill into a sub-graph) get an indigo accent border.
+        if (d.subgraphId) {
+          return '#818cf8';
+        }
         // In-progress work breathes with its type color (LIVE-1)
         if (isActiveStatus(d.status)) {
           return getTypeConfig(d.type as WorkItemType).hexColor;
@@ -2456,6 +2478,9 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         // Thicker border for selected node
         if (selectedNode && selectedNode.id === d.id) {
           return 3;
+        }
+        if (d.subgraphId) {
+          return 2.5; // Sheet symbol — emphasize it's a container
         }
         return 1.5;
       })
@@ -2691,6 +2716,72 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       setConnectionSource(d.id);
       setIsConnecting(true);
     });
+
+    // Sheet-symbol affordances: a "descend" glyph (bottom-right) + a child
+    // count line, only for nodes that drill into a sub-graph.
+    const sheetNodes = nodeElements.filter((d: WorkItem) => !!d.subgraphId);
+
+    const descendIcon = sheetNodes.append('g')
+      .attr('class', 'node-descend-icon')
+      .attr('transform', (d: WorkItem) => {
+        const x = getNodeDimensions(d).width / 2 - iconSize / 2 - 8;
+        const y = getNodeDimensions(d).height / 2 - iconSize / 2 - 6;
+        return `translate(${x}, ${y}) scale(${1 / (currentTransform?.k || 1)})`;
+      })
+      .style('cursor', 'pointer')
+      .style('opacity', (currentTransform?.k || 1) >= LOD_THRESHOLDS.FAR ? 0.9 : 0)
+      .style('pointer-events', 'all');
+    descendIcon.append('rect')
+      .attr('class', 'descend-bg')
+      .attr('x', -iconSize / 2)
+      .attr('y', -iconSize / 2)
+      .attr('width', iconSize)
+      .attr('height', iconSize)
+      .attr('rx', 4)
+      .attr('fill', 'rgba(99, 102, 241, 0.9)')
+      .attr('stroke', 'rgba(255, 255, 255, 0.85)')
+      .attr('stroke-width', 1);
+    descendIcon.append('text')
+      .attr('x', 0)
+      .attr('y', 0)
+      .attr('text-anchor', 'middle')
+      .attr('dominant-baseline', 'central')
+      .style('font-size', `${iconSize * 0.95}px`)
+      .style('font-weight', 'bold')
+      .style('fill', '#ffffff')
+      .style('pointer-events', 'none')
+      .text('⤢');
+    descendIcon
+      .on('mouseenter', function() {
+        d3.select(this).select('.descend-bg').transition().duration(150)
+          .attr('fill', 'rgba(129, 140, 248, 1)');
+      })
+      .on('mouseleave', function() {
+        d3.select(this).select('.descend-bg').transition().duration(150)
+          .attr('fill', 'rgba(99, 102, 241, 0.9)');
+      })
+      .on('click', (event: MouseEvent, d: WorkItem) => {
+        event.stopPropagation();
+        event.preventDefault();
+        if (d.subgraphId) descendIntoRef.current(d.subgraphId);
+      });
+
+    // Child-graph count line (LOD-gated like the description text).
+    sheetNodes.append('text')
+      .attr('class', 'node-subgraph-count')
+      .attr('x', 0)
+      .attr('y', (d: WorkItem) => getNodeDimensions(d).height / 2 - 10)
+      .attr('text-anchor', 'middle')
+      .style('font-size', '9px')
+      .style('font-weight', '600')
+      .style('fill', '#a5b4fc')
+      .style('pointer-events', 'none')
+      .style('opacity', (currentTransform?.k || 1) >= LOD_THRESHOLDS.CLOSE ? 1 : 0)
+      .text((d: WorkItem) => {
+        const n = d.subgraph?.nodeCount ?? 0;
+        const e = d.subgraph?.edgeCount ?? 0;
+        return `▸ ${n} nodes · ${e} edges`;
+      });
 
     // Node title section - with text wrapping
     nodeElements.each(function(d: WorkItem) {
