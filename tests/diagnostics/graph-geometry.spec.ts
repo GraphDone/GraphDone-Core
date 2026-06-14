@@ -265,4 +265,75 @@ test.describe('graph geometry diagnostic @geometry', () => {
     await gql(page, `mutation($id:ID!){deleteWorkItems(where:{graph:{id:$id}}){nodesDeleted}}`, { id: flowId });
     await gql(page, `mutation($id:ID!){deleteGraphs(where:{id:$id}){nodesDeleted}}`, { id: flowId });
   });
+
+  test('drag-time clamp: a node cannot be dragged closer than the label minimum', async ({ page }) => {
+    fs.mkdirSync(OUT, { recursive: true });
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await login(page, TEST_USERS.ADMIN);
+    await page.waitForTimeout(1500);
+
+    const me = await gql(page, '{ me { id } }');
+    const userId = me.data.me.id;
+    const g = await gql(page, `mutation($i:[GraphCreateInput!]!){createGraphs(input:$i){graphs{id}}}`,
+      { i: [{ name: `${TEST_GRAPH_PREFIX} DragClamp ${Date.now()}`, type: 'PROJECT', status: 'ACTIVE', createdBy: userId, isShared: true }] });
+    const graphId = g.data.createGraphs.graphs[0].id;
+    // Two placed nodes, far apart, joined by a wide-label edge.
+    const created = await gql(page, `mutation($i:[WorkItemCreateInput!]!){createWorkItems(input:$i){workItems{id title}}}`,
+      { i: [
+        { type: 'TASK', title: 'anchor', status: 'IN_PROGRESS', priority: 0.5, positionX: -260, positionY: 0, positionZ: 0, owner: { connect: { where: { node: { id: userId } } } }, graph: { connect: { where: { node: { id: graphId } } } } },
+        { type: 'TASK', title: 'dragme', status: 'IN_PROGRESS', priority: 0.5, positionX: 260, positionY: 0, positionZ: 0, owner: { connect: { where: { node: { id: userId } } } }, graph: { connect: { where: { node: { id: graphId } } } } },
+      ] });
+    const ids: Record<string, string> = {};
+    for (const w of created.data.createWorkItems.workItems) ids[w.title] = w.id;
+    await gql(page, `mutation($i:[EdgeCreateInput!]!){createEdges(input:$i){edges{id}}}`,
+      { i: [{ type: 'IS_PART_OF', weight: 0.6, source: { connect: { where: { node: { id: ids.dragme } } } }, target: { connect: { where: { node: { id: ids.anchor } } } } }] });
+
+    await page.evaluate((gid) => { localStorage.setItem('currentGraphId', gid); localStorage.setItem('graphdone.quality.override', 'HIGH'); }, graphId);
+    await page.reload();
+    await page.waitForTimeout(6000);
+    await page.evaluate(() => (window as any).miniMapNavigate?.(0, 0));
+    await page.waitForTimeout(1000);
+
+    const centerOf = (title: string) => page.evaluate((t) => {
+      const n = [...document.querySelectorAll('.graph-container svg .node')].find((el: any) => el.__data__?.title === t) as any;
+      if (!n) return null;
+      const r = (n.querySelector('.node-bg') as Element).getBoundingClientRect();
+      return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+    }, title);
+
+    const anchor = await centerOf('anchor');
+    const drag = await centerOf('dragme');
+    expect(anchor && drag, 'both nodes on screen').toBeTruthy();
+
+    // Drag "dragme" right onto "anchor" (and past it) — the clamp must stop it.
+    await page.mouse.move(drag!.x, drag!.y);
+    await page.mouse.down();
+    const steps = 24;
+    for (let i = 1; i <= steps; i++) {
+      await page.mouse.move(drag!.x + (anchor!.x - drag!.x) * (i / steps), drag!.y + (anchor!.y - drag!.y) * (i / steps), { steps: 1 });
+      await page.waitForTimeout(15);
+    }
+    await page.mouse.up();
+    await page.waitForTimeout(1500);
+    await page.screenshot({ path: path.join(OUT, 'drag-clamp.png') });
+
+    // Final graph-space center distance + the edge's enforced minimum.
+    const result = await page.evaluate(() => {
+      const node = (t: string) => [...document.querySelectorAll('.graph-container svg .node')].find((el: any) => el.__data__?.title === t) as any;
+      const a = node('anchor')?.__data__, b = node('dragme')?.__data__;
+      const edge = [...document.querySelectorAll('.graph-container svg .edge')].map((e: any) => e.__data__).find((d: any) => d && d._minLen);
+      return { dist: a && b ? Math.hypot(a.x - b.x, a.y - b.y) : -1, minLen: edge?._minLen ?? -1 };
+    });
+    // eslint-disable-next-line no-console
+    console.log(`[geometry:drag] after dragging onto the anchor: centerDist=${Math.round(result.dist)} minLen=${Math.round(result.minLen)}`);
+
+    expect(result.minLen, 'edge has a computed minimum length').toBeGreaterThan(0);
+    // The clamp must keep them apart — allow a small tolerance for the iterative
+    // projection + a tick of settling.
+    expect(result.dist, 'dragged node was held at the label minimum, not on top of the anchor').toBeGreaterThanOrEqual(result.minLen - 25);
+
+    await gql(page, `mutation($id:ID!){deleteEdges(where:{source:{graph:{id:$id}}}){nodesDeleted}}`, { id: graphId });
+    await gql(page, `mutation($id:ID!){deleteWorkItems(where:{graph:{id:$id}}){nodesDeleted}}`, { id: graphId });
+    await gql(page, `mutation($id:ID!){deleteGraphs(where:{id:$id}){nodesDeleted}}`, { id: graphId });
+  });
 });
