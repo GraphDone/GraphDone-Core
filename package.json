@@ -40,6 +40,7 @@
     "test:perf:scale": "playwright test --project=perf-scale --reporter=line && node tests/generate-perf-report.mjs",
     "report:perf": "node tests/generate-perf-report.mjs",
     "test:vlm": "playwright test --project=vlm --reporter=line && node tests/generate-vlm-report.mjs",
+    "test:geometry": "playwright test --project=geometry --reporter=line",
     "report:vlm": "node tests/generate-vlm-report.mjs",
     "perf:bundle": "node tests/perf/check-bundle-size.mjs"
   },
