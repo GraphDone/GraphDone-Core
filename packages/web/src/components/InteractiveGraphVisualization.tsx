@@ -2007,8 +2007,14 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
           // needs to display — the label width sets a minimum edge length so
           // it always fits in the border-to-border gap (edgeGeometry.minEdgeLength).
           const label = getRelationshipConfig(d.type as RelationshipType)?.label || '';
-          const labelW = label.length * 6.2 + 28; // 10px/600 text + icon + padding
-          const minLen = minEdgeLength(getNodeDimensions(d.source), getNodeDimensions(d.target), labelW);
+          // Slightly generous estimate of the rendered label box (10px/600 text
+          // + icon + padding) so the gap never UNDER-shoots the real label.
+          const labelW = label.length * 7 + 34;
+          // Pass the edge direction so the minimum is just the per-angle border
+          // reach + label + a small margin (not an oversized half-diagonal buffer).
+          const dx = (d.target.x || 0) - (d.source.x || 0);
+          const dy = (d.target.y || 0) - (d.source.y || 0);
+          const minLen = minEdgeLength(getNodeDimensions(d.source), getNodeDimensions(d.target), labelW, dx, dy);
           d._minLen = minLen; // cached for the hard min-edge constraint below
           return Math.max(preferred, minLen);
         })

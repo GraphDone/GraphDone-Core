@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { rectBorderPoint, edgeBorderEndpoints, halfDiagonal, minEdgeLength, clampToMinNeighbors } from '../edgeGeometry';
+import { rectBorderPoint, edgeBorderEndpoints, halfDiagonal, minEdgeLength, clampToMinNeighbors, borderReach, LABEL_MARGIN } from '../edgeGeometry';
 
 describe('rectBorderPoint', () => {
   const dims = { width: 100, height: 60 }; // hw=50, hh=30
@@ -56,21 +56,45 @@ describe('edgeBorderEndpoints', () => {
   });
 });
 
+describe('borderReach', () => {
+  const dims = { width: 170, height: 106 }; // hw=85, hh=53
+  it('is the half-width for a horizontal edge', () => {
+    expect(borderReach(dims, 1, 0)).toBeCloseTo(85, 6);
+  });
+  it('is the half-height for a vertical edge', () => {
+    expect(borderReach(dims, 0, 1)).toBeCloseTo(53, 6);
+  });
+  it('never exceeds the half-diagonal (corner is the worst case)', () => {
+    for (const a of [0.2, 0.9, 1.4, 2.2]) {
+      expect(borderReach(dims, Math.cos(a), Math.sin(a))).toBeLessThanOrEqual(halfDiagonal(dims) + 1e-9);
+    }
+  });
+});
+
 describe('minEdgeLength', () => {
   it('is zero when there is no label', () => {
     expect(minEdgeLength({ width: 170, height: 105 }, { width: 170, height: 105 }, 0)).toBe(0);
   });
 
-  it('guarantees the label fits in the border gap at any angle', () => {
+  it('leaves only a SMALL margin around the label, not an oversized buffer', () => {
     const a = { width: 170, height: 105 };
     const b = { width: 160, height: 100 };
     const labelW = 104;
-    const min = minEdgeLength(a, b, labelW, 16);
-    expect(min).toBeCloseTo(halfDiagonal(a) + halfDiagonal(b) + 104 + 16, 6);
-    // At the worst angle (toward a corner) the projections sum to the two half
-    // diagonals; the remaining gap must still cover the label.
-    const gap = min - halfDiagonal(a) - halfDiagonal(b);
-    expect(gap).toBeGreaterThanOrEqual(labelW);
+    // horizontal edge: the border-to-border gap should equal labelW + margin exactly.
+    const min = minEdgeLength(a, b, labelW, 1, 0);
+    const gap = min - borderReach(a, 1, 0) - borderReach(b, 1, 0);
+    expect(gap).toBeCloseTo(labelW + LABEL_MARGIN, 6);
+    // and it must be far tighter than the old half-diagonal buffer.
+    expect(min).toBeLessThan(halfDiagonal(a) + halfDiagonal(b) + labelW);
+  });
+
+  it('keeps the gap == label + margin at a vertical angle too', () => {
+    const a = { width: 170, height: 105 };
+    const b = { width: 170, height: 105 };
+    const labelW = 90;
+    const min = minEdgeLength(a, b, labelW, 0, 1);
+    const gap = min - borderReach(a, 0, 1) - borderReach(b, 0, 1);
+    expect(gap).toBeCloseTo(labelW + LABEL_MARGIN, 6);
   });
 });
 
