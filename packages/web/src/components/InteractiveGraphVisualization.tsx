@@ -85,9 +85,12 @@ interface DragState {
 
 interface InteractiveGraphVisualizationProps {
   onResetLayout?: () => void;
+  /** Notifies the host (Workspace) which node is selected, so a docked
+   *  inspector can show its contents/diagram. Fires null on deselect. */
+  onNodeSelected?: (node: WorkItem | null) => void;
 }
 
-export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGraphVisualizationProps = {}) {
+export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected }: InteractiveGraphVisualizationProps = {}) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const { currentGraph, availableGraphs, descendInto } = useGraph();
@@ -281,6 +284,12 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
   const [showUpdateGraphModal, setShowUpdateGraphModal] = useState(false);
   const [showDeleteGraphModal, setShowDeleteGraphModal] = useState(false);
   const [selectedNode, setSelectedNode] = useState<WorkItem | null>(null);
+  // Lift selection to the host (Workspace) for the docked inspector. One effect
+  // captures every path that changes selectedNode (node click, edit icon,
+  // background-click deselect) without instrumenting each call site.
+  useEffect(() => {
+    onNodeSelected?.(selectedNode);
+  }, [selectedNode, onNodeSelected]);
   const lastSelectedNodeRef = useRef<any>(null); // Track last selected node for centering
   const [selectedEdge, setSelectedEdge] = useState<WorkItemEdge | null>(null);
   const [createNodePosition, setCreateNodePosition] = useState<{ x: number; y: number; z: number } | undefined>(undefined);
@@ -963,7 +972,13 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
 
   // Close menus when clicking outside or pressing ESC
   useEffect(() => {
-    const handleClickOutside = () => {
+    const handleClickOutside = (event: MouseEvent) => {
+      // Clicks inside the docked inspector (a sibling tree) must not deselect
+      // the node — otherwise its own Card/Contents/Diagram controls close it.
+      const target = event.target as Element | null;
+      if (target && target.closest('[data-testid="node-inspector"]')) {
+        return;
+      }
       setNodeMenu(prev => ({ ...prev, visible: false }));
       setEdgeMenu(prev => ({ ...prev, visible: false }));
       setEditingEdge(null); // Close inline edge editor
@@ -1040,13 +1055,11 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
 
       setIsConnecting(false);
       setConnectionSource(null);
-    } else if (node.subgraphId) {
-      // Altium-style sheet symbol: a plain click descends into its sub-graph.
-      // (Grow/connect is handled above; drag is suppressed by mousedownNodeRef;
-      // edit/relationship icons stopPropagation, so this only fires on a plain
-      // click of a sheet node.) Called via ref to avoid re-binding the handler.
-      descendIntoRef.current(node.subgraphId);
     } else {
+      // A plain click SELECTS the node (opens the inspector). Descending into a
+      // sheet node's sub-graph is an explicit action — the descend glyph (⤢) on
+      // the card or the inspector's "Open" — so clicking never navigates you
+      // away unexpectedly (the user loses context otherwise).
       // Handle node selection with 2-item ring buffer
       setSelectedNodes(prev => {
         const newSet = new Set(prev);

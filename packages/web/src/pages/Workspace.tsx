@@ -3,6 +3,7 @@ import { Plus, Share2, Users, Table, Activity, Network, CreditCard, Columns, Cal
 import { createPortal } from 'react-dom';
 import { useQuery } from '@apollo/client';
 import { SafeGraphVisualization } from '../components/SafeGraphVisualization';
+import { NodeInspector } from '../components/NodeInspector';
 import { GraphSelector } from '../components/GraphSelector';
 import { MiniMap } from '../components/MiniMap';
 import { CreateWorkItemModal } from '../components/CreateWorkItemModal';
@@ -28,6 +29,7 @@ export function Workspace() {
   const [showMiniMap, setShowMiniMap] = useState(true);
   const { currentGraph, availableGraphs, getBreadcrumb, ascendTo } = useGraph();
   const breadcrumb = getBreadcrumb();
+  const [inspectorNode, setInspectorNode] = useState<any>(null);
   const { currentTeam, currentUser } = useAuth();
   const { health, loading: healthLoading, error: healthError } = useHealthStatus();
 
@@ -375,7 +377,8 @@ export function Workspace() {
             </div>
           </div>
         ) : viewMode === 'graph' ? (
-          <div className="relative h-full">
+          <div className="relative h-full flex">
+           <div className="relative flex-1 min-w-0 h-full">
             {/* Neo4j Connection Warning */}
             {health?.services?.neo4j?.status !== 'healthy' && (
               <div className="absolute top-4 left-4 right-4 z-50">
@@ -397,7 +400,13 @@ export function Workspace() {
                 </div>
               </div>
             )}
-            <SafeGraphVisualization />
+            <SafeGraphVisualization onNodeSelected={setInspectorNode} />
+           </div>
+           {inspectorNode && (
+             <div className="w-96 flex-shrink-0 h-full hidden md:block">
+               <NodeInspector node={inspectorNode} onClose={() => setInspectorNode(null)} />
+             </div>
+           )}
           </div>
         ) : (
           <ViewManager viewMode={viewMode as 'dashboard' | 'table' | 'cards' | 'kanban' | 'gantt' | 'calendar' | 'activity'} />
