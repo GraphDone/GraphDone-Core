@@ -3888,8 +3888,21 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       const t = d3.zoomIdentity.translate(w / 2 - graphX * k, h / 2 - graphY * k).scale(k);
       svg.transition().duration(350).call(zoomBehaviorRef.current.transform as any, t);
     };
+    // Mini-map wheel/pinch → zoom the main view to a target scale, centered on
+    // the gesture's graph point. Clamped to the same scaleExtent as the main
+    // zoom; applied via the shared zoom behavior so state + handlers stay in sync.
+    (window as any).miniMapZoom = (graphX: number, graphY: number, targetK: number) => {
+      if (!svgRef.current || !containerRef.current || !zoomBehaviorRef.current) return;
+      const svg = d3.select(svgRef.current);
+      const k = Math.max(0.1, Math.min(4, targetK));
+      const w = containerRef.current.clientWidth;
+      const h = containerRef.current.clientHeight;
+      const t = d3.zoomIdentity.translate(w / 2 - graphX * k, h / 2 - graphY * k).scale(k);
+      svg.transition().duration(120).call(zoomBehaviorRef.current.transform as any, t);
+    };
     return () => {
       delete (window as any).miniMapNavigate;
+      delete (window as any).miniMapZoom;
     };
   }, []);
 
