@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { login, TEST_USERS } from '../helpers/auth';
 import { seedLargeGraph, deleteGraphDeep } from '../helpers/seedGraph';
+import { sweepTestData, TEST_GRAPH_PREFIX } from '../helpers/dbHealing';
 import '../helpers/testEnv';
 import { isVlmAvailable, evaluateBatch, PERSONAS, personaByKey } from '../helpers/vlm';
 
@@ -31,6 +32,11 @@ async function shot(page: Page, name: string): Promise<string> {
   return file;
 }
 
+// Self-heal: clear leftover test graphs + orphans before and after, so an
+// interrupted run never leaves the dev DB dirty (which can break THE GATE).
+test.beforeAll(async () => { await sweepTestData('vlm:before'); });
+test.afterAll(async () => { await sweepTestData('vlm:after'); });
+
 test('VLM visual evaluation across personas @vlm', async ({ page }) => {
   test.setTimeout(900_000);
   const available = await isVlmAvailable();
@@ -44,14 +50,14 @@ test('VLM visual evaluation across personas @vlm', async ({ page }) => {
   await page.waitForTimeout(1500);
 
   // 1. Empty graph — first-run invitation (new-user + visual defects).
-  const empty = await page.evaluate(async () => {
+  const empty = await page.evaluate(async (pfx) => {
     const token = localStorage.getItem('authToken') ?? '';
     const post = (query: string, variables?: unknown) =>
       fetch('/api/graphql', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ query, variables }) }).then((r) => r.json());
     const me = await post('{ me { id } }');
-    const g = await post(`mutation($i:[GraphCreateInput!]!){createGraphs(input:$i){graphs{id}}}`, { i: [{ name: `VLM Empty ${Date.now()}`, type: 'PROJECT', status: 'ACTIVE', createdBy: me.data.me.id, isShared: true }] });
+    const g = await post(`mutation($i:[GraphCreateInput!]!){createGraphs(input:$i){graphs{id}}}`, { i: [{ name: `${pfx} VLM Empty ${Date.now()}`, type: 'PROJECT', status: 'ACTIVE', createdBy: me.data.me.id, isShared: true }] });
     return g.data.createGraphs.graphs[0].id as string;
-  });
+  }, TEST_GRAPH_PREFIX);
   cleanup.push(empty);
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.evaluate((id) => localStorage.setItem('currentGraphId', id), empty);

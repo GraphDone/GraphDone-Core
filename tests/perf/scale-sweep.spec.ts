@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { login, TEST_USERS } from '../helpers/auth';
 import { seedLargeGraph, deleteGraphDeep } from '../helpers/seedGraph';
+import { sweepTestData } from '../helpers/dbHealing';
 import '../helpers/testEnv';
 import { envIntList, envList } from '../helpers/testEnv';
 
@@ -192,6 +193,12 @@ async function measure(page: Page, graphId: string, size: number, quality: strin
 
 test.describe('large-scale graph perf sweep @scale', () => {
   test.describe.configure({ mode: 'serial', timeout: 600_000 });
+
+  // Self-heal: clear leftover test graphs + orphans from any prior interrupted
+  // run before starting, and clean up this run afterward even if a per-run
+  // delete was skipped (e.g. a killed run).
+  test.beforeAll(async () => { await sweepTestData('scale:before'); });
+  test.afterAll(async () => { await sweepTestData('scale:after'); });
 
   for (const size of SIZES) {
     test(`sweep ${size} nodes`, async ({ page }) => {
