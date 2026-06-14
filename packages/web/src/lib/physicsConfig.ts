@@ -34,12 +34,20 @@ export interface PhysicsConfig {
 
 /** Current production defaults (extracted verbatim from the component). */
 export const DEFAULT_PHYSICS: PhysicsConfig = {
-  charge: { strength: -60, distanceMax: 200 },
+  charge: { strength: -70, distanceMax: 350 },
   link: { minDistanceFactor: 0.4, maxDistanceFactor: 0.6, strengthNormal: 0.2, strengthStretched: 0.5 },
-  centering: { center: 0.01, axis: 0.002 },
-  collision: { paddingPx: 12, strength: 0.85, iterations: 2 },
+  // Only a TINY inward pull: a strong centering compresses dense graphs into a
+  // core that collision can't separate (the force equilibrium ends up
+  // overlapping). A tiny value just contains the layout so it converges instead
+  // of slowly expanding, while strong collision still spreads it to a clean,
+  // non-overlapping settle. The camera fit handles actual centering.
+  centering: { center: 0.0015, axis: 0.0003 },
+  collision: { paddingPx: 12, strength: 1, iterations: 4 },
   hierarchy: { distance: 250, strength: 0.05 },
-  alpha: { loadEnergy: 0.6, decay: 0.015, velocityDecay: 0.65, restTarget: 0 },
+  // Faster cool-down + heavier damping so a one-shot layout reaches REST
+  // quickly (it stops when alpha < alphaMin) instead of micro-drifting for
+  // many seconds — important on big graphs where low fps stretches the settle.
+  alpha: { loadEnergy: 0.7, decay: 0.03, velocityDecay: 0.78, restTarget: 0 },
   reheat: { drag: 0.1, dragNeighbors: 0.2, collisions: 0.3, resize: 0.3 },
 };
 
