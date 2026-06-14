@@ -6,7 +6,7 @@ import { GraphSelector } from './GraphSelector';
 import { useAuth } from '../contexts/AuthContext';
 import { McpHealthIndicator } from './McpHealthIndicator';
 import FloatingConsole from './FloatingConsole';
-import { TlsStatusIndicator, TlsSecurityBanner } from './TlsStatusIndicator';
+import { InsecureConnectionBanner } from './TlsStatusIndicator';
 import { APP_VERSION } from '../utils/version';
 
 interface LayoutProps {
@@ -31,12 +31,16 @@ export function Layout({ children }: LayoutProps) {
   ];
 
   return (
-    <div 
-      className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 relative overflow-hidden"
+    <div
+      className="h-screen flex flex-col bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 relative overflow-hidden"
       style={{
         '--sidebar-width': desktopSidebarCollapsed ? '4rem' : '16rem'
       } as React.CSSProperties}
     >
+      {/* Insecure-connection warning — an in-flow strip at the very top, so it
+          reserves its own space and never overlaps the app (only over HTTP). */}
+      <InsecureConnectionBanner className="relative z-30" />
+
       {/* Static gradient background - optimized for all browsers */}
       <div className="lagoon-caustics"></div>
       
@@ -58,7 +62,7 @@ export function Layout({ children }: LayoutProps) {
         </div>
       </div>
 
-      <div className="flex">
+      <div className="flex flex-1 min-h-0">
         {/* Sidebar */}
         <div className={`
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
@@ -293,7 +297,7 @@ export function Layout({ children }: LayoutProps) {
 
         {/* Main content */}
         <div className="flex-1 flex flex-col min-w-0 relative z-20">
-          <main className="flex-1 select-none">
+          <main className="flex-1 select-none min-h-0">
             {children}
           </main>
         </div>
@@ -305,9 +309,6 @@ export function Layout({ children }: LayoutProps) {
         onToggle={() => setShowFloatingConsole(!showFloatingConsole)}
         onClose={() => setShowFloatingConsole(false)}
       />
-      
-      {/* TLS/SSL Status Indicator */}
-      <TlsStatusIndicator />
     </div>
   );
 }
