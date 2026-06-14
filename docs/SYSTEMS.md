@@ -19,6 +19,8 @@
 | Lint | `npm run lint` | 0 errors (warnings allowed) |
 | Build | `npm run build` | Production build succeeds |
 | Showcase report | `TEST_URL=http://localhost:3127 npm run report:showcase` | Records .webm video + screenshots of every mode at all 5 resolutions → `test-artifacts/showcase/index.html` (also an every-PR CI artifact). |
+| Large-scale perf sweep | `TEST_URL=http://localhost:3127 npm run test:perf:scale` | Seeds graphs of increasing size (50→2000+ nodes) and records `window.__graphPerf` (settle, tick, fps, drift, query p95) across size × quality → `test-artifacts/scale-sweep/index.html`. Report-only; sizes/qualities via `.env.test.local`. See [docs/testing/local-vlm-and-scale.md](./testing/local-vlm-and-scale.md). |
+| Local VLM visual review | `TEST_URL=http://localhost:3127 npm run test:vlm` | A locally-hosted vision model judges captured states from 4 perspectives (visual defects, new-user clarity, accessibility, living-graph aliveness) → `test-artifacts/vlm/index.html`. **Skips unless `VLM_ENDPOINTS` is set in the gitignored `.env.test.local`** (CI can't reach local GPUs). Report-only. |
 
 **Why THE GATE exists:** a real incident — orphaned `Edge` records made the
 edges query 500 and the UI showed "Error" with zero edges, while every unit
