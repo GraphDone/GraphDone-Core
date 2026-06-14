@@ -25,7 +25,7 @@ export async function sharedWelcomeGraphExists(driver: Driver): Promise<boolean>
   }
 }
 
-interface OnboardingNode {
+export interface OnboardingNode {
   title: string;
   description: string;
   type: string;
@@ -35,13 +35,13 @@ interface OnboardingNode {
   positionZ: number;
 }
 
-interface OnboardingEdge {
+export interface OnboardingEdge {
   sourceIndex: number;
   targetIndex: number;
   type: string;
 }
 
-const WELCOME_NODES: OnboardingNode[] = [
+export const WELCOME_NODES: OnboardingNode[] = [
   {
     title: 'Welcome to GraphDone!',
     description: `# Welcome to GraphDone! 🎉
@@ -62,8 +62,8 @@ GraphDone is a graph-native project management system that reimagines how work f
 This is your workspace - feel free to edit, delete, or reorganize these tutorial nodes as you learn!`,
     type: 'DOCUMENTATION',
     status: 'COMPLETED',
-    positionX: 0,
-    positionY: 0,
+    positionX: -180,
+    positionY: -240,
     positionZ: 0
   },
   {
@@ -80,8 +80,8 @@ Each work item has:
 Try creating a work item right now!`,
     type: 'TASK',
     status: 'NOT_STARTED',
-    positionX: -200,
-    positionY: 150,
+    positionX: -180,
+    positionY: 0,
     positionZ: 0
   },
   {
@@ -102,8 +102,8 @@ To create a dependency:
 Dependencies determine priority - the more dependents a node has, the higher its priority becomes.`,
     type: 'TASK',
     status: 'NOT_STARTED',
-    positionX: 200,
-    positionY: 150,
+    positionX: 180,
+    positionY: 0,
     positionZ: 0
   },
   {
@@ -125,8 +125,8 @@ Dependencies determine priority - the more dependents a node has, the higher its
 The graph is alive - it reorganizes as you add dependencies and complete work!`,
     type: 'DOCUMENTATION',
     status: 'COMPLETED',
-    positionX: 0,
-    positionY: 300,
+    positionX: 180,
+    positionY: 240,
     positionZ: 0
   },
   {
@@ -144,8 +144,8 @@ Switch between views using the mode buttons at the top center of the screen.
 Each view presents the same underlying graph data in different ways - choose what works best for your current task!`,
     type: 'DOCUMENTATION',
     status: 'COMPLETED',
-    positionX: -200,
-    positionY: -150,
+    positionX: -180,
+    positionY: 240,
     positionZ: 0
   },
   {
@@ -170,21 +170,19 @@ Remember: In GraphDone, work flows through natural dependencies, not artificial 
 You can always come back to this Welcome graph for reference, or delete it when you're ready.`,
     type: 'MILESTONE',
     status: 'NOT_STARTED',
-    positionX: 200,
-    positionY: -150,
+    positionX: 180,
+    positionY: 480,
     positionZ: 0
   }
 ];
 
-const WELCOME_EDGES: OnboardingEdge[] = [
-  { sourceIndex: 1, targetIndex: 0, type: 'DEPENDS_ON' },
-  { sourceIndex: 2, targetIndex: 0, type: 'DEPENDS_ON' },
-  { sourceIndex: 3, targetIndex: 0, type: 'RELATES_TO' },
-  { sourceIndex: 4, targetIndex: 0, type: 'RELATES_TO' },
-  { sourceIndex: 5, targetIndex: 1, type: 'DEPENDS_ON' },
-  { sourceIndex: 5, targetIndex: 2, type: 'DEPENDS_ON' },
-  { sourceIndex: 5, targetIndex: 3, type: 'DEPENDS_ON' },
-  { sourceIndex: 5, targetIndex: 4, type: 'DEPENDS_ON' }
+export const WELCOME_EDGES: OnboardingEdge[] = [
+  { sourceIndex: 1, targetIndex: 0, type: 'RELATES_TO' },
+  { sourceIndex: 2, targetIndex: 1, type: 'DEPENDS_ON' },
+  { sourceIndex: 3, targetIndex: 2, type: 'DEPENDS_ON' },
+  { sourceIndex: 4, targetIndex: 1, type: 'RELATES_TO' },
+  { sourceIndex: 4, targetIndex: 3, type: 'RELATES_TO' },
+  { sourceIndex: 5, targetIndex: 3, type: 'DEPENDS_ON' }
 ];
 
 export async function createSharedWelcomeGraph(driver: Driver): Promise<string> {

@@ -3924,6 +3924,10 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
 
   // Track previous node count to detect transition from empty to non-empty
   const prevNodeCountRef = useRef<number>(0);
+  // Track the previous edge signature (id + type + direction) so a relationship
+  // TYPE change or a direction FLIP — which keep the edge COUNT the same — still
+  // forces a rebuild. Without this the edge label/arrow keep the stale value.
+  const prevEdgeSigRef = useRef<string>('');
 
   // Comprehensive reinitialization effect - ONLY when actually needed
   useEffect(() => {
@@ -3940,6 +3944,19 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     const isNowPopulated = nodes.length > 0;
     const transitioningFromEmpty = wasEmpty && isNowPopulated;
 
+    // Detect a relationship TYPE change or direction FLIP. Both keep the edge
+    // count the same, so length-based checks miss them; compare an id+type+
+    // direction signature against the last render and force a rebuild on change.
+    const edgeSig = (validatedEdges as any[])
+      .map((e) => {
+        const sId = typeof e.source === 'object' ? e.source?.id : e.source;
+        const tId = typeof e.target === 'object' ? e.target?.id : e.target;
+        return `${e.id}:${e.type}:${sId}>${tId}`;
+      })
+      .sort()
+      .join(',');
+    const edgesChanged = prevEdgeSigRef.current !== '' && prevEdgeSigRef.current !== edgeSig;
+
     // Only reinitialize if this is truly necessary
     const shouldReinit =
       !svgRef.current ||
@@ -3947,8 +3964,9 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       nodes.length === 0 ||
       !d3.select(svgRef.current).select('.main-graph-group').node() ||
       reinitTrigger > 0 ||
-      transitioningFromEmpty; // Force reinit when adding first node to empty graph
-    
+      transitioningFromEmpty || // Force reinit when adding first node to empty graph
+      edgesChanged; // relationship type changed or direction flipped
+
     if (shouldReinit) {
       console.log('[Graph Debug] Full reinitialization required');
       initializeVisualization();
@@ -3962,8 +3980,9 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       updateVisualizationData();
     }
 
-    // Update previous node count for next comparison
+    // Update previous node count + edge signature for next comparison
     prevNodeCountRef.current = nodes.length;
+    prevEdgeSigRef.current = edgeSig;
 
     const handleResize = () => {
       if (!containerRef.current || !svgRef.current || !simulationRef.current) return;
@@ -3995,7 +4014,13 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     loading, // Re-init when loading completes
     edgesLoading, // Re-init when edges loading completes
     // Track node property changes for selective updates (only titles, descriptions, types)
-    nodes.map(n => `${n.id}:${n.title}:${n.description}:${n.type}:${n.status}`).join(',')
+    nodes.map(n => `${n.id}:${n.title}:${n.description}:${n.type}:${n.status}`).join(','),
+    // Track edge type/direction changes so a relationship edit or flip rebuilds
+    validatedEdges.map((e: any) => {
+      const sId = typeof e.source === 'object' ? e.source?.id : e.source;
+      const tId = typeof e.target === 'object' ? e.target?.id : e.target;
+      return `${e.id}:${e.type}:${sId}>${tId}`;
+    }).join(',')
   ]);
 
   // Manual reinitialization function (expose globally for debugging)
