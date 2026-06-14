@@ -74,8 +74,8 @@ function lineChart(title, key, { unit = '', budget = null } = {}) {
 
 const HEADERS = [
   ['size', 'nodes'], ['quality', 'quality'], ['renderedNodes', 'rendered n'], ['renderedEdges', 'rendered e'],
-  ['loadMs', 'load ms'], ['settleMs', 'settle ms'], ['finalAlpha', 'alpha'], ['avgTickMs', 'tick ms'],
-  ['p95TickMs', 'tick p95'], ['fps', 'fps'], ['droppedFrames', 'dropped'], ['rmsFromSavedPx', 'drift px'],
+  ['loadMs', 'load ms'], ['interactionFps', 'drag fps'], ['settleMs', 'settle ms'], ['finalAlpha', 'alpha'],
+  ['avgTickMs', 'tick ms'], ['p95TickMs', 'tick p95'], ['rmsFromSavedPx', 'drift px'],
   ['queryP95Ms', 'query p95'],
 ];
 const tableRows = rows.map((r) => `<tr>${HEADERS.map(([k]) => `<td>${r[k] === null ? '—' : r[k]}</td>`).join('')}</tr>`).join('');
@@ -95,12 +95,12 @@ td:nth-child(2){text-align:center}
 <h1>GraphDone — Large-Scale Graph Performance Sweep</h1>
 <p class="muted">${rows.length} runs · sizes ${sizes.join(', ')} · qualities ${qualities.join(', ')} · generated ${new Date().toISOString()}</p>
 <div class="charts">
-${lineChart('Settle time vs size', 'settleMs', { unit: 'ms' })}
+${lineChart('Interaction FPS vs size (drag)', 'interactionFps', { unit: '' })}
+${lineChart('Initial load vs size', 'loadMs', { unit: 'ms' })}
 ${lineChart('Avg simulation tick vs size', 'avgTickMs', { unit: 'ms', budget: 8 })}
-${lineChart('Frame rate vs size', 'fps', { unit: '' })}
+${lineChart('Settle time vs size', 'settleMs', { unit: 'ms' })}
 ${lineChart('Layout drift vs size', 'rmsFromSavedPx', { unit: 'px', budget: 25 })}
 ${lineChart('Query p95 latency vs size', 'queryP95Ms', { unit: 'ms', budget: 800 })}
-${lineChart('Initial load vs size', 'loadMs', { unit: 'ms' })}
 </div>
 <h2>All metrics</h2>
 <table><thead><tr>${HEADERS.map(([, h]) => `<th>${h}</th>`).join('')}</tr></thead><tbody>${tableRows}</tbody></table>

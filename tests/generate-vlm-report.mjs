@@ -40,10 +40,13 @@ const sections = [...byCapture.values()].map((cap) => {
     const v = r.verdict;
     const cls = v.pass ? 'pass' : 'flag';
     const issues = v.issues?.length ? `<ul>${v.issues.map((i) => `<li>${esc(i)}</li>`).join('')}</ul>` : '';
+    const model = (v.model || '').replace(/\.gguf$/, '').slice(0, 28);
+    const host = (v.endpoint || '').replace(/^https?:\/\//, '');
+    const foot = (v.endpoint || v.latencyMs) ? `<div class="foot">${esc(model)} @ ${esc(host)}${v.latencyMs ? ` · ${(v.latencyMs / 1000).toFixed(1)}s` : ''}</div>` : '';
     return `<div class="card ${cls}">
       <div class="chead"><span class="badge ${cls}">${v.pass ? 'PASS' : 'FLAG'}</span>
       <strong>${esc(r.persona)}</strong><span class="score">score ${Number(v.score ?? 0).toFixed(2)}</span></div>
-      <p>${esc(v.summary)}</p>${issues}</div>`;
+      <p>${esc(v.summary)}</p>${issues}${foot}</div>`;
   }).join('');
   return `<section class="capture">
     <div class="shot"><img loading="lazy" src="${rel}" alt="${esc(path.basename(cap.imagePath))}"><div class="cap">${esc(path.basename(cap.imagePath))}</div><p class="ctx">${esc(cap.context)}</p></div>
@@ -66,6 +69,7 @@ section.capture{display:grid;grid-template-columns:minmax(320px,440px) 1fr;gap:2
 .badge{font-size:10px;padding:1px 6px;border-radius:4px;font-weight:700}
 .badge.pass{background:#064e3b;color:#6ee7b7}.badge.flag{background:#78350f;color:#fcd34d}
 .card ul{margin:6px 0 0;padding-left:18px;font-size:12px;color:#cdd6e2}
+.foot{margin-top:8px;font-size:10px;color:#5d6b80;border-top:1px solid #1b2536;padding-top:6px}
 </style></head><body>
 <h1>GraphDone — Local VLM Visual Review</h1>
 <div class="summary"><strong>${passed}/${total}</strong> persona checks passed · avg score <strong>${avgScore}</strong><br>

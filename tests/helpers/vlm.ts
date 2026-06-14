@@ -26,6 +26,9 @@ export interface VlmVerdict {
   issues: string[];
   summary: string;
   raw?: string; // raw model text, for the report when parsing is imperfect
+  endpoint?: string; // which box judged this (honesty in the report)
+  model?: string;
+  latencyMs?: number;
 }
 
 export interface Persona {
@@ -95,6 +98,7 @@ const MAX_CONCURRENCY = Math.max(1, envNumber('VLM_MAX_CONCURRENCY', 3));
 
 let rrCounter = 0;
 const protocolCache = new Map<string, VlmProtocol>();
+const modelCache = new Map<string, string>();
 
 export function vlmEndpoints(): string[] {
   return envList('VLM_ENDPOINTS').map((e) => e.replace(/\/+$/, ''));
@@ -102,6 +106,33 @@ export function vlmEndpoints(): string[] {
 
 export function vlmModel(): string {
   return (process.env.VLM_MODEL ?? '').trim();
+}
+
+/**
+ * Resolve the model id for an endpoint. With a single shared model set
+ * VLM_MODEL; with multiple boxes serving DIFFERENT models, set VLM_MODEL=auto
+ * (or leave blank) and each endpoint's own loaded model is used. llama.cpp
+ * serves one model and ignores the field, but sending the right id keeps logs
+ * honest and works with multi-model servers too.
+ */
+async function resolveModel(base: string, protocol: VlmProtocol): Promise<string> {
+  const configured = vlmModel();
+  if (configured && configured.toLowerCase() !== 'auto') return configured;
+  if (modelCache.has(base)) return modelCache.get(base)!;
+  let id = 'default';
+  try {
+    if (protocol === 'openai') {
+      const r = await fetchWithTimeout(`${base}/v1/models`, { headers: authHeaders() }, 5000);
+      const d = await r.json();
+      id = d?.data?.[0]?.id ?? d?.models?.[0]?.name ?? 'default';
+    } else {
+      const r = await fetchWithTimeout(`${base}/api/tags`, {}, 5000);
+      const d = await r.json();
+      id = d?.models?.[0]?.name ?? d?.models?.[0]?.model ?? 'default';
+    }
+  } catch { /* keep default */ }
+  modelCache.set(base, id);
+  return id;
 }
 
 export function isVlmConfigured(): boolean {
@@ -205,7 +236,7 @@ async function callOpenAI(base: string, model: string, system: string, prompt: s
     body: JSON.stringify({
       model,
       temperature: 0,
-      max_tokens: 700,
+      max_tokens: 400,
       messages: [
         { role: 'system', content: system },
         {
@@ -258,21 +289,25 @@ export async function evaluateImage(
     return { pass: false, score: 0, issues: ['No reachable VLM endpoint'], summary: '' };
   }
   const { base, protocol } = eps[rrCounter++ % eps.length];
-  const model = vlmModel();
   const prompt = buildPrompt(persona, context);
+  const started = Date.now();
   try {
+    const model = await resolveModel(base, protocol);
     const b64 = fs.readFileSync(imagePath).toString('base64');
     const text =
       protocol === 'openai'
         ? await callOpenAI(base, model, persona.system, prompt, b64)
         : await callOllama(base, model, persona.system, prompt, b64);
-    return extractVerdict(text);
+    const v = extractVerdict(text);
+    return { ...v, endpoint: base, model, latencyMs: Date.now() - started };
   } catch (err) {
     return {
       pass: false,
       score: 0,
       issues: [`VLM request failed: ${err instanceof Error ? err.message : String(err)}`],
       summary: '',
+      endpoint: base,
+      latencyMs: Date.now() - started,
     };
   }
 }

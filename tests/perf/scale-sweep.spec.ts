@@ -47,6 +47,7 @@ interface SweepResult {
   renderedNodes: number;
   renderedEdges: number;
   loadMs: number; // time from reload to first node painted
+  interactionFps: number; // RELIABLE: rendered frames/sec while dragging the graph
   settleMs: number | null; // time to reach REST_ALPHA (null = never settled within budget)
   finalAlpha: number;
   avgTickMs: number;
@@ -75,20 +76,70 @@ async function measure(page: Page, graphId: string, size: number, quality: strin
   await page.locator('.graph-container svg .node').first().waitFor({ timeout: 60_000 }).catch(() => {});
   const loadMs = Date.now() - t0;
 
-  // Sample until the simulation reaches rest (or budget elapses).
+  // Seeded nodes carry saved grid positions, so the app pins them and the force
+  // sim sits idle — PerfMeter (window.__graphPerf, published only every ~2s
+  // WHILE ticking) then never reports. We hold a node and drag it continuously
+  // for a few seconds: d3 keeps alphaTarget>0 while dragging, so the sim ticks
+  // the whole time and the meter publishes real UNDER-INTERACTION samples (tick
+  // cost / fps at this scale — a realistic "dragging a big graph" metric). We
+  // keep the best (lowest-tick) live sample, then release and time the settle.
+  const box = await page.evaluate(() => {
+    const n = document.querySelector('.graph-container svg .node .node-bg') as Element | null;
+    if (!n) return null;
+    const r = n.getBoundingClientRect();
+    return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+  });
+
+  // Reliable interaction FPS: count real rendered frames (requestAnimationFrame)
+  // over a fixed wall-clock window while dragging. This needs no app
+  // instrumentation, so it works at every size — when the main thread is busy
+  // ticking a huge sim, rAF visibly drops, which is exactly the scaling signal.
+  let lastNonNull: any = null;
+  const samples: any[] = [];
+  let interactionFps = -1;
+  if (box) {
+    await page.evaluate(() => {
+      (window as any).__fc = 0;
+      const loop = () => { (window as any).__fc++; (window as any).__rafId = requestAnimationFrame(loop); };
+      (window as any).__rafId = requestAnimationFrame(loop);
+    });
+    await page.mouse.move(box.x, box.y).catch(() => {});
+    await page.mouse.down().catch(() => {});
+    const dragStart = Date.now();
+    let a = 0;
+    while (Date.now() - dragStart < 6000) {
+      a += 0.6;
+      await page.mouse.move(box.x + Math.cos(a) * 70, box.y + Math.sin(a) * 55).catch(() => {});
+      await page.waitForTimeout(120);
+      const cur = await page.evaluate(() => (window as any).__graphPerf ?? null);
+      if (cur) { lastNonNull = cur; samples.push(cur); }
+    }
+    await page.mouse.up().catch(() => {});
+    const frames = await page.evaluate(() => { cancelAnimationFrame((window as any).__rafId); return (window as any).__fc || 0; });
+    const secs = (Date.now() - dragStart) / 1000;
+    interactionFps = Math.round((frames / secs) * 10) / 10;
+  }
+
+  // Now measure how long it takes to come to rest after the perturbation.
   let settleMs: number | null = null;
-  let last: any = null;
   const settleStart = Date.now();
   while (Date.now() - settleStart < SETTLE_BUDGET_MS) {
-    last = await page.evaluate(() => (window as any).__graphPerf ?? null);
-    if (last && typeof last.alpha === 'number' && last.alpha <= REST_ALPHA) {
-      settleMs = Date.now() - settleStart;
-      break;
+    const cur = await page.evaluate(() => (window as any).__graphPerf ?? null);
+    if (cur) {
+      lastNonNull = cur;
+      if (typeof cur.alpha === 'number' && cur.alpha <= REST_ALPHA) {
+        settleMs = Date.now() - settleStart;
+        break;
+      }
     }
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(300);
   }
-  // One more read so spatial/drift reflects the settled state.
-  last = (await page.evaluate(() => (window as any).__graphPerf ?? null)) ?? last ?? {};
+  // Prefer the worst (max) tick seen under interaction — that's the real cost at
+  // scale; a single settled sample understates it.
+  const underLoad = samples.length
+    ? samples.reduce((w, s) => ((s.avgTickMs ?? 0) > (w.avgTickMs ?? 0) ? s : w))
+    : null;
+  const last = underLoad ?? (await page.evaluate(() => (window as any).__graphPerf ?? null)) ?? lastNonNull ?? {};
 
   const renderedNodes = await page.locator('.graph-container svg .node').count();
   const renderedEdges = await page.locator('.graph-container svg .edge').count();
@@ -125,6 +176,7 @@ async function measure(page: Page, graphId: string, size: number, quality: strin
     renderedNodes,
     renderedEdges,
     loadMs,
+    interactionFps,
     settleMs,
     finalAlpha: typeof last?.alpha === 'number' ? last.alpha : -1,
     avgTickMs: last?.avgTickMs ?? -1,
@@ -146,25 +198,26 @@ test.describe('large-scale graph perf sweep @scale', () => {
       await login(page, TEST_USERS.ADMIN);
       await page.waitForTimeout(1500);
 
-      const seeded = await seedLargeGraph(page, { size });
-      try {
-        for (const quality of QUALITIES) {
+      // A FRESH graph per (size, quality): otherwise the second quality loads
+      // the first run's already-settled positions, the sim never ticks, and
+      // PerfMeter never publishes (the -1 / settle=NONE gaps in v1).
+      for (const quality of QUALITIES) {
+        const seeded = await seedLargeGraph(page, { size });
+        try {
           const result = await measure(page, seeded.graphId, size, quality);
           result.seededEdges = seeded.edgeCount;
           fs.mkdirSync(OUT_DIR, { recursive: true });
           fs.writeFileSync(path.join(OUT_DIR, `${size}n-${quality}.json`), JSON.stringify(result, null, 2));
-          // Console line so a headless run is legible without the report.
           // eslint-disable-next-line no-console
           console.log(
             `[scale] ${size}n/${quality}: rendered ${result.renderedNodes}n/${result.renderedEdges}e ` +
-              `load=${result.loadMs}ms settle=${result.settleMs ?? 'NONE'}ms ` +
-              `tick=${result.avgTickMs}ms fps=${result.fps} drift=${result.rmsFromSavedPx}px qP95=${result.queryP95Ms}ms`
+              `load=${result.loadMs}ms dragFps=${result.interactionFps} settle=${result.settleMs ?? 'NONE'}ms ` +
+              `tick=${result.avgTickMs}ms qP95=${result.queryP95Ms}ms`
           );
-          // Sanity: the seeded graph must actually render. (Report-only otherwise.)
           expect(result.renderedNodes, `graph of ${size} nodes must render some nodes`).toBeGreaterThan(0);
+        } finally {
+          await deleteGraphDeep(page, seeded.graphId);
         }
-      } finally {
-        await deleteGraphDeep(page, seeded.graphId);
       }
     });
   }

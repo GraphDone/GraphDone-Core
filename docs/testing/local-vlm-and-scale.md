@@ -82,9 +82,21 @@ SCALE_SWEEP_SIZES=50,200,500,1000,2000     # blank => small in CI, large locally
 SCALE_SWEEP_QUALITIES=HIGH,ULTRA
 ```
 
-Metrics per (size, quality): rendered node/edge counts, load ms, settle ms
-(to `alpha ≤ 0.02`), avg/p95 tick ms, fps, dropped frames, layout drift
-(`rmsFromSavedPx`), and graph-scoped query p95. Output:
+Metrics per (size, quality):
+
+- **Reliable (measured directly from the browser, captured at every size):**
+  rendered node/edge counts, initial load ms, graph-scoped query p95, and
+  **interaction FPS** — real rendered frames/sec while a node is dragged
+  (counted via `requestAnimationFrame`, so it needs no app instrumentation and
+  reflects how janky the graph feels under interaction at scale).
+- **Best-effort bonus (from the app's `window.__graphPerf`, which only
+  publishes ~every 2s while the sim ticks):** settle ms (to `alpha ≤ 0.02`),
+  avg/p95 sim tick ms, layout drift (`rmsFromSavedPx`). These can be blank for
+  graphs that settle instantly — `interactionFps` is the headline signal.
+
+A FRESH graph is seeded per (size, quality) so each measurement starts from an
+unsettled layout (otherwise the second quality loads the first run's settled,
+pinned positions and the sim never ticks). Output:
 `test-artifacts/scale-sweep/index.html` — a table plus inline SVG charts of how
 each metric scales, with the `@perf` budgets drawn for reference.
 

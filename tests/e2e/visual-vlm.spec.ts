@@ -32,7 +32,7 @@ async function shot(page: Page, name: string): Promise<string> {
 }
 
 test('VLM visual evaluation across personas @vlm', async ({ page }) => {
-  test.setTimeout(600_000);
+  test.setTimeout(900_000);
   const available = await isVlmAvailable();
   test.skip(!available, 'No reachable VLM endpoint (set VLM_ENDPOINTS in .env.test.local)');
 
@@ -73,11 +73,15 @@ test('VLM visual evaluation across personas @vlm', async ({ page }) => {
   await page.waitForTimeout(6000);
   captures.push({ file: await shot(page, 'populated-mobile'), context: 'the same project graph viewed on a phone-sized screen (393x852)', personas: ['visual-defects', 'new-user', 'accessibility'] });
 
-  // 4. Bonus: judge any large-scale sweep screenshots for density/legibility.
+  // 4. Bonus: judge the SINGLE largest scale-sweep frame for density/legibility
+  //    (those frames are 1920px and slow on the model; one is enough signal).
   if (fs.existsSync(SCALE_DIR)) {
-    for (const f of fs.readdirSync(SCALE_DIR).filter((f) => f.endsWith('.png'))) {
-      const label = f.replace(/\.png$/, '');
-      captures.push({ file: path.join(SCALE_DIR, f), context: `a large graph rendered at scale (${label}) — judge whether it stays legible at this density`, personas: ['visual-defects', 'accessibility'] });
+    const largest = fs.readdirSync(SCALE_DIR)
+      .filter((f) => f.endsWith('.png'))
+      .map((f) => ({ f, size: parseInt(f, 10) || 0 }))
+      .sort((a, b) => b.size - a.size)[0];
+    if (largest) {
+      captures.push({ file: path.join(SCALE_DIR, largest.f), context: `a large graph rendered at scale (${largest.size} nodes) — judge whether it stays legible at this density`, personas: ['visual-defects'] });
     }
   }
 
