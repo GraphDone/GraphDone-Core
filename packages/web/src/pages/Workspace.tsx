@@ -61,7 +61,7 @@ export function Workspace() {
   const actualEdgeCount = edgesData?.edges?.length || 0;
 
   return (
-    <div className="h-screen flex flex-col">
+    <div className="h-full flex flex-col">
       {/* Header with Graph Context */}
       <div className="bg-gray-900/30 backdrop-blur-md border-b border-gray-700/30 px-6 py-4">
         {/* Responsive Layout Container */}
