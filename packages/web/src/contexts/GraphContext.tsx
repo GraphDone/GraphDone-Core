@@ -667,8 +667,24 @@ export function GraphProvider({ children }: GraphProviderProps) {
   const getGraphPath = (graphId: string): Graph[] => {
     const graph = availableGraphs.find(g => g.id === graphId);
     if (!graph?.path) return [];
-    
+
     return graph.path.map(pathId => availableGraphs.find(g => g.id === pathId)).filter(Boolean) as Graph[];
+  };
+
+  // Altium-style hierarchy navigation: descend into a node's sub-graph, ascend
+  // back up via the breadcrumb. Both reduce to selectGraph; the breadcrumb is
+  // derived from the target graph's `path` (ancestors) + itself.
+  const descendInto = async (subgraphId: string): Promise<void> => {
+    await selectGraph(subgraphId);
+  };
+
+  const ascendTo = async (graphId: string): Promise<void> => {
+    await selectGraph(graphId);
+  };
+
+  const getBreadcrumb = (): Graph[] => {
+    if (!currentGraph) return [];
+    return [...getGraphPath(currentGraph.id), currentGraph];
   };
 
   const getGraphDepth = (graphId: string): number => {
@@ -725,6 +741,9 @@ export function GraphProvider({ children }: GraphProviderProps) {
     moveGraph,
     getGraphPath,
     getGraphChildren,
+    descendInto,
+    ascendTo,
+    getBreadcrumb,
     shareGraph,
     updatePermissions,
     joinSharedGraph,
