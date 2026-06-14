@@ -91,6 +91,15 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'], screenshot: 'on' },
     },
 
+    /* Graph-geometry diagnostics: measures node/edge/label geometry from the
+     * rendered DOM (edge attachment, label fit, overlaps) to SEE layout issues
+     * before/after a fix. Report-only. Run via `npm run test:geometry`. */
+    {
+      name: 'geometry',
+      testDir: './tests/diagnostics',
+      use: { ...devices['Desktop Chrome'], screenshot: 'on' },
+    },
+
     // Commented out until browsers installed with system dependencies
     // {
     //   name: 'GraphDone-Core/dev-neo4j/firefox',
