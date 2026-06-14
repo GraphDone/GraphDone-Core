@@ -25,6 +25,61 @@ export function MiniMap({ width = 192, height = 128 }: { width?: number; height?
   const [nodes, setNodes] = useState<Record<string, MiniMapNode>>({});
   const [viewport, setViewport] = useState<Viewport | null>(null);
   const nodeTypesRef = useRef<Record<string, string>>({});
+  // Live minimap-px <-> graph-coord conversion params, updated each render so
+  // the native (non-passive) wheel/touch listeners can map a gesture point to
+  // a graph point and drive the main view's zoom.
+  const geomRef = useRef({ minX: 0, minY: 0, offsetX: 0, offsetY: 0, scale: 1, k: 1 });
+  const svgElRef = useRef<SVGSVGElement>(null);
+
+  // Wheel + pinch on the minimap zoom the MAIN view (centered on the gesture
+  // point). Attached natively with passive:false so we can preventDefault and
+  // stop the page from scrolling while zooming the map.
+  useEffect(() => {
+    const el = svgElRef.current;
+    if (!el) return undefined;
+    const toGraph = (clientX: number, clientY: number) => {
+      const r = el.getBoundingClientRect();
+      const g = geomRef.current;
+      return {
+        x: g.minX + (clientX - r.left - g.offsetX) / g.scale,
+        y: g.minY + (clientY - r.top - g.offsetY) / g.scale,
+      };
+    };
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const p = toGraph(e.clientX, e.clientY);
+      const factor = e.deltaY < 0 ? 1.18 : 1 / 1.18;
+      (window as any).miniMapZoom?.(p.x, p.y, geomRef.current.k * factor);
+    };
+    let pinchDist0 = 0;
+    let pinchK0 = 1;
+    const dist = (t: TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+    const mid = (t: TouchList) => ({ x: (t[0].clientX + t[1].clientX) / 2, y: (t[0].clientY + t[1].clientY) / 2 });
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) { pinchDist0 = dist(e.touches); pinchK0 = geomRef.current.k; }
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 2 && pinchDist0 > 0) {
+        e.preventDefault();
+        const m = mid(e.touches);
+        const p = toGraph(m.x, m.y);
+        (window as any).miniMapZoom?.(p.x, p.y, pinchK0 * (dist(e.touches) / pinchDist0));
+      }
+    };
+    const onTouchEnd = () => { pinchDist0 = 0; };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    el.addEventListener('touchstart', onTouchStart, { passive: false });
+    el.addEventListener('touchmove', onTouchMove, { passive: false });
+    el.addEventListener('touchend', onTouchEnd);
+    return () => {
+      el.removeEventListener('wheel', onWheel);
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchmove', onTouchMove);
+      el.removeEventListener('touchend', onTouchEnd);
+    };
+    // Re-run when the svg appears: the minimap renders a "No nodes yet" div
+    // first (svg ref null), then the <svg> once positions arrive — attach then.
+  }, [Object.keys(nodes).length > 0]);
 
   useEffect(() => {
     (window as any).updateMiniMapPositions = (positions: Record<string, { x: number; y: number; type?: string }>) => {
@@ -75,6 +130,7 @@ export function MiniMap({ width = 192, height = 128 }: { width?: number; height?
   const scale = Math.min(width / spanX, height / spanY);
   const offsetX = (width - spanX * scale) / 2;
   const offsetY = (height - spanY * scale) / 2;
+  geomRef.current = { minX, minY, offsetX, offsetY, scale, k: viewport?.k || 1 };
 
   const toMini = useCallback(
     (gx: number, gy: number) => ({
@@ -117,6 +173,7 @@ export function MiniMap({ width = 192, height = 128 }: { width?: number; height?
 
   return (
     <svg
+      ref={svgElRef}
       width="100%"
       height="100%"
       viewBox={`0 0 ${width} ${height}`}
