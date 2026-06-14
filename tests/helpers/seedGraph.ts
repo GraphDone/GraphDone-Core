@@ -1,4 +1,5 @@
 import { Page } from '@playwright/test';
+import { TEST_GRAPH_PREFIX } from './dbHealing';
 
 /**
  * Seeds realistically-shaped graphs of arbitrary size through the real GraphQL
@@ -64,7 +65,7 @@ export async function seedLargeGraph(page: Page, opts: SeedOptions): Promise<See
   const g = await gql(
     page,
     `mutation($input: [GraphCreateInput!]!) { createGraphs(input: $input) { graphs { id } } }`,
-    { input: [{ name: `${namePrefix} ${size}n ${Date.now()}`, type: 'PROJECT', status: 'ACTIVE', createdBy: userId, isShared: true }] }
+    { input: [{ name: `${TEST_GRAPH_PREFIX} ${namePrefix} ${size}n ${Date.now()}`, type: 'PROJECT', status: 'ACTIVE', createdBy: userId, isShared: true }] }
   );
   const graphId = g.createGraphs.graphs[0].id as string;
 
