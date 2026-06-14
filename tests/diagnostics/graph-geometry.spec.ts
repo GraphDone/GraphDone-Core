@@ -226,5 +226,43 @@ test.describe('graph geometry diagnostic @geometry', () => {
     await gql(page, `mutation($id:ID!){deleteEdges(where:{source:{graph:{id:$id}}}){nodesDeleted}}`, { id: graphId });
     await gql(page, `mutation($id:ID!){deleteWorkItems(where:{graph:{id:$id}}){nodesDeleted}}`, { id: graphId });
     await gql(page, `mutation($id:ID!){deleteGraphs(where:{id:$id}){nodesDeleted}}`, { id: graphId });
+
+    // ── Scenario 2: an UNPINNED cluster the sim lays out (positionX/Y=0 =>
+    // unplaced). This exercises the physics floor: every auto-laid edge should
+    // settle long enough for its label (clearSpan >= labelW). Pinned scenario
+    // above can't test this (user-placed nodes aren't moved by the sim).
+    const g2 = await gql(page, `mutation($i:[GraphCreateInput!]!){createGraphs(input:$i){graphs{id}}}`,
+      { i: [{ name: `${TEST_GRAPH_PREFIX} GeometryFlow ${Date.now()}`, type: 'PROJECT', status: 'ACTIVE', createdBy: userId, isShared: true }] });
+    const flowId = g2.data.createGraphs.graphs[0].id;
+    const flowNodes = ['hub', 's1', 's2', 's3', 's4', 's5'];
+    const c2 = await gql(page, `mutation($i:[WorkItemCreateInput!]!){createWorkItems(input:$i){workItems{id title}}}`,
+      { i: flowNodes.map((t) => ({ type: 'TASK', title: t, status: 'IN_PROGRESS', priority: 0.5, positionX: 0, positionY: 0, positionZ: 0, owner: { connect: { where: { node: { id: userId } } } }, graph: { connect: { where: { node: { id: flowId } } } } })) });
+    const fids: Record<string, string> = {};
+    for (const w of c2.data.createWorkItems.workItems) fids[w.title] = w.id;
+    const fEdge = (a: string, b: string, type: string) => ({ type, weight: 0.6, source: { connect: { where: { node: { id: fids[a] } } } }, target: { connect: { where: { node: { id: fids[b] } } } } });
+    await gql(page, `mutation($i:[EdgeCreateInput!]!){createEdges(input:$i){edges{id}}}`,
+      { i: ['s1', 's2', 's3', 's4', 's5'].map((s, idx) => fEdge('hub', s, ['DEPENDS_ON', 'IS_PART_OF', 'RELATES_TO', 'BLOCKS', 'DEPENDS_ON'][idx])) });
+
+    await page.evaluate((gid) => { localStorage.setItem('currentGraphId', gid); localStorage.setItem('graphdone.quality.override', 'HIGH'); }, flowId);
+    await page.reload();
+    await page.waitForTimeout(9000); // unplaced nodes flow + settle
+    await page.evaluate(() => (window as any).miniMapNavigate?.(0, 0));
+    await page.waitForTimeout(800);
+    await page.screenshot({ path: path.join(OUT, 'flow-cluster.png') });
+    const flow = await readGeometry(page);
+    const flowSummary = {
+      edgeCount: flow.edges.length,
+      labelsOverflowing: flow.edges.filter((e) => e.labelOverflowPx > 0).length,
+      labelsOverlappingCards: flow.edges.filter((e) => e.labelOverlapsCard).length,
+      minClearSpan: Math.min(...flow.edges.map((e) => e.clearSpanPx)),
+      maxLabelW: Math.max(...flow.edges.map((e) => e.labelW)),
+    };
+    fs.writeFileSync(path.join(OUT, 'report-flow.json'), JSON.stringify({ summary: flowSummary, edges: flow.edges }, null, 2));
+    // eslint-disable-next-line no-console
+    console.log('[geometry:flow] ' + JSON.stringify(flowSummary));
+
+    await gql(page, `mutation($id:ID!){deleteEdges(where:{source:{graph:{id:$id}}}){nodesDeleted}}`, { id: flowId });
+    await gql(page, `mutation($id:ID!){deleteWorkItems(where:{graph:{id:$id}}){nodesDeleted}}`, { id: flowId });
+    await gql(page, `mutation($id:ID!){deleteGraphs(where:{id:$id}){nodesDeleted}}`, { id: flowId });
   });
 });
