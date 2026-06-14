@@ -52,14 +52,15 @@ test.describe('hierarchy navigation @geometry', () => {
     expect(overview.currentGraphId, 'on the overview graph').toBe(OVERVIEW_ID);
     expect(overview.sheetCount, 'overview has sheet-symbol nodes').toBeGreaterThan(0);
 
-    // Descend: click a sheet node's card.
+    // Descend: click a sheet node's DESCEND glyph (plain card-click now selects
+    // for the inspector; descending is the explicit ⤢ glyph or inspector Open).
     const targetSubgraphId = overview.firstSheetSubgraphId as string;
     await page.evaluate(() => {
       const sheet = [...document.querySelectorAll('.graph-container svg .node')].find(
         (n) => (n as any).__data__?.subgraphId
       ) as SVGGElement | undefined;
-      const bg = (sheet?.querySelector('.node-bg') ?? sheet) as Element | undefined;
-      (bg as any)?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      const glyph = sheet?.querySelector('.node-descend-icon') as Element | undefined;
+      (glyph as any)?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
     await page.waitForTimeout(5000);
 
