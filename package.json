@@ -37,6 +37,10 @@
     "test:smoke": "playwright test tests/e2e/user-smoke.spec.ts --reporter=line",
     "report:showcase": "playwright test --project=showcase && node tests/generate-showcase-report.mjs",
     "test:perf": "playwright test --project=perf --reporter=line",
+    "test:perf:scale": "playwright test --project=perf-scale --reporter=line && node tests/generate-perf-report.mjs",
+    "report:perf": "node tests/generate-perf-report.mjs",
+    "test:vlm": "playwright test --project=vlm --reporter=line && node tests/generate-vlm-report.mjs",
+    "report:vlm": "node tests/generate-vlm-report.mjs",
     "perf:bundle": "node tests/perf/check-bundle-size.mjs"
   },
   "devDependencies": {
