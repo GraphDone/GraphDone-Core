@@ -819,6 +819,39 @@ input[type="date"]:focus {
   animation: none;
 }
 
+/* PERF (simplified LOD): when a dense graph is zoomed out far enough that the
+   per-node detail is unreadable anyway, hide that detail entirely (not just
+   opacity:0 — transparent elements are still painted). Each node drops from ~40
+   painted SVG elements to just its colored card, which is what dominates the
+   frame cost in the whole-graph view. data-simplify is set by
+   InteractiveGraphVisualization below SIMPLIFY_SCALE on dense graphs; zooming
+   back in restores full detail. */
+.graph-container[data-simplify="true"] svg .node-title-bar,
+.graph-container[data-simplify="true"] svg .node-type-text,
+.graph-container[data-simplify="true"] svg .node-title-text,
+.graph-container[data-simplify="true"] svg .node-description-text,
+.graph-container[data-simplify="true"] svg .node-subgraph-count,
+.graph-container[data-simplify="true"] svg .completion-indicator,
+.graph-container[data-simplify="true"] svg .node-edit-icon,
+.graph-container[data-simplify="true"] svg .node-relationship-icon,
+.graph-container[data-simplify="true"] svg .node-descend-icon,
+.graph-container[data-simplify="true"] svg .status-icon-svg,
+.graph-container[data-simplify="true"] svg .status-label-text,
+.graph-container[data-simplify="true"] svg .status-percentage-text,
+.graph-container[data-simplify="true"] svg .status-progress-bg,
+.graph-container[data-simplify="true"] svg .status-progress-fill,
+.graph-container[data-simplify="true"] svg .priority-icon-svg,
+.graph-container[data-simplify="true"] svg .priority-label-text,
+.graph-container[data-simplify="true"] svg .priority-percentage-text,
+.graph-container[data-simplify="true"] svg .priority-progress-bg,
+.graph-container[data-simplify="true"] svg .priority-progress-fill,
+.graph-container[data-simplify="true"] svg .arrow,
+.graph-container[data-simplify="true"] svg .edge-label,
+.graph-container[data-simplify="true"] svg .edge-label-bg,
+.graph-container[data-simplify="true"] svg .edge-label-icon {
+  display: none !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .graph-container svg .edge-flowing-forward,
   .graph-container svg .edge-flowing-reverse {
