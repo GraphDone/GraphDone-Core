@@ -53,6 +53,8 @@ test.describe('large-graph baseline profile @geometry', () => {
       const renderedEdges = await page.locator('.graph-container svg .edge').count();
       const dataDense = await page.evaluate(() => document.querySelector('.graph-container')?.getAttribute('data-dense') ?? null);
       const dataSimplify = await page.evaluate(() => document.querySelector('.graph-container')?.getAttribute('data-simplify') ?? null);
+      const dataDots = await page.evaluate(() => document.querySelector('.graph-container')?.getAttribute('data-dots') ?? null);
+      const paintedEls = await page.evaluate(() => Array.from(document.querySelectorAll('.graph-container svg .node-bg, .graph-container svg .edge')).filter((e) => getComputedStyle(e).display !== 'none').length);
       const paintedDetail = await page.evaluate(() => {
         const sel = '.graph-container svg .node-title-bar, .graph-container svg .status-progress-bg, .graph-container svg .priority-progress-bg, .graph-container svg .node-type-text';
         return Array.from(document.querySelectorAll(sel)).filter((e) => getComputedStyle(e).display !== 'none').length;
@@ -96,6 +98,18 @@ test.describe('large-graph baseline profile @geometry', () => {
         dragFps = Math.round((frames / ((Date.now() - t) / 1000)) * 10) / 10;
       }
 
+      // Pan-interaction FPS: drag the empty top-left background (clear of the
+      // centered cloud at fit view). This is the paint-bound whole-graph metric.
+      await page.evaluate(() => { (window as any).__fc = 0; const loop = () => { (window as any).__fc++; (window as any).__rafId = requestAnimationFrame(loop); }; (window as any).__rafId = requestAnimationFrame(loop); });
+      await page.mouse.move(150, 150);
+      await page.mouse.down();
+      const pt = Date.now();
+      let pang = 0;
+      while (Date.now() - pt < 4000) { pang += 0.5; await page.mouse.move(150 + Math.cos(pang) * 80, 150 + Math.sin(pang) * 80); await page.waitForTimeout(16); }
+      await page.mouse.up();
+      const pframes = await page.evaluate(() => { cancelAnimationFrame((window as any).__rafId); return (window as any).__fc || 0; });
+      const panFps = Math.round((pframes / ((Date.now() - pt) / 1000)) * 10) / 10;
+
       // Zoom-interaction FPS: wheel-zoom repeatedly for 4s.
       await page.mouse.move(960, 540);
       await page.evaluate(() => { (window as any).__fc = 0; const loop = () => { (window as any).__fc++; (window as any).__rafId = requestAnimationFrame(loop); }; (window as any).__rafId = requestAnimationFrame(loop); });
@@ -138,10 +152,10 @@ test.describe('large-graph baseline profile @geometry', () => {
       const zinFrames = await page.evaluate(() => { cancelAnimationFrame((window as any).__rafId); return (window as any).__fc || 0; });
       const zoomedInDragFps = Math.round((zinFrames / ((Date.now() - zt2) / 1000)) * 10) / 10;
 
-      const result = { graph: COMPUTE_GRAPH_ID, quality, dataDense, dataSimplify, paintedDetail, renderedNodes, renderedEdges, idleFps, dragFps, zoomFps, zoomedInDragFps, culledHidden, dom };
+      const result = { graph: COMPUTE_GRAPH_ID, quality, dataDense, dataSimplify, dataDots, paintedEls, paintedDetail, renderedNodes, renderedEdges, idleFps, panFps, dragFps, zoomFps, zoomedInDragFps, culledHidden, dom };
       fs.writeFileSync(path.join(OUT, `compute-${quality}.json`), JSON.stringify(result, null, 2));
       // eslint-disable-next-line no-console
-      console.log(`[profile] ${quality}: dense=${dataDense} simplify=${dataSimplify} paintedDetail=${paintedDetail} nodes=${renderedNodes} edges=${renderedEdges} idleFps=${idleFps} dragFps=${dragFps} zoomFps=${zoomFps} zoomInDragFps=${zoomedInDragFps} culledHidden=${culledHidden} totalSvgEls=${dom.totalSvgEls}`);
+      console.log(`[profile] ${quality}: simplify=${dataSimplify} dots=${dataDots} paintedEls=${paintedEls} idleFps=${idleFps} panFps=${panFps} zoomFps=${zoomFps} dragFps=${dragFps} zoomInDragFps=${zoomedInDragFps}`);
       expect(renderedNodes, 'compute core renders nodes').toBeGreaterThan(0);
     });
   }

@@ -852,6 +852,15 @@ input[type="date"]:focus {
   display: none !important;
 }
 
+/* PERF (dot mode): at extreme zoom-out, edges are sub-pixel hairlines that
+   convey little but cost ~half the painted elements. Hide them so the whole-
+   graph overview composites only the node cards (the paint-bound limit). Edges
+   reappear above DOT_SCALE. data-dots is set by InteractiveGraphVisualization. */
+.graph-container[data-dots="true"] svg .edge,
+.graph-container[data-dots="true"] svg .edge-clickable {
+  display: none !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .graph-container svg .edge-flowing-forward,
   .graph-container svg .edge-flowing-reverse {
