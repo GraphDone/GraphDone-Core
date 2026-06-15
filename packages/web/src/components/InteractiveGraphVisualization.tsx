@@ -65,6 +65,12 @@ const LOD_THRESHOLDS = {
 // filtered layers each frame collapses FPS. Below it, the full aesthetic stays.
 const DENSE_GRAPH_NODE_THRESHOLD = 150;
 
+// Below this zoom scale on a dense graph, per-node detail (text, icons, status/
+// priority bars) is unreadable, so it is hidden outright (data-simplify) — each
+// node renders as just its colored card. This is the dominant win for the
+// whole-graph view, where every element is on screen and painted each frame.
+const SIMPLIFY_SCALE = 0.45;
+
 // Utility functions
 const getSmoothedOpacity = (scale: number, threshold: number, fadeRange: number = 0.2) => {
   if (scale >= threshold + fadeRange) return 1;
@@ -103,6 +109,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected }:
   // descendInto from context isn't memoized; hold the latest in a ref so the
   // D3-bound node click handler can call it without re-binding every render.
   const descendIntoRef = useRef(descendInto);
+  // Mirrors isSimplified for the d3 tick closure (which captures stale render
+  // values otherwise). Lets updateEdgePositions skip hidden arrow/label work.
+  const simplifiedRef = useRef(false);
   descendIntoRef.current = descendInto;
   const { currentUser } = useAuth();
   const { showSuccess, showError } = useNotifications();
@@ -3583,6 +3592,15 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected }:
         .attr('x2', (d: any) => d._ep.x2)
         .attr('y2', (d: any) => d._ep.y2);
 
+      // Simplified (dense + zoomed out): arrows and edge labels are hidden
+      // (data-simplify CSS), so skip their per-tick positioning entirely — at
+      // 1400 edges that arrow transform + label placement pass is the bulk of
+      // the remaining per-tick cost in the whole-graph view. forceAvoid (the
+      // one-shot settle pass) still runs so labels are correct when you zoom in.
+      if (simplifiedRef.current && !forceAvoid) {
+        return;
+      }
+
       // Arrow sits at the TARGET border, pointing into the node.
       arrowElements
         .attr('transform', (d: any) => {
@@ -4176,6 +4194,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected }:
   // a graph change. We wait briefly for the one-shot layout to settle, then fit.
   const hasNodes = nodes.length > 0;
   const isDenseGraph = nodes.length > DENSE_GRAPH_NODE_THRESHOLD;
+  const isSimplified = isDenseGraph && (currentTransform?.scale ?? 1) < SIMPLIFY_SCALE;
+  simplifiedRef.current = isSimplified;
   const currentGraphId = currentGraph?.id;
   useEffect(() => {
     if (!hasNodes || !svgRef.current) return undefined;
@@ -4400,7 +4420,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected }:
     const isNetworkError = errorMessage.includes('Cannot connect');
     
     return (
-      <div ref={containerRef} className="graph-container relative w-full h-full" data-quality={qualityTier} data-dense={isDenseGraph ? 'true' : undefined}>
+      <div ref={containerRef} className="graph-container relative w-full h-full" data-quality={qualityTier} data-dense={isDenseGraph ? 'true' : undefined} data-simplify={isSimplified ? 'true' : undefined}>
         <svg ref={svgRef} className="w-full h-full">
           {/* Error message centered in SVG */}
           <foreignObject x="20%" y="30%" width="60%" height="40%">
@@ -4584,7 +4604,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected }:
 
 
   return (
-    <div ref={containerRef} className="graph-container relative w-full h-full overflow-hidden select-none" data-quality={qualityTier} data-dense={isDenseGraph ? 'true' : undefined}>
+    <div ref={containerRef} className="graph-container relative w-full h-full overflow-hidden select-none" data-quality={qualityTier} data-dense={isDenseGraph ? 'true' : undefined} data-simplify={isSimplified ? 'true' : undefined}>
       <svg 
         ref={svgRef} 
         className="w-full h-full" 
