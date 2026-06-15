@@ -3663,8 +3663,63 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected }:
     const perfMeter = new PerfMeter(240);
     const driftMeter = new DriftMeter();
     let lastPerfReport = 0;
+
+    // Viewport culling (large graphs only). At 1000 nodes the dominant frame
+    // cost is the browser repainting every on-screen SVG element each time a
+    // position changes; off-screen elements cost just as much to paint. We hide
+    // node groups (and edges with both ends hidden) outside the viewport so they
+    // are neither painted nor laid out. Geometry-only, generous margin, recomputed
+    // on a throttle during simulation ticks AND on every pan/zoom (the sim is a
+    // one-shot, so when it has stopped the zoom handler is the only thing that can
+    // reveal nodes panned back into view).
+    const cullEnabled = nodes.length > 200;
+    const CULL_MARGIN_PX = 300;
+    // Culling only pays off when enough of the graph is actually off-screen, i.e.
+    // when zoomed IN. At the whole-graph "fit" view every node is visible, so a
+    // cull pass would be pure overhead (it even slowed zoom). Below this scale we
+    // skip culling and, if we had culled, reveal everything once.
+    const CULL_MIN_SCALE = 0.5;
+    let cullCounter = 0;
+    let cullActive = false;
+    const clearCull = () => {
+      nodeElements.style('display', null);
+      linkElements.style('display', null);
+      clickableEdges.style('display', null);
+      arrowElements.style('display', null);
+      edgeLabelGroups.style('display', null);
+      cullActive = false;
+    };
+    const applyViewportCull = () => {
+      const svgEl = svg.node();
+      if (!svgEl) return;
+      const t = d3.zoomTransform(svgEl);
+      if (t.k < CULL_MIN_SCALE) {
+        if (cullActive) clearCull();
+        return;
+      }
+      cullActive = true;
+      const minGX = (-CULL_MARGIN_PX - t.x) / t.k;
+      const maxGX = (width + CULL_MARGIN_PX - t.x) / t.k;
+      const minGY = (-CULL_MARGIN_PX - t.y) / t.k;
+      const maxGY = (height + CULL_MARGIN_PX - t.y) / t.k;
+      nodeElements.style('display', (d: any) => {
+        const x = d.x ?? 0;
+        const y = d.y ?? 0;
+        const visible = x >= minGX && x <= maxGX && y >= minGY && y <= maxGY;
+        d._culled = !visible;
+        return visible ? null : 'none';
+      });
+      const edgeDisplay = (d: any) => (d.source?._culled && d.target?._culled ? 'none' : null);
+      linkElements.style('display', edgeDisplay);
+      clickableEdges.style('display', edgeDisplay);
+      arrowElements.style('display', edgeDisplay);
+      edgeLabelGroups.style('display', edgeDisplay);
+    };
+
     simulation.on('tick', () => {
       const tickStart = performance.now();
+      cullCounter++;
+      if (cullEnabled && cullCounter % 5 === 0) applyViewportCull();
 
       // 1) Nodes first
       nodeElements
@@ -3695,8 +3750,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected }:
       }
 
       // Update mini-map with current node positions (live simulation objects —
-      // the React-state nodes are different objects since the identity merge)
-      if ((window as any).updateMiniMapPositions) {
+      // the React-state nodes are different objects since the identity merge).
+      // Throttled: rebuilding a full positions dict for every node on every tick
+      // was pure overhead at scale; the minimap doesn't need 60 Hz updates.
+      if (cullCounter % 8 === 0 && (window as any).updateMiniMapPositions) {
         const simNodesForMap = simulation.nodes() as any[];
         if (simNodesForMap.length > 0) {
           const positions: {[key: string]: {x: number, y: number}} = {};
@@ -3746,12 +3803,17 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected }:
     // Update zoom with LOD updates
     zoom.on('zoom', (event) => {
       g.attr('transform', event.transform);
-      setCurrentTransform({ 
-        x: event.transform.x, 
-        y: event.transform.y, 
-        scale: event.transform.k 
+      setCurrentTransform({
+        x: event.transform.x,
+        y: event.transform.y,
+        scale: event.transform.k
       });
-      
+
+      // Re-cull on pan/zoom. The one-shot sim is usually stopped during pan, so
+      // this is the only thing that reveals nodes panned back into view (and
+      // hides ones panned out) — and it keeps paint bounded while panning.
+      if (cullEnabled) applyViewportCull();
+
       // Update mini-map viewport
       if ((window as any).updateMiniMapViewport) {
         const viewportUpdate = {
