@@ -71,6 +71,13 @@ const DENSE_GRAPH_NODE_THRESHOLD = 150;
 // whole-graph view, where every element is on screen and painted each frame.
 const SIMPLIFY_SCALE = 0.45;
 
+// Below this (much smaller) scale a dense graph is in "dot mode": edges are
+// sub-pixel hairlines and nodes are tiny, so edges are hidden entirely and their
+// per-tick positioning skipped. This roughly halves the painted element count
+// (edges are ~half of what's left after simplify), which is the only lever that
+// helps the paint-bound whole-graph pan/zoom. Edges return when you zoom past it.
+const DOT_SCALE = 0.2;
+
 // Utility functions
 const getSmoothedOpacity = (scale: number, threshold: number, fadeRange: number = 0.2) => {
   if (scale >= threshold + fadeRange) return 1;
@@ -112,6 +119,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected }:
   // Mirrors isSimplified for the d3 tick closure (which captures stale render
   // values otherwise). Lets updateEdgePositions skip hidden arrow/label work.
   const simplifiedRef = useRef(false);
+  // Dot mode (extreme zoom-out): edges are hidden, so skip their per-tick work.
+  const dotModeRef = useRef(false);
   descendIntoRef.current = descendInto;
   const { currentUser } = useAuth();
   const { showSuccess, showError } = useNotifications();
@@ -3567,6 +3576,11 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected }:
 
     let labelAvoidCounter = 0;
     const updateEdgePositions = (forceAvoid = false) => {
+      // Dot mode (extreme zoom-out): all edges/arrows/labels are hidden, so there
+      // is nothing to position — skip the whole 1400-edge per-tick pass.
+      if (dotModeRef.current && !forceAvoid) {
+        return;
+      }
       // Border-to-border anchors: the edge starts/ends where the center line
       // crosses each card's border, not at the buried center. Computed once per
       // edge per tick (shared datum) so line, hitbox and arrow agree. The anchor
@@ -4195,7 +4209,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected }:
   const hasNodes = nodes.length > 0;
   const isDenseGraph = nodes.length > DENSE_GRAPH_NODE_THRESHOLD;
   const isSimplified = isDenseGraph && (currentTransform?.scale ?? 1) < SIMPLIFY_SCALE;
+  const isDotMode = isDenseGraph && (currentTransform?.scale ?? 1) < DOT_SCALE;
   simplifiedRef.current = isSimplified;
+  dotModeRef.current = isDotMode;
   const currentGraphId = currentGraph?.id;
   useEffect(() => {
     if (!hasNodes || !svgRef.current) return undefined;
@@ -4420,7 +4436,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected }:
     const isNetworkError = errorMessage.includes('Cannot connect');
     
     return (
-      <div ref={containerRef} className="graph-container relative w-full h-full" data-quality={qualityTier} data-dense={isDenseGraph ? 'true' : undefined} data-simplify={isSimplified ? 'true' : undefined}>
+      <div ref={containerRef} className="graph-container relative w-full h-full" data-quality={qualityTier} data-dense={isDenseGraph ? 'true' : undefined} data-simplify={isSimplified ? 'true' : undefined} data-dots={isDotMode ? 'true' : undefined}>
         <svg ref={svgRef} className="w-full h-full">
           {/* Error message centered in SVG */}
           <foreignObject x="20%" y="30%" width="60%" height="40%">
@@ -4604,7 +4620,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected }:
 
 
   return (
-    <div ref={containerRef} className="graph-container relative w-full h-full overflow-hidden select-none" data-quality={qualityTier} data-dense={isDenseGraph ? 'true' : undefined} data-simplify={isSimplified ? 'true' : undefined}>
+    <div ref={containerRef} className="graph-container relative w-full h-full overflow-hidden select-none" data-quality={qualityTier} data-dense={isDenseGraph ? 'true' : undefined} data-simplify={isSimplified ? 'true' : undefined} data-dots={isDotMode ? 'true' : undefined}>
       <svg 
         ref={svgRef} 
         className="w-full h-full" 
