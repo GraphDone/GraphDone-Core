@@ -796,6 +796,29 @@ input[type="date"]:focus {
   animation: none;
 }
 
+/* PERF (large graphs): independent of the quality tier, a graph with many
+   nodes strips the continuous per-node/edge effects. The breathing/ache/flow
+   animations and drop-shadow halos force a repaint of every filtered layer on
+   every frame, which collapses FPS at scale (measured: ~7 idle FPS at 1000
+   nodes vs ~60 with these off, identical DOM). Small graphs keep the full
+   living-graph aesthetic. data-dense is set by InteractiveGraphVisualization
+   above DENSE_GRAPH_NODE_THRESHOLD nodes. */
+.graph-container[data-dense="true"] svg .node-breathing,
+.graph-container[data-dense="true"] svg .node-stuck {
+  animation: none;
+}
+
+.graph-container[data-dense="true"] svg .node-bg,
+.graph-container[data-dense="true"] svg .node-stuck {
+  filter: none !important;
+}
+
+.graph-container[data-dense="true"] svg .edge-flowing-forward,
+.graph-container[data-dense="true"] svg .edge-flowing-reverse {
+  stroke-dasharray: none;
+  animation: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .graph-container svg .edge-flowing-forward,
   .graph-container svg .edge-flowing-reverse {

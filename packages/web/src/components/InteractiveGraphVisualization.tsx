@@ -59,6 +59,12 @@ const LOD_THRESHOLDS = {
   CLOSE: 1.0,
 };
 
+// Above this node count a graph is "dense": the continuous living-graph effects
+// (breathing/ache/flow animations + per-node drop-shadow halos) are gated off
+// via data-dense regardless of the quality tier, because repainting that many
+// filtered layers each frame collapses FPS. Below it, the full aesthetic stays.
+const DENSE_GRAPH_NODE_THRESHOLD = 150;
+
 // Utility functions
 const getSmoothedOpacity = (scale: number, threshold: number, fadeRange: number = 0.2) => {
   if (scale >= threshold + fadeRange) return 1;
@@ -4107,6 +4113,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected }:
   // hasNodes only and restored one global transform, so it never recentered on
   // a graph change. We wait briefly for the one-shot layout to settle, then fit.
   const hasNodes = nodes.length > 0;
+  const isDenseGraph = nodes.length > DENSE_GRAPH_NODE_THRESHOLD;
   const currentGraphId = currentGraph?.id;
   useEffect(() => {
     if (!hasNodes || !svgRef.current) return undefined;
@@ -4331,7 +4338,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected }:
     const isNetworkError = errorMessage.includes('Cannot connect');
     
     return (
-      <div ref={containerRef} className="graph-container relative w-full h-full" data-quality={qualityTier}>
+      <div ref={containerRef} className="graph-container relative w-full h-full" data-quality={qualityTier} data-dense={isDenseGraph ? 'true' : undefined}>
         <svg ref={svgRef} className="w-full h-full">
           {/* Error message centered in SVG */}
           <foreignObject x="20%" y="30%" width="60%" height="40%">
@@ -4515,7 +4522,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected }:
 
 
   return (
-    <div ref={containerRef} className="graph-container relative w-full h-full overflow-hidden select-none" data-quality={qualityTier}>
+    <div ref={containerRef} className="graph-container relative w-full h-full overflow-hidden select-none" data-quality={qualityTier} data-dense={isDenseGraph ? 'true' : undefined}>
       <svg 
         ref={svgRef} 
         className="w-full h-full" 
