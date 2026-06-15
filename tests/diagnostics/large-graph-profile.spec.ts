@@ -98,10 +98,43 @@ test.describe('large-graph baseline profile @geometry', () => {
       const zframes = await page.evaluate(() => { cancelAnimationFrame((window as any).__rafId); return (window as any).__fc || 0; });
       const zoomFps = Math.round((zframes / ((Date.now() - zt) / 1000)) * 10) / 10;
 
-      const result = { graph: COMPUTE_GRAPH_ID, quality, dataDense, renderedNodes, renderedEdges, idleFps, dragFps, zoomFps, dom };
+      // Zoomed-IN drag: zoom in hard so most of the graph is off-screen, then
+      // drag. This is where viewport culling should help (the fit-view drag above
+      // keeps every node on screen, so culling can't help there).
+      await page.mouse.move(960, 540);
+      for (let i = 0; i < 10; i++) { await page.mouse.wheel(0, 200); await page.waitForTimeout(60); }
+      await page.waitForTimeout(500);
+      const zoomState = await page.evaluate(() => {
+        const g = document.querySelector('.graph-container svg g');
+        const tr = g?.getAttribute('transform') ?? '';
+        const m = tr.match(/scale\(([0-9.]+)\)/);
+        const nodes = Array.from(document.querySelectorAll('.graph-container svg .node'));
+        const hidden = nodes.filter((n) => getComputedStyle(n).display === 'none').length;
+        return { transform: tr.slice(0, 60), scale: m ? parseFloat(m[1]) : null, hidden, total: nodes.length };
+      });
+      const culledHidden = zoomState.hidden;
+      // eslint-disable-next-line no-console
+      console.log(`[profile] ${quality} zoomState: scale=${zoomState.scale} hidden=${zoomState.hidden}/${zoomState.total} tr="${zoomState.transform}"`);
+      const zinBox = await page.evaluate(() => {
+        const n = document.querySelector('.graph-container svg .node .node-bg') as Element | null;
+        if (!n) return { x: 960, y: 540 };
+        const r = n.getBoundingClientRect();
+        return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+      });
+      await page.evaluate(() => { (window as any).__fc = 0; const loop = () => { (window as any).__fc++; (window as any).__rafId = requestAnimationFrame(loop); }; (window as any).__rafId = requestAnimationFrame(loop); });
+      await page.mouse.move(zinBox.x, zinBox.y);
+      await page.mouse.down();
+      const zt2 = Date.now();
+      let aa = 0;
+      while (Date.now() - zt2 < 4000) { aa += 0.6; await page.mouse.move(zinBox.x + Math.cos(aa) * 60, zinBox.y + Math.sin(aa) * 45); await page.waitForTimeout(110); }
+      await page.mouse.up();
+      const zinFrames = await page.evaluate(() => { cancelAnimationFrame((window as any).__rafId); return (window as any).__fc || 0; });
+      const zoomedInDragFps = Math.round((zinFrames / ((Date.now() - zt2) / 1000)) * 10) / 10;
+
+      const result = { graph: COMPUTE_GRAPH_ID, quality, dataDense, renderedNodes, renderedEdges, idleFps, dragFps, zoomFps, zoomedInDragFps, culledHidden, dom };
       fs.writeFileSync(path.join(OUT, `compute-${quality}.json`), JSON.stringify(result, null, 2));
       // eslint-disable-next-line no-console
-      console.log(`[profile] ${quality}: dense=${dataDense} nodes=${renderedNodes} edges=${renderedEdges} idleFps=${idleFps} dragFps=${dragFps} zoomFps=${zoomFps} perNodeEls=${dom.perNodeEls} totalSvgEls=${dom.totalSvgEls} blurOrFilterEls=${dom.blurOrFilterEls}`);
+      console.log(`[profile] ${quality}: dense=${dataDense} nodes=${renderedNodes} edges=${renderedEdges} idleFps=${idleFps} dragFps=${dragFps} zoomFps=${zoomFps} zoomInDragFps=${zoomedInDragFps} culledHidden=${culledHidden} perNodeEls=${dom.perNodeEls} totalSvgEls=${dom.totalSvgEls}`);
       expect(renderedNodes, 'compute core renders nodes').toBeGreaterThan(0);
     });
   }
