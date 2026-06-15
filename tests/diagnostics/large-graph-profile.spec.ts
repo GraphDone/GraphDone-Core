@@ -37,7 +37,9 @@ async function rafFps(page: Page, ms: number): Promise<number> {
 }
 
 test.describe('large-graph baseline profile @geometry', () => {
-  test.describe.configure({ timeout: 180_000 });
+  // Serial: two browsers rendering a 1000-node graph at once thrash the CPU and
+  // make the FPS numbers meaningless. One at a time.
+  test.describe.configure({ timeout: 180_000, mode: 'serial' });
 
   for (const quality of ['HIGH', 'LOW']) {
     test(`compute-core profile @${quality}`, async ({ page }) => {
@@ -50,6 +52,11 @@ test.describe('large-graph baseline profile @geometry', () => {
       const renderedNodes = await page.locator('.graph-container svg .node').count();
       const renderedEdges = await page.locator('.graph-container svg .edge').count();
       const dataDense = await page.evaluate(() => document.querySelector('.graph-container')?.getAttribute('data-dense') ?? null);
+      const dataSimplify = await page.evaluate(() => document.querySelector('.graph-container')?.getAttribute('data-simplify') ?? null);
+      const paintedDetail = await page.evaluate(() => {
+        const sel = '.graph-container svg .node-title-bar, .graph-container svg .status-progress-bg, .graph-container svg .priority-progress-bg, .graph-container svg .node-type-text';
+        return Array.from(document.querySelectorAll(sel)).filter((e) => getComputedStyle(e).display !== 'none').length;
+      });
 
       // DOM weight: total SVG elements, per-node element count, CSS filter usage.
       const dom = await page.evaluate(() => {
@@ -131,10 +138,10 @@ test.describe('large-graph baseline profile @geometry', () => {
       const zinFrames = await page.evaluate(() => { cancelAnimationFrame((window as any).__rafId); return (window as any).__fc || 0; });
       const zoomedInDragFps = Math.round((zinFrames / ((Date.now() - zt2) / 1000)) * 10) / 10;
 
-      const result = { graph: COMPUTE_GRAPH_ID, quality, dataDense, renderedNodes, renderedEdges, idleFps, dragFps, zoomFps, zoomedInDragFps, culledHidden, dom };
+      const result = { graph: COMPUTE_GRAPH_ID, quality, dataDense, dataSimplify, paintedDetail, renderedNodes, renderedEdges, idleFps, dragFps, zoomFps, zoomedInDragFps, culledHidden, dom };
       fs.writeFileSync(path.join(OUT, `compute-${quality}.json`), JSON.stringify(result, null, 2));
       // eslint-disable-next-line no-console
-      console.log(`[profile] ${quality}: dense=${dataDense} nodes=${renderedNodes} edges=${renderedEdges} idleFps=${idleFps} dragFps=${dragFps} zoomFps=${zoomFps} zoomInDragFps=${zoomedInDragFps} culledHidden=${culledHidden} perNodeEls=${dom.perNodeEls} totalSvgEls=${dom.totalSvgEls}`);
+      console.log(`[profile] ${quality}: dense=${dataDense} simplify=${dataSimplify} paintedDetail=${paintedDetail} nodes=${renderedNodes} edges=${renderedEdges} idleFps=${idleFps} dragFps=${dragFps} zoomFps=${zoomFps} zoomInDragFps=${zoomedInDragFps} culledHidden=${culledHidden} totalSvgEls=${dom.totalSvgEls}`);
       expect(renderedNodes, 'compute core renders nodes').toBeGreaterThan(0);
     });
   }
