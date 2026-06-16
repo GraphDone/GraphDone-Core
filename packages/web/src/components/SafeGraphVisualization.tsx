@@ -9,16 +9,17 @@ import type { WorkItem } from '../types/graph';
  */
 interface SafeGraphVisualizationProps {
   onNodeSelected?: (node: WorkItem | null) => void;
+  interactionLocked?: boolean;
 }
 
-export function SafeGraphVisualization({ onNodeSelected }: SafeGraphVisualizationProps = {}) {
+export function SafeGraphVisualization({ onNodeSelected, interactionLocked }: SafeGraphVisualizationProps = {}) {
   return (
     <GraphErrorBoundary
       onError={() => {
         // Error logged by boundary for debugging
       }}
     >
-      <InteractiveGraphVisualization onNodeSelected={onNodeSelected} />
+      <InteractiveGraphVisualization onNodeSelected={onNodeSelected} interactionLocked={interactionLocked} />
     </GraphErrorBoundary>
   );
 }
