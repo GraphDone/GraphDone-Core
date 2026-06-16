@@ -107,11 +107,17 @@ interface InteractiveGraphVisualizationProps {
   /** Notifies the host (Workspace) which node is selected, so a docked
    *  inspector can show its contents/diagram. Fires null on deselect. */
   onNodeSelected?: (node: WorkItem | null) => void;
+  /** When true (phone "locked" mode), node + edge-label dragging is disabled so
+   *  a touch gesture pans the canvas instead of accidentally moving things. */
+  interactionLocked?: boolean;
 }
 
-export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected }: InteractiveGraphVisualizationProps = {}) {
+export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, interactionLocked }: InteractiveGraphVisualizationProps = {}) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  // Live-readable lock flag for d3 drag filters (avoids re-binding handlers on toggle).
+  const interactionLockedRef = useRef<boolean>(!!interactionLocked);
+  useEffect(() => { interactionLockedRef.current = !!interactionLocked; }, [interactionLocked]);
   const { currentGraph, availableGraphs, descendInto } = useGraph();
   // descendInto from context isn't memoized; hold the latest in a ref so the
   // D3-bound node click handler can call it without re-binding every render.
@@ -2282,8 +2288,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected }:
       .attr('class', (d: WorkItem) => `node node-type-${d.type.toLowerCase()}`)
       .style('cursor', 'pointer')
       .call(d3.drag<any, any>()
+        // Locked (phone) → reject the drag so the gesture pans the canvas instead.
+        .filter((event: any) => !interactionLockedRef.current && !event.ctrlKey && !event.button)
         .on('start', (event, d: any) => {
-          
+
           // Check if this is an edge creation attempt (Alt/Option key held)
           if (event.sourceEvent.altKey) {
             mousedownNodeRef.current = d;
@@ -3686,6 +3694,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected }:
     edgeLabelGroups
       .style('cursor', 'grab')
       .call(d3.drag<any, any>()
+        // Locked (phone) → reject so the gesture pans instead of sliding the label.
+        .filter((event: any) => !interactionLockedRef.current && !event.ctrlKey && !event.button)
         .on('start', (event) => {
           event.sourceEvent?.stopPropagation();
         })
