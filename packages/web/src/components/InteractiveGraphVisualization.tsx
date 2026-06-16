@@ -46,6 +46,7 @@ import { mergeSimulationNodes, mergeSimulationEdges } from '../lib/graphDataMerg
 import { edgeLabelPlacement, clearSegment, slideTFromPointer, chooseLabelT } from '../lib/edgeLabelLayout';
 import { PerfMeter, DriftMeter } from '../lib/perfMeter';
 import { DEFAULT_PHYSICS, collisionRadius, linkDistance, linkMaxDistance, linkStrength } from '../lib/physicsConfig';
+import { edgeBorderEndpoints, minEdgeLength, clampToMinNeighbors } from '../lib/edgeGeometry';
 import { spawnCelebration } from '../lib/celebration';
 import { buildNeighborhood } from '../lib/graphAdjacency';
 import { UndoStack } from '../lib/undoStack';
@@ -57,6 +58,25 @@ const LOD_THRESHOLDS = {
   MEDIUM: 0.6,
   CLOSE: 1.0,
 };
+
+// Above this node count a graph is "dense": the continuous living-graph effects
+// (breathing/ache/flow animations + per-node drop-shadow halos) are gated off
+// via data-dense regardless of the quality tier, because repainting that many
+// filtered layers each frame collapses FPS. Below it, the full aesthetic stays.
+const DENSE_GRAPH_NODE_THRESHOLD = 150;
+
+// Below this zoom scale on a dense graph, per-node detail (text, icons, status/
+// priority bars) is unreadable, so it is hidden outright (data-simplify) — each
+// node renders as just its colored card. This is the dominant win for the
+// whole-graph view, where every element is on screen and painted each frame.
+const SIMPLIFY_SCALE = 0.45;
+
+// Below this (much smaller) scale a dense graph is in "dot mode": edges are
+// sub-pixel hairlines and nodes are tiny, so edges are hidden entirely and their
+// per-tick positioning skipped. This roughly halves the painted element count
+// (edges are ~half of what's left after simplify), which is the only lever that
+// helps the paint-bound whole-graph pan/zoom. Edges return when you zoom past it.
+const DOT_SCALE = 0.2;
 
 // Utility functions
 const getSmoothedOpacity = (scale: number, threshold: number, fadeRange: number = 0.2) => {
@@ -84,12 +104,27 @@ interface DragState {
 
 interface InteractiveGraphVisualizationProps {
   onResetLayout?: () => void;
+  /** Notifies the host (Workspace) which node is selected, so a docked
+   *  inspector can show its contents/diagram. Fires null on deselect. */
+  onNodeSelected?: (node: WorkItem | null) => void;
 }
 
-export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGraphVisualizationProps = {}) {
+export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected }: InteractiveGraphVisualizationProps = {}) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const { currentGraph, availableGraphs } = useGraph();
+  const { currentGraph, availableGraphs, descendInto } = useGraph();
+  // descendInto from context isn't memoized; hold the latest in a ref so the
+  // D3-bound node click handler can call it without re-binding every render.
+  const descendIntoRef = useRef(descendInto);
+  // Mirrors isSimplified for the d3 tick closure (which captures stale render
+  // values otherwise). Lets updateEdgePositions skip hidden arrow/label work.
+  const simplifiedRef = useRef(false);
+  // Dot mode (extreme zoom-out): edges are hidden, so skip their per-tick work.
+  const dotModeRef = useRef(false);
+  descendIntoRef.current = descendInto;
+  // The inline-rename overlay tracks its node live (drag/tick/zoom) via rAF,
+  // because its position derives from currentTransform which only updates on zoom.
+  const inlineEditRef = useRef<HTMLDivElement>(null);
   const { currentUser } = useAuth();
   const { showSuccess, showError } = useNotifications();
   const navigate = useNavigate();
@@ -276,6 +311,12 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
   const [showUpdateGraphModal, setShowUpdateGraphModal] = useState(false);
   const [showDeleteGraphModal, setShowDeleteGraphModal] = useState(false);
   const [selectedNode, setSelectedNode] = useState<WorkItem | null>(null);
+  // Lift selection to the host (Workspace) for the docked inspector. One effect
+  // captures every path that changes selectedNode (node click, edit icon,
+  // background-click deselect) without instrumenting each call site.
+  useEffect(() => {
+    onNodeSelected?.(selectedNode);
+  }, [selectedNode, onNodeSelected]);
   const lastSelectedNodeRef = useRef<any>(null); // Track last selected node for centering
   const [selectedEdge, setSelectedEdge] = useState<WorkItemEdge | null>(null);
   const [createNodePosition, setCreateNodePosition] = useState<{ x: number; y: number; z: number } | undefined>(undefined);
@@ -958,7 +999,13 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
 
   // Close menus when clicking outside or pressing ESC
   useEffect(() => {
-    const handleClickOutside = () => {
+    const handleClickOutside = (event: MouseEvent) => {
+      // Clicks inside the docked inspector (a sibling tree) must not deselect
+      // the node — otherwise its own Card/Contents/Diagram controls close it.
+      const target = event.target as Element | null;
+      if (target && target.closest('[data-testid="node-inspector"]')) {
+        return;
+      }
       setNodeMenu(prev => ({ ...prev, visible: false }));
       setEdgeMenu(prev => ({ ...prev, visible: false }));
       setEditingEdge(null); // Close inline edge editor
@@ -1036,6 +1083,10 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       setIsConnecting(false);
       setConnectionSource(null);
     } else {
+      // A plain click SELECTS the node (opens the inspector). Descending into a
+      // sheet node's sub-graph is an explicit action — the descend glyph (⤢) on
+      // the card or the inspector's "Open" — so clicking never navigates you
+      // away unexpectedly (the user loses context otherwise).
       // Handle node selection with 2-item ring buffer
       setSelectedNodes(prev => {
         const newSet = new Set(prev);
@@ -1197,14 +1248,17 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       let x = item.positionX;
       let y = item.positionY;
 
-      // If node has never been positioned (0,0) and has no connections, place it on periphery
-      if (!isPlaced && !hasConnections) {
-        const angle = (index / validatedNodes.length) * 2 * Math.PI;
-        const radius = Math.min(window.innerWidth, window.innerHeight) * 0.4; // Place on outer ring
-        const centerX = 0; // Start from center
-        const centerY = 0;
-        x = centerX + Math.cos(angle) * radius;
-        y = centerY + Math.sin(angle) * radius;
+      // Unplaced (never-positioned) nodes start on a CLEAN grid spread sized to
+      // the node count, spacing > collision diameter (~224) so there are no
+      // initial overlaps. Physics then REFINES this (links pull connected nodes
+      // together, collision holds the gap) and settles fast & clean — far
+      // better than exploding a pile at the origin. Jitter breaks symmetry.
+      if (!isPlaced) {
+        const cols = Math.max(1, Math.ceil(Math.sqrt(validatedNodes.length)));
+        const spacing = 260;
+        const half = (cols * spacing) / 2;
+        x = (index % cols) * spacing - half + ((index * 13) % 23) - 11;
+        y = Math.floor(index / cols) * spacing - half + ((index * 7) % 19) - 9;
       }
 
       const node = {
@@ -1719,8 +1773,14 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         });
     });
 
-    // Gentle restart to settle any property changes
-    simulation.alpha(0.1).restart();
+    // Physics is one-shot: it settles a graph, then stays idle. A routine
+    // data poll must NOT reheat a fully-placed (frozen) graph — that caused
+    // perpetual drift. Only nudge the sim if there are still-unsettled
+    // (unpinned / never-placed) nodes that actually need to find a spot.
+    const hasUnpinned = (simulation.nodes() as any[]).some((n: any) => n.fx == null || n.fy == null);
+    if (hasUnpinned) {
+      simulation.alpha(0.1).restart();
+    }
 
     console.log('[Graph Debug] Simulation data and DOM elements updated');
   }, [nodes, validatedEdges, getNodeDimensions]);
@@ -1766,6 +1826,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       // Surgical update - only clear data elements, preserve core structure
       existingMainGroup.selectAll('.nodes-group').remove();
       existingMainGroup.selectAll('.edges-group').remove();
+      existingMainGroup.selectAll('.arrows-group').remove();
       existingMainGroup.selectAll('.edge-labels-group').remove();
       existingMainGroup.selectAll('.node-labels-container').remove();
       d3.select(containerRef.current).selectAll('.node-labels-container').remove();
@@ -1917,7 +1978,10 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     // never-placed nodes are seeded near center and left free to flow.
     // (This block used to null every node's fx/fy unconditionally, which is
     //  why arrangements never survived a reload — the real drift bug.)
-    nodes.forEach((node: any) => {
+    const spreadCols = Math.max(1, Math.ceil(Math.sqrt(nodes.length)));
+    const spreadSpacing = 260; // > collision diameter so the spread has no overlaps
+    const spreadHalf = (spreadCols * spreadSpacing) / 2;
+    nodes.forEach((node: any, i: number) => {
       node.userPreferredPosition = null;
       node.userPreferenceVector = null;
       const placed = !(((node.positionX ?? 0) === 0) && ((node.positionY ?? 0) === 0));
@@ -1931,8 +1995,10 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         node.userPinned = false;
         node.fx = null;
         node.fy = null;
-        if (!node.x) node.x = centerX + (Math.random() - 0.5) * 100;
-        if (!node.y) node.y = centerY + (Math.random() - 0.5) * 100;
+        // Clean grid spread (not a random pile) so physics refines from a
+        // non-overlapping start.
+        if (!node.x) node.x = (i % spreadCols) * spreadSpacing - spreadHalf + ((i * 13) % 23) - 11;
+        if (!node.y) node.y = Math.floor(i / spreadCols) * spreadSpacing - spreadHalf + ((i * 7) % 19) - 9;
       }
     });
 
@@ -1969,13 +2035,53 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     // physicsConfig.ts — see that file (and the debug console's drift metrics)
     // to reason about / tune why nodes settle and drift the way they do.
     const phys = DEFAULT_PHYSICS;
+
+    // Hard minimum-edge-length constraint: connected nodes may never sit closer
+    // than their edge label needs to display (d._minLen, cached by the link
+    // distance accessor = halfDiag(src)+halfDiag(tgt)+labelW+pad). Position-based
+    // like forceCollide, so it's a real floor, not just a spring preference. It
+    // respects pinned nodes (fx set): a free node yields, two pinned nodes hold.
+    const minEdgeForce = () => {
+      for (const e of validatedEdges as any[]) {
+        const s = e.source, t = e.target;
+        if (!s || !t || typeof s.x !== 'number' || typeof t.x !== 'number') continue;
+        const min = e._minLen || 0;
+        if (min <= 0) continue;
+        let dx = t.x - s.x, dy = t.y - s.y;
+        let dist = Math.hypot(dx, dy);
+        if (dist === 0) { dx = 1; dy = 0; dist = 1; } // arbitrary separation dir
+        if (dist >= min) continue;
+        const corr = ((min - dist) / dist) * 0.5; // ease toward the floor
+        const ox = dx * corr, oy = dy * corr;
+        const sFixed = s.fx != null, tFixed = t.fx != null;
+        if (sFixed && tFixed) continue;
+        if (sFixed) { t.x += ox * 2; t.y += oy * 2; }
+        else if (tFixed) { s.x -= ox * 2; s.y -= oy * 2; }
+        else { s.x -= ox; s.y -= oy; t.x += ox; t.y += oy; }
+      }
+    };
+
     simulation
       .force('link', d3.forceLink(validatedEdges)
         .id((d: any) => d.id)
         .distance((d: any) => {
-          const currentDistance = Math.hypot(d.target.x - d.source.x, d.target.y - d.source.y);
+          const currentDistance = Math.hypot((d.target.x || 0) - (d.source.x || 0), (d.target.y || 0) - (d.source.y || 0));
           const maxDistance = linkMaxDistance(width, height, phys);
-          return currentDistance > maxDistance ? maxDistance : linkDistance(width, height, phys);
+          const preferred = currentDistance > maxDistance ? maxDistance : linkDistance(width, height, phys);
+          // Floor: never pull connected nodes closer than their edge label
+          // needs to display — the label width sets a minimum edge length so
+          // it always fits in the border-to-border gap (edgeGeometry.minEdgeLength).
+          const label = getRelationshipConfig(d.type as RelationshipType)?.label || '';
+          // Slightly generous estimate of the rendered label box (10px/600 text
+          // + icon + padding) so the gap never UNDER-shoots the real label.
+          const labelW = label.length * 7 + 34;
+          // Pass the edge direction so the minimum is just the per-angle border
+          // reach + label + a small margin (not an oversized half-diagonal buffer).
+          const dx = (d.target.x || 0) - (d.source.x || 0);
+          const dy = (d.target.y || 0) - (d.source.y || 0);
+          const minLen = minEdgeLength(getNodeDimensions(d.source), getNodeDimensions(d.target), labelW, dx, dy);
+          d._minLen = minLen; // cached for the hard min-edge constraint below
+          return Math.max(preferred, minLen);
         })
         .strength((d: any) => {
           const currentDistance = Math.hypot(d.target.x - d.source.x, d.target.y - d.source.y);
@@ -1995,6 +2101,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         .strength(phys.collision.strength)
         .iterations(phys.collision.iterations)
       )
+      .force('minEdge', minEdgeForce)
       .force('hierarchy', d3.forceLink()
         .id((d: any) => d.id)
         .links(createHierarchicalLinks(nodes))
@@ -2191,6 +2298,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
               const connectedNode = edge.source.id === d.id ? edge.target : edge.source;
               return {
                 node: connectedNode,
+                edge, // keep the edge so the drag clamp can read its _minLen
                 wasFixed: connectedNode.fx !== null || connectedNode.fy !== null
               };
             });
@@ -2209,12 +2317,23 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
           
           // Threshold for switching from cluster movement to edge stretching
           const stretchThreshold = 80; // pixels
-          
-          if (dragDistance < stretchThreshold) {
+          const clustering = dragDistance < stretchThreshold;
+
+          // Drag-time hard clamp: the dragged node may not get closer than the
+          // edge-label minimum to a connected neighbor that ISN'T moving with it
+          // (cluster-co-moving free neighbors keep their distance automatically,
+          // so they're excluded). This is the interactive twin of the minEdge
+          // force, which only governs the auto-layout.
+          const clampNeighbors = (d._connectedNodes || [])
+            .filter((c: any) => !(clustering && !c.wasFixed))
+            .map((c: any) => ({ x: c.node.x || 0, y: c.node.y || 0, minLen: c.edge?._minLen || 0 }));
+          const tgt = clampToMinNeighbors({ x: event.x, y: event.y }, clampNeighbors);
+
+          if (clustering) {
             // Cluster movement - move connected nodes together
-            const deltaX = event.x - d.x;
-            const deltaY = event.y - d.y;
-            
+            const deltaX = tgt.x - d.x;
+            const deltaY = tgt.y - d.y;
+
             d._connectedNodes.forEach(({ node, wasFixed }: { node: any, wasFixed: boolean }) => {
               if (!wasFixed) { // Only move if not already fixed by user previously
                 node.fx = (node.fx || node.x) + deltaX;
@@ -2232,10 +2351,10 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
               }
             });
           }
-          
-          // Move the dragged node
-          d.fx = event.x;
-          d.fy = event.y;
+
+          // Move the dragged node to the clamped target
+          d.fx = tgt.x;
+          d.fy = tgt.y;
           d.x = d.fx;
           d.y = d.fy;
         })
@@ -2334,6 +2453,24 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     // Monopoly-style rectangular nodes with colored title bars
     // getNodeDimensions is now defined outside and shared with updateVisualizationData
 
+    // Sheet-symbol "stack" — offset rects BEHIND the card imply this node opens
+    // a whole sub-graph (Altium-style hierarchical sheet). Rendered first so the
+    // main card sits on top. Only for nodes that drill into a sub-graph.
+    [10, 5].forEach((off) => {
+      nodeElements.filter((d: WorkItem) => !!d.subgraphId).append('rect')
+        .attr('class', 'node-subgraph-stack')
+        .attr('x', (d: WorkItem) => -getNodeDimensions(d).width / 2 + off)
+        .attr('y', (d: WorkItem) => -getNodeDimensions(d).height / 2 + off)
+        .attr('width', (d: WorkItem) => getNodeDimensions(d).width)
+        .attr('height', (d: WorkItem) => getNodeDimensions(d).height)
+        .attr('rx', 8)
+        .attr('fill', '#1f2937')
+        .attr('stroke', '#6366f1')
+        .attr('stroke-width', 1.5)
+        .style('opacity', 0.45)
+        .style('pointer-events', 'none');
+    });
+
     // Main node rectangle (dark theme background)
     nodeElements.append('rect')
       .attr('class', (d: WorkItem) => {
@@ -2378,6 +2515,10 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         if (d.status === 'COMPLETED' || d.status === 'Completed' || d.status === 'Done' || d.status === 'DONE') {
           return '#4b5563';
         }
+        // Sheet symbols (drill into a sub-graph) get an indigo accent border.
+        if (d.subgraphId) {
+          return '#818cf8';
+        }
         // In-progress work breathes with its type color (LIVE-1)
         if (isActiveStatus(d.status)) {
           return getTypeConfig(d.type as WorkItemType).hexColor;
@@ -2392,6 +2533,9 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         // Thicker border for selected node
         if (selectedNode && selectedNode.id === d.id) {
           return 3;
+        }
+        if (d.subgraphId) {
+          return 2.5; // Sheet symbol — emphasize it's a container
         }
         return 1.5;
       })
@@ -2627,6 +2771,72 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       setConnectionSource(d.id);
       setIsConnecting(true);
     });
+
+    // Sheet-symbol affordances: a "descend" glyph (bottom-right) + a child
+    // count line, only for nodes that drill into a sub-graph.
+    const sheetNodes = nodeElements.filter((d: WorkItem) => !!d.subgraphId);
+
+    const descendIcon = sheetNodes.append('g')
+      .attr('class', 'node-descend-icon')
+      .attr('transform', (d: WorkItem) => {
+        const x = getNodeDimensions(d).width / 2 - iconSize / 2 - 8;
+        const y = getNodeDimensions(d).height / 2 - iconSize / 2 - 6;
+        return `translate(${x}, ${y}) scale(${1 / (currentTransform?.k || 1)})`;
+      })
+      .style('cursor', 'pointer')
+      .style('opacity', (currentTransform?.k || 1) >= LOD_THRESHOLDS.FAR ? 0.9 : 0)
+      .style('pointer-events', 'all');
+    descendIcon.append('rect')
+      .attr('class', 'descend-bg')
+      .attr('x', -iconSize / 2)
+      .attr('y', -iconSize / 2)
+      .attr('width', iconSize)
+      .attr('height', iconSize)
+      .attr('rx', 4)
+      .attr('fill', 'rgba(99, 102, 241, 0.9)')
+      .attr('stroke', 'rgba(255, 255, 255, 0.85)')
+      .attr('stroke-width', 1);
+    descendIcon.append('text')
+      .attr('x', 0)
+      .attr('y', 0)
+      .attr('text-anchor', 'middle')
+      .attr('dominant-baseline', 'central')
+      .style('font-size', `${iconSize * 0.95}px`)
+      .style('font-weight', 'bold')
+      .style('fill', '#ffffff')
+      .style('pointer-events', 'none')
+      .text('⤢');
+    descendIcon
+      .on('mouseenter', function() {
+        d3.select(this).select('.descend-bg').transition().duration(150)
+          .attr('fill', 'rgba(129, 140, 248, 1)');
+      })
+      .on('mouseleave', function() {
+        d3.select(this).select('.descend-bg').transition().duration(150)
+          .attr('fill', 'rgba(99, 102, 241, 0.9)');
+      })
+      .on('click', (event: MouseEvent, d: WorkItem) => {
+        event.stopPropagation();
+        event.preventDefault();
+        if (d.subgraphId) descendIntoRef.current(d.subgraphId);
+      });
+
+    // Child-graph count line (LOD-gated like the description text).
+    sheetNodes.append('text')
+      .attr('class', 'node-subgraph-count')
+      .attr('x', 0)
+      .attr('y', (d: WorkItem) => getNodeDimensions(d).height / 2 - 10)
+      .attr('text-anchor', 'middle')
+      .style('font-size', '9px')
+      .style('font-weight', '600')
+      .style('fill', '#a5b4fc')
+      .style('pointer-events', 'none')
+      .style('opacity', (currentTransform?.k || 1) >= LOD_THRESHOLDS.CLOSE ? 1 : 0)
+      .text((d: WorkItem) => {
+        const n = d.subgraph?.nodeCount ?? 0;
+        const e = d.subgraph?.edgeCount ?? 0;
+        return `▸ ${n} nodes · ${e} edges`;
+      });
 
     // Node title section - with text wrapping
     nodeElements.each(function(d: WorkItem) {
@@ -3369,28 +3579,52 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     });
 
     let labelAvoidCounter = 0;
-    const updateEdgePositions = () => {
+    const updateEdgePositions = (forceAvoid = false) => {
+      // Dot mode (extreme zoom-out): all edges/arrows/labels are hidden, so there
+      // is nothing to position — skip the whole 1400-edge per-tick pass.
+      if (dotModeRef.current && !forceAvoid) {
+        return;
+      }
+      // Border-to-border anchors: the edge starts/ends where the center line
+      // crosses each card's border, not at the buried center. Computed once per
+      // edge per tick (shared datum) so line, hitbox and arrow agree. The anchor
+      // slides around the border as the nodes move — shortest border path.
+      linkElements.each(function (d: any) {
+        d._ep = edgeBorderEndpoints(
+          { x: d.source.x || 0, y: d.source.y || 0 }, getNodeDimensions(d.source),
+          { x: d.target.x || 0, y: d.target.y || 0 }, getNodeDimensions(d.target)
+        );
+      });
+
       // Update visible edge positions
       linkElements
-        .attr('x1', (d: any) => d.source.x)
-        .attr('y1', (d: any) => d.source.y)
-        .attr('x2', (d: any) => d.target.x)
-        .attr('y2', (d: any) => d.target.y);
-      
-      // Update clickable edge positions  
+        .attr('x1', (d: any) => d._ep.x1)
+        .attr('y1', (d: any) => d._ep.y1)
+        .attr('x2', (d: any) => d._ep.x2)
+        .attr('y2', (d: any) => d._ep.y2);
+
+      // Update clickable edge positions
       clickableEdges
-        .attr('x1', (d: any) => d.source.x)
-        .attr('y1', (d: any) => d.source.y)
-        .attr('x2', (d: any) => d.target.x)
-        .attr('y2', (d: any) => d.target.y);
-        
-      // Update arrow positions
+        .attr('x1', (d: any) => d._ep.x1)
+        .attr('y1', (d: any) => d._ep.y1)
+        .attr('x2', (d: any) => d._ep.x2)
+        .attr('y2', (d: any) => d._ep.y2);
+
+      // Simplified (dense + zoomed out): arrows and edge labels are hidden
+      // (data-simplify CSS), so skip their per-tick positioning entirely — at
+      // 1400 edges that arrow transform + label placement pass is the bulk of
+      // the remaining per-tick cost in the whole-graph view. forceAvoid (the
+      // one-shot settle pass) still runs so labels are correct when you zoom in.
+      if (simplifiedRef.current && !forceAvoid) {
+        return;
+      }
+
+      // Arrow sits at the TARGET border, pointing into the node.
       arrowElements
         .attr('transform', (d: any) => {
-          const midX = (d.source.x + d.target.x) / 2;
-          const midY = (d.source.y + d.target.y) / 2;
-          const angle = Math.atan2(d.target.y - d.source.y, d.target.x - d.source.x) * 180 / Math.PI;
-          return `translate(${midX},${midY}) rotate(${angle})`;
+          const ep = d._ep;
+          const angle = Math.atan2(ep.y2 - ep.y1, ep.x2 - ep.x1) * 180 / Math.PI;
+          return `translate(${ep.x2},${ep.y2}) rotate(${angle})`;
         });
 
       // Edge labels: auto-centered in the clear span between the two node
@@ -3398,7 +3632,9 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       // slidable by the user (d.labelT persists because the data merge keeps
       // edge object identity stable; d.labelTUser pins a manual slide).
       labelAvoidCounter++;
-      const runAvoidance = simulation.alpha() < 0.1 && labelAvoidCounter % 15 === 0;
+      // forceAvoid lets a one-shot caller (layout settle / pinned graphs that
+      // don't tick) run a full label de-overlap pass on demand.
+      const runAvoidance = forceAvoid || (simulation.alpha() < 0.1 && labelAvoidCounter % 15 === 0);
       const obstacles = runAvoidance
         ? (simulation.nodes() as any[]).map((n: any) => {
             const dims = getNodeDimensions(n);
@@ -3463,8 +3699,63 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     const perfMeter = new PerfMeter(240);
     const driftMeter = new DriftMeter();
     let lastPerfReport = 0;
+
+    // Viewport culling (large graphs only). At 1000 nodes the dominant frame
+    // cost is the browser repainting every on-screen SVG element each time a
+    // position changes; off-screen elements cost just as much to paint. We hide
+    // node groups (and edges with both ends hidden) outside the viewport so they
+    // are neither painted nor laid out. Geometry-only, generous margin, recomputed
+    // on a throttle during simulation ticks AND on every pan/zoom (the sim is a
+    // one-shot, so when it has stopped the zoom handler is the only thing that can
+    // reveal nodes panned back into view).
+    const cullEnabled = nodes.length > 200;
+    const CULL_MARGIN_PX = 300;
+    // Culling only pays off when enough of the graph is actually off-screen, i.e.
+    // when zoomed IN. At the whole-graph "fit" view every node is visible, so a
+    // cull pass would be pure overhead (it even slowed zoom). Below this scale we
+    // skip culling and, if we had culled, reveal everything once.
+    const CULL_MIN_SCALE = 0.5;
+    let cullCounter = 0;
+    let cullActive = false;
+    const clearCull = () => {
+      nodeElements.style('display', null);
+      linkElements.style('display', null);
+      clickableEdges.style('display', null);
+      arrowElements.style('display', null);
+      edgeLabelGroups.style('display', null);
+      cullActive = false;
+    };
+    const applyViewportCull = () => {
+      const svgEl = svg.node();
+      if (!svgEl) return;
+      const t = d3.zoomTransform(svgEl);
+      if (t.k < CULL_MIN_SCALE) {
+        if (cullActive) clearCull();
+        return;
+      }
+      cullActive = true;
+      const minGX = (-CULL_MARGIN_PX - t.x) / t.k;
+      const maxGX = (width + CULL_MARGIN_PX - t.x) / t.k;
+      const minGY = (-CULL_MARGIN_PX - t.y) / t.k;
+      const maxGY = (height + CULL_MARGIN_PX - t.y) / t.k;
+      nodeElements.style('display', (d: any) => {
+        const x = d.x ?? 0;
+        const y = d.y ?? 0;
+        const visible = x >= minGX && x <= maxGX && y >= minGY && y <= maxGY;
+        d._culled = !visible;
+        return visible ? null : 'none';
+      });
+      const edgeDisplay = (d: any) => (d.source?._culled && d.target?._culled ? 'none' : null);
+      linkElements.style('display', edgeDisplay);
+      clickableEdges.style('display', edgeDisplay);
+      arrowElements.style('display', edgeDisplay);
+      edgeLabelGroups.style('display', edgeDisplay);
+    };
+
     simulation.on('tick', () => {
       const tickStart = performance.now();
+      cullCounter++;
+      if (cullEnabled && cullCounter % 5 === 0) applyViewportCull();
 
       // 1) Nodes first
       nodeElements
@@ -3495,8 +3786,10 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       }
 
       // Update mini-map with current node positions (live simulation objects —
-      // the React-state nodes are different objects since the identity merge)
-      if ((window as any).updateMiniMapPositions) {
+      // the React-state nodes are different objects since the identity merge).
+      // Throttled: rebuilding a full positions dict for every node on every tick
+      // was pure overhead at scale; the minimap doesn't need 60 Hz updates.
+      if (cullCounter % 8 === 0 && (window as any).updateMiniMapPositions) {
         const simNodesForMap = simulation.nodes() as any[];
         if (simNodesForMap.length > 0) {
           const positions: {[key: string]: {x: number, y: number}} = {};
@@ -3546,12 +3839,17 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     // Update zoom with LOD updates
     zoom.on('zoom', (event) => {
       g.attr('transform', event.transform);
-      setCurrentTransform({ 
-        x: event.transform.x, 
-        y: event.transform.y, 
-        scale: event.transform.k 
+      setCurrentTransform({
+        x: event.transform.x,
+        y: event.transform.y,
+        scale: event.transform.k
       });
-      
+
+      // Re-cull on pan/zoom. The one-shot sim is usually stopped during pan, so
+      // this is the only thing that reveals nodes panned back into view (and
+      // hides ones panned out) — and it keeps paint bounded while panning.
+      if (cullEnabled) applyViewportCull();
+
       // Update mini-map viewport
       if ((window as any).updateMiniMapViewport) {
         const viewportUpdate = {
@@ -3598,14 +3896,27 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     // unpinned (new / never-placed) nodes to lay out; an already-arranged
     // graph loads pinned and stays put (snapshot-authoritative).
     const hasUnpinnedNodes = (simulation.nodes() as any[]).some((n: any) => n.fx == null || n.fy == null);
+    if (hasUnpinnedNodes) {
+      // Mark the start of a one-shot layout so we can report how long it took
+      // the physics to settle (a metric for studying the behavior).
+      layoutStartRef.current = performance.now();
+      lastSettleMsRef.current = null;
+    }
     simulation
       .alpha(hasUnpinnedNodes ? DEFAULT_PHYSICS.alpha.loadEnergy : 0)
       .alphaDecay(0.015)
       .restart();
 
-    // When the layout settles, persist it so the arrangement is durable
-    // across reloads (covers physics-laid-out graphs the user never dragged).
-    simulation.on('end.persist', () => persistAllPositions());
+    // When the layout settles: record settle time, persist the arrangement so
+    // it's durable across reloads, run a final edge-label de-overlap pass, and
+    // center the camera. After this the simulation is idle (one-shot physics).
+    simulation.on('end.persist', () => {
+      if (layoutStartRef.current != null && lastSettleMsRef.current == null) {
+        lastSettleMsRef.current = Math.round(performance.now() - layoutStartRef.current);
+      }
+      persistAllPositions();
+      runLabelAvoidanceRef.current?.();
+    });
     
     // Add method to restart collision detection
     (simulation as any).restartCollisions = () => {
@@ -3614,7 +3925,18 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         simulation.alphaTarget(0);
       }, 2000);
     };
+
+    // Expose a one-shot edge-label de-overlap pass + run one shortly after init.
+    // Fully-pinned graphs don't tick, so without this their labels would stay at
+    // the default midpoint and could overlap → clean starting positions need it.
+    runLabelAvoidanceRef.current = () => updateEdgePositions(true);
+    setTimeout(() => updateEdgePositions(true), 500);
   }, [nodes, validatedEdges, handleNodeClick, initializeEmptyVisualization]); // Include handleNodeClick to get fresh connection state
+
+  // One-shot layout instrumentation + the forced label-avoidance hook.
+  const layoutStartRef = useRef<number | null>(null);
+  const lastSettleMsRef = useRef<number | null>(null);
+  const runLabelAvoidanceRef = useRef<(() => void) | null>(null);
 
   // Store simulation reference for resize handling
   const simulationRef = useRef<d3.Simulation<any, any> | null>(null);
@@ -3683,8 +4005,21 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       const t = d3.zoomIdentity.translate(w / 2 - graphX * k, h / 2 - graphY * k).scale(k);
       svg.transition().duration(350).call(zoomBehaviorRef.current.transform as any, t);
     };
+    // Mini-map wheel/pinch → zoom the main view to a target scale, centered on
+    // the gesture's graph point. Clamped to the same scaleExtent as the main
+    // zoom; applied via the shared zoom behavior so state + handlers stay in sync.
+    (window as any).miniMapZoom = (graphX: number, graphY: number, targetK: number) => {
+      if (!svgRef.current || !containerRef.current || !zoomBehaviorRef.current) return;
+      const svg = d3.select(svgRef.current);
+      const k = Math.max(0.1, Math.min(4, targetK));
+      const w = containerRef.current.clientWidth;
+      const h = containerRef.current.clientHeight;
+      const t = d3.zoomIdentity.translate(w / 2 - graphX * k, h / 2 - graphY * k).scale(k);
+      svg.transition().duration(120).call(zoomBehaviorRef.current.transform as any, t);
+    };
     return () => {
       delete (window as any).miniMapNavigate;
+      delete (window as any).miniMapZoom;
     };
   }, []);
 
@@ -3776,17 +4111,21 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
   // authoritative snapshot.
   const resetLayout = useCallback(() => {
     layoutReflowingRef.current = true;
+    // Unpin + mark unplaced; initializeVisualization will lay the unplaced
+    // nodes out on a CLEAN spread grid (see getUnplacedSpread) so physics
+    // REFINES a non-overlapping start instead of trying to explode a pile.
     nodes.forEach((node: any) => {
       node.userPinned = false;
       node.userPreferredPosition = null;
       node.userPreferenceVector = null;
       node.fx = null;
       node.fy = null;
-      // Treat as unplaced so init/merge won't re-pin to the old spot
       node.positionX = 0;
       node.positionY = 0;
       node.targetX = null;
       node.targetY = null;
+      node.x = 0;
+      node.y = 0;
     });
     initializeVisualization();
     setTimeout(() => {
@@ -3796,51 +4135,119 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     }, 2500);
   }, [nodes, initializeVisualization, fitViewToNodes, persistAllPositions]);
 
-  // Auto-fit view when component first mounts with nodes - using stable dependency
-  const hasNodes = nodes.length > 0;
+  // Comprehensive layout metrics for studying the physics behaviour skeptically:
+  // is the simulation actually idle (not silently reheating), do node cards
+  // overlap, do edge labels overlap, how long did the last layout take to
+  // settle, plus the live drift sample. Exposed for the diagnostic + console.
   useEffect(() => {
-    if (hasNodes && svgRef.current) {
-      // Check if this is the initial load (no previous transform stored)
-      const hasStoredTransform = sessionStorage.getItem('graphViewTransform');
-      if (!hasStoredTransform) {
-        // First time loading - auto fit after simulation settles
-        const timer = setTimeout(() => {
-          fitViewToNodes();
-          // Store the fitted transform
-          if (svgRef.current) {
-            const svg = d3.select(svgRef.current);
-            const transform = d3.zoomTransform(svg.node()!);
-            sessionStorage.setItem('graphViewTransform', JSON.stringify({
-              x: transform.x,
-              y: transform.y,
-              k: transform.k
-            }));
-          }
-        }, 1500);
-        return () => clearTimeout(timer);
-      } else {
-        // Restore previous transform
-        try {
-          const saved = JSON.parse(hasStoredTransform);
-          const timer = setTimeout(() => {
-            if (svgRef.current) {
-              const svg = d3.select(svgRef.current);
-              const transform = d3.zoomIdentity.translate(saved.x, saved.y).scale(saved.k);
-              svg.call(d3.zoom<SVGSVGElement, unknown>().transform as any, transform);
-            }
-          }, 500);
-          return () => clearTimeout(timer);
-        } catch (e) {
-          // If stored transform is invalid, auto-fit
-          const timer = setTimeout(() => {
-            fitViewToNodes();
-          }, 1500);
-          return () => clearTimeout(timer);
+    (window as any).__organizeGraph = () => resetLayout();
+    (window as any).__layoutMetrics = () => {
+      const sim = simulationRef.current;
+      if (!sim) return null;
+      const ns = sim.nodes() as any[];
+      // TRUE visual overlap = the node CARD rectangles intersect (AABB). The
+      // collision radius is the half-diagonal, which over-counts side-by-side
+      // cards that don't actually overlap — this metric measures the real pile.
+      let overlapPairs = 0;
+      let maxOverlap = 0;
+      let proximityPairs = 0; // closer than collision radius (soft crowding)
+      const dims = ns.map((n) => getNodeDimensions(n));
+      for (let i = 0; i < ns.length; i++) {
+        const a = ns[i];
+        const da = dims[i];
+        const ra = collisionRadius(da);
+        for (let j = i + 1; j < ns.length; j++) {
+          const b = ns[j];
+          const db = dims[j];
+          const dx = Math.abs((a.x || 0) - (b.x || 0));
+          const dy = Math.abs((a.y || 0) - (b.y || 0));
+          const ox = (da.width + db.width) / 2 - dx;
+          const oy = (da.height + db.height) / 2 - dy;
+          if (ox > 0 && oy > 0) { overlapPairs++; if (Math.min(ox, oy) > maxOverlap) maxOverlap = Math.min(ox, oy); }
+          if (Math.hypot(dx, dy) < ra + collisionRadius(db)) proximityPairs++;
         }
       }
-    }
-    return undefined;
-  }, [hasNodes]); // Removed fitViewToNodes dependency to prevent camera jumps
+      const labelRects = Array.from(document.querySelectorAll('.graph-container svg .edge-label-group'))
+        .map((g) => (g as SVGGElement).getBoundingClientRect())
+        .filter((r) => r.width > 0 && r.height > 0);
+      let labelOverlaps = 0;
+      for (let i = 0; i < labelRects.length; i++) {
+        for (let j = i + 1; j < labelRects.length; j++) {
+          const a = labelRects[i];
+          const b = labelRects[j];
+          if (a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom) labelOverlaps++;
+        }
+      }
+      const alpha = sim.alpha();
+      // The sim stops ticking once alpha drops past alphaMin (~0.001); at that
+      // point nodes are frozen. (The drift field below is sampled in the tick
+      // loop, so it goes STALE after the sim stops — use atRest, not drift, to
+      // judge "has it stopped moving".)
+      const atRest = alpha <= 0.0015;
+      return {
+        simRunning: !atRest,
+        atRest,
+        alpha: Math.round(alpha * 10000) / 10000,
+        lastSettleMs: lastSettleMsRef.current,
+        nodeCount: ns.length,
+        pinnedCount: ns.filter((n: any) => n.fx != null).length,
+        edgeCount: validatedEdges.length,
+        overlappingNodePairs: overlapPairs,
+        maxNodeOverlapPx: Math.round(maxOverlap),
+        proximityPairs,
+        labelCount: labelRects.length,
+        overlappingLabelPairs: labelOverlaps,
+        drift: (window as any).__graphPerf?.spatial ?? null,
+      };
+    };
+    return () => {
+      delete (window as any).__layoutMetrics;
+      delete (window as any).__organizeGraph;
+    };
+  }, [getNodeDimensions, validatedEdges, resetLayout]);
+
+  // Center the camera on the graph whenever it loads or CHANGES (login, graph
+  // switch, drill-in / ascend). Keyed on the graph id — the old effect keyed on
+  // hasNodes only and restored one global transform, so it never recentered on
+  // a graph change. We wait briefly for the one-shot layout to settle, then fit.
+  const hasNodes = nodes.length > 0;
+  const isDenseGraph = nodes.length > DENSE_GRAPH_NODE_THRESHOLD;
+  const isSimplified = isDenseGraph && (currentTransform?.scale ?? 1) < SIMPLIFY_SCALE;
+  const isDotMode = isDenseGraph && (currentTransform?.scale ?? 1) < DOT_SCALE;
+  simplifiedRef.current = isSimplified;
+  dotModeRef.current = isDotMode;
+
+  // Keep the inline-rename box glued to its node while it's open — through node
+  // DRAGS, simulation ticks and pan/zoom — by repositioning the overlay div
+  // directly each frame from the live sim position + live zoom transform. The
+  // JSX position only recomputes on React renders (zoom), which is why the box
+  // lagged a drag until release.
+  const inlineEditNodeId = inlineEdit?.nodeId ?? null;
+  useEffect(() => {
+    if (!inlineEditNodeId) return undefined;
+    let raf = 0;
+    const sync = () => {
+      const el = inlineEditRef.current;
+      const svgEl = svgRef.current;
+      if (el && svgEl) {
+        const n = (simulationRef.current?.nodes() as any[])?.find((m: any) => m.id === inlineEditNodeId);
+        if (n) {
+          const t = d3.zoomTransform(svgEl);
+          el.style.left = `${(n.x ?? 0) * t.k + t.x}px`;
+          el.style.top = `${(n.y ?? 0) * t.k + t.y}px`;
+        }
+      }
+      raf = requestAnimationFrame(sync);
+    };
+    raf = requestAnimationFrame(sync);
+    return () => cancelAnimationFrame(raf);
+  }, [inlineEditNodeId]);
+  const currentGraphId = currentGraph?.id;
+  useEffect(() => {
+    if (!hasNodes || !svgRef.current) return undefined;
+    const timer = setTimeout(() => fitViewToNodes(), 1500);
+    return () => clearTimeout(timer);
+  }, [hasNodes, currentGraphId, fitViewToNodes]);
 
   // Expose reset function to parent component
   useEffect(() => {
@@ -3860,6 +4267,15 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
 
   // Track previous node count to detect transition from empty to non-empty
   const prevNodeCountRef = useRef<number>(0);
+  // Track the previous edge signature (id + type + direction) so a relationship
+  // TYPE change or a direction FLIP — which keep the edge COUNT the same — still
+  // forces a rebuild. Without this the edge label/arrow keep the stale value.
+  const prevEdgeSigRef = useRef<string>('');
+  // Track a per-node id+type signature: a node TYPE change keeps node COUNT the
+  // same, and the selective update path refreshes the badge text but NOT the
+  // type-derived card color/border/icon, so the graph showed a stale type. A
+  // signature change forces a full rebuild (same approach as edges). (#30)
+  const prevNodeSigRef = useRef<string>('');
 
   // Comprehensive reinitialization effect - ONLY when actually needed
   useEffect(() => {
@@ -3876,6 +4292,27 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     const isNowPopulated = nodes.length > 0;
     const transitioningFromEmpty = wasEmpty && isNowPopulated;
 
+    // Detect a relationship TYPE change or direction FLIP. Both keep the edge
+    // count the same, so length-based checks miss them; compare an id+type+
+    // direction signature against the last render and force a rebuild on change.
+    const edgeSig = (validatedEdges as any[])
+      .map((e) => {
+        const sId = typeof e.source === 'object' ? e.source?.id : e.source;
+        const tId = typeof e.target === 'object' ? e.target?.id : e.target;
+        return `${e.id}:${e.type}:${sId}>${tId}`;
+      })
+      .sort()
+      .join(',');
+    const edgesChanged = prevEdgeSigRef.current !== '' && prevEdgeSigRef.current !== edgeSig;
+
+    // Detect a node TYPE change (same count → length checks miss it). The
+    // selective path refreshes the badge text but not the card color/icon. (#30)
+    const nodeSig = (nodes as any[])
+      .map((n) => `${n.id}:${n.type}`)
+      .sort()
+      .join(',');
+    const nodesChanged = prevNodeSigRef.current !== '' && prevNodeSigRef.current !== nodeSig;
+
     // Only reinitialize if this is truly necessary
     const shouldReinit =
       !svgRef.current ||
@@ -3883,8 +4320,10 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       nodes.length === 0 ||
       !d3.select(svgRef.current).select('.main-graph-group').node() ||
       reinitTrigger > 0 ||
-      transitioningFromEmpty; // Force reinit when adding first node to empty graph
-    
+      transitioningFromEmpty || // Force reinit when adding first node to empty graph
+      edgesChanged || // relationship type changed or direction flipped
+      nodesChanged; // a node's type changed — re-render its color/border/icon
+
     if (shouldReinit) {
       console.log('[Graph Debug] Full reinitialization required');
       initializeVisualization();
@@ -3898,8 +4337,10 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
       updateVisualizationData();
     }
 
-    // Update previous node count for next comparison
+    // Update previous node count + edge signature for next comparison
     prevNodeCountRef.current = nodes.length;
+    prevEdgeSigRef.current = edgeSig;
+    prevNodeSigRef.current = nodeSig;
 
     const handleResize = () => {
       if (!containerRef.current || !svgRef.current || !simulationRef.current) return;
@@ -3931,7 +4372,13 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     loading, // Re-init when loading completes
     edgesLoading, // Re-init when edges loading completes
     // Track node property changes for selective updates (only titles, descriptions, types)
-    nodes.map(n => `${n.id}:${n.title}:${n.description}:${n.type}:${n.status}`).join(',')
+    nodes.map(n => `${n.id}:${n.title}:${n.description}:${n.type}:${n.status}`).join(','),
+    // Track edge type/direction changes so a relationship edit or flip rebuilds
+    validatedEdges.map((e: any) => {
+      const sId = typeof e.source === 'object' ? e.source?.id : e.source;
+      const tId = typeof e.target === 'object' ? e.target?.id : e.target;
+      return `${e.id}:${e.type}:${sId}>${tId}`;
+    }).join(',')
   ]);
 
   // Manual reinitialization function (expose globally for debugging)
@@ -4034,7 +4481,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
     const isNetworkError = errorMessage.includes('Cannot connect');
     
     return (
-      <div ref={containerRef} className="graph-container relative w-full h-full" data-quality={qualityTier}>
+      <div ref={containerRef} className="graph-container relative w-full h-full" data-quality={qualityTier} data-dense={isDenseGraph ? 'true' : undefined} data-simplify={isSimplified ? 'true' : undefined} data-dots={isDotMode ? 'true' : undefined}>
         <svg ref={svgRef} className="w-full h-full">
           {/* Error message centered in SVG */}
           <foreignObject x="20%" y="30%" width="60%" height="40%">
@@ -4218,7 +4665,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
 
 
   return (
-    <div ref={containerRef} className="graph-container relative w-full h-full overflow-hidden select-none" data-quality={qualityTier}>
+    <div ref={containerRef} className="graph-container relative w-full h-full overflow-hidden select-none" data-quality={qualityTier} data-dense={isDenseGraph ? 'true' : undefined} data-simplify={isSimplified ? 'true' : undefined} data-dots={isDotMode ? 'true' : undefined}>
       <svg 
         ref={svgRef} 
         className="w-full h-full" 
@@ -4318,6 +4765,7 @@ export function InteractiveGraphVisualization({ onResetLayout }: InteractiveGrap
         };
         return (
           <div
+            ref={inlineEditRef}
             className="absolute z-50"
             style={{ left, top, transform: 'translate(-50%, -50%)' }}
           >

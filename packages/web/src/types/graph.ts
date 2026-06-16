@@ -100,6 +100,15 @@ export interface WorkItem {
   userId?: string;
   dependencies?: WorkItem[];
   dependents?: WorkItem[];
+  // Altium-style hierarchy: if set, this node drills into another graph
+  subgraphId?: string;
+  subgraph?: {
+    id: string;
+    name: string;
+    nodeCount?: number;
+    edgeCount?: number;
+    type?: string;
+  };
 }
 
 // Import and re-export RelationshipType from central constants file
@@ -151,6 +160,10 @@ export interface GraphContextType {
   moveGraph: (graphId: string, newParentId?: string) => Promise<void>;
   getGraphPath: (graphId: string) => Graph[];
   getGraphChildren: (graphId: string) => Graph[];
+  // Altium-style drill-in navigation
+  descendInto: (subgraphId: string) => Promise<void>;
+  ascendTo: (graphId: string) => Promise<void>;
+  getBreadcrumb: () => Graph[];
   
   // Sharing and permissions
   shareGraph: (graphId: string, settings: Partial<ShareSettings>) => Promise<void>;
