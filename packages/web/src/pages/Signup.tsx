@@ -259,8 +259,8 @@ export function Signup() {
             setOauthConfig(config.oauth.providers);
           }
         }
-      } catch (error) {
-        console.error('Failed to fetch OAuth config:', error);
+      } catch {
+        console.debug('OAuth config unavailable; hiding social sign-up.');
       }
     };
     fetchOAuthConfig();

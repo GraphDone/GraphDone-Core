@@ -111,8 +111,8 @@ export function Agents() {
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="bg-gray-900/30 backdrop-blur-md border-b border-gray-700/30 px-6 py-4">
-        <div className="flex items-center justify-between">
+      <div className="bg-gray-900/30 backdrop-blur-md border-b border-gray-700/30 px-3 py-3 sm:px-6 sm:py-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <div className="flex items-center space-x-3">
               <h1 className="text-2xl font-bold text-gray-100">AI & Agents</h1>
@@ -125,7 +125,7 @@ export function Agents() {
             </p>
           </div>
           
-          <div className="flex items-center space-x-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <button
               type="button"
               onClick={() => setSettingsModalOpen(true)}
