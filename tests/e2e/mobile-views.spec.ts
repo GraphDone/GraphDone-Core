@@ -10,31 +10,33 @@ import { login, TEST_USERS } from '../helpers/auth';
  */
 test.use({ viewport: { width: 390, height: 844 } });
 
-const VIEWS = [
-  { name: 'Dashboard', tab: 'Dashboard View' },
-  { name: 'Table', tab: 'Table View' },
-  { name: 'Card', tab: 'Card View' },
-  { name: 'Kanban', tab: 'Kanban View' },
-  { name: 'Gantt', tab: 'Gantt Chart' },
-  { name: 'Calendar', tab: 'Calendar View' },
-  { name: 'Activity', tab: 'Activity Feed' },
-];
+const VIEWS = ['Dashboard', 'Table', 'Card', 'Kanban', 'Gantt', 'Calendar', 'Activity'];
 
-async function openView(page: Page, tab: string) {
-  const t = page.locator(`button[title="${tab}"]`);
-  await t.scrollIntoViewIfNeeded();
-  await t.click();
+// Navigate via the mobile bottom nav (List/Graph) + More sheet — the top tab
+// strip is desktop-only now.
+async function openView(page: Page, name: string) {
+  const nav = page.getByTestId('mobile-bottom-nav');
+  if (name === 'Card') {
+    await nav.getByText('List', { exact: true }).click();
+  } else if (name === 'Graph') {
+    await nav.getByText('Graph', { exact: true }).click();
+  } else {
+    await nav.getByText('More', { exact: true }).click();
+    const sheet = page.getByTestId('mobile-more-sheet');
+    const label = name === 'Kanban' ? 'Board' : name;
+    await sheet.getByText(label, { exact: true }).click();
+  }
   await page.waitForTimeout(2000);
 }
 
 test.describe('mobile views are explorable by scrolling down, not sideways @mobile', () => {
-  for (const v of VIEWS) {
-    test(`${v.name} view needs no horizontal scrolling on a phone`, async ({ page }) => {
+  for (const name of VIEWS) {
+    test(`${name} view needs no horizontal scrolling on a phone`, async ({ page }) => {
       const pageErrors: string[] = [];
       page.on('pageerror', (e) => pageErrors.push(e.message));
 
       await login(page, TEST_USERS.ADMIN);
-      await openView(page, v.tab);
+      await openView(page, name);
 
       const probe = await page.evaluate(() => {
         const el = document.querySelector('[data-testid="view-content"]');
@@ -69,15 +71,15 @@ test.describe('mobile views are explorable by scrolling down, not sideways @mobi
       expect(probe.docOverflow, 'page itself must not overflow sideways').toBeLessThanOrEqual(1);
       expect(
         probe.offenders,
-        `${v.name}: these elements force horizontal scrolling on a phone`
+        `${name}: these elements force horizontal scrolling on a phone`
       ).toEqual([]);
-      expect(pageErrors, `${v.name}: no uncaught JS errors`).toEqual([]);
+      expect(pageErrors, `${name}: no uncaught JS errors`).toEqual([]);
     });
   }
 
   test('Calendar defaults to the agenda list on a phone (not the cramped month grid)', async ({ page }) => {
     await login(page, TEST_USERS.ADMIN);
-    await openView(page, 'Calendar View');
+    await openView(page, 'Calendar');
     const agendaActive = await page.evaluate(() => {
       const btn = [...document.querySelectorAll('button')].find(
         (b) => (b.textContent || '').trim() === 'Agenda'

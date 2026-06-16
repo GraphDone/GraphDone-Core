@@ -37,29 +37,37 @@ test.describe('mobile experience @mobile', () => {
     expect(overflow, 'no horizontal page overflow on a phone').toBeLessThanOrEqual(1);
   });
 
-  test('all eight view tabs stay reachable and the graph view is mobile-clean', async ({ page }) => {
+  test('bottom nav (List/Graph/More) drives the views and the graph is mobile-clean', async ({ page }) => {
     await login(page, TEST_USERS.ADMIN);
     await page.waitForTimeout(1500);
 
-    // Every view tab must exist and be clickable (the strip scrolls, never clips).
-    const tabTitles = [
-      'Graph View', 'Dashboard View', 'Table View', 'Card View',
-      'Kanban View', 'Gantt Chart', 'Calendar View', 'Activity Feed',
-    ];
-    for (const title of tabTitles) {
-      const tab = page.locator(`button[title="${title}"]`);
-      await expect(tab, `${title} tab present`).toHaveCount(1);
-    }
+    // The phone uses a bottom tab bar, not the desktop tab strip.
+    const nav = page.getByTestId('mobile-bottom-nav');
+    await expect(nav, 'mobile bottom nav present').toBeVisible();
+    await expect(nav.getByText('List', { exact: true })).toBeVisible();
+    await expect(nav.getByText('Graph', { exact: true })).toBeVisible();
+    await expect(nav.getByText('More', { exact: true })).toBeVisible();
 
-    // Switch to the graph view and verify the mobile-clean treatment.
-    const graphTab = page.locator('button[title="Graph View"]');
-    await graphTab.scrollIntoViewIfNeeded();
-    await graphTab.click();
+    // More opens a sheet with the secondary views (kanban shows as "Board").
+    await nav.getByText('More', { exact: true }).click();
+    const sheet = page.getByTestId('mobile-more-sheet');
+    for (const label of ['Dashboard', 'Table', 'Board', 'Gantt', 'Calendar', 'Activity']) {
+      await expect(sheet.getByText(label, { exact: true }), `${label} in More sheet`).toBeVisible();
+    }
+    await page.keyboard.press('Escape').catch(() => {});
+    await page.mouse.click(10, 200); // dismiss the sheet
+
+    // Switch to the graph via the bottom nav and verify the mobile-clean treatment.
+    await nav.getByText('Graph', { exact: true }).click();
     await page.waitForTimeout(3000);
 
-    // Minimap is hidden on mobile (it covered ~18% of the screen).
+    // The lock toggle defaults to "Locked" so panning never drags a node/edge.
+    const lock = page.getByTestId('graph-lock-toggle');
+    await expect(lock, 'graph lock toggle present on mobile').toBeVisible();
+    await expect(lock).toContainText('Locked');
+
+    // Minimap is hidden on mobile; no connection banner while GraphQL is healthy.
     await expect(page.getByText('Mini-Map', { exact: true })).toHaveCount(0);
-    // No connection banner while the GraphQL data layer is healthy.
     await expect(page.getByText('Connection Lost', { exact: true })).toHaveCount(0);
   });
 });

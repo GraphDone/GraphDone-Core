@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Share2, Users, Table, Activity, Network, CreditCard, Columns, CalendarDays, GanttChartSquare, LayoutDashboard, Database, AlertTriangle, Map, X, Minimize2, Edit3, Trash2, FolderPlus, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Share2, Users, Table, Activity, Network, CreditCard, Columns, CalendarDays, GanttChartSquare, LayoutDashboard, Database, AlertTriangle, Map, X, Minimize2, Edit3, Trash2, FolderPlus, ChevronLeft, ChevronRight, MoreHorizontal, Lock, Unlock } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useQuery } from '@apollo/client';
 import { SafeGraphVisualization } from '../components/SafeGraphVisualization';
@@ -33,6 +33,12 @@ export function Workspace() {
     return window.matchMedia('(max-width: 767px)').matches ? 'cards' : 'graph';
   });
   const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
+  );
+  const [showMoreSheet, setShowMoreSheet] = useState(false);
+  // Graph touch-interaction lock — on a phone, default to locked so panning the
+  // canvas never accidentally drags a node or an edge label; unlock to edit.
+  const [graphLocked, setGraphLocked] = useState(() =>
     typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
   );
   const [showMiniMap, setShowMiniMap] = useState(true);
@@ -124,9 +130,9 @@ export function Workspace() {
             </div>
           </div>
 
-          {/* Center Section: View Mode Buttons — horizontally scrollable on mobile so
-              all eight stay reachable without clipping on a phone-width screen. */}
-          <div className="flex justify-start sm:justify-center lg:order-2 overflow-x-auto no-scrollbar -mx-3 px-3 sm:mx-0 sm:px-0">
+          {/* Center Section: View Mode Buttons — desktop/tablet only. Phones use the
+              bottom tab bar (List / Graph / More) instead of this strip. */}
+          <div className="hidden md:flex justify-start sm:justify-center lg:order-2 overflow-x-auto no-scrollbar -mx-3 px-3 sm:mx-0 sm:px-0">
             <div className="flex flex-nowrap bg-gray-700/50 backdrop-blur-sm rounded-lg p-1.5 sm:p-2 gap-1 border border-gray-600/50">
               <button
                 onClick={() => setViewMode('graph')}
@@ -425,8 +431,23 @@ export function Workspace() {
                 </div>
               </div>
             )}
-            <SafeGraphVisualization onNodeSelected={setInspectorNode} />
+            <SafeGraphVisualization onNodeSelected={setInspectorNode} interactionLocked={isMobile && graphLocked} />
            </div>
+           {/* Lock toggle (phones): when locked, touch pans the canvas and never
+               drags a node or edge label; unlock to rearrange/edit. */}
+           <button
+             data-testid="graph-lock-toggle"
+             onClick={() => setGraphLocked((v) => !v)}
+             className={`md:hidden absolute top-3 right-3 z-40 flex items-center gap-1.5 px-3 py-2 rounded-full shadow-lg backdrop-blur-sm border text-xs font-medium transition-colors ${
+               graphLocked
+                 ? 'bg-gray-900/90 border-gray-600 text-gray-200'
+                 : 'bg-green-600/90 border-green-400 text-white'
+             }`}
+             title={graphLocked ? 'Locked — tap to edit' : 'Editing — tap to lock'}
+           >
+             {graphLocked ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
+             {graphLocked ? 'Locked' : 'Editing'}
+           </button>
            {inspectorNode && (
              <div className="absolute z-40 inset-x-3 bottom-3 md:inset-x-auto md:bottom-auto md:top-3 md:right-3">
                <NodeInspector node={inspectorNode} onClose={() => setInspectorNode(null)} />
@@ -437,6 +458,93 @@ export function Workspace() {
           <ViewManager viewMode={viewMode as 'dashboard' | 'table' | 'cards' | 'kanban' | 'gantt' | 'calendar' | 'activity'} />
         )}
       </div>
+
+      {/* Mobile bottom navigation — the primary way to move between views on a phone.
+          List first, then Graph; the rest live in the More sheet. */}
+      {currentGraph && (
+        <nav data-testid="mobile-bottom-nav" className="md:hidden flex-shrink-0 flex items-stretch border-t border-gray-700/60 bg-gray-900/95 backdrop-blur-md pb-safe">
+          {([
+            { mode: 'cards', label: 'List', Icon: CreditCard },
+            { mode: 'graph', label: 'Graph', Icon: Network },
+          ] as const).map(({ mode, label, Icon }) => (
+            <button
+              key={mode}
+              onClick={() => setViewMode(mode)}
+              className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 min-h-[3.25rem] transition-colors ${
+                viewMode === mode ? 'text-green-400' : 'text-gray-400 hover:text-gray-200'
+              }`}
+            >
+              <Icon className="h-5 w-5" strokeWidth={1.75} />
+              <span className="text-[11px] font-medium">{label}</span>
+            </button>
+          ))}
+          <button
+            onClick={() => setShowMoreSheet(true)}
+            className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 min-h-[3.25rem] transition-colors ${
+              !['cards', 'graph'].includes(viewMode) ? 'text-green-400' : 'text-gray-400 hover:text-gray-200'
+            }`}
+          >
+            <MoreHorizontal className="h-5 w-5" strokeWidth={1.75} />
+            <span className="text-[11px] font-medium">More</span>
+          </button>
+        </nav>
+      )}
+
+      {/* Create FAB (phones) — primary action; hidden for read-only guests and in
+          graph view (where the on-canvas "+" grow flow creates nodes). */}
+      {currentGraph && currentUser?.role !== 'GUEST' && viewMode !== 'graph' && (
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className="md:hidden fixed right-4 bottom-[4.75rem] z-40 w-14 h-14 rounded-full bg-gradient-to-br from-green-600 to-blue-600 text-white shadow-xl flex items-center justify-center active:scale-95 transition-transform"
+          style={{ marginBottom: 'env(safe-area-inset-bottom)' }}
+          aria-label="New work item"
+          title="New work item"
+        >
+          <Plus className="h-7 w-7" />
+        </button>
+      )}
+
+      {/* "More" views sheet (phones) */}
+      {showMoreSheet && createPortal(
+        <div
+          className="md:hidden fixed inset-0 z-[100] flex flex-col justify-end"
+          onClick={() => setShowMoreSheet(false)}
+        >
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+          <div
+            data-testid="mobile-more-sheet"
+            className="relative bg-gray-900 border-t border-gray-700 rounded-t-2xl p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-gray-600" />
+            <h3 className="text-sm font-semibold text-gray-200 mb-3 px-1">More views</h3>
+            <div className="grid grid-cols-3 gap-2">
+              {([
+                { mode: 'dashboard', label: 'Dashboard', Icon: LayoutDashboard },
+                { mode: 'table', label: 'Table', Icon: Table },
+                { mode: 'kanban', label: 'Board', Icon: Columns },
+                { mode: 'gantt', label: 'Gantt', Icon: GanttChartSquare },
+                { mode: 'calendar', label: 'Calendar', Icon: CalendarDays },
+                { mode: 'activity', label: 'Activity', Icon: Activity },
+              ] as const).map(({ mode, label, Icon }) => (
+                <button
+                  key={mode}
+                  onClick={() => { setViewMode(mode); setShowMoreSheet(false); }}
+                  className={`flex flex-col items-center justify-center gap-1.5 py-4 rounded-xl border transition-colors ${
+                    viewMode === mode
+                      ? 'bg-green-600/20 border-green-500/40 text-green-300'
+                      : 'bg-gray-800/60 border-gray-700/60 text-gray-300 active:bg-gray-700'
+                  }`}
+                >
+                  <Icon className="h-6 w-6" strokeWidth={1.5} />
+                  <span className="text-xs font-medium">{label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* Mini-Map Navigation - Bottom Right Corner (hidden on mobile: it covers too
           much of a phone screen, and panning the graph by touch is the primary nav there) */}
