@@ -98,17 +98,52 @@ test.describe('user smoke: the app works from a user point of view @smoke', () =
 
   test('grow flow stays healthy: + → empty space → connected named node @smoke', async ({ page }) => {
     await login(page, TEST_USERS.ADMIN);
-    await page.waitForTimeout(6000);
+    // Wait for a graph to auto-load, then for the force layout to SETTLE — the "+"
+    // grow icon rides on its node, so clicking it while the sim is still moving
+    // (or while nodes overlap) is the historical source of flake. Poll a node's
+    // box until it stops moving rather than guessing with a fixed sleep.
+    await page.locator('.graph-container svg .node').first().waitFor({ timeout: 20000 }).catch(() => {});
+    {
+      let last: { x: number; y: number } | null = null;
+      let stable = 0;
+      for (let i = 0; i < 40 && stable < 2; i++) {
+        const pos = await page.evaluate(() => {
+          const n = document.querySelector('.graph-container svg .node');
+          if (!n) return null;
+          const r = n.getBoundingClientRect();
+          return { x: Math.round(r.x), y: Math.round(r.y) };
+        });
+        if (pos && last && Math.abs(pos.x - last.x) < 1 && Math.abs(pos.y - last.y) < 1) stable++;
+        else stable = 0;
+        last = pos;
+        await page.waitForTimeout(300);
+      }
+    }
 
-    const before = {
-      nodes: await page.locator('.graph-container svg .node').count(),
-      edges: await page.locator('.graph-container svg .edge').count()
-    };
-    test.skip(before.nodes === 0, 'no graph with nodes auto-selected');
+    // A graph must be loaded for the grow affordance to exist (the "+" rides on a
+    // node). Use the DOM for that precondition; use the API for the +1/-1 DELTAS
+    // below so viewport culling (offscreen nodes aren't in the DOM) can't skew them.
+    const domNodes = await page.locator('.graph-container svg .node').count();
+    test.skip(domNodes === 0, 'no graph with nodes auto-selected');
 
-    const plus = page.locator('.node-relationship-icon').first();
-    await plus.click({ force: true });
-    await expect(page.locator('text=Click empty space to grow')).toBeVisible();
+    const countAll = () => page.evaluate(async () => {
+      const token = localStorage.getItem('authToken') ?? '';
+      const res = await fetch('/api/graphql', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ query: `{ workItems { id } edges { id } }` })
+      }).then((r) => r.json());
+      return { nodes: res.data?.workItems?.length ?? -1, edges: res.data?.edges?.length ?? -1 };
+    });
+    const before = await countAll();
+
+    // Enter grow mode. Retry the click→hint: a settled layout makes this reliable,
+    // but a stray overlap can still swallow one click, so re-click until grow mode
+    // activates instead of failing on the first miss.
+    await expect(async () => {
+      await page.locator('.node-relationship-icon').first().click({ force: true });
+      await expect(page.locator('text=Click empty space to grow')).toBeVisible({ timeout: 2000 });
+    }).toPass({ timeout: 20000 });
 
     // Find a genuinely empty spot of canvas (viewport-relative, verified)
     const spot = await page.evaluate(() => {
@@ -133,17 +168,19 @@ test.describe('user smoke: the app works from a user point of view @smoke', () =
     await page.keyboard.press('Enter');
     await page.waitForTimeout(4000);
 
-    expect(await page.locator('.graph-container svg .node').count(), 'node count must grow').toBe(before.nodes + 1);
-    expect(await page.locator('.graph-container svg .edge').count(), 'edge count must grow').toBe(before.edges + 1);
+    const after = await countAll();
+    expect(after.nodes, 'a node must be created').toBe(before.nodes + 1);
+    expect(after.edges, 'a connecting edge must be created').toBe(before.edges + 1);
+    // ...and the user actually sees the newly named node on the canvas.
     await expect(page.locator(`text=${name}`).first()).toBeVisible();
 
-    // Undo must walk it back: Ctrl+Z undoes the rename, then the creation
+    // Undo must walk it back: Ctrl+Z undoes the rename, then the creation.
     await page.keyboard.press('Control+z');
     await page.waitForTimeout(2500);
     await page.keyboard.press('Control+z');
     await page.waitForTimeout(5000);
-    expect(await page.locator('.graph-container svg .node').count(), 'undo must remove the created node').toBe(before.nodes);
-    expect(await page.locator('.graph-container svg .edge').count(), 'undo must remove the created edge').toBe(before.edges);
+    await expect.poll(async () => (await countAll()).nodes, { timeout: 10000 }).toBe(before.nodes);
+    expect((await countAll()).edges, 'undo must remove the created edge').toBe(before.edges);
 
     // Belt-and-braces cleanup in case undo half-failed (keeps re-runnable)
     await page.evaluate(async (title) => {

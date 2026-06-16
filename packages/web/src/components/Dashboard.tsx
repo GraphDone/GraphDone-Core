@@ -191,8 +191,8 @@ const PieChart = ({ data, title }: { data: Array<{label: string, value: number, 
         {(() => {
           const isPriorityChart = filteredData.some(item => ['Critical', 'High', 'Moderate', 'Low', 'Minimal'].includes(item.label));
           const isStatusChart = filteredData.some(item => ['Proposed', 'Planned', 'In Progress', 'Completed', 'Blocked'].includes(item.label));
-          const gridCols = isPriorityChart ? "grid grid-cols-2 gap-2" : 
-                           isStatusChart ? "grid grid-cols-3 gap-2" : 
+          const gridCols = isPriorityChart ? "grid grid-cols-2 gap-2" :
+                           isStatusChart ? "grid grid-cols-2 sm:grid-cols-3 gap-2" :
                            "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2";
           
           return (

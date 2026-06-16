@@ -44,6 +44,7 @@ test.describe('mobile views are explorable by scrolling down, not sideways @mobi
         // Any element whose content is wider than its box is something the user
         // must scroll sideways to see — the failure we hunt for.
         const offenders: { tag: string; cls: string; scrollW: number; clientW: number }[] = [];
+        const collapsed: { tag: string; cls: string; clientW: number; txt: string }[] = [];
         el.querySelectorAll('*').forEach((d) => {
           const e = d as HTMLElement;
           const ox = getComputedStyle(e).overflowX;
@@ -59,10 +60,17 @@ test.describe('mobile views are explorable by scrolling down, not sideways @mobi
               clientW: e.clientWidth,
             });
           }
+          // A multi-character leaf label squeezed to near-zero width is unreadable
+          // (e.g. a flex/grid cell that collapsed). Single-char badges (1, 2, •) are fine.
+          const txt = (e.textContent || '').trim();
+          if (e.children.length === 0 && txt.length > 2 && e.clientWidth > 0 && e.clientWidth < 12) {
+            collapsed.push({ tag: e.tagName, cls: (e.className?.toString?.() || '').slice(0, 48), clientW: e.clientWidth, txt: txt.slice(0, 16) });
+          }
         });
         return {
           found: true,
           offenders: offenders.slice(0, 6),
+          collapsed: collapsed.slice(0, 6),
           docOverflow: document.documentElement.scrollWidth - window.innerWidth,
         };
       });
@@ -72,6 +80,10 @@ test.describe('mobile views are explorable by scrolling down, not sideways @mobi
       expect(
         probe.offenders,
         `${name}: these elements force horizontal scrolling on a phone`
+      ).toEqual([]);
+      expect(
+        probe.collapsed,
+        `${name}: these labels are squeezed to an unreadable width`
       ).toEqual([]);
       expect(pageErrors, `${name}: no uncaught JS errors`).toEqual([]);
     });
