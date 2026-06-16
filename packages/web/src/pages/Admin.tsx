@@ -759,7 +759,7 @@ function DatabaseManagement() {
         </div>
         
         {/* Database Statistics */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
           <div className="bg-gray-700 border border-gray-600 rounded-lg p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -816,7 +816,7 @@ function DatabaseManagement() {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-6">
           <button
             onClick={async () => {
               const debug = [...debugInfo];
@@ -1340,7 +1340,7 @@ certbot renew --dry-run
                 </defs>
               </svg>
               
-              <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+              <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
                 <div className="flex items-center space-x-2" title="End user browsers connecting via HTTPS">
                   <div className="w-3 h-3 bg-blue-500/30 border border-blue-500 rounded"></div>
                   <span className="text-blue-300">Client Browser</span>
