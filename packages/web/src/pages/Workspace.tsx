@@ -90,8 +90,9 @@ export function Workspace() {
         {/* Responsive Layout Container */}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2 sm:gap-4">
           
-          {/* Left Section: Graph Selector */}
-          <div className="flex-1 min-w-0 lg:order-1 max-w-lg">
+          {/* Left Section: Graph Selector — desktop only; on mobile the project
+              selector lives in the global top bar (Layout) to keep the header to 2 rows. */}
+          <div className="hidden lg:block flex-1 min-w-0 lg:order-1 max-w-lg">
             <div className="flex items-center space-x-4 h-full">
               {/* Title & Version - Compact */}
               <div className="flex flex-col justify-center">
