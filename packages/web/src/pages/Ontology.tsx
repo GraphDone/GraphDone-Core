@@ -195,7 +195,7 @@ export function Ontology() {
         {activeTab === 'types' && (
           <div className="p-6">
             {/* Search and filters */}
-            <div className="mb-6 flex items-center space-x-4">
+            <div className="mb-6 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
               <div className="flex-1 relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
@@ -288,7 +288,7 @@ export function Ontology() {
         {activeTab === 'relationships' && (
           <div className="p-6">
             {/* Search and filters */}
-            <div className="mb-6 flex items-center space-x-4">
+            <div className="mb-6 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
               <div className="flex-1 relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input

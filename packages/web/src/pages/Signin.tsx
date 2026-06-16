@@ -122,8 +122,10 @@ export function Signin() {
             setOauthConfig(config.oauth.providers);
           }
         }
-      } catch (error) {
-        console.error('Failed to fetch OAuth config:', error);
+      } catch {
+        // OAuth config is optional (e.g. the D1-first cloud has no OAuth backend);
+        // a fetch failure just means "no social providers", not an app error.
+        console.debug('OAuth config unavailable; hiding social sign-in.');
       }
     };
     fetchOAuthConfig();
