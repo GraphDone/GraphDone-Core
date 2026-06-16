@@ -4271,6 +4271,11 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected }:
   // TYPE change or a direction FLIP — which keep the edge COUNT the same — still
   // forces a rebuild. Without this the edge label/arrow keep the stale value.
   const prevEdgeSigRef = useRef<string>('');
+  // Track a per-node id+type signature: a node TYPE change keeps node COUNT the
+  // same, and the selective update path refreshes the badge text but NOT the
+  // type-derived card color/border/icon, so the graph showed a stale type. A
+  // signature change forces a full rebuild (same approach as edges). (#30)
+  const prevNodeSigRef = useRef<string>('');
 
   // Comprehensive reinitialization effect - ONLY when actually needed
   useEffect(() => {
@@ -4300,6 +4305,14 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected }:
       .join(',');
     const edgesChanged = prevEdgeSigRef.current !== '' && prevEdgeSigRef.current !== edgeSig;
 
+    // Detect a node TYPE change (same count → length checks miss it). The
+    // selective path refreshes the badge text but not the card color/icon. (#30)
+    const nodeSig = (nodes as any[])
+      .map((n) => `${n.id}:${n.type}`)
+      .sort()
+      .join(',');
+    const nodesChanged = prevNodeSigRef.current !== '' && prevNodeSigRef.current !== nodeSig;
+
     // Only reinitialize if this is truly necessary
     const shouldReinit =
       !svgRef.current ||
@@ -4308,7 +4321,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected }:
       !d3.select(svgRef.current).select('.main-graph-group').node() ||
       reinitTrigger > 0 ||
       transitioningFromEmpty || // Force reinit when adding first node to empty graph
-      edgesChanged; // relationship type changed or direction flipped
+      edgesChanged || // relationship type changed or direction flipped
+      nodesChanged; // a node's type changed — re-render its color/border/icon
 
     if (shouldReinit) {
       console.log('[Graph Debug] Full reinitialization required');
@@ -4326,6 +4340,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected }:
     // Update previous node count + edge signature for next comparison
     prevNodeCountRef.current = nodes.length;
     prevEdgeSigRef.current = edgeSig;
+    prevNodeSigRef.current = nodeSig;
 
     const handleResize = () => {
       if (!containerRef.current || !svgRef.current || !simulationRef.current) return;
