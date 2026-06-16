@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Share2, Users, Table, Activity, Network, CreditCard, Columns, CalendarDays, GanttChartSquare, LayoutDashboard, Database, AlertTriangle, Map, X, Minimize2, Edit3, Trash2, FolderPlus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useQuery } from '@apollo/client';
@@ -25,13 +25,33 @@ export function Workspace() {
   const [showDeleteGraphModal, setShowDeleteGraphModal] = useState(false);
   const [showGraphSelectionModal, setShowGraphSelectionModal] = useState(false);
   const [graphToEdit, setGraphToEdit] = useState<any>(null);
-  const [viewMode, setViewMode] = useState<'graph' | 'dashboard' | 'table' | 'cards' | 'kanban' | 'gantt' | 'calendar' | 'activity'>('graph');
+  const [viewMode, setViewMode] = useState<'graph' | 'dashboard' | 'table' | 'cards' | 'kanban' | 'gantt' | 'calendar' | 'activity'>(() => {
+    if (typeof window === 'undefined') return 'graph';
+    const saved = window.localStorage.getItem('graphdone:viewMode');
+    if (saved) return saved as any;
+    // On the go: a phone-sized screen lands on the readable card list, not the graph.
+    return window.matchMedia('(max-width: 767px)').matches ? 'cards' : 'graph';
+  });
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
+  );
   const [showMiniMap, setShowMiniMap] = useState(true);
   const { currentGraph, availableGraphs, getBreadcrumb, ascendTo } = useGraph();
   const breadcrumb = getBreadcrumb();
   const [inspectorNode, setInspectorNode] = useState<any>(null);
   const { currentTeam, currentUser } = useAuth();
   const { health, loading: healthLoading, error: healthError } = useHealthStatus();
+
+  useEffect(() => {
+    try { window.localStorage.setItem('graphdone:viewMode', viewMode); } catch { /* private mode */ }
+  }, [viewMode]);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)');
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
 
   // Get real-time counts for header display
   const { data: workItemsData } = useQuery(GET_WORK_ITEMS, {
@@ -66,9 +86,9 @@ export function Workspace() {
   return (
     <div className="h-full flex flex-col">
       {/* Header with Graph Context */}
-      <div className="bg-gray-900/30 backdrop-blur-md border-b border-gray-700/30 px-6 py-4">
+      <div className="bg-gray-900/30 backdrop-blur-md border-b border-gray-700/30 px-3 py-2 sm:px-6 sm:py-4">
         {/* Responsive Layout Container */}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2 sm:gap-4">
           
           {/* Left Section: Graph Selector */}
           <div className="flex-1 min-w-0 lg:order-1 max-w-lg">
@@ -103,118 +123,119 @@ export function Workspace() {
             </div>
           </div>
 
-          {/* Center Section: View Mode Buttons (Always Centered) */}
-          <div className="flex justify-center lg:order-2">
-            <div className="flex bg-gray-700/50 backdrop-blur-sm rounded-lg p-2 gap-1 border border-gray-600/50">
+          {/* Center Section: View Mode Buttons — horizontally scrollable on mobile so
+              all eight stay reachable without clipping on a phone-width screen. */}
+          <div className="flex justify-start sm:justify-center lg:order-2 overflow-x-auto no-scrollbar -mx-3 px-3 sm:mx-0 sm:px-0">
+            <div className="flex flex-nowrap bg-gray-700/50 backdrop-blur-sm rounded-lg p-1.5 sm:p-2 gap-1 border border-gray-600/50">
               <button
                 onClick={() => setViewMode('graph')}
-                className={`px-3 py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center space-y-2 ${
+                className={`px-2.5 py-1.5 sm:px-3 sm:py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center gap-0.5 sm:gap-2 min-w-[3rem] flex-shrink-0 ${
                   viewMode === 'graph' 
                     ? 'bg-green-600 text-white shadow' 
                     : 'text-gray-300 hover:text-white'
                 }`}
                 title="Graph View"
               >
-                <Network className="h-6 w-6 sm:h-8 sm:w-8 lg:h-10 lg:w-10" strokeWidth={1.5} />
-                <div className="text-xs text-center font-medium">
+                <Network className="h-5 w-5 sm:h-8 sm:w-8 lg:h-10 lg:w-10" strokeWidth={1.5} />
+                <div className="text-[10px] sm:text-xs text-center font-medium leading-tight">
                   Graph
                 </div>
               </button>
               <button
                 onClick={() => setViewMode('dashboard')}
-                className={`px-3 py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center space-y-2 ${
+                className={`px-2.5 py-1.5 sm:px-3 sm:py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center gap-0.5 sm:gap-2 min-w-[3rem] flex-shrink-0 ${
                   viewMode === 'dashboard' 
                     ? 'bg-green-600 text-white shadow' 
                     : 'text-gray-300 hover:text-white'
                 }`}
                 title="Dashboard View"
               >
-                <LayoutDashboard className="h-6 w-6 sm:h-8 sm:w-8 lg:h-10 lg:w-10" strokeWidth={1.5} />
-                <div className="text-xs text-center font-medium">
+                <LayoutDashboard className="h-5 w-5 sm:h-8 sm:w-8 lg:h-10 lg:w-10" strokeWidth={1.5} />
+                <div className="text-[10px] sm:text-xs text-center font-medium leading-tight">
                   Dashboard
                 </div>
               </button>
               <button
                 onClick={() => setViewMode('table')}
-                className={`px-3 py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center space-y-2 ${
+                className={`px-2.5 py-1.5 sm:px-3 sm:py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center gap-0.5 sm:gap-2 min-w-[3rem] flex-shrink-0 ${
                   viewMode === 'table' 
                     ? 'bg-green-600 text-white shadow' 
                     : 'text-gray-300 hover:text-white'
                 }`}
                 title="Table View"
               >
-                <Table className="h-6 w-6 sm:h-8 sm:w-8 lg:h-10 lg:w-10" strokeWidth={1.5} />
-                <div className="text-xs text-center font-medium">
+                <Table className="h-5 w-5 sm:h-8 sm:w-8 lg:h-10 lg:w-10" strokeWidth={1.5} />
+                <div className="text-[10px] sm:text-xs text-center font-medium leading-tight">
                   Table
                 </div>
               </button>
               <button
                 onClick={() => setViewMode('cards')}
-                className={`px-3 py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center space-y-2 ${
+                className={`px-2.5 py-1.5 sm:px-3 sm:py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center gap-0.5 sm:gap-2 min-w-[3rem] flex-shrink-0 ${
                   viewMode === 'cards' 
                     ? 'bg-green-600 text-white shadow' 
                     : 'text-gray-300 hover:text-white'
                 }`}
                 title="Card View"
               >
-                <CreditCard className="h-6 w-6 sm:h-8 sm:w-8 lg:h-10 lg:w-10" strokeWidth={1.5} />
-                <div className="text-xs text-center font-medium">
+                <CreditCard className="h-5 w-5 sm:h-8 sm:w-8 lg:h-10 lg:w-10" strokeWidth={1.5} />
+                <div className="text-[10px] sm:text-xs text-center font-medium leading-tight">
                   Card
                 </div>
               </button>
               <button
                 onClick={() => setViewMode('kanban')}
-                className={`px-3 py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center space-y-2 ${
+                className={`px-2.5 py-1.5 sm:px-3 sm:py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center gap-0.5 sm:gap-2 min-w-[3rem] flex-shrink-0 ${
                   viewMode === 'kanban' 
                     ? 'bg-green-600 text-white shadow' 
                     : 'text-gray-300 hover:text-white'
                 }`}
                 title="Kanban View"
               >
-                <Columns className="h-6 w-6 sm:h-8 sm:w-8 lg:h-10 lg:w-10" strokeWidth={1.5} />
-                <div className="text-xs text-center font-medium">
+                <Columns className="h-5 w-5 sm:h-8 sm:w-8 lg:h-10 lg:w-10" strokeWidth={1.5} />
+                <div className="text-[10px] sm:text-xs text-center font-medium leading-tight">
                   Kanban
                 </div>
               </button>
               <button
                 onClick={() => setViewMode('gantt')}
-                className={`px-3 py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center space-y-2 ${
+                className={`px-2.5 py-1.5 sm:px-3 sm:py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center gap-0.5 sm:gap-2 min-w-[3rem] flex-shrink-0 ${
                   viewMode === 'gantt' 
                     ? 'bg-green-600 text-white shadow' 
                     : 'text-gray-300 hover:text-white'
                 }`}
                 title="Gantt Chart"
               >
-                <GanttChartSquare className="h-6 w-6 sm:h-8 sm:w-8 lg:h-10 lg:w-10" strokeWidth={1.5} />
-                <div className="text-xs text-center font-medium">
+                <GanttChartSquare className="h-5 w-5 sm:h-8 sm:w-8 lg:h-10 lg:w-10" strokeWidth={1.5} />
+                <div className="text-[10px] sm:text-xs text-center font-medium leading-tight">
                   Gantt
                 </div>
               </button>
               <button
                 onClick={() => setViewMode('calendar')}
-                className={`px-3 py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center space-y-2 ${
+                className={`px-2.5 py-1.5 sm:px-3 sm:py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center gap-0.5 sm:gap-2 min-w-[3rem] flex-shrink-0 ${
                   viewMode === 'calendar' 
                     ? 'bg-green-600 text-white shadow' 
                     : 'text-gray-300 hover:text-white'
                 }`}
                 title="Calendar View"
               >
-                <CalendarDays className="h-6 w-6 sm:h-8 sm:w-8 lg:h-10 lg:w-10" strokeWidth={1.5} />
-                <div className="text-xs text-center font-medium">
+                <CalendarDays className="h-5 w-5 sm:h-8 sm:w-8 lg:h-10 lg:w-10" strokeWidth={1.5} />
+                <div className="text-[10px] sm:text-xs text-center font-medium leading-tight">
                   Calendar
                 </div>
               </button>
               <button
                 onClick={() => setViewMode('activity')}
-                className={`px-3 py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center space-y-2 ${
+                className={`px-2.5 py-1.5 sm:px-3 sm:py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center gap-0.5 sm:gap-2 min-w-[3rem] flex-shrink-0 ${
                   viewMode === 'activity' 
                     ? 'bg-green-600 text-white shadow' 
                     : 'text-gray-300 hover:text-white'
                 }`}
                 title="Activity Feed"
               >
-                <Activity className="h-6 w-6 sm:h-8 sm:w-8 lg:h-10 lg:w-10" strokeWidth={1.5} />
-                <div className="text-xs text-center font-medium">
+                <Activity className="h-5 w-5 sm:h-8 sm:w-8 lg:h-10 lg:w-10" strokeWidth={1.5} />
+                <div className="text-[10px] sm:text-xs text-center font-medium leading-tight">
                   Activity
                 </div>
               </button>
@@ -224,19 +245,20 @@ export function Workspace() {
           {/* Right Section: Status and Actions — hidden on mobile (the hamburger
               handles nav there); these chips otherwise eat the small-screen width. */}
           <div className="hidden md:flex flex-col lg:flex-row lg:items-center gap-3 lg:order-3">
-            {/* Graph store status (provider-agnostic — core is Neo4j-optional) */}
+            {/* Data-store status (provider-agnostic — keyed off the GraphQL API, which is
+                the actual data layer; the backing store may be D1, Neo4j, etc.) */}
             <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-all cursor-help ${
-              health?.services?.neo4j?.status === 'healthy'
+              health?.services?.graphql?.status === 'healthy'
                 ? 'bg-green-600/20 text-green-300 border border-green-500/30'
                 : 'bg-red-600/20 text-red-300 border border-red-500/30'
             }`} title={
-              health?.services?.neo4j?.status === 'healthy'
-                ? 'Graph database connected — all graph operations available'
-                : `Graph database offline — limited functionality${health?.services?.neo4j?.error ? `\nError: ${health.services.neo4j.error}` : ''}`
+              health?.services?.graphql?.status === 'healthy'
+                ? 'Connected — all operations available'
+                : 'Server unreachable — limited functionality'
             }>
               <Database className="w-4 h-4" />
               <span className="font-medium">
-                {health?.services?.neo4j?.status === 'healthy' ? 'Graph DB' : 'Graph DB Offline'}
+                {health?.services?.graphql?.status === 'healthy' ? 'Connected' : 'Offline'}
               </span>
             </div>
 
@@ -380,20 +402,21 @@ export function Workspace() {
         ) : viewMode === 'graph' ? (
           <div className="relative h-full">
            <div className="relative w-full h-full">
-            {/* Neo4j Connection Warning */}
-            {health?.services?.neo4j?.status !== 'healthy' && (
+            {/* Connection warning — fires only when the GraphQL data layer itself is
+                unreachable, not when an optional store (Neo4j) is simply unused. */}
+            {!healthLoading && health?.services?.graphql?.status !== 'healthy' && (
               <div className="absolute top-4 left-4 right-4 z-50">
                 <div className="bg-red-600/90 backdrop-blur-sm border border-red-500 rounded-lg p-4 shadow-lg">
                   <div className="flex items-start gap-3">
                     <AlertTriangle className="h-5 w-5 text-red-200 flex-shrink-0 mt-0.5" />
                     <div>
-                      <h3 className="font-semibold text-red-100 mb-1">Database Connection Lost</h3>
+                      <h3 className="font-semibold text-red-100 mb-1">Connection Lost</h3>
                       <p className="text-red-200 text-sm mb-2">
-                        Neo4j database is not available. Graph features are limited.
+                        The server is unreachable. Some features are limited until it reconnects.
                       </p>
-                      {health?.services?.neo4j?.error && (
+                      {healthError && (
                         <p className="text-red-300 text-xs font-mono bg-red-800/30 px-2 py-1 rounded">
-                          {health.services.neo4j.error}
+                          {healthError}
                         </p>
                       )}
                     </div>
@@ -404,7 +427,7 @@ export function Workspace() {
             <SafeGraphVisualization onNodeSelected={setInspectorNode} />
            </div>
            {inspectorNode && (
-             <div className="absolute top-3 right-3 z-40 hidden md:block">
+             <div className="absolute z-40 inset-x-3 bottom-3 md:inset-x-auto md:bottom-auto md:top-3 md:right-3">
                <NodeInspector node={inspectorNode} onClose={() => setInspectorNode(null)} />
              </div>
            )}
@@ -414,8 +437,9 @@ export function Workspace() {
         )}
       </div>
 
-      {/* Mini-Map Navigation - Bottom Right Corner */}
-      {viewMode === 'graph' && currentGraph && showMiniMap && createPortal(
+      {/* Mini-Map Navigation - Bottom Right Corner (hidden on mobile: it covers too
+          much of a phone screen, and panning the graph by touch is the primary nav there) */}
+      {viewMode === 'graph' && currentGraph && showMiniMap && !isMobile && createPortal(
         <div className="fixed bottom-4 right-4 w-64 h-48 bg-gray-800/95 backdrop-blur-sm border border-gray-600 rounded-lg shadow-xl z-50">
           {/* Mini-Map Header */}
           <div className="flex items-center justify-between p-3 border-b border-gray-700">
@@ -442,8 +466,8 @@ export function Workspace() {
         document.body
       )}
 
-      {/* Mini-Map Toggle Button - Shows when mini-map is hidden */}
-      {viewMode === 'graph' && currentGraph && !showMiniMap && createPortal(
+      {/* Mini-Map Toggle Button - Shows when mini-map is hidden (desktop only) */}
+      {viewMode === 'graph' && currentGraph && !showMiniMap && !isMobile && createPortal(
         <button
           onClick={() => setShowMiniMap(true)}
           className="fixed bottom-4 right-4 bg-gray-800/90 backdrop-blur-sm border border-gray-600 rounded-lg p-3 shadow-xl hover:bg-gray-700/90 transition-all duration-200 z-50"

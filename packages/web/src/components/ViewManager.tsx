@@ -373,8 +373,8 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
     <div className="h-full flex flex-col">
       {/* Search and Filter Bar - Only for table, card, kanban views */}
       {shouldShowFilters && (
-        <div className="bg-gray-800/90 backdrop-blur-sm border-b border-gray-700/50 p-4">
-          <div className="flex flex-col sm:flex-row gap-4 items-center">
+        <div className="bg-gray-800/90 backdrop-blur-sm border-b border-gray-700/50 p-3 sm:p-4">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-stretch sm:items-center">
             {/* Search Input */}
             <div className="relative w-full sm:w-80 md:w-96 lg:w-[28rem]">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -707,10 +707,11 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
           {renderView()}
         </div>
 
-        {/* Project Health Toggle Button - Floating */}
+        {/* Project Health Toggle Button - Floating (desktop only: the 320px panel
+            would cover a phone screen, and it's a secondary analytics surface) */}
         <button
           onClick={() => setShowProjectHealth(!showProjectHealth)}
-          className="fixed right-4 top-20 z-40 p-3 bg-gray-700/60 hover:bg-gray-700/80 backdrop-blur-sm rounded-lg border border-gray-600/50 hover:border-gray-500/70 transition-all duration-200 group"
+          className="hidden md:block fixed right-4 top-20 z-40 p-3 bg-gray-700/60 hover:bg-gray-700/80 backdrop-blur-sm rounded-lg border border-gray-600/50 hover:border-gray-500/70 transition-all duration-200 group"
           title={showProjectHealth ? "Hide Project Health" : "Show Project Health"}
         >
           {showProjectHealth ? (
@@ -720,9 +721,9 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
           )}
         </button>
 
-        {/* Right Sidebar - Overlay */}
+        {/* Right Sidebar - Overlay (desktop only) */}
         {showProjectHealth && (
-          <div className="absolute right-0 top-0 bottom-0 z-30">
+          <div className="hidden md:block absolute right-0 top-0 bottom-0 z-30">
             <RightSidebar currentView={viewMode} stats={stats} />
           </div>
         )}

@@ -688,6 +688,27 @@ input[type="date"]:focus {
   input, textarea, [contenteditable], .select-text {
     user-select: text !important;
   }
+
+  /* Hide the scrollbar on horizontally-scrollable strips (mobile view tabs etc.)
+     while keeping them swipe-scrollable. */
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Dynamic viewport height: fills the visible area on mobile browsers, accounting
+     for the collapsing address bar (falls back to vh where dvh is unsupported). */
+  .h-dvh-screen {
+    height: 100vh;
+    height: 100dvh;
+  }
+
+  /* Safe-area insets for notched devices (requires viewport-fit=cover). */
+  .pt-safe { padding-top: env(safe-area-inset-top); }
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
 }
 
 @keyframes fadeIn {

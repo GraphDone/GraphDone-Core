@@ -35,7 +35,7 @@ export function NodeInspector({ node, onClose }: NodeInspectorProps) {
   return (
     <div
       data-testid="node-inspector"
-      className="flex flex-col bg-gray-900/95 backdrop-blur-sm border border-gray-700/60 rounded-xl shadow-2xl w-72 max-h-[70vh] overflow-hidden"
+      className="flex flex-col bg-gray-900/95 backdrop-blur-sm border border-gray-700/60 rounded-xl shadow-2xl w-full sm:w-72 max-h-[60vh] sm:max-h-[70vh] overflow-hidden"
     >
       {/* Header */}
       <div className="flex items-start gap-2 p-3 border-b border-gray-700/60">
