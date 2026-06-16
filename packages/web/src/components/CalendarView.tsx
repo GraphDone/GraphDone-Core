@@ -41,7 +41,9 @@ const getStatusColor = (status: string) => {
 const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [viewMode, setViewMode] = useState<'month' | 'week' | 'agenda'>('month');
+  const [viewMode, setViewMode] = useState<'month' | 'week' | 'agenda'>(() =>
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 639px)').matches ? 'agenda' : 'month'
+  );
   const [filterPriority, setFilterPriority] = useState<string>('all');
   const [filterType, setFilterType] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -109,6 +111,14 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
     
     return grouped;
   }, [filteredNodes, showCompleted, filterPriority, filterType, filterStatus, searchQuery]);
+
+  // Flatten grouped nodes into a date-sorted list for the agenda view
+  const agendaDays = useMemo(() => {
+    return Object.keys(nodesByDate)
+      .filter(dateKey => nodesByDate[dateKey].length > 0)
+      .sort((a, b) => new Date(a).getTime() - new Date(b).getTime())
+      .map(dateKey => ({ date: new Date(dateKey), nodes: nodesByDate[dateKey] }));
+  }, [nodesByDate]);
 
   // Generate calendar days
   const calendarDays = useMemo(() => {
@@ -420,7 +430,66 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
             </button>
           </div>
 
+          {/* Agenda List */}
+          {viewMode === 'agenda' && (
+            <div className="flex-1 p-2 sm:p-4 overflow-y-auto space-y-4">
+              {agendaDays.length === 0 ? (
+                <div className="text-center py-12 text-gray-400">
+                  <CalendarDays className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p>No scheduled tasks</p>
+                </div>
+              ) : (
+                agendaDays.map(({ date, nodes }) => (
+                  <div key={date.toDateString()}>
+                    <div className={`flex items-center space-x-2 mb-2 text-sm font-semibold ${
+                      isToday(date) ? 'text-green-400' : 'text-gray-300'
+                    }`}>
+                      <Clock className="h-4 w-4 flex-shrink-0" />
+                      <span className="truncate">
+                        {date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+                      </span>
+                    </div>
+                    <div className="space-y-2">
+                      {nodes.map((node, index) => {
+                        const statusConfig = getStatusConfig(node.status as WorkItemStatus);
+                        const typeConfig = getTypeConfig(node.type as WorkItemType);
+                        const priority = node.priority || 0;
+                        const priorityConfig = getPriorityConfig(priority);
+
+                        return (
+                          <div
+                            key={index}
+                            onClick={() => setSelectedTask(selectedTask === node.id ? null : node.id)}
+                            className="flex items-start justify-between gap-2 p-3 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors cursor-pointer"
+                          >
+                            <div className="flex items-start space-x-3 min-w-0">
+                              <div className={`mt-1 w-3 h-3 rounded-full flex-shrink-0 ${statusConfig.bgColor}`} />
+                              <div className="min-w-0">
+                                <div className="text-sm font-medium text-white truncate">{node.title}</div>
+                                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-400">
+                                  <span className="flex items-center">{React.createElement(typeConfig.icon as any, { className: 'h-3 w-3 inline mr-1' })} {node.type}</span>
+                                  <span className={priorityConfig.color}>{priorityConfig.label}</span>
+                                  {node.assignedTo && (
+                                    <span className="truncate">{node.assignedTo.name}</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <span className={`text-xs px-2 py-1 rounded flex-shrink-0 ${statusConfig.bgColor} ${statusConfig.color}`}>
+                              {node.status.replace('_', ' ')}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+
           {/* Days of Week Header */}
+          {viewMode !== 'agenda' && (
           <div className="grid grid-cols-7 gap-1 p-2 border-b border-gray-700">
             {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((day, index) => (
               <div key={day} className={`text-center py-3 text-sm font-medium ${
@@ -431,8 +500,10 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
               </div>
             ))}
           </div>
+          )}
 
           {/* Calendar Grid */}
+          {viewMode !== 'agenda' && (
           <div className="flex-1 p-2 overflow-auto">
             <div className="grid grid-cols-7 gap-1 h-full">
               {calendarDays.map((day, index) => {
@@ -528,8 +599,9 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
               })}
             </div>
           </div>
+          )}
         </div>
-        
+
         {/* Selected Date Details Panel */}
         {selectedDate && (
           <div className="mt-4 bg-gray-800/50 backdrop-blur-sm rounded-lg border border-gray-700/50 p-4">

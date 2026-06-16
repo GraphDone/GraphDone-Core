@@ -703,7 +703,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
       {/* Main Content Container */}
       <div className="flex flex-1 overflow-hidden relative">
         {/* Main Content */}
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-auto" data-testid="view-content">
           {renderView()}
         </div>
 

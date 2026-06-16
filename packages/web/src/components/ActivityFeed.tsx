@@ -594,7 +594,7 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ filteredNodes }) => {
       </div>
 
       {/* Activity List */}
-      <div className="flex-1 overflow-auto p-6">
+      <div className="flex-1 overflow-auto p-3 sm:p-6">
         {paginatedActivities.length === 0 ? (
           <div className="text-center py-12">
             <AlertCircle className="h-12 w-12 text-gray-500 mx-auto mb-4" />
@@ -630,8 +630,8 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ filteredNodes }) => {
                       </div>
                       
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center space-x-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2 mb-3 sm:flex-nowrap">
+                          <div className="flex flex-wrap items-center gap-2 min-w-0 sm:flex-nowrap sm:space-x-3 sm:gap-0">
                             <h3 className="text-base font-semibold text-white">{activity.title}</h3>
                             {(() => {
                               const priorityConfig = PRIORITY_OPTIONS.find(opt => opt.value === activity.priority);
@@ -662,18 +662,18 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ filteredNodes }) => {
                         
                         <p className="text-sm text-gray-300 mb-4 leading-relaxed">{activity.description}</p>
                         
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-4 text-xs">
-                            <div className="flex items-center space-x-2 px-2 py-1 bg-gray-700/50 rounded-lg">
-                              <User className="h-3 w-3 text-gray-400" />
-                              <span className="text-gray-300 font-medium">{activity.user}</span>
+                        <div className="flex flex-wrap items-center justify-between gap-2 sm:flex-nowrap">
+                          <div className="flex flex-wrap items-center gap-2 min-w-0 text-xs sm:flex-nowrap sm:space-x-4 sm:gap-0">
+                            <div className="flex items-center space-x-2 px-2 py-1 bg-gray-700/50 rounded-lg min-w-0">
+                              <User className="h-3 w-3 text-gray-400 flex-shrink-0" />
+                              <span className="truncate text-gray-300 font-medium">{activity.user}</span>
                             </div>
-                            <div className="flex items-center space-x-2 px-2 py-1 bg-gray-700/50 rounded-lg">
-                              <Target className="h-3 w-3 text-gray-400" />
+                            <div className="flex items-center space-x-2 px-2 py-1 bg-gray-700/50 rounded-lg min-w-0">
+                              <Target className="h-3 w-3 text-gray-400 flex-shrink-0" />
                               <span className="truncate max-w-32 text-gray-300 font-medium">{activity.nodeTitle}</span>
                             </div>
                           </div>
-                          <div className="text-xs text-gray-500 bg-gray-700/30 px-2 py-1 rounded">
+                          <div className="text-xs text-gray-500 bg-gray-700/30 px-2 py-1 rounded flex-shrink-0">
                             {activity.timestamp.toLocaleString()}
                           </div>
                         </div>

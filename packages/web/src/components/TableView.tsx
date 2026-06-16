@@ -110,9 +110,115 @@ const getContributorAvatar = (contributor?: string) => {
 };
 
 const TableView: React.FC<TableViewProps> = ({ filteredNodes, handleEditNode, edges }) => {
+  const sortedNodes = [...filteredNodes].sort((a, b) => {
+    const dateA = new Date(a.updatedAt || a.createdAt).getTime();
+    const dateB = new Date(b.updatedAt || b.createdAt).getTime();
+    return dateB - dateA; // Most recent first
+  });
+
   return (
-    <div className="p-6">
-      <div className="bg-gray-800/80 backdrop-blur-sm rounded-xl border border-gray-700/50 shadow-2xl overflow-hidden max-w-full">
+    <div className="p-4 sm:p-6">
+      <div className="sm:hidden space-y-4">
+        {sortedNodes.map((node) => {
+          const { incomingCount, outgoingCount, totalCount } = getConnectionDetails(node, edges);
+          return (
+            <div
+              key={node.id}
+              onClick={() => handleEditNode(node)}
+              className={`${getNodeTypeRowBackground(node.type)} rounded-xl shadow-lg cursor-pointer active:brightness-125 transition-all duration-200`}
+              style={{
+                borderLeft: `4px solid ${getNodeTypeBorderColor(node.type)}`,
+                borderRight: `2px solid ${getNodeTypeBorderColor(node.type)}`
+              }}
+            >
+              <div className="p-4 space-y-3">
+                <div>
+                  <div className="text-white font-medium text-base break-words">{node.title}</div>
+                  {node.description && (
+                    <div className="text-gray-400 text-sm mt-1 break-words">{node.description}</div>
+                  )}
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getNodeTypeColor(node.type)} shadow-sm`}>
+                    {getTypeIconElement(node.type as WorkItemType, "w-3 h-3")}
+                    <span className="ml-1">{formatLabel(node.type)}</span>
+                  </span>
+                  <span className="inline-flex items-center">
+                    <span className={`mr-1 ${getStatusConfig(node.status as WorkItemStatus).color}`}>
+                      {getStatusIconElement(node.status as WorkItemStatus, "h-4 w-4")}
+                    </span>
+                    <span className={`text-sm font-medium ${getStatusColor(node.status)}`}>
+                      {formatLabel(node.status)}
+                    </span>
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <div className="text-gray-500 text-xs uppercase tracking-wider mb-1">Priority</div>
+                    <AnimatedPriority
+                      value={getNodePriority(node)}
+                      className="text-sm font-bold text-white"
+                    />
+                  </div>
+                  <div>
+                    <div className="text-gray-500 text-xs uppercase tracking-wider mb-1">Contributor</div>
+                    {node.assignedTo ? (
+                      <span className="text-gray-300 text-sm break-words">{node.assignedTo.name}</span>
+                    ) : (
+                      <span className="text-gray-500 text-sm">Available</span>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-gray-500 text-xs uppercase tracking-wider mb-1">Connections</div>
+                  {totalCount === 0 ? (
+                    <div className="flex items-center space-x-2 text-gray-500">
+                      <GitBranch className="h-4 w-4" />
+                      <span className="text-sm">None</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center space-x-3">
+                      <div className="flex items-center space-x-1">
+                        <GitBranch className="h-4 w-4 text-gray-400" />
+                        <span className="text-sm font-medium text-white">{totalCount}</span>
+                      </div>
+                      {incomingCount > 0 && (
+                        <div className="flex items-center space-x-1 px-2 py-1 bg-red-900/20 border border-red-500/30 rounded-md">
+                          <ArrowLeft className="h-3 w-3 text-red-400" />
+                          <span className="text-xs font-medium text-red-300">{incomingCount}</span>
+                        </div>
+                      )}
+                      {outgoingCount > 0 && (
+                        <div className="flex items-center space-x-1 px-2 py-1 bg-purple-900/20 border border-purple-500/30 rounded-md">
+                          <ArrowRight className="h-3 w-3 text-purple-400" />
+                          <span className="text-xs font-medium text-purple-300">{outgoingCount}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <div className="text-gray-500 text-xs uppercase tracking-wider mb-1">Due Date</div>
+                  {node.dueDate ? (
+                    <div className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-lg border ${getDueDateColorScheme(node.dueDate).bg} ${getDueDateColorScheme(node.dueDate).border} ${getDueDateColorScheme(node.dueDate).text}`}>
+                      {new Date(node.dueDate).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
+                      })}
+                    </div>
+                  ) : (
+                    <span className="text-gray-500 text-sm">No due date</span>
+                  )}
+                </div>
+                <TagDisplay tags={node.tags} compact />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="hidden sm:block bg-gray-800/80 backdrop-blur-sm rounded-xl border border-gray-700/50 shadow-2xl overflow-hidden max-w-full">
         <div className="overflow-x-auto max-w-full">
           <table className="w-max min-w-full">
             <thead className="bg-gradient-to-r from-gray-700 to-gray-800 border-b border-gray-600/50">
@@ -127,12 +233,7 @@ const TableView: React.FC<TableViewProps> = ({ filteredNodes, handleEditNode, ed
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-600/30 backdrop-blur-sm">
-              {[...filteredNodes]
-                .sort((a, b) => {
-                  const dateA = new Date(a.updatedAt || a.createdAt).getTime();
-                  const dateB = new Date(b.updatedAt || b.createdAt).getTime();
-                  return dateB - dateA; // Most recent first
-                })
+              {sortedNodes
                 .map((node) => {
                   return (
                 <tr 
