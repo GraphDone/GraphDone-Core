@@ -3671,6 +3671,13 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected }:
           if (obstacles) {
             placedLabels.push({ x: placement.x, y: placement.y, width: labelW + 8, height: labelH + 8 });
           }
+          // edgeLabelPlacement keeps text upright by stripping 180° when the edge
+          // points "backward" — which leaves the directional label icon pointing
+          // the wrong way after a flip. Carry that lost 180° on the icon so its
+          // arrow tracks the real edge direction (and flips when the edge flips).
+          const trueAngle = (Math.atan2(target.y - source.y, target.x - source.x) * 180) / Math.PI;
+          const iconFlipped = trueAngle > 90 || trueAngle < -90;
+          d3.select(this).select('.edge-label-icon').attr('transform', iconFlipped ? 'rotate(180)' : null);
           return `translate(${placement.x},${placement.y}) rotate(${placement.rotation})`;
         });
     };
