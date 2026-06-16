@@ -49,7 +49,7 @@ export function Analytics() {
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="bg-gray-900/30 backdrop-blur-md border-b border-gray-700/30 px-6 py-4">
+      <div className="bg-gray-900/30 backdrop-blur-md border-b border-gray-700/30 px-3 py-3 sm:px-6 sm:py-4">
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center space-x-3">

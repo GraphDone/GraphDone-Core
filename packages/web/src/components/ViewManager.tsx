@@ -395,14 +395,14 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
               )}
             </div>
 
-            {/* Filter Dropdowns */}
-            <div className="flex gap-3">
+            {/* Filter Dropdowns — 2-up grid on phones so all filters fit; inline on desktop */}
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:gap-3">
               {/* Type Filter */}
               <div className="relative" ref={typeDropdownRef}>
                 <button
                   type="button"
                   onClick={() => setIsTypeDropdownOpen(!isTypeDropdownOpen)}
-                  className="flex items-center justify-between px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent hover:border-gray-500 transition-all duration-200 min-w-[160px]"
+                  className="flex items-center justify-between px-2.5 sm:px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-xs sm:text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent hover:border-gray-500 transition-all duration-200 w-full sm:w-auto sm:min-w-[150px] min-w-0"
                 >
                   <div className="flex items-center space-x-2">
                     {(() => {
@@ -476,7 +476,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
                 <button
                   type="button"
                   onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
-                  className="flex items-center justify-between px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent hover:border-gray-500 transition-all duration-200 min-w-[150px]"
+                  className="flex items-center justify-between px-2.5 sm:px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-xs sm:text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent hover:border-gray-500 transition-all duration-200 w-full sm:w-auto sm:min-w-[150px] min-w-0"
                 >
                   <div className="flex items-center space-x-2">
                     {(() => {
@@ -548,7 +548,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
                 <button
                   type="button"
                   onClick={() => setIsPriorityDropdownOpen(!isPriorityDropdownOpen)}
-                  className="flex items-center justify-between px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent hover:border-gray-500 transition-all duration-200 min-w-[140px]"
+                  className="flex items-center justify-between px-2.5 sm:px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-xs sm:text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent hover:border-gray-500 transition-all duration-200 w-full sm:w-auto sm:min-w-[150px] min-w-0"
                 >
                   <div className="flex items-center space-x-2">
                     {(() => {
@@ -620,7 +620,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
                 <button
                   type="button"
                   onClick={() => setIsContributorDropdownOpen(!isContributorDropdownOpen)}
-                  className="flex items-center justify-between px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent hover:border-gray-500 transition-all duration-200 min-w-[180px]"
+                  className="flex items-center justify-between px-2.5 sm:px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-xs sm:text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent hover:border-gray-500 transition-all duration-200 w-full sm:w-auto sm:min-w-[150px] min-w-0"
                 >
                   <div className="flex items-center space-x-2">
                     {(() => {
