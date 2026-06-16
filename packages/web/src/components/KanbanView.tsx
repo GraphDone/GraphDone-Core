@@ -122,13 +122,13 @@ const KanbanView: React.FC<KanbanViewProps> = ({ filteredNodes, handleEditNode, 
   }, {} as Record<string, WorkItem[]>);
 
   return (
-    <div className="flex space-x-4 p-6 overflow-x-auto h-full">
+    <div className="flex flex-col gap-4 p-3 overflow-y-auto sm:flex-row sm:space-x-4 sm:gap-0 sm:p-6 sm:overflow-x-auto h-full">
       {statuses.map((status) => {
         const nodes = nodesByStatus[status] || [];
         const config = getStatusConfig(status);
-        
+
         return (
-          <div key={status} className="flex-shrink-0 w-80">
+          <div key={status} className="w-full sm:w-80 flex-shrink-0">
             <div className="bg-gray-800/40 backdrop-blur-sm rounded-lg h-full">
               <div className={`p-4 border-b border-gray-600/30`}>
                 <div className="flex items-center justify-between">
