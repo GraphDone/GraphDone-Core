@@ -7,6 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { McpHealthIndicator } from './McpHealthIndicator';
 import FloatingConsole from './FloatingConsole';
 import { InsecureConnectionBanner } from './TlsStatusIndicator';
+import { MobileBottomNav } from './MobileBottomNav';
 import { APP_VERSION } from '../utils/version';
 
 interface LayoutProps {
@@ -302,13 +303,16 @@ export function Layout({ children }: LayoutProps) {
         )}
 
         {/* Main content */}
-        <div className="flex-1 flex flex-col min-w-0 relative z-20">
+        <div className="flex-1 flex flex-col min-w-0 min-h-0 relative z-20">
           <main className="flex-1 select-none min-h-0">
             {children}
           </main>
         </div>
       </div>
-      
+
+      {/* Consistent mobile footer across every page */}
+      <MobileBottomNav />
+
       {/* Global Floating Console */}
       <FloatingConsole
         isVisible={showFloatingConsole}

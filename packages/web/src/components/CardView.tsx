@@ -120,7 +120,7 @@ const CardView: React.FC<CardViewProps> = ({ filteredNodes, handleEditNode, edge
         <div
           key={node.id}
           onClick={() => handleEditNode(node)}
-          className={`${getNodeTypeCardBackground(node.type)} rounded-xl p-6 shadow-lg hover:shadow-xl hover:shadow-white/10 transition-all duration-200 cursor-pointer border border-gray-600/50 hover:border-gray-500/70 hover:scale-[1.02] hover:-translate-y-1 hover:brightness-125 group backdrop-blur-sm`}
+          className={`${getNodeTypeCardBackground(node.type)} rounded-xl p-3 sm:p-4 shadow-lg hover:shadow-xl hover:shadow-white/10 transition-all duration-200 cursor-pointer border border-gray-600/50 hover:border-gray-500/70 hover:scale-[1.02] hover:-translate-y-1 hover:brightness-125 group backdrop-blur-sm`}
           style={{
             borderLeft: `4px solid ${getNodeTypeCardBorderColor(node.type)}`,
             borderLeftWidth: '4px',
@@ -128,7 +128,7 @@ const CardView: React.FC<CardViewProps> = ({ filteredNodes, handleEditNode, edge
             borderLeftColor: getNodeTypeCardBorderColor(node.type)
           }}
         >
-          <div className="flex items-start justify-between mb-4">
+          <div className="flex items-start justify-between mb-2">
             <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold shadow-sm ${getNodeTypeColor(node.type)}`}>
               {getTypeIconElement(node.type as WorkItemType, "w-3 h-3")}
               <span className="ml-1">{formatLabel(node.type)}</span>
@@ -171,18 +171,18 @@ const CardView: React.FC<CardViewProps> = ({ filteredNodes, handleEditNode, edge
             })()}
           </div>
           
-          <h3 className="text-gray-900 dark:text-white font-semibold mb-3 text-lg leading-tight break-words">{node.title}</h3>
-          
+          <h3 className="text-gray-900 dark:text-white font-semibold mb-1.5 text-base sm:text-lg leading-tight break-words">{node.title}</h3>
+
           {node.description && (
-            <p className="text-gray-600 dark:text-gray-400 text-sm mb-4 leading-relaxed break-words">{node.description}</p>
+            <p className="text-gray-600 dark:text-gray-400 text-sm mb-3 leading-snug break-words line-clamp-2">{node.description}</p>
           )}
 
           {/* Tags */}
-          <TagDisplay tags={node.tags} className="mb-4" />
+          <TagDisplay tags={node.tags} className="mb-3" />
 
           {/* Priority and Due Date */}
-          <div className="mb-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
-            <div className="flex items-center justify-between mb-2">
+          <div className="mb-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
+            <div className="flex items-center justify-between mb-1">
               <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Priority</span>
             </div>
             <div className="flex items-center justify-between">
@@ -193,7 +193,7 @@ const CardView: React.FC<CardViewProps> = ({ filteredNodes, handleEditNode, edge
                   className="text-sm font-semibold"
                   renderBar={(animatedValue, animatedColor) => (
                     <div className="flex items-center relative">
-                      <div className="w-3 h-12 bg-gray-300 dark:bg-gray-600 rounded overflow-hidden flex flex-col justify-end relative">
+                      <div className="w-3 h-9 bg-gray-300 dark:bg-gray-600 rounded overflow-hidden flex flex-col justify-end relative">
                         <div 
                           className="w-full transition-colors duration-300"
                           style={{ 
@@ -262,7 +262,7 @@ const CardView: React.FC<CardViewProps> = ({ filteredNodes, handleEditNode, edge
           </div>
           
           {/* Footer */}
-          <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-600">
+          <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-600">
             {/* Contributor */}
             <div className="flex items-center">
               {node.assignedTo ? (
