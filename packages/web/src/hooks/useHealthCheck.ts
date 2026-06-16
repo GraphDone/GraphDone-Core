@@ -19,8 +19,8 @@ export interface HealthCheckResult {
   timestamp: string;
   services: {
     graphql: ServiceHealth & { port: number };
-    neo4j: ServiceHealth & { uri: string };
-    mcp: McpHealth;
+    neo4j?: ServiceHealth & { uri: string };
+    mcp?: McpHealth;
   };
 }
 
@@ -158,11 +158,15 @@ export function useHealthCheck(options: UseHealthCheckOptions = {}) {
   const getOverallStatus = useCallback((): 'healthy' | 'degraded' | 'unhealthy' | 'unknown' => {
     if (!health) return 'unknown';
     
-    const criticalServices = [health.services.graphql, health.services.neo4j];
-    const hasCriticalIssue = criticalServices.some(s => s.status === 'unhealthy');
-    
+    const criticalServices = [health.services.graphql];
+    const hasCriticalIssue = criticalServices.some(s => s?.status === 'unhealthy');
+
     if (hasCriticalIssue) return 'unhealthy';
-    if (health.status === 'degraded' || health.services.mcp.status === 'unhealthy') return 'degraded';
+    if (
+      health.status === 'degraded' ||
+      health.services.mcp?.status === 'unhealthy' ||
+      health.services.neo4j?.status === 'unhealthy'
+    ) return 'degraded';
     
     return 'healthy';
   }, [health]);

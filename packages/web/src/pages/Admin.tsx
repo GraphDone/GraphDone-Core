@@ -1279,7 +1279,7 @@ certbot renew --dry-run
                 <g transform="translate(120, 95)">
                   <line x1="0" y1="10" x2="80" y2="10" stroke="rgb(34, 197, 94)" strokeWidth="2" markerEnd="url(#arrowhead)"/>
                   <text x="40" y="0" textAnchor="middle" className="fill-green-400 text-xs font-medium">
-                    {config ? `HTTPS:${config.services.proxy.httpsPort}` : 'HTTPS:8443'}
+                    {`HTTPS:${config?.services?.proxy?.httpsPort ?? '8443'}`}
                   </text>
                 </g>
                 
@@ -1296,10 +1296,10 @@ certbot renew --dry-run
                   <line x1="0" y1="10" x2="50" y2="-20" stroke="rgb(34, 197, 94)" strokeWidth="2" markerEnd="url(#arrowhead)"/>
                   <line x1="0" y1="10" x2="50" y2="40" stroke="rgb(34, 197, 94)" strokeWidth="2" markerEnd="url(#arrowhead)"/>
                   <text x="25" y="-10" textAnchor="middle" className="fill-green-400 text-xs">
-                    {config ? `HTTP:${config.services.web.port}` : 'HTTP:3127'}
+                    {`HTTP:${config?.services?.web?.port ?? '3127'}`}
                   </text>
                   <text x="25" y="55" textAnchor="middle" className="fill-green-400 text-xs">
-                    {config ? `HTTP:${config.services.api.port}` : 'HTTP:4127'}
+                    {`HTTP:${config?.services?.api?.port ?? '4127'}`}
                   </text>
                 </g>
                 
@@ -1321,14 +1321,14 @@ certbot renew --dry-run
                 <g transform="translate(540, 140)">
                   <line x1="0" y1="5" x2="80" y2="5" stroke="rgb(14, 165, 233)" strokeWidth="2" markerEnd="url(#arrowhead)"/>
                   <text x="40" y="-5" textAnchor="middle" className="fill-sky-400 text-xs">
-                    {config ? `Neo4j:${config.services.neo4j.port}` : 'Neo4j:7687'}
+                    {`Graph DB:${config?.services?.neo4j?.port ?? '7687'}`}
                   </text>
                 </g>
-                
-                {/* Neo4j Database */}
+
+                {/* Graph Database */}
                 <g transform="translate(640, 120)">
                   <rect x="0" y="0" width="100" height="50" rx="6" fill="rgb(14, 165, 233)" fillOpacity="0.2" stroke="rgb(14, 165, 233)" strokeWidth="2"/>
-                  <text x="50" y="20" textAnchor="middle" className="fill-sky-300 text-sm font-medium">Neo4j</text>
+                  <text x="50" y="20" textAnchor="middle" className="fill-sky-300 text-sm font-medium">Graph DB</text>
                   <text x="50" y="35" textAnchor="middle" className="fill-sky-300 text-xs">Database</text>
                 </g>
                 
@@ -1360,7 +1360,7 @@ certbot renew --dry-run
               </div>
               
               <div className="mt-3 text-xs text-gray-400" title="Traffic flow explanation">
-                <strong className="text-green-400">Traffic Flow:</strong> Browser → HTTPS ({config?.services.proxy.httpsPort || '8443'}) → Nginx Proxy → HTTP backends ({config?.services.web.port || '3127'} Web, {config?.services.api.port || '4127'} API) → Neo4j ({config?.services.neo4j.port || '7687'})
+                <strong className="text-green-400">Traffic Flow:</strong> Browser → HTTPS ({config?.services?.proxy?.httpsPort || '8443'}) → Nginx Proxy → HTTP backends ({config?.services?.web?.port || '3127'} Web, {config?.services?.api?.port || '4127'} API) → Graph DB ({config?.services?.neo4j?.port || '7687'})
               </div>
               
               {lastUpdated && (
@@ -1767,7 +1767,7 @@ For more details, see: /docs/tls-ssl-setup.md
                     addDebugMessage(`📊 Status code: ${healthResponse.status}`);
                     addDebugMessage(`🔍 Server status: ${healthData.status}`);
                     addDebugMessage(`💾 GraphQL service: ${healthData.services?.graphql?.status || 'unknown'}`);
-                    addDebugMessage(`🗄️ Neo4j status: ${healthData.services?.neo4j?.status || 'unknown'}`);
+                    addDebugMessage(`🗄️ Graph store status: ${healthData.services?.neo4j?.status || 'unknown'}`);
                     
                     if (healthResponse.ok) {
                       addDebugMessage('✅ Health endpoint test PASSED');
