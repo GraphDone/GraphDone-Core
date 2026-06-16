@@ -90,24 +90,26 @@ export function Backend() {
         dependencies: ['GraphQL API Server']
       });
 
-      // Neo4j Graph Database
+      // Graph store
       const neo4jStatus = healthData.services?.neo4j?.status;
       let neo4jServiceStatus: 'healthy' | 'degraded' | 'down' = 'down';
-      let neo4jDescription = 'Neo4j connection status unknown';
-      
+      let neo4jDescription = 'Graph store connection status unknown';
+
       if (neo4jStatus === 'healthy') {
         neo4jServiceStatus = 'healthy';
-        neo4jDescription = `Connected to ${healthData.services.neo4j.uri}`;
-        debug.push(`🗄️  Neo4j: healthy at ${healthData.services.neo4j.uri}`);
+        neo4jDescription = healthData.services?.neo4j?.uri
+          ? `Connected to ${healthData.services.neo4j.uri}`
+          : 'Graph store connected';
+        debug.push(`🗄️  Graph store: healthy${healthData.services?.neo4j?.uri ? ` at ${healthData.services.neo4j.uri}` : ''}`);
       } else if (neo4jStatus === 'unhealthy') {
         neo4jServiceStatus = 'down';
-        const error = healthData.services.neo4j.error || 'Connection failed';
+        const error = healthData.services?.neo4j?.error || 'Connection failed';
         neo4jDescription = `Connection failed: ${error.substring(0, 100)}${error.length > 100 ? '...' : ''}`;
-        debug.push(`❌ Neo4j: down - ${error}`);
+        debug.push(`❌ Graph store: down - ${error}`);
       }
-      
+
       services.push({
-        name: 'Neo4j Graph Database',
+        name: 'Graph store',
         status: neo4jServiceStatus,
         responseTime: neo4jServiceStatus === 'healthy' ? 8 : undefined,
         lastChecked: now,
@@ -197,7 +199,7 @@ export function Backend() {
             description: 'Unavailable (depends on GraphQL API)'
           },
           {
-            name: 'Neo4j Graph Database',
+            name: 'Graph store',
             status: 'down',
             lastChecked: new Date(),
             description: 'Status unknown (server unreachable)'
@@ -586,7 +588,7 @@ export function Backend() {
                     <text x="165" y="467" textAnchor="middle" className="fill-pink-200 text-xs">SQLite Auth</text>
                     
                     <rect x="250" y="450" width="130" height="25" fill="#9d174d" stroke="#ec4899" rx="4" />
-                    <text x="315" y="467" textAnchor="middle" className="fill-pink-200 text-xs">Neo4j (Optional)</text>
+                    <text x="315" y="467" textAnchor="middle" className="fill-pink-200 text-xs">Graph store</text>
                     
                     <rect x="400" y="450" width="130" height="25" fill="#9d174d" stroke="#ec4899" rx="4" />
                     <text x="465" y="467" textAnchor="middle" className="fill-pink-200 text-xs">MCP Server</text>
@@ -713,13 +715,13 @@ export function Backend() {
               <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-400">Graph Database</p>
+                    <p className="text-sm text-gray-400">Graph database</p>
                     <p className="text-2xl font-bold text-gray-100">
-                      {systemHealth.services.find(s => s.name === 'Neo4j Graph Database')?.status === 'healthy' ? 'Online' : 'Offline'}
+                      {systemHealth.services.find(s => s.name === 'Graph store')?.status === 'healthy' ? 'Online' : 'Offline'}
                     </p>
                   </div>
                   <Database className={`h-8 w-8 ${
-                    systemHealth.services.find(s => s.name === 'Neo4j Graph Database')?.status === 'healthy' 
+                    systemHealth.services.find(s => s.name === 'Graph store')?.status === 'healthy'
                       ? 'text-green-400' : 'text-red-400'
                   }`} />
                 </div>
