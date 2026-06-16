@@ -295,8 +295,8 @@ export function Signup() {
         {/* Header */}
         <div className="text-center mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
           <Link to="/" className="inline-flex items-center justify-center mb-6 hover:opacity-90 transition-all duration-300 hover:scale-105 group">
-            <img src="/favicon.svg" alt="GraphDone Logo" className="h-16 w-16 drop-shadow-lg group-hover:drop-shadow-2xl transition-all duration-300" />
-            <span className="ml-4 text-5xl font-bold bg-gradient-to-r from-teal-400 via-cyan-400 to-blue-500 bg-clip-text text-transparent drop-shadow-2xl tracking-tight">GraphDone</span>
+            <img src="/favicon.svg" alt="GraphDone Logo" className="h-12 w-12 sm:h-16 sm:w-16 drop-shadow-lg group-hover:drop-shadow-2xl transition-all duration-300" />
+            <span className="ml-3 sm:ml-4 text-4xl sm:text-5xl font-bold bg-gradient-to-r from-teal-400 via-cyan-400 to-blue-500 bg-clip-text text-transparent drop-shadow-2xl tracking-tight">GraphDone</span>
           </Link>
           <h1 className="text-3xl font-bold text-gray-100 mb-3">Create Your Account</h1>
           <p className="text-gray-400 text-lg">Join the decentralized project management revolution</p>
@@ -364,8 +364,11 @@ export function Signup() {
             </div>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="bg-gray-800/50 backdrop-blur-xl border border-gray-700/50 rounded-2xl p-8 space-y-5 shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-700">
-          {/* Social Signup Buttons */}
+          <form onSubmit={handleSubmit} className="bg-gray-800/50 backdrop-blur-xl border border-gray-700/50 rounded-2xl p-5 sm:p-8 space-y-5 shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-700">
+          {/* Social Signup Buttons — only when at least one provider is configured;
+              otherwise the whole block (and divider) is hidden so no setup hints leak. */}
+          {(oauthConfig?.google?.configured || oauthConfig?.linkedin?.configured || oauthConfig?.github?.configured) && (
+          <>
           <div className="grid grid-cols-3 gap-3">
             <button
               type="button"
@@ -389,7 +392,7 @@ export function Signup() {
                   ? 'text-teal-400 bg-gray-900/95 border border-teal-500/30'
                   : 'text-gray-300 bg-gray-900/95 border border-gray-700/50'
               }`}>
-                {oauthConfig?.google.configured ? 'Sign up with Google' : 'Run: ./scripts/setup-oauth.sh'}
+                {oauthConfig?.google.configured ? 'Sign up with Google' : 'Not configured'}
               </span>
             </button>
 
@@ -412,7 +415,7 @@ export function Signup() {
                   ? 'text-teal-400 bg-gray-900/95 border border-teal-500/30'
                   : 'text-gray-300 bg-gray-900/95 border border-gray-700/50'
               }`}>
-                {oauthConfig?.linkedin.configured ? 'Sign up with LinkedIn' : 'Run: ./scripts/setup-oauth.sh'}
+                {oauthConfig?.linkedin.configured ? 'Sign up with LinkedIn' : 'Not configured'}
               </span>
             </button>
 
@@ -433,7 +436,7 @@ export function Signup() {
                   ? 'text-teal-400 bg-gray-900/95 border border-teal-500/30'
                   : 'text-gray-300 bg-gray-900/95 border border-gray-700/50'
               }`}>
-                {oauthConfig?.github.configured ? 'Sign up with GitHub' : 'Run: ./scripts/setup-oauth.sh'}
+                {oauthConfig?.github.configured ? 'Sign up with GitHub' : 'Not configured'}
               </span>
             </button>
           </div>
@@ -446,6 +449,8 @@ export function Signup() {
               <span className="px-2 bg-gray-800 text-gray-400">Or sign up with your credentials</span>
             </div>
           </div>
+          </>
+          )}
 
           {/* Name Field */}
           <div>

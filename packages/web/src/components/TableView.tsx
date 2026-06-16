@@ -133,13 +133,7 @@ const TableView: React.FC<TableViewProps> = ({ filteredNodes, handleEditNode, ed
                   const dateB = new Date(b.updatedAt || b.createdAt).getTime();
                   return dateB - dateA; // Most recent first
                 })
-                .map((node, index) => {
-                  console.log(`Row ${index}:`, {
-                    id: node.id,
-                    title: node.title,
-                    type: node.type,
-                    visible: 'rendering'
-                  });
+                .map((node) => {
                   return (
                 <tr 
                   key={node.id} 
