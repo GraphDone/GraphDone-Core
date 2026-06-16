@@ -109,7 +109,7 @@ const getContributorAvatar = (contributor?: string) => {
 
 const CardView: React.FC<CardViewProps> = ({ filteredNodes, handleEditNode, edges }) => {
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 p-6">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-6 p-3 sm:p-6">
       {[...filteredNodes]
         .sort((a, b) => {
           const dateA = new Date(a.updatedAt || a.createdAt).getTime();

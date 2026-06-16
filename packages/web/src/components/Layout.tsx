@@ -32,7 +32,7 @@ export function Layout({ children }: LayoutProps) {
 
   return (
     <div
-      className="h-screen flex flex-col bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 relative overflow-hidden"
+      className="h-dvh-screen flex flex-col bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 relative overflow-hidden"
       style={{
         '--sidebar-width': desktopSidebarCollapsed ? '4rem' : '16rem'
       } as React.CSSProperties}
@@ -45,7 +45,7 @@ export function Layout({ children }: LayoutProps) {
       <div className="lagoon-caustics"></div>
       
       {/* Mobile menu button */}
-      <div className="lg:hidden relative z-30">
+      <div className="lg:hidden relative z-30 pt-safe">
         <div className="flex items-center justify-between bg-gray-800/90 backdrop-blur-sm px-4 py-2 border-b border-gray-700/50">
           <div className="flex items-center">
             <button
@@ -69,7 +69,7 @@ export function Layout({ children }: LayoutProps) {
           lg:translate-x-0 lg:static lg:inset-0
           fixed inset-y-0 left-0 z-50 bg-gray-800/95 backdrop-blur-sm border-r border-gray-700/50
           transform transition-all duration-200 ease-in-out
-          ${desktopSidebarCollapsed ? 'lg:w-16' : 'w-64'}
+          w-64 ${desktopSidebarCollapsed ? 'lg:w-16' : ''}
         `}>
           <div className="flex flex-col h-full">
             {/* Logo */}
@@ -110,14 +110,14 @@ export function Layout({ children }: LayoutProps) {
                       title={desktopSidebarCollapsed ? `${item.name}: ${restrictionMessage}` : `${item.description} (${restrictionMessage})`}
                     >
                       <Icon className="h-5 w-5 flex-shrink-0 text-gray-500" />
-                      {!desktopSidebarCollapsed && (
-                        <div className="flex-1 min-w-0 ml-3">
-                          <div className="text-sm font-medium text-gray-500">{item.name}</div>
-                          <div className="text-xs text-gray-600 truncate">
-                            {restrictionMessage}
-                          </div>
+                      {/* Labels show in the expanded mobile drawer; hidden in the
+                          collapsed desktop (zen) rail, which uses hover tooltips. */}
+                      <div className="flex-1 min-w-0 ml-3 lg:hidden">
+                        <div className="text-sm font-medium text-gray-500">{item.name}</div>
+                        <div className="text-xs text-gray-600 truncate">
+                          {restrictionMessage}
                         </div>
-                      )}
+                      </div>
                       {/* Tooltip for collapsed mode */}
                       {desktopSidebarCollapsed && (
                         <div className="hidden lg:group-hover:block absolute left-full top-1/2 transform -translate-y-1/2 ml-2 px-2 py-1 bg-gray-800 border border-gray-600 rounded shadow-lg text-sm whitespace-nowrap z-50">
@@ -145,16 +145,14 @@ export function Layout({ children }: LayoutProps) {
                     title={desktopSidebarCollapsed ? `${item.name}: ${item.description}` : item.description}
                   >
                     <Icon className="h-5 w-5 flex-shrink-0" />
-                    {!desktopSidebarCollapsed && (
-                      <>
-                        <div className="flex-1 min-w-0 ml-3">
-                          <div className="text-sm font-medium">{item.name}</div>
-                          <div className="text-xs text-gray-400 truncate group-hover:text-gray-300">
-                            {item.description}
-                          </div>
-                        </div>
-                      </>
-                    )}
+                    {/* Labels show in the expanded mobile drawer; hidden in the
+                        collapsed desktop (zen) rail, which uses hover tooltips. */}
+                    <div className="flex-1 min-w-0 ml-3 lg:hidden">
+                      <div className="text-sm font-medium">{item.name}</div>
+                      <div className="text-xs text-gray-400 truncate group-hover:text-gray-300">
+                        {item.description}
+                      </div>
+                    </div>
                     {/* Tooltip for collapsed mode */}
                     {desktopSidebarCollapsed && (
                       <div className="hidden lg:group-hover:block absolute left-full top-1/2 transform -translate-y-1/2 ml-2 px-2 py-1 bg-gray-800 border border-gray-600 rounded shadow-lg text-sm whitespace-nowrap z-50">
@@ -174,9 +172,9 @@ export function Layout({ children }: LayoutProps) {
               </div>
             )}
 
-            {/* Guest Mode Indicator */}
-            {currentUser?.role === 'GUEST' && !desktopSidebarCollapsed && (
-              <div className="border-t border-gray-700 p-4">
+            {/* Guest Mode Indicator (mobile drawer + expanded desktop) */}
+            {currentUser?.role === 'GUEST' && (
+              <div className="border-t border-gray-700 p-4 lg:hidden">
                 <div className="bg-purple-900/30 border border-purple-500/30 rounded-lg p-3">
                   <div className="flex items-center space-x-2">
                     <Users className="h-4 w-4 text-purple-400" />
