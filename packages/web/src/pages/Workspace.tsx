@@ -377,8 +377,8 @@ export function Workspace() {
             </div>
           </div>
         ) : viewMode === 'graph' ? (
-          <div className="relative h-full flex">
-           <div className="relative flex-1 min-w-0 h-full">
+          <div className="relative h-full">
+           <div className="relative w-full h-full">
             {/* Neo4j Connection Warning */}
             {health?.services?.neo4j?.status !== 'healthy' && (
               <div className="absolute top-4 left-4 right-4 z-50">
@@ -403,7 +403,7 @@ export function Workspace() {
             <SafeGraphVisualization onNodeSelected={setInspectorNode} />
            </div>
            {inspectorNode && (
-             <div className="w-96 flex-shrink-0 h-full hidden md:block">
+             <div className="absolute top-3 right-3 z-40 hidden md:block">
                <NodeInspector node={inspectorNode} onClose={() => setInspectorNode(null)} />
              </div>
            )}

@@ -35,7 +35,7 @@ export function NodeInspector({ node, onClose }: NodeInspectorProps) {
   return (
     <div
       data-testid="node-inspector"
-      className="h-full flex flex-col bg-gray-900/95 backdrop-blur-sm border-l border-gray-700/60 w-full"
+      className="flex flex-col bg-gray-900/95 backdrop-blur-sm border border-gray-700/60 rounded-xl shadow-2xl w-72 max-h-[70vh] overflow-hidden"
     >
       {/* Header */}
       <div className="flex items-start gap-2 p-3 border-b border-gray-700/60">
@@ -56,7 +56,7 @@ export function NodeInspector({ node, onClose }: NodeInspectorProps) {
       </div>
 
       {/* Body */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="overflow-y-auto">
         {mode === 'card' && (
           <div className="p-3 space-y-3 text-sm">
             <Row label="Type" value={typeCfg.label} color={typeCfg.hexColor} />

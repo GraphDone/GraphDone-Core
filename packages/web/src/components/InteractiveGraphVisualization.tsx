@@ -122,6 +122,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected }:
   // Dot mode (extreme zoom-out): edges are hidden, so skip their per-tick work.
   const dotModeRef = useRef(false);
   descendIntoRef.current = descendInto;
+  // The inline-rename overlay tracks its node live (drag/tick/zoom) via rAF,
+  // because its position derives from currentTransform which only updates on zoom.
+  const inlineEditRef = useRef<HTMLDivElement>(null);
   const { currentUser } = useAuth();
   const { showSuccess, showError } = useNotifications();
   const navigate = useNavigate();
@@ -1823,6 +1826,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected }:
       // Surgical update - only clear data elements, preserve core structure
       existingMainGroup.selectAll('.nodes-group').remove();
       existingMainGroup.selectAll('.edges-group').remove();
+      existingMainGroup.selectAll('.arrows-group').remove();
       existingMainGroup.selectAll('.edge-labels-group').remove();
       existingMainGroup.selectAll('.node-labels-container').remove();
       d3.select(containerRef.current).selectAll('.node-labels-container').remove();
@@ -4212,6 +4216,32 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected }:
   const isDotMode = isDenseGraph && (currentTransform?.scale ?? 1) < DOT_SCALE;
   simplifiedRef.current = isSimplified;
   dotModeRef.current = isDotMode;
+
+  // Keep the inline-rename box glued to its node while it's open — through node
+  // DRAGS, simulation ticks and pan/zoom — by repositioning the overlay div
+  // directly each frame from the live sim position + live zoom transform. The
+  // JSX position only recomputes on React renders (zoom), which is why the box
+  // lagged a drag until release.
+  const inlineEditNodeId = inlineEdit?.nodeId ?? null;
+  useEffect(() => {
+    if (!inlineEditNodeId) return undefined;
+    let raf = 0;
+    const sync = () => {
+      const el = inlineEditRef.current;
+      const svgEl = svgRef.current;
+      if (el && svgEl) {
+        const n = (simulationRef.current?.nodes() as any[])?.find((m: any) => m.id === inlineEditNodeId);
+        if (n) {
+          const t = d3.zoomTransform(svgEl);
+          el.style.left = `${(n.x ?? 0) * t.k + t.x}px`;
+          el.style.top = `${(n.y ?? 0) * t.k + t.y}px`;
+        }
+      }
+      raf = requestAnimationFrame(sync);
+    };
+    raf = requestAnimationFrame(sync);
+    return () => cancelAnimationFrame(raf);
+  }, [inlineEditNodeId]);
   const currentGraphId = currentGraph?.id;
   useEffect(() => {
     if (!hasNodes || !svgRef.current) return undefined;
@@ -4720,6 +4750,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected }:
         };
         return (
           <div
+            ref={inlineEditRef}
             className="absolute z-50"
             style={{ left, top, transform: 'translate(-50%, -50%)' }}
           >
