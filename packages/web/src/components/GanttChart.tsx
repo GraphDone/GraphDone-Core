@@ -452,7 +452,50 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
 
       {/* Main Content */}
       <div className="flex-1 overflow-hidden">
-        <div className="h-full overflow-auto" ref={scrollRef}>
+        {/* Mobile Schedule List */}
+        <div className="sm:hidden h-full overflow-y-auto p-4 space-y-3">
+          {timelineData.length === 0 ? (
+            <div className="text-center text-sm text-gray-400 py-8">No tasks to display</div>
+          ) : (
+            timelineData.map(item => {
+              const statusConfig = getStatusConfig(item.status as WorkItemStatus);
+              const priorityConfig = getPriorityConfig(item.priority);
+              return (
+                <div
+                  key={item.id}
+                  className={`rounded-lg border p-3 ${
+                    selectedTask === item.id
+                      ? `${WORK_ITEM_STATUSES.COMPLETED.bgColor} ${WORK_ITEM_STATUSES.COMPLETED.borderColor}`
+                      : 'bg-gray-800/50 border-gray-700/50'
+                  }`}
+                  onClick={() => setSelectedTask(selectedTask === item.id ? null : item.id)}
+                >
+                  <div className="flex items-center space-x-2 mb-2">
+                    <div
+                      className="w-1 h-6 rounded-full shrink-0"
+                      style={{ backgroundColor: priorityConfig.color.replace('text-', '') }}
+                      title={`Priority: ${priorityConfig.label}`}
+                    />
+                    <div className="text-sm font-medium text-white truncate">{item.title}</div>
+                  </div>
+                  <div className="flex items-center space-x-2 text-xs text-gray-400 mb-1">
+                    <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${statusConfig.bgColor}`} />
+                    <span>{item.status.replace('_', ' ')}</span>
+                    <span>•</span>
+                    <span>{item.progress}%</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-gray-400">
+                    <span>{item.startDate.toLocaleDateString()} – {item.endDate.toLocaleDateString()}</span>
+                    <span>{item.duration}d</span>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Interactive Gantt Timeline */}
+        <div className="hidden sm:block h-full overflow-auto" ref={scrollRef}>
           <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700/50">
             <div className="overflow-x-auto">
               <div className="relative" style={{ minWidth: `${800 * zoomLevel}px`, transform: `scale(${zoomLevel})`, transformOrigin: 'top left' }}>
