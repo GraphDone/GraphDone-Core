@@ -19,6 +19,9 @@ export function Layout({ children }: LayoutProps) {
   const [showFloatingConsole, setShowFloatingConsole] = React.useState(false);
   const desktopSidebarCollapsed = true; // Zen mode permanently on
   const { currentTeam, currentUser } = useAuth();
+  // On the workspace, the mobile top bar carries the project selector (row 1 of a
+  // 2-row mobile header: project selection, then the view bar in the page below).
+  const isWorkspaceRoute = location.pathname === '/' || location.pathname === '/workspace';
 
   const navigation = [
     { name: 'Workspace', href: '/', icon: Globe, description: 'Main work' },
@@ -44,21 +47,26 @@ export function Layout({ children }: LayoutProps) {
       {/* Static gradient background - optimized for all browsers */}
       <div className="lagoon-caustics"></div>
       
-      {/* Mobile menu button */}
+      {/* Mobile top bar: hamburger + (on the workspace) the project selector, so the
+          mobile header is just two rows — project selection here, view bar below. */}
       <div className="lg:hidden relative z-30 pt-safe">
-        <div className="flex items-center justify-between bg-gray-800/90 backdrop-blur-sm px-4 py-2 border-b border-gray-700/50">
-          <div className="flex items-center">
-            <button
-              type="button"
-              className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-300 hover:bg-gray-700"
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-            >
-              <Menu className="h-6 w-6" aria-hidden="true" />
-            </button>
-            <Link to="/" className="ml-3 text-xl font-bold text-green-400 hover:text-green-300 transition-colors">
+        <div className="flex items-center gap-2 bg-gray-800/90 backdrop-blur-sm px-3 py-2 border-b border-gray-700/50">
+          <button
+            type="button"
+            className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-300 hover:bg-gray-700 flex-shrink-0"
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+          >
+            <Menu className="h-6 w-6" aria-hidden="true" />
+          </button>
+          {isWorkspaceRoute ? (
+            <div className="flex-1 min-w-0">
+              <GraphSelector />
+            </div>
+          ) : (
+            <Link to="/" className="text-lg font-bold text-green-400 hover:text-green-300 transition-colors">
               GraphDone
             </Link>
-          </div>
+          )}
         </div>
       </div>
 
