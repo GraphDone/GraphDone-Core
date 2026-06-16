@@ -4463,7 +4463,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected }:
       }
       
       if (message.includes('Neo4j')) {
-        return "Database connection failed. Please ensure Neo4j is running and properly configured.";
+        return "Database connection failed. Please ensure the graph backend is reachable and properly configured.";
       }
       
       if (message.includes('Enum') && message.includes('cannot represent')) {
@@ -4506,7 +4506,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected }:
                     <div>💡 <strong>Quick fixes:</strong></div>
                     <div>• Run <code className="bg-gray-800 px-2 py-1 rounded">./start</code> to start the server</div>
                     <div>• Check if port 4127 is available</div>
-                    <div>• Verify Neo4j database is running</div>
+                    <div>• Verify the graph backend is reachable</div>
                   </div>
                 )}
                 

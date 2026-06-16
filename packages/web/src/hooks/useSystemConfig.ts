@@ -1,53 +1,53 @@
 import { useState, useEffect, useRef } from 'react';
 
 interface SystemConfig {
-  timestamp: string;
-  services: {
-    api: {
-      port: number;
-      protocol: string;
-      host: string;
-      path: string;
-      healthPath: string;
+  timestamp?: string;
+  services?: {
+    api?: {
+      port?: number;
+      protocol?: string;
+      host?: string;
+      path?: string;
+      healthPath?: string;
     };
-    web: {
-      port: number;
-      protocol: string;
-      host: string;
-      path: string;
+    web?: {
+      port?: number;
+      protocol?: string;
+      host?: string;
+      path?: string;
     };
-    neo4j: {
-      uri: string;
-      port: number;
-      protocol: string;
-      host: string;
+    neo4j?: {
+      uri?: string;
+      port?: number;
+      protocol?: string;
+      host?: string;
     };
-    mcp: {
-      port: number;
-      protocol: string;
-      host: string;
-      path: string;
+    mcp?: {
+      port?: number;
+      protocol?: string;
+      host?: string;
+      path?: string;
     };
-    proxy: {
-      enabled: boolean;
-      httpsPort: number;
-      httpPort: number;
-      protocol: string;
-      host: string;
-      certPath: string | null;
-      keyPath: string | null;
+    proxy?: {
+      enabled?: boolean;
+      httpsPort?: number;
+      httpPort?: number;
+      protocol?: string;
+      host?: string;
+      certPath?: string | null;
+      keyPath?: string | null;
     };
   };
-  tls: {
-    enabled: boolean;
-    certPath: string | null;
-    keyPath: string | null;
-    httpsPort: number | null;
+  tls?: {
+    enabled?: boolean;
+    certPath?: string | null;
+    keyPath?: string | null;
+    httpsPort?: number | null;
   };
-  environment: {
-    nodeEnv: string;
-    clientUrl: string;
-    corsOrigin: string;
+  environment?: {
+    nodeEnv?: string;
+    clientUrl?: string;
+    corsOrigin?: string;
   };
 }
 
@@ -133,28 +133,31 @@ export function useSystemConfig(options: UseSystemConfigOptions = {}) {
 
   // Helper functions to get specific configuration values
   const getApiUrl = () => {
-    if (!config) return null;
-    return `${config.services.api.protocol}://${config.services.api.host}:${config.services.api.port}`;
+    const api = config?.services?.api;
+    if (!api) return null;
+    return `${api.protocol}://${api.host}:${api.port}`;
   };
 
   const getWebUrl = () => {
-    if (!config) return null;
-    return `${config.services.web.protocol}://${config.services.web.host}:${config.services.web.port}`;
+    const web = config?.services?.web;
+    if (!web) return null;
+    return `${web.protocol}://${web.host}:${web.port}`;
   };
 
   const getProxyUrl = () => {
-    if (!config || !config.services.proxy.enabled) return null;
-    return `${config.services.proxy.protocol}://${config.services.proxy.host}:${config.services.proxy.httpsPort}`;
+    const proxy = config?.services?.proxy;
+    if (!proxy || !proxy.enabled) return null;
+    return `${proxy.protocol}://${proxy.host}:${proxy.httpsPort}`;
   };
 
   const getNeo4jUrl = () => {
-    if (!config) return null;
-    return config.services.neo4j.uri;
+    return config?.services?.neo4j?.uri ?? null;
   };
 
   const getMcpUrl = () => {
-    if (!config) return null;
-    return `${config.services.mcp.protocol}://${config.services.mcp.host}:${config.services.mcp.port}`;
+    const mcp = config?.services?.mcp;
+    if (!mcp) return null;
+    return `${mcp.protocol}://${mcp.host}:${mcp.port}`;
   };
 
   return {
