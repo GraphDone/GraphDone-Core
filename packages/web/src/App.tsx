@@ -14,6 +14,7 @@ import { ResetPassword } from './pages/ResetPassword';
 import { InteractiveGraphVisualization } from './components/InteractiveGraphVisualization';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { GraphProvider } from './contexts/GraphContext';
+import { ViewModeProvider } from './contexts/ViewModeContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 
 function AuthenticatedApp() {
@@ -96,6 +97,7 @@ function AuthenticatedApp() {
   return (
     <NotificationProvider>
       <GraphProvider>
+        <ViewModeProvider>
         <Layout>
           <Routes>
             <Route path="/" element={<Workspace />} />
@@ -109,6 +111,7 @@ function AuthenticatedApp() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Layout>
+        </ViewModeProvider>
       </GraphProvider>
     </NotificationProvider>
   );
