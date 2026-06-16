@@ -418,8 +418,12 @@ export function CodeCaptcha({
               {/* Math Problem or Canvas Code Image */}
               <div className="flex-1 flex items-center justify-center">
                 {currentStyle === 'math' ? (
-                  <div className="text-center py-8">
-                    <p className="text-sm text-gray-400 mb-2">What is:</p>
+                  // The "What is:" label floats at the top so the NUMBER is the
+                  // vertically-centered element — otherwise the label pushed the
+                  // number below the panel center and the lone refresh button
+                  // (panel-centered) sat above it.
+                  <div className="relative w-full text-center py-8 flex items-center justify-center min-h-[5.5rem]">
+                    <span className="absolute top-1 left-0 right-0 text-sm text-gray-400">What is:</span>
                     <p className="text-5xl font-bold text-teal-300 tracking-wider">
                       {mathProblem} = ?
                     </p>

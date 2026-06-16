@@ -10,10 +10,13 @@ import {
 
 describe('physicsConfig defaults', () => {
   it('matches the production-tuned values', () => {
-    expect(DEFAULT_PHYSICS.charge.strength).toBe(-60);
-    expect(DEFAULT_PHYSICS.alpha.velocityDecay).toBe(0.65);
+    // Tuned for one-shot, non-overlapping settle (PR-A): centering near-off so
+    // dense graphs expand until collision is satisfied, stronger collision,
+    // faster cool-down + damping so the sim reaches rest quickly.
+    expect(DEFAULT_PHYSICS.charge.strength).toBe(-70);
+    expect(DEFAULT_PHYSICS.alpha.velocityDecay).toBe(0.78);
     expect(DEFAULT_PHYSICS.alpha.restTarget).toBe(0); // fully stops when settled
-    expect(DEFAULT_PHYSICS.collision.strength).toBe(0.85);
+    expect(DEFAULT_PHYSICS.collision.strength).toBe(1);
   });
 });
 
@@ -52,6 +55,6 @@ describe('withOverrides (live tuning)', () => {
   });
   it('does not mutate the defaults', () => {
     withOverrides({ charge: { strength: 999 } });
-    expect(DEFAULT_PHYSICS.charge.strength).toBe(-60);
+    expect(DEFAULT_PHYSICS.charge.strength).toBe(-70);
   });
 });

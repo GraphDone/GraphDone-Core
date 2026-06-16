@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, gql } from '@apollo/client';
 import { Eye, EyeOff, ArrowRight, CheckCircle, XCircle, Github, Mail, Info, Shield } from 'lucide-react';
-import { TlsStatusIndicator } from '../components/TlsStatusIndicator';
+import { InsecureConnectionBanner } from '../components/TlsStatusIndicator';
 import { PasswordRequirements } from '../components/PasswordRequirements';
 import { isValidEmail, getPasswordStrength } from '../utils/validation';
 import { CodeCaptcha } from '../components/CodeCaptcha';
@@ -729,8 +729,8 @@ export function Signup() {
         )}
       </div>
       
-      {/* TLS/SSL Status Indicator */}
-      <TlsStatusIndicator />
+      {/* Insecure-connection warning (top strip, only over HTTP) */}
+      <InsecureConnectionBanner fixed />
     </div>
   );
 }

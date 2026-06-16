@@ -15,7 +15,8 @@
     "clean": "rm -rf dist coverage",
     "db:seed": "tsx src/scripts/seed.ts",
     "create-admin": "tsx src/scripts/create-admin.ts",
-    "create-welcome-graphs": "tsx src/scripts/create-welcome-graphs.ts"
+    "create-welcome-graphs": "tsx src/scripts/create-welcome-graphs.ts",
+    "create-hierarchy-demo": "tsx src/scripts/create-hierarchy-demo.ts"
   },
   "dependencies": {
     "@apollo/server": "^4.9.0",

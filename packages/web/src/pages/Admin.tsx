@@ -15,7 +15,7 @@ export function Admin() {
   // Redirect if not ADMIN
   if (currentUser?.role !== 'ADMIN') {
     return (
-      <div className="h-screen flex items-center justify-center">
+      <div className="h-full flex items-center justify-center">
         <div className="text-center">
           <Shield className="h-16 w-16 text-red-400 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-100 mb-2">Access Denied</h1>

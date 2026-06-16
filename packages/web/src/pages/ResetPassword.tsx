@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { Lock, Eye, EyeOff, CheckCircle, XCircle, ArrowLeft } from 'lucide-react';
-import { TlsStatusIndicator } from '../components/TlsStatusIndicator';
+import { InsecureConnectionBanner } from '../components/TlsStatusIndicator';
 import { CodeCaptcha } from '../components/CodeCaptcha';
 import { PasswordRequirements } from '../components/PasswordRequirements';
 import { validatePassword, getPasswordStrength } from '../utils/validation';
@@ -255,7 +255,7 @@ export function ResetPassword() {
         </div>
       </div>
 
-      <TlsStatusIndicator />
+      <InsecureConnectionBanner fixed />
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Mail, ArrowLeft, CheckCircle, XCircle, Shield } from 'lucide-react';
-import { TlsStatusIndicator } from '../components/TlsStatusIndicator';
+import { InsecureConnectionBanner } from '../components/TlsStatusIndicator';
 import { CodeCaptcha } from '../components/CodeCaptcha';
 import { isValidEmail } from '../utils/validation';
 
@@ -246,8 +246,8 @@ export function ForgotPassword() {
         </div>
       </div>
 
-      {/* TLS/SSL Status Indicator */}
-      <TlsStatusIndicator />
+      {/* Insecure-connection warning (top strip, only over HTTP) */}
+      <InsecureConnectionBanner fixed />
     </div>
   );
 }

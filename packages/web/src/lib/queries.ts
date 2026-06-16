@@ -18,6 +18,14 @@ export const GET_WORK_ITEMS = gql`
       dueDate
       tags
       metadata
+      subgraphId
+      subgraph {
+        id
+        name
+        nodeCount
+        edgeCount
+        type
+      }
       owner {
         id
         name
@@ -103,6 +111,14 @@ export const GET_WORK_ITEM_BY_ID = gql`
       dueDate
       tags
       metadata
+      subgraphId
+      subgraph {
+        id
+        name
+        nodeCount
+        edgeCount
+        type
+      }
       owner {
         id
         name
