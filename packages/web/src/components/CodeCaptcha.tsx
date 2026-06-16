@@ -398,8 +398,8 @@ export function CodeCaptcha({
   };
 
   return (
-    <div className={className}>
-      <div className="bg-gradient-to-br from-gray-800/60 to-gray-700/50 backdrop-blur-sm border-2 border-teal-500/30 rounded-xl p-5 shadow-lg">
+    <div className={`${className ?? ''} w-full max-w-full min-w-0`}>
+      <div className="bg-gradient-to-br from-gray-800/60 to-gray-700/50 backdrop-blur-sm border-2 border-teal-500/30 rounded-xl p-3 sm:p-5 shadow-lg overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
@@ -424,7 +424,7 @@ export function CodeCaptcha({
                   // (panel-centered) sat above it.
                   <div className="relative w-full text-center py-8 flex items-center justify-center min-h-[5.5rem]">
                     <span className="absolute top-1 left-0 right-0 text-sm text-gray-400">What is:</span>
-                    <p className="text-5xl font-bold text-teal-300 tracking-wider">
+                    <p className="text-3xl sm:text-5xl font-bold text-teal-300 tracking-wider">
                       {mathProblem} = ?
                     </p>
                   </div>

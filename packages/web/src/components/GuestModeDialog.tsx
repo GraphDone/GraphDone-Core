@@ -31,7 +31,7 @@ export function GuestModeDialog({ isOpen, onClose, onConfirm }: GuestModeDialogP
       onClick={onClose}
     >
       <div 
-        className="bg-gray-800 border border-gray-700 rounded-2xl shadow-2xl max-w-lg w-full"
+        className="bg-gray-800 border border-gray-700 rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between p-6 border-b border-gray-700">
