@@ -197,6 +197,11 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   // descendInto from context isn't memoized; hold the latest in a ref so the
   // D3-bound node click handler can call it without re-binding every render.
   const descendIntoRef = useRef(descendInto);
+  // Camera persistence: remember the user's view per-graph + auto-fit once.
+  const currentGraphIdRef = useRef<string | undefined>(currentGraph?.id);
+  currentGraphIdRef.current = currentGraph?.id;
+  const fittedGraphsRef = useRef<Set<string>>(new Set());
+  const cameraSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Mirrors isSimplified for the d3 tick closure (which captures stale render
   // values otherwise). Lets updateEdgePositions skip hidden arrow/label work.
   const simplifiedRef = useRef(false);
@@ -3833,6 +3838,18 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         y: event.transform.y,
         scale: event.transform.k
       });
+      // Persist the user's camera per-graph (debounced) so their view survives a
+      // reload and isn't reset on the next visit. localStorage only — no D1 chatter.
+      {
+        const gid = currentGraphIdRef.current;
+        if (gid) {
+          const cam = { x: event.transform.x, y: event.transform.y, k: event.transform.k };
+          if (cameraSaveTimerRef.current) clearTimeout(cameraSaveTimerRef.current);
+          cameraSaveTimerRef.current = setTimeout(() => {
+            try { localStorage.setItem(`graphdone:camera:${gid}`, JSON.stringify(cam)); } catch { /* ignore */ }
+          }, 600);
+        }
+      }
 
       // Re-cull on pan/zoom. The one-shot sim is usually stopped during pan, so
       // this is the only thing that reveals nodes panned back into view (and
@@ -3995,6 +4012,11 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       svg.call(d3.zoom<SVGSVGElement, unknown>().transform as any, transform);
     }
   }, [getNodeDimensions]);
+  // Latest fit fn in a ref so the once-per-graph camera effect can call it WITHOUT
+  // listing it as a dep — its identity churns during settle, which would otherwise
+  // cancel the fit timer before it fires (the bug that left graphs off-screen).
+  const fitViewRef = useRef(fitViewToNodes);
+  fitViewRef.current = fitViewToNodes;
 
   // Mini-map click → pan the main view to that graph point at current zoom
   useEffect(() => {
@@ -4243,11 +4265,28 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     return () => cancelAnimationFrame(raf);
   }, [inlineEditNodeId]);
   const currentGraphId = currentGraph?.id;
+  // On graph load: restore the user's saved camera for THIS graph (respect their
+  // in-session view) or auto-fit ONCE so it never loads off-screen, then jumps in.
+  // Keyed on the graph id; never re-fits a graph already framed (don't fight the
+  // user). Uses fitViewRef (not fitViewToNodes) so the timer isn't cancelled by
+  // the callback's identity churning during physics settle.
   useEffect(() => {
-    if (!hasNodes || !svgRef.current) return undefined;
-    const timer = setTimeout(() => fitViewToNodes(), 1500);
+    if (!hasNodes || !svgRef.current || !currentGraphId) return undefined;
+    if (fittedGraphsRef.current.has(currentGraphId)) return undefined;
+    const gid = currentGraphId;
+    const timer = setTimeout(() => {
+      if (fittedGraphsRef.current.has(gid)) return;
+      fittedGraphsRef.current.add(gid);
+      let saved: { x: number; y: number; k: number } | null = null;
+      try { const r = localStorage.getItem(`graphdone:camera:${gid}`); saved = r ? JSON.parse(r) : null; } catch { /* ignore */ }
+      if (saved && typeof saved.k === 'number' && zoomBehaviorRef.current && svgRef.current) {
+        d3.select(svgRef.current).call(zoomBehaviorRef.current.transform as any, d3.zoomIdentity.translate(saved.x, saved.y).scale(saved.k));
+      } else {
+        fitViewRef.current();
+      }
+    }, 1200);
     return () => clearTimeout(timer);
-  }, [hasNodes, currentGraphId, fitViewToNodes]);
+  }, [hasNodes, currentGraphId]);
 
   // PR-3: keep the expand-in-place panel glued to its node through drags, ticks
   // and pan/zoom (same rAF technique as the rename box). The panel sits beside
@@ -4308,6 +4347,16 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       }
     };
   }, [resetLayout, onResetLayout]);
+
+  // Expose "zoom to fit" (zoom extents) so the Workspace toolbar button can frame
+  // every node without touching the camera-restore state. Calls through the ref so
+  // the latest fit fn is used regardless of when the button mounts.
+  useEffect(() => {
+    (window as any).triggerZoomToFit = () => fitViewRef.current();
+    return () => {
+      delete (window as any).triggerZoomToFit;
+    };
+  }, []);
 
   // Force reinitialization trigger - incremented when view needs refresh
   const [reinitTrigger, setReinitTrigger] = useState(0);

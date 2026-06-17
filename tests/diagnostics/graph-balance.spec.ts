@@ -13,11 +13,19 @@ import * as path from 'node:path';
  * graph is placed: centroid offset from centre, bbox coverage, content usage,
  * margin balance, quadrant mass distribution, and an informational balanceScore.
  *
- * PHASE 1 = measurement, not a verdict. It records numbers + an annotated
- * overlay into the report and only asserts that content was detected — so we get
- * objective baselines first. Centering/usage THRESHOLDS (pass/fail) come once the
- * camera-centering work lands and we know what "good" looks like numerically.
+ * PHASE 2 = a gate. The camera-centering work landed (graph loads framed +
+ * once-per-graph fit), so we now know what "good" looks like numerically:
+ * offMag ~0.05 and bbox coverage ~0.93 across desktop/laptop/tablet. The
+ * thresholds below have a wide margin over those values and would have FAILED
+ * the pre-fix state (offMag ~0.80, ~6% coverage — graph off in a corner), so a
+ * regression that pushes the graph off-screen again is caught. The annotated
+ * overlay + raw metrics are still attached to the report for every run.
  */
+
+// Pass/fail thresholds (see header). Wide margins over the measured good state
+// so they catch a real regression (off-screen / cornered graph) without flaking.
+const MAX_OFF_MAG = 0.30; // centroid offset from frame centre (0 = dead centre)
+const MIN_BBOX_COVERAGE = 0.35; // graph bbox vs canvas (off-screen graph ~= 0.06)
 
 const PY = path.join(process.cwd(), 'tests/helpers/balance_metrics.py');
 const OUT = path.join(process.cwd(), 'test-artifacts/balance');
@@ -65,13 +73,11 @@ test.describe('graph balance metrics (OpenCV) @balance', () => {
       await info.attach(`balance-${r.name}`, { path: ann, contentType: 'image/jpeg' });
       await info.attach(`metrics-${r.name}`, { body: JSON.stringify(m, null, 2), contentType: 'application/json' });
 
-      // Phase 1 is measurement, not a gate: record even a near-empty canvas
-      // (itself a signal the graph rendered off-screen) instead of failing.
-      // Centering/usage THRESHOLDS become pass/fail once the camera work lands.
+      // Gate: the graph must actually be on-screen, framed, and centred.
       expect(m, 'metrics computed').toBeTruthy();
-      if ((m.contentPixels ?? 0) < 200) {
-        console.warn(`[balance ${r.name}] near-empty canvas (${m.contentPixels}px) — graph likely rendered off-screen`);
-      }
+      expect(m.contentPixels ?? 0, `content detected on canvas (${m.contentPixels}px) — a near-empty canvas means the graph rendered off-screen`).toBeGreaterThan(200);
+      expect(b.coverage ?? 0, `graph bbox fills the canvas (coverage ${b.coverage}); a cornered/off-screen graph reads ~0.06`).toBeGreaterThan(MIN_BBOX_COVERAGE);
+      expect(c.offMag ?? 1, `graph is centred (offMag ${c.offMag}, dx=${c.offX} dy=${c.offY}); off-centre pre-fix read ~0.80`).toBeLessThan(MAX_OFF_MAG);
     });
   }
 });
