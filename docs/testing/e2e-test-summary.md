@@ -198,4 +198,4 @@ The remaining work is to debug why the runcmd commands aren't executing as expec
 **For Support:**
 - Check `tools/multipass.sh --help`
 - Review logs in `test-reports/`
-- Consult `SETUP_MULTIPASS.md` for detailed setup instructions
+- Consult `docs/guides/vm-setup.md` for detailed setup instructions

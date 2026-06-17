@@ -66,7 +66,7 @@ wget -qO- https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public
    - Linux: Smart sudo authentication (works with curl/wget pipes), uses apt/dnf/yum + Docker Engine (15+ distributions supported)
 4. **Code Setup** - Clones repository to `~/graphdone`, installs npm dependencies
 5. **Security Config** - Generates self-signed TLS certificates for HTTPS
-6. **Service Deployment** - Starts Neo4j, Redis, GraphQL API, React Web App
+6. **Service Deployment** - Starts Neo4j, GraphQL API, React Web App
 7. **Health Verification** - Waits for all services to be healthy (60s timeout)
 
 **Access URLs after installation:**
