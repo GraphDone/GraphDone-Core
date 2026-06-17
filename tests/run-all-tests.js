@@ -735,7 +735,7 @@ function generateHTMLReport() {
                 </div>
                 <div>
                     <h1>GraphDone Test Report</h1>
-                    <div class="subtitle">Comprehensive testing results for graph-native project management</div>
+                    <div class="subtitle">Comprehensive testing results for graph-native management</div>
                     <div class="meta">
                         Generated: ${new Date().toLocaleString()} | 
                         Environment: <strong>${testResults.environment}</strong> | 

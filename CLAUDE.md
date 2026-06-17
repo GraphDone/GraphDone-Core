@@ -281,7 +281,7 @@ const GraphView = () => {
 };
 ```
 
-## Current UI Evolution: Slick Dialog Revolution
+## Contextual Dialog Direction (slick inline editors)
 
 GraphDone is undergoing a **major UI transformation** moving away from heavy modal dialogs toward slick, contextual, inline-style editors. This shift prioritizes **immediate feedback, minimal context switching, and delightful micro-interactions**.
 
