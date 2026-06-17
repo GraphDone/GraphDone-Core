@@ -290,7 +290,7 @@ docker logs graphdone-neo4j
 
 ### OAuth Test Maintenance
 
-See [docs/oauth-testing-guide.md](./oauth-testing-guide.md) for OAuth-specific maintenance:
+See [docs/oauth-testing-guide.md](../security/oauth-testing-guide.md) for OAuth-specific maintenance:
 - Monthly spec review (every 12th)
 - Provider documentation updates
 - Token handling validation
@@ -371,8 +371,8 @@ open test-results/reports/pr-report.html
 ## Support
 
 **Documentation**:
-- [OAuth Testing Guide](./oauth-testing-guide.md) - OAuth-specific testing
-- [OAuth Implementation Guide](./oauth-implementation.md) - OAuth compliance tracking
+- [OAuth Testing Guide](../security/oauth-testing-guide.md) - OAuth-specific testing
+- [OAuth Implementation Guide](../security/oauth-implementation.md) - OAuth compliance tracking
 - [TLS/SSL Setup](./tls-ssl-setup.md) - HTTPS configuration
 
 **Test Code**:

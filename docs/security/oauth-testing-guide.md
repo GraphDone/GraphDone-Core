@@ -27,7 +27,7 @@ npx playwright test tests/e2e/oauth-linkedin.spec.ts --ui
 
 ## What's Included
 
-### 1. Official Documentation (`docs/oauth-implementation.md`)
+### 1. Official Documentation (`docs/security/oauth-implementation.md`)
 
 **Comprehensive guide with:**
 - ✅ Official spec links for Google, GitHub, LinkedIn
@@ -306,8 +306,8 @@ LINKEDIN_CALLBACK_URL=https://localhost:4128/auth/linkedin/callback
 ## Support
 
 **Documentation:**
-- Implementation guide: `docs/oauth-implementation.md`
-- This testing guide: `docs/oauth-testing-guide.md`
+- Implementation guide: `docs/security/oauth-implementation.md`
+- This testing guide: `docs/security/oauth-testing-guide.md`
 
 **Code:**
 - OAuth strategies: `packages/server/src/auth/oauth-strategies.ts`
