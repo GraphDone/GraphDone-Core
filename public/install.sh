@@ -10,7 +10,7 @@
 #
 # 📖 DESCRIPTION
 # ============================================================================
-#   Automated installer for GraphDone - a graph-native project management
+#   Automated installer for GraphDone - a graph-native management
 #   system that reimagines work coordination through dependencies and
 #   democratic prioritization. Handles complete setup from dependency
 #   installation to running services with beautiful CLI progress feedback.
