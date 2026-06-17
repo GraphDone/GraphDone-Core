@@ -428,7 +428,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
                 </button>
 
                 {isTypeDropdownOpen && (
-                  <div className="absolute top-full left-0 mt-2 w-full bg-gray-700 border border-gray-600 rounded-lg shadow-2xl z-50 max-h-80 overflow-y-auto">
+                  <div data-testid="filter-dropdown" className="absolute top-full left-0 mt-2 w-full bg-gray-700 border border-gray-600 rounded-lg shadow-2xl z-50 max-h-80 overflow-y-auto">
                     <div className="p-2">
                       {typeOptions.map((option, index) => (
                         <button
@@ -502,7 +502,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
                 </button>
 
                 {isStatusDropdownOpen && (
-                  <div className="absolute top-full left-0 mt-2 w-full bg-gray-700 border border-gray-600 rounded-lg shadow-2xl z-50 max-h-80 overflow-y-auto">
+                  <div data-testid="filter-dropdown" className="absolute top-full left-0 mt-2 w-full bg-gray-700 border border-gray-600 rounded-lg shadow-2xl z-50 max-h-80 overflow-y-auto">
                     <div className="p-2">
                       {statusOptions.map((option, index) => (
                         <button
@@ -574,7 +574,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
                 </button>
 
                 {isPriorityDropdownOpen && (
-                  <div className="absolute top-full left-0 mt-2 w-full bg-gray-700 border border-gray-600 rounded-lg shadow-2xl z-50 max-h-80 overflow-y-auto">
+                  <div data-testid="filter-dropdown" className="absolute top-full left-0 mt-2 w-full bg-gray-700 border border-gray-600 rounded-lg shadow-2xl z-50 max-h-80 overflow-y-auto">
                     <div className="p-2">
                       {priorityOptions.map((option, index) => (
                         <button
@@ -639,7 +639,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
                 </button>
 
                 {isContributorDropdownOpen && (
-                  <div className="absolute top-full left-0 mt-2 w-full bg-gray-700 border border-gray-600 rounded-lg shadow-2xl z-50 max-h-80 overflow-y-auto">
+                  <div data-testid="filter-dropdown" className="absolute top-full left-0 mt-2 w-full bg-gray-700 border border-gray-600 rounded-lg shadow-2xl z-50 max-h-80 overflow-y-auto">
                     <div className="p-2">
                       {contributorOptions.map((option, index) => (
                         <button
