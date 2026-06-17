@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Brain, Bot, BarChart3, Settings, Menu, Server, Globe, Shield, Users, Terminal } from 'lucide-react';
+import { Brain, Bot, BarChart3, Settings, Server, Globe, Shield, Users, Terminal } from 'lucide-react';
 import { UserSelector } from './UserSelector';
 import { GraphSelector } from './GraphSelector';
 import { useAuth } from '../contexts/AuthContext';
@@ -48,41 +48,30 @@ export function Layout({ children }: LayoutProps) {
       {/* Static gradient background - optimized for all browsers */}
       <div className="lagoon-caustics"></div>
       
-      {/* Mobile top bar: hamburger + (on the workspace) the project selector, so the
-          mobile header is just two rows — project selection here, view bar below. */}
-      <div className="lg:hidden relative z-30 pt-safe">
-        <div className="flex items-center gap-2 bg-gray-800/90 backdrop-blur-sm px-3 py-2 border-b border-gray-700/50">
-          <button
-            type="button"
-            className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-300 hover:bg-gray-700 flex-shrink-0"
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-          >
-            <Menu className="h-6 w-6" aria-hidden="true" />
-          </button>
-          {isWorkspaceRoute ? (
+      {/* Phone top bar: just the project selector on the workspace (no hamburger —
+          the bottom nav handles navigation). Other pages use their own header. */}
+      {isWorkspaceRoute && (
+        <div className="md:hidden relative z-30 pt-safe">
+          <div className="flex items-center bg-gray-800/90 backdrop-blur-sm px-3 py-2 border-b border-gray-700/50">
             <div className="flex-1 min-w-0">
               <GraphSelector />
             </div>
-          ) : (
-            <Link to="/" className="text-lg font-bold text-green-400 hover:text-green-300 transition-colors">
-              GraphDone
-            </Link>
-          )}
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="flex flex-1 min-h-0">
         {/* Sidebar */}
         <div className={`
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-          lg:translate-x-0 lg:static lg:inset-0
+          md:translate-x-0 md:static md:inset-0
           fixed inset-y-0 left-0 z-50 bg-gray-800/95 backdrop-blur-sm border-r border-gray-700/50
           transform transition-all duration-200 ease-in-out
-          w-64 ${desktopSidebarCollapsed ? 'lg:w-16' : ''}
+          w-64 ${desktopSidebarCollapsed ? 'md:w-16' : ''}
         `}>
           <div className="flex flex-col h-full">
             {/* Logo */}
-            <div className={`flex items-center h-16 px-6 border-b border-gray-700 ${desktopSidebarCollapsed ? 'lg:justify-center lg:px-4' : ''}`}>
+            <div className={`flex items-center h-16 px-6 border-b border-gray-700 ${desktopSidebarCollapsed ? 'md:justify-center md:px-4' : ''}`}>
               <Link to="/" className="flex items-center hover:opacity-80 transition-opacity">
                 <img src="/favicon.svg" alt="GraphDone Logo" className="h-8 w-8" />
                 {!desktopSidebarCollapsed && (
@@ -114,14 +103,14 @@ export function Layout({ children }: LayoutProps) {
                       key={item.name}
                       className={`
                         flex items-center px-3 py-3 rounded-lg transition-colors group cursor-not-allowed opacity-50 relative
-                        ${desktopSidebarCollapsed ? 'lg:justify-center lg:px-2' : ''}
+                        ${desktopSidebarCollapsed ? 'md:justify-center md:px-2' : ''}
                       `}
                       title={desktopSidebarCollapsed ? `${item.name}: ${restrictionMessage}` : `${item.description} (${restrictionMessage})`}
                     >
                       <Icon className="h-5 w-5 flex-shrink-0 text-gray-500" />
                       {/* Labels show in the expanded mobile drawer; hidden in the
                           collapsed desktop (zen) rail, which uses hover tooltips. */}
-                      <div className="flex-1 min-w-0 ml-3 lg:hidden">
+                      <div className="flex-1 min-w-0 ml-3 md:hidden">
                         <div className="text-sm font-medium text-gray-500">{item.name}</div>
                         <div className="text-xs text-gray-600 truncate">
                           {restrictionMessage}
@@ -129,7 +118,7 @@ export function Layout({ children }: LayoutProps) {
                       </div>
                       {/* Tooltip for collapsed mode */}
                       {desktopSidebarCollapsed && (
-                        <div className="hidden lg:group-hover:block absolute left-full top-1/2 transform -translate-y-1/2 ml-2 px-2 py-1 bg-gray-800 border border-gray-600 rounded shadow-lg text-sm whitespace-nowrap z-50">
+                        <div className="hidden md:group-hover:block absolute left-full top-1/2 transform -translate-y-1/2 ml-2 px-2 py-1 bg-gray-800 border border-gray-600 rounded shadow-lg text-sm whitespace-nowrap z-50">
                           <div className="font-medium text-gray-500">{item.name}</div>
                           <div className="text-xs text-gray-600">{restrictionMessage}</div>
                         </div>
@@ -144,7 +133,7 @@ export function Layout({ children }: LayoutProps) {
                     to={item.href}
                     className={`
                       flex items-center px-3 py-3 rounded-lg transition-colors group relative
-                      ${desktopSidebarCollapsed ? 'lg:justify-center lg:px-2' : ''}
+                      ${desktopSidebarCollapsed ? 'md:justify-center md:px-2' : ''}
                       ${isActive
                         ? 'bg-green-900/30 text-green-300 border border-green-500/30'
                         : 'text-gray-300 hover:bg-gray-700'
@@ -156,7 +145,7 @@ export function Layout({ children }: LayoutProps) {
                     <Icon className="h-5 w-5 flex-shrink-0" />
                     {/* Labels show in the expanded mobile drawer; hidden in the
                         collapsed desktop (zen) rail, which uses hover tooltips. */}
-                    <div className="flex-1 min-w-0 ml-3 lg:hidden">
+                    <div className="flex-1 min-w-0 ml-3 md:hidden">
                       <div className="text-sm font-medium">{item.name}</div>
                       <div className="text-xs text-gray-400 truncate group-hover:text-gray-300">
                         {item.description}
@@ -164,7 +153,7 @@ export function Layout({ children }: LayoutProps) {
                     </div>
                     {/* Tooltip for collapsed mode */}
                     {desktopSidebarCollapsed && (
-                      <div className="hidden lg:group-hover:block absolute left-full top-1/2 transform -translate-y-1/2 ml-2 px-2 py-1 bg-gray-800 border border-gray-600 rounded shadow-lg text-sm whitespace-nowrap z-50">
+                      <div className="hidden md:group-hover:block absolute left-full top-1/2 transform -translate-y-1/2 ml-2 px-2 py-1 bg-gray-800 border border-gray-600 rounded shadow-lg text-sm whitespace-nowrap z-50">
                         <div className="font-medium">{item.name}</div>
                         <div className="text-xs text-gray-400">{item.description}</div>
                       </div>
@@ -183,7 +172,7 @@ export function Layout({ children }: LayoutProps) {
 
             {/* Guest Mode Indicator (mobile drawer + expanded desktop) */}
             {currentUser?.role === 'GUEST' && (
-              <div className="border-t border-gray-700 p-4 lg:hidden">
+              <div className="border-t border-gray-700 p-4 md:hidden">
                 <div className="bg-purple-900/30 border border-purple-500/30 rounded-lg p-3">
                   <div className="flex items-center space-x-2">
                     <Users className="h-4 w-4 text-purple-400" />
@@ -202,7 +191,7 @@ export function Layout({ children }: LayoutProps) {
             </div>
 
             {/* Status Section - Section 3 */}
-            <div className={`p-4 border-t border-gray-700 ${desktopSidebarCollapsed ? 'lg:px-2' : ''}`}>
+            <div className={`p-4 border-t border-gray-700 ${desktopSidebarCollapsed ? 'md:px-2' : ''}`}>
               {!desktopSidebarCollapsed ? (
                 <>
                   {/* MCP Health Indicator */}
@@ -219,7 +208,7 @@ export function Layout({ children }: LayoutProps) {
             </div>
             
             {/* Console & Tools Section - Section 4 */}
-            <div className={`p-4 border-t border-gray-700/50 ${desktopSidebarCollapsed ? 'lg:px-2' : ''}`}>
+            <div className={`p-4 border-t border-gray-700/50 ${desktopSidebarCollapsed ? 'md:px-2' : ''}`}>
               {!desktopSidebarCollapsed ? (
                 <>
                   {/* Debug Console Toggle */}
@@ -271,7 +260,7 @@ export function Layout({ children }: LayoutProps) {
             </div>
             
             {/* Footer Info Section */}
-            <div className={`p-4 border-t border-gray-700/30 ${desktopSidebarCollapsed ? 'lg:px-2' : ''}`}>
+            <div className={`p-4 border-t border-gray-700/30 ${desktopSidebarCollapsed ? 'md:px-2' : ''}`}>
               {!desktopSidebarCollapsed && (
                 <>
                   {currentTeam && (
@@ -297,7 +286,7 @@ export function Layout({ children }: LayoutProps) {
         {/* Overlay for mobile */}
         {sidebarOpen && (
           <div
-            className="fixed inset-0 z-40 bg-gray-600 bg-opacity-75 lg:hidden"
+            className="fixed inset-0 z-40 bg-gray-600 bg-opacity-75 md:hidden"
             onClick={() => setSidebarOpen(false)}
           />
         )}
