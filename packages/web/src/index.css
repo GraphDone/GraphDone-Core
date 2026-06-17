@@ -940,3 +940,37 @@ input[type="date"]:focus {
     stroke-width: 5;
   }
 }
+
+/* ── Audit / high-contrast theme ─────────────────────────────────────────────
+   A deliberately flat, no-texture, no-glow render (set via <html data-theme=
+   "contrast">). It is a REAL browser render — layout, positions and sizes are
+   unchanged — but the decorative lagoon background, grid, blur and glows are
+   stripped so OpenCV layout/balance scans get a clean, deterministic image.
+   This is also the groundwork for a real high-contrast accessibility theme. */
+html[data-theme="contrast"] body,
+html[data-theme="contrast"] #root {
+  background: #050608 !important;
+}
+html[data-theme="contrast"] .lagoon-caustics,
+html[data-theme="contrast"] .grid-overlay {
+  display: none !important;
+}
+html[data-theme="contrast"] .graph-container,
+html[data-theme="contrast"] .graph-container svg {
+  background: #050608 !important;
+}
+/* strip decoration that muddies pixel analysis: blur, glow, soft shadows, gradients-on-text */
+html[data-theme="contrast"] *,
+html[data-theme="contrast"] *::before,
+html[data-theme="contrast"] *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+/* node glow/drop-shadow filters off → solid, crisp shapes for detection */
+html[data-theme="contrast"] .graph-container svg .node,
+html[data-theme="contrast"] .graph-container svg .node *,
+html[data-theme="contrast"] .node-selected {
+  filter: none !important;
+}
