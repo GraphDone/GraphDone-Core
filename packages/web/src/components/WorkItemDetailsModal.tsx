@@ -11,6 +11,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useGraph } from '../contexts/GraphContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { useDialog } from '../hooks/useDialogManager';
+import { useModalA11y } from '../hooks/useModalA11y';
 import {
   Calendar, Clock,
   Layers, Trophy, Target, ListTodo, AlertTriangle, Lightbulb, Microscope,
@@ -80,8 +81,12 @@ export function WorkItemDetailsModal({
   const disconnectDropdownRef = useRef<HTMLDivElement>(null);
   const datePickerRef = useRef<HTMLDivElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   useDialog(isOpen, onClose);
+  // Container already manages its own initial focus (modalRef) below; this adds
+  // the Tab focus-trap + focus-restore-to-trigger on top.
+  useModalA11y(dialogRef, { isOpen, initialFocus: false });
 
   useEffect(() => {
     if (node) {
@@ -101,12 +106,11 @@ export function WorkItemDetailsModal({
   useEffect(() => {
     if (!isOpen) return;
 
+    // Escape is handled centrally by useDialog (defers while typing in a field,
+    // and keeps the dialog-manager's "close top-most" stack coherent). Here we
+    // only add the Ctrl/Cmd+S save shortcut.
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation();
-        e.preventDefault();
-        onClose();
-      } else if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.stopPropagation();
         e.preventDefault();
         if (handleSaveRef.current) {
@@ -516,10 +520,11 @@ export function WorkItemDetailsModal({
 
   return createPortal((
     <div
+      ref={dialogRef}
       className="fixed inset-0 bg-black/70 backdrop-blur-lg z-50 flex items-stretch sm:items-center justify-center p-0 sm:p-4"
       role="dialog"
       aria-modal="true"
-      aria-labelledby="modal-title"
+      aria-label="Work item details"
     >
       <div
         className="fixed inset-0 cursor-pointer"
