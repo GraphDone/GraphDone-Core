@@ -373,7 +373,10 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
     <div className="h-full flex flex-col">
       {/* Search and Filter Bar - Only for table, card, kanban views */}
       {shouldShowFilters && (
-        <div className="bg-gray-800/90 backdrop-blur-sm border-b border-gray-700/50 p-3 sm:p-4">
+        // relative z-50: backdrop-blur makes this a stacking context, so the filter
+        // dropdowns' z-50 is trapped inside it — without an explicit z-index the
+        // later content area paints over the open dropdowns.
+        <div className="relative z-50 bg-gray-800/90 backdrop-blur-sm border-b border-gray-700/50 p-3 sm:p-4">
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-stretch sm:items-center">
             {/* Search Input */}
             <div className="relative w-full sm:w-80 md:w-96 lg:w-[28rem]">

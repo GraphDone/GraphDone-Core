@@ -588,6 +588,7 @@ export function WorkItemDetailsModal({
             {/* Enhanced Clickable Type Badge */}
             <div className="relative z-[100000]">
               <button
+                data-testid="details-type-badge"
                 onClick={() => setShowTypeDropdown(!showTypeDropdown)}
                 className={`w-36 flex items-center justify-between px-3 py-2 rounded-lg text-sm font-semibold hover:scale-105 transition-all duration-200 cursor-pointer shadow-lg backdrop-blur-sm ${getTypeColor(currentNode.type)} border border-opacity-30 hover:border-opacity-50`}
               >
@@ -600,7 +601,7 @@ export function WorkItemDetailsModal({
               
               {/* Enhanced Type Dropdown with Staggered Animation */}
               {showTypeDropdown && (
-                <div className="absolute top-full left-0 mt-1 w-40 bg-gray-800/95 backdrop-blur-xl rounded-xl border border-gray-600/30 shadow-2xl z-[99999] max-h-48 overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-200">
+                <div data-testid="details-type-dropdown" className="absolute top-full left-0 mt-1 w-40 bg-gray-800/95 backdrop-blur-xl rounded-xl border border-gray-600/30 shadow-2xl z-[99999] max-h-48 overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-200">
                   <div className="p-2">
                     {TYPE_OPTIONS.filter(opt => opt.value !== 'all').map((type, index) => (
                       <button
@@ -641,6 +642,7 @@ export function WorkItemDetailsModal({
             {/* Enhanced Clickable Status Badge */}
             <div className="relative z-[100000]">
               <button
+                data-testid="details-status-badge"
                 onClick={() => setShowStatusDropdown(!showStatusDropdown)}
                 className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-semibold hover:scale-105 transition-all duration-200 cursor-pointer shadow-lg backdrop-blur-sm ${getStatusColor(currentNode.status)} border border-opacity-30 hover:border-opacity-50`}
               >
@@ -653,7 +655,7 @@ export function WorkItemDetailsModal({
               
               {/* Enhanced Status Dropdown with Staggered Animation */}
               {showStatusDropdown && (
-                <div className="absolute top-full left-0 mt-1 w-40 bg-gray-800/95 backdrop-blur-xl rounded-xl border border-gray-600/30 shadow-2xl z-[99999] max-h-48 overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-200">
+                <div data-testid="details-status-dropdown" className="absolute top-full left-0 mt-1 w-40 bg-gray-800/95 backdrop-blur-xl rounded-xl border border-gray-600/30 shadow-2xl z-[99999] max-h-48 overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-200">
                   <div className="p-2">
                     {STATUS_OPTIONS.filter(opt => opt.value !== 'all').map((status, index) => (
                       <button

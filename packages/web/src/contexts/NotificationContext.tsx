@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { Check, X, AlertCircle, Info } from 'lucide-react';
 
 type NotificationType = 'success' | 'error' | 'warning' | 'info';
@@ -66,6 +66,14 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     showNotification({ type: 'info', title, message });
   }, [showNotification]);
 
+  // Test affordance: fire a toast on demand (e.g. to verify it stacks above an
+  // open modal). Harmless in prod — it can only surface a local notification.
+  useEffect(() => {
+    (window as any).__notify = (type: NotificationType, title: string, message?: string) =>
+      showNotification({ type, title, message });
+    return () => { delete (window as any).__notify; };
+  }, [showNotification]);
+
   return (
     <NotificationContext.Provider 
       value={{
@@ -96,8 +104,10 @@ function NotificationContainer({
 }) {
   if (notifications.length === 0) return null;
 
+  // Toasts/alerts are the top transient layer — above modals (≤ z-[999999999])
+  // so an alert is never hidden behind an open dialog; below tooltips.
   return (
-    <div className="fixed top-4 right-4 z-[9999] space-y-2 max-w-sm">
+    <div data-testid="toast-stack" className="fixed top-4 right-4 z-[1000000000] space-y-2 max-w-sm">
       {notifications.map(notification => (
         <NotificationItem
           key={notification.id}
