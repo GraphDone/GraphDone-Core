@@ -37,6 +37,7 @@ import { UpdateGraphModal } from './UpdateGraphModal';
 import { DeleteGraphModal } from './DeleteGraphModal';
 import { ConnectWorkItemModal } from './ConnectWorkItemModal';
 import { WorkItemDetailsModal } from './WorkItemDetailsModal';
+import { NodeInspector } from './NodeInspector';
 
 import { WorkItem, WorkItemEdge } from '../types/graph';
 import { RelationshipType, RELATIONSHIP_OPTIONS, getRelationshipConfig } from '../constants/workItemConstants';
@@ -85,6 +86,33 @@ const getSmoothedOpacity = (scale: number, threshold: number, fadeRange: number 
   return (scale - (threshold - fadeRange)) / (fadeRange * 2);
 };
 
+// PR-4 legibility floor: zoom does double duty in this app — it's both spatial
+// navigation AND the readability control (text is rendered at a fixed font size,
+// so the parent `g` zoom scales it down with everything else). Past a certain
+// zoom-out the primary label is sub-readable. Rather than forcing the user to
+// zoom IN to read a label, counter-scale the title/type so their ON-SCREEN size
+// never drops below a readable floor within the working band. Beyond the band
+// the existing LOD opacity cull still hides them for overview/perf.
+const TITLE_BASE_PX = 14; // matches .node-title-text font-size
+const TYPE_BASE_PX = 13;  // matches .node-type-text font-size
+const LEGIBLE_FLOOR_PX = 12; // smallest on-screen size we keep text at
+const LEGIBLE_MAX_BOOST = 1.9; // cap the counter-scale so text never balloons
+// Title appears (and gets the floor) from this zoom — lower than the old
+// title-visible threshold so the label is readable across the working band, not
+// only when zoomed all the way in. Perf-safe: dense graphs hide node text via
+// the data-simplify CSS below SIMPLIFY_SCALE (0.45) regardless of opacity.
+const TITLE_VISIBLE_SCALE = 0.4;
+const legibilityScale = (basePx: number, k: number) => {
+  if (!k || k <= 0) return 1;
+  return Math.min(LEGIBLE_MAX_BOOST, Math.max(1, LEGIBLE_FLOOR_PX / (basePx * k)));
+};
+// A scale about a stored vertical anchor (data-cy) so multi-line title blocks
+// grow/shrink as a unit (font AND line-spacing together → never overlap).
+const legibilityTransform = (cy: number, basePx: number, k: number) => {
+  const s = legibilityScale(basePx, k);
+  return `translate(0,${cy}) scale(${s}) translate(0,${-cy})`;
+};
+
 interface NodeMenuState {
   node: WorkItem | null;
   position: { x: number; y: number };
@@ -131,6 +159,18 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   // The inline-rename overlay tracks its node live (drag/tick/zoom) via rAF,
   // because its position derives from currentTransform which only updates on zoom.
   const inlineEditRef = useRef<HTMLDivElement>(null);
+  // PR-3 expand-in-place: a readable peek panel anchored to a node on the canvas
+  // (Card/Contents/Diagram at full size, independent of zoom). Like the rename
+  // box, it tracks its node every frame via rAF.
+  const [expandedNode, setExpandedNode] = useState<WorkItem | null>(null);
+  const expandPanelRef = useRef<HTMLDivElement>(null);
+  const expandedNodeIdRef = useRef<string | null>(null);
+  expandedNodeIdRef.current = expandedNode?.id ?? null;
+  const toggleExpandedNode = useCallback((n: WorkItem) => {
+    setExpandedNode((prev) => (prev?.id === n.id ? null : n));
+  }, []);
+  const toggleExpandedNodeRef = useRef(toggleExpandedNode);
+  toggleExpandedNodeRef.current = toggleExpandedNode;
   const { currentUser } = useAuth();
   const { showSuccess, showError } = useNotifications();
   const navigate = useNavigate();
@@ -1148,7 +1188,12 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         .style('opacity', getSmoothedOpacity(scale, LOD_THRESHOLDS.FAR));
       (g.selectAll('.node-title-text') as any)
         .style('visibility', 'visible')
-        .style('opacity', getSmoothedOpacity(scale, LOD_THRESHOLDS.MEDIUM));
+        .style('opacity', getSmoothedOpacity(scale, TITLE_VISIBLE_SCALE));
+      (g.selectAll('.node-title-group') as any)
+        .attr('transform', function(this: any) {
+          const cy = +(this.getAttribute('data-cy')) || 0;
+          return legibilityTransform(cy, TITLE_BASE_PX, scale);
+        });
       (g.selectAll('.node-description-text') as any)
         .style('visibility', 'visible')
         .style('opacity', getSmoothedOpacity(scale, LOD_THRESHOLDS.CLOSE));
@@ -1716,7 +1761,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       if (!updatedNode) return;
 
       // Update title text elements (must mirror the creation path exactly,
-      // or cards shift layout on every poll)
+      // or cards shift layout on every poll — incl. the legibility-floor group)
+      nodeGroup.selectAll('.node-title-group').remove();
       nodeGroup.selectAll('.node-title-text').remove();
       const maxCharsPerLine = getNodeDimensions(updatedNode).maxCharsPerLine;
       const maxLines = 3;
@@ -1744,14 +1790,21 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       const dimensions = getNodeDimensions(updatedNode);
       const titleBarHeight = 28;
       const startY = -dimensions.height / 2 + titleBarHeight + 18;
+      const liveK = svgRef.current ? d3.zoomTransform(svgRef.current).k : 1;
+      const titleCy = startY + ((lines.length - 1) * 16) / 2;
+      const titleGroup = nodeGroup.append('g')
+        .attr('class', 'node-title-group')
+        .attr('data-cy', titleCy)
+        .attr('transform', legibilityTransform(titleCy, TITLE_BASE_PX, liveK));
       lines.forEach((line, index) => {
-        nodeGroup.append('text')
+        titleGroup.append('text')
           .attr('class', 'node-title-text')
           .attr('x', 0)
           .attr('y', startY + (index * 16))
           .attr('text-anchor', 'middle')
           .attr('dominant-baseline', 'middle')
           .text(line)
+          .style('opacity', getSmoothedOpacity(liveK, TITLE_VISIBLE_SCALE))
           .style('font-size', '14px')
           .style('font-weight', '600')
           .style('fill', () => {
@@ -1768,14 +1821,17 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           return config.label.toUpperCase();
         });
 
-      // Update description
+      // Update description — mirror the build path's honest preview exactly
+      // (width-responsive truncation + ellipsis), or the card text mutates on
+      // the next data poll.
       nodeGroup.select('.node-description-text')
         .text(() => {
           if (!updatedNode.description) return '';
-          const maxDescChars = 25;
-          return updatedNode.description.length > maxDescChars
-            ? updatedNode.description.substring(0, maxDescChars) + '...'
-            : updatedNode.description;
+          const maxLength = Math.floor(getNodeDimensions(updatedNode).width / 6.5);
+          const oneLine = updatedNode.description.replace(/\s+/g, ' ').trim();
+          return oneLine.length > maxLength
+            ? oneLine.slice(0, Math.max(1, maxLength - 1)).trimEnd() + '…'
+            : oneLine;
         });
     });
 
@@ -2780,6 +2836,57 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       setIsConnecting(true);
     });
 
+    // Expand-in-place icon (title bar, inboard of the + icon): opens a readable
+    // peek panel anchored to the node (Card/Contents/Diagram at full size) so you
+    // can read a node's contents/diagram WITHOUT zooming in (PR-3).
+    const expandIcons = nodeElements.append('g')
+      .attr('class', 'node-expand-icon')
+      .attr('transform', (d: WorkItem) => {
+        const x = getNodeDimensions(d).width / 2 - iconSize / 2 - 12 - iconSize - 8;
+        const y = -getNodeDimensions(d).height / 2 + 2 + titleBarHeight / 2;
+        return `translate(${x}, ${y}) scale(${1 / (currentTransform?.k || 1)})`;
+      })
+      .style('cursor', 'pointer')
+      .style('opacity', (currentTransform?.k || 1) >= LOD_THRESHOLDS.FAR ? 0.85 : 0)
+      .style('pointer-events', 'all');
+    expandIcons.append('rect')
+      .attr('class', 'expand-bg')
+      .attr('x', -iconSize / 2)
+      .attr('y', -iconSize / 2)
+      .attr('width', iconSize)
+      .attr('height', iconSize)
+      .attr('rx', 3)
+      .attr('fill', 'rgba(0, 0, 0, 0.7)')
+      .attr('stroke', 'rgba(255, 255, 255, 0.8)')
+      .attr('stroke-width', 1);
+    expandIcons.append('text')
+      .attr('class', 'expand-glyph')
+      .attr('x', 0)
+      .attr('y', 0)
+      .attr('text-anchor', 'middle')
+      .attr('dominant-baseline', 'central')
+      .style('font-size', `${iconSize * 0.95}px`)
+      .style('font-weight', 'bold')
+      .style('fill', '#ffffff')
+      .style('pointer-events', 'none')
+      .text('⛶');
+    expandIcons
+      .on('mouseenter', function() {
+        d3.select(this).select('.expand-bg').transition().duration(150)
+          .attr('fill', 'rgba(16, 185, 129, 0.85)')
+          .attr('stroke', '#10b981');
+      })
+      .on('mouseleave', function() {
+        d3.select(this).select('.expand-bg').transition().duration(150)
+          .attr('fill', 'rgba(0, 0, 0, 0.7)')
+          .attr('stroke', 'rgba(255, 255, 255, 0.8)');
+      })
+      .on('click', (event: MouseEvent, d: WorkItem) => {
+        event.stopPropagation();
+        event.preventDefault();
+        toggleExpandedNodeRef.current(d);
+      });
+
     // Sheet-symbol affordances: a "descend" glyph (bottom-right) + a child
     // count line, only for nodes that drill into a sub-graph.
     const sheetNodes = nodeElements.filter((d: WorkItem) => !!d.subgraphId);
@@ -2898,17 +3005,26 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         lines.push(d.title.substring(0, maxCharsPerLine - 3) + '...');
       }
       
-      // Create text elements for each line
+      // Create text elements for each line, inside a group that the legibility
+      // floor counter-scales as a unit (font + line-spacing together → readable
+      // when zoomed out, no overlap). data-cy = the title block's vertical center
+      // so the scale grows about the title, not the node origin. (PR-4)
       const startY = -dimensions.height / 2 + titleBarHeight + 18;
+      const liveK = svgRef.current ? d3.zoomTransform(svgRef.current).k : 1;
+      const titleCy = startY + ((lines.length - 1) * 16) / 2;
+      const titleGroup = nodeGroup.append('g')
+        .attr('class', 'node-title-group')
+        .attr('data-cy', titleCy)
+        .attr('transform', legibilityTransform(titleCy, TITLE_BASE_PX, liveK));
       lines.forEach((line, index) => {
-        nodeGroup.append('text')
+        titleGroup.append('text')
           .attr('class', 'node-title-text')
           .attr('x', 0)
           .attr('y', startY + (index * 16))
           .attr('text-anchor', 'middle')
           .attr('dominant-baseline', 'middle')
           .text(line)
-          .style('opacity', (currentTransform?.k || 1) >= LOD_THRESHOLDS.MEDIUM ? 1 : 0)
+          .style('opacity', getSmoothedOpacity(liveK, TITLE_VISIBLE_SCALE))
           .style('font-size', '14px')
           .style('font-weight', '600')
           .style('fill', () => {
@@ -2933,9 +3049,14 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .attr('dominant-baseline', 'middle')
       .text((d: WorkItem) => {
         if (!d.description) return '';
+        // Honest preview: truncate with an ellipsis instead of silently hiding
+        // long descriptions (the old behavior made content vanish with no cue).
+        // The ⛶ expand icon / inspector show the full contents (PR-3/PR-4).
         const maxLength = Math.floor(getNodeDimensions(d).width / 6.5);
-        // Hide description if too long instead of truncating
-        return d.description.length > maxLength ? '' : d.description;
+        const oneLine = d.description.replace(/\s+/g, ' ').trim();
+        return oneLine.length > maxLength
+          ? oneLine.slice(0, Math.max(1, maxLength - 1)).trimEnd() + '…'
+          : oneLine;
       })
       .style('opacity', (currentTransform?.k || 1) >= LOD_THRESHOLDS.CLOSE ? 1 : 0)
       .style('font-size', '11px')
@@ -3794,7 +3915,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
                 const scale = currentTransform.k;
                 const classList = d3.select(this as any).attr('class');
                 if (classList?.includes('node-type-text')) return getSmoothedOpacity(scale, LOD_THRESHOLDS.FAR);
-                if (classList?.includes('node-title-text')) return getSmoothedOpacity(scale, LOD_THRESHOLDS.MEDIUM);
+                if (classList?.includes('node-title-text')) return getSmoothedOpacity(scale, TITLE_VISIBLE_SCALE);
                 if (classList?.includes('node-description-text')) return getSmoothedOpacity(scale, LOD_THRESHOLDS.CLOSE);
               }
             }
@@ -3890,8 +4011,21 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       // Update text opacities with smooth transitions
       g.selectAll('.node-type-text' as any)
         .style('opacity', getSmoothedOpacity(LOD_THRESHOLDS.FAR));
+      // Title appears across the working band (not only when zoomed all the way
+      // in) and is counter-scaled to a legibility floor so it stays readable. The
+      // group transform is updated live here (the only path that runs on zoom).
       g.selectAll('.node-title-text' as any)
-        .style('opacity', getSmoothedOpacity(LOD_THRESHOLDS.MEDIUM));
+        .style('opacity', getSmoothedOpacity(TITLE_VISIBLE_SCALE));
+      // Counter-scale the title block to the legibility floor. Skipped on dense
+      // graphs in data-simplify mode (titles hidden via CSS → no visible effect,
+      // so don't walk 1000+ groups every pan frame).
+      if (!simplifiedRef.current) {
+        g.selectAll('.node-title-group' as any)
+          .attr('transform', function(this: any) {
+            const cy = +(this.getAttribute('data-cy')) || 0;
+            return legibilityTransform(cy, TITLE_BASE_PX, scale);
+          });
+      }
       g.selectAll('.node-description-text' as any)
         .style('opacity', getSmoothedOpacity(LOD_THRESHOLDS.CLOSE));
       g.selectAll('.edge-label' as any)
@@ -4265,6 +4399,53 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     const timer = setTimeout(() => fitViewToNodes(), 1500);
     return () => clearTimeout(timer);
   }, [hasNodes, currentGraphId, fitViewToNodes]);
+
+  // PR-3: keep the expand-in-place panel glued to its node through drags, ticks
+  // and pan/zoom (same rAF technique as the rename box). The panel sits beside
+  // the node, flips/clamps to stay fully on screen.
+  const expandedNodeId = expandedNode?.id ?? null;
+  useEffect(() => {
+    if (!expandedNodeId) return undefined;
+    let raf = 0;
+    const sync = () => {
+      const el = expandPanelRef.current;
+      const svgEl = svgRef.current;
+      if (el && svgEl) {
+        const simNodes = simulationRef.current?.nodes() as any[] | undefined;
+        const n = simNodes?.find((m: any) => m.id === expandedNodeId);
+        // The node was deleted / its graph left → close the peek instead of
+        // leaving a frozen, stale panel (and stop spinning this rAF loop).
+        if (simNodes && !n) { setExpandedNode(null); return; }
+        if (n) {
+          const rect = svgEl.getBoundingClientRect();
+          const t = d3.zoomTransform(svgEl);
+          const nodeScreenX = rect.left + (n.x ?? 0) * t.k + t.x;
+          const nodeScreenY = rect.top + (n.y ?? 0) * t.k + t.y;
+          const pw = el.offsetWidth || 320;
+          const ph = el.offsetHeight || 260;
+          let left = nodeScreenX + 28;
+          if (left + pw > window.innerWidth - 8) left = nodeScreenX - 28 - pw;
+          let top = nodeScreenY - ph / 2;
+          left = Math.min(Math.max(8, left), Math.max(8, window.innerWidth - pw - 8));
+          top = Math.min(Math.max(8, top), Math.max(8, window.innerHeight - ph - 8));
+          el.style.left = `${left}px`;
+          el.style.top = `${top}px`;
+        }
+      }
+      raf = requestAnimationFrame(sync);
+    };
+    raf = requestAnimationFrame(sync);
+    return () => cancelAnimationFrame(raf);
+  }, [expandedNodeId]);
+
+  // Esc closes the expand panel; switching graphs dismisses it (its node is gone).
+  useEffect(() => {
+    if (!expandedNodeId) return undefined;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setExpandedNode(null); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [expandedNodeId]);
+  useEffect(() => { setExpandedNode(null); }, [currentGraphId]);
 
   // Expose reset function to parent component
   useEffect(() => {
@@ -4802,6 +4983,26 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           </div>
         );
       })()}
+
+      {/* PR-3: expand-in-place peek — a readable Card/Contents/Diagram panel
+          anchored to its node on the canvas, on top of everything. Position is
+          driven each frame by the rAF sync effect above. */}
+      {expandedNode && createPortal(
+        <div
+          ref={expandPanelRef}
+          data-testid="node-expand-panel"
+          className="fixed z-[999999] w-80 max-w-[90vw]"
+          style={{ left: -9999, top: -9999 }}
+        >
+          <NodeInspector
+            node={expandedNode}
+            compact
+            rootTestId="node-expand-inspector"
+            onClose={() => setExpandedNode(null)}
+          />
+        </div>,
+        document.body
+      )}
 
       {/* Node Context Menu */}
       {nodeMenu.visible && nodeMenu.node && createPortal(

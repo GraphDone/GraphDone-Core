@@ -856,6 +856,7 @@ input[type="date"]:focus {
 .graph-container[data-simplify="true"] svg .node-edit-icon,
 .graph-container[data-simplify="true"] svg .node-relationship-icon,
 .graph-container[data-simplify="true"] svg .node-descend-icon,
+.graph-container[data-simplify="true"] svg .node-expand-icon,
 .graph-container[data-simplify="true"] svg .status-icon-svg,
 .graph-container[data-simplify="true"] svg .status-label-text,
 .graph-container[data-simplify="true"] svg .status-percentage-text,
