@@ -4,6 +4,7 @@ import { onError } from '@apollo/client/link/error';
 import { getMainDefinition } from '@apollo/client/utilities';
 import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
 import { createClient } from 'graphql-ws';
+import { getToken, clearSession } from './authStorage';
 
 // Dynamically construct GraphQL URLs based on current host
 const getGraphQLUrl = () => {
@@ -28,7 +29,7 @@ const httpLink = createHttpLink({
 });
 
 const authLink = setContext((_, { headers }) => {
-  const token = localStorage.getItem('authToken');
+  const token = getToken();
   return {
     headers: {
       ...headers,
@@ -44,8 +45,7 @@ const errorLink = onError(({ graphQLErrors, networkError, operation, forward }) 
       if (error.extensions?.code === 'UNAUTHENTICATED' || 
           error.message.includes('Invalid token') ||
           error.message.includes('Unauthorized')) {
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('currentUser');
+        clearSession();
         // Don't reload immediately - let auth context handle it
         return;
       }
@@ -55,8 +55,7 @@ const errorLink = onError(({ graphQLErrors, networkError, operation, forward }) 
   if (networkError) {
     // Handle 401/403 network errors
     if ('statusCode' in networkError && (networkError.statusCode === 401 || networkError.statusCode === 403)) {
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('currentUser');
+      clearSession();
       // Don't reload immediately - let auth context handle it
       return;
     }
@@ -67,7 +66,7 @@ const wsLink = new GraphQLWsLink(
   createClient({
     url: getWebSocketUrl(),
     connectionParams: () => {
-      const token = localStorage.getItem('authToken');
+      const token = getToken();
       return {
         authorization: token ? `Bearer ${token}` : '',
       };

@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, gql } from '@apollo/client';
 import { Eye, EyeOff, ArrowRight, Mail, Lock, Users, Github, Zap, Check, CheckCircle, XCircle, AlertTriangle, Shield } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { setToken } from '../lib/authStorage';
 import { InsecureConnectionBanner } from '../components/TlsStatusIndicator';
 import { GuestModeDialog } from '../components/GuestModeDialog';
 import { PasswordRequirements } from '../components/PasswordRequirements';
@@ -97,7 +98,9 @@ export function Signin({ initialMagicLink = false }: { initialMagicLink?: boolea
   const [magicLinkSent, setMagicLinkSent] = useState(false);
   const [magicLinkLoading, setMagicLinkLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [rememberMe, setRememberMe] = useState(false);
+  // Default ON — keep users signed in on this device so they don't have to log
+  // in over and over (clearly labelled below; uncheck for a session-only login).
+  const [rememberMe, setRememberMe] = useState(true);
   const [emailValid, setEmailValid] = useState<boolean | null>(null);
   const [magicLinkEmailValid, setMagicLinkEmailValid] = useState<boolean | null>(null);
   const [loginAttempts, setLoginAttempts] = useState(0);
@@ -179,7 +182,10 @@ export function Signin({ initialMagicLink = false }: { initialMagicLink?: boolea
         setErrors({ submit: 'Authentication failed. Please try again.' });
       }
     } else if (token) {
-      localStorage.setItem('authToken', token);
+      // Magic-link sign-in: keep them signed in on this device by default
+      // (they clicked their own link). The user is loaded by the ME query
+      // after reload.
+      setToken(token, true);
       window.history.replaceState({}, '', '/login');
       window.location.reload();
     }
@@ -239,7 +245,7 @@ export function Signin({ initialMagicLink = false }: { initialMagicLink?: boolea
       setLoginAttempts(0);
       localStorage.removeItem('loginAttempts');
       localStorage.removeItem('lockoutTime');
-      setAuthUser(data.login.user, data.login.token);
+      setAuthUser(data.login.user, data.login.token, rememberMe);
       navigate('/');
     },
     onError: (error) => {
@@ -804,10 +810,10 @@ export function Signin({ initialMagicLink = false }: { initialMagicLink?: boolea
             {errors.password && <p id="password-error" className="mt-1 text-xs text-red-400" role="alert">{errors.password}</p>}
           </div>
 
-          {/* Remember Me & Forgot Password */}
-          <div className="flex items-center justify-between">
-            <label className="flex items-center cursor-pointer group">
-              <div className="relative">
+          {/* Keep me logged in & Forgot Password */}
+          <div className="flex items-start justify-between gap-3">
+            <label className="flex items-start cursor-pointer group">
+              <div className="relative mt-0.5">
                 <input
                   type="checkbox"
                   checked={rememberMe}
@@ -820,11 +826,16 @@ export function Signin({ initialMagicLink = false }: { initialMagicLink?: boolea
                   )}
                 </div>
               </div>
-              <span className="ml-3 text-sm text-gray-300 group-hover:text-gray-100 transition-colors">
-                Remember me
+              <span className="ml-3 leading-tight">
+                <span className="block text-sm text-gray-200 group-hover:text-gray-100 transition-colors">
+                  Keep me logged in
+                </span>
+                <span className="block text-xs text-gray-400">
+                  Stay signed in on this device — uncheck on shared computers
+                </span>
               </span>
             </label>
-            <Link to="/forgot-password" className="text-sm text-teal-400 hover:text-teal-300 transition-colors">
+            <Link to="/forgot-password" className="text-sm text-teal-400 hover:text-teal-300 transition-colors whitespace-nowrap">
               Forgot password?
             </Link>
           </div>

@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useLazyQuery, gql } from '@apollo/client';
 import { User, Team, AuthContextType } from '../types/auth';
+import { getToken, getUserRaw, setSession, setUser, clearSession, isKept } from '../lib/authStorage';
 
 const ME_QUERY = gql`
   query Me {
@@ -42,10 +43,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (meData.me) {
         setCurrentUser(meData.me);
         setCurrentTeam(meData.me.team);
+        // Refresh the cached user so it stays in sync with the server.
+        setUser(meData.me);
       } else {
         // ME query returned null, clear stale data
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('currentUser');
+        clearSession();
         setCurrentUser(null);
         setCurrentTeam(null);
       }
@@ -56,25 +58,26 @@ export function AuthProvider({ children }: AuthProviderProps) {
   useEffect(() => {
     if (meError) {
       // Token is invalid, clear it
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('currentUser');
+      clearSession();
       setCurrentUser(null);
       setCurrentTeam(null);
       setIsInitializing(false);
     }
   }, [meError]);
 
-  // Load saved user from localStorage and validate token on mount
+  // Load saved session (localStorage if "keep me logged in", else sessionStorage)
+  // and validate the token on mount.
   useEffect(() => {
-    const token = localStorage.getItem('authToken');
-    const savedUser = localStorage.getItem('currentUser');
+    const token = getToken();
+    const savedUser = getUserRaw();
 
     if (token) {
       if (savedUser) {
         try {
           JSON.parse(savedUser);
         } catch (error) {
-          localStorage.removeItem('currentUser');
+          // Corrupt cache — drop it; the ME query will repopulate.
+          clearSession();
         }
       }
       getMe();
@@ -83,21 +86,24 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [getMe]);
 
-  const login = (user: User, token?: string) => {
+  // keepLoggedIn defaults to the user's last choice (true unless they opted out)
+  // so callers that don't pass it (e.g. guest login) honour the preference.
+  const login = (user: User, token?: string, keepLoggedIn: boolean = isKept()) => {
     setCurrentUser(user);
     setCurrentTeam(user.team || null);
-    
+
     if (token) {
-      localStorage.setItem('authToken', token);
+      setSession(token, user, keepLoggedIn);
+    } else {
+      // No new token (e.g. a user refresh) — just update the cached user.
+      setUser(user);
     }
-    localStorage.setItem('currentUser', JSON.stringify(user));
   };
 
   const logout = () => {
     setCurrentUser(null);
     setCurrentTeam(null);
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('currentUser');
+    clearSession();
   };
 
   const switchUser = (_userId: string) => {
