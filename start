@@ -60,7 +60,7 @@ detect_platform
 
 # Help function
 show_help() {
-    echo -e "${BOLD}GraphDone${NC} - Graph-native project management system"
+    echo -e "${BOLD}GraphDone${NC} - Graph-native management system"
     echo ""
     echo -e "${BOLD}USAGE:${NC}"
     echo "  ./start [COMMAND] [OPTIONS]"
@@ -196,7 +196,7 @@ show_banner() {
         echo "║                                                              ║"
         echo "║                     🌐 GraphDone 🌐                          ║"
         echo "║                                                              ║"
-        echo "║           Graph-native project management system             ║"
+        echo "║                Graph-native management system                ║"
         echo "║                                                              ║"
         echo "╚══════════════════════════════════════════════════════════════╝"
         echo -e "${NC}"

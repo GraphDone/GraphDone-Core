@@ -133,7 +133,7 @@ if [ "$BUILD_DOCS" = true ]; then
     </ul>
     
     <h2>Project Overview</h2>
-    <p>GraphDone reimagines project management as a collaborative graph where work flows through natural dependencies rather than artificial hierarchies.</p>
+    <p>GraphDone reimagines management as a collaborative graph where work flows through natural dependencies rather than artificial hierarchies.</p>
     
     <h3>Key Features</h3>
     <ul>
