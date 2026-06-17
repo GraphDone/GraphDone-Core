@@ -124,6 +124,42 @@ const hexToRgb = (hex: string) => {
   } : { r: 0.06, g: 0.73, b: 0.51 }; // fallback green
 };
 
+// Build (replacing any prior) an animated SVG glow filter on `defs`: a colored
+// gaussian blur (pulsing stdDeviation) merged back over the source. Shared by the
+// node / selected-node / edge glow effects, which differ only in id, region,
+// blur size, animation values and duration.
+const createGlowFilter = (
+  defs: any,
+  filterId: string,
+  color: string,
+  opts: { stdDeviation: string; animValues: string; dur: string; x?: string; y?: string; width?: string; height?: string }
+) => {
+  defs.select(`#${filterId}`).remove();
+  const filter = defs.append('filter')
+    .attr('id', filterId)
+    .attr('x', opts.x ?? '-100%')
+    .attr('y', opts.y ?? '-100%')
+    .attr('width', opts.width ?? '300%')
+    .attr('height', opts.height ?? '300%');
+  const rgb = hexToRgb(color);
+  filter.append('feColorMatrix')
+    .attr('in', 'SourceGraphic')
+    .attr('type', 'matrix')
+    .attr('values', `0 0 0 0 ${rgb.r} 0 0 0 0 ${rgb.g} 0 0 0 0 ${rgb.b} 0 0 0 1 0`);
+  const blur = filter.append('feGaussianBlur')
+    .attr('stdDeviation', opts.stdDeviation)
+    .attr('result', 'coloredBlur');
+  blur.append('animate')
+    .attr('attributeName', 'stdDeviation')
+    .attr('values', opts.animValues)
+    .attr('dur', opts.dur)
+    .attr('repeatCount', 'indefinite');
+  const feMerge = filter.append('feMerge');
+  feMerge.append('feMergeNode').attr('in', 'coloredBlur');
+  feMerge.append('feMergeNode').attr('in', 'SourceGraphic');
+  return filter;
+};
+
 interface NodeMenuState {
   node: WorkItem | null;
   position: { x: number; y: number };
@@ -563,38 +599,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     const nodeColor = nodeTypeConfig.hexColor;
     const filterId = `node-glow-${node.type.toLowerCase()}`;
     
-    // Remove existing filter and create new one with node's type color
-    defs.select(`#${filterId}`).remove();
-    
-    const nodeGlowFilter = defs.append('filter')
-      .attr('id', filterId)
-      .attr('x', '-100%')
-      .attr('y', '-100%')
-      .attr('width', '300%')
-      .attr('height', '300%');
-    
-    // Convert hex to RGB values for feColorMatrix
-    
-    const rgb = hexToRgb(nodeColor);
-    nodeGlowFilter.append('feColorMatrix')
-      .attr('in', 'SourceGraphic')
-      .attr('type', 'matrix')
-      .attr('values', `0 0 0 0 ${rgb.r} 0 0 0 0 ${rgb.g} 0 0 0 0 ${rgb.b} 0 0 0 1 0`);
-    
-    const blur = nodeGlowFilter.append('feGaussianBlur')
-      .attr('stdDeviation', '15')
-      .attr('result', 'coloredBlur');
-    
-    blur.append('animate')
-      .attr('attributeName', 'stdDeviation')
-      .attr('values', '10;20;10')
-      .attr('dur', '2s')
-      .attr('repeatCount', 'indefinite');
-    
-    const feMerge = nodeGlowFilter.append('feMerge');
-    feMerge.append('feMergeNode').attr('in', 'coloredBlur');
-    feMerge.append('feMergeNode').attr('in', 'SourceGraphic');
-    
+    createGlowFilter(defs, filterId, nodeColor, { stdDeviation: '15', animValues: '10;20;10', dur: '2s' });
+
     // Apply the type-specific glow filter immediately
     svg.selectAll('.node-bg')
       .filter((d: any) => d && d.id === node.id)
@@ -620,38 +626,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       const nodeColor = nodeTypeConfig.hexColor;
       const filterId = `node-glow-${nodeMenu.node.type.toLowerCase()}`;
       
-      // Remove existing filter and create new one with node's type color
-      defs.select(`#${filterId}`).remove();
-      
-      const nodeGlowFilter = defs.append('filter')
-        .attr('id', filterId)
-        .attr('x', '-100%')
-        .attr('y', '-100%')
-        .attr('width', '300%')
-        .attr('height', '300%');
-      
-      // Convert hex to RGB values for feColorMatrix
-      
-      const rgb = hexToRgb(nodeColor);
-      nodeGlowFilter.append('feColorMatrix')
-        .attr('in', 'SourceGraphic')
-        .attr('type', 'matrix')
-        .attr('values', `0 0 0 0 ${rgb.r} 0 0 0 0 ${rgb.g} 0 0 0 0 ${rgb.b} 0 0 0 1 0`);
-      
-      const blur = nodeGlowFilter.append('feGaussianBlur')
-        .attr('stdDeviation', '15')
-        .attr('result', 'coloredBlur');
-      
-      blur.append('animate')
-        .attr('attributeName', 'stdDeviation')
-        .attr('values', '10;20;10')
-        .attr('dur', '2s')
-        .attr('repeatCount', 'indefinite');
-      
-      const feMerge = nodeGlowFilter.append('feMerge');
-      feMerge.append('feMergeNode').attr('in', 'coloredBlur');
-      feMerge.append('feMergeNode').attr('in', 'SourceGraphic');
-      
+      createGlowFilter(defs, filterId, nodeColor, { stdDeviation: '15', animValues: '10;20;10', dur: '2s' });
+
       // Apply the type-specific glow filter
       svg.selectAll('.node-bg')
         .filter((d: any) => d && d.id === nodeMenu.node?.id)
@@ -681,39 +657,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         const nodeColor = nodeTypeConfig.hexColor;
         const filterId = `selected-node-glow-${nodeType}`;
         
-        // Remove existing filter and create new one
-        defs.select(`#${filterId}`).remove();
-        
-        const nodeGlowFilter = defs.append('filter')
-          .attr('id', filterId)
-          .attr('x', '-100%')
-          .attr('y', '-100%')
-          .attr('width', '300%')
-          .attr('height', '300%');
-        
-        // Convert hex to RGB values
-        
-        const rgb = hexToRgb(nodeColor);
-        nodeGlowFilter.append('feColorMatrix')
-          .attr('in', 'SourceGraphic')
-          .attr('type', 'matrix')
-          .attr('values', `0 0 0 0 ${rgb.r} 0 0 0 0 ${rgb.g} 0 0 0 0 ${rgb.b} 0 0 0 1 0`);
-        
-        const blur = nodeGlowFilter.append('feGaussianBlur')
-          .attr('stdDeviation', '8')  // Slightly smaller than dialog glow
-          .attr('result', 'coloredBlur');
-        
-        // Subtle pulsing animation for selected nodes
-        blur.append('animate')
-          .attr('attributeName', 'stdDeviation')
-          .attr('values', '6;12;6')
-          .attr('dur', '3s')
-          .attr('repeatCount', 'indefinite');
-        
-        const feMerge = nodeGlowFilter.append('feMerge');
-        feMerge.append('feMergeNode').attr('in', 'coloredBlur');
-        feMerge.append('feMergeNode').attr('in', 'SourceGraphic');
-        
+        createGlowFilter(defs, filterId, nodeColor, { stdDeviation: '8', animValues: '6;12;6', dur: '3s' });
+
         // Apply the glow to nodes of this type that are selected
         svg.selectAll('.node-bg')
           .filter((d: any) => d && nodeIds.includes(d.id))
@@ -727,37 +672,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       const edgeColor = relationshipConfig.hexColor;
       const edgeFilterId = `edge-glow-${editingEdge.edge.type.toLowerCase()}`;
       
-      // Remove existing filter and create new one with relationship color
-      defs.select(`#${edgeFilterId}`).remove();
-      
-      const edgeGlowFilter = defs.append('filter')
-        .attr('id', edgeFilterId)
-        .attr('x', '-150%')
-        .attr('y', '-150%')
-        .attr('width', '400%')
-        .attr('height', '400%');
-      
-      
-      const rgb = hexToRgb(edgeColor);
-      edgeGlowFilter.append('feColorMatrix')
-        .attr('in', 'SourceGraphic')
-        .attr('type', 'matrix')
-        .attr('values', `0 0 0 0 ${rgb.r} 0 0 0 0 ${rgb.g} 0 0 0 0 ${rgb.b} 0 0 0 1 0`);
-      
-      const edgeBlur = edgeGlowFilter.append('feGaussianBlur')
-        .attr('stdDeviation', '25')
-        .attr('result', 'coloredBlur');
-      
-      edgeBlur.append('animate')
-        .attr('attributeName', 'stdDeviation')
-        .attr('values', '15;35;15')
-        .attr('dur', '1.5s')
-        .attr('repeatCount', 'indefinite');
-      
-      const edgeFeMerge = edgeGlowFilter.append('feMerge');
-      edgeFeMerge.append('feMergeNode').attr('in', 'coloredBlur');
-      edgeFeMerge.append('feMergeNode').attr('in', 'SourceGraphic');
-      
+      createGlowFilter(defs, edgeFilterId, edgeColor, { x: '-150%', y: '-150%', width: '400%', height: '400%', stdDeviation: '25', animValues: '15;35;15', dur: '1.5s' });
+
       svg.selectAll('.edge')
         .filter((d: any) => d && d.id === editingEdge.edge?.id)
         .style('filter', `url(#${edgeFilterId})`)
