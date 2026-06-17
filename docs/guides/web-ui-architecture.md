@@ -52,3 +52,11 @@ graph TD
 `tests/helpers/mobileAudit.ts` auditors (sideways-scroll, squeezed labels,
 low-contrast/invisible text, modals clipped under the nav) across **every** screen
 at phone width, in CI right after the smoke gate.
+
+**Massive local report** — `npm run report:matrix` (then `npm run report:matrix:open`)
+runs `tests/e2e/feature-matrix.spec.ts`: every view (8) + page (6) + signin + key
+features (inspector / expand peek / create modal) at **6 resolutions** (360→1920),
+each cell screenshotted **and** layout/contrast-audited. `tests/generate-matrix-report.mjs`
+stitches the screenshots into one self-contained gallery
+(`test-artifacts/matrix/index.html`, feature × resolution grid). Heavy; local-only,
+not in the smoke gate.
