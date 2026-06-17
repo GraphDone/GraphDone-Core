@@ -37,6 +37,8 @@
     "test:smoke": "playwright test tests/e2e/user-smoke.spec.ts --reporter=line",
     "test:mobile": "playwright test --grep \"@mobile|@audit\" --project=\"GraphDone-Core/dev-neo4j/chromium\" --reporter=line",
     "report:showcase": "playwright test --project=showcase && node tests/generate-showcase-report.mjs",
+    "report:matrix": "playwright test --project=matrix --reporter=line,html && node tests/generate-matrix-report.mjs",
+    "report:matrix:open": "open test-artifacts/matrix/index.html 2>/dev/null || xdg-open test-artifacts/matrix/index.html 2>/dev/null || echo 'Open test-artifacts/matrix/index.html'",
     "test:perf": "playwright test --project=perf --reporter=line",
     "test:perf:scale": "playwright test --project=perf-scale --reporter=line && node tests/generate-perf-report.mjs",
     "report:perf": "node tests/generate-perf-report.mjs",
