@@ -114,6 +114,16 @@ const legibilityTransform = (cy: number, basePx: number, k: number) => {
   return `translate(0,${cy}) scale(${s}) translate(0,${-cy})`;
 };
 
+// Hex color → normalized 0..1 RGB for SVG feColorMatrix glow filters.
+const hexToRgb = (hex: string) => {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result ? {
+    r: parseInt(result[1], 16) / 255,
+    g: parseInt(result[2], 16) / 255,
+    b: parseInt(result[3], 16) / 255
+  } : { r: 0.06, g: 0.73, b: 0.51 }; // fallback green
+};
+
 interface NodeMenuState {
   node: WorkItem | null;
   position: { x: number; y: number };
@@ -323,11 +333,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     awaitRefetchQueries: true, // Wait for refetch to complete
     errorPolicy: 'all',
     onCompleted: (data) => {
-      console.log('[Graph Debug] Node update completed successfully', data);
       // Don't force reinitialization - let data updates flow through naturally
     },
     onError: (error) => {
-      console.error('[Graph Debug] Node update failed:', error);
+      console.error('Node update failed:', error);
     }
   });
 
@@ -565,14 +574,6 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .attr('height', '300%');
     
     // Convert hex to RGB values for feColorMatrix
-    const hexToRgb = (hex: string) => {
-      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-      return result ? {
-        r: parseInt(result[1], 16) / 255,
-        g: parseInt(result[2], 16) / 255,
-        b: parseInt(result[3], 16) / 255
-      } : { r: 0.06, g: 0.73, b: 0.51 }; // fallback green
-    };
     
     const rgb = hexToRgb(nodeColor);
     nodeGlowFilter.append('feColorMatrix')
@@ -630,14 +631,6 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         .attr('height', '300%');
       
       // Convert hex to RGB values for feColorMatrix
-      const hexToRgb = (hex: string) => {
-        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-        return result ? {
-          r: parseInt(result[1], 16) / 255,
-          g: parseInt(result[2], 16) / 255,
-          b: parseInt(result[3], 16) / 255
-        } : { r: 0.06, g: 0.73, b: 0.51 }; // fallback green
-      };
       
       const rgb = hexToRgb(nodeColor);
       nodeGlowFilter.append('feColorMatrix')
@@ -699,14 +692,6 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           .attr('height', '300%');
         
         // Convert hex to RGB values
-        const hexToRgb = (hex: string) => {
-          const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-          return result ? {
-            r: parseInt(result[1], 16) / 255,
-            g: parseInt(result[2], 16) / 255,
-            b: parseInt(result[3], 16) / 255
-          } : { r: 0.06, g: 0.73, b: 0.51 }; // fallback green
-        };
         
         const rgb = hexToRgb(nodeColor);
         nodeGlowFilter.append('feColorMatrix')
@@ -752,14 +737,6 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         .attr('width', '400%')
         .attr('height', '400%');
       
-      const hexToRgb = (hex: string) => {
-        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-        return result ? {
-          r: parseInt(result[1], 16) / 255,
-          g: parseInt(result[2], 16) / 255,
-          b: parseInt(result[3], 16) / 255
-        } : { r: 0.06, g: 0.73, b: 0.51 }; // fallback green
-      };
       
       const rgb = hexToRgb(edgeColor);
       edgeGlowFilter.append('feColorMatrix')
@@ -1062,7 +1039,6 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         if (!event.ctrlKey && !event.metaKey && !event.altKey) { // Only plain R key
           event.preventDefault();
           refreshTextVisibility();
-          console.log('[Graph Debug] Manual text visibility refresh triggered');
         }
       }
     };
@@ -1199,14 +1175,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       refetchEdges();
     }
   }, [currentGraph?.id, refetch, refetchEdges]);
-  
-  // Refresh text visibility after data changes - DISABLED to prevent conflicts
-  // useEffect(() => {
-  //   if (workItems && edgesData?.edges) {
-  //     refreshTextVisibility();
-  //   }
-  // }, [workItems?.length, edgesData?.edges?.length, refreshTextVisibility]);
-  
+
   const workItemEdges: WorkItemEdge[] = [];
   
   // Add edges from Neo4j Edge entities
@@ -1245,25 +1214,6 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
   // Validate and sanitize data before D3 processing
   const currentValidationResult = validateGraphData(workItems, workItemEdges);
-  
-  // Debug logging for data validation issues
-  useEffect(() => {
-    console.log('[Graph Debug] Data validation result:', {
-      totalWorkItems: workItems.length,
-      totalEdges: workItemEdges.length,
-      validNodes: currentValidationResult.validNodes.length,
-      validEdges: currentValidationResult.validEdges.length,
-      errors: currentValidationResult.errors,
-      warnings: currentValidationResult.warnings
-    });
-    
-    if (workItems.length > 0 && currentValidationResult.validNodes.length === 0) {
-      console.error('[Graph Debug] CRITICAL: All nodes filtered out by validation!', {
-        rawWorkItems: workItems,
-        validationResult: currentValidationResult
-      });
-    }
-  }, [workItems.length, currentValidationResult.validNodes.length, currentValidationResult.errors.length]);
   
   // Update validation state
   useEffect(() => {
@@ -1313,10 +1263,6 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         priority: item.priority || 0
       };
       
-      // DEBUG: Log if this node is being reset to origin
-      if (x === 0 && y === 0 && item.positionX !== 0 && item.positionY !== 0) {
-        console.log('[CRITICAL DEBUG] Node position being reset to origin:', item.id, 'was at:', item.positionX, item.positionY);
-      }
       
       return node;
     })
@@ -1691,13 +1637,11 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     const needsReinit = (currentNodeCount !== newNodeCount) || (currentEdgeCount !== newEdgeCount);
     
     if (needsReinit) {
-      console.log('[Graph Debug] Data structure changed - triggering reinitialization with preserved camera');
       setReinitTrigger(prev => prev + 1);
       return;
     }
 
     // If counts are the same, update both simulation data AND DOM elements (for property changes)
-    console.log('[Graph Debug] Data counts unchanged - updating simulation data and DOM elements');
 
     // Merge fresh data INTO the live simulation objects instead of swapping
     // arrays. The DOM is data-bound to these exact objects; replacing them
@@ -1836,7 +1780,6 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       simulation.alpha(0.1).restart();
     }
 
-    console.log('[Graph Debug] Simulation data and DOM elements updated');
   }, [nodes, validatedEdges, getNodeDimensions]);
 
   // Define initializeVisualization function with access to nodes data
@@ -4209,7 +4152,6 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       if ((window as any).debugLog) {
         (window as any).debugLog('Graph', '🎯 Center on node', viewportUpdate);
       }
-      console.log('🎯 CENTER-ON-NODE viewport update:', viewportUpdate);
       (window as any).updateMiniMapViewport(viewportUpdate);
     }
   }, [nodes, currentTransform]);
@@ -4225,7 +4167,6 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       if ((window as any).debugLog) {
         (window as any).debugLog('Graph', '📊 Viewport dimensions updated', dimensions);
       }
-      console.log('📊 VIEWPORT DIMENSIONS:', dimensions);
       if ((window as any).updateViewportDimensions) {
         (window as any).updateViewportDimensions(dimensions);
       }
@@ -4469,13 +4410,6 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
   // Comprehensive reinitialization effect - ONLY when actually needed
   useEffect(() => {
-    console.log('[Graph Debug] Checking if reinitialization needed...', {
-      nodesLength: nodes.length,
-      prevNodesLength: prevNodeCountRef.current,
-      edgesLength: validatedEdges.length,
-      trigger: reinitTrigger,
-      currentGraph: currentGraph?.id
-    });
 
     // Detect transition from empty to non-empty graph (first node creation)
     const wasEmpty = prevNodeCountRef.current === 0;
@@ -4515,14 +4449,12 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       nodesChanged; // a node's type changed — re-render its color/border/icon
 
     if (shouldReinit) {
-      console.log('[Graph Debug] Full reinitialization required');
       initializeVisualization();
       // Reset trigger after use
       if (reinitTrigger > 0) {
         setReinitTrigger(0);
       }
     } else {
-      console.log('[Graph Debug] Using selective updates instead of full reinit');
       // Use selective data updates instead of full reinitialization
       updateVisualizationData();
     }
@@ -4574,26 +4506,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   // Manual reinitialization function (expose globally for debugging)
   useEffect(() => {
     (window as any).forceGraphReinit = () => {
-      console.log('[Graph Debug] Forcing manual reinitialization...');
       setReinitTrigger(prev => prev + 1);
     };
-    
-    // Auto-reinit on view switches or navigation changes - DISABLED to prevent conflicts
-    // const handleVisibilityChange = () => {
-    //   if (!document.hidden) {
-    //     console.log('[Graph Debug] View became visible, checking if reinit needed...');
-    //     setTimeout(() => {
-    //       const svg = d3.select(containerRef.current).select('svg');
-    //       const hasNodes = svg.select('.nodes-group').selectAll('.node').size() > 0;
-    //       if (nodes.length > 0 && !hasNodes) {
-    //         console.log('[Graph Debug] Missing nodes detected, forcing reinit...');
-    //         setReinitTrigger(prev => prev + 1);
-    //       }
-    //     }, 100);
-    //   }
-    // };
-    
-    // document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => {
       delete (window as any).forceGraphReinit;
     };
@@ -4604,7 +4518,6 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'R' && event.shiftKey) {
         event.preventDefault();
-        console.log('[Graph Debug] Manual reinit triggered by Shift+R');
         setReinitTrigger(prev => prev + 1);
       }
     };

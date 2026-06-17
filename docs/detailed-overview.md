@@ -2,6 +2,15 @@
 
 > This document contains the comprehensive technical documentation, architecture details, and implementation guides for GraphDone.
 
+> ⚠️ **Accuracy note:** the actual stack is **React + Vite + Tailwind + D3** (web),
+> **Node + Apollo + @neo4j/graphql** (server), **Neo4j** (graph) + **SQLite** (auth),
+> and an **MCP** server; the hosted edition runs on **Cloudflare Workers + D1** (see
+> the GraphDone-Cloud repo). Some sections below describe earlier or aspirational
+> designs (e.g. PostgreSQL, Prisma, Redis, React Native) that are **not** the current
+> implementation. For the concise current picture see
+> [guides/architecture-overview.md](./guides/architecture-overview.md) and
+> [guides/web-ui-architecture.md](./guides/web-ui-architecture.md).
+
 ## How GraphDone Works: A Visual Deep Dive
 
 ### The Core Concept: Work as a Graph

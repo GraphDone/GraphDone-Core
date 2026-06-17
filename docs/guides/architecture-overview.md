@@ -18,8 +18,7 @@ GraphDone is architected around three core principles:
 ```mermaid
 graph TB
     subgraph "Client Applications"
-        WEB[Web Application<br/>React + TypeScript + D3.js<br/>Touch-optimized UI<br/>Port 3127]
-        IOS[iPhone App<br/>SwiftUI<br/>Separate GraphDone-iOS repo]
+        WEB[Web Application<br/>React + TypeScript + D3.js<br/>Responsive desktop + mobile web<br/>Port 3127]
         CLAUDE[Claude Code MCP<br/>Natural language interface<br/>Port 3128]
     end
     
@@ -41,7 +40,6 @@ graph TB
     end
     
     WEB --> GQL
-    IOS --> GQL
     CLAUDE --> NEO4J
     GQL --> SQLITE
     GQL --> NEO4J

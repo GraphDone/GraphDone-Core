@@ -25,6 +25,9 @@ Welcome to the GraphDone documentation! This directory contains comprehensive gu
 - [Testing Guide](../tests/README.md) - **E2E testing with robust authentication system**
 - [SQLite Deployment Modes](./guides/sqlite-deployment-modes.md) - Local dev vs Docker authentication storage
 - [User Flows](./guides/user-flows.md) - How teams actually use GraphDone
+- [VM Setup (Multipass)](./guides/vm-setup.md) - Run GraphDone in a throwaway VM
+- [Git Hooks](./guides/git-hooks.md) - Pre-commit / pre-push hooks
+- More: [`docs/testing/`](./testing/) (test architecture, PR + OAuth testing) · [`docs/security/`](./security/) (TLS, OAuth) · [`docs/deployment/`](./deployment/)
 
 ### 🤖 AI Agents Documentation
 > **Start here**: [Simple AI Agent Reality Check](./simple-agent-reality.md) - **What we're actually building**
