@@ -15,7 +15,7 @@
 
 ### The Core Concept: Work as a Graph
 
-Traditional project management tools organize work in linear lists or hierarchical trees. GraphDone models work as it actually exists - a network of interconnected outcomes, dependencies, and relationships.
+Traditional management tools organize work in linear lists or hierarchical trees. GraphDone models work as it actually exists - a network of interconnected outcomes, dependencies, and relationships.
 
 ```mermaid
 graph TD

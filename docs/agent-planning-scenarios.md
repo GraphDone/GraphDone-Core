@@ -521,7 +521,7 @@ Syntax: "Let me analyze the current technical architecture..."
 
 Spark: "While Syntax checks tech readiness, I'll research the competitive landscape..."
 → Tool Call: web_search.search({
-    query: "SaaS project management tools market 2025 competitors pricing",
+    query: "SaaS management tools market 2025 competitors pricing",
     max_results: 5
   })
 → Tool Response: Top competitors: Monday.com ($8-16/user), Asana ($10-24/user), Notion ($8-16/user)

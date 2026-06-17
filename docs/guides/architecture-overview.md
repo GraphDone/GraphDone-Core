@@ -29,7 +29,7 @@ graph TB
     
     subgraph "Data Layer"
         SQLITE[(SQLite<br/>User authentication<br/>User settings & preferences<br/>Fast local storage)]
-        NEO4J[(Neo4j 5.15-community<br/>Project management graph<br/>Work items & dependencies<br/>APOC plugins<br/>Port 7687)]
+        NEO4J[(Neo4j 5.15-community<br/>Management graph<br/>Work items & dependencies<br/>APOC plugins<br/>Port 7687)]
         REDIS[(Redis 8-alpine<br/>Available in Docker<br/>Not yet integrated<br/>Port 6379)]
     end
     
@@ -234,7 +234,7 @@ GraphDone uses a hybrid database approach, optimizing each database for its spec
 - No network latency for auth operations
 
 **Neo4j: Graph Data**
-- Project management nodes (tasks, outcomes, milestones)
+- Management nodes (tasks, outcomes, milestones)
 - Dependencies and relationships between work items
 - Graph traversal and pathfinding operations
 - Complex graph queries and analytics
