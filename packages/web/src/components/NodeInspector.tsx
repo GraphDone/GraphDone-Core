@@ -14,15 +14,21 @@ type Mode = 'card' | 'contents' | 'diagram';
 interface NodeInspectorProps {
   node: any;
   onClose: () => void;
+  /** Tighter type + smaller content for the anchored on-canvas peek (PR-3). */
+  compact?: boolean;
+  /** Override the root data-testid so an anchored instance is distinguishable
+   * from the docked one when both are mounted. */
+  rootTestId?: string;
 }
 
 /**
- * Docked inspector: shows the selected node's Card (summary), Contents (its
- * description rendered as readable markdown/code), or Diagram (its sub-graph),
- * each at full legible size regardless of canvas zoom. The mode is an explicit,
- * per-node toggle — not a side effect of zooming in.
+ * Inspector: shows the selected node's Card (summary), Contents (its description
+ * rendered as readable markdown/code), or Diagram (its sub-graph), each at full
+ * legible size regardless of canvas zoom. The mode is an explicit, per-node
+ * toggle — not a side effect of zooming in. Used both docked (Workspace) and
+ * anchored on-canvas (the expand-in-place peek), the latter via `compact`.
  */
-export function NodeInspector({ node, onClose }: NodeInspectorProps) {
+export function NodeInspector({ node, onClose, compact = false, rootTestId = 'node-inspector' }: NodeInspectorProps) {
   const { descendInto } = useGraph();
   const hasSubgraph = !!node?.subgraphId;
   const [modeByNode, setModeByNode] = useState<Record<string, Mode>>({});
@@ -34,8 +40,10 @@ export function NodeInspector({ node, onClose }: NodeInspectorProps) {
 
   return (
     <div
-      data-testid="node-inspector"
-      className="flex flex-col bg-gray-900/95 backdrop-blur-sm border border-gray-700/60 rounded-xl shadow-2xl w-full sm:w-72 max-h-[60vh] sm:max-h-[70vh] overflow-hidden"
+      data-testid={rootTestId}
+      className={`flex flex-col bg-gray-900/95 backdrop-blur-md border border-gray-700/60 rounded-xl shadow-2xl overflow-hidden ${
+        compact ? 'w-full max-h-[60vh]' : 'w-full sm:w-72 max-h-[60vh] sm:max-h-[70vh]'
+      }`}
     >
       {/* Header */}
       <div className="flex items-start gap-2 p-3 border-b border-gray-700/60">
@@ -83,7 +91,7 @@ export function NodeInspector({ node, onClose }: NodeInspectorProps) {
         {mode === 'contents' && (
           <div className="p-3">
             <Suspense fallback={<div className="text-sm text-gray-500">Loading…</div>}>
-              <NodeContentRenderer content={node.description ?? ''} />
+              <NodeContentRenderer content={node.description ?? ''} compact={compact} />
             </Suspense>
           </div>
         )}
