@@ -41,8 +41,24 @@ export default defineConfig({
       // The showcase tour and the local-VLM visual eval run in their own
       // capture-heavy projects below; keep them out of the default (fast)
       // project so the smoke gate stays quick.
-      testIgnore: [/showcase\.spec\.ts/, /visual-vlm\.spec\.ts/],
+      testIgnore: [/showcase\.spec\.ts/, /visual-vlm\.spec\.ts/, /feature-matrix\.spec\.ts/, /matrix\.setup\.ts/],
       use: { ...devices['Desktop Chrome'] },
+    },
+
+    /* The massive resolution × feature report: every screen + key feature,
+     * screenshotted + audited at every viewport, into the Playwright HTML report.
+     * Local + heavy; run via `npm run report:matrix`. One shared login (the
+     * matrix-setup dependency) feeds storageState so the ~100 cells don't re-login. */
+    {
+      name: 'matrix-setup',
+      testMatch: /matrix\.setup\.ts/,
+      use: { ...devices['Desktop Chrome'] },
+    },
+    {
+      name: 'matrix',
+      testMatch: /feature-matrix\.spec\.ts/,
+      dependencies: ['matrix-setup'],
+      use: { ...devices['Desktop Chrome'], storageState: 'test-artifacts/matrix-auth.json', screenshot: 'on' },
     },
 
     /* Showcase: records web-friendly .webm video + full-page screenshots of
