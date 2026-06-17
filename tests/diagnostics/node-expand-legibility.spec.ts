@@ -111,9 +111,6 @@ test.describe('node expand-in-place + legibility floor @geometry', () => {
     await expect(panel, 'peek stays anchored through zoom').toBeVisible();
     await page.keyboard.press('Escape');
     await expect(panel, 'Esc closes the peek').toBeHidden({ timeout: 5000 });
-
-    // eslint-disable-next-line no-console
-    console.log('[expand] ok — anchored Card/Contents/Diagram peek verified');
   });
 
   test('PR-4: title stays above the on-screen legibility floor when zoomed out', async ({ page }) => {
@@ -125,9 +122,7 @@ test.describe('node expand-in-place + legibility floor @geometry', () => {
     // Zoom OUT into the band where the native (un-counter-scaled) title would be
     // sub-readable (k < ~0.857) but the label is still on screen.
     const k = await zoomOutInto(page, 0.45, 0.7);
-    // eslint-disable-next-line no-console
-    console.log('[legibility] zoomed to k=' + k.toFixed(3));
-    expect(k, 'reached the counter-scale band (k < 0.857)').toBeLessThan(0.857);
+    expect(k, `reached the counter-scale band (k=${k.toFixed(3)} < 0.857)`).toBeLessThan(0.857);
 
     const probe = await page.evaluate(() => {
       const texts = [...document.querySelectorAll('.graph-container svg .node-title-text')] as SVGTextElement[];
@@ -151,9 +146,6 @@ test.describe('node expand-in-place + legibility floor @geometry', () => {
     // (e.g. 14px * 0.5 = 7px).
     expect(probe.screenHeight, `title on-screen height >= floor (${LEGIBLE_FLOOR_PX}px)`).toBeGreaterThanOrEqual(LEGIBLE_FLOOR_PX - 3);
     // Zoomed into the band, the counter-scale should be actively boosting (> 1).
-    expect(probe.groupScale, 'legibility counter-scale is engaged when zoomed out').toBeGreaterThan(1);
-
-    // eslint-disable-next-line no-console
-    console.log('[legibility] title screenHeight=' + Math.round(probe.screenHeight) + 'px, groupScale=' + probe.groupScale);
+    expect(probe.groupScale, `legibility counter-scale engaged when zoomed out (h=${Math.round(probe.screenHeight)}px, scale=${probe.groupScale})`).toBeGreaterThan(1);
   });
 });
