@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import {
   X, User, Flag, Edit3, Save, ChevronDown, Plus, Unlink, Trash2,
   GitBranch, ArrowRight, ArrowLeft, Ban, Link2, Folder, Split, Copy, Shield, Bookmark, Package,
@@ -513,9 +514,9 @@ export function WorkItemDetailsModal({
     return getRelationshipIconElement(type as RelationshipType, "h-4 w-4");
   };
 
-  return (
+  return createPortal((
     <div
-      className="fixed inset-0 bg-black/70 backdrop-blur-lg z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 bg-black/70 backdrop-blur-lg z-50 flex items-stretch sm:items-center justify-center p-0 sm:p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
@@ -528,7 +529,7 @@ export function WorkItemDetailsModal({
       <div
         ref={modalRef}
         tabIndex={-1}
-        className="relative bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 border border-gray-600/50 shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl animate-in fade-in zoom-in-95 duration-300 ring-1 ring-white/20 overflow-hidden focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+        className="relative bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 border border-gray-600/50 shadow-2xl w-full sm:max-w-3xl h-full sm:h-auto sm:max-h-[90vh] overflow-y-auto rounded-none sm:rounded-2xl animate-in fade-in zoom-in-95 duration-300 ring-1 ring-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Gradient accent line at top */}
@@ -542,8 +543,8 @@ export function WorkItemDetailsModal({
           }}></div>
         </div>
 
-        {/* Title Header */}
-        <div className="relative px-4 py-3 bg-gradient-to-r from-gray-800/40 via-gray-700/30 to-gray-800/40 border-b border-gray-600/30">
+        {/* Title Header — sticky so Save/Close stay reachable while scrolling */}
+        <div className="sticky top-0 z-20 px-4 py-3 bg-gradient-to-r from-gray-900/95 via-gray-800/95 to-gray-900/95 backdrop-blur-md border-b border-gray-600/30">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <div className="p-3 bg-gradient-to-br from-teal-300/60 via-magenta-400/50 to-magenta-300/40 rounded-2xl border border-magenta-200/50">
@@ -693,7 +694,7 @@ export function WorkItemDetailsModal({
         </div>
 
         {/* Enhanced Content */}
-        <div className="flex px-3 py-2 gap-3 bg-gradient-to-br from-gray-800/20 via-transparent to-gray-900/20">
+        <div className="flex flex-col md:flex-row px-3 py-2 gap-3 bg-gradient-to-br from-gray-800/20 via-transparent to-gray-900/20">
           {/* Enhanced Left Column - Main Content */}
           <div className="flex-1">
           {/* Enhanced Title - Always Editable */}
@@ -1071,7 +1072,7 @@ export function WorkItemDetailsModal({
           </div>
 
           {/* Enhanced Right Column - Action Buttons */}
-          <div className="w-36 flex-shrink-0 relative">
+          <div className="w-full md:w-36 flex-shrink-0 relative">
             <h3 className="text-base font-medium text-gray-300 mb-1 flex items-center">
               <div className="p-1 bg-gradient-to-br from-indigo-500/20 to-blue-600/20 rounded-lg mr-1 border border-indigo-500/30">
                 <Rocket className="h-3 w-3 text-indigo-400" />
@@ -1286,5 +1287,5 @@ export function WorkItemDetailsModal({
         </div>
       </div>
     </div>
-  );
+  ), document.body);
 }
