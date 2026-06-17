@@ -183,6 +183,11 @@ jobs:
         env:
           TEST_URL: http://localhost:3127
           CI: true
+      - name: Mobile UI audit (layout / contrast / dialogs across every screen)
+        run: npm run test:mobile
+        env:
+          TEST_URL: http://localhost:3127
+          CI: true
       - name: Living-graph effects render (LIVE-*)
         run: npx playwright test tests/e2e/living-graph.spec.ts --project="GraphDone-Core/dev-neo4j/chromium" --reporter=line
         env:

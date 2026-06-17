@@ -351,7 +351,9 @@ export function AdminUserManagement() {
           </h2>
         </div>
 
-        <div className="flex-1 overflow-auto">
+        {/* Admin user table: a dense data grid that scrolls horizontally on a
+            phone by design (power-user surface), so it's exempt from the audit. */}
+        <div className="flex-1 overflow-auto" data-audit-scroll-ok>
           <table className="min-w-full divide-y divide-gray-700">
             <thead className="bg-gray-900">
               <tr>
