@@ -1,6 +1,6 @@
 # GraphDone
 
-> Project management for teams who think differently. Coordinate through dependencies and outcomes, not hierarchies and top-down control.
+> Management for teams who think differently. Coordinate through dependencies and outcomes, not hierarchies and top-down control.
 
 ![GraphDone's living graph — priority glow, breathing nodes, energy flowing along dependencies](./docs/graphdone_ui.png)
 
@@ -12,7 +12,7 @@
 
 ## What is GraphDone?
 
-GraphDone reimagines project management as a collaborative graph where work flows through natural dependencies rather than artificial hierarchies. It's designed for high-quality individual contributors who thrive on autonomy, teams that include AI agents, and organizations ready to embrace democratic coordination.
+GraphDone reimagines management as a collaborative graph where work flows through natural dependencies rather than artificial hierarchies. It's designed for high-quality individual contributors who thrive on autonomy, teams that include AI agents, and organizations ready to embrace democratic coordination.
 
 **Key Features:**
 - 🌊 **A living graph** - in-progress work breathes, priority glows, energy flows along dependencies, completed work celebrates. The graph feels inhabited, not diagrammed

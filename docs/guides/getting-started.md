@@ -1,6 +1,6 @@
 # Getting Started with GraphDone
 
-Welcome to GraphDone! This guide will help you set up and start using GraphDone for your team's project management needs.
+Welcome to GraphDone! This guide will help you set up and start using GraphDone for your team's management needs.
 
 ## Prerequisites
 
