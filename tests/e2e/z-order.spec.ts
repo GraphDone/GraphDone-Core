@@ -51,7 +51,8 @@ async function firstInViewport(page: Page, selector: string) {
     const el = loc.nth(i);
     if (!(await el.isVisible().catch(() => false))) continue;
     const box = await el.boundingBox().catch(() => null);
-    if (box && box.x >= 0 && box.y >= 0 && box.x + box.width <= vp.width + 1 && box.y + box.height <= vp.height + 1) return el;
+    // A few px of slack so sub-pixel/CI-rendering overflow doesn't silently skip a real trigger.
+    if (box && box.x >= -4 && box.y >= -4 && box.x + box.width <= vp.width + 4 && box.y + box.height <= vp.height + 4) return el;
   }
   return null;
 }
@@ -60,6 +61,9 @@ async function firstInViewport(page: Page, selector: string) {
 async function assertOnTop(page: Page, selector: string, label: string) {
   const r = await auditOnTop(page, selector);
   expect(r.found, `${label}: overlay present (${selector})`).toBe(true);
+  // A collapsed (zero-size) or off-screen overlay must NOT count as "on top".
+  expect(r.empty, `${label}: overlay has real size (not collapsed)`).toBeFalsy();
+  expect(r.fitsViewport, `${label}: overlay fits within the viewport`).toBe(true);
   expect(r.coveredBy, `${label} is covered by: ${fmt(r.coveredBy)}`).toEqual([]);
   return r;
 }
@@ -108,7 +112,7 @@ test.describe('z-order: overlays render on top @zorder', () => {
           if (!(await btn.isVisible().catch(() => false))) continue;
           await btn.click();
           await page.waitForTimeout(400);
-          await assertOnTop(page, '.absolute.top-full.z-50', `filter "${label}" dropdown`);
+          await assertOnTop(page, '[data-testid="filter-dropdown"]', `filter "${label}" dropdown`);
           await btn.click().catch(() => {}); // toggle closed before the next one
           await page.waitForTimeout(200);
           tested++;
