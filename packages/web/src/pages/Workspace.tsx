@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Share2, Users, Table, Activity, Network, CreditCard, Columns, CalendarDays, GanttChartSquare, LayoutDashboard, Database, AlertTriangle, Map, X, Minimize2, Edit3, Trash2, FolderPlus, ChevronLeft, ChevronRight, Lock, Unlock } from 'lucide-react';
+import { Plus, Share2, Users, Table, Activity, Network, CreditCard, Columns, CalendarDays, GanttChartSquare, LayoutDashboard, Database, AlertTriangle, Map, X, Minimize2, Maximize2, Edit3, Trash2, FolderPlus, ChevronLeft, ChevronRight, Lock, Unlock } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useQuery } from '@apollo/client';
 import { SafeGraphVisualization } from '../components/SafeGraphVisualization';
@@ -437,6 +437,18 @@ export function Workspace() {
            >
              {graphLocked ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
              {graphLocked ? 'Locked' : 'Editing'}
+           </button>
+           {/* Zoom-extents: frame every node, independent of the camera-restore
+               state. Sits under the lock toggle on phones; top-left on desktop,
+               where the right corner is taken by the docked inspector. */}
+           <button
+             data-testid="graph-zoom-extents"
+             onClick={() => (window as any).triggerZoomToFit?.()}
+             className="absolute top-16 right-3 md:top-3 md:left-3 md:right-auto z-40 flex items-center justify-center w-10 h-10 rounded-full shadow-lg backdrop-blur-sm border border-gray-600 bg-gray-900/90 text-gray-200 hover:text-white hover:border-green-400 transition-colors"
+             title="Zoom to fit — frame all nodes"
+             aria-label="Zoom to fit — frame all nodes"
+           >
+             <Maximize2 className="h-4 w-4" />
            </button>
            {inspectorNode && (
              <div className="absolute z-40 inset-x-3 bottom-3 md:inset-x-auto md:bottom-auto md:top-3 md:right-3">
