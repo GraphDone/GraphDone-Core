@@ -299,7 +299,7 @@ export function Signup() {
             <span className="ml-3 sm:ml-4 text-4xl sm:text-5xl font-bold bg-gradient-to-r from-teal-400 via-cyan-400 to-blue-500 bg-clip-text text-transparent drop-shadow-2xl tracking-tight">GraphDone</span>
           </Link>
           <h1 className="text-3xl font-bold text-gray-100 mb-3">Create Your Account</h1>
-          <p className="text-gray-400 text-lg">Join the decentralized project management revolution</p>
+          <p className="text-gray-400 text-lg">Join the decentralized management revolution</p>
         </div>
 
         {/* Email Verification Screen or Signup Form */}

@@ -4,7 +4,7 @@
 
 ## The Problem We're Solving
 
-Traditional project management tools assume people work best when told what to do, when to do it, and how to do it. They optimize for management visibility and control rather than human autonomy and natural work patterns. This creates friction for high-quality individual contributors who thrive on intrinsic motivation, creative problem-solving, and peer collaboration.
+Traditional management tools assume people work best when told what to do, when to do it, and how to do it. They optimize for management visibility and control rather than human autonomy and natural work patterns. This creates friction for high-quality individual contributors who thrive on intrinsic motivation, creative problem-solving, and peer collaboration.
 
 These tools particularly fail people who think differently - those with pathological demand avoidance, autism, ADHD, or anyone who experiences traditional hierarchical structures as oppressive rather than helpful. The result is talented individuals either struggling within systems designed against their natural patterns, or being excluded entirely from collaborative work.
 
@@ -141,8 +141,8 @@ We envision a world where:
 - **Teams self-organize** around shared outcomes
 - **Technology amplifies** human agency rather than replacing it
 
-GraphDone is our contribution to this future - a tool that respects how people actually think, work, and collaborate while providing the coordination benefits of modern project management.
+GraphDone is our contribution to this future - a tool that respects how people actually think, work, and collaborate while providing the coordination benefits of modern management.
 
 From todo lists to todone lists. From directives to explorations. From control to connection.
 
-This is project management for people who think differently, built by people who think differently, in service of a more inclusive and effective future of work.
+This is management for people who think differently, built by people who think differently, in service of a more inclusive and effective future of work.

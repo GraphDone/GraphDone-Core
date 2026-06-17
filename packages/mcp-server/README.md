@@ -11,7 +11,7 @@ This MCP (Model Context Protocol) server acts as a bridge between Claude Code an
 
 ## What You Get
 
-Transform how you interact with your project management graph:
+Transform how you interact with your management graph:
 
 - 🔍 **Smart Browsing**: Query nodes by type, status, contributor, priority, or search terms
 - ➕ **Easy Creation**: Create tasks, epics, bugs, and features through conversation
