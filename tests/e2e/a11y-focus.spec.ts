@@ -26,24 +26,31 @@ const focusWithinDialog = (page: Page) =>
     return !!d && !!document.activeElement && d.contains(document.activeElement);
   });
 
-/** Focus the first focusable in the dialog, then Tab `presses` times; focus must
- *  stay inside the dialog the whole time (the trap). Returns true if it never escaped. */
-async function tabStaysTrapped(page: Page, presses = 14): Promise<boolean> {
-  await page.evaluate((sel) => {
+async function focusEdge(page: Page, which: 'first' | 'last') {
+  await page.evaluate(({ sel, which }) => {
     const d = document.querySelector('[role="dialog"][aria-modal="true"]');
-    const f = d?.querySelector(sel) as HTMLElement | null;
-    f?.focus();
-  }, FOCUSABLE);
-  for (let i = 0; i < presses; i++) {
-    await page.keyboard.press('Tab');
-    if (!(await focusWithinDialog(page))) return false;
-  }
-  // and a few back-tabs
-  for (let i = 0; i < 4; i++) {
-    await page.keyboard.press('Shift+Tab');
-    if (!(await focusWithinDialog(page))) return false;
-  }
-  return true;
+    if (!d) return;
+    const items = Array.from(d.querySelectorAll(sel)).filter(
+      (e) => (e as HTMLElement).getClientRects().length > 0
+    ) as HTMLElement[];
+    (which === 'first' ? items[0] : items[items.length - 1])?.focus();
+  }, { sel: FOCUSABLE, which });
+}
+
+/**
+ * Prove the trap AT THE BOUNDARY: Tab from the last focusable must wrap back
+ * inside the dialog, and Shift+Tab from the first must wrap to the last. This
+ * is the case that fails without the trap — pressing Tab a fixed number of
+ * times never reaches the edge on a modal with many focusables, so it would
+ * pass even with the trap removed.
+ */
+async function tabStaysTrapped(page: Page): Promise<boolean> {
+  await focusEdge(page, 'last');
+  await page.keyboard.press('Tab');
+  if (!(await focusWithinDialog(page))) return false;
+  await focusEdge(page, 'first');
+  await page.keyboard.press('Shift+Tab');
+  return focusWithinDialog(page);
 }
 
 test.describe('modal a11y: role + focus trap + restore @a11y', () => {
@@ -93,13 +100,19 @@ test.describe('modal a11y: role + focus trap + restore @a11y', () => {
       await openWorkspace(page, 'cards');
       const fab = page.locator('[aria-label="New work item"]');
       if (!(await fab.isVisible().catch(() => false))) test.skip(true, 'no create FAB');
+      // Focus the trigger first so the "restore to trigger" expectation is deterministic.
+      await fab.focus();
       await fab.click();
       await page.waitForTimeout(1000);
 
       const dialog = page.locator('[role="dialog"][aria-modal="true"]');
       await expect(dialog, 'create-work-item exposed as a modal dialog').toBeVisible();
-      // Focus moved into the modal on open.
+      // Focus moved INTO the modal (and off the trigger) on open.
       expect(await focusWithinDialog(page), 'focus moved into the modal on open').toBe(true);
+      const onFabWhileOpen = await page.evaluate(
+        () => document.activeElement?.getAttribute('aria-label') === 'New work item'
+      );
+      expect(onFabWhileOpen, 'focus left the trigger while the modal is open').toBe(false);
       // Tab is trapped within it.
       expect(await tabStaysTrapped(page), 'Tab focus stays within the create modal').toBe(true);
 

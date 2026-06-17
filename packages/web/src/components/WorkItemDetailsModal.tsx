@@ -106,12 +106,11 @@ export function WorkItemDetailsModal({
   useEffect(() => {
     if (!isOpen) return;
 
+    // Escape is handled centrally by useDialog (defers while typing in a field,
+    // and keeps the dialog-manager's "close top-most" stack coherent). Here we
+    // only add the Ctrl/Cmd+S save shortcut.
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation();
-        e.preventDefault();
-        onClose();
-      } else if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.stopPropagation();
         e.preventDefault();
         if (handleSaveRef.current) {

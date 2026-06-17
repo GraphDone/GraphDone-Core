@@ -2,15 +2,19 @@ import { RefObject, useEffect } from 'react';
 
 /**
  * Accessibility primitive for modal dialogs. When `isOpen`, it:
- *  - marks the container as role="dialog" aria-modal="true" (keeps an existing
- *    role if one is already set) and labels it (aria-label / aria-labelledby);
- *  - moves focus into the dialog on open (first focusable, or the container);
- *  - traps Tab / Shift+Tab so keyboard focus cycles WITHIN the dialog instead of
- *    leaking to the page behind it;
- *  - restores focus to whatever was focused before it opened (the trigger) on
- *    close, so keyboard users land back where they were.
+ *  - marks the container role="dialog" aria-modal="true" (keeps an existing role)
+ *    and gives it an accessible name (aria-label / aria-labelledby);
+ *  - moves focus into the dialog on open (the first form field if there is one,
+ *    else the first focusable, else the container);
+ *  - traps Tab / Shift+Tab so KEYBOARD focus cycles within the dialog instead of
+ *    tabbing out to the page behind it;
+ *  - restores focus to the trigger on close (only when focus fell back to <body>,
+ *    so it never fights a close that deliberately moved focus elsewhere).
  *
- * Pair it with `useDialog` (Escape / click-outside) for the full contract.
+ * Scope note: this is a Tab-focus trap + aria-modal hint. It does NOT make the
+ * background `inert`, so it doesn't block mouse clicks or an AT virtual cursor
+ * from reaching content behind the dialog — pair it with `useDialog` (Escape /
+ * click-outside) and rely on the visual backdrop for pointer dismissal.
  */
 
 const FOCUSABLE = [
@@ -19,6 +23,7 @@ const FOCUSABLE = [
   'input:not([disabled])',
   'select:not([disabled])',
   'textarea:not([disabled])',
+  '[contenteditable]:not([contenteditable="false"])',
   '[tabindex]:not([tabindex="-1"])',
 ].join(',');
 
@@ -34,8 +39,14 @@ interface ModalA11yOptions {
 }
 
 function isVisible(el: HTMLElement): boolean {
-  return el.offsetWidth > 0 || el.offsetHeight > 0 || el === document.activeElement;
+  if (el === document.activeElement) return true;
+  if (el.getClientRects().length === 0) return false;
+  const cs = getComputedStyle(el);
+  return cs.visibility !== 'hidden' && cs.display !== 'none';
 }
+
+const isField = (el: HTMLElement) =>
+  /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) && (el as HTMLInputElement).type !== 'hidden';
 
 export function useModalA11y(ref: RefObject<HTMLElement>, opts: ModalA11yOptions): void {
   const { isOpen, label, labelledBy, initialFocus = true } = opts;
@@ -56,11 +67,13 @@ export function useModalA11y(ref: RefObject<HTMLElement>, opts: ModalA11yOptions
 
     let raf = 0;
     if (initialFocus) {
-      // Defer past paint so portaled inputs/buttons exist before we grab focus.
+      // Defer past paint so portaled fields/buttons exist before we grab focus,
+      // and prefer the first real form field over an icon-only Close button.
       raf = requestAnimationFrame(() => {
         const items = focusables();
-        if (items[0]) {
-          items[0].focus({ preventScroll: true });
+        const target = items.find(isField) || items[0];
+        if (target) {
+          target.focus({ preventScroll: true });
         } else {
           if (!el.getAttribute('tabindex')) el.setAttribute('tabindex', '-1');
           el.focus({ preventScroll: true });
@@ -94,7 +107,12 @@ export function useModalA11y(ref: RefObject<HTMLElement>, opts: ModalA11yOptions
     return () => {
       if (raf) cancelAnimationFrame(raf);
       el.removeEventListener('keydown', onKeyDown);
+      // Restore focus to the trigger ONLY if focus dropped to <body> as the
+      // dialog unmounted — never override a close that intentionally moved focus.
+      const active = document.activeElement as HTMLElement | null;
+      const focusDropped = !active || active === document.body;
       if (
+        focusDropped &&
         previouslyFocused &&
         previouslyFocused !== document.body &&
         document.contains(previouslyFocused) &&

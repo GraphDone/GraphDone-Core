@@ -374,6 +374,7 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
             </div>
             <button
               onClick={onClose}
+              aria-label="Close"
               className="p-2 text-gray-400 hover:text-white hover:bg-red-600 rounded-lg transition-all duration-200 hover:scale-110"
             >
               <X className="h-5 w-5" />
