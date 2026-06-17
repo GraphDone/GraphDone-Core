@@ -79,7 +79,7 @@ const GET_SYSTEM_SETTINGS = gql`
   }
 `;
 
-export function Signin() {
+export function Signin({ initialMagicLink = false }: { initialMagicLink?: boolean } = {}) {
   const navigate = useNavigate();
   const { login: setAuthUser } = useAuth();
   const [searchParams] = useSearchParams();
@@ -93,7 +93,7 @@ export function Signin() {
   const [magicLinkCaptchaPayload, setMagicLinkCaptchaPayload] = useState<string | null>(null);
 
   const [showPassword, setShowPassword] = useState(false);
-  const [useMagicLink, setUseMagicLink] = useState(false);
+  const [useMagicLink, setUseMagicLink] = useState(initialMagicLink);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
   const [magicLinkLoading, setMagicLinkLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -581,6 +581,9 @@ export function Signin() {
                   </p>
                   <p className="text-xs text-teal-300/60 text-center">
                     📂 Don't see it? Check your spam folder after 3 minutes
+                  </p>
+                  <p className="text-xs text-teal-300/80 text-center font-medium">
+                    ✅ Once you click it you'll stay signed in on this device — no need to log in again
                   </p>
                 </div>
                 

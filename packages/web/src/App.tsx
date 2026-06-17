@@ -8,7 +8,6 @@ import { Settings } from './pages/Settings';
 import { Admin } from './pages/Admin';
 import { Backend } from './pages/Backend';
 import { Signin } from './pages/Signin';
-import { Signup } from './pages/Signup';
 import { ForgotPassword } from './pages/ForgotPassword';
 import { ResetPassword } from './pages/ResetPassword';
 import { InteractiveGraphVisualization } from './components/InteractiveGraphVisualization';
@@ -86,7 +85,9 @@ function AuthenticatedApp() {
       <Routes>
         <Route path="/" element={<Signin />} />
         <Route path="/login" element={<Signin />} />
-        <Route path="/signup" element={<Signup />} />
+        {/* Passwordless: signing up and signing in are the same action (email → link →
+            account, new or returning). /signup opens the magic-link flow directly. */}
+        <Route path="/signup" element={<Signin initialMagicLink />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="*" element={<Navigate to="/" replace />} />
