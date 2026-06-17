@@ -52,12 +52,13 @@ import { spawnCelebration } from '../lib/celebration';
 import { buildNeighborhood } from '../lib/graphAdjacency';
 import { UndoStack } from '../lib/undoStack';
 
-// LOD thresholds for different zoom levels
+// Level-of-detail zoom thresholds (single source of truth): below each scale the
+// matching per-node detail is hidden, for legibility and paint cost. (Values are
+// the ones the graph actually ran on — a stale shadowing duplicate was removed.)
 const LOD_THRESHOLDS = {
-  VERY_FAR: 0.1,
-  FAR: 0.3,
-  MEDIUM: 0.6,
-  CLOSE: 1.0,
+  VERY_FAR: 0.3, // below: viewport-cull, basic shapes only
+  FAR: 0.5,      // below: hide type text + edit/grow/expand/descend icons
+  CLOSE: 0.6,    // below: hide descriptions, edge labels, sub-graph counts
 };
 
 // Above this node count a graph is "dense": the continuous living-graph effects
@@ -795,15 +796,6 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // Window will be controlled manually by user interactions
   }, [selectedNodes.size, editingEdge]);
   
-  // Level of detail thresholds
-  const LOD_THRESHOLDS = {
-    VERY_FAR: 0.3,    // Only show basic shapes
-    FAR: 0.5,         // Add node icons  
-    MEDIUM: 0.8,      // Add node titles
-    CLOSE: 0.6,       // Add edge labels (earlier)
-    VERY_CLOSE: 2.0   // Full detail
-  };
-
   // Function to save node position to database
   const saveNodePosition = useCallback(async (nodeId: string, x: number, y: number) => {
     try {

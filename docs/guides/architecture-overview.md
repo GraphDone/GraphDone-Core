@@ -8,6 +8,11 @@ GraphDone is architected around three core principles:
 2. **Real-Time First**: Changes propagate immediately to all participants
 3. **Democratic Coordination**: Priority emerges from community validation, not top-down assignment
 
+> **Client / UI layer:** for the web app's structure (view system, graph canvas,
+> mobile shell, node inspector) see [web-ui-architecture.md](./web-ui-architecture.md).
+> Some sections below describe the forward-looking server/infra target, not all of
+> which is wired up today.
+
 ## Current Architecture (v0.3.1-alpha)
 
 ```mermaid
