@@ -422,10 +422,10 @@ export function Backend() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'healthy': return 'text-green-600';
-      case 'degraded': return 'text-yellow-600';
-      case 'down': return 'text-red-600';
-      default: return 'text-gray-600';
+      case 'healthy': return 'text-green-400';
+      case 'degraded': return 'text-yellow-400';
+      case 'down': return 'text-red-400';
+      default: return 'text-gray-400';
     }
   };
 
@@ -966,7 +966,7 @@ export function Backend() {
                       setDebugInfo(debug);
                     }
                   }}
-                  className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center justify-center space-x-2"
+                  className="bg-yellow-500 hover:bg-yellow-600 text-gray-900 px-4 py-2 rounded-lg transition-colors flex items-center justify-center space-x-2"
                 >
                   <AlertCircle className="h-4 w-4" />
                   <span>Check Data</span>
