@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useDialog } from '../hooks/useDialogManager';
+import { useModalA11y } from '../hooks/useModalA11y';
 import { X, Folder, FolderOpen, Plus, Copy, FileText } from 'lucide-react';
 import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -14,6 +15,8 @@ interface CreateGraphModalProps {
 
 export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraphModalProps) {
   useDialog(isOpen, onClose);
+  const panelRef = useRef<HTMLDivElement>(null);
+  useModalA11y(panelRef, { isOpen, label: 'Create new graph' });
   const { currentTeam, currentUser } = useAuth();
   const { createGraph, duplicateGraph, availableGraphs, isCreating } = useGraph();
   const { showSuccess, showError } = useNotifications();
@@ -219,7 +222,7 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
         />
 
         {/* Modern eye-catching modal */}
-        <div className="inline-block w-full max-w-2xl p-0 my-8 overflow-hidden text-left align-middle transition-all transform bg-gradient-to-br from-gray-800/98 via-gray-850/98 to-gray-900/98 backdrop-blur-2xl shadow-2xl rounded-2xl border border-gray-600/30 animate-in slide-in-from-bottom-4 duration-300 relative">
+        <div ref={panelRef} className="inline-block w-full max-w-2xl p-0 my-8 overflow-hidden text-left align-middle transition-all transform bg-gradient-to-br from-gray-800/98 via-gray-850/98 to-gray-900/98 backdrop-blur-2xl shadow-2xl rounded-2xl border border-gray-600/30 animate-in slide-in-from-bottom-4 duration-300 relative">
           {/* Animated gradient border */}
           <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-green-500/20 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-purple-500 via-pink-500 to-green-500"></div>
