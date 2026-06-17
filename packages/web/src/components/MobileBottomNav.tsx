@@ -4,7 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import {
   CreditCard, Network, MoreHorizontal, LayoutDashboard, Table, Columns,
   GanttChartSquare, CalendarDays, Activity, Brain, Settings as SettingsIcon,
-  Shield, Server, Bot, BarChart3,
+  Shield, Server, Bot, BarChart3, LogOut, UserCircle,
 } from 'lucide-react';
 import { useViewMode, ViewMode } from '../contexts/ViewModeContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -16,7 +16,7 @@ import { useAuth } from '../contexts/AuthContext';
  */
 export function MobileBottomNav() {
   const { viewMode, setViewMode } = useViewMode();
-  const { currentUser } = useAuth();
+  const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -120,6 +120,24 @@ export function MobileBottomNav() {
                   <span className="text-xs font-medium text-center leading-tight">{label}</span>
                 </button>
               ))}
+            </div>
+
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mt-4 mb-2 px-1">Account</h3>
+            <div className="flex items-center justify-between gap-2 rounded-xl border border-gray-700/60 bg-gray-800/60 p-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <UserCircle className="h-7 w-7 text-gray-400 flex-shrink-0" />
+                <div className="min-w-0">
+                  <div className="text-sm font-medium text-gray-100 truncate">{currentUser?.name || currentUser?.username || 'Account'}</div>
+                  {currentUser?.role && <div className="text-[11px] text-gray-400">{currentUser.role}</div>}
+                </div>
+              </div>
+              <button
+                onClick={() => { logout(); setMoreOpen(false); }}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-600/20 border border-red-500/30 text-red-300 text-sm font-medium active:bg-red-600/40 flex-shrink-0"
+              >
+                <LogOut className="h-4 w-4" />
+                Sign out
+              </button>
             </div>
           </div>
         </div>,

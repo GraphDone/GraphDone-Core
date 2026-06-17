@@ -396,9 +396,9 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
             </div>
 
             {/* Filter Dropdowns — 2-up grid on phones so all filters fit; inline on desktop */}
-            <div className="grid grid-cols-2 gap-2 sm:flex sm:gap-3">
+            <div className="flex gap-2 sm:gap-3">
               {/* Type Filter */}
-              <div className="relative" ref={typeDropdownRef}>
+              <div className="hidden sm:block relative" ref={typeDropdownRef}>
                 <button
                   type="button"
                   onClick={() => setIsTypeDropdownOpen(!isTypeDropdownOpen)}
@@ -544,7 +544,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
               </div>
 
               {/* Priority Filter */}
-              <div className="relative" ref={priorityDropdownRef}>
+              <div className="hidden sm:block relative" ref={priorityDropdownRef}>
                 <button
                   type="button"
                   onClick={() => setIsPriorityDropdownOpen(!isPriorityDropdownOpen)}
@@ -616,7 +616,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
               </div>
 
               {/* Contributors Filter */}
-              <div className="relative" ref={contributorDropdownRef}>
+              <div className="hidden sm:block relative" ref={contributorDropdownRef}>
                 <button
                   type="button"
                   onClick={() => setIsContributorDropdownOpen(!isContributorDropdownOpen)}

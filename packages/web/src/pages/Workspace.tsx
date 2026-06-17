@@ -81,14 +81,14 @@ export function Workspace() {
 
   return (
     <div className="h-full flex flex-col">
-      {/* Header with Graph Context */}
-      <div className="bg-gray-900/30 backdrop-blur-md border-b border-gray-700/30 px-3 py-2 sm:px-6 sm:py-4">
+      {/* Header with Graph Context — tablet/desktop only; phones use the Layout
+          top bar (project selector) + the bottom nav, so this band is hidden there. */}
+      <div className="hidden md:block bg-gray-900/30 backdrop-blur-md border-b border-gray-700/30 px-3 py-2 sm:px-6 sm:py-4">
         {/* Responsive Layout Container */}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2 sm:gap-4">
-          
-          {/* Left Section: Graph Selector — desktop only; on mobile the project
-              selector lives in the global top bar (Layout) to keep the header to 2 rows. */}
-          <div className="hidden lg:block flex-1 min-w-0 lg:order-1 max-w-lg">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 sm:gap-4">
+
+          {/* Left Section: Graph Selector */}
+          <div className="flex-1 min-w-0 md:order-1 max-w-lg">
             <div className="flex items-center space-x-4 h-full">
               {/* Title & Version - Compact */}
               <div className="flex flex-col justify-center">
@@ -122,7 +122,7 @@ export function Workspace() {
 
           {/* Center Section: View Mode Buttons — desktop/tablet only. Phones use the
               bottom tab bar (List / Graph / More) instead of this strip. */}
-          <div className="hidden md:flex justify-start sm:justify-center lg:order-2 overflow-x-auto no-scrollbar -mx-3 px-3 sm:mx-0 sm:px-0">
+          <div className="flex justify-start lg:justify-center md:order-2 overflow-x-auto no-scrollbar -mx-3 px-3 sm:mx-0 sm:px-0">
             <div className="flex flex-nowrap bg-gray-700/50 backdrop-blur-sm rounded-lg p-1.5 sm:p-2 gap-1 border border-gray-600/50">
               <button
                 onClick={() => setViewMode('graph')}
@@ -241,7 +241,7 @@ export function Workspace() {
 
           {/* Right Section: Status and Actions — hidden on mobile (the hamburger
               handles nav there); these chips otherwise eat the small-screen width. */}
-          <div className="hidden md:flex flex-col lg:flex-row lg:items-center gap-3 lg:order-3">
+          <div className="flex flex-col lg:flex-row lg:items-center gap-3 md:order-3">
             {/* Data-store status (provider-agnostic — keyed off the GraphQL API, which is
                 the actual data layer; the backing store may be D1, Neo4j, etc.) */}
             <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-all cursor-help ${
