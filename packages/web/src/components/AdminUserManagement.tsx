@@ -661,7 +661,7 @@ export function AdminUserManagement() {
       {/* Create User Modal */}
       {showCreateUser && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50">
-          <div className="bg-gray-800 border border-gray-700 rounded-lg p-6 max-w-md w-full mx-4">
+          <div data-testid="admin-create-user-modal" className="bg-gray-800 border border-gray-700 rounded-lg p-6 max-w-md w-full mx-4">
             <div className="flex items-center mb-4">
               <Plus className="h-6 w-6 text-green-400 mr-3" />
               <h3 className="text-lg font-semibold text-gray-100">Create New User</h3>

@@ -90,7 +90,7 @@ export function UserSelector({ isCollapsed = false }: UserSelectorProps) {
 
       {/* Dropdown menu */}
       {isOpen && (
-        <div className={`absolute top-full mt-2 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-50 max-h-96 overflow-hidden ${
+        <div data-testid="user-menu-dropdown" className={`absolute top-full mt-2 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-50 max-h-96 overflow-hidden ${
           isCollapsed ? 'left-0 w-64' : 'left-0 right-0'
         }`}>
           {/* Tabs */}

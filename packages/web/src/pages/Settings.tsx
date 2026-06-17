@@ -52,17 +52,19 @@ export function Settings() {
                     <p className="text-sm text-gray-400 mb-2">
                       Auto adapts to your device and network — effects scale down before responsiveness ever does. Pin a tier if auto guesses wrong.
                     </p>
-                    <CustomDropdown
-                      options={[
-                        { value: 'AUTO', label: 'Auto (recommended)' },
-                        { value: 'LOW', label: 'Low — fastest, no effects' },
-                        { value: 'MEDIUM', label: 'Medium — glow, light animation' },
-                        { value: 'HIGH', label: 'High — full living graph' },
-                        { value: 'ULTRA', label: 'Ultra — everything on' }
-                      ]}
-                      value={override ?? 'AUTO'}
-                      onChange={(value) => setOverride(value === 'AUTO' ? null : (value as QualityTier))}
-                    />
+                    <div data-testid="settings-quality-dropdown">
+                      <CustomDropdown
+                        options={[
+                          { value: 'AUTO', label: 'Auto (recommended)' },
+                          { value: 'LOW', label: 'Low — fastest, no effects' },
+                          { value: 'MEDIUM', label: 'Medium — glow, light animation' },
+                          { value: 'HIGH', label: 'High — full living graph' },
+                          { value: 'ULTRA', label: 'Ultra — everything on' }
+                        ]}
+                        value={override ?? 'AUTO'}
+                        onChange={(value) => setOverride(value === 'AUTO' ? null : (value as QualityTier))}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
