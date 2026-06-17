@@ -253,6 +253,7 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph }: Gra
       {/* Dropdown menu with folder structure - Portal based for proper z-index */}
       {isOpen && buttonPosition && createPortal(
         <div
+          data-testid="graph-selector-dropdown"
           className="bg-gradient-to-br from-gray-800/98 to-gray-900/98 backdrop-blur-xl border-2 border-gray-600/50 rounded-2xl shadow-2xl overflow-hidden"
           style={{
             position: 'fixed',

@@ -4897,6 +4897,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           onTouchEnd={() => setMenuDragState({ isDragging: false, offset: { x: 0, y: 0 } })}
         >
           <div
+            data-testid="node-context-menu"
             className="absolute bg-black/90 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl overflow-hidden animate-fadeIn"
             style={{
               left: nodeMenu.position.x,
