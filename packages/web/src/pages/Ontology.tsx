@@ -1,8 +1,16 @@
 import { useState } from 'react';
-import { Plus, Search, Edit3, Trash2, Eye, Copy, Brain, Settings, X, Calendar, User, Hash } from 'lucide-react';
+import { useQuery } from '@apollo/client';
+import { Plus, Search, Edit3, Trash2, Eye, Copy, Brain, Settings, X, Calendar, User, Hash, ShieldCheck } from 'lucide-react';
 import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
 import { APP_VERSION } from '../utils/version';
+import { GET_WORK_ITEMS, GET_EDGES } from '../lib/queries';
+import {
+  groupSatisfyingTasks,
+  REQUIREMENT_WORK_ITEM_TYPE,
+  type CoverageEdge,
+  type CoverageWorkItem
+} from '../lib/requirementsCoverage';
 import { 
   WORK_ITEM_TYPES, 
   getTypeIconElement, 
@@ -40,7 +48,7 @@ interface NodeField {
 export function Ontology() {
   const { currentGraph } = useGraph();
   const { } = useAuth();
-  const [activeTab, setActiveTab] = useState<'types' | 'relationships' | 'templates'>('types');
+  const [activeTab, setActiveTab] = useState<'types' | 'relationships' | 'templates' | 'coverage'>('types');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedNodeType, setSelectedNodeType] = useState<NodeType | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -95,6 +103,22 @@ export function Ontology() {
     rel.label.toLowerCase().includes(relationshipSearchTerm.toLowerCase()) ||
     rel.description.toLowerCase().includes(relationshipSearchTerm.toLowerCase())
   );
+
+  const { data: coverageWorkItemsData } = useQuery(GET_WORK_ITEMS, {
+    variables: currentGraph ? { where: { graph: { id: currentGraph.id } } } : { where: {} },
+    fetchPolicy: currentGraph ? 'cache-and-network' : 'cache-only'
+  });
+
+  const { data: coverageEdgesData } = useQuery(GET_EDGES, {
+    variables: currentGraph ? { where: { source: { graph: { id: currentGraph.id } } } } : { where: {} },
+    fetchPolicy: currentGraph ? 'cache-and-network' : 'cache-only'
+  });
+
+  const allWorkItems: CoverageWorkItem[] = coverageWorkItemsData?.workItems ?? [];
+  const allEdges: CoverageEdge[] = coverageEdgesData?.edges ?? [];
+  const requirements = allWorkItems.filter(wi => wi.type === REQUIREMENT_WORK_ITEM_TYPE);
+  const tasks = allWorkItems.filter(wi => wi.type === 'TASK');
+  const requirementCoverage = groupSatisfyingTasks(requirements, tasks, allEdges);
 
 
   const getColorClasses = (nodeType: string) => {
@@ -185,6 +209,17 @@ export function Ontology() {
               }`}
             >
               Templates
+            </button>
+            <button
+              onClick={() => setActiveTab('coverage')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === 'coverage'
+                  ? 'border-green-500 text-green-400'
+                  : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-600'
+              }`}
+            >
+              <ShieldCheck className="h-4 w-4 inline mr-2" />
+              Requirements Coverage
             </button>
           </nav>
         </div>
@@ -370,6 +405,82 @@ export function Ontology() {
                 Create Template
               </button>
             </div>
+          </div>
+        )}
+
+        {activeTab === 'coverage' && (
+          <div className="p-6">
+            {requirementCoverage.length === 0 ? (
+              <div className="text-center py-12">
+                <ShieldCheck className="h-10 w-10 text-gray-500 mx-auto mb-3" />
+                <h3 className="text-lg font-medium text-gray-100 mb-2">No requirements yet</h3>
+                <p className="text-gray-400 max-w-md mx-auto">
+                  Create work items of type Requirement, then connect tasks to them with a
+                  Satisfies relationship to track coverage here.
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="mb-6 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-100">Requirements Coverage</h2>
+                    <p className="text-sm text-gray-400">Tasks that satisfy each requirement</p>
+                  </div>
+                  <div className="text-sm text-gray-400">
+                    {requirementCoverage.length} requirements
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  {requirementCoverage.map(({ requirement, satisfyingTasks, count }) => (
+                    <div key={requirement.id} className="bg-gray-800 border border-gray-700 rounded-lg p-6">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-10 h-10 rounded-lg flex items-center justify-center border bg-gray-700 text-gray-300 border-gray-600">
+                            <ShieldCheck className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-gray-100">
+                              {requirement.title || 'Untitled requirement'}
+                            </h3>
+                            <span className="text-xs bg-gray-700 text-gray-300 px-2 py-1 rounded">
+                              Requirement
+                            </span>
+                          </div>
+                        </div>
+                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                          count > 0 ? 'bg-green-900 text-green-300' : 'bg-gray-700 text-gray-400'
+                        }`}>
+                          {count} satisfying {count === 1 ? 'task' : 'tasks'}
+                        </span>
+                      </div>
+
+                      {count === 0 ? (
+                        <p className="text-sm text-gray-500 italic">
+                          No tasks satisfy this requirement yet.
+                        </p>
+                      ) : (
+                        <ul className="space-y-2">
+                          {satisfyingTasks.map((task) => (
+                            <li
+                              key={task.id}
+                              className="flex items-center justify-between bg-gray-900/40 border border-gray-700/50 rounded px-3 py-2"
+                            >
+                              <span className="text-sm text-gray-200">{task.title || task.id}</span>
+                              {task.status && (
+                                <span className="text-xs bg-gray-700 text-gray-300 px-2 py-1 rounded">
+                                  {task.status}
+                                </span>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>
