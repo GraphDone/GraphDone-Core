@@ -427,7 +427,7 @@ export function Signin({ initialMagicLink = false }: { initialMagicLink?: boolea
 
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4 lg:py-3 relative overflow-hidden">
       {/* Static gradient background - optimized for all browsers */}
       <div className="lagoon-caustics"></div>
       {/* Design religion: fit the window. On large screens the branding sits
@@ -446,7 +446,7 @@ export function Signin({ initialMagicLink = false }: { initialMagicLink?: boolea
         </div>
 
         {/* Login Form */}
-        <form onSubmit={handleSubmit} className="bg-gray-800/50 backdrop-blur-xl border border-gray-700/50 rounded-2xl p-5 sm:p-8 space-y-5 shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <form onSubmit={handleSubmit} className="bg-gray-800/50 backdrop-blur-xl border border-gray-700/50 rounded-2xl p-5 sm:p-8 lg:py-6 space-y-5 lg:space-y-4 shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-700">
           {/* Social Login Buttons — only when at least one provider is actually
               configured; otherwise the whole block (and its divider) is hidden so
               no setup hints leak to end users (cloud uses email + guest). */}
