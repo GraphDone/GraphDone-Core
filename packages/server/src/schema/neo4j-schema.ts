@@ -6,9 +6,6 @@ export const typeDefs = gql`
     # Legacy types (for backward compatibility)
     OUTCOME
 
-    # Ontology layer — a requirement that tasks satisfy
-    REQUIREMENT
-
     # Strategic Planning
     EPIC
     INITIATIVE
