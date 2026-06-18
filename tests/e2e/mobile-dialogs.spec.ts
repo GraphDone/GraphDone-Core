@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
-import { login, TEST_USERS, getBaseURL } from '../helpers/auth';
-import { auditDialog } from '../helpers/mobileAudit';
+import { login, TEST_USERS, getBaseURL } from '../lib/auth';
+import { auditDialog } from '../lib/mobileAudit';
 
 /**
  * Automated dialog sweep — opens the modals a phone user actually hits and

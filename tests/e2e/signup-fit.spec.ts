@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { getBaseURL } from '../helpers/auth';
+import { getBaseURL } from '../lib/auth';
 
 /**
  * Responsive "fit the window" religion (@signup-fit): on a large screen the

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { login, TEST_USERS, getBaseURL } from '../helpers/auth';
+import { login, TEST_USERS, getBaseURL } from '../lib/auth';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import * as path from 'node:path';
@@ -9,7 +9,7 @@ import * as path from 'node:path';
  *
  * Clips a screenshot to the graph canvas (`.graph-container`, which excludes the
  * nav rail, top bar, and the body-portaled minimap), then runs
- * tests/helpers/balance_metrics.py to compute OBJECTIVE numbers about how the
+ * tests/lib/metrics/balance_metrics.py to compute OBJECTIVE numbers about how the
  * graph is placed: centroid offset from centre, bbox coverage, content usage,
  * margin balance, quadrant mass distribution, and an informational balanceScore.
  *
@@ -27,7 +27,7 @@ import * as path from 'node:path';
 const MAX_OFF_MAG = 0.30; // centroid offset from frame centre (0 = dead centre)
 const MIN_BBOX_COVERAGE = 0.35; // graph bbox vs canvas (off-screen graph ~= 0.06)
 
-const PY = path.join(process.cwd(), 'tests/helpers/balance_metrics.py');
+const PY = path.join(process.cwd(), 'tests/lib/metrics/balance_metrics.py');
 const OUT = path.join(process.cwd(), 'test-artifacts/balance');
 mkdirSync(OUT, { recursive: true });
 

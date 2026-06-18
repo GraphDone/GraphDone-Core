@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { login, TEST_USERS } from '../helpers/auth';
+import { login, TEST_USERS } from '../lib/auth';
 
 test.describe('Basic User Workflow', () => {
   test('should complete full user journey: login → select/create graph → create node → verify node appears without refresh', async ({ page }) => {

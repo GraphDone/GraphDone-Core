@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { getBaseURL } from '../helpers/auth';
+import { getBaseURL } from '../lib/auth';
 
 /**
  * Passwordless sign-in focus order (@loginfocus). When the user switches to the

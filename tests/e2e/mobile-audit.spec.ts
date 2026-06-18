@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
-import { login, TEST_USERS, getBaseURL } from '../helpers/auth';
-import { auditLayout, auditContrast } from '../helpers/mobileAudit';
+import { login, TEST_USERS, getBaseURL } from '../lib/auth';
+import { auditLayout, auditContrast } from '../lib/mobileAudit';
 
 /**
  * Automated mobile sweep — runs the layout + contrast auditors against EVERY

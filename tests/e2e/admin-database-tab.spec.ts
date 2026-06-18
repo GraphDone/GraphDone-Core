@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { login, TEST_USERS, getBaseURL } from '../helpers/auth';
+import { login, TEST_USERS, getBaseURL } from '../lib/auth';
 
 test.describe('Admin Database Tab', () => {
   test.beforeEach(async ({ page }) => {
