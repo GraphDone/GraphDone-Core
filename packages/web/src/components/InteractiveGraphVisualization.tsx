@@ -3964,14 +3964,17 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const layoutReflowingRef = useRef(false);
   const mousedownNodeRef = useRef<any>(null);
 
-  // Fit view to show all nodes
-  const fitViewToNodes = useCallback(() => {
-    if (!svgRef.current || !containerRef.current) return;
+  // Fit view to show all nodes. Returns true if a fit transform was applied,
+  // false if it couldn't yet (no svg/container, or the simulation has no
+  // positioned nodes) — the once-per-graph framing polls on this so a slow data
+  // load doesn't leave the graph pinned off-screen (the live-guest bug).
+  const fitViewToNodes = useCallback((): boolean => {
+    if (!svgRef.current || !containerRef.current) return false;
     // Bounds must come from the LIVE simulation objects (the React-state
     // nodes are different objects since the identity merge and may hold
     // stale/initial coordinates — that bug made fit zoom out to a huge box).
     const simNodes = (simulationRef.current?.nodes() as any[]) || [];
-    if (simNodes.length === 0) return;
+    if (simNodes.length === 0) return false;
 
     const svg = d3.select(svgRef.current);
     const container = containerRef.current;
@@ -3989,7 +3992,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       maxY = Math.max(maxY, node.y + dims.height / 2);
     });
 
-    if (!isFinite(minX)) return; // No valid positions
+    if (!isFinite(minX)) return false; // No valid positions yet
 
     const padding = 60;
     minX -= padding; maxX += padding; minY -= padding; maxY += padding;
@@ -4011,6 +4014,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     } else {
       svg.call(d3.zoom<SVGSVGElement, unknown>().transform as any, transform);
     }
+    return true;
   }, [getNodeDimensions]);
   // Latest fit fn in a ref so the once-per-graph camera effect can call it WITHOUT
   // listing it as a dep — its identity churns during settle, which would otherwise
@@ -4268,24 +4272,67 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   // On graph load: restore the user's saved camera for THIS graph (respect their
   // in-session view) or auto-fit ONCE so it never loads off-screen, then jumps in.
   // Keyed on the graph id; never re-fits a graph already framed (don't fight the
-  // user). Uses fitViewRef (not fitViewToNodes) so the timer isn't cancelled by
-  // the callback's identity churning during physics settle.
+  // user).
+  //
+  // POLL until the fit/restore actually succeeds, then mark the graph done. A
+  // fixed delay was the live-guest bug: on a cold load the data chain (guest
+  // token → me → graph → workItems) lands AFTER the timer, so the simulation had
+  // no positioned nodes yet, fitViewToNodes no-opped, the graph was marked
+  // "fitted", and it stayed pinned top-left forever. We retry on a short cadence
+  // until fitViewRef returns true (sim has real positions), capped so we never
+  // spin. fitViewRef is used (not fitViewToNodes) so its identity churn during
+  // physics settle doesn't cancel the loop.
   useEffect(() => {
-    if (!hasNodes || !svgRef.current || !currentGraphId) return undefined;
+    if (!hasNodes || !currentGraphId) return undefined;
     if (fittedGraphsRef.current.has(currentGraphId)) return undefined;
     const gid = currentGraphId;
-    const timer = setTimeout(() => {
+
+    let saved: { x: number; y: number; k: number } | null = null;
+    try { const r = localStorage.getItem(`graphdone:camera:${gid}`); saved = r ? JSON.parse(r) : null; } catch { /* ignore */ }
+    const hasSaved = !!(saved && typeof saved.k === 'number');
+
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let tries = 0;
+    const MAX_TRIES = 60; // ~15s at 250ms — covers a cold Worker/D1 first paint
+
+    const attempt = () => {
+      timer = null;
       if (fittedGraphsRef.current.has(gid)) return;
-      fittedGraphsRef.current.add(gid);
-      let saved: { x: number; y: number; k: number } | null = null;
-      try { const r = localStorage.getItem(`graphdone:camera:${gid}`); saved = r ? JSON.parse(r) : null; } catch { /* ignore */ }
-      if (saved && typeof saved.k === 'number' && zoomBehaviorRef.current && svgRef.current) {
-        d3.select(svgRef.current).call(zoomBehaviorRef.current.transform as any, d3.zoomIdentity.translate(saved.x, saved.y).scale(saved.k));
-      } else {
-        fitViewRef.current();
+      // Graph changed out from under us — let the new graph's effect take over.
+      if (currentGraphIdRef.current !== gid) return;
+
+      // The <svg> may not be mounted yet on the render where hasNodes flipped
+      // true (it renders a tick later). zoomBehaviorRef + the simulation are set
+      // up only once it mounts. Keep retrying until everything is ready rather
+      // than giving up — that early-return was the live bug that left the
+      // origin-centred graph pinned in the top-left corner.
+      let ok = false;
+      if (svgRef.current && zoomBehaviorRef.current) {
+        if (hasSaved) {
+          d3.select(svgRef.current).call(
+            zoomBehaviorRef.current.transform as any,
+            d3.zoomIdentity.translate(saved!.x, saved!.y).scale(saved!.k)
+          );
+          ok = true;
+        } else {
+          ok = fitViewRef.current(); // false until the sim has positioned nodes
+        }
       }
-    }, 1200);
-    return () => clearTimeout(timer);
+
+      if (ok) {
+        fittedGraphsRef.current.add(gid);
+        return;
+      }
+      if (++tries >= MAX_TRIES) {
+        fittedGraphsRef.current.add(gid); // give up; don't spin forever
+        return;
+      }
+      timer = setTimeout(attempt, 250);
+    };
+
+    // Small initial delay so the first simulation build/tick has run.
+    timer = setTimeout(attempt, 300);
+    return () => { if (timer) clearTimeout(timer); };
   }, [hasNodes, currentGraphId]);
 
   // PR-3: keep the expand-in-place panel glued to its node through drags, ticks
