@@ -4,6 +4,7 @@ import { useGraph } from '../contexts/GraphContext';
 import { getTypeConfig, getStatusConfig } from '../constants/workItemConstants';
 import type { WorkItemType } from '../constants/workItemConstants';
 import { NodeSubgraphPreview } from './NodeSubgraphPreview';
+import { CopyableId } from './CopyableId';
 
 // Heavy (markdown + Prism) — lazy so it's out of the main bundle until a node's
 // contents are first opened.
@@ -50,6 +51,7 @@ export function NodeInspector({ node, onClose, compact = false, rootTestId = 'no
         <div className="flex-1 min-w-0">
           <div className="text-[10px] uppercase tracking-wide" style={{ color: typeCfg.hexColor }}>{typeCfg.label}</div>
           <div className="text-sm font-semibold text-white truncate" title={node.title}>{node.title}</div>
+          <div className="mt-0.5"><CopyableId id={node.id} /></div>
         </div>
         <button onClick={onClose} className="p-1 text-gray-400 hover:text-white rounded hover:bg-gray-700/50" title="Close">
           <X className="h-4 w-4" />
