@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   assignLayersByDependencyDirection, computeLayerYPositions, isHierarchicalLayout,
+  parseLayoutMode, computeNodeLayerY, LAYOUT_MODE_STORAGE_KEY,
 } from '../layoutAlgorithms';
 
 const n = (id: string) => ({ id });
@@ -72,5 +73,44 @@ describe('isHierarchicalLayout', () => {
     expect(isHierarchicalLayout('hierarchical')).toBe(true);
     expect(isHierarchicalLayout('force')).toBe(false);
     expect(isHierarchicalLayout(undefined)).toBe(false);
+  });
+});
+
+describe('parseLayoutMode', () => {
+  it('keeps "hierarchical"', () => {
+    expect(parseLayoutMode('hierarchical')).toBe('hierarchical');
+  });
+
+  it('defaults anything else to "force"', () => {
+    expect(parseLayoutMode('force')).toBe('force');
+    expect(parseLayoutMode('garbage')).toBe('force');
+    expect(parseLayoutMode(null)).toBe('force');
+    expect(parseLayoutMode(undefined)).toBe('force');
+  });
+
+  it('exposes a stable storage key', () => {
+    expect(LAYOUT_MODE_STORAGE_KEY).toBe('graphdone:layoutMode');
+  });
+});
+
+describe('computeNodeLayerY', () => {
+  it('gives every node the Y of its dependency layer (prerequisite higher)', () => {
+    // A depends on B → B layer 0 (top, smaller Y), A layer 1 (lower, larger Y).
+    const ys = computeNodeLayerY([n('A'), n('B')], [dep('A', 'B')], { width: 1000, height: 900 });
+    expect(ys.get('B')!).toBeLessThan(ys.get('A')!);
+  });
+
+  it('places nodes on the same layer at the same Y', () => {
+    const ys = computeNodeLayerY(
+      [n('A'), n('B'), n('C')], [dep('A', 'C'), dep('B', 'C')], { width: 800, height: 600 },
+    );
+    expect(ys.get('A')!).toBe(ys.get('B')!);
+    expect(ys.get('C')!).toBeLessThan(ys.get('A')!);
+  });
+
+  it('returns a finite Y for every node in a single-layer graph', () => {
+    const ys = computeNodeLayerY([n('A'), n('B')], [], { width: 500, height: 500 });
+    expect(Number.isFinite(ys.get('A')!)).toBe(true);
+    expect(Number.isFinite(ys.get('B')!)).toBe(true);
   });
 });
