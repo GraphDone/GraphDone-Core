@@ -256,22 +256,18 @@ const PieChart = ({ data, title }: { data: Array<{label: string, value: number, 
 const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
   return (
     <div className="p-6 space-y-6">
-      {/* Total Tasks - Full Width Card */}
-      <div className="bg-gradient-to-br from-lime-500/15 via-lime-500/8 to-lime-500/5 rounded-lg p-8 border border-gray-700/30 border-l-4 border-l-lime-400/70 hover:from-lime-500/25 hover:via-lime-500/18 hover:to-lime-500/15 transition-all duration-200 hover:scale-[1.01] hover:-translate-y-1 cursor-pointer">
-        <div className="flex items-center justify-center">
-          <div className="flex-shrink-0">
-            <Sigma className="h-12 w-12 text-lime-400" />
-          </div>
-          <div className="ml-6 text-center">
-            <div className="text-2xl font-bold text-gray-300">Total Tasks</div>
-            <div className="text-4xl font-bold text-lime-400">{stats.total}</div>
-          </div>
-        </div>
+      {/* Summary strip — compact + content-sized (was a tall, near-empty banner) */}
+      <div className="bg-gradient-to-br from-lime-500/15 via-lime-500/8 to-lime-500/5 rounded-lg px-5 py-3 border border-gray-700/30 border-l-4 border-l-lime-400/70 flex items-center gap-3">
+        <Sigma className="h-7 w-7 text-lime-400 flex-shrink-0" />
+        <span className="text-sm font-semibold text-gray-300">Total Tasks</span>
+        <span className="ml-auto text-3xl font-bold text-lime-400 leading-none">{stats.total}</span>
       </div>
 
-      {/* Stats Cards - Second Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div className={`${getStatusGradientBackground('NOT_STARTED' as WorkItemStatus, 'dashboard')} rounded-lg p-6 border border-gray-700/30 hover:scale-[1.02] hover:-translate-y-1 transition-all duration-200 cursor-pointer`}>
+      {/* Status breakdown — one compact, dense grid (was 3 sparse rows of 3 with
+          single-digit numbers in oversized boxes). 2 cols on phones up to 5 on
+          desktop so the 9 statuses read as a tidy panel, not a wall of whitespace. */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div className={`${getStatusGradientBackground('NOT_STARTED' as WorkItemStatus, 'dashboard')} rounded-lg p-4 border border-gray-700/30 hover:scale-[1.02] hover:-translate-y-1 transition-all duration-200 cursor-pointer`}>
           <div className="flex items-center">
             <div className="flex-shrink-0">
               {React.createElement(getStatusConfig('NOT_STARTED').icon!, { className: `h-8 w-8 ${getStatusConfig('NOT_STARTED').color}` })}
@@ -283,7 +279,7 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
           </div>
         </div>
 
-        <div className={`${getStatusGradientBackground('PROPOSED' as WorkItemStatus, 'dashboard')} rounded-lg p-6 border border-gray-700/30 hover:scale-[1.02] hover:-translate-y-1 transition-all duration-200 cursor-pointer`}>
+        <div className={`${getStatusGradientBackground('PROPOSED' as WorkItemStatus, 'dashboard')} rounded-lg p-4 border border-gray-700/30 hover:scale-[1.02] hover:-translate-y-1 transition-all duration-200 cursor-pointer`}>
           <div className="flex items-center">
             <div className="flex-shrink-0">
               {React.createElement(getStatusConfig('PROPOSED').icon!, { className: `h-8 w-8 ${getStatusConfig('PROPOSED').color}` })}
@@ -295,7 +291,7 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
           </div>
         </div>
 
-        <div className={`${getStatusGradientBackground('PLANNED' as WorkItemStatus, 'dashboard')} rounded-lg p-6 border border-gray-700/30 hover:scale-[1.02] hover:-translate-y-1 transition-all duration-200 cursor-pointer`}>
+        <div className={`${getStatusGradientBackground('PLANNED' as WorkItemStatus, 'dashboard')} rounded-lg p-4 border border-gray-700/30 hover:scale-[1.02] hover:-translate-y-1 transition-all duration-200 cursor-pointer`}>
           <div className="flex items-center">
             <div className="flex-shrink-0">
               {React.createElement(getStatusConfig('PLANNED').icon!, { className: `h-8 w-8 ${getStatusConfig('PLANNED').color}` })}
@@ -306,11 +302,7 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Stats Cards - Third Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div className={`${getStatusGradientBackground('IN_PROGRESS' as WorkItemStatus, 'dashboard')} rounded-lg p-6 border border-gray-700/30 hover:scale-[1.02] hover:-translate-y-1 transition-all duration-200 cursor-pointer`}>
+        <div className={`${getStatusGradientBackground('IN_PROGRESS' as WorkItemStatus, 'dashboard')} rounded-lg p-4 border border-gray-700/30 hover:scale-[1.02] hover:-translate-y-1 transition-all duration-200 cursor-pointer`}>
           <div className="flex items-center">
             <div className="flex-shrink-0">
               {React.createElement(getStatusConfig('IN_PROGRESS').icon!, { className: `h-8 w-8 ${getStatusConfig('IN_PROGRESS').color}` })}
@@ -322,7 +314,7 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
           </div>
         </div>
 
-        <div className={`${getStatusGradientBackground('IN_REVIEW' as WorkItemStatus, 'dashboard')} rounded-lg p-6 border border-gray-700/30 hover:scale-[1.02] hover:-translate-y-1 transition-all duration-200 cursor-pointer`}>
+        <div className={`${getStatusGradientBackground('IN_REVIEW' as WorkItemStatus, 'dashboard')} rounded-lg p-4 border border-gray-700/30 hover:scale-[1.02] hover:-translate-y-1 transition-all duration-200 cursor-pointer`}>
           <div className="flex items-center">
             <div className="flex-shrink-0">
               {React.createElement(getStatusConfig('IN_REVIEW').icon!, { className: `h-8 w-8 ${getStatusConfig('IN_REVIEW').color}` })}
@@ -334,7 +326,7 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
           </div>
         </div>
 
-        <div className={`${getStatusGradientBackground('BLOCKED' as WorkItemStatus, 'dashboard')} rounded-lg p-6 border border-gray-700/30 hover:scale-[1.02] hover:-translate-y-1 transition-all duration-200 cursor-pointer`}>
+        <div className={`${getStatusGradientBackground('BLOCKED' as WorkItemStatus, 'dashboard')} rounded-lg p-4 border border-gray-700/30 hover:scale-[1.02] hover:-translate-y-1 transition-all duration-200 cursor-pointer`}>
           <div className="flex items-center">
             <div className="flex-shrink-0">
               {React.createElement(getStatusConfig('BLOCKED').icon!, { className: `h-8 w-8 ${getStatusConfig('BLOCKED').color}` })}
@@ -345,11 +337,7 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Stats Cards - Fourth Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div className={`${getStatusGradientBackground('ON_HOLD' as WorkItemStatus, 'dashboard')} rounded-lg p-6 border border-gray-700/30 hover:scale-[1.02] hover:-translate-y-1 transition-all duration-200 cursor-pointer`}>
+        <div className={`${getStatusGradientBackground('ON_HOLD' as WorkItemStatus, 'dashboard')} rounded-lg p-4 border border-gray-700/30 hover:scale-[1.02] hover:-translate-y-1 transition-all duration-200 cursor-pointer`}>
           <div className="flex items-center">
             <div className="flex-shrink-0">
               {React.createElement(getStatusConfig('ON_HOLD').icon!, { className: `h-8 w-8 ${getStatusConfig('ON_HOLD').color}` })}
@@ -361,7 +349,7 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
           </div>
         </div>
 
-        <div className={`${getStatusGradientBackground('COMPLETED' as WorkItemStatus, 'dashboard')} rounded-lg p-6 border border-gray-700/30 hover:scale-[1.02] hover:-translate-y-1 transition-all duration-200 cursor-pointer`}>
+        <div className={`${getStatusGradientBackground('COMPLETED' as WorkItemStatus, 'dashboard')} rounded-lg p-4 border border-gray-700/30 hover:scale-[1.02] hover:-translate-y-1 transition-all duration-200 cursor-pointer`}>
           <div className="flex items-center">
             <div className="flex-shrink-0">
               {React.createElement(getStatusConfig('COMPLETED').icon!, { className: `h-8 w-8 ${getStatusConfig('COMPLETED').color}` })}
@@ -373,7 +361,7 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
           </div>
         </div>
 
-        <div className={`${getStatusGradientBackground('CANCELLED' as WorkItemStatus, 'dashboard')} rounded-lg p-6 border border-gray-700/30 hover:scale-[1.02] hover:-translate-y-1 transition-all duration-200 cursor-pointer`}>
+        <div className={`${getStatusGradientBackground('CANCELLED' as WorkItemStatus, 'dashboard')} rounded-lg p-4 border border-gray-700/30 hover:scale-[1.02] hover:-translate-y-1 transition-all duration-200 cursor-pointer`}>
           <div className="flex items-center">
             <div className="flex-shrink-0">
               {React.createElement(getStatusConfig('CANCELLED').icon!, { className: `h-8 w-8 ${getStatusConfig('CANCELLED').color}` })}
