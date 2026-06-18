@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { login, TEST_USERS } from '../helpers/auth';
+import { login, TEST_USERS } from '../lib/auth';
 
 /**
  * Project-explorer hierarchy: the graph selector expands a parent graph

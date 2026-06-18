@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { login, TEST_USERS } from '../helpers/auth';
+import { login, TEST_USERS } from '../lib/auth';
 
 /**
  * THE GATE. This spec sees the app exactly as a user does — if it fails,

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { login, TEST_USERS, getBaseURL } from '../helpers/auth';
+import { login, TEST_USERS, getBaseURL } from '../lib/auth';
 
 /**
  * Click-to-copy node id (@copyid, #23): the node inspector shows a short id chip;

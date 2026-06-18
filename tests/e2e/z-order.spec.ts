@@ -1,7 +1,7 @@
 import { test, expect, Page } from '@playwright/test';
-import { login, TEST_USERS, getBaseURL } from '../helpers/auth';
-import { auditOnTop } from '../helpers/zorder';
-import { auditDialog } from '../helpers/mobileAudit';
+import { login, TEST_USERS, getBaseURL } from '../lib/auth';
+import { auditOnTop } from '../lib/zorder';
+import { auditDialog } from '../lib/mobileAudit';
 
 /**
  * Z-order / stacking gate. Opens every floating overlay in the app (dropdowns,

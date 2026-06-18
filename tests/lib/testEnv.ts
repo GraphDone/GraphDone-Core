@@ -8,7 +8,7 @@ import dotenv from 'dotenv';
  * this for its side effect at the top of any spec/generator that needs the VLM
  * endpoints or sweep config:
  *
- *   import '../helpers/testEnv';
+ *   import '../lib/testEnv';
  *
  * Safe to import everywhere — it's a no-op when the file is absent (e.g. CI),
  * so VLM-driven suites skip cleanly. Existing process.env values win, so you

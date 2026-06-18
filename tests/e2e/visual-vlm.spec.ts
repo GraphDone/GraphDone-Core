@@ -1,11 +1,11 @@
 import { test, expect, Page } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
-import { login, TEST_USERS } from '../helpers/auth';
-import { seedLargeGraph, deleteGraphDeep } from '../helpers/seedGraph';
-import { sweepTestData, TEST_GRAPH_PREFIX } from '../helpers/dbHealing';
-import '../helpers/testEnv';
-import { isVlmAvailable, evaluateBatch, PERSONAS, personaByKey } from '../helpers/vlm';
+import { login, TEST_USERS } from '../lib/auth';
+import { seedLargeGraph, deleteGraphDeep } from '../lib/seedGraph';
+import { sweepTestData, TEST_GRAPH_PREFIX } from '../lib/dbHealing';
+import '../lib/testEnv';
+import { isVlmAvailable, evaluateBatch, PERSONAS, personaByKey } from '../lib/vlm';
 
 /**
  * Local-VLM visual evaluation. Captures key user-facing states, then asks a

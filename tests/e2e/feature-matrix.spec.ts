@@ -1,8 +1,8 @@
 import { test, expect, Page, TestInfo } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
-import { getBaseURL } from '../helpers/auth';
-import { auditLayout, auditContrast } from '../helpers/mobileAudit';
+import { getBaseURL } from '../lib/auth';
+import { auditLayout, auditContrast } from '../lib/mobileAudit';
 
 const SHOT_ROOT = path.resolve(process.cwd(), 'test-artifacts/matrix');
 
