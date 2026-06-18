@@ -548,6 +548,35 @@ const tools: Tool[] = [
     }
   },
 
+  {
+    name: 'suggest_task_assignment',
+    description: 'Suggest the best contributor(s) for open tasks in a graph by combining each contributor\'s expertise (work-type history + completion rate) with their current availability (active workload). Returns ranked, rationale-bearing candidates per task to make AI-as-peer assignment workflows easier.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        graph_id: { type: 'string', description: 'Graph/project ID to draw open tasks and contributors from' },
+        task_ids: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Restrict suggestions to these specific task IDs (default: all open tasks in the graph)'
+        },
+        open_statuses: {
+          type: 'array',
+          items: { type: 'string', enum: ['PROPOSED', 'ACTIVE', 'IN_PROGRESS', 'BLOCKED'] },
+          description: 'Statuses considered "open" and eligible for assignment'
+        },
+        include_assigned: { type: 'boolean', default: false, description: 'Include tasks that already have a contributor' },
+        expertise_weight: { type: 'number', description: 'Relative weight of expertise match (default 0.6)' },
+        availability_weight: { type: 'number', description: 'Relative weight of contributor availability (default 0.4)' },
+        max_candidates_per_task: { type: 'number', default: 3, description: 'Maximum ranked candidates returned per task' },
+        min_items_threshold: { type: 'number', default: 3, description: 'Minimum items of a work type before a contributor counts as more than a beginner' },
+        task_limit: { type: 'number', default: 25, description: 'Maximum number of open tasks to rank' }
+      },
+      required: ['graph_id'],
+      additionalProperties: false
+    }
+  },
+
   // Graph Management Tools
   {
     name: 'create_graph',
@@ -788,6 +817,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'get_contributor_availability':
         return await graphService.getContributorAvailability(args as Record<string, unknown>);
+
+      case 'suggest_task_assignment':
+        return await graphService.suggestTaskAssignment(args || {});
 
       // Graph Management Commands - Type assertions needed for MCP dynamic arguments
       case 'create_graph':
