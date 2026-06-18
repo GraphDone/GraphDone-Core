@@ -110,4 +110,32 @@ test.describe('camera framing + persistence @camera', () => {
     // of the same view (no fresh fit, which would change k substantially).
     expect(Math.abs(restored.k - cam.k), 'zoom level preserved across reload').toBeLessThan(0.05);
   });
+
+  // Regression for the live-guest bug: a cold load delivers the graph data AFTER
+  // a fixed fit timer would have fired, so the fit no-opped and the graph stayed
+  // pinned off-screen. We delay the workItems response past the old 1200ms timer
+  // and assert the poll-until-ready framing still centres the graph.
+  test('graph still frames when data arrives slowly (cold load)', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('graphdone:viewMode', 'graph'));
+    await login(page, TEST_USERS.ADMIN);
+
+    // Delay only the workItems query (not login/me) by ~2s — well past the old
+    // fixed fit timer — to mimic a cold Worker/D1 first paint.
+    await page.route('**/graphql', async (route) => {
+      const body = route.request().postData() || '';
+      if (/workItems/i.test(body)) {
+        await new Promise((r) => setTimeout(r, 2000));
+      }
+      await route.continue();
+    });
+
+    await page.goto(`${getBaseURL()}/`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('.graph-container svg .node', { timeout: 20_000 });
+    // Allow the delayed data + the poll-until-ready fit to complete.
+    await page.waitForTimeout(5000);
+
+    const { inView, total } = await nodesInView(page);
+    expect(total, 'graph has nodes after the delayed load').toBeGreaterThan(0);
+    expect(inView, `${inView}/${total} nodes framed despite slow load`).toBeGreaterThan(total * 0.5);
+  });
 });
