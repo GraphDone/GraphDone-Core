@@ -5,7 +5,7 @@ export const typeDefs = gql`
   enum NodeType {
     # Legacy types (for backward compatibility)
     OUTCOME
-    
+
     # Strategic Planning
     EPIC
     INITIATIVE
@@ -200,6 +200,7 @@ export const typeDefs = gql`
     VALIDATES
     REFERENCES
     CONTAINS
+    SATISFIES
   }
 
   enum ContributorType {
