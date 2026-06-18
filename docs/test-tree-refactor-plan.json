@@ -1,0 +1,592 @@
+{
+  "summary": "Inventory the sprawling test surface (both repos) and synthesize a clean target tree + migration plan + unified dual-output harness design",
+  "agentCount": 7,
+  "logs": [],
+  "result": {
+    "targetTree": "CANONICAL CONFIG STAYS AT REPO ROOT: /playwright.config.ts (the one config; tests/playwright.config.ts + tests/playwright.config.production.ts deleted). Playwright auto-discovers it from cwd; its projects point testDir at the folders below.\n\ntests/\n├── run-unified.mjs                      # SINGLE entry → npm run test:unified (report.html + report.json)\n├── sequences/\n│   └── unified.config.mjs               # declarative manifest of sequences + profiles (smoke|pr|full|report)\n├── e2e/                                 # default PW project testDir; grouped by domain\n│   ├── smoke/\n│   │   └── user-smoke.spec.ts           # THE GATE (@smoke) — kept runnable\n│   ├── auth/\n│   │   ├── form-validation.spec.ts\n│   │   ├── responsive-layout.spec.ts        (was signup-fit)\n│   │   └── passwordless-focus.spec.ts       (was login-focus)\n│   ├── graph/\n│   │   ├── camera.spec.ts\n│   │   ├── living-graph-effects.spec.ts     (was living-graph)\n│   │   ├── relationship-flip.spec.ts\n│   │   ├── node-quick-edit.spec.ts\n│   │   └── node-inspector-copyid.spec.ts    (was copy-id)\n│   ├── ui/\n│   │   ├── overlay-dismissal.spec.ts\n│   │   └── z-order.spec.ts\n│   ├── a11y/\n│   │   └── modal-focus.spec.ts              (was a11y-focus)\n│   ├── mobile/\n│   │   ├── experience.spec.ts\n│   │   ├── view-navigation.spec.ts          (was mobile-views)\n│   │   ├── accessibility-audit.spec.ts      (was mobile-audit)\n│   │   ├── dialog-positioning.spec.ts       (was mobile-dialogs)\n│   │   └── tls-compat.spec.ts               (ported from mobile-https-compatibility-test.js)\n│   ├── responsive/\n│   │   └── viewports.spec.ts                (was responsive)\n│   ├── api/\n│   │   └── health.spec.ts                   (was api-health)\n│   ├── admin/\n│   │   ├── database-tab.spec.ts             (was admin-database-tab)\n│   │   └── oauth-provider-config.spec.ts\n│   └── reports/                             # capture-heavy, own PW projects, report-only\n│       ├── showcase.spec.ts                 # records .webm + screenshots (video source)\n│       ├── feature-matrix.spec.ts\n│       ├── matrix.setup.ts\n│       ├── visual-regression.spec.ts        (was visual-regression-suite)\n│       └── vlm-evaluation.spec.ts           (was visual-vlm)\n├── perf/                                    # perf + perf-scale PW projects\n│   ├── graph-perf.spec.ts                   # budget gate (@perf)\n│   ├── scale-sweep.spec.ts\n│   └── check-bundle-size.mjs\n├── diagnostics/                             # geometry PW project (recursive testDir)\n│   ├── layout/\n│   │   ├── geometry.spec.ts                 (was graph-geometry)\n│   │   └── graph-balance.spec.ts\n│   ├── interactions/\n│   │   ├── core-matrix.spec.ts             (was core-interactions)\n│   │   └── relationship-audit.spec.ts      (was interaction-audit)\n│   ├── hierarchy/\n│   │   ├── explorer-tree.spec.ts\n│   │   └── navigation.spec.ts              (was hierarchy-navigation)\n│   ├── inspector/\n│   │   └── node-inspector.spec.ts\n│   ├── physics/\n│   │   └── settle.spec.ts                  (was physics-settle)\n│   ├── perf/\n│   │   └── large-graph-profile.spec.ts\n│   └── ui/\n│       ├── legibility-floor.spec.ts        (was node-expand-legibility)\n│       ├── minimap-zoom.spec.ts\n│       ├── captcha-layout.spec.ts\n│       └── tls-banner.spec.ts              (was insecure-connection-banner)\n├── integration/                            # non-app infra specs (excluded from default project)\n│   ├── tls-integration.spec.ts\n│   ├── tls-certificate-cross-browser.spec.ts  (ported from ssl-certificate-analysis.js)\n│   └── installation-validation.spec.ts\n├── fixtures/\n│   └── oauth-profiles.ts\n└── lib/                                    # REUSABLE harness + helpers (shared by Core AND Cloud)\n    ├── README.md\n    ├── auth.ts            (from helpers/)   # most-imported helper — battle-tested login\n    ├── api.ts             (from helpers/)\n    ├── seedGraph.ts       (from helpers/)\n    ├── dbHealing.ts       (from helpers/)\n    ├── testEnv.ts         (from helpers/)\n    ├── mobileAudit.ts     (from helpers/)\n    ├── zorder.ts          (from helpers/)\n    ├── vlm.ts             (from helpers/)\n    ├── mock-oauth-server.ts (from helpers/)\n    ├── metrics/\n    │   └── balance_metrics.py (from helpers/)  # subprocess; Cloud audit-kit BALANCE_PY cross-links here\n    ├── audit/                              # promoted from GraphDone-Cloud/scripts/lib (Cloud cross-links back)\n    │   ├── audit-kit.mjs\n    │   ├── schema-contract.mjs\n    │   └── schema-coverage.mjs\n    ├── reporting/\n    │   ├── aggregate.mjs   (from tests/_draft_unified/aggregate.mjs)  # pure rollup\n    │   ├── html.mjs        # unified HTML report: <img> screenshots + <video> .webm; absorbs Cloud report.mjs renderer\n    │   └── json.mjs        # report.json (schema graphdone.unified-report/1)\n    ├── adapters/                           # parse external result formats → sequence objects\n    │   ├── playwright.mjs  # PW JSON reporter + collect playwright-output/*.webm + *.png\n    │   ├── vitest.mjs      # vitest JSON\n    │   ├── perf.mjs        # folds generate-perf-report.mjs (scale-sweep + graph-perf metrics)\n    │   ├── vlm.mjs         # folds generate-vlm-report.mjs\n    │   ├── matrix.mjs      # folds generate-matrix-report.mjs\n    │   ├── showcase.mjs    # folds generate-showcase-report.mjs\n    │   └── cloud-audit.mjs # optional ingest of GraphDone-Cloud live-audit findings.json\n    └── runner/\n        └── runSequence.mjs # spawn a step, capture exit/stdout, resolve its JSON + artifact dir\n\nscripts/   (Core repo, non-tests)\n├── verify-camera-fix.mjs       (promoted from GraphDone-Cloud) → npm run verify:prod-build\n├── generate-audit-report.mjs   (promoted from GraphDone-Cloud) → npm run audit:report\n├── fresh-test.sh  github-actions-test.sh  test-installation-simple.sh  test-tls.sh  generate-clean-report.sh  generate-dev-certs.sh   (KEPT)\n\nCLOUD CROSS-LINKS (GraphDone-Cloud, which carries Core as the core/ submodule):\n  scripts/live-audit.mjs, scripts/verify-live.mjs  import from  core/tests/lib/audit/* and core/tests/lib/reporting/*\n  (audit-kit/schema-contract/schema-coverage/report renderer now live ONLY in Core; Cloud consumes via submodule).\n\nOutputs land in test-artifacts/unified/ (report.html, report.json, sequences/*.json) — see unifiedHarness.",
+    "migrations": [
+      {
+        "from": "tests/e2e/user-smoke.spec.ts",
+        "to": "tests/e2e/smoke/user-smoke.spec.ts",
+        "reason": "THE GATE; group under smoke/. test:smoke + CI must repoint to new path."
+      },
+      {
+        "from": "tests/e2e/basic-workflow.spec.ts",
+        "to": "MERGE->tests/e2e/smoke/user-smoke.spec.ts",
+        "reason": "Login→create graph→node-appears duplicates user-smoke grow flow; absorb any unique assertion then delete source."
+      },
+      {
+        "from": "tests/e2e/camera.spec.ts",
+        "to": "tests/e2e/graph/camera.spec.ts",
+        "reason": "Domain grouping (graph)."
+      },
+      {
+        "from": "tests/e2e/living-graph.spec.ts",
+        "to": "tests/e2e/graph/living-graph-effects.spec.ts",
+        "reason": "Domain grouping; CI line 192 references this path directly and must update."
+      },
+      {
+        "from": "tests/e2e/relationship-flip.spec.ts",
+        "to": "tests/e2e/graph/relationship-flip.spec.ts",
+        "reason": "Domain grouping (graph)."
+      },
+      {
+        "from": "tests/e2e/node-quick-edit.spec.ts",
+        "to": "tests/e2e/graph/node-quick-edit.spec.ts",
+        "reason": "Domain grouping (graph)."
+      },
+      {
+        "from": "tests/e2e/copy-id.spec.ts",
+        "to": "tests/e2e/graph/node-inspector-copyid.spec.ts",
+        "reason": "Domain grouping + descriptive name."
+      },
+      {
+        "from": "tests/e2e/form-validation.spec.ts",
+        "to": "tests/e2e/auth/form-validation.spec.ts",
+        "reason": "Domain grouping (auth)."
+      },
+      {
+        "from": "tests/e2e/signup-fit.spec.ts",
+        "to": "tests/e2e/auth/responsive-layout.spec.ts",
+        "reason": "Domain grouping + clearer name."
+      },
+      {
+        "from": "tests/e2e/login-focus.spec.ts",
+        "to": "tests/e2e/auth/passwordless-focus.spec.ts",
+        "reason": "Domain grouping + clearer name."
+      },
+      {
+        "from": "tests/e2e/a11y-focus.spec.ts",
+        "to": "tests/e2e/a11y/modal-focus.spec.ts",
+        "reason": "Domain grouping (a11y)."
+      },
+      {
+        "from": "tests/e2e/overlay-dismissal.spec.ts",
+        "to": "tests/e2e/ui/overlay-dismissal.spec.ts",
+        "reason": "Domain grouping (ui)."
+      },
+      {
+        "from": "tests/e2e/z-order.spec.ts",
+        "to": "tests/e2e/ui/z-order.spec.ts",
+        "reason": "Domain grouping (ui)."
+      },
+      {
+        "from": "tests/e2e/responsive.spec.ts",
+        "to": "tests/e2e/responsive/viewports.spec.ts",
+        "reason": "Domain grouping; @core tag preserved."
+      },
+      {
+        "from": "tests/e2e/api-health.spec.ts",
+        "to": "tests/e2e/api/health.spec.ts",
+        "reason": "Domain grouping; @core. Keeps importing lib/api.ts."
+      },
+      {
+        "from": "tests/e2e/mobile-experience.spec.ts",
+        "to": "tests/e2e/mobile/experience.spec.ts",
+        "reason": "Domain grouping (mobile)."
+      },
+      {
+        "from": "tests/e2e/mobile-views.spec.ts",
+        "to": "tests/e2e/mobile/view-navigation.spec.ts",
+        "reason": "Domain grouping (mobile)."
+      },
+      {
+        "from": "tests/e2e/mobile-audit.spec.ts",
+        "to": "tests/e2e/mobile/accessibility-audit.spec.ts",
+        "reason": "Domain grouping; @audit tag preserved."
+      },
+      {
+        "from": "tests/e2e/mobile-dialogs.spec.ts",
+        "to": "tests/e2e/mobile/dialog-positioning.spec.ts",
+        "reason": "Domain grouping; @audit tag preserved."
+      },
+      {
+        "from": "tests/e2e/admin-database-tab.spec.ts",
+        "to": "tests/e2e/admin/database-tab.spec.ts",
+        "reason": "Group stale-but-kept admin specs together."
+      },
+      {
+        "from": "tests/e2e/oauth-provider-config.spec.ts",
+        "to": "tests/e2e/admin/oauth-provider-config.spec.ts",
+        "reason": "Admin grouping; sole remaining consumer of mock-oauth-server.ts + oauth fixtures."
+      },
+      {
+        "from": "tests/e2e/showcase.spec.ts",
+        "to": "tests/e2e/reports/showcase.spec.ts",
+        "reason": "Report-only capture spec; PW showcase project testMatch by filename still resolves."
+      },
+      {
+        "from": "tests/e2e/feature-matrix.spec.ts",
+        "to": "tests/e2e/reports/feature-matrix.spec.ts",
+        "reason": "Report-only; matrix project testMatch by filename still resolves."
+      },
+      {
+        "from": "tests/e2e/matrix.setup.ts",
+        "to": "tests/e2e/reports/matrix.setup.ts",
+        "reason": "Co-locate with matrix spec; matrix-setup project testMatch by filename still resolves."
+      },
+      {
+        "from": "tests/e2e/visual-regression-suite.spec.ts",
+        "to": "tests/e2e/reports/visual-regression.spec.ts",
+        "reason": "Report-only; test:e2e:visual npm script path must update."
+      },
+      {
+        "from": "tests/e2e/visual-vlm.spec.ts",
+        "to": "tests/e2e/reports/vlm-evaluation.spec.ts",
+        "reason": "Report-only RENAME; vlm project testMatch + default project testIgnore must update to new filename."
+      },
+      {
+        "from": "tests/e2e/installation-validation.spec.ts",
+        "to": "tests/integration/installation-validation.spec.ts",
+        "reason": "CI/infra test, not app E2E; exclude from default project."
+      },
+      {
+        "from": "tests/e2e/tls-integration.spec.ts",
+        "to": "tests/integration/tls-integration.spec.ts",
+        "reason": "Infra test; exclude from default project."
+      },
+      {
+        "from": "tests/ssl-certificate-analysis.js",
+        "to": "tests/integration/tls-certificate-cross-browser.spec.ts",
+        "reason": "Port loose JS to a real PW spec; folds test:https TLS coverage into the suite."
+      },
+      {
+        "from": "tests/mobile-https-compatibility-test.js",
+        "to": "tests/e2e/mobile/tls-compat.spec.ts",
+        "reason": "Port loose JS to a real PW spec with @mobile tag."
+      },
+      {
+        "from": "tests/diagnostics/graph-geometry.spec.ts",
+        "to": "tests/diagnostics/layout/geometry.spec.ts",
+        "reason": "Diagnostics sub-grouping (layout)."
+      },
+      {
+        "from": "tests/diagnostics/graph-balance.spec.ts",
+        "to": "tests/diagnostics/layout/graph-balance.spec.ts",
+        "reason": "Diagnostics sub-grouping (layout); subprocess path to balance_metrics.py must update."
+      },
+      {
+        "from": "tests/diagnostics/core-interactions.spec.ts",
+        "to": "tests/diagnostics/interactions/core-matrix.spec.ts",
+        "reason": "Diagnostics sub-grouping (interactions)."
+      },
+      {
+        "from": "tests/diagnostics/interaction-audit.spec.ts",
+        "to": "tests/diagnostics/interactions/relationship-audit.spec.ts",
+        "reason": "Diagnostics sub-grouping (interactions)."
+      },
+      {
+        "from": "tests/diagnostics/explorer-tree.spec.ts",
+        "to": "tests/diagnostics/hierarchy/explorer-tree.spec.ts",
+        "reason": "Diagnostics sub-grouping (hierarchy)."
+      },
+      {
+        "from": "tests/diagnostics/hierarchy-navigation.spec.ts",
+        "to": "tests/diagnostics/hierarchy/navigation.spec.ts",
+        "reason": "Diagnostics sub-grouping (hierarchy)."
+      },
+      {
+        "from": "tests/diagnostics/node-inspector.spec.ts",
+        "to": "tests/diagnostics/inspector/node-inspector.spec.ts",
+        "reason": "Diagnostics sub-grouping (inspector)."
+      },
+      {
+        "from": "tests/diagnostics/physics-settle.spec.ts",
+        "to": "tests/diagnostics/physics/settle.spec.ts",
+        "reason": "Diagnostics sub-grouping (physics)."
+      },
+      {
+        "from": "tests/diagnostics/large-graph-profile.spec.ts",
+        "to": "tests/diagnostics/perf/large-graph-profile.spec.ts",
+        "reason": "Diagnostics sub-grouping (perf profiling); balance_metrics.py path may need update."
+      },
+      {
+        "from": "tests/diagnostics/node-expand-legibility.spec.ts",
+        "to": "tests/diagnostics/ui/legibility-floor.spec.ts",
+        "reason": "Diagnostics sub-grouping (ui)."
+      },
+      {
+        "from": "tests/diagnostics/minimap-zoom.spec.ts",
+        "to": "tests/diagnostics/ui/minimap-zoom.spec.ts",
+        "reason": "Diagnostics sub-grouping (ui)."
+      },
+      {
+        "from": "tests/diagnostics/captcha-layout.spec.ts",
+        "to": "tests/diagnostics/ui/captcha-layout.spec.ts",
+        "reason": "Diagnostics sub-grouping (ui)."
+      },
+      {
+        "from": "tests/diagnostics/insecure-connection-banner.spec.ts",
+        "to": "tests/diagnostics/ui/tls-banner.spec.ts",
+        "reason": "Diagnostics sub-grouping (ui) + clearer name."
+      },
+      {
+        "from": "tests/helpers/auth.ts",
+        "to": "tests/lib/auth.ts",
+        "reason": "Consolidate helpers into reusable lib/; ALL ~51 specs import this — codemod required."
+      },
+      {
+        "from": "tests/helpers/api.ts",
+        "to": "tests/lib/api.ts",
+        "reason": "Reusable lib; kept (api-health still uses it after database-connectivity deletion)."
+      },
+      {
+        "from": "tests/helpers/seedGraph.ts",
+        "to": "tests/lib/seedGraph.ts",
+        "reason": "Reusable graph-seeding lib for harness."
+      },
+      {
+        "from": "tests/helpers/dbHealing.ts",
+        "to": "tests/lib/dbHealing.ts",
+        "reason": "Reusable DB-isolation lib for heavy sequences."
+      },
+      {
+        "from": "tests/helpers/testEnv.ts",
+        "to": "tests/lib/testEnv.ts",
+        "reason": "Reusable config loader (.env.test.local)."
+      },
+      {
+        "from": "tests/helpers/mobileAudit.ts",
+        "to": "tests/lib/mobileAudit.ts",
+        "reason": "Reusable auditor module."
+      },
+      {
+        "from": "tests/helpers/zorder.ts",
+        "to": "tests/lib/zorder.ts",
+        "reason": "Reusable auditor module."
+      },
+      {
+        "from": "tests/helpers/vlm.ts",
+        "to": "tests/lib/vlm.ts",
+        "reason": "Reusable VLM client for visual-evaluation sequence."
+      },
+      {
+        "from": "tests/helpers/mock-oauth-server.ts",
+        "to": "tests/lib/mock-oauth-server.ts",
+        "reason": "Reusable OAuth mock; retained for admin/oauth-provider-config."
+      },
+      {
+        "from": "tests/helpers/README.md",
+        "to": "tests/lib/README.md",
+        "reason": "Docs move with helpers; rewrite for new lib layout + harness."
+      },
+      {
+        "from": "tests/helpers/balance_metrics.py",
+        "to": "tests/lib/metrics/balance_metrics.py",
+        "reason": "Reusable metrics tool; specs (graph-balance, large-graph-profile) AND Cloud audit-kit BALANCE_PY reference its path."
+      },
+      {
+        "from": "tests/fixtures/oauth-profiles.ts",
+        "to": "tests/fixtures/oauth-profiles.ts",
+        "reason": "Stays; retained for OAuth mock/admin spec."
+      },
+      {
+        "from": "tests/_draft_unified/aggregate.mjs",
+        "to": "tests/lib/reporting/aggregate.mjs",
+        "reason": "Pure rollup is the core of unified reporting; promote from draft. Then remove _draft_unified/."
+      },
+      {
+        "from": "tests/generate-showcase-report.mjs",
+        "to": "MERGE->tests/lib/adapters/showcase.mjs",
+        "reason": "Fold gallery logic (reads playwright-output/*.webm + showcase/*.png) into harness adapter feeding reporting/html.mjs."
+      },
+      {
+        "from": "tests/generate-matrix-report.mjs",
+        "to": "MERGE->tests/lib/adapters/matrix.mjs",
+        "reason": "Fold feature×resolution gallery into harness adapter."
+      },
+      {
+        "from": "tests/generate-perf-report.mjs",
+        "to": "MERGE->tests/lib/adapters/perf.mjs",
+        "reason": "Fold scale-sweep + graph-perf metric rendering into harness adapter."
+      },
+      {
+        "from": "tests/generate-vlm-report.mjs",
+        "to": "MERGE->tests/lib/adapters/vlm.mjs",
+        "reason": "Fold VLM verdict gallery into harness adapter."
+      },
+      {
+        "from": "tests/perf/check-bundle-size.mjs",
+        "to": "tests/perf/check-bundle-size.mjs",
+        "reason": "Stays; perf:bundle script unchanged."
+      },
+      {
+        "from": "tests/playwright.config.production.ts",
+        "to": "MERGE->playwright.config.ts",
+        "reason": "Fold prod timeouts/junit reporter into root config as env-conditional (CI/TEST_URL); then delete. Removes dead globalSetup binding."
+      },
+      {
+        "from": "GraphDone-Cloud/scripts/lib/audit-kit.mjs",
+        "to": "tests/lib/audit/audit-kit.mjs",
+        "reason": "Promote shared audit toolkit into Core; Cloud consumes via core/ submodule (cross-link)."
+      },
+      {
+        "from": "GraphDone-Cloud/scripts/lib/schema-contract.mjs",
+        "to": "tests/lib/audit/schema-contract.mjs",
+        "reason": "Promote generic SPA↔schema contract validator into Core; Core can validate local server too."
+      },
+      {
+        "from": "GraphDone-Cloud/scripts/lib/schema-coverage.mjs",
+        "to": "tests/lib/audit/schema-coverage.mjs",
+        "reason": "Promote generic mutation-discovery/coverage into Core lib/audit; Cloud cross-links."
+      },
+      {
+        "from": "GraphDone-Cloud/scripts/lib/report.mjs",
+        "to": "MERGE->tests/lib/reporting/html.mjs",
+        "reason": "Reuse renderHtml (dark-theme, embedded screenshots) as the unified html.mjs renderer; single report renderer for both repos."
+      },
+      {
+        "from": "GraphDone-Cloud/scripts/verify-camera-fix.mjs",
+        "to": "scripts/verify-camera-fix.mjs",
+        "reason": "Validates Core PROD build + camera framing; belongs in Core as npm run verify:prod-build."
+      },
+      {
+        "from": "GraphDone-Cloud/scripts/generate-audit-report.mjs",
+        "to": "scripts/generate-audit-report.mjs",
+        "reason": "Re-render report from findings.json; promote to Core as npm run audit:report (uses promoted reporting lib)."
+      },
+      {
+        "from": "GraphDone-Cloud/scripts/live-audit.mjs",
+        "to": "GraphDone-Cloud/scripts/live-audit.mjs",
+        "reason": "Stays in Cloud (prod-specific) but re-point imports to core/tests/lib/audit/* and core/tests/lib/reporting/*; harness ingests its findings.json via cloud-audit adapter."
+      },
+      {
+        "from": "GraphDone-Cloud/scripts/verify-live.mjs",
+        "to": "GraphDone-Cloud/scripts/verify-live.mjs",
+        "reason": "Stays in Cloud; re-point imports to promoted core/tests/lib/audit toolkit."
+      }
+    ],
+    "npmScripts": [
+      {
+        "name": "test:smoke",
+        "command": "playwright test tests/e2e/smoke/user-smoke.spec.ts --reporter=line",
+        "note": "THE GATE — path updated to smoke/ folder; behavior identical. CI smoke-gate + prod-smoke keep calling this name."
+      },
+      {
+        "name": "test:unified",
+        "command": "node tests/run-unified.mjs --profile full",
+        "note": "NEW single entry; runs the declarative sequence manifest, emits test-artifacts/unified/report.html (img+video) + report.json."
+      },
+      {
+        "name": "test:unified:smoke",
+        "command": "node tests/run-unified.mjs --profile smoke",
+        "note": "Fast blocking profile (unit + smoke + core e2e + perf budgets); no heavy report sequences."
+      },
+      {
+        "name": "test:comprehensive",
+        "command": "node tests/run-unified.mjs --profile full",
+        "note": "Repointed from deleted run-all-tests.js to the unified harness (kept as alias for ./start test + docs)."
+      },
+      {
+        "name": "test:pr",
+        "command": "node tests/run-unified.mjs --profile pr",
+        "note": "Repointed from deleted run-pr-tests.js; CI prod-smoke advisory step calls this name."
+      },
+      {
+        "name": "test",
+        "command": "turbo run test",
+        "note": "Unchanged — package unit/vitest suites."
+      },
+      {
+        "name": "test:e2e",
+        "command": "playwright test",
+        "note": "Unchanged; uses canonical root config."
+      },
+      {
+        "name": "test:e2e:core",
+        "command": "playwright test --grep=\"@core\"",
+        "note": "Unchanged."
+      },
+      {
+        "name": "test:e2e:visual",
+        "command": "playwright test tests/e2e/reports/visual-regression.spec.ts",
+        "note": "Path updated to reports/ folder."
+      },
+      {
+        "name": "test:mobile",
+        "command": "playwright test --grep \"@mobile|@audit\" --project=\"GraphDone-Core/dev-neo4j/chromium\" --reporter=line",
+        "note": "Unchanged; tag-driven so survives the folder moves."
+      },
+      {
+        "name": "test:perf",
+        "command": "playwright test --project=perf --reporter=line",
+        "note": "Unchanged (budget gate)."
+      },
+      {
+        "name": "test:perf:scale",
+        "command": "playwright test --project=perf-scale --reporter=line && node tests/run-unified.mjs --sequence perf-scale --report-only",
+        "note": "Generator folded into harness perf adapter."
+      },
+      {
+        "name": "test:geometry",
+        "command": "playwright test --project=geometry --reporter=line",
+        "note": "Unchanged; geometry testDir=./tests/diagnostics is recursive."
+      },
+      {
+        "name": "test:vlm",
+        "command": "playwright test --project=vlm --reporter=line && node tests/run-unified.mjs --sequence vlm --report-only",
+        "note": "Generator folded into harness vlm adapter; skips if no VLM endpoint."
+      },
+      {
+        "name": "report:showcase",
+        "command": "playwright test --project=showcase && node tests/run-unified.mjs --sequence showcase --report-only",
+        "note": "Generator folded into harness showcase adapter (video+screenshots)."
+      },
+      {
+        "name": "report:matrix",
+        "command": "playwright test --project=matrix --reporter=line && node tests/run-unified.mjs --sequence matrix --report-only",
+        "note": "Generator folded into harness matrix adapter."
+      },
+      {
+        "name": "test:https",
+        "command": "playwright test tests/integration/tls-certificate-cross-browser.spec.ts tests/e2e/mobile/tls-compat.spec.ts",
+        "note": "Loose JS ported to specs; runs via canonical config instead of standalone node."
+      },
+      {
+        "name": "perf:bundle",
+        "command": "node tests/perf/check-bundle-size.mjs",
+        "note": "Unchanged."
+      },
+      {
+        "name": "verify:prod-build",
+        "command": "node scripts/verify-camera-fix.mjs http://localhost:4500",
+        "note": "Promoted from Cloud; PROD-mode camera-framing check (needs local PROD build on :4500)."
+      },
+      {
+        "name": "audit:report",
+        "command": "node scripts/generate-audit-report.mjs",
+        "note": "Promoted from Cloud; re-render HTML report from a prior findings.json."
+      },
+      {
+        "name": "test:report",
+        "command": "node tests/run-unified.mjs --open",
+        "note": "Repointed from stale test-results/reports/index.html to test-artifacts/unified/report.html."
+      }
+    ],
+    "referencesToUpdate": [
+      "playwright.config.ts (root, canonical): rewrite projects to drive by directory where possible — default project testDir ./tests/e2e with testIgnore adding tests/e2e/reports/** and tests/integration/**; update vlm project testMatch visual-vlm.spec.ts → vlm-evaluation.spec.ts; update default-project testIgnore list to reference vlm-evaluation.spec.ts (not visual-vlm); confirm showcase/feature-matrix/matrix.setup testMatch still resolve (filenames unchanged); add integration dir exclusion so infra specs never run in the smoke gate; fold prod-config timeouts/junit reporter as env-conditional.",
+      "package.json scripts: test:smoke path, test:e2e:visual path, repoint test:comprehensive + test:pr to run-unified.mjs, rewrite test:https to ported specs, repoint test:report, fold report:perf/report:vlm into harness; add test:unified, test:unified:smoke, verify:prod-build, audit:report; delete test:e2e:error-handling (its target spec is deleted).",
+      ".github/workflows/ci.yml line 192: npx playwright test tests/e2e/living-graph.spec.ts → tests/e2e/graph/living-graph-effects.spec.ts (DIRECT path ref).",
+      ".github/workflows/ci.yml line 307: npm run test:pr now drives the unified harness (--profile pr); confirm advisory continue-on-error still holds.",
+      ".github/workflows/ci.yml smoke-gate (test:smoke, test:mobile, test:perf, report:showcase) — names unchanged, but re-run after each phase to confirm the moves did not break collection.",
+      "ALL keeper specs (~51): relative imports `../helpers/auth` etc. → `../../lib/auth` (depth changed by domain subfolders); also seedGraph/dbHealing/testEnv/mobileAudit/zorder/vlm imports. Apply as a single codemod.",
+      "Subprocess path to balance_metrics.py in diagnostics/layout/graph-balance.spec.ts and diagnostics/perf/large-graph-profile.spec.ts → tests/lib/metrics/balance_metrics.py.",
+      "tests/run-unified.mjs + adapters: artifact roots (test-artifacts/playwright-output for .webm, test-artifacts/{showcase,matrix,vlm,scale-sweep}); write unified outputs to test-artifacts/unified/.",
+      "GraphDone-Cloud/scripts/live-audit.mjs, verify-live.mjs: import paths → core/tests/lib/audit/{audit-kit,schema-contract,schema-coverage}.mjs and core/tests/lib/reporting/html.mjs; audit-kit BALANCE_PY → core/tests/lib/metrics/balance_metrics.py.",
+      "GraphDone-Cloud submodule pointer: bump core/ to the Core commit that contains tests/lib before Cloud imports resolve (cross-repo ordering).",
+      "CLAUDE.md Testing Strategy section: helper import path (tests/helpers/auth.ts → tests/lib/auth.ts), THE GATE path, ./start test + make test-report (legacy test-results/reports path → test-artifacts/unified/report.html).",
+      "./start script + Makefile (test-report target): repoint to test-artifacts/unified/report.html and to test:unified.",
+      "docs/TESTING_AND_REFINEMENT_PLAN.md: referenced by the CI test:pr warning string; update to reflect unified harness.",
+      "tests/lib/README.md: rewrite for new lib/ + harness layout.",
+      "turbo.json / .gitignore: confirm no pinned tests/helpers or test-results/reports paths; add test-artifacts/unified to ignore if needed."
+    ],
+    "unifiedHarness": {
+      "libModules": [
+        "tests/lib/reporting/aggregate.mjs — pure rollup (rollupStatus/statusFromCounts/sumCounts/buildReport), folded from _draft_unified; emits schema graphdone.unified-report/1",
+        "tests/lib/reporting/html.mjs — renders report.html with embedded <img> screenshots + <video> .webm clips and per-sequence sections; reuses Cloud report.mjs renderHtml + galleries",
+        "tests/lib/reporting/json.mjs — writes machine-parsable report.json (+ per-sequence raw JSON under sequences/)",
+        "tests/lib/runner/runSequence.mjs — spawns a step (playwright/vitest/node), captures exit code + stdout, resolves the step's JSON output and artifact directory",
+        "tests/lib/adapters/playwright.mjs — parses Playwright JSON reporter into cases; collects .webm from test-artifacts/playwright-output and screenshots",
+        "tests/lib/adapters/vitest.mjs — parses vitest JSON output from the four packages into case counts",
+        "tests/lib/adapters/perf.mjs — folds generate-perf-report.mjs; turns scale-sweep + graph-perf JSON into metric charts",
+        "tests/lib/adapters/vlm.mjs — folds generate-vlm-report.mjs; turns VLM results.json into persona verdict cards",
+        "tests/lib/adapters/matrix.mjs — folds generate-matrix-report.mjs; builds feature×resolution gallery",
+        "tests/lib/adapters/showcase.mjs — folds generate-showcase-report.mjs; builds video+screenshot gallery (the .webm source)",
+        "tests/lib/adapters/cloud-audit.mjs — optional ingest of GraphDone-Cloud live-audit findings.json into a sequence",
+        "tests/lib/audit/audit-kit.mjs — promoted Cloud toolkit (Playwright resolve, GraphQL client, browser probes, AuditRun)",
+        "tests/lib/audit/schema-contract.mjs — promoted SPA↔schema validator (generic over any GraphQL endpoint)",
+        "tests/lib/audit/schema-coverage.mjs — promoted mutation discovery/coverage",
+        "tests/lib/auth.ts — battle-tested login/navigateToWorkspace (consumed by every spec sequence)"
+      ],
+      "sequences": [
+        "smoke — playwright tests/e2e/smoke/user-smoke.spec.ts (THE GATE; blocking; in smoke+pr+full profiles)",
+        "unit — turbo run test → vitest JSON for core/server/web/mcp-server (blocking)",
+        "e2e-core — default project @core + auth/graph/ui/a11y/responsive/api domain specs (blocking)",
+        "mobile — --grep @mobile|@audit (blocking in pr/full)",
+        "perf-budgets — perf project graph-perf.spec.ts (ADAPT-8 budgets; blocking)",
+        "diagnostics — geometry project (report-only; full profile)",
+        "perf-scale — perf-scale project + perf adapter metrics (report-only; full)",
+        "showcase — showcase project (records .webm + screenshots) + showcase adapter (report-only; provides video for report.html)",
+        "matrix — matrix project (depends matrix-setup) + matrix adapter gallery (report-only)",
+        "vlm — vlm project + vlm adapter (report-only; auto-skips when no VLM_ENDPOINTS)",
+        "cloud-audit — optional: ingest GraphDone-Cloud findings.json via cloud-audit adapter (report-only; skipped if absent)"
+      ],
+      "entry": "tests/run-unified.mjs (npm run test:unified) — reads tests/sequences/unified.config.mjs, selects sequences by --profile {smoke|pr|full|report} or --sequence <name>, runs each via runner/runSequence.mjs, maps results through adapters, aggregates with reporting/aggregate.mjs, and writes both reports. Exit code = rollup status (failed→1) so it doubles as a gate.",
+      "outputs": [
+        "test-artifacts/unified/report.html — human-readable: per-sequence pass/warn/fail, embedded <img> screenshots, embedded <video> .webm clips (showcase), perf charts, VLM gallery",
+        "test-artifacts/unified/report.json — machine-parsable (schema graphdone.unified-report/1): rollup status, totals, per-sequence counts + artifact paths",
+        "test-artifacts/unified/sequences/<name>.json — raw per-sequence results for debugging/CI artifact upload",
+        "process exit code — 0 pass / 1 on any blocking failure, for CI gating"
+      ]
+    },
+    "deletions": [
+      "tests/e2e/auth-basic-test.spec.ts — redundant admin-login; covered by form-validation/mobile-audit",
+      "tests/e2e/auth-system-test.spec.ts — vague auth validation; form-validation is more specific",
+      "tests/e2e/add-node.spec.ts — overlaps user-smoke grow flow",
+      "tests/e2e/comprehensive-interaction.spec.ts — vague exploratory; overlaps diagnostics core-matrix",
+      "tests/e2e/comprehensive-graph-operations.spec.ts — vague; overlaps living-graph + real-time specs",
+      "tests/e2e/database-connectivity.spec.ts — Neo4j-only failure path obsolete under D1-first arch (api.ts retained for api-health)",
+      "tests/e2e/fix-left-click-refresh.spec.ts — one-off bug proof, untagged, not in scripts",
+      "tests/e2e/flash-detection.spec.ts — exploratory, untagged; overlaps showcase",
+      "tests/e2e/graph-error-handling.spec.ts — data-template not real test; doesn't match GraphQL schema (also removes test:e2e:error-handling)",
+      "tests/e2e/graph-real-time-updates.spec.ts — unclear purpose; overlaps living-graph",
+      "tests/e2e/manual-test.spec.ts — manual placeholder, no assertions",
+      "tests/e2e/neo4j-core-functionality.spec.ts — redundant with @core; untagged",
+      "tests/e2e/neo4j-working-demo.spec.ts — old demo proof; overlaps user-smoke",
+      "tests/e2e/oauth-linkedin.spec.ts — stale OAuth provider (magic-link now); mock-oauth-server + fixtures retained for admin/oauth-provider-config",
+      "tests/e2e/project-name-verification.spec.ts — exploratory naming check, untagged",
+      "tests/e2e/screenshot-current-graph.spec.ts — documentation artifact, not a test; overlaps showcase",
+      "tests/e2e/simple-error-test.spec.ts — template placeholder, no real assertions",
+      "tests/e2e/ui-basic-functionality.spec.ts — vague; overlaps responsive",
+      "tests/e2e/user-workflow.spec.ts — overlaps user-smoke/basic-workflow, untagged",
+      "tests/e2e/user-workflow-robust.spec.ts — overlaps user-smoke, untagged",
+      "tests/e2e/verify-improved-visualization.spec.ts — old visualization proof; overlaps user-smoke/showcase",
+      "tests/e2e/verify-ui-data.spec.ts — generic proof, no real assertions",
+      "tests/e2e/workspace-scrolling.spec.ts — old issue proof, no real assertions",
+      "tests/run-all-tests.js — replaced by tests/run-unified.mjs",
+      "tests/run-pr-tests.js — replaced by tests/run-unified.mjs --profile pr",
+      "tests/ci-basic-tests.js — mock-only fake results; CI runs real playwright now",
+      "tests/quick-auth-test.js — manual debug tool, hardcoded creds",
+      "tests/simple-login-test.js — manual debug tool, infinite wait",
+      "tests/manual-graph-operations-test.js — manual debug tool",
+      "tests/realtime-update-test.js — manual debug tool",
+      "tests/test-production-scrolling.js — manual debug tool, hardcoded :3128",
+      "tests/test-refresh-bugs.js — manual debug tool",
+      "tests/https-browser-compatibility-test.js — overlaps ported tls specs; not in scripts",
+      "tests/global-setup-production.js — dead binding (only the deleted production config referenced it)",
+      "tests/playwright.config.ts — duplicate config, referenced by nothing",
+      "tests/playwright.config.production.ts — settings folded into root config, then removed",
+      "tests/_draft_unified/ — emptied after aggregate.mjs promoted to lib/reporting",
+      "scripts/generate-final-report.sh — duplicate installation-report generator (keep generate-clean-report.sh)",
+      "scripts/generate-comprehensive-report.sh — duplicate installation-report generator (keep generate-clean-report.sh)",
+      "scripts/test-cert-security.sh — stale, not in CI; covered by test-tls.sh",
+      "scripts/test-installation-demo.sh — duplicate of test-installation-simple.sh",
+      "scripts/test-installation-full.sh — duplicate of test-installation-simple.sh",
+      "scripts/test-installation-functional.sh — duplicate of test-installation-simple.sh",
+      "scripts/test-installation-macos.sh — single-platform, not in CI",
+      "scripts/test-installation-multi-distro.sh — deprecated; Docker approach in test-installation-simple.sh"
+    ],
+    "risks": [
+      "The ~51-spec import codemod (helpers→lib + deeper folders) is the highest-risk change: one missed relative path throws at COLLECTION, which silently zeroes a whole project run — the exact failure class as the CI=true/webServer incident. Mitigate: codemod in one commit, then `playwright test --list` per project + run THE GATE before moving on.",
+      "Playwright projects use filename-regex testMatch; the visual-vlm→vlm-evaluation rename must be mirrored in BOTH the vlm project testMatch AND the default project testIgnore, or the heavy VLM spec leaks into the fast smoke project (or the vlm project matches nothing).",
+      "Report-only specs resolve artifact output by path; moving them into deeper subfolders can shift __dirname-relative writes (showcase per-viewport dirs, scale-sweep JSON). Verify all output roots resolve from repo root, not the spec's directory.",
+      "balance_metrics.py is referenced by string path from two specs AND by Cloud audit-kit (BALANCE_PY); moving it can break Cloud's layout metrics, and audit-kit's graceful-degrade may hide the breakage. Grep both repos for the old path.",
+      "Deleting oauth-linkedin.spec.ts removes the only importer of mock-oauth-server.ts + oauth fixtures; they are retained ONLY because admin/oauth-provider-config keeps using them — confirm that before deleting, else also delete the lib+fixture.",
+      "Deleting database-connectivity.spec.ts removes one of two api.ts consumers; api-health.spec.ts still needs api.ts — do not delete api.ts.",
+      "test:pr / test:comprehensive are public surface (CLAUDE.md, ./start test, CI prod-smoke). Repointing to the unified harness changes their output location and exit semantics; CI prod-smoke is advisory (continue-on-error) so a harness regression there is silent.",
+      "Cloud is a submodule pinned to a Core commit. Promoting libs into Core means Cloud imports break until its submodule pointer is bumped — cross-repo ordering hazard; sequence Core-first, then Cloud bump.",
+      "Heavy sequences (matrix ~100 cells, showcase 5 viewports, scale-sweep up to 2000 nodes, VLM GPU) must stay OUT of the blocking smoke/pr profiles or local + CI gate runs time out; keep them report-only/full-profile.",
+      "Legacy report path test-results/reports/index.html is referenced by ./start test, Makefile test-report, and CLAUDE.md; missing these leaves dead links after the harness moves output to test-artifacts/unified.",
+      "Folding Cloud report.mjs into reporting/html.mjs must preserve the embedded-base64-screenshot path so Cloud's portable single-file report still works; regression here breaks shareable audit reports."
+    ],
+    "phases": [
+      "Phase 0 — Scaffold the harness without moving anything. Create tests/lib/{reporting,adapters,runner}, promote _draft_unified/aggregate.mjs into lib/reporting, build run-unified.mjs + json.mjs + html.mjs + adapters against the CURRENT artifact paths, add tests/sequences/unified.config.mjs and the test:unified scripts. GATE UNCHANGED. Verify: TEST_URL=http://localhost:3127 npm run test:smoke green AND npm run test:unified emits report.html+report.json from the existing layout.",
+      "Phase 1 — Delete dead weight (no keepers touched). Remove the 23 dead/stale e2e specs, 11 loose tests/*.js, duplicate/stale configs (tests/playwright.config.ts, production config, global-setup-production.js), and redundant shell scripts. Drop/neutralize their npm scripts. Verify: gate green; `playwright test --list` shows only keepers.",
+      "Phase 2 — Consolidate helpers→tests/lib + codemod imports (NO folder reshuffle of specs yet). Move helpers/* + balance_metrics.py into lib/ (+ metrics/), run the import codemod across all keeper specs, fix the balance_metrics.py subprocess paths. Verify: `playwright test --list` per project (zero collection errors) + gate green.",
+      "Phase 3 — Reorganize specs into domain folders (e2e/<domain>, diagnostics/<concern>, integration/, reports/) with renames; rewrite root playwright.config.ts projects (testDir/testMatch/testIgnore incl. vlm-evaluation rename + integration exclusion); update test:smoke + test:e2e:visual paths and CI line 192 (living-graph). Verify: gate green via the renamed path; each PW project --list resolves; test:mobile (tag-driven) green.",
+      "Phase 4 — Fold the 4 report generators into adapters and port the loose-JS keepers to specs (tls-certificate-cross-browser, mobile/tls-compat). Wire report:showcase/report:matrix/test:vlm/test:perf:scale + test:pr/test:comprehensive through run-unified.mjs. Verify: each report sequence emits into test-artifacts/unified with embedded video+images; gate still green.",
+      "Phase 5 — Cross-repo: promote audit-kit/schema-contract/schema-coverage + report renderer into Core tests/lib/{audit,reporting}, move verify-camera-fix.mjs + generate-audit-report.mjs into Core scripts, add the cloud-audit adapter, add verify:prod-build + audit:report. Then bump GraphDone-Cloud's core/ submodule and re-point its live-audit/verify-live imports. Verify: Cloud verify-live still passes; Core audit:report renders from a sample findings.json.",
+      "Phase 6 — Docs + final cleanup. Update CLAUDE.md testing section, ./start test, Makefile test-report, tests/lib/README.md to the new layout/paths; delete tests/_draft_unified and any _archive. Final full run: npm run test:unified (full profile) + THE GATE green."
+    ]
+  }
+}
