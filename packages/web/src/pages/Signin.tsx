@@ -430,10 +430,14 @@ export function Signin({ initialMagicLink = false }: { initialMagicLink?: boolea
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4 relative overflow-hidden">
       {/* Static gradient background - optimized for all browsers */}
       <div className="lagoon-caustics"></div>
-      <div className="max-w-md w-full relative z-10">
+      {/* Design religion: fit the window. On large screens the branding sits
+          BESIDE the form (wider, 2-column) so the page never needs vertical
+          scrolling; on small screens it stacks above as before. */}
+      <div className="w-full max-w-md lg:max-w-4xl relative z-10">
+       <div className="lg:grid lg:grid-cols-2 lg:gap-12 lg:items-center">
         {/* Header */}
-        <div className="text-center mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
-          <Link to="/" className="inline-flex items-center justify-center mb-6 hover:opacity-90 transition-all duration-300 hover:scale-105 group">
+        <div className="text-center lg:text-left mb-8 lg:mb-0 animate-in fade-in slide-in-from-top-4 duration-500">
+          <Link to="/" className="inline-flex items-center justify-center lg:justify-start mb-6 hover:opacity-90 transition-all duration-300 hover:scale-105 group">
             <img src="/favicon.svg" alt="GraphDone Logo" className="h-12 w-12 sm:h-16 sm:w-16 drop-shadow-lg group-hover:drop-shadow-2xl transition-all duration-300" />
             <span className="ml-3 sm:ml-4 text-4xl sm:text-5xl font-bold bg-gradient-to-r from-teal-400 via-cyan-400 to-blue-500 bg-clip-text text-transparent drop-shadow-2xl tracking-tight">GraphDone</span>
           </Link>
@@ -961,6 +965,7 @@ export function Signin({ initialMagicLink = false }: { initialMagicLink?: boolea
             </div>
           )}
         </form>
+       </div>
 
         {/* Development Mode - Default Credentials */}
         {showDefaultCredentials && (
