@@ -139,4 +139,25 @@ test.describe('camera framing + persistence @camera', () => {
     expect(total, 'graph has nodes after the delayed load').toBeGreaterThan(0);
     expect(inView, `${inView}/${total} nodes framed despite slow load`).toBeGreaterThan(total * 0.5);
   });
+
+  test('re-frames the graph after a significant viewport resize', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await gotoGraph(page);
+    // Pan hard so the graph leaves the frame, wait past the camera-save debounce.
+    const canvas = await page.locator('.graph-container').first().boundingBox();
+    if (!canvas) throw new Error('no canvas');
+    await page.mouse.move(canvas.x + canvas.width / 2, canvas.y + canvas.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(canvas.x + canvas.width / 2 - 700, canvas.y + canvas.height / 2 - 500, { steps: 10 });
+    await page.mouse.up();
+    await page.waitForTimeout(800);
+    const panned = await nodesInView(page);
+    expect(panned.inView, `pan pushed nodes off (${panned.inView}/${panned.total})`).toBeLessThan(panned.total);
+
+    // Shrink the window materially (>20%) → the resize handler re-frames.
+    await page.setViewportSize({ width: 900, height: 700 });
+    await page.waitForTimeout(1200); // 250ms debounce + 450ms fit transition + margin
+    const reframed = await nodesInView(page);
+    expect(reframed.inView, `resize re-framed ${reframed.inView}/${reframed.total}`).toBeGreaterThan(reframed.total * 0.5);
+  });
 });

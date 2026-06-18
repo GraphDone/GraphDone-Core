@@ -3861,7 +3861,13 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       {
         const gid = currentGraphIdRef.current;
         if (gid) {
-          const cam = { x: event.transform.x, y: event.transform.y, k: event.transform.k };
+          // Stamp the viewport size with the camera so a later restore can tell
+          // the window was resized materially (rotate / maximize) and re-fit
+          // instead of applying a transform framed for a different size.
+          const cam = {
+            x: event.transform.x, y: event.transform.y, k: event.transform.k,
+            w: containerRef.current?.clientWidth || 0, h: containerRef.current?.clientHeight || 0,
+          };
           if (cameraSaveTimerRef.current) clearTimeout(cameraSaveTimerRef.current);
           cameraSaveTimerRef.current = setTimeout(() => {
             try { localStorage.setItem(`graphdone:camera:${gid}`, JSON.stringify(cam)); } catch { /* ignore */ }
@@ -4153,6 +4159,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     };
   }, []);
 
+
   // Reset layout = the explicit "re-flow everything" escape hatch. It must
   // override snapshot-authoritative pinning: clear each node's saved-position
   // intent (in memory) and unpin, suspend re-pinning while physics rearranges,
@@ -4260,6 +4267,32 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   // hasNodes only and restored one global transform, so it never recentered on
   // a graph change. We wait briefly for the one-shot layout to settle, then fit.
   const hasNodes = nodes.length > 0;
+
+  // Re-frame the graph when the container changes size SIGNIFICANTLY (window
+  // resize, rotate, sidebar/panel toggle) so a camera framed for the old size
+  // isn't left mis-centred. A ResizeObserver on the container is more reliable
+  // than the window 'resize' event (which didn't fire in headless tests) and
+  // also catches layout-driven size changes. Debounced + gated on a >20% size
+  // delta so it doesn't fight a user nudging the window edge or a normal pan.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || !hasNodes) return undefined;
+    let last = { w: el.clientWidth || 0, h: el.clientHeight || 0 };
+    let t: ReturnType<typeof setTimeout> | null = null;
+    const ro = new ResizeObserver(() => {
+      if (t) clearTimeout(t);
+      t = setTimeout(() => {
+        const w = el.clientWidth || 0, h = el.clientHeight || 0;
+        if (!w || !h || !last.w || !last.h) { last = { w, h }; return; }
+        const changed = Math.abs(w - last.w) / last.w > 0.2 || Math.abs(h - last.h) / last.h > 0.2;
+        last = { w, h };
+        if (changed) fitViewRef.current();
+      }, 250);
+    });
+    ro.observe(el);
+    return () => { if (t) clearTimeout(t); ro.disconnect(); };
+  }, [hasNodes]);
+
   const isDenseGraph = nodes.length > DENSE_GRAPH_NODE_THRESHOLD;
   const isSimplified = isDenseGraph && (currentTransform?.scale ?? 1) < SIMPLIFY_SCALE;
   const isDotMode = isDenseGraph && (currentTransform?.scale ?? 1) < DOT_SCALE;
@@ -4310,9 +4343,16 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     if (fittedGraphsRef.current.has(currentGraphId)) return undefined;
     const gid = currentGraphId;
 
-    let saved: { x: number; y: number; k: number } | null = null;
+    let saved: { x: number; y: number; k: number; w?: number; h?: number } | null = null;
     try { const r = localStorage.getItem(`graphdone:camera:${gid}`); saved = r ? JSON.parse(r) : null; } catch { /* ignore */ }
-    const hasSaved = !!(saved && typeof saved.k === 'number');
+    // A saved camera framed for a very different viewport (resized window, rotated
+    // device) would mis-frame the graph now — prefer a fresh fit in that case.
+    const sizeMatches = (s: { w?: number; h?: number }): boolean => {
+      const cw = containerRef.current?.clientWidth || 0, ch = containerRef.current?.clientHeight || 0;
+      if (!s.w || !s.h || !cw || !ch) return true; // legacy save without size → trust it
+      return Math.abs(cw - s.w) / s.w < 0.2 && Math.abs(ch - s.h) / s.h < 0.2;
+    };
+    const hasSaved = !!(saved && typeof saved.k === 'number' && sizeMatches(saved));
 
     let timer: ReturnType<typeof setTimeout> | null = null;
     let tries = 0;
