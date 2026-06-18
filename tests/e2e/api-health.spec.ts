@@ -1,9 +1,9 @@
 import { test, expect } from '@playwright/test';
-import { HEALTH_URL, gqlRequest, apiLogin } from '../helpers/api';
+import { HEALTH_URL, gqlRequest, apiLogin } from '../lib/api';
 
 // API health checks, deployment-agnostic: every URL derives from TEST_URL
 // (nginx route layout in production, Vite proxy in dev) and data queries
-// authenticate the same way the UI does. See tests/helpers/api.ts.
+// authenticate the same way the UI does. See tests/lib/api.ts.
 test.describe('GraphQL API Health Tests', () => {
   let token: string;
 

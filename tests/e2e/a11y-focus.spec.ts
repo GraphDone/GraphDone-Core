@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { login, TEST_USERS, getBaseURL } from '../helpers/auth';
+import { login, TEST_USERS, getBaseURL } from '../lib/auth';
 
 /**
  * Modal accessibility / keyboard-focus gate (@a11y). Asserts the contract added

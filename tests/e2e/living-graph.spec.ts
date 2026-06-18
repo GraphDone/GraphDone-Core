@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { login, TEST_USERS } from '../helpers/auth';
+import { login, TEST_USERS } from '../lib/auth';
 
 /**
  * The living graph is the product's differentiator (breathing, glow, energy

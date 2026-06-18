@@ -1,8 +1,8 @@
 import { test, expect, Page } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
-import { login, TEST_USERS } from '../helpers/auth';
-import { sweepTestData, TEST_GRAPH_PREFIX } from '../helpers/dbHealing';
+import { login, TEST_USERS } from '../lib/auth';
+import { sweepTestData, TEST_GRAPH_PREFIX } from '../lib/dbHealing';
 
 /**
  * Graph-geometry diagnostic — measures node/edge/label geometry from the REAL
