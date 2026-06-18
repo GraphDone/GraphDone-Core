@@ -3667,9 +3667,20 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           // points "backward" — which leaves the directional label icon pointing
           // the wrong way after a flip. Carry that lost 180° on the icon so its
           // arrow tracks the real edge direction (and flips when the edge flips).
+          // CRITICAL: rotate around the ICON's own centre — a bare rotate(180)
+          // pivots on the group origin (0,0), which threw the icon across onto the
+          // label text (overlap) and left it upside-down. The icon is a 14×14
+          // foreignObject at (x,y), so its centre is (x+7, y+7).
           const trueAngle = (Math.atan2(target.y - source.y, target.x - source.x) * 180) / Math.PI;
           const iconFlipped = trueAngle > 90 || trueAngle < -90;
-          d3.select(this).select('.edge-label-icon').attr('transform', iconFlipped ? 'rotate(180)' : null);
+          const iconSel = d3.select(this).select('.edge-label-icon');
+          if (iconFlipped) {
+            const ix = parseFloat(iconSel.attr('x') || '-7');
+            const iy = parseFloat(iconSel.attr('y') || '-7');
+            iconSel.attr('transform', `rotate(180, ${ix + 7}, ${iy + 7})`);
+          } else {
+            iconSel.attr('transform', null);
+          }
           return `translate(${placement.x},${placement.y}) rotate(${placement.rotation})`;
         });
     };
