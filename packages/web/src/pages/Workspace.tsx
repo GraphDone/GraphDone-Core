@@ -18,6 +18,7 @@ import { GET_WORK_ITEMS, GET_EDGES } from '../lib/queries';
 import { APP_VERSION } from '../utils/version';
 import { useHealthStatus } from '../hooks/useHealthStatus';
 import { useViewMode } from '../contexts/ViewModeContext';
+import { parseLayoutMode, LAYOUT_MODE_STORAGE_KEY, type LayoutMode } from '../lib/layoutAlgorithms';
 
 export function Workspace() {
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -36,6 +37,15 @@ export function Workspace() {
     typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
   );
   const [showMiniMap, setShowMiniMap] = useState(true);
+  const [layoutMode, setLayoutMode] = useState<LayoutMode>(() =>
+    parseLayoutMode(typeof window !== 'undefined' ? window.localStorage.getItem(LAYOUT_MODE_STORAGE_KEY) : null)
+  );
+  const toggleLayoutMode = () => {
+    const next: LayoutMode = layoutMode === 'hierarchical' ? 'force' : 'hierarchical';
+    setLayoutMode(next);
+    try { window.localStorage.setItem(LAYOUT_MODE_STORAGE_KEY, next); } catch { /* storage unavailable */ }
+    (window as any).triggerLayoutMode?.(next);
+  };
   const { currentGraph, availableGraphs, getBreadcrumb, ascendTo } = useGraph();
   const breadcrumb = getBreadcrumb();
   const [inspectorNode, setInspectorNode] = useState<any>(null);
@@ -501,6 +511,22 @@ export function Workspace() {
             </div>
           </div>
         </div>,
+        document.body
+      )}
+
+      {/* Layout Mode Toggle - force (organic) vs hierarchical (dependency layers) */}
+      {viewMode === 'graph' && currentGraph && !isMobile && createPortal(
+        <button
+          onClick={toggleLayoutMode}
+          className={`fixed bottom-4 left-4 backdrop-blur-sm border rounded-lg p-3 shadow-xl transition-all duration-200 z-50 ${
+            layoutMode === 'hierarchical'
+              ? 'bg-blue-600/90 border-blue-400 hover:bg-blue-500/90'
+              : 'bg-gray-800/90 border-gray-600 hover:bg-gray-700/90'
+          }`}
+          title={layoutMode === 'hierarchical' ? 'Hierarchical layout (click for force)' : 'Force layout (click for hierarchical)'}
+        >
+          <Network className={`h-5 w-5 ${layoutMode === 'hierarchical' ? 'text-white' : 'text-gray-400'}`} />
+        </button>,
         document.body
       )}
 

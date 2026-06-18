@@ -68,3 +68,36 @@ export function computeLayerYPositions(
 export function isHierarchicalLayout(mode: string | undefined | null): boolean {
   return mode === 'hierarchical';
 }
+
+/** The two graph layout modes. 'force' is the organic default. */
+export type LayoutMode = 'force' | 'hierarchical';
+
+/** localStorage key the graph view persists the chosen layout mode under. */
+export const LAYOUT_MODE_STORAGE_KEY = 'graphdone:layoutMode';
+
+/** Coerce any stored/raw value to a valid LayoutMode (defaults to 'force'). */
+export function parseLayoutMode(raw: string | undefined | null): LayoutMode {
+  return raw === 'hierarchical' ? 'hierarchical' : 'force';
+}
+
+/**
+ * Per-node target Y for the hierarchical layout: assign dependency layers, map
+ * each layer to a Y, then resolve every node to its layer's Y. The simulation
+ * pins each node's fy to this so it settles into dependency layers (X stays free
+ * to arrange organically). Pure glue over the two layering primitives.
+ */
+export function computeNodeLayerY(
+  nodes: NodeLike[],
+  edges: EdgeLike[],
+  viewport: { width: number; height: number },
+  verticalPadding = 60,
+): Map<string, number> {
+  const layers = assignLayersByDependencyDirection(nodes, edges);
+  const layerY = computeLayerYPositions(layers, viewport, verticalPadding);
+  const out = new Map<string, number>();
+  for (const node of nodes) {
+    const layer = layers.get(node.id) ?? 0;
+    out.set(node.id, layerY.get(layer) ?? verticalPadding);
+  }
+  return out;
+}

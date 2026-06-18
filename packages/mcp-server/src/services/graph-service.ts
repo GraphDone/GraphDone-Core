@@ -40,6 +40,14 @@ import { electCoordinator } from '../utils/leader-election.js';
 import { withCPUThrottling, isSystemUnderStress } from '../utils/cpu-monitor.js';
 import { withConnectionPoolLimit } from '../utils/connection-pool.js';
 import { withReadConsistency, withWriteConsistency } from '../utils/consistency-manager.js';
+import {
+  rankTaskAssignments,
+  ContributorProfile,
+  ContributorExpertise,
+  ExpertiseLevel,
+  CapacityStatus,
+  OpenTask
+} from './assignment-synthesis.js';
 
 export interface PaginationInfo {
   total_count: number;
@@ -3741,6 +3749,154 @@ export class GraphService {
         await tx.rollback();
         throw error;
       }
+    } finally {
+      await session.close();
+    }
+  }
+
+  async suggestTaskAssignment(args: {
+    graph_id?: string;
+    task_ids?: string[];
+    open_statuses?: string[];
+    include_assigned?: boolean;
+    expertise_weight?: number;
+    availability_weight?: number;
+    max_candidates_per_task?: number;
+    min_items_threshold?: number;
+    task_limit?: number;
+  }): Promise<MCPResponse> {
+    if (!args.graph_id) {
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify({ error: 'graph_id is required' })
+        }],
+        isError: true
+      };
+    }
+
+    const session = this.driver.session();
+    try {
+      const openStatuses = args.open_statuses?.length
+        ? args.open_statuses
+        : ['PROPOSED', 'ACTIVE', 'IN_PROGRESS', 'BLOCKED'];
+      const minThreshold = args.min_items_threshold ?? 3;
+      const taskLimit = args.task_limit ?? 25;
+      const includeAssigned = args.include_assigned ?? false;
+
+      const tasksQuery = `
+        MATCH (g:Graph {id: $graphId})<-[:BELONGS_TO]-(w:WorkItem)
+        WHERE w.status IN $openStatuses
+          AND ($taskIds IS NULL OR w.id IN $taskIds)
+        OPTIONAL MATCH (w)<-[:CONTRIBUTES_TO]-(assignee:Contributor)
+        WITH w, count(assignee) AS assigneeCount
+        WHERE $includeAssigned OR assigneeCount = 0
+        RETURN w.id AS id, w.title AS title, w.type AS type, w.priorityComp AS priority
+        ORDER BY w.priorityComp DESC
+        LIMIT $taskLimit
+      `;
+
+      const tasksResult = await session.run(tasksQuery, {
+        graphId: args.graph_id,
+        openStatuses,
+        taskIds: args.task_ids?.length ? args.task_ids : null,
+        includeAssigned,
+        taskLimit: int(taskLimit)
+      });
+
+      const tasks: OpenTask[] = tasksResult.records.map(record => ({
+        id: String(record.get('id')),
+        title: record.get('title') ? String(record.get('title')) : '',
+        type: record.get('type') ? String(record.get('type')) : 'TASK',
+        priority: typeof record.get('priority') === 'number'
+          ? (record.get('priority') as number)
+          : undefined
+      }));
+
+      const contributorsQuery = `
+        MATCH (g:Graph {id: $graphId})<-[:BELONGS_TO]-(:WorkItem)<-[:CONTRIBUTES_TO]-(c:Contributor)
+        WITH DISTINCT c
+        OPTIONAL MATCH (c)-[:CONTRIBUTES_TO]->(active:WorkItem)
+          WHERE active.status IN ['ACTIVE', 'IN_PROGRESS', 'BLOCKED']
+        WITH c, count(active) AS activeItems
+        OPTIONAL MATCH (c)-[:CONTRIBUTES_TO]->(hist:WorkItem)
+        WITH c, activeItems, hist.type AS workType,
+             count(hist) AS typeCount,
+             sum(CASE WHEN hist.status = 'COMPLETED' THEN 1 ELSE 0 END) AS completed
+        WITH c, activeItems,
+             collect(CASE WHEN workType IS NULL THEN null
+                          ELSE {workType: workType, count: typeCount, completed: completed} END) AS expertise
+        RETURN c.id AS contributorId, c.name AS contributorName, activeItems, expertise
+      `;
+
+      const contributorsResult = await session.run(contributorsQuery, {
+        graphId: args.graph_id
+      });
+
+      const toNum = (v: unknown): number =>
+        typeof (v as { toNumber?: () => number })?.toNumber === 'function'
+          ? (v as { toNumber: () => number }).toNumber()
+          : Number(v) || 0;
+
+      const capacityFor = (activeItems: number): CapacityStatus => {
+        if (activeItems >= 15) return 'overloaded';
+        if (activeItems >= 10) return 'at_capacity';
+        if (activeItems >= 5) return 'busy';
+        return 'available';
+      };
+
+      const contributors: ContributorProfile[] = contributorsResult.records.map(record => {
+        const activeItems = toNum(record.get('activeItems'));
+        const rawExpertise = (record.get('expertise') || []) as Array<{
+          workType: string;
+          count: unknown;
+          completed: unknown;
+        } | null>;
+
+        const expertise: ContributorExpertise[] = rawExpertise
+          .filter((e): e is { workType: string; count: unknown; completed: unknown } => !!e && !!e.workType)
+          .map(e => {
+            const count = toNum(e.count);
+            const completed = toNum(e.completed);
+            const completionRate = count > 0 ? completed / count : 0;
+            let level: ExpertiseLevel = 'Beginner';
+            if (count >= minThreshold) {
+              level = completionRate > 0.8 ? 'Expert' : 'Proficient';
+            }
+            return { workType: e.workType, level, completionRate };
+          });
+
+        return {
+          id: String(record.get('contributorId')),
+          name: record.get('contributorName') ? String(record.get('contributorName')) : '',
+          activeItems,
+          capacityStatus: capacityFor(activeItems),
+          expertise
+        };
+      });
+
+      const suggestions = rankTaskAssignments(tasks, contributors, {
+        weights: {
+          expertiseWeight: args.expertise_weight,
+          availabilityWeight: args.availability_weight
+        },
+        maxCandidatesPerTask: args.max_candidates_per_task
+      });
+
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify({
+            graph_id: args.graph_id,
+            summary: {
+              open_tasks: tasks.length,
+              candidate_contributors: contributors.length,
+              tasks_with_a_suggestion: suggestions.filter(s => s.bestCandidate).length
+            },
+            suggestions
+          }, null, 2)
+        }]
+      };
     } finally {
       await session.close();
     }
