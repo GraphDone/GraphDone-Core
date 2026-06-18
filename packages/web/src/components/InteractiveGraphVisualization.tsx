@@ -2496,13 +2496,18 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       })
       .attr('stroke-width', 1.5);
 
-    // Node type text in colored title bar (centered)
+    const iconSize = Math.max(16, Math.min(24, titleBarHeight * 0.7));
+    // Node type text: centered in the OPEN GAP between the single left (gear)
+    // button and the right button cluster (expand + grow), NOT the whole header —
+    // gear right edge ≈ -W/2+iconSize+12, expand left edge ≈ W/2-2*iconSize-20, so
+    // the gap midpoint is -(iconSize+8)/2 (independent of node width).
+    const typeGapX = -(iconSize + 8) / 2;
     nodeElements.append('text')
       .attr('class', 'node-type-text')
-      .attr('x', 0)
+      .attr('x', typeGapX)
       .attr('y', (d: WorkItem) => -getNodeDimensions(d).height / 2 + titleBarHeight / 2 + 2)
       .attr('text-anchor', 'middle')
-      .attr('dominant-baseline', 'middle')
+      .attr('dominant-baseline', 'central')
       .text((d: WorkItem) => d.type)
       .style('opacity', (currentTransform?.k || 1) >= LOD_THRESHOLDS.FAR ? 1 : 0)
       .style('font-size', '13px')
@@ -2514,7 +2519,6 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .style('pointer-events', 'none');
 
     // Edit icon in title bar (centered vertically, left side) - scales with zoom
-    const iconSize = Math.max(16, Math.min(24, titleBarHeight * 0.7));
     const editIcons = nodeElements.append('g')
       .attr('class', 'node-edit-icon')
       .attr('transform', (d: WorkItem) => {
@@ -2525,7 +2529,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .style('cursor', 'pointer')
       .style('opacity', (currentTransform?.k || 1) >= LOD_THRESHOLDS.FAR ? 0.85 : 0)
       .style('pointer-events', 'all');
-    
+    editIcons.append('title').text('Open details / edit'); // native hover tooltip
+
     // Edit icon background - scales with icon
     const editBg = editIcons.append('rect')
       .attr('class', 'edit-bg')
@@ -2544,7 +2549,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .attr('x', 0)
       .attr('y', 0)
       .attr('text-anchor', 'middle')
-      .attr('dominant-baseline', 'middle')
+      .attr('dominant-baseline', 'central')
       .style('font-size', `${iconSize * 1.1}px`)
       .style('fill', '#ffffff')
       .style('pointer-events', 'none')
@@ -2611,7 +2616,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .style('cursor', 'pointer')
       .style('opacity', (currentTransform?.k || 1) >= LOD_THRESHOLDS.FAR ? 0.85 : 0)
       .style('pointer-events', 'all');
-    
+    relationshipIcons.append('title').text('Add a connection (grow)'); // native hover tooltip
+
     // Relationship icon background - same as edit icon
     relationshipIcons.append('rect')
       .attr('class', 'relationship-bg')
@@ -2630,7 +2636,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .attr('x', 0)
       .attr('y', 0)
       .attr('text-anchor', 'middle')
-      .attr('dominant-baseline', 'middle')
+      .attr('dominant-baseline', 'central')
       .style('font-size', `${iconSize * 1.2}px`) // Slightly bigger than gear for visual balance
       .style('font-weight', 'bold')
       .style('fill', '#ffffff')
@@ -2705,6 +2711,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .style('cursor', 'pointer')
       .style('opacity', (currentTransform?.k || 1) >= LOD_THRESHOLDS.FAR ? 0.85 : 0)
       .style('pointer-events', 'all');
+    expandIcons.append('title').text('Expand — read contents & diagram'); // native hover tooltip
     expandIcons.append('rect')
       .attr('class', 'expand-bg')
       .attr('x', -iconSize / 2)
