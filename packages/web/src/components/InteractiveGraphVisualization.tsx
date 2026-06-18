@@ -46,6 +46,7 @@ import { mergeSimulationNodes, mergeSimulationEdges } from '../lib/graphDataMerg
 import { edgeLabelPlacement, clearSegment, slideTFromPointer, chooseLabelT } from '../lib/edgeLabelLayout';
 import { PerfMeter, DriftMeter } from '../lib/perfMeter';
 import { DEFAULT_PHYSICS, collisionRadius, linkDistance, linkMaxDistance, linkStrength } from '../lib/physicsConfig';
+import { computeNodeLayerY, isHierarchicalLayout, parseLayoutMode, LAYOUT_MODE_STORAGE_KEY, type LayoutMode } from '../lib/layoutAlgorithms';
 import { edgeBorderEndpoints, minEdgeLength, clampToMinNeighbors } from '../lib/edgeGeometry';
 import { spawnCelebration } from '../lib/celebration';
 import { buildNeighborhood } from '../lib/graphAdjacency';
@@ -4135,6 +4136,48 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected }:
     }, 2500);
   }, [nodes, initializeVisualization, fitViewToNodes, persistAllPositions]);
 
+  // Layout mode (#30): 'force' = organic spring layout (default); 'hierarchical'
+  // pins each node's fy to its dependency-layer Y (computed by the pure module)
+  // so the graph settles into prerequisite layers while X stays force-arranged.
+  // Non-destructive + reversible: switching back to 'force' restores the fy each
+  // node had before we pinned it (saved-snapshot pins survive the round-trip).
+  const layoutModeRef = useRef<LayoutMode>(
+    parseLayoutMode(typeof window !== 'undefined' ? window.localStorage?.getItem(LAYOUT_MODE_STORAGE_KEY) : null)
+  );
+  const applyLayoutMode = useCallback((mode: LayoutMode) => {
+    layoutModeRef.current = mode;
+    try { window.localStorage?.setItem(LAYOUT_MODE_STORAGE_KEY, mode); } catch { /* storage unavailable */ }
+    const sim = simulationRef.current;
+    const container = containerRef.current;
+    if (!sim || !container) return;
+    const simNodes = sim.nodes() as any[];
+    if (isHierarchicalLayout(mode)) {
+      const ys = computeNodeLayerY(
+        simNodes, validatedEdges as any[],
+        { width: container.clientWidth, height: container.clientHeight },
+      );
+      simNodes.forEach((node: any) => {
+        const y = ys.get(node.id);
+        if (y == null) return;
+        if (!node.__layerPinned) node.__preLayerFy = node.fy ?? null;
+        node.__layerPinned = true;
+        node.fy = y;
+      });
+    } else {
+      simNodes.forEach((node: any) => {
+        if (!node.__layerPinned) return;
+        node.fy = node.__preLayerFy ?? null;
+        node.__layerPinned = false;
+        delete node.__preLayerFy;
+      });
+    }
+    sim.alpha(DEFAULT_PHYSICS.alpha.loadEnergy).restart();
+  }, [validatedEdges]);
+  // Stable handle so the window hook + load effect don't churn when the edge
+  // poll re-creates applyLayoutMode (which would reheat the sim every poll).
+  const applyLayoutModeRef = useRef(applyLayoutMode);
+  applyLayoutModeRef.current = applyLayoutMode;
+
   // Comprehensive layout metrics for studying the physics behaviour skeptically:
   // is the simulation actually idle (not silently reheating), do node cards
   // overlap, do edge labels overlap, how long did the last layout take to
@@ -4261,6 +4304,27 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected }:
       }
     };
   }, [resetLayout, onResetLayout]);
+
+  // Expose the layout-mode toggle to the parent (Workspace control), mirroring
+  // the triggerGraphReset hook above. getLayoutMode lets the control reflect the
+  // persisted mode without prop drilling through SafeGraphVisualization.
+  useEffect(() => {
+    (window as any).triggerLayoutMode = (mode: string) => applyLayoutModeRef.current(parseLayoutMode(mode));
+    (window as any).getLayoutMode = () => layoutModeRef.current;
+    return () => {
+      if ((window as any).triggerLayoutMode) delete (window as any).triggerLayoutMode;
+      if ((window as any).getLayoutMode) delete (window as any).getLayoutMode;
+    };
+  }, []);
+
+  // Re-apply a persisted hierarchical layout once a graph's nodes have settled
+  // (graph load / switch / drill-in). Force mode needs no action on load.
+  useEffect(() => {
+    if (!hasNodes) return undefined;
+    if (!isHierarchicalLayout(layoutModeRef.current)) return undefined;
+    const timer = setTimeout(() => applyLayoutModeRef.current('hierarchical'), 1600);
+    return () => clearTimeout(timer);
+  }, [hasNodes, currentGraphId]);
 
   // Force reinitialization trigger - incremented when view needs refresh
   const [reinitTrigger, setReinitTrigger] = useState(0);
