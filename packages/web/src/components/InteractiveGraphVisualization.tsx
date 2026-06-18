@@ -4071,18 +4071,23 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     const centerX = width / 2;
     const centerY = height / 2;
     
-    // Get current zoom scale (maintain it)
-    const currentScale = currentTransform?.scale || 1;
-    
+    // Maintain the LIVE zoom scale (read from the element, not stale React state).
+    const currentScale = d3.zoomTransform(svgElement).k || currentTransform?.scale || 1;
+
     // Calculate translation to center the node
     const translateX = centerX - nodeX * currentScale;
     const translateY = centerY - nodeY * currentScale;
-    
-    // Apply transform with smooth transition
+
+    // Apply through the BOUND zoom behavior so its 'zoom' handler actually moves
+    // the graph group (and keeps currentTransform coherent) — using a throwaway
+    // d3.zoom() only set the svg's stored __zoom, so nothing moved until the next
+    // gesture snapped to it (the deferred/abrupt jump). Mirrors fitViewToNodes.
     const transform = d3.zoomIdentity.translate(translateX, translateY).scale(currentScale);
-    svg.transition()
-      .duration(750)
-      .call(d3.zoom<SVGSVGElement, unknown>().transform as any, transform);
+    if (zoomBehaviorRef.current) {
+      svg.transition().duration(600).call(zoomBehaviorRef.current.transform as any, transform);
+    } else {
+      svg.transition().duration(600).call(d3.zoom<SVGSVGElement, unknown>().transform as any, transform);
+    }
       
     // Update mini-map viewport
     if ((window as any).updateMiniMapViewport) {
