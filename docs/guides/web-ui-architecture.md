@@ -49,7 +49,7 @@ graph TD
 ## Quality gate
 
 `tests/e2e/mobile-audit.spec.ts` + `mobile-dialogs.spec.ts` run the
-`tests/helpers/mobileAudit.ts` auditors (sideways-scroll, squeezed labels,
+`tests/lib/mobileAudit.ts` auditors (sideways-scroll, squeezed labels,
 low-contrast/invisible text, modals clipped under the nav) across **every** screen
 at phone width, in CI right after the smoke gate.
 

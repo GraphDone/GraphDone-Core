@@ -46,7 +46,7 @@ npx playwright test tests/e2e/oauth-linkedin.spec.ts --ui
 - Security best practices
 - Known issues prioritization
 
-### 2. Mock OAuth Server (`tests/helpers/mock-oauth-server.ts`)
+### 2. Mock OAuth Server (`tests/lib/mock-oauth-server.ts`)
 
 **Full-featured mock server:**
 - ✅ Simulates Google OAuth 2.0
@@ -312,7 +312,7 @@ LINKEDIN_CALLBACK_URL=https://localhost:4128/auth/linkedin/callback
 **Code:**
 - OAuth strategies: `packages/server/src/auth/oauth-strategies.ts`
 - OAuth routes: `packages/server/src/routes/auth.ts`
-- Mock server: `tests/helpers/mock-oauth-server.ts`
+- Mock server: `tests/lib/mock-oauth-server.ts`
 - Test fixtures: `tests/fixtures/oauth-profiles.ts`
 - LinkedIn tests: `tests/e2e/oauth-linkedin.spec.ts`
 

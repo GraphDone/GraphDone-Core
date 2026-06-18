@@ -332,7 +332,7 @@ See [docs/oauth-testing-guide.md](../security/oauth-testing-guide.md) for OAuth-
 
 ### Writing Reliable Tests
 
-- ✅ **Use auth helpers** - Leverage `tests/helpers/auth.ts` for consistent login
+- ✅ **Use auth helpers** - Leverage `tests/lib/auth.ts` for consistent login
 - ✅ **Wait for elements** - Use `await expect().toBeVisible()` not `page.waitForTimeout()`
 - ✅ **Test data isolation** - Create unique test data, don't rely on shared state
 - ✅ **Handle flakiness** - Add retries for network-dependent tests
@@ -377,8 +377,8 @@ open test-results/reports/pr-report.html
 
 **Test Code**:
 - Test runner: `tests/run-pr-tests.js` (PR), `tests/run-all-tests.js` (comprehensive)
-- Auth helpers: `tests/helpers/auth.ts`
-- OAuth mock server: `tests/helpers/mock-oauth-server.ts`
+- Auth helpers: `tests/lib/auth.ts`
+- OAuth mock server: `tests/lib/mock-oauth-server.ts`
 - Test fixtures: `tests/fixtures/oauth-profiles.ts`
 - E2E tests: `tests/e2e/*.spec.ts`
 
