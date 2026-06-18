@@ -712,9 +712,12 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
 
         {/* Project Health Toggle Button - Floating (desktop only: the 320px panel
             would cover a phone screen, and it's a secondary analytics surface) */}
+        {/* Positioned WITHIN the content container (absolute), like the panel it
+            toggles — not `fixed`, which overlapped the global header. When the
+            320px panel is open, sit just left of it so the toggle stays clickable. */}
         <button
           onClick={() => setShowProjectHealth(!showProjectHealth)}
-          className="hidden md:block fixed right-4 top-20 z-40 p-3 bg-gray-700/60 hover:bg-gray-700/80 backdrop-blur-sm rounded-lg border border-gray-600/50 hover:border-gray-500/70 transition-all duration-200 group"
+          className={`hidden md:block absolute top-4 z-40 p-3 bg-gray-700/60 hover:bg-gray-700/80 backdrop-blur-sm rounded-lg border border-gray-600/50 hover:border-gray-500/70 transition-all duration-200 group ${showProjectHealth ? 'right-[21rem]' : 'right-4'}`}
           title={showProjectHealth ? "Hide Project Health" : "Show Project Health"}
         >
           {showProjectHealth ? (
