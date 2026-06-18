@@ -5,7 +5,10 @@ export const typeDefs = gql`
   enum NodeType {
     # Legacy types (for backward compatibility)
     OUTCOME
-    
+
+    # Ontology layer — a requirement that tasks satisfy
+    REQUIREMENT
+
     # Strategic Planning
     EPIC
     INITIATIVE
@@ -200,6 +203,7 @@ export const typeDefs = gql`
     VALIDATES
     REFERENCES
     CONTAINS
+    SATISFIES
   }
 
   enum ContributorType {
