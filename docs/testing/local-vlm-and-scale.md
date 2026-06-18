@@ -29,7 +29,7 @@ developers are never blocked by hardware they don't have.
 - `.env.test.example` is committed and documents the variable **names** with
   placeholder hosts (`http://<gpu-host>:<port>`). Copy it to `.env.test.local`
   and fill in the rest.
-- The harness auto-loads `.env.test.local` via `tests/helpers/testEnv.ts`.
+- The harness auto-loads `.env.test.local` via `tests/lib/testEnv.ts`.
 
 ```bash
 # .env.test.local  (NOT committed)
@@ -44,7 +44,7 @@ every GPU you list.
 
 ## VLM protocol support
 
-`tests/helpers/vlm.ts` is protocol-agnostic and auto-detects per endpoint:
+`tests/lib/vlm.ts` is protocol-agnostic and auto-detects per endpoint:
 
 | Protocol | Detected via | Request |
 |----------|--------------|---------|
@@ -57,7 +57,7 @@ strict JSON verdict `{pass, score, issues[], summary}`, parsed leniently.
 ### Personas
 
 Each captured screenshot is judged from several perspectives (see `PERSONAS`
-in `tests/helpers/vlm.ts`):
+in `tests/lib/vlm.ts`):
 
 - **Visual defects** — overlapping/cut-off nodes, unreadable labels, broken
   layout, missing edges, error chrome.
