@@ -4986,9 +4986,12 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           field with immediate optimistic saves + undo, no heavy modal. */}
       {quickEditNode && (() => {
         const simNode = (simulationRef.current?.nodes() as any[])?.find((n: any) => n.id === quickEditNode.id);
-        const node = simNode || quickEditNode;
-        const gx = node.x ?? 0;
-        const gy = node.y ?? 0;
+        // Position from the live sim node, but field DATA (incl. freshly-saved
+        // metadata/status notes) from the Apollo-backed nodes array so reopening
+        // the editor shows the latest values, not a stale d3 datum.
+        const dataNode = (nodes as any[]).find((n: any) => n.id === quickEditNode.id) || quickEditNode;
+        const gx = simNode?.x ?? dataNode.x ?? 0;
+        const gy = simNode?.y ?? dataNode.y ?? 0;
         const left = gx * currentTransform.scale + currentTransform.x;
         const top = gy * currentTransform.scale + currentTransform.y;
         const onCommit = (c: QuickEditCommit) => {
@@ -5005,7 +5008,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         };
         return (
           <div className="absolute z-50" style={{ left, top, transform: 'translate(-50%, -50%)' }}>
-            <NodeQuickEdit node={node} onCommit={onCommit} onClose={() => setQuickEditNode(null)} />
+            <NodeQuickEdit key={quickEditNode.id} node={dataNode} onCommit={onCommit} onClose={() => setQuickEditNode(null)} />
           </div>
         );
       })()}

@@ -60,4 +60,31 @@ test.describe('node quick-edit @quickedit', () => {
       await page.waitForTimeout(800);
     }
   });
+
+  test('adds a timestamped status note that persists, then deletes it', async ({ page }) => {
+    await gotoGraph(page);
+    await page.locator('.graph-container svg .node').first().dblclick();
+    await expect(page.locator('[data-testid="node-quick-edit"]')).toBeVisible();
+
+    const note = `note-${Date.now() % 100000}`;
+    await page.locator('[data-testid="quick-note-input"]').fill(note);
+    await page.locator('[data-testid="quick-note-add"]').click();
+    // Appears in the list immediately.
+    await expect(page.locator('[data-testid="quick-note-list"]').getByText(note, { exact: false })).toBeVisible();
+    await page.waitForTimeout(1500); // let the metadata mutation persist
+
+    // Reload (strongest persistence proof) → the note survives, loaded from the
+    // backend's saved metadata.
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('.graph-container svg .node', { timeout: 15_000 });
+    await page.waitForTimeout(3500);
+    await page.locator('.graph-container svg .node').first().dblclick();
+    await expect(page.locator('[data-testid="quick-note-list"]').getByText(note, { exact: false })).toBeVisible({ timeout: 8000 });
+
+    // Clean up: delete the note so seed data is unchanged.
+    const item = page.locator('[data-testid="quick-note-list"] li', { hasText: note }).first();
+    await item.hover();
+    await item.getByRole('button', { name: 'Delete note' }).click();
+    await expect(page.locator('[data-testid="quick-note-list"]').getByText(note, { exact: false })).toHaveCount(0);
+  });
 });
