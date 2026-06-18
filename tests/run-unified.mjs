@@ -12,6 +12,7 @@ import { mkdirSync, copyFileSync, rmSync } from 'node:fs';
 import { join, extname, resolve } from 'node:path';
 import { runVitestSequence } from './lib/adapters/vitest.mjs';
 import { runPlaywrightSequence } from './lib/adapters/playwright.mjs';
+import { cloudAuditSequence, findLatestCloudFindings } from './lib/adapters/cloud-audit.mjs';
 import { buildReport } from './lib/reporting/aggregate.mjs';
 import { writeJsonReport } from './lib/reporting/json.mjs';
 import { renderHtml } from './lib/reporting/html.mjs';
@@ -36,6 +37,12 @@ async function runOne(id) {
   process.stdout.write(`\n▶ ${id} — ${def.title}\n`);
   if (def.adapter === 'vitest') return runVitestSequence({ id, title: def.title, cwd: def.cwd });
   if (def.adapter === 'playwright') return runPlaywrightSequence({ id, title: def.title, args: def.args, target });
+  if (def.adapter === 'cloud-audit') {
+    const cloudDir = def.cloudRepoDir || resolve(process.cwd(), '..', 'GraphDone-Cloud');
+    const explicit = flag('--cloud-findings', null);
+    const findingsPath = typeof explicit === 'string' ? explicit : findLatestCloudFindings(cloudDir);
+    return cloudAuditSequence({ id, title: def.title, findingsPath });
+  }
   return { id, title: def.title, status: 'skipped', counts: { passed: 0, failed: 0, warned: 0, skipped: 1 }, cases: [] };
 }
 
