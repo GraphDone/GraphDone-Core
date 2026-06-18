@@ -460,6 +460,22 @@ export function Workspace() {
            >
              <Maximize2 className="h-4 w-4" />
            </button>
+           {/* Layout mode (desktop): force (organic) vs hierarchical (dependency
+               layers). Lives in the graph control cluster under zoom-extents, so
+               it never overlaps the left sidebar's console toggle. */}
+           <button
+             data-testid="graph-layout-toggle"
+             onClick={toggleLayoutMode}
+             className={`hidden md:flex absolute top-16 left-3 z-40 items-center justify-center w-10 h-10 rounded-full shadow-lg backdrop-blur-sm border transition-colors ${
+               layoutMode === 'hierarchical'
+                 ? 'bg-blue-600/90 border-blue-400 text-white hover:bg-blue-500/90'
+                 : 'bg-gray-900/90 border-gray-600 text-gray-300 hover:text-white hover:border-blue-400'
+             }`}
+             title={layoutMode === 'hierarchical' ? 'Hierarchical layout (click for force)' : 'Force layout (click for hierarchical)'}
+             aria-label="Toggle hierarchical layout"
+           >
+             <Network className="h-4 w-4" />
+           </button>
            {inspectorNode && (
              <div className="absolute z-40 inset-x-3 bottom-3 md:inset-x-auto md:bottom-auto md:top-3 md:right-3">
                <NodeInspector node={inspectorNode} onClose={() => setInspectorNode(null)} />
@@ -511,22 +527,6 @@ export function Workspace() {
             </div>
           </div>
         </div>,
-        document.body
-      )}
-
-      {/* Layout Mode Toggle - force (organic) vs hierarchical (dependency layers) */}
-      {viewMode === 'graph' && currentGraph && !isMobile && createPortal(
-        <button
-          onClick={toggleLayoutMode}
-          className={`fixed bottom-4 left-4 backdrop-blur-sm border rounded-lg p-3 shadow-xl transition-all duration-200 z-50 ${
-            layoutMode === 'hierarchical'
-              ? 'bg-blue-600/90 border-blue-400 hover:bg-blue-500/90'
-              : 'bg-gray-800/90 border-gray-600 hover:bg-gray-700/90'
-          }`}
-          title={layoutMode === 'hierarchical' ? 'Hierarchical layout (click for force)' : 'Force layout (click for hierarchical)'}
-        >
-          <Network className={`h-5 w-5 ${layoutMode === 'hierarchical' ? 'text-white' : 'text-gray-400'}`} />
-        </button>,
         document.body
       )}
 
