@@ -38,6 +38,7 @@ import { DeleteGraphModal } from './DeleteGraphModal';
 import { ConnectWorkItemModal } from './ConnectWorkItemModal';
 import { WorkItemDetailsModal } from './WorkItemDetailsModal';
 import { NodeInspector } from './NodeInspector';
+import { NodeQuickEdit, type QuickEditCommit } from './NodeQuickEdit';
 
 import { WorkItem, WorkItemEdge } from '../types/graph';
 import { RelationshipType, RELATIONSHIP_OPTIONS, getRelationshipConfig } from '../constants/workItemConstants';
@@ -429,6 +430,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const [selectedNodes, setSelectedNodes] = useState<Set<string>>(new Set());
   // Inline rename: an input floats over the node — no modal (W2)
   const [inlineEdit, setInlineEdit] = useState<{ nodeId: string; value: string; original: string; graphX: number; graphY: number } | null>(null);
+  // PR #87: quick in-context node editor (double-click a node) — edits every
+  // field without the heavy details modal. Holds the work item being edited.
+  const [quickEditNode, setQuickEditNode] = useState<any | null>(null);
+  const quickEditNodeId = quickEditNode?.id ?? null;
 
   // D3 handlers are bound once at init and the init effect intentionally
   // avoids re-initialising on mode changes — so handlers would capture STALE
@@ -2363,10 +2368,14 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         clickableEdges.classed('dim-for-hover', false);
         edgeLabelGroups.classed('dim-for-hover', false);
       })
-      // Double-click a node → rename in place, no modal (W2)
+      // Double-click a node → quick in-context editor (title, description, type,
+      // priority, status) anchored to the node, no heavy modal (#87, W2). Single
+      // click+drag still moves the node (when unlocked); only a genuine
+      // double-click opens this.
       .on('dblclick.rename', (event: MouseEvent, d: any) => {
         event.stopPropagation();
-        setInlineEdit({ nodeId: d.id, value: d.title || '', original: d.title || '', graphX: d.x || 0, graphY: d.y || 0 });
+        setInlineEdit(null);
+        setQuickEditNode(d);
       });
 
 
@@ -4405,6 +4414,15 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   }, [expandedNodeId]);
   useEffect(() => { setExpandedNode(null); }, [currentGraphId]);
 
+  // Esc closes the quick editor; switching graphs dismisses it (node is gone).
+  useEffect(() => {
+    if (!quickEditNodeId) return undefined;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setQuickEditNode(null); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [quickEditNodeId]);
+  useEffect(() => { setQuickEditNode(null); }, [currentGraphId]);
+
   // Expose reset function to parent component
   useEffect(() => {
     if (onResetLayout) {
@@ -4920,6 +4938,34 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
               onBlur={commit}
               className="px-3 py-2 rounded-lg bg-gray-900/95 border-2 border-emerald-400 text-white text-sm font-semibold shadow-2xl outline-none min-w-[180px] text-center"
             />
+          </div>
+        );
+      })()}
+
+      {/* #87: quick in-context node editor — anchored to the node, edits every
+          field with immediate optimistic saves + undo, no heavy modal. */}
+      {quickEditNode && (() => {
+        const simNode = (simulationRef.current?.nodes() as any[])?.find((n: any) => n.id === quickEditNode.id);
+        const node = simNode || quickEditNode;
+        const gx = node.x ?? 0;
+        const gy = node.y ?? 0;
+        const left = gx * currentTransform.scale + currentTransform.x;
+        const top = gy * currentTransform.scale + currentTransform.y;
+        const onCommit = (c: QuickEditCommit) => {
+          updateWorkItemMutation({ variables: { where: { id: quickEditNode.id }, update: c.update } })
+            .then(() => {
+              undoStackRef.current.push({
+                label: c.label,
+                undo: async () => {
+                  await updateWorkItemMutation({ variables: { where: { id: quickEditNode.id }, update: c.prev } });
+                },
+              });
+            })
+            .catch(() => showError(`Could not ${c.label.toLowerCase()}`));
+        };
+        return (
+          <div className="absolute z-50" style={{ left, top, transform: 'translate(-50%, -50%)' }}>
+            <NodeQuickEdit node={node} onCommit={onCommit} onClose={() => setQuickEditNode(null)} />
           </div>
         );
       })()}
