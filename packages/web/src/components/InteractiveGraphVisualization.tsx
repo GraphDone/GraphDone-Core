@@ -49,6 +49,8 @@ import { edgeLabelPlacement, clearSegment, slideTFromPointer, chooseLabelT } fro
 import { PerfMeter, DriftMeter } from '../lib/perfMeter';
 import { DEFAULT_PHYSICS, collisionRadius, linkDistance, linkMaxDistance, linkStrength } from '../lib/physicsConfig';
 import { edgeBorderEndpoints, minEdgeLength, clampToMinNeighbors } from '../lib/edgeGeometry';
+import { directionStrategy, arrowVisibility, labelVisibility, perpendicularOffset } from '../lib/edgeLOD';
+import { assignParallelEdgeIndices } from '../lib/parallelEdges';
 import { spawnCelebration } from '../lib/celebration';
 import { buildNeighborhood } from '../lib/graphAdjacency';
 import { UndoStack } from '../lib/undoStack';
@@ -2038,9 +2040,24 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // Filter edges based on visible nodes for performance
     // Temporarily show ALL edges for debugging
     const visibleEdges = validatedEdges;
-    
+
+    // Parallel-edge bundling (#22): tag each edge with its index + sibling count
+    // within its node-pair group so parallels can be fanned apart perpendicular
+    // to the edge line (perpendicularOffset) and dimmed as they crowd.
+    const parallelInfo = assignParallelEdgeIndices(validatedEdges as any[]);
+    (validatedEdges as any[]).forEach((e: any) => {
+      const info = parallelInfo.get(e.id);
+      e._pIndex = info ? info.index : 0;
+      e._pTotal = info ? info.total : 1;
+    });
+    const liveScale = svg.node() ? d3.zoomTransform(svg.node() as Element).k : 1;
+    // Arrow opacity routed through the edge LOD module: hidden direction → 0,
+    // otherwise the zoom-faded arrow opacity (smaller/dimmer when edges crowd).
+    const edgeArrowOpacity = (k: number, count: number) =>
+      directionStrategy(k) === 'hidden' ? 0 : arrowVisibility(k, count).opacity;
+
     // Debug: Log edge visibility
-    
+
     // Create edges FIRST (so they render under nodes)
     const edgesGroup = g.append('g').attr('class', 'edges-group');
     
@@ -3165,7 +3182,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         return config.hexColor;
       })
       .attr('stroke-width', 1)
-      .attr('opacity', 1);
+      .attr('opacity', (d: WorkItemEdge) => edgeArrowOpacity(liveScale, (d as any)._pTotal || 1));
 
     // Create edge label groups with rounded rectangles and text (only for visible edges)
     // NOTE: this group is appended after the nodes group, so nodes-group is
@@ -3213,12 +3230,12 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         const config = getRelationshipConfig(d.type as RelationshipType);
         return config.label;
       })
-      .style('opacity', (currentTransform?.k || 1) >= LOD_THRESHOLDS.CLOSE ? 1 : 0);
+      .style('opacity', (d: WorkItemEdge) => labelVisibility(liveScale, (d as any)._pTotal || 1));
 
     // Add icons positioned to the left of text
     edgeLabelGroups
       .append('foreignObject')
-      .style('opacity', (currentTransform?.k || 1) >= LOD_THRESHOLDS.CLOSE ? 1 : 0)
+      .style('opacity', (d: WorkItemEdge) => labelVisibility(liveScale, (d as any)._pTotal || 1))
       .attr('class', 'edge-label-icon')
       .attr('width', 14)
       .attr('height', 14)
@@ -3586,15 +3603,34 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       if (dotModeRef.current && !forceAvoid) {
         return;
       }
+      // Live zoom scale drives the LOD-aware parallel-edge fan-out (collapses to
+      // the centre line when zoomed out) and arrow sizing.
+      const liveK = svg.node() ? d3.zoomTransform(svg.node() as Element).k : 1;
+
       // Border-to-border anchors: the edge starts/ends where the center line
       // crosses each card's border, not at the buried center. Computed once per
       // edge per tick (shared datum) so line, hitbox and arrow agree. The anchor
-      // slides around the border as the nodes move — shortest border path.
+      // slides around the border as the nodes move — shortest border path. For
+      // parallel edges, shift the whole anchored line perpendicular to itself by
+      // perpendicularOffset so siblings don't overlap.
       linkElements.each(function (d: any) {
-        d._ep = edgeBorderEndpoints(
+        const ep = edgeBorderEndpoints(
           { x: d.source.x || 0, y: d.source.y || 0 }, getNodeDimensions(d.source),
           { x: d.target.x || 0, y: d.target.y || 0 }, getNodeDimensions(d.target)
         );
+        if ((d._pTotal || 1) > 1) {
+          const off = perpendicularOffset(d._pIndex || 0, d._pTotal, liveK);
+          if (off !== 0) {
+            const lx = ep.x2 - ep.x1;
+            const ly = ep.y2 - ep.y1;
+            const len = Math.hypot(lx, ly) || 1;
+            const px = -ly / len;
+            const py = lx / len;
+            ep.x1 += px * off; ep.y1 += py * off;
+            ep.x2 += px * off; ep.y2 += py * off;
+          }
+        }
+        d._ep = ep;
       });
 
       // Update visible edge positions
@@ -3620,12 +3656,15 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         return;
       }
 
-      // Arrow sits at the TARGET border, pointing into the node.
+      // Arrow sits at the TARGET border, pointing into the node. Parallel edges
+      // get a smaller arrow head (arrowVisibility.scale) so crowded siblings stay
+      // legible; lone edges keep the default size.
       arrowElements
         .attr('transform', (d: any) => {
           const ep = d._ep;
           const angle = Math.atan2(ep.y2 - ep.y1, ep.x2 - ep.x1) * 180 / Math.PI;
-          return `translate(${ep.x2},${ep.y2}) rotate(${angle})`;
+          const size = arrowVisibility(liveK, d._pTotal || 1).scale;
+          return `translate(${ep.x2},${ep.y2}) rotate(${angle}) scale(${size})`;
         });
 
       // Edge labels: auto-centered in the clear span between the two node
@@ -3669,8 +3708,22 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           }
 
           const placement = edgeLabelPlacement({ source, target, sourceDims, targetDims, t: d.labelT });
+          // Fan parallel-edge labels off the centre line to match their shifted
+          // paths (same perpendicular offset as the line above).
+          let labelX = placement.x;
+          let labelY = placement.y;
+          if ((d._pTotal || 1) > 1) {
+            const off = perpendicularOffset(d._pIndex || 0, d._pTotal, liveK);
+            if (off !== 0) {
+              const lx = target.x - source.x;
+              const ly = target.y - source.y;
+              const len = Math.hypot(lx, ly) || 1;
+              labelX += (-ly / len) * off;
+              labelY += (lx / len) * off;
+            }
+          }
           if (obstacles) {
-            placedLabels.push({ x: placement.x, y: placement.y, width: labelW + 8, height: labelH + 8 });
+            placedLabels.push({ x: labelX, y: labelY, width: labelW + 8, height: labelH + 8 });
           }
           // edgeLabelPlacement keeps text upright by stripping 180° when the edge
           // points "backward" — which leaves the directional label icon pointing
@@ -3690,7 +3743,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           } else {
             iconSel.attr('transform', null);
           }
-          return `translate(${placement.x},${placement.y}) rotate(${placement.rotation})`;
+          return `translate(${labelX},${labelY}) rotate(${placement.rotation})`;
         });
     };
 
@@ -3929,10 +3982,14 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       }
       g.selectAll('.node-description-text' as any)
         .style('opacity', getSmoothedOpacity(LOD_THRESHOLDS.CLOSE));
+      // Edge labels + arrows follow the edge LOD module (zoom-aware, crowd-aware).
       g.selectAll('.edge-label' as any)
-        .style('opacity', getSmoothedOpacity(LOD_THRESHOLDS.CLOSE));
+        .style('opacity', (d: any) => labelVisibility(scale, d?._pTotal || 1));
       g.selectAll('.edge-label-icon' as any)
-        .style('opacity', getSmoothedOpacity(LOD_THRESHOLDS.CLOSE));
+        .style('opacity', (d: any) => labelVisibility(scale, d?._pTotal || 1));
+      g.selectAll('.arrow' as any)
+        .style('opacity', (d: any) =>
+          directionStrategy(scale) === 'hidden' ? 0 : arrowVisibility(scale, d?._pTotal || 1).opacity);
       g.selectAll('.edge' as any)
         .style('opacity', Math.max(0.1, getSmoothedOpacity(LOD_THRESHOLDS.VERY_FAR, 0.1)))
         .attr('stroke-width', function(d: any) {
