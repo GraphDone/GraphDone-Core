@@ -23,10 +23,10 @@ help:
 
 # Run all comprehensive tests
 test-all: check-deploy
-	@echo "🧪 Running comprehensive test suite..."
+	@echo "🧪 Running comprehensive test suite (unified harness)..."
 	@npm run test:comprehensive
 	@echo "✅ Tests complete! Opening HTML report..."
-	@open test-results/reports/index.html
+	@open test-artifacts/unified/report.html
 
 # Run HTTPS/SSL tests only
 test-https: check-deploy
@@ -48,11 +48,11 @@ test-unit:
 
 # Open test report
 test-report:
-	@if [ -f test-results/reports/index.html ]; then \
-		open test-results/reports/index.html; \
-		echo "📊 Opening test report in browser..."; \
+	@if [ -f test-artifacts/unified/report.html ]; then \
+		open test-artifacts/unified/report.html; \
+		echo "📊 Opening unified test report in browser..."; \
 	else \
-		echo "❌ No test report found. Run 'make test-all' first."; \
+		echo "❌ No test report found. Run 'make test-all' (or npm run test:unified) first."; \
 	fi
 
 # Start production deployment

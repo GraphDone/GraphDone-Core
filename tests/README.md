@@ -17,7 +17,7 @@ tests/
 
 ## 🔑 Authentication System for E2E Tests
 
-**Location**: `tests/helpers/auth.ts`
+**Location**: `tests/lib/auth.ts`
 
 This is the **foundational authentication system** that ALL E2E tests should use. It provides robust, cross-browser authentication with intelligent state management.
 

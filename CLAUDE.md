@@ -106,10 +106,10 @@ git add . && git commit -m "Update version to v0.3.2-alpha"
 ## Testing Strategy
 
 **🔑 Authentication System for E2E Tests:**
-GraphDone includes a comprehensive, battle-tested authentication system for E2E tests in `tests/helpers/auth.ts`. **This is the foundation for all E2E testing** and should be used by every test that requires user authentication.
+GraphDone includes a comprehensive, battle-tested authentication system for E2E tests in `tests/lib/auth.ts`. **This is the foundation for all E2E testing** and should be used by every test that requires user authentication.
 
 ```typescript
-import { login, navigateToWorkspace, TEST_USERS } from '../helpers/auth';
+import { login, navigateToWorkspace, TEST_USERS } from '../../lib/auth';
 
 test('my feature test', async ({ page }) => {
   // Robust cross-browser authentication
@@ -167,14 +167,23 @@ The automated testing has revealed important UI inflexibility issues that need a
 
 **🚀 Usage:**
 ```bash
-# Run comprehensive tests with beautiful HTML report
-./start test
+# Run the unified harness — dual output: HTML (with screenshots + .webm video
+# clips) AND machine-parsable JSON, from the reusable tests/lib modules.
+npm run test:unified              # full battery (unit + e2e + report captures + cloud audit)
+npm run test:unified:smoke        # fast blocking subset (unit + THE GATE + a focused e2e)
+npm run test:unified:open         # full battery, then open the HTML report
 
-# View interactive report
-make test-report
+# Outputs land in test-artifacts/unified/: report.html + report.json (+ sequences/*.json)
+make test-report                  # open the latest unified HTML report
 # or
-open test-results/reports/index.html
+open test-artifacts/unified/report.html
 ```
+
+The unified harness (`tests/run-unified.mjs` + `tests/sequences/unified.config.mjs`)
+is the single entry; profiles are `smoke|pr|full|report`. The test tree is organised
+as `tests/e2e/<domain>/`, `tests/diagnostics/<concern>/`, `tests/integration/`, with
+all reusable helpers + harness modules under `tests/lib/`. Retired/legacy specs are
+parked (not deleted) under `archive/2026-06-test-cleanup/` — see its MANIFEST.md.
 
 **🔐 HTTPS/TLS Testing Setup (for next developer):**
 ```bash
@@ -357,7 +366,7 @@ npm run dev
 TEST_URL=http://localhost:3127 npm run test:smoke
 ```
 
-`tests/e2e/user-smoke.spec.ts` sees the app exactly as a user does: login →
+`tests/e2e/smoke/user-smoke.spec.ts` sees the app exactly as a user does: login →
 nodes AND edges render → no error chrome → no GraphQL errors reach the client
 → no uncaught JS errors → the grow flow works → no orphan edges in the DB.
 **Green unit tests do not mean the app works.** This gate exists because of a
@@ -422,16 +431,21 @@ artifacts/
 └── certificates/    # Test certificates
 
 tests/
-├── e2e/            # All E2E test specs
-├── helpers/        # Authentication system
-└── *.js            # Moved test files from root level
+├── run-unified.mjs        # single entry — npm run test:unified
+├── sequences/             # unified.config.mjs — declarative sequences + profiles
+├── e2e/<domain>/          # smoke, auth, graph, ui, a11y, mobile, responsive, api, admin, reports
+├── diagnostics/<concern>/ # layout, interactions, hierarchy, inspector, physics, perf, ui
+├── integration/           # infra specs (TLS, installation) — out of the default project
+├── fixtures/              # shared test data
+└── lib/                   # reusable: auth + helpers, metrics/, audit/, reporting/, adapters/, runner/
 ```
 
 **Clean Patterns:**
-- Test files belong in `tests/` directory
-- Screenshots go in `artifacts/screenshots/`
-- No loose files at repository root
-- Certificate management consolidated
+- One canonical `playwright.config.ts` at the repo root; the unified harness is the single test entry.
+- All reusable helpers + harness modules live under `tests/lib/`; specs import `../../lib/<x>` (depth-2 domain folders).
+- Capture-heavy report-only specs live in `tests/e2e/reports/` (own Playwright projects), excluded from the fast default project.
+- Retired/legacy specs are archived (not deleted) in `archive/2026-06-test-cleanup/` with a MANIFEST — mine before deleting.
+- No loose files at repository root.
 
 ## Key Implementation Guidelines
 
@@ -454,7 +468,7 @@ export const getTypeGradientBackground = (type: WorkItemType, style: GradientSty
 ```
 
 ### Authentication for Tests
-Use the comprehensive auth system in `tests/helpers/auth.ts` for all E2E tests requiring login.
+Use the comprehensive auth system in `tests/lib/auth.ts` for all E2E tests requiring login.
 
 ## Common Gotchas
 
