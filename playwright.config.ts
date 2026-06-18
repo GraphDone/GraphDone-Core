@@ -38,10 +38,10 @@ export default defineConfig({
   projects: [
     {
       name: 'GraphDone-Core/dev-neo4j/chromium',
-      // The showcase tour and the local-VLM visual eval run in their own
-      // capture-heavy projects below; keep them out of the default (fast)
+      // Capture-heavy, report-only specs live under tests/e2e/reports/ and run in
+      // their own projects below; keep that whole folder out of the default (fast)
       // project so the smoke gate stays quick.
-      testIgnore: [/showcase\.spec\.ts/, /visual-vlm\.spec\.ts/, /feature-matrix\.spec\.ts/, /matrix\.setup\.ts/],
+      testIgnore: '**/reports/**',
       use: { ...devices['Desktop Chrome'] },
     },
 
@@ -103,7 +103,7 @@ export default defineConfig({
     {
       name: 'vlm',
       testDir: './tests/e2e',
-      testMatch: /visual-vlm\.spec\.ts/,
+      testMatch: /vlm-evaluation\.spec\.ts/,
       use: { ...devices['Desktop Chrome'], screenshot: 'on' },
     },
 

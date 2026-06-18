@@ -14,9 +14,9 @@ const PW = 'GraphDone-Core/dev-neo4j/chromium';
 
 export const SEQUENCES = {
   'unit-web': { adapter: 'vitest', title: 'Web unit tests', cwd: 'packages/web', blocking: true },
-  'smoke': { adapter: 'playwright', title: 'Smoke gate (THE GATE)', args: ['tests/e2e/user-smoke.spec.ts', `--project=${PW}`], blocking: true },
-  'e2e-auth': { adapter: 'playwright', title: 'Auth e2e — passwordless focus', args: ['tests/e2e/login-focus.spec.ts', `--project=${PW}`], blocking: true },
-  'e2e-graph': { adapter: 'playwright', title: 'Graph e2e — camera', args: ['tests/e2e/camera.spec.ts', `--project=${PW}`], blocking: true },
+  'smoke': { adapter: 'playwright', title: 'Smoke gate (THE GATE)', args: ['tests/e2e/smoke/user-smoke.spec.ts', `--project=${PW}`], blocking: true },
+  'e2e-auth': { adapter: 'playwright', title: 'Auth e2e — passwordless focus', args: ['tests/e2e/auth/passwordless-focus.spec.ts', `--project=${PW}`], blocking: true },
+  'e2e-graph': { adapter: 'playwright', title: 'Graph e2e — camera', args: ['tests/e2e/graph/camera.spec.ts', `--project=${PW}`], blocking: true },
   'mobile': { adapter: 'playwright', title: 'Mobile audit', args: ['--grep', '@mobile|@audit', `--project=${PW}`], blocking: false },
   'showcase': { adapter: 'playwright', title: 'Showcase — video + screenshots', args: ['--project=showcase'], blocking: false },
 };
