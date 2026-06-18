@@ -10,6 +10,7 @@ interface CodeCaptchaProps {
   className?: string;
   difficulty?: DifficultyLevel;
   style?: CaptchaStyle;
+  autoFocus?: boolean;
 }
 
 export function CodeCaptcha({
@@ -17,7 +18,8 @@ export function CodeCaptcha({
   onError,
   className = '',
   difficulty = 'easy',
-  style: initialStyle = 'math'
+  style: initialStyle = 'math',
+  autoFocus = true
 }: CodeCaptchaProps) {
   const [currentStyle, setCurrentStyle] = useState<CaptchaStyle>(initialStyle);
   const [code, setCode] = useState('');
@@ -309,8 +311,8 @@ export function CodeCaptcha({
   }, [code, currentStyle]);
 
   useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
+    if (autoFocus) inputRef.current?.focus();
+  }, [autoFocus]);
 
   useEffect(() => {
     console.log('CAPTCHA state:', { currentStyle, codeLength, minLength, userInputLength: userInput.length, isDisabled: userInput.length < minLength });

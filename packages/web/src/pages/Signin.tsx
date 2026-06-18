@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, gql } from '@apollo/client';
 import { Eye, EyeOff, ArrowRight, Mail, Lock, Users, Github, Zap, Check, CheckCircle, XCircle, AlertTriangle, Shield } from 'lucide-react';
@@ -9,6 +9,7 @@ import { GuestModeDialog } from '../components/GuestModeDialog';
 import { PasswordRequirements } from '../components/PasswordRequirements';
 import { isValidEmail } from '../utils/validation';
 import { CodeCaptcha } from '../components/CodeCaptcha';
+import { magicLinkFocusTarget, hasEnteredEmail } from '../lib/loginFocus';
 
 const LOGIN_MUTATION = gql`
   mutation Login($input: LoginInput!) {
@@ -92,6 +93,7 @@ export function Signin({ initialMagicLink = false }: { initialMagicLink?: boolea
   });
   const [captchaPayload, setCaptchaPayload] = useState<string | null>(null);
   const [magicLinkCaptchaPayload, setMagicLinkCaptchaPayload] = useState<string | null>(null);
+  const magicLinkEmailRef = useRef<HTMLInputElement>(null);
 
   const [showPassword, setShowPassword] = useState(false);
   const [useMagicLink, setUseMagicLink] = useState(initialMagicLink);
@@ -224,6 +226,20 @@ export function Signin({ initialMagicLink = false }: { initialMagicLink?: boolea
     }
     return undefined;
   }, [lockoutTime]);
+
+  // When passwordless mode becomes active, put the cursor where the user will
+  // type next: the email field if they haven't entered one yet, otherwise the
+  // captcha (whose own autoFocus is gated to that case). Runs on mode entry and
+  // when returning from the "link sent" view, not on every keystroke.
+  useEffect(() => {
+    const target = magicLinkFocusTarget({
+      active: useMagicLink,
+      magicLinkSent,
+      hasEmail: hasEnteredEmail(formData.magicLinkEmail),
+    });
+    if (target === 'email') magicLinkEmailRef.current?.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [useMagicLink, magicLinkSent]);
 
   // Check if guest access is enabled
   const { data: systemSettings } = useQuery(GET_SYSTEM_SETTINGS);
@@ -630,13 +646,13 @@ export function Signin({ initialMagicLink = false }: { initialMagicLink?: boolea
                       <Mail className="h-5 w-5 text-gray-400" />
                     </div>
                     <input
+                      ref={magicLinkEmailRef}
                       type="email"
                       id="magicLinkEmail"
                       name="magicLinkEmail"
                       value={formData.magicLinkEmail}
                       onChange={handleChange}
                       autoComplete="email"
-                      autoFocus
                       className={`w-full pl-10 py-3 bg-gray-700/50 backdrop-blur-sm border rounded-xl text-gray-100 focus:outline-none focus:ring-2 transition-all ${
                         magicLinkEmailValid === false
                           ? 'pr-10 border-red-500/50 focus:ring-red-500/50'
@@ -698,11 +714,13 @@ export function Signin({ initialMagicLink = false }: { initialMagicLink?: boolea
                   )}
                 </div>
 
-                {/* CAPTCHA for Magic Link */}
+                {/* CAPTCHA for Magic Link — only auto-focuses when an email is
+                    already entered; otherwise the email field gets focus first. */}
                 <div>
                   <CodeCaptcha
                     onVerified={(code) => setMagicLinkCaptchaPayload(code)}
                     className="w-full"
+                    autoFocus={hasEnteredEmail(formData.magicLinkEmail)}
                   />
                 </div>
 
