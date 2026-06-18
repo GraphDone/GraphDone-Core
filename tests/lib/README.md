@@ -1,64 +1,36 @@
-# GraphDone Testing Helpers
+# `tests/lib/` — reusable test layer + unified harness
 
-This directory contains testing utilities and helpers for GraphDone E2E tests.
+Everything reusable across the test suite lives here. Specs import from it via
+`../../lib/<module>` (specs sit in depth-2 domain folders like `tests/e2e/auth/`).
 
-## 🔑 Authentication System (`auth.ts`)
+## Helpers (consumed by specs)
+- `auth.ts` — battle-tested `login` / `navigateToWorkspace` / `TEST_USERS` (the
+  foundation for every authenticated E2E spec)
+- `api.ts` — GraphQL/REST helpers that authenticate the way the UI does
+- `seedGraph.ts` — seed graphs/work items for a test
+- `dbHealing.ts` — DB isolation + cleanup for heavy suites
+- `testEnv.ts` — `.env.test.local` loader (VLM endpoints, etc.)
+- `mobileAudit.ts`, `zorder.ts` — DOM auditors used by the mobile/z-order specs
+- `vlm.ts` — local-VLM client for the visual-evaluation sequence
+- `mock-oauth-server.ts` — OAuth mock for the admin/oauth-provider specs
+- `metrics/balance_metrics.py` — OpenCV graph-balance metrics (subprocess; also
+  referenced by the GraphDone-Cloud live-audit via the `core/` submodule)
 
-**THE FOUNDATION FOR ALL E2E TESTS** - This is the robust, cross-browser authentication system that every E2E test should use.
+## Unified harness (`npm run test:unified`)
+The single, reproducible entry (`tests/run-unified.mjs`) runs a profile of
+sequences from `tests/sequences/unified.config.mjs` and emits DUAL output to
+`test-artifacts/unified/`: `report.html` (per-sequence pass/warn/fail with embedded
+`<img>` screenshots + `<video>` .webm clips) and `report.json`
+(`schema: graphdone.unified-report/1`). Exit code = rollup status (CI-gateable).
 
-### Quick Start
+- `reporting/` — `aggregate.mjs` (pure rollup, `node --test`), `html.mjs`, `json.mjs`,
+  and the consolidated `generate-*-report.mjs` domain generators
+- `adapters/` — normalise external results into unified sequences:
+  `playwright.mjs` (parses PW JSON + harvests video/screenshots), `vitest.mjs`,
+  `cloud-audit.mjs` (ingests the sibling GraphDone-Cloud live-audit findings.json)
+- `runner/runSequence.mjs` — argv-array spawn that captures exit/stdout/duration
 
-```typescript
-import { login, navigateToWorkspace, TEST_USERS } from './auth';
+Profiles: `smoke` (fast blocking) · `pr` (broader blocking) · `full` (everything
+incl. capture-heavy report sequences + cloud audit) · `report` (captures only).
 
-test('my test', async ({ page }) => {
-  await login(page, TEST_USERS.ADMIN);
-  await navigateToWorkspace(page);
-  // Your test code here - fully authenticated!
-});
-```
-
-### Why Use This System?
-
-✅ **Cross-browser tested** (Chromium, Firefox, WebKit)
-✅ **Handles all edge cases** (connection failures, timeouts, UI changes)  
-✅ **Smart retry logic** with exponential backoff
-✅ **Skips redundant logins** for better performance
-✅ **Comprehensive logging** for easy debugging
-✅ **Session cleanup** for test isolation
-
-### Available Functions
-
-- `login(page, credentials?, options?)` - Main authentication function
-- `navigateToWorkspace(page)` - Navigate to workspace with readiness verification
-- `getAuthState(page)` - Get current authentication status
-- `createTestGraph(page, options?)` - Create test graphs
-- `logout(page)` - Clean logout with multiple strategies
-- `cleanupAuth(page)` - Complete session cleanup for teardown
-
-### Test Credentials
-
-```typescript
-TEST_USERS = {
-  ADMIN: { username: 'admin', password: 'graphdone', role: 'admin' },
-  MEMBER: { username: 'member', password: 'graphdone', role: 'member' },
-  VIEWER: { username: 'viewer', password: 'graphdone', role: 'viewer' },
-  GUEST: { username: '', password: '', role: 'guest' }
-}
-```
-
-## 📚 Documentation
-
-For complete documentation and examples, see: **[../README.md](../README.md)**
-
-## 🚨 Important
-
-**DO NOT create custom authentication logic in your tests.** Use this system instead to ensure:
-- Consistency across all tests
-- Proper error handling
-- Cross-browser compatibility
-- Easier maintenance
-
----
-
-*This authentication system was battle-tested across all browsers and handles every edge case we've encountered. Trust it and use it!* 🔑
+Run the lib's own unit tests with `npm run test:unified:lib` (`node --test tests/lib/`).

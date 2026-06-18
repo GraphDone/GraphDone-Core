@@ -29,7 +29,7 @@
     "test:unified:lib": "node --test tests/lib/",
     "test:installation": "./scripts/test-installation-simple.sh",
     "test:https": "node tests/integration/ssl-certificate-analysis.js && node tests/integration/mobile-https-compatibility-test.js",
-    "test:report": "open test-results/reports/index.html",
+    "test:report": "open test-artifacts/unified/report.html",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "clean": "turbo run clean && rm -rf node_modules",
