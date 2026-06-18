@@ -1318,8 +1318,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     const zoom = d3.zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.1, 3])
       .wheelDelta((event: WheelEvent) => {
-        // Reverse wheel direction: negative deltaY for zoom in, positive for zoom out
-        return -event.deltaY * (event.deltaMode === 1 ? 0.05 : event.deltaMode ? 1 : 0.002) * -1;
+        // Standard direction (like maps/most apps): scroll UP (deltaY<0) zooms IN.
+        return -event.deltaY * (event.deltaMode === 1 ? 0.05 : event.deltaMode ? 1 : 0.002);
       })
       .on('zoom', (event) => {
         const g = svg.select('g.main-graph-group');
@@ -1761,8 +1761,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     const zoom = d3.zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.1, 4])
       .wheelDelta((event: WheelEvent) => {
-        // Reverse wheel direction: negative deltaY for zoom in, positive for zoom out
-        return -event.deltaY * (event.deltaMode === 1 ? 0.05 : event.deltaMode ? 1 : 0.002) * -1;
+        // Standard direction (like maps/most apps): scroll UP (deltaY<0) zooms IN.
+        return -event.deltaY * (event.deltaMode === 1 ? 0.05 : event.deltaMode ? 1 : 0.002);
       });
 
     const g = isFirstInit ? svg.append('g').attr('class', 'main-graph-group') : existingMainGroup;
@@ -2496,13 +2496,18 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       })
       .attr('stroke-width', 1.5);
 
-    // Node type text in colored title bar (centered)
+    const iconSize = Math.max(16, Math.min(24, titleBarHeight * 0.7));
+    // Node type text: centered in the OPEN GAP between the single left (gear)
+    // button and the right button cluster (expand + grow), NOT the whole header —
+    // gear right edge ≈ -W/2+iconSize+12, expand left edge ≈ W/2-2*iconSize-20, so
+    // the gap midpoint is -(iconSize+8)/2 (independent of node width).
+    const typeGapX = -(iconSize + 8) / 2;
     nodeElements.append('text')
       .attr('class', 'node-type-text')
-      .attr('x', 0)
+      .attr('x', typeGapX)
       .attr('y', (d: WorkItem) => -getNodeDimensions(d).height / 2 + titleBarHeight / 2 + 2)
       .attr('text-anchor', 'middle')
-      .attr('dominant-baseline', 'middle')
+      .attr('dominant-baseline', 'central')
       .text((d: WorkItem) => d.type)
       .style('opacity', (currentTransform?.k || 1) >= LOD_THRESHOLDS.FAR ? 1 : 0)
       .style('font-size', '13px')
@@ -2514,7 +2519,6 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .style('pointer-events', 'none');
 
     // Edit icon in title bar (centered vertically, left side) - scales with zoom
-    const iconSize = Math.max(16, Math.min(24, titleBarHeight * 0.7));
     const editIcons = nodeElements.append('g')
       .attr('class', 'node-edit-icon')
       .attr('transform', (d: WorkItem) => {
@@ -2525,7 +2529,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .style('cursor', 'pointer')
       .style('opacity', (currentTransform?.k || 1) >= LOD_THRESHOLDS.FAR ? 0.85 : 0)
       .style('pointer-events', 'all');
-    
+    editIcons.append('title').text('Open details / edit'); // native hover tooltip
+
     // Edit icon background - scales with icon
     const editBg = editIcons.append('rect')
       .attr('class', 'edit-bg')
@@ -2544,7 +2549,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .attr('x', 0)
       .attr('y', 0)
       .attr('text-anchor', 'middle')
-      .attr('dominant-baseline', 'middle')
+      .attr('dominant-baseline', 'central')
       .style('font-size', `${iconSize * 1.1}px`)
       .style('fill', '#ffffff')
       .style('pointer-events', 'none')
@@ -2611,7 +2616,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .style('cursor', 'pointer')
       .style('opacity', (currentTransform?.k || 1) >= LOD_THRESHOLDS.FAR ? 0.85 : 0)
       .style('pointer-events', 'all');
-    
+    relationshipIcons.append('title').text('Add a connection (grow)'); // native hover tooltip
+
     // Relationship icon background - same as edit icon
     relationshipIcons.append('rect')
       .attr('class', 'relationship-bg')
@@ -2630,7 +2636,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .attr('x', 0)
       .attr('y', 0)
       .attr('text-anchor', 'middle')
-      .attr('dominant-baseline', 'middle')
+      .attr('dominant-baseline', 'central')
       .style('font-size', `${iconSize * 1.2}px`) // Slightly bigger than gear for visual balance
       .style('font-weight', 'bold')
       .style('fill', '#ffffff')
@@ -2705,6 +2711,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .style('cursor', 'pointer')
       .style('opacity', (currentTransform?.k || 1) >= LOD_THRESHOLDS.FAR ? 0.85 : 0)
       .style('pointer-events', 'all');
+    expandIcons.append('title').text('Expand — read contents & diagram'); // native hover tooltip
     expandIcons.append('rect')
       .attr('class', 'expand-bg')
       .attr('x', -iconSize / 2)
@@ -3660,9 +3667,20 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           // points "backward" — which leaves the directional label icon pointing
           // the wrong way after a flip. Carry that lost 180° on the icon so its
           // arrow tracks the real edge direction (and flips when the edge flips).
+          // CRITICAL: rotate around the ICON's own centre — a bare rotate(180)
+          // pivots on the group origin (0,0), which threw the icon across onto the
+          // label text (overlap) and left it upside-down. The icon is a 14×14
+          // foreignObject at (x,y), so its centre is (x+7, y+7).
           const trueAngle = (Math.atan2(target.y - source.y, target.x - source.x) * 180) / Math.PI;
           const iconFlipped = trueAngle > 90 || trueAngle < -90;
-          d3.select(this).select('.edge-label-icon').attr('transform', iconFlipped ? 'rotate(180)' : null);
+          const iconSel = d3.select(this).select('.edge-label-icon');
+          if (iconFlipped) {
+            const ix = parseFloat(iconSel.attr('x') || '-7');
+            const iy = parseFloat(iconSel.attr('y') || '-7');
+            iconSel.attr('transform', `rotate(180, ${ix + 7}, ${iy + 7})`);
+          } else {
+            iconSel.attr('transform', null);
+          }
           return `translate(${placement.x},${placement.y}) rotate(${placement.rotation})`;
         });
     };
@@ -4071,18 +4089,23 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     const centerX = width / 2;
     const centerY = height / 2;
     
-    // Get current zoom scale (maintain it)
-    const currentScale = currentTransform?.scale || 1;
-    
+    // Maintain the LIVE zoom scale (read from the element, not stale React state).
+    const currentScale = d3.zoomTransform(svgElement).k || currentTransform?.scale || 1;
+
     // Calculate translation to center the node
     const translateX = centerX - nodeX * currentScale;
     const translateY = centerY - nodeY * currentScale;
-    
-    // Apply transform with smooth transition
+
+    // Apply through the BOUND zoom behavior so its 'zoom' handler actually moves
+    // the graph group (and keeps currentTransform coherent) — using a throwaway
+    // d3.zoom() only set the svg's stored __zoom, so nothing moved until the next
+    // gesture snapped to it (the deferred/abrupt jump). Mirrors fitViewToNodes.
     const transform = d3.zoomIdentity.translate(translateX, translateY).scale(currentScale);
-    svg.transition()
-      .duration(750)
-      .call(d3.zoom<SVGSVGElement, unknown>().transform as any, transform);
+    if (zoomBehaviorRef.current) {
+      svg.transition().duration(600).call(zoomBehaviorRef.current.transform as any, transform);
+    } else {
+      svg.transition().duration(600).call(d3.zoom<SVGSVGElement, unknown>().transform as any, transform);
+    }
       
     // Update mini-map viewport
     if ((window as any).updateMiniMapViewport) {

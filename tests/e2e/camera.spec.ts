@@ -50,14 +50,15 @@ test.describe('camera framing + persistence @camera', () => {
 
     // Zoom IN hard over the canvas centre (wheel, not drag) so peripheral nodes
     // leave the viewport. Wheel avoids the minimap (bottom-right) and never grabs
-    // a node the way a drag-pan can. Custom wheelDelta: +deltaY == zoom in.
+    // a node the way a drag-pan can. Standard direction: scroll UP (negative
+    // deltaY) zooms in.
     const canvas = await page.locator('.graph-container').first().boundingBox();
     if (!canvas) throw new Error('no canvas');
     const cx = canvas.x + canvas.width / 2;
     const cy = canvas.y + canvas.height / 2;
     await page.mouse.move(cx, cy);
     for (let i = 0; i < 7; i++) {
-      await page.mouse.wheel(0, 320);
+      await page.mouse.wheel(0, -320);
       await page.waitForTimeout(90);
     }
     await page.waitForTimeout(500);
