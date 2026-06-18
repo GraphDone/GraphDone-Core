@@ -1318,8 +1318,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     const zoom = d3.zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.1, 3])
       .wheelDelta((event: WheelEvent) => {
-        // Reverse wheel direction: negative deltaY for zoom in, positive for zoom out
-        return -event.deltaY * (event.deltaMode === 1 ? 0.05 : event.deltaMode ? 1 : 0.002) * -1;
+        // Standard direction (like maps/most apps): scroll UP (deltaY<0) zooms IN.
+        return -event.deltaY * (event.deltaMode === 1 ? 0.05 : event.deltaMode ? 1 : 0.002);
       })
       .on('zoom', (event) => {
         const g = svg.select('g.main-graph-group');
@@ -1761,8 +1761,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     const zoom = d3.zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.1, 4])
       .wheelDelta((event: WheelEvent) => {
-        // Reverse wheel direction: negative deltaY for zoom in, positive for zoom out
-        return -event.deltaY * (event.deltaMode === 1 ? 0.05 : event.deltaMode ? 1 : 0.002) * -1;
+        // Standard direction (like maps/most apps): scroll UP (deltaY<0) zooms IN.
+        return -event.deltaY * (event.deltaMode === 1 ? 0.05 : event.deltaMode ? 1 : 0.002);
       });
 
     const g = isFirstInit ? svg.append('g').attr('class', 'main-graph-group') : existingMainGroup;
