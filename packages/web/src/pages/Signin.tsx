@@ -10,6 +10,7 @@ import { PasswordRequirements } from '../components/PasswordRequirements';
 import { isValidEmail } from '../utils/validation';
 import { CodeCaptcha } from '../components/CodeCaptcha';
 import { magicLinkFocusTarget, hasEnteredEmail } from '../lib/loginFocus';
+import { formatLoginCodeInput, isCompleteLoginCode } from '../lib/loginCode';
 
 const LOGIN_MUTATION = gql`
   mutation Login($input: LoginInput!) {
@@ -94,6 +95,9 @@ export function Signin({ initialMagicLink = false }: { initialMagicLink?: boolea
   const [captchaPayload, setCaptchaPayload] = useState<string | null>(null);
   const [magicLinkCaptchaPayload, setMagicLinkCaptchaPayload] = useState<string | null>(null);
   const magicLinkEmailRef = useRef<HTMLInputElement>(null);
+  const [loginCodeInput, setLoginCodeInput] = useState('');
+  const [codeVerifying, setCodeVerifying] = useState(false);
+  const [codeError, setCodeError] = useState<string | null>(null);
 
   const [showPassword, setShowPassword] = useState(false);
   const [useMagicLink, setUseMagicLink] = useState(initialMagicLink);
@@ -441,6 +445,34 @@ export function Signin({ initialMagicLink = false }: { initialMagicLink?: boolea
     await handleMagicLinkRequest({ preventDefault: () => {} } as React.FormEvent);
   };
 
+  // Verify the type-in code from the email (alternative to clicking the link, so
+  // a user on a shared device never has to open their inbox there). On success the
+  // Worker returns a session token; persist it and reload into the app.
+  const handleVerifyCode = async () => {
+    if (!isCompleteLoginCode(loginCodeInput)) return;
+    setCodeVerifying(true);
+    setCodeError(null);
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:4127';
+      const response = await fetch(`${apiUrl}/auth/code/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: formData.magicLinkEmail, code: loginCodeInput }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (response.ok && data.token) {
+        setToken(data.token, true);
+        window.location.assign('/');
+      } else {
+        setCodeError(data.message || 'Incorrect code. Please check and try again.');
+      }
+    } catch {
+      setCodeError('Could not verify the code. Please try again.');
+    } finally {
+      setCodeVerifying(false);
+    }
+  };
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4 lg:py-3 relative overflow-hidden">
@@ -613,6 +645,48 @@ export function Signin({ initialMagicLink = false }: { initialMagicLink?: boolea
                   </p>
                 </div>
                 
+                {/* Type-in code — alternative to clicking the link, so you can
+                    sign in on a device where you don't want to open your email. */}
+                <div className="pt-4 border-t border-teal-500/20">
+                  <label htmlFor="loginCode" className="block text-sm font-medium text-teal-200 mb-2 text-center">
+                    Or enter the code from the email
+                  </label>
+                  <input
+                    id="loginCode"
+                    type="text"
+                    inputMode="text"
+                    autoComplete="one-time-code"
+                    autoFocus
+                    value={loginCodeInput}
+                    onChange={(e) => { setLoginCodeInput(formatLoginCodeInput(e.target.value)); setCodeError(null); }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleVerifyCode(); }}
+                    placeholder="XXXX-XXXX-XXXX"
+                    aria-label="Sign-in code from email"
+                    className="w-full px-4 py-3 bg-gray-900/60 border border-teal-500/40 rounded-xl text-gray-100 font-mono text-center text-lg tracking-[0.25em] uppercase focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500/50"
+                  />
+                  {codeError && (
+                    <p className="mt-2 text-xs text-red-400 text-center" role="alert">{codeError}</p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleVerifyCode}
+                    disabled={!isCompleteLoginCode(loginCodeInput) || codeVerifying}
+                    className="mt-3 w-full bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 border border-teal-400/50 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center space-x-2"
+                  >
+                    {codeVerifying ? (
+                      <>
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                        <span>Verifying…</span>
+                      </>
+                    ) : (
+                      <>
+                        <ArrowRight className="h-5 w-5" />
+                        <span>Enter code &amp; sign in</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
                 <div className="pt-4 border-t border-teal-500/20 space-y-2">
                   <button
                     type="button"
@@ -628,6 +702,8 @@ export function Signin({ initialMagicLink = false }: { initialMagicLink?: boolea
                       setMagicLinkSent(false);
                       setFormData({ ...formData, magicLinkEmail: '' });
                       setResendCooldown(0);
+                      setLoginCodeInput('');
+                      setCodeError(null);
                     }}
                     className="w-full text-sm text-teal-400 hover:text-teal-300"
                   >
