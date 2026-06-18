@@ -24,11 +24,14 @@ export const SEQUENCES = {
   'matrix': { adapter: 'playwright', title: 'Feature × resolution matrix', args: ['--project=matrix'], blocking: false },
   'vlm': { adapter: 'playwright', title: 'Local-VLM visual eval (skips w/o endpoints)', args: ['--project=vlm'], blocking: false },
   'perf-scale': { adapter: 'playwright', title: 'Large-scale perf sweep', args: ['--project=perf-scale'], blocking: false },
+  // Cross-repo: ingest the newest GraphDone-Cloud live-audit findings.json (sibling
+  // repo) into the unified report. Skips cleanly when absent.
+  'cloud-audit': { adapter: 'cloud-audit', title: 'Cloud live audit (ingested)', blocking: false },
 };
 
 export const PROFILES = {
   smoke: ['unit-web', 'smoke', 'e2e-auth'],
   pr: ['unit-web', 'smoke', 'e2e-auth', 'e2e-graph', 'mobile', 'perf-budgets'],
-  full: ['unit-web', 'smoke', 'e2e-auth', 'e2e-graph', 'mobile', 'perf-budgets', 'diagnostics', 'showcase', 'matrix', 'vlm', 'perf-scale'],
-  report: ['diagnostics', 'showcase', 'matrix', 'vlm', 'perf-scale'],
+  full: ['unit-web', 'smoke', 'e2e-auth', 'e2e-graph', 'mobile', 'perf-budgets', 'diagnostics', 'showcase', 'matrix', 'vlm', 'perf-scale', 'cloud-audit'],
+  report: ['diagnostics', 'showcase', 'matrix', 'vlm', 'perf-scale', 'cloud-audit'],
 };
