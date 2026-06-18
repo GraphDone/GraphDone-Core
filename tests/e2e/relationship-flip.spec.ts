@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { login, TEST_USERS, navigateToWorkspace } from '../helpers/auth';
+import { login, TEST_USERS, navigateToWorkspace } from '../lib/auth';
 
 test.describe('Relationship Flip Functionality', () => {
   test.beforeEach(async ({ page }) => {

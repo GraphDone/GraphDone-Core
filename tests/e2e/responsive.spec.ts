@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { login, TEST_USERS } from '../helpers/auth';
+import { login, TEST_USERS } from '../lib/auth';
 
 // RESP-5 (docs/USER_STORIES.md): the core flow must work on phone, tablet and
 // desktop viewports, with no horizontal scroll and visible primary navigation.

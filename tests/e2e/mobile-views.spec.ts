@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { login, TEST_USERS } from '../helpers/auth';
+import { login, TEST_USERS } from '../lib/auth';
 
 /**
  * Mobile usability of the non-graph views. On a phone a user should be able to
