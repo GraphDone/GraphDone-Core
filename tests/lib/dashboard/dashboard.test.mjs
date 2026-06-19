@@ -156,6 +156,13 @@ test('scaleSweepMetrics drops -1 not-measured sentinels', () => {
   assert.equal(m.find((x) => x.metric === 'graph.loadMs').value, 1200);
   assert.equal(m.find((x) => x.metric === 'graph.settleMs').value, 0);
 });
+test('largeGraphMetrics drops -1 not-measured fps sentinels', () => {
+  const m = largeGraphMetrics({ quality: 'HIGH', graph: 'g', idleFps: 60, panFps: 55, dragFps: -1, zoomFps: 48, zoomedInDragFps: -1 }, 123);
+  assert.equal(m.find((x) => x.metric === 'graph.dragFps'), undefined, 'dragFps sentinel should be dropped');
+  assert.equal(m.find((x) => x.metric === 'graph.zoomedInDragFps'), undefined, 'zoomedInDragFps sentinel should be dropped');
+  assert.equal(m.find((x) => x.metric === 'graph.idleFps').value, 60);
+  assert.equal(m.length, 3);
+});
 test('largeGraphMetrics + physicsMetrics + vlmMetrics', () => {
   assert.equal(largeGraphMetrics({ quality: 'HIGH', graph: 'g', idleFps: 60, panFps: 55, dragFps: 50, zoomFps: 48, zoomedInDragFps: 40 }, 123).length, 5);
   const p = physicsMetrics({ graphId: 'g', summary: { settleSeconds: 4, overlapAfterOrganize: 0, labelOverlapAfter: 1 } }, 9);
