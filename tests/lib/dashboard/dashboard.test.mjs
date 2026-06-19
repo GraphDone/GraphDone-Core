@@ -148,6 +148,14 @@ test('scaleSweepMetrics maps fps/load/etc with context', () => {
   assert.equal(fps.context.quality, 'HIGH');
   assert.equal(fps.better, 'higher');
 });
+test('scaleSweepMetrics drops -1 not-measured sentinels', () => {
+  const m = scaleSweepMetrics({ size: 500, quality: 'ULTRA', interactionFps: -1, loadMs: 1200, settleMs: 0, avgTickMs: -1, queryP95Ms: -1, rmsFromSavedPx: -1, fps: -1, timestampISO: '2026-06-19T00:00:00Z' });
+  for (const metric of ['graph.interactionFps', 'graph.avgTickMs', 'graph.queryP95Ms', 'graph.driftPx', 'graph.idleFps']) {
+    assert.equal(m.find((x) => x.metric === metric), undefined, `${metric} sentinel should be dropped`);
+  }
+  assert.equal(m.find((x) => x.metric === 'graph.loadMs').value, 1200);
+  assert.equal(m.find((x) => x.metric === 'graph.settleMs').value, 0);
+});
 test('largeGraphMetrics + physicsMetrics + vlmMetrics', () => {
   assert.equal(largeGraphMetrics({ quality: 'HIGH', graph: 'g', idleFps: 60, panFps: 55, dragFps: 50, zoomFps: 48, zoomedInDragFps: 40 }, 123).length, 5);
   const p = physicsMetrics({ graphId: 'g', summary: { settleSeconds: 4, overlapAfterOrganize: 0, labelOverlapAfter: 1 } }, 9);
