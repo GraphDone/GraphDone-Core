@@ -179,6 +179,19 @@ make test-report                  # open the latest unified HTML report
 open test-artifacts/unified/report.html
 ```
 
+**📊 Live test dashboard (the continuous "guiding light"):**
+```bash
+npm run dashboard                 # serve at http://localhost:3199 (read-only, localhost)
+npm run dashboard:open            # …and open the browser
+make dashboard
+```
+Leave it running while you work. It watches every `graphdone.unified-report/1` run
+in BOTH repos (Core `test-artifacts/unified*` + Cloud `live-full-report/<stamp>`),
+keeps append-only trend history that survives Core's per-run overwrite, and
+**updates live over SSE** when a new run lands — performance trend charts, a runs
+timeline, per-check drill-down with embedded screenshots + video clips. Zero deps
+(`node:http` + SSE). See `tests/lib/dashboard/README.md`.
+
 The unified harness (`tests/run-unified.mjs` + `tests/sequences/unified.config.mjs`)
 is the single entry; profiles are `smoke|pr|full|report`. The test tree is organised
 as `tests/e2e/<domain>/`, `tests/diagnostics/<concern>/`, `tests/integration/`, with
