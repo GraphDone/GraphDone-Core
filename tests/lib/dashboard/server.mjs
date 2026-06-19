@@ -16,7 +16,7 @@ import { resolve, join, sep, extname } from 'node:path';
 import { spawn } from 'node:child_process';
 import { discover, signature, safeId, summarize } from './ingest.mjs';
 import { reportMetrics, scanPerfArtifacts } from './metrics.mjs';
-import { mergeRuns, mergeMetrics, readJsonl, appendJsonl, snapshotRun, pruneSnapshots } from './history.mjs';
+import { mergeRuns, mergeMetrics, readJsonl, appendJsonl, snapshotRun, pruneSnapshots, pickLatest } from './history.mjs';
 import { renderShell } from './page.mjs';
 
 const args = process.argv.slice(2);
@@ -104,7 +104,7 @@ function reindex() {
   const allMetrics = readJsonl(METRICS_JSONL);
   state = {
     generatedAt: Date.now(),
-    latest: merged[0] ? merged[0].runId : null,
+    latest: pickLatest(merged),
     runs: merged,
     metrics: allMetrics.slice(-6000),
     roots: ROOTS.map((r) => ({ name: r.name, label: r.label, mode: r.mode, exists: existsSync(r.path), count: discovered.filter((d) => d.source === r.name).length })),
