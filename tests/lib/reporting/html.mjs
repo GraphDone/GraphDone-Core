@@ -31,11 +31,10 @@ function caseHtml(c) {
 function seqHtml(seq, i) {
   const c = seq.counts || {};
   const cases = (seq.cases || []);
-  // Show failed/warn cases expanded; collapse a long all-green list to just its attachments.
-  const notable = cases.filter((x) => x.status === 'failed' || x.status === 'warn');
-  const withAtts = cases.filter((x) => (x.attachments || []).length);
-  const shown = notable.length ? notable : withAtts.slice(0, 24);
-  return `<details class="seq ${esc(seq.status)}" ${seq.status === 'failed' ? 'open' : ''}>
+  // Render EVERY check (each carries a citable ref) so any of them can be cited;
+  // the section is a <details> collapsed by default (open if it failed), so the
+  // page stays scannable while nothing is hidden.
+  return `<details class="seq ${esc(seq.status)}" ${seq.status === 'failed' || seq.status === 'warn' ? 'open' : ''}>
     <summary>
       <span class="badge" style="background:${COLOR[seq.status] || '#888'}">${ICON[seq.status] || ''} ${esc(seq.status)}</span>
       ${seq.ref ? `<code class="sref" title="section ref">§${esc(seq.ref)}</code>` : ''}
@@ -45,7 +44,7 @@ function seqHtml(seq, i) {
     </summary>
     ${seq.command ? `<code class="cmd">${esc(seq.command)}</code>` : ''}
     ${seq.notes ? `<p class="notes">${esc(seq.notes)}</p>` : ''}
-    ${shown.map(caseHtml).join('') || '<p class="empty">no per-case detail</p>'}
+    ${cases.map(caseHtml).join('') || '<p class="empty">no per-case detail</p>'}
   </details>`;
 }
 
