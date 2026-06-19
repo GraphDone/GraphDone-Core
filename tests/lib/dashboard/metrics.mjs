@@ -52,12 +52,15 @@ export function scaleSweepMetrics(json) {
 
 export function largeGraphMetrics(json, ts) {
   const ctx = { quality: json.quality, graph: json.graph };
+  // The large-graph profiler writes -1 for any fps it could not measure
+  // (e.g. dragFps when the node element is absent); keep those out of trends.
+  const measured = (v) => (typeof v === 'number' && v < 0 ? NaN : v);
   return [
-    pt('graph.idleFps', json.idleFps, 'fps', 'higher', ctx, ts),
-    pt('graph.panFps', json.panFps, 'fps', 'higher', ctx, ts),
-    pt('graph.dragFps', json.dragFps, 'fps', 'higher', ctx, ts),
-    pt('graph.zoomFps', json.zoomFps, 'fps', 'higher', ctx, ts),
-    pt('graph.zoomedInDragFps', json.zoomedInDragFps, 'fps', 'higher', ctx, ts),
+    pt('graph.idleFps', measured(json.idleFps), 'fps', 'higher', ctx, ts),
+    pt('graph.panFps', measured(json.panFps), 'fps', 'higher', ctx, ts),
+    pt('graph.dragFps', measured(json.dragFps), 'fps', 'higher', ctx, ts),
+    pt('graph.zoomFps', measured(json.zoomFps), 'fps', 'higher', ctx, ts),
+    pt('graph.zoomedInDragFps', measured(json.zoomedInDragFps), 'fps', 'higher', ctx, ts),
   ].filter(Boolean);
 }
 
