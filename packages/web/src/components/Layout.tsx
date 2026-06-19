@@ -54,7 +54,7 @@ export function Layout({ children }: LayoutProps) {
         <div className="md:hidden relative z-30 pt-safe">
           <div className="flex items-center bg-gray-800/90 backdrop-blur-sm px-3 py-2 border-b border-gray-700/50">
             <div className="flex-1 min-w-0">
-              <GraphSelector />
+              <GraphSelector testId="graph-selector-mobile" />
             </div>
           </div>
         </div>
@@ -166,7 +166,7 @@ export function Layout({ children }: LayoutProps) {
             {/* Graph Selector */}
             {!desktopSidebarCollapsed && (
               <div className="border-t border-gray-700">
-                <GraphSelector />
+                <GraphSelector testId="graph-selector-sidebar" />
               </div>
             )}
 
