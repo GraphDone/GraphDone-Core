@@ -21,6 +21,7 @@ function caseHtml(c) {
   const err = c.error ? `<pre class="err">${esc(c.error)}</pre>` : '';
   return `<div class="case ${esc(c.status)}">
     <span class="dot" style="background:${COLOR[c.status] || '#888'}"></span>
+    ${c.ref ? `<code class="ref" title="cite this check">${esc(c.ref)}</code>` : ''}
     <span class="ctitle">${esc(c.title)}</span>
     ${c.durationMs != null ? `<span class="cdur">${(c.durationMs / 1000).toFixed(1)}s</span>` : ''}
     ${err}${atts ? `<div class="atts">${atts}</div>` : ''}
@@ -37,6 +38,7 @@ function seqHtml(seq, i) {
   return `<details class="seq ${esc(seq.status)}" ${seq.status === 'failed' ? 'open' : ''}>
     <summary>
       <span class="badge" style="background:${COLOR[seq.status] || '#888'}">${ICON[seq.status] || ''} ${esc(seq.status)}</span>
+      ${seq.ref ? `<code class="sref" title="section ref">§${esc(seq.ref)}</code>` : ''}
       <span class="sname">${esc(seq.title || seq.id)}</span>
       <span class="counts">${c.passed || 0}✓ ${c.failed || 0}✗ ${c.warned || 0}⚠ ${c.skipped || 0}⏭</span>
       ${seq.durationMs != null ? `<span class="sdur">${(seq.durationMs / 1000).toFixed(1)}s</span>` : ''}
@@ -70,6 +72,8 @@ h1{font-size:22px;margin:0 0 4px;display:flex;align-items:center;gap:10px}
 .seq summary{display:flex;align-items:center;gap:12px;cursor:pointer;list-style:none;padding:8px 0}
 .seq summary::-webkit-details-marker{display:none}
 .badge{padding:2px 10px;border-radius:999px;font-size:11px;font-weight:700;color:#0b1220;text-transform:uppercase}
+.sref{background:#1e293b;color:#7dd3fc;border:1px solid #334155;border-radius:5px;padding:1px 7px;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums}
+.ref{background:#0b1220;color:#fbbf24;border:1px solid #334155;border-radius:5px;padding:0 6px;font-size:11px;font-weight:700;margin-right:8px;font-variant-numeric:tabular-nums;user-select:all}
 .sname{font-weight:600;flex:1}
 .counts{font-variant-numeric:tabular-nums;color:#cbd5e1;font-size:12px}
 .sdur,.cdur{color:#64748b;font-size:12px}
