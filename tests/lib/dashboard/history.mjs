@@ -24,6 +24,18 @@ export function mergeRuns(existing, incoming) {
   return { merged, added };
 }
 
+/**
+ * Pick the headline "latest" run for the dashboard. Runs come in newest-first
+ * (as mergeRuns sorts them). Prefer the newest run whose report is actually on
+ * disk (available) so the headline never points at a re-stamped/cached entry
+ * that 404s on drill-down; fall back to the newest run overall, else null.
+ */
+export function pickLatest(runs) {
+  if (!Array.isArray(runs) || !runs.length) return null;
+  const available = runs.find((r) => r && r.available);
+  return (available || runs[0]).runId;
+}
+
 export function mergeMetrics(existing, incoming) {
   const seen = new Set(existing.map((m) => m.key));
   const added = [];

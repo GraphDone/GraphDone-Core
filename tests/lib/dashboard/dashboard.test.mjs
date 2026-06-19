@@ -8,7 +8,7 @@ import { rollupStatus, fmtDuration, fmtBytes, pct, decodeMungedName, esc, STATUS
 import { niceMax, bounds, lineChart, statusBar, sparkline } from './charts.mjs';
 import { isUnifiedReport, runIdFor, summarize, mediaCount, safeId } from './ingest.mjs';
 import { reportMetrics, scaleSweepMetrics, largeGraphMetrics, physicsMetrics, vlmMetrics, pointKey } from './metrics.mjs';
-import { mergeRuns, mergeMetrics, readJsonl, appendJsonl, snapshotRun, pruneSnapshots } from './history.mjs';
+import { mergeRuns, mergeMetrics, readJsonl, appendJsonl, snapshotRun, pruneSnapshots, pickLatest } from './history.mjs';
 
 // ── format ────────────────────────────────────────────────────────────────
 test('rollupStatus: worst-of precedence', () => {
@@ -185,6 +185,13 @@ test('mergeRuns appends a CHANGED summary (same runId, different status), skips 
 test('mergeRuns tie-breaks equal finishedAt deterministically by runId', () => {
   const { merged } = mergeRuns([], [{ runId: 'b', finishedAt: 5 }, { runId: 'a', finishedAt: 5 }]);
   assert.deepEqual(merged.map((r) => r.runId), ['a', 'b']);
+});
+test('pickLatest prefers newest available run, skips re-stamped/unavailable headline', () => {
+  assert.equal(pickLatest([]), null);
+  assert.equal(pickLatest(null), null);
+  assert.equal(pickLatest([{ runId: 'r2', available: false }, { runId: 'r1', available: true }]), 'r1');
+  assert.equal(pickLatest([{ runId: 'r2', available: true }, { runId: 'r1', available: true }]), 'r2');
+  assert.equal(pickLatest([{ runId: 'r2', available: false }, { runId: 'r1', available: false }]), 'r2');
 });
 test('mergeMetrics dedupes by key', () => {
   const { merged, added } = mergeMetrics([{ key: 'a' }], [{ key: 'a' }, { key: 'b' }, { key: 'b' }]);
