@@ -1,7 +1,7 @@
 # GraphDone Makefile for Test Automation
 # Run all tests and generate HTML report with: make test-all
 
-.PHONY: help test test-all test-https test-e2e test-unit test-report deploy clean
+.PHONY: help test test-all test-https test-e2e test-unit test-report dashboard deploy clean
 
 # Default target - show help
 help:
@@ -54,6 +54,11 @@ test-report:
 	else \
 		echo "❌ No test report found. Run 'make test-all' (or npm run test:unified) first."; \
 	fi
+
+# Live test dashboard (auto-opens browser; watches test runs + updates live)
+dashboard:
+	@echo "📊 Starting live test dashboard at http://localhost:3199 ..."
+	@npm run dashboard:open
 
 # Start production deployment
 deploy:
