@@ -63,7 +63,10 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: true,
+    // No production source maps — serving .js.map publicly leaks original source.
+    // Caught by the live red-team (REDTEAM-SEC). Dev uses the Vite dev server
+    // (its own maps), so debugging is unaffected.
+    sourcemap: false,
     rollupOptions: {
       output: {
         // Force new filenames to break cache
