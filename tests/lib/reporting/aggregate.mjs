@@ -43,7 +43,22 @@ export function sumCounts(sequences) {
 }
 
 /** Build the full report object the reporters consume. Pure; timestamps passed in. */
+/**
+ * Stable hierarchical reference IDs so a reviewer can cite a specific check
+ * (e.g. "3.5 looks wrong"). Each sequence gets a section number; each case gets
+ * `<section>.<n>`. Pre-set refs (e.g. a deeper source.dimension.check from the
+ * live runner) are preserved.
+ */
+export function assignRefs(sequences) {
+  sequences.forEach((seq, i) => {
+    seq.ref = seq.ref || String(i + 1);
+    (seq.cases || []).forEach((c, j) => { c.ref = c.ref || `${seq.ref}.${j + 1}`; });
+  });
+  return sequences;
+}
+
 export function buildReport({ sequences = [], startedAt, finishedAt, target = '', env = {} } = {}) {
+  assignRefs(sequences);
   const { totals, byStatus } = sumCounts(sequences);
   return {
     schema: 'graphdone.unified-report/1',
