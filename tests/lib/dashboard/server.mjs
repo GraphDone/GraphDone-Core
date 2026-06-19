@@ -16,7 +16,7 @@ import { resolve, join, sep, extname } from 'node:path';
 import { spawn } from 'node:child_process';
 import { discover, signature, safeId, summarize } from './ingest.mjs';
 import { reportMetrics, scanPerfArtifacts } from './metrics.mjs';
-import { mergeRuns, mergeMetrics, readJsonl, appendJsonl, snapshotRun, pruneSnapshots, pickLatest } from './history.mjs';
+import { mergeRuns, mergeMetrics, liveMetrics, readJsonl, appendJsonl, snapshotRun, pruneSnapshots, pickLatest } from './history.mjs';
 import { renderShell } from './page.mjs';
 
 const args = process.argv.slice(2);
@@ -101,7 +101,7 @@ function reindex() {
 
   if (existsSync(join(STORE, 'runs'))) pruneSnapshots(STORE, KEEP);
 
-  const allMetrics = readJsonl(METRICS_JSONL);
+  const allMetrics = liveMetrics(readJsonl(METRICS_JSONL));
   state = {
     generatedAt: Date.now(),
     latest: pickLatest(merged),
