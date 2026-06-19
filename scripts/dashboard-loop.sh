@@ -34,11 +34,38 @@ log "── iteration start (pid $$) ──"
 
 health() { curl -s -o /dev/null -w '%{http_code}' "http://localhost:$PORT/api/state" 2>/dev/null; }
 
-# 1) keep the dashboard alive
-if [ "$(health)" != "200" ]; then
-  log "dashboard down → starting"
+start_dashboard() {
   nohup npm run dashboard >/tmp/gd-dash.log 2>&1 & disown
   for _ in 1 2 3 4 5 6; do sleep 1; [ "$(health)" = "200" ] && break; done
+}
+
+# A long-running server keeps serving the code it started with, so dashboard
+# self-improvements (e.g. new metric filtering) never reach the live charts
+# until it restarts. Restart when any dashboard source is newer than the
+# running process; the down→start net below still recovers if this misfires.
+restart_if_stale() {
+  local pid pstart newest
+  # the listener bound to the port — not the `sh -c` wrapper pgrep also matches
+  pid=$(ss -ltnp 2>/dev/null | awk -v p=":$PORT" '$4 ~ p {print $NF}' | grep -oP 'pid=\K[0-9]+' | head -1)
+  [ -z "$pid" ] && return 0
+  pstart=$(date -d "$(ps -o lstart= -p "$pid" 2>/dev/null)" +%s 2>/dev/null) || return 0
+  [ -z "$pstart" ] && return 0
+  newest=$(find tests/lib/dashboard -name '*.mjs' -printf '%T@\n' 2>/dev/null | sort -n | tail -1 | cut -d. -f1)
+  [ -z "$newest" ] && return 0
+  if [ "$newest" -gt "$pstart" ]; then
+    log "dashboard code newer than running server (pid $pid) → restarting"
+    kill "$pid" 2>/dev/null
+    sleep 1
+    start_dashboard
+  fi
+}
+
+# 1) keep the dashboard alive (and current)
+if [ "$(health)" != "200" ]; then
+  log "dashboard down → starting"
+  start_dashboard
+else
+  restart_if_stale
 fi
 log "dashboard health=$(health)"
 
