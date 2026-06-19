@@ -43,6 +43,17 @@ test('sumCounts totals + status tally', () => {
   assert.equal(byStatus.failed, 1);
 });
 
+test('buildReport assigns hierarchical refs (section + section.case), preserving presets', () => {
+  const r = buildReport({ sequences: [
+    { title: 'A', status: 'passed', counts: { passed: 2 }, cases: [{ title: 'x', status: 'passed' }, { title: 'y', status: 'passed' }] },
+    { ref: '2.4', title: 'B', status: 'warn', counts: { warned: 1 }, cases: [{ ref: '2.4.1', title: 'z', status: 'warn' }] },
+  ] });
+  assert.equal(r.sequences[0].ref, '1');
+  assert.deepEqual(r.sequences[0].cases.map((c) => c.ref), ['1.1', '1.2']);
+  assert.equal(r.sequences[1].ref, '2.4');        // preset section ref preserved
+  assert.equal(r.sequences[1].cases[0].ref, '2.4.1'); // preset case ref preserved
+});
+
 test('buildReport rolls up status + duration', () => {
   const r = buildReport({
     sequences: [{ status: 'passed', counts: { passed: 2 } }, { status: 'warn', counts: { warned: 1 } }],
