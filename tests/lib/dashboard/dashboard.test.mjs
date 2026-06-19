@@ -8,7 +8,7 @@ import { rollupStatus, fmtDuration, fmtBytes, pct, decodeMungedName, esc, STATUS
 import { niceMax, bounds, lineChart, statusBar, sparkline } from './charts.mjs';
 import { isUnifiedReport, runIdFor, summarize, mediaCount, safeId } from './ingest.mjs';
 import { reportMetrics, scaleSweepMetrics, largeGraphMetrics, physicsMetrics, vlmMetrics, pointKey } from './metrics.mjs';
-import { mergeRuns, mergeMetrics, readJsonl, appendJsonl, snapshotRun, pruneSnapshots, pickLatest } from './history.mjs';
+import { mergeRuns, mergeMetrics, liveMetrics, readJsonl, appendJsonl, snapshotRun, pruneSnapshots, pickLatest } from './history.mjs';
 
 // ── format ────────────────────────────────────────────────────────────────
 test('rollupStatus: worst-of precedence', () => {
@@ -212,6 +212,19 @@ test('mergeMetrics dedupes by key', () => {
   const { merged, added } = mergeMetrics([{ key: 'a' }], [{ key: 'a' }, { key: 'b' }, { key: 'b' }]);
   assert.equal(merged.length, 2);
   assert.deepEqual(added.map((m) => m.key), ['b']);
+});
+test('liveMetrics drops stale -1 sentinels and non-finite values from stored history', () => {
+  const m = liveMetrics([
+    { metric: 'graph.driftPx', value: -1 },
+    { metric: 'graph.avgTickMs', value: -1 },
+    { metric: 'graph.driftPx', value: 85.77 },
+    { metric: 'graph.idleFps', value: 0 },
+    { metric: 'graph.loadMs', value: NaN },
+    { metric: 'suite.passRate', value: 100 },
+    null,
+  ]);
+  assert.equal(m.length, 3);
+  assert.deepEqual(m.map((x) => x.value), [85.77, 0, 100]);
 });
 
 // ── history fs round-trip ───────────────────────────────────────────────────
