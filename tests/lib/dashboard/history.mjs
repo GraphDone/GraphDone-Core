@@ -36,6 +36,18 @@ export function pickLatest(runs) {
   return (available || runs[0]).runId;
 }
 
+/**
+ * Drop not-measured sentinels from a stored metric series before it reaches the
+ * charts. Ingestion (metrics.mjs) already filters -1 sentinels, but the
+ * append-only metrics.jsonl retains points written before that fix landed; a -1
+ * on a lower-is-better metric (driftPx, avgTickMs) otherwise reads as a perfect
+ * score and distorts the trend. Every GraphDone metric is non-negative, so a
+ * non-finite or negative value is always a sentinel.
+ */
+export function liveMetrics(metrics) {
+  return metrics.filter((m) => m && typeof m.value === 'number' && isFinite(m.value) && m.value >= 0);
+}
+
 export function mergeMetrics(existing, incoming) {
   const seen = new Set(existing.map((m) => m.key));
   const added = [];
