@@ -36,14 +36,17 @@ export function reportMetrics(report) {
 export function scaleSweepMetrics(json) {
   const ts = Date.parse(json.timestampISO || '') || 0;
   const ctx = { graphSize: json.size, quality: json.quality };
+  // The scale-sweep harness writes -1 for any measurement it could not take;
+  // those are not real data points, so keep them out of the trend charts.
+  const measured = (v) => (typeof v === 'number' && v < 0 ? NaN : v);
   return [
-    pt('graph.interactionFps', json.interactionFps, 'fps', 'higher', ctx, ts),
-    pt('graph.loadMs', json.loadMs, 'ms', 'lower', ctx, ts),
-    pt('graph.settleMs', json.settleMs, 'ms', 'lower', ctx, ts),
-    pt('graph.avgTickMs', json.avgTickMs, 'ms', 'lower', ctx, ts),
-    pt('graph.queryP95Ms', json.queryP95Ms, 'ms', 'lower', ctx, ts),
-    pt('graph.driftPx', json.rmsFromSavedPx, 'px', 'lower', ctx, ts),
-    pt('graph.idleFps', json.fps, 'fps', 'higher', ctx, ts),
+    pt('graph.interactionFps', measured(json.interactionFps), 'fps', 'higher', ctx, ts),
+    pt('graph.loadMs', measured(json.loadMs), 'ms', 'lower', ctx, ts),
+    pt('graph.settleMs', measured(json.settleMs), 'ms', 'lower', ctx, ts),
+    pt('graph.avgTickMs', measured(json.avgTickMs), 'ms', 'lower', ctx, ts),
+    pt('graph.queryP95Ms', measured(json.queryP95Ms), 'ms', 'lower', ctx, ts),
+    pt('graph.driftPx', measured(json.rmsFromSavedPx), 'px', 'lower', ctx, ts),
+    pt('graph.idleFps', measured(json.fps), 'fps', 'higher', ctx, ts),
   ].filter(Boolean);
 }
 
