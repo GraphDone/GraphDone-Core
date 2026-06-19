@@ -52,6 +52,7 @@ import { computeNodeLayerY, isHierarchicalLayout, parseLayoutMode, LAYOUT_MODE_S
 import { edgeBorderEndpoints, minEdgeLength, clampToMinNeighbors } from '../lib/edgeGeometry';
 import { directionStrategy, arrowVisibility, labelVisibility, perpendicularOffset } from '../lib/edgeLOD';
 import { assignParallelEdgeIndices } from '../lib/parallelEdges';
+import { isTap, touchHitSize, isCoarsePointer } from '../lib/touchInteraction';
 import { spawnCelebration } from '../lib/celebration';
 import { buildNeighborhood } from '../lib/graphAdjacency';
 import { UndoStack } from '../lib/undoStack';
@@ -2826,6 +2827,24 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         if (d.subgraphId) descendIntoRef.current(d.subgraphId);
       });
 
+    // 44px touch targets (#29): the header icon buttons draw at iconSize (16-24px),
+    // far below the 44px minimum, so they're hard to hit on a phone. On a coarse
+    // pointer, prepend a transparent hit-rect of touchHitSize() to each icon group
+    // (pointer-events bubble to the group's handlers) — bigger tap area, identical
+    // look. The rect lives in the group's counter-zoomed local space, so it tracks.
+    if (isCoarsePointer()) {
+      const hit = touchHitSize(iconSize, true);
+      nodeElements.selectAll('.node-edit-icon, .node-relationship-icon, .node-expand-icon, .node-descend-icon')
+        .insert('rect', ':first-child')
+        .attr('class', 'touch-hit-area')
+        .attr('x', -hit / 2)
+        .attr('y', -hit / 2)
+        .attr('width', hit)
+        .attr('height', hit)
+        .attr('fill', 'transparent')
+        .style('pointer-events', 'all');
+    }
+
     // Child-graph count line (LOD-gated like the description text).
     sheetNodes.append('text')
       .attr('class', 'node-subgraph-count')
@@ -3568,7 +3587,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         }
       }
     })
-    .on('touchend', function() {
+    .on('touchend', function(event: TouchEvent, d: any) {
       // Clean up long-press detection
       const element = d3.select(this);
       const touchData = (element.node() as any).__touchData;
@@ -3576,6 +3595,16 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       if (touchData) {
         if (touchData.timeout) {
           clearTimeout(touchData.timeout);
+        }
+        // TAP-TO-OPEN (#29): a quick touch that didn't move = a tap → select/open
+        // the node, deterministically. preventDefault suppresses the flaky
+        // synthetic mouse-click so the tap doesn't double-fire (open then toggle
+        // shut). Long-press (handled by the touchstart timeout) and drag/pan
+        // (moved past the slop) are excluded by isTap.
+        const duration = Date.now() - touchData.startTime;
+        if (isTap(duration, touchData.moved ? 999 : 0)) {
+          event.preventDefault();
+          handleNodeClick(event as unknown as MouseEvent, d);
         }
         delete (element.node() as any).__touchData;
       }
