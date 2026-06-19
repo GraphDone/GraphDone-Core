@@ -53,6 +53,7 @@ import { edgeBorderEndpoints, minEdgeLength, clampToMinNeighbors } from '../lib/
 import { directionStrategy, arrowVisibility, labelVisibility, perpendicularOffset } from '../lib/edgeLOD';
 import { assignParallelEdgeIndices } from '../lib/parallelEdges';
 import { isTap, touchHitSize, isCoarsePointer } from '../lib/touchInteraction';
+import { createPositionSaveQueue } from '../lib/positionSaveQueue';
 import { spawnCelebration } from '../lib/celebration';
 import { buildNeighborhood } from '../lib/graphAdjacency';
 import { UndoStack } from '../lib/undoStack';
@@ -721,6 +722,18 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     }
   }, [updateWorkItemMutation]);
 
+  // #95: coalescing, concurrency-bounded position writes. A large-graph reflow
+  // moves hundreds of nodes at once; without this each fired its own mutation in
+  // parallel (a D1 write-amplification spike). The queue keeps only the latest
+  // position per node and drains with a hard cap on in-flight writes. Bound to
+  // the latest saveNodePosition via a ref so the queue itself is created once.
+  const saveNodePositionRef = useRef(saveNodePosition);
+  saveNodePositionRef.current = saveNodePosition;
+  const positionSaveQueueRef = useRef(createPositionSaveQueue({
+    save: (s) => saveNodePositionRef.current(s.id, s.x, s.y),
+    concurrency: 4,
+  }));
+
   // Durable layout: persist the current position of every node whose live
   // position has moved away from its last-saved position by more than a pixel.
   // This makes a physics-laid-out arrangement (and grown/new nodes) survive a
@@ -733,12 +746,16 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       typeof n.x === 'number' && typeof n.y === 'number' &&
       (Math.abs((n.positionX ?? 0) - n.x) > 1 || Math.abs((n.positionY ?? 0) - n.y) > 1)
     );
+    // Coalesce all moved nodes into the queue, then drain with bounded
+    // concurrency — one reflow of N nodes does at most `concurrency` writes at a
+    // time instead of N in parallel (#95).
     moved.forEach((n: any) => {
       n.positionX = n.x;
       n.positionY = n.y;
-      saveNodePosition(n.id, n.x, n.y);
+      positionSaveQueueRef.current.queue(n.id, n.x, n.y);
     });
-  }, [saveNodePosition]);
+    positionSaveQueueRef.current.flush();
+  }, []);
 
   // Save the settled layout on page hide so a tidy arrangement is never lost
   // even if the user never dragged a node.
@@ -2340,8 +2357,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           // Don't release fx/fy - let the node stay where the user put it
           // The physics will adapt around the fixed position
           
-          // Save the new position to the database
-          saveNodePosition(d.id, d.fx, d.fy);
+          // Save the new position via the coalescing queue (#95) so a drag during
+          // a reflow doesn't add another parallel write.
+          positionSaveQueueRef.current.queue(d.id, d.fx, d.fy);
+          positionSaveQueueRef.current.flush();
           
           // Let the simulation cool to a full stop after the neighbors settle
           setTimeout(() => {
