@@ -76,3 +76,15 @@ Read-only and **bound to `127.0.0.1`** (no LAN exposure, no auth surface). No
 command-execution endpoints. Media is served only from within a run's own report
 directory (real-path checked, traversal/symlink-escape rejected) and only for an
 allowlist of media extensions; `/static/` serves a fixed three-file allowlist.
+
+## Autonomous loop (`scripts/dashboard-loop.sh`)
+
+So the dashboard keeps living and improving across sessions/reboots, a cron-driven
+loop runs `scripts/dashboard-loop.sh once` every ~30 min (system crontab, tagged
+`# graphdone-dashboard-loop`). Each iteration: (1) ensures the dashboard server is
+up, (2) self-checks it (`node --test tests/lib/dashboard/`), (3) runs ONE bounded
+headless `claude -p` improvement iteration against `scripts/dashboard-loop.prompt.txt`.
+A `flock` lock prevents overlap; the agent prompt has hard constraints (never
+deploy, never touch secrets, never merge a failing gate). Run mechanical-only with
+`NO_AGENT=1 bash scripts/dashboard-loop.sh once`. Disable the loop by removing the
+`graphdone-dashboard-loop` lines from `crontab -e`. Logs: `test-artifacts/dashboard/loop.log`.
