@@ -28,6 +28,7 @@ npm run test:perf:scale                      # perf trends update on the Overvie
   drill into its sequences and **every citable check** (`§3.2.4`), with embedded
   **screenshots and video clips** and failure detail.
 - **Media** — a gallery of all screenshots + videos for any media-bearing run.
+- **🎧 Narrated** — a piper-tts narrated walkthrough of progress (high-quality female voice): test health, recently-shipped PRs, performance trends, and a feature tour, each segment playing its audio while the synced media (trend chart / video clip / screenshot) shows above and the transcript below. Auto-advances. Generate it with `npm run dashboard:narrate` (data-driven from the newest runs + git history + metrics).
 
 ## How it stays "continuous"
 

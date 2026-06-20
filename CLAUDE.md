@@ -190,7 +190,11 @@ in BOTH repos (Core `test-artifacts/unified*` + Cloud `live-full-report/<stamp>`
 keeps append-only trend history that survives Core's per-run overwrite, and
 **updates live over SSE** when a new run lands — performance trend charts, a runs
 timeline, per-check drill-down with embedded screenshots + video clips. Zero deps
-(`node:http` + SSE). See `tests/lib/dashboard/README.md`.
+(`node:http` + SSE). It also has a **🎧 Narrated tab**: `npm run dashboard:narrate`
+(`make dashboard-narrate`) renders a piper-tts walkthrough of progress (female
+voice en_US-lessac-high) — test health, shipped PRs, perf trends, feature tour —
+each segment's audio synced to its chart/video/screenshot. See
+`tests/lib/dashboard/README.md`.
 
 The unified harness (`tests/run-unified.mjs` + `tests/sequences/unified.config.mjs`)
 is the single entry; profiles are `smoke|pr|full|report`. The test tree is organised

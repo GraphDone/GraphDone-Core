@@ -1,7 +1,7 @@
 # GraphDone Makefile for Test Automation
 # Run all tests and generate HTML report with: make test-all
 
-.PHONY: help test test-all test-https test-e2e test-unit test-report dashboard deploy clean
+.PHONY: help test test-all test-https test-e2e test-unit test-report dashboard dashboard-narrate deploy clean
 
 # Default target - show help
 help:
@@ -59,6 +59,11 @@ test-report:
 dashboard:
 	@echo "📊 Starting live test dashboard at http://localhost:3199 ..."
 	@npm run dashboard:open
+
+# Generate the piper-tts narrated progress report (Narrated tab in the dashboard)
+dashboard-narrate:
+	@echo "🎧 Generating narrated progress report (piper-tts)..."
+	@npm run dashboard:narrate
 
 # Start production deployment
 deploy:

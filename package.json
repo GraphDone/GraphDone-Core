@@ -29,6 +29,7 @@
     "test:unified:lib": "node --test tests/lib/",
     "dashboard": "node tests/lib/dashboard/server.mjs",
     "dashboard:open": "node tests/lib/dashboard/server.mjs --open",
+    "dashboard:narrate": "node scripts/narrate-report.mjs",
     "test:installation": "./scripts/test-installation-simple.sh",
     "test:https": "node tests/integration/ssl-certificate-analysis.js && node tests/integration/mobile-https-compatibility-test.js",
     "test:report": "open test-artifacts/unified/report.html",

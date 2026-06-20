@@ -47,8 +47,10 @@ const HERE = resolve(new URL('.', import.meta.url).pathname);
 const MIME = {
   '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif',
   '.webp': 'image/webp', '.svg': 'image/svg+xml', '.webm': 'video/webm', '.mp4': 'video/mp4',
+  '.mp3': 'audio/mpeg',
 };
 const MEDIA_EXT = new Set(Object.keys(MIME));
+const NARRATION = join(STORE, 'narration');
 
 let state = { generatedAt: 0, latest: null, runs: [], metrics: [], roots: [] };
 const runIndex = new Map();
@@ -133,21 +135,14 @@ function send(res, code, type, body, extra = {}) {
   res.end(body);
 }
 
-function serveMedia(req, res, runId, href) {
-  const entry = runIndex.get(runId);
-  if (!entry || !entry.mediaBase) return send(res, 404, 'text/plain', 'unknown run');
-  let base, target;
-  try {
-    base = realpathSync(entry.mediaBase);
-    target = realpathSync(resolve(base, href));
-  } catch { return send(res, 404, 'text/plain', 'not found'); }
-  if (target !== base && !target.startsWith(base + sep)) return send(res, 403, 'text/plain', 'forbidden');
+// Stream a file with HTTP Range support (incl. suffix bytes). Caller has already
+// validated `target` is a real file within an allowed base + allowed extension.
+function streamFile(req, res, target) {
   const ext = extname(target).toLowerCase();
-  if (!MEDIA_EXT.has(ext)) return send(res, 415, 'text/plain', 'unsupported');
+  const type = MIME[ext] || 'application/octet-stream';
   let st;
   try { st = statSync(target); } catch { return send(res, 404, 'text/plain', 'not found'); }
   if (!st.isFile()) return send(res, 404, 'text/plain', 'not found');
-  const type = MIME[ext] || 'application/octet-stream';
   const range = req.headers.range;
   if (range) {
     const m = /bytes=(\d*)-(\d*)/.exec(range);
@@ -164,6 +159,31 @@ function serveMedia(req, res, runId, href) {
   }
   res.writeHead(200, { 'Content-Type': type, 'Content-Length': st.size, 'Accept-Ranges': 'bytes', 'Cache-Control': 'public, max-age=31536000, immutable' });
   createReadStream(target).pipe(res);
+}
+
+function serveMedia(req, res, runId, href) {
+  const entry = runIndex.get(runId);
+  if (!entry || !entry.mediaBase) return send(res, 404, 'text/plain', 'unknown run');
+  let base, target;
+  try {
+    base = realpathSync(entry.mediaBase);
+    target = realpathSync(resolve(base, href));
+  } catch { return send(res, 404, 'text/plain', 'not found'); }
+  if (target !== base && !target.startsWith(base + sep)) return send(res, 403, 'text/plain', 'forbidden');
+  if (!MEDIA_EXT.has(extname(target).toLowerCase())) return send(res, 415, 'text/plain', 'unsupported');
+  return streamFile(req, res, target);
+}
+
+// Serve a narration audio file (only .mp3, only from the narration dir).
+function serveNarration(req, res, name) {
+  if (!/^[a-zA-Z0-9._-]+\.mp3$/.test(name)) return send(res, 400, 'text/plain', 'bad name');
+  let base, target;
+  try {
+    base = realpathSync(NARRATION);
+    target = realpathSync(resolve(base, name));
+  } catch { return send(res, 404, 'text/plain', 'not found'); }
+  if (!target.startsWith(base + sep)) return send(res, 403, 'text/plain', 'forbidden');
+  return streamFile(req, res, target);
 }
 
 const server = createServer((req, res) => {
@@ -196,6 +216,17 @@ const server = createServer((req, res) => {
     const href = url.searchParams.get('href');
     if (!href) return send(res, 400, 'text/plain', 'missing href');
     return serveMedia(req, res, id, href);
+  }
+
+  if (path === '/api/narration') {
+    const f = join(NARRATION, 'narration.json');
+    if (!existsSync(f)) return send(res, 404, 'application/json', JSON.stringify({ error: 'no narration yet — run npm run dashboard:narrate' }));
+    try { return send(res, 200, 'application/json', readFileSync(f, 'utf8')); }
+    catch { return send(res, 500, 'application/json', JSON.stringify({ error: 'unreadable narration manifest' })); }
+  }
+
+  if (path.startsWith('/narration/')) {
+    return serveNarration(req, res, decodeURIComponent(path.slice('/narration/'.length)));
   }
 
   if (path === '/api/events') {
