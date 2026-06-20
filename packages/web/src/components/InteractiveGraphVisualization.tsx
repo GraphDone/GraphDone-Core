@@ -262,7 +262,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       }
     } : { where: {} },
     fetchPolicy: currentGraph ? 'cache-and-network' : 'cache-only',
-    pollInterval: currentGraph ? 2000 : 0,
+    // Cross-client freshness without the 2s idle hammer: poll every 15s and skip
+    // the tick entirely while the tab is hidden. Own edits still refetch instantly.
+    pollInterval: currentGraph ? 15000 : 0,
+    skipPollAttempt: () => typeof document !== 'undefined' && document.visibilityState !== 'visible',
     errorPolicy: 'all'
   });
 
@@ -277,7 +280,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       }
     } : { where: {} },
     fetchPolicy: currentGraph ? 'cache-and-network' : 'cache-only',
-    pollInterval: currentGraph ? 2000 : 0,
+    // Cross-client freshness without the 2s idle hammer: poll every 15s and skip
+    // the tick entirely while the tab is hidden. Own edits still refetch instantly.
+    pollInterval: currentGraph ? 15000 : 0,
+    skipPollAttempt: () => typeof document !== 'undefined' && document.visibilityState !== 'visible',
     errorPolicy: 'all'
   });
 

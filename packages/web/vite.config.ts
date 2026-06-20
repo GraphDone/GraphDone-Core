@@ -69,6 +69,14 @@ export default defineConfig({
     sourcemap: false,
     rollupOptions: {
       output: {
+        // Split heavy vendors into separate, independently-cacheable chunks so the
+        // entry isn't one monolithic ~1.5MB file (live-audit perf finding).
+        manualChunks: {
+          react: ['react', 'react-dom', 'react-router-dom'],
+          apollo: ['@apollo/client', 'graphql'],
+          d3: ['d3'],
+          icons: ['lucide-react'],
+        },
         // Force new filenames to break cache
         entryFileNames: `assets/[name]-${Date.now()}.js`,
         chunkFileNames: `assets/[name]-${Date.now()}.js`,
