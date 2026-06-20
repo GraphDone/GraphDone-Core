@@ -99,7 +99,7 @@ ${lineChart('Interaction FPS vs size (drag)', 'interactionFps', { unit: '' })}
 ${lineChart('Initial load vs size', 'loadMs', { unit: 'ms' })}
 ${lineChart('Avg simulation tick vs size', 'avgTickMs', { unit: 'ms', budget: 8 })}
 ${lineChart('Settle time vs size', 'settleMs', { unit: 'ms' })}
-${lineChart('Layout drift vs size', 'rmsFromSavedPx', { unit: 'px', budget: 25 })}
+${lineChart('Layout wander vs size (seed displacement)', 'rmsFromSavedPx', { unit: 'px' })}
 ${lineChart('Query p95 latency vs size', 'queryP95Ms', { unit: 'ms', budget: 800 })}
 </div>
 <h2>All metrics</h2>
