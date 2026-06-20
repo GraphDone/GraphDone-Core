@@ -184,6 +184,7 @@ open test-artifacts/unified/report.html
 npm run dashboard                 # serve at http://localhost:3199 (read-only, localhost)
 npm run dashboard:open            # …and open the browser
 make dashboard
+bash scripts/install-dashboard-service.sh   # ALWAYS-on: systemd --user service (auto-restart + boot)
 ```
 Leave it running while you work. It watches every `graphdone.unified-report/1` run
 in BOTH repos (Core `test-artifacts/unified*` + Cloud `live-full-report/<stamp>`),
