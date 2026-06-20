@@ -983,6 +983,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       
       // Manual text refresh shortcut (R key)
       if (event.key === 'r' || event.key === 'R') {
+        // Never steal the keystroke while the user is typing in a field (e.g. the
+        // inline node-title editor) — otherwise titles lose every r/R character.
+        const t = event.target as HTMLElement | null;
+        if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
         if (!event.ctrlKey && !event.metaKey && !event.altKey) { // Only plain R key
           event.preventDefault();
           refreshTextVisibility();
@@ -4780,6 +4784,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'R' && event.shiftKey) {
+        const t = event.target as HTMLElement | null;
+        if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
         event.preventDefault();
         setReinitTrigger(prev => prev + 1);
       }
