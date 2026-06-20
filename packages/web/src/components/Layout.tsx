@@ -4,6 +4,7 @@ import { Brain, Bot, BarChart3, Settings, Server, Globe, Shield, Users, Terminal
 import { UserSelector } from './UserSelector';
 import { GraphSelector } from './GraphSelector';
 import { useAuth } from '../contexts/AuthContext';
+import { canAccessAdmin, canAccessBackend } from '../lib/roleAccess';
 import { McpHealthIndicator } from './McpHealthIndicator';
 import FloatingConsole from './FloatingConsole';
 import { InsecureConnectionBanner } from './TlsStatusIndicator';
@@ -30,8 +31,8 @@ export function Layout({ children }: LayoutProps) {
     { name: 'AI & Agents', href: '/agents', icon: Bot, description: 'AI collaboration', comingSoon: true },
     { name: 'Analytics', href: '/analytics', icon: BarChart3, description: 'Priority insights', comingSoon: true },
     { name: 'Settings', href: '/settings', icon: Settings, description: 'User preferences' },
-    { name: 'Admin', href: '/admin', icon: Shield, description: 'System administration', restricted: currentUser?.role !== 'ADMIN' },
-    { name: 'System', href: '/backend', icon: Server, description: 'Backend status', restricted: currentUser?.role === 'VIEWER' || currentUser?.role === 'GUEST' },
+    { name: 'Admin', href: '/admin', icon: Shield, description: 'System administration', hidden: !canAccessAdmin(currentUser?.role) },
+    { name: 'System', href: '/backend', icon: Server, description: 'Backend status', hidden: !canAccessBackend(currentUser?.role) },
   ];
 
   return (
@@ -87,7 +88,10 @@ export function Layout({ children }: LayoutProps) {
               {navigation.map((item) => {
                 const Icon = item.icon;
                 const isActive = location.pathname === item.href;
-                const isRestricted = item.restricted || (item as { comingSoon?: boolean }).comingSoon;
+                // Role-gated items the user can't reach are hidden entirely (not
+                // greyed) — no point advertising a page they can never open.
+                if ((item as { hidden?: boolean }).hidden) return null;
+                const isRestricted = (item as { comingSoon?: boolean }).comingSoon;
                 
                 if (isRestricted) {
                   const restrictionMessage = (item as { comingSoon?: boolean }).comingSoon

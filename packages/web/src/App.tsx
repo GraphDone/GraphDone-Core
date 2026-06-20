@@ -7,6 +7,8 @@ import { Analytics } from './pages/Analytics';
 import { Settings } from './pages/Settings';
 import { Admin } from './pages/Admin';
 import { Backend } from './pages/Backend';
+import { RequireRole } from './components/RequireRole';
+import { canAccessAdmin, canAccessBackend } from './lib/roleAccess';
 import { Signin } from './pages/Signin';
 import { ForgotPassword } from './pages/ForgotPassword';
 import { ResetPassword } from './pages/ResetPassword';
@@ -107,8 +109,8 @@ function AuthenticatedApp() {
             <Route path="/agents" element={<Agents />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/settings" element={<Settings />} />
-            <Route path="/admin" element={<Admin />} />
-            <Route path="/backend" element={<Backend />} />
+            <Route path="/admin" element={<RequireRole can={canAccessAdmin}><Admin /></RequireRole>} />
+            <Route path="/backend" element={<RequireRole can={canAccessBackend}><Backend /></RequireRole>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Layout>
