@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -21,6 +21,16 @@ export function MobileBottomNav() {
   const navigate = useNavigate();
   const location = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
+  const sheetRef = useRef<HTMLDivElement>(null);
+
+  // The "More" sheet is a modal: close on Esc and move focus into it on open.
+  useEffect(() => {
+    if (!moreOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMoreOpen(false); };
+    document.addEventListener('keydown', onKey);
+    sheetRef.current?.focus();
+    return () => document.removeEventListener('keydown', onKey);
+  }, [moreOpen]);
 
   const onWorkspace = location.pathname === '/' || location.pathname === '/workspace';
   const goView = (m: ViewMode) => {
@@ -83,8 +93,13 @@ export function MobileBottomNav() {
         >
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
           <div
+            ref={sheetRef}
             data-testid="mobile-more-sheet"
-            className="relative bg-gray-900 border-t border-gray-700 rounded-t-2xl p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-2xl max-h-[80vh] overflow-y-auto"
+            role="dialog"
+            aria-modal="true"
+            aria-label="More navigation"
+            tabIndex={-1}
+            className="relative bg-gray-900 border-t border-gray-700 rounded-t-2xl p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-2xl max-h-[80vh] overflow-y-auto outline-none"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-gray-600" />
