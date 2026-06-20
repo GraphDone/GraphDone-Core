@@ -108,6 +108,25 @@ describe('profileForTier (ADAPT-3, ADAPT-2, ADAPT-9)', () => {
     }
   });
 
+  it('never lets a richer tier render less work than a cheaper one (ADAPT-3 invariant)', () => {
+    // TIER_ORDER is cheapest → richest. As the tier rises, cost-bearing
+    // knobs must move monotonically toward "more work", never less — a
+    // lower tier doing MORE rendering would make adaptive downgrades pointless.
+    for (let i = 1; i < TIER_ORDER.length; i++) {
+      const lo = profileForTier(TIER_ORDER[i - 1], {});
+      const hi = profileForTier(TIER_ORDER[i], {});
+      // Bigger preview = more work; richer tier must not request a smaller one.
+      expect(hi.attachmentPreviewSize).toBeGreaterThanOrEqual(lo.attachmentPreviewSize);
+      // Lower labelLodZoom = labels appear sooner = more labels drawn; richer
+      // tier must not have a higher threshold than a cheaper one.
+      expect(hi.labelLodZoom).toBeLessThanOrEqual(lo.labelLodZoom);
+      // An effect on at a cheaper tier must stay on at every richer tier.
+      for (const flag of ['glowEffects', 'animations', 'entranceAnimation', 'particleCelebrations'] as const) {
+        if (lo[flag]) expect(hi[flag]).toBe(true);
+      }
+    }
+  });
+
   it('clamps attachment previews to ≤256px under Save-Data at any tier (ADAPT-2)', () => {
     for (const tier of TIER_ORDER) {
       expect(profileForTier(tier, { saveData: true }).attachmentPreviewSize).toBeLessThanOrEqual(256);
