@@ -9,6 +9,7 @@ import { niceMax, bounds, lineChart, statusBar, sparkline } from './charts.mjs';
 import { isUnifiedReport, runIdFor, summarize, mediaCount, safeId } from './ingest.mjs';
 import { reportMetrics, scaleSweepMetrics, largeGraphMetrics, physicsMetrics, vlmMetrics, pointKey } from './metrics.mjs';
 import { mergeRuns, mergeMetrics, liveMetrics, readJsonl, appendJsonl, snapshotRun, pruneSnapshots, pickLatest } from './history.mjs';
+import { buildNarration, cleanTitle, plural, spokenUrl } from './narrate.mjs';
 
 // ── format ────────────────────────────────────────────────────────────────
 test('rollupStatus: worst-of precedence', () => {
@@ -262,4 +263,46 @@ test('snapshotRun flags truncation above maxBytes', () => {
   assert.equal(res.truncated, true);
   assert.ok(existsSync(join(res.dest, 'report.json')));
   assert.ok(!existsSync(join(res.dest, 'assets')));
+});
+
+// ── narration ───────────────────────────────────────────────────────────────
+test('cleanTitle strips conventional-commit prefix + PR tail + backticks', () => {
+  assert.equal(cleanTitle('fix(graph): unique test id per mount (#139)'), 'unique test id per mount');
+  assert.equal(cleanTitle('feat(test): live dashboard `npm run dashboard`'), 'live dashboard npm run dashboard');
+  assert.equal(cleanTitle(''), '');
+});
+test('plural + spokenUrl helpers', () => {
+  assert.equal(plural(1, 'check'), '1 check');
+  assert.equal(plural(5, 'check'), '5 checks');
+  assert.equal(spokenUrl('https://graphdone-cloud.pages.dev/'), 'graphdone-cloud.pages.dev');
+  assert.equal(spokenUrl(''), 'the application');
+});
+test('buildNarration assembles ordered segments with media refs', () => {
+  const n = buildNarration({
+    dateISO: '2026-06-19T00:00:00Z',
+    voiceName: 'en_US-lessac-high',
+    health: { cases: 181, sequences: 26, passed: 164, failed: 0, warned: 6, passRate: 90.6, target: 'https://graphdone-cloud.pages.dev' },
+    shipped: [{ title: 'fix(graph): unique test id (#139)' }, { title: 'feat(test): live dashboard (#135)' }],
+    perf: [{ metric: 'graph.idleFps', label: 'idle frame rate', value: 58, unit: 'fps', better: 'higher' }],
+    tour: [{ name: 'graph-overview', note: 'Graph loads and settles · 1200x760', kind: 'video', runId: 'live-full-report/x', href: 'assets/tour-graph-overview.mp4' }],
+  });
+  const ids = n.segments.map((s) => s.id);
+  assert.ok(ids.includes('intro') && ids.includes('health') && ids.includes('shipped') && ids.includes('performance') && ids.includes('outro'));
+  assert.ok(ids.some((i) => i.startsWith('tour-')));
+  assert.equal(n.voice, 'en_US-lessac-high');
+  const health = n.segments.find((s) => s.id === 'health');
+  assert.match(health.text, /181 checks/);
+  assert.match(health.text, /90\.6 percent/);
+  assert.equal(health.media.kind, 'chart');
+  const tour = n.segments.find((s) => s.id === 'tour-graph-overview');
+  assert.equal(tour.media.kind, 'video');
+  assert.equal(tour.media.href, 'assets/tour-graph-overview.mp4');
+  // every segment has non-empty spoken text
+  assert.ok(n.segments.every((s) => s.text.length > 0));
+});
+test('buildNarration tolerates empty data (intro + outro only)', () => {
+  const n = buildNarration({});
+  assert.ok(n.segments.length >= 2);
+  assert.equal(n.segments[0].id, 'intro');
+  assert.equal(n.segments[n.segments.length - 1].id, 'outro');
 });
