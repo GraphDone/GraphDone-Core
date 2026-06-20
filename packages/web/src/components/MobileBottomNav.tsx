@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useViewMode, ViewMode } from '../contexts/ViewModeContext';
 import { useAuth } from '../contexts/AuthContext';
+import { canAccessAdmin, canAccessBackend } from '../lib/roleAccess';
 
 /**
  * The app-wide mobile footer. Present on every page so navigation is consistent:
@@ -43,8 +44,8 @@ export function MobileBottomNav() {
     { href: '/agents', label: 'AI & Agents', Icon: Bot, show: true },
     { href: '/analytics', label: 'Analytics', Icon: BarChart3, show: true },
     { href: '/settings', label: 'Settings', Icon: SettingsIcon, show: true },
-    { href: '/admin', label: 'Admin', Icon: Shield, show: role === 'ADMIN' },
-    { href: '/backend', label: 'System', Icon: Server, show: role !== 'VIEWER' && role !== 'GUEST' },
+    { href: '/admin', label: 'Admin', Icon: Shield, show: canAccessAdmin(role) },
+    { href: '/backend', label: 'System', Icon: Server, show: canAccessBackend(role) },
   ].filter((p) => p.show);
 
   const tabActive = (active: boolean) =>
