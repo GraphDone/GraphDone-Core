@@ -194,15 +194,71 @@ async function renderMedia() {
 function setTab(tab, render = true) {
   ui.tab = tab;
   document.querySelectorAll('.tab[data-tab]').forEach((el) => el.classList.toggle('active', el.getAttribute('data-tab') === tab));
+  if (tab !== 'narrated') { try { narrAudio.pause(); narrIdx = -1; } catch { /* */ } }
   if (!render) return;
   if (tab === 'overview') renderOverview();
   else if (tab === 'runs') renderRuns();
   else if (tab === 'media') renderMedia();
+  else if (tab === 'narrated') renderNarrated();
+}
+
+const narrAudio = new Audio();
+let narration = null;
+let narrIdx = -1;
+
+function chartDef(ref) { return CHART_DEFS.find((d) => d.metric === ref) || { metric: ref, title: ref, unit: '' }; }
+
+function narrMediaHtml(seg) {
+  const m = seg.media || { kind: 'none' };
+  if (m.kind === 'chart') {
+    const d = chartDef(m.ref);
+    return lineChart({ title: d.title, series: seriesFor(d.metric), unit: d.unit, budget: d.budget ?? null, xIsTime: true });
+  }
+  if (m.kind === 'video' && m.runId && m.href) return `<video src="${esc(mediaUrl(m.runId, m.href))}" autoplay muted loop playsinline></video>`;
+  if (m.kind === 'image' && m.runId && m.href) return `<img src="${esc(mediaUrl(m.runId, m.href))}" alt="${esc(seg.title)}">`;
+  return '<div class="muted" style="padding:40px;text-align:center">no media for this segment</div>';
+}
+
+function playNarrSegment(i) {
+  if (!narration || i < 0 || i >= narration.segments.length) { narrIdx = -1; return; }
+  narrIdx = i;
+  const seg = narration.segments[i];
+  const stage = $('narr-stage');
+  if (stage) stage.innerHTML = narrMediaHtml(seg);
+  document.querySelectorAll('.narr-seg').forEach((el) => el.classList.toggle('active', Number(el.getAttribute('data-i')) === i));
+  const row = document.querySelector(`.narr-seg[data-i="${i}"]`);
+  if (row) row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  narrAudio.src = `/narration/${encodeURIComponent(seg.audioHref)}`;
+  narrAudio.play().catch(() => {});
+}
+
+narrAudio.onended = () => { if (ui.tab === 'narrated' && narrIdx >= 0) playNarrSegment(narrIdx + 1); };
+
+async function renderNarrated() {
+  let data;
+  try { data = await fetchJSON('/api/narration'); }
+  catch {
+    narrAudio.pause();
+    $('view').innerHTML = `<div class="empty-state">No narrated report yet.<br><br>Generate it with <code>npm run dashboard:narrate</code> (renders a piper-tts walkthrough of the latest results), then reopen this tab.</div>`;
+    return;
+  }
+  narration = data;
+  const mins = Math.round((data.totalDurationMs || 0) / 600) / 100;
+  $('view').innerHTML = `
+    <div class="section-h">🎧 Narrated progress report</div>
+    <div class="meta">voice ${esc(data.voice || '')} · ${data.segments.length} segments · ~${mins} min · narrated by piper-tts${data.full ? ` · <a href="/narration/${esc(data.full.audioHref)}" download>download full track</a>` : ''}</div>
+    <div class="narr-controls"><button id="narr-play" class="narr-btn">▶ Play narrated report</button><button id="narr-stop" class="narr-btn">■ Stop</button></div>
+    <div id="narr-stage" class="narr-stage"><div class="muted" style="padding:40px;text-align:center">press play</div></div>
+    <div class="narr-list">${data.segments.map((s, i) => `<div class="narr-seg" data-i="${i}" tabindex="0" role="button"><div class="narr-seg-h"><span class="narr-seg-t">${esc(s.title)}</span><span class="narr-seg-d">${((s.durationMs || 0) / 1000).toFixed(0)}s</span></div><div class="narr-seg-text">${esc(s.text)}</div></div>`).join('')}</div>`;
+  $('narr-play').onclick = () => playNarrSegment(0);
+  $('narr-stop').onclick = () => { narrAudio.pause(); narrIdx = -1; document.querySelectorAll('.narr-seg').forEach((el) => el.classList.remove('active')); };
+  document.querySelectorAll('.narr-seg').forEach((el) => el.onclick = () => playNarrSegment(Number(el.getAttribute('data-i'))));
 }
 
 function rerender() {
   renderHeader();
   if (ui.tab === 'detail' && ui.runId) openRun(ui.runId);
+  else if (ui.tab === 'narrated') { /* leave the narration player undisturbed by live run updates */ }
   else setTab(ui.tab);
 }
 
@@ -228,7 +284,7 @@ function connectSSE() {
 document.querySelectorAll('.tab[data-tab]').forEach((el) => el.onclick = () => { ui.runId = null; setTab(el.getAttribute('data-tab')); });
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Enter' && e.key !== ' ') return;
-  const el = e.target.closest && e.target.closest('[data-run],[data-tab],[data-mrun],.back');
+  const el = e.target.closest && e.target.closest('[data-run],[data-tab],[data-mrun],.narr-seg,.back');
   if (el) { e.preventDefault(); el.click(); }
 });
 
