@@ -67,7 +67,7 @@ const CHART_DEFS = [
   { metric: 'graph.loadMs', title: 'Graph load time', unit: 'ms', budget: null },
   { metric: 'graph.avgTickMs', title: 'Sim tick cost', unit: 'ms', budget: 8 },
   { metric: 'graph.queryP95Ms', title: 'Query p95 latency', unit: 'ms', budget: 800 },
-  { metric: 'graph.driftPx', title: 'Layout drift', unit: 'px', budget: 25 },
+  { metric: 'graph.driftPx', title: 'Layout wander vs size (scale sweep)', unit: 'px' },
   { metric: 'physics.settleSeconds', title: 'Physics settle time', unit: 's' },
   { metric: 'vlm.score', title: 'VLM visual score', unit: 'score' },
 ];
