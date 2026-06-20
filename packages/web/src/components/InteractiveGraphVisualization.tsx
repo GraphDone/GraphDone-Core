@@ -4194,6 +4194,35 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     };
   }, []);
 
+  // Seed the minimap from the laid-out graph on load. The tick-based publish
+  // (in the simulation tick) only runs while the sim is ticking; with one-shot
+  // physics the graph settles and stops, so without this the minimap showed
+  // "No nodes yet" until the user clicked a node. Publish a few times over the
+  // first few seconds (covers fast + slow settles), then stop — no idle cost.
+  useEffect(() => {
+    if (!currentGraph) return undefined;
+    let n = 0;
+    const publish = () => {
+      const sim = simulationRef.current;
+      const upd = (window as { updateMiniMapPositions?: (p: Record<string, { x: number; y: number }>) => void }).updateMiniMapPositions;
+      if (!sim || !upd) return;
+      const simNodes = sim.nodes() as { id: string; x?: number; y?: number; type?: string }[];
+      if (!simNodes?.length) return;
+      const positions: Record<string, { x: number; y: number }> = {};
+      const types: Record<string, string> = {};
+      for (const nd of simNodes) {
+        if (nd.x !== undefined && nd.y !== undefined) { positions[nd.id] = { x: nd.x, y: nd.y }; types[nd.id] = nd.type as string; }
+      }
+      if (Object.keys(positions).length) {
+        upd(positions);
+        (window as { updateMiniMapTypes?: (t: Record<string, string>) => void }).updateMiniMapTypes?.(types);
+      }
+    };
+    const id = setInterval(() => { publish(); if (++n >= 5) clearInterval(id); }, 800);
+    publish();
+    return () => clearInterval(id);
+  }, [currentGraph?.id, workItemsData?.workItems?.length]);
+
   // Center on specific node
   const centerOnNode = useCallback((nodeId?: string) => {
     const nodeToCenter = nodeId 
@@ -4817,9 +4846,12 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       
       const message = err.message || err.toString();
       
-      // Network/connection errors
+      // Network/connection errors — keep dev hints (localhost URL) out of the
+      // hosted build; production users get a generic, actionable message.
       if (message.includes('NetworkError') || message.includes('fetch')) {
-        return "Cannot connect to GraphDone server. Please check if the server is running at http://localhost:4127";
+        return import.meta.env.DEV
+          ? `Cannot connect to GraphDone server. Please check the server is running at ${import.meta.env.VITE_API_URL || 'http://localhost:4127'}`
+          : "Can't reach GraphDone right now. Please check your connection and try again.";
       }
       
       // GraphQL/Database errors
@@ -4866,7 +4898,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
                   {errorMessage}
                 </div>
                 
-                {isNetworkError && (
+                {isNetworkError && import.meta.env.DEV && (
                   <div className="text-gray-400 text-sm space-y-2">
                     <div>💡 <strong>Quick fixes:</strong></div>
                     <div>• Run <code className="bg-gray-800 px-2 py-1 rounded">./start</code> to start the server</div>
@@ -5038,11 +5070,17 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
   return (
     <div ref={containerRef} className="graph-container relative w-full h-full overflow-hidden select-none" data-quality={qualityTier} data-dense={isDenseGraph ? 'true' : undefined} data-simplify={isSimplified ? 'true' : undefined} data-dots={isDotMode ? 'true' : undefined}>
-      <svg 
-        ref={svgRef} 
-        className="w-full h-full" 
+      <svg
+        ref={svgRef}
+        className="w-full h-full"
+        role="img"
+        aria-label="Interactive work-item dependency graph"
+        aria-describedby="graph-a11y-desc"
       />
-      
+      <p id="graph-a11y-desc" className="sr-only">
+        Force-directed graph of work items and their dependencies. Use the view switcher to see the same data as a list, table, or board, which are keyboard-navigable.
+      </p>
+
       
       {/* Empty State Overlay */}
       {showEmptyStateOverlay && (

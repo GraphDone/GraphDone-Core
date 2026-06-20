@@ -56,13 +56,26 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [meData]);
   
   useEffect(() => {
-    if (meError) {
-      // Token is invalid, clear it
+    if (!meError) return;
+    // Only log the user out on a GENUINE auth failure. A transient network/5xx
+    // blip must not wipe the token (that was silently logging guests out).
+    const isAuthFailure =
+      meError.graphQLErrors?.some((e: { extensions?: { code?: string } }) => e.extensions?.code === 'UNAUTHENTICATED') ||
+      (meError.networkError as { statusCode?: number } | null)?.statusCode === 401 ||
+      (meError.networkError as { statusCode?: number } | null)?.statusCode === 403;
+    if (isAuthFailure) {
       clearSession();
       setCurrentUser(null);
       setCurrentTeam(null);
-      setIsInitializing(false);
+    } else if (!currentUser) {
+      // Transient error — keep the session and hydrate from the cached user so a
+      // momentary backend hiccup leaves the app usable instead of bouncing to login.
+      const raw = getUserRaw();
+      if (raw) {
+        try { const u = JSON.parse(raw); setCurrentUser(u); setCurrentTeam(u.team ?? null); } catch { /* corrupt cache — ignore */ }
+      }
     }
+    setIsInitializing(false);
   }, [meError]);
 
   // Load saved session (localStorage if "keep me logged in", else sessionStorage)
