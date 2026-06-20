@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
 # Autonomous continuous-improvement loop for GraphDone, driven by cron so it
 # survives session limits AND reboots. Each invocation (cron passes "once"):
-#   1. ensures the live test dashboard server is up (the guiding light)
+#   1. ensures the live test dashboard server is up (prefers the systemd --user
+#      service graphdone-dashboard if installed, else nohup) + restarts on stale code
 #   2. self-checks the dashboard (its own unit tests)
+#   2.5. regenerates the narrated report when a run is newer than the narration
 #   3. runs ONE bounded headless `claude -p` improvement iteration — the agent
 #      decides whether to run a real test suite (which is what feeds the
 #      dashboard fresh run data); the driver never fabricates synthetic runs.
 # Single-instance via flock. Set NO_AGENT=1 to skip step 3 (mechanical only).
+# For an ALWAYS-up server prefer the systemd service: bash scripts/install-dashboard-service.sh
 #
 #   bash scripts/dashboard-loop.sh once
 set -uo pipefail
@@ -34,8 +37,11 @@ log "── iteration start (pid $$) ──"
 
 health() { curl -s -o /dev/null -w '%{http_code}' "http://localhost:$PORT/api/state" 2>/dev/null; }
 
+have_service() { systemctl --user cat graphdone-dashboard.service >/dev/null 2>&1; }
+
 start_dashboard() {
-  nohup npm run dashboard >/tmp/gd-dash.log 2>&1 & disown
+  if have_service; then systemctl --user start graphdone-dashboard 2>/dev/null
+  else nohup npm run dashboard >/tmp/gd-dash.log 2>&1 & disown; fi
   for _ in 1 2 3 4 5 6; do sleep 1; [ "$(health)" = "200" ] && break; done
 }
 
@@ -54,9 +60,29 @@ restart_if_stale() {
   [ -z "$newest" ] && return 0
   if [ "$newest" -gt "$pstart" ]; then
     log "dashboard code newer than running server (pid $pid) → restarting"
-    kill "$pid" 2>/dev/null
-    sleep 1
-    start_dashboard
+    if have_service; then
+      systemctl --user restart graphdone-dashboard 2>/dev/null
+      for _ in 1 2 3 4 5 6; do sleep 1; [ "$(health)" = "200" ] && break; done
+    else
+      kill "$pid" 2>/dev/null; sleep 1; start_dashboard
+    fi
+  fi
+}
+
+# Keep the narrated report current: regenerate only when a run report.json is
+# newer than the existing narration (and a piper voice is present). The server
+# serves narration.json fresh per request, so no restart is needed.
+refresh_narration_if_stale() {
+  [ -d "$STATE/voices" ] && ls "$STATE/voices"/*.onnx >/dev/null 2>&1 || { log "narration: no voice model, skipping"; return 0; }
+  local narr newest_report narr_mtime
+  narr="$STATE/narration/narration.json"
+  newest_report=$(find "$CORE/test-artifacts/unified" "$CORE"/test-artifacts/unified-* "$CORE/../GraphDone-Cloud/live-full-report" -name report.json -printf '%T@\n' 2>/dev/null | sort -n | tail -1 | cut -d. -f1)
+  narr_mtime=$( [ -f "$narr" ] && stat -c %Y "$narr" 2>/dev/null || echo 0 )
+  if [ -n "$newest_report" ] && [ "$newest_report" -gt "${narr_mtime:-0}" ]; then
+    log "narration stale → regenerating"
+    if node scripts/narrate-report.mjs >>"$LOG" 2>&1; then log "narration regenerated"; else log "narration regen failed (rc=$?)"; fi
+  else
+    log "narration up to date"
   fi
 }
 
@@ -71,6 +97,9 @@ log "dashboard health=$(health)"
 
 # 2) self-check the dashboard tool (cheap; does NOT fabricate runs)
 if node --test tests/lib/dashboard/ >>"$LOG" 2>&1; then log "dashboard lib tests ok"; else log "dashboard lib tests FAILED"; fi
+
+# 2.5) keep the narrated report current with the latest runs
+refresh_narration_if_stale
 
 # 3) one bounded headless agent iteration (skippable)
 if [ "${NO_AGENT:-0}" = "1" ]; then

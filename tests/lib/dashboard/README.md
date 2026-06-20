@@ -11,6 +11,19 @@ npm run dashboard:open   #   …and open the browser
 make dashboard           #   same, via make
 ```
 
+**Always-on (recommended):** install it as a systemd `--user` service so it is
+*constantly* available — auto-restarts on crash, starts on boot, runs even when
+logged out:
+
+```bash
+bash scripts/install-dashboard-service.sh      # install + start + enable + linger
+systemctl --user status  graphdone-dashboard   # check
+systemctl --user disable --now graphdone-dashboard  # uninstall
+```
+
+The cron loop (`scripts/dashboard-loop.sh`) also keeps it alive (every ~30 min +
+`@reboot`) and prefers the service when installed, so the two don't conflict.
+
 Then, in another terminal, run tests as usual — each completed run appears live:
 
 ```bash
