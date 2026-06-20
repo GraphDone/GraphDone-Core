@@ -63,6 +63,20 @@ h1{font-size:20px;margin:0;display:flex;align-items:center;gap:10px}
 .att img,.att video{width:300px;border-radius:8px;border:1px solid #1e293b;background:#000;display:block}
 .att figcaption{color:#64748b;font-size:11px;margin-top:4px;word-break:break-all}
 .empty-state{color:#64748b;padding:40px;text-align:center}
+.narr-controls{display:flex;gap:10px;margin:8px 0 14px}
+.narr-btn{padding:8px 16px;border-radius:8px;background:#1e293b;border:1px solid #334155;color:#e2e8f0;cursor:pointer;font-size:14px;font-weight:600}
+.narr-btn:hover{background:#27364f}
+.narr-stage{background:#0f1623;border:1px solid #243044;border-radius:12px;padding:12px;min-height:200px;display:flex;align-items:center;justify-content:center;margin-bottom:16px}
+.narr-stage video,.narr-stage img{max-width:100%;max-height:420px;border-radius:8px;border:1px solid #1e293b;background:#000}
+.narr-stage .chart{width:100%;max-width:640px}
+.narr-list{display:flex;flex-direction:column;gap:8px}
+.narr-seg{background:#0f1729;border:1px solid #1e293b;border-radius:10px;padding:10px 14px;cursor:pointer}
+.narr-seg:hover{border-color:#334155}
+.narr-seg.active{border-color:#34d399;background:#10241f;box-shadow:0 0 0 1px #34d39955}
+.narr-seg-h{display:flex;align-items:center;gap:10px}
+.narr-seg-t{font-weight:600;flex:1;text-transform:capitalize}
+.narr-seg-d{color:#64748b;font-size:12px;font-variant-numeric:tabular-nums}
+.narr-seg-text{color:#94a3b8;font-size:12px;margin-top:4px;line-height:1.5}
 footer{color:#475569;font-size:12px;margin-top:40px;text-align:center}
 </style></head><body><div class="wrap">
 <header class="top">
@@ -75,6 +89,7 @@ footer{color:#475569;font-size:12px;margin-top:40px;text-align:center}
   <div class="tab active" data-tab="overview" role="tab" tabindex="0">Overview</div>
   <div class="tab" data-tab="runs" role="tab" tabindex="0">Runs</div>
   <div class="tab" data-tab="media" role="tab" tabindex="0">Media</div>
+  <div class="tab" data-tab="narrated" role="tab" tabindex="0">🎧 Narrated</div>
 </div>
 <div id="view"></div>
 <footer>graphdone.unified-report/1 · live dashboard · read-only · localhost</footer>
