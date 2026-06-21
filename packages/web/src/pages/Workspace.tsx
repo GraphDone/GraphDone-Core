@@ -251,7 +251,7 @@ export function Workspace() {
 
           {/* Right Section: Status and Actions — hidden on mobile (the hamburger
               handles nav there); these chips otherwise eat the small-screen width. */}
-          <div className="flex flex-col lg:flex-row lg:items-center gap-3 md:order-3 md:shrink-0">
+          <div className="flex flex-col items-end gap-1.5 md:order-3 md:shrink-0">
             {/* Data-store status (provider-agnostic — keyed off the GraphQL API, which is
                 the actual data layer; the backing store may be D1, Neo4j, etc.) */}
             <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-all cursor-help ${
