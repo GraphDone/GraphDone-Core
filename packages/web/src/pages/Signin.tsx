@@ -242,7 +242,6 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
       hasEmail: hasEnteredEmail(formData.magicLinkEmail),
     });
     if (target === 'email') magicLinkEmailRef.current?.focus();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [useMagicLink, magicLinkSent]);
 
   // Check if guest access is enabled
