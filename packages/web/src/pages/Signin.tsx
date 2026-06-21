@@ -82,7 +82,7 @@ const GET_SYSTEM_SETTINGS = gql`
   }
 `;
 
-export function Signin({ initialMagicLink = false }: { initialMagicLink?: boolean } = {}) {
+export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean } = {}) {
   const navigate = useNavigate();
   const { login: setAuthUser } = useAuth();
   const [searchParams] = useSearchParams();
@@ -584,9 +584,11 @@ export function Signin({ initialMagicLink = false }: { initialMagicLink?: boolea
           )}
 
           {/* Sign In Method Toggle */}
-          <div className="flex items-center justify-center gap-2">
+          <div className="flex items-center justify-center gap-2" role="tablist" aria-label="Sign-in method">
             <button
               type="button"
+              role="tab"
+              aria-selected={!useMagicLink}
               onClick={() => {
                 setUseMagicLink(false);
                 setMagicLinkSent(false);
@@ -594,7 +596,7 @@ export function Signin({ initialMagicLink = false }: { initialMagicLink?: boolea
               }}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 !useMagicLink
-                  ? 'bg-teal-600 text-white'
+                  ? 'bg-teal-700 text-white'
                   : 'bg-gray-700/50 text-gray-400 hover:bg-gray-600/50 hover:text-gray-300'
               }`}
             >
@@ -603,6 +605,8 @@ export function Signin({ initialMagicLink = false }: { initialMagicLink?: boolea
             </button>
             <button
               type="button"
+              role="tab"
+              aria-selected={useMagicLink}
               onClick={() => {
                 setUseMagicLink(true);
                 setMagicLinkSent(false);
@@ -610,7 +614,7 @@ export function Signin({ initialMagicLink = false }: { initialMagicLink?: boolea
               }}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 useMagicLink
-                  ? 'bg-gradient-to-r from-teal-600 to-cyan-600 text-white shadow-lg shadow-teal-500/30'
+                  ? 'bg-gradient-to-r from-teal-700 to-cyan-700 text-white shadow-lg shadow-teal-500/30'
                   : 'bg-gray-700/50 text-gray-400 hover:bg-gray-600/50 hover:text-gray-300'
               }`}
             >
