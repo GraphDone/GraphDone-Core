@@ -50,14 +50,17 @@ const viewOptions = [
 
 const ViewSwitcher: React.FC<ViewSwitcherProps> = ({ currentView, onViewChange, className = '' }) => {
   return (
-    <div className={`flex bg-gray-700 rounded-lg p-1 ${className}`}>
+    <div className={`flex bg-gray-700 rounded-lg p-1 ${className}`} role="tablist" aria-label="View mode">
       {viewOptions.map((option) => {
         const Icon = option.icon;
         const isActive = currentView === option.id;
-        
+
         return (
           <button
             key={option.id}
+            role="tab"
+            aria-selected={isActive}
+            aria-label={option.name}
             onClick={() => onViewChange(option.id)}
             className={`
               group relative flex items-center px-3 py-2 text-sm font-medium rounded-md transition-all duration-200

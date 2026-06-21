@@ -53,6 +53,8 @@ export function useAdaptiveQuality(): {
   }, [governor]);
 
   // FPS sampling: count frames per second, feed smoothed samples to the governor.
+  // Paused while the tab is hidden so we don't run a perpetual rAF loop in
+  // backgrounded tabs (no rendering to measure there anyway).
   useEffect(() => {
     let raf = 0;
     let frames = 0;
@@ -67,8 +69,12 @@ export function useAdaptiveQuality(): {
       }
       raf = requestAnimationFrame(loop);
     };
-    raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
+    const start = () => { if (!raf) { windowStart = performance.now(); frames = 0; raf = requestAnimationFrame(loop); } };
+    const stop = () => { if (raf) { cancelAnimationFrame(raf); raf = 0; } };
+    const onVisibility = () => (document.visibilityState === 'visible' ? start() : stop());
+    document.addEventListener('visibilitychange', onVisibility);
+    if (document.visibilityState === 'visible') start();
+    return () => { document.removeEventListener('visibilitychange', onVisibility); stop(); };
   }, [governor]);
 
   const setOverride = useCallback(

@@ -1,12 +1,14 @@
+import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { Workspace } from './pages/Workspace';
-import { Ontology } from './pages/Ontology';
-import { Agents } from './pages/Agents';
-import { Analytics } from './pages/Analytics';
 import { Settings } from './pages/Settings';
-import { Admin } from './pages/Admin';
-import { Backend } from './pages/Backend';
+// Rarely-visited pages are code-split out of the main bundle (live-audit perf).
+const Ontology = lazy(() => import('./pages/Ontology').then((m) => ({ default: m.Ontology })));
+const Agents = lazy(() => import('./pages/Agents').then((m) => ({ default: m.Agents })));
+const Analytics = lazy(() => import('./pages/Analytics').then((m) => ({ default: m.Analytics })));
+const Admin = lazy(() => import('./pages/Admin').then((m) => ({ default: m.Admin })));
+const Backend = lazy(() => import('./pages/Backend').then((m) => ({ default: m.Backend })));
 import { RequireRole } from './components/RequireRole';
 import { canAccessAdmin, canAccessBackend } from './lib/roleAccess';
 import { Signin } from './pages/Signin';
@@ -102,6 +104,7 @@ function AuthenticatedApp() {
       <GraphProvider>
         <ViewModeProvider>
         <Layout>
+          <Suspense fallback={<div className="h-full w-full flex items-center justify-center text-gray-400 text-sm">Loading…</div>}>
           <Routes>
             <Route path="/" element={<Workspace />} />
             <Route path="/workspace" element={<Workspace />} />
@@ -113,6 +116,7 @@ function AuthenticatedApp() {
             <Route path="/backend" element={<RequireRole can={canAccessBackend}><Backend /></RequireRole>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </Suspense>
         </Layout>
         </ViewModeProvider>
       </GraphProvider>
