@@ -133,115 +133,115 @@ export function Workspace() {
           {/* Center Section: View Mode Buttons — desktop/tablet only. Phones use the
               bottom tab bar (List / Graph / More) instead of this strip. */}
           <div className="flex flex-1 min-w-0 justify-start xl:justify-center md:order-2 overflow-x-auto no-scrollbar -mx-3 px-3 sm:mx-0 sm:px-0">
-            <div className="flex flex-nowrap bg-gray-700/50 backdrop-blur-sm rounded-lg p-1.5 sm:p-2 gap-1 border border-gray-600/50">
+            <div className="flex flex-nowrap bg-gray-700/50 backdrop-blur-sm rounded-lg p-1 sm:p-1.5 gap-0.5 border border-gray-600/50">
               <button
                 onClick={() => setViewMode('graph')}
-                className={`px-2.5 py-1.5 sm:px-3 sm:py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center gap-0.5 sm:gap-2 min-w-[3rem] flex-shrink-0 ${
+                className={`px-2 py-1.5 sm:px-2 sm:py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center gap-0.5 sm:gap-1.5 min-w-[2.75rem] flex-shrink-0 ${
                   viewMode === 'graph' 
                     ? 'bg-green-600 text-white shadow' 
                     : 'text-gray-300 hover:text-white'
                 }`}
                 title="Graph View"
               >
-                <Network className="h-5 w-5 sm:h-8 sm:w-8 lg:h-10 lg:w-10" strokeWidth={1.5} />
+                <Network className="h-5 w-5 sm:h-7 sm:w-7 lg:h-8 lg:w-8" strokeWidth={1.5} />
                 <div className="text-[10px] sm:text-xs text-center font-medium leading-tight">
                   Graph
                 </div>
               </button>
               <button
                 onClick={() => setViewMode('dashboard')}
-                className={`px-2.5 py-1.5 sm:px-3 sm:py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center gap-0.5 sm:gap-2 min-w-[3rem] flex-shrink-0 ${
+                className={`px-2 py-1.5 sm:px-2 sm:py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center gap-0.5 sm:gap-1.5 min-w-[2.75rem] flex-shrink-0 ${
                   viewMode === 'dashboard' 
                     ? 'bg-green-600 text-white shadow' 
                     : 'text-gray-300 hover:text-white'
                 }`}
                 title="Dashboard View"
               >
-                <LayoutDashboard className="h-5 w-5 sm:h-8 sm:w-8 lg:h-10 lg:w-10" strokeWidth={1.5} />
+                <LayoutDashboard className="h-5 w-5 sm:h-7 sm:w-7 lg:h-8 lg:w-8" strokeWidth={1.5} />
                 <div className="text-[10px] sm:text-xs text-center font-medium leading-tight">
                   Dashboard
                 </div>
               </button>
               <button
                 onClick={() => setViewMode('table')}
-                className={`px-2.5 py-1.5 sm:px-3 sm:py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center gap-0.5 sm:gap-2 min-w-[3rem] flex-shrink-0 ${
+                className={`px-2 py-1.5 sm:px-2 sm:py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center gap-0.5 sm:gap-1.5 min-w-[2.75rem] flex-shrink-0 ${
                   viewMode === 'table' 
                     ? 'bg-green-600 text-white shadow' 
                     : 'text-gray-300 hover:text-white'
                 }`}
                 title="Table View"
               >
-                <Table className="h-5 w-5 sm:h-8 sm:w-8 lg:h-10 lg:w-10" strokeWidth={1.5} />
+                <Table className="h-5 w-5 sm:h-7 sm:w-7 lg:h-8 lg:w-8" strokeWidth={1.5} />
                 <div className="text-[10px] sm:text-xs text-center font-medium leading-tight">
                   Table
                 </div>
               </button>
               <button
                 onClick={() => setViewMode('cards')}
-                className={`px-2.5 py-1.5 sm:px-3 sm:py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center gap-0.5 sm:gap-2 min-w-[3rem] flex-shrink-0 ${
+                className={`px-2 py-1.5 sm:px-2 sm:py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center gap-0.5 sm:gap-1.5 min-w-[2.75rem] flex-shrink-0 ${
                   viewMode === 'cards' 
                     ? 'bg-green-600 text-white shadow' 
                     : 'text-gray-300 hover:text-white'
                 }`}
                 title="Card View"
               >
-                <CreditCard className="h-5 w-5 sm:h-8 sm:w-8 lg:h-10 lg:w-10" strokeWidth={1.5} />
+                <CreditCard className="h-5 w-5 sm:h-7 sm:w-7 lg:h-8 lg:w-8" strokeWidth={1.5} />
                 <div className="text-[10px] sm:text-xs text-center font-medium leading-tight">
                   Card
                 </div>
               </button>
               <button
                 onClick={() => setViewMode('kanban')}
-                className={`px-2.5 py-1.5 sm:px-3 sm:py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center gap-0.5 sm:gap-2 min-w-[3rem] flex-shrink-0 ${
+                className={`px-2 py-1.5 sm:px-2 sm:py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center gap-0.5 sm:gap-1.5 min-w-[2.75rem] flex-shrink-0 ${
                   viewMode === 'kanban' 
                     ? 'bg-green-600 text-white shadow' 
                     : 'text-gray-300 hover:text-white'
                 }`}
                 title="Kanban View"
               >
-                <Columns className="h-5 w-5 sm:h-8 sm:w-8 lg:h-10 lg:w-10" strokeWidth={1.5} />
+                <Columns className="h-5 w-5 sm:h-7 sm:w-7 lg:h-8 lg:w-8" strokeWidth={1.5} />
                 <div className="text-[10px] sm:text-xs text-center font-medium leading-tight">
                   Kanban
                 </div>
               </button>
               <button
                 onClick={() => setViewMode('gantt')}
-                className={`px-2.5 py-1.5 sm:px-3 sm:py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center gap-0.5 sm:gap-2 min-w-[3rem] flex-shrink-0 ${
+                className={`px-2 py-1.5 sm:px-2 sm:py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center gap-0.5 sm:gap-1.5 min-w-[2.75rem] flex-shrink-0 ${
                   viewMode === 'gantt' 
                     ? 'bg-green-600 text-white shadow' 
                     : 'text-gray-300 hover:text-white'
                 }`}
                 title="Gantt Chart"
               >
-                <GanttChartSquare className="h-5 w-5 sm:h-8 sm:w-8 lg:h-10 lg:w-10" strokeWidth={1.5} />
+                <GanttChartSquare className="h-5 w-5 sm:h-7 sm:w-7 lg:h-8 lg:w-8" strokeWidth={1.5} />
                 <div className="text-[10px] sm:text-xs text-center font-medium leading-tight">
                   Gantt
                 </div>
               </button>
               <button
                 onClick={() => setViewMode('calendar')}
-                className={`px-2.5 py-1.5 sm:px-3 sm:py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center gap-0.5 sm:gap-2 min-w-[3rem] flex-shrink-0 ${
+                className={`px-2 py-1.5 sm:px-2 sm:py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center gap-0.5 sm:gap-1.5 min-w-[2.75rem] flex-shrink-0 ${
                   viewMode === 'calendar' 
                     ? 'bg-green-600 text-white shadow' 
                     : 'text-gray-300 hover:text-white'
                 }`}
                 title="Calendar View"
               >
-                <CalendarDays className="h-5 w-5 sm:h-8 sm:w-8 lg:h-10 lg:w-10" strokeWidth={1.5} />
+                <CalendarDays className="h-5 w-5 sm:h-7 sm:w-7 lg:h-8 lg:w-8" strokeWidth={1.5} />
                 <div className="text-[10px] sm:text-xs text-center font-medium leading-tight">
                   Calendar
                 </div>
               </button>
               <button
                 onClick={() => setViewMode('activity')}
-                className={`px-2.5 py-1.5 sm:px-3 sm:py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center gap-0.5 sm:gap-2 min-w-[3rem] flex-shrink-0 ${
+                className={`px-2 py-1.5 sm:px-2 sm:py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center gap-0.5 sm:gap-1.5 min-w-[2.75rem] flex-shrink-0 ${
                   viewMode === 'activity' 
                     ? 'bg-green-600 text-white shadow' 
                     : 'text-gray-300 hover:text-white'
                 }`}
                 title="Activity Feed"
               >
-                <Activity className="h-5 w-5 sm:h-8 sm:w-8 lg:h-10 lg:w-10" strokeWidth={1.5} />
+                <Activity className="h-5 w-5 sm:h-7 sm:w-7 lg:h-8 lg:w-8" strokeWidth={1.5} />
                 <div className="text-[10px] sm:text-xs text-center font-medium leading-tight">
                   Activity
                 </div>
