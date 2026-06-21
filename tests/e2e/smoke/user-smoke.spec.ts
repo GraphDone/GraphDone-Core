@@ -97,12 +97,47 @@ test.describe('user smoke: the app works from a user point of view @smoke', () =
   });
 
   test('grow flow stays healthy: + → empty space → connected named node @smoke', async ({ page }) => {
+    test.setTimeout(90_000); // fixture build + reload + settle + grow + undo exceed the 30s default
     await login(page, TEST_USERS.ADMIN);
-    // Wait for a graph to auto-load, then for the force layout to SETTLE — the "+"
-    // grow icon rides on its node, so clicking it while the sim is still moving
-    // (or while nodes overlap) is the historical source of flake. Poll a node's
-    // box until it stops moving rather than guessing with a fixed sleep.
-    await page.locator('.graph-container svg .node').first().waitFor({ timeout: 20000 }).catch(() => {});
+    await page.waitForTimeout(1500);
+
+    // Deterministic fixture: a fresh ADMIN-OWNED graph with ONE regular TASK
+    // node. The auto-selected default graph is non-deterministic and a known
+    // flake source — the seeded "Development Team" hierarchy uses sheet nodes
+    // whose first +-click doesn't enter grow mode, and a Welcome graph owned by
+    // a different user disables grow. Owning our own single-node graph removes
+    // both. (API truth is used for the +1/-1 deltas below; viewport culling can't
+    // skew them.)
+    const graphId = await page.evaluate(async () => {
+      const token = localStorage.getItem('authToken') ?? '';
+      const post = (query: string, variables?: unknown) =>
+        fetch('/api/graphql', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ query, variables }),
+        }).then((r) => r.json());
+      const me = await post('{ me { id } }');
+      const userId = me.data.me.id;
+      const g = await post(
+        `mutation($input: [GraphCreateInput!]!) { createGraphs(input: $input) { graphs { id } } }`,
+        { input: [{ name: `Grow Smoke ${Date.now()}`, type: 'PROJECT', status: 'ACTIVE', createdBy: userId, isShared: true }] }
+      );
+      const gid = g.data.createGraphs.graphs[0].id as string;
+      await post(
+        `mutation($input: [WorkItemCreateInput!]!) { createWorkItems(input: $input) { workItems { id } } }`,
+        { input: [{ type: 'TASK', title: 'Grow Seed', status: 'IN_PROGRESS', priority: 0.5, positionX: 0, positionY: 0, positionZ: 0, owner: { connect: { where: { node: { id: userId } } } }, graph: { connect: { where: { node: { id: gid } } } } }] }
+      );
+      return gid;
+    });
+    expect(graphId, 'fixture graph created').toBeTruthy();
+
+    await page.evaluate((gid) => localStorage.setItem('currentGraphId', gid), graphId);
+    await page.reload();
+
+    // Wait for the seed node to render, then for the force layout to SETTLE — the
+    // "+" grow icon rides on its node, so clicking while the sim is still moving
+    // is the historical source of flake. Poll the node's box until it stops.
+    await page.locator('.graph-container svg .node').first().waitFor({ timeout: 20000 });
     {
       let last: { x: number; y: number } | null = null;
       let stable = 0;
@@ -120,22 +155,18 @@ test.describe('user smoke: the app works from a user point of view @smoke', () =
       }
     }
 
-    // A graph must be loaded for the grow affordance to exist (the "+" rides on a
-    // node). Use the DOM for that precondition; use the API for the +1/-1 DELTAS
-    // below so viewport culling (offscreen nodes aren't in the DOM) can't skew them.
-    const domNodes = await page.locator('.graph-container svg .node').count();
-    test.skip(domNodes === 0, 'no graph with nodes auto-selected');
-
-    const countAll = () => page.evaluate(async () => {
+    // Count only THIS fixture graph so the +1 node / +1 edge delta is exact.
+    const countAll = () => page.evaluate(async (gid) => {
       const token = localStorage.getItem('authToken') ?? '';
       const res = await fetch('/api/graphql', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ query: `{ workItems { id } edges { id } }` })
+        body: JSON.stringify({ query: `query($g: ID!) { workItems(where: { graph: { id: $g } }) { id } edges(where: { source: { graph: { id: $g } } }) { id } }`, variables: { g: gid } })
       }).then((r) => r.json());
       return { nodes: res.data?.workItems?.length ?? -1, edges: res.data?.edges?.length ?? -1 };
-    });
+    }, graphId);
     const before = await countAll();
+    expect(before.nodes, 'fixture starts with exactly the seed node').toBe(1);
 
     // Enter grow mode. Retry the click→hint: a settled layout makes this reliable,
     // but a stray overlap can still swallow one click, so re-click until grow mode
@@ -182,31 +213,16 @@ test.describe('user smoke: the app works from a user point of view @smoke', () =
     await expect.poll(async () => (await countAll()).nodes, { timeout: 10000 }).toBe(before.nodes);
     expect((await countAll()).edges, 'undo must remove the created edge').toBe(before.edges);
 
-    // Belt-and-braces cleanup in case undo half-failed (keeps re-runnable)
-    await page.evaluate(async (title) => {
+    // Tear down the whole fixture graph (edges FIRST — orphan edges break the
+    // edges query), keeping the suite re-runnable and the DB clean.
+    await page.evaluate(async (gid) => {
       const token = localStorage.getItem('authToken') ?? '';
-      const find = await fetch('/api/graphql', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ query: `query($t: String!) { workItems(where: { title: $t }) { id } }`, variables: { t: title } })
-      }).then((r) => r.json());
-      const id = find.data?.workItems?.[0]?.id;
-      if (!id) return;
-      // Detach edges FIRST — orphan edges break the whole edges query
-      await fetch('/api/graphql', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          query: `mutation($id: ID!) { deleteEdges(where: { OR: [{ source: { id: $id } }, { target: { id: $id } }] }) { nodesDeleted } }`,
-          variables: { id }
-        })
-      });
-      await fetch('/api/graphql', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ query: `mutation($id: ID!) { deleteWorkItems(where: { id: $id }) { nodesDeleted } }`, variables: { id } })
-      });
-    }, name);
+      const post = (query: string, variables: unknown) =>
+        fetch('/api/graphql', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ query, variables }) });
+      await post(`mutation($id: ID!) { deleteEdges(where: { source: { graph: { id: $id } } }) { nodesDeleted } }`, { id: gid });
+      await post(`mutation($id: ID!) { deleteWorkItems(where: { graph: { id: $id } }) { nodesDeleted } }`, { id: gid });
+      await post(`mutation($id: ID!) { deleteGraphs(where: { id: $id }) { nodesDeleted } }`, { id: gid });
+    }, graphId);
   });
 
   // A brand-new EMPTY graph (the very first thing a user sees after "Create
