@@ -81,12 +81,26 @@ const perf = PERF_ORDER.filter((k) => latestByMetric.has(k)).map((k) => {
   return { metric: k, label: PERF_LABELS[k] || k, value: m.value, unit: m.unit, better: m.better };
 });
 
+// Give the live-site journey clips a clean spoken name + a real description
+// (the raw attachment name is just the test title, which would otherwise be
+// read out twice). Falls back to the generic name for any other video clip.
+const liveClipMeta = (title) => {
+  const t = String(title || '').toLowerCase();
+  if (/phone|mobile/.test(t)) return { name: 'The mobile journey', note: 'On a phone, a guest lands on the list view, switches to the live graph, opens the navigation, and reaches settings — with no horizontal overflow.' };
+  if (/desktop/.test(t)) return { name: 'The desktop journey', note: 'On the desktop, a guest signs in, the live graph renders with real nodes and edges, and they open a node card, re-fit the view, and tour the pages.' };
+  return null;
+};
+
 const tour = [];
 if (mediaRun) {
   for (const s of mediaRun.report.sequences || []) {
     for (const c of s.cases || []) {
       for (const a of c.attachments || []) {
-        if (a.type === 'video') tour.push({ name: a.name || c.ref || `clip-${tour.length + 1}`, note: c.title || '', kind: 'video', runId: mediaRun.runId, href: a.href });
+        if (a.type !== 'video') continue;
+        const meta = liveClipMeta(c.title || a.name);
+        tour.push(meta
+          ? { name: meta.name, note: meta.note, kind: 'video', runId: mediaRun.runId, href: a.href }
+          : { name: a.name || c.ref || `clip-${tour.length + 1}`, note: c.title || '', kind: 'video', runId: mediaRun.runId, href: a.href });
       }
     }
   }
