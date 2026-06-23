@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { render, screen, cleanup } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { RequireRole } from './RequireRole';
 import { canAccessAdmin, canAccessBackend } from '../lib/roleAccess';
@@ -9,6 +9,11 @@ let mockRole: string | undefined | null;
 vi.mock('../contexts/AuthContext', () => ({
   useAuth: () => ({ currentUser: mockRole === undefined ? null : { role: mockRole } }),
 }));
+
+// Tear down the DOM after every test (and between in-loop renders below) so a
+// prior render's "PROTECTED PAGE" can never bleed into the next assertion — the
+// redirect is exactly what we're verifying.
+afterEach(() => cleanup());
 
 function renderGuarded(role: string | undefined | null, can: (r: any) => boolean) {
   mockRole = role;
@@ -23,31 +28,33 @@ function renderGuarded(role: string | undefined | null, can: (r: any) => boolean
 }
 
 describe('RequireRole (router guard)', () => {
-  it('renders the protected page for an allowed role', () => {
+  it('renders the protected page for an allowed role', async () => {
     renderGuarded('ADMIN', canAccessAdmin);
-    expect(screen.getByText('PROTECTED PAGE')).toBeTruthy();
+    expect(await screen.findByText('PROTECTED PAGE')).toBeTruthy();
   });
 
-  it('redirects disallowed roles (GUEST/VIEWER/USER) away from /admin', () => {
+  it('redirects disallowed roles (GUEST/VIEWER/USER) away from /admin', async () => {
     for (const r of ['GUEST', 'VIEWER', 'USER']) {
-      const { unmount } = renderGuarded(r, canAccessAdmin);
+      renderGuarded(r, canAccessAdmin);
+      // <Navigate> resolves to HOME; PROTECTED PAGE must never render.
+      expect(await screen.findByText('HOME')).toBeTruthy();
       expect(screen.queryByText('PROTECTED PAGE')).toBeNull();
-      expect(screen.getByText('HOME')).toBeTruthy();
-      unmount();
+      cleanup();
     }
   });
 
-  it('redirects when unauthenticated (no user)', () => {
+  it('redirects when unauthenticated (no user)', async () => {
     renderGuarded(undefined, canAccessAdmin);
+    expect(await screen.findByText('HOME')).toBeTruthy();
     expect(screen.queryByText('PROTECTED PAGE')).toBeNull();
-    expect(screen.getByText('HOME')).toBeTruthy();
   });
 
-  it('backend guard: blocks GUEST/VIEWER, allows USER/ADMIN', () => {
-    const { unmount } = renderGuarded('GUEST', canAccessBackend);
+  it('backend guard: blocks GUEST/VIEWER, allows USER/ADMIN', async () => {
+    renderGuarded('GUEST', canAccessBackend);
+    expect(await screen.findByText('HOME')).toBeTruthy();
     expect(screen.queryByText('PROTECTED PAGE')).toBeNull();
-    unmount();
+    cleanup();
     renderGuarded('USER', canAccessBackend);
-    expect(screen.getByText('PROTECTED PAGE')).toBeTruthy();
+    expect(await screen.findByText('PROTECTED PAGE')).toBeTruthy();
   });
 });
