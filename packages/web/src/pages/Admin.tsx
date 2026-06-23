@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { Navigate } from 'react-router-dom';
 import { Users, Database, Shield, Download, Upload, Settings2, RefreshCw, AlertCircle, Lock, Key, Globe, CheckCircle, XCircle, AlertTriangle, FileText, Calendar, Server, Network, Copy, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { canAccessAdmin } from '../lib/roleAccess';
 import { AdminUserManagement } from '../components/AdminUserManagement';
 import { CustomDropdown } from '../components/CustomDropdown';
 import { APP_VERSION } from '../utils/version';
@@ -12,17 +14,13 @@ export function Admin() {
   const { currentUser } = useAuth();
   const [activeTab, setActiveTab] = useState('users');
 
-  // Redirect if not ADMIN
-  if (currentUser?.role !== 'ADMIN') {
-    return (
-      <div className="h-full flex items-center justify-center">
-        <div className="text-center">
-          <Shield className="h-16 w-16 text-red-400 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-100 mb-2">Access Denied</h1>
-          <p className="text-gray-400">Only ADMIN users can access the Admin panel.</p>
-        </div>
-      </div>
-    );
+  // Hard lockout for non-admins: redirect away rather than render any admin
+  // chrome/tabs. This is defense-in-depth — the /admin route is already gated by
+  // <RequireRole can={canAccessAdmin}> and the Worker rejects admin operations
+  // server-side — but the page also fails closed on its own so admin UI can
+  // never mount for a non-admin even if the route guard is ever changed.
+  if (!canAccessAdmin(currentUser?.role)) {
+    return <Navigate to="/" replace />;
   }
 
   const tabs = [
