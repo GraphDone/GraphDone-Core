@@ -1,3 +1,4 @@
+import {FeedbackButton,PublicAnnouncement} from './Feedback';
 import { OfflineStatus } from './OfflineStatus';
 import React from 'react';
 import { HostedUsage } from './HostedUsage';
@@ -47,7 +48,7 @@ export function Layout({ children }: LayoutProps) {
       {/* Insecure-connection warning — an in-flow strip at the very top, so it
           reserves its own space and never overlaps the app (only over HTTP). */}
       <InsecureConnectionBanner className="relative z-30" />
-      <HostedUsage compact /><OfflineStatus compact />
+      <PublicAnnouncement /><HostedUsage compact /><OfflineStatus compact />
 
       {/* Static gradient background - optimized for all browsers */}
 
@@ -267,6 +268,7 @@ export function Layout({ children }: LayoutProps) {
               )}
             </div>
 
+            <div className="flex justify-center"><FeedbackButton compact /></div>
             {/* Footer Info Section */}
             <div className={`p-4 border-t border-gray-700/30 ${desktopSidebarCollapsed ? 'md:px-2' : ''}`}>
               {!desktopSidebarCollapsed && (

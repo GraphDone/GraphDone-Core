@@ -1,3 +1,4 @@
+import {FeedbackButton} from './Feedback';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -138,6 +139,7 @@ export function MobileBottomNav() {
               ))}
             </div>
 
+            <FeedbackButton onOpen={()=>setMoreOpen(false)} />
             <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mt-4 mb-2 px-1">Account</h3>
             <div className="flex items-center justify-between gap-2 rounded-xl border border-gray-700/60 bg-gray-800/60 p-3">
               <div className="flex items-center gap-2 min-w-0">

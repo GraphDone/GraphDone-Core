@@ -1,3 +1,4 @@
+import {FeedbackButton} from '../components/Feedback';
 import React from 'react';
 import { HostedUsage } from '../components/HostedUsage';
 import { Settings as SettingsIcon } from 'lucide-react';
@@ -36,6 +37,7 @@ export function Settings() {
         <div className="max-w-4xl mx-auto px-6 py-8">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-semibold text-gray-100">Application Settings</h2>
+              <FeedbackButton />
             </div>
             
             <div className="space-y-8">

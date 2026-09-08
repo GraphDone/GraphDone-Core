@@ -392,7 +392,9 @@ async function startServer() {
     express.json(),
     expressMiddleware(apolloServer, {
       context: async ({ req }) => {
-        const user = extractUserFromToken(req.headers.authorization);
+        const claims = extractUserFromToken(req.headers.authorization);
+        const account = claims ? await sqliteAuthStore.findUserById(claims.userId) : null;
+        const user = account?.isActive ? { userId: account.id, email: account.email, role: account.role } : (claims?.role === 'GUEST' && /^guest-\d+$/.test(claims.userId) ? claims : null);
         return {
           driver: isNeo4jAvailable ? driver : null,
           user,
@@ -405,6 +407,7 @@ async function startServer() {
 
   // Enhanced health check endpoint that checks all services
   app.use('/api/agent', agentApi);
+  if(process.env.TRUST_PROXY==='1'||process.env.TRUST_PROXY==='2')app.set('trust proxy',Number(process.env.TRUST_PROXY));
   app.use('/api/ops', operationsApi);
 
   app.get('/health', cors<cors.CorsRequest>(), async (_req, res) => {

@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { CheckCircle } from '../constants/workItemConstants';
 import { GET_ALL_USERS, UPDATE_USER_ROLE, RESET_USER_PASSWORD, DELETE_USER, CREATE_USER, UPDATE_USER_STATUS } from '../lib/queries';
+import { hostedUsageEnabled } from '../lib/hostedUsage';
 import { CustomDropdown } from './CustomDropdown';
 import { useModalA11y } from '../hooks/useModalA11y';
 
@@ -110,6 +111,7 @@ export function AdminUserManagement() {
   };
 
   const canDeactivateUser = (user: User) => {
+    if (hostedUsageEnabled) return false;
     if (user.role === 'ADMIN' && adminCount <= 1 && user.isActive) {
       return false; // Can't deactivate the last active admin
     }
@@ -507,7 +509,7 @@ export function AdminUserManagement() {
                         }`}
                         title={
                           !canDeactivateUser(user)
-                            ? "Cannot deactivate the last admin user"
+                            ? (hostedUsageEnabled ? "Account suspension is not available in this hosted release" : "Cannot deactivate the last admin user")
                             : user.isActive
                               ? "Deactivate user"
                               : "Activate user"

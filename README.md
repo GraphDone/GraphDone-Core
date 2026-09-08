@@ -45,6 +45,10 @@ GraphDone is built on the belief that:
 
 [Read our complete philosophy →](./docs/philosophy.md)
 
+## Public VPS hosting
+
+Use the [self-hosting guide](docs/deployment/SELF_HOSTING.md) and `./scripts/self-host.sh your-domain.example` for a production-oriented installation with generated credentials and private database networking. The development setup below uses demo credentials and is for local development.
+
 ## Quick Start
 
 ### 🚀 One-Line Install (Like Ollama!)

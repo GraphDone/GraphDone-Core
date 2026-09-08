@@ -1,3 +1,5 @@
+import {hostedUsageEnabled} from '../lib/hostedUsage';
+import {AdminOperations} from '../components/AdminOperations';
 import React, { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { Users, Database, Shield, Download, Upload, Settings2, RefreshCw, AlertCircle, Lock, Key, Globe, CheckCircle, XCircle, AlertTriangle, FileText, Calendar, Server, Network, Copy, Eye, EyeOff } from 'lucide-react';
@@ -12,7 +14,7 @@ import { GET_OAUTH_PROVIDER_CONFIGS, UPDATE_OAUTH_PROVIDER_CONFIG } from '../lib
 
 export function Admin() {
   const { currentUser } = useAuth();
-  const [activeTab, setActiveTab] = useState('users');
+  const [activeTab, setActiveTab] = useState('operations');
 
   // Hard lockout for non-admins: redirect away rather than render any admin
   // chrome/tabs. This is defense-in-depth — the /admin route is already gated by
@@ -24,6 +26,7 @@ export function Admin() {
   }
 
   const tabs = [
+    {id:'operations',name:'Feedback & operations',icon:FileText,description:'Reports, usage and improvement agents'},
     { id: 'users', name: 'Users', icon: Users, description: 'Manage user roles and permissions' },
     { id: 'settings', name: 'Registration', icon: Settings2, description: 'User registration policies and defaults' },
     { id: 'oauth', name: 'OAuth Providers', icon: Key, description: 'Configure OAuth authentication providers' },
@@ -34,6 +37,7 @@ export function Admin() {
 
   const renderTabContent = () => {
     switch (activeTab) {
+      case 'operations': return <AdminOperations />;
       case 'users':
         return <AdminUserManagement />;
       case 'settings':
@@ -52,7 +56,7 @@ export function Admin() {
   };
 
   return (
-    <div className="h-screen flex flex-col">
+    <div className="h-full min-h-0 flex flex-col">
       {/* Header */}
       <div className="bg-gray-900/30 backdrop-blur-md border-b border-gray-700/30 px-3 py-3 sm:px-6 sm:py-4">
         <div className="flex items-center justify-between">
@@ -74,22 +78,24 @@ export function Admin() {
         
         {/* Tab Navigation */}
         <div className="mt-6">
-          <nav className="flex space-x-1">
+          <nav className="flex flex-wrap gap-1">
             {tabs.map((tab) => {
               const Icon = tab.icon;
+              const unavailable = tab.id === 'settings' || (hostedUsageEnabled && ['oauth','database','security'].includes(tab.id));
               return (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`px-4 py-2 rounded-lg flex items-center space-x-2 text-sm font-medium transition-colors ${
+                  disabled={unavailable}
+                  className={`px-4 py-2 rounded-lg flex items-center space-x-2 text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
                     activeTab === tab.id
                       ? 'bg-yellow-900/30 text-yellow-300 border border-yellow-500/30'
                       : 'text-gray-400 hover:text-gray-300 hover:bg-gray-800'
                   }`}
-                  title={tab.description}
+                  title={unavailable ? 'Not available in this release; configure deployment settings on the server.' : tab.description}
                 >
                   <Icon className="h-4 w-4" />
-                  <span>{tab.name}</span>
+                  <span>{tab.name}{unavailable ? ' · unavailable' : ''}</span>
                 </button>
               );
             })}

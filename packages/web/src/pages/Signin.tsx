@@ -1,3 +1,4 @@
+import {FeedbackButton,PublicAnnouncement} from '../components/Feedback';
 import { WorkIllustration } from '../components/WorkIllustration';
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
@@ -127,7 +128,7 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
   useEffect(() => {
     const fetchOAuthConfig = async () => {
       try {
-        const apiUrl = import.meta.env.VITE_API_URL || 'https://localhost:4128';
+        const apiUrl = import.meta.env.VITE_API_URL || window.location.origin;
         const response = await fetch(`${apiUrl}/config`);
         if (response.ok) {
           const config = await response.json();
@@ -494,6 +495,7 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
           BESIDE the form (wider, 2-column) so the page never needs vertical
           scrolling; on small screens it stacks above as before. */}
       <div className="w-full max-w-md lg:max-w-4xl relative z-10">
+       <PublicAnnouncement />
        <div className="lg:grid lg:grid-cols-2 lg:gap-12 lg:items-center">
         {/* Header */}
         <div className="signin-intro text-center lg:text-left mb-6 lg:mb-0">
@@ -504,6 +506,7 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
           <h1 className="text-3xl font-bold text-gray-100 mb-3">You and your agent.<br /><span className="signin-headline-accent">Moving work forward.</span></h1>
           <p className="text-gray-400 text-lg">One shared place for your to-dos, priorities, and notes. See what needs you and what your agent can take on.</p>
           <WorkIllustration />
+          <FeedbackButton />
         </div>
 
         {/* Login Form */}
@@ -516,7 +519,7 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
           <div className="grid grid-cols-3 gap-3">
             <button
               type="button"
-              onClick={() => oauthConfig?.google.configured && (window.location.href = `${import.meta.env.VITE_API_URL || 'https://localhost:4128'}/auth/google`)}
+              onClick={() => oauthConfig?.google.configured && (window.location.href = `${import.meta.env.VITE_API_URL || window.location.origin}/auth/google`)}
               disabled={!oauthConfig?.google.configured}
               className={`group relative flex items-center justify-center p-3 backdrop-blur-sm border rounded-lg transition-all duration-200 ${
                 oauthConfig?.google.configured
@@ -542,7 +545,7 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
 
             <button
               type="button"
-              onClick={() => oauthConfig?.linkedin.configured && (window.location.href = `${import.meta.env.VITE_API_URL || 'https://localhost:4128'}/auth/linkedin`)}
+              onClick={() => oauthConfig?.linkedin.configured && (window.location.href = `${import.meta.env.VITE_API_URL || window.location.origin}/auth/linkedin`)}
               disabled={!oauthConfig?.linkedin.configured}
               className={`group relative flex items-center justify-center p-3 backdrop-blur-sm border rounded-lg transition-all duration-200 ${
                 oauthConfig?.linkedin.configured
@@ -565,7 +568,7 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
 
             <button
               type="button"
-              onClick={() => oauthConfig?.github.configured && (window.location.href = `${import.meta.env.VITE_API_URL || 'https://localhost:4128'}/auth/github`)}
+              onClick={() => oauthConfig?.github.configured && (window.location.href = `${import.meta.env.VITE_API_URL || window.location.origin}/auth/github`)}
               disabled={!oauthConfig?.github.configured}
               className={`group relative flex items-center justify-center p-3 backdrop-blur-sm border rounded-lg transition-all duration-200 ${
                 oauthConfig?.github.configured

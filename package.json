@@ -70,7 +70,10 @@
     "qc:signup": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 tests/e2e/quality/signup-delivery.spec.ts",
     "qc:offline": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 tests/e2e/quality/offline-sync.spec.ts",
     "qc:hosted-usage": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 tests/e2e/quality/hosted-usage.spec.ts",
-    "qc:project-transfer": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line tests/e2e/quality/project-transfer.spec.ts"
+    "qc:project-transfer": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line tests/e2e/quality/project-transfer.spec.ts",
+    "qc:operations": "playwright test tests/e2e/quality/operations.spec.ts --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line",
+    "qc:operator-login": "playwright test tests/e2e/quality/operator-login.spec.ts --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line",
+    "test:operations": "tsx scripts/test-operations-local.mts && tsx scripts/test-admin-bootstrap.mts && node --test tests/contracts/triage-runner.test.mjs"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
