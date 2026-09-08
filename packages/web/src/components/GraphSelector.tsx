@@ -44,7 +44,7 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
         }
       }
     } : { where: {} },
-    pollInterval: currentGraph ? 5000 : 0,
+    pollInterval: 0,
     fetchPolicy: currentGraph ? 'cache-and-network' : 'cache-only'
   });
 
@@ -58,7 +58,7 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
         }
       }
     } : { where: {} },
-    pollInterval: currentGraph ? 5000 : 0,
+    pollInterval: 0,
     fetchPolicy: currentGraph ? 'cache-and-network' : 'cache-only'
   });
 

@@ -32,7 +32,7 @@ export function Analytics() {
     variables: { where: { graph: { id: currentGraph?.id } } },
     skip: !currentGraph?.id,
     fetchPolicy: 'cache-and-network',
-    pollInterval: 15000,
+    pollInterval: 0,
     skipPollAttempt: () => document.visibilityState !== "visible",
     notifyOnNetworkStatusChange: true,
   });

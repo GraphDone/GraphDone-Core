@@ -1,3 +1,4 @@
+import { skipBackgroundPoll, useHostedUsage } from '../lib/hostedUsage';
 import { AgentConnection } from '../components/AgentConnection';
 import type { WorkItem } from '../types/graph';
 import { useState, useEffect } from 'react';
@@ -22,6 +23,8 @@ import { useViewMode } from '../contexts/ViewModeContext';
 import { parseLayoutMode, LAYOUT_MODE_STORAGE_KEY, type LayoutMode } from '../lib/layoutAlgorithms';
 
 export function Workspace() {
+  const { usage: cloudUsage } = useHostedUsage();
+  const cloudPaused = !!cloudUsage && cloudUsage.status !== 'AVAILABLE';
   const [showAgentConnection, setShowAgentConnection] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showCreateGraphModal, setShowCreateGraphModal] = useState(false);
@@ -71,8 +74,8 @@ export function Workspace() {
         }
       }
     } : { where: {} },
-    pollInterval: currentGraph ? 15000 : 0,
-    skipPollAttempt: () => document.visibilityState !== 'visible',
+    pollInterval: 60000,
+    skipPollAttempt: skipBackgroundPoll,
     fetchPolicy: currentGraph ? 'cache-and-network' : 'cache-only'
   });
 
@@ -86,8 +89,8 @@ export function Workspace() {
         }
       }
     } : { where: {} },
-    pollInterval: currentGraph ? 15000 : 0,
-    skipPollAttempt: () => document.visibilityState !== 'visible',
+    pollInterval: 60000,
+    skipPollAttempt: skipBackgroundPoll,
     fetchPolicy: currentGraph ? 'cache-and-network' : 'cache-only'
   });
 
@@ -315,10 +318,10 @@ export function Workspace() {
       {/* Main Content */}
       <div className="flex-1 relative min-h-0">
         {!currentGraph ? (
-          <div className="h-full flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 relative">
+          <div className="h-full overflow-y-auto flex flex-col items-center bg-gray-900 relative">
             <div className="lagoon-caustics"></div>
 
-            <div className="text-center max-w-xl mx-auto px-6 relative z-20">
+            <div className="text-center shrink-0 max-w-xl mx-auto my-auto px-6 py-6 relative z-20">
               {/* Compact Icon */}
               <div className="mx-auto mb-6 w-16 h-16 bg-gradient-to-br from-green-600 to-blue-600 rounded-xl flex items-center justify-center shadow-lg backdrop-blur-sm border border-green-400/20">
                 <Plus className="h-8 w-8 text-white" />
@@ -330,11 +333,11 @@ export function Workspace() {
               </h1>
               
               <h2 className="text-lg font-medium text-green-300 mb-4">
-                {availableGraphs.length > 0 ? 'No Graph Selected' : 'No Graphs Available'}
+                {cloudPaused ? 'Projects could not be loaded' : availableGraphs.length > 0 ? 'No Graph Selected' : 'No Graphs Available'}
               </h2>
               
               <p className="text-gray-300 mb-8 leading-relaxed">
-                {availableGraphs.length > 0 
+                {cloudPaused ? 'Cloud access is paused. Check your allowance in Settings.' : availableGraphs.length > 0
                   ? 'Ready to organize your work? Choose an existing graph or create a new one to get started.'
                   : 'Get started by creating your first graph to organize your work.'
                 }
@@ -365,7 +368,8 @@ export function Workspace() {
 
                 <button
                   onClick={() => setShowCreateGraphModal(true)}
-                  className="w-full px-6 py-3 bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500 text-white rounded-lg transition-all duration-200 font-medium flex items-center justify-center shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 backdrop-blur-sm border border-green-400/30"
+                  disabled={cloudPaused}
+                  className="disabled:opacity-40 disabled:cursor-not-allowed w-full px-6 py-3 bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500 text-white rounded-lg transition-all duration-200 font-medium flex items-center justify-center shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 backdrop-blur-sm border border-green-400/30"
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Create New Graph

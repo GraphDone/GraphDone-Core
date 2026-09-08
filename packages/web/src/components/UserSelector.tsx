@@ -49,7 +49,7 @@ export function UserSelector({ isCollapsed = false }: { isCollapsed?: boolean })
       style={position} className="fixed z-[1100] w-80 max-w-[calc(100vw-16px)] max-h-[calc(100dvh-16px)] overflow-y-auto rounded-xl border border-gray-600 bg-gray-800 text-gray-100 shadow-2xl p-3"
       onBlur={event => { if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget as Node) && event.relatedTarget !== trigger.current) setIsOpen(false); }}>
       <div className="p-2 break-words"><p className="font-semibold">{currentUser.name}</p><p className="text-sm text-gray-300">{currentUser.email}</p><p className="mt-2 text-xs text-emerald-200">{currentUser.role}{currentTeam ? ` · ${currentTeam.name}` : ''}</p></div>
-      <Link to="/settings" onClick={() => setIsOpen(false)} className="flex items-center gap-3 min-h-[44px] p-2 rounded-lg hover:bg-gray-700"><Settings className="w-4 h-4" />Account settings</Link>
+      <Link to="/settings" onClick={() => setIsOpen(false)} className="flex items-center gap-3 min-h-[44px] p-2 rounded-lg hover:bg-gray-700"><Settings className="w-4 h-4" />Account settings & usage</Link>
       <button onClick={() => { setIsOpen(false); logout(); }} className="flex items-center gap-3 w-full min-h-[44px] p-2 rounded-lg hover:bg-red-950 text-red-200"><LogOut className="w-4 h-4" />Logout</button>
     </div>, document.body)}
   </>;

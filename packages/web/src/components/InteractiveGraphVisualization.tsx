@@ -1,3 +1,4 @@
+import { skipBackgroundPoll } from '../lib/hostedUsage';
 import { QuickEditSurface } from './QuickEditSurface';
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import ReactDOM from 'react-dom/client';
@@ -282,10 +283,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       }
     } : { where: {} },
     fetchPolicy: currentGraph ? 'cache-and-network' : 'cache-only',
-    // Cross-client freshness without the 2s idle hammer: poll every 15s and skip
+    // Cross-client freshness without the 2s idle hammer: poll every minute and skip
     // the tick entirely while the tab is hidden. Own edits still refetch instantly.
-    pollInterval: currentGraph ? 15000 : 0,
-    skipPollAttempt: () => typeof document !== 'undefined' && document.visibilityState !== 'visible',
+    pollInterval: 60000,
+    skipPollAttempt: skipBackgroundPoll,
     errorPolicy: 'all'
   });
 
@@ -300,10 +301,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       }
     } : { where: {} },
     fetchPolicy: currentGraph ? 'cache-and-network' : 'cache-only',
-    // Cross-client freshness without the 2s idle hammer: poll every 15s and skip
+    // Cross-client freshness without the 2s idle hammer: poll every minute and skip
     // the tick entirely while the tab is hidden. Own edits still refetch instantly.
-    pollInterval: currentGraph ? 15000 : 0,
-    skipPollAttempt: () => typeof document !== 'undefined' && document.visibilityState !== 'visible',
+    pollInterval: 60000,
+    skipPollAttempt: skipBackgroundPoll,
     errorPolicy: 'all'
   });
 

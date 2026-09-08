@@ -67,7 +67,8 @@
     "qc:modals": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 tests/e2e/quality/modal-header.spec.ts",
     "qc:real-agents": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 tests/e2e/quality/real-agent-journey.spec.ts",
     "qc:reported-controls": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 tests/e2e/quality/reported-controls.spec.ts",
-    "qc:signup": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 tests/e2e/quality/signup-delivery.spec.ts"
+    "qc:signup": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 tests/e2e/quality/signup-delivery.spec.ts",
+    "qc:hosted-usage": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 tests/e2e/quality/hosted-usage.spec.ts"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",

@@ -1,4 +1,5 @@
 import React from 'react';
+import { HostedUsage } from '../components/HostedUsage';
 import { Settings as SettingsIcon } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { CustomDropdown } from '../components/CustomDropdown';
@@ -38,6 +39,7 @@ export function Settings() {
             </div>
             
             <div className="space-y-8">
+              <HostedUsage />
               {/* Performance (ADAPT-6) */}
               <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
                 <h2 className="text-lg font-semibold text-gray-100 mb-4">Performance</h2>

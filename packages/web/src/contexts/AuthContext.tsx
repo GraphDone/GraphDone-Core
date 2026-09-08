@@ -39,7 +39,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   
   // Handle ME query results with useEffect
   useEffect(() => {
-    if (meData) {
+    if (meData && !meError) {
       if (meData.me) {
         setCurrentUser(meData.me);
         setCurrentTeam(meData.me.team);
@@ -53,7 +53,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
       setIsInitializing(false);
     }
-  }, [meData]);
+  }, [meData, meError]);
   
   useEffect(() => {
     if (!meError) return;
