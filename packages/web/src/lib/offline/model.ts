@@ -1,7 +1,7 @@
 export type Row = {id:string; [key:string]:any};
 export type Snapshot = {project:Row; nodes:Row[]; edges:Row[]; notes:Row[]};
 export type Change = {table:'nodes'|'edges'|'notes'; id:string; action:'put'|'delete'; value?:Row};
-export type PendingRequest = {requestId:string;projectId:string;version:number;name?:string;deleteProject?:boolean;changes:Change[];sent:Snapshot|null};
+export type PendingRequest = {requestId:string;projectId:string;version:number;attempts?:number;name?:string;deleteProject?:boolean;changes:Change[];sent:Snapshot|null};
 export type Project = {base:Snapshot|null;local:Snapshot|null;request?:PendingRequest;conflicts?:string[];remote?:Snapshot|null;checkedAt:number};
 export type Account = {user?:Record<string,any>;projects:Record<string,Project>;list:Row[];listedAt:number;retryAt:number;error:string;blocked?:'auth'|'validation'};
 export const emptyAccount = ():Account=>({projects:{},list:[],listedAt:0,retryAt:0,error:''});
@@ -67,7 +67,7 @@ export function makeRequest(id:string,p:Project):PendingRequest {
  if(delta.length&&!selected.length)throw Error('A change is too large to upload. Shorten its description or metadata.');
  const sent=p.local?structuredClone(p.base||{project:p.local.project,nodes:[],edges:[],notes:[]}):null;
  if(sent && p.local) {sent.project.name=p.local.project.name;for(const c of selected){sent[c.table]=sent[c.table].filter(r=>r.id!==c.id);if(c.action==='put')sent[c.table].push(c.value!);}}
- return {requestId:crypto.randomUUID(),projectId:id,version:p.base?.project.sync_version??-1,name:p.local?.project.name,deleteProject:!p.local,changes:p.local?selected:[],sent};
+ return {requestId:crypto.randomUUID(),attempts:0,projectId:id,version:p.base?.project.sync_version??-1,name:p.local?.project.name,deleteProject:!p.local,changes:p.local?selected:[],sent};
 }
 
 /** Backups are untrusted files. Reject malformed renderable values before they
@@ -86,4 +86,13 @@ export function validateBackupSnapshot(s:any):asserts s is Snapshot {
  }
  const edgeIds=new Set<string>();for(const e of s.edges){text(e.id,128);if(edgeIds.has(e.id))fail();edgeIds.add(e.id);text(e.type,60);num(e.weight);if(!ids.has(e.source_id)||!ids.has(e.target_id)||e.source_id===e.target_id)fail();if(e.created_at!=null)num(e.created_at);}
  const noteIds=new Set<string>();for(const n of s.notes){text(n.id,128);if(noteIds.has(n.id))fail();noteIds.add(n.id);text(n.body,4000);text(n.actor,254);text(n.actor_type,60);if(typeof n.created_at!=='string'||!Number.isFinite(Date.parse(n.created_at)))fail();text(n.work_item_id,128,true);}
+}
+
+/** If an old receipt has expired, a retried create followed by a remote delete
+ * is indistinguishable from an upload that never arrived. Require review rather
+ * than silently resurrecting a task, connection, note, or project. */
+export function ambiguousRetriedCreation(request:PendingRequest,base:Snapshot|null,local:Snapshot|null,remote:Snapshot|null):boolean {
+ if((request.attempts??2)<=1||!local||request.deleteProject)return false;
+ if(!base&&!remote)return true;
+ return request.changes.some(c=>c.action==='put' && local[c.table].some(r=>r.id===c.id) && !base?.[c.table].some(r=>r.id===c.id) && !remote?.[c.table].some(r=>r.id===c.id));
 }
