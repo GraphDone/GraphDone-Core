@@ -315,6 +315,11 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (useMagicLink) {
+      if (magicLinkSent) await handleVerifyCode();
+      else await handleMagicLinkRequest(e);
+      return;
+    }
 
     if (!validateForm()) {
       return;
@@ -403,6 +408,7 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
       return;
     }
 
+    if (!magicLinkCaptchaPayload) { setErrors({ submit: 'Please finish the verification first.' }); return; }
     setMagicLinkLoading(true);
     setErrors({});
 
@@ -421,7 +427,7 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
 
       const data = await response.json();
 
-      if (response.ok) {
+      if (response.ok && data.sent !== false) {
         if (data.userExists === false) {
           setErrors({ magicLinkEmail: 'This email is not registered in our system.' });
         } else {
@@ -434,10 +440,10 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
           rateLimitRetryAfter: data.retryAfter
         });
       } else {
-        setErrors({ submit: data.error || 'Failed to send magic link' });
+        setErrors({ submit: data.message || 'We could not send your sign-in email. Please try again shortly.' });
       }
     } catch {
-      setErrors({ submit: 'Failed to send magic link. Please try again.' });
+      setErrors({ submit: 'We could not reach the sign-in service. Please try again shortly.' });
     } finally {
       setMagicLinkLoading(false);
     }
@@ -668,7 +674,7 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
                     autoFocus
                     value={loginCodeInput}
                     onChange={(e) => { setLoginCodeInput(formatLoginCodeInput(e.target.value)); setCodeError(null); }}
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleVerifyCode(); }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void handleVerifyCode(); } }}
                     placeholder="XXXX-XXXX-XXXX"
                     aria-label="Sign-in code from email"
                     className="w-full px-4 py-3 bg-gray-900/60 border border-teal-500/40 rounded-xl text-gray-100 font-mono text-center text-lg tracking-[0.25em] uppercase focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500/50"
@@ -981,19 +987,6 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
             </div>
           )}
 
-          {/* Submit Error */}
-          {errors.submit && !lockoutTime && (
-            <div className="p-3 bg-red-900 border border-red-700 rounded-lg">
-              {errors.submitTitle && (
-                <p className="text-sm text-red-300 font-semibold mb-1">{errors.submitTitle}</p>
-              )}
-              <p className="text-sm text-red-300">{errors.submit}</p>
-              {errors.submitAction && (
-                <p className="text-xs text-red-200/70 mt-2">💡 {errors.submitAction}</p>
-              )}
-            </div>
-          )}
-
           {/* Submit Button */}
           <button
             type="submit"
@@ -1014,6 +1007,19 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
           </button>
 
             </>
+          )}
+
+          {/* Submit Error */}
+          {errors.submit && !lockoutTime && (
+            <div role="alert" className="p-3 bg-red-900 border border-red-700 rounded-lg">
+              {errors.submitTitle && (
+                <p className="text-sm text-red-300 font-semibold mb-1">{errors.submitTitle}</p>
+              )}
+              <p className="text-sm text-red-300">{errors.submit}</p>
+              {errors.submitAction && (
+                <p className="text-xs text-red-200/70 mt-2">💡 {errors.submitAction}</p>
+              )}
+            </div>
           )}
 
           {/* Guest Mode Button */}
@@ -1057,7 +1063,7 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
           {isGuestEnabled ? (
             <div className="p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
               <p className="text-xs text-blue-300 text-center">
-                <strong>Guest Mode:</strong> Explore GraphDone with read-only access. No account required.
+                <strong>Guest Mode:</strong> Try GraphDone without creating an account.
               </p>
             </div>
           ) : (
