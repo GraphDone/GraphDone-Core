@@ -23,6 +23,7 @@ test('student team: offline reload, drag, quota pause, reconnect, no duplicates 
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  }
  await page.setViewportSize({width:1440,height:900});
+ await page.route('**/health',route=>route.abort());
  await context.setOffline(true);
  await page.getByRole('button',{name:'New work item',exact:true}).click();
  const title='Offline student research '+Date.now();
@@ -72,12 +73,14 @@ test('student team: offline reload, drag, quota pause, reconnect, no duplicates 
  const agentToken=instructions.match(/Bearer (gd_agent_[a-f0-9]+)/)![1];
  await page.getByRole('button',{name:'Hide token',exact:true}).click();
  await context.setOffline(true);
+ await expect(page.getByRole('button',{name:'Create agent token',exact:true})).toBeDisabled();
  await page.getByLabel('Note for your agent').fill('Offline human handoff: check the experiment');
  await page.getByRole('button',{name:'Leave note',exact:true}).click();
  await expect(page.getByLabel('Shared notes')).toContainText('Offline human handoff');
  await page.getByRole('button',{name:'Close agent connection',exact:true}).click();
  const editedIndex=await page.locator('.graph-container .node').evaluateAll((els,id)=>els.findIndex(el=>(el as any).__data__.id===id),position.id);
  await page.locator('.graph-container .node').nth(editedIndex).click();
+ await expect(page.getByText('Connection Lost',{exact:true})).toHaveCount(0);
  await page.getByRole('button',{name:'Edit',exact:true}).click();
  await page.getByTestId('quick-priority').focus();await page.getByTestId('quick-priority').press('End');
  await page.getByRole('button',{name:'Close quick edit',exact:true}).click();

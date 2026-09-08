@@ -2,7 +2,7 @@ import { ApolloLink,Observable } from '@apollo/client';
 import { getMainDefinition } from '@apollo/client/utilities';
 import { valueFromASTUntyped } from 'graphql';
 import { getUserRaw } from '../authStorage';
-import { offlineEnabled,ownerId,localGuest,listProjects,getProject,syncNow } from './engine';
+import { offlineEnabled,ownerId,localGuest,primaryProjectId,listProjects,getProject,syncNow } from './engine';
 import { readAccount,editAccount } from './store';
 import { Row,Snapshot } from './model';
 const iso=(n:number)=>new Date(n*1000).toISOString();
@@ -86,11 +86,14 @@ export const offlineLink=new ApolloLink((operation,forward)=>{
      const owner=ownerId()!,user=JSON.parse(getUserRaw()||'{}');if(user.role==='VIEWER')throw Error('This account is read-only.');
      const graphOp=name.endsWith('Graphs'),table=name.endsWith('Edges')?'edges':'nodes';
      let pid=graphOp?args.where?.id:await findProject(args,table);
+     if(name==='deleteGraphs'&&pid===primaryProjectId())throw Error('Your initial account project cannot be deleted.');
      if(name!=='createGraphs')await getProject(pid);
      value=await editAccount(owner,a=>{
       if(a.blocked==='validation'){a.retryAt=0;a.error='';delete a.blocked;}
       if(name==='createGraphs') {
-       const input=Array.isArray(args.input)?args.input:[args.input],created=input.map((i:any)=>{
+       const occupied=new Set(a.list.filter(r=>!a.projects[r.id]||a.projects[r.id].base||a.projects[r.id].local).map(r=>r.id));for(const [id,p] of Object.entries(a.projects))if(p.base||p.local)occupied.add(id);
+       const input=Array.isArray(args.input)?args.input:[args.input];if(occupied.size+input.length>100)throw Error('This account can hold 100 projects. Sync a project deletion before adding another.');
+       const created=input.map((i:any)=>{
         if(!i.name?.trim())throw Error('A project name is required.');
         const id=crypto.randomUUID(),s:Snapshot={project:{id,name:i.name.slice(0,120),owner_id:owner,created_at:now(),sync_version:0},nodes:[],edges:[],notes:[]};a.projects[id]={base:null,local:s,checkedAt:Date.now()};return graph(s.project,s);
        });return {__typename:'GraphsMutationResponse',graphs:created};
@@ -107,6 +110,7 @@ export const offlineLink=new ApolloLink((operation,forward)=>{
       }
       let rows:Row[]=[];
       if(created)for(const i of args.input) {
+       if(s[table].length>=(table==='nodes'?300:600))throw Error(table==='nodes'?'This project can hold 300 tasks. Start another project to continue.':'This project can hold 600 connections. Remove a connection before adding another.');
        const row:Row=table==='nodes'?{id:crypto.randomUUID(),title:'',type:'TASK',description:null,status:'PROPOSED',priority:0,position_x:0,position_y:0,due_date:null,tags:'[]',metadata:'{}',created_at:now(),updated_at:now(),...nodeUpdate(i)}:{id:crypto.randomUUID(),source_id:ref(i.source),target_id:ref(i.target),type:i.type||'DEPENDS_ON',weight:i.weight??1,created_at:now()};
        if(table==='nodes'&&(!row.title?.trim()||row.title.length>200))throw Error('Use a task title of 1–200 characters.');
        if(table==='edges'&&(row.source_id===row.target_id||!s.nodes.some(n=>n.id===row.source_id)||!s.nodes.some(n=>n.id===row.target_id)))throw Error('Choose two different tasks from this project.');

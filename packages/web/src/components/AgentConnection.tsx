@@ -1,4 +1,4 @@
-import { offlineEnabled, ownerId, getProject, syncNow } from '../lib/offline/engine';
+import { offlineEnabled, ownerId, getProject, syncNow, localGuest, useOffline } from '../lib/offline/engine';
 import { editAccount } from '../lib/offline/store';
 import { cloudFailure, preserveCloudDraft, skipBackgroundPoll } from '../lib/hostedUsage';
 import { useEffect, useRef, useState } from 'react';
@@ -16,13 +16,14 @@ export async function agentRequest(graphId: string, path: string, method = 'GET'
     if(method==='POST') {
       const input=body as {body:string;workItemId?:string};
       if(!input.body?.trim()||input.body.length>4000)throw Error('Use a note of 1–4000 characters.');
-      await editAccount(ownerId()!,a=>{a.projects[graphId].local!.notes.push({id:crypto.randomUUID(),body:input.body.trim(),work_item_id:input.workItemId||null,actor:'You',actor_id:ownerId(),actor_type:'human',created_at:new Date().toISOString()});});
+      await editAccount(ownerId()!,a=>{if(a.projects[graphId].local!.notes.length>=2000)throw Error('This project has 2000 shared notes. Export a backup and start another project to continue.');a.projects[graphId].local!.notes.push({id:crypto.randomUUID(),body:input.body.trim(),work_item_id:input.workItemId||null,actor:'You',actor_id:ownerId(),actor_type:'human',created_at:new Date().toISOString()});});
       setTimeout(()=>void syncNow(),3000);return {created:true};
     }
   }
+  if(offlineEnabled && path==='/tokens' && (localGuest() || !navigator.onLine))throw Error('Sign in and connect to the internet to manage agent tokens. Notes are saved on this device.');
   try {
   const response = await fetch(`${agentBase}${path}?graphId=${encodeURIComponent(graphId)}`, {
-    method, headers: { Authorization: `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
+    signal: AbortSignal.timeout(10000), method, headers: { Authorization: `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
     ...(body ? { body: JSON.stringify(body) } : {})
   });
   if (!response.headers.get('content-type')?.includes('application/json')) throw new Error('Agent connections are not available on this server yet.');
@@ -34,6 +35,8 @@ export async function agentRequest(graphId: string, path: string, method = 'GET'
 type Token = { id: string; name: string; scope: string; expiresAt: string };
 type Note = { id: string; actor: string; actorType: string; body: string; createdAt: string; workItemId: string };
 export function AgentConnection({ graphId, graphName, onClose }: { graphId: string; graphName: string; onClose: () => void }) {
+  const {online}=useOffline();
+  const tokenUnavailable=offlineEnabled && (localGuest() || !online);
   const ref = useRef<HTMLDivElement>(null);
   useDialog(true, onClose);
   useModalA11y(ref, { isOpen: true, label: 'Work with your agent' });
@@ -50,6 +53,7 @@ export function AgentConnection({ graphId, graphName, onClose }: { graphId: stri
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
   const refresh = async () => {
+    if(offlineEnabled){const context=await agentRequest(graphId,'/context');setNotes(context.notes);setItems(context.items);setReady(true);}
     const [access, context] = await Promise.all([agentRequest(graphId, '/tokens').catch(e=>{if(!offlineEnabled)throw e;setError('Agent token management requires cloud access. You can still leave notes locally.');return {tokens:[]};}), agentRequest(graphId, '/context')]);
     setTokens(access.tokens); setNotes(context.notes); setItems(context.items); setReady(true);
   };
@@ -66,10 +70,10 @@ export function AgentConnection({ graphId, graphName, onClose }: { graphId: stri
         <form className="space-y-3" onSubmit={e => { e.preventDefault(); void act(async () => { const created = await agentRequest(graphId, '/tokens', 'POST', { name, scope }); setSecret(created.token); setCopied(false); await refresh(); }); }}>
           <label className="block text-sm">Agent name<input className={field} value={name} maxLength={60} required onChange={e => setName(e.target.value)} /></label>
           <label className="block text-sm">Access<select aria-label="Access" className={field} value={scope} onChange={e => setScope(e.target.value)}><option value="collaborate">Collaborate — update progress, priorities, and notes</option><option value="read">Read only — review tasks and notes</option></select></label>
-          <button disabled={busy || !name.trim()} className="min-h-[44px] rounded-lg bg-violet-600 px-4 py-2 disabled:opacity-50">Create agent token</button><p className="text-xs text-gray-300">This project only · expires in 30 days · revoke anytime</p>
+          <button disabled={busy || !name.trim() || tokenUnavailable} className="min-h-[44px] rounded-lg bg-violet-600 px-4 py-2 disabled:opacity-50">Create agent token</button><p className="text-xs text-gray-300">{tokenUnavailable ? 'Sign in and reconnect to manage agent tokens. You can leave notes locally.' : 'This project only · expires in 30 days · revoke anytime'}</p>
         </form>
         {secret && <div className="mt-4 rounded-lg border border-emerald-400/50 p-3 space-y-2"><p className="font-medium">Connection ready. Copy it now.</p><p className="text-sm text-gray-300">The token is shown only here. Give these instructions privately to your agent.</p><textarea aria-label="Agent connection instructions" readOnly className={`${field} h-40 text-xs font-mono`} value={instructions}/><div className="flex flex-wrap gap-2"><button className="min-h-[44px] px-3 bg-emerald-900 rounded-lg" onClick={() => void act(async () => { await navigator.clipboard.writeText(instructions); setCopied(true); })}>{copied ? 'Copied' : 'Copy connection instructions'}</button><button className="min-h-[44px] px-3" onClick={() => setSecret('')}>Hide token</button></div></div>}
-        <ul className="my-4 space-y-2" aria-label="Agent connections">{tokens.map(token => <li key={token.id} className="flex items-center justify-between gap-2 border-b border-gray-600 py-2"><div className="min-w-0 break-words"><strong>{token.name}</strong><p className="text-xs text-gray-300">{token.scope === 'read' ? 'Read only' : 'Collaboration'} · expires {new Date(token.expiresAt).toLocaleDateString()}</p></div><button disabled={busy} className="min-h-[44px] px-3 text-red-200" onClick={() => void act(async () => { await agentRequest(graphId, '/tokens', 'DELETE', { id: token.id }); setSecret(''); await refresh(); })}>Revoke<span className="sr-only"> {token.name}</span></button></li>)}</ul>
+        <ul className="my-4 space-y-2" aria-label="Agent connections">{tokens.map(token => <li key={token.id} className="flex items-center justify-between gap-2 border-b border-gray-600 py-2"><div className="min-w-0 break-words"><strong>{token.name}</strong><p className="text-xs text-gray-300">{token.scope === 'read' ? 'Read only' : 'Collaboration'} · expires {new Date(token.expiresAt).toLocaleDateString()}</p></div><button disabled={busy || tokenUnavailable} className="min-h-[44px] px-3 text-red-200 disabled:opacity-50" onClick={() => void act(async () => { await agentRequest(graphId, '/tokens', 'DELETE', { id: token.id }); setSecret(''); await refresh(); })}>Revoke<span className="sr-only"> {token.name}</span></button></li>)}</ul>
         <h3 className="font-semibold">Shared notes</h3>
         <form className="space-y-2 mt-2" onSubmit={e => { e.preventDefault(); void act(async () => { await agentRequest(graphId, '/notes', 'POST', { body: note, ...(itemId ? {workItemId: itemId} : {}) }); setNote(''); await refresh(); }); }}>
           <label className="block text-sm">About<select aria-label="About" className={field} value={itemId} onChange={e => setItemId(e.target.value)}><option value="">Whole project</option>{items.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label>
