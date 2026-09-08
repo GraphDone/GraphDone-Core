@@ -1,3 +1,4 @@
+import { QuickEditSurface } from './QuickEditSurface';
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import ReactDOM from 'react-dom/client';
 import { createPortal } from 'react-dom';
@@ -191,9 +192,11 @@ interface InteractiveGraphVisualizationProps {
   /** When true (phone "locked" mode), node + edge-label dragging is disabled so
    *  a touch gesture pans the canvas instead of accidentally moving things. */
   interactionLocked?: boolean;
+  quickEditRequest?: WorkItem | null;
+  onQuickEditRequestHandled?: () => void;
 }
 
-export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, interactionLocked }: InteractiveGraphVisualizationProps = {}) {
+export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, interactionLocked, quickEditRequest, onQuickEditRequestHandled }: InteractiveGraphVisualizationProps = {}) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   // Live-readable lock flag for d3 drag filters (avoids re-binding handlers on toggle).
@@ -445,6 +448,13 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   // field without the heavy details modal. Holds the work item being edited.
   const [quickEditNode, setQuickEditNode] = useState<any | null>(null);
   const quickEditNodeId = quickEditNode?.id ?? null;
+  useEffect(() => {
+    if (!quickEditRequest) return;
+    setInlineEdit(null);
+    setExpandedNode(null);
+    setQuickEditNode(quickEditRequest);
+    onQuickEditRequestHandled?.();
+  }, [quickEditRequest, onQuickEditRequestHandled]);
 
   // D3 handlers are bound once at init and the init effect intentionally
   // avoids re-initialising on mode changes — so handlers would capture STALE
@@ -2586,7 +2596,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .style('cursor', 'pointer')
       .style('opacity', (currentTransform?.k || 1) >= LOD_THRESHOLDS.FAR ? 0.85 : 0)
       .style('pointer-events', 'all');
-    editIcons.append('title').text('Open details / edit'); // native hover tooltip
+    editIcons.append('title').text('Quick edit'); // native hover tooltip
 
     // Edit icon background - scales with icon
     const editBg = editIcons.append('rect')
@@ -2655,11 +2665,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       event.stopPropagation();
       event.preventDefault();
       
-      // Set selected node and show details modal for editing
-      setSelectedNode(d);
-      lastSelectedNodeRef.current = d; // Track last selected
-      applyNodeGlowImmediately(d);
-      setShowNodeDetailsModal(true);
+      setInlineEdit(null);
+      setExpandedNode(null);
+      setQuickEditNode(d);
     });
 
     // Relationship creation icon in title bar (centered vertically, right side) - mirrors edit icon
@@ -3481,7 +3489,17 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         return;
       }
       
-      // Regular node clicks (right-click menu)
+      // Some touch browsers deliver a compatibility click after D3 consumes
+      // touchstart. Keep that path identical to a direct touchend tap.
+      const pointer = event as MouseEvent & { pointerType?: string; sourceCapabilities?: { firesTouchEvents?: boolean } };
+      if ((pointer.pointerType === 'touch' || pointer.sourceCapabilities?.firesTouchEvents) && !isConnectingRef.current && !mousedownNodeRef.current) {
+        event.stopPropagation();
+        setInlineEdit(null);
+        setExpandedNode(null);
+        setQuickEditNode(d);
+        return;
+      }
+      // Regular mouse selection.
       setTimeout(() => {
         if (!mousedownNodeRef.current) {
           handleNodeClick(event, d);
@@ -3633,7 +3651,18 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         const duration = Date.now() - touchData.startTime;
         if (isTap(duration, touchData.moved ? 999 : 0)) {
           event.preventDefault();
-          handleNodeClick(event as unknown as MouseEvent, d);
+          const control = (event.target as Element).closest('.node-edit-icon, .node-relationship-icon, .node-expand-icon, .node-descend-icon');
+          if (control) {
+            // Dispatch the icon's own action once; the suppressed synthetic
+            // mouse event must not turn a grow/expand tap into body editing.
+            control.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX: event.changedTouches[0]?.clientX, clientY: event.changedTouches[0]?.clientY }));
+          } else if (isConnectingRef.current) {
+            handleNodeClick(event as unknown as MouseEvent, d);
+          } else {
+            setInlineEdit(null);
+            setExpandedNode(null);
+            setQuickEditNode(d);
+          }
         }
         delete (element.node() as any).__touchData;
       }
@@ -4117,7 +4146,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   // false if it couldn't yet (no svg/container, or the simulation has no
   // positioned nodes) — the once-per-graph framing polls on this so a slow data
   // load doesn't leave the graph pinned off-screen (the live-guest bug).
-  const fitViewToNodes = useCallback((): boolean => {
+  const fitViewToNodes = useCallback((animate = true): boolean => {
     if (!svgRef.current || !containerRef.current) return false;
     // Bounds must come from the LIVE simulation objects (the React-state
     // nodes are different objects since the identity merge and may hold
@@ -4159,7 +4188,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // Use the component's own zoom behavior so handlers fire and state stays
     // coherent; animate so the user keeps spatial context.
     if (zoomBehaviorRef.current) {
-      svg.transition().duration(450).call(zoomBehaviorRef.current.transform as any, transform);
+      if (animate) svg.transition().duration(450).call(zoomBehaviorRef.current.transform as any, transform);
+      else svg.interrupt().call(zoomBehaviorRef.current.transform as any, transform);
     } else {
       svg.call(d3.zoom<SVGSVGElement, unknown>().transform as any, transform);
     }
@@ -4552,6 +4582,13 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
     let timer: ReturnType<typeof setTimeout> | null = null;
     let tries = 0;
+    let lastPositions = new Map<string, { x: number; y: number }>();
+    let stableSamples = 0;
+    // Once a person touches the canvas, preserve their camera choice.
+    const canvas = containerRef.current;
+    const stopFraming = () => fittedGraphsRef.current.add(gid);
+    canvas?.addEventListener('pointerdown', stopFraming);
+    canvas?.addEventListener('wheel', stopFraming, { passive: true });
     const MAX_TRIES = 60; // ~15s at 250ms — covers a cold Worker/D1 first paint
 
     const attempt = () => {
@@ -4574,7 +4611,17 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           );
           ok = true;
         } else {
-          ok = fitViewRef.current(); // false until the sim has positioned nodes
+          const liveNodes = (simulationRef.current?.nodes() || []) as { id: string; x: number; y: number }[];
+          const stable = liveNodes.length > 0 && liveNodes.every(node => {
+            const previous = lastPositions.get(node.id);
+            return previous && Math.hypot(node.x - previous.x, node.y - previous.y) < 1;
+          });
+          stableSamples = stable ? stableSamples + 1 : 0;
+          lastPositions = new Map(liveNodes.map(node => [node.id, { x: node.x, y: node.y }]));
+          // Frame the moving layout too: fitting once mid-settle can strand all
+          // nodes below a short landscape viewport after the forces move them.
+          const framed = fitViewRef.current(false);
+          ok = framed && stableSamples >= 4;
         }
       }
 
@@ -4591,7 +4638,11 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
     // Small initial delay so the first simulation build/tick has run.
     timer = setTimeout(attempt, 300);
-    return () => { if (timer) clearTimeout(timer); };
+    return () => {
+      if (timer) clearTimeout(timer);
+      canvas?.removeEventListener('pointerdown', stopFraming);
+      canvas?.removeEventListener('wheel', stopFraming);
+    };
   }, [hasNodes, currentGraphId]);
 
   // PR-3: keep the expand-in-place panel glued to its node through drags, ticks
@@ -5084,26 +5135,29 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         aria-describedby="graph-a11y-desc"
       />
       <p id="graph-a11y-desc" className="sr-only">
-        Force-directed graph of work items and their dependencies. Use the view switcher to see the same data as a list, table, or board, which are keyboard-navigable.
+        Force-directed graph of work items and their dependencies. Double-click with a mouse or tap an item to edit it. Use the view switcher to see the same data as a list, table, or board, which are keyboard-navigable.
       </p>
 
       
       {/* Empty State Overlay */}
       {showEmptyStateOverlay && (
-        <div className="absolute inset-0 flex items-start justify-center pointer-events-none pt-16 pl-32">
-          <div className="max-w-lg text-center bg-gray-800/90 backdrop-blur-sm rounded-xl p-8 border border-gray-600/50 shadow-2xl pointer-events-auto">
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none p-3 overflow-auto">
+          <div className="w-full max-w-lg text-center bg-gray-800/90 backdrop-blur-sm rounded-xl p-4 sm:p-6 border border-gray-600/50 shadow-2xl pointer-events-auto">
             <div className="text-green-400 text-4xl mb-4">
               🌱
             </div>
             <h3 className="text-2xl font-bold bg-gradient-to-r from-emerald-400 via-green-300 to-blue-400 bg-clip-text text-transparent mb-3">
-              Transform Your Vision
+              Start with one idea
             </h3>
             <div className="text-gray-200 mb-8 leading-relaxed text-base max-w-md mx-auto">
-              Break free from rigid hierarchies. Create your first work item and experience how GraphDone intelligently connects ideas, surfaces priorities, and accelerates meaningful outcomes.
+              Add a work item, give it a name, then use + to grow a connected idea.
             </div>
             
             <button 
-              onClick={() => createInlineNode(400, 300)}
+              onClick={() => {
+                const rect = containerRef.current?.getBoundingClientRect();
+                createInlineNode(((rect?.width ?? 800) / 2 - currentTransform.x) / currentTransform.scale, ((rect?.height ?? 600) / 2 - currentTransform.y) / currentTransform.scale);
+              }}
               className="bg-gradient-to-r from-emerald-700 to-green-700 hover:from-emerald-600 hover:to-green-600 text-white px-8 py-4 rounded-xl font-semibold text-lg transition-all duration-300 flex items-center gap-3 mx-auto pointer-events-auto cursor-pointer shadow-lg hover:shadow-xl hover:shadow-green-500/25 transform hover:-translate-y-0.5 hover:scale-105"
             >
               <div className="w-5 h-5 bg-white/20 rounded-full flex items-center justify-center">
@@ -5118,7 +5172,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       {/* No Graph Selected Overlay */}
       {showNoGraphMessage && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="max-w-lg text-center bg-gray-800/90 backdrop-blur-sm rounded-xl p-8 border border-gray-600/50 shadow-2xl pointer-events-auto">
+          <div className="w-full max-w-lg text-center bg-gray-800/90 backdrop-blur-sm rounded-xl p-4 sm:p-6 border border-gray-600/50 shadow-2xl pointer-events-auto">
             <div className="text-yellow-300 text-4xl mb-4">
               📊
             </div>
@@ -5227,9 +5281,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
             .catch(() => showError(`Could not ${c.label.toLowerCase()}`));
         };
         return (
-          <div className="absolute z-50" style={{ left, top, transform: 'translate(-50%, -50%)' }}>
+          <QuickEditSurface x={left + (containerRef.current?.getBoundingClientRect().left ?? 0)} y={top + (containerRef.current?.getBoundingClientRect().top ?? 0)} onClose={() => setQuickEditNode(null)}>
             <NodeQuickEdit key={quickEditNode.id} node={dataNode} onCommit={onCommit} onClose={() => setQuickEditNode(null)} />
-          </div>
+          </QuickEditSurface>
         );
       })()}
 
@@ -5248,6 +5302,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
             compact
             rootTestId="node-expand-inspector"
             onClose={() => setExpandedNode(null)}
+            onEdit={() => { setQuickEditNode(expandedNode); setExpandedNode(null); }}
           />
         </div>,
         document.body

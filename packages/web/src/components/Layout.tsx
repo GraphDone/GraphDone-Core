@@ -28,8 +28,8 @@ export function Layout({ children }: LayoutProps) {
   const navigation = [
     { name: 'Workspace', href: '/', icon: Globe, description: 'Main work' },
     { name: 'Ontology', href: '/ontology', icon: Brain, description: 'Node schemas' },
-    { name: 'AI & Agents', href: '/agents', icon: Bot, description: 'AI collaboration', comingSoon: true },
-    { name: 'Analytics', href: '/analytics', icon: BarChart3, description: 'Priority insights', comingSoon: true },
+    { name: 'AI & Agents', href: '/agents', icon: Bot, description: 'Recorded AI contributions' },
+    { name: 'Analytics', href: '/analytics', icon: BarChart3, description: 'Live graph progress' },
     { name: 'Settings', href: '/settings', icon: Settings, description: 'User preferences' },
     { name: 'Admin', href: '/admin', icon: Shield, description: 'System administration', hidden: !canAccessAdmin(currentUser?.role) },
     { name: 'System', href: '/backend', icon: Server, description: 'Backend status', hidden: !canAccessBackend(currentUser?.role) },
@@ -68,11 +68,11 @@ export function Layout({ children }: LayoutProps) {
           md:translate-x-0 md:static md:inset-0
           fixed inset-y-0 left-0 z-50 bg-gray-800/95 backdrop-blur-sm border-r border-gray-700/50
           transform transition-all duration-200 ease-in-out
-          w-64 ${desktopSidebarCollapsed ? 'md:w-16' : ''}
+          w-64 shrink-0 overflow-y-auto overscroll-contain ${desktopSidebarCollapsed ? 'md:w-16' : ''}
         `}>
-          <div className="flex flex-col h-full">
+          <div className="flex flex-col min-h-full">
             {/* Logo */}
-            <div className={`flex items-center h-16 px-6 border-b border-gray-700 ${desktopSidebarCollapsed ? 'md:justify-center md:px-4' : ''}`}>
+            <div className={`flex shrink-0 items-center h-16 px-6 border-b border-gray-700 ${desktopSidebarCollapsed ? 'md:justify-center md:px-4' : ''}`}>
               <Link to="/" className="flex items-center hover:opacity-80 transition-opacity">
                 <img src="/favicon.svg" alt="GraphDone Logo" className="h-8 w-8" />
                 {!desktopSidebarCollapsed && (

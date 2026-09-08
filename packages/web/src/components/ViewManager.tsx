@@ -78,7 +78,8 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
         }
       }
     } : { where: {} },
-    pollInterval: currentGraph ? 5000 : 0,
+    pollInterval: currentGraph ? 15000 : 0,
+    skipPollAttempt: () => document.visibilityState !== 'visible',
     fetchPolicy: currentGraph ? 'cache-and-network' : 'cache-only'
   });
 
@@ -94,7 +95,8 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
         ]
       }
     } : { where: {} },
-    pollInterval: currentGraph ? 5000 : 0,
+    pollInterval: currentGraph ? 15000 : 0,
+    skipPollAttempt: () => document.visibilityState !== 'visible',
     fetchPolicy: currentGraph ? 'cache-and-network' : 'cache-only'
   });
 
@@ -348,7 +350,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
   const renderView = () => {
     switch (viewMode) {
       case 'dashboard':
-        return <Dashboard filteredNodes={filteredNodes} stats={stats} />;
+        return <Dashboard filteredNodes={filteredNodes} stats={stats} onOpenWork={id => { const item = workItems.find(node => node.id === id); if (item) handleEditNode(item); }} />;
       case 'table':
         return <TableView filteredNodes={filteredNodes} handleEditNode={handleEditNode} edges={edges} />;
       case 'cards':
@@ -362,7 +364,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
       case 'activity':
         return <ActivityFeed filteredNodes={filteredNodes} />;
       default:
-        return <Dashboard filteredNodes={filteredNodes} stats={stats} />;
+        return <Dashboard filteredNodes={filteredNodes} stats={stats} onOpenWork={id => { const item = workItems.find(node => node.id === id); if (item) handleEditNode(item); }} />;
     }
   };
 
@@ -370,7 +372,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
   const shouldShowFilters = ['table', 'cards', 'kanban'].includes(viewMode);
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full min-h-0 min-w-0 flex flex-col">
       {/* Search and Filter Bar - Only for table, card, kanban views */}
       {shouldShowFilters && (
         // relative z-50: backdrop-blur makes this a stacking context, so the filter
@@ -704,9 +706,9 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
       )}
 
       {/* Main Content Container */}
-      <div className="flex flex-1 overflow-hidden relative">
+      <div className="flex flex-1 min-h-0 min-w-0 overflow-hidden relative">
         {/* Main Content */}
-        <div className="flex-1 overflow-auto" data-testid="view-content">
+        <div className="flex-1 min-w-0 overflow-auto" data-testid="view-content">
           {renderView()}
         </div>
 
@@ -717,7 +719,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
             320px panel is open, sit just left of it so the toggle stays clickable. */}
         <button
           onClick={() => setShowProjectHealth(!showProjectHealth)}
-          className={`hidden md:block absolute top-4 z-40 p-3 bg-gray-700/60 hover:bg-gray-700/80 backdrop-blur-sm rounded-lg border border-gray-600/50 hover:border-gray-500/70 transition-all duration-200 group ${showProjectHealth ? 'right-[21rem]' : 'right-4'}`}
+          className={`hidden md:block absolute bottom-4 z-40 p-3 bg-gray-700/60 hover:bg-gray-700/80 backdrop-blur-sm rounded-lg border border-gray-600/50 hover:border-gray-500/70 transition-all duration-200 group ${showProjectHealth ? 'right-[21rem]' : 'right-4'}`}
           title={showProjectHealth ? "Hide Project Health" : "Show Project Health"}
         >
           {showProjectHealth ? (

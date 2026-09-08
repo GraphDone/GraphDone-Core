@@ -10,16 +10,18 @@ import type { WorkItem } from '../types/graph';
 interface SafeGraphVisualizationProps {
   onNodeSelected?: (node: WorkItem | null) => void;
   interactionLocked?: boolean;
+  quickEditRequest?: WorkItem | null;
+  onQuickEditRequestHandled?: () => void;
 }
 
-export function SafeGraphVisualization({ onNodeSelected, interactionLocked }: SafeGraphVisualizationProps = {}) {
+export function SafeGraphVisualization({ onNodeSelected, interactionLocked, quickEditRequest, onQuickEditRequestHandled }: SafeGraphVisualizationProps = {}) {
   return (
     <GraphErrorBoundary
       onError={() => {
         // Error logged by boundary for debugging
       }}
     >
-      <InteractiveGraphVisualization onNodeSelected={onNodeSelected} interactionLocked={interactionLocked} />
+      <InteractiveGraphVisualization onNodeSelected={onNodeSelected} interactionLocked={interactionLocked} quickEditRequest={quickEditRequest} onQuickEditRequestHandled={onQuickEditRequestHandled} />
     </GraphErrorBoundary>
   );
 }

@@ -1,20 +1,20 @@
 import React, { useState } from 'react';
-import { 
-  BarChart3, 
+import {
+  BarChart3,
   Sigma,
   RotateCcw,
   ZoomIn,
   ZoomOut
 } from 'lucide-react';
-import { 
-  getStatusConfig, 
-  getTypeConfig, 
+import {
+  getStatusConfig,
+  getTypeConfig,
   getPriorityConfig,
   getStatusIconElement,
   getTypeIconElement,
   getPriorityIconElement,
   getStatusGradientBackground,
-  WORK_ITEM_STATUSES, 
+  WORK_ITEM_STATUSES,
   WORK_ITEM_PRIORITIES,
   WORK_ITEM_TYPES,
   type WorkItemStatus,
@@ -47,6 +47,7 @@ interface WorkItem {
 }
 
 interface DashboardProps {
+  onOpenWork: (id: string) => void;
   filteredNodes: WorkItem[];
   stats: {
     total: number;
@@ -82,11 +83,11 @@ const PieChart = ({ data, title }: { data: Array<{label: string, value: number, 
   const filteredData = data.filter(item => item.value > 0);
   const total = filteredData.reduce((sum, item) => sum + item.value, 0);
   let cumulativePercentage = 0;
-  
+
   const handleZoomIn = () => {
     setZoomLevel(prev => Math.min(prev + 0.1, 2));
   };
-  
+
   const handleZoomOut = () => {
     setZoomLevel(prev => Math.max(prev - 0.1, 0.5));
   };
@@ -99,7 +100,7 @@ const PieChart = ({ data, title }: { data: Array<{label: string, value: number, 
     const startAngle = startPercentage * 3.6 - 90;
     const endAngle = (startPercentage + percentage) * 3.6 - 90;
     const largeArcFlag = percentage > 50 ? 1 : 0;
-    
+
     const startX = 50 + 40 * Math.cos(startAngle * Math.PI / 180);
     const startY = 50 + 40 * Math.sin(startAngle * Math.PI / 180);
     const endX = 50 + 40 * Math.cos(endAngle * Math.PI / 180);
@@ -151,26 +152,27 @@ const PieChart = ({ data, title }: { data: Array<{label: string, value: number, 
             <RotateCcw className="h-4 w-4" />
           </button>
         </div>
-      
-        <div className="flex justify-center">
-          <div 
-            style={{ 
+
+        <div className="flex justify-center overflow-hidden">
+          <div className="w-full max-w-[350px]"
+            style={{
               transform: `scale(${zoomLevel})`,
               transformOrigin: 'center',
               transition: 'transform 0.2s ease-in-out'
             }}
           >
-            <svg 
-              width="350" 
-              height="350" 
+            <svg
+              width="100%"
+              className="max-w-[350px] h-auto aspect-square"
+              height="350"
               viewBox="0 0 100 100"
             >
             {filteredData.map((item, index) => {
             const percentage = (item.value / total) * 100;
             const path = createPath(percentage, cumulativePercentage);
-            
+
             cumulativePercentage += percentage;
-            
+
             return (
               <g key={index}>
                 <path
@@ -194,7 +196,7 @@ const PieChart = ({ data, title }: { data: Array<{label: string, value: number, 
           const gridCols = isPriorityChart ? "grid grid-cols-2 gap-2" :
                            isStatusChart ? "grid grid-cols-2 sm:grid-cols-3 gap-2" :
                            "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2";
-          
+
           return (
             <div className={gridCols}>
               {filteredData.map((item, index) => {
@@ -205,13 +207,13 @@ const PieChart = ({ data, title }: { data: Array<{label: string, value: number, 
               if (statusEntry) {
                 return getStatusIconElement(statusEntry[0] as WorkItemStatus, "h-5 w-5");
               }
-              
-              // Find type by label  
+
+              // Find type by label
               const typeEntry = Object.entries(WORK_ITEM_TYPES).find(([, config]) => config.label === label);
               if (typeEntry) {
                 return getTypeIconElement(typeEntry[0] as WorkItemType, "h-5 w-5");
               }
-              
+
               // Find priority by label
               const priorityEntry = Object.entries(WORK_ITEM_PRIORITIES).find(([, config]) => config.label === label);
               if (priorityEntry) {
@@ -220,10 +222,10 @@ const PieChart = ({ data, title }: { data: Array<{label: string, value: number, 
                 const priorityValue = priorityEntry[1].threshold.min;
                 return getPriorityIconElement(priorityValue, "h-5 w-5");
               }
-              
+
               return <div className="w-4 h-4 rounded-full" style={{ backgroundColor: item.color }}></div>;
             };
-                
+
                 return (
                   <div
                     key={index}
@@ -253,127 +255,52 @@ const PieChart = ({ data, title }: { data: Array<{label: string, value: number, 
   );
 };
 
-const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
+const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats, onOpenWork }) => {
   return (
-    <div className="p-6 space-y-6">
-      {/* Summary strip — compact + content-sized (was a tall, near-empty banner) */}
-      <div className="bg-gradient-to-br from-lime-500/15 via-lime-500/8 to-lime-500/5 rounded-lg px-5 py-3 border border-gray-700/30 border-l-4 border-l-lime-400/70 flex items-center gap-3">
-        <Sigma className="h-7 w-7 text-lime-400 flex-shrink-0" />
-        <span className="text-sm font-semibold text-gray-300">Total Tasks</span>
-        <span className="ml-auto text-3xl font-bold text-lime-400 leading-none">{stats.total}</span>
+    <div className="p-3 sm:p-6 space-y-4 sm:space-y-6 min-w-0">
+      <header>
+        <h2 className="text-2xl font-semibold text-gray-100">Your work, at a glance</h2>
+        <p className="mt-1 text-sm text-gray-400">{stats.completed} of {stats.total} work items completed</p>
+        <progress aria-label="Work completed" max={Math.max(1, stats.total)} value={stats.completed} className="mt-3 w-full h-2 accent-emerald-400" />
+      </header>
+      <div className="grid grid-cols-4 gap-2">
+        {[
+          ['Working', stats.inProgress, 'text-blue-300'],
+          ['Blocked', stats.blocked, 'text-red-300'],
+          ['Review', stats.inReview, 'text-amber-300'],
+          ['Done', stats.completed, 'text-emerald-300'],
+        ].map(([label, count, color]) => (
+          <div key={label} className="rounded-xl border border-gray-700/60 bg-gray-800/40 p-2 sm:p-3">
+            <p className="text-xs sm:text-sm text-gray-400">{label}</p>
+            <p className={`mt-1 text-2xl font-semibold ${color}`}>{count}</p>
+          </div>
+        ))}
       </div>
-
-      {/* Status breakdown — one compact, dense grid (was 3 sparse rows of 3 with
-          single-digit numbers in oversized boxes). 2 cols on phones up to 5 on
-          desktop so the 9 statuses read as a tidy panel, not a wall of whitespace. */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        <div className={`${getStatusGradientBackground('NOT_STARTED' as WorkItemStatus, 'dashboard')} rounded-lg p-4 border border-gray-700/30 hover:scale-[1.02] hover:-translate-y-1 transition-all duration-200 cursor-pointer`}>
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              {React.createElement(getStatusConfig('NOT_STARTED').icon!, { className: `h-8 w-8 ${getStatusConfig('NOT_STARTED').color}` })}
-            </div>
-            <div className="ml-4">
-              <div className="text-base font-bold text-gray-300">Not Started</div>
-              <div className={`text-3xl font-bold ${getStatusConfig('NOT_STARTED').color}`}>{stats.notStarted}</div>
-            </div>
-          </div>
-        </div>
-
-        <div className={`${getStatusGradientBackground('PROPOSED' as WorkItemStatus, 'dashboard')} rounded-lg p-4 border border-gray-700/30 hover:scale-[1.02] hover:-translate-y-1 transition-all duration-200 cursor-pointer`}>
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              {React.createElement(getStatusConfig('PROPOSED').icon!, { className: `h-8 w-8 ${getStatusConfig('PROPOSED').color}` })}
-            </div>
-            <div className="ml-4">
-              <div className="text-base font-bold text-gray-300">Proposed</div>
-              <div className={`text-3xl font-bold ${getStatusConfig('PROPOSED').color}`}>{stats.proposed}</div>
-            </div>
-          </div>
-        </div>
-
-        <div className={`${getStatusGradientBackground('PLANNED' as WorkItemStatus, 'dashboard')} rounded-lg p-4 border border-gray-700/30 hover:scale-[1.02] hover:-translate-y-1 transition-all duration-200 cursor-pointer`}>
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              {React.createElement(getStatusConfig('PLANNED').icon!, { className: `h-8 w-8 ${getStatusConfig('PLANNED').color}` })}
-            </div>
-            <div className="ml-4">
-              <div className="text-base font-bold text-gray-300">Planned</div>
-              <div className={`text-3xl font-bold ${getStatusConfig('PLANNED').color}`}>{stats.planned}</div>
-            </div>
-          </div>
-        </div>
-        <div className={`${getStatusGradientBackground('IN_PROGRESS' as WorkItemStatus, 'dashboard')} rounded-lg p-4 border border-gray-700/30 hover:scale-[1.02] hover:-translate-y-1 transition-all duration-200 cursor-pointer`}>
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              {React.createElement(getStatusConfig('IN_PROGRESS').icon!, { className: `h-8 w-8 ${getStatusConfig('IN_PROGRESS').color}` })}
-            </div>
-            <div className="ml-4">
-              <div className="text-base font-bold text-gray-300">In Progress</div>
-              <div className={`text-3xl font-bold ${getStatusConfig('IN_PROGRESS').color}`}>{stats.inProgress}</div>
-            </div>
-          </div>
-        </div>
-
-        <div className={`${getStatusGradientBackground('IN_REVIEW' as WorkItemStatus, 'dashboard')} rounded-lg p-4 border border-gray-700/30 hover:scale-[1.02] hover:-translate-y-1 transition-all duration-200 cursor-pointer`}>
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              {React.createElement(getStatusConfig('IN_REVIEW').icon!, { className: `h-8 w-8 ${getStatusConfig('IN_REVIEW').color}` })}
-            </div>
-            <div className="ml-4">
-              <div className="text-base font-bold text-gray-300">In Review</div>
-              <div className={`text-3xl font-bold ${getStatusConfig('IN_REVIEW').color}`}>{stats.inReview}</div>
-            </div>
-          </div>
-        </div>
-
-        <div className={`${getStatusGradientBackground('BLOCKED' as WorkItemStatus, 'dashboard')} rounded-lg p-4 border border-gray-700/30 hover:scale-[1.02] hover:-translate-y-1 transition-all duration-200 cursor-pointer`}>
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              {React.createElement(getStatusConfig('BLOCKED').icon!, { className: `h-8 w-8 ${getStatusConfig('BLOCKED').color}` })}
-            </div>
-            <div className="ml-4">
-              <div className="text-base font-bold text-gray-300">Blocked</div>
-              <div className={`text-3xl font-bold ${getStatusConfig('BLOCKED').color}`}>{stats.blocked}</div>
-            </div>
-          </div>
-        </div>
-        <div className={`${getStatusGradientBackground('ON_HOLD' as WorkItemStatus, 'dashboard')} rounded-lg p-4 border border-gray-700/30 hover:scale-[1.02] hover:-translate-y-1 transition-all duration-200 cursor-pointer`}>
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              {React.createElement(getStatusConfig('ON_HOLD').icon!, { className: `h-8 w-8 ${getStatusConfig('ON_HOLD').color}` })}
-            </div>
-            <div className="ml-4">
-              <div className="text-base font-bold text-gray-300">On Hold</div>
-              <div className={`text-3xl font-bold ${getStatusConfig('ON_HOLD').color}`}>{stats.onHold}</div>
-            </div>
-          </div>
-        </div>
-
-        <div className={`${getStatusGradientBackground('COMPLETED' as WorkItemStatus, 'dashboard')} rounded-lg p-4 border border-gray-700/30 hover:scale-[1.02] hover:-translate-y-1 transition-all duration-200 cursor-pointer`}>
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              {React.createElement(getStatusConfig('COMPLETED').icon!, { className: `h-8 w-8 ${getStatusConfig('COMPLETED').color}` })}
-            </div>
-            <div className="ml-4">
-              <div className="text-base font-bold text-gray-300">Completed</div>
-              <div className={`text-3xl font-bold ${getStatusConfig('COMPLETED').color}`}>{stats.completed}</div>
-            </div>
-          </div>
-        </div>
-
-        <div className={`${getStatusGradientBackground('CANCELLED' as WorkItemStatus, 'dashboard')} rounded-lg p-4 border border-gray-700/30 hover:scale-[1.02] hover:-translate-y-1 transition-all duration-200 cursor-pointer`}>
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              {React.createElement(getStatusConfig('CANCELLED').icon!, { className: `h-8 w-8 ${getStatusConfig('CANCELLED').color}` })}
-            </div>
-            <div className="ml-4">
-              <div className="text-base font-bold text-gray-300">Cancelled</div>
-              <div className={`text-3xl font-bold ${getStatusConfig('CANCELLED').color}`}>{stats.cancelled}</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
+      {[
+        { title: 'Needs attention', statuses: ['BLOCKED', 'IN_REVIEW'], empty: 'No blockers or review requests right now.' },
+        { title: 'In motion', statuses: ['IN_PROGRESS', 'PLANNED'], empty: 'Choose a work item to get started.' },
+      ].map(section => {
+        const work = filteredNodes.filter(item => section.statuses.includes(item.status))
+          .sort((a, b) => b.priority - a.priority || a.title.localeCompare(b.title));
+        return (
+          <section key={section.title} className="rounded-xl border border-gray-700/60 bg-gray-900/40 p-4">
+            <h3 className="font-medium text-gray-100 mb-2">{section.title}</h3>
+            {work.length === 0 ? <p className="text-sm text-gray-400">{section.empty}</p> : (
+              <ul className="divide-y divide-gray-700/50">
+                {work.slice(0, 5).map(item => <li key={item.id}>
+                  <button onClick={() => onOpenWork(item.id)} aria-label={`Open ${item.title}`} className="w-full min-h-[44px] py-3 text-left rounded-lg hover:bg-gray-800 focus-visible:outline focus-visible:outline-emerald-400">
+                    <span className="block text-sm text-gray-100 break-words">{item.title}</span>
+                    <span className="text-xs text-gray-400">{getStatusConfig(item.status as WorkItemStatus).label}</span>
+                  </button>
+                </li>)}
+              </ul>
+            )}
+            {work.length > 5 && <p className="mt-2 text-xs text-gray-400">Showing 5 of {work.length}. All work is available in List.</p>}
+          </section>
+        );
+      })}
+      <details className="rounded-xl border border-gray-700/60 p-3 sm:p-4">
+        <summary className="min-h-[44px] cursor-pointer content-center text-sm text-gray-300">Explore distributions</summary>
       {/* Analytics Dashboard */}
       <div className="space-y-8 relative">
         {/* Dashboard Header */}
@@ -407,13 +334,13 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
               <span className="text-xs text-gray-300 font-medium">Pie Charts</span>
             </div>
           </div>
-          
+
           <div className="space-y-8">
             {/* Status Distribution */}
             <div className="flex flex-col items-center">
               <h4 className="text-base font-semibold text-white mb-4 tracking-wide">Status Distribution</h4>
               <div className="w-full">
-                <PieChart 
+                <PieChart
                   title=""
                   data={[
                     { label: WORK_ITEM_STATUSES.NOT_STARTED.label, value: stats.notStarted, color: WORK_ITEM_STATUSES.NOT_STARTED.hexColor },
@@ -434,7 +361,7 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
             <div className="flex flex-col items-center">
               <h4 className="text-base font-semibold text-white mb-4 tracking-wide">Priority Distribution</h4>
               <div className="w-full">
-                <PieChart 
+                <PieChart
                   title=""
                   data={[
                     { label: WORK_ITEM_PRIORITIES.critical.label, value: stats.priorityStats.critical, color: WORK_ITEM_PRIORITIES.critical.hexColor },
@@ -451,7 +378,7 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
             <div className="flex flex-col items-center">
               <h4 className="text-base font-semibold text-white mb-4 tracking-wide">Node Distribution</h4>
               <div className="w-full">
-                <PieChart 
+                <PieChart
                   title=""
                   data={Object.entries(stats.typeStats)
                     .filter(([, count]) => count > 0)
@@ -518,7 +445,7 @@ const Dashboard: React.FC<DashboardProps> = ({ filteredNodes, stats }) => {
           </div>
         </div>
       </div>
-
+      </details>
     </div>
   );
 };

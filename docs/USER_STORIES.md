@@ -121,3 +121,18 @@ These profiles are encoded in `packages/web/src/lib/adaptiveQuality.ts` and exer
 | AINAT-1 | As an agent, I want MCP tools over the ontology (list sets, get defs, create typed objects/links, coverage), so domain work is fully scriptable. | MCP tools land in the same PR as each ONTO story; validation errors are machine-readable. | `mcp-server/tests/ontology-tools.test.ts` | 💤 |
 | AINAT-2 | As a Claude user, I want a GraphDone Skill that runs a full requirements workflow (spec doc → proposed graph → maintained trace links → coverage report), so AI does the bookkeeping while humans watch the living graph. | Skill in skills/; end-to-end demo against dev stack; humans see live updates. | skill smoke script | 💤 |
 | AINAT-3 | As an agent, I want get_graph_context to include the ontology section (active sets, type counts, coverage headline), so one call orients me on any domain graph. | <2.5kB response incl. ontology block. | `mcp-server/tests/graph-context.test.ts` | 💤 |
+
+## Live-data and responsive completion review (2026-09-07)
+
+See [state review](reviews/2026-09-07-state.md) for the evidence and remaining gaps.
+
+| ID | Story | Acceptance / evidence | Status |
+| --- | --- | --- | --- |
+| DATA-1 | As a contributor, I want analytics based on my selected graph so progress is trustworthy. | Actual node/status/priority/contributor data; graph selection, search/status filters, empty/error/retry states; `graphAnalytics.test.ts` and `responsive-real-workflows.spec.ts`. Historical voting metrics remain unavailable. | 🧪 |
+| RESP-1a | As a phone user, I want quick editing to remain within the visible screen in either orientation. | Viewport-bounded editor/sheet, 44px controls, one-tap entry, Escape/click-away and focus handling; responsive persistence journey. Native virtual-keyboard validation still required before closing RESP-1. | 🧪 |
+
+| OBS-1a | As a human, I want saved API progress to appear in my workspace without invented events or agents. | Recorded notes and timestamps, selected-graph AI contributor view, poll while visible; `recordedActivity.test.ts` and `recorded-ai-work.spec.ts`. Actor attribution and append-only events remain open. | 🧪 |
+
+The [human-first AI work contract](design/human-ai-workspace.md) defines the remaining release requirements: scoped hosted credentials, atomic claims, idempotent attributed progress, human input/review, evidence and reconnect recovery.
+
+| UX-1a | As a human, I want the work that matters first and direct access to editing. | Overview attention/current-work sections open items; Board hides empty lanes by default; graph editing takes one tap/click; Admin reference collapses and forms fit short screens. Headed responsive and Admin form journeys. | 🧪 |

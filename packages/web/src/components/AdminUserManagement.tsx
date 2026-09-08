@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
 import { 
   Users, 
@@ -21,6 +21,7 @@ import {
 import { CheckCircle } from '../constants/workItemConstants';
 import { GET_ALL_USERS, UPDATE_USER_ROLE, RESET_USER_PASSWORD, DELETE_USER, CREATE_USER, UPDATE_USER_STATUS } from '../lib/queries';
 import { CustomDropdown } from './CustomDropdown';
+import { useModalA11y } from '../hooks/useModalA11y';
 
 interface User {
   id: string;
@@ -51,6 +52,22 @@ export function AdminUserManagement() {
     password: '',
     role: 'VIEWER'
   });
+
+  const createDialogRef = useRef<HTMLDivElement>(null);
+  const deleteDialogRef = useRef<HTMLDivElement>(null);
+  const notificationRef = useRef<HTMLDivElement>(null);
+  useModalA11y(createDialogRef, { isOpen: showCreateUser, label: 'Create new user' });
+  useModalA11y(deleteDialogRef, { isOpen: !!deleteConfirmation, label: 'Delete user' });
+  useModalA11y(notificationRef, { isOpen: !!notification, label: 'User management result' });
+  useEffect(() => {
+    if (!showCreateUser && !deleteConfirmation && !notification) return;
+    const close = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setShowCreateUser(false); setDeleteConfirmation(null); setNotification(null);
+    };
+    document.addEventListener('keydown', close);
+    return () => document.removeEventListener('keydown', close);
+  }, [showCreateUser, deleteConfirmation, notification]);
 
   const { data, loading, error, refetch } = useQuery(GET_ALL_USERS);
   const [updateUserRole] = useMutation(UPDATE_USER_ROLE);
@@ -273,7 +290,7 @@ export function AdminUserManagement() {
   }
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 px-6 py-8">
+    <div className="flex-1 flex flex-col min-h-0 px-3 py-4 sm:px-6 sm:py-6">
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-100 mb-2">User Management</h1>
@@ -281,8 +298,8 @@ export function AdminUserManagement() {
       </div>
 
       {/* Role Legend */}
-      <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 mb-6">
-        <h3 className="text-lg font-semibold text-gray-200 mb-3">Role Hierarchy</h3>
+      <details className="bg-gray-800 border border-gray-700 rounded-lg px-4 mb-4">
+        <summary className="min-h-[44px] cursor-pointer content-center text-sm font-medium text-gray-200">About roles and permissions</summary>
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           {ROLE_HIERARCHY.map((role) => {
             const IconComponent = role.icon;
@@ -297,7 +314,7 @@ export function AdminUserManagement() {
             );
           })}
         </div>
-      </div>
+      </details>
 
       {/* Controls */}
       <div className="mb-6 flex flex-col sm:flex-row gap-4">
@@ -385,7 +402,7 @@ export function AdminUserManagement() {
                       <div className="ml-4">
                         <div className="text-sm font-medium text-gray-100">{user.name}</div>
                         <div className="text-sm text-gray-400">{user.email}</div>
-                        <div className="text-xs text-gray-500">@{user.username}</div>
+                        <div className="text-xs text-gray-400">@{user.username}</div>
                       </div>
                     </div>
                   </td>
@@ -465,12 +482,12 @@ export function AdminUserManagement() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
                     <div className="flex flex-col space-y-1">
                       <div>
-                        <span className="text-xs text-gray-500">Created: </span>
+                        <span className="text-xs text-gray-400">Created: </span>
                         <span>{new Date(user.createdAt).toLocaleDateString()}</span>
                       </div>
                       {user.deactivationDate && (
                         <div>
-                          <span className="text-xs text-gray-500">Deactivated: </span>
+                          <span className="text-xs text-gray-400">Deactivated: </span>
                           <span className="text-orange-300">{new Date(user.deactivationDate).toLocaleDateString()}</span>
                         </div>
                       )}
@@ -483,7 +500,7 @@ export function AdminUserManagement() {
                         disabled={!canDeactivateUser(user)}
                         className={`inline-flex items-center px-2 py-1 border rounded text-xs focus:outline-none focus:ring-1 ${
                           !canDeactivateUser(user)
-                            ? 'border-gray-600 text-gray-500 cursor-not-allowed'
+                            ? 'border-gray-600 text-gray-400 cursor-not-allowed'
                             : user.isActive
                               ? 'border-orange-600 text-orange-300 hover:text-orange-100 hover:bg-orange-900/20 focus:ring-orange-500'
                               : 'border-green-600 text-green-300 hover:text-green-100 hover:bg-green-900/20 focus:ring-green-500'
@@ -522,7 +539,7 @@ export function AdminUserManagement() {
                         className={`inline-flex items-center px-2 py-1 border rounded text-xs focus:outline-none focus:ring-1 ${
                           canDeleteUser(user)
                             ? 'border-red-600 text-red-300 hover:text-red-100 hover:bg-red-900/20 focus:ring-red-500'
-                            : 'border-gray-600 text-gray-500 cursor-not-allowed'
+                            : 'border-gray-600 text-gray-400 cursor-not-allowed'
                         }`}
                         title={canDeleteUser(user) ? "Delete user" : "Cannot delete the last admin user"}
                       >
@@ -538,7 +555,7 @@ export function AdminUserManagement() {
 
           {filteredUsers.length === 0 && (
             <div className="text-center py-12">
-              <Users className="h-12 w-12 text-gray-500 mx-auto mb-4" />
+              <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <p className="text-gray-400">No users found matching your criteria.</p>
             </div>
           )}
@@ -548,7 +565,7 @@ export function AdminUserManagement() {
       {/* Delete Confirmation Modal */}
       {deleteConfirmation && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50">
-          <div className="bg-gray-800 border border-gray-700 rounded-lg p-6 max-w-md w-full mx-4">
+          <div ref={deleteDialogRef} className="bg-gray-800 border border-gray-700 rounded-lg p-4 sm:p-6 max-w-md w-full mx-4 max-h-[calc(100dvh-2rem)] overflow-y-auto">
             <div className="flex items-center mb-4">
               <AlertTriangle className="h-6 w-6 text-red-400 mr-3" />
               <h3 className="text-lg font-semibold text-gray-100">Delete User</h3>
@@ -619,7 +636,7 @@ export function AdminUserManagement() {
       {/* Notification Modal */}
       {notification && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50">
-          <div className="bg-gray-800 border border-gray-700 rounded-lg p-6 max-w-md w-full mx-4">
+          <div ref={notificationRef} className="bg-gray-800 border border-gray-700 rounded-lg p-4 sm:p-6 max-w-md w-full mx-4 max-h-[calc(100dvh-2rem)] overflow-y-auto">
             <div className="flex items-center mb-4">
               {notification.type === 'success' ? (
                 <CheckCircle className="h-6 w-6 text-green-400 mr-3" />
@@ -661,7 +678,7 @@ export function AdminUserManagement() {
       {/* Create User Modal */}
       {showCreateUser && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50">
-          <div data-testid="admin-create-user-modal" className="bg-gray-800 border border-gray-700 rounded-lg p-6 max-w-md w-full mx-4">
+          <div ref={createDialogRef} role="dialog" aria-modal="true" aria-label="Create new user" data-testid="admin-create-user-modal" className="bg-gray-800 border border-gray-700 rounded-lg p-4 sm:p-6 max-w-md w-full mx-4 max-h-[calc(100dvh-2rem)] overflow-y-auto">
             <div className="flex items-center mb-4">
               <Plus className="h-6 w-6 text-green-400 mr-3" />
               <h3 className="text-lg font-semibold text-gray-100">Create New User</h3>
@@ -675,7 +692,7 @@ export function AdminUserManagement() {
                   value={newUser.email}
                   onChange={(e) => setNewUser(prev => ({ ...prev, email: e.target.value }))}
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  placeholder="user@example.com"
+                  aria-label="Email" placeholder="user@example.com"
                 />
               </div>
 
@@ -686,7 +703,7 @@ export function AdminUserManagement() {
                   value={newUser.username}
                   onChange={(e) => setNewUser(prev => ({ ...prev, username: e.target.value }))}
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  placeholder="username"
+                  aria-label="Username" placeholder="username"
                 />
               </div>
 
@@ -697,7 +714,7 @@ export function AdminUserManagement() {
                   value={newUser.name}
                   onChange={(e) => setNewUser(prev => ({ ...prev, name: e.target.value }))}
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  placeholder="Full Name"
+                  aria-label="Full name" placeholder="Full Name"
                 />
               </div>
 
@@ -708,7 +725,7 @@ export function AdminUserManagement() {
                   value={newUser.password}
                   onChange={(e) => setNewUser(prev => ({ ...prev, password: e.target.value }))}
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  placeholder="Initial password"
+                  aria-label="Initial password" placeholder="Initial password"
                 />
               </div>
 
