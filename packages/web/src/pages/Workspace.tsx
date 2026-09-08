@@ -1,3 +1,4 @@
+import { AgentConnection } from '../components/AgentConnection';
 import type { WorkItem } from '../types/graph';
 import { useState, useEffect } from 'react';
 import { Plus, Share2, Users, Table, Activity, Network, CreditCard, Columns, CalendarDays, GanttChartSquare, LayoutDashboard, Database, AlertTriangle, Map, X, Minimize2, Maximize2, Edit3, Trash2, FolderPlus, ChevronLeft, ChevronRight, Lock, Unlock } from 'lucide-react';
@@ -16,12 +17,12 @@ import ViewManager from '../components/ViewManager';
 import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
 import { GET_WORK_ITEMS, GET_EDGES } from '../lib/queries';
-import { APP_VERSION } from '../utils/version';
 import { useHealthStatus } from '../hooks/useHealthStatus';
 import { useViewMode } from '../contexts/ViewModeContext';
 import { parseLayoutMode, LAYOUT_MODE_STORAGE_KEY, type LayoutMode } from '../lib/layoutAlgorithms';
 
 export function Workspace() {
+  const [showAgentConnection, setShowAgentConnection] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showCreateGraphModal, setShowCreateGraphModal] = useState(false);
   const [showUpdateGraphModal, setShowUpdateGraphModal] = useState(false);
@@ -47,7 +48,7 @@ export function Workspace() {
     try { window.localStorage.setItem(LAYOUT_MODE_STORAGE_KEY, next); } catch { /* storage unavailable */ }
     (window as any).triggerLayoutMode?.(next);
   };
-  const { currentGraph, availableGraphs, getBreadcrumb, ascendTo } = useGraph();
+  const { currentGraph, availableGraphs, getBreadcrumb, ascendTo, canEditGraph } = useGraph();
   const breadcrumb = getBreadcrumb();
   const [inspectorNode, setInspectorNode] = useState<any>(null);
   const [quickEditRequest, setQuickEditRequest] = useState<WorkItem | null>(null);
@@ -95,22 +96,24 @@ export function Workspace() {
 
   return (
     <div className="h-full min-h-0 flex flex-col">
+      {showAgentConnection && currentGraph && <AgentConnection graphId={currentGraph.id} graphName={currentGraph.name} onClose={() => setShowAgentConnection(false)} />}
+      {currentGraph && currentGraph.createdBy === currentUser?.id && <button onClick={() => setShowAgentConnection(true)} className="md:hidden fixed left-4 bottom-[4.75rem] z-40 min-h-[44px] rounded-xl bg-violet-700 px-4 py-2 text-white shadow-lg">Work with your agent</button>}
       {/* Header with Graph Context — tablet/desktop only; phones use the Layout
           top bar (project selector) + the bottom nav, so this band is hidden there. */}
-      <div className="hidden md:block bg-gray-900/30 backdrop-blur-md border-b border-gray-700/30 px-3 py-2 sm:px-4 sm:py-2">
+      <div data-workspace-header className="workspace-toolbar hidden md:block border-b px-3 py-2 sm:px-4 sm:py-2">
         {/* Responsive Layout Container */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 sm:gap-4">
 
           {/* Left Section: Graph Selector */}
-          <div className="min-w-0 md:order-1 w-full md:w-auto md:max-w-xs md:w-60 md:shrink-0">
+          <div className="min-w-0 md:order-1 w-full md:w-auto md:max-w-xs md:w-72 md:shrink-0">
             <div className="flex items-center space-x-4 h-full">
               {/* Title & Version - Compact */}
-              <div className="hidden xl:flex flex-col justify-center">
+              <div className="sr-only">
                 <h1 className="text-sm font-medium text-gray-200 leading-tight">
-                  Graph Viewer
+                  GraphDone
                 </h1>
                 <div className="flex items-center space-x-2 text-xs text-gray-400 leading-tight">
-                  <span>v{APP_VERSION}</span>
+                  <span>Workspace</span>
                   {currentTeam && (
                     <>
                       <span>•</span>
@@ -137,14 +140,11 @@ export function Workspace() {
           {/* Center Section: View Mode Buttons — desktop/tablet only. Phones use the
               bottom tab bar (List / Graph / More) instead of this strip. */}
           <div className="hidden xl:flex flex-1 min-w-0 justify-start xl:justify-center md:order-2 overflow-x-auto no-scrollbar -mx-3 px-3 sm:mx-0 sm:px-0">
-            <div className="flex flex-nowrap bg-gray-700/50 backdrop-blur-sm rounded-lg p-1 sm:p-1.5 gap-0.5 border border-gray-600/50">
+            <div className="workspace-view-switcher" role="group" aria-label="Workspace views">
               <button
                 onClick={() => setViewMode('graph')}
-                className={`px-2 py-1.5 sm:px-2 sm:py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center gap-0.5 sm:gap-1.5 min-w-[2.75rem] flex-shrink-0 ${
-                  viewMode === 'graph' 
-                    ? 'bg-green-600 text-white shadow' 
-                    : 'text-gray-300 hover:text-white'
-                }`}
+                aria-pressed={viewMode === 'graph'}
+                className="workspace-view-tab"
                 title="Graph View"
               >
                 <Network className="h-5 w-5 sm:h-7 sm:w-7 lg:h-8 lg:w-8" strokeWidth={1.5} />
@@ -154,11 +154,8 @@ export function Workspace() {
               </button>
               <button
                 onClick={() => setViewMode('dashboard')}
-                className={`px-2 py-1.5 sm:px-2 sm:py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center gap-0.5 sm:gap-1.5 min-w-[2.75rem] flex-shrink-0 ${
-                  viewMode === 'dashboard' 
-                    ? 'bg-green-600 text-white shadow' 
-                    : 'text-gray-300 hover:text-white'
-                }`}
+                aria-pressed={viewMode === 'dashboard'}
+                className="workspace-view-tab"
                 title="Dashboard View"
               >
                 <LayoutDashboard className="h-5 w-5 sm:h-7 sm:w-7 lg:h-8 lg:w-8" strokeWidth={1.5} />
@@ -168,11 +165,8 @@ export function Workspace() {
               </button>
               <button
                 onClick={() => setViewMode('table')}
-                className={`px-2 py-1.5 sm:px-2 sm:py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center gap-0.5 sm:gap-1.5 min-w-[2.75rem] flex-shrink-0 ${
-                  viewMode === 'table' 
-                    ? 'bg-green-600 text-white shadow' 
-                    : 'text-gray-300 hover:text-white'
-                }`}
+                aria-pressed={viewMode === 'table'}
+                className="workspace-view-tab"
                 title="Table View"
               >
                 <Table className="h-5 w-5 sm:h-7 sm:w-7 lg:h-8 lg:w-8" strokeWidth={1.5} />
@@ -182,11 +176,8 @@ export function Workspace() {
               </button>
               <button
                 onClick={() => setViewMode('cards')}
-                className={`px-2 py-1.5 sm:px-2 sm:py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center gap-0.5 sm:gap-1.5 min-w-[2.75rem] flex-shrink-0 ${
-                  viewMode === 'cards' 
-                    ? 'bg-green-600 text-white shadow' 
-                    : 'text-gray-300 hover:text-white'
-                }`}
+                aria-pressed={viewMode === 'cards'}
+                className="workspace-view-tab"
                 title="Card View"
               >
                 <CreditCard className="h-5 w-5 sm:h-7 sm:w-7 lg:h-8 lg:w-8" strokeWidth={1.5} />
@@ -196,11 +187,8 @@ export function Workspace() {
               </button>
               <button
                 onClick={() => setViewMode('kanban')}
-                className={`px-2 py-1.5 sm:px-2 sm:py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center gap-0.5 sm:gap-1.5 min-w-[2.75rem] flex-shrink-0 ${
-                  viewMode === 'kanban' 
-                    ? 'bg-green-600 text-white shadow' 
-                    : 'text-gray-300 hover:text-white'
-                }`}
+                aria-pressed={viewMode === 'kanban'}
+                className="workspace-view-tab"
                 title="Kanban View"
               >
                 <Columns className="h-5 w-5 sm:h-7 sm:w-7 lg:h-8 lg:w-8" strokeWidth={1.5} />
@@ -210,11 +198,8 @@ export function Workspace() {
               </button>
               <button
                 onClick={() => setViewMode('gantt')}
-                className={`px-2 py-1.5 sm:px-2 sm:py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center gap-0.5 sm:gap-1.5 min-w-[2.75rem] flex-shrink-0 ${
-                  viewMode === 'gantt' 
-                    ? 'bg-green-600 text-white shadow' 
-                    : 'text-gray-300 hover:text-white'
-                }`}
+                aria-pressed={viewMode === 'gantt'}
+                className="workspace-view-tab"
                 title="Gantt Chart"
               >
                 <GanttChartSquare className="h-5 w-5 sm:h-7 sm:w-7 lg:h-8 lg:w-8" strokeWidth={1.5} />
@@ -224,11 +209,8 @@ export function Workspace() {
               </button>
               <button
                 onClick={() => setViewMode('calendar')}
-                className={`px-2 py-1.5 sm:px-2 sm:py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center gap-0.5 sm:gap-1.5 min-w-[2.75rem] flex-shrink-0 ${
-                  viewMode === 'calendar' 
-                    ? 'bg-green-600 text-white shadow' 
-                    : 'text-gray-300 hover:text-white'
-                }`}
+                aria-pressed={viewMode === 'calendar'}
+                className="workspace-view-tab"
                 title="Calendar View"
               >
                 <CalendarDays className="h-5 w-5 sm:h-7 sm:w-7 lg:h-8 lg:w-8" strokeWidth={1.5} />
@@ -238,11 +220,8 @@ export function Workspace() {
               </button>
               <button
                 onClick={() => setViewMode('activity')}
-                className={`px-2 py-1.5 sm:px-2 sm:py-2 text-sm rounded transition-colors whitespace-nowrap flex flex-col items-center gap-0.5 sm:gap-1.5 min-w-[2.75rem] flex-shrink-0 ${
-                  viewMode === 'activity' 
-                    ? 'bg-green-600 text-white shadow' 
-                    : 'text-gray-300 hover:text-white'
-                }`}
+                aria-pressed={viewMode === 'activity'}
+                className="workspace-view-tab"
                 title="Activity Feed"
               >
                 <Activity className="h-5 w-5 sm:h-7 sm:w-7 lg:h-8 lg:w-8" strokeWidth={1.5} />
@@ -257,14 +236,21 @@ export function Workspace() {
             {['graph', 'cards', 'dashboard', 'table', 'kanban', 'gantt', 'calendar', 'activity'].map(mode => <option key={mode} value={mode}>{({ graph: 'Graph', cards: 'Work list', dashboard: 'Overview', table: 'Table', kanban: 'Board', gantt: 'Timeline', calendar: 'Calendar', activity: 'Activity' } as Record<string, string>)[mode]}</option>)}
           </select>
 
+          {currentGraph && currentGraph.createdBy === currentUser?.id && <button onClick={() => setShowAgentConnection(true)} className="min-h-[44px] shrink-0 rounded-lg bg-violet-700 px-3 text-white">Your agent</button>}
+          {currentGraph && canEditGraph(currentGraph.id) && (
+            <button onClick={() => setShowCreateModal(true)} aria-label="New work item" title="New work item" className="workspace-create shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg">
+              <Plus className="h-5 w-5" />
+            </button>
+          )}
+
           {/* Right Section: Status and Actions — hidden on mobile (the hamburger
               handles nav there); these chips otherwise eat the small-screen width. */}
           <div className="hidden xl:flex flex-col items-stretch gap-1.5 md:order-3 md:shrink-0">
             {/* Data-store status (provider-agnostic — keyed off the GraphQL API, which is
                 the actual data layer; the backing store may be D1, Neo4j, etc.) */}
-            <div className={`flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs transition-all cursor-help ${
+            <div className={`workspace-connection flex items-center justify-center gap-2 px-2 py-2 rounded-lg text-xs cursor-help ${
               health?.services?.graphql?.status === 'healthy'
-                ? 'bg-green-600/20 text-green-300 border border-green-500/30'
+                ? 'text-emerald-200'
                 : 'bg-red-600/20 text-red-300 border border-red-500/30'
             }`} title={
               health?.services?.graphql?.status === 'healthy'
@@ -495,9 +481,8 @@ export function Workspace() {
         )}
       </div>
 
-      {/* Create FAB (phones) — primary action; hidden for read-only guests and in
-          graph view (where the on-canvas "+" grow flow creates nodes). */}
-      {currentGraph && currentUser?.role !== 'GUEST' && viewMode !== 'graph' && (
+      {/* Keep creation reachable in every view, including an empty graph. */}
+      {currentGraph && canEditGraph(currentGraph.id) && (
         <button
           onClick={() => setShowCreateModal(true)}
           className="md:hidden fixed right-4 bottom-[4.75rem] z-40 w-14 h-14 rounded-full bg-gradient-to-br from-green-600 to-blue-600 text-white shadow-xl flex items-center justify-center active:scale-95 transition-transform"

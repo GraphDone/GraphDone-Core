@@ -89,16 +89,23 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
       // Check if click is outside both the button and the portal dropdown
       if (buttonRef.current && !buttonRef.current.contains(target)) {
         // For portal, we need to check if the click is inside any dropdown element
-        const dropdownElement = document.querySelector('[style*="z-index: 999999999"]');
+        const dropdownElement = document.querySelector('[data-testid="graph-selector-dropdown"]');
         if (!dropdownElement || !dropdownElement.contains(target)) {
           setIsOpen(false);
         }
       }
     }
 
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { setIsOpen(false); buttonRef.current?.focus({ preventScroll: true }); }
+    };
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleEscape);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+        document.removeEventListener('keydown', handleEscape);
+      };
     }
     return undefined;
   }, [isOpen]);
@@ -234,7 +241,7 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
         ref={buttonRef}
         onClick={toggleDropdown}
         data-testid={testId}
-        className="flex items-center space-x-3 w-full p-3 text-left hover:bg-gray-700/80 rounded-xl transition-all duration-200 hover:scale-[1.02] border border-gray-600/30 hover:border-gray-500/50 shadow-lg hover:shadow-xl backdrop-blur-sm bg-gray-800/50"
+        className="project-switcher flex items-center gap-3 w-full p-3 text-left rounded-lg transition-colors border"
       >
         <div className="flex-shrink-0">
           <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${getGraphTypeColor(currentGraph.type)}`}>
@@ -243,22 +250,22 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
         </div>
         
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium text-green-300 truncate">
+          <div title={currentGraph.name} data-testid="graph-selector-name" className="text-sm font-medium text-stone-100 truncate">
             {currentGraph.name}
           </div>
           <div className="flex items-center gap-2 text-xs text-gray-400">
-            <span>{actualNodeCount} node{actualNodeCount !== 1 ? 's' : ''}, {actualEdgeCount} connection{actualEdgeCount !== 1 ? 's' : ''}</span>
+            <span className="block truncate">{actualNodeCount} node{actualNodeCount !== 1 ? 's' : ''}, {actualEdgeCount} connection{actualEdgeCount !== 1 ? 's' : ''}</span>
           </div>
         </div>
         
-        <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`h-4 w-4 shrink-0 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
       {/* Dropdown menu with folder structure - Portal based for proper z-index */}
       {isOpen && buttonPosition && createPortal(
         <div
           data-testid="graph-selector-dropdown"
-          className="bg-gradient-to-br from-gray-800/98 to-gray-900/98 backdrop-blur-xl border-2 border-gray-600/50 rounded-2xl shadow-2xl overflow-hidden"
+          className="project-menu bg-gray-800 border border-gray-600/50 rounded-xl shadow-2xl overflow-hidden"
           style={{
             position: 'fixed',
             top: buttonPosition.top + 8,
@@ -271,8 +278,8 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
           }}
         >
           {/* Header with Create Button */}
-          <div className="flex items-center justify-between p-4 border-b border-gray-600/60 bg-gradient-to-r from-emerald-500/10 to-green-500/10 backdrop-blur-sm">
-            <span className="text-base font-semibold bg-gradient-to-r from-emerald-400 to-green-300 bg-clip-text text-transparent">Graph Controller</span>
+          <div className="flex items-center justify-between px-4 py-2 border-b border-gray-600/60">
+            <span className="text-base font-semibold text-stone-100">Projects</span>
             <div className="flex items-center gap-2">
               {onCreateGraph && (
                 <button
@@ -281,7 +288,7 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
                     onCreateGraph();
                     setIsOpen(false);
                   }}
-                  className="p-1.5 text-gray-400 hover:text-green-300 hover:bg-gray-700/50 rounded transition-all duration-200"
+                  className="min-h-[44px] min-w-[44px] flex items-center justify-center text-gray-400 hover:text-green-300 hover:bg-gray-700/50 rounded transition-all duration-200"
                   title="Create New Graph"
                 >
                   <FolderPlus className="h-5 w-5" />
@@ -289,7 +296,7 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
               )}
               <button
                 onClick={() => setIsOpen(false)}
-                className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-gray-700/50 rounded transition-all duration-200"
+                className="min-h-[44px] min-w-[44px] flex items-center justify-center text-gray-400 hover:text-red-400 hover:bg-gray-700/50 rounded transition-all duration-200"
                 title="Close"
               >
                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

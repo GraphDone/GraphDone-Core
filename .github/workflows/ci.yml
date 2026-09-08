@@ -183,6 +183,11 @@ jobs:
         env:
           TEST_URL: http://localhost:3127
           CI: true
+      - name: New-user quality gate (headed under virtual display)
+        run: xvfb-run --auto-servernum npm run qc:new-user
+        env:
+          TEST_URL: http://localhost:3127
+          CI: true
       - name: Mobile UI audit (layout / contrast / dialogs across every screen)
         run: npm run test:mobile
         env:

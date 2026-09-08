@@ -138,3 +138,10 @@ The [human-first AI work contract](design/human-ai-workspace.md) defines the rem
 | UX-1a | As a human, I want the work that matters first and direct access to editing. | Overview attention/current-work sections open items; Board hides empty lanes by default; graph editing takes one tap/click; Admin reference collapses and forms fit short screens. Headed responsive and Admin form journeys. | 🧪 |
 
 | UX-SCROLL-1 | As a user, I want screens without unnecessary scrollbar clutter. | Guest dialog fits 320px portrait without scrolling, including verification success; narrow inputs shrink correctly; actions stay visible on short screens; scroll lock and viewport anchoring; Calendar uses its parent scroll region. Scrollbar chrome stays quiet, with hover/focus and forced-color access preserved. `guest-dialog-layout.spec.ts`. | 🧪 |
+
+## New-user release gate
+
+| ID | Story | Acceptance criteria | Tests | Status |
+| --- | --- | --- | --- | --- |
+| QC-NEW-1 | As a first-time user, I can create useful work, record progress and return to it on my device. | First task can be created through visible UI in every view; status/notes/dates persist; the same data appears across views. | `quality/persona-lifecycle.spec.ts`, `quality/new-user-modes.spec.ts`, `docs/quality/SCENARIOS.md` | 🧪 |
+| QC-TEAM-1 | As a team member, I can hand off work without losing context or exposing private work. | Distinct editor/reviewer/viewer/outsider sessions, concurrency and membership changes pass the standard scenarios. | `docs/quality/SCENARIOS.md` COLLAB-* / LARGE-*; not yet full end-to-end coverage | 🔨 |

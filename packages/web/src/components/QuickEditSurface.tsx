@@ -38,7 +38,9 @@ export function QuickEditSurface({
         width < 640 ||
         (height < 500 && window.matchMedia('(pointer: coarse)').matches);
       const editorWidth = Math.min(sheet ? 480 : 352, width - 16);
-      const maxHeight = Math.max(80, height - 16);
+      const headerBottom = Math.max(vy, ...Array.from(document.querySelectorAll('[data-workspace-header]')).filter(el => el.getClientRects().length).map(el => el.getBoundingClientRect().bottom));
+      const topBoundary = height - (headerBottom - vy) >= 420 ? headerBottom : vy;
+      const maxHeight = Math.max(80, height - (topBoundary - vy) - 16);
       const editorHeight = Math.min(
         ref.current?.scrollHeight || maxHeight,
         maxHeight
@@ -52,7 +54,7 @@ export function QuickEditSurface({
       const top = sheet
         ? vy + height - editorHeight - 8
         : Math.max(
-            vy + 8,
+            topBoundary + 8,
             Math.min(y - editorHeight / 2, vy + height - editorHeight - 8)
           );
       setBounds(previous => {
@@ -96,6 +98,7 @@ export function QuickEditSurface({
           width: bounds.width,
           maxHeight: bounds.maxHeight,
         }}
+        onClick={event => event.stopPropagation()}
         onKeyDown={event => {
           if (event.key === 'Escape' && !event.defaultPrevented) {
             event.stopPropagation();

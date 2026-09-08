@@ -48,6 +48,7 @@ import { nodeLifeClasses, nodeGlowFilter, isActiveStatus, isCompletedStatus, edg
 import { mergeSimulationNodes, mergeSimulationEdges } from '../lib/graphDataMerge';
 import { edgeLabelPlacement, clearSegment, slideTFromPointer, chooseLabelT } from '../lib/edgeLabelLayout';
 import { PerfMeter, DriftMeter } from '../lib/perfMeter';
+import { separateCards } from '../lib/separateCards';
 import { DEFAULT_PHYSICS, collisionRadius, linkDistance, linkMaxDistance, linkStrength } from '../lib/physicsConfig';
 import { computeNodeLayerY, isHierarchicalLayout, parseLayoutMode, LAYOUT_MODE_STORAGE_KEY, type LayoutMode } from '../lib/layoutAlgorithms';
 import { edgeBorderEndpoints, minEdgeLength, clampToMinNeighbors } from '../lib/edgeGeometry';
@@ -120,6 +121,22 @@ const legibilityTransform = (cy: number, basePx: number, k: number) => {
   const s = legibilityScale(basePx, k);
   return `translate(0,${cy}) scale(${s}) translate(0,${-cy})`;
 };
+
+// The legibility boost must never let text escape its card. The full title
+// remains available in the editor; at overview zoom the card is the boundary.
+function fittedTitleTransform(element: SVGGElement, k: number): string {
+  const cy = Number(element.getAttribute('data-cy')) || 0;
+  const card = element.parentElement?.querySelector('.node-bg');
+  const box = element.getBBox();
+  const width = Number(card?.getAttribute('width')) || 170;
+  const height = Number(card?.getAttribute('height')) || 110;
+  const top = -height / 2 + 34;
+  const bottom = height / 2 - 32;
+  const availableHeight = Math.max(1, 2 * Math.min(cy - top, bottom - cy));
+  const boost = Math.min(legibilityScale(TITLE_BASE_PX, k),
+    (width - 16) / Math.max(1, box.width), availableHeight / Math.max(1, box.height));
+  return `translate(0,${cy}) scale(${boost}) translate(0,${-cy})`;
+}
 
 // Hex color → normalized 0..1 RGB for SVG feColorMatrix glow filters.
 const hexToRgb = (hex: string) => {
@@ -778,10 +795,14 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   useEffect(() => {
     const handler = () => persistAllPositions();
     window.addEventListener('pagehide', handler);
-    document.addEventListener('visibilitychange', () => {
+    const onVisibilityChange = () => {
       if (document.visibilityState === 'hidden') persistAllPositions();
-    });
-    return () => window.removeEventListener('pagehide', handler);
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      window.removeEventListener('pagehide', handler);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
   }, [persistAllPositions]);
 
   // Function to get SVG path for priority icons (using correct Lucide icon paths)
@@ -981,7 +1002,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       // Clicks inside the docked inspector (a sibling tree) must not deselect
       // the node — otherwise its own Card/Contents/Diagram controls close it.
       const target = event.target as Element | null;
-      if (target && target.closest('[data-testid="node-inspector"]')) {
+      if (target && target.closest('[data-testid="node-inspector"], [role="dialog"]')) {
         return;
       }
       setNodeMenu(prev => ({ ...prev, visible: false }));
@@ -1127,7 +1148,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       (g.selectAll('.node-title-group') as any)
         .attr('transform', function(this: any) {
           const cy = +(this.getAttribute('data-cy')) || 0;
-          return legibilityTransform(cy, TITLE_BASE_PX, scale);
+          return fittedTitleTransform(this as SVGGElement, scale);
         });
       (g.selectAll('.node-description-text') as any)
         .style('visibility', 'visible')
@@ -1326,9 +1347,17 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     return hierarchyLinks;
   };
 
+  // A graph owns one simulation. Detached simulations otherwise keep mutating
+  // shared node objects after a rebuild and can fight the visible simulation.
+  const stopActiveSimulation = useCallback(() => {
+    simulationRef.current?.on('tick', null).on('end.persist', null).alphaTarget(0).stop();
+    simulationRef.current = null;
+  }, []);
+
   // Initialize empty visualization canvas
   const initializeEmptyVisualization = useCallback(() => {
     if (!svgRef.current || !containerRef.current) return;
+    stopActiveSimulation();
 
     const container = containerRef.current;
     const svg = d3.select(svgRef.current);
@@ -1636,7 +1665,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     if (!layoutReflowingRef.current) {
       (nodeMerge.nodes as any[]).forEach((node: any) => {
         const placed = !(((node.positionX ?? 0) === 0) && ((node.positionY ?? 0) === 0));
-        if (placed) {
+        if (placed && !node._dragging) {
           node.fx = node.positionX;
           node.fy = node.positionY;
           node.userPinned = true;
@@ -1717,6 +1746,29 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           .style('pointer-events', 'none');
       });
 
+      titleGroup.attr('transform', function() { return fittedTitleTransform(this as SVGGElement, liveK); });
+
+      // Saved state must update on the canvas without rebuilding the graph.
+      const status = getStatusConfig(updatedNode.status as WorkItemStatus);
+      const completion = getStatusCompletionPercentage(updatedNode.status as WorkItemStatus);
+      nodeGroup.select('.status-percentage-text').text(status.label).style('fill', status.hexColor);
+      nodeGroup.select('.status-progress-fill').attr('width', 40 * completion / 100).attr('fill', status.hexColor);
+      nodeGroup.select('.status-icon-svg path').attr('d', getStatusIconSvgPath(updatedNode.status)).attr('stroke', status.hexColor);
+      const priority = updatedNode.priority || 0;
+      const priorityColor = priority >= .8 ? '#ef4444' : priority >= .6 ? '#f97316' : priority >= .4 ? '#eab308' : priority >= .2 ? '#3b82f6' : '#6b7280';
+      nodeGroup.select('.priority-percentage-text').text(`${Math.round(priority * 100)}%`).style('fill', priorityColor);
+      nodeGroup.select('.priority-progress-fill').attr('width', 40 * priority).attr('fill', priorityColor);
+      nodeGroup.select('.priority-icon-svg path').attr('d', getPriorityIconSvgPath(priority)).attr('stroke', priorityColor);
+      const completed = isCompletedStatus(updatedNode.status);
+      nodeGroup.select('.node-bg').attr('class', `node-bg ${nodeLifeClasses(updatedNode.status)}`)
+        .attr('fill', completed ? '#374151' : '#1f2937');
+      nodeGroup.selectAll('.completion-indicator').data(completed ? [updatedNode] : []).join('text')
+        .attr('class', 'completion-indicator').attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
+        .attr('x', 0)
+          .attr('y', (d: any) => getNodeDimensions(d).height / 2 - 13)
+          .attr('font-size', '18').attr('font-weight', '900').attr('fill', '#10b981').attr('stroke', '#10b981')
+        .attr('stroke-width', '1').attr('pointer-events', 'none').text('✓');
+
       // Update node type badge text
       nodeGroup.select('.node-type-text')
         .text(() => {
@@ -1768,6 +1820,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         }
       });
     }
+
+    stopActiveSimulation();
 
     const container = containerRef.current;
     const svg = d3.select(svgRef.current);
@@ -1963,6 +2017,17 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         // non-overlapping start.
         if (!node.x) node.x = (i % spreadCols) * spreadSpacing - spreadHalf + ((i * 13) % 23) - 11;
         if (!node.y) node.y = Math.floor(i / spreadCols) * spreadSpacing - spreadHalf + ((i * 7) % 19) - 9;
+      }
+    });
+
+    // Imported or previously saved coordinates can already intersect. Pins
+    // prevent any collision force from fixing that. Repair once before paint,
+    // then persist the repaired snapshot through the normal settle queue.
+    const repairedCards = separateCards(nodes, getNodeDimensions);
+    nodes.forEach((node: any) => {
+      if (repairedCards.has(node.id) && node.fx != null) {
+        node.fx = node.x;
+        node.fy = node.y;
       }
     });
 
@@ -2259,6 +2324,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .enter()
       .append('g')
       .attr('class', (d: WorkItem) => `node node-type-${d.type.toLowerCase()}`)
+      // Place replacement nodes before their first paint, not on a later tick.
+      .attr('transform', (d: any) => `translate(${d.x ?? d.positionX ?? 0},${d.y ?? d.positionY ?? 0})`)
       .style('cursor', 'pointer')
       .call(d3.drag<any, any>()
         // Locked (phone) → reject the drag so the gesture pans the canvas instead.
@@ -2272,6 +2339,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           }
           
           // Store initial position and connected nodes for cluster behavior
+          d._dragging = true;
           d._dragStart = { x: d.x, y: d.y };
           d._connectedNodes = validatedEdges
             .filter(edge => edge.source.id === d.id || edge.target.id === d.id)
@@ -2280,7 +2348,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
               return {
                 node: connectedNode,
                 edge, // keep the edge so the drag clamp can read its _minLen
-                wasFixed: connectedNode.fx !== null || connectedNode.fy !== null
+                wasFixed: connectedNode.fx != null || connectedNode.fy != null
               };
             });
           
@@ -2370,8 +2438,16 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
             return;
           }
           
-          // Sticky drag behavior - node stays where user put it
-          if (!event.active) simulation.alphaTarget(0.1).restart();
+          // Keep the dropped snapshot authoritative during polls and rebuilds.
+          d._dragging = false;
+          d.positionX = d.fx;
+          d.positionY = d.fy;
+          if (!event.active) {
+            const needsLayout = simulation.nodes().some((n: any) => n.fx == null || n.fy == null);
+            // One last tick paints the final pointer position; a fully pinned
+            // graph needs no continuing physics or delayed reheating.
+            simulation.alphaTarget(0).alpha(needsLayout ? DEFAULT_PHYSICS.reheat.drag : 0).restart();
+          }
           
           // Keep the node fixed at the dropped position
           // Don't release fx/fy - let the node stay where the user put it
@@ -2382,10 +2458,6 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           positionSaveQueueRef.current.queue(d.id, d.fx, d.fy);
           positionSaveQueueRef.current.flush();
           
-          // Let the simulation cool to a full stop after the neighbors settle
-          setTimeout(() => {
-            simulation.alphaTarget(0);
-          }, 1000);
           mousedownNodeRef.current = null;
         }));
 
@@ -2979,6 +3051,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           })
           .style('pointer-events', 'none');
       });
+      titleGroup.attr('transform', function() { return fittedTitleTransform(this as SVGGElement, liveK); });
 
     });
 
@@ -3096,7 +3169,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         .attr('y', barY - 4)
         .attr('text-anchor', 'middle')
         .attr('dominant-baseline', 'middle')
-        .text(`${statusPercentage}%`)
+        .text(statusConfig.label)
         .style('font-size', '9px')
         .style('font-weight', '500')
         .style('fill', statusColor)
@@ -3208,7 +3281,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           .attr('class', 'completion-indicator')
           .attr('text-anchor', 'middle')
           .attr('dominant-baseline', 'central')
-          .attr('font-size', '96')
+          .attr('x', 0)
+          .attr('y', (d: any) => getNodeDimensions(d).height / 2 - 13)
+          .attr('font-size', '18')
           .attr('font-weight', '900')
           .attr('fill', '#10b981')
           .attr('stroke', '#10b981')
@@ -3252,7 +3327,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .enter()
       .append('g')
       .attr('class', 'edge-label-group')
-      .style('pointer-events', 'all')
+      .style('opacity', (d: any) => labelVisibility(liveScale, d._pTotal || 1))
+      .style('pointer-events', (d: any) => labelVisibility(liveScale, d._pTotal || 1) > 0 ? 'all' : 'none')
       .style('cursor', 'pointer')
       .on('click', function(event: MouseEvent, d: WorkItemEdge) {
         event.stopPropagation();
@@ -3332,7 +3408,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .attr('ry', 8)
       .style('fill', (d: WorkItemEdge) => {
         const config = getRelationshipConfig(d.type as RelationshipType);
-        return config.hexColor;
+        return '#29332f';
       })
       .style('opacity', 1)
       .style('stroke', (d: WorkItemEdge) => {
@@ -3915,6 +3991,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     };
 
     simulation.on('tick', () => {
+      if (simulationRef.current !== simulation) return;
       const tickStart = performance.now();
       cullCounter++;
       if (cullEnabled && cullCounter % 5 === 0) applyViewportCull();
@@ -4065,12 +4142,15 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         g.selectAll('.node-title-group' as any)
           .attr('transform', function(this: any) {
             const cy = +(this.getAttribute('data-cy')) || 0;
-            return legibilityTransform(cy, TITLE_BASE_PX, scale);
+            return fittedTitleTransform(this as SVGGElement, scale);
           });
       }
       g.selectAll('.node-description-text' as any)
         .style('opacity', getSmoothedOpacity(LOD_THRESHOLDS.CLOSE));
       // Edge labels + arrows follow the edge LOD module (zoom-aware, crowd-aware).
+      g.selectAll('.edge-label-group' as any)
+        .style('opacity', (d: any) => labelVisibility(scale, d?._pTotal || 1))
+        .style('pointer-events', (d: any) => labelVisibility(scale, d?._pTotal || 1) > 0 ? 'all' : 'none');
       g.selectAll('.edge-label' as any)
         .style('opacity', (d: any) => labelVisibility(scale, d?._pTotal || 1));
       g.selectAll('.edge-label-icon' as any)
@@ -4101,13 +4181,14 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     }
     simulation
       .alpha(hasUnpinnedNodes ? DEFAULT_PHYSICS.alpha.loadEnergy : 0)
-      .alphaDecay(0.015)
+      .alphaDecay(DEFAULT_PHYSICS.alpha.decay)
       .restart();
 
     // When the layout settles: record settle time, persist the arrangement so
     // it's durable across reloads, run a final edge-label de-overlap pass, and
     // center the camera. After this the simulation is idle (one-shot physics).
     simulation.on('end.persist', () => {
+      if (simulationRef.current !== simulation) return;
       if (layoutStartRef.current != null && lastSettleMsRef.current == null) {
         lastSettleMsRef.current = Math.round(performance.now() - layoutStartRef.current);
       }
@@ -4117,9 +4198,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     
     // Add method to restart collision detection
     (simulation as any).restartCollisions = () => {
+      if (simulationRef.current !== simulation) return;
       simulation.alphaTarget(0.3).restart();
       setTimeout(() => {
-        simulation.alphaTarget(0);
+        if (simulationRef.current === simulation) simulation.alphaTarget(0);
       }, 2000);
     };
 
@@ -4127,7 +4209,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // Fully-pinned graphs don't tick, so without this their labels would stay at
     // the default midpoint and could overlap → clean starting positions need it.
     runLabelAvoidanceRef.current = () => updateEdgePositions(true);
-    setTimeout(() => updateEdgePositions(true), 500);
+    updateEdgePositions(true);
+    setTimeout(() => { if (simulationRef.current === simulation) updateEdgePositions(true); }, 500);
   }, [nodes, validatedEdges, handleNodeClick, initializeEmptyVisualization]); // Include handleNodeClick to get fresh connection state
 
   // One-shot layout instrumentation + the forced label-avoidance hook.
@@ -4137,6 +4220,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
   // Store simulation reference for resize handling
   const simulationRef = useRef<d3.Simulation<any, any> | null>(null);
+  useEffect(() => () => stopActiveSimulation(), [stopActiveSimulation]);
   const zoomBehaviorRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
   // True only while "Reset layout" is re-flowing — suspends snapshot pinning
   const layoutReflowingRef = useRef(false);
@@ -4494,29 +4578,31 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   // a graph change. We wait briefly for the one-shot layout to settle, then fit.
   const hasNodes = nodes.length > 0;
 
-  // Re-frame the graph when the container changes size SIGNIFICANTLY (window
+  // Re-frame the graph when the container changes size (window
   // resize, rotate, sidebar/panel toggle) so a camera framed for the old size
   // isn't left mis-centred. A ResizeObserver on the container is more reliable
   // than the window 'resize' event (which didn't fire in headless tests) and
-  // also catches layout-driven size changes. Debounced + gated on a >20% size
-  // delta so it doesn't fight a user nudging the window edge or a normal pan.
+  // also catches layout-driven size changes. Coalesce notifications per frame;
+  // a percentage threshold loses gradual resizes as its baseline advances.
+  // Resize only changes the camera, never the nodes' saved positions.
   useEffect(() => {
     const el = containerRef.current;
     if (!el || !hasNodes) return undefined;
     let last = { w: el.clientWidth || 0, h: el.clientHeight || 0 };
-    let t: ReturnType<typeof setTimeout> | null = null;
+    let frame = 0;
     const ro = new ResizeObserver(() => {
-      if (t) clearTimeout(t);
-      t = setTimeout(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
         const w = el.clientWidth || 0, h = el.clientHeight || 0;
-        if (!w || !h || !last.w || !last.h) { last = { w, h }; return; }
-        const changed = Math.abs(w - last.w) / last.w > 0.2 || Math.abs(h - last.h) / last.h > 0.2;
+        if (!w || !h) return;
+        const changed = w !== last.w || h !== last.h;
         last = { w, h };
-        if (changed) fitViewRef.current();
-      }, 250);
+        // Do not start competing animated zooms while the window edge moves.
+        if (changed) fitViewRef.current(false);
+      });
     });
     ro.observe(el);
-    return () => { if (t) clearTimeout(t); ro.disconnect(); };
+    return () => { cancelAnimationFrame(frame); ro.disconnect(); };
   }, [hasNodes]);
 
   const isDenseGraph = nodes.length > DENSE_GRAPH_NODE_THRESHOLD;
@@ -4831,11 +4917,11 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       // Update SVG dimensions
       svg.attr('width', newWidth).attr('height', newHeight);
       
-      // Update simulation center force with new dimensions
-      simulationRef.current
-        .force('center', d3.forceCenter(newCenterX, newCenterY))
-        .alpha(0.3) // Restart simulation with some energy
-        .restart();
+      // Resizing the viewport must not disturb the user's placed nodes.
+      const sim = simulationRef.current;
+      if (sim.nodes().every((n: any) => n.fx != null && n.fy != null)) return;
+      sim.force('center', d3.forceCenter(newCenterX, newCenterY).strength(DEFAULT_PHYSICS.centering.center))
+        .alphaTarget(0).alpha(DEFAULT_PHYSICS.reheat.resize).restart();
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
@@ -4847,7 +4933,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     loading, // Re-init when loading completes
     edgesLoading, // Re-init when edges loading completes
     // Track node property changes for selective updates (only titles, descriptions, types)
-    nodes.map(n => `${n.id}:${n.title}:${n.description}:${n.type}:${n.status}`).join(','),
+    nodes.map(n => `${n.id}:${n.title}:${n.description}:${n.type}:${n.status}:${n.priority}`).join(','),
     // Track edge type/direction changes so a relationship edit or flip rebuilds
     validatedEdges.map((e: any) => {
       const sId = typeof e.source === 'object' ? e.source?.id : e.source;
@@ -5282,7 +5368,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         };
         return (
           <QuickEditSurface x={left + (containerRef.current?.getBoundingClientRect().left ?? 0)} y={top + (containerRef.current?.getBoundingClientRect().top ?? 0)} onClose={() => setQuickEditNode(null)}>
-            <NodeQuickEdit key={quickEditNode.id} node={dataNode} onCommit={onCommit} onClose={() => setQuickEditNode(null)} />
+            <NodeQuickEdit key={quickEditNode.id} node={dataNode} onCommit={onCommit} onClose={() => setQuickEditNode(null)} onOpenDetails={() => { setQuickEditNode(null); handleEditNode(dataNode); }} />
           </QuickEditSurface>
         );
       })()}

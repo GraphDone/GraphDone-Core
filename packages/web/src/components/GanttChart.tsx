@@ -84,7 +84,7 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
       })
       .map((node, index) => {
         const startDate = new Date(node.createdAt);
-        const endDate = node.dueDate ? new Date(node.dueDate) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+        const endDate = node.dueDate ? new Date(node.dueDate) : startDate;
         const duration = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
         const progress = getStatusCompletionPercentage(node.status as WorkItemStatus);
         const priority = node.priority || 0;
@@ -482,8 +482,8 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
                     <span>{item.progress}%</span>
                   </div>
                   <div className="flex items-center justify-between text-xs text-gray-400">
-                    <span>{item.startDate.toLocaleDateString()} – {item.endDate.toLocaleDateString()}</span>
-                    <span>{item.duration}d</span>
+                    <span>{item.dueDate ? `Created ${item.startDate.toLocaleDateString()} · Due ${item.endDate.toLocaleDateString()}` : 'Unscheduled'}</span>
+                    {item.dueDate && <span>{item.duration}d</span>}
                   </div>
                 </div>
               );
@@ -545,7 +545,7 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
                       {timelineData.map(task =>
                         task.dependencies?.map((dep: any) => {
                           const depTask = timelineData.find(t => t.id === dep.id);
-                          if (!depTask) return null;
+                          if (!depTask?.dueDate || !task.dueDate) return null;
 
                           const fromY = depTask.row * 60 + 30;
                           const toY = task.row * 60 + 30;
@@ -611,7 +611,7 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
                               <div className="flex items-center space-x-2 text-xs text-gray-400">
                                 <span>{item.status.replace('_', ' ')}</span>
                                 <span>•</span>
-                                <span>{item.duration}d</span>
+                                {item.dueDate && <span>{item.duration}d</span>}
                                 {item.assignedTo && (
                                   <>
                                     <span>•</span>
@@ -626,8 +626,9 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
                         {/* Timeline Bar */}
                         <div className="flex-1 relative py-3 px-2">
                           <div className="relative h-9">
-                            {/* Main Task Bar */}
-                            <div
+                            {/* No invented schedule for work without a due date. */}
+                            {!item.dueDate && <span className="text-xs text-gray-400">Unscheduled</span>}
+                            {item.dueDate && <div
                               className={`absolute h-6 bg-gray-600/40 backdrop-blur-sm rounded-lg shadow-sm border transition-all duration-200 cursor-pointer ${
                                 isSelected ? 'border-green-500 shadow-lg shadow-green-500/25' : 'border-gray-500/50'
                               }`}
@@ -636,7 +637,7 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
                                 width: `${Math.max(barWidth, 2)}%`,
                                 top: '6px'
                               }}
-                              title={`${item.title}\nStart: ${item.startDate.toLocaleDateString()}\nEnd: ${item.endDate.toLocaleDateString()}\nDuration: ${item.duration} days\nProgress: ${item.progress}%`}
+                              title={`${item.title}\nCreated: ${item.startDate.toLocaleDateString()}\nDue: ${item.endDate.toLocaleDateString()}\nDuration: ${item.duration} days\nProgress: ${item.progress}%`}
                             >
                               {/* Progress Fill */}
                               <div
@@ -655,10 +656,10 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
                               <div className="absolute -top-5 right-0 text-xs text-gray-400">
                                 {item.progress}%
                               </div>
-                            </div>
+                            </div>}
 
                             {/* Milestone Indicator */}
-                            {item.type === 'MILESTONE' && (
+                            {item.dueDate && item.type === 'MILESTONE' && (
                               <div
                                 className={`absolute w-3 h-3 ${WORK_ITEM_TYPES.MILESTONE.color.replace('text-', 'bg-')} rotate-45 border ${WORK_ITEM_TYPES.MILESTONE.borderColor}`}
                                 style={{
@@ -671,7 +672,7 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
                             )}
 
                             {/* Overdue Indicator */}
-                            {new Date() > item.endDate && item.status !== 'COMPLETED' && (
+                            {item.dueDate && new Date() > item.endDate && item.status !== 'COMPLETED' && (
                               <div className={`absolute -top-1 right-0 w-2 h-2 ${WORK_ITEM_STATUSES.BLOCKED.color.replace('text-', 'bg-')} rounded-full animate-pulse`} title="Overdue" />
                             )}
                           </div>
@@ -702,7 +703,7 @@ const GanttChart: React.FC<GanttChartProps> = ({ filteredNodes }) => {
             </div>
             <div className="text-gray-300">
               <span className="font-medium">
-                {timelineData.filter(t => new Date() > t.endDate && t.status !== 'COMPLETED').length}
+                {timelineData.filter(t => t.dueDate && new Date() > t.endDate && t.status !== 'COMPLETED').length}
               </span> overdue
             </div>
             <div className="text-gray-300">
