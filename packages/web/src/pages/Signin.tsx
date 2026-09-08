@@ -103,6 +103,7 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
   const [showPassword, setShowPassword] = useState(false);
   const [useMagicLink, setUseMagicLink] = useState(initialMagicLink);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
+  const [existingCode, setExistingCode] = useState(false);
   const [magicLinkLoading, setMagicLinkLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   // Default ON — keep users signed in on this device so they don't have to log
@@ -431,6 +432,7 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
         if (data.userExists === false) {
           setErrors({ magicLinkEmail: 'This email is not registered in our system.' });
         } else {
+          setExistingCode(false);
           setMagicLinkSent(true);
           setResendCooldown(60);
         }
@@ -641,9 +643,9 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
                 <div className="flex items-center justify-center mb-3">
                   <Mail className="h-8 w-8 text-teal-400" />
                 </div>
-                <h3 className="text-lg font-semibold text-teal-300 text-center mb-2">Check Your Email!</h3>
+                <h3 className="text-lg font-semibold text-teal-300 text-center mb-2">{existingCode ? 'Enter your sign-in code' : 'Check Your Email!'}</h3>
                 <p className="text-sm text-teal-200/80 text-center mb-4">
-                  We've sent a magic link to <strong>{formData.magicLinkEmail}</strong>
+                  {existingCode ? 'Use the code sent to ' : "We've sent a magic link to "}<strong>{formData.magicLinkEmail}</strong>
                 </p>
                 <div className="space-y-2">
                   <p className="text-xs text-teal-300/60 text-center">
@@ -834,6 +836,10 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
                   )}
                 </button>
 
+                <button type="button" className="w-full min-h-[44px] text-teal-200 hover:text-teal-100 underline underline-offset-4" onClick={() => {
+                  if (!isValidEmail(formData.magicLinkEmail)) { setErrors({ submit: 'Enter your email address first, then use your existing code.' }); return; }
+                  setErrors({}); setExistingCode(true); setMagicLinkSent(true);
+                }}>Already have a code?</button>
                 <div className="p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
                   <p className="text-xs text-blue-300 text-center">
                     We'll email you a secure link to sign in. No password needed.
