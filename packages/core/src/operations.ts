@@ -44,7 +44,7 @@ export class OperationsService {
   }
   if((path==='/reports'||path==='/feedback')&&method==='GET') {
    if(path==='/reports'&&!admin)return result(403,{error:'Administrator access required.'});
-   if(path==='/feedback'&&isAgent)return result(403,{error:'Use the operator reports endpoint.'});
+   if(path==='/feedback'&&(isAgent||identity.role==='GUEST'))return result(403,{error:'Use the operator reports endpoint.'});
    const clauses:string[]=[],args:unknown[]=[];
    if(path==='/feedback'){clauses.push('owner_id=?');args.push(identity.id);}
    if(q.status){if(!states.includes(q.status))return result(400,{error:'Unknown status'});clauses.push('status=?');args.push(q.status);}
