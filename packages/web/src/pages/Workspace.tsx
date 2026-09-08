@@ -1,3 +1,4 @@
+import type { WorkItem } from '../types/graph';
 import { useState, useEffect } from 'react';
 import { Plus, Share2, Users, Table, Activity, Network, CreditCard, Columns, CalendarDays, GanttChartSquare, LayoutDashboard, Database, AlertTriangle, Map, X, Minimize2, Maximize2, Edit3, Trash2, FolderPlus, ChevronLeft, ChevronRight, Lock, Unlock } from 'lucide-react';
 import { createPortal } from 'react-dom';
@@ -36,7 +37,7 @@ export function Workspace() {
   const [graphLocked, setGraphLocked] = useState(() =>
     typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
   );
-  const [showMiniMap, setShowMiniMap] = useState(true);
+  const [showMiniMap, setShowMiniMap] = useState(() => window.innerWidth >= 1024 && window.innerHeight >= 600);
   const [layoutMode, setLayoutMode] = useState<LayoutMode>(() =>
     parseLayoutMode(typeof window !== 'undefined' ? window.localStorage.getItem(LAYOUT_MODE_STORAGE_KEY) : null)
   );
@@ -49,6 +50,7 @@ export function Workspace() {
   const { currentGraph, availableGraphs, getBreadcrumb, ascendTo } = useGraph();
   const breadcrumb = getBreadcrumb();
   const [inspectorNode, setInspectorNode] = useState<any>(null);
+  const [quickEditRequest, setQuickEditRequest] = useState<WorkItem | null>(null);
   const { currentTeam, currentUser } = useAuth();
   const { health, loading: healthLoading, error: healthError } = useHealthStatus();
 
@@ -68,7 +70,8 @@ export function Workspace() {
         }
       }
     } : { where: {} },
-    pollInterval: currentGraph ? 5000 : 0,
+    pollInterval: currentGraph ? 15000 : 0,
+    skipPollAttempt: () => document.visibilityState !== 'visible',
     fetchPolicy: currentGraph ? 'cache-and-network' : 'cache-only'
   });
 
@@ -82,7 +85,8 @@ export function Workspace() {
         }
       }
     } : { where: {} },
-    pollInterval: currentGraph ? 5000 : 0,
+    pollInterval: currentGraph ? 15000 : 0,
+    skipPollAttempt: () => document.visibilityState !== 'visible',
     fetchPolicy: currentGraph ? 'cache-and-network' : 'cache-only'
   });
 
@@ -90,18 +94,18 @@ export function Workspace() {
   const actualEdgeCount = edgesData?.edges?.length || 0;
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full min-h-0 flex flex-col">
       {/* Header with Graph Context — tablet/desktop only; phones use the Layout
           top bar (project selector) + the bottom nav, so this band is hidden there. */}
-      <div className="hidden md:block bg-gray-900/30 backdrop-blur-md border-b border-gray-700/30 px-3 py-2 sm:px-6 sm:py-4">
+      <div className="hidden md:block bg-gray-900/30 backdrop-blur-md border-b border-gray-700/30 px-3 py-2 sm:px-4 sm:py-2">
         {/* Responsive Layout Container */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 sm:gap-4">
 
           {/* Left Section: Graph Selector */}
-          <div className="min-w-0 md:order-1 w-full md:w-auto md:max-w-xs md:shrink">
+          <div className="min-w-0 md:order-1 w-full md:w-auto md:max-w-xs md:w-60 md:shrink-0">
             <div className="flex items-center space-x-4 h-full">
               {/* Title & Version - Compact */}
-              <div className="flex flex-col justify-center">
+              <div className="hidden xl:flex flex-col justify-center">
                 <h1 className="text-sm font-medium text-gray-200 leading-tight">
                   Graph Viewer
                 </h1>
@@ -132,7 +136,7 @@ export function Workspace() {
 
           {/* Center Section: View Mode Buttons — desktop/tablet only. Phones use the
               bottom tab bar (List / Graph / More) instead of this strip. */}
-          <div className="flex flex-1 min-w-0 justify-start xl:justify-center md:order-2 overflow-x-auto no-scrollbar -mx-3 px-3 sm:mx-0 sm:px-0">
+          <div className="hidden xl:flex flex-1 min-w-0 justify-start xl:justify-center md:order-2 overflow-x-auto no-scrollbar -mx-3 px-3 sm:mx-0 sm:px-0">
             <div className="flex flex-nowrap bg-gray-700/50 backdrop-blur-sm rounded-lg p-1 sm:p-1.5 gap-0.5 border border-gray-600/50">
               <button
                 onClick={() => setViewMode('graph')}
@@ -249,9 +253,13 @@ export function Workspace() {
             </div>
           </div>
 
+          <select aria-label="Workspace view" value={viewMode} onChange={event => setViewMode(event.target.value as typeof viewMode)} className="xl:hidden min-h-[44px] flex-1 min-w-0 rounded-lg border border-gray-600 bg-gray-800 px-3 text-base text-white">
+            {['graph', 'cards', 'dashboard', 'table', 'kanban', 'gantt', 'calendar', 'activity'].map(mode => <option key={mode} value={mode}>{({ graph: 'Graph', cards: 'Work list', dashboard: 'Overview', table: 'Table', kanban: 'Board', gantt: 'Timeline', calendar: 'Calendar', activity: 'Activity' } as Record<string, string>)[mode]}</option>)}
+          </select>
+
           {/* Right Section: Status and Actions — hidden on mobile (the hamburger
               handles nav there); these chips otherwise eat the small-screen width. */}
-          <div className="flex flex-col items-stretch gap-1.5 md:order-3 md:shrink-0">
+          <div className="hidden xl:flex flex-col items-stretch gap-1.5 md:order-3 md:shrink-0">
             {/* Data-store status (provider-agnostic — keyed off the GraphQL API, which is
                 the actual data layer; the backing store may be D1, Neo4j, etc.) */}
             <div className={`flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs transition-all cursor-help ${
@@ -260,7 +268,7 @@ export function Workspace() {
                 : 'bg-red-600/20 text-red-300 border border-red-500/30'
             }`} title={
               health?.services?.graphql?.status === 'healthy'
-                ? 'Connected — all operations available'
+                ? 'Connected to the graph service'
                 : 'Server unreachable — limited functionality'
             }>
               <Database className="w-4 h-4" />
@@ -431,7 +439,7 @@ export function Workspace() {
                 </div>
               </div>
             )}
-            <SafeGraphVisualization onNodeSelected={setInspectorNode} interactionLocked={isMobile && graphLocked} />
+            <SafeGraphVisualization onNodeSelected={setInspectorNode} interactionLocked={isMobile && graphLocked} quickEditRequest={quickEditRequest} onQuickEditRequestHandled={() => setQuickEditRequest(null)} />
            </div>
            {/* Lock toggle (phones): when locked, touch pans the canvas and never
                drags a node or edge label; unlock to rearrange/edit. */}
@@ -478,7 +486,7 @@ export function Workspace() {
            </button>
            {inspectorNode && (
              <div className="absolute z-40 inset-x-3 bottom-3 md:inset-x-auto md:bottom-auto md:top-3 md:right-3">
-               <NodeInspector node={inspectorNode} onClose={() => setInspectorNode(null)} />
+               <NodeInspector node={inspectorNode} onClose={() => setInspectorNode(null)} onEdit={() => { setQuickEditRequest(inspectorNode); setInspectorNode(null); }} />
              </div>
            )}
           </div>

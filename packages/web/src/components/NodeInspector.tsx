@@ -15,6 +15,7 @@ type Mode = 'card' | 'contents' | 'diagram';
 interface NodeInspectorProps {
   node: any;
   onClose: () => void;
+  onEdit?: () => void;
   /** Tighter type + smaller content for the anchored on-canvas peek (PR-3). */
   compact?: boolean;
   /** Override the root data-testid so an anchored instance is distinguishable
@@ -29,7 +30,7 @@ interface NodeInspectorProps {
  * toggle — not a side effect of zooming in. Used both docked (Workspace) and
  * anchored on-canvas (the expand-in-place peek), the latter via `compact`.
  */
-export function NodeInspector({ node, onClose, compact = false, rootTestId = 'node-inspector' }: NodeInspectorProps) {
+export function NodeInspector({ node, onClose, onEdit, compact = false, rootTestId = 'node-inspector' }: NodeInspectorProps) {
   const { descendInto } = useGraph();
   const hasSubgraph = !!node?.subgraphId;
   const [modeByNode, setModeByNode] = useState<Record<string, Mode>>({});
@@ -53,7 +54,8 @@ export function NodeInspector({ node, onClose, compact = false, rootTestId = 'no
           <div className="text-sm font-semibold text-white truncate" title={node.title}>{node.title}</div>
           <div className="mt-0.5"><CopyableId id={node.id} /></div>
         </div>
-        <button onClick={onClose} className="p-1 text-gray-400 hover:text-white rounded hover:bg-gray-700/50" title="Close">
+        {onEdit && <button onClick={onEdit} className="min-h-[44px] px-3 rounded-lg text-emerald-300 hover:bg-gray-800">Edit</button>}
+        <button onClick={onClose} className="min-h-[44px] min-w-[44px] flex items-center justify-center text-gray-400 hover:text-white rounded hover:bg-gray-700/50" title="Close">
           <X className="h-4 w-4" />
         </button>
       </div>
@@ -120,7 +122,7 @@ function ModeBtn({ active, onClick, icon, label, disabled, title }: { active: bo
       onClick={onClick}
       disabled={disabled}
       title={title}
-      className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+      className={`flex-1 flex items-center justify-center gap-1.5 min-h-[44px] px-2 py-1.5 rounded-lg text-sm font-medium transition-colors ${
         disabled
           ? 'text-gray-600 cursor-not-allowed'
           : active
