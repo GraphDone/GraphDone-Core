@@ -1,5 +1,5 @@
 import { describe,it,expect } from 'vitest';
-import { changes,dirty,merge,makeRequest,Snapshot,Project,validateBackupSnapshot } from './model';
+import { changes,dirty,merge,makeRequest,Snapshot,Project,validateBackupSnapshot,ambiguousRetriedCreation } from './model';
 const base=():Snapshot=>({project:{id:'p',name:'Family plans',sync_version:1},nodes:[{id:'a',title:'Dinner',status:'PROPOSED',priority:.3,position_x:0,position_y:0}],edges:[],notes:[]});
 describe('durable project reconciliation',()=>{
  it('merges agent status with offline human title without overwriting either',()=>{const b=base(),l=structuredClone(b),r=structuredClone(b);l.nodes[0].title='Dinner for six';r.nodes[0].status='IN_PROGRESS';const m=merge(b,l,r);expect(m.conflicts).toEqual([]);expect(m.local!.nodes[0]).toMatchObject({title:'Dinner for six',status:'IN_PROGRESS'});});
@@ -11,5 +11,6 @@ describe('durable project reconciliation',()=>{
  it('keeps a deletion made while its create acknowledgement was in flight',()=>{const sent=base(),remote=structuredClone(sent);remote.project.sync_version=4;remote.nodes[0].created_at=123;expect(merge(sent,null,remote)).toEqual({local:null,conflicts:[]});});
  it('creates and deletes empty projects as real pending work',()=>{expect(dirty({base:null,local:base(),checkedAt:0})).toBe(true);expect(makeRequest('p',{base:base(),local:null,checkedAt:0}).deleteProject).toBe(true);});
  it('rejects malformed backup data before it can poison local rendering',()=>{expect(()=>validateBackupSnapshot({project:{name:'X'},nodes:[{id:'a',title:{html:'bad'}}],edges:[],notes:[]})).toThrow(/invalid/);});
+ it('never silently resurrects a remote deletion after an old create receipt expires',()=>{const b=base(),l=structuredClone(b);l.nodes.push({id:'new',title:'Unconfirmed'});const req=makeRequest('p',{base:b,local:l,checkedAt:0});req.attempts=2;expect(ambiguousRetriedCreation(req,b,l,b)).toBe(true);expect(ambiguousRetriedCreation(req,b,b,b)).toBe(false);req.attempts=1;expect(ambiguousRetriedCreation(req,b,l,b)).toBe(false);});
  it('runs 1000 deterministic disjoint person/agent edit scenarios',()=>{for(let i=0;i<1000;i++){const b=base(),l=structuredClone(b),r=structuredClone(b);l.nodes[0].position_x=i;r.nodes[0].priority=i/1000;r.notes.push({id:'n'+i,body:'Agent progress '+i});const m=merge(b,l,r);expect(m.conflicts).toEqual([]);expect(m.local!.nodes[0].position_x).toBe(i);expect(m.local!.nodes[0].priority).toBe(i/1000);expect(m.local!.notes).toHaveLength(1);}});
 });

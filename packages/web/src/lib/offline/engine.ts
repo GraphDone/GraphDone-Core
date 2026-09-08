@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import { getToken,getUserRaw } from '../authStorage';
 import { cloudFailure, skipBackgroundPoll } from '../hostedUsage';
-import { changes,dirty,makeRequest,merge,Snapshot,Row,validateBackupSnapshot } from './model';
+import { changes,dirty,makeRequest,merge,Snapshot,Row,validateBackupSnapshot,ambiguousRetriedCreation } from './model';
 import { readAccount,editAccount,channel } from './store';
 export const offlineEnabled=import.meta.env.VITE_OFFLINE_SYNC==='true';
 export function sessionAccountId():string|null {try{const t=getToken();return t&&t!=='local-guest'?JSON.parse(atob(t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))).uid||null:null;}catch{return null;}}
@@ -94,13 +94,14 @@ export async function syncNow(manual=false) {
      if(manual||(!skipBackgroundPoll() && (localStorage.getItem('currentGraphId')===id)&&Date.now()-p.checkedAt>60000))await getProject(id,true);
      continue;
     }
-    const pending=await editAccount(owner,state=>{const current=state.projects[id];return current.request ||= makeRequest(id,current);});
-    const {sent,...payload}=pending;
+    const pending=await editAccount(owner,state=>{const current=state.projects[id];const request=current.request ||= makeRequest(id,current);request.attempts=request.attempts===undefined?2:request.attempts+1;return request;});
+    const {sent,attempts,...payload}=pending;
     const {data,status}=await request(owner,'/project',payload);
     if(status===409) {
      const remote=data.snapshot===undefined?(await request(owner,`/project?id=${encodeURIComponent(id)}`)).data.snapshot:data.snapshot;
      await editAccount(owner,state=>{delete state.projects[id].request;});
      await acceptRemote(owner,id,remote);
+     await editAccount(owner,state=>{const current=state.projects[id];if(ambiguousRetriedCreation(pending,p.base,current.local,remote)){current.remote=remote;current.conflicts=[...(current.conflicts||[]),'An earlier creation could not be confirmed; review it before adding it again'];}});
     }else await acceptRemote(owner,id,data.snapshot,pending.requestId);
    }
    await editAccount(owner,state=>{state.error='';state.retryAt=0;delete state.blocked;});
