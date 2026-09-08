@@ -1,3 +1,4 @@
+import { ProjectTransfer } from './ProjectTransfer';
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Plus, Folder, FolderOpen, FileText, Share2, Eye, Edit3, Crown, Trash2, FolderPlus, ChevronRight, Users, Bot, Settings, Zap, User, Lock } from 'lucide-react';
@@ -229,6 +230,7 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
         <div className="text-center text-gray-400">
           <Plus className="h-8 w-8 mx-auto mb-2 opacity-50" />
           <p className="text-sm">No graphs available</p>
+          <ProjectTransfer />
         </div>
       </div>
     );
@@ -265,20 +267,20 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
       {isOpen && buttonPosition && createPortal(
         <div
           data-testid="graph-selector-dropdown"
-          className="project-menu bg-gray-800 border border-gray-600/50 rounded-xl shadow-2xl overflow-hidden"
+          className="project-menu flex flex-col bg-gray-800 border border-gray-600/50 rounded-xl shadow-2xl overflow-hidden"
           style={{
             position: 'fixed',
             top: buttonPosition.top + 8,
             // Clamp to the viewport so the dropdown stays usable on phones
             left: Math.max(8, Math.min(buttonPosition.left, window.innerWidth - Math.min(Math.max(buttonPosition.width, 320), window.innerWidth - 16) - 8)),
             width: Math.min(Math.max(buttonPosition.width, 320), window.innerWidth - 16),
-            maxHeight: 'min(24rem, 70vh)',
+            maxHeight: Math.max(0, Math.min(576, window.innerHeight - buttonPosition.top - 16)),
             zIndex: '999999999',
             pointerEvents: 'all'
           }}
         >
           {/* Header with Create Button */}
-          <div className="flex items-center justify-between px-4 py-2 border-b border-gray-600/60">
+          <div className="shrink-0 flex items-center justify-between px-4 py-2 border-b border-gray-600/60">
             <span className="text-base font-semibold text-stone-100">Projects</span>
             <div className="flex items-center gap-2">
               {onCreateGraph && (
@@ -307,7 +309,8 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
           </div>
 
           {/* Folder Structure */}
-          <div className="overflow-y-auto" style={{ maxHeight: 'min(20rem, 55vh)' }}>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <ProjectTransfer />
             <div className="p-2.5 space-y-1">
               {Object.entries(folders).map(([folderId, graphs]) => {
                 if (graphs.length === 0) return null;
@@ -332,7 +335,7 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
                       <div className="ml-5 mt-1 space-y-1">
                         {graphs.map((graph) => (
                           <div key={graph.id}>
-                          <div className="flex items-center group/item">
+                          <div className="flex min-w-0 items-center group/item">
                             {graph.children && graph.children.length > 0 && (
                               <button
                                 onClick={(e) => { e.stopPropagation(); toggleGraphExpand(graph.id); }}
@@ -344,7 +347,7 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
                             )}
                             <button
                               onClick={() => handleGraphSelect(graph.id)}
-                              className={`flex-1 flex items-center space-x-2.5 p-2.5 rounded-xl text-left transition-all duration-200 ${
+                              className={`min-w-0 flex-1 flex items-center space-x-2.5 p-2.5 rounded-xl text-left transition-all duration-200 ${
                                 graph.id === currentGraph?.id
                                   ? 'bg-gradient-to-r from-emerald-500/25 to-green-500/25 text-emerald-200 border-2 border-emerald-400/40 shadow-lg'
                                   : 'hover:bg-gray-700/50 text-gray-300 border border-transparent hover:border-gray-600/30'
@@ -375,7 +378,7 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
                             </button>
                             
                             {/* Per-Graph Actions */}
-                            <div className="flex items-center space-x-1 opacity-0 group-hover/item:opacity-100 transition-opacity ml-2">
+                            <div className="shrink-0 flex items-center space-x-1 opacity-0 group-hover/item:opacity-100 transition-opacity ml-2">
                               {onEditGraph && (() => {
                                 const isSystemGraph = graph.createdBy === 'system' ||
                                                     graph.id === 'welcome-graph-shared' ||
@@ -499,7 +502,7 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
 
           {/* Footer */}
           {graphHierarchy.length > 0 && (
-            <div className="border-t border-gray-600 p-3 bg-gray-700/50">
+            <div className="shrink-0 border-t border-gray-600 p-3 bg-gray-700/50">
               <div className="flex items-center justify-between text-xs font-normal text-gray-400">
                 <span>Total: {graphHierarchy.length} Graph{graphHierarchy.length !== 1 ? 's' : ''}</span>
                 <span>Organized by: Team, Personal</span>

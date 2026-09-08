@@ -3,6 +3,7 @@ import { getToken,getUserRaw } from '../authStorage';
 import { cloudFailure, skipBackgroundPoll } from '../hostedUsage';
 import { changes,dirty,makeRequest,merge,Snapshot,Row,validateBackupSnapshot,ambiguousRetriedCreation } from './model';
 import { readAccount,editAccount,channel } from './store';
+import { PROJECT_FORMAT,parseProjectDocument,projectDocument,projectMermaid,projectFilename,downloadText } from '../project-transfer/format';
 export const offlineEnabled=import.meta.env.VITE_OFFLINE_SYNC==='true';
 export function sessionAccountId():string|null {try{const t=getToken();return t&&t!=='local-guest'?JSON.parse(atob(t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))).uid||null:null;}catch{return null;}}
 export function ownerId():string|null {
@@ -127,22 +128,34 @@ export async function exportOffline() {
  const blob=new Blob([JSON.stringify({format:'graphdone-offline-v1',exportedAt:new Date().toISOString(),account},null,2)],{type:'application/json'});
  const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='graphdone-offline-backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);
 }
+export async function exportProject(id:string,format:'json'|'mermaid') {
+ const snapshot=await getProject(id);
+ downloadText(format==='json'?JSON.stringify(projectDocument(snapshot),null,2):projectMermaid(snapshot),projectFilename(snapshot.project.name,format==='json'?'json':'mmd'),format==='json'?'application/json':'text/plain');
+}
 export async function importOffline(file:File) {
  if(file.size>50*1024*1024)throw Error('Backup is too large (50 MB maximum).');
- const data=JSON.parse(await file.text()),owner=ownerId();
- if(data.format!=='graphdone-offline-v1'||!data.account?.projects||!owner)throw Error('Choose a GraphDone offline backup while signed in.');
+ let data:any;try{data=JSON.parse(await file.text());}catch{throw Error('This file is not valid JSON. Mermaid files are diagrams; import a GraphDone JSON export to restore work.');}
+ const owner=ownerId();
+ if(data?.format===PROJECT_FORMAT){const snapshot=parseProjectDocument(data);data={format:'graphdone-offline-v1',account:{projects:{project:{local:snapshot}}}};}
+ if(data?.format!=='graphdone-offline-v1'||!data.account?.projects||Array.isArray(data.account.projects)||typeof data.account.projects!=='object'||!owner)throw Error('Choose a GraphDone offline backup while signed in.');
  // Import as NEW local projects. Never replay another account's requests/ids.
  if(Object.keys(data.account.projects).length>100)throw Error('Import at most 100 projects at a time.');
  const copies:Snapshot[]=[];
  for(const p of Object.values(data.account.projects) as any[]) {
+  if(!p||typeof p!=='object')throw Error('Invalid project in backup');
   if(!p.local)continue;const s=p.local as Snapshot;validateBackupSnapshot(s);
   if(!s.project||typeof s.project.name!=='string'||!Array.isArray(s.nodes)||!Array.isArray(s.edges)||!Array.isArray(s.notes))throw Error('Invalid project in backup');
   if(s.nodes.length>300||s.edges.length>600||s.notes.length>2000)throw Error('A project exceeds the supported import size.');
   const ids=new Map(s.nodes.map(n=>[n.id,crypto.randomUUID()]));
   copies.push({project:{...s.project,id:crypto.randomUUID(),owner_id:owner,sync_version:0,name:`${s.project.name.slice(0,105)} (imported)`},nodes:s.nodes.map(n=>({...n,id:ids.get(n.id)!})),edges:s.edges.map(e=>({...e,id:crypto.randomUUID(),source_id:ids.get(e.source_id),target_id:ids.get(e.target_id)})),notes:s.notes.map(n=>({...n,id:crypto.randomUUID(),work_item_id:ids.get(n.work_item_id)||null}))});
  }
- await editAccount(owner,a=>{for(const s of copies)a.projects[s.project.id]={base:null,local:s,checkedAt:Date.now()};});
+ if(!copies.length)throw Error('This file contains no projects to import.');
+ if(owner!==ownerId())throw Error('Account changed. Please import again.');
+ await editAccount(owner,a=>{const ids=new Set(a.list.map(p=>p.id));for(const [id,p] of Object.entries(a.projects)){if(p.local)ids.add(id);else ids.delete(id);}
+ if(ids.size+copies.length>100)throw Error('Import would exceed 100 projects. Remove unused projects or import fewer projects.');
+ for(const s of copies)a.projects[s.project.id]={base:null,local:s,checkedAt:Date.now()};});
  window.dispatchEvent(new Event('graphdone-sync-refresh'));void syncNow();
+ return copies.map(s=>({id:s.project.id,name:s.project.name}));
 }
 function storageError(e:unknown){view={...view,ready:false,error:e instanceof Error?e.message:'Device storage unavailable'};listeners.forEach(f=>f());}
 let observedToken=getToken();
