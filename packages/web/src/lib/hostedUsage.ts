@@ -15,6 +15,7 @@ export async function refreshHostedUsage(force = false) {
   if (!hostedUsageEnabled) return;
   const token = getToken();
   if (token !== lastToken) { lastToken = token; lastFetch = 0; publish({ usage: null, error: '', drafts: readDrafts().length }); }
+  if (token === 'local-guest') return;
   if (!token || pending || (!force && Date.now() - lastFetch < 15000)) return;
   pending = true; lastFetch = Date.now();
   try {

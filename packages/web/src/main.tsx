@@ -30,3 +30,6 @@ root.render(
     </ApolloProvider>
   </React.StrictMode>
 );
+if (import.meta.env.PROD && import.meta.env.VITE_OFFLINE_SYNC === 'true' && 'serviceWorker' in navigator) {
+  window.addEventListener('load',()=>{void navigator.serviceWorker.register('/sw.js').catch(()=>{console.warn('Offline app shell is not available yet.');});});
+}

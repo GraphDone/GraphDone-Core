@@ -1,3 +1,5 @@
+import { offlineEnabled, ownerId, getProject, syncNow } from '../lib/offline/engine';
+import { editAccount } from '../lib/offline/store';
 import { cloudFailure, preserveCloudDraft, skipBackgroundPoll } from '../lib/hostedUsage';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -8,6 +10,16 @@ import { useModalA11y } from '../hooks/useModalA11y';
 
 export const agentBase = `${import.meta.env.VITE_API_URL || window.location.origin}/api/agent`;
 export async function agentRequest(graphId: string, path: string, method = 'GET', body?: object) {
+  if (offlineEnabled && ownerId() && (path === '/context' || path === '/notes')) {
+    const s=await getProject(graphId);
+    if(path==='/context')return {project:{id:graphId,name:s.project.name},items:s.nodes,notes:[...s.notes].sort((a,b)=>b.created_at.localeCompare(a.created_at)).map(n=>({id:n.id,body:n.body,actor:n.actor,actorType:n.actor_type,createdAt:n.created_at,workItemId:n.work_item_id}))};
+    if(method==='POST') {
+      const input=body as {body:string;workItemId?:string};
+      if(!input.body?.trim()||input.body.length>4000)throw Error('Use a note of 1–4000 characters.');
+      await editAccount(ownerId()!,a=>{a.projects[graphId].local!.notes.push({id:crypto.randomUUID(),body:input.body.trim(),work_item_id:input.workItemId||null,actor:'You',actor_id:ownerId(),actor_type:'human',created_at:new Date().toISOString()});});
+      setTimeout(()=>void syncNow(),3000);return {created:true};
+    }
+  }
   try {
   const response = await fetch(`${agentBase}${path}?graphId=${encodeURIComponent(graphId)}`, {
     method, headers: { Authorization: `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
@@ -38,7 +50,7 @@ export function AgentConnection({ graphId, graphName, onClose }: { graphId: stri
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
   const refresh = async () => {
-    const [access, context] = await Promise.all([agentRequest(graphId, '/tokens'), agentRequest(graphId, '/context')]);
+    const [access, context] = await Promise.all([agentRequest(graphId, '/tokens').catch(e=>{if(!offlineEnabled)throw e;setError('Agent token management requires cloud access. You can still leave notes locally.');return {tokens:[]};}), agentRequest(graphId, '/context')]);
     setTokens(access.tokens); setNotes(context.notes); setItems(context.items); setReady(true);
   };
   useEffect(() => { let alive = true; refresh().catch(e => { if (alive) setError(e.message); }); const timer = window.setInterval(() => { if (!skipBackgroundPoll()) void refresh().catch(() => {}); }, 60000); return () => { alive = false; clearInterval(timer); }; }, [graphId]);
