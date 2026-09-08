@@ -11,6 +11,7 @@ interface CodeCaptchaProps {
   difficulty?: DifficultyLevel;
   style?: CaptchaStyle;
   autoFocus?: boolean;
+  compact?: boolean;
 }
 
 export function CodeCaptcha({
@@ -19,7 +20,8 @@ export function CodeCaptcha({
   className = '',
   difficulty = 'easy',
   style: initialStyle = 'math',
-  autoFocus = true
+  autoFocus = true,
+  compact = false
 }: CodeCaptchaProps) {
   const [currentStyle, setCurrentStyle] = useState<CaptchaStyle>(initialStyle);
   const [code, setCode] = useState('');
@@ -401,32 +403,30 @@ export function CodeCaptcha({
 
   return (
     <div className={`${className ?? ''} w-full max-w-full min-w-0`}>
-      <div className="bg-gradient-to-br from-gray-800/60 to-gray-700/50 backdrop-blur-sm border-2 border-teal-500/30 rounded-xl p-3 sm:p-5 shadow-lg overflow-hidden">
+      <div className={`bg-gradient-to-br from-gray-800/60 to-gray-700/50 border border-teal-500/30 rounded-xl ${compact ? "p-3" : "p-3 sm:p-5"} overflow-hidden`}>
         {/* Header */}
-        <div className="flex items-center justify-between mb-4">
+        <div className={`flex flex-wrap items-center justify-between gap-2 ${compact ? "mb-2" : "mb-4"}`}>
           <div className="flex items-center gap-2">
             <Shield className="h-5 w-5 text-teal-400" />
-            <h3 className="text-sm font-semibold text-teal-300">Verification required!</h3>
+            <h3 className="text-sm font-semibold text-teal-300">Verification</h3>
           </div>
-          <p className="text-xs text-gray-400">
-            Protected by <span className="text-teal-400 font-semibold">ALTCHA</span>
-          </p>
+
         </div>
 
         {/* Code Display */}
-        <div className="mb-4">
-          <div className="bg-gray-900/60 border border-teal-500/40 rounded-lg p-4 relative overflow-hidden">
+        <div className={compact ? "mb-2" : "mb-4"}>
+          <div className={`bg-gray-900/60 border border-teal-500/40 rounded-lg ${compact ? "p-2" : "p-4"} relative overflow-hidden`}>
             <div className="relative flex items-center gap-3">
               {/* Math Problem or Canvas Code Image */}
-              <div className="flex-1 flex items-center justify-center">
+              <div className="flex-1 min-w-0 flex items-center justify-center">
                 {currentStyle === 'math' ? (
                   // The "What is:" label floats at the top so the NUMBER is the
                   // vertically-centered element — otherwise the label pushed the
                   // number below the panel center and the lone refresh button
                   // (panel-centered) sat above it.
-                  <div className="relative w-full text-center py-8 flex items-center justify-center min-h-[5.5rem]">
+                  <div className={`relative w-full text-center flex items-center justify-center ${compact ? "pt-5 pb-1 min-h-[64px]" : "py-8 min-h-[5.5rem]"}`}>
                     <span className="absolute top-1 left-0 right-0 text-sm text-gray-400">What is:</span>
-                    <p className="text-3xl sm:text-5xl font-bold text-teal-300 tracking-wider">
+                    <p className={`${compact ? "text-2xl" : "text-3xl sm:text-5xl"} font-bold text-teal-300 tracking-wider`}>
                       {mathProblem} = ?
                     </p>
                   </div>
@@ -472,13 +472,14 @@ export function CodeCaptcha({
         <div className="mb-3">
           <div className="flex gap-3">
             {/* Input Field */}
-            <div className="flex-1 relative min-w-[200px]">
+            <div className="flex-1 relative min-w-0">
               <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
                 <KeyRound className="h-5 w-5 text-gray-400" />
               </div>
               <input
                 ref={inputRef}
                 id="captcha-input"
+                aria-label={currentStyle === "math" ? "Verification answer" : "Verification code"}
                 type="text"
                 value={userInput}
                 onChange={(e) => {
@@ -512,7 +513,7 @@ export function CodeCaptcha({
                 handleVerify();
               }}
               disabled={userInput.length < minLength || isVerifying}
-              className="bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 disabled:from-gray-700 disabled:to-gray-600 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 hover:scale-[1.02] disabled:scale-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 shadow-lg shadow-teal-500/20"
+              className="bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 disabled:from-gray-700 disabled:to-gray-600 text-white font-semibold min-h-[44px] py-2 px-3 sm:px-4 rounded-xl transition-all duration-200 hover:scale-[1.02] disabled:scale-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 shadow-lg shadow-teal-500/20"
               data-testid="captcha-verify-btn"
               aria-disabled={userInput.length < minLength || isVerifying}
             >
@@ -537,7 +538,7 @@ export function CodeCaptcha({
             </p>
           )}
           {isVerified && (
-            <div className="mt-2 p-3 bg-teal-900/30 border border-teal-500/50 rounded-lg flex items-center gap-2">
+            <div className="mt-2 p-2 bg-teal-900/30 border border-teal-500/50 rounded-lg flex items-center gap-2">
               <CheckCircle className="h-5 w-5 text-teal-400" />
               <p className="text-sm text-teal-300 font-medium">
                 Verified successfully!

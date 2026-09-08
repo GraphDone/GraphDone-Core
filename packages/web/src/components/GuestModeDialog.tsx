@@ -1,7 +1,8 @@
 import { createPortal } from 'react-dom';
-import { X, Users, AlertCircle, Clock, Lock, Eye } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { X, Users } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
 import { CodeCaptcha } from './CodeCaptcha';
+import { useModalA11y } from '../hooks/useModalA11y';
 
 interface GuestModeDialogProps {
   isOpen: boolean;
@@ -11,132 +12,40 @@ interface GuestModeDialogProps {
 
 export function GuestModeDialog({ isOpen, onClose, onConfirm }: GuestModeDialogProps) {
   const [guestCaptchaVerified, setGuestCaptchaVerified] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useModalA11y(dialogRef, { isOpen, label: 'Continue as Guest?' });
 
   useEffect(() => {
-    if (!isOpen) {
-      setGuestCaptchaVerified(false);
-    }
-  }, [isOpen]);
+    if (!isOpen) { setGuestCaptchaVerified(false); return; }
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const close = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', close);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', close);
+    };
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
   return createPortal(
-    <div 
-      className="fixed inset-0 z-[999999999] flex items-center justify-center p-4"
-      style={{ 
-        backgroundColor: 'rgba(0, 0, 0, 0.75)',
-        backdropFilter: 'blur(4px)',
-        pointerEvents: 'all'
-      }}
-      onClick={onClose}
-    >
-      <div 
-        className="bg-gray-800 border border-gray-700 rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto"
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between p-6 border-b border-gray-700">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-purple-900/50 rounded-full flex items-center justify-center">
-              <Users className="h-5 w-5 text-purple-400" />
-            </div>
-            <div>
-              <h2 className="text-xl font-semibold text-gray-100">Continue as Guest?</h2>
-              <p className="text-sm text-gray-400">Read-only exploration mode</p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 text-gray-400 hover:text-white hover:bg-red-600 rounded-lg transition-all duration-200 hover:scale-110"
-          >
-            <X className="h-5 w-5" />
-          </button>
+    <div className="fixed inset-0 z-[999999999] flex items-center justify-center p-3 bg-black/75 backdrop-blur-sm" onClick={onClose}>
+      <div ref={dialogRef} data-testid="guest-dialog" className="flex flex-col w-full max-w-lg max-h-[calc(100dvh-1.5rem)] min-h-0 rounded-2xl border border-gray-700 bg-gray-800 shadow-2xl overflow-hidden" onClick={event => event.stopPropagation()}>
+        <header className="flex shrink-0 items-center gap-3 px-4 py-2 border-b border-gray-700">
+          <Users className="h-5 w-5 shrink-0 text-purple-300" />
+          <h2 className="flex-1 text-lg font-semibold text-gray-100">Continue as Guest?</h2>
+          <button aria-label="Close guest dialog" onClick={onClose} className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-700 hover:text-white"><X className="h-5 w-5" /></button>
+        </header>
+        <div data-testid="guest-dialog-content" className="min-h-0 overflow-y-auto overscroll-contain p-4 space-y-3">
+          <p className="text-sm text-gray-300">Explore public graphs and views without an account. Guest access is read-only; create an account to save and edit your work.</p>
+          <CodeCaptcha compact autoFocus={false} onVerified={() => setGuestCaptchaVerified(true)} />
         </div>
-
-        <div className="p-6 space-y-4">
-          <div className="p-4 bg-purple-900/20 border border-purple-500/30 rounded-lg">
-            <p className="text-sm text-purple-200 mb-3">
-              Guest mode lets you explore GraphDone without creating an account. Perfect for trying out the platform!
-            </p>
-          </div>
-
-          <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-gray-100">What you can do:</h3>
-            <div className="space-y-2">
-              <div className="flex items-start space-x-3">
-                <Eye className="h-4 w-4 text-teal-400 mt-0.5 flex-shrink-0" />
-                <p className="text-sm text-gray-300">View public graphs and work items</p>
-              </div>
-              <div className="flex items-start space-x-3">
-                <Eye className="h-4 w-4 text-teal-400 mt-0.5 flex-shrink-0" />
-                <p className="text-sm text-gray-300">Explore graph visualizations and relationships</p>
-              </div>
-              <div className="flex items-start space-x-3">
-                <Eye className="h-4 w-4 text-teal-400 mt-0.5 flex-shrink-0" />
-                <p className="text-sm text-gray-300">Navigate between different views</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-gray-100 flex items-center">
-              <AlertCircle className="h-4 w-4 text-orange-400 mr-2" />
-              Limitations:
-            </h3>
-            <div className="space-y-2">
-              <div className="flex items-start space-x-3">
-                <Lock className="h-4 w-4 text-gray-500 mt-0.5 flex-shrink-0" />
-                <p className="text-sm text-gray-400">Cannot create or edit work items</p>
-              </div>
-              <div className="flex items-start space-x-3">
-                <Lock className="h-4 w-4 text-gray-500 mt-0.5 flex-shrink-0" />
-                <p className="text-sm text-gray-400">Cannot manage graphs or relationships</p>
-              </div>
-              <div className="flex items-start space-x-3">
-                <Clock className="h-4 w-4 text-gray-500 mt-0.5 flex-shrink-0" />
-                <p className="text-sm text-gray-400">Session expires after 24 hours</p>
-              </div>
-              <div className="flex items-start space-x-3">
-                <Lock className="h-4 w-4 text-gray-500 mt-0.5 flex-shrink-0" />
-                <p className="text-sm text-gray-400">No preferences or progress saved</p>
-              </div>
-            </div>
-          </div>
-
-          {/* CAPTCHA Verification */}
-          <div>
-            <CodeCaptcha
-              onVerified={() => setGuestCaptchaVerified(true)}
-              className="w-full"
-            />
-          </div>
-
-          <div className="p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
-            <p className="text-xs text-blue-300">
-              💡 <strong>Tip:</strong> Create a free account to unlock full features including editing, collaboration, and persistent workspace!
-            </p>
-          </div>
-        </div>
-
-        <div className="border-t border-gray-700 p-6 bg-gray-750 flex items-center justify-between gap-3 rounded-b-2xl">
-          <button
-            onClick={onClose}
-            className="flex-1 px-4 py-3 bg-gray-700/50 hover:bg-red-600 hover:text-white border border-gray-600/50 hover:border-red-600 text-gray-300 font-medium rounded-xl transition-all duration-200"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => {
-              onConfirm();
-              onClose();
-            }}
-            disabled={!guestCaptchaVerified}
-            className="flex-1 px-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 border border-purple-400/50 text-white font-semibold rounded-xl transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-purple-500/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:from-gray-700 disabled:to-gray-600 disabled:border-gray-600"
-          >
-            Continue as Guest
-          </button>
-        </div>
+        <footer className="flex shrink-0 gap-2 px-4 py-3 border-t border-gray-700">
+          <button onClick={onClose} className="min-h-[44px] px-4 rounded-lg border border-gray-600 text-gray-300 hover:bg-gray-700">Cancel</button>
+          <button onClick={() => { onConfirm(); onClose(); }} disabled={!guestCaptchaVerified} className="min-h-[44px] flex-1 px-3 rounded-lg bg-purple-600 text-white font-medium hover:bg-purple-500 disabled:bg-gray-700 disabled:text-gray-400 disabled:cursor-not-allowed">Continue as Guest</button>
+        </footer>
       </div>
-    </div>,
-    document.body
+    </div>, document.body
   );
 }
