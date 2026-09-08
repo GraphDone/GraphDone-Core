@@ -24,7 +24,7 @@ interface Viewport {
 export function MiniMap({ width = 192, height = 128 }: { width?: number; height?: number }) {
   const [nodes, setNodes] = useState<Record<string, MiniMapNode>>({});
   const [viewport, setViewport] = useState<Viewport | null>(null);
-  const nodeTypesRef = useRef<Record<string, string>>({});
+  const [nodeTypes, setNodeTypes] = useState<Record<string, string>>({});
   // Live minimap-px <-> graph-coord conversion params, updated each render so
   // the native (non-passive) wheel/touch listeners can map a gesture point to
   // a graph point and drive the main view's zoom.
@@ -103,9 +103,10 @@ export function MiniMap({ width = 192, height = 128 }: { width?: number; height?
       });
     };
     (window as any).updateMiniMapTypes = (types: Record<string, string>) => {
-      nodeTypesRef.current = types;
+      setNodeTypes(previous => Object.keys(previous).length === Object.keys(types).length && Object.keys(types).every(id => types[id] === previous[id]) ? previous : { ...types });
     };
     (window as any).updateMiniMapViewport = (v: Viewport) => setViewport({ ...v });
+    window.dispatchEvent(new Event('graphdone:minimap-open'));
     return () => {
       delete (window as any).updateMiniMapPositions;
       delete (window as any).updateMiniMapTypes;
@@ -195,9 +196,9 @@ export function MiniMap({ width = 192, height = 128 }: { width?: number; height?
       )}
       {entries.map(([id, n]) => {
         const p = toMini(n.x, n.y);
-        const type = nodeTypesRef.current[id];
+        const type = nodeTypes[id];
         const color = type ? getTypeConfig(type as WorkItemType).hexColor : '#9ca3af';
-        return <circle key={id} cx={p.x} cy={p.y} r={2.5} fill={color} fillOpacity={0.9} />;
+        return <circle data-testid="mini-map-node" key={id} cx={p.x} cy={p.y} r={2.5} fill={color} fillOpacity={0.9} />;
       })}
     </svg>
   );

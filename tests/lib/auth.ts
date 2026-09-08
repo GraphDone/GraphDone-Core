@@ -106,7 +106,7 @@ export async function getAuthState(page: Page): Promise<AuthState> {
       
       // Check for error messages
       if (indicator.includes('Failed') || indicator.includes('error') || indicator.includes('alert')) {
-        const text = await element.textContent();
+        const text = (await element.textContent())?.trim();
         if (text) errors.push(text);
       }
     }

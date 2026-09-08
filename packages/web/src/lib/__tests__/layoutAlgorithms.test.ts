@@ -114,3 +114,39 @@ describe('computeNodeLayerY', () => {
     expect(Number.isFinite(ys.get('B')!)).toBe(true);
   });
 });
+
+describe('compact hierarchical card layout', () => {
+  const size = (node: { id: string }) => ({ width: node.id === 'A' ? 200 : 170, height: node.id === 'A' ? 152 : 120 });
+  it('keeps small dependency chains compact when a window grows', async () => {
+    const { computeCompactLayout } = await import('../layoutAlgorithms');
+    const nodes = [n('A'), n('B')];
+    const small = computeCompactLayout(nodes, [dep('A', 'B')], { width: 390, height: 600 }, size);
+    const large = computeCompactLayout(nodes, [dep('A', 'B')], { width: 2560, height: 1440 }, size);
+    const gap = (points: typeof small) => points.get('A')!.y - points.get('B')!.y;
+    expect(gap(large)).toBe(gap(small));
+    expect(gap(large)).toBeLessThan(240);
+    expect(gap(large) - (size(nodes[0]).height + size(nodes[1]).height) / 2).toBeGreaterThanOrEqual(48);
+  });
+  it('keeps mixed-size siblings clear and centers the occupied row', async () => {
+    const { computeCompactLayout } = await import('../layoutAlgorithms');
+    const nodes = [n('A'), n('B'), n('C')];
+    const points = computeCompactLayout(nodes, [], { width: 844, height: 390 }, size);
+    const left = points.get('A')!.x - size(nodes[0]).width / 2;
+    const right = points.get('C')!.x + size(nodes[2]).width / 2;
+    expect((left + right) / 2).toBe(422);
+    for (let i = 1; i < nodes.length; i++) {
+      expect(points.get(nodes[i].id)!.x - points.get(nodes[i - 1].id)!.x).toBeGreaterThan((size(nodes[i]).width + size(nodes[i - 1]).width) / 2 + 24);
+    }
+  });
+});
+
+
+it('wraps a wide set of independent tasks instead of making one unreadable strip', async () => {
+  const { computeCompactLayout } = await import('../layoutAlgorithms');
+  const nodes = Array.from({length:200}, (_,i) => ({id:`task-${i}`}));
+  const points = [...computeCompactLayout(nodes, [], {width:1440,height:900}, () => ({width:170,height:120})).values()];
+  expect(Math.max(...points.map(p=>p.x)) - Math.min(...points.map(p=>p.x))).toBeLessThan(1100);
+  for(let i=0;i<points.length;i++)for(let j=i+1;j<points.length;j++) {
+    expect(Math.abs(points[i].x-points[j].x)>=194 || Math.abs(points[i].y-points[j].y)>=144).toBe(true);
+  }
+});

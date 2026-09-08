@@ -387,7 +387,8 @@ export function Ontology() {
               <p className="text-gray-400 mb-4">
                 Pre-configured work item templates for common patterns
               </p>
-              <button className="btn btn-primary">
+              <p id="templates-unavailable" className="text-sm text-gray-300 mb-4">Coming soon — reusable templates are not available yet.</p>
+              <button disabled aria-describedby="templates-unavailable" className="inline-flex items-center justify-center min-h-[44px] px-4 py-2 rounded-lg border border-gray-600 bg-gray-800 text-gray-400 cursor-not-allowed">
                 <Plus className="h-4 w-4 mr-2" />
                 Create Template
               </button>

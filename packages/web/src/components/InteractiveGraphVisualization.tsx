@@ -50,7 +50,7 @@ import { edgeLabelPlacement, clearSegment, slideTFromPointer, chooseLabelT } fro
 import { PerfMeter, DriftMeter } from '../lib/perfMeter';
 import { separateCards } from '../lib/separateCards';
 import { DEFAULT_PHYSICS, collisionRadius, linkDistance, linkMaxDistance, linkStrength } from '../lib/physicsConfig';
-import { computeNodeLayerY, isHierarchicalLayout, parseLayoutMode, LAYOUT_MODE_STORAGE_KEY, type LayoutMode } from '../lib/layoutAlgorithms';
+import { computeCompactLayout, isHierarchicalLayout, parseLayoutMode, LAYOUT_MODE_STORAGE_KEY, type LayoutMode } from '../lib/layoutAlgorithms';
 import { edgeBorderEndpoints, minEdgeLength, clampToMinNeighbors } from '../lib/edgeGeometry';
 import { directionStrategy, arrowVisibility, labelVisibility, perpendicularOffset } from '../lib/edgeLOD';
 import { assignParallelEdgeIndices } from '../lib/parallelEdges';
@@ -4327,20 +4327,24 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       const upd = (window as { updateMiniMapPositions?: (p: Record<string, { x: number; y: number }>) => void }).updateMiniMapPositions;
       if (!sim || !upd) return;
       const simNodes = sim.nodes() as { id: string; x?: number; y?: number; type?: string }[];
-      if (!simNodes?.length) return;
       const positions: Record<string, { x: number; y: number }> = {};
       const types: Record<string, string> = {};
       for (const nd of simNodes) {
         if (nd.x !== undefined && nd.y !== undefined) { positions[nd.id] = { x: nd.x, y: nd.y }; types[nd.id] = nd.type as string; }
       }
-      if (Object.keys(positions).length) {
+      {
         upd(positions);
         (window as { updateMiniMapTypes?: (t: Record<string, string>) => void }).updateMiniMapTypes?.(types);
       }
     };
+    const snapshot = () => {
+      publish();
+      if (svgRef.current) (window as any).updateMiniMapViewport?.(d3.zoomTransform(svgRef.current));
+    };
+    window.addEventListener('graphdone:minimap-open', snapshot);
     const id = setInterval(() => { publish(); if (++n >= 5) clearInterval(id); }, 800);
     publish();
-    return () => clearInterval(id);
+    return () => { clearInterval(id); window.removeEventListener('graphdone:minimap-open', snapshot); };
   }, [currentGraph?.id, workItemsData?.workItems?.length]);
 
   // Center on specific node
@@ -4459,11 +4463,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     }, 2500);
   }, [nodes, initializeVisualization, fitViewToNodes, persistAllPositions]);
 
-  // Layout mode (#30): 'force' = organic spring layout (default); 'hierarchical'
-  // pins each node's fy to its dependency-layer Y (computed by the pure module)
-  // so the graph settles into prerequisite layers while X stays force-arranged.
-  // Non-destructive + reversible: switching back to 'force' restores the fy each
-  // node had before we pinned it (saved-snapshot pins survive the round-trip).
+  // Hierarchical mode packs actual card sizes into compact dependency rows.
+  // Pin both axes so repulsion cannot spread a finished row across the viewport.
+  // Switching back restores both original pins, including saved-position pins.
   const layoutModeRef = useRef<LayoutMode>(
     parseLayoutMode(typeof window !== 'undefined' ? window.localStorage?.getItem(LAYOUT_MODE_STORAGE_KEY) : null)
   );
@@ -4475,27 +4477,32 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     if (!sim || !container) return;
     const simNodes = sim.nodes() as any[];
     if (isHierarchicalLayout(mode)) {
-      const ys = computeNodeLayerY(
+      const positions = computeCompactLayout(
         simNodes, validatedEdges as any[],
-        { width: container.clientWidth, height: container.clientHeight },
+        { width: container.clientWidth, height: container.clientHeight }, getNodeDimensions,
       );
       simNodes.forEach((node: any) => {
-        const y = ys.get(node.id);
-        if (y == null) return;
-        if (!node.__layerPinned) node.__preLayerFy = node.fy ?? null;
+        const point = positions.get(node.id);
+        if (!point) return;
+        if (!node.__layerPinned) { node.__preLayerFy = node.fy ?? null; node.__preLayerFx = node.fx ?? null; }
         node.__layerPinned = true;
-        node.fy = y;
+        node.fx = node.x = point.x;
+        node.fy = node.y = point.y;
+        node.vx = node.vy = 0;
       });
     } else {
       simNodes.forEach((node: any) => {
         if (!node.__layerPinned) return;
         node.fy = node.__preLayerFy ?? null;
+        node.fx = node.__preLayerFx ?? null;
+        delete node.__preLayerFx;
         node.__layerPinned = false;
         delete node.__preLayerFy;
       });
     }
     sim.alpha(DEFAULT_PHYSICS.alpha.loadEnergy).restart();
-  }, [validatedEdges]);
+    if (isHierarchicalLayout(mode)) requestAnimationFrame(() => fitViewToNodes());
+  }, [validatedEdges, getNodeDimensions, fitViewToNodes]);
   // Stable handle so the window hook + load effect don't churn when the edge
   // poll re-creates applyLayoutMode (which would reheat the sim every poll).
   const applyLayoutModeRef = useRef(applyLayoutMode);

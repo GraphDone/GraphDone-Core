@@ -64,7 +64,10 @@
     "qc:verification": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line tests/e2e/quality/turnstile-guest.spec.ts",
     "qc:graph": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line tests/e2e/quality/graph-motion.spec.ts tests/e2e/quality/graph-resize.spec.ts tests/e2e/quality/graph-details.spec.ts tests/e2e/quality/graph-controls.spec.ts tests/e2e/smoke/user-smoke.spec.ts",
     "qc:agents": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 tests/e2e/quality/agent-collaboration.spec.ts",
-    "qc:modals": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 tests/e2e/quality/modal-header.spec.ts"
+    "qc:modals": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 tests/e2e/quality/modal-header.spec.ts",
+    "qc:real-agents": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 tests/e2e/quality/real-agent-journey.spec.ts",
+    "qc:reported-controls": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 tests/e2e/quality/reported-controls.spec.ts",
+    "qc:signup": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 tests/e2e/quality/signup-delivery.spec.ts"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
