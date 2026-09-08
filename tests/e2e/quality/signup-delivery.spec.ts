@@ -2,6 +2,8 @@ import { test, expect } from '@playwright/test';
 for (const [width,height] of [[390,844],[844,390],[1440,900]]) {
  for (const outcome of ['sent','delivery-failed','security-page']) test(`signup ${outcome} ${width} @signup`, async ({page}) => {
   await page.setViewportSize({width,height});
+  const policyErrors: string[] = [];
+  page.on('console', message => { if (/violates.*Content Security Policy/i.test(message.text())) policyErrors.push(message.text()); });
   let requests=0;
   await page.route('**/auth/magic-link/request', async route => {
    requests++;
@@ -23,6 +25,20 @@ for (const [width,height] of [[390,844],[844,390],[1440,900]]) {
    await expect(page.getByRole('button',{name:'Send Link',exact:true})).toBeEnabled();
   }
   expect(requests).toBe(1);
+  expect(policyErrors).toEqual([]);
   await page.screenshot({path:`test-artifacts/quality/signup-${outcome}-${width}.png`});
  });
 }
+
+test('returning visitor can enter an existing code without sending another email @signup', async ({page}) => {
+ let sends=0, verifies=0;
+ await page.route('**/auth/magic-link/request', route => { sends++; return route.abort(); });
+ await page.route('**/auth/code/verify', route => { verifies++; return route.fulfill({status:400,contentType:'application/json',body:JSON.stringify({error:'Invalid or expired code'})}); });
+ await page.goto('/signup');
+ await page.locator('#magicLinkEmail').fill('fixture@example.invalid');
+ await page.getByRole('button',{name:'Already have a code?'}).click();
+ await page.getByLabel('Sign-in code from email').fill('AAAA-BBBB-CCCC');
+ await page.getByLabel('Sign-in code from email').press('Enter');
+ await expect(page.getByRole('alert')).toBeVisible();
+ expect(sends).toBe(0);expect(verifies).toBe(1);
+});
