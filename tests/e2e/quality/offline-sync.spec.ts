@@ -49,8 +49,11 @@ test('student team: offline reload, drag, quota pause, reconnect, no duplicates 
  await page.route('**/api/sync/project',route=>{denied++;return route.fulfill({status:429,json:{code:'PERSONAL_LIMIT',message:'Local quota fixture',resetAt:new Date(Date.now()+60000).toISOString()}});});
  await context.setOffline(false);await expect.poll(()=>denied).toBe(1);
  await page.waitForTimeout(12000);expect(denied).toBe(1);
+ let profileReads=0;page.on('request',request=>{if(request.url().includes('/api/graphql')&&request.postData()?.includes('\"operationName\":\"Me\"'))profileReads++;});
+ // A renewed sign-in has a token but may need its cached profile while D1 is paused.
+ await page.evaluate(()=>{localStorage.removeItem('currentUser');sessionStorage.removeItem('currentUser');});
  await page.reload();await expect(page.locator('.graph-container .node')).toHaveCount(2);
- expect(denied).toBe(1);
+ expect(denied).toBe(1);expect(profileReads).toBe(0);
  await page.screenshot({path:'test-artifacts/quality/offline-quota-retained.png'});
  await expect(page.getByTestId('offline-status')).toContainText('waiting to sync');
  await page.unroute('**/api/sync/project');

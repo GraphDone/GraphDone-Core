@@ -4,6 +4,7 @@ import { cloudFailure, skipBackgroundPoll } from '../hostedUsage';
 import { changes,dirty,makeRequest,merge,Snapshot,Row,validateBackupSnapshot } from './model';
 import { readAccount,editAccount,channel } from './store';
 export const offlineEnabled=import.meta.env.VITE_OFFLINE_SYNC==='true';
+export function sessionAccountId():string|null {try{const t=getToken();return t&&t!=='local-guest'?JSON.parse(atob(t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))).uid||null:null;}catch{return null;}}
 export function ownerId():string|null {
  try {const token=getToken(),user=JSON.parse(getUserRaw()||'null');if(!token||!user?.id)return null;
   if(token==='local-guest')return user.id;
@@ -121,7 +122,8 @@ export async function resolveConflict(id:string,choice:'local'|'cloud') {
 export async function prepareOffline() {const list=await listProjects(true);for(const p of list){const owner=ownerId();if(!owner||!await canConnect(owner))break;await getProject(p.id);}}
 export async function exportOffline() {
  const owner=ownerId();if(!owner)return;
- const blob=new Blob([JSON.stringify({format:'graphdone-offline-v1',exportedAt:new Date().toISOString(),account:await readAccount(owner)},null,2)],{type:'application/json'});
+ const account=await readAccount(owner);delete account.user;
+ const blob=new Blob([JSON.stringify({format:'graphdone-offline-v1',exportedAt:new Date().toISOString(),account},null,2)],{type:'application/json'});
  const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='graphdone-offline-backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);
 }
 export async function importOffline(file:File) {
@@ -149,6 +151,7 @@ if(offlineEnabled) {
  window.addEventListener('online',()=>{changed();void syncNow();});window.addEventListener('offline',changed);
  window.addEventListener('graphdone-session',()=>{
   changed();const owner=ownerId(),token=getToken();
+  if(owner){const user=JSON.parse(getUserRaw()||'null');void readAccount(owner).then(async a=>{if(JSON.stringify(a.user)!==JSON.stringify(user))await editAccount(owner,state=>{state.user=user;});}).catch(storageError);}
   if(owner && token!==observedToken){observedToken=token;void editAccount(owner,a=>{if(a.blocked==='auth'){a.retryAt=0;a.error='';delete a.blocked;}}).then(()=>syncNow());}
  });
  setInterval(()=>{if(!document.hidden)void syncNow();},10000);
