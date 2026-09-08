@@ -1,3 +1,5 @@
+import { offlineLink } from './offline/link';
+import { ownerId, offlineEnabled } from './offline/engine';
 import { ApolloClient, ApolloLink, InMemoryCache, createHttpLink, split, from } from '@apollo/client';
 import { setContext } from '@apollo/client/link/context';
 import { onError } from '@apollo/client/link/error';
@@ -52,7 +54,7 @@ const errorLink = onError(({ graphQLErrors, networkError, operation, forward }) 
       if (error.extensions?.code === 'UNAUTHENTICATED' || 
           error.message.includes('Invalid token') ||
           error.message.includes('Unauthorized')) {
-        clearSession();
+        if (!offlineEnabled || !ownerId()) clearSession();
         // Don't reload immediately - let auth context handle it
         return;
       }
@@ -62,7 +64,7 @@ const errorLink = onError(({ graphQLErrors, networkError, operation, forward }) 
   if (networkError) {
     // Handle 401/403 network errors
     if ('statusCode' in networkError && (networkError.statusCode === 401 || networkError.statusCode === 403)) {
-      clearSession();
+      if (!offlineEnabled || !ownerId()) clearSession();
       // Don't reload immediately - let auth context handle it
       return;
     }
@@ -92,7 +94,7 @@ const splitLink = split(
     );
   },
   wsLink,
-  from([errorLink, authLink, usageLink, httpLink])
+  from([offlineLink, errorLink, authLink, usageLink, httpLink])
 );
 
 export const apolloClient = new ApolloClient({
@@ -129,3 +131,6 @@ export const apolloClient = new ApolloClient({
     }
   }
 });
+let cacheOwner=ownerId();
+window.addEventListener('graphdone-session',()=>{const next=ownerId();if(next!==cacheOwner){cacheOwner=next;void apolloClient.clearStore();}});
+window.addEventListener('graphdone-sync-refresh',()=>{void apolloClient.refetchQueries({include:['GetGraphs','GetGraphsByUser','GetGraph','GetWorkItems','GetWorkItemById','GetEdges']}).catch(()=>{});});

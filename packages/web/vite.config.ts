@@ -1,3 +1,4 @@
+import { offlineShell } from './offline-shell';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
@@ -6,7 +7,7 @@ import { readFileSync } from 'fs';
 import { existsSync } from 'fs';
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), offlineShell()],
   resolve: {
     alias: {
       '@': resolve(__dirname, './src'),
@@ -37,6 +38,7 @@ export default defineConfig({
     },
     proxy: {
       // apollo.ts uses the nginx-style /api/graphql path; map it in dev too
+      '/api/sync': { target: process.env.VITE_PROXY_TARGET || 'http://localhost:8797', changeOrigin: true },
       '/api/agent': { target: process.env.VITE_PROXY_TARGET || 'http://localhost:4127', changeOrigin: true, secure: false },
       '/api/graphql': {
         target: process.env.VITE_PROXY_TARGET || (process.env.VITE_HTTPS === 'true' ? 'https://localhost:4128' : 'http://localhost:4127'),

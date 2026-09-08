@@ -1,3 +1,4 @@
+import { OfflineStatus } from './OfflineStatus';
 import React from 'react';
 import { HostedUsage } from './HostedUsage';
 import { Link, useLocation } from 'react-router-dom';
@@ -46,7 +47,7 @@ export function Layout({ children }: LayoutProps) {
       {/* Insecure-connection warning — an in-flow strip at the very top, so it
           reserves its own space and never overlaps the app (only over HTTP). */}
       <InsecureConnectionBanner className="relative z-30" />
-      <HostedUsage compact />
+      <HostedUsage compact /><OfflineStatus compact />
 
       {/* Static gradient background - optimized for all browsers */}
 

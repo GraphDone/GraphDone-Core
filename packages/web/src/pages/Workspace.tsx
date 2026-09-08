@@ -1,3 +1,4 @@
+import { offlineEnabled } from '../lib/offline/engine';
 import { skipBackgroundPoll, useHostedUsage } from '../lib/hostedUsage';
 import { AgentConnection } from '../components/AgentConnection';
 import type { WorkItem } from '../types/graph';
@@ -24,7 +25,7 @@ import { parseLayoutMode, LAYOUT_MODE_STORAGE_KEY, type LayoutMode } from '../li
 
 export function Workspace() {
   const { usage: cloudUsage } = useHostedUsage();
-  const cloudPaused = !!cloudUsage && cloudUsage.status !== 'AVAILABLE';
+  const cloudPaused = !offlineEnabled && !!cloudUsage && cloudUsage.status !== 'AVAILABLE';
   const [showAgentConnection, setShowAgentConnection] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showCreateGraphModal, setShowCreateGraphModal] = useState(false);

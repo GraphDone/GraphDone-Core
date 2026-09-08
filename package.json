@@ -68,6 +68,7 @@
     "qc:real-agents": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 tests/e2e/quality/real-agent-journey.spec.ts",
     "qc:reported-controls": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 tests/e2e/quality/reported-controls.spec.ts",
     "qc:signup": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 tests/e2e/quality/signup-delivery.spec.ts",
+    "qc:offline": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 tests/e2e/quality/offline-sync.spec.ts",
     "qc:hosted-usage": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 tests/e2e/quality/hosted-usage.spec.ts"
   },
   "devDependencies": {

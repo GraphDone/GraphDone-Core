@@ -138,3 +138,15 @@ unconfirmed graph/task operations). They can be downloaded after reload but are
 not an offline database or automatic retry queue. Check for partial server
 success before reapplying. Full offline guests/sync, comprehensive security
 clearance and all-persona inference sweeps remain separate work.
+
+## Offline storage and sync — September 8, 2026
+
+The managed client now has an account-scoped IndexedDB project store, local-first task/position/edge/project mutations, human note persistence, an exact-request upload queue, three-way conflict review, backup export/import, local-only guest onboarding, and a precached production app shell. Enable with `VITE_OFFLINE_SYNC=true` only against the compatible managed `/api/sync` backend. Standalone Neo4j remains unchanged by default.
+
+Repeatable sequence: start Cloud `scripts/test-offline-sync.mjs --serve`, build Core with the local API at `http://localhost:8798` and both `VITE_OFFLINE_SYNC=true` / `VITE_HOSTED_USAGE=true`, preview on 3136, then run `DISPLAY=:1 PLAYWRIGHT_BROWSERS_PATH=/tmp/graphdone-playwright TEST_URL=http://localhost:3136 npm run qc:offline`. Restart the isolated fixture server between full sweeps to reset its quota ledger. Run headed tests serially without source/build changes during a run.
+
+Latest result: **3 headed scenarios passed (50.9 seconds)**. Student team: six viewport bounds, real offline task creation and mouse drag, table/card/Kanban/Gantt/calendar/activity/graph navigation offline, offline reload, persisted quota deadline with no retry loop, reconnect and exact-once remote creation, second tab, real local agent token, offline human note, competing agent priority update, explicit conflict resolution, credential-free export and imported project with new IDs. Guest: no cloud mutation during onboarding and offline reload. Parent: school pickup task survives closing the entire browser and reopening its profile offline.
+
+Nine unit cases passed, including 1000 deterministic disjoint human/agent edit scenarios, delete/edit conflicts, edits made during an in-flight upload, bounded dependency-ordered batches, and malformed backup rejection. Cloud's real local D1 tests cover replay, owner isolation, atomic revision races, agent writes, 2000 full-length notes (8 MB), metering regressions, and signup regressions. This does not claim exhaustive browser/device/security coverage or thousands of inference calls.
+
+Downloaded projects work offline; unopened projects need an initial download (Settings can prepare all). Uploads resume while the app is open and cloud access is available. Browser data clearing can remove local copies; export important work. Account records are currently rewritten as one transaction, so very large accounts still need low-memory-device benchmarking. Agent credentials and account administration remain online-only. The hosted backend's existing sharing and unsupported-property limitations remain.

@@ -61,6 +61,7 @@ export function setSession(token: string, user: unknown, keep: boolean): void {
   }
   safeRemove(secondary, TOKEN_KEY);
   safeRemove(secondary, USER_KEY);
+  window.dispatchEvent(new Event('graphdone-session'));
   try {
     localStorage.setItem(KEEP_KEY, keep ? 'true' : 'false');
   } catch {
@@ -82,6 +83,7 @@ export function setToken(token: string, keep: boolean): void {
   }
   safeRemove(secondary, TOKEN_KEY);
   safeRemove(secondary, USER_KEY);
+  window.dispatchEvent(new Event('graphdone-session'));
   try {
     localStorage.setItem(KEEP_KEY, keep ? 'true' : 'false');
   } catch {
@@ -95,6 +97,7 @@ export function setUser(user: unknown): void {
   const store = safeGet(localStorage, TOKEN_KEY) != null ? localStorage : sessionStorage;
   try {
     store.setItem(USER_KEY, raw);
+    window.dispatchEvent(new Event('graphdone-session'));
   } catch {
     /* ignore */
   }
@@ -106,4 +109,5 @@ export function clearSession(): void {
     safeRemove(store, TOKEN_KEY);
     safeRemove(store, USER_KEY);
   }
+  window.dispatchEvent(new Event('graphdone-session'));
 }

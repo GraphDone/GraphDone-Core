@@ -1,3 +1,4 @@
+import { offlineEnabled } from '../lib/offline/engine';
 import { createPortal } from 'react-dom';
 import { X, Users } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
@@ -42,12 +43,12 @@ export function GuestModeDialog({ isOpen, onClose, onConfirm, guestDescription, 
           <button aria-label="Close guest dialog" onClick={onClose} className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-700 hover:text-white"><X className="h-5 w-5" /></button>
         </header>
         <div data-testid="guest-dialog-content" className="min-h-0 overflow-y-auto overscroll-contain p-4 space-y-3">
-          <p className="text-sm text-gray-300">{guestDescription || 'Explore public graphs and views without an account. Guest access is read-only; create an account to save and edit your work.'}</p>
-          {turnstileSiteKey ? <TurnstileChallenge siteKey={turnstileSiteKey} onToken={setTurnstileToken} /> : <CodeCaptcha compact autoFocus={false} onVerified={() => setGuestCaptchaVerified(true)} />}
+          <p className="text-sm text-gray-300">{offlineEnabled ? 'Create projects, tasks, and connections on this device without an account or an internet connection. Export a backup before clearing browser data. Sign in and import your backup when you want cloud sync.' : guestDescription || 'Explore public graphs and views without an account. Guest access is read-only; create an account to save and edit your work.'}</p>
+          {!offlineEnabled && (turnstileSiteKey ? <TurnstileChallenge siteKey={turnstileSiteKey} onToken={setTurnstileToken} /> : <CodeCaptcha compact autoFocus={false} onVerified={() => setGuestCaptchaVerified(true)} />)}
         </div>
         <footer className="flex shrink-0 gap-2 px-4 py-3 border-t border-gray-700">
           <button onClick={onClose} className="min-h-[44px] px-4 rounded-lg border border-gray-600 text-gray-300 hover:bg-gray-700">Cancel</button>
-          <button onClick={() => { onConfirm(turnstileToken || undefined); onClose(); }} disabled={turnstileSiteKey ? !turnstileToken : !guestCaptchaVerified} className="min-h-[44px] flex-1 px-3 rounded-lg bg-purple-600 text-white font-medium hover:bg-purple-500 disabled:bg-gray-700 disabled:text-gray-400 disabled:cursor-not-allowed">Continue as Guest</button>
+          <button onClick={() => { onConfirm(turnstileToken || undefined); onClose(); }} disabled={!offlineEnabled && (turnstileSiteKey ? !turnstileToken : !guestCaptchaVerified)} className="min-h-[44px] flex-1 px-3 rounded-lg bg-purple-600 text-white font-medium hover:bg-purple-500 disabled:bg-gray-700 disabled:text-gray-400 disabled:cursor-not-allowed">Continue as Guest</button>
         </footer>
       </div>
     </div>, document.body
