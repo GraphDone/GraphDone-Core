@@ -96,9 +96,10 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
+  /* Keep body untransformed: portals with position:fixed must anchor to the
+     viewport, including when a long sign-in page has already scrolled. */
   body {
     @apply bg-gray-900 text-gray-100;
-    transform: translateZ(0);
     -webkit-backface-visibility: hidden;
     backface-visibility: hidden;
   }
@@ -115,6 +116,10 @@
     -webkit-transform: translateZ(0);
   }
 
+  /* Quiet scroll chrome: scrolling stays available, but tracks do not create
+     permanent visual rails. Reveal the thumb on hover or keyboard focus. */
+  * { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+  *:hover, *:focus-within { scrollbar-color: #6b7280 transparent; }
   /* Custom scrollbar */
   ::-webkit-scrollbar {
     width: 6px;
@@ -122,12 +127,17 @@
   }
 
   ::-webkit-scrollbar-track {
-    background: #374151;
+    background: transparent;
   }
 
   ::-webkit-scrollbar-thumb {
-    background: #6B7280;
+    background: transparent;
     border-radius: 4px;
+  }
+
+  *:hover::-webkit-scrollbar-thumb,
+  *:focus-within::-webkit-scrollbar-thumb {
+    background: #6b7280;
   }
 
   ::-webkit-scrollbar-thumb:hover {
@@ -755,4 +765,14 @@ html[data-theme="contrast"] .graph-container svg .node,
 html[data-theme="contrast"] .graph-container svg .node *,
 html[data-theme="contrast"] .node-selected {
   filter: none !important;
+}
+
+/* Touch surfaces retain swipe scrolling without permanent scrollbar chrome. */
+@media (hover: none) and (pointer: coarse) {
+  * { scrollbar-width: none; }
+  ::-webkit-scrollbar { display: none; }
+}
+@media (forced-colors: active) {
+  * { scrollbar-width: auto; scrollbar-color: auto; }
+  ::-webkit-scrollbar { display: block; }
 }

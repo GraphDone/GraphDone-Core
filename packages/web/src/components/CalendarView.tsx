@@ -438,7 +438,7 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
 
           {/* Agenda List */}
           {viewMode === 'agenda' && (
-            <div className="flex-1 p-2 sm:p-4 overflow-y-auto space-y-4">
+            <div className="flex-1 p-2 sm:p-4 space-y-4">
               {agendaDays.length === 0 ? (
                 <div className="text-center py-12 text-gray-400">
                   <CalendarDays className="h-8 w-8 mx-auto mb-2 opacity-50" />
@@ -510,7 +510,7 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
 
           {/* Calendar Grid */}
           {viewMode !== 'agenda' && (
-          <div className="flex-1 p-2 overflow-auto">
+          <div className="flex-1 min-w-0 p-2">
             <div className="grid grid-cols-7 gap-1 h-full">
               {calendarDays.map((day, index) => {
                 const dateKey = day.toDateString();

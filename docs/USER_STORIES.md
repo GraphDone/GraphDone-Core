@@ -136,3 +136,5 @@ See [state review](reviews/2026-09-07-state.md) for the evidence and remaining g
 The [human-first AI work contract](design/human-ai-workspace.md) defines the remaining release requirements: scoped hosted credentials, atomic claims, idempotent attributed progress, human input/review, evidence and reconnect recovery.
 
 | UX-1a | As a human, I want the work that matters first and direct access to editing. | Overview attention/current-work sections open items; Board hides empty lanes by default; graph editing takes one tap/click; Admin reference collapses and forms fit short screens. Headed responsive and Admin form journeys. | 🧪 |
+
+| UX-SCROLL-1 | As a user, I want screens without unnecessary scrollbar clutter. | Guest dialog fits 320px portrait without scrolling, including verification success; narrow inputs shrink correctly; actions stay visible on short screens; scroll lock and viewport anchoring; Calendar uses its parent scroll region. Scrollbar chrome stays quiet, with hover/focus and forced-color access preserved. `guest-dialog-layout.spec.ts`. | 🧪 |
