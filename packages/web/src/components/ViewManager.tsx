@@ -1,3 +1,4 @@
+import { skipBackgroundPoll } from '../lib/hostedUsage';
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useQuery } from '@apollo/client';
 import { Search, X, ChevronDown, BarChart3, PanelRightClose, PanelRightOpen } from 'lucide-react';
@@ -78,8 +79,8 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
         }
       }
     } : { where: {} },
-    pollInterval: currentGraph ? 15000 : 0,
-    skipPollAttempt: () => document.visibilityState !== 'visible',
+    pollInterval: 60000,
+    skipPollAttempt: skipBackgroundPoll,
     fetchPolicy: currentGraph ? 'cache-and-network' : 'cache-only'
   });
 
@@ -95,8 +96,8 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
         ]
       }
     } : { where: {} },
-    pollInterval: currentGraph ? 15000 : 0,
-    skipPollAttempt: () => document.visibilityState !== 'visible',
+    pollInterval: 60000,
+    skipPollAttempt: skipBackgroundPoll,
     fetchPolicy: currentGraph ? 'cache-and-network' : 'cache-only'
   });
 

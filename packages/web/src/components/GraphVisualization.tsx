@@ -1,3 +1,4 @@
+import { skipBackgroundPoll } from '../lib/hostedUsage';
 import { useRef, useEffect, useState } from 'react';
 import { useQuery } from '@apollo/client';
 import * as d3 from 'd3';
@@ -67,14 +68,16 @@ export function GraphVisualization() {
       options: { limit: 100 }
     },
     fetchPolicy: 'cache-and-network',
-    pollInterval: 100,
+    pollInterval: 60000,
+    skipPollAttempt: skipBackgroundPoll,
     notifyOnNetworkStatusChange: true,
     errorPolicy: 'all'
   });
 
   const { data: edgesData, loading: edgesLoading } = useQuery(GET_EDGES, {
     fetchPolicy: 'cache-and-network',
-    pollInterval: 100,  // Also poll edges for consistency
+    pollInterval: 60000,
+    skipPollAttempt: skipBackgroundPoll,  // Also poll edges for consistency
     notifyOnNetworkStatusChange: true
   });
 

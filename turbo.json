@@ -5,7 +5,7 @@
     "build": {
       "dependsOn": ["^build"],
       "outputs": ["dist/**", ".next/**", "build/**"],
-      "env": ["NODE_ENV", "API_URL", "DATABASE_URL"]
+      "env": ["NODE_ENV", "API_URL", "DATABASE_URL", "VITE_HOSTED_USAGE", "VITE_API_URL", "VITE_GRAPHQL_URL"]
     },
     "test": {
       "dependsOn": ["build"],

@@ -1,4 +1,5 @@
 import React from 'react';
+import { HostedUsage } from './HostedUsage';
 import { Link, useLocation } from 'react-router-dom';
 import { Brain, Bot, BarChart3, Settings, Server, Globe, Shield, Users, Terminal } from 'lucide-react';
 import { UserSelector } from './UserSelector';
@@ -45,6 +46,7 @@ export function Layout({ children }: LayoutProps) {
       {/* Insecure-connection warning — an in-flow strip at the very top, so it
           reserves its own space and never overlaps the app (only over HTTP). */}
       <InsecureConnectionBanner className="relative z-30" />
+      <HostedUsage compact />
 
       {/* Static gradient background - optimized for all browsers */}
 

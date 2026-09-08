@@ -12,7 +12,7 @@ export function Agents() {
   const { currentGraph, availableGraphs, selectGraph } = useGraph();
   const { data, loading, error, refetch } = useQuery<{ workItems: AgentWork[] }>(GET_WORK_ITEMS, {
     variables: { where: { graph: { id: currentGraph?.id } } }, skip: !currentGraph,
-    fetchPolicy: 'cache-and-network', pollInterval: 15000,
+    fetchPolicy: 'cache-and-network', pollInterval: 0,
     skipPollAttempt: () => document.visibilityState !== 'visible',
   });
   const work = (currentGraph ? data?.workItems || [] : []).filter(item => item.contributors?.some(person => person.type === 'AI_AGENT'));

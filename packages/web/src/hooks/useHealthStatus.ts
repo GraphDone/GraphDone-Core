@@ -1,3 +1,4 @@
+import { hostedUsageEnabled, skipBackgroundPoll } from '../lib/hostedUsage';
 import { useState, useEffect } from 'react';
 
 interface HealthStatus {
@@ -37,6 +38,7 @@ export function useHealthStatus() {
     
     // Dynamic polling: faster when unhealthy, slower when healthy
     const getPollingInterval = () => {
+      if (hostedUsageEnabled) return 60000;
       if (!health) return 5000; // Initial check every 5 seconds
       
       const hasUnhealthyService = health.services?.graphql?.status !== 'healthy';
@@ -51,7 +53,7 @@ export function useHealthStatus() {
     const scheduleNext = () => {
       const interval = getPollingInterval();
       timeoutId = setTimeout(async () => {
-        await checkHealth();
+        if (!skipBackgroundPoll()) await checkHealth();
         scheduleNext(); // Schedule the next check
       }, interval);
     };

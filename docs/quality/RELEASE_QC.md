@@ -112,3 +112,29 @@ The first Claude Haiku handoff completed and was visible in the UI. An early rev
 Hosted fair-share admission has a separate prototype in `/tmp/graphdone-usage` (`improve/fair-usage`). Its 10,000 allocation-policy attempts are not end-to-end UI tests or model runs, and production enforcement/UI remain pending. Do not claim complete coverage or per-user daily protection from this policy result.
 
 Reported-controls follow-up: all 3 headed cases passed at 844×390, 1440×900 and 2560×1440 after the empty-alert helper fix. They exercise account-menu visibility/hit-testing/Escape focus, disabled template messaging, hierarchical card separation, and three settled minimap reopen cycles. Compact-layout unit suite: 18 passed, including mixed card sizes and 200 independent tasks without card overlap. Web typecheck passed. This does not establish edge-label clearance or readability of every title in a 200-node overview.
+
+## Hosted allowance follow-through — 2026-09-08
+
+Cloud `docs/FAIR_USAGE.md` is the enforcement contract. Core's hosted build shows
+actual account operations/row counters and local reset times, with 80/95/100%
+warning states. Self-hosted Core has no hosted limits or usage UI by default.
+
+Repeatable headed scenario: `tests/e2e/quality/hosted-usage.spec.ts`, with
+`VITE_HOSTED_USAGE=true` on local Vite. Six viewports (320 portrait through 2560
+landscape), personal/shared pauses, simulated reset, rejected task creation,
+retained text, blocked reload, retained login, hit-tested recovery download.
+All six passed. The test uses local Core and intercepted quota responses;
+Cloud's complementary `test-hosted-usage.mjs` exercises actual local D1/DO,
+including signup, agent owner accounting, concurrency, failure and UTC reset.
+
+The harsher blocked-reload test exposed a real empty-workspace overflow that
+covered the recovery button. The empty panel now scrolls within its own bounds.
+Quota errors no longer clear cached authentication or auto-create welcome graphs.
+Reported controls regression (three headed sizes) passed: user-menu placement,
+nonfunctional template labeling, minimap reopen and compact hierarchy.
+
+Recovery records are per-tab, per-account sessionStorage (last 20 distinct
+unconfirmed graph/task operations). They can be downloaded after reload but are
+not an offline database or automatic retry queue. Check for partial server
+success before reapplying. Full offline guests/sync, comprehensive security
+clearance and all-persona inference sweeps remain separate work.

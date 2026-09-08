@@ -29,7 +29,7 @@ function GraphItem({ graph, onSelect, getGraphTypeIcon }: GraphItemProps) {
         }
       }
     },
-    pollInterval: 10000,
+    pollInterval: 0,
     fetchPolicy: 'cache-and-network'
   });
 
@@ -43,7 +43,7 @@ function GraphItem({ graph, onSelect, getGraphTypeIcon }: GraphItemProps) {
         }
       }
     },
-    pollInterval: 10000,
+    pollInterval: 0,
     fetchPolicy: 'cache-and-network'
   });
 

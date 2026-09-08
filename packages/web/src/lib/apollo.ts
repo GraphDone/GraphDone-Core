@@ -1,9 +1,10 @@
-import { ApolloClient, InMemoryCache, createHttpLink, split, from } from '@apollo/client';
+import { ApolloClient, ApolloLink, InMemoryCache, createHttpLink, split, from } from '@apollo/client';
 import { setContext } from '@apollo/client/link/context';
 import { onError } from '@apollo/client/link/error';
 import { getMainDefinition } from '@apollo/client/utilities';
 import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
 import { createClient } from 'graphql-ws';
+import { cloudFailure, preserveCloudDraft, refreshHostedUsage } from './hostedUsage';
 import { getToken, clearSession } from './authStorage';
 
 // Dynamically construct GraphQL URLs based on current host
@@ -39,6 +40,12 @@ const authLink = setContext((_, { headers }) => {
 });
 
 const errorLink = onError(({ graphQLErrors, networkError, operation, forward }) => {
+  if (graphQLErrors?.length || networkError) {
+    const definition = getMainDefinition(operation.query);
+    if (definition.kind === 'OperationDefinition' && definition.operation === 'mutation' && /workitem|edge|graph/i.test(operation.operationName)) preserveCloudDraft(operation.operationName, operation.variables);
+    for (const error of graphQLErrors || []) cloudFailure(String(error.extensions?.code || ''));
+    if (networkError && 'result' in networkError) cloudFailure((networkError.result as any)?.code);
+  }
   if (graphQLErrors) {
     for (const error of graphQLErrors) {
       // Check for authentication errors
@@ -74,6 +81,8 @@ const wsLink = new GraphQLWsLink(
   })
 );
 
+const usageLink = new ApolloLink((operation,forward) => forward(operation).map(result => { void refreshHostedUsage(); return result; }));
+
 const splitLink = split(
   ({ query }) => {
     const definition = getMainDefinition(query);
@@ -83,7 +92,7 @@ const splitLink = split(
     );
   },
   wsLink,
-  from([errorLink, authLink, httpLink])
+  from([errorLink, authLink, usageLink, httpLink])
 );
 
 export const apolloClient = new ApolloClient({

@@ -1,3 +1,4 @@
+import { hostedUsageEnabled, skipBackgroundPoll } from '../lib/hostedUsage';
 import { useState, useEffect, useCallback } from 'react';
 
 export interface ServiceHealth {
@@ -145,7 +146,7 @@ export function useHealthCheck(options: UseHealthCheckOptions = {}) {
   useEffect(() => {
     if (!enabled || !interval) return;
 
-    const intervalId = setInterval(checkHealth, interval);
+    const intervalId = setInterval(() => { if (!skipBackgroundPoll()) void checkHealth(); }, hostedUsageEnabled ? Math.max(interval,60000) : interval);
 
     return () => clearInterval(intervalId);
   }, [enabled, interval, checkHealth]);
