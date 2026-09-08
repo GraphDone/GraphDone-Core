@@ -23,7 +23,7 @@ export class SQLiteOperationsDatabase implements OpsDatabase {
 let database:SQLiteOperationsDatabase|undefined;
 const hash=async(s:string)=>createHash('sha256').update(s).digest('hex');
 export const operationsApi=Router();
-operationsApi.use(cors(),express.json({limit:'16kb'}),rateLimit({windowMs:60000,limit:60}));
+operationsApi.use(cors(),express.json({limit:'32kb'}),rateLimit({windowMs:60000,limit:60}));
 operationsApi.all('*',async(req,res)=>{
  res.setHeader('Cache-Control','no-store');
  try {
@@ -31,7 +31,7 @@ operationsApi.all('*',async(req,res)=>{
   const user=async(id:string)=>{const u=await sqliteAuthStore.findUserById(id);return u?.isActive?{id:u.id,role:u.role,name:u.name}:null;};
   const bearer=req.headers.authorization?.match(/^Bearer (.+)$/)?.[1]||'';
   let identity= !bearer?{id:'public:'+await hash(req.ip||'unknown'),role:'GUEST'}:null;
-  if(bearer&&!bearer.startsWith('gd_ops_')){const claims=extractUserFromToken(req.headers.authorization);if(claims)identity=await user(claims.userId);}
+  if(bearer&&!bearer.startsWith('gd_ops_')){const claims=extractUserFromToken(req.headers.authorization);if(claims)identity=claims.role==='GUEST'?{id:'public:'+await hash(req.ip||'unknown'),role:'GUEST'}:await user(claims.userId);}
   const service=new OperationsService({db:database,hash,random:randomUUID,user,usage:async()=>({hosted:false,message:'Self-hosted storage has no GraphDone service quota. Monitor your own disk and server resources.'}),userCount:()=>sqliteAuthStore.getUserCount()});
   const q=Object.fromEntries(Object.entries(req.query).filter(([,v])=>typeof v==='string')) as Record<string,string>;
   const result=await service.handle(req.method,req.path,q,req.body,identity,bearer);

@@ -59,6 +59,11 @@ export const authResolvers = {
         return null;
       }
 
+      // Temporary guests have no persistent account; preserve their read-only session on reload.
+      if (context.user.role === 'GUEST' && /^guest-\d+$/.test(context.user.userId)) {
+        return { id: context.user.userId, email: 'guest@demo.local', username: 'guest', name: 'Guest User', role: 'GUEST', isActive: true, isEmailVerified: false, team: null };
+      }
+
       // Try SQLite first
       try {
         const user = await sqliteAuthStore.findUserById(context.user.userId);

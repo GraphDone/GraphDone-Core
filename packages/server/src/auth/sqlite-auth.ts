@@ -1,3 +1,4 @@
+import {randomBytes} from 'node:crypto';
 import sqlite3 from 'sqlite3';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
@@ -354,60 +355,28 @@ class SQLiteAuthStore {
   }
 
   private async createDefaultUsers(): Promise<void> {
-    const db = await this.getDb();
-
-    return new Promise((resolve, reject) => {
-      // Check if admin user exists
-      db.get('SELECT id FROM users WHERE username = ?', ['admin'], async (err, row) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-
-        if (!row) {
-          // Create default team
-          const teamId = uuidv4();
-          const now = new Date().toISOString();
-
-          db.run('INSERT INTO teams (id, name, createdAt, updatedAt) VALUES (?, ?, ?, ?)', 
-            [teamId, 'Development Team', now, now]);
-
-          // Create admin user
-          const adminId = uuidv4();
-          const adminPasswordHash = await bcrypt.hash('graphdone', 10);
-          
-          db.run(`INSERT INTO users (id, email, username, name, role, passwordHash, createdAt, updatedAt, isActive, isEmailVerified) 
-                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, 
-            [adminId, 'admin@graphdone.local', 'admin', 'Admin User', 'ADMIN', adminPasswordHash, now, now, 1, 1]);
-
-          // Link admin to team
-          db.run('INSERT INTO user_teams (userId, teamId, role, createdAt) VALUES (?, ?, ?, ?)',
-            [adminId, teamId, 'OWNER', now]);
-
-          // Create viewer user
-          const viewerId = uuidv4();
-          const viewerPasswordHash = await bcrypt.hash('viewer123', 10);
-          
-          db.run(`INSERT INTO users (id, email, username, name, role, passwordHash, createdAt, updatedAt, isActive, isEmailVerified) 
-                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, 
-            [viewerId, 'viewer@graphdone.local', 'viewer', 'Viewer User', 'VIEWER', viewerPasswordHash, now, now, 1, 1]);
-
-          // Link viewer to team
-          db.run('INSERT INTO user_teams (userId, teamId, role, createdAt) VALUES (?, ?, ?, ?)',
-            [viewerId, teamId, 'MEMBER', now], (err) => {
-              if (err) {
-                reject(err);
-              } else {
-                // Default users created successfully
-                resolve();
-              }
-            });
-        } else {
-          // Default users already exist
-          resolve();
-        }
-      });
-    });
+    const db=await this.getDb();
+    const run=(sql:string,args:unknown[])=>new Promise<void>((resolve,reject)=>db.run(sql,args,e=>e?reject(e):resolve()));
+    const existing=await new Promise<any>((resolve,reject)=>db.get("SELECT * FROM users WHERE username='admin'",(e,row)=>e?reject(e):resolve(row)));
+    if(existing)return;
+    const production=process.env.NODE_ENV==='production';
+    let password=process.env.ADMIN_PASSWORD||(production?randomBytes(32).toString('base64url'):'graphdone');
+    if(production&&password.length<20)throw Error('ADMIN_PASSWORD must be at least 20 characters in production.');
+    let email=process.env.ADMIN_EMAIL||'admin@graphdone.local';const now=new Date().toISOString(),adminId=uuidv4(),teamId=uuidv4();
+    if(production&&!process.env.ADMIN_PASSWORD){
+      const filename=path.join(process.cwd(),'data','bootstrap-admin.json');
+      // Retain recoverable first-start credentials on the persistent private volume.
+      if(fs.existsSync(filename)){const saved=JSON.parse(fs.readFileSync(filename,'utf8'));if(typeof saved.password!=='string'||saved.password.length<20||typeof saved.email!=='string')throw Error('Invalid bootstrap credential file');password=saved.password;email=saved.email;}
+      else fs.writeFileSync(filename,JSON.stringify({username:'admin',email,password,createdAt:now},null,2),{mode:0o600,flag:'wx'});
+    }
+    await run('BEGIN IMMEDIATE',[]);
+    try {
+    await run('INSERT INTO teams(id,name,createdAt,updatedAt) VALUES(?,?,?,?)',[teamId,'My team',now,now]);
+    await run('INSERT INTO users(id,email,username,name,role,passwordHash,createdAt,updatedAt,isActive,isEmailVerified) VALUES(?,?,?,?,?,?,?,?,1,1)',[adminId,email,'admin','Administrator','ADMIN',await bcrypt.hash(password,12),now,now]);
+    await run('INSERT INTO user_teams(userId,teamId,role,createdAt) VALUES(?,?,?,?)',[adminId,teamId,'OWNER',now]);
+    if(!production){const viewerId=uuidv4();await run('INSERT INTO users(id,email,username,name,role,passwordHash,createdAt,updatedAt,isActive,isEmailVerified) VALUES(?,?,?,?,?,?,?,?,1,1)',[viewerId,'viewer@graphdone.local','viewer','Viewer','VIEWER',await bcrypt.hash('viewer123',10),now,now]);await run('INSERT INTO user_teams(userId,teamId,role,createdAt) VALUES(?,?,?,?)',[viewerId,teamId,'MEMBER',now]);}
+    await run('COMMIT',[]);
+    }catch(error){await run('ROLLBACK',[]);throw error;}
   }
 
   async findUserByEmailOrUsername(emailOrUsername: string): Promise<User | null> {
