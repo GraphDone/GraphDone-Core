@@ -2,7 +2,7 @@ import { useSyncExternalStore } from 'react';
 import { getToken, getUserRaw } from './authStorage';
 export const hostedUsageEnabled = import.meta.env.VITE_HOSTED_USAGE === 'true';
 type Meter = { operations: number; reads: number; writes: number };
-export type HostedUsage = { used: Meter; limit: Meter; status: string; resetAt: string; allocationShares: number; kind: string; limits: {projectsPerAccount?: number; tasksPerProject: number; linksPerProject: number} };
+export type HostedUsage = { used: Meter; limit: Meter; status: string; resetAt: string; rolloutOperations?: number; allocationShares: number; kind: string; limits: {projectsPerAccount?: number; tasksPerProject: number; linksPerProject: number} };
 let snapshot: { usage: HostedUsage | null; error: string; drafts: number } = { usage: null, error: '', drafts: 0 };
 const listeners = new Set<() => void>();
 let pending = false;
