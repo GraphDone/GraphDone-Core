@@ -65,6 +65,8 @@ export function WorkItemDetailsModal({
   const { showSuccess, showError, showWarning } = useNotifications();
   const [editedNode, setEditedNode] = useState<WorkItem | null>(null);
   const [savedNode, setSavedNode] = useState<WorkItem | null>(null);
+  const draftDirtyRef = useRef(false);
+  const draftNodeIdRef = useRef<string | null>(null);
   const [showTypeDropdown, setShowTypeDropdown] = useState(false);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [showConnectDropdown, setShowConnectDropdown] = useState(false);
@@ -89,7 +91,10 @@ export function WorkItemDetailsModal({
   useModalA11y(dialogRef, { isOpen, initialFocus: false });
 
   useEffect(() => {
-    if (node) {
+    // Background refreshes produce fresh objects for the same work item.
+    // They must not wipe a person's unfinished form.
+    if (node && (draftNodeIdRef.current !== node.id || !draftDirtyRef.current)) {
+      draftNodeIdRef.current = node.id;
       setEditedNode({ ...node });
       setSavedNode({ ...node });
     }
@@ -259,9 +264,7 @@ export function WorkItemDetailsModal({
     },
     onError: (error) => {
       showError(`Failed to update work item: ${error.message}`);
-      if (node) {
-        setEditedNode({ ...node });
-      }
+      // Keep the draft available for correction or retry after a failed save.
     },
     optimisticResponse: (vars) => {
       if (!editedNode) return;
@@ -316,7 +319,7 @@ export function WorkItemDetailsModal({
         status: nodeToSave.status,
         priority: nodeToSave.priority,
         tags: nodeToSave.tags || [],
-        dueDate: nodeToSave.dueDate,
+        dueDate: nodeToSave.dueDate ?? null,
       };
 
       // Handle assignedTo relationship properly for Neo4j GraphQL
@@ -415,6 +418,8 @@ export function WorkItemDetailsModal({
   };
   
   const totalPriority = getNodePriority(currentNode);
+
+  draftDirtyRef.current = Boolean(hasChanges);
 
   const getStatusColor = (status: string) => {
     const statusScheme = getStatusColorScheme(status as WorkItemStatus);
@@ -521,6 +526,7 @@ export function WorkItemDetailsModal({
   return createPortal((
     <div
       ref={dialogRef}
+      data-modal-backdrop
       className="fixed inset-0 bg-black/70 backdrop-blur-lg z-50 flex items-stretch sm:items-center justify-center p-0 sm:p-4"
       role="dialog"
       aria-modal="true"
@@ -533,6 +539,7 @@ export function WorkItemDetailsModal({
       />
       <div
         ref={modalRef}
+        data-modal-panel
         tabIndex={-1}
         className="relative bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 border border-gray-600/50 shadow-2xl w-full sm:max-w-3xl h-full sm:h-auto sm:max-h-[90vh] overflow-y-auto rounded-none sm:rounded-2xl animate-in fade-in zoom-in-95 duration-300 ring-1 ring-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
         onClick={(e) => e.stopPropagation()}

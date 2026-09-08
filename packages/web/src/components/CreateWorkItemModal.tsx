@@ -53,7 +53,7 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
   useDialog(isOpen, onClose);
   const panelRef = React.useRef<HTMLDivElement>(null);
   useModalA11y(panelRef, { isOpen, label: parentWorkItemId ? 'Create and connect work item' : 'Create new work item' });
-  const { currentUser, currentTeam } = useAuth();
+  const { currentUser } = useAuth();
   const { currentGraph } = useGraph();
   const { showSuccess, showError } = useNotifications();
 
@@ -118,110 +118,15 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
 
 
   const [createWorkItem, { loading: creatingWorkItem }] = useMutation(CREATE_WORK_ITEM, {
-    refetchQueries: [
-      // Refetch work items for graph visualization
-      { 
-        query: GET_WORK_ITEMS,
-        variables: {
-          options: { limit: 100 }
-        }
-      },
-      // Refetch work items for list view
-      { 
-        query: GET_WORK_ITEMS,
-        variables: {
-          where: {
-            teamId: currentTeam?.id || 'team-1'
-          }
-        }
-      },
-      // Refetch all edges if creating a connected work item
-      ...(parentWorkItemId ? [
-        { 
-          query: GET_EDGES,
-          variables: {}
-        },
-        // Also refetch edges for the parent work item specifically
-        { 
-          query: GET_EDGES,
-          variables: {
-            where: {
-              OR: [
-                { source: { id: parentWorkItemId } },
-                { target: { id: parentWorkItemId } }
-              ]
-            }
-          }
-        }
-      ] : [])
-    ],
+    // Refetch active graph-scoped queries with their existing variables. Do not
+    // inject a new item into the default graph or issue a made-up team filter.
+    refetchQueries: [GET_WORK_ITEMS, GET_EDGES],
     awaitRefetchQueries: true,
-    update: (cache, { data }) => {
-      // Update Apollo cache for immediate UI refresh
-      if (data?.createWorkItems?.workItems) {
-        const newNode = data.createWorkItems.workItems[0];
-        
-        // Update cache for GraphVisualization (no team filter)
-        try {
-          const graphData = cache.readQuery({
-            query: GET_WORK_ITEMS,
-            variables: {
-              options: { limit: 100 }
-            }
-          }) as { workItems: WorkItem[] } | null;
-          
-          if (graphData) {
-            cache.writeQuery({
-              query: GET_WORK_ITEMS,
-              variables: {
-                options: { limit: 100 }
-              },
-              data: {
-                workItems: [newNode, ...graphData.workItems]
-              }
-            });
-          }
-        } catch {
-          // Silently fail if cache read fails
-        }
-
-        // Update cache for ListView (with team filter)
-        try {
-          const listData = cache.readQuery({
-            query: GET_WORK_ITEMS,
-            variables: {
-              where: {
-                teamId: currentTeam?.id || 'team-1'
-              }
-            }
-          }) as { workItems: WorkItem[] } | null;
-          
-          if (listData) {
-            cache.writeQuery({
-              query: GET_WORK_ITEMS,
-              variables: {
-                where: {
-                  teamId: currentTeam?.id || 'team-1'
-                }
-              },
-              data: {
-                workItems: [newNode, ...listData.workItems]
-              }
-            });
-          }
-        } catch {
-          // Silently fail if cache read fails
-        }
-      }
-    }
   });
 
-  // Edge creation mutation for connected work items
   const [createEdge] = useMutation(CREATE_EDGE, {
-    refetchQueries: [
-      { query: GET_EDGES, variables: {} },
-      { query: GET_WORK_ITEMS, variables: { options: { limit: 100 } } }
-    ]
+    refetchQueries: [GET_EDGES, GET_WORK_ITEMS],
+    awaitRefetchQueries: true,
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -242,7 +147,7 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
         type: formData.type,
         status: formData.status,
         priority: formData.priority,
-        dueDate: formData.dueDate || undefined,
+        dueDate: formData.dueDate ? `${formData.dueDate}T23:59:59.999Z` : undefined,
         tags: formData.tags || [],
       };
       
@@ -341,14 +246,14 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
   if (!isOpen) return null;
 
   return createPortal((
-    <div className="fixed inset-0 z-[9999] overflow-y-auto backdrop-blur-sm" style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0}}>
-      <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+    <div data-modal-backdrop className="fixed inset-0 z-[9999] overflow-y-auto backdrop-blur-sm" style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0}}>
+      <div className="modal-stage">
         <div
           className="fixed inset-0 transition-opacity bg-gradient-to-br from-gray-900/90 via-black/80 to-gray-800/90 animate-in fade-in duration-300"
           onClick={onClose}
         />
 
-        <div ref={panelRef} className="inline-block w-full max-w-lg p-0 my-8 overflow-hidden text-left align-middle transition-all transform bg-gradient-to-br from-gray-800/98 via-gray-850/98 to-gray-900/98 backdrop-blur-2xl shadow-2xl rounded-2xl border border-gray-600/30 focus-within:ring-2 focus-within:ring-blue-500/50 animate-in slide-in-from-bottom-4 duration-300 relative" onClick={(e) => e.stopPropagation()}>
+        <div ref={panelRef} data-modal-panel className="inline-block w-full max-w-lg p-0 my-8 overflow-hidden text-left align-middle transition-all transform bg-gradient-to-br from-gray-800/98 via-gray-850/98 to-gray-900/98 backdrop-blur-2xl shadow-2xl rounded-2xl border border-gray-600/30 focus-within:ring-2 focus-within:ring-blue-500/50 animate-in slide-in-from-bottom-4 duration-300 relative" onClick={(e) => e.stopPropagation()}>
           <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-green-500/20 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-purple-500 via-pink-500 to-green-500"></div>
 

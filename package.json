@@ -51,7 +51,20 @@
     "test:vlm": "playwright test --project=vlm --reporter=line && node tests/lib/reporting/generate-vlm-report.mjs",
     "test:geometry": "playwright test --project=geometry --reporter=line",
     "report:vlm": "node tests/lib/reporting/generate-vlm-report.mjs",
-    "perf:bundle": "node tests/perf/check-bundle-size.mjs"
+    "perf:bundle": "node tests/perf/check-bundle-size.mjs",
+    "qc:modes": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line tests/e2e/quality/new-user-modes.spec.ts",
+    "qc:new-user": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line tests/e2e/quality/new-user-modes.spec.ts tests/e2e/quality/button-content.spec.ts tests/e2e/graph/guest-dialog-layout.spec.ts tests/e2e/graph/responsive-real-workflows.spec.ts tests/e2e/graph/overview-board-actions.spec.ts tests/e2e/graph/recorded-ai-work.spec.ts tests/e2e/graph/admin-dialog-responsive.spec.ts tests/e2e/smoke/user-smoke.spec.ts tests/e2e/quality/persona-lifecycle.spec.ts tests/e2e/quality/graph-motion.spec.ts tests/e2e/quality/graph-resize.spec.ts tests/e2e/quality/graph-details.spec.ts",
+    "qc:personas": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line tests/e2e/quality/persona-lifecycle.spec.ts",
+    "qc:motion": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line tests/e2e/quality/graph-motion.spec.ts tests/e2e/quality/graph-resize.spec.ts",
+    "qc:graph-first": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line tests/e2e/quality/graph-first-journey.spec.ts",
+    "qc:visual": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line tests/e2e/quality/visual-style.spec.ts",
+    "qc:buttons": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line tests/e2e/quality/button-content.spec.ts",
+    "qc:controls": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line tests/e2e/quality/graph-controls.spec.ts",
+    "qc:layout": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line tests/e2e/quality/graph-layout.spec.ts",
+    "qc:verification": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line tests/e2e/quality/turnstile-guest.spec.ts",
+    "qc:graph": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line tests/e2e/quality/graph-motion.spec.ts tests/e2e/quality/graph-resize.spec.ts tests/e2e/quality/graph-details.spec.ts tests/e2e/quality/graph-controls.spec.ts tests/e2e/smoke/user-smoke.spec.ts",
+    "qc:agents": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 tests/e2e/quality/agent-collaboration.spec.ts",
+    "qc:modals": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 tests/e2e/quality/modal-header.spec.ts"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",

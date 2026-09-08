@@ -581,8 +581,8 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
                           >
                             <div className="flex items-center space-x-1">
                               <span className="text-xs opacity-70">{React.createElement(typeConfig.icon as any, { className: 'h-3 w-3' })}</span>
-                              <span className="truncate">
-                                {node.title.length > 15 ? node.title.substring(0, 15) + '...' : node.title}
+                              <span className="truncate min-w-0">
+                                {node.title}
                               </span>
                             </div>
                           </div>

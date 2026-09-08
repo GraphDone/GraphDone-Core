@@ -37,7 +37,7 @@ export function Layout({ children }: LayoutProps) {
 
   return (
     <div
-      className="h-dvh-screen flex flex-col bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 relative overflow-hidden"
+      className="workspace-surface h-dvh-screen flex flex-col relative overflow-hidden"
       style={{
         '--sidebar-width': desktopSidebarCollapsed ? '4rem' : '16rem'
       } as React.CSSProperties}
@@ -47,12 +47,12 @@ export function Layout({ children }: LayoutProps) {
       <InsecureConnectionBanner className="relative z-30" />
 
       {/* Static gradient background - optimized for all browsers */}
-      <div className="lagoon-caustics"></div>
-      
+
+
       {/* Phone top bar: just the project selector on the workspace (no hamburger —
           the bottom nav handles navigation). Other pages use their own header. */}
       {isWorkspaceRoute && (
-        <div className="md:hidden relative z-30 pt-safe">
+        <div data-workspace-header className="md:hidden relative z-30 pt-safe">
           <div className="flex items-center bg-gray-800/90 backdrop-blur-sm px-3 py-2 border-b border-gray-700/50">
             <div className="flex-1 min-w-0">
               <GraphSelector testId="graph-selector-mobile" />
@@ -92,7 +92,7 @@ export function Layout({ children }: LayoutProps) {
                 // greyed) — no point advertising a page they can never open.
                 if ((item as { hidden?: boolean }).hidden) return null;
                 const isRestricted = (item as { comingSoon?: boolean }).comingSoon;
-                
+
                 if (isRestricted) {
                   const restrictionMessage = (item as { comingSoon?: boolean }).comingSoon
                     ? 'Coming soon'
@@ -101,7 +101,7 @@ export function Layout({ children }: LayoutProps) {
                     : item.name === 'System'
                     ? 'User or Admin access required'
                     : 'Access restricted';
-                  
+
                   return (
                     <div
                       key={item.name}
@@ -130,11 +130,12 @@ export function Layout({ children }: LayoutProps) {
                     </div>
                   );
                 }
-                
+
                 return (
                   <Link
                     key={item.name}
                     to={item.href}
+                    aria-current={location.pathname === item.href ? 'page' : undefined}
                     className={`
                       flex items-center px-3 py-3 rounded-lg transition-colors group relative
                       ${desktopSidebarCollapsed ? 'md:justify-center md:px-2' : ''}
@@ -210,7 +211,7 @@ export function Layout({ children }: LayoutProps) {
                 </div>
               )}
             </div>
-            
+
             {/* Console & Tools Section - Section 4 */}
             <div className={`p-4 border-t border-gray-700/50 ${desktopSidebarCollapsed ? 'md:px-2' : ''}`}>
               {!desktopSidebarCollapsed ? (
@@ -231,7 +232,7 @@ export function Layout({ children }: LayoutProps) {
                       )}
                     </button>
                   </div>
-                  
+
                   {currentTeam && (
                     <div className="mb-2">
                       <p className="text-xs text-gray-300 font-medium">{currentTeam.name}</p>
@@ -262,7 +263,7 @@ export function Layout({ children }: LayoutProps) {
                 </div>
               )}
             </div>
-            
+
             {/* Footer Info Section */}
             <div className={`p-4 border-t border-gray-700/30 ${desktopSidebarCollapsed ? 'md:px-2' : ''}`}>
               {!desktopSidebarCollapsed && (

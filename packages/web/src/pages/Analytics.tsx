@@ -92,7 +92,7 @@ export function Analytics() {
           </button>
         ))}
       </nav>
-      <main className="flex-1 min-h-0 overflow-auto p-4 sm:p-6 space-y-4">
+      <section aria-label="Analytics results" className="flex-1 min-h-0 overflow-auto p-4 sm:p-6 space-y-4">
         {!currentGraph ? (
           <p>Select a graph to explore its progress.</p>
         ) : error ? (
@@ -323,7 +323,7 @@ export function Analytics() {
             )}
           </>
         )}
-      </main>
+      </section>
     </div>
   );
 }

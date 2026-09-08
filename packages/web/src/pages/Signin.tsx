@@ -1,3 +1,4 @@
+import { WorkIllustration } from '../components/WorkIllustration';
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, gql } from '@apollo/client';
@@ -113,6 +114,8 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
   const [lockoutTime, setLockoutTime] = useState<Date | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [turnstileSiteKey, setTurnstileSiteKey] = useState<string | undefined>();
+  const [guestDescription, setGuestDescription] = useState<string | undefined>();
   const [showGuestInfo, setShowGuestInfo] = useState(false);
   const [oauthConfig, setOauthConfig] = useState<{
     google: { enabled: boolean; configured: boolean };
@@ -127,6 +130,8 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
         const response = await fetch(`${apiUrl}/config`);
         if (response.ok) {
           const config = await response.json();
+          if (typeof config.guest?.turnstileSiteKey === 'string') setTurnstileSiteKey(config.guest.turnstileSiteKey);
+          if (typeof config.guest?.description === 'string') setGuestDescription(config.guest.description);
           if (config.oauth && config.oauth.providers) {
             setOauthConfig(config.oauth.providers);
           }
@@ -179,7 +184,7 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
       };
       const errorDetail = errorMessages[error];
       if (errorDetail) {
-        setErrors({ 
+        setErrors({
           submit: errorDetail.message,
           submitTitle: errorDetail.title,
           submitAction: errorDetail.action
@@ -271,7 +276,7 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
       const newAttempts = loginAttempts + 1;
       setLoginAttempts(newAttempts);
       localStorage.setItem('loginAttempts', newAttempts.toString());
-      
+
       if (newAttempts >= 5) {
         const lockout = new Date(Date.now() + 15 * 60 * 1000);
         setLockoutTime(lockout);
@@ -295,15 +300,15 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
-    
+
     if (!formData.emailOrUsername) {
       newErrors.emailOrUsername = 'Email or username is required';
     }
-    
+
     if (!formData.password) {
       newErrors.password = 'Password is required';
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -332,8 +337,8 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
     });
   };
 
-  const handleGuestLogin = async () => {
-    await guestLogin();
+  const handleGuestLogin = async (token?: string) => {
+    await guestLogin(token ? { context: { headers: { 'X-Turnstile-Token': token } } } : {});
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -474,26 +479,27 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
 
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4 lg:py-3 relative overflow-hidden">
+    <div className="signin-surface min-h-screen flex items-center justify-center p-4 lg:py-3 relative overflow-hidden">
       {/* Static gradient background - optimized for all browsers */}
-      <div className="lagoon-caustics"></div>
+
       {/* Design religion: fit the window. On large screens the branding sits
           BESIDE the form (wider, 2-column) so the page never needs vertical
           scrolling; on small screens it stacks above as before. */}
       <div className="w-full max-w-md lg:max-w-4xl relative z-10">
        <div className="lg:grid lg:grid-cols-2 lg:gap-12 lg:items-center">
         {/* Header */}
-        <div className="text-center lg:text-left mb-8 lg:mb-0 animate-in fade-in slide-in-from-top-4 duration-500">
-          <Link to="/" className="inline-flex items-center justify-center lg:justify-start mb-6 hover:opacity-90 transition-all duration-300 hover:scale-105 group">
-            <img src="/favicon.svg" alt="GraphDone Logo" className="h-12 w-12 sm:h-16 sm:w-16 drop-shadow-lg group-hover:drop-shadow-2xl transition-all duration-300" />
-            <span className="ml-3 sm:ml-4 text-4xl sm:text-5xl font-bold bg-gradient-to-r from-teal-400 via-cyan-400 to-blue-500 bg-clip-text text-transparent drop-shadow-2xl tracking-tight">GraphDone</span>
+        <div className="signin-intro text-center lg:text-left mb-6 lg:mb-0">
+          <Link to="/" className="inline-flex items-center justify-center lg:justify-start mb-6 hover:opacity-90 transition-opacity group">
+            <img src="/favicon.svg" alt="GraphDone Logo" className="h-10 w-10 sm:h-12 sm:w-12" />
+            <span className="ml-3 sm:ml-4 text-3xl sm:text-4xl font-semibold text-stone-100 tracking-tight">GraphDone</span>
           </Link>
-          <h1 className="text-3xl font-bold text-gray-100 mb-3">Welcome Back</h1>
-          <p className="text-gray-400 text-lg">Enter your credentials to join the team</p>
+          <h1 className="text-3xl font-bold text-gray-100 mb-3">You and your agent.<br /><span className="signin-headline-accent">Moving work forward.</span></h1>
+          <p className="text-gray-400 text-lg">One shared place for your to-dos, priorities, and notes. See what needs you and what your agent can take on.</p>
+          <WorkIllustration />
         </div>
 
         {/* Login Form */}
-        <form onSubmit={handleSubmit} className="bg-gray-800/50 backdrop-blur-xl border border-gray-700/50 rounded-2xl p-5 sm:p-8 lg:py-6 space-y-5 lg:space-y-4 shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <form onSubmit={handleSubmit} className="signin-card border border-stone-500/20 rounded-xl p-5 sm:p-8 lg:py-6 space-y-5 lg:space-y-4">
           {/* Social Login Buttons — only when at least one provider is actually
               configured; otherwise the whole block (and its divider) is hidden so
               no setup hints leak to end users (cloud uses email + guest). */}
@@ -647,7 +653,7 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
                     ✅ Once you click it you'll stay signed in on this device — no need to log in again
                   </p>
                 </div>
-                
+
                 {/* Type-in code — alternative to clicking the link, so you can
                     sign in on a device where you don't want to open your email. */}
                 <div className="pt-4 border-t border-teal-500/20">
@@ -796,7 +802,7 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
                 {/* CAPTCHA for Magic Link — only auto-focuses when an email is
                     already entered; otherwise the email field gets focus first. */}
                 <div>
-                  <CodeCaptcha
+                  <CodeCaptcha compact
                     onVerified={(code) => setMagicLinkCaptchaPayload(code)}
                     className="w-full"
                     autoFocus={hasEnteredEmail(formData.magicLinkEmail)}
@@ -1041,7 +1047,7 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
           </button>
 
           {/* Guest Mode Dialog */}
-          <GuestModeDialog 
+          <GuestModeDialog turnstileSiteKey={turnstileSiteKey} guestDescription={guestDescription}
             isOpen={showGuestInfo}
             onClose={() => setShowGuestInfo(false)}
             onConfirm={handleGuestLogin}
@@ -1115,7 +1121,7 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
         </div>
 
       </div>
-      
+
       {/* Insecure-connection warning (top strip, only over HTTP) */}
       <InsecureConnectionBanner fixed />
     </div>

@@ -131,8 +131,8 @@ export function GraphProvider({ children }: GraphProviderProps) {
           zoomLevel: 1.0
         },
         permissions: g.permissions ? JSON.parse(g.permissions) : {
-          owner: currentUser?.id || 'unknown',
-          admins: [currentUser?.id || 'unknown'],
+          owner: g.createdBy || 'unknown',
+          admins: g.createdBy ? [g.createdBy] : [],
           editors: [],
           viewers: [],
           teamPermission: 'VIEW'

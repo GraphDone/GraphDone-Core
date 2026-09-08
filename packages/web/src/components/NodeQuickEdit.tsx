@@ -24,6 +24,7 @@ interface NodeQuickEditProps {
   /** Persist one field change (optimistic); parent wires the mutation + undo. */
   onCommit: (c: QuickEditCommit) => void;
   onClose: () => void;
+  onOpenDetails?: () => void;
   rootTestId?: string;
 }
 
@@ -38,7 +39,7 @@ const STATUSES = STATUS_OPTIONS.filter((s) => s.value !== 'all');
  * mutation + an undo entry. Positioning is handled by the parent (like the inline
  * rename box).
  */
-export function NodeQuickEdit({ node, onCommit, onClose, rootTestId = 'node-quick-edit' }: NodeQuickEditProps) {
+export function NodeQuickEdit({ node, onCommit, onClose, onOpenDetails, rootTestId = 'node-quick-edit' }: NodeQuickEditProps) {
   const [title, setTitle] = useState<string>(node.title || '');
   const [description, setDescription] = useState<string>(node.description || '');
   const [priority, setPriority] = useState<number>(Math.round(((node.priority ?? 0) as number) * 100));
@@ -246,6 +247,7 @@ export function NodeQuickEdit({ node, onCommit, onClose, rootTestId = 'node-quic
             </ul>
           )}
         </div>
+        {onOpenDetails && <button onClick={onOpenDetails} className="min-h-[44px] w-full rounded-lg border border-gray-600 px-3 py-2 text-sm text-gray-200 hover:bg-gray-800">Details & connections</button>}
       </div>
     </div>
   );

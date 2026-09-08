@@ -776,3 +776,92 @@ html[data-theme="contrast"] .node-selected {
   * { scrollbar-width: auto; scrollbar-color: auto; }
   ::-webkit-scrollbar { display: block; }
 }
+
+/* GraphDone studio. Shared surfaces and a single interaction accent; status
+   colors remain semantic. All texture is static, outside the moving canvas. */
+:root {
+  --gd-canvas: #111929;
+  --gd-surface: #202941;
+  --gd-chrome: #192139;
+  --gd-line: #3b4565;
+  --gd-ink: #eeece5;
+  --gd-muted: #b2bace;
+  --gd-accent: #b4efd0;
+  --gd-action: #6950de;
+}
+.workspace-surface, .signin-surface {
+  background-color: var(--gd-canvas);
+  color: var(--gd-ink);
+  font-family: 'Segoe UI', 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.signin-surface::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: url('/paper-grain.svg') repeat; opacity: .055;
+}
+.signin-intro h1 {
+  font-family: Georgia, 'Times New Roman', serif; font-weight: 400;
+  letter-spacing: -.035em; line-height: 1.12;
+}
+.signin-intro p { color: var(--gd-muted); line-height: 1.6; font-size: 1rem; }
+@media (min-width: 1024px) { .signin-intro h1 { font-size: 3.8rem; max-width: 25rem; } }
+.signin-card { background: var(--gd-surface); box-shadow: 0 20px 64px #0003; }
+.signin-surface button[class*="bg-gradient"] { background-image: none; background-color: var(--gd-action); box-shadow: none; }
+.signin-surface button:hover { transform: none; }
+.workspace-toolbar { background: var(--gd-chrome); border-color: var(--gd-line); }
+.workspace-view-switcher { display: flex; align-items: center; gap: 2px; }
+.workspace-view-tab {
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  min-height: 44px; padding: 10px 9px; white-space: nowrap;
+  border-bottom: 2px solid transparent; color: var(--gd-muted);
+  transition: color 120ms, border-color 120ms;
+}
+.workspace-view-tab > svg { display: none; }
+.workspace-view-tab > div { font-size: 12px; font-weight: 500; }
+.workspace-view-tab:hover { color: var(--gd-ink); border-color: var(--gd-line); }
+.workspace-view-tab[aria-pressed="true"] { color: var(--gd-accent); border-color: var(--gd-accent); }
+@media (min-width: 1600px) { .workspace-view-tab > svg { display: block; width: 17px; height: 17px; } }
+.workspace-create { background: var(--gd-action); color: #f5f4ee; border: 1px solid #a68cff; }
+.workspace-create:hover { background: #7e63f0; }
+.project-switcher { background: var(--gd-surface); border-color: var(--gd-line); box-shadow: 0 1px 2px #0002; }
+.project-switcher:hover { background: #293452; border-color: #8d7ae1; }
+.project-menu { background: var(--gd-surface); }
+html:not([data-theme="contrast"]) .workspace-surface .graph-container { background: var(--gd-canvas); }
+html:not([data-theme="contrast"]) .workspace-surface .graph-container .node-bg { fill: #26314a; }
+.workspace-surface .graph-container .node-title-bar { fill-opacity: .55; stroke-opacity: .65; }
+.workspace-surface .graph-container .node-type-text { letter-spacing: .06em; }
+html:not([data-theme="contrast"]) .workspace-surface .graph-container .node-title-text { fill: var(--gd-ink); }
+.workspace-surface .graph-container .edge { stroke-opacity: .55; }
+.workspace-surface .graph-container .edge-label-bg { stroke-opacity: .55; }
+.workspace-surface button:focus-visible, .signin-surface button:focus-visible {
+  outline: 2px solid var(--gd-accent); outline-offset: 3px;
+}
+
+/* Color has a job: violet actions, mint selection, coral editorial emphasis. */
+.signin-headline-accent { color: #f6a280; }
+.work-illustration { display: none; width: 100%; max-width: 420px; margin-top: 28px; }
+@media (min-width: 1024px) and (min-height: 700px) { .work-illustration { display: block; } }
+.workspace-view-tab[aria-pressed="true"] { background: #302951; border-radius: 6px 6px 0 0; }
+.signin-card { border-top: 3px solid #9678ff; }
+.workspace-surface nav a[aria-current="page"] { background: #342e59; color: #e0d4ff; box-shadow: inset 3px 0 #a186ff; }
+
+/* Illustration text deliberately differs from the legacy graph-wide white
+   SVG labels. Keep dark ink on the light coral and mint panels. */
+.work-illustration .ink-on-violet { fill: #fff8ef !important; }
+.work-illustration .ink-on-coral { fill: #312024 !important; }
+.work-illustration .ink-on-mint { fill: #183a30 !important; }
+
+[data-modal-backdrop] { --modal-header-offset: 0px; }
+.modal-stage {
+  min-height: 100dvh; display: flex; align-items: center; justify-content: center;
+  padding: calc(var(--modal-header-offset) + 12px) 12px 12px;
+}
+[data-modal-backdrop] [data-modal-panel] {
+  margin-top: 0; margin-bottom: 0;
+  max-height: calc(100dvh - var(--modal-header-offset) - 24px);
+  overflow-y: auto;
+}
+[data-modal-backdrop][role="dialog"] {
+  padding-top: calc(var(--modal-header-offset) + 12px);
+  padding-bottom: 12px;
+}

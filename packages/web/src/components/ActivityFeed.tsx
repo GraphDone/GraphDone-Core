@@ -12,11 +12,10 @@ export default function ActivityFeed({ filteredNodes }: { filteredNodes: Activit
     `${event.itemTitle} ${event.text}`.toLowerCase().includes(search.toLowerCase()));
 
   return (
-    <section className="min-h-full min-w-0 p-3 sm:p-6" aria-label="Recorded activity">
-      <header className="mb-4">
+    <section className="min-h-full min-w-0 p-3 sm:p-4" aria-label="Recorded activity">
+      <header className="mb-3">
         <h2 className="text-xl font-semibold text-gray-100">What changed</h2>
-        <p className="mt-1 text-sm text-gray-400">Saved work and progress notes from this graph.</p>
-        <p className="mt-2 text-xs text-gray-400">Shows creation, the latest update, and editable notes. Full change history and actor attribution are not yet recorded.</p>
+        <p className="mt-2 text-xs text-gray-400">Creation, latest edits and progress notes. Full history and actor attribution are not recorded.</p>
       </header>
       <div className="flex flex-col sm:flex-row gap-2 mb-4">
         <label className="relative flex-1 min-w-0">

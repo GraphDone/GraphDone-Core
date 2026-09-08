@@ -1,3 +1,4 @@
+import { agentApi } from './agent-api.js';
 import { ApolloServer } from '@apollo/server';
 import { expressMiddleware } from '@apollo/server/express4';
 import { ApolloServerPluginDrainHttpServer } from '@apollo/server/plugin/drainHttpServer';
@@ -402,6 +403,8 @@ async function startServer() {
   );
 
   // Enhanced health check endpoint that checks all services
+  app.use('/api/agent', agentApi);
+
   app.get('/health', cors<cors.CorsRequest>(), async (_req, res) => {
     const health: {
       status: string;
