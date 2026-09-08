@@ -156,3 +156,21 @@ Live acceptance found the legacy red connection overlay could cover the inspecto
 Quota recovery additionally retains the account profile in IndexedDB. A returning token can recover the cached profile without a D1 `Me` query, while uploads still require server authorization. Profile caches are excluded from project exports. The final local sweep explicitly removes the browser's currentUser cache, reloads during a persisted quota pause, asserts zero network `Me` requests, and recovers both tasks: **3 headed scenarios passed in 48.9 seconds**.
 
 A persisted upload attempt counter now prevents silent resurrection after receipt retention: a retried creation missing from the cloud requires review after a revision conflict. This covers a lost acknowledgement followed by another device deleting that item, even after the server's bounded receipt history expires. Eleven unit cases passed; the full headed sequence passed again in **48.6 seconds**.
+
+## 2026-09-08 — Individual project transfer and Mermaid
+
+New repeatable gate: `npm run qc:project-transfer` (headed, serial; local offline-enabled production build). Full format contract and JSON example: `docs/formats/PROJECT_TRANSFER.md`; public JSON Schema: `packages/web/public/schemas/project-v1.schema.json`.
+
+| ID | New-user question / persona | Sequence | Required result |
+| --- | --- | --- | --- |
+| TRANSFER-01 | Student: Can I share just this project? | Import documented example via file chooser, select it, export JSON | Exactly one project; task fields, positions, tags, metadata, links and notes preserved; no auth or sync internals |
+| TRANSFER-02 | Parent / team: Will importing overwrite my work? | Reimport export offline, reload | Fresh project/task/link/note IDs; references remapped; original unchanged; durable local copy |
+| TRANSFER-03 | Engineer: Can I put this in documentation? | Export Mermaid with adversarial quotes, emoji, HTML and directive-like task text; parse/render locally with Mermaid 11.17.2 | Three readable nodes, directed labeled edge, no executable user syntax; actual SVG screenshot |
+| TRANSFER-04 | Any user: What if a file is broken or my disk is full? | Invalid JSON/version/references, mixed valid-invalid backup, >50 MB file, injected IndexedDB put failure | Visible error, zero partial imports; later saves still work |
+| TRANSFER-05 | Large team: What are the limits? | 300 tasks / 600 links / 2,000 full-length notes round trip; over-limit project; account with 100 cloud summaries | Full-size data round trips; excess rejected without saving |
+| TRANSFER-06 | Mobile user: Can I reach every action? | Click JSON export, Mermaid export and import file chooser at 320×568, 390×844, 844×390, 1024×768, 1440×900, 2560×1440; actual import at 320 portrait | Downloads work; buttons fit; menu is bounded and scrolls only its contents; no page overflow |
+| TRANSFER-07 | Returning user: Can I preserve notes for deleted tasks? | Export historical note whose task no longer exists | Note body and author label preserved as a project note |
+
+Evidence: 26 unit/schema/reconciliation tests passed (including 1,000 deterministic merge cases). Local transfer headed gate passed in 12.7 s; local offline headed regression 3/3 passed in 49.8 s. Actual local Worker/D1/DO sync fixture passed owner isolation, idempotent replay, atomic races, real REST agent revision conflict and 8 MB notes download. Production build/typecheck passed. Mermaid/Ajv are dev-only validation dependencies and do not ship in the app bundle. Screenshots under ignored `test-artifacts/quality/project-transfer-*.png` and `project-mermaid.png`.
+
+Scope: hosted/offline-enabled app. Mermaid is export-only and omits notes, descriptions, dates, priorities and exact layout; use JSON for restoration. This is targeted transfer/offline validation, not a claim of exhaustive browser or security coverage.
