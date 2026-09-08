@@ -1,238 +1,56 @@
-import { useState, useRef, useEffect } from 'react';
-import { ChevronDown, User, Users, LogOut } from 'lucide-react';
+import { useState, useRef, useLayoutEffect, useId } from 'react';
+import { createPortal } from 'react-dom';
+import { Link } from 'react-router-dom';
+import { ChevronDown, LogOut, Settings } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
-interface UserSelectorProps {
-  isCollapsed?: boolean;
-}
-
-export function UserSelector({ isCollapsed = false }: UserSelectorProps) {
-  const { currentUser, currentTeam, availableUsers, availableTeams, switchUser, switchTeam, logout } = useAuth();
+export function UserSelector({ isCollapsed = false }: { isCollapsed?: boolean }) {
+  const { currentUser, currentTeam, logout } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'users' | 'teams'>('users');
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const handleUserSelect = (userId: string) => {
-    switchUser(userId);
-    setIsOpen(false);
-  };
-
-  const handleTeamSelect = (teamId: string) => {
-    switchTeam(teamId);
-    setIsOpen(false);
-  };
-
-  const handleLogout = () => {
-    logout();
-    setIsOpen(false);
-  };
-
+  const [position, setPosition] = useState({ left: 8, top: 8 });
+  const trigger = useRef<HTMLButtonElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  const id = useId();
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+    const place = () => {
+      if (!trigger.current || !panel.current) return;
+      const anchor = trigger.current.getBoundingClientRect();
+      const menu = panel.current.getBoundingClientRect();
+      setPosition({
+        left: Math.max(8, Math.min(anchor.right + 8, window.innerWidth - menu.width - 8)),
+        top: Math.max(8, Math.min(anchor.bottom - menu.height, window.innerHeight - menu.height - 8)),
+      });
+    };
+    const close = (event: MouseEvent) => {
+      if (!panel.current?.contains(event.target as Node) && !trigger.current?.contains(event.target as Node)) setIsOpen(false);
+    };
+    const key = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { event.preventDefault(); setIsOpen(false); trigger.current?.focus(); }
+    };
+    place();
+    panel.current?.querySelector<HTMLElement>('a, button')?.focus();
+    const observer = new ResizeObserver(place);
+    if (panel.current) observer.observe(panel.current);
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown', key);
+    return () => { observer.disconnect(); window.removeEventListener('resize', place); window.removeEventListener('scroll', place, true); document.removeEventListener('mousedown', close); document.removeEventListener('keydown', key); };
+  }, [isOpen]);
   if (!currentUser) return null;
-
-  const getRoleColor = (role: string) => {
-    switch (role) {
-      case 'admin': return 'text-purple-300 bg-purple-900';
-      case 'ADMIN': return 'text-purple-300 bg-purple-900';
-      case 'member': return 'text-blue-300 bg-blue-900';
-      case 'viewer': return 'text-gray-300 bg-gray-700';
-      case 'VIEWER': return 'text-gray-300 bg-gray-700';
-      default: return 'text-gray-300 bg-gray-700';
-    }
-  };
-
-  const currentTeamUsers = availableUsers.filter(user => user.team?.id === currentTeam?.id);
-
-  return (
-    <div className="relative" ref={dropdownRef}>
-      {/* User selector button */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        data-testid="user-menu"
-        className={`flex items-center w-full p-3 text-left hover:bg-gray-700 rounded-lg transition-colors ${
-          isCollapsed ? 'justify-center lg:p-2' : 'space-x-3'
-        }`}
-      >
-        <div className="flex-shrink-0">
-          <div className={`bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-medium ${
-            isCollapsed ? 'w-10 h-10 text-base' : 'w-8 h-8 text-sm'
-          }`}>
-            {currentUser.avatar || currentUser.name.charAt(0)}
-          </div>
-        </div>
-
-        {!isCollapsed && (
-          <>
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium text-gray-100 truncate">
-                {currentUser.name}
-              </div>
-              <div className="text-xs text-gray-400 truncate">
-                {currentTeam?.name} • {currentUser.role}
-              </div>
-            </div>
-
-            <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-          </>
-        )}
-      </button>
-
-      {/* Dropdown menu */}
-      {isOpen && (
-        <div data-testid="user-menu-dropdown" className={`absolute top-full mt-2 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-50 max-h-96 overflow-hidden ${
-          isCollapsed ? 'left-0 w-64' : 'left-0 right-0'
-        }`}>
-          {/* Tabs */}
-          <div className="flex border-b border-gray-600">
-            <button
-              onClick={() => setActiveTab('users')}
-              className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-                activeTab === 'users'
-                  ? 'text-blue-400 border-b-2 border-blue-400 bg-gray-700'
-                  : 'text-gray-300 hover:text-gray-100 hover:bg-gray-700'
-              }`}
-            >
-              <User className="h-4 w-4 inline mr-2" />
-              Users
-            </button>
-            <button
-              onClick={() => setActiveTab('teams')}
-              className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-                activeTab === 'teams'
-                  ? 'text-blue-400 border-b-2 border-blue-400 bg-gray-700'
-                  : 'text-gray-300 hover:text-gray-100 hover:bg-gray-700'
-              }`}
-            >
-              <Users className="h-4 w-4 inline mr-2" />
-              Teams
-            </button>
-          </div>
-
-          <div className="max-h-64 overflow-y-auto">
-            {activeTab === 'users' && (
-              <div className="p-2">
-                <div className="text-xs font-medium text-gray-400 px-2 py-1 uppercase tracking-wide">
-                  {currentTeam?.name} Members
-                </div>
-                {currentTeamUsers.map((user) => (
-                  <button
-                    key={user.id}
-                    onClick={() => handleUserSelect(user.id)}
-                    className={`w-full flex items-center space-x-3 p-2 rounded-lg text-left transition-colors ${
-                      user.id === currentUser.id
-                        ? 'bg-blue-900 text-blue-100'
-                        : 'hover:bg-gray-700 text-gray-100'
-                    }`}
-                  >
-                    <div className="flex-shrink-0">
-                      <div className="w-6 h-6 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xs font-medium">
-                        {user.avatar || user.name.charAt(0)}
-                      </div>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium truncate">{user.name}</div>
-                      <div className="text-xs text-gray-400 truncate">{user.email}</div>
-                    </div>
-                    <div className={`text-xs px-2 py-1 rounded-full ${getRoleColor(user.role)}`}>
-                      {user.role}
-                    </div>
-                    {user.id === currentUser.id && (
-                      <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
-                    )}
-                  </button>
-                ))}
-                
-                {/* Other team users */}
-                {availableUsers.filter(user => user.team?.id !== currentTeam?.id).length > 0 && (
-                  <>
-                    <div className="text-xs font-medium text-gray-400 px-2 py-1 mt-3 uppercase tracking-wide border-t border-gray-600 pt-3">
-                      Other Teams
-                    </div>
-                    {availableUsers
-                      .filter(user => user.team?.id !== currentTeam?.id)
-                      .map((user) => {
-                        const userTeam = availableTeams.find(t => t.id === user.team?.id);
-                        return (
-                          <button
-                            key={user.id}
-                            onClick={() => handleUserSelect(user.id)}
-                            className="w-full flex items-center space-x-3 p-2 rounded-lg text-left hover:bg-gray-700 text-gray-100 transition-colors"
-                          >
-                            <div className="flex-shrink-0">
-                              <div className="w-6 h-6 bg-gradient-to-br from-gray-400 to-gray-600 rounded-full flex items-center justify-center text-white text-xs font-medium">
-                                {user.avatar || user.name.charAt(0)}
-                              </div>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="text-sm font-medium truncate">{user.name}</div>
-                              <div className="text-xs text-gray-400 truncate">{userTeam?.name}</div>
-                            </div>
-                            <div className={`text-xs px-2 py-1 rounded-full ${getRoleColor(user.role)}`}>
-                              {user.role}
-                            </div>
-                          </button>
-                        );
-                      })}
-                  </>
-                )}
-              </div>
-            )}
-
-            {activeTab === 'teams' && (
-              <div className="p-2">
-                {availableTeams.map((team) => (
-                  <button
-                    key={team.id}
-                    onClick={() => handleTeamSelect(team.id)}
-                    className={`w-full flex items-center space-x-3 p-2 rounded-lg text-left transition-colors ${
-                      team.id === currentTeam?.id
-                        ? 'bg-blue-900 text-blue-100'
-                        : 'hover:bg-gray-700 text-gray-100'
-                    }`}
-                  >
-                    <div className="flex-shrink-0">
-                      <div className="w-6 h-6 bg-gradient-to-br from-green-500 to-blue-600 rounded-full flex items-center justify-center text-white text-xs font-medium">
-                        {team.name.charAt(0)}
-                      </div>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium truncate">{team.name}</div>
-                      <div className="text-xs text-gray-400 truncate">
-                        {team.memberCount} members • {team.description}
-                      </div>
-                    </div>
-                    {team.id === currentTeam?.id && (
-                      <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
-                    )}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Logout button */}
-          <div className="border-t border-gray-600 p-2">
-            <button
-              onClick={handleLogout}
-              className="w-full flex items-center space-x-3 p-2 rounded-lg text-left hover:bg-red-900 text-red-400 transition-colors"
-            >
-              <LogOut className="h-4 w-4" />
-              <span className="text-sm font-medium">Logout</span>
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+  return <>
+    <button ref={trigger} data-testid="user-menu" aria-label={`Account: ${currentUser.name}`} aria-expanded={isOpen} aria-controls={isOpen ? id : undefined}
+      onClick={() => setIsOpen(!isOpen)} className={`flex items-center gap-3 w-full min-h-[44px] p-2 text-left hover:bg-gray-700 rounded-lg ${isCollapsed ? 'justify-center' : ''}`}>
+      <span className="shrink-0 w-9 h-9 rounded-full bg-violet-700 text-white flex items-center justify-center font-semibold">{currentUser.avatar || currentUser.name.charAt(0)}</span>
+      {!isCollapsed && <><span className="min-w-0 flex-1"><span className="block text-sm text-gray-100 truncate">{currentUser.name}</span><span className="block text-xs text-gray-300 truncate">{currentUser.role}</span></span><ChevronDown className="w-4 h-4 shrink-0" /></>}
+    </button>
+    {isOpen && createPortal(<div ref={panel} id={id} data-testid="user-menu-dropdown" aria-label="Your account" role="region"
+      style={position} className="fixed z-[1100] w-80 max-w-[calc(100vw-16px)] max-h-[calc(100dvh-16px)] overflow-y-auto rounded-xl border border-gray-600 bg-gray-800 text-gray-100 shadow-2xl p-3"
+      onBlur={event => { if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget as Node) && event.relatedTarget !== trigger.current) setIsOpen(false); }}>
+      <div className="p-2 break-words"><p className="font-semibold">{currentUser.name}</p><p className="text-sm text-gray-300">{currentUser.email}</p><p className="mt-2 text-xs text-emerald-200">{currentUser.role}{currentTeam ? ` · ${currentTeam.name}` : ''}</p></div>
+      <Link to="/settings" onClick={() => setIsOpen(false)} className="flex items-center gap-3 min-h-[44px] p-2 rounded-lg hover:bg-gray-700"><Settings className="w-4 h-4" />Account settings</Link>
+      <button onClick={() => { setIsOpen(false); logout(); }} className="flex items-center gap-3 w-full min-h-[44px] p-2 rounded-lg hover:bg-red-950 text-red-200"><LogOut className="w-4 h-4" />Logout</button>
+    </div>, document.body)}
+  </>;
 }
