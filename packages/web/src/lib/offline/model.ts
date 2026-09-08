@@ -19,11 +19,12 @@ export function changes(base:Snapshot|null,local:Snapshot|null):Change[] {
 export function dirty(p:Project) {return !!p.request || (!!p.base!==!!p.local) || p.base?.project.name!==p.local?.project.name || changes(p.base,p.local).length>0;}
 /** Three-way merge preserves disjoint human/agent edits; never resolves competing
  * edits or delete-vs-edit silently. Metadata is an atomic field. */
+const equivalent=(a:Snapshot|null,b:Snapshot|null)=>!a&&!b || !!a&&!!b&&a.project.name===b.project.name&&changes(a,b).length===0;
 export function merge(base:Snapshot|null,local:Snapshot|null,remote:Snapshot|null):{local:Snapshot|null;conflicts:string[]} {
- if(same(base,local))return {local:structuredClone(remote),conflicts:[]};
+ if(equivalent(base,local))return {local:structuredClone(remote),conflicts:[]};
  if(!remote || !local || !base) {
-  if(same(base,remote))return {local:structuredClone(local),conflicts:[]};
-  if(same(local,remote))return {local:structuredClone(remote),conflicts:[]};
+  if(equivalent(base,remote))return {local:structuredClone(local),conflicts:[]};
+  if(equivalent(local,remote))return {local:structuredClone(remote),conflicts:[]};
   return {local:structuredClone(local),conflicts:['Project was created or deleted elsewhere']};
  }
  const conflicts:string[]=[],out=structuredClone(remote);

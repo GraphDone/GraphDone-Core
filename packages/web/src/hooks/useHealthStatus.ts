@@ -35,6 +35,8 @@ export function useHealthStatus() {
 
   useEffect(() => {
     checkHealth();
+    const reconnect=()=>void checkHealth();
+    window.addEventListener('online',reconnect);
     
     // Dynamic polling: faster when unhealthy, slower when healthy
     const getPollingInterval = () => {
@@ -63,6 +65,7 @@ export function useHealthStatus() {
     
     return () => {
       if (timeoutId) clearTimeout(timeoutId);
+      window.removeEventListener('online',reconnect);
     };
   }, [health?.services?.graphql?.status]);
 

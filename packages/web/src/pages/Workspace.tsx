@@ -410,7 +410,7 @@ export function Workspace() {
            <div className="relative w-full h-full">
             {/* Connection warning — fires only when the GraphQL data layer itself is
                 unreachable, not when an optional store (Neo4j) is simply unused. */}
-            {!healthLoading && health?.services?.graphql?.status !== 'healthy' && (
+            {!offlineEnabled && !healthLoading && health?.services?.graphql?.status !== 'healthy' && (
               <div className="absolute top-4 left-4 right-4 z-50">
                 <div className="bg-red-600/90 backdrop-blur-sm border border-red-500 rounded-lg p-4 shadow-lg">
                   <div className="flex items-start gap-3">

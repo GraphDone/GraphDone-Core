@@ -55,3 +55,5 @@ export function downloadCloudDrafts() {
 let lastActivity = Date.now();
 for (const event of ['pointerdown','keydown','pointermove']) window.addEventListener(event,()=>{lastActivity=Date.now();},{passive:true});
 export function skipBackgroundPoll() { return document.hidden || Date.now()-lastActivity>60000 || (hostedUsageEnabled && (usageFraction(snapshot.usage)>=.8 || (!!snapshot.usage && snapshot.usage.status!=='AVAILABLE'))); }
+
+window.addEventListener('online',()=>{void refreshHostedUsage(true);});

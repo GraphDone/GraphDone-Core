@@ -11,6 +11,7 @@ export function ownerId():string|null {
   return payload.uid===user.id?user.id:null;
  }catch{return null;}
 }
+export function primaryProjectId():string|null {try{const token=getToken();return token&&token!=='local-guest'?JSON.parse(atob(token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))).pid||null:null;}catch{return null;}}
 export function localGuest() {return getToken()==='local-guest';}
 let view={ready:false,pending:0,conflicts:[] as {id:string;name:string;fields:string[]}[],available:0,total:0,error:'',retryAt:0,online:navigator.onLine,syncing:false,blocked:undefined as 'auth'|'validation'|undefined};
 const listeners=new Set<()=>void>();
@@ -85,7 +86,7 @@ export async function syncNow(manual=false) {
   if(!Object.values(a.projects).some(dirty) && !manual && (skipBackgroundPoll() || !Object.entries(a.projects).some(([id,p])=>localStorage.getItem('currentGraphId')===id && Date.now()-p.checkedAt>60000)))return;
   view={...view,syncing:true};listeners.forEach(f=>f());
   try {
-   for(const [id] of Object.entries(a.projects)) {
+   for(const [id] of Object.entries(a.projects).sort(([,a],[,b])=>Number(!!a.local)-Number(!!b.local))) {
     if(owner!==ownerId()||!navigator.onLine)break;
     const p=(await readAccount(owner)).projects[id];if(p.conflicts?.length)continue;
     if(!dirty(p)) {
