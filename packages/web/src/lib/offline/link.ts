@@ -2,7 +2,7 @@ import { ApolloLink,Observable } from '@apollo/client';
 import { getMainDefinition } from '@apollo/client/utilities';
 import { valueFromASTUntyped } from 'graphql';
 import { getUserRaw } from '../authStorage';
-import { offlineEnabled,ownerId,localGuest,primaryProjectId,listProjects,getProject,syncNow } from './engine';
+import { offlineEnabled,ownerId,localGuest,primaryProjectId,sessionAccountId,listProjects,getProject,syncNow } from './engine';
 import { readAccount,editAccount } from './store';
 import { Row,Snapshot } from './model';
 const iso=(n:number)=>new Date(n*1000).toISOString();
@@ -60,17 +60,20 @@ export const offlineLink=new ApolloLink((operation,forward)=>{
  const def=getMainDefinition(operation.query) as any;
  if(!offlineEnabled||def.kind!=='OperationDefinition')return forward(operation);
  const fields=def.selectionSet.selections;
- const me=fields.length===1&&fields[0].name?.value==='me'&&!!ownerId();
+ const me=fields.length===1&&fields[0].name?.value==='me'&&!!(ownerId()||sessionAccountId());
  const guest=fields.length===1&&fields[0].name?.value==='guestLogin';
  if(!me&&!guest&&(!ownerId()||!fields.every((f:any)=>supported.has(f.name?.value))))return forward(operation);
  return new Observable(observer=>{
-  let cancelled=false;
+  let cancelled=false,fallback:any;
   (async()=>{
    const result:Record<string,any>={},fragments=new Map(operation.query.definitions.filter(d=>d.kind==='FragmentDefinition').map((d:any)=>[d.name.value,d]));
    for(const field of fields) {
     const name=field.name.value,args=Object.fromEntries((field.arguments||[]).map((a:any)=>[a.name.value,valueFromASTUntyped(a.value,operation.variables)]));
     let value:any;
-    if(me)value=JSON.parse(getUserRaw()||'null');
+    if(me){
+     value=ownerId()?JSON.parse(getUserRaw()||'null'):(await readAccount(sessionAccountId()!)).user;
+     if(!value){fallback=forward(operation).subscribe(observer);return;}
+    }
     else if(guest) {
      const id=crypto.randomUUID();value={__typename:'AuthPayload',token:'local-guest',user:{__typename:'User',id,name:'Guest',username:'Guest',email:'',role:'GUEST',isActive:true,isEmailVerified:false,avatar:null,team:null}};
      await editAccount(id,a=>{a.listedAt=Date.now();});
@@ -127,6 +130,6 @@ export const offlineLink=new ApolloLink((operation,forward)=>{
    }
    if(!cancelled){observer.next({data:result});observer.complete();}
   })().catch(error=>{if(!cancelled)observer.error(error);});
-  return()=>{cancelled=true;};
+  return()=>{cancelled=true;fallback?.unsubscribe();};
  });
 });
