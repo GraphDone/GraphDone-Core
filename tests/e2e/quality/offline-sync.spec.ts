@@ -19,7 +19,7 @@ test('student team: offline reload, drag, quota pause, reconnect, no duplicates 
  await page.reload();
  await expect(page.locator('.graph-container .node')).toHaveCount(1);
  for(const [width,height] of [[320,568],[390,844],[844,390],[1024,768],[1440,900],[2560,1440]]) {
-  await page.setViewportSize({width,height});await expect(page.getByTestId('offline-status')).toBeVisible();
+  await page.setViewportSize({width,height});await expect(page.getByTestId(width<768||(height<=500&&width<=1023)?'mobile-storage-status':'offline-status')).toBeVisible();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  }
  await page.setViewportSize({width:1440,height:900});

@@ -31,7 +31,7 @@ for(const scenario of scenarios) {
    await page.goto(base);
    await page.getByRole('button',{name:'New work item',exact:true}).click();
    await page.getByPlaceholder('Enter a descriptive title for your work item').fill(scenario.input.title);
-   if(scenario.id==='STUDENT-01') await page.locator('#dueDate').fill('2026-09-12');
+   if(scenario.id==='STUDENT-01') { const details=page.locator('[data-task-create] details');if(!await details.evaluate(el=>el.hasAttribute('open')))await details.locator('summary').click();await page.locator('#dueDate').fill('2026-09-12'); }
    await page.getByRole('button',{name:'Create Work Item',exact:true}).click();
    await expect.poll(async()=>(await read()).length).toBe(1);
    if(scenario.id==='STUDENT-01') expect((await read())[0].dueDate).toContain('2026-09-12T23:59:59');

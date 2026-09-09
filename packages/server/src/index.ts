@@ -25,6 +25,7 @@ import { extractUserFromToken } from './middleware/auth.js';
 import { mergeTypeDefs } from '@graphql-tools/merge';
 import { driver, NEO4J_URI } from './db.js';
 import { sqliteAuthStore } from './auth/sqlite-auth.js';
+import { ensureGraphIdentity } from './auth/graph-identity.js';
 import { configureOAuthStrategies } from './auth/oauth-strategies.js';
 import { generateToken } from './utils/auth.js';
 import { createTlsConfig, validateTlsConfig, type TlsConfig } from './config/tls.js';
@@ -394,6 +395,7 @@ async function startServer() {
       context: async ({ req }) => {
         const claims = extractUserFromToken(req.headers.authorization);
         const account = claims ? await sqliteAuthStore.findUserById(claims.userId) : null;
+        if (account?.isActive && isNeo4jAvailable) await ensureGraphIdentity(driver, account);
         const user = account?.isActive ? { userId: account.id, email: account.email, role: account.role } : (claims?.role === 'GUEST' && /^guest-\d+$/.test(claims.userId) ? claims : null);
         return {
           driver: isNeo4jAvailable ? driver : null,
