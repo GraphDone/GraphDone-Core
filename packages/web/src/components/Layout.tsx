@@ -1,3 +1,4 @@
+import {useCompactWorkspace} from '../hooks/useCompactWorkspace';
 import {FeedbackButton,PublicAnnouncement} from './Feedback';
 import { OfflineStatus } from './OfflineStatus';
 import React from 'react';
@@ -20,6 +21,7 @@ interface LayoutProps {
 
 export function Layout({ children }: LayoutProps) {
   const location = useLocation();
+  const compactWorkspace=useCompactWorkspace();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const [showFloatingConsole, setShowFloatingConsole] = React.useState(false);
   const desktopSidebarCollapsed = true; // Zen mode permanently on
@@ -40,6 +42,7 @@ export function Layout({ children }: LayoutProps) {
 
   return (
     <div
+      data-compact-workspace={compactWorkspace ? "true" : "false"}
       className="workspace-surface h-dvh-screen flex flex-col relative overflow-hidden"
       style={{
         '--sidebar-width': desktopSidebarCollapsed ? '4rem' : '16rem'
@@ -48,7 +51,7 @@ export function Layout({ children }: LayoutProps) {
       {/* Insecure-connection warning — an in-flow strip at the very top, so it
           reserves its own space and never overlaps the app (only over HTTP). */}
       <InsecureConnectionBanner className="relative z-30" />
-      <PublicAnnouncement /><HostedUsage compact /><OfflineStatus compact />
+      <div className="workspace-status-strips"><PublicAnnouncement /><HostedUsage compact /><OfflineStatus compact /></div>
 
       {/* Static gradient background - optimized for all browsers */}
 
@@ -56,11 +59,12 @@ export function Layout({ children }: LayoutProps) {
       {/* Phone top bar: just the project selector on the workspace (no hamburger —
           the bottom nav handles navigation). Other pages use their own header. */}
       {isWorkspaceRoute && (
-        <div data-workspace-header className="md:hidden relative z-30 pt-safe">
+        <div data-workspace-header className="mobile-project-header md:hidden relative z-30 pt-safe">
           <div className="flex items-center bg-gray-800/90 backdrop-blur-sm px-3 py-2 border-b border-gray-700/50">
             <div className="flex-1 min-w-0">
               <GraphSelector testId="graph-selector-mobile" />
             </div>
+            <button aria-label="New work item" onClick={()=>window.dispatchEvent(new Event('graphdone-create-task'))} className="min-h-[44px] min-w-[44px] ml-2 rounded-lg bg-violet-700 text-white text-xl">+</button>
           </div>
         </div>
       )}
@@ -68,7 +72,7 @@ export function Layout({ children }: LayoutProps) {
       <div className="flex flex-1 min-h-0">
         {/* Sidebar */}
         <div className={`
-          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+          workspace-sidebar ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
           md:translate-x-0 md:static md:inset-0
           fixed inset-y-0 left-0 z-50 bg-gray-800/95 backdrop-blur-sm border-r border-gray-700/50
           transform transition-all duration-200 ease-in-out

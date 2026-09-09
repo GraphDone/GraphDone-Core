@@ -539,7 +539,7 @@ export function WorkItemDetailsModal({
       />
       <div
         ref={modalRef}
-        data-modal-panel
+        data-modal-panel data-task-editor
         tabIndex={-1}
         className="relative bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 border border-gray-600/50 shadow-2xl w-full sm:max-w-3xl h-full sm:h-auto sm:max-h-[90vh] overflow-y-auto rounded-none sm:rounded-2xl animate-in fade-in zoom-in-95 duration-300 ring-1 ring-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
         onClick={(e) => e.stopPropagation()}
@@ -556,7 +556,7 @@ export function WorkItemDetailsModal({
         </div>
 
         {/* Title Header — sticky so Save/Close stay reachable while scrolling */}
-        <div className="sticky top-0 z-20 px-4 py-3 bg-gradient-to-r from-gray-900/95 via-gray-800/95 to-gray-900/95 backdrop-blur-md border-b border-gray-600/30">
+        <div className="task-editor-heading sticky top-0 z-20 px-4 py-3 bg-gradient-to-r from-gray-900/95 via-gray-800/95 to-gray-900/95 backdrop-blur-md border-b border-gray-600/30">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <div className="p-3 bg-gradient-to-br from-teal-300/60 via-magenta-400/50 to-magenta-300/40 rounded-2xl border border-magenta-200/50">

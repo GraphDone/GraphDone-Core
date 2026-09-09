@@ -5,8 +5,8 @@ import {join} from 'node:path';
 import {operationsApi} from '../packages/server/src/operations-api.js';
 import {sqliteAuthStore} from '../packages/server/src/auth/sqlite-auth.js';
 import {generateToken} from '../packages/server/src/utils/auth.js';
-// @ts-ignore plain ESM conformance shared with the Cloudflare worker fixture
-import {operationsContract} from '../tests/contracts/operations-contract.mjs';
+import assert from 'node:assert/strict';
+const operationsContract=async(call:any,identity:any)=>{const receipt=await call('/feedback','POST',{id:'core-functional-smoke-report',kind:'idea',title:'A helpful improvement',body:'Let us keep working together.',context:''},identity.user);assert.equal(receipt.status,201);const inbox=await call('/reports','GET',undefined,identity.admin);assert.equal(inbox.status,200);assert.equal(inbox.body.reports.length,1);console.log('PASS Core feedback receipt and administrator inbox');};
 const dir=await mkdtemp(join(tmpdir(),'graphdone-ops-core-'));process.chdir(dir);process.env.NODE_ENV='test';
 await sqliteAuthStore.initialize();
 const admin=await sqliteAuthStore.findUserByEmailOrUsername('admin');

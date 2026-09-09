@@ -1,3 +1,4 @@
+import {COMPACT_WORKSPACE_QUERY} from './useCompactWorkspace';
 import { RefObject, useEffect } from 'react';
 
 /**
@@ -67,7 +68,7 @@ export function useModalA11y(ref: RefObject<HTMLElement>, opts: ModalA11yOptions
     const position = () => {
       const bottom = Math.max(0, ...headers.filter(header => header.getClientRects().length > 0)
         .map(header => header.getBoundingClientRect().bottom));
-      const offset = window.innerHeight - bottom >= 420 ? bottom : 0;
+      const offset = !matchMedia(COMPACT_WORKSPACE_QUERY).matches && window.innerHeight - bottom >= 420 ? bottom : 0;
       backdrop?.style.setProperty('--modal-header-offset', `${offset}px`);
     };
     const observer = new ResizeObserver(position);

@@ -47,6 +47,7 @@ interface ViewManagerProps {
 
 const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [mobileFiltersOpen,setMobileFiltersOpen]=useState(false);
   const [selectedNode, setSelectedNode] = useState<WorkItem | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -379,7 +380,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
         // relative z-50: backdrop-blur makes this a stacking context, so the filter
         // dropdowns' z-50 is trapped inside it — without an explicit z-index the
         // later content area paints over the open dropdowns.
-        <div className="relative z-50 bg-gray-800/90 backdrop-blur-sm border-b border-gray-700/50 p-3 sm:p-4">
+        <div data-testid="task-filter-bar" className="task-filter-bar relative z-50 bg-gray-800/90 backdrop-blur-sm border-b border-gray-700/50 p-3 sm:p-4">
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-stretch sm:items-center">
             {/* Search Input */}
             <div className="relative w-full sm:w-80 md:w-96 lg:w-[28rem]">
@@ -402,7 +403,8 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
             </div>
 
             {/* Filter Dropdowns — 2-up grid on phones so all filters fit; inline on desktop */}
-            <div className="flex gap-2 sm:gap-3">
+            <button className="mobile-filter-toggle hidden min-h-[44px] px-3 text-sm rounded-lg border border-gray-600" aria-expanded={mobileFiltersOpen} aria-controls="task-filter-options" onClick={()=>setMobileFiltersOpen(!mobileFiltersOpen)}>Filters</button>
+            <div id="task-filter-options" data-open={mobileFiltersOpen} className="task-filter-options flex gap-2 sm:gap-3">
               {/* Type Filter */}
               <div className="hidden sm:block relative" ref={typeDropdownRef}>
                 <button
@@ -695,7 +697,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
           </div>
 
           {/* Results Count */}
-          <div className="mt-3 text-sm text-gray-400">
+          <div className="task-result-count mt-3 text-sm text-gray-400">
             Showing {filteredNodes.length} of {workItems.length} nodes
             {(searchQuery || statusFilter || typeFilter || priorityFilter || contributorFilter) && (
               <span className="text-green-400 ml-2">
