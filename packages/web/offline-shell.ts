@@ -11,7 +11,9 @@ export function offlineShell() {
   const files=walk(root).filter(f=>/\.(js|css|html|woff2?|png|svg|ico|webp)$/.test(f)&&!f.endsWith('/sw.js'));
   const revision=createHash('sha256');for(const f of files)revision.update(readFileSync(f));
   const key=`graphdone-shell-${revision.digest('hex').slice(0,16)}`;
-  const urls=files.map(f=>'/'+relative(root,f));
+  // Pages redirects /index.html to /. A redirected cached Response cannot
+  // satisfy an offline navigation request with redirect mode 'manual'.
+  const urls=files.map(f=>relative(root,f)==='index.html' ? '/' : '/'+relative(root,f));
   writeFileSync(resolve(root,'sw.js'),`
 const CACHE=${JSON.stringify(key)},FILES=${JSON.stringify(urls)};
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(FILES))));
@@ -20,7 +22,7 @@ self.addEventListener('fetch',event=>{
  const url=new URL(event.request.url);
  if(event.request.method!=='GET'||url.origin!==self.location.origin||/^\\/(api|auth|health|config|mcp)(\\/|$)/.test(url.pathname))return;
  if(event.request.mode==='navigate'){
-  event.respondWith(fetch(event.request).then(response=>{if(!response.ok)throw Error('Unavailable');return response;}).catch(()=>caches.open(CACHE).then(cache=>cache.match('/index.html'))));return;
+  event.respondWith(fetch(event.request).then(response=>{if(!response.ok)throw Error('Unavailable');return response;}).catch(()=>caches.open(CACHE).then(cache=>cache.match('/'))));return;
  }
  if(FILES.includes(url.pathname))event.respondWith(caches.open(CACHE).then(async cache=>(await cache.match(url.pathname))||fetch(event.request)));
 });
