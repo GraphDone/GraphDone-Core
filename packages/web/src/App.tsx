@@ -1,6 +1,7 @@
+import {SharedProject} from './pages/SharedProject';
 import {FeedbackHost} from './components/Feedback';
 import { lazy, Suspense } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { Workspace } from './pages/Workspace';
 import { Settings } from './pages/Settings';
@@ -23,6 +24,8 @@ import { NotificationProvider } from './contexts/NotificationContext';
 
 function AuthenticatedApp() {
   const { isAuthenticated, isInitializing } = useAuth();
+  const location=useLocation();
+  if(location.pathname==='/share')return <SharedProject/>;
 
   if (isInitializing) {
     // Maintain consistent structure during initial load to prevent DOM flash

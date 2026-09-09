@@ -503,8 +503,8 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
             <img src="/favicon.svg" alt="GraphDone Logo" className="h-10 w-10 sm:h-12 sm:w-12" />
             <span className="ml-3 sm:ml-4 text-3xl sm:text-4xl font-semibold text-stone-100 tracking-tight">GraphDone</span>
           </Link>
-          <h1 className="text-3xl font-bold text-gray-100 mb-3">You and your agent.<br /><span className="signin-headline-accent">Moving work forward.</span></h1>
-          <p className="text-gray-400 text-lg">One shared place for your to-dos, priorities, and notes. See what needs you and what your agent can take on.</p>
+          <h1 className="text-3xl font-bold text-gray-100 mb-3">Your agents keep moving.<br /><span className="signin-headline-accent">You stay in the loop.</span></h1>
+          <p className="text-gray-400 text-lg">Connect the agents you already use. They can coordinate through tasks and notes while you’re away—with clear limits and a simple place to check progress, set priorities, and step in.</p>
           <WorkIllustration />
           <FeedbackButton />
         </div>

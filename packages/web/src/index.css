@@ -944,3 +944,15 @@ html:not([data-theme="contrast"]) .workspace-surface .graph-container .node-titl
 
 /* Keep choice fields readable on wide displays without constraining phone forms. */
 .workspace-surface select, .modal-stage select { max-width: min(100%, 24rem); }
+
+.task-editor-title-compact { display: none; }
+@media (max-width: 767px), (max-height: 500px) and (max-width: 1023px) {
+  .task-editor-title-wide { display: none; }
+  .task-editor-title-compact { display: inline; }
+  .task-editor-heading h2 { white-space: nowrap; line-height: 24px; }
+  .task-editor-heading > div > div:first-child > div { margin-left: 0; }
+  .task-editor-badges > div { gap: 8px; width: 100%; min-width: 0; }
+  .task-editor-badges > div > div { flex: 1; min-width: 0; margin-left: 0; }
+  .task-editor-badges [data-testid$="-badge"] { width: 100%; min-height: 44px; padding: 6px 8px; gap: 4px; transform: none; }
+  .task-editor-badges [data-testid="details-status-dropdown"] { left: auto; right: 0; }
+}
