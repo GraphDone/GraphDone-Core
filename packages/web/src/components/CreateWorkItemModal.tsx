@@ -506,11 +506,7 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
                   className="w-full bg-gray-800 border-2 border-gray-600 rounded-lg px-4 py-3 text-sm text-white focus:outline-none focus:!border-green-400 transition-all duration-200 placeholder-gray-400"
                 >
                   <option value="">No contributor</option>
-                  <option value="user-1">John Doe</option>
-                  <option value="user-2">Jane Smith</option>
-                  <option value="user-3">Mike Johnson</option>
-                  <option value="user-4">Sarah Wilson</option>
-                  <option value="user-5">Alex Chen</option>
+                  {currentUser && <option value={currentUser.id}>{currentUser.name || currentUser.username} (you)</option>}
                 </select>
               </div>
 

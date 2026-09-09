@@ -10,27 +10,19 @@
     "dev:start": "tsx watch src/index.ts",
     "start": "node dist/index.js",
     "test": "NODE_OPTIONS='--max-old-space-size=4096' vitest --run",
-    "test:coverage": "vitest run --coverage", 
-    
-    "test:input": "vitest --run tests/garbage-input.test.ts",
-    "test:security": "vitest --run tests/comprehensive-chaos.test.ts tests/multi-perspective-chaos.test.ts",
-    "test:ddos": "vitest --run tests/concurrency-chaos.test.ts tests/network-protocol-chaos.test.ts tests/performance-chaos.test.ts",
-    "test:stress": "vitest --run tests/resource-exhaustion-chaos.test.ts tests/distributed-systems-chaos.test.ts tests/filesystem-io-chaos.test.ts",
-    
-    "test:integration:local": "vitest --run tests/real-database-integration.test.ts tests/real-chaos-testing.test.ts",
-    "test:safe:ci": "npm run test:input && npm run test:security",
-    "test:unsafe:local": "npm run test:ddos && npm run test:stress && npm run test:integration:local",
+    "test:coverage": "vitest run --coverage",
+    "test:integration:local": "vitest --run tests/real-database-integration.test.ts",
     "lint": "eslint src --ext .ts",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist coverage",
-    "ci:safe": "npm run lint && npm run typecheck && npm run test && npm run test:safe:ci",
-    "ci:full:local": "npm run ci:safe && npm run test:unsafe:local"
+    "ci:safe": "npm run lint && npm run typecheck && npm run test",
+    "ci:full:local": "npm run ci:safe && npm run test:integration:local"
   },
   "dependencies": {
     "@graphdone/core": "*",
-    "@modelcontextprotocol/sdk": "^0.5.0",
-    "neo4j-driver": "^5.15.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "dotenv": "^16.3.0",
+    "neo4j-driver": "^5.15.0",
     "zod": "^3.22.0"
   },
   "devDependencies": {

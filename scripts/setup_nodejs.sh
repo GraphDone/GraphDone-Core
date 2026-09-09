@@ -225,14 +225,14 @@ check_nodejs_installed() {
         local node_version=$(node --version 2>/dev/null | sed 's/v//' | cut -d. -f1 || echo '0')
         local npm_version=$(npm --version 2>/dev/null | cut -d. -f1 || echo '0')
 
-        if [ "$node_version" -ge 18 ] && [ "$npm_version" -ge 9 ]; then
+        if node -e 'const [a,b]=process.versions.node.split(".").map(Number);process.exit(a>20||(a===20&&b>=17)?0:1)' && [ "$npm_version" -ge 9 ]; then
             local node_full=$(node --version 2>/dev/null || echo 'unknown')
             local npm_full=$(npm --version 2>/dev/null || echo 'unknown')
             printf "        ${GREEN}✓${NC} Node.js ${node_full} and npm ${npm_full} already installed\n" >&2
             return 0
         else
             printf "        ${YELLOW}⚠${NC} Node.js ${node_full:-unknown} found but version requirements not met\n" >&2
-            printf "        ${GRAY}  Required: Node.js >= 18.0.0, npm >= 9.0.0${NC}\n" >&2
+            printf "        ${GRAY}  Required: Node.js >= 20.17.0, npm >= 9.0.0${NC}\n" >&2
             return 1
         fi
     else
@@ -420,13 +420,13 @@ verify_nodejs() {
         local node_major=$(echo "$node_version" | sed 's/v//' | cut -d. -f1 || echo "0")
         local npm_major=$(echo "$npm_version" | cut -d. -f1 || echo "0")
 
-        if [ "$node_major" -ge 18 ] && [ "$npm_major" -ge 9 ]; then
+        if node -e 'const [a,b]=process.versions.node.split(".").map(Number);process.exit(a>20||(a===20&&b>=17)?0:1)' && [ "$npm_major" -ge 9 ]; then
             printf "        ${GREEN}✓${NC} ${BOLD}Node.js${NC} ${GREEN}${node_version}${NC} and ${BOLD}npm${NC} ${GREEN}${npm_version}${NC} ready\n" >&2
             return 0
         else
             printf "${YELLOW}!${NC} Node.js installed but version requirements not met\n" >&2
             printf "${GRAY}  Found: Node.js ${node_version}, npm ${npm_version}${NC}\n" >&2
-            printf "${GRAY}  Required: Node.js >= 18.0.0, npm >= 9.0.0${NC}\n" >&2
+            printf "${GRAY}  Required: Node.js >= 20.17.0, npm >= 9.0.0${NC}\n" >&2
             return 1
         fi
     else
