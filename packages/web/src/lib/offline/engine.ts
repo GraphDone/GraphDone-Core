@@ -168,5 +168,5 @@ if(offlineEnabled) {
   if(owner){const user=JSON.parse(getUserRaw()||'null');void readAccount(owner).then(async a=>{if(JSON.stringify(a.user)!==JSON.stringify(user))await editAccount(owner,state=>{state.user=user;});}).catch(storageError);}
   if(owner && token!==observedToken){observedToken=token;void editAccount(owner,a=>{if(a.blocked==='auth'){a.retryAt=0;a.error='';delete a.blocked;}}).then(()=>syncNow());}
  });
- setInterval(()=>{if(!document.hidden)void syncNow();},10000);
+ setInterval(()=>{if(!document.hidden)void syncNow();},60000);
 }
