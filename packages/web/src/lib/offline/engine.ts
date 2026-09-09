@@ -30,7 +30,10 @@ async function request(owner:string,path:string,body?:any) {
  const data=await response.json().catch(()=>({message:'Sync service unavailable'}));
  if(!response.ok&&response.status!==409) {
   const validation=[400,413,422].includes(response.status);
-  const retry=validation||response.status===401||response.status===403?Number.MAX_SAFE_INTEGER:response.status===429?Date.parse(data.resetAt)||Date.now()+Math.max(60,Number(response.headers.get('Retry-After'))||60)*1000:Date.now()+(response.status>=500?60000:300000);
+  let retry=validation||response.status===401||response.status===403?Number.MAX_SAFE_INTEGER:response.status===429?Date.parse(data.resetAt)||Date.now()+Math.max(60,Number(response.headers.get('Retry-After'))||60)*1000:Date.now()+(response.status>=500?60000:300000);
+  // Personal shares can recover when other accounts go idle. Recheck hourly;
+  // shared exhaustion still waits for the service reset. Denied work never reaches D1.
+  if(response.status===429&&data.code==='PERSONAL_LIMIT')retry=Math.min(retry,Date.now()+3600000);
   await editAccount(owner,a=>{a.retryAt=retry;a.blocked=validation?'validation':response.status===401||response.status===403?'auth':undefined;if(validation&&body?.projectId&&a.projects[body.projectId])delete a.projects[body.projectId].request;a.error=response.status===401?'Sign in again to upload. Your local work is retained.':data.message||data.error||'Sync paused. Your local work is retained.';});
   cloudFailure(data.code);throw Error(data.message||data.error||'Sync paused');
  }
@@ -83,7 +86,7 @@ export async function syncNow(manual=false) {
   if(!lock)return;
   const a=await readAccount(owner);
   // Manual retry can retry expired authentication after a fresh sign-in, but
-  // cannot bypass a daily quota deadline by repeatedly pressing a button.
+  // cannot bypass a quota recheck deadline by repeatedly pressing a button.
   if(a.retryAt>Date.now())return;
   if(!Object.values(a.projects).some(dirty) && !manual && (skipBackgroundPoll() || !Object.entries(a.projects).some(([id,p])=>localStorage.getItem('currentGraphId')===id && Date.now()-p.checkedAt>60000)))return;
   view={...view,syncing:true};listeners.forEach(f=>f());
