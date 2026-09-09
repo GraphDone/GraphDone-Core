@@ -1,3 +1,4 @@
+import {AgentConnection} from '../components/AgentConnection';
 import { useQuery } from '@apollo/client';
 import { Bot, RefreshCw } from 'lucide-react';
 import { useGraph } from '../contexts/GraphContext';
@@ -20,7 +21,7 @@ export function Agents() {
   return (
     <div className="h-full min-h-0 overflow-auto p-3 sm:p-6 text-gray-100">
       <header className="flex flex-wrap items-center justify-between gap-3 mb-5">
-        <div><h1 className="text-2xl font-semibold">Working with AI</h1><p className="mt-1 text-sm text-gray-400">Follow the work your agents contribute to.</p></div>
+        <div><h1 className="text-2xl font-semibold">Working with AI</h1><p className="mt-1 text-sm text-gray-400">Connect an agent, share priorities, and follow its progress.</p></div>
         <div className="flex w-full sm:w-auto min-w-0 gap-2">
           <select aria-label="Agent work graph" value={currentGraph?.id || ''} onChange={event => void selectGraph(event.target.value)} className="min-h-[44px] min-w-0 flex-1 max-w-full sm:max-w-[260px] rounded-lg border border-gray-600 bg-gray-800 px-3 text-base">
             {!currentGraph && <option value="">Select a graph</option>}
@@ -29,6 +30,7 @@ export function Agents() {
           <button aria-label="Refresh agent work" disabled={loading || !currentGraph} onClick={() => void refetch().catch(() => {})} className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg border border-gray-600 disabled:opacity-50"><RefreshCw className="h-4 w-4" /></button>
         </div>
       </header>
+      {currentGraph&&<section aria-label="Agent setup" className="mb-5"><AgentConnection key={currentGraph.id} embedded graphId={currentGraph.id} graphName={currentGraph.name} onClose={()=>{}} /></section>}
       <p className="mb-5 rounded-lg border border-gray-700 bg-gray-800/50 p-3 text-sm text-gray-300">This view follows recorded AI contributors and their work. Starting agents, automatic work claims, and verified execution history are not available yet.</p>
       {error ? <p role="alert">Could not load agent work. Use refresh to try again.</p> : loading && !data ? <p role="status">Loading agent work…</p> : work.length === 0 ? (
         <section className="rounded-xl border border-gray-700 p-5 sm:p-8">

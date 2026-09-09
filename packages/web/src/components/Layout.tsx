@@ -92,7 +92,7 @@ export function Layout({ children }: LayoutProps) {
             </div>
 
             {/* Navigation Buttons - Section 2 */}
-            <nav className="flex-1 px-4 py-6 space-y-2">
+            <nav className="flex-1 px-4 md:px-2 py-6 space-y-2">
               {navigation.map((item) => {
                 const Icon = item.icon;
                 const isActive = location.pathname === item.href;
@@ -128,13 +128,6 @@ export function Layout({ children }: LayoutProps) {
                           {restrictionMessage}
                         </div>
                       </div>
-                      {/* Tooltip for collapsed mode */}
-                      {desktopSidebarCollapsed && (
-                        <div className="hidden md:group-hover:block absolute left-full top-1/2 transform -translate-y-1/2 ml-2 px-2 py-1 bg-gray-800 border border-gray-600 rounded shadow-lg text-sm whitespace-nowrap z-50">
-                          <div className="font-medium text-gray-500">{item.name}</div>
-                          <div className="text-xs text-gray-600">{restrictionMessage}</div>
-                        </div>
-                      )}
                     </div>
                   );
                 }
@@ -143,9 +136,10 @@ export function Layout({ children }: LayoutProps) {
                   <Link
                     key={item.name}
                     to={item.href}
+                    aria-label={item.name}
                     aria-current={location.pathname === item.href ? 'page' : undefined}
                     className={`
-                      flex items-center px-3 py-3 rounded-lg transition-colors group relative
+                      flex items-center min-h-[44px] px-3 py-3 rounded-lg transition-colors group relative
                       ${desktopSidebarCollapsed ? 'md:justify-center md:px-2' : ''}
                       ${isActive
                         ? 'bg-green-900/30 text-green-300 border border-green-500/30'
@@ -164,13 +158,6 @@ export function Layout({ children }: LayoutProps) {
                         {item.description}
                       </div>
                     </div>
-                    {/* Tooltip for collapsed mode */}
-                    {desktopSidebarCollapsed && (
-                      <div className="hidden md:group-hover:block absolute left-full top-1/2 transform -translate-y-1/2 ml-2 px-2 py-1 bg-gray-800 border border-gray-600 rounded shadow-lg text-sm whitespace-nowrap z-50">
-                        <div className="font-medium">{item.name}</div>
-                        <div className="text-xs text-gray-400">{item.description}</div>
-                      </div>
-                    )}
                   </Link>
                 );
               })}

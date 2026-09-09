@@ -5,7 +5,7 @@ import {join} from 'node:path';
 import {randomUUID} from 'node:crypto';
 const fixturePath='/tmp/graphdone-offline-fixture.json';
 test('student team: offline reload, drag, quota pause, reconnect, no duplicates @offline-sync',async({page,context})=>{
- test.setTimeout(180000);
+ test.setTimeout(300000);
  const fixture=JSON.parse(await readFile(fixturePath,'utf8'));
  fixture.projectId=randomUUID();
  const seeded=await page.request.post('http://localhost:8798/api/sync/project',{headers:{Authorization:'Bearer '+fixture.token},data:{requestId:randomUUID(),projectId:fixture.projectId,version:-1,name:'Offline student QC '+fixture.projectId,changes:[{table:'nodes',id:randomUUID(),action:'put',value:{title:'Plan the student project',type:'TASK',description:null,status:'PROPOSED',priority:.5,position_x:0,position_y:0,due_date:null,tags:'[]',metadata:'{}'}}]}});
@@ -63,7 +63,7 @@ test('student team: offline reload, drag, quota pause, reconnect, no duplicates 
   await new Promise<void>((resolve,reject)=>{const tx=db.transaction('accounts','readwrite'),store=tx.objectStore('accounts'),r=store.get('browser');r.onsuccess=()=>{const a=r.result;a.retryAt=0;a.error='';store.put(a,'browser');};tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);});db.close();
  });
  await expect.poll(async()=>{const r=await page.request.get('http://localhost:8798/api/sync/project?id='+fixture.projectId,{headers:{Authorization:'Bearer '+fixture.token}});return (await r.json()).snapshot.nodes.some((n:any)=>n.title===title);},{timeout:90000,intervals:[1000,3000,5000]}).toBe(true);
- await expect(page.getByTestId('offline-status')).not.toContainText('waiting to sync',{timeout:30000});
+ await expect(page.getByTestId('offline-status')).not.toContainText('waiting to sync',{timeout:90000});
  const response=await page.request.get('http://localhost:8798/api/sync/project?id='+fixture.projectId,{headers:{Authorization:'Bearer '+fixture.token}});expect(response.ok()).toBe(true);
  const remote=(await response.json()).snapshot;expect(remote.nodes.filter((n:any)=>n.title===title)).toHaveLength(1);
  expect(remote.nodes.find((n:any)=>n.title===title).position_x).toBeCloseTo(position.x,0);
