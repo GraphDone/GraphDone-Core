@@ -3,7 +3,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends python3 make g+
 WORKDIR /app
 COPY package.json package-lock.json turbo.json tsconfig.json ./
 COPY packages ./packages
-RUN npm ci --legacy-peer-deps --no-audit --no-fund
+# Compile the native binding against this image's libc instead of accepting a
+# prebuilt SQLite binary that may require a newer glibc than the runtime image.
+RUN npm ci --legacy-peer-deps --no-audit --no-fund && npm rebuild sqlite3 --build-from-source
 RUN npm run build -w @graphdone/core && npm run build -w @graphdone/server
 RUN VITE_GRAPHQL_URL=/api/graphql npm run build -w @graphdone/web
 FROM node:22-bookworm-slim AS api
