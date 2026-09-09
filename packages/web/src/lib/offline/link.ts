@@ -1,3 +1,4 @@
+import {taskAssignee} from '@graphdone/core';
 import { ApolloLink,Observable } from '@apollo/client';
 import { getMainDefinition } from '@apollo/client/utilities';
 import { valueFromASTUntyped } from 'graphql';
@@ -12,7 +13,7 @@ function graph(row:Row,s?:Snapshot|null):any {
 }
 export function workItem(row:Row,s:Snapshot):any {
  const lite=(id:string)=>{const n=s.nodes.find(n=>n.id===id);return n?{__typename:'WorkItem',id:n.id,title:n.title,type:n.type,status:n.status}:null;};
- return {__typename:'WorkItem',id:row.id,title:row.title,type:row.type,description:row.description,status:row.status,priority:row.priority,positionX:row.position_x,positionY:row.position_y,positionZ:0,radius:0,theta:0,phi:0,dueDate:row.due_date,tags:JSON.parse(row.tags||'[]'),metadata:row.metadata||'{}',subgraphId:null,subgraph:null,owner:null,assignedTo:null,graph:graph(s.project),contributors:[],dependencies:s.edges.filter(e=>e.source_id===row.id).map(e=>lite(e.target_id)).filter(Boolean),dependents:s.edges.filter(e=>e.target_id===row.id).map(e=>lite(e.source_id)).filter(Boolean),createdAt:iso(row.created_at||now()),updatedAt:iso(row.updated_at||now())};
+ return {__typename:'WorkItem',id:row.id,title:row.title,type:row.type,description:row.description,status:row.status,priority:row.priority,positionX:row.position_x,positionY:row.position_y,positionZ:0,radius:0,theta:0,phi:0,dueDate:row.due_date,tags:JSON.parse(row.tags||'[]'),metadata:row.metadata||'{}',subgraphId:null,subgraph:null,owner:null,assignedTo:taskAssignee(row.metadata),graph:graph(s.project),contributors:[],dependencies:s.edges.filter(e=>e.source_id===row.id).map(e=>lite(e.target_id)).filter(Boolean),dependents:s.edges.filter(e=>e.target_id===row.id).map(e=>lite(e.source_id)).filter(Boolean),createdAt:iso(row.created_at||now()),updatedAt:iso(row.updated_at||now())};
 }
 function edge(row:Row,s:Snapshot):any {return {__typename:'Edge',id:row.id,type:row.type,weight:row.weight,createdBy:null,source:s.nodes.find(n=>n.id===row.source_id)?workItem(s.nodes.find(n=>n.id===row.source_id)!,s):null,target:s.nodes.find(n=>n.id===row.target_id)?workItem(s.nodes.find(n=>n.id===row.target_id)!,s):null,createdAt:iso(row.created_at||now())};}
 function matches(row:any,where:any):boolean {

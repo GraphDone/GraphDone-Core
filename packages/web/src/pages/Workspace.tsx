@@ -1,3 +1,4 @@
+import {COMPACT_WORKSPACE_QUERY} from '../hooks/useCompactWorkspace';
 import { offlineEnabled } from '../lib/offline/engine';
 import { skipBackgroundPoll, useHostedUsage } from '../lib/hostedUsage';
 import { AgentConnection } from '../components/AgentConnection';
@@ -27,6 +28,7 @@ export function Workspace() {
   const { usage: cloudUsage } = useHostedUsage();
   const cloudPaused = !offlineEnabled && !!cloudUsage && cloudUsage.status !== 'AVAILABLE';
   const [showAgentConnection, setShowAgentConnection] = useState(false);
+  useEffect(()=>{const open=()=>setShowAgentConnection(true);const create=()=>setShowCreateModal(true);window.addEventListener('graphdone-create-task',create);window.addEventListener('graphdone-connect-agent',open);return()=>{window.removeEventListener('graphdone-connect-agent',open);window.removeEventListener('graphdone-create-task',create);};},[]);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showCreateGraphModal, setShowCreateGraphModal] = useState(false);
   const [showUpdateGraphModal, setShowUpdateGraphModal] = useState(false);
@@ -35,12 +37,12 @@ export function Workspace() {
   const [graphToEdit, setGraphToEdit] = useState<any>(null);
   const { viewMode, setViewMode } = useViewMode();
   const [isMobile, setIsMobile] = useState(() =>
-    typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
+    typeof window !== 'undefined' && window.matchMedia(COMPACT_WORKSPACE_QUERY).matches
   );
   // Graph touch-interaction lock — on a phone, default to locked so panning the
   // canvas never accidentally drags a node or an edge label; unlock to edit.
   const [graphLocked, setGraphLocked] = useState(() =>
-    typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
+    typeof window !== 'undefined' && window.matchMedia(COMPACT_WORKSPACE_QUERY).matches
   );
   const [showMiniMap, setShowMiniMap] = useState(() => window.innerWidth >= 1024 && window.innerHeight >= 600);
   const [layoutMode, setLayoutMode] = useState<LayoutMode>(() =>
@@ -60,7 +62,7 @@ export function Workspace() {
   const { health, loading: healthLoading, error: healthError } = useHealthStatus();
 
   useEffect(() => {
-    const mq = window.matchMedia('(max-width: 767px)');
+    const mq = window.matchMedia(COMPACT_WORKSPACE_QUERY);
     const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
     mq.addEventListener('change', handler);
     return () => mq.removeEventListener('change', handler);
@@ -101,7 +103,7 @@ export function Workspace() {
   return (
     <div className="h-full min-h-0 flex flex-col">
       {showAgentConnection && currentGraph && <AgentConnection graphId={currentGraph.id} graphName={currentGraph.name} onClose={() => setShowAgentConnection(false)} />}
-      {currentGraph && currentGraph.createdBy === currentUser?.id && <button onClick={() => setShowAgentConnection(true)} className="md:hidden fixed left-4 bottom-[4.75rem] z-40 min-h-[44px] rounded-xl bg-violet-700 px-4 py-2 text-white shadow-lg">Work with your agent</button>}
+
       {/* Header with Graph Context — tablet/desktop only; phones use the Layout
           top bar (project selector) + the bottom nav, so this band is hidden there. */}
       <div data-workspace-header className="workspace-toolbar hidden md:block border-b px-3 py-2 sm:px-4 sm:py-2">
@@ -317,7 +319,7 @@ export function Workspace() {
       )}
 
       {/* Main Content */}
-      <div className="flex-1 relative min-h-0">
+      <div data-testid="workspace-content" className="flex-1 relative min-h-0">
         {!currentGraph ? (
           <div className="h-full overflow-y-auto flex flex-col items-center bg-gray-900 relative">
             <div className="lagoon-caustics"></div>
@@ -485,19 +487,6 @@ export function Workspace() {
           <ViewManager viewMode={viewMode as 'dashboard' | 'table' | 'cards' | 'kanban' | 'gantt' | 'calendar' | 'activity'} />
         )}
       </div>
-
-      {/* Keep creation reachable in every view, including an empty graph. */}
-      {currentGraph && canEditGraph(currentGraph.id) && (
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="md:hidden fixed right-4 bottom-[4.75rem] z-40 w-14 h-14 rounded-full bg-gradient-to-br from-green-600 to-blue-600 text-white shadow-xl flex items-center justify-center active:scale-95 transition-transform"
-          style={{ marginBottom: 'env(safe-area-inset-bottom)' }}
-          aria-label="New work item"
-          title="New work item"
-        >
-          <Plus className="h-7 w-7" />
-        </button>
-      )}
 
       {/* Mini-Map Navigation - Bottom Right Corner (hidden on mobile: it covers too
           much of a phone screen, and panning the graph by touch is the primary nav there) */}

@@ -1,3 +1,4 @@
+import {COMPACT_WORKSPACE_QUERY} from '../hooks/useCompactWorkspace';
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useDialog } from '../hooks/useDialogManager';
@@ -16,7 +17,6 @@ export function QuickEditSurface({
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const dragStart = useRef<number | null>(null);
   const [bounds, setBounds] = useState({
     left: 8,
     top: 8,
@@ -35,24 +35,23 @@ export function QuickEditSurface({
       const vx = viewport?.offsetLeft ?? 0;
       const vy = viewport?.offsetTop ?? 0;
       const sheet =
-        width < 640 ||
-        (height < 500 && window.matchMedia('(pointer: coarse)').matches);
-      const editorWidth = Math.min(sheet ? 480 : 352, width - 16);
+        window.matchMedia(COMPACT_WORKSPACE_QUERY).matches;
+      const editorWidth = sheet ? width : Math.min(352, width - 16);
       const headerBottom = Math.max(vy, ...Array.from(document.querySelectorAll('[data-workspace-header]')).filter(el => el.getClientRects().length).map(el => el.getBoundingClientRect().bottom));
       const topBoundary = height - (headerBottom - vy) >= 420 ? headerBottom : vy;
-      const maxHeight = Math.max(80, height - (topBoundary - vy) - 16);
+      const maxHeight = sheet ? height : Math.max(80, height - (topBoundary - vy) - 16);
       const editorHeight = Math.min(
         ref.current?.scrollHeight || maxHeight,
         maxHeight
       );
       const left = sheet
-        ? vx + (width - editorWidth) / 2
+        ? vx
         : Math.max(
             vx + 8,
             Math.min(x - editorWidth / 2, vx + width - editorWidth - 8)
           );
       const top = sheet
-        ? vy + height - editorHeight - 8
+        ? vy
         : Math.max(
             topBoundary + 8,
             Math.min(y - editorHeight / 2, vy + height - editorHeight - 8)
@@ -97,6 +96,8 @@ export function QuickEditSurface({
           top: bounds.top,
           width: bounds.width,
           maxHeight: bounds.maxHeight,
+          height: bounds.sheet ? bounds.maxHeight : undefined,
+          borderRadius: bounds.sheet ? 0 : undefined,
         }}
         onClick={event => event.stopPropagation()}
         onKeyDown={event => {
@@ -106,27 +107,6 @@ export function QuickEditSurface({
           }
         }}
       >
-        {bounds.sheet && (
-          <button
-            aria-label="Close editor or swipe down"
-            className="w-full min-h-[44px] flex justify-center items-center touch-none"
-            onClick={onClose}
-            onPointerDown={event => {
-              dragStart.current = event.clientY;
-              event.currentTarget.setPointerCapture(event.pointerId);
-            }}
-            onPointerUp={event => {
-              if (
-                dragStart.current !== null &&
-                event.clientY - dragStart.current > 60
-              )
-                onClose();
-              dragStart.current = null;
-            }}
-          >
-            <span className="h-1 w-10 rounded-full bg-gray-500" />
-          </button>
-        )}
         {children}
       </div>
     </>,

@@ -1,3 +1,4 @@
+import {useCompactWorkspace} from '../hooks/useCompactWorkspace';
 import React from 'react';
 import { 
   GitBranch,
@@ -108,8 +109,21 @@ const getContributorAvatar = (contributor?: string) => {
 };
 
 const CardView: React.FC<CardViewProps> = ({ filteredNodes, handleEditNode, edges }) => {
+  const compact=useCompactWorkspace();
+  if(compact)return <div data-testid="task-list" className="compact-task-list p-2 space-y-1">
+    {[...filteredNodes].sort((a,b)=>new Date(b.updatedAt||b.createdAt).getTime()-new Date(a.updatedAt||a.createdAt).getTime()).map(node=><button key={node.id} aria-label={`Edit ${node.title}`} onClick={()=>handleEditNode(node)} className="w-full min-h-[76px] text-left px-3 py-2 rounded-lg border border-gray-700 bg-gray-800/70 active:bg-gray-700 focus-visible:outline-emerald-300">
+      <h3 className="text-sm font-semibold text-gray-100 leading-5 break-words line-clamp-2">{node.title}</h3>
+      <div className="flex items-center gap-2 mt-1 text-xs text-gray-400 min-w-0">
+        <span className="truncate min-w-0 flex-1">{node.assignedTo?.name||'Unassigned'}</span>
+        {node.dueDate&&<span className="shrink-0">{new Date(node.dueDate).toLocaleDateString(undefined,{month:'short',day:'numeric'})}</span>}
+        <span className="shrink-0" aria-label={`Priority ${Math.round(getNodePriority(node)*100)} percent`}>{getNodePriority(node)>=.8?'Critical':getNodePriority(node)>=.6?'High':getNodePriority(node)>=.4?'Normal':'Low'}</span>
+        <span className="shrink-0 text-emerald-200">{getStatusConfig(node.status as WorkItemStatus).label}</span>
+      </div>
+    </button>)}
+  </div>;
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-6 p-3 sm:p-6">
+    <div data-testid="task-list" className="task-list grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-6 p-3 sm:p-6">
       {[...filteredNodes]
         .sort((a, b) => {
           const dateA = new Date(a.updatedAt || a.createdAt).getTime();
@@ -119,6 +133,7 @@ const CardView: React.FC<CardViewProps> = ({ filteredNodes, handleEditNode, edge
         .map((node) => (
         <div
           key={node.id}
+          role="button" tabIndex={0} aria-label={`Edit ${node.title}`} onKeyDown={event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();handleEditNode(node);}}}
           onClick={() => handleEditNode(node)}
           className={`${getNodeTypeCardBackground(node.type)} rounded-xl p-3 sm:p-4 shadow-lg hover:shadow-xl hover:shadow-white/10 transition-all duration-200 cursor-pointer border border-gray-600/50 hover:border-gray-500/70 hover:scale-[1.02] hover:-translate-y-1 hover:brightness-125 group backdrop-blur-sm`}
           style={{
@@ -181,7 +196,7 @@ const CardView: React.FC<CardViewProps> = ({ filteredNodes, handleEditNode, edge
           <TagDisplay tags={node.tags} className="mb-3" />
 
           {/* Priority and Due Date */}
-          <div className="mb-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
+          <div className="task-card-priority mb-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Priority</span>
             </div>

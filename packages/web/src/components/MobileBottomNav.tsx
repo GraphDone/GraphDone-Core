@@ -1,4 +1,7 @@
-import {FeedbackButton} from './Feedback';
+import {useGraph} from '../contexts/GraphContext';
+import {useModalA11y} from '../hooks/useModalA11y';
+import {MobileStorageStatus} from './MobileStorageStatus';
+import {FeedbackButton,PublicAnnouncement} from './Feedback';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -19,10 +22,12 @@ import { canAccessAdmin, canAccessBackend } from '../lib/roleAccess';
 export function MobileBottomNav() {
   const { viewMode, setViewMode } = useViewMode();
   const { currentUser, logout } = useAuth();
+  const {currentGraph}=useGraph();
   const navigate = useNavigate();
   const location = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
   const sheetRef = useRef<HTMLDivElement>(null);
+  useModalA11y(sheetRef,{isOpen:moreOpen,label:"More navigation"});
 
   // The "More" sheet is a modal: close on Esc and move focus into it on open.
   useEffect(() => {
@@ -85,11 +90,12 @@ export function MobileBottomNav() {
           <MoreHorizontal className="h-5 w-5" strokeWidth={1.75} />
           <span className="text-[11px] font-medium">More</span>
         </button>
+        <MobileStorageStatus />
       </nav>
 
       {moreOpen && createPortal(
         <div
-          className="md:hidden fixed inset-0 z-[100] flex flex-col justify-end"
+          className="mobile-navigation-sheet fixed inset-0 z-[100] flex flex-col justify-end"
           onClick={() => setMoreOpen(false)}
         >
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
@@ -139,6 +145,9 @@ export function MobileBottomNav() {
               ))}
             </div>
 
+            {onWorkspace && currentGraph?.createdBy===currentUser?.id && <button className="min-h-[44px] w-full my-3 rounded-lg border border-violet-400/40 text-violet-200" onClick={()=>{setMoreOpen(false);window.dispatchEvent(new Event('graphdone-connect-agent'));}}>Connect an agent to this project</button>}
+            <MobileStorageStatus expanded />
+            <PublicAnnouncement />
             <FeedbackButton onOpen={()=>setMoreOpen(false)} />
             <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mt-4 mb-2 px-1">Account</h3>
             <div className="flex items-center justify-between gap-2 rounded-xl border border-gray-700/60 bg-gray-800/60 p-3">

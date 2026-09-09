@@ -1,3 +1,5 @@
+import {useCompactWorkspace} from '../hooks/useCompactWorkspace';
+import {offlineEnabled} from '../lib/offline/engine';
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { useDialog } from '../hooks/useDialogManager';
@@ -54,6 +56,7 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
   const panelRef = React.useRef<HTMLDivElement>(null);
   useModalA11y(panelRef, { isOpen, label: parentWorkItemId ? 'Create and connect work item' : 'Create new work item' });
   const { currentUser } = useAuth();
+  const compact=useCompactWorkspace();
   const { currentGraph } = useGraph();
   const { showSuccess, showError } = useNotifications();
 
@@ -73,10 +76,10 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
   const [formData, setFormData] = React.useState({
     title: '',
     description: '',
-    type: 'DEFAULT',
-    priority: 0,
+    type: 'TASK',
+    priority: 0.5,
     status: 'NOT_STARTED',
-    assignedTo: '',
+    assignedTo: currentUser?.id || '',
     dueDate: '',
     tags: [] as string[]
   });
@@ -149,6 +152,7 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
         priority: formData.priority,
         dueDate: formData.dueDate ? `${formData.dueDate}T23:59:59.999Z` : undefined,
         tags: formData.tags || [],
+        metadata: JSON.stringify({assignee:formData.assignedTo ? {id:formData.assignedTo,name:currentUser?.name||currentUser?.username||'You'} : null}),
       };
       
       const workItemInput: any = {
@@ -163,7 +167,7 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
       };
 
       // Handle assignedTo relationship properly for Neo4j GraphQL
-      if (formData.assignedTo) {
+      if (formData.assignedTo && !offlineEnabled) {
         workItemInput.assignedTo = {
           connect: {
             where: { node: { id: formData.assignedTo } }
@@ -220,7 +224,7 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
           type: 'DEFAULT',
           priority: 0,
           status: 'NOT_STARTED',
-          assignedTo: '',
+          assignedTo: currentUser?.id || '',
           dueDate: '',
           tags: []
         });
@@ -253,11 +257,11 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
           onClick={onClose}
         />
 
-        <div ref={panelRef} data-modal-panel className="inline-block w-full max-w-lg p-0 my-8 overflow-hidden text-left align-middle transition-all transform bg-gradient-to-br from-gray-800/98 via-gray-850/98 to-gray-900/98 backdrop-blur-2xl shadow-2xl rounded-2xl border border-gray-600/30 focus-within:ring-2 focus-within:ring-blue-500/50 animate-in slide-in-from-bottom-4 duration-300 relative" onClick={(e) => e.stopPropagation()}>
+        <div ref={panelRef} data-modal-panel data-task-create className="inline-block w-full max-w-lg p-0 my-8 overflow-hidden text-left align-middle transition-all transform bg-gradient-to-br from-gray-800/98 via-gray-850/98 to-gray-900/98 backdrop-blur-2xl shadow-2xl rounded-2xl border border-gray-600/30 focus-within:ring-2 focus-within:ring-blue-500/50 animate-in slide-in-from-bottom-4 duration-300 relative" onClick={(e) => e.stopPropagation()}>
           <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-green-500/20 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-purple-500 via-pink-500 to-green-500"></div>
 
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700/30 bg-gradient-to-r from-gray-800/50 to-gray-900/50 backdrop-blur-sm relative">
+          <div className="task-create-heading flex items-center justify-between px-6 py-4 border-b border-gray-700/30 bg-gradient-to-r from-gray-800/50 to-gray-900/50 backdrop-blur-sm relative">
             <div className="flex items-center space-x-3">
               <div className="w-10 h-10 bg-gradient-to-br from-green-500 via-emerald-500 to-teal-500 rounded-xl flex items-center justify-center shadow-lg shadow-green-500/30 relative">
                 <div className="absolute inset-0 bg-gradient-to-br from-green-400 to-emerald-600 rounded-xl blur opacity-50 animate-pulse"></div>
@@ -265,7 +269,7 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
               </div>
               <div>
                 <h3 className="text-lg font-bold bg-gradient-to-r from-white via-green-100 to-emerald-100 bg-clip-text text-transparent">
-                  {parentWorkItemId ? 'Create & Connect Work Item' : 'Create New Work Item'}
+                  {parentWorkItemId ? 'New connected task' : 'New task'}
                 </h3>
                 <p className="text-xs text-gray-400">
                   {parentWorkItemId
@@ -361,6 +365,9 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
               )}
             </div>
 
+            <details className="task-extra-fields" open={!compact || undefined}>
+              <summary className="min-h-[44px] flex items-center cursor-pointer text-sm text-gray-300">Details · {formData.assignedTo ? 'assigned to you' : 'unassigned'}</summary>
+              <label className="flex items-center gap-2 min-h-[44px] text-sm text-gray-200"><input type="checkbox" checked={!!formData.assignedTo} onChange={e=>setFormData(prev=>({...prev,assignedTo:e.target.checked ? currentUser?.id||'' : ''}))}/>I’ll do this</label>
             <div>
               <label htmlFor="description" className="block text-base font-bold text-gray-100 mb-1 flex items-center">
                 <div className="p-1 bg-gradient-to-br from-emerald-500/20 to-teal-500/20 rounded-lg mr-1 border border-emerald-500/30">
@@ -662,7 +669,8 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
               
             </div>
             
-            <div className="flex justify-end space-x-2 pt-2 border-t border-gray-700/30">
+            </details>
+            <div className="task-create-actions flex justify-end space-x-2 pt-2 border-t border-gray-700/30">
               <button
                 type="button"
                 onClick={onClose}

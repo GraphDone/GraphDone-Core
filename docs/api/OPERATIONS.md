@@ -34,7 +34,7 @@ Native Codex, Claude and Hermes can use the same operator contract through their
 - `npx tsx scripts/test-operations-local.mts` — real Core Express/SQLite/auth contract.
 - Cloud `node scripts/test-operations.mjs` — same contract against actual Worker/D1/Usage Durable Object.
 - `npx tsx scripts/test-admin-bootstrap.mts` — generated production credentials, permissions, login and restart.
-- `node --test tests/contracts/triage-runner.test.mjs` — valid proposal/apply, 100 adversarial actions, readonly denial, quota failure, stale revision, no retries.
+- Deep adversarial contracts and the cross-edition security suite are maintained in GraphDone-Cloud under `tests/security`; Core retains functional smoke tests.
 - `tests/e2e/quality/operations.spec.ts` — headed user→admin→operator→public-notice workflow at six viewport sizes, using the local Cloud fixture.
 - `GRAPHDONE_GATEWAY_SMOKE=1 node scripts/test-gateway-triage.mjs` — explicit one-call real gateway experiment, synthetic loopback reports only. Never include this in bulk CI.
 - `node scripts/test-codex-connection.mjs` — real installed Codex JSON-RPC initialization, without starting a model turn.

@@ -4,3 +4,4 @@ export * from './node';
 export * from './edge';
 export * from './priority';
 export * from './types';
+export {taskAssignee} from './taskAssignment';
