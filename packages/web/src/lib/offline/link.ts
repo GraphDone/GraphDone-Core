@@ -3,7 +3,7 @@ import { ApolloLink,Observable } from '@apollo/client';
 import { getMainDefinition } from '@apollo/client/utilities';
 import { valueFromASTUntyped } from 'graphql';
 import { getUserRaw } from '../authStorage';
-import { offlineEnabled,ownerId,localGuest,primaryProjectId,sessionAccountId,listProjects,getProject,syncNow } from './engine';
+import { offlineEnabled,ownerId,localGuest,primaryProjectId,sessionAccountId,listProjects,getProject } from './engine';
 import { readAccount,editAccount } from './store';
 import { Row,Snapshot } from './model';
 const iso=(n:number)=>new Date(n*1000).toISOString();
@@ -125,7 +125,7 @@ export const offlineLink=new ApolloLink((operation,forward)=>{
       }
       return table==='nodes'?{__typename:created?'CreateWorkItemsResponse':'UpdateWorkItemsResponse',workItems:rows.map(n=>workItem(n,s))}:{__typename:created?'CreateEdgesResponse':'UpdateEdgesResponse',edges:rows.map(e=>edge(e,s))};
      });
-     setTimeout(()=>void syncNow(),3000);
+     // IndexedDB is already committed. The periodic uploader coalesces edits.
     }
     result[field.alias?.value||name]=projectResult(value,field.selectionSet,operation.variables,fragments);
    }

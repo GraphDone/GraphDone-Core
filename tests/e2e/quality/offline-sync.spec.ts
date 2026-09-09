@@ -62,7 +62,7 @@ test('student team: offline reload, drag, quota pause, reconnect, no duplicates 
   const db=await new Promise<IDBDatabase>((resolve,reject)=>{const r=indexedDB.open('graphdone-offline',1);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});
   await new Promise<void>((resolve,reject)=>{const tx=db.transaction('accounts','readwrite'),store=tx.objectStore('accounts'),r=store.get('browser');r.onsuccess=()=>{const a=r.result;a.retryAt=0;a.error='';store.put(a,'browser');};tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);});db.close();
  });
- await expect.poll(async()=>{const r=await page.request.get('http://localhost:8798/api/sync/project?id='+fixture.projectId,{headers:{Authorization:'Bearer '+fixture.token}});return (await r.json()).snapshot.nodes.some((n:any)=>n.title===title);},{timeout:30000,intervals:[1000,3000,5000]}).toBe(true);
+ await expect.poll(async()=>{const r=await page.request.get('http://localhost:8798/api/sync/project?id='+fixture.projectId,{headers:{Authorization:'Bearer '+fixture.token}});return (await r.json()).snapshot.nodes.some((n:any)=>n.title===title);},{timeout:90000,intervals:[1000,3000,5000]}).toBe(true);
  await expect(page.getByTestId('offline-status')).not.toContainText('waiting to sync',{timeout:30000});
  const response=await page.request.get('http://localhost:8798/api/sync/project?id='+fixture.projectId,{headers:{Authorization:'Bearer '+fixture.token}});expect(response.ok()).toBe(true);
  const remote=(await response.json()).snapshot;expect(remote.nodes.filter((n:any)=>n.title===title)).toHaveLength(1);
@@ -92,7 +92,7 @@ test('student team: offline reload, drag, quota pause, reconnect, no duplicates 
  await context.setOffline(false);
  await expect(page.getByTestId('offline-status')).toContainText('Changes need your review',{timeout:30000});
  await page.getByRole('button',{name:'Keep my version',exact:true}).click();
- await expect.poll(async()=>{const r=await page.request.get('http://localhost:8798/api/sync/project?id='+fixture.projectId,{headers:{Authorization:'Bearer '+fixture.token}});const s=(await r.json()).snapshot;return s.nodes.find((n:any)=>n.id===position.id).priority===1&&s.notes.some((n:any)=>n.body==='Offline human handoff: check the experiment');},{timeout:30000,intervals:[1000,3000,5000]}).toBe(true);
+ await expect.poll(async()=>{const r=await page.request.get('http://localhost:8798/api/sync/project?id='+fixture.projectId,{headers:{Authorization:'Bearer '+fixture.token}});const s=(await r.json()).snapshot;return s.nodes.find((n:any)=>n.id===position.id).priority===1&&s.notes.some((n:any)=>n.body==='Offline human handoff: check the experiment');},{timeout:90000,intervals:[1000,3000,5000]}).toBe(true);
  await page.goto('/settings');
  const panel=page.getByTestId('offline-status').last();
  const [download]=await Promise.all([page.waitForEvent('download'),panel.getByRole('button',{name:'Export backup',exact:true}).click()]);
@@ -100,7 +100,7 @@ test('student team: offline reload, drag, quota pause, reconnect, no duplicates 
  expect(backup).toContain(title);expect(backup).not.toContain(fixture.token);expect(backup).not.toContain(agentToken);
  await panel.locator('input[type=file]').setInputFiles({name:'offline-backup.json',mimeType:'application/json',buffer:Buffer.from(backup)});
  let importedId='';
- await expect.poll(async()=>{const response=await page.request.get('http://localhost:8798/api/sync/projects',{headers:{Authorization:'Bearer '+fixture.token}});const projects=(await response.json()).projects;importedId=projects.find((p:any)=>p.name==='Offline student QC '+fixture.projectId+' (imported)')?.id||'';return !!importedId;},{timeout:30000,intervals:[1000,3000,5000]}).toBe(true);
+ await expect.poll(async()=>{const response=await page.request.get('http://localhost:8798/api/sync/projects',{headers:{Authorization:'Bearer '+fixture.token}});const projects=(await response.json()).projects;importedId=projects.find((p:any)=>p.name==='Offline student QC '+fixture.projectId+' (imported)')?.id||'';return !!importedId;},{timeout:90000,intervals:[1000,3000,5000]}).toBe(true);
  const imported=(await (await page.request.get('http://localhost:8798/api/sync/project?id='+importedId,{headers:{Authorization:'Bearer '+fixture.token}})).json()).snapshot;
  expect(imported.nodes).toHaveLength(2);expect(imported.nodes.some((n:any)=>n.id===position.id)).toBe(false);expect(imported.notes.some((n:any)=>n.body==='Offline human handoff: check the experiment')).toBe(true);
  expect(errors).toEqual([]);
