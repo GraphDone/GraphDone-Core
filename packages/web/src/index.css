@@ -941,3 +941,6 @@ html:not([data-theme="contrast"]) .workspace-surface .graph-container .node-titl
   [data-modal-backdrop] [data-task-create] form { padding: 12px; }
   .workspace-surface .task-card-priority { padding: 0; margin-bottom: 6px; border: 0; background: transparent; }
 }
+
+/* Keep choice fields readable on wide displays without constraining phone forms. */
+.workspace-surface select, .modal-stage select { max-width: min(100%, 24rem); }
