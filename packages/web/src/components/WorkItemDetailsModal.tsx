@@ -570,7 +570,7 @@ export function WorkItemDetailsModal({
                 <Eye className="h-6 w-6 text-teal-200" />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-white">Work Item Details</h2>
+                <h2 className="text-lg font-bold text-white"><span className="task-editor-title-wide">Work Item Details</span><span className="task-editor-title-compact">Edit work</span></h2>
                 <p className="text-sm text-gray-400 mt-0.5">View and edit work item information</p>
               </div>
             </div>
@@ -602,7 +602,7 @@ export function WorkItemDetailsModal({
         </div>
 
         {/* Enhanced Header */}
-        <div className="relative flex items-center justify-between px-3 py-2 border-b border-gray-600/50 bg-gradient-to-r from-gray-800/30 via-gray-700/20 to-gray-800/30 backdrop-blur-sm z-10">
+        <div className="task-editor-badges relative flex items-center justify-between px-3 py-2 border-b border-gray-600/50 bg-gradient-to-r from-gray-800/30 via-gray-700/20 to-gray-800/30 backdrop-blur-sm z-10">
           <div className="flex items-center space-x-6">
             {/* Enhanced Clickable Type Badge */}
             <div className="relative z-[100000]">
