@@ -17,6 +17,8 @@ export function HostedUsage({ compact = false }: { compact?: boolean }) {
     return () => { clearInterval(timer); document.removeEventListener('visibilitychange',refresh); };
   }, [currentUser?.id]);
   if (!hostedUsageEnabled || !currentUser) return null;
+  // The workspace uses its single compact storage control; details belong in Settings.
+  if (compact && offlineEnabled) return null;
   if (offlineEnabled && localGuest()) return compact ? null : <OfflineStatus />;
   const ratio = usageFraction(usage), paused = usage && usage.status !== 'AVAILABLE';
   const reset = usage ? new Date(usage.resetAt).toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit',timeZoneName:'short'}) : '';

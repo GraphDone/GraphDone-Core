@@ -1,7 +1,10 @@
 import { useEffect,useState } from 'react';
 import { offlineEnabled,useOffline,syncNow,exportOffline,importOffline,prepareOffline,resolveConflict,localGuest } from '../lib/offline/engine';
+import {useHostedUsage,usageFraction} from '../lib/hostedUsage';
 import { useAuth } from '../contexts/AuthContext';
 export function OfflineStatus({compact=false}:{compact?:boolean}) {
+ const {usage}=useHostedUsage();
+ const cloudLabel=usage&&usage.status!=='AVAILABLE'?'Cloud sync paused':usageFraction(usage)>=.8?'Cloud allowance low':'';
  const {currentUser,logout}=useAuth(),state=useOffline();const [error,setError]=useState(''),[busy,setBusy]=useState(false),[persistent,setPersistent]=useState(false);
  useEffect(()=>{if(offlineEnabled)void navigator.storage?.persisted().then(setPersistent);},[]);
  if(!offlineEnabled||!currentUser)return null;
@@ -9,7 +12,7 @@ export function OfflineStatus({compact=false}:{compact?:boolean}) {
  const title=!state.ready ? state.error ? 'Device storage unavailable' : 'Checking device storage…' : state.conflicts.length?'Changes need your review':localGuest()?'Guest workspace · saved on this device':state.pending?`${state.pending} project${state.pending===1?'':'s'} saved on this device · waiting to sync`:!state.online?'Offline · saved on this device':state.syncing?'Syncing your work…':'Saved on this device';
  const button='min-h-[40px] px-3 py-2 rounded-lg border border-gray-600 disabled:opacity-50 text-sm';
  return <section aria-label="Offline storage and sync" data-testid="offline-status" className={`${compact?'shrink-0 px-3 py-1 text-xs':'rounded-xl border border-gray-600 p-4 text-sm'} bg-gray-900 text-gray-100`}>
-  <div className="flex flex-wrap items-center justify-between gap-2"><span role="status">{title}</span>{compact?<a href="/settings" className="min-h-[32px] inline-flex items-center underline">Storage & sync</a>:<button className={button} disabled={busy||!state.online||state.retryAt>Date.now()||localGuest()} onClick={()=>void act(()=>syncNow(true))}>Sync now</button>}</div>
+  <div className="flex flex-wrap items-center justify-between gap-2"><span role="status" className={compact?'min-w-0 flex-1 truncate':''}>{title}{compact&&cloudLabel&&<span data-testid="workspace-cloud-status" className="ml-2 text-amber-200"> · {cloudLabel}</span>}</span>{compact?<a href="/settings" className="min-h-[32px] inline-flex items-center underline">Storage & sync</a>:<button className={button} disabled={busy||!state.online||state.retryAt>Date.now()||localGuest()} onClick={()=>void act(()=>syncNow(true))}>Sync now</button>}</div>
   {!compact&&<><p className="mt-2 text-gray-300">{state.available} projects available offline on this device. Edits save immediately on this device. Cloud uploads are grouped about once a minute while GraphDone is open and allowance is available. Use Sync now for an immediate handoff. Larger queues upload in batches; agent activity appears after sync.</p>
    {localGuest()&&<p className="mt-2 text-amber-200">Guest projects stay on this device. Export a backup, then import it after signing in to put a copy in your account.</p>}
    {state.blocked==='auth'&&<button className={button} onClick={logout}>Sign in again to resume sync</button>}
