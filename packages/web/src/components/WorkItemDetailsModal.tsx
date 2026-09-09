@@ -1,3 +1,4 @@
+import {offlineEnabled} from '../lib/offline/engine';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import {
@@ -326,14 +327,20 @@ export function WorkItemDetailsModal({
       const currentAssignedToId = typeof currentNodeRef.assignedTo === 'string' ? currentNodeRef.assignedTo : currentNodeRef.assignedTo?.id;
       const newAssignedToId = typeof nodeToSave.assignedTo === 'string' ? nodeToSave.assignedTo : nodeToSave.assignedTo?.id;
 
-      if (newAssignedToId && newAssignedToId !== currentAssignedToId) {
+      if (newAssignedToId !== currentAssignedToId) {
+        let metadata: Record<string, unknown> = {};
+        const raw = (currentNodeRef as any).metadata;
+        try { const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw; if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) metadata = parsed; } catch { /* Preserve valid task metadata when available. */ }
+        updateInput.metadata = JSON.stringify({...metadata, assignee: newAssignedToId ? {id: newAssignedToId, name: typeof nodeToSave.assignedTo === 'object' ? nodeToSave.assignedTo.name : newAssignedToId} : null});
+      }
+      if (!offlineEnabled && newAssignedToId && newAssignedToId !== currentAssignedToId) {
         // Connect to new user
         updateInput.assignedTo = {
           connect: {
             where: { node: { id: newAssignedToId } }
           }
         };
-      } else if (!newAssignedToId && currentAssignedToId) {
+      } else if (!offlineEnabled && !newAssignedToId && currentAssignedToId) {
         // Disconnect current user
         updateInput.assignedTo = {
           disconnect: {
@@ -806,6 +813,7 @@ export function WorkItemDetailsModal({
               </h3>
               <div className="relative">
                 <select
+                  aria-label="Contributor"
                   value={typeof editedNode?.assignedTo === 'string' ? editedNode.assignedTo : (editedNode?.assignedTo?.id || '')}
                   onChange={(e) => {
                     const value = e.target.value;
@@ -817,11 +825,8 @@ export function WorkItemDetailsModal({
                   className="w-full bg-gray-800 border border-gray-600 rounded-lg px-2 py-1 text-sm text-white focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-400 transition-all duration-300 appearance-none hover:border-gray-500 shadow-lg font-medium"
                 >
                   <option value="">No contributor</option>
-                  <option value="user-1">John Doe (@john)</option>
-                  <option value="user-2">Jane Smith (@jane)</option>
-                  <option value="user-3">Mike Johnson (@mike)</option>
-                  <option value="user-4">Sarah Wilson (@sarah)</option>
-                  <option value="user-5">Alex Chen (@alex)</option>
+                  {currentUser && <option value={currentUser.id}>{currentUser.name || currentUser.username} (you)</option>}
+                  {node?.assignedTo && typeof node.assignedTo === 'object' && node.assignedTo.id !== currentUser?.id && <option value={node.assignedTo.id}>{node.assignedTo.name}</option>}
                 </select>
                 <ChevronDown className="absolute right-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
               </div>
