@@ -1,3 +1,4 @@
+import { agentDiscovery } from '@graphdone/core';
 import { Router } from 'express';
 import express from 'express';
 import cors from 'cors';
@@ -14,6 +15,7 @@ const ownerMatch = 'MATCH (g:Graph {id:$graphId, createdBy:$ownerId})';
 export const agentApi = Router();
 agentApi.use(cors(), express.json({ limit: '16kb' }), rateLimit({ windowMs: 60000, limit: 120 }));
 agentApi.use((_req, res, next) => { res.setHeader('Cache-Control', 'no-store'); next(); });
+agentApi.get('/discovery', (_req, res) => res.json(agentDiscovery(false)));
 agentApi.all('*', async (req, res) => {
   const session = driver.session();
   try {
@@ -38,6 +40,8 @@ agentApi.all('*', async (req, res) => {
     const params = { graphId, ownerId };
     const graph = await session.run(`${ownerMatch} RETURN g.name AS name`, params);
     if (!graph.records.length) return res.status(403).json({ error: 'Only projects you own can be connected' });
+
+    if ((req.path === '/limits' || req.path === '/usage') && req.method === 'GET') return res.json({version:1,hosted:false,advisory:true,account:null,agent:null,sharing:null,actions:{canRead:true,canWrite:scope==='collaborate',next:scope==='collaborate'?'WORK':'READ_ONLY'},transport:{requestsPerMinutePerIp:120,remaining:null},constraints:{noteCharacters:4000,connectionsPerProject:25},note:'No managed daily quota. Remaining per-IP capacity is not measured here; your administrator may configure additional limits. Respect HTTP 429 and Retry-After.'});
 
     if (req.path === '/tokens') {
       if (isAgent) return res.status(403).json({ error: 'Only a human owner can manage connections' });
