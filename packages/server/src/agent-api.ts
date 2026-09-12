@@ -74,7 +74,7 @@ agentApi.all('*', async (req, res) => {
     if (req.path === '/context' && req.method === 'GET') {
       const result = await session.run(`${ownerMatch} MATCH (w:WorkItem)-[:BELONGS_TO]->(g) RETURN w { .id, .title, .description, .status, .priority, .dueDate, .tags, .updatedAt } AS item ORDER BY w.priority DESC, w.id LIMIT 501`, params);
       const notes = await session.run('MATCH (n:CollaborationNote {graphId:$graphId}) RETURN n { .id, .workItemId, .body, .actor, .actorId, .actorType, .createdAt } AS note ORDER BY n.createdAt DESC LIMIT 100', params);
-      return res.json({ project: { id: graphId, name: graph.records[0].get('name') }, scope, items: result.records.slice(0,500).map(r => r.get('item')), truncated: result.records.length > 500, notes: notes.records.map(r => r.get('note')), capabilities: { updateStatusAndPriority: scope === 'collaborate', leaveNotes: scope === 'collaborate', createTasks: true, deleteTasks: false }, statuses, priorityRange: [0,1] });
+      return res.json({ project: { id: graphId, name: graph.records[0].get('name') }, scope, items: result.records.slice(0,500).map(r => r.get('item')), truncated: result.records.length > 500, notes: notes.records.map(r => r.get('note')), capabilities: { updateStatusAndPriority: scope === 'collaborate', leaveNotes: scope === 'collaborate', createTasks: scope === 'collaborate', deleteTasks: false }, statuses, priorityRange: [0,1] });
     }
     if (scope !== 'collaborate') return res.status(403).json({ error: 'This token is read-only' });
     if (req.path === '/notes' && req.method === 'POST') {
@@ -90,7 +90,7 @@ agentApi.all('*', async (req, res) => {
     }
     if (req.path === '/items' && req.method === 'POST') {
       const {id,title,description='',priority=.5,status='NOT_STARTED'}=req.body;
-      if(typeof id!=='string'||!/^[a-f0-9-]{36}$/.test(id)||typeof title!=='string'||!title.trim()||title.length>200||typeof description!=='string'||description.length>2000||typeof priority!=='number'||!Number.isFinite(priority)||priority<0||priority>1||!statuses.includes(status))return res.status(400).json({error:'Provide a UUID id, title (1–200), optional description (up to 2000), priority (0–1) and valid status'});
+      if(typeof id!=='string'||!/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/.test(id)||typeof title!=='string'||!title.trim()||title.length>200||typeof description!=='string'||description.length>2000||typeof priority!=='number'||!Number.isFinite(priority)||priority<0||priority>1||!statuses.includes(status))return res.status(400).json({error:'Provide a lowercase UUID id, title (1–200), optional description (up to 2000), priority (0–1) and valid status'});
       const digest=hash(JSON.stringify([title.trim(),description,priority,status]));
       const outcome=await session.executeWrite(async tx=>{
         await tx.run(`${ownerMatch} SET g.agentAccessVersion=coalesce(g.agentAccessVersion,0)+1`,params);
