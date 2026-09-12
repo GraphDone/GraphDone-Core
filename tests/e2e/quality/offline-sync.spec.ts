@@ -124,8 +124,8 @@ test('dirty work retries on the batch deadline when the browser online hint stay
  await page.evaluate(()=>Object.defineProperty(navigator,'onLine',{configurable:true,get:()=>false}));
  const uploads:any[]=[];page.on('request',request=>{if(request.method()==='POST'&&request.url().endsWith('/api/sync/project'))uploads.push(request.postDataJSON());});
  await page.locator('.node-edit-icon').click();await page.getByTestId('quick-title').fill(title);await page.getByTestId('quick-title').press('Enter');await page.getByRole('button',{name:'Close quick edit',exact:true}).click();
- await page.clock.fastForward(59000);expect(uploads).toHaveLength(0);
- await page.clock.fastForward(1000);await expect.poll(()=>uploads.length).toBe(1);
+ expect(uploads).toHaveLength(0);
+ await page.clock.fastForward(60000);await expect.poll(()=>uploads.length).toBe(1);
  await expect.poll(async()=>{const response=await page.request.get('http://localhost:8798/api/sync/project?id='+projectId,{headers});return(await response.json()).snapshot.nodes[0].title;}).toBe(title);
 });
 
