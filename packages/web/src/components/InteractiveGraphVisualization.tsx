@@ -4618,7 +4618,11 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     });
     ro.observe(el);
     return () => { cancelAnimationFrame(frame); ro.disconnect(); };
-  }, [hasNodes]);
+  // Loading can briefly render a placeholder after cached nodes already make
+  // hasNodes true. Re-run when either query settles so the observer follows the
+  // graph container that is actually mounted, rather than returning once on a
+  // missing ref and leaving future phone/desktop resizes unframed.
+  }, [hasNodes, loading, edgesLoading]);
 
   const isDenseGraph = nodes.length > DENSE_GRAPH_NODE_THRESHOLD;
   const isSimplified = isDenseGraph && (currentTransform?.scale ?? 1) < SIMPLIFY_SCALE;
@@ -4987,7 +4991,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
   if (loading || edgesLoading) {
     return (
-      <div className="graph-container relative w-full h-full flex items-center justify-center">
+      <div ref={containerRef} className="graph-container relative w-full h-full flex items-center justify-center">
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <div className="text-green-300 text-lg font-medium">Loading graph data...</div>
