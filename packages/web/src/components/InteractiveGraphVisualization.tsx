@@ -212,9 +212,12 @@ interface InteractiveGraphVisualizationProps {
   interactionLocked?: boolean;
   quickEditRequest?: WorkItem | null;
   onQuickEditRequestHandled?: () => void;
+  /** Workspace-scoped history lets the primary create modal and graph gestures
+   * share the same Ctrl/Cmd+Z and touch context-menu undo action. */
+  undoStack?: UndoStack;
 }
 
-export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, interactionLocked, quickEditRequest, onQuickEditRequestHandled }: InteractiveGraphVisualizationProps = {}) {
+export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, interactionLocked, quickEditRequest, onQuickEditRequestHandled, undoStack: workspaceUndoStack }: InteractiveGraphVisualizationProps = {}) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   // Live-readable lock flag for d3 drag filters (avoids re-binding handlers on toggle).
@@ -484,17 +487,21 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const selectedRelationTypeRef = useRef<RelationshipType>('RELATES_TO');
 
   // FLOW-3: every mutation registers its inverse — experimentation is safe
-  const undoStackRef = useRef(new UndoStack(36));
-  const [undoLabel, setUndoLabel] = useState<string | null>(null);
-  useEffect(() => undoStackRef.current.onChange(() => setUndoLabel(undoStackRef.current.peekLabel())), []);
+  const localUndoStackRef = useRef(new UndoStack(36));
+  const undoStack = workspaceUndoStack ?? localUndoStackRef.current;
+  const [undoLabel, setUndoLabel] = useState<string | null>(() => undoStack.peekLabel());
+  useEffect(() => {
+    setUndoLabel(undoStack.peekLabel());
+    return undoStack.onChange(() => setUndoLabel(undoStack.peekLabel()));
+  }, [undoStack]);
   const runUndo = useCallback(async () => {
     try {
-      const action = await undoStackRef.current.undo();
+      const action = await undoStack.undo();
       if (action) showSuccess(`Undid: ${action.label}`);
     } catch {
       showError('Could not undo that — the server refused');
     }
-  }, []);
+  }, [undoStack]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
@@ -1070,7 +1077,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         }).then((result) => {
           const createdEdgeId = result?.data?.createEdges?.edges?.[0]?.id;
           if (createdEdgeId) {
-            undoStackRef.current.push({
+            undoStack.push({
               label: 'Connect items',
               undo: async () => {
                 await deleteEdgeMutation({ variables: { where: { id: createdEdgeId } } });
@@ -1536,7 +1543,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         if (newNode?.id) {
           const createdId = newNode.id;
           const edgeToRemove = grownEdgeId;
-          undoStackRef.current.push({
+          undoStack.push({
             label: 'Create item',
             undo: async () => {
               // edges first — orphan edges break the whole edges query
@@ -5199,7 +5206,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       }
     }).then(() => {
       // Deleting is safe because undo can rebuild it — no confirm() popup
-      undoStackRef.current.push({
+      undoStack.push({
         label: 'Delete relationship',
         undo: async () => {
           await createEdgeMutation({
@@ -5316,7 +5323,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
             updateWorkItemMutation({
               variables: { where: { id: inlineEdit.nodeId }, update: { title } }
             }).then(() => {
-              undoStackRef.current.push({
+              undoStack.push({
                 label: 'Rename item',
                 undo: async () => {
                   await updateWorkItemMutation({
@@ -5365,7 +5372,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         const onCommit = (c: QuickEditCommit) => {
           updateWorkItemMutation({ variables: { where: { id: quickEditNode.id }, update: c.update } })
             .then(() => {
-              undoStackRef.current.push({
+              undoStack.push({
                 label: c.label,
                 undo: async () => {
                   await updateWorkItemMutation({ variables: { where: { id: quickEditNode.id }, update: c.prev } });
@@ -5967,6 +5974,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         <CreateWorkItemModal
           isOpen={showCreateNodeModal}
           onClose={handleCloseCreateNodeModal}
+          undoStack={undoStack}
           onSubmit={async (nodeData) => {
             // Handle node creation
             handleCloseCreateNodeModal();

@@ -6,7 +6,8 @@ import { useDialog } from '../hooks/useDialogManager';
 import { useModalA11y } from '../hooks/useModalA11y';
 import { useMutation, useQuery } from '@apollo/client';
 import { X, Link, ChevronDown, Plus } from 'lucide-react';
-import { CREATE_WORK_ITEM, GET_WORK_ITEMS, GET_EDGES, CREATE_EDGE } from '../lib/queries';
+import { CREATE_WORK_ITEM, GET_WORK_ITEMS, GET_EDGES, CREATE_EDGE, DELETE_WORK_ITEM, DELETE_EDGE } from '../lib/queries';
+import type { UndoStack } from '../lib/undoStack';
 import { useAuth } from '../contexts/AuthContext';
 import { useGraph } from '../contexts/GraphContext';
 import { useNotifications } from '../contexts/NotificationContext';
@@ -48,10 +49,11 @@ interface CreateWorkItemModalProps {
   parentWorkItemId?: string; // If provided, creates a connection to this work item
   position?: { x: number; y: number; z: number }; // Position for floating work items
   onSubmit?: (nodeData: any) => Promise<void>; // Optional callback after work item creation
+  undoStack?: UndoStack;
 }
 
 
-export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, position, onSubmit }: CreateWorkItemModalProps) {
+export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, position, onSubmit, undoStack }: CreateWorkItemModalProps) {
   useDialog(isOpen, onClose);
   const panelRef = React.useRef<HTMLDivElement>(null);
   useModalA11y(panelRef, { isOpen, label: parentWorkItemId ? 'Create and connect work item' : 'Create new work item' });
@@ -131,6 +133,14 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
     refetchQueries: [GET_EDGES, GET_WORK_ITEMS],
     awaitRefetchQueries: true,
   });
+  const [deleteCreatedWorkItem] = useMutation(DELETE_WORK_ITEM, {
+    refetchQueries: [GET_WORK_ITEMS, GET_EDGES],
+    awaitRefetchQueries: true,
+  });
+  const [deleteCreatedEdge] = useMutation(DELETE_EDGE, {
+    refetchQueries: [GET_EDGES, GET_WORK_ITEMS],
+    awaitRefetchQueries: true,
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -194,6 +204,7 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
 
       if (result.data?.createWorkItems?.workItems?.[0]) {
         const createdNode = result.data.createWorkItems.workItems[0];
+        let createdEdgeId: string | undefined;
         
         // If parentWorkItemId is provided, create the edge with the correct relationship type
         if (parentWorkItemId) {
@@ -203,7 +214,8 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
             target: { connect: { where: { node: { id: createdNode.id } } } }
           };
           
-          await createEdge({ variables: { input: [edgeInput] } });
+          const edgeResult = await createEdge({ variables: { input: [edgeInput] } });
+          createdEdgeId = edgeResult.data?.createEdges?.edges?.[0]?.id;
           
           const relationshipLabel = getRelationshipConfig(selectedRelationType as RelationshipType).label;
           showSuccess(
@@ -216,6 +228,15 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
             `"${createdNode.title}" has been added to your workspace and is now visible in all views.`
           );
         }
+
+        const createdNodeId = createdNode.id;
+        undoStack?.push({
+          label: 'Create item',
+          undo: async () => {
+            if (createdEdgeId) await deleteCreatedEdge({ variables: { where: { id: createdEdgeId } } }).catch(() => undefined);
+            await deleteCreatedWorkItem({ variables: { where: { id: createdNodeId } } });
+          },
+        });
 
         onClose();
         setFormData({

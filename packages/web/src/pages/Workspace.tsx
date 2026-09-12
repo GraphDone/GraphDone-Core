@@ -23,6 +23,7 @@ import { GET_WORK_ITEMS, GET_EDGES } from '../lib/queries';
 import { useHealthStatus } from '../hooks/useHealthStatus';
 import { useViewMode } from '../contexts/ViewModeContext';
 import { parseLayoutMode, LAYOUT_MODE_STORAGE_KEY, type LayoutMode } from '../lib/layoutAlgorithms';
+import { UndoStack } from '../lib/undoStack';
 
 export function Workspace() {
   const { usage: cloudUsage } = useHostedUsage();
@@ -55,6 +56,8 @@ export function Workspace() {
     (window as any).triggerLayoutMode?.(next);
   };
   const { currentGraph, availableGraphs, getBreadcrumb, ascendTo, canEditGraph } = useGraph();
+  const [undoStack] = useState(() => new UndoStack(36));
+  useEffect(() => { undoStack.clear(); }, [currentGraph?.id, undoStack]);
   const breadcrumb = getBreadcrumb();
   const [inspectorNode, setInspectorNode] = useState<any>(null);
   const [quickEditRequest, setQuickEditRequest] = useState<WorkItem | null>(null);
@@ -432,7 +435,7 @@ export function Workspace() {
                 </div>
               </div>
             )}
-            <SafeGraphVisualization onNodeSelected={setInspectorNode} interactionLocked={isMobile && graphLocked} quickEditRequest={quickEditRequest} onQuickEditRequestHandled={() => setQuickEditRequest(null)} />
+            <SafeGraphVisualization onNodeSelected={setInspectorNode} interactionLocked={isMobile && graphLocked} quickEditRequest={quickEditRequest} onQuickEditRequestHandled={() => setQuickEditRequest(null)} undoStack={undoStack} />
            </div>
            {/* Lock toggle (phones): when locked, touch pans the canvas and never
                drags a node or edge label; unlock to rearrange/edit. */}
@@ -534,6 +537,7 @@ export function Workspace() {
         <CreateWorkItemModal
           isOpen={showCreateModal}
           onClose={() => setShowCreateModal(false)}
+          undoStack={undoStack}
         />
       )}
 
