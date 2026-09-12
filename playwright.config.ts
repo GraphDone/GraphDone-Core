@@ -20,6 +20,12 @@ export default defineConfig({
     /* Base URL to use in actions like `await page.goto('/')`. */
     baseURL: process.env.TEST_URL || 'https://localhost:3128',
 
+    /* Stream isolated headed QC through scripts/headed-viewer.mjs while using
+     * the installed Chrome build instead of requiring a bundled browser. */
+    ...(process.env.QC_BROWSER_PORT
+      ? { channel: 'chrome', launchOptions: { args: [`--remote-debugging-port=${process.env.QC_BROWSER_PORT}`] } }
+      : {}),
+
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
     
