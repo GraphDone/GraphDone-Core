@@ -439,28 +439,30 @@ export function Workspace() {
             )}
             <SafeGraphVisualization onNodeSelected={setInspectorNode} interactionLocked={isMobile && graphLocked} quickEditRequest={quickEditRequest} onQuickEditRequestHandled={() => setQuickEditRequest(null)} undoStack={undoStack} />
            </div>
-           {/* Lock toggle (phones): when locked, touch pans the canvas and never
+           {/* Lock toggle (compact layouts): when locked, touch pans the canvas and never
                drags a node or edge label; unlock to rearrange/edit. */}
-           <button
-             data-testid="graph-lock-toggle"
-             onClick={() => setGraphLocked((v) => !v)}
-             className={`md:hidden absolute top-3 right-3 z-40 flex items-center gap-1.5 px-3 py-2 rounded-full shadow-lg backdrop-blur-sm border text-xs font-medium transition-colors ${
-               graphLocked
-                 ? 'bg-gray-900/90 border-gray-600 text-gray-200'
-                 : 'bg-green-600/90 border-green-400 text-white'
-             }`}
-             title={graphLocked ? 'Locked — tap to edit' : 'Editing — tap to lock'}
-           >
-             {graphLocked ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
-             {graphLocked ? 'Locked' : 'Editing'}
-           </button>
+           {isMobile && (
+             <button
+               data-testid="graph-lock-toggle"
+               onClick={() => setGraphLocked((v) => !v)}
+               className={`absolute top-3 right-3 z-40 flex min-h-11 items-center gap-1.5 px-3 py-2 rounded-full shadow-lg backdrop-blur-sm border text-xs font-medium transition-colors ${
+                 graphLocked
+                   ? 'bg-gray-900/90 border-gray-600 text-gray-200'
+                   : 'bg-green-600/90 border-green-400 text-white'
+               }`}
+               title={graphLocked ? 'Locked — tap to edit' : 'Editing — tap to lock'}
+             >
+               {graphLocked ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
+               {graphLocked ? 'Locked' : 'Editing'}
+             </button>
+           )}
            {/* Zoom-extents: frame every node, independent of the camera-restore
-               state. Sits under the lock toggle on phones; top-left on desktop,
+               state. Sits under the lock toggle in compact layouts; top-left on desktop,
                where the right corner is taken by the docked inspector. */}
            <button
              data-testid="graph-zoom-extents"
              onClick={() => (window as any).triggerZoomToFit?.()}
-             className="absolute top-16 right-3 md:top-3 md:left-3 md:right-auto z-40 flex items-center justify-center w-10 h-10 rounded-full shadow-lg backdrop-blur-sm border border-gray-600 bg-gray-900/90 text-gray-200 hover:text-white hover:border-green-400 transition-colors"
+             className="absolute top-16 right-3 md:top-3 md:left-3 md:right-auto z-40 flex items-center justify-center w-11 h-11 rounded-full shadow-lg backdrop-blur-sm border border-gray-600 bg-gray-900/90 text-gray-200 hover:text-white hover:border-green-400 transition-colors"
              title="Zoom to fit — frame all nodes"
              aria-label="Zoom to fit — frame all nodes"
            >
