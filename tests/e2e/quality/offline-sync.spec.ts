@@ -47,7 +47,11 @@ test('student team: offline reload, drag, quota pause, reconnect, no duplicates 
  // Quota denial must retain the durable exact request, and stop retries.
  let denied=0;
  await page.route('**/api/sync/project',route=>{denied++;return route.fulfill({status:429,json:{code:'PERSONAL_LIMIT',message:'Local quota fixture',resetAt:new Date(Date.now()+60000).toISOString()}});});
- await context.setOffline(false);await expect.poll(()=>denied).toBe(1);
+ await context.setOffline(false);
+ // Playwright promises network emulation, not a DOM connectivity event. Model
+ // the browser's fast reconnect hint explicitly after restoring transport.
+ await page.evaluate(()=>window.dispatchEvent(new Event('online')));
+ await expect.poll(()=>denied).toBe(1);
  await page.waitForTimeout(12000);expect(denied).toBe(1);
  let profileReads=0;page.on('request',request=>{if(request.url().includes('/api/graphql')&&request.postData()?.includes('\"operationName\":\"Me\"'))profileReads++;});
  // A renewed sign-in has a token but may need its cached profile while D1 is paused.
@@ -108,6 +112,21 @@ test('student team: offline reload, drag, quota pause, reconnect, no duplicates 
  // Remove this run's isolated project, including agent tokens and notes.
  const last=(await (await page.request.get('http://localhost:8798/api/sync/project?id='+fixture.projectId,{headers:{Authorization:'Bearer '+fixture.token}})).json()).snapshot;
  const removed=await page.request.post('http://localhost:8798/api/sync/project',{headers:{Authorization:'Bearer '+fixture.token},data:{requestId:randomUUID(),projectId:fixture.projectId,version:last.project.sync_version,deleteProject:true,changes:[]}});expect(removed.ok()).toBe(true);
+});
+
+test('dirty work retries on the batch deadline when the browser online hint stays stale @offline-sync',async({page})=>{
+ test.setTimeout(90000);
+ const fixture=JSON.parse(await readFile(fixturePath,'utf8')),projectId=randomUUID(),id=randomUUID(),title='Reconnect deadline '+Date.now();
+ const headers={Authorization:'Bearer '+fixture.token};
+ const seeded=await page.request.post('http://localhost:8798/api/sync/project',{headers,data:{requestId:randomUUID(),projectId,version:-1,name:'Stale connectivity hint',changes:[{table:'nodes',id,action:'put',value:{title:'Before reconnect',type:'TASK',description:null,status:'PROPOSED',priority:.5,position_x:0,position_y:0,due_date:null,tags:'[]',metadata:'{}'}}]}});expect(seeded.ok()).toBe(true);
+ await page.clock.install();await page.goto('/');await page.evaluate(state=>{localStorage.setItem('authToken',state.token);localStorage.setItem('currentUser',JSON.stringify(state.user));localStorage.setItem('currentGraphId',state.projectId);localStorage.setItem('graphdone:viewMode','graph');},{...fixture,projectId});await page.reload();
+ await expect(page.locator('.graph-container .node')).toHaveCount(1);
+ await page.evaluate(()=>Object.defineProperty(navigator,'onLine',{configurable:true,get:()=>false}));
+ const uploads:any[]=[];page.on('request',request=>{if(request.method()==='POST'&&request.url().endsWith('/api/sync/project'))uploads.push(request.postDataJSON());});
+ await page.locator('.node-edit-icon').click();await page.getByTestId('quick-title').fill(title);await page.getByTestId('quick-title').press('Enter');await page.getByRole('button',{name:'Close quick edit',exact:true}).click();
+ await page.clock.fastForward(59000);expect(uploads).toHaveLength(0);
+ await page.clock.fastForward(1000);await expect.poll(()=>uploads.length).toBe(1);
+ await expect.poll(async()=>{const response=await page.request.get('http://localhost:8798/api/sync/project?id='+projectId,{headers});return(await response.json()).snapshot.nodes[0].title;}).toBe(title);
 });
 
 test('local-only guest: project, tasks and reload without any D1 writes @offline-sync',async({page,context})=>{

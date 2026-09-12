@@ -79,8 +79,8 @@ async function acceptRemote(owner:string,id:string,remote:Snapshot|null,ack?:str
   a.projects[id]={base:remote,local:result.local,conflicts:result.conflicts,remote:result.conflicts.length?remote:undefined,checkedAt:Date.now()};
  });
 }
-export async function syncNow(manual=false) {
- const owner=ownerId();if(!offlineEnabled||!owner||localGuest()||!navigator.onLine)return;
+export async function syncNow(manual=false,scheduled=false) {
+ const owner=ownerId();if(!offlineEnabled||!owner||localGuest()||(!navigator.onLine&&!scheduled))return;
  if(!navigator.locks) {await editAccount(owner,a=>{a.error='This browser cannot coordinate safe sync between tabs. Export a backup and use a current browser.';});return;}
  await navigator.locks.request(`graphdone-sync:${owner}`,{ifAvailable:true},async lock=>{
   if(!lock)return;
@@ -88,11 +88,16 @@ export async function syncNow(manual=false) {
   // Manual retry can retry expired authentication after a fresh sign-in, but
   // cannot bypass a quota recheck deadline by repeatedly pressing a button.
   if(a.retryAt>Date.now())return;
-  if(!Object.values(a.projects).some(dirty) && !manual && (skipBackgroundPoll() || !Object.entries(a.projects).some(([id,p])=>localStorage.getItem('currentGraphId')===id && Date.now()-p.checkedAt>60000)))return;
+  const hasDirty=Object.values(a.projects).some(dirty);
+  // A scheduled dirty upload is also the bounded connectivity probe. Browser
+  // online hints can be stale; the request result is authoritative. Never use
+  // this exception for clean background reads.
+  if(!navigator.onLine&&!hasDirty)return;
+  if(!hasDirty && !manual && (skipBackgroundPoll() || !Object.entries(a.projects).some(([id,p])=>localStorage.getItem('currentGraphId')===id && Date.now()-p.checkedAt>60000)))return;
   view={...view,syncing:true};listeners.forEach(f=>f());
   try {
    for(const [id] of Object.entries(a.projects).sort(([,a],[,b])=>Number(!!a.local)-Number(!!b.local))) {
-    if(owner!==ownerId()||!navigator.onLine)break;
+    if(owner!==ownerId()||(!navigator.onLine&&!scheduled))break;
     const p=(await readAccount(owner)).projects[id];if(p.conflicts?.length)continue;
     if(!dirty(p)) {
      if(manual||(!skipBackgroundPoll() && (localStorage.getItem('currentGraphId')===id)&&Date.now()-p.checkedAt>60000))await getProject(id,true);
@@ -165,25 +170,11 @@ let observedToken=getToken();
 if(offlineEnabled) {
  void publish().catch(storageError);
  const changed=()=>{void publish().catch(storageError);};channel?.addEventListener('message',event=>{changed();if(event.data===ownerId())window.dispatchEvent(new Event('graphdone-sync-refresh'));});window.addEventListener('graphdone-local-change',changed);
- // Some browsers do not deliver a reliable `online` event when a page was
- // loaded while offline. A local-only probe keeps watching navigator.onLine;
- // it performs no request until connectivity returns, then runs one sync.
- let reconnectTimer:number|undefined;
- const watchForReconnect=()=>{
-  if(reconnectTimer!==undefined)return;
-  reconnectTimer=window.setTimeout(function check(){
-   reconnectTimer=undefined;
-   if(navigator.onLine){changed();void syncNow();}
-   else watchForReconnect();
-  },2000);
- };
- window.addEventListener('online',()=>{if(reconnectTimer!==undefined)clearTimeout(reconnectTimer);reconnectTimer=undefined;changed();void syncNow();});
- window.addEventListener('offline',()=>{changed();watchForReconnect();});
- if(!navigator.onLine)watchForReconnect();
+ window.addEventListener('online',()=>{changed();void syncNow();});window.addEventListener('offline',changed);
  window.addEventListener('graphdone-session',()=>{
   changed();const owner=ownerId(),token=getToken();
   if(owner){const user=JSON.parse(getUserRaw()||'null');void readAccount(owner).then(async a=>{if(JSON.stringify(a.user)!==JSON.stringify(user))await editAccount(owner,state=>{state.user=user;});}).catch(storageError);}
   if(owner && token!==observedToken){observedToken=token;void editAccount(owner,a=>{if(a.blocked==='auth'){a.retryAt=0;a.error='';delete a.blocked;}}).then(()=>syncNow());}
  });
- setInterval(()=>{if(!document.hidden)void syncNow();},60000);
+ setInterval(()=>{if(!document.hidden)void syncNow(false,true);},60000);
 }
