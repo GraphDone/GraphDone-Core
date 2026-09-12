@@ -74,7 +74,7 @@ agentApi.all('*', async (req, res) => {
     if (req.path === '/context' && req.method === 'GET') {
       const result = await session.run(`${ownerMatch} MATCH (w:WorkItem)-[:BELONGS_TO]->(g) RETURN w { .id, .title, .description, .status, .priority, .dueDate, .tags, .updatedAt } AS item ORDER BY w.priority DESC, w.id LIMIT 501`, params);
       const notes = await session.run('MATCH (n:CollaborationNote {graphId:$graphId}) RETURN n { .id, .workItemId, .body, .actor, .actorId, .actorType, .createdAt } AS note ORDER BY n.createdAt DESC LIMIT 100', params);
-      return res.json({ project: { id: graphId, name: graph.records[0].get('name') }, scope, items: result.records.slice(0,500).map(r => r.get('item')), truncated: result.records.length > 500, notes: notes.records.map(r => r.get('note')), capabilities: { updateStatusAndPriority: scope === 'collaborate', leaveNotes: scope === 'collaborate', createOrDeleteTasks: false }, statuses, priorityRange: [0,1] });
+      return res.json({ project: { id: graphId, name: graph.records[0].get('name') }, scope, items: result.records.slice(0,500).map(r => r.get('item')), truncated: result.records.length > 500, notes: notes.records.map(r => r.get('note')), capabilities: { updateStatusAndPriority: scope === 'collaborate', leaveNotes: scope === 'collaborate', createTasks: true, deleteTasks: false }, statuses, priorityRange: [0,1] });
     }
     if (scope !== 'collaborate') return res.status(403).json({ error: 'This token is read-only' });
     if (req.path === '/notes' && req.method === 'POST') {
@@ -87,6 +87,19 @@ agentApi.all('*', async (req, res) => {
       const note = { id: randomUUID(), graphId, workItemId: workItemId || '', body: body.trim(), actor, actorId, actorType: isAgent ? 'agent' : 'human', createdAt: new Date().toISOString() };
       await session.executeWrite(async tx => { await tx.run('CREATE (n:CollaborationNote) SET n=$note', { note }); await tx.run('MATCH (n:CollaborationNote {graphId:$graphId}) WITH n ORDER BY n.createdAt DESC, n.id DESC SKIP 2000 DELETE n', params); });
       return res.status(201).json(note);
+    }
+    if (req.path === '/items' && req.method === 'POST') {
+      const {id,title,description='',priority=.5,status='NOT_STARTED'}=req.body;
+      if(typeof id!=='string'||!/^[a-f0-9-]{36}$/.test(id)||typeof title!=='string'||!title.trim()||title.length>200||typeof description!=='string'||description.length>2000||typeof priority!=='number'||!Number.isFinite(priority)||priority<0||priority>1||!statuses.includes(status))return res.status(400).json({error:'Provide a UUID id, title (1–200), optional description (up to 2000), priority (0–1) and valid status'});
+      const digest=hash(JSON.stringify([title.trim(),description,priority,status]));
+      const outcome=await session.executeWrite(async tx=>{
+        await tx.run(`${ownerMatch} SET g.agentAccessVersion=coalesce(g.agentAccessVersion,0)+1`,params);
+        const existing=await tx.run('MATCH (w:WorkItem {id:$id}) OPTIONAL MATCH (w)-[:BELONGS_TO]->(g:Graph) RETURN w.agentCreationDigest AS digest,g.id AS graphId',{id});
+        if(existing.records.length)return existing.records[0].get('graphId')===graphId&&existing.records[0].get('digest')===digest?'existing':'conflict';
+        await tx.run(`${ownerMatch} CREATE (w:WorkItem {id:$id,type:'TASK',title:$title,description:$description,status:$status,priority:$priority,tags:[],metadata:$metadata,positionX:0.0,positionY:0.0,positionZ:0.0,createdAt:datetime(),updatedAt:datetime(),agentCreationDigest:$digest})-[:BELONGS_TO]->(g)`,{...params,id,title:title.trim(),description,status,priority,digest,metadata:JSON.stringify({createdByAgent:actorId})});return 'created';
+      });
+      if(outcome==='conflict')return res.status(409).json({error:'This task ID is already used. Existing work was not changed.'});
+      return res.status(outcome==='created'?201:200).json({id,created:outcome==='created'});
     }
     if (req.path === '/items' && req.method === 'PATCH') {
       const { id, status, priority } = req.body;
