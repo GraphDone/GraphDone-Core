@@ -1,5 +1,5 @@
 /** Small, transport-neutral contract shared by hosted and self-hosted agents. */
-export function agentDiscovery(hosted: boolean) {
+export function agentDiscovery(hosted: boolean, enrollment = false) {
   return {
     version: 1,
     authentication: {type: 'Bearer', projectParameter: 'graphId', accountAccess: false},
@@ -11,14 +11,15 @@ export function agentDiscovery(hosted: boolean) {
       {method: 'GET', path: '/discovery', authentication: false},
       {method: 'GET', path: '/limits', authentication: true},
       {method: 'GET', path: '/context', authentication: true},
+      {method: 'POST', path: '/items', scope: 'collaborate', body: {id: 'new UUID; reuse unchanged for safe retry', title: 'Task title'}, defaults: {status: 'NOT_STARTED', priority: 0.5}},
       {method: 'PATCH', path: '/items', scope: 'collaborate', body: {id: 'returned task ID', status: 'IN_PROGRESS'}},
       {method: 'POST', path: '/notes', scope: 'collaborate', body: {body: 'Useful result, blocker or handoff', workItemId: 'optional returned task ID'}},
       ...(hosted ? [{method: 'POST', path: '/shares', scope: 'collaborate', requiresExplicitSharingPermission: true, body: {}}] : []),
     ],
-    constraints: {priority: {min: 0, max: 1, highestFirst: true}, noteCharacters: 4000, createOrDeleteTasks: false, launchModels: false},
+    constraints: {priority: {min: 0, max: 1, highestFirst: true}, noteCharacters: 4000, createTasks: true, deleteTasks: false, launchModels: false},
     coordination: {humanMustRemainOnline: false, shareOwnerBudget: hosted, tokenRotationResetsBudget: false, acknowledgementLoops: false},
     recovery: {429: 'Stop until Retry-After/resetAt; do not rotate tokens', 401: 'Stop and request valid credentials', 403: 'Stop; additional permission is required', ambiguousWrite: 'Do not blindly repeat'},
-    onboarding: {mode: 'human-sign-in-and-token', agentInitiatedEmailSignup: false, instructions: 'The owner signs in, opens Agents, creates a project token, and privately supplies the connection prompt. Email-approved agent enrollment is not enabled yet.'},
+    onboarding: enrollment ? {mode:'email-consent',agentInitiatedEmailSignup:true,start:'/api/enrollment/start',status:'/api/enrollment/status',method:'POST',required:{requestId:'fresh UUID',email:'human owner email',agentName:'your name',projectName:'new project name',purpose:'short purpose',scope:'read or collaborate',statusSecret:'secure random 32 bytes encoded as 64 lowercase hex',agentTokenDigest:'SHA-256 hex of a fresh gd_agent_ credential; retain the raw credential privately'},credential:'Generate gd_agent_ followed by 32 secure random bytes as hex. Submit only its SHA-256 digest. Approval activates that credential.',polling:'POST status with {id,secret:statusSecret}; wait at least intervalSeconds; stop on rejection, expiry or 429',human:'Email link, explicit approval and Turnstile. No access to existing projects or account controls.'} : {mode: 'human-sign-in-and-token', agentInitiatedEmailSignup: false, instructions: 'The owner signs in, opens Agents, creates a project token, and privately supplies the connection prompt. Email-approved agent enrollment is not enabled yet.'},
   };
 }
 export function agentLimits(usage: any, scope = 'collaborate') {

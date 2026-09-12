@@ -1,3 +1,4 @@
+import {AgentApproval} from './pages/AgentApproval';
 import {SharedProject} from './pages/SharedProject';
 import {FeedbackHost} from './components/Feedback';
 import { lazy, Suspense } from 'react';
@@ -25,6 +26,7 @@ import { NotificationProvider } from './contexts/NotificationContext';
 function AuthenticatedApp() {
   const { isAuthenticated, isInitializing } = useAuth();
   const location=useLocation();
+  if(location.pathname==='/agent-approval')return <AgentApproval/>;
   if(location.pathname==='/share')return <SharedProject/>;
 
   if (isInitializing) {
