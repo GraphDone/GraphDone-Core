@@ -66,14 +66,18 @@ export function Backend() {
       const services: ServiceStatus[] = [];
       
       // GraphQL API Server (main backend)
-      const graphqlStatus = healthData.services?.graphql?.status === 'healthy' ? 'healthy' : 'down';
+      const graphqlReportedStatus = healthData.services?.graphql?.status;
+      const graphqlStatus = graphqlReportedStatus === 'healthy' || graphqlReportedStatus === 'available' ? 'healthy' : 'down';
+      const graphqlWasProbed = graphqlReportedStatus === 'healthy';
       services.push({
         name: 'GraphQL API Server',
         status: graphqlStatus,
         responseTime: responseTime,
         lastChecked: now,
-        description: graphqlStatus === 'healthy' 
-          ? `Apollo Server running on port ${healthData.services?.graphql?.port || 4127}`
+        description: graphqlStatus === 'healthy'
+          ? graphqlWasProbed
+            ? `Graph API responding on port ${healthData.services?.graphql?.port || 4127}`
+            : 'Graph API route is available; storage is checked by real operations'
           : 'GraphQL API Server not responding'
       });
       debug.push(`🖥️  GraphQL API: ${graphqlStatus}`);
@@ -101,6 +105,10 @@ export function Backend() {
           ? `Connected to ${healthData.services.neo4j.uri}`
           : 'Graph store connected';
         debug.push(`🗄️  Graph store: healthy${healthData.services?.neo4j?.uri ? ` at ${healthData.services.neo4j.uri}` : ''}`);
+      } else if (neo4jStatus === 'not_probed' || neo4jStatus === 'unknown') {
+        neo4jServiceStatus = 'degraded';
+        neo4jDescription = 'Not probed by this zero-read liveness check; real operations report storage failures';
+        debug.push(`🗄️  Graph store: not probed`);
       } else if (neo4jStatus === 'unhealthy') {
         neo4jServiceStatus = 'down';
         const error = healthData.services?.neo4j?.error || 'Connection failed';
@@ -116,15 +124,17 @@ export function Backend() {
         description: neo4jDescription
       });
 
-      // SQLite Auth Database (always healthy if server is running)
+      // Authentication service. Hosted passwordless auth may use the managed store;
+      // this liveness response does not spend a read to verify it.
+      const storageWasProbed = neo4jStatus === 'healthy';
       services.push({
         name: 'SQLite Auth Database',
-        status: 'healthy',
-        responseTime: 2,
+        status: storageWasProbed ? 'healthy' : 'degraded',
+        responseTime: storageWasProbed ? 2 : undefined,
         lastChecked: now,
-        description: 'User authentication and configuration (always available when API is running)'
+        description: storageWasProbed ? 'Authentication storage is responding' : 'Authentication route is loaded; storage was not probed'
       });
-      debug.push(`📁 SQLite: healthy (embedded database)`);
+      debug.push(`📁 Authentication storage: ${storageWasProbed ? 'healthy' : 'not probed'}`);
 
       // MCP Server
       const mcpStatus = healthData.services?.mcp?.status;
@@ -717,12 +727,12 @@ export function Backend() {
                   <div>
                     <p className="text-sm text-gray-400">Graph database</p>
                     <p className="text-2xl font-bold text-gray-100">
-                      {systemHealth.services.find(s => s.name === 'Graph store')?.status === 'healthy' ? 'Online' : 'Offline'}
+                      {systemHealth.services.find(s => s.name === 'Graph store')?.status === 'healthy' ? 'Online' : systemHealth.services.find(s => s.name === 'Graph store')?.status === 'degraded' ? 'Not checked' : 'Offline'}
                     </p>
                   </div>
                   <Database className={`h-8 w-8 ${
                     systemHealth.services.find(s => s.name === 'Graph store')?.status === 'healthy'
-                      ? 'text-green-400' : 'text-red-400'
+                      ? 'text-green-400' : systemHealth.services.find(s => s.name === 'Graph store')?.status === 'degraded' ? 'text-yellow-400' : 'text-red-400'
                   }`} />
                 </div>
               </div>
