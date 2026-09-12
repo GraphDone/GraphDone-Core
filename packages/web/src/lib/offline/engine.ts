@@ -165,7 +165,21 @@ let observedToken=getToken();
 if(offlineEnabled) {
  void publish().catch(storageError);
  const changed=()=>{void publish().catch(storageError);};channel?.addEventListener('message',event=>{changed();if(event.data===ownerId())window.dispatchEvent(new Event('graphdone-sync-refresh'));});window.addEventListener('graphdone-local-change',changed);
- window.addEventListener('online',()=>{changed();void syncNow();});window.addEventListener('offline',changed);
+ // Some browsers do not deliver a reliable `online` event when a page was
+ // loaded while offline. A local-only probe keeps watching navigator.onLine;
+ // it performs no request until connectivity returns, then runs one sync.
+ let reconnectTimer:number|undefined;
+ const watchForReconnect=()=>{
+  if(reconnectTimer!==undefined)return;
+  reconnectTimer=window.setTimeout(function check(){
+   reconnectTimer=undefined;
+   if(navigator.onLine){changed();void syncNow();}
+   else watchForReconnect();
+  },2000);
+ };
+ window.addEventListener('online',()=>{if(reconnectTimer!==undefined)clearTimeout(reconnectTimer);reconnectTimer=undefined;changed();void syncNow();});
+ window.addEventListener('offline',()=>{changed();watchForReconnect();});
+ if(!navigator.onLine)watchForReconnect();
  window.addEventListener('graphdone-session',()=>{
   changed();const owner=ownerId(),token=getToken();
   if(owner){const user=JSON.parse(getUserRaw()||'null');void readAccount(owner).then(async a=>{if(JSON.stringify(a.user)!==JSON.stringify(user))await editAccount(owner,state=>{state.user=user;});}).catch(storageError);}
