@@ -20,7 +20,7 @@ import ViewManager from '../components/ViewManager';
 import { useGraph } from '../contexts/GraphContext';
 import { useAuth } from '../contexts/AuthContext';
 import { GET_WORK_ITEMS, GET_EDGES } from '../lib/queries';
-import { useHealthStatus } from '../hooks/useHealthStatus';
+import { isGraphServiceAvailable, useHealthStatus } from '../hooks/useHealthStatus';
 import { useViewMode } from '../contexts/ViewModeContext';
 import { parseLayoutMode, LAYOUT_MODE_STORAGE_KEY, type LayoutMode } from '../lib/layoutAlgorithms';
 import { UndoStack } from '../lib/undoStack';
@@ -258,17 +258,19 @@ export function Workspace() {
             {/* Data-store status (provider-agnostic — keyed off the GraphQL API, which is
                 the actual data layer; the backing store may be D1, Neo4j, etc.) */}
             <div className={`workspace-connection flex items-center justify-center gap-2 px-2 py-2 rounded-lg text-xs cursor-help ${
-              health?.services?.graphql?.status === 'healthy'
+              isGraphServiceAvailable(health)
                 ? 'text-emerald-200'
                 : 'bg-red-600/20 text-red-300 border border-red-500/30'
             }`} title={
-              health?.services?.graphql?.status === 'healthy'
-                ? 'Connected to the graph service'
+              isGraphServiceAvailable(health)
+                ? health?.services?.graphql?.status === 'available'
+                  ? 'GraphDone is online. Storage is checked when work loads.'
+                  : 'Connected to the graph service'
                 : 'Server unreachable — limited functionality'
             }>
               <Database className="w-4 h-4" />
               <span className="font-medium">
-                {health?.services?.graphql?.status === 'healthy' ? 'Connected' : 'Offline'}
+                {isGraphServiceAvailable(health) ? (health?.services?.graphql?.status === 'available' ? 'Online' : 'Connected') : 'Offline'}
               </span>
             </div>
 
@@ -415,7 +417,7 @@ export function Workspace() {
            <div className="relative w-full h-full">
             {/* Connection warning — fires only when the GraphQL data layer itself is
                 unreachable, not when an optional store (Neo4j) is simply unused. */}
-            {!offlineEnabled && !healthLoading && health?.services?.graphql?.status !== 'healthy' && (
+            {!offlineEnabled && !healthLoading && !isGraphServiceAvailable(health) && (
               <div className="absolute top-4 left-4 right-4 z-50">
                 <div className="bg-red-600/90 backdrop-blur-sm border border-red-500 rounded-lg p-4 shadow-lg">
                   <div className="flex items-start gap-3">
