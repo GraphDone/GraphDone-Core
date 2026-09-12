@@ -1,6 +1,7 @@
 import { GraphErrorBoundary } from './GraphErrorBoundary';
 import { InteractiveGraphVisualization } from './InteractiveGraphVisualization';
 import type { WorkItem } from '../types/graph';
+import type { UndoStack } from '../lib/undoStack';
 
 /**
  * Wrapper component that adds error handling to the graph visualization
@@ -12,16 +13,17 @@ interface SafeGraphVisualizationProps {
   interactionLocked?: boolean;
   quickEditRequest?: WorkItem | null;
   onQuickEditRequestHandled?: () => void;
+  undoStack?: UndoStack;
 }
 
-export function SafeGraphVisualization({ onNodeSelected, interactionLocked, quickEditRequest, onQuickEditRequestHandled }: SafeGraphVisualizationProps = {}) {
+export function SafeGraphVisualization({ onNodeSelected, interactionLocked, quickEditRequest, onQuickEditRequestHandled, undoStack }: SafeGraphVisualizationProps = {}) {
   return (
     <GraphErrorBoundary
       onError={() => {
         // Error logged by boundary for debugging
       }}
     >
-      <InteractiveGraphVisualization onNodeSelected={onNodeSelected} interactionLocked={interactionLocked} quickEditRequest={quickEditRequest} onQuickEditRequestHandled={onQuickEditRequestHandled} />
+      <InteractiveGraphVisualization onNodeSelected={onNodeSelected} interactionLocked={interactionLocked} quickEditRequest={quickEditRequest} onQuickEditRequestHandled={onQuickEditRequestHandled} undoStack={undoStack} />
     </GraphErrorBoundary>
   );
 }
