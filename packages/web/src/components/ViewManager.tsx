@@ -67,6 +67,10 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
   const typeDropdownRef = useRef<HTMLDivElement>(null);
   const priorityDropdownRef = useRef<HTMLDivElement>(null);
   const contributorDropdownRef = useRef<HTMLDivElement>(null);
+  const statusTriggerRef = useRef<HTMLButtonElement>(null);
+  const typeTriggerRef = useRef<HTMLButtonElement>(null);
+  const priorityTriggerRef = useRef<HTMLButtonElement>(null);
+  const contributorTriggerRef = useRef<HTMLButtonElement>(null);
 
   const { currentUser } = useAuth();
   const { currentGraph } = useGraph();
@@ -176,6 +180,30 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Escape closes whichever filter menu is open and returns keyboard focus to
+  // its trigger. Pointer users still get the existing outside-click behavior.
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      const trigger = isTypeDropdownOpen ? typeTriggerRef.current
+        : isStatusDropdownOpen ? statusTriggerRef.current
+        : isPriorityDropdownOpen ? priorityTriggerRef.current
+        : isContributorDropdownOpen ? contributorTriggerRef.current
+        : null;
+      if (!trigger) return;
+
+      event.preventDefault();
+      setIsTypeDropdownOpen(false);
+      setIsStatusDropdownOpen(false);
+      setIsPriorityDropdownOpen(false);
+      setIsContributorDropdownOpen(false);
+      requestAnimationFrame(() => trigger.focus());
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [isTypeDropdownOpen, isStatusDropdownOpen, isPriorityDropdownOpen, isContributorDropdownOpen]);
 
   const clearAllFilters = () => {
     setSearchQuery('');
@@ -408,8 +436,11 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
               {/* Type Filter */}
               <div className="hidden sm:block relative" ref={typeDropdownRef}>
                 <button
+                  ref={typeTriggerRef}
                   type="button"
                   onClick={() => setIsTypeDropdownOpen(!isTypeDropdownOpen)}
+                  aria-expanded={isTypeDropdownOpen}
+                  aria-controls="task-type-filter-menu"
                   className="flex items-center justify-between px-2.5 sm:px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-xs sm:text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent hover:border-gray-500 transition-all duration-200 w-full sm:w-auto sm:min-w-[150px] min-w-0"
                 >
                   <div className="flex items-center space-x-2">
@@ -433,7 +464,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
                 </button>
 
                 {isTypeDropdownOpen && (
-                  <div data-testid="filter-dropdown" className="absolute top-full left-0 mt-2 w-full bg-gray-700 border border-gray-600 rounded-lg shadow-2xl z-50 max-h-80 overflow-y-auto">
+                  <div id="task-type-filter-menu" data-testid="filter-dropdown" className="task-filter-popup absolute top-full left-0 mt-2 w-full bg-gray-700 border border-gray-600 rounded-lg shadow-2xl z-50 max-h-80 overflow-y-auto">
                     <div className="p-2">
                       {typeOptions.map((option, index) => (
                         <button
@@ -482,8 +513,11 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
               {/* Status Filter */}
               <div className="relative" ref={statusDropdownRef}>
                 <button
+                  ref={statusTriggerRef}
                   type="button"
                   onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
+                  aria-expanded={isStatusDropdownOpen}
+                  aria-controls="task-status-filter-menu"
                   className="flex items-center justify-between px-2.5 sm:px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-xs sm:text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent hover:border-gray-500 transition-all duration-200 w-full sm:w-auto sm:min-w-[150px] min-w-0"
                 >
                   <div className="flex items-center space-x-2">
@@ -507,7 +541,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
                 </button>
 
                 {isStatusDropdownOpen && (
-                  <div data-testid="filter-dropdown" className="absolute top-full left-0 mt-2 w-full bg-gray-700 border border-gray-600 rounded-lg shadow-2xl z-50 max-h-80 overflow-y-auto">
+                  <div id="task-status-filter-menu" data-testid="filter-dropdown" className="task-filter-popup absolute top-full left-0 mt-2 w-full bg-gray-700 border border-gray-600 rounded-lg shadow-2xl z-50 max-h-80 overflow-y-auto">
                     <div className="p-2">
                       {statusOptions.map((option, index) => (
                         <button
@@ -554,8 +588,11 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
               {/* Priority Filter */}
               <div className="hidden sm:block relative" ref={priorityDropdownRef}>
                 <button
+                  ref={priorityTriggerRef}
                   type="button"
                   onClick={() => setIsPriorityDropdownOpen(!isPriorityDropdownOpen)}
+                  aria-expanded={isPriorityDropdownOpen}
+                  aria-controls="task-priority-filter-menu"
                   className="flex items-center justify-between px-2.5 sm:px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-xs sm:text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent hover:border-gray-500 transition-all duration-200 w-full sm:w-auto sm:min-w-[150px] min-w-0"
                 >
                   <div className="flex items-center space-x-2">
@@ -579,7 +616,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
                 </button>
 
                 {isPriorityDropdownOpen && (
-                  <div data-testid="filter-dropdown" className="absolute top-full left-0 mt-2 w-full bg-gray-700 border border-gray-600 rounded-lg shadow-2xl z-50 max-h-80 overflow-y-auto">
+                  <div id="task-priority-filter-menu" data-testid="filter-dropdown" className="task-filter-popup absolute top-full left-0 mt-2 w-full bg-gray-700 border border-gray-600 rounded-lg shadow-2xl z-50 max-h-80 overflow-y-auto">
                     <div className="p-2">
                       {priorityOptions.map((option, index) => (
                         <button
@@ -626,8 +663,11 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
               {/* Contributors Filter */}
               <div className="hidden sm:block relative" ref={contributorDropdownRef}>
                 <button
+                  ref={contributorTriggerRef}
                   type="button"
                   onClick={() => setIsContributorDropdownOpen(!isContributorDropdownOpen)}
+                  aria-expanded={isContributorDropdownOpen}
+                  aria-controls="task-contributor-filter-menu"
                   className="flex items-center justify-between px-2.5 sm:px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-xs sm:text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent hover:border-gray-500 transition-all duration-200 w-full sm:w-auto sm:min-w-[150px] min-w-0"
                 >
                   <div className="flex items-center space-x-2">
@@ -644,7 +684,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
                 </button>
 
                 {isContributorDropdownOpen && (
-                  <div data-testid="filter-dropdown" className="absolute top-full left-0 mt-2 w-full bg-gray-700 border border-gray-600 rounded-lg shadow-2xl z-50 max-h-80 overflow-y-auto">
+                  <div id="task-contributor-filter-menu" data-testid="filter-dropdown" className="task-filter-popup absolute top-full left-0 mt-2 w-full bg-gray-700 border border-gray-600 rounded-lg shadow-2xl z-50 max-h-80 overflow-y-auto">
                     <div className="p-2">
                       {contributorOptions.map((option, index) => (
                         <button
