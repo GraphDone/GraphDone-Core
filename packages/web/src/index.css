@@ -880,8 +880,17 @@ html:not([data-theme="contrast"]) .workspace-surface .graph-container .node-titl
   .task-filter-bar input { min-height: 44px; font-size: 16px; }
   .mobile-filter-toggle { display: block; }
   .task-filter-options { display: none; }
-  .task-filter-options[data-open="true"] { display: flex; flex-wrap: wrap; width: 100%; }
-  .task-filter-options > div { display: block; flex: 1; min-width: 0; }
+  .task-filter-options[data-open="true"] { display: flex; flex-wrap: wrap; width: 100%; position: relative; }
+  .task-filter-options > div { display: block; flex: 1; min-width: 0; position: static; }
+  .task-filter-popup {
+    width: min(22rem, 100%) !important;
+    min-width: min(14rem, 100%);
+    max-width: 100%;
+  }
+  .task-filter-options > div:nth-child(n + 3) .task-filter-popup {
+    left: auto;
+    right: 0;
+  }
   [data-modal-backdrop] { --modal-header-offset: 0px !important; padding: 0 !important; }
   [data-modal-backdrop] [data-modal-panel] {
     max-width: none; width: 100%; height: 100dvh; max-height: 100dvh;
