@@ -249,7 +249,23 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const [expandedNode, setExpandedNode] = useState<WorkItem | null>(null);
   const expandPanelRef = useRef<HTMLDivElement>(null);
   const expandedNodeIdRef = useRef<string | null>(null);
+  const expandedReturnFocusIdRef = useRef<string | null>(null);
   expandedNodeIdRef.current = expandedNode?.id ?? null;
+  const closeExpandedNode = useCallback(() => {
+    const returnFocusId = expandedReturnFocusIdRef.current;
+    expandedReturnFocusIdRef.current = null;
+    setExpandedNode(null);
+    if (!returnFocusId) return;
+    requestAnimationFrame(() => {
+      const active = document.activeElement;
+      if (active && active !== document.body) return;
+      const trigger = Array.from(
+        containerRef.current?.querySelectorAll<SVGGElement>('.node-expand-icon') ?? []
+      ).find(element => element.dataset.nodeId === returnFocusId);
+      trigger?.setAttribute('aria-expanded', 'false');
+      trigger?.focus({ preventScroll: true });
+    });
+  }, []);
   const toggleExpandedNode = useCallback((n: WorkItem) => {
     setExpandedNode((prev) => (prev?.id === n.id ? null : n));
   }, []);
@@ -2877,6 +2893,12 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // can read a node's contents/diagram WITHOUT zooming in (PR-3).
     const expandIcons = nodeElements.append('g')
       .attr('class', 'node-expand-icon')
+      .attr('role', 'button')
+      .attr('tabindex', 0)
+      .attr('aria-label', (d: WorkItem) => `Expand ${d.title}`)
+      .attr('aria-controls', (d: WorkItem) => `node-expand-panel-${d.id}`)
+      .attr('aria-expanded', (d: WorkItem) => expandedNodeIdRef.current === d.id ? 'true' : 'false')
+      .attr('data-node-id', (d: WorkItem) => d.id)
       .attr('transform', (d: WorkItem) => {
         const x = getNodeDimensions(d).width / 2 - iconSize / 2 - 12 - iconSize - 8;
         const y = -getNodeDimensions(d).height / 2 + 2 + titleBarHeight / 2;
@@ -2907,6 +2929,15 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .style('fill', '#ffffff')
       .style('pointer-events', 'none')
       .text('⛶');
+    const toggleExpanded = (event: MouseEvent | KeyboardEvent, d: WorkItem) => {
+      event.stopPropagation();
+      event.preventDefault();
+      const opening = expandedNodeIdRef.current !== d.id;
+      d3.select(event.currentTarget as SVGGElement).attr('aria-expanded', opening ? 'true' : 'false');
+      expandedReturnFocusIdRef.current = opening ? d.id : null;
+      toggleExpandedNodeRef.current(d);
+    };
+
     expandIcons
       .on('mouseenter', function() {
         d3.select(this).select('.expand-bg').transition().duration(150)
@@ -2918,10 +2949,21 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           .attr('fill', 'rgba(0, 0, 0, 0.7)')
           .attr('stroke', 'rgba(255, 255, 255, 0.8)');
       })
-      .on('click', (event: MouseEvent, d: WorkItem) => {
-        event.stopPropagation();
-        event.preventDefault();
-        toggleExpandedNodeRef.current(d);
+      .on('focus', function() {
+        d3.select(this).select('.expand-bg')
+          .attr('fill', 'rgba(16, 185, 129, 0.95)')
+          .attr('stroke', '#fbbf24')
+          .attr('stroke-width', 3);
+      })
+      .on('blur', function() {
+        d3.select(this).select('.expand-bg')
+          .attr('fill', 'rgba(0, 0, 0, 0.7)')
+          .attr('stroke', 'rgba(255, 255, 255, 0.8)')
+          .attr('stroke-width', 1);
+      })
+      .on('click', toggleExpanded)
+      .on('keydown', (event: KeyboardEvent, d: WorkItem) => {
+        if (event.key === 'Enter' || event.key === ' ') toggleExpanded(event, d);
       });
 
     // Sheet-symbol affordances: a "descend" glyph (bottom-right) + a child
@@ -4898,7 +4940,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         const n = simNodes?.find((m: any) => m.id === expandedNodeId);
         // The node was deleted / its graph left → close the peek instead of
         // leaving a frozen, stale panel (and stop spinning this rAF loop).
-        if (simNodes && !n) { setExpandedNode(null); return; }
+        if (simNodes && !n) { closeExpandedNode(); return; }
         if (n) {
           const rect = svgEl.getBoundingClientRect();
           const t = d3.zoomTransform(svgEl);
@@ -4919,16 +4961,28 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     };
     raf = requestAnimationFrame(sync);
     return () => cancelAnimationFrame(raf);
+  }, [expandedNodeId, closeExpandedNode]);
+
+  useEffect(() => {
+    if (!expandedNodeId) return undefined;
+    const raf = requestAnimationFrame(() => {
+      expandPanelRef.current?.querySelector<HTMLElement>('button[title="Close"]')
+        ?.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(raf);
   }, [expandedNodeId]);
 
   // Esc closes the expand panel; switching graphs dismisses it (its node is gone).
   useEffect(() => {
     if (!expandedNodeId) return undefined;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setExpandedNode(null); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') closeExpandedNode(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [expandedNodeId]);
-  useEffect(() => { setExpandedNode(null); }, [currentGraphId]);
+  }, [expandedNodeId, closeExpandedNode]);
+  useEffect(() => {
+    expandedReturnFocusIdRef.current = null;
+    setExpandedNode(null);
+  }, [currentGraphId]);
 
   // Esc closes the quick editor; switching graphs dismisses it (node is gone).
   useEffect(() => {
@@ -5534,7 +5588,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       {expandedNode && createPortal(
         <div
           ref={expandPanelRef}
+          id={`node-expand-panel-${expandedNode.id}`}
           data-testid="node-expand-panel"
+          role="dialog"
+          aria-label={`Expanded ${expandedNode.title}`}
           className="fixed z-[999999] w-80 max-w-[90vw]"
           style={{ left: -9999, top: -9999 }}
         >
@@ -5542,8 +5599,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
             node={expandedNode}
             compact
             rootTestId="node-expand-inspector"
-            onClose={() => setExpandedNode(null)}
-            onEdit={() => { setQuickEditNode(expandedNode); setExpandedNode(null); }}
+            onClose={closeExpandedNode}
+            onEdit={() => { expandedReturnFocusIdRef.current = null; setQuickEditNode(expandedNode); setExpandedNode(null); }}
           />
         </div>,
         document.body
