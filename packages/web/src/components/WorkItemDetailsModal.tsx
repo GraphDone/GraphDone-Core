@@ -7,7 +7,7 @@ import {
   Sparkles, Hash, Crown, Activity, Gem, Rocket, Star, Brain, FileText, Eye, Sparkle
 } from 'lucide-react';
 import { useMutation } from '@apollo/client';
-import { UPDATE_WORK_ITEM, GET_WORK_ITEMS, CREATE_EDGE, GET_EDGES, DELETE_EDGE, DELETE_WORK_ITEM } from '../lib/queries';
+import { UPDATE_WORK_ITEM, GET_WORK_ITEMS, CREATE_WORK_ITEM, CREATE_EDGE, GET_EDGES, DELETE_EDGE, DELETE_WORK_ITEM } from '../lib/queries';
 import { useAuth } from '../contexts/AuthContext';
 import { useGraph } from '../contexts/GraphContext';
 import { useNotifications } from '../contexts/NotificationContext';
@@ -94,6 +94,32 @@ function workItemUpdate(target: WorkItem, previous: WorkItem) {
   return update;
 }
 
+function workItemRestoreInput(item: WorkItem, graphId: string, fallbackOwnerId?: string) {
+  const input: any = {
+    title: item.title,
+    description: item.description || undefined,
+    type: item.type,
+    status: item.status,
+    priority: item.priority ?? 0,
+    dueDate: item.dueDate || undefined,
+    tags: item.tags || [],
+    metadata: (item as any).metadata || '{}',
+    positionX: item.positionX ?? 0,
+    positionY: item.positionY ?? 0,
+    positionZ: item.positionZ ?? 0,
+    radius: (item as any).radius ?? 1,
+    theta: (item as any).theta ?? 0,
+    phi: (item as any).phi ?? 0,
+    priorityComp: item.priority ?? 0,
+    graph: { connect: { where: { node: { id: graphId } } } },
+  };
+  const owner = item.owner?.id || fallbackOwnerId;
+  if (owner) input.owner = { connect: { where: { node: { id: owner } } } };
+  const assigned = assigneeId(item);
+  if (!offlineEnabled && assigned) input.assignedTo = { connect: { where: { node: { id: assigned } } } };
+  return input;
+}
+
 export function WorkItemDetailsModal({
   isOpen,
   onClose,
@@ -130,6 +156,8 @@ export function WorkItemDetailsModal({
   const datePickerRef = useRef<HTMLDivElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
+  const deleteButtonRef = useRef<HTMLButtonElement>(null);
+  const deleteConfirmRef = useRef<HTMLInputElement>(null);
 
   useDialog(isOpen, onClose);
   // Container already manages its own initial focus (modalRef) below; this adds
@@ -151,6 +179,10 @@ export function WorkItemDetailsModal({
       modalRef.current.focus();
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (showDeleteConfirm) deleteConfirmRef.current?.focus();
+  }, [showDeleteConfirm]);
 
   const handleSaveRef = useRef<(() => Promise<void>) | null>(null);
 
@@ -324,6 +356,7 @@ export function WorkItemDetailsModal({
       },
       { query: GET_EDGES }
     ],
+    awaitRefetchQueries: true,
     onCompleted: () => {
       showSuccess('Work item deleted successfully');
       onClose();
@@ -331,6 +364,16 @@ export function WorkItemDetailsModal({
     onError: (error) => {
       showError(`Failed to delete work item: ${error.message}`);
     }
+  });
+  const [restoreWorkItem] = useMutation(CREATE_WORK_ITEM, {
+    refetchQueries: [
+      {
+        query: GET_WORK_ITEMS,
+        variables: currentGraph ? { where: { graph: { id: currentGraph.id } } } : { where: {} }
+      },
+      { query: GET_EDGES }
+    ],
+    awaitRefetchQueries: true,
   });
 
   const handleSave = useCallback(async () => {
@@ -408,14 +451,27 @@ export function WorkItemDetailsModal({
   };
 
   const confirmDelete = async () => {
-    if (!node) return;
+    if (!node || !currentGraph) return;
 
     try {
-      await deleteWorkItem({
+      const deletedNode = copyWorkItem(node);
+      const result = await deleteWorkItem({
         variables: {
           where: { id: node.id }
         }
       });
+      if (result.data?.deleteWorkItems?.nodesDeleted > 0) {
+        undoStack?.push({
+          label: 'Delete item',
+          undo: async () => {
+            await restoreWorkItem({
+              variables: {
+                input: [workItemRestoreInput(deletedNode, currentGraph.id, currentUser?.id)]
+              }
+            });
+          },
+        });
+      }
     } catch (error) {
       console.error('Failed to delete work item:', error);
     }
@@ -1267,6 +1323,7 @@ export function WorkItemDetailsModal({
 
               {!showDeleteConfirm ? (
                 <button
+                  ref={deleteButtonRef}
                   onClick={handleDelete}
                   disabled={deleting}
                   className="w-full min-h-[44px] flex flex-row items-center justify-start gap-2 px-3 py-2 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 disabled:from-red-400 disabled:to-rose-400 disabled:cursor-not-allowed text-white rounded-lg transition-all duration-300 text-xs font-semibold shadow-lg hover:scale-105 transform border border-red-400/30"
@@ -1283,21 +1340,16 @@ export function WorkItemDetailsModal({
                   </div>
                   
                   {/* Confirmation Checkbox */}
-                  <label className="flex items-center space-x-1 cursor-pointer">
-                    <div
-                      onClick={() => setDeleteConfirmed(!deleteConfirmed)}
-                      className={`w-3 h-3 min-w-[12px] min-h-[12px] border flex items-center justify-center transition-colors cursor-pointer ${
-                        deleteConfirmed
-                          ? 'bg-red-600 border-red-600'
-                          : 'bg-gray-700 border-gray-600 hover:border-gray-500'
-                      }`}
-                    >
-                      {deleteConfirmed && (
-                        <span className="text-white text-[8px] font-bold">✓</span>
-                      )}
-                    </div>
-                    <span className="text-[10px] text-gray-400 leading-tight">
-                      Confirm
+                  <label data-testid="delete-confirmation-choice" className="min-h-[44px] flex items-center gap-2 px-2 rounded-lg cursor-pointer text-gray-300 hover:bg-red-950/30 focus-within:ring-2 focus-within:ring-red-400/70">
+                    <input
+                      ref={deleteConfirmRef}
+                      type="checkbox"
+                      checked={deleteConfirmed}
+                      onChange={(event) => setDeleteConfirmed(event.target.checked)}
+                      className="h-4 w-4 shrink-0 accent-red-600"
+                    />
+                    <span className="text-xs leading-tight">
+                      Confirm deletion
                     </span>
                   </label>
 
@@ -1306,17 +1358,20 @@ export function WorkItemDetailsModal({
                       onClick={() => {
                         setShowDeleteConfirm(false);
                         setDeleteConfirmed(false);
+                        requestAnimationFrame(() => deleteButtonRef.current?.focus());
                       }}
-                      className="px-2 py-1 bg-gradient-to-r from-gray-600 to-gray-700 hover:bg-red-600 hover:text-white text-white rounded-lg transition-all duration-200 text-xs font-semibold shadow-lg hover:scale-105 transform"
+                      className="min-h-[44px] px-2 py-2 bg-gradient-to-r from-gray-600 to-gray-700 hover:bg-red-600 hover:text-white text-white rounded-lg transition-all duration-200 text-xs font-semibold shadow-lg hover:scale-105 transform"
+                      aria-label="Cancel deletion"
                     >
                       Cancel
                     </button>
                     <button
                       onClick={confirmDelete}
                       disabled={deleting || !deleteConfirmed}
-                      className="px-2 py-1 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 disabled:from-red-400 disabled:to-rose-400 disabled:cursor-not-allowed text-white rounded-lg transition-all duration-200 text-xs font-semibold shadow-lg hover:scale-105 transform"
+                      className="min-h-[44px] px-2 py-2 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 disabled:from-red-400 disabled:to-rose-400 disabled:cursor-not-allowed text-white rounded-lg transition-all duration-200 text-xs font-semibold shadow-lg hover:scale-105 transform"
+                      aria-label="Confirm delete work item"
                     >
-                      {deleting ? 'Del...' : 'Del'}
+                      {deleting ? 'Deleting...' : 'Delete'}
                     </button>
                   </div>
                 </div>
