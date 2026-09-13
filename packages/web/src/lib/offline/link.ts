@@ -56,7 +56,7 @@ async function findProject(args:any,table='nodes'):Promise<string> {
  if(id){for(const [pid,p] of Object.entries(account.projects))if((p.local?.[table as 'nodes']||[]).some(r=>r.id===id)||p.local?.nodes.some(r=>r.id===id))return pid;}
  return localStorage.getItem('currentGraphId')||Object.keys(account.projects)[0]||account.list[0]?.id;
 }
-const supported=new Set(['graphs','workItems','workItem','edges','createGraphs','updateGraphs','deleteGraphs','createWorkItems','updateWorkItems','deleteWorkItems','createEdges','updateEdges','deleteEdges']);
+const supported=new Set(['graphs','workItems','workItem','edges','createGraphs','updateGraphs','deleteGraphs','createWorkItems','updateWorkItems','deleteWorkItems','createEdges','updateEdges','deleteEdges','restoreWorkItem']);
 export const offlineLink=new ApolloLink((operation,forward)=>{
  const def=getMainDefinition(operation.query) as any;
  if(!offlineEnabled||def.kind!=='OperationDefinition')return forward(operation);
@@ -89,7 +89,7 @@ export const offlineLink=new ApolloLink((operation,forward)=>{
     }else {
      const owner=ownerId()!,user=JSON.parse(getUserRaw()||'{}');if(user.role==='VIEWER')throw Error('This account is read-only.');
      const graphOp=name.endsWith('Graphs'),table=name.endsWith('Edges')?'edges':'nodes';
-     let pid=graphOp?args.where?.id:await findProject(args,table);
+     let pid=name==='restoreWorkItem'?args.input?.graphId:graphOp?args.where?.id:await findProject(args,table);
      if(name==='deleteGraphs'&&pid===primaryProjectId())throw Error('Your initial account project cannot be deleted.');
      if(name!=='createGraphs')await getProject(pid);
      value=await editAccount(owner,a=>{
@@ -103,6 +103,20 @@ export const offlineLink=new ApolloLink((operation,forward)=>{
        });return {__typename:'GraphsMutationResponse',graphs:created};
       }
       const p=a.projects[pid],s=p?.local;if(!s)throw Error('Download this project before editing offline.');
+      if(name==='restoreWorkItem') {
+       const i=args.input;
+       if(typeof i?.id!=='string'||!/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/.test(i.id))throw Error('The task recovery identity is invalid.');
+       const parsedCreated=typeof i.createdAt==='string'?Math.floor(Date.parse(i.createdAt)/1000):now();
+       const row:Row={id:i.id,title:'',type:'TASK',description:null,status:'PROPOSED',priority:0,position_x:0,position_y:0,due_date:null,tags:'[]',metadata:'{}',created_at:Number.isFinite(parsedCreated)?parsedCreated:now(),updated_at:now(),...nodeUpdate(i)};
+       const located=Object.entries(a.projects).flatMap(([projectId,project])=>(project.local?.nodes||[]).filter(node=>node.id===i.id).map(node=>({projectId,node})));
+       if(located.length) {
+        const prior=located[0],keys:(keyof Row)[]=['id','title','type','description','status','priority','position_x','position_y','due_date','tags','metadata'];
+        if(located.length===1&&prior.projectId===pid&&keys.every(key=>prior.node[key]===row[key]))return workItem(prior.node,s);
+        throw Error('The task identity is already in use. No existing work was changed.');
+       }
+       if(s.nodes.length>=300)throw Error('This project can hold 300 tasks. Start another project to continue.');
+       s.nodes.push(row);return workItem(row,s);
+      }
       if(name==='updateGraphs'){if(args.update.name!==undefined)s.project.name=String(args.update.name).trim().slice(0,120);if(!s.project.name)throw Error('A project name is required.');return {__typename:'GraphsMutationResponse',graphs:[graph(s.project,s)]};}
       if(name==='deleteGraphs'){const count=s.nodes.length;p.local=null;return {__typename:'DeleteResponse',nodesDeleted:count,relationshipsDeleted:s.edges.length};}
       const deleted=name.startsWith('delete'),created=name.startsWith('create');

@@ -21,6 +21,7 @@ import { authTypeDefs } from './schema/auth-schema.js';
 import { authOnlyTypeDefs } from './schema/auth-only-schema.js';
 import { sqliteAuthResolvers } from './resolvers/sqlite-auth.js';
 import { graphProtectionResolvers } from './resolvers/graph-protection.js';
+import { workItemRecoveryResolvers } from './resolvers/work-item-recovery.js';
 import { extractUserFromToken } from './middleware/auth.js';
 import { mergeTypeDefs } from '@graphql-tools/merge';
 import { driver, NEO4J_URI } from './db.js';
@@ -312,6 +313,8 @@ async function startServer() {
           ...sqliteAuthResolvers.Mutation,
           // Graph protection (prevent Welcome graph deletion)
           ...graphProtectionResolvers.Mutation,
+          // Preserve task identity when a user undoes deletion.
+          ...workItemRecoveryResolvers.Mutation,
         },
         Query: {
           ...sqliteAuthResolvers.Query,

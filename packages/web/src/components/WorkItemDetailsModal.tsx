@@ -7,7 +7,7 @@ import {
   Sparkles, Hash, Crown, Activity, Gem, Rocket, Star, Brain, FileText, Eye, Sparkle
 } from 'lucide-react';
 import { useMutation } from '@apollo/client';
-import { UPDATE_WORK_ITEM, GET_WORK_ITEMS, CREATE_WORK_ITEM, CREATE_EDGE, GET_EDGES, DELETE_EDGE, DELETE_WORK_ITEM } from '../lib/queries';
+import { UPDATE_WORK_ITEM, GET_WORK_ITEMS, RESTORE_WORK_ITEM, CREATE_EDGE, GET_EDGES, DELETE_EDGE, DELETE_WORK_ITEM } from '../lib/queries';
 import { useAuth } from '../contexts/AuthContext';
 import { useGraph } from '../contexts/GraphContext';
 import { useNotifications } from '../contexts/NotificationContext';
@@ -94,8 +94,10 @@ function workItemUpdate(target: WorkItem, previous: WorkItem) {
   return update;
 }
 
-function workItemRestoreInput(item: WorkItem, graphId: string, fallbackOwnerId?: string) {
+function workItemRestoreInput(item: WorkItem, graphId: string) {
   const input: any = {
+    id: item.id,
+    graphId,
     title: item.title,
     description: item.description || undefined,
     type: item.type,
@@ -111,12 +113,8 @@ function workItemRestoreInput(item: WorkItem, graphId: string, fallbackOwnerId?:
     theta: (item as any).theta ?? 0,
     phi: (item as any).phi ?? 0,
     priorityComp: item.priority ?? 0,
-    graph: { connect: { where: { node: { id: graphId } } } },
+    createdAt: item.createdAt || undefined,
   };
-  const owner = item.owner?.id || fallbackOwnerId;
-  if (owner) input.owner = { connect: { where: { node: { id: owner } } } };
-  const assigned = assigneeId(item);
-  if (!offlineEnabled && assigned) input.assignedTo = { connect: { where: { node: { id: assigned } } } };
   return input;
 }
 
@@ -365,7 +363,7 @@ export function WorkItemDetailsModal({
       showError(`Failed to delete work item: ${error.message}`);
     }
   });
-  const [restoreWorkItem] = useMutation(CREATE_WORK_ITEM, {
+  const [restoreWorkItem] = useMutation(RESTORE_WORK_ITEM, {
     refetchQueries: [
       {
         query: GET_WORK_ITEMS,
@@ -466,7 +464,7 @@ export function WorkItemDetailsModal({
           undo: async () => {
             await restoreWorkItem({
               variables: {
-                input: [workItemRestoreInput(deletedNode, currentGraph.id, currentUser?.id)]
+                input: workItemRestoreInput(deletedNode, currentGraph.id)
               }
             });
           },
