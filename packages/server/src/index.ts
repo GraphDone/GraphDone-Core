@@ -376,7 +376,7 @@ async function startServer() {
     if (account?.isActive && isNeo4jAvailable) await ensureGraphIdentity(driver, account);
     const user = account?.isActive
       ? { userId: account.id, email: account.email, role: account.role }
-      : (claims?.role === 'GUEST' && /^guest-\d+$/.test(claims.userId) ? claims : null);
+      : (claims?.role === 'GUEST' && /^guest-[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(claims.userId) ? claims : null);
     return {
       driver: isNeo4jAvailable ? driver : null,
       user,

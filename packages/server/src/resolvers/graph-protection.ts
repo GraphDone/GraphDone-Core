@@ -37,7 +37,7 @@ export const graphProtectionResolvers = {
           extensions: { code: 'UNAUTHENTICATED' }
         });
       }
-      if (context.user.role === 'VIEWER') {
+      if (!['USER', 'ADMIN'].includes(context.user.role)) {
         throw new GraphQLError('This account is read-only', {
           extensions: { code: 'FORBIDDEN' }
         });
@@ -45,6 +45,11 @@ export const graphProtectionResolvers = {
 
       const graphId = args.where?.id;
       const graphIds = args.where?.id_IN;
+      if (Boolean(graphId) === Boolean(graphIds)) {
+        throw new GraphQLError('Delete projects by one id or one bounded id list', {
+          extensions: { code: 'BAD_USER_INPUT' }
+        });
+      }
       const idsToCheck = graphId ? [graphId] : (graphIds || []);
       if (!idsToCheck.length || idsToCheck.length > 100 || idsToCheck.some(id => typeof id !== 'string' || !id || id.length > 128)) {
         throw new GraphQLError('Delete projects by one id or a bounded id list', {

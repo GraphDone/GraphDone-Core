@@ -2,6 +2,7 @@ import { GraphQLError } from 'graphql';
 import { sqliteAuthStore } from '../auth/sqlite-auth.js';
 import { generateToken } from '../utils/auth.js';
 import { verifyCaptcha } from '../utils/captcha.js';
+import { randomUUID } from 'node:crypto';
 
 interface LoginInput {
   emailOrUsername: string;
@@ -390,7 +391,7 @@ export const sqliteAuthResolvers = {
     // Guest login
     guestLogin: async () => {
       const guestUser = {
-        id: 'guest-' + Date.now(),
+        id: `guest-${randomUUID()}`,
         email: 'guest@demo.local',
         username: 'guest',
         name: 'Guest User',
