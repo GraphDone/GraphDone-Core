@@ -167,6 +167,16 @@ NEO4J_PASSWORD=disposable-test-password \
 npm run test:integration:local
 ```
 
-The command fails before connecting when the disposable marker, URI, or
-credentials are missing, and it rejects non-loopback database addresses. Do
-not point it at a development, shared, or production database.
+The separate MCP Cypher contract uses the same owned fixture policy:
+
+```bash
+GRAPHDONE_DISPOSABLE_NEO4J=1 \
+NEO4J_URI=bolt://127.0.0.1:17687 \
+NEO4J_USER=neo4j \
+NEO4J_PASSWORD=disposable-test-password \
+npm run test:contract:local
+```
+
+Both commands fail before connecting when the disposable marker, URI, or
+credentials are missing, and they reject non-loopback database addresses. Do
+not point either command at a development, shared, or production database.

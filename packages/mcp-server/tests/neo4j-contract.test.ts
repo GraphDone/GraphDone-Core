@@ -11,21 +11,30 @@ import { GraphService } from '../src/services/graph-service';
  * server's OWN Cypher (node + edge lifecycle, browse) against a live Neo4j and
  * asserts real, well-formed results.
  *
- * Gated by RUN_DB_CONTRACT so it only runs where a real Neo4j is provisioned
- * (the dedicated CI job); local `npm run test` (mock-only) is unaffected.
+ * Gated by RUN_DB_CONTRACT and an explicit disposable loopback Neo4j fixture
+ * so the default suite cannot mutate a developer's shared database.
  * Assertions are shape-tolerant (match on the serialized payload) so a benign
  * response-shape change doesn't false-fail, while genuine DB/Cypher breakage
  * (throws, missing data, orphan edges) still does.
  */
-const RUN = !!process.env.RUN_DB_CONTRACT;
-const URI = process.env.NEO4J_URI || 'bolt://localhost:7687';
-const USER = process.env.NEO4J_USER || 'neo4j';
-const PASS = process.env.NEO4J_PASSWORD || 'graphdone_password';
+const requested = process.env.RUN_DB_CONTRACT === '1';
+const disposable = process.env.GRAPHDONE_DISPOSABLE_NEO4J === '1';
+const URI = process.env.NEO4J_URI || '';
+const USER = process.env.NEO4J_USER || '';
+const PASS = process.env.NEO4J_PASSWORD || '';
+const configured = requested && disposable && !!URI && !!USER && !!PASS;
+
+if (requested && !configured) {
+  throw new Error('The MCP Neo4j contract requires GRAPHDONE_DISPOSABLE_NEO4J=1 plus explicit NEO4J_URI, NEO4J_USER and NEO4J_PASSWORD for an owned disposable fixture.');
+}
+if (configured && !['localhost', '127.0.0.1', '[::1]'].includes(new URL(URI).hostname)) {
+  throw new Error('The MCP Neo4j contract only accepts an explicitly configured loopback Neo4j fixture.');
+}
 
 const text = (r: { content: { text: string }[] }) => r.content[0].text;
 const parse = (r: { content: { text: string }[] }) => JSON.parse(text(r));
 
-describe.skipIf(!RUN)('MCP GraphService — real Neo4j contract', () => {
+describe.skipIf(!configured)('MCP GraphService — real Neo4j contract', () => {
   let driver: Driver;
   let svc: GraphService;
   const createdNodes: string[] = [];
