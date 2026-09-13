@@ -886,6 +886,7 @@ html:not([data-theme="contrast"]) .workspace-surface .graph-container .node-titl
     width: min(22rem, 100%) !important;
     min-width: min(14rem, 100%);
     max-width: 100%;
+    max-height: min(20rem, var(--task-filter-available-height, 20rem)) !important;
   }
   .task-filter-options > div:nth-child(n + 3) .task-filter-popup {
     left: auto;

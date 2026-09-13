@@ -67,6 +67,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
   const typeDropdownRef = useRef<HTMLDivElement>(null);
   const priorityDropdownRef = useRef<HTMLDivElement>(null);
   const contributorDropdownRef = useRef<HTMLDivElement>(null);
+  const filterOptionsRef = useRef<HTMLDivElement>(null);
   const statusTriggerRef = useRef<HTMLButtonElement>(null);
   const typeTriggerRef = useRef<HTMLButtonElement>(null);
   const priorityTriggerRef = useRef<HTMLButtonElement>(null);
@@ -204,6 +205,30 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
     document.addEventListener('keydown', handleEscape);
     return () => document.removeEventListener('keydown', handleEscape);
   }, [isTypeDropdownOpen, isStatusDropdownOpen, isPriorityDropdownOpen, isContributorDropdownOpen]);
+
+  // Compact layouts position each menu below the complete filter row. Cap the
+  // menu to the space that is actually left so every option remains reachable
+  // after a phone rotates or a short desktop window is resized.
+  useEffect(() => {
+    const options = filterOptionsRef.current;
+    if (!mobileFiltersOpen || !options) return undefined;
+
+    const updateAvailableHeight = () => {
+      const availableHeight = Math.max(96, window.innerHeight - options.getBoundingClientRect().bottom - 16);
+      options.style.setProperty('--task-filter-available-height', `${availableHeight}px`);
+    };
+
+    const animationFrame = requestAnimationFrame(updateAvailableHeight);
+    const resizeObserver = new ResizeObserver(updateAvailableHeight);
+    resizeObserver.observe(options);
+    window.addEventListener('resize', updateAvailableHeight);
+
+    return () => {
+      cancelAnimationFrame(animationFrame);
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', updateAvailableHeight);
+    };
+  }, [mobileFiltersOpen]);
 
   const clearAllFilters = () => {
     setSearchQuery('');
@@ -433,7 +458,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
 
             {/* Filter Dropdowns — 2-up grid on phones so all filters fit; inline on desktop */}
             <button className="mobile-filter-toggle hidden min-h-[44px] px-3 text-sm rounded-lg border border-gray-600" aria-expanded={mobileFiltersOpen} aria-controls="task-filter-options" onClick={()=>setMobileFiltersOpen(!mobileFiltersOpen)}>Filters</button>
-            <div id="task-filter-options" data-open={mobileFiltersOpen} className="task-filter-options flex gap-2 sm:gap-3">
+            <div ref={filterOptionsRef} id="task-filter-options" data-open={mobileFiltersOpen} className="task-filter-options flex gap-2 sm:gap-3">
               {/* Type Filter */}
               <div className="hidden sm:block relative" ref={typeDropdownRef}>
                 <button
