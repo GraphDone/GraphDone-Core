@@ -1,5 +1,6 @@
 import { hostedUsageEnabled, skipBackgroundPoll } from '../lib/hostedUsage';
 import { useState, useEffect } from 'react';
+import { apiUrl } from '../lib/apiUrl';
 
 export interface HealthStatus {
   status: string;
@@ -26,7 +27,7 @@ export function useHealthStatus() {
 
   const checkHealth = async () => {
     try {
-      const response = await fetch('/health'); // Use relative URL to leverage Vite proxy
+      const response = await fetch(apiUrl('/health'));
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }

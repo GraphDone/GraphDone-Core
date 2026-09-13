@@ -1,4 +1,5 @@
 import { hostedUsageEnabled, skipBackgroundPoll } from '../lib/hostedUsage';
+import { apiUrl } from '../lib/apiUrl';
 import { useState, useEffect, useCallback } from 'react';
 
 export interface ServiceHealth {
@@ -52,8 +53,6 @@ export function useHealthCheck(options: UseHealthCheckOptions = {}) {
   const [error, setError] = useState<string | null>(null);
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
 
-  const API_BASE_URL = ''; // Always use relative URLs to leverage Vite proxy in all environments
-
   const checkHealth = useCallback(async () => {
     // Create AbortController for proper timeout handling
     const controller = new AbortController();
@@ -70,7 +69,7 @@ export function useHealthCheck(options: UseHealthCheckOptions = {}) {
       }, 10000) as unknown as number;
 
       // Fetch general health status
-      const healthResponse = await fetch(`${API_BASE_URL}/health`, {
+      const healthResponse = await fetch(apiUrl('/health'), {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -92,7 +91,7 @@ export function useHealthCheck(options: UseHealthCheckOptions = {}) {
 
       // Fetch MCP-specific status
       try {
-        const mcpResponse = await fetch(`${API_BASE_URL}/mcp/status`, {
+        const mcpResponse = await fetch(apiUrl('/mcp/status'), {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -133,7 +132,7 @@ export function useHealthCheck(options: UseHealthCheckOptions = {}) {
       }
       setLoading(false);
     }
-  }, [API_BASE_URL]);
+  }, []);
 
   // Initial check
   useEffect(() => {
