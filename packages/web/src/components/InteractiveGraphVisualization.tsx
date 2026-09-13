@@ -311,16 +311,17 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     errorPolicy: 'all'
   });
 
+  const edgeQueryVariables = currentGraph ? {
+    where: {
+      OR: [
+        { source: { graph: { id: currentGraph.id } } },
+        { target: { graph: { id: currentGraph.id } } },
+      ],
+    },
+  } : { where: {} };
+
   const { data: edgesData, loading: edgesLoading, error: edgesError, refetch: refetchEdges } = useQuery(GET_EDGES, {
-    variables: currentGraph ? {
-      where: {
-        source: {
-          graph: {
-            id: currentGraph.id
-          }
-        }
-      }
-    } : { where: {} },
+    variables: edgeQueryVariables,
     fetchPolicy: currentGraph ? 'cache-and-network' : 'cache-only',
     // Cross-client freshness without the 2s idle hammer: poll every minute and skip
     // the tick entirely while the tab is hidden. Own edits still refetch instantly.
@@ -357,15 +358,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       // Refetch edges for current graph
       { 
         query: GET_EDGES, 
-        variables: {
-          where: {
-            source: {
-              graph: {
-                id: currentGraph?.id
-              }
-            }
-          }
-        }
+        variables: edgeQueryVariables,
       },
       // Refetch work items for current graph
       { 
@@ -414,15 +407,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       },
       { 
         query: GET_EDGES,
-        variables: currentGraph ? {
-          where: {
-            source: {
-              graph: {
-                id: currentGraph.id
-              }
-            }
-          }
-        } : { where: {} }
+        variables: edgeQueryVariables,
       }
     ],
     awaitRefetchQueries: true, // Wait for refetch to complete
@@ -438,7 +423,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const [deleteWorkItemMutation] = useMutation(DELETE_WORK_ITEM, {
     refetchQueries: [
       { query: GET_WORK_ITEMS, variables: currentGraph ? { where: { graph: { id: currentGraph.id } } } : { where: {} } },
-      { query: GET_EDGES, variables: currentGraph ? { where: { source: { graph: { id: currentGraph.id } } } } : { where: {} } }
+      { query: GET_EDGES, variables: edgeQueryVariables }
     ]
   });
   
@@ -896,15 +881,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       // Refetch edges for current graph
       { 
         query: GET_EDGES, 
-        variables: {
-          where: {
-            source: {
-              graph: {
-                id: currentGraph?.id
-              }
-            }
-          }
-        }
+        variables: edgeQueryVariables,
       }
     ],
     awaitRefetchQueries: true,
@@ -928,29 +905,13 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         // Update the GET_EDGES query cache
         const existingEdges = cache.readQuery({
           query: GET_EDGES,
-          variables: {
-            where: {
-              source: {
-                graph: {
-                  id: currentGraph?.id
-                }
-              }
-            }
-          }
+          variables: edgeQueryVariables,
         });
         
         if (existingEdges) {
           cache.writeQuery({
             query: GET_EDGES,
-            variables: {
-              where: {
-                source: {
-                  graph: {
-                    id: currentGraph?.id
-                  }
-                }
-              }
-            },
+            variables: edgeQueryVariables,
             data: {
               edges: (existingEdges as any).edges.map((edge: any) => 
                 edge.id === updatedEdge.id ? updatedEdge : edge
@@ -975,15 +936,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       // Refetch edges for current graph
       { 
         query: GET_EDGES, 
-        variables: {
-          where: {
-            source: {
-              graph: {
-                id: currentGraph?.id
-              }
-            }
-          }
-        }
+        variables: edgeQueryVariables,
       },
       // Refetch work items for current graph
       { 
