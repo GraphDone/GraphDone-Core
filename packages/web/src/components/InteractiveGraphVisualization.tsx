@@ -471,6 +471,21 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   // field without the heavy details modal. Holds the work item being edited.
   const [quickEditNode, setQuickEditNode] = useState<any | null>(null);
   const quickEditNodeId = quickEditNode?.id ?? null;
+  const quickEditReturnFocusIdRef = useRef<string | null>(null);
+  const closeQuickEdit = useCallback(() => {
+    const returnFocusId = quickEditReturnFocusIdRef.current;
+    quickEditReturnFocusIdRef.current = null;
+    setQuickEditNode(null);
+    if (!returnFocusId) return;
+    requestAnimationFrame(() => {
+      const active = document.activeElement;
+      if (active && active !== document.body) return;
+      const trigger = Array.from(
+        containerRef.current?.querySelectorAll<SVGGElement>('.node-edit-icon') ?? []
+      ).find(element => element.dataset.nodeId === returnFocusId);
+      trigger?.focus({ preventScroll: true });
+    });
+  }, []);
   useEffect(() => {
     if (!quickEditRequest) return;
     setInlineEdit(null);
@@ -2657,6 +2672,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // Edit icon in title bar (centered vertically, left side) - scales with zoom
     const editIcons = nodeElements.append('g')
       .attr('class', 'node-edit-icon')
+      .attr('role', 'button')
+      .attr('tabindex', 0)
+      .attr('aria-label', (d: WorkItem) => `Quick edit ${d.title}`)
+      .attr('data-node-id', (d: WorkItem) => d.id)
       .attr('transform', (d: WorkItem) => {
         const x = -getNodeDimensions(d).width / 2 + iconSize / 2 + 12;
         const y = -getNodeDimensions(d).height / 2 + 2 + titleBarHeight / 2;
@@ -2729,15 +2748,36 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           .style('font-size', `${iconSize * 1.1}px`);
       });
     
-    // Edit icon click handler - opens edit modal
-    editIcons.on('click', (event: MouseEvent, d: WorkItem) => {
+    const openQuickEdit = (event: MouseEvent | KeyboardEvent, d: WorkItem) => {
       event.stopPropagation();
       event.preventDefault();
-      
+
       setInlineEdit(null);
       setExpandedNode(null);
+      quickEditReturnFocusIdRef.current = d.id;
       setQuickEditNode(d);
-    });
+    };
+
+    // The visible gear is a real keyboard action as well as a pointer target.
+    // Keeping focus on the trigger lets the dialog accessibility hook restore it
+    // when quick edit closes, so keyboard users do not fall back to <body>.
+    editIcons
+      .on('click', openQuickEdit)
+      .on('keydown', (event: KeyboardEvent, d: WorkItem) => {
+        if (event.key === 'Enter' || event.key === ' ') openQuickEdit(event, d);
+      })
+      .on('focus', function() {
+        d3.select(this).select('.edit-bg')
+          .attr('fill', 'rgba(59, 130, 246, 0.95)')
+          .attr('stroke', '#fbbf24')
+          .attr('stroke-width', 3);
+      })
+      .on('blur', function() {
+        d3.select(this).select('.edit-bg')
+          .attr('fill', 'rgba(0, 0, 0, 0.7)')
+          .attr('stroke', 'rgba(255, 255, 255, 0.8)')
+          .attr('stroke-width', 1);
+      });
 
     // Relationship creation icon in title bar (centered vertically, right side) - mirrors edit icon
     const relationshipIcons = nodeElements.append('g')
@@ -4893,11 +4933,14 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   // Esc closes the quick editor; switching graphs dismisses it (node is gone).
   useEffect(() => {
     if (!quickEditNodeId) return undefined;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setQuickEditNode(null); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') closeQuickEdit(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [quickEditNodeId]);
-  useEffect(() => { setQuickEditNode(null); }, [currentGraphId]);
+  }, [quickEditNodeId, closeQuickEdit]);
+  useEffect(() => {
+    quickEditReturnFocusIdRef.current = null;
+    setQuickEditNode(null);
+  }, [currentGraphId]);
 
   // Expose reset function to parent component
   useEffect(() => {
@@ -5479,8 +5522,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
             .catch(() => showError(`Could not ${c.label.toLowerCase()}`));
         };
         return (
-          <QuickEditSurface x={left + (containerRef.current?.getBoundingClientRect().left ?? 0)} y={top + (containerRef.current?.getBoundingClientRect().top ?? 0)} onClose={() => setQuickEditNode(null)}>
-            <NodeQuickEdit key={quickEditNode.id} node={dataNode} onCommit={onCommit} onClose={() => setQuickEditNode(null)} onOpenDetails={() => { setQuickEditNode(null); handleEditNode(dataNode); }} />
+          <QuickEditSurface x={left + (containerRef.current?.getBoundingClientRect().left ?? 0)} y={top + (containerRef.current?.getBoundingClientRect().top ?? 0)} onClose={closeQuickEdit}>
+            <NodeQuickEdit key={quickEditNode.id} node={dataNode} onCommit={onCommit} onClose={closeQuickEdit} onOpenDetails={() => { quickEditReturnFocusIdRef.current = null; setQuickEditNode(null); handleEditNode(dataNode); }} />
           </QuickEditSurface>
         );
       })()}
