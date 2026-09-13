@@ -19,7 +19,7 @@ test.describe('mobile experience @mobile', () => {
 
     // 1) Default view is a list (its search/filter toolbar renders only for
     //    table/cards/kanban) and the graph canvas is NOT the mobile default.
-    await expect(page.getByPlaceholder('Search tasks by type, status, priority')).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'Search work items' })).toHaveAttribute('placeholder', 'Search work');
     expect(
       await page.locator('.graph-container').count(),
       'graph canvas should not be the default view on a phone'
