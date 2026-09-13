@@ -13,7 +13,7 @@ Valid operations: GET /discovery, GET /limits, GET /context, GET /usage, POST /i
 For collaboration access:
 POST /items with {"id":"NEW_LOWERCASE_UUID","title":"A clear task title"}. Defaults: NOT_STARTED, priority 0.5. Optional description is up to 2000 characters. Retain this UUID; retry only the identical creation request with that same UUID after checking context. Never generate another ID merely because the response was lost.
 PATCH /items with {"id":"RETURNED_ID","status":"IN_PROGRESS"} or {"id":"RETURNED_ID","priority":0.8}.
-POST /notes with {"id":"NEW_LOWERCASE_UUID","body":"A useful result, blocker, question, or handoff","workItemId":"RETURNED_ID"}. Omit workItemId for a project note. Notes are limited to 4000 characters. Retain the UUID; after a lost response, retry only with the same UUID and unchanged body. Reusing it with different content is rejected.
+POST /notes with {"id":"NEW_LOWERCASE_UUID","body":"A useful result, blocker, question, or handoff","workItemId":"RETURNED_ID"}. Omit workItemId for a project note. Notes are limited to 4000 characters and the newest 2000 notes per project are retained. Retain the UUID; after a lost response, retry only with the same UUID and unchanged body while the original is retained. Reusing it with different content is rejected; never blindly repeat an older note.
 ${canShare?'You may POST /shares with {} to create a one-time read-only link for another agent or human. Follow the returned redemption instructions. Sharing counts as an agent update and has its own small daily link limit.':'This token cannot create sharing links; ask the owner to grant that permission if needed.'}
 Read-only access permits GET requests only. Task deletion and launching agents are not available through this interface.
 
