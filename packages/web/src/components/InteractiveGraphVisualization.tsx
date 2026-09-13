@@ -1,6 +1,6 @@
 import { skipBackgroundPoll } from '../lib/hostedUsage';
 import { QuickEditSurface } from './QuickEditSurface';
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
 import ReactDOM from 'react-dom/client';
 import { createPortal } from 'react-dom';
 import * as d3 from 'd3';
@@ -463,6 +463,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [dragStart, setDragStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number; graphX: number; graphY: number } | null>(null);
+  const contextMenuRef = useRef<HTMLDivElement>(null);
+  const [contextMenuPlacement, setContextMenuPlacement] = useState<{ left: number; top: number; maxHeight: number } | null>(null);
   const [isFlippingEdge, setIsFlippingEdge] = useState(false);
   const [showRelationshipWindow, setShowRelationshipWindow] = useState(false);
   const [selectedNodes, setSelectedNodes] = useState<Set<string>>(new Set());
@@ -4376,6 +4378,57 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const fitViewRef = useRef(fitViewToNodes);
   fitViewRef.current = fitViewToNodes;
 
+  // Position the canvas menu from its rendered size instead of assuming a
+  // fixed height. The Undo label is dynamic, and short landscape viewports can
+  // otherwise place the final action below the screen.
+  useLayoutEffect(() => {
+    if (!contextMenuPosition) {
+      setContextMenuPlacement(null);
+      return undefined;
+    }
+    const placeMenu = () => {
+      const menu = contextMenuRef.current;
+      if (!menu) return;
+      const margin = 8;
+      const graphBounds = containerRef.current?.getBoundingClientRect();
+      const leftEdge = Math.max(margin, graphBounds?.left ?? margin);
+      const rightEdge = Math.min(window.innerWidth - margin, graphBounds?.right ?? window.innerWidth - margin);
+      const topEdge = Math.max(margin, graphBounds?.top ?? margin);
+      const bottomEdge = Math.min(window.innerHeight - margin, graphBounds?.bottom ?? window.innerHeight - margin);
+      const maxHeight = Math.max(44, bottomEdge - topEdge);
+      const menuWidth = menu.offsetWidth;
+      const renderedHeight = Math.min(menu.offsetHeight, maxHeight);
+      const clampX = (value: number) => Math.max(leftEdge, Math.min(value, rightEdge - menuWidth));
+      const clampY = (value: number) => Math.max(topEdge, Math.min(value, bottomEdge - renderedHeight));
+      const obstacles = Array.from(document.querySelectorAll<HTMLElement>('[data-graph-fit-obstacle="true"]'))
+        .map(element => element.getBoundingClientRect())
+        .filter(rect => rect.left < rightEdge && rect.right > leftEdge && rect.top < bottomEdge && rect.bottom > topEdge);
+      const xs = new Set([clampX(contextMenuPosition.x), leftEdge, rightEdge - menuWidth]);
+      const ys = new Set([clampY(contextMenuPosition.y), topEdge, bottomEdge - renderedHeight]);
+      obstacles.forEach(rect => {
+        xs.add(clampX(rect.left - menuWidth - margin));
+        xs.add(clampX(rect.right + margin));
+        ys.add(clampY(rect.top - renderedHeight - margin));
+        ys.add(clampY(rect.bottom + margin));
+      });
+      const candidates = Array.from(xs).flatMap(left => Array.from(ys).map(top => ({ left, top })))
+        .filter(candidate => !obstacles.some(rect =>
+          candidate.left < rect.right + margin && candidate.left + menuWidth > rect.left - margin
+          && candidate.top < rect.bottom + margin && candidate.top + renderedHeight > rect.top - margin
+        ));
+      const placement = (candidates.length > 0 ? candidates : [{ left: clampX(contextMenuPosition.x), top: clampY(contextMenuPosition.y) }])
+        .reduce((best, candidate) => {
+          const distance = (candidate.left - contextMenuPosition.x) ** 2 + (candidate.top - contextMenuPosition.y) ** 2;
+          const bestDistance = (best.left - contextMenuPosition.x) ** 2 + (best.top - contextMenuPosition.y) ** 2;
+          return distance < bestDistance ? candidate : best;
+        });
+      setContextMenuPlacement({ ...placement, maxHeight });
+    };
+    placeMenu();
+    window.addEventListener('resize', placeMenu);
+    return () => window.removeEventListener('resize', placeMenu);
+  }, [contextMenuPosition, undoLabel]);
+
   // Mini-map click → pan the main view to that graph point at current zoom
   useEffect(() => {
     (window as any).miniMapNavigate = (graphX: number, graphY: number) => {
@@ -5928,10 +5981,15 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       {/* Context Menu */}
       {contextMenuPosition && (
         <div
-          className="fixed z-50 bg-black/90 backdrop-blur-md border border-white/10 rounded-lg shadow-2xl overflow-hidden min-w-[200px]"
+          ref={contextMenuRef}
+          data-testid="graph-context-menu"
+          className="fixed z-50 bg-black/90 backdrop-blur-md border border-white/10 rounded-lg shadow-2xl overflow-x-hidden overflow-y-auto"
           style={{
-            left: Math.min(contextMenuPosition?.x || 0, window.innerWidth - 220),
-            top: Math.min(contextMenuPosition?.y || 0, window.innerHeight - 120),
+            left: contextMenuPlacement?.left ?? 8,
+            top: contextMenuPlacement?.top ?? 8,
+            visibility: contextMenuPlacement ? 'visible' : 'hidden',
+            maxHeight: contextMenuPlacement?.maxHeight ?? 'calc(100dvh - 16px)',
+            width: 'min(216px, calc(100vw - 32px))',
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.05)',
             animation: 'slideInScale 0.2s ease-out'
           }}
@@ -5946,7 +6004,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
               }}
               disabled={!undoLabel}
               data-testid="context-undo"
-              className={`w-full text-left px-4 py-3 flex items-center space-x-3 transition-all duration-300 ease-out group rounded-lg mx-2 border-b border-white/5 mb-2 ${undoLabel ? 'hover:bg-amber-500/10 text-gray-200' : 'opacity-40 cursor-not-allowed text-gray-500'}`}
+              className={`w-[calc(100%-1rem)] text-left px-4 py-3 flex items-center space-x-3 transition-all duration-300 ease-out group rounded-lg mx-2 border-b border-white/5 mb-2 ${undoLabel ? 'hover:bg-amber-500/10 text-gray-200' : 'opacity-40 cursor-not-allowed text-gray-500'}`}
             >
               <div className="w-6 h-6 rounded-lg bg-gray-700/50 flex items-center justify-center group-hover:bg-amber-500/20 transition-all duration-300 ease-out">
                 <Undo2 className="h-4 w-4 text-gray-400 group-hover:text-amber-400 transition-colors duration-300" />
@@ -5962,7 +6020,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
                 createInlineNode(contextMenuPosition?.graphX || 0, contextMenuPosition?.graphY || 0);
                 setContextMenuPosition(null);
               }}
-              className="w-full text-left px-4 py-3 hover:bg-white/8 text-gray-200 flex items-center space-x-3 transition-all duration-300 ease-out group rounded-lg mx-2"
+              className="w-[calc(100%-1rem)] text-left px-4 py-3 hover:bg-white/8 text-gray-200 flex items-center space-x-3 transition-all duration-300 ease-out group rounded-lg mx-2"
             >
               <div className="w-6 h-6 rounded-lg bg-gray-700/50 flex items-center justify-center group-hover:bg-emerald-500/20 transition-all duration-300 ease-out">
                 <Plus className="h-4 w-4 text-gray-400 group-hover:text-emerald-400 transition-colors duration-300" />
@@ -5975,74 +6033,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
             
             <button
               onClick={() => {
-                // Zoom to fit button clicked
-                // Zoom to fit all nodes - completely rewritten for proper detection
-                const svg = d3.select(svgRef.current);
-                const containerRect = containerRef.current?.getBoundingClientRect();
-                if (svg.node() && containerRect && nodes.length > 0) {
-                  // Get all node positions (both from simulation and stored positions)
-                  const allPositions = nodes.map(node => ({
-                    x: node.x !== undefined ? node.x : (node.positionX || 0),
-                    y: node.y !== undefined ? node.y : (node.positionY || 0)
-                  })).filter(pos => pos.x !== undefined && pos.y !== undefined);
-                  
-                  if (allPositions.length === 0) {
-                    // No valid node positions found
-                    setContextMenuPosition(null);
-                    return;
-                  }
-                  
-                  // Find the absolute bounds of all nodes
-                  const minX = Math.min(...allPositions.map(p => p.x));
-                  const maxX = Math.max(...allPositions.map(p => p.x));
-                  const minY = Math.min(...allPositions.map(p => p.y));
-                  const maxY = Math.max(...allPositions.map(p => p.y));
-                  
-                  // Add generous padding for node sizes and breathing room
-                  const nodePadding = 150; // Account for node size
-                  const extraMargin = 300; // Extra breathing room
-                  const totalPadding = nodePadding + extraMargin;
-                  
-                  const boundsWidth = (maxX - minX) + (2 * totalPadding);
-                  const boundsHeight = (maxY - minY) + (2 * totalPadding);
-                  
-                  // Calculate how much we need to scale to fit everything
-                  const containerWidth = containerRect.width;
-                  const containerHeight = containerRect.height;
-                  
-                  const scaleX = containerWidth / boundsWidth;
-                  const scaleY = containerHeight / boundsHeight;
-                  const scale = Math.min(scaleX, scaleY, 0.2); // Very conservative max scale for wide zoom out
-                  
-                  // Find the center of all nodes
-                  const centerX = (minX + maxX) / 2;
-                  const centerY = (minY + maxY) / 2;
-                  
-                  // Calculate translation to center the nodes
-                  const translateX = (containerWidth / 2) - (centerX * scale);
-                  const translateY = (containerHeight / 2) - (centerY * scale);
-                  
-                  // Zoom to fit calculation complete
-                  
-                  // Create the transform and update D3's zoom behavior state properly
-                  const newTransform = d3.zoomIdentity.translate(translateX, translateY).scale(scale);
-                  
-                  // Update D3's internal zoom state immediately (no transition)
-                  svg.property('__zoom', newTransform);
-                  
-                  // Apply the visual transform with transition
-                  const g = svg.select('g');
-                  g.transition()
-                    .duration(750)
-                    .attr('transform', newTransform.toString())
-                    .on('end', () => {
-                      // Update the current transform state
-                      setCurrentTransform({ x: translateX, y: translateY, scale: scale });
-                    });
-                }
+                fitViewRef.current();
                 setContextMenuPosition(null);
               }}
-              className="w-full text-left px-4 py-3 hover:bg-white/8 text-gray-200 flex items-center space-x-3 transition-all duration-300 ease-out group rounded-lg mx-2"
+              className="w-[calc(100%-1rem)] text-left px-4 py-3 hover:bg-white/8 text-gray-200 flex items-center space-x-3 transition-all duration-300 ease-out group rounded-lg mx-2"
             >
               <div className="w-6 h-6 rounded-lg bg-gray-700/50 flex items-center justify-center group-hover:bg-blue-500/20 transition-all duration-300 ease-out">
                 <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-400 transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
