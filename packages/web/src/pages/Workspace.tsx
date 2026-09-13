@@ -517,7 +517,7 @@ export function Workspace() {
           {/* Mini-Map Content */}
           <div className="p-3 h-32">
             <div className="w-full h-full bg-gray-900/50 rounded border border-gray-600 overflow-hidden">
-              <MiniMap />
+              <MiniMap key={currentGraph.id} expectedNodeCount={actualNodeCount} />
             </div>
           </div>
         </div>,

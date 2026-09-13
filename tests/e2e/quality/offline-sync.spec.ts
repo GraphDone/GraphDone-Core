@@ -57,6 +57,10 @@ test('student team: offline reload, drag, quota pause, reconnect, no duplicates 
  // A renewed sign-in has a token but may need its cached profile while D1 is paused.
  await page.evaluate(()=>{localStorage.removeItem('currentUser');sessionStorage.removeItem('currentUser');});
  await page.reload();await expect(page.locator('.graph-container .node')).toHaveCount(2);
+ await expect(page.getByText('No nodes yet',{exact:true})).toHaveCount(0);
+ await expect(page.getByTestId('mini-map-node')).toHaveCount(2,{timeout:5000});
+ const cardsAreVisible=()=>page.locator('.graph-container').evaluate(container=>{const frame=container.getBoundingClientRect();const cards=Array.from(container.querySelectorAll('.node-bg')).map(node=>node.getBoundingClientRect());return cards.length===2&&cards.every(card=>card.width>0&&card.height>0&&card.left>=frame.left-1&&card.right<=frame.right+1&&card.top>=frame.top-1&&card.bottom<=frame.bottom+1);});
+ await expect.poll(cardsAreVisible,{timeout:5000}).toBe(true);
  expect(denied).toBe(1);expect(profileReads).toBe(0);
  await page.screenshot({path:'test-artifacts/quality/offline-quota-retained.png'});
  await expect(page.getByTestId('offline-status')).toContainText('waiting to sync');
