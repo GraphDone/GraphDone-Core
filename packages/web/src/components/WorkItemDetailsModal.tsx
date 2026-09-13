@@ -59,6 +59,24 @@ const copyWorkItem = (item: WorkItem): WorkItem => ({
   assignedTo: item.assignedTo && typeof item.assignedTo === 'object' ? { ...item.assignedTo } : item.assignedTo,
 });
 
+const edgeEndpointId = (endpoint: unknown): string | null => {
+  if (typeof endpoint === 'string') return endpoint;
+  if (endpoint && typeof endpoint === 'object' && 'id' in endpoint && typeof endpoint.id === 'string') return endpoint.id;
+  return null;
+};
+
+const edgeCreateInput = (edge: WorkItemEdge) => {
+  const sourceId = edgeEndpointId(edge.source);
+  const targetId = edgeEndpointId(edge.target);
+  if (!sourceId || !targetId) throw new Error('A connection endpoint is unavailable.');
+  return {
+    type: edge.type,
+    weight: (edge as WorkItemEdge & { weight?: number }).weight ?? edge.strength ?? 1,
+    source: { connect: { where: { node: { id: sourceId } } } },
+    target: { connect: { where: { node: { id: targetId } } } },
+  };
+};
+
 function workItemUpdate(target: WorkItem, previous: WorkItem) {
   const update: any = {
     title: target.title,
@@ -290,8 +308,25 @@ export function WorkItemDetailsModal({
         target: { connect: { where: { node: { id: targetWorkItemId } } } }
       }));
 
-      await createEdge({
+      const result = await createEdge({
         variables: { input: edgeInputs }
+      });
+
+      const createdIds: string[] = (result.data?.createEdges?.edges || [])
+        .map((edge: { id?: string }) => edge.id)
+        .filter((id: unknown): id is string => typeof id === 'string');
+      if (createdIds.length !== edgeInputs.length) throw new Error('The new connections could not be identified for Undo.');
+      undoStack?.push({
+        label: 'Connect items',
+        undo: async () => {
+          await deleteEdge({
+            variables: {
+              where: createdIds.length === 1
+                ? { id: createdIds[0] }
+                : { OR: createdIds.map(id => ({ id })) },
+            },
+          });
+        },
       });
 
       showSuccess(`Connected to ${count} node${isPlural ? 's' : ''} successfully`);
@@ -307,15 +342,38 @@ export function WorkItemDetailsModal({
   const handleDisconnectSelected = async () => {
     if (selectedEdgesForDisconnection.length === 0) return;
     
-    const count = selectedEdgesForDisconnection.length;
+    const selectedEdges = selectedEdgesForDisconnection
+      .map(edgeId => edges.find(edge => edge.id === edgeId))
+      .filter((edge): edge is WorkItemEdge => Boolean(edge));
+    if (selectedEdges.length !== selectedEdgesForDisconnection.length) {
+      showError('A selected connection is no longer available. Refresh and try again.');
+      return;
+    }
+    const count = selectedEdges.length;
     const isPlural = count > 1;
+    let restoreInputs: ReturnType<typeof edgeCreateInput>[];
+    try {
+      restoreInputs = selectedEdges.map(edgeCreateInput);
+    } catch (error) {
+      console.error('Error preparing connection Undo:', error);
+      showError('A selected connection could not be safely removed.');
+      return;
+    }
     
     try {
-      for (const edgeId of selectedEdgesForDisconnection) {
-        await deleteEdge({
-          variables: { where: { id: edgeId } }
-        });
-      }
+      await deleteEdge({
+        variables: {
+          where: count === 1
+            ? { id: selectedEdges[0].id }
+            : { OR: selectedEdges.map(edge => ({ id: edge.id })) },
+        },
+      });
+      undoStack?.push({
+        label: 'Disconnect items',
+        undo: async () => {
+          await createEdge({ variables: { input: restoreInputs } });
+        },
+      });
 
       showSuccess(`Removed ${count} connection${isPlural ? 's' : ''} successfully`);
       setSelectedEdgesForDisconnection([]);

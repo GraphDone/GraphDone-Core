@@ -6154,6 +6154,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
             node={freshNode}
             edges={validatedEdges}
             nodes={validatedNodes}
+            undoStack={undoStack}
             onConnectToExisting={(node) => {
               setShowNodeDetailsModal(false);
               handleConnectToExistingNodes(node);
