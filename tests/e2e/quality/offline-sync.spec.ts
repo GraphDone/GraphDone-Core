@@ -98,6 +98,10 @@ test('student team: offline reload, drag, quota pause, reconnect, no duplicates 
  // APIRequestContext is independent of the disconnected browser. No remote inference.
  const agentEdit=await page.request.patch('http://localhost:8798/api/agent/items?graphId='+fixture.projectId,{headers:{Authorization:'Bearer '+agentToken},data:{id:position.id,priority:.2}});expect(agentEdit.ok()).toBe(true);
  await context.setOffline(false);
+ // Playwright restores transport but does not consistently emit the browser's
+ // online event. Mirror the first reconnect above so the app receives the real
+ // browser signal and starts conflict reconciliation deterministically.
+ await page.evaluate(()=>window.dispatchEvent(new Event('online')));
  await expect(page.getByTestId('offline-status')).toContainText('Changes need your review',{timeout:30000});
  await page.getByRole('button',{name:'Keep my version',exact:true}).click();
  await expect.poll(async()=>{const r=await page.request.get('http://localhost:8798/api/sync/project?id='+fixture.projectId,{headers:{Authorization:'Bearer '+fixture.token}});const s=(await r.json()).snapshot;return s.nodes.find((n:any)=>n.id===position.id).priority===1&&s.notes.some((n:any)=>n.body==='Offline human handoff: check the experiment');},{timeout:90000,intervals:[1000,3000,5000]}).toBe(true);
