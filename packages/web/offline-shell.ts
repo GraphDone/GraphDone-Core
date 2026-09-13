@@ -1,12 +1,13 @@
 import { readdirSync,readFileSync,writeFileSync } from 'node:fs';
 import { resolve,relative } from 'node:path';
 import { createHash } from 'node:crypto';
+import type { Plugin } from 'vite';
 /** Precache the complete compiled shell, including lazy route chunks. Never
  * cache auth/API responses. A new worker waits for existing tabs to close. */
-export function offlineShell() {
- return {name:'graphdone-offline-shell',closeBundle(){
+export function offlineShell(): Plugin {
+ let root=resolve(__dirname,'dist');
+ return {name:'graphdone-offline-shell',configResolved(config){root=resolve(config.root,config.build.outDir);},closeBundle(){
   if(process.env.VITE_OFFLINE_SYNC!=='true')return;
-  const root=resolve(__dirname,'dist');
   function walk(dir:string):string[]{return readdirSync(dir,{withFileTypes:true}).flatMap(f=>f.isDirectory()?walk(resolve(dir,f.name)):[resolve(dir,f.name)]);}
   const files=walk(root).filter(f=>/\.(js|css|html|woff2?|png|svg|ico|webp)$/.test(f)&&!f.endsWith('/sw.js'));
   const revision=createHash('sha256');for(const f of files)revision.update(readFileSync(f));
