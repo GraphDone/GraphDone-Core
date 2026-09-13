@@ -10,6 +10,7 @@ import { sqliteAuthStore } from './auth/sqlite-auth.js';
 
 const hash = (value: string) => createHash('sha256').update(value).digest('hex');
 const statuses = ['NOT_STARTED','PROPOSED','PLANNED','IN_PROGRESS','IN_REVIEW','BLOCKED','ON_HOLD','COMPLETED','CANCELLED'];
+const uuid = (value: unknown): value is string => typeof value === 'string' && /^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/.test(value);
 const ownerMatch = 'MATCH (g:Graph {id:$graphId, createdBy:$ownerId})';
 /** Separate from login/GraphQL: agent credentials never grant general account access. */
 export const agentApi = Router();
@@ -78,19 +79,36 @@ agentApi.all('*', async (req, res) => {
     }
     if (scope !== 'collaborate') return res.status(403).json({ error: 'This token is read-only' });
     if (req.path === '/notes' && req.method === 'POST') {
-      const { body, workItemId } = req.body;
+      const { id, body, workItemId } = req.body;
       if (typeof body !== 'string' || !body.trim() || body.length > 4000 || (workItemId !== undefined && typeof workItemId !== 'string')) return res.status(400).json({ error: 'A note must contain 1–4000 characters' });
+      if ((isAgent && id === undefined) || (id !== undefined && !uuid(id))) return res.status(400).json({ error: 'Agents must provide a new lowercase UUID id and reuse it unchanged only for an identical retry' });
       if (workItemId) {
         const item = await session.run(`${ownerMatch} MATCH (w:WorkItem {id:$workItemId})-[:BELONGS_TO]->(g) RETURN w.id`, { ...params, workItemId });
         if (!item.records.length) return res.status(404).json({ error: 'Work item not found in this project' });
       }
-      const note = { id: randomUUID(), graphId, workItemId: workItemId || '', body: body.trim(), actor, actorId, actorType: isAgent ? 'agent' : 'human', createdAt: new Date().toISOString() };
-      await session.executeWrite(async tx => { await tx.run('CREATE (n:CollaborationNote) SET n=$note', { note }); await tx.run('MATCH (n:CollaborationNote {graphId:$graphId}) WITH n ORDER BY n.createdAt DESC, n.id DESC SKIP 2000 DELETE n', params); });
-      return res.status(201).json(note);
+      const note = { id: id || randomUUID(), graphId, workItemId: workItemId || '', body: body.trim(), actor, actorId, actorType: isAgent ? 'agent' : 'human', createdAt: new Date().toISOString() };
+      const outcome = await session.executeWrite(async tx => {
+        // Lock this graph before checking the caller ID, so concurrent retries
+        // cannot both observe a missing note and create duplicates.
+        await tx.run(`${ownerMatch} SET g.agentNoteVersion=coalesce(g.agentNoteVersion,0)+1`, params);
+        const found = await tx.run('MATCH (n:CollaborationNote {id:$id}) RETURN n', { id: note.id });
+        if (found.records.length) {
+          const existing = found.records[0].get('n').properties;
+          return existing.graphId === note.graphId && existing.workItemId === note.workItemId
+            && existing.body === note.body && existing.actor === note.actor
+            && existing.actorId === note.actorId && existing.actorType === note.actorType
+            ? 'existing' : 'conflict';
+        }
+        await tx.run('CREATE (n:CollaborationNote) SET n=$note', { note });
+        await tx.run('MATCH (n:CollaborationNote {graphId:$graphId}) WITH n ORDER BY n.createdAt DESC, n.id DESC SKIP 2000 DELETE n', params);
+        return 'created';
+      });
+      if (outcome === 'conflict') return res.status(409).json({ error: 'This note ID is already used. Existing notes were not changed.' });
+      return res.status(outcome === 'created' ? 201 : 200).json({ id: note.id, created: outcome === 'created' });
     }
     if (req.path === '/items' && req.method === 'POST') {
       const {id,title,description='',priority=.5,status='NOT_STARTED'}=req.body;
-      if(typeof id!=='string'||!/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/.test(id)||typeof title!=='string'||!title.trim()||title.length>200||typeof description!=='string'||description.length>2000||typeof priority!=='number'||!Number.isFinite(priority)||priority<0||priority>1||!statuses.includes(status))return res.status(400).json({error:'Provide a lowercase UUID id, title (1–200), optional description (up to 2000), priority (0–1) and valid status'});
+      if(!uuid(id)||typeof title!=='string'||!title.trim()||title.length>200||typeof description!=='string'||description.length>2000||typeof priority!=='number'||!Number.isFinite(priority)||priority<0||priority>1||!statuses.includes(status))return res.status(400).json({error:'Provide a lowercase UUID id, title (1–200), optional description (up to 2000), priority (0–1) and valid status'});
       const digest=hash(JSON.stringify([title.trim(),description,priority,status]));
       const outcome=await session.executeWrite(async tx=>{
         await tx.run(`${ownerMatch} SET g.agentAccessVersion=coalesce(g.agentAccessVersion,0)+1`,params);
