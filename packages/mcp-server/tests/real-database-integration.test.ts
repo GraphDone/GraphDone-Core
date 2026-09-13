@@ -1,18 +1,27 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import neo4j, { Driver } from 'neo4j-driver';
 import { GraphService } from '../src/services/graph-service';
 
-describe.skipIf(process.env.CI)('REAL DATABASE INTEGRATION - Graph Management', () => {
+const disposable = process.env.GRAPHDONE_DISPOSABLE_NEO4J === '1';
+const required = process.env.GRAPHDONE_MCP_INTEGRATION_REQUIRED === '1';
+const neo4jUri = process.env.NEO4J_URI || '';
+const neo4jUser = process.env.NEO4J_USER || process.env.NEO4J_USERNAME || '';
+const neo4jPassword = process.env.NEO4J_PASSWORD || '';
+const configured = disposable && !!neo4jUri && !!neo4jUser && !!neo4jPassword;
+
+if (required && !configured) {
+  throw new Error('Real MCP integration requires GRAPHDONE_DISPOSABLE_NEO4J=1 plus explicit NEO4J_URI, NEO4J_USER and NEO4J_PASSWORD for an owned disposable fixture.');
+}
+if (configured && !['localhost', '127.0.0.1', '[::1]'].includes(new URL(neo4jUri).hostname)) {
+  throw new Error('Real MCP integration only accepts an explicitly configured loopback Neo4j fixture.');
+}
+
+describe.skipIf(!configured)('REAL DATABASE INTEGRATION - Graph Management', () => {
   let driver: Driver;
   let graphService: GraphService;
-  let testGraphIds: string[] = [];
+  const testGraphIds: string[] = [];
 
   beforeAll(async () => {
-    // Connect to REAL Neo4j database using environment variables
-    const neo4jUri = process.env.NEO4J_URI || 'bolt://localhost:7687';
-    const neo4jUser = process.env.NEO4J_USER || process.env.NEO4J_USERNAME || 'neo4j';
-    const neo4jPassword = process.env.NEO4J_PASSWORD || 'graphdone_password';
-    
     driver = neo4j.driver(
       neo4jUri,
       neo4j.auth.basic(neo4jUser, neo4jPassword),
@@ -69,11 +78,6 @@ describe.skipIf(process.env.CI)('REAL DATABASE INTEGRATION - Graph Management', 
       await session.close();
       await driver.close();
     }
-  });
-
-  beforeEach(() => {
-    // Reset test graph tracking
-    testGraphIds = [];
   });
 
   describe('Graph Creation - REAL DATABASE', () => {
