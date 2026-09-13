@@ -160,7 +160,7 @@ export function MobileBottomNav() {
               </div>
               <button
                 onClick={() => { logout(); setMoreOpen(false); }}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-600/20 border border-red-500/30 text-red-300 text-sm font-medium active:bg-red-600/40 flex-shrink-0"
+                className="flex min-h-[44px] items-center gap-1.5 px-3 py-2 rounded-lg bg-red-600/20 border border-red-500/30 text-red-300 text-sm font-medium active:bg-red-600/40 flex-shrink-0"
               >
                 <LogOut className="h-4 w-4" />
                 Sign out
