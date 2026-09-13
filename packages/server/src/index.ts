@@ -370,7 +370,30 @@ async function startServer() {
     path: '/graphql',
   });
 
-  const serverCleanup = useServer({ schema }, wsServer);
+  const graphContext = async (authHeader?: string) => {
+    const claims = extractUserFromToken(authHeader);
+    const account = claims ? await sqliteAuthStore.findUserById(claims.userId) : null;
+    if (account?.isActive && isNeo4jAvailable) await ensureGraphIdentity(driver, account);
+    const user = account?.isActive
+      ? { userId: account.id, email: account.email, role: account.role }
+      : (claims?.role === 'GUEST' && /^guest-\d+$/.test(claims.userId) ? claims : null);
+    return {
+      driver: isNeo4jAvailable ? driver : null,
+      user,
+      // This value is created only from a server-verified token. Neo4j GraphQL
+      // uses it for tenant filters; client-supplied decoded JWT objects are ignored.
+      jwt: user ? { sub: user.userId, roles: [user.role] } : undefined,
+      isNeo4jAvailable,
+    };
+  };
+
+  const serverCleanup = useServer({
+    schema,
+    context: async connection => {
+      const supplied = connection.connectionParams?.authorization ?? connection.connectionParams?.Authorization;
+      return graphContext(typeof supplied === 'string' ? supplied : undefined);
+    },
+  }, wsServer);
 
   const apolloServer = new ApolloServer({
     schema,
@@ -396,14 +419,8 @@ async function startServer() {
     express.json(),
     expressMiddleware(apolloServer, {
       context: async ({ req }) => {
-        const claims = extractUserFromToken(req.headers.authorization);
-        const account = claims ? await sqliteAuthStore.findUserById(claims.userId) : null;
-        if (account?.isActive && isNeo4jAvailable) await ensureGraphIdentity(driver, account);
-        const user = account?.isActive ? { userId: account.id, email: account.email, role: account.role } : (claims?.role === 'GUEST' && /^guest-\d+$/.test(claims.userId) ? claims : null);
         return {
-          driver: isNeo4jAvailable ? driver : null,
-          user,
-          isNeo4jAvailable,
+          ...await graphContext(req.headers.authorization),
           req,
         };
       },

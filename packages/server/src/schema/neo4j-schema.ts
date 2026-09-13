@@ -230,7 +230,7 @@ export const typeDefs = gql`
   }
 
   # User entity - represents authenticated users in the system
-  type User {
+  type User @query(read: false, aggregate: false) @mutation(operations: []) {
     id: ID! @id
     email: String! @unique
     username: String! @unique
@@ -266,7 +266,7 @@ export const typeDefs = gql`
   }
 
   # Team entity - represents teams/organizations
-  type Team {
+  type Team @query(read: false, aggregate: false) @mutation(operations: []) {
     id: ID! @id
     name: String! @unique
     description: String
@@ -283,7 +283,10 @@ export const typeDefs = gql`
   }
 
   # Graph entity - represents a graph/workspace/project
-  type Graph {
+  type Graph @authorization(
+    filter: [{ where: { node: { createdBy: "$jwt.sub" } } }]
+    validate: [{ operations: [CREATE, UPDATE], when: [AFTER], where: { node: { createdBy: "$jwt.sub" } } }]
+  ) {
     id: ID! @id
     name: String!
     description: String
@@ -319,7 +322,10 @@ export const typeDefs = gql`
   }
 
   # WorkItem entity - represents work items in the graph
-  type WorkItem {
+  type WorkItem @authorization(
+    filter: [{ where: { node: { graph: { createdBy: "$jwt.sub" } } } }]
+    validate: [{ operations: [CREATE, UPDATE], when: [AFTER], where: { node: { graph: { createdBy: "$jwt.sub" } } } }]
+  ) {
     id: ID! @id
     type: NodeType!
     title: String!
@@ -357,7 +363,7 @@ export const typeDefs = gql`
   }
 
   # Contributor entity - humans and AI agents (legacy - kept for AI agents)
-  type Contributor {
+  type Contributor @query(read: false, aggregate: false) @mutation(operations: []) {
     id: ID! @id
     type: ContributorType!
     name: String!
@@ -375,7 +381,10 @@ export const typeDefs = gql`
   }
 
   # Edge entity - relationships between nodes
-  type Edge {
+  type Edge @authorization(
+    filter: [{ where: { node: { source: { graph: { createdBy: "$jwt.sub" } }, target: { graph: { createdBy: "$jwt.sub" } } } } }]
+    validate: [{ operations: [CREATE, UPDATE], when: [AFTER], where: { node: { source: { graph: { createdBy: "$jwt.sub" } }, target: { graph: { createdBy: "$jwt.sub" } } } } }]
+  ) {
     id: ID! @id
     type: EdgeType!
     weight: Float! @default(value: 1.0)
