@@ -151,6 +151,8 @@ export function WorkItemDetailsModal({
   const isSavingRef = useRef(false);
   const connectDropdownRef = useRef<HTMLDivElement>(null);
   const disconnectDropdownRef = useRef<HTMLDivElement>(null);
+  const connectButtonRef = useRef<HTMLButtonElement>(null);
+  const disconnectButtonRef = useRef<HTMLButtonElement>(null);
   const datePickerRef = useRef<HTMLDivElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -188,9 +190,19 @@ export function WorkItemDetailsModal({
     if (!isOpen) return;
 
     // Escape is handled centrally by useDialog (defers while typing in a field,
-    // and keeps the dialog-manager's "close top-most" stack coherent). Here we
-    // only add the Ctrl/Cmd+S save shortcut.
+    // and keeps the dialog-manager's "close top-most" stack coherent). A
+    // relationship picker is the active surface while it is open, so Escape
+    // dismisses that picker first and returns focus to its trigger.
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && (showConnectDropdown || showDisconnectDropdown)) {
+        e.preventDefault();
+        e.stopPropagation();
+        const focusTarget = showConnectDropdown ? connectButtonRef.current : disconnectButtonRef.current;
+        setShowConnectDropdown(false);
+        setShowDisconnectDropdown(false);
+        requestAnimationFrame(() => focusTarget?.focus());
+        return;
+      }
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.stopPropagation();
         e.preventDefault();
@@ -202,7 +214,7 @@ export function WorkItemDetailsModal({
 
     document.addEventListener('keydown', handleKeyDown, true);
     return () => document.removeEventListener('keydown', handleKeyDown, true);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, showConnectDropdown, showDisconnectDropdown]);
 
   useEffect(() => {
     if (!showConnectDropdown && !showDisconnectDropdown) return;
@@ -220,8 +232,18 @@ export function WorkItemDetailsModal({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showConnectDropdown, showDisconnectDropdown]);
 
+  const edgeQueryVariables = currentGraph ? {
+    where: {
+      OR: [
+        { source: { graph: { id: currentGraph.id } } },
+        { target: { graph: { id: currentGraph.id } } },
+      ],
+    },
+  } : { where: {} };
+
   const [createEdge] = useMutation(CREATE_EDGE, {
-    refetchQueries: [{ query: GET_EDGES }],
+    refetchQueries: [{ query: GET_EDGES, variables: edgeQueryVariables }],
+    awaitRefetchQueries: true,
     // Remove individual success messages - we'll show a batch message instead
     onError: (error) => {
       showError(`Failed to create connection: ${error.message}`);
@@ -229,7 +251,8 @@ export function WorkItemDetailsModal({
   });
 
   const [deleteEdge] = useMutation(DELETE_EDGE, {
-    refetchQueries: [{ query: GET_EDGES }],
+    refetchQueries: [{ query: GET_EDGES, variables: edgeQueryVariables }],
+    awaitRefetchQueries: true,
     // Remove individual success messages - we'll show a batch message instead
     onError: (error) => {
       showError(`Failed to remove connection: ${error.message}`);
@@ -237,20 +260,18 @@ export function WorkItemDetailsModal({
   });
 
   // Toggle node selection for batch connection
-  const toggleNodeSelection = (nodeId: string) => {
-    setSelectedNodesForConnection(prev => 
-      prev.includes(nodeId) 
-        ? prev.filter(id => id !== nodeId)
-        : [...prev, nodeId]
+  const setNodeSelection = (nodeId: string, selected: boolean) => {
+    setSelectedNodesForConnection(prev => selected
+      ? (prev.includes(nodeId) ? prev : [...prev, nodeId])
+      : prev.filter(id => id !== nodeId)
     );
   };
 
   // Toggle edge selection for batch disconnection
-  const toggleEdgeSelection = (edgeId: string) => {
-    setSelectedEdgesForDisconnection(prev => 
-      prev.includes(edgeId) 
-        ? prev.filter(id => id !== edgeId)
-        : [...prev, edgeId]
+  const setEdgeSelection = (edgeId: string, selected: boolean) => {
+    setSelectedEdgesForDisconnection(prev => selected
+      ? (prev.includes(edgeId) ? prev : [...prev, edgeId])
+      : prev.filter(id => id !== edgeId)
     );
   };
 
@@ -1176,10 +1197,17 @@ export function WorkItemDetailsModal({
               {/* Enhanced Connect Dropdown */}
               <div className="relative" ref={connectDropdownRef}>
                 <button
-                  onClick={() => setShowConnectDropdown(!showConnectDropdown)}
+                  ref={connectButtonRef}
+                  type="button"
+                  onClick={() => {
+                    setShowConnectDropdown(open => !open);
+                    setShowDisconnectDropdown(false);
+                  }}
                   disabled={getAvailableNodes().length === 0}
                   className="w-full min-h-[44px] flex flex-row items-center justify-start gap-2 px-3 py-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-all duration-300 text-xs font-semibold shadow-lg hover:scale-105 transform border border-green-400/30"
                   aria-label={`Connect to other work items (${getAvailableNodes().length} available)`}
+                  aria-expanded={showConnectDropdown}
+                  aria-controls={`connect-work-items-${currentNode.id}`}
                   title={getAvailableNodes().length === 0 ? "No work items available to connect" : "Connect to other work items"}
                 >
                   <Link2 className="h-4 w-4" />
@@ -1187,26 +1215,26 @@ export function WorkItemDetailsModal({
                 </button>
                 
                 {showConnectDropdown && getAvailableNodes().length > 0 && (
-                  <div className="absolute top-full left-0 mt-2 w-full bg-gray-900 border border-gray-600 rounded-lg shadow-xl z-50 max-h-80 overflow-y-auto">
+                  <div
+                    id={`connect-work-items-${currentNode.id}`}
+                    role="group"
+                    aria-label="Work items available to connect"
+                    className="absolute top-full left-0 mt-2 w-full md:left-auto md:right-0 md:w-80 bg-gray-900 border border-gray-600 rounded-lg shadow-xl z-50"
+                  >
                     {/* Multi-select list */}
                     <div className="p-2 max-h-48 overflow-y-auto">
                       {getAvailableNodes().map((availableNode) => (
                         <label
                           key={availableNode.id}
-                          className="flex items-center space-x-3 p-2 hover:bg-gray-700 rounded cursor-pointer transition-colors"
+                          className="flex min-h-[44px] items-center space-x-3 px-2 py-1.5 hover:bg-gray-700 rounded cursor-pointer transition-colors focus-within:ring-2 focus-within:ring-green-400/70"
                         >
-                          <div
-                            onClick={() => toggleNodeSelection(availableNode.id)}
-                            className={`w-4 h-4 min-w-[16px] min-h-[16px] border flex items-center justify-center transition-colors cursor-pointer ${
-                              selectedNodesForConnection.includes(availableNode.id)
-                                ? 'bg-green-600 border-green-600' 
-                                : 'bg-gray-700 border-gray-600 hover:border-gray-500'
-                            }`}
-                          >
-                            {selectedNodesForConnection.includes(availableNode.id) && (
-                              <span className="text-white text-xs font-bold">✓</span>
-                            )}
-                          </div>
+                          <input
+                            type="checkbox"
+                            checked={selectedNodesForConnection.includes(availableNode.id)}
+                            onChange={(event) => setNodeSelection(availableNode.id, event.target.checked)}
+                            aria-label={`Select ${availableNode.title} to connect`}
+                            className="h-5 w-5 shrink-0 accent-green-600"
+                          />
                           <div className="flex items-center space-x-2 flex-1">
                             {getTypeIcon(availableNode.type)}
                             <div>
@@ -1223,20 +1251,20 @@ export function WorkItemDetailsModal({
                       <button
                         onClick={handleConnectSelected}
                         disabled={selectedNodesForConnection.length === 0}
-                        className="w-full px-3 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-sm font-medium rounded transition-colors"
+                        className="w-full min-h-[44px] px-3 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-sm font-medium rounded transition-colors"
                       >
                         Connect Selected ({selectedNodesForConnection.length})
                       </button>
                       <div className="flex space-x-2">
                         <button
                           onClick={() => setSelectedNodesForConnection(getAvailableNodes().map(n => n.id))}
-                          className="flex-1 px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded transition-colors"
+                          className="flex-1 min-h-[44px] px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded transition-colors"
                         >
                           Select All
                         </button>
                         <button
                           onClick={() => setSelectedNodesForConnection([])}
-                          className="flex-1 px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded transition-colors"
+                          className="flex-1 min-h-[44px] px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded transition-colors"
                         >
                           Clear
                         </button>
@@ -1249,10 +1277,17 @@ export function WorkItemDetailsModal({
               {/* Enhanced Disconnect Dropdown */}
               <div className="relative" ref={disconnectDropdownRef}>
                 <button
-                  onClick={() => setShowDisconnectDropdown(!showDisconnectDropdown)}
+                  ref={disconnectButtonRef}
+                  type="button"
+                  onClick={() => {
+                    setShowDisconnectDropdown(open => !open);
+                    setShowConnectDropdown(false);
+                  }}
                   disabled={getConnectedNodes().length === 0}
                   className="w-full min-h-[44px] flex flex-row items-center justify-start gap-2 px-3 py-2 bg-gradient-to-r from-yellow-600 to-amber-600 hover:from-yellow-500 hover:to-amber-500 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-all duration-300 text-xs font-semibold shadow-lg hover:scale-105 transform border border-yellow-400/30"
                   aria-label={`Disconnect from work items (${getConnectedNodes().length} connected)`}
+                  aria-expanded={showDisconnectDropdown}
+                  aria-controls={`disconnect-work-items-${currentNode.id}`}
                   title={getConnectedNodes().length === 0 ? "No connections to disconnect" : "Disconnect from work items"}
                 >
                   <Unlink className="h-4 w-4" />
@@ -1260,26 +1295,26 @@ export function WorkItemDetailsModal({
                 </button>
                 
                 {showDisconnectDropdown && getConnectedNodes().length > 0 && (
-                  <div className="absolute top-full left-0 mt-2 w-full bg-gray-900 border border-gray-600 rounded-lg shadow-xl z-50 max-h-80 overflow-y-auto">
+                  <div
+                    id={`disconnect-work-items-${currentNode.id}`}
+                    role="group"
+                    aria-label="Connected work items available to disconnect"
+                    className="absolute top-full left-0 mt-2 w-full md:left-auto md:right-0 md:w-80 bg-gray-900 border border-gray-600 rounded-lg shadow-xl z-50"
+                  >
                     {/* Multi-select list */}
                     <div className="p-2 max-h-48 overflow-y-auto">
                       {getConnectedNodes().map(({ node: connectedNode, edge, isIncoming }) => (
                         <label
                           key={edge.id}
-                          className="flex items-center space-x-3 p-2 hover:bg-gray-700 rounded cursor-pointer transition-colors"
+                          className="flex min-h-[44px] items-center space-x-3 px-2 py-1.5 hover:bg-gray-700 rounded cursor-pointer transition-colors focus-within:ring-2 focus-within:ring-yellow-400/70"
                         >
-                          <div
-                            onClick={() => toggleEdgeSelection(edge.id)}
-                            className={`w-4 h-4 min-w-[16px] min-h-[16px] border flex items-center justify-center transition-colors cursor-pointer ${
-                              selectedEdgesForDisconnection.includes(edge.id)
-                                ? 'bg-yellow-600 border-yellow-600' 
-                                : 'bg-gray-700 border-gray-600 hover:border-gray-500'
-                            }`}
-                          >
-                            {selectedEdgesForDisconnection.includes(edge.id) && (
-                              <span className="text-white text-xs font-bold">✓</span>
-                            )}
-                          </div>
+                          <input
+                            type="checkbox"
+                            checked={selectedEdgesForDisconnection.includes(edge.id)}
+                            onChange={(event) => setEdgeSelection(edge.id, event.target.checked)}
+                            aria-label={`Select ${connectedNode!.title} to disconnect`}
+                            className="h-5 w-5 shrink-0 accent-yellow-600"
+                          />
                           <div className="flex items-center space-x-2 flex-1">
                             {getTypeIcon(connectedNode!.type)}
                             <div>
@@ -1296,20 +1331,20 @@ export function WorkItemDetailsModal({
                       <button
                         onClick={handleDisconnectSelected}
                         disabled={selectedEdgesForDisconnection.length === 0}
-                        className="w-full px-3 py-2 bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-sm font-medium rounded transition-colors"
+                        className="w-full min-h-[44px] px-3 py-2 bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-sm font-medium rounded transition-colors"
                       >
                         Remove Selected ({selectedEdgesForDisconnection.length})
                       </button>
                       <div className="flex space-x-2">
                         <button
                           onClick={() => setSelectedEdgesForDisconnection(getConnectedNodes().map(item => item.edge.id))}
-                          className="flex-1 px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded transition-colors"
+                          className="flex-1 min-h-[44px] px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded transition-colors"
                         >
                           Select All
                         </button>
                         <button
                           onClick={() => setSelectedEdgesForDisconnection([])}
-                          className="flex-1 px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded transition-colors"
+                          className="flex-1 min-h-[44px] px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded transition-colors"
                         >
                           Clear
                         </button>
