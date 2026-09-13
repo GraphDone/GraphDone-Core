@@ -1124,7 +1124,7 @@ export function WorkItemDetailsModal({
                 <button
                   onClick={() => setShowConnectDropdown(!showConnectDropdown)}
                   disabled={getAvailableNodes().length === 0}
-                  className="w-full flex flex-row items-center justify-start gap-2 px-3 py-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-all duration-300 text-xs font-semibold shadow-lg hover:scale-105 transform border border-green-400/30"
+                  className="w-full min-h-[44px] flex flex-row items-center justify-start gap-2 px-3 py-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-all duration-300 text-xs font-semibold shadow-lg hover:scale-105 transform border border-green-400/30"
                   aria-label={`Connect to other work items (${getAvailableNodes().length} available)`}
                   title={getAvailableNodes().length === 0 ? "No work items available to connect" : "Connect to other work items"}
                 >
@@ -1197,7 +1197,7 @@ export function WorkItemDetailsModal({
                 <button
                   onClick={() => setShowDisconnectDropdown(!showDisconnectDropdown)}
                   disabled={getConnectedNodes().length === 0}
-                  className="w-full flex flex-row items-center justify-start gap-2 px-3 py-2 bg-gradient-to-r from-yellow-600 to-amber-600 hover:from-yellow-500 hover:to-amber-500 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-all duration-300 text-xs font-semibold shadow-lg hover:scale-105 transform border border-yellow-400/30"
+                  className="w-full min-h-[44px] flex flex-row items-center justify-start gap-2 px-3 py-2 bg-gradient-to-r from-yellow-600 to-amber-600 hover:from-yellow-500 hover:to-amber-500 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-all duration-300 text-xs font-semibold shadow-lg hover:scale-105 transform border border-yellow-400/30"
                   aria-label={`Disconnect from work items (${getConnectedNodes().length} connected)`}
                   title={getConnectedNodes().length === 0 ? "No connections to disconnect" : "Disconnect from work items"}
                 >
@@ -1269,7 +1269,7 @@ export function WorkItemDetailsModal({
                 <button
                   onClick={handleDelete}
                   disabled={deleting}
-                  className="w-full flex flex-row items-center justify-start gap-2 px-3 py-2 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 disabled:from-red-400 disabled:to-rose-400 disabled:cursor-not-allowed text-white rounded-lg transition-all duration-300 text-xs font-semibold shadow-lg hover:scale-105 transform border border-red-400/30"
+                  className="w-full min-h-[44px] flex flex-row items-center justify-start gap-2 px-3 py-2 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 disabled:from-red-400 disabled:to-rose-400 disabled:cursor-not-allowed text-white rounded-lg transition-all duration-300 text-xs font-semibold shadow-lg hover:scale-105 transform border border-red-400/30"
                   aria-label="Delete work item"
                   title="Delete this work item (requires disconnecting all relationships first)"
                 >
