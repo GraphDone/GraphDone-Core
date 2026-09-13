@@ -4264,37 +4264,56 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     const boundsWidth = Math.max(1, maxX - minX);
     const boundsHeight = Math.max(1, maxY - minY);
 
-    // Fixed graph controls can cover an otherwise correctly fitted card. The
-    // MiniMap occupies the bottom-right corner, so choose between fitting to
-    // the full-height space on its left and the full-width space above it.
-    // Keeping the larger scale uses the most canvas while guaranteeing every
-    // fitted card remains available to pointer input.
+    // Fixed graph controls can cover an otherwise correctly fitted card. Find
+    // the largest useful rectangle that avoids every control and the MiniMap,
+    // then fit the cards inside it. This keeps fitted cards readable and
+    // clickable in phone landscape as well as on desktop.
     let fitRegion = { x: 0, y: 0, width, height };
     const containerRect = container.getBoundingClientRect();
-    const obstacle = document.querySelector<HTMLElement>('[data-graph-fit-obstacle="true"]');
-    if (obstacle) {
-      const rect = obstacle.getBoundingClientRect();
-      const obstacleLeft = Math.max(0, Math.min(width, rect.left - containerRect.left));
-      const obstacleTop = Math.max(0, Math.min(height, rect.top - containerRect.top));
-      const obstacleRight = Math.max(0, Math.min(width, rect.right - containerRect.left));
-      const obstacleBottom = Math.max(0, Math.min(height, rect.bottom - containerRect.top));
-      const intersects = obstacleRight > obstacleLeft && obstacleBottom > obstacleTop;
-      if (intersects) {
-        const gap = 12;
-        const candidates = [
-          { x: 0, y: 0, width: Math.max(0, obstacleLeft - gap), height },
-          { x: 0, y: 0, width, height: Math.max(0, obstacleTop - gap) },
-        ].filter(region => region.width > 0 && region.height > 0);
-        if (candidates.length > 0) {
-          const fitScale = (region: typeof fitRegion) =>
-            Math.min(region.width / boundsWidth, region.height / boundsHeight, 1.25);
-          fitRegion = candidates.reduce((best, region) => {
-            const bestScale = fitScale(best);
-            const nextScale = fitScale(region);
-            if (nextScale !== bestScale) return nextScale > bestScale ? region : best;
-            return region.width * region.height > best.width * best.height ? region : best;
-          });
+    const gap = 12;
+    const obstacles = Array.from(document.querySelectorAll<HTMLElement>('[data-graph-fit-obstacle="true"]'))
+      .map(element => {
+        const rect = element.getBoundingClientRect();
+        return {
+          left: Math.max(0, Math.min(width, rect.left - containerRect.left - gap)),
+          top: Math.max(0, Math.min(height, rect.top - containerRect.top - gap)),
+          right: Math.max(0, Math.min(width, rect.right - containerRect.left + gap)),
+          bottom: Math.max(0, Math.min(height, rect.bottom - containerRect.top + gap)),
+        };
+      })
+      .filter(obstacle => obstacle.right > obstacle.left && obstacle.bottom > obstacle.top);
+    if (obstacles.length > 0) {
+      const xs = Array.from(new Set([0, width, ...obstacles.flatMap(obstacle => [obstacle.left, obstacle.right])])).sort((a, b) => a - b);
+      const ys = Array.from(new Set([0, height, ...obstacles.flatMap(obstacle => [obstacle.top, obstacle.bottom])])).sort((a, b) => a - b);
+      const candidates: typeof fitRegion[] = [];
+      for (let leftIndex = 0; leftIndex < xs.length - 1; leftIndex += 1) {
+        for (let rightIndex = leftIndex + 1; rightIndex < xs.length; rightIndex += 1) {
+          for (let topIndex = 0; topIndex < ys.length - 1; topIndex += 1) {
+            for (let bottomIndex = topIndex + 1; bottomIndex < ys.length; bottomIndex += 1) {
+              const region = {
+                x: xs[leftIndex],
+                y: ys[topIndex],
+                width: xs[rightIndex] - xs[leftIndex],
+                height: ys[bottomIndex] - ys[topIndex],
+              };
+              const overlapsObstacle = obstacles.some(obstacle =>
+                region.x < obstacle.right && region.x + region.width > obstacle.left
+                && region.y < obstacle.bottom && region.y + region.height > obstacle.top
+              );
+              if (!overlapsObstacle && region.width > 0 && region.height > 0) candidates.push(region);
+            }
+          }
         }
+      }
+      const fitScale = (region: typeof fitRegion) =>
+        Math.min(region.width / boundsWidth, region.height / boundsHeight, 1.25);
+      if (candidates.length > 0) {
+        fitRegion = candidates.reduce((best, region) => {
+          const bestScale = fitScale(best);
+          const nextScale = fitScale(region);
+          if (nextScale !== bestScale) return nextScale > bestScale ? region : best;
+          return region.width * region.height > best.width * best.height ? region : best;
+        });
       }
     }
 

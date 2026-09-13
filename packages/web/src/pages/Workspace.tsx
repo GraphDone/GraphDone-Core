@@ -465,6 +465,7 @@ export function Workspace() {
            {isMobile && (
              <button
                data-testid="graph-lock-toggle"
+               data-graph-fit-obstacle="true"
                onClick={() => setGraphLocked((v) => !v)}
                className={`absolute top-3 right-3 z-40 flex min-h-11 items-center gap-1.5 px-3 py-2 rounded-full shadow-lg backdrop-blur-sm border text-xs font-medium transition-colors ${
                  graphLocked
@@ -482,6 +483,7 @@ export function Workspace() {
                where the right corner is taken by the docked inspector. */}
            <button
              data-testid="graph-zoom-extents"
+             data-graph-fit-obstacle="true"
              onClick={() => (window as any).triggerZoomToFit?.()}
              className="absolute top-16 right-3 md:top-3 md:left-3 md:right-auto z-40 flex items-center justify-center w-11 h-11 rounded-full shadow-lg backdrop-blur-sm border border-gray-600 bg-gray-900/90 text-gray-200 hover:text-white hover:border-green-400 transition-colors"
              title="Zoom to fit — frame all nodes"
@@ -494,6 +496,7 @@ export function Workspace() {
                it never overlaps the left sidebar's console toggle. */}
            <button
              data-testid="graph-layout-toggle"
+             data-graph-fit-obstacle="true"
              onClick={toggleLayoutMode}
              className={`hidden md:flex absolute top-16 left-3 z-40 items-center justify-center w-10 h-10 rounded-full shadow-lg backdrop-blur-sm border transition-colors ${
                layoutMode === 'hierarchical'
