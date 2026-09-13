@@ -248,7 +248,8 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
       magicLinkSent,
       hasEmail: hasEnteredEmail(formData.magicLinkEmail),
     });
-    if (target === 'email') magicLinkEmailRef.current?.focus();
+    const wideScreen = typeof window.matchMedia !== 'function' || window.matchMedia('(min-width: 1024px)').matches;
+    if (target === 'email' && wideScreen) magicLinkEmailRef.current?.focus();
   }, [useMagicLink, magicLinkSent]);
 
   // Check if guest access is enabled
@@ -505,6 +506,16 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
           </Link>
           <h1 className="text-3xl font-bold text-gray-100 mb-3">Your agents keep moving.<br /><span className="signin-headline-accent">You stay in the loop.</span></h1>
           <p className="text-gray-400 text-lg">Connect the agents you already use. They can coordinate through tasks and notes while you’re away—with clear limits and a simple place to check progress, set priorities, and step in.</p>
+          <button
+            type="button"
+            data-testid="compact-guest-entry"
+            onClick={() => setShowGuestInfo(true)}
+            disabled={!isGuestEnabled || loading || guestLoading || magicLinkLoading || (lockoutTime !== null && new Date() < lockoutTime)}
+            className="mt-4 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl border border-[#da70d6]/50 bg-[#da70d6]/20 px-5 text-base font-semibold text-white transition-colors hover:bg-[#da70d6]/30 disabled:cursor-not-allowed disabled:opacity-50 lg:hidden"
+            title={!isGuestEnabled ? "Guest access has been disabled by the administrator" : undefined}
+          >
+            {guestLoading ? <><div className="h-5 w-5 animate-spin rounded-full border-b-2 border-white" /><span>Opening workspace…</span></> : <><Users className="h-5 w-5" /><span>Continue as Guest</span></>}
+          </button>
           <WorkIllustration />
           <FeedbackButton />
         </div>
@@ -588,7 +599,7 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
             </button>
           </div>
 
-          <div className="relative">
+          <div className="relative hidden lg:block">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-gray-600" />
             </div>
@@ -1045,7 +1056,7 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
             type="button"
             onClick={() => setShowGuestInfo(true)}
             disabled={!isGuestEnabled || loading || guestLoading || magicLinkLoading || (lockoutTime !== null && new Date() < lockoutTime)}
-            className="w-full bg-[#da70d6]/20 hover:bg-[#da70d6]/30 backdrop-blur-sm border border-[#da70d6]/30 hover:border-[#da70d6]/50 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-[#da70d6]/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:translate-y-0 flex items-center justify-center space-x-2"
+            className="hidden w-full bg-[#da70d6]/20 hover:bg-[#da70d6]/30 backdrop-blur-sm border border-[#da70d6]/30 hover:border-[#da70d6]/50 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-[#da70d6]/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:translate-y-0 lg:flex items-center justify-center space-x-2"
             title={!isGuestEnabled ? "Guest access has been disabled by the administrator" : undefined}
           >
             {guestLoading ? (
