@@ -1055,18 +1055,20 @@ export function WorkItemDetailsModal({
                 {editedNode?.tags?.map((tag, index) => (
                   <span
                     key={index}
-                    className="flex items-center px-2 py-1 bg-gradient-to-r from-gray-700/60 to-gray-600/40 text-gray-200 rounded-lg text-xs font-medium group hover:from-gray-600/60 hover:to-gray-500/40 transition-all duration-200 hover:scale-105 shadow-md border border-gray-600/30"
+                    className="task-detail-tag-chip flex max-w-full min-w-0 items-center pl-2 pr-0 py-0 bg-gradient-to-r from-gray-700/60 to-gray-600/40 text-gray-200 rounded-lg text-xs font-medium group hover:from-gray-600/60 hover:to-gray-500/40 transition-all duration-200 shadow-md border border-gray-600/30"
                   >
-                    <span>{tag}</span>
+                    <span className="min-w-0 truncate">{tag}</span>
                     <button
+                      type="button"
                       onClick={() => {
                         const newTags = editedNode.tags?.filter((_, i) => i !== index) || [];
                         setEditedNode(prev => prev ? { ...prev, tags: newTags } : null);
                       }}
-                      className="ml-2 text-gray-400 hover:text-red-400 transition-all duration-200 hover:scale-125"
-                      title="Remove tag"
+                      className="task-detail-tag-remove ml-1 inline-flex min-h-7 min-w-7 flex-shrink-0 items-center justify-center rounded-md text-lg leading-none text-gray-400 hover:bg-red-500/15 hover:text-red-300 transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400"
+                      aria-label={`Remove tag ${tag}`}
+                      title={`Remove tag ${tag}`}
                     >
-                      ×
+                      <span aria-hidden="true">×</span>
                     </button>
                   </span>
               ))}

@@ -910,6 +910,8 @@ html:not([data-theme="contrast"]) .workspace-surface .graph-container .node-titl
   }
   [data-task-editor] .task-detail-tag-entry { flex: 1 1 100%; }
   [data-task-editor] .task-detail-tag { width: 100% !important; min-width: 0; }
+  [data-task-editor] .task-detail-tag-chip { min-height: 44px; }
+  [data-task-editor] .task-detail-tag-remove { min-width: 44px; min-height: 44px; }
   [data-task-editor] > div:nth-last-child(1) { padding-bottom: env(safe-area-inset-bottom); }
 }
 @media (max-height: 500px) and (min-width: 600px) and (max-width: 1023px) {
