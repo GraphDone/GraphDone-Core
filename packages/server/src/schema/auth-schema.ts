@@ -267,10 +267,37 @@ export const authTypeDefs = gql`
     # OAuth provider configuration mutations (Admin only)
     updateOAuthProviderConfig(input: OAuthProviderConfigInput!): OAuthProviderConfig!
     deleteOAuthProviderConfig(provider: String!): MessageResponse!
+
+    # Restore a just-deleted task with the same immutable identity. Ordinary
+    # createWorkItems remains server-ID-only.
+    restoreWorkItem(input: WorkItemRestoreInput!): WorkItem!
   }
   
   input GraphOrderInput {
     graphId: String!
     position: Int!
+  }
+
+  # Recovery is separate from ordinary creation so a client can restore the
+  # immutable identity of a task without choosing IDs for new work.
+  input WorkItemRestoreInput {
+    id: ID!
+    graphId: ID!
+    title: String!
+    description: String
+    type: NodeType!
+    status: NodeStatus!
+    priority: Float
+    dueDate: DateTime
+    tags: [String!]
+    metadata: String
+    positionX: Float
+    positionY: Float
+    positionZ: Float
+    radius: Float
+    theta: Float
+    phi: Float
+    priorityComp: Float
+    createdAt: DateTime
   }
 `;
