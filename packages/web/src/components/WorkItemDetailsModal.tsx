@@ -169,6 +169,10 @@ export function WorkItemDetailsModal({
   const isSavingRef = useRef(false);
   const connectDropdownRef = useRef<HTMLDivElement>(null);
   const disconnectDropdownRef = useRef<HTMLDivElement>(null);
+  const typeDropdownRef = useRef<HTMLDivElement>(null);
+  const statusDropdownRef = useRef<HTMLDivElement>(null);
+  const typeButtonRef = useRef<HTMLButtonElement>(null);
+  const statusButtonRef = useRef<HTMLButtonElement>(null);
   const connectButtonRef = useRef<HTMLButtonElement>(null);
   const disconnectButtonRef = useRef<HTMLButtonElement>(null);
   const datePickerRef = useRef<HTMLDivElement>(null);
@@ -209,13 +213,21 @@ export function WorkItemDetailsModal({
 
     // Escape is handled centrally by useDialog (defers while typing in a field,
     // and keeps the dialog-manager's "close top-most" stack coherent). A
-    // relationship picker is the active surface while it is open, so Escape
-    // dismisses that picker first and returns focus to its trigger.
+    // picker is the active surface while it is open, so Escape dismisses that
+    // picker first and returns focus to its trigger without losing the draft.
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && (showConnectDropdown || showDisconnectDropdown)) {
+      if (e.key === 'Escape' && (showTypeDropdown || showStatusDropdown || showConnectDropdown || showDisconnectDropdown)) {
         e.preventDefault();
         e.stopPropagation();
-        const focusTarget = showConnectDropdown ? connectButtonRef.current : disconnectButtonRef.current;
+        const focusTarget = showTypeDropdown
+          ? typeButtonRef.current
+          : showStatusDropdown
+            ? statusButtonRef.current
+            : showConnectDropdown
+              ? connectButtonRef.current
+              : disconnectButtonRef.current;
+        setShowTypeDropdown(false);
+        setShowStatusDropdown(false);
         setShowConnectDropdown(false);
         setShowDisconnectDropdown(false);
         requestAnimationFrame(() => focusTarget?.focus());
@@ -232,12 +244,18 @@ export function WorkItemDetailsModal({
 
     document.addEventListener('keydown', handleKeyDown, true);
     return () => document.removeEventListener('keydown', handleKeyDown, true);
-  }, [isOpen, onClose, showConnectDropdown, showDisconnectDropdown]);
+  }, [isOpen, onClose, showTypeDropdown, showStatusDropdown, showConnectDropdown, showDisconnectDropdown]);
 
   useEffect(() => {
-    if (!showConnectDropdown && !showDisconnectDropdown) return;
+    if (!showTypeDropdown && !showStatusDropdown && !showConnectDropdown && !showDisconnectDropdown) return;
 
     function handleClickOutside(event: MouseEvent) {
+      if (typeDropdownRef.current && !typeDropdownRef.current.contains(event.target as Node)) {
+        setShowTypeDropdown(false);
+      }
+      if (statusDropdownRef.current && !statusDropdownRef.current.contains(event.target as Node)) {
+        setShowStatusDropdown(false);
+      }
       if (connectDropdownRef.current && !connectDropdownRef.current.contains(event.target as Node)) {
         setShowConnectDropdown(false);
       }
@@ -248,7 +266,7 @@ export function WorkItemDetailsModal({
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showConnectDropdown, showDisconnectDropdown]);
+  }, [showTypeDropdown, showStatusDropdown, showConnectDropdown, showDisconnectDropdown]);
 
   const edgeQueryVariables = currentGraph ? {
     where: {
@@ -758,10 +776,16 @@ export function WorkItemDetailsModal({
         <div className="task-editor-badges relative flex items-center justify-between px-3 py-2 border-b border-gray-600/50 bg-gradient-to-r from-gray-800/30 via-gray-700/20 to-gray-800/30 backdrop-blur-sm z-10">
           <div className="flex items-center space-x-6">
             {/* Enhanced Clickable Type Badge */}
-            <div className="relative z-[100000]">
+            <div ref={typeDropdownRef} className="relative z-[100000]">
               <button
+                ref={typeButtonRef}
                 data-testid="details-type-badge"
-                onClick={() => setShowTypeDropdown(!showTypeDropdown)}
+                onClick={() => {
+                  setShowTypeDropdown(open => !open);
+                  setShowStatusDropdown(false);
+                }}
+                aria-haspopup="menu"
+                aria-expanded={showTypeDropdown}
                 className={`w-36 flex items-center justify-between px-3 py-2 rounded-lg text-sm font-semibold hover:scale-105 transition-all duration-200 cursor-pointer shadow-lg backdrop-blur-sm ${getTypeColor(currentNode.type)} border border-opacity-30 hover:border-opacity-50`}
               >
                 <div className="flex items-center space-x-1">
@@ -812,10 +836,16 @@ export function WorkItemDetailsModal({
             </div>
 
             {/* Enhanced Clickable Status Badge */}
-            <div className="relative z-[100000]">
+            <div ref={statusDropdownRef} className="relative z-[100000]">
               <button
+                ref={statusButtonRef}
                 data-testid="details-status-badge"
-                onClick={() => setShowStatusDropdown(!showStatusDropdown)}
+                onClick={() => {
+                  setShowStatusDropdown(open => !open);
+                  setShowTypeDropdown(false);
+                }}
+                aria-haspopup="menu"
+                aria-expanded={showStatusDropdown}
                 className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-semibold hover:scale-105 transition-all duration-200 cursor-pointer shadow-lg backdrop-blur-sm ${getStatusColor(currentNode.status)} border border-opacity-30 hover:border-opacity-50`}
               >
                 <div className="flex items-center space-x-1">
