@@ -17,6 +17,7 @@ import RightSidebar from './RightSidebar';
 import GanttChart from './GanttChart';
 import CalendarView from './CalendarView';
 import ActivityFeed from './ActivityFeed';
+import type { UndoStack } from '../lib/undoStack';
 
 // WorkItem interface matching GraphQL schema
 interface WorkItem {
@@ -43,9 +44,10 @@ type ViewType = 'dashboard' | 'table' | 'cards' | 'kanban' | 'gantt' | 'calendar
 
 interface ViewManagerProps {
   viewMode: ViewType;
+  undoStack?: UndoStack;
 }
 
-const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
+const ViewManager: React.FC<ViewManagerProps> = ({ viewMode, undoStack }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [mobileFiltersOpen,setMobileFiltersOpen]=useState(false);
   const [selectedNode, setSelectedNode] = useState<WorkItem | null>(null);
@@ -834,6 +836,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
           node={selectedNode}
           edges={workItemEdges}
           nodes={filteredNodes}
+          undoStack={undoStack}
         />
       )}
     </div>

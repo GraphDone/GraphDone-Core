@@ -502,19 +502,6 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       showError('Could not undo that — the server refused');
     }
   }, [undoStack]);
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
-        const t = e.target as HTMLElement | null;
-        if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
-        e.preventDefault();
-        runUndo();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [runUndo]);
-
   // Esc always works: pop one mode level, never trap the user
   // (docs/design/interaction-model.md, principle 3). Connection mode and the
   // edge-type selector were keyboard traps before this.

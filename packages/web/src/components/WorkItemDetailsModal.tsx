@@ -37,6 +37,7 @@ import {
   getPriorityColorScheme
 } from '../constants/workItemConstants';
 import { WorkItem, WorkItemEdge } from '../types/graph';
+import type { UndoStack } from '../lib/undoStack';
 
 interface NodeDetailsModalProps {
   isOpen: boolean;
@@ -48,6 +49,49 @@ interface NodeDetailsModalProps {
   onConnectToExisting?: (node: WorkItem) => void;
   onDisconnect?: (node: WorkItem) => void;
   onDelete?: (node: WorkItem) => void;
+  undoStack?: UndoStack;
+}
+
+const assigneeId = (item: WorkItem) => typeof item.assignedTo === 'string' ? item.assignedTo : item.assignedTo?.id;
+const copyWorkItem = (item: WorkItem): WorkItem => ({
+  ...item,
+  tags: [...(item.tags || [])],
+  assignedTo: item.assignedTo && typeof item.assignedTo === 'object' ? { ...item.assignedTo } : item.assignedTo,
+});
+
+function workItemUpdate(target: WorkItem, previous: WorkItem) {
+  const update: any = {
+    title: target.title,
+    description: target.description,
+    type: target.type,
+    status: target.status,
+    priority: target.priority,
+    tags: target.tags || [],
+    dueDate: target.dueDate ?? null,
+  };
+  const previousAssigneeId = assigneeId(previous);
+  const targetAssigneeId = assigneeId(target);
+  if (targetAssigneeId !== previousAssigneeId) {
+    let metadata: Record<string, unknown> = {};
+    const raw = (target as any).metadata ?? (previous as any).metadata;
+    try {
+      const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) metadata = parsed;
+    } catch { /* Preserve valid task metadata when available. */ }
+    update.metadata = JSON.stringify({
+      ...metadata,
+      assignee: targetAssigneeId ? {
+        id: targetAssigneeId,
+        name: typeof target.assignedTo === 'object' ? target.assignedTo.name : targetAssigneeId,
+      } : null,
+    });
+    if (!offlineEnabled && targetAssigneeId) {
+      update.assignedTo = { connect: { where: { node: { id: targetAssigneeId } } } };
+    } else if (!offlineEnabled && previousAssigneeId) {
+      update.assignedTo = { disconnect: { where: { node: { id: previousAssigneeId } } } };
+    }
+  }
+  return update;
 }
 
 export function WorkItemDetailsModal({
@@ -59,7 +103,8 @@ export function WorkItemDetailsModal({
   onEdit,
   onConnectToExisting,
   onDisconnect,
-  onDelete
+  onDelete,
+  undoStack,
 }: NodeDetailsModalProps) {
   const { currentGraph } = useGraph();
   const { currentUser } = useAuth();
@@ -266,20 +311,6 @@ export function WorkItemDetailsModal({
     onError: (error) => {
       showError(`Failed to update work item: ${error.message}`);
       // Keep the draft available for correction or retry after a failed save.
-    },
-    optimisticResponse: (vars) => {
-      if (!editedNode) return;
-      return {
-        __typename: 'Mutation',
-        updateWorkItems: {
-          __typename: 'UpdateWorkItemsMutationResponse',
-          workItems: [{
-            ...editedNode,
-            __typename: 'WorkItem',
-            updatedAt: new Date().toISOString()
-          }]
-        }
-      };
     }
   });
 
@@ -308,60 +339,49 @@ export function WorkItemDetailsModal({
     // Capture current values immediately to prevent stale closures
     const nodeToSave = { ...editedNode };
     const currentNodeRef = node;
+    const previousNode = copyWorkItem(savedNode || currentNodeRef);
 
     isSavingRef.current = true;
     setIsSaving(true);
 
     try {
-      const updateInput: any = {
-        title: nodeToSave.title,
-        description: nodeToSave.description,
-        type: nodeToSave.type,
-        status: nodeToSave.status,
-        priority: nodeToSave.priority,
-        tags: nodeToSave.tags || [],
-        dueDate: nodeToSave.dueDate ?? null,
-      };
-
-      // Handle assignedTo relationship properly for Neo4j GraphQL
-      const currentAssignedToId = typeof currentNodeRef.assignedTo === 'string' ? currentNodeRef.assignedTo : currentNodeRef.assignedTo?.id;
-      const newAssignedToId = typeof nodeToSave.assignedTo === 'string' ? nodeToSave.assignedTo : nodeToSave.assignedTo?.id;
-
-      if (newAssignedToId !== currentAssignedToId) {
-        let metadata: Record<string, unknown> = {};
-        const raw = (currentNodeRef as any).metadata;
-        try { const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw; if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) metadata = parsed; } catch { /* Preserve valid task metadata when available. */ }
-        updateInput.metadata = JSON.stringify({...metadata, assignee: newAssignedToId ? {id: newAssignedToId, name: typeof nodeToSave.assignedTo === 'object' ? nodeToSave.assignedTo.name : newAssignedToId} : null});
-      }
-      if (!offlineEnabled && newAssignedToId && newAssignedToId !== currentAssignedToId) {
-        // Connect to new user
-        updateInput.assignedTo = {
-          connect: {
-            where: { node: { id: newAssignedToId } }
-          }
-        };
-      } else if (!offlineEnabled && !newAssignedToId && currentAssignedToId) {
-        // Disconnect current user
-        updateInput.assignedTo = {
-          disconnect: {
-            where: { node: { id: currentAssignedToId } }
-          }
-        };
-      }
-
-      await updateWorkItem({
+      const result = await updateWorkItem({
         variables: {
           where: { id: currentNodeRef.id },
-          update: updateInput
-        }
+          update: workItemUpdate(nodeToSave, currentNodeRef),
+        },
+        // The direct save stays instant. Undo deliberately has no optimistic
+        // response, so its visible completion means the durable local mutation
+        // has finished and an immediate reload cannot resurrect the edit.
+        optimisticResponse: {
+          __typename: 'Mutation',
+          updateWorkItems: {
+            __typename: 'UpdateWorkItemsMutationResponse',
+            workItems: [{ ...nodeToSave, __typename: 'WorkItem', updatedAt: new Date().toISOString() }],
+          },
+        },
       });
+      if (result.data?.updateWorkItems?.workItems?.[0]) {
+        const editedSnapshot = copyWorkItem(nodeToSave);
+        undoStack?.push({
+          label: 'Edit item',
+          undo: async () => {
+            await updateWorkItem({
+              variables: {
+                where: { id: currentNodeRef.id },
+                update: workItemUpdate(previousNode, editedSnapshot),
+              },
+            });
+          },
+        });
+      }
     } catch (error) {
       console.error('Failed to update work item:', error);
     } finally {
       isSavingRef.current = false;
       setIsSaving(false);
     }
-  }, [editedNode, node, updateWorkItem]);
+  }, [editedNode, node, savedNode, undoStack, updateWorkItem]);
 
   useEffect(() => {
     handleSaveRef.current = handleSave;
