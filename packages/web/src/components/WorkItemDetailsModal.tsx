@@ -887,7 +887,7 @@ export function WorkItemDetailsModal({
                 const newValue = e.target.value;
                 setEditedNode(prev => prev ? { ...prev, title: newValue } : null);
               }}
-              className="text-sm bg-gray-800 border-2 border-gray-600 text-white placeholder-gray-400 w-full focus:outline-none focus:!border-green-400 transition-all duration-300 hover:border-gray-500 p-2 rounded-lg shadow-lg cursor-text"
+              className="task-detail-control text-sm bg-gray-800 border-2 border-gray-600 text-white placeholder-gray-400 w-full focus:outline-none focus:!border-green-400 transition-all duration-300 hover:border-gray-500 p-2 rounded-lg shadow-lg cursor-text"
               placeholder="Enter title"
               autoComplete="off"
               aria-label="Work item title"
@@ -905,7 +905,7 @@ export function WorkItemDetailsModal({
             <textarea
               value={editedNode?.description || ''}
               onChange={(e) => setEditedNode(prev => prev ? { ...prev, description: e.target.value } : null)}
-              className="w-full text-sm text-white bg-gray-800 border border-gray-600 rounded-lg placeholder-gray-400 p-2 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-400 transition-all duration-300 resize-none hover:border-gray-500 shadow-lg cursor-text"
+              className="task-detail-control w-full text-sm text-white bg-gray-800 border border-gray-600 rounded-lg placeholder-gray-400 p-2 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-400 transition-all duration-300 resize-none hover:border-gray-500 shadow-lg cursor-text"
               placeholder="Enter description"
               rows={3}
               autoComplete="off"
@@ -926,12 +926,13 @@ export function WorkItemDetailsModal({
               <div className="space-y-1">
                 <input
                   type="range"
+                  aria-label="Priority"
                   min="0"
                   max="1"
                   step="0.1"
                   value={editedNode?.priority || 0}
                   onChange={(e) => setEditedNode(prev => prev ? { ...prev, priority: parseFloat(e.target.value) } : null)}
-                  className={`w-full h-2 bg-gray-700/50 rounded-lg appearance-none cursor-pointer slider shadow-inner ${
+                  className={`task-priority-slider w-full h-2 bg-gray-700/50 rounded-lg appearance-none cursor-pointer slider shadow-inner ${
                     getPriorityConfig(editedNode?.priority || 0).value === 'critical' ? 'accent-red-500' :
                     getPriorityConfig(editedNode?.priority || 0).value === 'high' ? 'accent-orange-500' :
                     getPriorityConfig(editedNode?.priority || 0).value === 'moderate' ? 'accent-yellow-500' :
@@ -939,7 +940,7 @@ export function WorkItemDetailsModal({
                     'accent-gray-500'
                   }`}
                   style={{
-                    background: `linear-gradient(to right, ${
+                    backgroundImage: `linear-gradient(to right, ${
                       getPriorityColorScheme(editedNode?.priority || 0).hex
                     } 0%, ${
                       getPriorityColorScheme(editedNode?.priority || 0).hex
@@ -975,7 +976,7 @@ export function WorkItemDetailsModal({
                       assignedTo: value ? { id: value, name: e.target.selectedOptions[0].text.split(' (')[0], username: value } : undefined 
                     } : null);
                   }}
-                  className="w-full bg-gray-800 border border-gray-600 rounded-lg px-2 py-1 text-sm text-white focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-400 transition-all duration-300 appearance-none hover:border-gray-500 shadow-lg font-medium"
+                  className="task-detail-control w-full bg-gray-800 border border-gray-600 rounded-lg px-2 py-1 text-sm text-white focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-400 transition-all duration-300 appearance-none hover:border-gray-500 shadow-lg font-medium"
                 >
                   <option value="">No contributor</option>
                   {currentUser && <option value={currentUser.id}>{currentUser.name || currentUser.username} (you)</option>}
@@ -1019,6 +1020,7 @@ export function WorkItemDetailsModal({
               </h3>
               <input
                 type="date"
+                aria-label="Due date"
                 value={editedNode?.dueDate ? editedNode.dueDate.split('T')[0] : ''}
                 onChange={(e) => {
                   const value = e.target.value;
@@ -1027,7 +1029,7 @@ export function WorkItemDetailsModal({
                     dueDate: value ? `${value}T23:59:59.999Z` : undefined
                   } : null);
                 }}
-                className="w-full bg-gray-800 border border-gray-600 rounded-lg px-2 py-1 text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-400 transition-all duration-300 hover:border-gray-500 shadow-lg font-medium"
+                className="task-detail-control w-full bg-gray-800 border border-gray-600 rounded-lg px-2 py-1 text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-400 transition-all duration-300 hover:border-gray-500 shadow-lg font-medium"
                 placeholder="dd/mm/yyyy"
               />
               {editedNode?.dueDate && (
@@ -1071,11 +1073,12 @@ export function WorkItemDetailsModal({
                 
                 {/* Enhanced Inline Add Tag Input */}
                 {(!editedNode?.tags || editedNode.tags.length < 5) && (
-                  <div className="flex items-center">
+                  <div className="task-detail-tag-entry flex items-center min-w-0">
                     <input
                       type="text"
+                      aria-label="Add tag"
                       placeholder="Add Tag"
-                      className="text-xs bg-gray-800 border border-gray-600 rounded-lg px-2 py-1 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-400 transition-all duration-300 min-w-20 shadow-lg font-medium"
+                      className="task-detail-control task-detail-tag text-xs bg-gray-800 border border-gray-600 rounded-lg px-2 py-1 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-400 transition-all duration-300 min-w-20 max-w-full shadow-lg font-medium"
                       style={{ width: `${Math.max(20, 8)}ch` }}
                       onInput={(e) => {
                         const input = e.target as HTMLInputElement;
