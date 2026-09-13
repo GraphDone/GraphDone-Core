@@ -3,7 +3,7 @@ import { offlineEnabled } from '../lib/offline/engine';
 import { skipBackgroundPoll, useHostedUsage } from '../lib/hostedUsage';
 import { AgentConnection } from '../components/AgentConnection';
 import type { WorkItem } from '../types/graph';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Plus, Share2, Users, Table, Activity, Network, CreditCard, Columns, CalendarDays, GanttChartSquare, LayoutDashboard, Database, AlertTriangle, Map, X, Minimize2, Maximize2, Edit3, Trash2, FolderPlus, ChevronLeft, ChevronRight, Lock, Unlock } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useQuery } from '@apollo/client';
@@ -24,6 +24,7 @@ import { isGraphServiceAvailable, useHealthStatus } from '../hooks/useHealthStat
 import { useViewMode } from '../contexts/ViewModeContext';
 import { parseLayoutMode, LAYOUT_MODE_STORAGE_KEY, type LayoutMode } from '../lib/layoutAlgorithms';
 import { UndoStack } from '../lib/undoStack';
+import { useNotifications } from '../contexts/NotificationContext';
 
 export function Workspace() {
   const { usage: cloudUsage } = useHostedUsage();
@@ -57,7 +58,27 @@ export function Workspace() {
   };
   const { currentGraph, availableGraphs, getBreadcrumb, ascendTo, canEditGraph } = useGraph();
   const [undoStack] = useState(() => new UndoStack(36));
+  const { showSuccess, showError } = useNotifications();
   useEffect(() => { undoStack.clear(); }, [currentGraph?.id, undoStack]);
+  const runUndo = useCallback(async () => {
+    try {
+      const action = await undoStack.undo();
+      if (action) showSuccess(`Undid: ${action.label}`);
+    } catch {
+      showError('Could not undo that — the server refused');
+    }
+  }, [showError, showSuccess, undoStack]);
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'z' || event.shiftKey) return;
+      const target = event.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+      event.preventDefault();
+      void runUndo();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [runUndo]);
   const breadcrumb = getBreadcrumb();
   const [inspectorNode, setInspectorNode] = useState<any>(null);
   const [quickEditRequest, setQuickEditRequest] = useState<WorkItem | null>(null);
@@ -491,7 +512,7 @@ export function Workspace() {
            )}
           </div>
         ) : (
-          <ViewManager viewMode={viewMode as 'dashboard' | 'table' | 'cards' | 'kanban' | 'gantt' | 'calendar' | 'activity'} />
+          <ViewManager viewMode={viewMode as 'dashboard' | 'table' | 'cards' | 'kanban' | 'gantt' | 'calendar' | 'activity'} undoStack={undoStack} />
         )}
       </div>
 
