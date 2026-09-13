@@ -1292,7 +1292,6 @@ export function WorkItemDetailsModal({
                 <button
                   ref={connectButtonRef}
                   type="button"
-                  onMouseDown={(event) => event.stopPropagation()}
                   onClick={() => {
                     setShowConnectDropdown(open => !open);
                     setShowDisconnectDropdown(false);
@@ -1373,7 +1372,6 @@ export function WorkItemDetailsModal({
                 <button
                   ref={disconnectButtonRef}
                   type="button"
-                  onMouseDown={(event) => event.stopPropagation()}
                   onClick={() => {
                     setShowDisconnectDropdown(open => !open);
                     setShowConnectDropdown(false);
