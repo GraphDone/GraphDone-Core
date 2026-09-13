@@ -1166,12 +1166,12 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     if (item.dependencies) {
       item.dependencies.forEach((dep: WorkItem) => {
         // Only add if not already added from Edge entities
-        const exists = workItemEdges.some(e => e.source === dep.id && e.target === item.id);
+        const exists = workItemEdges.some(e => e.source === item.id && e.target === dep.id);
         if (!exists) {
           workItemEdges.push({
             id: `edge-${dep.id}-${item.id}`,
-            source: dep.id,
-            target: item.id,
+            source: item.id,
+            target: dep.id,
             type: 'DEPENDS_ON' as RelationshipType,
             strength: 0.8,
             description: 'dependency relationship'
