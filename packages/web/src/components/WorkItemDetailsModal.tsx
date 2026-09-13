@@ -749,9 +749,9 @@ export function WorkItemDetailsModal({
               <button
                 onClick={handleSave}
                 disabled={updating || !hasChanges || isSaving}
-                className={`flex items-center space-x-1 px-4 py-2 rounded-lg transition-all duration-300 text-sm font-semibold shadow-lg ${
+                className={`flex items-center space-x-1 px-4 py-2 rounded-lg transition-transform duration-300 text-sm font-semibold shadow-lg ${
                   hasChanges && !updating && !isSaving
-                    ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:from-green-500 hover:to-emerald-500 hover:scale-105 transform border border-green-400/30'
+                    ? 'bg-gradient-to-r from-green-700 to-emerald-700 text-white hover:from-green-800 hover:to-emerald-800 hover:scale-105 transform border border-green-400/50'
                     : 'bg-gray-700 text-gray-500 cursor-not-allowed border border-gray-600'
                 }`}
                 title={hasChanges ? "Save Changes (Ctrl+S)" : "No changes to save"}
@@ -1297,7 +1297,7 @@ export function WorkItemDetailsModal({
                     setShowDisconnectDropdown(false);
                   }}
                   disabled={getAvailableNodes().length === 0}
-                  className="w-full min-h-[44px] flex flex-row items-center justify-start gap-2 px-3 py-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-all duration-300 text-xs font-semibold shadow-lg hover:scale-105 transform border border-green-400/30"
+                  className="w-full min-h-[44px] flex flex-row items-center justify-start gap-2 px-3 py-2 bg-gradient-to-r from-green-700 to-emerald-700 hover:from-green-800 hover:to-emerald-800 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-transform duration-300 text-xs font-semibold shadow-lg hover:scale-105 transform border border-green-400/50"
                   aria-label={`Connect to other work items (${getAvailableNodes().length} available)`}
                   aria-expanded={showConnectDropdown}
                   aria-controls={`connect-work-items-${currentNode.id}`}
@@ -1344,7 +1344,7 @@ export function WorkItemDetailsModal({
                       <button
                         onClick={handleConnectSelected}
                         disabled={selectedNodesForConnection.length === 0}
-                        className="w-full min-h-[44px] px-3 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-sm font-medium rounded transition-colors"
+                        className="w-full min-h-[44px] px-3 py-2 bg-green-700 hover:bg-green-800 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-sm font-medium rounded transition-[background-color]"
                       >
                         Connect Selected ({selectedNodesForConnection.length})
                       </button>
@@ -1377,7 +1377,7 @@ export function WorkItemDetailsModal({
                     setShowConnectDropdown(false);
                   }}
                   disabled={getConnectedNodes().length === 0}
-                  className="w-full min-h-[44px] flex flex-row items-center justify-start gap-2 px-3 py-2 bg-gradient-to-r from-yellow-600 to-amber-600 hover:from-yellow-500 hover:to-amber-500 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-all duration-300 text-xs font-semibold shadow-lg hover:scale-105 transform border border-yellow-400/30"
+                  className="w-full min-h-[44px] flex flex-row items-center justify-start gap-2 px-3 py-2 bg-gradient-to-r from-yellow-700 to-amber-700 hover:from-yellow-800 hover:to-amber-800 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-transform duration-300 text-xs font-semibold shadow-lg hover:scale-105 transform border border-yellow-400/50"
                   aria-label={`Disconnect from work items (${getConnectedNodes().length} connected)`}
                   aria-expanded={showDisconnectDropdown}
                   aria-controls={`disconnect-work-items-${currentNode.id}`}
@@ -1424,7 +1424,7 @@ export function WorkItemDetailsModal({
                       <button
                         onClick={handleDisconnectSelected}
                         disabled={selectedEdgesForDisconnection.length === 0}
-                        className="w-full min-h-[44px] px-3 py-2 bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-sm font-medium rounded transition-colors"
+                        className="w-full min-h-[44px] px-3 py-2 bg-yellow-700 hover:bg-yellow-800 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-sm font-medium rounded transition-[background-color]"
                       >
                         Remove Selected ({selectedEdgesForDisconnection.length})
                       </button>
