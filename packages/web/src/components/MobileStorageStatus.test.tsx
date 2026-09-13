@@ -5,6 +5,7 @@ import { MobileStorageStatus } from './MobileStorageStatus';
 
 const fixture = vi.hoisted(() => ({
   guest: true,
+  usage: null as null | { status: string },
   state: {
     ready: true,
     online: true,
@@ -21,11 +22,12 @@ vi.mock('../lib/offline/engine', () => ({
 }));
 vi.mock('../lib/hostedUsage', () => ({
   hostedUsageEnabled: true,
-  useHostedUsage: () => ({ usage: null, error: '' }),
+  useHostedUsage: () => ({ usage: fixture.usage, error: '' }),
 }));
 
 beforeEach(() => {
   fixture.guest = true;
+  fixture.usage = null;
   fixture.state.pending = 1;
 });
 
@@ -44,5 +46,16 @@ describe('MobileStorageStatus', () => {
     const status = screen.getByTestId('mobile-storage-status');
     expect(status.textContent).toContain('Pending');
     expect(status.getAttribute('aria-label')).toBe('Saved locally · waiting to sync — storage and allowance details');
+  });
+
+  it('names the action that stopped when the cloud allowance is exhausted', () => {
+    fixture.guest = false;
+    fixture.usage = { status: 'PERSONAL_LIMIT' };
+    fixture.state.pending = 0;
+    render(<MemoryRouter><MobileStorageStatus /></MemoryRouter>);
+    const status = screen.getByTestId('mobile-storage-status');
+    expect(status.textContent).toContain('Sync paused');
+    expect(status.textContent).not.toContain('Local only');
+    expect(status.getAttribute('aria-label')).toBe('Saved locally · sync paused — storage and allowance details');
   });
 });
