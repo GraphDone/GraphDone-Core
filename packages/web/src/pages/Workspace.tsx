@@ -519,7 +519,11 @@ export function Workspace() {
       {/* Mini-Map Navigation - Bottom Right Corner (hidden on mobile: it covers too
           much of a phone screen, and panning the graph by touch is the primary nav there) */}
       {viewMode === 'graph' && currentGraph && showMiniMap && !isMobile && createPortal(
-        <div className="fixed bottom-4 right-4 w-64 h-48 bg-gray-800/95 backdrop-blur-sm border border-gray-600 rounded-lg shadow-xl z-50">
+        <div
+          className="fixed bottom-4 right-4 w-64 h-48 bg-gray-800/95 backdrop-blur-sm border border-gray-600 rounded-lg shadow-xl z-50"
+          data-testid="mini-map-panel"
+          data-graph-fit-obstacle="true"
+        >
           {/* Mini-Map Header */}
           <div className="flex items-center justify-between p-3 border-b border-gray-700">
             <div className="flex items-center gap-2">

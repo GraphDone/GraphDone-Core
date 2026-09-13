@@ -4257,11 +4257,45 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     const boundsWidth = Math.max(1, maxX - minX);
     const boundsHeight = Math.max(1, maxY - minY);
 
-    // Fit, but never zoom IN past 1.25 (a 3-node graph shouldn't fill the screen)
-    const scale = Math.min(width / boundsWidth, height / boundsHeight, 1.25);
+    // Fixed graph controls can cover an otherwise correctly fitted card. The
+    // MiniMap occupies the bottom-right corner, so choose between fitting to
+    // the full-height space on its left and the full-width space above it.
+    // Keeping the larger scale uses the most canvas while guaranteeing every
+    // fitted card remains available to pointer input.
+    let fitRegion = { x: 0, y: 0, width, height };
+    const containerRect = container.getBoundingClientRect();
+    const obstacle = document.querySelector<HTMLElement>('[data-graph-fit-obstacle="true"]');
+    if (obstacle) {
+      const rect = obstacle.getBoundingClientRect();
+      const obstacleLeft = Math.max(0, Math.min(width, rect.left - containerRect.left));
+      const obstacleTop = Math.max(0, Math.min(height, rect.top - containerRect.top));
+      const obstacleRight = Math.max(0, Math.min(width, rect.right - containerRect.left));
+      const obstacleBottom = Math.max(0, Math.min(height, rect.bottom - containerRect.top));
+      const intersects = obstacleRight > obstacleLeft && obstacleBottom > obstacleTop;
+      if (intersects) {
+        const gap = 12;
+        const candidates = [
+          { x: 0, y: 0, width: Math.max(0, obstacleLeft - gap), height },
+          { x: 0, y: 0, width, height: Math.max(0, obstacleTop - gap) },
+        ].filter(region => region.width > 0 && region.height > 0);
+        if (candidates.length > 0) {
+          const fitScale = (region: typeof fitRegion) =>
+            Math.min(region.width / boundsWidth, region.height / boundsHeight, 1.25);
+          fitRegion = candidates.reduce((best, region) => {
+            const bestScale = fitScale(best);
+            const nextScale = fitScale(region);
+            if (nextScale !== bestScale) return nextScale > bestScale ? region : best;
+            return region.width * region.height > best.width * best.height ? region : best;
+          });
+        }
+      }
+    }
 
-    const translateX = width / 2 - ((minX + maxX) / 2) * scale;
-    const translateY = height / 2 - ((minY + maxY) / 2) * scale;
+    // Fit, but never zoom IN past 1.25 (a 3-node graph shouldn't fill the screen)
+    const scale = Math.min(fitRegion.width / boundsWidth, fitRegion.height / boundsHeight, 1.25);
+
+    const translateX = fitRegion.x + fitRegion.width / 2 - ((minX + maxX) / 2) * scale;
+    const translateY = fitRegion.y + fitRegion.height / 2 - ((minY + maxY) / 2) * scale;
     const transform = d3.zoomIdentity.translate(translateX, translateY).scale(scale);
 
     // Use the component's own zoom behavior so handlers fire and state stays
@@ -4335,6 +4369,20 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     const snapshot = () => {
       publish();
       if (svgRef.current) (window as any).updateMiniMapViewport?.(d3.zoomTransform(svgRef.current));
+      // Reopening the MiniMap must not leave an existing task underneath it.
+      // Preserve the person's camera when there is no collision; refit only
+      // when the newly mounted panel actually blocks a card.
+      requestAnimationFrame(() => {
+        const obstacle = document.querySelector<HTMLElement>('[data-graph-fit-obstacle="true"]');
+        if (!obstacle || !svgRef.current) return;
+        const obstacleRect = obstacle.getBoundingClientRect();
+        const covered = Array.from(svgRef.current.querySelectorAll<SVGGraphicsElement>('.node-bg')).some(node => {
+          const card = node.getBoundingClientRect();
+          return card.right > obstacleRect.left && card.left < obstacleRect.right
+            && card.bottom > obstacleRect.top && card.top < obstacleRect.bottom;
+        });
+        if (covered) fitViewRef.current(false);
+      });
     };
     window.addEventListener('graphdone:minimap-open', snapshot);
     const id = setInterval(() => { publish(); if (++n >= 5) clearInterval(id); }, 800);
@@ -4672,21 +4720,25 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     };
     const hasSaved = !!(saved && typeof saved.k === 'number' && sizeMatches(saved));
 
-    // Camera persistence is useful only while it still shows the graph. A node
-    // can keep a valid saved transform while its restored position changes
-    // after an offline reload; trusting that transform makes retained work look
-    // lost. If no rendered card intersects the canvas, fall back to framing the
-    // current simulation instead.
-    const savedCameraShowsANode = (): boolean => {
+    // Camera persistence is useful only while it still shows the graph without
+    // putting a card under a fixed control. A node can keep a valid saved
+    // transform while its restored position changes after an offline reload;
+    // trusting that transform can make retained work look lost or unreachable.
+    const savedCameraIsUsable = (): boolean => {
       const frame = containerRef.current?.getBoundingClientRect();
       const svg = svgRef.current;
       if (!frame || !svg) return false;
-      return Array.from(svg.querySelectorAll<SVGGraphicsElement>('.node-bg')).some(node => {
-        const card = node.getBoundingClientRect();
-        return card.width > 0 && card.height > 0
+      const cards = Array.from(svg.querySelectorAll<SVGGraphicsElement>('.node-bg'))
+        .map(node => node.getBoundingClientRect());
+      const showsANode = cards.some(card => card.width > 0 && card.height > 0
           && card.right >= frame.left && card.left <= frame.right
-          && card.bottom >= frame.top && card.top <= frame.bottom;
-      });
+          && card.bottom >= frame.top && card.top <= frame.bottom);
+      const obstacle = document.querySelector<HTMLElement>('[data-graph-fit-obstacle="true"]');
+      if (!obstacle) return showsANode;
+      const obstacleRect = obstacle.getBoundingClientRect();
+      const blocksACard = cards.some(card => card.right > obstacleRect.left && card.left < obstacleRect.right
+        && card.bottom > obstacleRect.top && card.top < obstacleRect.bottom);
+      return showsANode && !blocksACard;
     };
 
     let timer: ReturnType<typeof setTimeout> | null = null;
@@ -4718,7 +4770,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
             zoomBehaviorRef.current.transform as any,
             d3.zoomIdentity.translate(saved!.x, saved!.y).scale(saved!.k)
           );
-          ok = savedCameraShowsANode() || fitViewRef.current(false);
+          ok = savedCameraIsUsable() || fitViewRef.current(false);
         } else {
           const liveNodes = (simulationRef.current?.nodes() || []) as { id: string; x: number; y: number }[];
           const stable = liveNodes.length > 0 && liveNodes.every(node => {
