@@ -1064,7 +1064,7 @@ export function WorkItemDetailsModal({
                         const newTags = editedNode.tags?.filter((_, i) => i !== index) || [];
                         setEditedNode(prev => prev ? { ...prev, tags: newTags } : null);
                       }}
-                      className="task-detail-tag-remove ml-1 inline-flex min-h-7 min-w-7 flex-shrink-0 items-center justify-center rounded-md text-lg leading-none text-gray-400 hover:bg-red-500/15 hover:text-red-300 transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400"
+                      className="task-detail-tag-remove ml-1 inline-flex min-h-7 min-w-7 flex-shrink-0 items-center justify-center rounded-md text-lg leading-none text-gray-400 hover:bg-red-500/15 hover:text-red-300 transition-colors duration-200 focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-sky-400"
                       aria-label={`Remove tag ${tag}`}
                       title={`Remove tag ${tag}`}
                     >
