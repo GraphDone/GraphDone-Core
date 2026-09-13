@@ -11,6 +11,7 @@
     "start": "node dist/index.js",
     "test": "NODE_OPTIONS='--max-old-space-size=4096' vitest --run",
     "test:coverage": "vitest run --coverage",
+    "test:contract:local": "RUN_DB_CONTRACT=1 vitest --run tests/neo4j-contract.test.ts",
     "test:integration:local": "GRAPHDONE_MCP_INTEGRATION_REQUIRED=1 vitest --run tests/real-database-integration.test.ts tests/mock-validation.test.ts",
     "lint": "eslint src --ext .ts",
     "typecheck": "tsc --noEmit",
