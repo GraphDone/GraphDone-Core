@@ -4685,6 +4685,23 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     };
     const hasSaved = !!(saved && typeof saved.k === 'number' && sizeMatches(saved));
 
+    // Camera persistence is useful only while it still shows the graph. A node
+    // can keep a valid saved transform while its restored position changes
+    // after an offline reload; trusting that transform makes retained work look
+    // lost. If no rendered card intersects the canvas, fall back to framing the
+    // current simulation instead.
+    const savedCameraShowsANode = (): boolean => {
+      const frame = containerRef.current?.getBoundingClientRect();
+      const svg = svgRef.current;
+      if (!frame || !svg) return false;
+      return Array.from(svg.querySelectorAll<SVGGraphicsElement>('.node-bg')).some(node => {
+        const card = node.getBoundingClientRect();
+        return card.width > 0 && card.height > 0
+          && card.right >= frame.left && card.left <= frame.right
+          && card.bottom >= frame.top && card.top <= frame.bottom;
+      });
+    };
+
     let timer: ReturnType<typeof setTimeout> | null = null;
     let tries = 0;
     let lastPositions = new Map<string, { x: number; y: number }>();
@@ -4714,7 +4731,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
             zoomBehaviorRef.current.transform as any,
             d3.zoomIdentity.translate(saved!.x, saved!.y).scale(saved!.k)
           );
-          ok = true;
+          ok = savedCameraShowsANode() || fitViewRef.current(false);
         } else {
           const liveNodes = (simulationRef.current?.nodes() || []) as { id: string; x: number; y: number }[];
           const stable = liveNodes.length > 0 && liveNodes.every(node => {

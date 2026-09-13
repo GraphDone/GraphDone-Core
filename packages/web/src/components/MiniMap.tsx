@@ -21,7 +21,15 @@ interface Viewport {
  * by type plus the viewport rectangle, and clicking navigates the main view
  * through window.miniMapNavigate(graphX, graphY).
  */
-export function MiniMap({ width = 192, height = 128 }: { width?: number; height?: number }) {
+export function MiniMap({
+  width = 192,
+  height = 128,
+  expectedNodeCount = 0,
+}: {
+  width?: number;
+  height?: number;
+  expectedNodeCount?: number;
+}) {
   const [nodes, setNodes] = useState<Record<string, MiniMapNode>>({});
   const [viewport, setViewport] = useState<Viewport | null>(null);
   const [nodeTypes, setNodeTypes] = useState<Record<string, string>>({});
@@ -166,8 +174,11 @@ export function MiniMap({ width = 192, height = 128 }: { width?: number; height?
 
   if (entries.length === 0) {
     return (
-      <div className="w-full h-full flex items-center justify-center text-gray-500 text-xs">
-        No nodes yet
+      <div
+        className="w-full h-full flex items-center justify-center text-gray-500 text-xs"
+        data-testid="mini-map-status"
+      >
+        {expectedNodeCount > 0 ? 'Loading map…' : 'No nodes yet'}
       </div>
     );
   }
