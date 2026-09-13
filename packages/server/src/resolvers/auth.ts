@@ -60,7 +60,7 @@ export const authResolvers = {
       }
 
       // Temporary guests have no persistent account; preserve their read-only session on reload.
-      if (context.user.role === 'GUEST' && /^guest-\d+$/.test(context.user.userId)) {
+      if (context.user.role === 'GUEST' && /^guest-[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(context.user.userId)) {
         return { id: context.user.userId, email: 'guest@demo.local', username: 'guest', name: 'Guest User', role: 'GUEST', isActive: true, isEmailVerified: false, team: null };
       }
 
@@ -366,7 +366,7 @@ export const authResolvers = {
     guestLogin: async () => {
       // Create a temporary guest user token without storing in database
       const guestUser = {
-        id: 'guest-' + Date.now(),
+        id: `guest-${uuidv4()}`,
         email: 'guest@demo.local',
         username: 'guest',
         name: 'Guest User',

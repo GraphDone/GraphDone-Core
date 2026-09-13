@@ -15,7 +15,7 @@ export const workItemRecoveryResolvers = {
       if (!context.driver || !context.user) {
         throw new GraphQLError('Authentication required', { extensions: { code: 'UNAUTHENTICATED' } });
       }
-      if (context.user.role === 'VIEWER') {
+      if (!['USER', 'ADMIN'].includes(context.user.role)) {
         throw new GraphQLError('This account is read-only', { extensions: { code: 'FORBIDDEN' } });
       }
       const userId = context.user.userId;
