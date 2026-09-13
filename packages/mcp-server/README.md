@@ -152,6 +152,21 @@ Add this configuration:
 ```bash
 npm run build    # Build TypeScript
 npm run dev      # Development with watch mode
-npm run test     # Run tests
+npm run test     # Run mock/unit tests; never opens a Neo4j connection
 npm run lint     # Lint code
 ```
+
+The real-database integration mutates data and only accepts an explicitly
+owned loopback fixture. Use a disposable Neo4j instance on its own port:
+
+```bash
+GRAPHDONE_DISPOSABLE_NEO4J=1 \
+NEO4J_URI=bolt://127.0.0.1:17687 \
+NEO4J_USER=neo4j \
+NEO4J_PASSWORD=disposable-test-password \
+npm run test:integration:local
+```
+
+The command fails before connecting when the disposable marker, URI, or
+credentials are missing, and it rejects non-loopback database addresses. Do
+not point it at a development, shared, or production database.
