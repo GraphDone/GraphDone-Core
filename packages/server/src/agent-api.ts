@@ -36,7 +36,7 @@ agentApi.all('*', async (req, res) => {
       ownerId = user.userId; actorId = user.userId; actor = user.email;
     }
     const owner = await sqliteAuthStore.findUserById(ownerId);
-    if (!owner?.isActive || owner.role === 'VIEWER') return res.status(403).json({ error: 'Active project owner required' });
+    if (!owner?.isActive || !['USER', 'ADMIN'].includes(owner.role)) return res.status(403).json({ error: 'Active USER or ADMIN project owner required' });
     if (!isAgent) actor = owner.name;
     const params = { graphId, ownerId };
     const graph = await session.run(`${ownerMatch} RETURN g.name AS name`, params);
