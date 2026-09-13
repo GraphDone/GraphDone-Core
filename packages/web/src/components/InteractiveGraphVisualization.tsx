@@ -232,6 +232,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   currentGraphIdRef.current = currentGraph?.id;
   const fittedGraphsRef = useRef<Set<string>>(new Set());
   const cameraSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cameraManuallyPositionedRef = useRef(false);
+  useEffect(() => { cameraManuallyPositionedRef.current = false; }, [currentGraph?.id]);
   // Mirrors isSimplified for the d3 tick closure (which captures stale render
   // values otherwise). Lets updateEdgePositions skip hidden arrow/label work.
   const simplifiedRef = useRef(false);
@@ -4072,6 +4074,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
     // Update zoom with LOD updates
     zoom.on('zoom', (event) => {
+      // D3 sets sourceEvent only for direct wheel/pointer gestures. Programmatic
+      // fit/restore transforms must remain distinguishable so an automatic fit
+      // that later clips a restored task can be repaired on reload.
+      if (event.sourceEvent) cameraManuallyPositionedRef.current = true;
       g.attr('transform', event.transform);
       setCurrentTransform({
         x: event.transform.x,
@@ -4089,6 +4095,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           const cam = {
             x: event.transform.x, y: event.transform.y, k: event.transform.k,
             w: containerRef.current?.clientWidth || 0, h: containerRef.current?.clientHeight || 0,
+            manual: cameraManuallyPositionedRef.current,
           };
           if (cameraSaveTimerRef.current) clearTimeout(cameraSaveTimerRef.current);
           cameraSaveTimerRef.current = setTimeout(() => {
@@ -4318,6 +4325,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   useEffect(() => {
     (window as any).miniMapNavigate = (graphX: number, graphY: number) => {
       if (!svgRef.current || !containerRef.current || !zoomBehaviorRef.current) return;
+      cameraManuallyPositionedRef.current = true;
       const svg = d3.select(svgRef.current);
       const k = d3.zoomTransform(svgRef.current).k || 1;
       const w = containerRef.current.clientWidth;
@@ -4330,6 +4338,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // zoom; applied via the shared zoom behavior so state + handlers stay in sync.
     (window as any).miniMapZoom = (graphX: number, graphY: number, targetK: number) => {
       if (!svgRef.current || !containerRef.current || !zoomBehaviorRef.current) return;
+      cameraManuallyPositionedRef.current = true;
       const svg = d3.select(svgRef.current);
       const k = Math.max(0.1, Math.min(4, targetK));
       const w = containerRef.current.clientWidth;
@@ -4709,8 +4718,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     if (fittedGraphsRef.current.has(currentGraphId)) return undefined;
     const gid = currentGraphId;
 
-    let saved: { x: number; y: number; k: number; w?: number; h?: number } | null = null;
+    let saved: { x: number; y: number; k: number; w?: number; h?: number; manual?: boolean } | null = null;
     try { const r = localStorage.getItem(`graphdone:camera:${gid}`); saved = r ? JSON.parse(r) : null; } catch { /* ignore */ }
+    cameraManuallyPositionedRef.current = saved?.manual === true;
     // A saved camera framed for a very different viewport (resized window, rotated
     // device) would mis-frame the graph now — prefer a fresh fit in that case.
     const sizeMatches = (s: { w?: number; h?: number }): boolean => {
@@ -4720,10 +4730,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     };
     const hasSaved = !!(saved && typeof saved.k === 'number' && sizeMatches(saved));
 
-    // Camera persistence is useful only while it still shows the graph without
-    // putting a card under a fixed control. A node can keep a valid saved
-    // transform while its restored position changes after an offline reload;
-    // trusting that transform can make retained work look lost or unreachable.
+    // Preserve an explicitly panned/zoomed focus as long as it still shows a
+    // task, but require an automatically saved fit to keep every task framed.
+    // In both cases a fixed control must not cover a card. This distinction lets
+    // recovery repair stale automatic cameras without discarding user intent.
     const savedCameraIsUsable = (): boolean => {
       const frame = containerRef.current?.getBoundingClientRect();
       const svg = svgRef.current;
@@ -4733,12 +4743,16 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       const showsANode = cards.some(card => card.width > 0 && card.height > 0
           && card.right >= frame.left && card.left <= frame.right
           && card.bottom >= frame.top && card.top <= frame.bottom);
+      const framesEveryNode = cards.length > 0 && cards.every(card => card.width > 0 && card.height > 0
+        && card.left >= frame.left && card.right <= frame.right
+        && card.top >= frame.top && card.bottom <= frame.bottom);
       const obstacle = document.querySelector<HTMLElement>('[data-graph-fit-obstacle="true"]');
-      if (!obstacle) return showsANode;
+      const showsExpectedContent = cameraManuallyPositionedRef.current ? showsANode : framesEveryNode;
+      if (!obstacle) return showsExpectedContent;
       const obstacleRect = obstacle.getBoundingClientRect();
       const blocksACard = cards.some(card => card.right > obstacleRect.left && card.left < obstacleRect.right
         && card.bottom > obstacleRect.top && card.top < obstacleRect.bottom);
-      return showsANode && !blocksACard;
+      return showsExpectedContent && !blocksACard;
     };
 
     let timer: ReturnType<typeof setTimeout> | null = null;
