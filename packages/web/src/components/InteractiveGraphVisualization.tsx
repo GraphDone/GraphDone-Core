@@ -4714,7 +4714,11 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   // spin. fitViewRef is used (not fitViewToNodes) so its identity churn during
   // physics settle doesn't cancel the loop.
   useEffect(() => {
-    if (!hasNodes || !currentGraphId) return undefined;
+    // `cache-and-network` can render an older one-node snapshot before the
+    // durable offline result adds the rest. Fitting that partial graph and
+    // marking it done strands later nodes at the old camera. Wait until both
+    // graph queries settle before accepting or replacing a saved transform.
+    if (!hasNodes || !currentGraphId || loading || edgesLoading) return undefined;
     if (fittedGraphsRef.current.has(currentGraphId)) return undefined;
     const gid = currentGraphId;
 
@@ -4818,7 +4822,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       canvas?.removeEventListener('pointerdown', stopFraming);
       canvas?.removeEventListener('wheel', stopFraming);
     };
-  }, [hasNodes, currentGraphId]);
+  }, [hasNodes, currentGraphId, loading, edgesLoading]);
 
   // PR-3: keep the expand-in-place panel glued to its node through drags, ticks
   // and pan/zoom (same rAF technique as the rename box). The panel sits beside
