@@ -1161,13 +1161,14 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     });
   }
   
-  // Extract edges from legacy dependencies (fallback)
-  workItems.forEach(item => {
-    if (item.dependencies) {
-      item.dependencies.forEach((dep: WorkItem) => {
-        // Only add if not already added from Edge entities
-        const exists = workItemEdges.some(e => e.source === item.id && e.target === dep.id);
-        if (!exists) {
+  // Use legacy dependency fields only until the dedicated edge query resolves.
+  // Once it has resolved, including to an empty array after deletion, it is the
+  // authority; otherwise stale normalized WorkItem fields can resurrect a
+  // just-deleted connection until the next full work-item refresh.
+  if (!edgesData?.edges) {
+    workItems.forEach(item => {
+      if (item.dependencies) {
+        item.dependencies.forEach((dep: WorkItem) => {
           workItemEdges.push({
             id: `edge-${dep.id}-${item.id}`,
             source: item.id,
@@ -1176,10 +1177,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
             strength: 0.8,
             description: 'dependency relationship'
           });
-        }
-      });
-    }
-  });
+        });
+      }
+    });
+  }
 
   // Validate and sanitize data before D3 processing
   const currentValidationResult = validateGraphData(workItems, workItemEdges);
