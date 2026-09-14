@@ -322,7 +322,7 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
                     {/* Folder Header */}
                     <button
                       onClick={() => toggleFolder(folderId)}
-                      className="w-full flex items-center space-x-2.5 p-2.5 rounded-xl hover:bg-gray-700/60 transition-all duration-200 text-left group border border-transparent hover:border-gray-600/40"
+                      className="w-full min-h-[44px] flex items-center space-x-2.5 p-2.5 rounded-xl hover:bg-gray-700/60 transition-all duration-200 text-left group border border-transparent hover:border-gray-600/40"
                     >
                       <ChevronRight className={`h-3.5 w-3.5 text-gray-400 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
                       {getFolderIcon(folderId)}
