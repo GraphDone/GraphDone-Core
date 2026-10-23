@@ -1,0 +1,58 @@
+{
+  "format": "graphdone-project",
+  "version": 1,
+  "project": {
+    "id": "science-project",
+    "name": "Student launch project"
+  },
+  "nodes": [
+    {
+      "id": "plan",
+      "title": "Plan the launch 🚀",
+      "type": "TASK",
+      "description": "Check weather and safety",
+      "status": "IN_PROGRESS",
+      "priority": 0.8,
+      "position_x": -120,
+      "position_y": 40,
+      "due_date": "2026-10-01",
+      "tags": [
+        "science",
+        "team"
+      ],
+      "metadata": "{\"custom\":true}"
+    },
+    {
+      "id": "launch",
+      "title": "Launch",
+      "type": "TASK",
+      "description": null,
+      "status": "PROPOSED",
+      "priority": 0.5,
+      "position_x": 200,
+      "position_y": 80,
+      "due_date": null,
+      "tags": [],
+      "metadata": "{}"
+    }
+  ],
+  "edges": [
+    {
+      "id": "dependency",
+      "source_id": "plan",
+      "target_id": "launch",
+      "type": "DEPENDS_ON",
+      "weight": 1
+    }
+  ],
+  "notes": [
+    {
+      "id": "handoff",
+      "work_item_id": "plan",
+      "body": "Ask the agent to check the forecast.",
+      "actor": "Student team",
+      "actor_type": "HUMAN",
+      "created_at": "2026-09-08T00:00:00Z"
+    }
+  ]
+}

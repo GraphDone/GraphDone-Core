@@ -1,3 +1,4 @@
+import {COMPACT_WORKSPACE_QUERY} from './useCompactWorkspace';
 import { RefObject, useEffect } from 'react';
 
 /**
@@ -60,6 +61,21 @@ export function useModalA11y(ref: RefObject<HTMLElement>, opts: ModalA11yOptions
     if (labelledBy) el.setAttribute('aria-labelledby', labelledBy);
     else if (label && !el.getAttribute('aria-labelledby')) el.setAttribute('aria-label', label);
 
+    // Position full modal panels below workspace chrome when enough height is
+    // available. Short landscape screens retain the full viewport for the form.
+    const backdrop = el.closest<HTMLElement>('[data-modal-backdrop]');
+    const headers = Array.from(document.querySelectorAll<HTMLElement>('[data-workspace-header]'));
+    const position = () => {
+      const bottom = Math.max(0, ...headers.filter(header => header.getClientRects().length > 0)
+        .map(header => header.getBoundingClientRect().bottom));
+      const offset = !matchMedia(COMPACT_WORKSPACE_QUERY).matches && window.innerHeight - bottom >= 420 ? bottom : 0;
+      backdrop?.style.setProperty('--modal-header-offset', `${offset}px`);
+    };
+    const observer = new ResizeObserver(position);
+    headers.forEach(header => observer.observe(header));
+    window.addEventListener('resize', position);
+    position();
+
     const previouslyFocused = document.activeElement as HTMLElement | null;
 
     const focusables = () =>
@@ -105,6 +121,9 @@ export function useModalA11y(ref: RefObject<HTMLElement>, opts: ModalA11yOptions
     el.addEventListener('keydown', onKeyDown);
 
     return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', position);
+      backdrop?.style.removeProperty('--modal-header-offset');
       if (raf) cancelAnimationFrame(raf);
       el.removeEventListener('keydown', onKeyDown);
       // Restore focus to the trigger ONLY if focus dropped to <body> as the

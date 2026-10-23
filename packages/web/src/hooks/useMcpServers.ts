@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { apiUrl } from '../lib/apiUrl';
 
 export interface MCPServer {
   id: string;
@@ -36,8 +37,7 @@ export function useMcpServers() {
       let capabilities: string[] = []; // Default empty capabilities
       
       try {
-        // Use the Vite proxy endpoints instead of direct localhost:3128
-        const healthResponse = await fetch('/health', {
+        const healthResponse = await fetch(apiUrl('/health'), {
           method: 'GET',
           signal: AbortSignal.timeout(2000) // 2 second timeout
         });
@@ -59,7 +59,7 @@ export function useMcpServers() {
               
             // Get additional status info
             try {
-              const statusResponse = await fetch('/mcp/status', {
+              const statusResponse = await fetch(apiUrl('/mcp/status'), {
                 method: 'GET',
                 signal: AbortSignal.timeout(2000)
               });
@@ -98,7 +98,7 @@ export function useMcpServers() {
         owner: 'system',
         isLocal: true,
         port: 3128,
-        endpoint: '/health' // Use proxy endpoint for UI display
+        endpoint: apiUrl('/health')
       };
       
       detectedServers.push(graphdoneMcp);

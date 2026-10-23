@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import {offlineEnabled} from '../lib/offline/engine';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import {
   X, User, Flag, Edit3, Save, ChevronDown, Plus, Unlink, Trash2,
@@ -6,7 +7,7 @@ import {
   Sparkles, Hash, Crown, Activity, Gem, Rocket, Star, Brain, FileText, Eye, Sparkle
 } from 'lucide-react';
 import { useMutation } from '@apollo/client';
-import { UPDATE_WORK_ITEM, GET_WORK_ITEMS, CREATE_EDGE, GET_EDGES, DELETE_EDGE, DELETE_WORK_ITEM } from '../lib/queries';
+import { UPDATE_WORK_ITEM, GET_WORK_ITEMS, RESTORE_WORK_ITEM, CREATE_EDGE, GET_EDGES, DELETE_EDGE, DELETE_WORK_ITEM } from '../lib/queries';
 import { useAuth } from '../contexts/AuthContext';
 import { useGraph } from '../contexts/GraphContext';
 import { useNotifications } from '../contexts/NotificationContext';
@@ -36,6 +37,7 @@ import {
   getPriorityColorScheme
 } from '../constants/workItemConstants';
 import { WorkItem, WorkItemEdge } from '../types/graph';
+import type { UndoStack } from '../lib/undoStack';
 
 interface NodeDetailsModalProps {
   isOpen: boolean;
@@ -47,6 +49,129 @@ interface NodeDetailsModalProps {
   onConnectToExisting?: (node: WorkItem) => void;
   onDisconnect?: (node: WorkItem) => void;
   onDelete?: (node: WorkItem) => void;
+  undoStack?: UndoStack;
+}
+
+const assigneeId = (item: WorkItem) => typeof item.assignedTo === 'string' ? item.assignedTo : item.assignedTo?.id;
+const copyWorkItem = (item: WorkItem): WorkItem => ({
+  ...item,
+  tags: [...(item.tags || [])],
+  assignedTo: item.assignedTo && typeof item.assignedTo === 'object' ? { ...item.assignedTo } : item.assignedTo,
+});
+
+const editableFields = ['title', 'description', 'type', 'status', 'priority', 'tags', 'assignedTo', 'dueDate'] as const;
+const fieldValue = (item: WorkItem, field: typeof editableFields[number]) => {
+  if (field === 'tags') return JSON.stringify(item.tags || []);
+  if (field === 'assignedTo') return assigneeId(item) ?? null;
+  if (field === 'dueDate') return item.dueDate ?? null;
+  return item[field];
+};
+const hasDraftChanges = (draft: WorkItem, saved: WorkItem) => editableFields.some(field => fieldValue(draft, field) !== fieldValue(saved, field));
+const mergeSavedWorkItem = (saved: WorkItem, submitted: WorkItem, draft: WorkItem): WorkItem => ({
+  ...copyWorkItem(saved),
+  ...Object.fromEntries(editableFields
+    .filter(field => fieldValue(draft, field) !== fieldValue(submitted, field))
+    .map(field => [field, draft[field]])),
+});
+
+const confirmedWorkItem = (result: { data?: { updateWorkItems?: { workItems?: WorkItem[] } } | null; errors?: readonly { message: string }[] }, id: string): WorkItem => {
+  if (result.errors?.length) throw new Error(result.errors[0].message);
+  const items = result.data?.updateWorkItems?.workItems;
+  if (items?.length !== 1 || items[0].id !== id) throw new Error('The server did not confirm the expected work item update.');
+  return copyWorkItem(items[0]);
+};
+
+interface EditorSession {
+  nodeId: string | undefined;
+  graphId: string | undefined;
+  ownerId: string | undefined;
+  open: boolean;
+}
+
+const beginUpdate = (pending: Map<EditorSession, number>, session: EditorSession) => {
+  pending.set(session, (pending.get(session) || 0) + 1);
+  return () => {
+    const remaining = (pending.get(session) || 1) - 1;
+    if (remaining) pending.set(session, remaining);
+    else pending.delete(session);
+  };
+};
+
+const edgeEndpointId = (endpoint: unknown): string | null => {
+  if (typeof endpoint === 'string') return endpoint;
+  if (endpoint && typeof endpoint === 'object' && 'id' in endpoint && typeof endpoint.id === 'string') return endpoint.id;
+  return null;
+};
+
+const edgeCreateInput = (edge: WorkItemEdge) => {
+  const sourceId = edgeEndpointId(edge.source);
+  const targetId = edgeEndpointId(edge.target);
+  if (!sourceId || !targetId) throw new Error('A connection endpoint is unavailable.');
+  return {
+    type: edge.type,
+    weight: (edge as WorkItemEdge & { weight?: number }).weight ?? edge.strength ?? 1,
+    source: { connect: { where: { node: { id: sourceId } } } },
+    target: { connect: { where: { node: { id: targetId } } } },
+  };
+};
+
+function workItemUpdate(target: WorkItem, previous: WorkItem) {
+  const update: any = {
+    title: target.title,
+    description: target.description,
+    type: target.type,
+    status: target.status,
+    priority: target.priority,
+    tags: target.tags || [],
+    dueDate: target.dueDate ?? null,
+  };
+  const previousAssigneeId = assigneeId(previous);
+  const targetAssigneeId = assigneeId(target);
+  if (targetAssigneeId !== previousAssigneeId) {
+    let metadata: Record<string, unknown> = {};
+    const raw = (target as any).metadata ?? (previous as any).metadata;
+    try {
+      const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) metadata = parsed;
+    } catch { /* Preserve valid task metadata when available. */ }
+    update.metadata = JSON.stringify({
+      ...metadata,
+      assignee: targetAssigneeId ? {
+        id: targetAssigneeId,
+        name: typeof target.assignedTo === 'object' ? target.assignedTo.name : targetAssigneeId,
+      } : null,
+    });
+    if (!offlineEnabled && targetAssigneeId) {
+      update.assignedTo = { connect: { where: { node: { id: targetAssigneeId } } } };
+    } else if (!offlineEnabled && previousAssigneeId) {
+      update.assignedTo = { disconnect: { where: { node: { id: previousAssigneeId } } } };
+    }
+  }
+  return update;
+}
+
+function workItemRestoreInput(item: WorkItem, graphId: string) {
+  const input: any = {
+    id: item.id,
+    graphId,
+    title: item.title,
+    description: item.description || undefined,
+    type: item.type,
+    status: item.status,
+    priority: item.priority ?? 0,
+    dueDate: item.dueDate || undefined,
+    tags: item.tags || [],
+    metadata: (item as any).metadata || '{}',
+    positionX: item.positionX ?? 0,
+    positionY: item.positionY ?? 0,
+    positionZ: item.positionZ ?? 0,
+    radius: (item as any).radius ?? 1,
+    theta: (item as any).theta ?? 0,
+    phi: (item as any).phi ?? 0,
+    priorityComp: item.priority ?? 0,
+    createdAt: item.createdAt || undefined,
+  };
+  return input;
 }
 
 export function WorkItemDetailsModal({
@@ -58,13 +183,22 @@ export function WorkItemDetailsModal({
   onEdit,
   onConnectToExisting,
   onDisconnect,
-  onDelete
+  onDelete,
+  undoStack,
 }: NodeDetailsModalProps) {
   const { currentGraph } = useGraph();
   const { currentUser } = useAuth();
   const { showSuccess, showError, showWarning } = useNotifications();
   const [editedNode, setEditedNode] = useState<WorkItem | null>(null);
   const [savedNode, setSavedNode] = useState<WorkItem | null>(null);
+  const savedNodeRef = useRef(savedNode);
+  savedNodeRef.current = savedNode;
+  const draftDirtyRef = useRef(false);
+  const editorSession = useMemo(() => ({ nodeId: node?.id, graphId: currentGraph?.id, ownerId: currentUser?.id, open: isOpen }), [node?.id, currentGraph?.id, currentUser?.id, isOpen]);
+  const activeSessionRef = useRef<EditorSession | null>(editorSession);
+  activeSessionRef.current = editorSession;
+  const draftSessionRef = useRef<EditorSession | null>(null);
+  const pendingUpdatesRef = useRef(new Map<EditorSession, number>());
   const [showTypeDropdown, setShowTypeDropdown] = useState(false);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [showConnectDropdown, setShowConnectDropdown] = useState(false);
@@ -79,9 +213,17 @@ export function WorkItemDetailsModal({
   const isSavingRef = useRef(false);
   const connectDropdownRef = useRef<HTMLDivElement>(null);
   const disconnectDropdownRef = useRef<HTMLDivElement>(null);
+  const typeDropdownRef = useRef<HTMLDivElement>(null);
+  const statusDropdownRef = useRef<HTMLDivElement>(null);
+  const typeButtonRef = useRef<HTMLButtonElement>(null);
+  const statusButtonRef = useRef<HTMLButtonElement>(null);
+  const connectButtonRef = useRef<HTMLButtonElement>(null);
+  const disconnectButtonRef = useRef<HTMLButtonElement>(null);
   const datePickerRef = useRef<HTMLDivElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
+  const deleteButtonRef = useRef<HTMLButtonElement>(null);
+  const deleteConfirmRef = useRef<HTMLInputElement>(null);
 
   useDialog(isOpen, onClose);
   // Container already manages its own initial focus (modalRef) below; this adds
@@ -89,11 +231,25 @@ export function WorkItemDetailsModal({
   useModalA11y(dialogRef, { isOpen, initialFocus: false });
 
   useEffect(() => {
-    if (node) {
-      setEditedNode({ ...node });
-      setSavedNode({ ...node });
+    // Background refreshes produce fresh objects for the same work item.
+    // They must not wipe a person's unfinished form.
+    if (node && isOpen && (draftSessionRef.current !== editorSession || (!draftDirtyRef.current && !pendingUpdatesRef.current.has(editorSession)))) {
+      draftSessionRef.current = editorSession;
+      setEditedNode(copyWorkItem(node));
+      setSavedNode(copyWorkItem(node));
     }
-  }, [node]);
+  }, [node, isOpen, editorSession]);
+
+  useEffect(() => {
+    activeSessionRef.current = editorSession;
+    return () => { if (activeSessionRef.current === editorSession) activeSessionRef.current = null; };
+  }, [editorSession]);
+
+  const applySavedNode = useCallback((updated: WorkItem, submitted: WorkItem, session: EditorSession) => {
+    if (activeSessionRef.current !== session || updated.id !== session.nodeId) return;
+    setSavedNode(copyWorkItem(updated));
+    setEditedNode(draft => draft?.id === updated.id ? mergeSavedWorkItem(updated, submitted, draft) : draft);
+  }, []);
 
   useEffect(() => {
     if (isOpen && modalRef.current) {
@@ -101,15 +257,37 @@ export function WorkItemDetailsModal({
     }
   }, [isOpen]);
 
+  useEffect(() => {
+    if (showDeleteConfirm) deleteConfirmRef.current?.focus();
+  }, [showDeleteConfirm]);
+
   const handleSaveRef = useRef<(() => Promise<void>) | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
 
     // Escape is handled centrally by useDialog (defers while typing in a field,
-    // and keeps the dialog-manager's "close top-most" stack coherent). Here we
-    // only add the Ctrl/Cmd+S save shortcut.
+    // and keeps the dialog-manager's "close top-most" stack coherent). A
+    // picker is the active surface while it is open, so Escape dismisses that
+    // picker first and returns focus to its trigger without losing the draft.
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && (showTypeDropdown || showStatusDropdown || showConnectDropdown || showDisconnectDropdown)) {
+        e.preventDefault();
+        e.stopPropagation();
+        const focusTarget = showTypeDropdown
+          ? typeButtonRef.current
+          : showStatusDropdown
+            ? statusButtonRef.current
+            : showConnectDropdown
+              ? connectButtonRef.current
+              : disconnectButtonRef.current;
+        setShowTypeDropdown(false);
+        setShowStatusDropdown(false);
+        setShowConnectDropdown(false);
+        setShowDisconnectDropdown(false);
+        requestAnimationFrame(() => focusTarget?.focus());
+        return;
+      }
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.stopPropagation();
         e.preventDefault();
@@ -121,12 +299,18 @@ export function WorkItemDetailsModal({
 
     document.addEventListener('keydown', handleKeyDown, true);
     return () => document.removeEventListener('keydown', handleKeyDown, true);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, showTypeDropdown, showStatusDropdown, showConnectDropdown, showDisconnectDropdown]);
 
   useEffect(() => {
-    if (!showConnectDropdown && !showDisconnectDropdown) return;
+    if (!showTypeDropdown && !showStatusDropdown && !showConnectDropdown && !showDisconnectDropdown) return;
 
     function handleClickOutside(event: MouseEvent) {
+      if (typeDropdownRef.current && !typeDropdownRef.current.contains(event.target as Node)) {
+        setShowTypeDropdown(false);
+      }
+      if (statusDropdownRef.current && !statusDropdownRef.current.contains(event.target as Node)) {
+        setShowStatusDropdown(false);
+      }
       if (connectDropdownRef.current && !connectDropdownRef.current.contains(event.target as Node)) {
         setShowConnectDropdown(false);
       }
@@ -137,10 +321,20 @@ export function WorkItemDetailsModal({
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showConnectDropdown, showDisconnectDropdown]);
+  }, [showTypeDropdown, showStatusDropdown, showConnectDropdown, showDisconnectDropdown]);
+
+  const edgeQueryVariables = currentGraph ? {
+    where: {
+      OR: [
+        { source: { graph: { id: currentGraph.id } } },
+        { target: { graph: { id: currentGraph.id } } },
+      ],
+    },
+  } : { where: {} };
 
   const [createEdge] = useMutation(CREATE_EDGE, {
-    refetchQueries: [{ query: GET_EDGES }],
+    refetchQueries: [{ query: GET_EDGES, variables: edgeQueryVariables }],
+    awaitRefetchQueries: true,
     // Remove individual success messages - we'll show a batch message instead
     onError: (error) => {
       showError(`Failed to create connection: ${error.message}`);
@@ -148,7 +342,8 @@ export function WorkItemDetailsModal({
   });
 
   const [deleteEdge] = useMutation(DELETE_EDGE, {
-    refetchQueries: [{ query: GET_EDGES }],
+    refetchQueries: [{ query: GET_EDGES, variables: edgeQueryVariables }],
+    awaitRefetchQueries: true,
     // Remove individual success messages - we'll show a batch message instead
     onError: (error) => {
       showError(`Failed to remove connection: ${error.message}`);
@@ -156,20 +351,18 @@ export function WorkItemDetailsModal({
   });
 
   // Toggle node selection for batch connection
-  const toggleNodeSelection = (nodeId: string) => {
-    setSelectedNodesForConnection(prev => 
-      prev.includes(nodeId) 
-        ? prev.filter(id => id !== nodeId)
-        : [...prev, nodeId]
+  const setNodeSelection = (nodeId: string, selected: boolean) => {
+    setSelectedNodesForConnection(prev => selected
+      ? (prev.includes(nodeId) ? prev : [...prev, nodeId])
+      : prev.filter(id => id !== nodeId)
     );
   };
 
   // Toggle edge selection for batch disconnection
-  const toggleEdgeSelection = (edgeId: string) => {
-    setSelectedEdgesForDisconnection(prev => 
-      prev.includes(edgeId) 
-        ? prev.filter(id => id !== edgeId)
-        : [...prev, edgeId]
+  const setEdgeSelection = (edgeId: string, selected: boolean) => {
+    setSelectedEdgesForDisconnection(prev => selected
+      ? (prev.includes(edgeId) ? prev : [...prev, edgeId])
+      : prev.filter(id => id !== edgeId)
     );
   };
 
@@ -188,8 +381,25 @@ export function WorkItemDetailsModal({
         target: { connect: { where: { node: { id: targetWorkItemId } } } }
       }));
 
-      await createEdge({
+      const result = await createEdge({
         variables: { input: edgeInputs }
+      });
+
+      const createdIds: string[] = (result.data?.createEdges?.edges || [])
+        .map((edge: { id?: string }) => edge.id)
+        .filter((id: unknown): id is string => typeof id === 'string');
+      if (createdIds.length !== edgeInputs.length) throw new Error('The new connections could not be identified for Undo.');
+      undoStack?.push({
+        label: 'Connect items',
+        undo: async () => {
+          await deleteEdge({
+            variables: {
+              where: createdIds.length === 1
+                ? { id: createdIds[0] }
+                : { OR: createdIds.map(id => ({ id })) },
+            },
+          });
+        },
       });
 
       showSuccess(`Connected to ${count} node${isPlural ? 's' : ''} successfully`);
@@ -205,15 +415,38 @@ export function WorkItemDetailsModal({
   const handleDisconnectSelected = async () => {
     if (selectedEdgesForDisconnection.length === 0) return;
     
-    const count = selectedEdgesForDisconnection.length;
+    const selectedEdges = selectedEdgesForDisconnection
+      .map(edgeId => edges.find(edge => edge.id === edgeId))
+      .filter((edge): edge is WorkItemEdge => Boolean(edge));
+    if (selectedEdges.length !== selectedEdgesForDisconnection.length) {
+      showError('A selected connection is no longer available. Refresh and try again.');
+      return;
+    }
+    const count = selectedEdges.length;
     const isPlural = count > 1;
+    let restoreInputs: ReturnType<typeof edgeCreateInput>[];
+    try {
+      restoreInputs = selectedEdges.map(edgeCreateInput);
+    } catch (error) {
+      console.error('Error preparing connection Undo:', error);
+      showError('A selected connection could not be safely removed.');
+      return;
+    }
     
     try {
-      for (const edgeId of selectedEdgesForDisconnection) {
-        await deleteEdge({
-          variables: { where: { id: edgeId } }
-        });
-      }
+      await deleteEdge({
+        variables: {
+          where: count === 1
+            ? { id: selectedEdges[0].id }
+            : { OR: selectedEdges.map(edge => ({ id: edge.id })) },
+        },
+      });
+      undoStack?.push({
+        label: 'Disconnect items',
+        undo: async () => {
+          await createEdge({ variables: { input: restoreInputs } });
+        },
+      });
 
       showSuccess(`Removed ${count} connection${isPlural ? 's' : ''} successfully`);
       setSelectedEdgesForDisconnection([]);
@@ -248,35 +481,6 @@ export function WorkItemDetailsModal({
       { query: GET_EDGES }
     ],
     awaitRefetchQueries: true,
-    onCompleted: (data) => {
-      if (data?.updateWorkItems?.workItems?.[0]) {
-        const updatedNode = data.updateWorkItems.workItems[0];
-        setEditedNode({ ...updatedNode });
-        setSavedNode({ ...updatedNode });
-      }
-
-      showSuccess('Work item updated successfully');
-    },
-    onError: (error) => {
-      showError(`Failed to update work item: ${error.message}`);
-      if (node) {
-        setEditedNode({ ...node });
-      }
-    },
-    optimisticResponse: (vars) => {
-      if (!editedNode) return;
-      return {
-        __typename: 'Mutation',
-        updateWorkItems: {
-          __typename: 'UpdateWorkItemsMutationResponse',
-          workItems: [{
-            ...editedNode,
-            __typename: 'WorkItem',
-            updatedAt: new Date().toISOString()
-          }]
-        }
-      };
-    }
   });
 
   const [deleteWorkItem, { loading: deleting }] = useMutation(DELETE_WORK_ITEM, {
@@ -289,6 +493,7 @@ export function WorkItemDetailsModal({
       },
       { query: GET_EDGES }
     ],
+    awaitRefetchQueries: true,
     onCompleted: () => {
       showSuccess('Work item deleted successfully');
       onClose();
@@ -297,61 +502,80 @@ export function WorkItemDetailsModal({
       showError(`Failed to delete work item: ${error.message}`);
     }
   });
+  const [restoreWorkItem] = useMutation(RESTORE_WORK_ITEM, {
+    refetchQueries: [
+      {
+        query: GET_WORK_ITEMS,
+        variables: currentGraph ? { where: { graph: { id: currentGraph.id } } } : { where: {} }
+      },
+      { query: GET_EDGES }
+    ],
+    awaitRefetchQueries: true,
+  });
 
   const handleSave = useCallback(async () => {
-    if (!editedNode || !node || isSavingRef.current) return;
+    if (!editedNode || !node || editedNode.id !== node.id || isSavingRef.current || pendingUpdatesRef.current.has(editorSession)) return;
 
     // Capture current values immediately to prevent stale closures
-    const nodeToSave = { ...editedNode };
+    const nodeToSave = copyWorkItem(editedNode);
     const currentNodeRef = node;
+    const previousNode = copyWorkItem(savedNode || currentNodeRef);
+    const undoGeneration = undoStack?.generation;
+    const endUpdate = beginUpdate(pendingUpdatesRef.current, editorSession);
 
     isSavingRef.current = true;
     setIsSaving(true);
 
     try {
-      const updateInput: any = {
-        title: nodeToSave.title,
-        description: nodeToSave.description,
-        type: nodeToSave.type,
-        status: nodeToSave.status,
-        priority: nodeToSave.priority,
-        tags: nodeToSave.tags || [],
-        dueDate: nodeToSave.dueDate,
-      };
-
-      // Handle assignedTo relationship properly for Neo4j GraphQL
-      const currentAssignedToId = typeof currentNodeRef.assignedTo === 'string' ? currentNodeRef.assignedTo : currentNodeRef.assignedTo?.id;
-      const newAssignedToId = typeof nodeToSave.assignedTo === 'string' ? nodeToSave.assignedTo : nodeToSave.assignedTo?.id;
-
-      if (newAssignedToId && newAssignedToId !== currentAssignedToId) {
-        // Connect to new user
-        updateInput.assignedTo = {
-          connect: {
-            where: { node: { id: newAssignedToId } }
-          }
-        };
-      } else if (!newAssignedToId && currentAssignedToId) {
-        // Disconnect current user
-        updateInput.assignedTo = {
-          disconnect: {
-            where: { node: { id: currentAssignedToId } }
-          }
-        };
-      }
-
-      await updateWorkItem({
+      const result = await updateWorkItem({
         variables: {
           where: { id: currentNodeRef.id },
-          update: updateInput
-        }
+          update: workItemUpdate(nodeToSave, previousNode),
+        },
+        // The direct save stays instant. Undo deliberately has no optimistic
+        // response, so its visible completion means the durable local mutation
+        // has finished and an immediate reload cannot resurrect the edit.
+        optimisticResponse: {
+          __typename: 'Mutation',
+          updateWorkItems: {
+            __typename: 'UpdateWorkItemsMutationResponse',
+            workItems: [{ ...nodeToSave, __typename: 'WorkItem', updatedAt: new Date().toISOString() }],
+          },
+        },
+      });
+      const editedSnapshot = confirmedWorkItem(result, currentNodeRef.id);
+      applySavedNode(editedSnapshot, nodeToSave, editorSession);
+      if (activeSessionRef.current === editorSession) showSuccess('Work item updated successfully');
+      if (undoStack?.generation === undoGeneration && (!activeSessionRef.current || (activeSessionRef.current.graphId === editorSession.graphId && activeSessionRef.current.ownerId === editorSession.ownerId))) undoStack?.push({
+        label: 'Edit item',
+        undo: async () => {
+          const activeSession = activeSessionRef.current;
+          const undoSession = activeSession?.open && activeSession.nodeId === currentNodeRef.id && activeSession.graphId === editorSession.graphId && activeSession.ownerId === editorSession.ownerId ? activeSession : null;
+          const undoBaseline = copyWorkItem(undoSession && savedNodeRef.current ? savedNodeRef.current : editedSnapshot);
+          const endUndo = undoSession ? beginUpdate(pendingUpdatesRef.current, undoSession) : () => {};
+          try {
+            const undone = await updateWorkItem({
+              variables: {
+                where: { id: currentNodeRef.id },
+                update: workItemUpdate(previousNode, editedSnapshot),
+              },
+            });
+            const restored = confirmedWorkItem(undone, currentNodeRef.id);
+            if (undoSession) applySavedNode(restored, undoBaseline, undoSession);
+          } finally {
+            endUndo();
+          }
+        },
       });
     } catch (error) {
+      if (activeSessionRef.current === editorSession) showError(`Failed to update work item: ${error instanceof Error ? error.message : 'Unknown error'}`);
       console.error('Failed to update work item:', error);
     } finally {
+      endUpdate();
       isSavingRef.current = false;
       setIsSaving(false);
     }
-  }, [editedNode, node, updateWorkItem]);
+  }, [editedNode, node, savedNode, undoStack, updateWorkItem, editorSession, applySavedNode, showError, showSuccess]);
 
   useEffect(() => {
     handleSaveRef.current = handleSave;
@@ -378,14 +602,27 @@ export function WorkItemDetailsModal({
   };
 
   const confirmDelete = async () => {
-    if (!node) return;
+    if (!node || !currentGraph) return;
 
     try {
-      await deleteWorkItem({
+      const deletedNode = copyWorkItem(node);
+      const result = await deleteWorkItem({
         variables: {
           where: { id: node.id }
         }
       });
+      if (result.data?.deleteWorkItems?.nodesDeleted > 0) {
+        undoStack?.push({
+          label: 'Delete item',
+          undo: async () => {
+            await restoreWorkItem({
+              variables: {
+                input: workItemRestoreInput(deletedNode, currentGraph.id)
+              }
+            });
+          },
+        });
+      }
     } catch (error) {
       console.error('Failed to delete work item:', error);
     }
@@ -397,17 +634,7 @@ export function WorkItemDetailsModal({
   const currentNode = editedNode || node;
 
   // Check if any changes have been made (compare with savedNode instead of node prop)
-  const hasChanges = editedNode && savedNode && (
-    editedNode.title !== savedNode.title ||
-    editedNode.description !== savedNode.description ||
-    editedNode.type !== savedNode.type ||
-    editedNode.status !== savedNode.status ||
-    editedNode.priority !== savedNode.priority ||
-    JSON.stringify(editedNode.tags || []) !== JSON.stringify(savedNode.tags || []) ||
-    (typeof editedNode.assignedTo === 'string' ? editedNode.assignedTo : editedNode.assignedTo?.id) !==
-    (typeof savedNode.assignedTo === 'string' ? savedNode.assignedTo : savedNode.assignedTo?.id) ||
-    editedNode.dueDate !== savedNode.dueDate
-  );
+  const hasChanges = editedNode && savedNode && hasDraftChanges(editedNode, savedNode);
 
   // Use the same priority calculation as ListView for consistency
   const getNodePriority = (node: WorkItem) => {
@@ -415,6 +642,8 @@ export function WorkItemDetailsModal({
   };
   
   const totalPriority = getNodePriority(currentNode);
+
+  draftDirtyRef.current = Boolean(hasChanges);
 
   const getStatusColor = (status: string) => {
     const statusScheme = getStatusColorScheme(status as WorkItemStatus);
@@ -521,6 +750,7 @@ export function WorkItemDetailsModal({
   return createPortal((
     <div
       ref={dialogRef}
+      data-modal-backdrop
       className="fixed inset-0 bg-black/70 backdrop-blur-lg z-50 flex items-stretch sm:items-center justify-center p-0 sm:p-4"
       role="dialog"
       aria-modal="true"
@@ -533,6 +763,7 @@ export function WorkItemDetailsModal({
       />
       <div
         ref={modalRef}
+        data-modal-panel data-task-editor
         tabIndex={-1}
         className="relative bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 border border-gray-600/50 shadow-2xl w-full sm:max-w-3xl h-full sm:h-auto sm:max-h-[90vh] overflow-y-auto rounded-none sm:rounded-2xl animate-in fade-in zoom-in-95 duration-300 ring-1 ring-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
         onClick={(e) => e.stopPropagation()}
@@ -549,14 +780,14 @@ export function WorkItemDetailsModal({
         </div>
 
         {/* Title Header — sticky so Save/Close stay reachable while scrolling */}
-        <div className="sticky top-0 z-20 px-4 py-3 bg-gradient-to-r from-gray-900/95 via-gray-800/95 to-gray-900/95 backdrop-blur-md border-b border-gray-600/30">
+        <div className="task-editor-heading sticky top-0 z-20 px-4 py-3 bg-gradient-to-r from-gray-900/95 via-gray-800/95 to-gray-900/95 backdrop-blur-md border-b border-gray-600/30">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <div className="p-3 bg-gradient-to-br from-teal-300/60 via-magenta-400/50 to-magenta-300/40 rounded-2xl border border-magenta-200/50">
                 <Eye className="h-6 w-6 text-teal-200" />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-white">Work Item Details</h2>
+                <h2 className="text-lg font-bold text-white"><span className="task-editor-title-wide">Work Item Details</span><span className="task-editor-title-compact">Edit work</span></h2>
                 <p className="text-sm text-gray-400 mt-0.5">View and edit work item information</p>
               </div>
             </div>
@@ -564,9 +795,9 @@ export function WorkItemDetailsModal({
               <button
                 onClick={handleSave}
                 disabled={updating || !hasChanges || isSaving}
-                className={`flex items-center space-x-1 px-4 py-2 rounded-lg transition-all duration-300 text-sm font-semibold shadow-lg ${
+                className={`flex items-center space-x-1 px-4 py-2 rounded-lg transition-transform duration-300 text-sm font-semibold shadow-lg ${
                   hasChanges && !updating && !isSaving
-                    ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:from-green-500 hover:to-emerald-500 hover:scale-105 transform border border-green-400/30'
+                    ? 'bg-gradient-to-r from-green-700 to-emerald-700 text-white hover:from-green-800 hover:to-emerald-800 hover:scale-105 transform border border-green-400/50'
                     : 'bg-gray-700 text-gray-500 cursor-not-allowed border border-gray-600'
                 }`}
                 title={hasChanges ? "Save Changes (Ctrl+S)" : "No changes to save"}
@@ -588,13 +819,19 @@ export function WorkItemDetailsModal({
         </div>
 
         {/* Enhanced Header */}
-        <div className="relative flex items-center justify-between px-3 py-2 border-b border-gray-600/50 bg-gradient-to-r from-gray-800/30 via-gray-700/20 to-gray-800/30 backdrop-blur-sm z-10">
+        <div className="task-editor-badges relative flex items-center justify-between px-3 py-2 border-b border-gray-600/50 bg-gradient-to-r from-gray-800/30 via-gray-700/20 to-gray-800/30 backdrop-blur-sm z-10">
           <div className="flex items-center space-x-6">
             {/* Enhanced Clickable Type Badge */}
-            <div className="relative z-[100000]">
+            <div ref={typeDropdownRef} className="relative z-[100000]">
               <button
+                ref={typeButtonRef}
                 data-testid="details-type-badge"
-                onClick={() => setShowTypeDropdown(!showTypeDropdown)}
+                onClick={() => {
+                  setShowTypeDropdown(open => !open);
+                  setShowStatusDropdown(false);
+                }}
+                aria-haspopup="menu"
+                aria-expanded={showTypeDropdown}
                 className={`w-36 flex items-center justify-between px-3 py-2 rounded-lg text-sm font-semibold hover:scale-105 transition-all duration-200 cursor-pointer shadow-lg backdrop-blur-sm ${getTypeColor(currentNode.type)} border border-opacity-30 hover:border-opacity-50`}
               >
                 <div className="flex items-center space-x-1">
@@ -645,10 +882,16 @@ export function WorkItemDetailsModal({
             </div>
 
             {/* Enhanced Clickable Status Badge */}
-            <div className="relative z-[100000]">
+            <div ref={statusDropdownRef} className="relative z-[100000]">
               <button
+                ref={statusButtonRef}
                 data-testid="details-status-badge"
-                onClick={() => setShowStatusDropdown(!showStatusDropdown)}
+                onClick={() => {
+                  setShowStatusDropdown(open => !open);
+                  setShowTypeDropdown(false);
+                }}
+                aria-haspopup="menu"
+                aria-expanded={showStatusDropdown}
                 className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-semibold hover:scale-105 transition-all duration-200 cursor-pointer shadow-lg backdrop-blur-sm ${getStatusColor(currentNode.status)} border border-opacity-30 hover:border-opacity-50`}
               >
                 <div className="flex items-center space-x-1">
@@ -720,7 +963,7 @@ export function WorkItemDetailsModal({
                 const newValue = e.target.value;
                 setEditedNode(prev => prev ? { ...prev, title: newValue } : null);
               }}
-              className="text-sm bg-gray-800 border-2 border-gray-600 text-white placeholder-gray-400 w-full focus:outline-none focus:!border-green-400 transition-all duration-300 hover:border-gray-500 p-2 rounded-lg shadow-lg cursor-text"
+              className="task-detail-control text-sm bg-gray-800 border-2 border-gray-600 text-white placeholder-gray-400 w-full focus:outline-none focus:!border-green-400 transition-all duration-300 hover:border-gray-500 p-2 rounded-lg shadow-lg cursor-text"
               placeholder="Enter title"
               autoComplete="off"
               aria-label="Work item title"
@@ -738,7 +981,7 @@ export function WorkItemDetailsModal({
             <textarea
               value={editedNode?.description || ''}
               onChange={(e) => setEditedNode(prev => prev ? { ...prev, description: e.target.value } : null)}
-              className="w-full text-sm text-white bg-gray-800 border border-gray-600 rounded-lg placeholder-gray-400 p-2 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-400 transition-all duration-300 resize-none hover:border-gray-500 shadow-lg cursor-text"
+              className="task-detail-control w-full text-sm text-white bg-gray-800 border border-gray-600 rounded-lg placeholder-gray-400 p-2 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-400 transition-all duration-300 resize-none hover:border-gray-500 shadow-lg cursor-text"
               placeholder="Enter description"
               rows={3}
               autoComplete="off"
@@ -759,12 +1002,13 @@ export function WorkItemDetailsModal({
               <div className="space-y-1">
                 <input
                   type="range"
+                  aria-label="Priority"
                   min="0"
                   max="1"
                   step="0.1"
                   value={editedNode?.priority || 0}
                   onChange={(e) => setEditedNode(prev => prev ? { ...prev, priority: parseFloat(e.target.value) } : null)}
-                  className={`w-full h-2 bg-gray-700/50 rounded-lg appearance-none cursor-pointer slider shadow-inner ${
+                  className={`task-priority-slider w-full h-2 bg-gray-700/50 rounded-lg appearance-none cursor-pointer slider shadow-inner ${
                     getPriorityConfig(editedNode?.priority || 0).value === 'critical' ? 'accent-red-500' :
                     getPriorityConfig(editedNode?.priority || 0).value === 'high' ? 'accent-orange-500' :
                     getPriorityConfig(editedNode?.priority || 0).value === 'moderate' ? 'accent-yellow-500' :
@@ -772,7 +1016,7 @@ export function WorkItemDetailsModal({
                     'accent-gray-500'
                   }`}
                   style={{
-                    background: `linear-gradient(to right, ${
+                    backgroundImage: `linear-gradient(to right, ${
                       getPriorityColorScheme(editedNode?.priority || 0).hex
                     } 0%, ${
                       getPriorityColorScheme(editedNode?.priority || 0).hex
@@ -799,6 +1043,7 @@ export function WorkItemDetailsModal({
               </h3>
               <div className="relative">
                 <select
+                  aria-label="Contributor"
                   value={typeof editedNode?.assignedTo === 'string' ? editedNode.assignedTo : (editedNode?.assignedTo?.id || '')}
                   onChange={(e) => {
                     const value = e.target.value;
@@ -807,14 +1052,11 @@ export function WorkItemDetailsModal({
                       assignedTo: value ? { id: value, name: e.target.selectedOptions[0].text.split(' (')[0], username: value } : undefined 
                     } : null);
                   }}
-                  className="w-full bg-gray-800 border border-gray-600 rounded-lg px-2 py-1 text-sm text-white focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-400 transition-all duration-300 appearance-none hover:border-gray-500 shadow-lg font-medium"
+                  className="task-detail-control w-full bg-gray-800 border border-gray-600 rounded-lg px-2 py-1 text-sm text-white focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-400 transition-all duration-300 appearance-none hover:border-gray-500 shadow-lg font-medium"
                 >
                   <option value="">No contributor</option>
-                  <option value="user-1">John Doe (@john)</option>
-                  <option value="user-2">Jane Smith (@jane)</option>
-                  <option value="user-3">Mike Johnson (@mike)</option>
-                  <option value="user-4">Sarah Wilson (@sarah)</option>
-                  <option value="user-5">Alex Chen (@alex)</option>
+                  {currentUser && <option value={currentUser.id}>{currentUser.name || currentUser.username} (you)</option>}
+                  {node?.assignedTo && typeof node.assignedTo === 'object' && node.assignedTo.id !== currentUser?.id && <option value={node.assignedTo.id}>{node.assignedTo.name}</option>}
                 </select>
                 <ChevronDown className="absolute right-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
               </div>
@@ -854,6 +1096,7 @@ export function WorkItemDetailsModal({
               </h3>
               <input
                 type="date"
+                aria-label="Due date"
                 value={editedNode?.dueDate ? editedNode.dueDate.split('T')[0] : ''}
                 onChange={(e) => {
                   const value = e.target.value;
@@ -862,7 +1105,7 @@ export function WorkItemDetailsModal({
                     dueDate: value ? `${value}T23:59:59.999Z` : undefined
                   } : null);
                 }}
-                className="w-full bg-gray-800 border border-gray-600 rounded-lg px-2 py-1 text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-400 transition-all duration-300 hover:border-gray-500 shadow-lg font-medium"
+                className="task-detail-control w-full bg-gray-800 border border-gray-600 rounded-lg px-2 py-1 text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-400 transition-all duration-300 hover:border-gray-500 shadow-lg font-medium"
                 placeholder="dd/mm/yyyy"
               />
               {editedNode?.dueDate && (
@@ -888,29 +1131,32 @@ export function WorkItemDetailsModal({
                 {editedNode?.tags?.map((tag, index) => (
                   <span
                     key={index}
-                    className="flex items-center px-2 py-1 bg-gradient-to-r from-gray-700/60 to-gray-600/40 text-gray-200 rounded-lg text-xs font-medium group hover:from-gray-600/60 hover:to-gray-500/40 transition-all duration-200 hover:scale-105 shadow-md border border-gray-600/30"
+                    className="task-detail-tag-chip flex max-w-full min-w-0 items-center pl-2 pr-0 py-0 bg-gradient-to-r from-gray-700/60 to-gray-600/40 text-gray-200 rounded-lg text-xs font-medium group hover:from-gray-600/60 hover:to-gray-500/40 transition-all duration-200 shadow-md border border-gray-600/30"
                   >
-                    <span>{tag}</span>
+                    <span className="min-w-0 truncate">{tag}</span>
                     <button
+                      type="button"
                       onClick={() => {
                         const newTags = editedNode.tags?.filter((_, i) => i !== index) || [];
                         setEditedNode(prev => prev ? { ...prev, tags: newTags } : null);
                       }}
-                      className="ml-2 text-gray-400 hover:text-red-400 transition-all duration-200 hover:scale-125"
-                      title="Remove tag"
+                      className="task-detail-tag-remove ml-1 inline-flex min-h-7 min-w-7 flex-shrink-0 items-center justify-center rounded-md text-lg leading-none text-gray-400 hover:bg-red-500/15 hover:text-red-300 transition-colors duration-200 focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-sky-400"
+                      aria-label={`Remove tag ${tag}`}
+                      title={`Remove tag ${tag}`}
                     >
-                      ×
+                      <span aria-hidden="true">×</span>
                     </button>
                   </span>
               ))}
                 
                 {/* Enhanced Inline Add Tag Input */}
                 {(!editedNode?.tags || editedNode.tags.length < 5) && (
-                  <div className="flex items-center">
+                  <div className="task-detail-tag-entry flex items-center min-w-0">
                     <input
                       type="text"
+                      aria-label="Add tag"
                       placeholder="Add Tag"
-                      className="text-xs bg-gray-800 border border-gray-600 rounded-lg px-2 py-1 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-400 transition-all duration-300 min-w-20 shadow-lg font-medium"
+                      className="task-detail-control task-detail-tag text-xs bg-gray-800 border border-gray-600 rounded-lg px-2 py-1 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-400 transition-all duration-300 min-w-20 max-w-full shadow-lg font-medium"
                       style={{ width: `${Math.max(20, 8)}ch` }}
                       onInput={(e) => {
                         const input = e.target as HTMLInputElement;
@@ -1090,10 +1336,17 @@ export function WorkItemDetailsModal({
               {/* Enhanced Connect Dropdown */}
               <div className="relative" ref={connectDropdownRef}>
                 <button
-                  onClick={() => setShowConnectDropdown(!showConnectDropdown)}
+                  ref={connectButtonRef}
+                  type="button"
+                  onClick={() => {
+                    setShowConnectDropdown(open => !open);
+                    setShowDisconnectDropdown(false);
+                  }}
                   disabled={getAvailableNodes().length === 0}
-                  className="w-full flex flex-row items-center justify-start gap-2 px-3 py-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-all duration-300 text-xs font-semibold shadow-lg hover:scale-105 transform border border-green-400/30"
+                  className="w-full min-h-[44px] flex flex-row items-center justify-start gap-2 px-3 py-2 bg-gradient-to-r from-green-700 to-emerald-700 hover:from-green-800 hover:to-emerald-800 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-transform duration-300 text-xs font-semibold shadow-lg hover:scale-105 transform border border-green-400/50"
                   aria-label={`Connect to other work items (${getAvailableNodes().length} available)`}
+                  aria-expanded={showConnectDropdown}
+                  aria-controls={`connect-work-items-${currentNode.id}`}
                   title={getAvailableNodes().length === 0 ? "No work items available to connect" : "Connect to other work items"}
                 >
                   <Link2 className="h-4 w-4" />
@@ -1101,26 +1354,26 @@ export function WorkItemDetailsModal({
                 </button>
                 
                 {showConnectDropdown && getAvailableNodes().length > 0 && (
-                  <div className="absolute top-full left-0 mt-2 w-full bg-gray-900 border border-gray-600 rounded-lg shadow-xl z-50 max-h-80 overflow-y-auto">
+                  <div
+                    id={`connect-work-items-${currentNode.id}`}
+                    role="group"
+                    aria-label="Work items available to connect"
+                    className="absolute top-full left-0 mt-2 w-full md:left-auto md:right-0 md:w-80 bg-gray-900 border border-gray-600 rounded-lg shadow-xl z-50"
+                  >
                     {/* Multi-select list */}
                     <div className="p-2 max-h-48 overflow-y-auto">
                       {getAvailableNodes().map((availableNode) => (
                         <label
                           key={availableNode.id}
-                          className="flex items-center space-x-3 p-2 hover:bg-gray-700 rounded cursor-pointer transition-colors"
+                          className="flex min-h-[44px] items-center space-x-3 px-2 py-1.5 hover:bg-gray-700 rounded cursor-pointer transition-colors focus-within:ring-2 focus-within:ring-green-400/70"
                         >
-                          <div
-                            onClick={() => toggleNodeSelection(availableNode.id)}
-                            className={`w-4 h-4 min-w-[16px] min-h-[16px] border flex items-center justify-center transition-colors cursor-pointer ${
-                              selectedNodesForConnection.includes(availableNode.id)
-                                ? 'bg-green-600 border-green-600' 
-                                : 'bg-gray-700 border-gray-600 hover:border-gray-500'
-                            }`}
-                          >
-                            {selectedNodesForConnection.includes(availableNode.id) && (
-                              <span className="text-white text-xs font-bold">✓</span>
-                            )}
-                          </div>
+                          <input
+                            type="checkbox"
+                            checked={selectedNodesForConnection.includes(availableNode.id)}
+                            onChange={(event) => setNodeSelection(availableNode.id, event.target.checked)}
+                            aria-label={`Select ${availableNode.title} to connect`}
+                            className="h-5 w-5 shrink-0 accent-green-600"
+                          />
                           <div className="flex items-center space-x-2 flex-1">
                             {getTypeIcon(availableNode.type)}
                             <div>
@@ -1137,20 +1390,20 @@ export function WorkItemDetailsModal({
                       <button
                         onClick={handleConnectSelected}
                         disabled={selectedNodesForConnection.length === 0}
-                        className="w-full px-3 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-sm font-medium rounded transition-colors"
+                        className="w-full min-h-[44px] px-3 py-2 bg-green-700 hover:bg-green-800 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-sm font-medium rounded transition-[background-color]"
                       >
                         Connect Selected ({selectedNodesForConnection.length})
                       </button>
                       <div className="flex space-x-2">
                         <button
                           onClick={() => setSelectedNodesForConnection(getAvailableNodes().map(n => n.id))}
-                          className="flex-1 px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded transition-colors"
+                          className="flex-1 min-h-[44px] px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded transition-colors"
                         >
                           Select All
                         </button>
                         <button
                           onClick={() => setSelectedNodesForConnection([])}
-                          className="flex-1 px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded transition-colors"
+                          className="flex-1 min-h-[44px] px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded transition-colors"
                         >
                           Clear
                         </button>
@@ -1163,10 +1416,17 @@ export function WorkItemDetailsModal({
               {/* Enhanced Disconnect Dropdown */}
               <div className="relative" ref={disconnectDropdownRef}>
                 <button
-                  onClick={() => setShowDisconnectDropdown(!showDisconnectDropdown)}
+                  ref={disconnectButtonRef}
+                  type="button"
+                  onClick={() => {
+                    setShowDisconnectDropdown(open => !open);
+                    setShowConnectDropdown(false);
+                  }}
                   disabled={getConnectedNodes().length === 0}
-                  className="w-full flex flex-row items-center justify-start gap-2 px-3 py-2 bg-gradient-to-r from-yellow-600 to-amber-600 hover:from-yellow-500 hover:to-amber-500 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-all duration-300 text-xs font-semibold shadow-lg hover:scale-105 transform border border-yellow-400/30"
+                  className="w-full min-h-[44px] flex flex-row items-center justify-start gap-2 px-3 py-2 bg-gradient-to-r from-yellow-700 to-amber-700 hover:from-yellow-800 hover:to-amber-800 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-transform duration-300 text-xs font-semibold shadow-lg hover:scale-105 transform border border-yellow-400/50"
                   aria-label={`Disconnect from work items (${getConnectedNodes().length} connected)`}
+                  aria-expanded={showDisconnectDropdown}
+                  aria-controls={`disconnect-work-items-${currentNode.id}`}
                   title={getConnectedNodes().length === 0 ? "No connections to disconnect" : "Disconnect from work items"}
                 >
                   <Unlink className="h-4 w-4" />
@@ -1174,26 +1434,26 @@ export function WorkItemDetailsModal({
                 </button>
                 
                 {showDisconnectDropdown && getConnectedNodes().length > 0 && (
-                  <div className="absolute top-full left-0 mt-2 w-full bg-gray-900 border border-gray-600 rounded-lg shadow-xl z-50 max-h-80 overflow-y-auto">
+                  <div
+                    id={`disconnect-work-items-${currentNode.id}`}
+                    role="group"
+                    aria-label="Connected work items available to disconnect"
+                    className="absolute top-full left-0 mt-2 w-full md:left-auto md:right-0 md:w-80 bg-gray-900 border border-gray-600 rounded-lg shadow-xl z-50"
+                  >
                     {/* Multi-select list */}
                     <div className="p-2 max-h-48 overflow-y-auto">
                       {getConnectedNodes().map(({ node: connectedNode, edge, isIncoming }) => (
                         <label
                           key={edge.id}
-                          className="flex items-center space-x-3 p-2 hover:bg-gray-700 rounded cursor-pointer transition-colors"
+                          className="flex min-h-[44px] items-center space-x-3 px-2 py-1.5 hover:bg-gray-700 rounded cursor-pointer transition-colors focus-within:ring-2 focus-within:ring-yellow-400/70"
                         >
-                          <div
-                            onClick={() => toggleEdgeSelection(edge.id)}
-                            className={`w-4 h-4 min-w-[16px] min-h-[16px] border flex items-center justify-center transition-colors cursor-pointer ${
-                              selectedEdgesForDisconnection.includes(edge.id)
-                                ? 'bg-yellow-600 border-yellow-600' 
-                                : 'bg-gray-700 border-gray-600 hover:border-gray-500'
-                            }`}
-                          >
-                            {selectedEdgesForDisconnection.includes(edge.id) && (
-                              <span className="text-white text-xs font-bold">✓</span>
-                            )}
-                          </div>
+                          <input
+                            type="checkbox"
+                            checked={selectedEdgesForDisconnection.includes(edge.id)}
+                            onChange={(event) => setEdgeSelection(edge.id, event.target.checked)}
+                            aria-label={`Select ${connectedNode!.title} to disconnect`}
+                            className="h-5 w-5 shrink-0 accent-yellow-600"
+                          />
                           <div className="flex items-center space-x-2 flex-1">
                             {getTypeIcon(connectedNode!.type)}
                             <div>
@@ -1210,20 +1470,20 @@ export function WorkItemDetailsModal({
                       <button
                         onClick={handleDisconnectSelected}
                         disabled={selectedEdgesForDisconnection.length === 0}
-                        className="w-full px-3 py-2 bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-sm font-medium rounded transition-colors"
+                        className="w-full min-h-[44px] px-3 py-2 bg-yellow-700 hover:bg-yellow-800 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-sm font-medium rounded transition-[background-color]"
                       >
                         Remove Selected ({selectedEdgesForDisconnection.length})
                       </button>
                       <div className="flex space-x-2">
                         <button
                           onClick={() => setSelectedEdgesForDisconnection(getConnectedNodes().map(item => item.edge.id))}
-                          className="flex-1 px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded transition-colors"
+                          className="flex-1 min-h-[44px] px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded transition-colors"
                         >
                           Select All
                         </button>
                         <button
                           onClick={() => setSelectedEdgesForDisconnection([])}
-                          className="flex-1 px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded transition-colors"
+                          className="flex-1 min-h-[44px] px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded transition-colors"
                         >
                           Clear
                         </button>
@@ -1235,9 +1495,10 @@ export function WorkItemDetailsModal({
 
               {!showDeleteConfirm ? (
                 <button
+                  ref={deleteButtonRef}
                   onClick={handleDelete}
                   disabled={deleting}
-                  className="w-full flex flex-row items-center justify-start gap-2 px-3 py-2 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 disabled:from-red-400 disabled:to-rose-400 disabled:cursor-not-allowed text-white rounded-lg transition-all duration-300 text-xs font-semibold shadow-lg hover:scale-105 transform border border-red-400/30"
+                  className="w-full min-h-[44px] flex flex-row items-center justify-start gap-2 px-3 py-2 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 disabled:from-red-400 disabled:to-rose-400 disabled:cursor-not-allowed text-white rounded-lg transition-all duration-300 text-xs font-semibold shadow-lg hover:scale-105 transform border border-red-400/30"
                   aria-label="Delete work item"
                   title="Delete this work item (requires disconnecting all relationships first)"
                 >
@@ -1251,21 +1512,16 @@ export function WorkItemDetailsModal({
                   </div>
                   
                   {/* Confirmation Checkbox */}
-                  <label className="flex items-center space-x-1 cursor-pointer">
-                    <div
-                      onClick={() => setDeleteConfirmed(!deleteConfirmed)}
-                      className={`w-3 h-3 min-w-[12px] min-h-[12px] border flex items-center justify-center transition-colors cursor-pointer ${
-                        deleteConfirmed
-                          ? 'bg-red-600 border-red-600'
-                          : 'bg-gray-700 border-gray-600 hover:border-gray-500'
-                      }`}
-                    >
-                      {deleteConfirmed && (
-                        <span className="text-white text-[8px] font-bold">✓</span>
-                      )}
-                    </div>
-                    <span className="text-[10px] text-gray-400 leading-tight">
-                      Confirm
+                  <label data-testid="delete-confirmation-choice" className="min-h-[44px] flex items-center gap-2 px-2 rounded-lg cursor-pointer text-gray-300 hover:bg-red-950/30 focus-within:ring-2 focus-within:ring-red-400/70">
+                    <input
+                      ref={deleteConfirmRef}
+                      type="checkbox"
+                      checked={deleteConfirmed}
+                      onChange={(event) => setDeleteConfirmed(event.target.checked)}
+                      className="h-4 w-4 shrink-0 accent-red-600"
+                    />
+                    <span className="text-xs leading-tight">
+                      Confirm deletion
                     </span>
                   </label>
 
@@ -1274,17 +1530,20 @@ export function WorkItemDetailsModal({
                       onClick={() => {
                         setShowDeleteConfirm(false);
                         setDeleteConfirmed(false);
+                        requestAnimationFrame(() => deleteButtonRef.current?.focus());
                       }}
-                      className="px-2 py-1 bg-gradient-to-r from-gray-600 to-gray-700 hover:bg-red-600 hover:text-white text-white rounded-lg transition-all duration-200 text-xs font-semibold shadow-lg hover:scale-105 transform"
+                      className="min-h-[44px] px-2 py-2 bg-gradient-to-r from-gray-600 to-gray-700 hover:bg-red-600 hover:text-white text-white rounded-lg transition-all duration-200 text-xs font-semibold shadow-lg hover:scale-105 transform"
+                      aria-label="Cancel deletion"
                     >
                       Cancel
                     </button>
                     <button
                       onClick={confirmDelete}
                       disabled={deleting || !deleteConfirmed}
-                      className="px-2 py-1 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 disabled:from-red-400 disabled:to-rose-400 disabled:cursor-not-allowed text-white rounded-lg transition-all duration-200 text-xs font-semibold shadow-lg hover:scale-105 transform"
+                      className="min-h-[44px] px-2 py-2 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 disabled:from-red-400 disabled:to-rose-400 disabled:cursor-not-allowed text-white rounded-lg transition-all duration-200 text-xs font-semibold shadow-lg hover:scale-105 transform"
+                      aria-label="Confirm delete work item"
                     >
-                      {deleting ? 'Del...' : 'Del'}
+                      {deleting ? 'Deleting...' : 'Delete'}
                     </button>
                   </div>
                 </div>

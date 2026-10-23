@@ -3,18 +3,33 @@ import neo4j, { Driver, Session } from 'neo4j-driver';
 import { GraphService } from '../src/services/graph-service';
 import { createMockDriver } from './mock-neo4j';
 
-describe('Neo4j Mock Validation Against Real Database', () => {
+const disposable = process.env.GRAPHDONE_DISPOSABLE_NEO4J === '1';
+const required = process.env.GRAPHDONE_MCP_INTEGRATION_REQUIRED === '1';
+const neo4jUri = process.env.NEO4J_URI || '';
+const neo4jUser = process.env.NEO4J_USER || process.env.NEO4J_USERNAME || '';
+const neo4jPassword = process.env.NEO4J_PASSWORD || '';
+const configured = disposable && !!neo4jUri && !!neo4jUser && !!neo4jPassword;
+
+if (required && !configured) {
+  throw new Error('Real MCP integration requires GRAPHDONE_DISPOSABLE_NEO4J=1 plus explicit NEO4J_URI, NEO4J_USER and NEO4J_PASSWORD for an owned disposable fixture.');
+}
+if (configured && !['localhost', '127.0.0.1', '[::1]'].includes(new URL(neo4jUri).hostname)) {
+  throw new Error('Real MCP integration only accepts an explicitly configured loopback Neo4j fixture.');
+}
+
+describe.skipIf(!configured)('Neo4j Mock Validation Against Real Database', () => {
   let realDriver: Driver;
   let mockDriver: Driver;
   let realGraphService: GraphService;
   let mockGraphService: GraphService;
   let realSession: Session;
+  const createdNodeIds: string[] = [];
 
   beforeAll(async () => {
     // Create real Neo4j driver for comparison
     realDriver = neo4j.driver(
-      'bolt://localhost:7687',
-      neo4j.auth.basic('neo4j', 'graphdone_password'),
+      neo4jUri,
+      neo4j.auth.basic(neo4jUser, neo4jPassword),
       { disableLosslessIntegers: true }
     );
 
@@ -39,7 +54,15 @@ describe('Neo4j Mock Validation Against Real Database', () => {
 
   afterAll(async () => {
     if (realDriver) {
-      await realDriver.close();
+      const session = realDriver.session();
+      try {
+        if (createdNodeIds.length) {
+          await session.run('MATCH (n:WorkItem) WHERE n.id IN $ids DETACH DELETE n', { ids: createdNodeIds });
+        }
+      } finally {
+        await session.close();
+        await realDriver.close();
+      }
     }
   });
 
@@ -53,6 +76,8 @@ describe('Neo4j Mock Validation Against Real Database', () => {
 
       try {
         const realResult = await realGraphService.createNode(testParams);
+        const createdId = JSON.parse(realResult.content[0].text).node?.id;
+        if (createdId) createdNodeIds.push(createdId);
         const mockResult = await mockGraphService.createNode(testParams);
 
         // Both should return objects with content arrays

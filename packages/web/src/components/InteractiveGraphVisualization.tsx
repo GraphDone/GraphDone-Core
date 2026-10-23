@@ -1,4 +1,6 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { skipBackgroundPoll } from '../lib/hostedUsage';
+import { QuickEditSurface } from './QuickEditSurface';
+import React, { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
 import ReactDOM from 'react-dom/client';
 import { createPortal } from 'react-dom';
 import * as d3 from 'd3';
@@ -47,13 +49,14 @@ import { nodeLifeClasses, nodeGlowFilter, isActiveStatus, isCompletedStatus, edg
 import { mergeSimulationNodes, mergeSimulationEdges } from '../lib/graphDataMerge';
 import { edgeLabelPlacement, clearSegment, slideTFromPointer, chooseLabelT } from '../lib/edgeLabelLayout';
 import { PerfMeter, DriftMeter } from '../lib/perfMeter';
+import { separateCards } from '../lib/separateCards';
 import { DEFAULT_PHYSICS, collisionRadius, linkDistance, linkMaxDistance, linkStrength } from '../lib/physicsConfig';
-import { computeNodeLayerY, isHierarchicalLayout, parseLayoutMode, LAYOUT_MODE_STORAGE_KEY, type LayoutMode } from '../lib/layoutAlgorithms';
+import { computeCompactLayout, isHierarchicalLayout, parseLayoutMode, LAYOUT_MODE_STORAGE_KEY, type LayoutMode } from '../lib/layoutAlgorithms';
 import { edgeBorderEndpoints, minEdgeLength, clampToMinNeighbors } from '../lib/edgeGeometry';
 import { directionStrategy, arrowVisibility, labelVisibility, perpendicularOffset } from '../lib/edgeLOD';
 import { assignParallelEdgeIndices } from '../lib/parallelEdges';
 import { isTap, touchHitSize, isCoarsePointer } from '../lib/touchInteraction';
-import { createPositionSaveQueue } from '../lib/positionSaveQueue';
+import { usePositionSaveQueue } from '../hooks/usePositionSaveQueue';
 import { spawnCelebration } from '../lib/celebration';
 import { buildNeighborhood } from '../lib/graphAdjacency';
 import { UndoStack } from '../lib/undoStack';
@@ -119,6 +122,22 @@ const legibilityTransform = (cy: number, basePx: number, k: number) => {
   const s = legibilityScale(basePx, k);
   return `translate(0,${cy}) scale(${s}) translate(0,${-cy})`;
 };
+
+// The legibility boost must never let text escape its card. The full title
+// remains available in the editor; at overview zoom the card is the boundary.
+function fittedTitleTransform(element: SVGGElement, k: number): string {
+  const cy = Number(element.getAttribute('data-cy')) || 0;
+  const card = element.parentElement?.querySelector('.node-bg');
+  const box = element.getBBox();
+  const width = Number(card?.getAttribute('width')) || 170;
+  const height = Number(card?.getAttribute('height')) || 110;
+  const top = -height / 2 + 34;
+  const bottom = height / 2 - 32;
+  const availableHeight = Math.max(1, 2 * Math.min(cy - top, bottom - cy));
+  const boost = Math.min(legibilityScale(TITLE_BASE_PX, k),
+    (width - 16) / Math.max(1, box.width), availableHeight / Math.max(1, box.height));
+  return `translate(0,${cy}) scale(${boost}) translate(0,${-cy})`;
+}
 
 // Hex color → normalized 0..1 RGB for SVG feColorMatrix glow filters.
 const hexToRgb = (hex: string) => {
@@ -191,9 +210,14 @@ interface InteractiveGraphVisualizationProps {
   /** When true (phone "locked" mode), node + edge-label dragging is disabled so
    *  a touch gesture pans the canvas instead of accidentally moving things. */
   interactionLocked?: boolean;
+  quickEditRequest?: WorkItem | null;
+  onQuickEditRequestHandled?: () => void;
+  /** Workspace-scoped history lets the primary create modal and graph gestures
+   * share the same Ctrl/Cmd+Z and touch context-menu undo action. */
+  undoStack?: UndoStack;
 }
 
-export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, interactionLocked }: InteractiveGraphVisualizationProps = {}) {
+export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, interactionLocked, quickEditRequest, onQuickEditRequestHandled, undoStack: workspaceUndoStack }: InteractiveGraphVisualizationProps = {}) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   // Live-readable lock flag for d3 drag filters (avoids re-binding handlers on toggle).
@@ -208,6 +232,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   currentGraphIdRef.current = currentGraph?.id;
   const fittedGraphsRef = useRef<Set<string>>(new Set());
   const cameraSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cameraManuallyPositionedRef = useRef(false);
+  useEffect(() => { cameraManuallyPositionedRef.current = false; }, [currentGraph?.id]);
   // Mirrors isSimplified for the d3 tick closure (which captures stale render
   // values otherwise). Lets updateEdgePositions skip hidden arrow/label work.
   const simplifiedRef = useRef(false);
@@ -223,7 +249,23 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const [expandedNode, setExpandedNode] = useState<WorkItem | null>(null);
   const expandPanelRef = useRef<HTMLDivElement>(null);
   const expandedNodeIdRef = useRef<string | null>(null);
+  const expandedReturnFocusIdRef = useRef<string | null>(null);
   expandedNodeIdRef.current = expandedNode?.id ?? null;
+  const closeExpandedNode = useCallback(() => {
+    const returnFocusId = expandedReturnFocusIdRef.current;
+    expandedReturnFocusIdRef.current = null;
+    setExpandedNode(null);
+    if (!returnFocusId) return;
+    requestAnimationFrame(() => {
+      const active = document.activeElement;
+      if (active && active !== document.body) return;
+      const trigger = Array.from(
+        containerRef.current?.querySelectorAll<SVGGElement>('.node-expand-icon') ?? []
+      ).find(element => element.dataset.nodeId === returnFocusId);
+      trigger?.setAttribute('aria-expanded', 'false');
+      trigger?.focus({ preventScroll: true });
+    });
+  }, []);
   const toggleExpandedNode = useCallback((n: WorkItem) => {
     setExpandedNode((prev) => (prev?.id === n.id ? null : n));
   }, []);
@@ -262,28 +304,29 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       }
     } : { where: {} },
     fetchPolicy: currentGraph ? 'cache-and-network' : 'cache-only',
-    // Cross-client freshness without the 2s idle hammer: poll every 15s and skip
+    // Cross-client freshness without the 2s idle hammer: poll every minute and skip
     // the tick entirely while the tab is hidden. Own edits still refetch instantly.
-    pollInterval: currentGraph ? 15000 : 0,
-    skipPollAttempt: () => typeof document !== 'undefined' && document.visibilityState !== 'visible',
+    pollInterval: 60000,
+    skipPollAttempt: skipBackgroundPoll,
     errorPolicy: 'all'
   });
 
+  const edgeQueryVariables = currentGraph ? {
+    where: {
+      OR: [
+        { source: { graph: { id: currentGraph.id } } },
+        { target: { graph: { id: currentGraph.id } } },
+      ],
+    },
+  } : { where: {} };
+
   const { data: edgesData, loading: edgesLoading, error: edgesError, refetch: refetchEdges } = useQuery(GET_EDGES, {
-    variables: currentGraph ? {
-      where: {
-        source: {
-          graph: {
-            id: currentGraph.id
-          }
-        }
-      }
-    } : { where: {} },
+    variables: edgeQueryVariables,
     fetchPolicy: currentGraph ? 'cache-and-network' : 'cache-only',
-    // Cross-client freshness without the 2s idle hammer: poll every 15s and skip
+    // Cross-client freshness without the 2s idle hammer: poll every minute and skip
     // the tick entirely while the tab is hidden. Own edits still refetch instantly.
-    pollInterval: currentGraph ? 15000 : 0,
-    skipPollAttempt: () => typeof document !== 'undefined' && document.visibilityState !== 'visible',
+    pollInterval: 60000,
+    skipPollAttempt: skipBackgroundPoll,
     errorPolicy: 'all'
   });
 
@@ -315,15 +358,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       // Refetch edges for current graph
       { 
         query: GET_EDGES, 
-        variables: {
-          where: {
-            source: {
-              graph: {
-                id: currentGraph?.id
-              }
-            }
-          }
-        }
+        variables: edgeQueryVariables,
       },
       // Refetch work items for current graph
       { 
@@ -372,15 +407,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       },
       { 
         query: GET_EDGES,
-        variables: currentGraph ? {
-          where: {
-            source: {
-              graph: {
-                id: currentGraph.id
-              }
-            }
-          }
-        } : { where: {} }
+        variables: edgeQueryVariables,
       }
     ],
     awaitRefetchQueries: true, // Wait for refetch to complete
@@ -396,7 +423,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const [deleteWorkItemMutation] = useMutation(DELETE_WORK_ITEM, {
     refetchQueries: [
       { query: GET_WORK_ITEMS, variables: currentGraph ? { where: { graph: { id: currentGraph.id } } } : { where: {} } },
-      { query: GET_EDGES, variables: currentGraph ? { where: { source: { graph: { id: currentGraph.id } } } } : { where: {} } }
+      { query: GET_EDGES, variables: edgeQueryVariables }
     ]
   });
   
@@ -436,6 +463,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [dragStart, setDragStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number; graphX: number; graphY: number } | null>(null);
+  const contextMenuRef = useRef<HTMLDivElement>(null);
+  const [contextMenuPlacement, setContextMenuPlacement] = useState<{ left: number; top: number; maxHeight: number } | null>(null);
   const [isFlippingEdge, setIsFlippingEdge] = useState(false);
   const [showRelationshipWindow, setShowRelationshipWindow] = useState(false);
   const [selectedNodes, setSelectedNodes] = useState<Set<string>>(new Set());
@@ -445,6 +474,28 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   // field without the heavy details modal. Holds the work item being edited.
   const [quickEditNode, setQuickEditNode] = useState<any | null>(null);
   const quickEditNodeId = quickEditNode?.id ?? null;
+  const quickEditReturnFocusIdRef = useRef<string | null>(null);
+  const closeQuickEdit = useCallback(() => {
+    const returnFocusId = quickEditReturnFocusIdRef.current;
+    quickEditReturnFocusIdRef.current = null;
+    setQuickEditNode(null);
+    if (!returnFocusId) return;
+    requestAnimationFrame(() => {
+      const active = document.activeElement;
+      if (active && active !== document.body) return;
+      const trigger = Array.from(
+        containerRef.current?.querySelectorAll<SVGGElement>('.node-edit-icon') ?? []
+      ).find(element => element.dataset.nodeId === returnFocusId);
+      trigger?.focus({ preventScroll: true });
+    });
+  }, []);
+  useEffect(() => {
+    if (!quickEditRequest) return;
+    setInlineEdit(null);
+    setExpandedNode(null);
+    setQuickEditNode(quickEditRequest);
+    onQuickEditRequestHandled?.();
+  }, [quickEditRequest, onQuickEditRequestHandled]);
 
   // D3 handlers are bound once at init and the init effect intentionally
   // avoids re-initialising on mode changes — so handlers would capture STALE
@@ -456,30 +507,21 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const selectedRelationTypeRef = useRef<RelationshipType>('RELATES_TO');
 
   // FLOW-3: every mutation registers its inverse — experimentation is safe
-  const undoStackRef = useRef(new UndoStack(36));
-  const [undoLabel, setUndoLabel] = useState<string | null>(null);
-  useEffect(() => undoStackRef.current.onChange(() => setUndoLabel(undoStackRef.current.peekLabel())), []);
+  const localUndoStackRef = useRef(new UndoStack(36));
+  const undoStack = workspaceUndoStack ?? localUndoStackRef.current;
+  const [undoLabel, setUndoLabel] = useState<string | null>(() => undoStack.peekLabel());
+  useEffect(() => {
+    setUndoLabel(undoStack.peekLabel());
+    return undoStack.onChange(() => setUndoLabel(undoStack.peekLabel()));
+  }, [undoStack]);
   const runUndo = useCallback(async () => {
     try {
-      const action = await undoStackRef.current.undo();
+      const action = await undoStack.undo();
       if (action) showSuccess(`Undid: ${action.label}`);
     } catch {
       showError('Could not undo that — the server refused');
     }
-  }, []);
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
-        const t = e.target as HTMLElement | null;
-        if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
-        e.preventDefault();
-        runUndo();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [runUndo]);
-
+  }, [undoStack]);
   // Esc always works: pop one mode level, never trap the user
   // (docs/design/interaction-model.md, principle 3). Connection mode and the
   // edge-type selector were keyboard traps before this.
@@ -712,33 +754,29 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   
   // Function to save node position to database
   const saveNodePosition = useCallback(async (nodeId: string, x: number, y: number) => {
-    try {
-      await updateWorkItemMutation({
-        variables: {
-          where: { id: nodeId },
-          update: { 
-            positionX: x,
-            positionY: y
-          }
+    if (!currentUser || !currentGraph) throw new Error('A signed-in owner and graph are required.');
+    const result = await updateWorkItemMutation({
+      context: { expectedOwnerId: currentUser.id },
+      variables: {
+        where: { id: nodeId, graph: { id: currentGraph.id } },
+        update: {
+          positionX: x,
+          positionY: y
         }
-      });
-      // Position saved successfully
-    } catch (error) {
-      // Error saving position, continue without logging
+      }
+    });
+    if (result.errors?.length || !result.data?.updateWorkItems?.workItems?.some((item: { id: string }) => item.id === nodeId)) {
+      throw new Error('The task position was not saved.');
     }
-  }, [updateWorkItemMutation]);
+  }, [updateWorkItemMutation, currentUser?.id, currentGraph?.id]);
 
-  // #95: coalescing, concurrency-bounded position writes. A large-graph reflow
-  // moves hundreds of nodes at once; without this each fired its own mutation in
-  // parallel (a D1 write-amplification spike). The queue keeps only the latest
-  // position per node and drains with a hard cap on in-flight writes. Bound to
-  // the latest saveNodePosition via a ref so the queue itself is created once.
-  const saveNodePositionRef = useRef(saveNodePosition);
-  saveNodePositionRef.current = saveNodePosition;
-  const positionSaveQueueRef = useRef(createPositionSaveQueue({
-    save: (s) => saveNodePositionRef.current(s.id, s.x, s.y),
-    concurrency: 4,
-  }));
+  const positionSaveQueue = usePositionSaveQueue(
+    position => saveNodePosition(position.id, position.x, position.y),
+    message => showError('Layout could not be saved', message || 'Keep this tab open and return to this graph after reconnecting to retry your pending positions.'),
+    currentUser && currentGraph ? { ownerId: currentUser.id, graphId: currentGraph.id } : null,
+  );
+  const positionSaveQueueRef = useRef(positionSaveQueue);
+  positionSaveQueueRef.current = positionSaveQueue;
 
   // Durable layout: persist the current position of every node whose live
   // position has moved away from its last-saved position by more than a pixel.
@@ -756,9 +794,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // concurrency — one reflow of N nodes does at most `concurrency` writes at a
     // time instead of N in parallel (#95).
     moved.forEach((n: any) => {
-      n.positionX = n.x;
-      n.positionY = n.y;
-      positionSaveQueueRef.current.queue(n.id, n.x, n.y);
+      if (positionSaveQueueRef.current.queue(n.id, n.x, n.y)) {
+        n.positionX = n.x;
+        n.positionY = n.y;
+      }
     });
     positionSaveQueueRef.current.flush();
   }, []);
@@ -768,10 +807,14 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   useEffect(() => {
     const handler = () => persistAllPositions();
     window.addEventListener('pagehide', handler);
-    document.addEventListener('visibilitychange', () => {
+    const onVisibilityChange = () => {
       if (document.visibilityState === 'hidden') persistAllPositions();
-    });
-    return () => window.removeEventListener('pagehide', handler);
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      window.removeEventListener('pagehide', handler);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
   }, [persistAllPositions]);
 
   // Function to get SVG path for priority icons (using correct Lucide icon paths)
@@ -837,15 +880,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       // Refetch edges for current graph
       { 
         query: GET_EDGES, 
-        variables: {
-          where: {
-            source: {
-              graph: {
-                id: currentGraph?.id
-              }
-            }
-          }
-        }
+        variables: edgeQueryVariables,
       }
     ],
     awaitRefetchQueries: true,
@@ -869,29 +904,13 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         // Update the GET_EDGES query cache
         const existingEdges = cache.readQuery({
           query: GET_EDGES,
-          variables: {
-            where: {
-              source: {
-                graph: {
-                  id: currentGraph?.id
-                }
-              }
-            }
-          }
+          variables: edgeQueryVariables,
         });
         
         if (existingEdges) {
           cache.writeQuery({
             query: GET_EDGES,
-            variables: {
-              where: {
-                source: {
-                  graph: {
-                    id: currentGraph?.id
-                  }
-                }
-              }
-            },
+            variables: edgeQueryVariables,
             data: {
               edges: (existingEdges as any).edges.map((edge: any) => 
                 edge.id === updatedEdge.id ? updatedEdge : edge
@@ -916,15 +935,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       // Refetch edges for current graph
       { 
         query: GET_EDGES, 
-        variables: {
-          where: {
-            source: {
-              graph: {
-                id: currentGraph?.id
-              }
-            }
-          }
-        }
+        variables: edgeQueryVariables,
       },
       // Refetch work items for current graph
       { 
@@ -971,7 +982,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       // Clicks inside the docked inspector (a sibling tree) must not deselect
       // the node — otherwise its own Card/Contents/Diagram controls close it.
       const target = event.target as Element | null;
-      if (target && target.closest('[data-testid="node-inspector"]')) {
+      if (target && target.closest('[data-testid="node-inspector"], [role="dialog"]')) {
         return;
       }
       setNodeMenu(prev => ({ ...prev, visible: false }));
@@ -1038,7 +1049,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         }).then((result) => {
           const createdEdgeId = result?.data?.createEdges?.edges?.[0]?.id;
           if (createdEdgeId) {
-            undoStackRef.current.push({
+            undoStack.push({
               label: 'Connect items',
               undo: async () => {
                 await deleteEdgeMutation({ variables: { where: { id: createdEdgeId } } });
@@ -1117,7 +1128,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       (g.selectAll('.node-title-group') as any)
         .attr('transform', function(this: any) {
           const cy = +(this.getAttribute('data-cy')) || 0;
-          return legibilityTransform(cy, TITLE_BASE_PX, scale);
+          return fittedTitleTransform(this as SVGGElement, scale);
         });
       (g.selectAll('.node-description-text') as any)
         .style('visibility', 'visible')
@@ -1149,25 +1160,26 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     });
   }
   
-  // Extract edges from legacy dependencies (fallback)
-  workItems.forEach(item => {
-    if (item.dependencies) {
-      item.dependencies.forEach((dep: WorkItem) => {
-        // Only add if not already added from Edge entities
-        const exists = workItemEdges.some(e => e.source === dep.id && e.target === item.id);
-        if (!exists) {
+  // Use legacy dependency fields only until the dedicated edge query resolves.
+  // Once it has resolved, including to an empty array after deletion, it is the
+  // authority; otherwise stale normalized WorkItem fields can resurrect a
+  // just-deleted connection until the next full work-item refresh.
+  if (!edgesData?.edges) {
+    workItems.forEach(item => {
+      if (item.dependencies) {
+        item.dependencies.forEach((dep: WorkItem) => {
           workItemEdges.push({
             id: `edge-${dep.id}-${item.id}`,
-            source: dep.id,
-            target: item.id,
+            source: item.id,
+            target: dep.id,
             type: 'DEPENDS_ON' as RelationshipType,
             strength: 0.8,
             description: 'dependency relationship'
           });
-        }
-      });
-    }
-  });
+        });
+      }
+    });
+  }
 
   // Validate and sanitize data before D3 processing
   const currentValidationResult = validateGraphData(workItems, workItemEdges);
@@ -1316,9 +1328,18 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     return hierarchyLinks;
   };
 
+  // A graph owns one simulation. Detached simulations otherwise keep mutating
+  // shared node objects after a rebuild and can fight the visible simulation.
+  const stopActiveSimulation = useCallback(() => {
+    simulationRef.current?.on('tick', null).on('end.persist', null).alphaTarget(0).stop();
+    simulationRef.current = null;
+    delete (window as any).__graphPerf;
+  }, []);
+
   // Initialize empty visualization canvas
   const initializeEmptyVisualization = useCallback(() => {
     if (!svgRef.current || !containerRef.current) return;
+    stopActiveSimulation();
 
     const container = containerRef.current;
     const svg = d3.select(svgRef.current);
@@ -1496,7 +1517,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         if (newNode?.id) {
           const createdId = newNode.id;
           const edgeToRemove = grownEdgeId;
-          undoStackRef.current.push({
+          undoStack.push({
             label: 'Create item',
             undo: async () => {
               // edges first — orphan edges break the whole edges query
@@ -1626,7 +1647,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     if (!layoutReflowingRef.current) {
       (nodeMerge.nodes as any[]).forEach((node: any) => {
         const placed = !(((node.positionX ?? 0) === 0) && ((node.positionY ?? 0) === 0));
-        if (placed) {
+        if (placed && !node._dragging) {
           node.fx = node.positionX;
           node.fy = node.positionY;
           node.userPinned = true;
@@ -1707,6 +1728,29 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           .style('pointer-events', 'none');
       });
 
+      titleGroup.attr('transform', function() { return fittedTitleTransform(this as SVGGElement, liveK); });
+
+      // Saved state must update on the canvas without rebuilding the graph.
+      const status = getStatusConfig(updatedNode.status as WorkItemStatus);
+      const completion = getStatusCompletionPercentage(updatedNode.status as WorkItemStatus);
+      nodeGroup.select('.status-percentage-text').text(status.label).style('fill', status.hexColor);
+      nodeGroup.select('.status-progress-fill').attr('width', 40 * completion / 100).attr('fill', status.hexColor);
+      nodeGroup.select('.status-icon-svg path').attr('d', getStatusIconSvgPath(updatedNode.status)).attr('stroke', status.hexColor);
+      const priority = updatedNode.priority || 0;
+      const priorityColor = priority >= .8 ? '#ef4444' : priority >= .6 ? '#f97316' : priority >= .4 ? '#eab308' : priority >= .2 ? '#3b82f6' : '#6b7280';
+      nodeGroup.select('.priority-percentage-text').text(`${Math.round(priority * 100)}%`).style('fill', priorityColor);
+      nodeGroup.select('.priority-progress-fill').attr('width', 40 * priority).attr('fill', priorityColor);
+      nodeGroup.select('.priority-icon-svg path').attr('d', getPriorityIconSvgPath(priority)).attr('stroke', priorityColor);
+      const completed = isCompletedStatus(updatedNode.status);
+      nodeGroup.select('.node-bg').attr('class', `node-bg ${nodeLifeClasses(updatedNode.status)}`)
+        .attr('fill', completed ? '#374151' : '#1f2937');
+      nodeGroup.selectAll('.completion-indicator').data(completed ? [updatedNode] : []).join('text')
+        .attr('class', 'completion-indicator').attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
+        .attr('x', 0)
+          .attr('y', (d: any) => getNodeDimensions(d).height / 2 - 13)
+          .attr('font-size', '18').attr('font-weight', '900').attr('fill', '#10b981').attr('stroke', '#10b981')
+        .attr('stroke-width', '1').attr('pointer-events', 'none').text('✓');
+
       // Update node type badge text
       nodeGroup.select('.node-type-text')
         .text(() => {
@@ -1758,6 +1802,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         }
       });
     }
+
+    stopActiveSimulation();
 
     const container = containerRef.current;
     const svg = d3.select(svgRef.current);
@@ -1953,6 +1999,17 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         // non-overlapping start.
         if (!node.x) node.x = (i % spreadCols) * spreadSpacing - spreadHalf + ((i * 13) % 23) - 11;
         if (!node.y) node.y = Math.floor(i / spreadCols) * spreadSpacing - spreadHalf + ((i * 7) % 19) - 9;
+      }
+    });
+
+    // Imported or previously saved coordinates can already intersect. Pins
+    // prevent any collision force from fixing that. Repair once before paint,
+    // then persist the repaired snapshot through the normal settle queue.
+    const repairedCards = separateCards(nodes, getNodeDimensions);
+    nodes.forEach((node: any) => {
+      if (repairedCards.has(node.id) && node.fx != null) {
+        node.fx = node.x;
+        node.fy = node.y;
       }
     });
 
@@ -2249,6 +2306,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .enter()
       .append('g')
       .attr('class', (d: WorkItem) => `node node-type-${d.type.toLowerCase()}`)
+      // Place replacement nodes before their first paint, not on a later tick.
+      .attr('transform', (d: any) => `translate(${d.x ?? d.positionX ?? 0},${d.y ?? d.positionY ?? 0})`)
       .style('cursor', 'pointer')
       .call(d3.drag<any, any>()
         // Locked (phone) → reject the drag so the gesture pans the canvas instead.
@@ -2262,6 +2321,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           }
           
           // Store initial position and connected nodes for cluster behavior
+          d._dragging = true;
           d._dragStart = { x: d.x, y: d.y };
           d._connectedNodes = validatedEdges
             .filter(edge => edge.source.id === d.id || edge.target.id === d.id)
@@ -2270,7 +2330,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
               return {
                 node: connectedNode,
                 edge, // keep the edge so the drag clamp can read its _minLen
-                wasFixed: connectedNode.fx !== null || connectedNode.fy !== null
+                wasFixed: connectedNode.fx != null || connectedNode.fy != null
               };
             });
           
@@ -2360,8 +2420,16 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
             return;
           }
           
-          // Sticky drag behavior - node stays where user put it
-          if (!event.active) simulation.alphaTarget(0.1).restart();
+          // Keep the dropped snapshot authoritative during polls and rebuilds.
+          d._dragging = false;
+          d.positionX = d.fx;
+          d.positionY = d.fy;
+          if (!event.active) {
+            const needsLayout = simulation.nodes().some((n: any) => n.fx == null || n.fy == null);
+            // One last tick paints the final pointer position; a fully pinned
+            // graph needs no continuing physics or delayed reheating.
+            simulation.alphaTarget(0).alpha(needsLayout ? DEFAULT_PHYSICS.reheat.drag : 0).restart();
+          }
           
           // Keep the node fixed at the dropped position
           // Don't release fx/fy - let the node stay where the user put it
@@ -2372,10 +2440,6 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           positionSaveQueueRef.current.queue(d.id, d.fx, d.fy);
           positionSaveQueueRef.current.flush();
           
-          // Let the simulation cool to a full stop after the neighbors settle
-          setTimeout(() => {
-            simulation.alphaTarget(0);
-          }, 1000);
           mousedownNodeRef.current = null;
         }));
 
@@ -2578,6 +2642,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // Edit icon in title bar (centered vertically, left side) - scales with zoom
     const editIcons = nodeElements.append('g')
       .attr('class', 'node-edit-icon')
+      .attr('role', 'button')
+      .attr('tabindex', 0)
+      .attr('aria-label', (d: WorkItem) => `Quick edit ${d.title}`)
+      .attr('data-node-id', (d: WorkItem) => d.id)
       .attr('transform', (d: WorkItem) => {
         const x = -getNodeDimensions(d).width / 2 + iconSize / 2 + 12;
         const y = -getNodeDimensions(d).height / 2 + 2 + titleBarHeight / 2;
@@ -2586,7 +2654,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .style('cursor', 'pointer')
       .style('opacity', (currentTransform?.k || 1) >= LOD_THRESHOLDS.FAR ? 0.85 : 0)
       .style('pointer-events', 'all');
-    editIcons.append('title').text('Open details / edit'); // native hover tooltip
+    editIcons.append('title').text('Quick edit'); // native hover tooltip
 
     // Edit icon background - scales with icon
     const editBg = editIcons.append('rect')
@@ -2650,17 +2718,36 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           .style('font-size', `${iconSize * 1.1}px`);
       });
     
-    // Edit icon click handler - opens edit modal
-    editIcons.on('click', (event: MouseEvent, d: WorkItem) => {
+    const openQuickEdit = (event: MouseEvent | KeyboardEvent, d: WorkItem) => {
       event.stopPropagation();
       event.preventDefault();
-      
-      // Set selected node and show details modal for editing
-      setSelectedNode(d);
-      lastSelectedNodeRef.current = d; // Track last selected
-      applyNodeGlowImmediately(d);
-      setShowNodeDetailsModal(true);
-    });
+
+      setInlineEdit(null);
+      setExpandedNode(null);
+      quickEditReturnFocusIdRef.current = d.id;
+      setQuickEditNode(d);
+    };
+
+    // The visible gear is a real keyboard action as well as a pointer target.
+    // Keeping focus on the trigger lets the dialog accessibility hook restore it
+    // when quick edit closes, so keyboard users do not fall back to <body>.
+    editIcons
+      .on('click', openQuickEdit)
+      .on('keydown', (event: KeyboardEvent, d: WorkItem) => {
+        if (event.key === 'Enter' || event.key === ' ') openQuickEdit(event, d);
+      })
+      .on('focus', function() {
+        d3.select(this).select('.edit-bg')
+          .attr('fill', 'rgba(59, 130, 246, 0.95)')
+          .attr('stroke', '#fbbf24')
+          .attr('stroke-width', 3);
+      })
+      .on('blur', function() {
+        d3.select(this).select('.edit-bg')
+          .attr('fill', 'rgba(0, 0, 0, 0.7)')
+          .attr('stroke', 'rgba(255, 255, 255, 0.8)')
+          .attr('stroke-width', 1);
+      });
 
     // Relationship creation icon in title bar (centered vertically, right side) - mirrors edit icon
     const relationshipIcons = nodeElements.append('g')
@@ -2760,6 +2847,12 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // can read a node's contents/diagram WITHOUT zooming in (PR-3).
     const expandIcons = nodeElements.append('g')
       .attr('class', 'node-expand-icon')
+      .attr('role', 'button')
+      .attr('tabindex', 0)
+      .attr('aria-label', (d: WorkItem) => `Expand ${d.title}`)
+      .attr('aria-controls', (d: WorkItem) => `node-expand-panel-${d.id}`)
+      .attr('aria-expanded', (d: WorkItem) => expandedNodeIdRef.current === d.id ? 'true' : 'false')
+      .attr('data-node-id', (d: WorkItem) => d.id)
       .attr('transform', (d: WorkItem) => {
         const x = getNodeDimensions(d).width / 2 - iconSize / 2 - 12 - iconSize - 8;
         const y = -getNodeDimensions(d).height / 2 + 2 + titleBarHeight / 2;
@@ -2790,6 +2883,15 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .style('fill', '#ffffff')
       .style('pointer-events', 'none')
       .text('⛶');
+    const toggleExpanded = (event: MouseEvent | KeyboardEvent, d: WorkItem) => {
+      event.stopPropagation();
+      event.preventDefault();
+      const opening = expandedNodeIdRef.current !== d.id;
+      d3.select(event.currentTarget as SVGGElement).attr('aria-expanded', opening ? 'true' : 'false');
+      expandedReturnFocusIdRef.current = opening ? d.id : null;
+      toggleExpandedNodeRef.current(d);
+    };
+
     expandIcons
       .on('mouseenter', function() {
         d3.select(this).select('.expand-bg').transition().duration(150)
@@ -2801,10 +2903,21 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           .attr('fill', 'rgba(0, 0, 0, 0.7)')
           .attr('stroke', 'rgba(255, 255, 255, 0.8)');
       })
-      .on('click', (event: MouseEvent, d: WorkItem) => {
-        event.stopPropagation();
-        event.preventDefault();
-        toggleExpandedNodeRef.current(d);
+      .on('focus', function() {
+        d3.select(this).select('.expand-bg')
+          .attr('fill', 'rgba(16, 185, 129, 0.95)')
+          .attr('stroke', '#fbbf24')
+          .attr('stroke-width', 3);
+      })
+      .on('blur', function() {
+        d3.select(this).select('.expand-bg')
+          .attr('fill', 'rgba(0, 0, 0, 0.7)')
+          .attr('stroke', 'rgba(255, 255, 255, 0.8)')
+          .attr('stroke-width', 1);
+      })
+      .on('click', toggleExpanded)
+      .on('keydown', (event: KeyboardEvent, d: WorkItem) => {
+        if (event.key === 'Enter' || event.key === ' ') toggleExpanded(event, d);
       });
 
     // Sheet-symbol affordances: a "descend" glyph (bottom-right) + a child
@@ -2971,6 +3084,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           })
           .style('pointer-events', 'none');
       });
+      titleGroup.attr('transform', function() { return fittedTitleTransform(this as SVGGElement, liveK); });
 
     });
 
@@ -3088,7 +3202,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         .attr('y', barY - 4)
         .attr('text-anchor', 'middle')
         .attr('dominant-baseline', 'middle')
-        .text(`${statusPercentage}%`)
+        .text(statusConfig.label)
         .style('font-size', '9px')
         .style('font-weight', '500')
         .style('fill', statusColor)
@@ -3200,7 +3314,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           .attr('class', 'completion-indicator')
           .attr('text-anchor', 'middle')
           .attr('dominant-baseline', 'central')
-          .attr('font-size', '96')
+          .attr('x', 0)
+          .attr('y', (d: any) => getNodeDimensions(d).height / 2 - 13)
+          .attr('font-size', '18')
           .attr('font-weight', '900')
           .attr('fill', '#10b981')
           .attr('stroke', '#10b981')
@@ -3244,7 +3360,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .enter()
       .append('g')
       .attr('class', 'edge-label-group')
-      .style('pointer-events', 'all')
+      .style('opacity', (d: any) => labelVisibility(liveScale, d._pTotal || 1))
+      .style('pointer-events', (d: any) => labelVisibility(liveScale, d._pTotal || 1) > 0 ? 'all' : 'none')
       .style('cursor', 'pointer')
       .on('click', function(event: MouseEvent, d: WorkItemEdge) {
         event.stopPropagation();
@@ -3324,7 +3441,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .attr('ry', 8)
       .style('fill', (d: WorkItemEdge) => {
         const config = getRelationshipConfig(d.type as RelationshipType);
-        return config.hexColor;
+        return '#29332f';
       })
       .style('opacity', 1)
       .style('stroke', (d: WorkItemEdge) => {
@@ -3481,7 +3598,17 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         return;
       }
       
-      // Regular node clicks (right-click menu)
+      // Some touch browsers deliver a compatibility click after D3 consumes
+      // touchstart. Keep that path identical to a direct touchend tap.
+      const pointer = event as MouseEvent & { pointerType?: string; sourceCapabilities?: { firesTouchEvents?: boolean } };
+      if ((pointer.pointerType === 'touch' || pointer.sourceCapabilities?.firesTouchEvents) && !isConnectingRef.current && !mousedownNodeRef.current) {
+        event.stopPropagation();
+        setInlineEdit(null);
+        setExpandedNode(null);
+        setQuickEditNode(d);
+        return;
+      }
+      // Regular mouse selection.
       setTimeout(() => {
         if (!mousedownNodeRef.current) {
           handleNodeClick(event, d);
@@ -3633,7 +3760,18 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         const duration = Date.now() - touchData.startTime;
         if (isTap(duration, touchData.moved ? 999 : 0)) {
           event.preventDefault();
-          handleNodeClick(event as unknown as MouseEvent, d);
+          const control = (event.target as Element).closest('.node-edit-icon, .node-relationship-icon, .node-expand-icon, .node-descend-icon');
+          if (control) {
+            // Dispatch the icon's own action once; the suppressed synthetic
+            // mouse event must not turn a grow/expand tap into body editing.
+            control.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX: event.changedTouches[0]?.clientX, clientY: event.changedTouches[0]?.clientY }));
+          } else if (isConnectingRef.current) {
+            handleNodeClick(event as unknown as MouseEvent, d);
+          } else {
+            setInlineEdit(null);
+            setExpandedNode(null);
+            setQuickEditNode(d);
+          }
         }
         delete (element.node() as any).__touchData;
       }
@@ -3831,7 +3969,35 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // console + window.__graphPerf) so dynamics work stays evidence-based.
     const perfMeter = new PerfMeter(240);
     const driftMeter = new DriftMeter();
-    let lastPerfReport = 0;
+    let lastPerfReport = -Infinity;
+    const measuredGraphId = currentGraphIdRef.current;
+    const publishPerf = (now: number, settled = false) => {
+      if (simulationRef.current !== simulation || currentGraphIdRef.current !== measuredGraphId) return;
+      const summary = perfMeter.summary();
+      if (summary.samples === 0) return;
+      lastPerfReport = now;
+      // Drift = node movement, the actual "slip and drift" signal that
+      // frame stats can't show. rmsFromSavedPx near 0 means the layout
+      // matches what's saved (snapshot fidelity).
+      const spatial = driftMeter.sample(simulation.nodes() as any[]);
+      const stats = {
+        ...summary,
+        graphId: measuredGraphId,
+        settled,
+        alpha: Math.round(simulation.alpha() * 1000) / 1000,
+        nodes: nodes.length,
+        edges: validatedEdges.length,
+        quality: qualityProfileRef.current.tier,
+        spatial
+      };
+      (window as any).__graphPerf = stats;
+      if ((window as any).debugLog) {
+        const level = stats.avgTickMs > 8 || stats.fps < 30 ? '⚠️' : '✅';
+        (window as any).debugLog('Perf', `${level} fps=${stats.fps} tick avg=${stats.avgTickMs}ms p95=${stats.p95TickMs}ms dropped=${stats.droppedFrames} alpha=${stats.alpha}`, stats);
+        const driftLevel = spatial.rmsFromSavedPx > 25 ? '⚠️' : '✅';
+        (window as any).debugLog('Drift', `${driftLevel} moving=${spatial.movingNodes} maxStep=${spatial.maxStepPx}px meanStep=${spatial.meanStepPx}px rmsFromSaved=${spatial.rmsFromSavedPx}px`, spatial);
+      }
+    };
 
     // Viewport culling (large graphs only). At 1000 nodes the dominant frame
     // cost is the browser repainting every on-screen SVG element each time a
@@ -3886,6 +4052,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     };
 
     simulation.on('tick', () => {
+      if (simulationRef.current !== simulation) return;
       const tickStart = performance.now();
       cullCounter++;
       if (cullEnabled && cullCounter % 5 === 0) applyViewportCull();
@@ -3945,32 +4112,15 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       const now = performance.now();
       perfMeter.tick(now - tickStart);
       perfMeter.frame(now);
-      if (now - lastPerfReport > 2000) {
-        lastPerfReport = now;
-        // Drift = node movement, the actual "slip and drift" signal that
-        // frame stats can't show. rmsFromSavedPx near 0 means the layout
-        // matches what's saved (snapshot fidelity).
-        const spatial = driftMeter.sample(simulation.nodes() as any[]);
-        const stats = {
-          ...perfMeter.summary(),
-          alpha: Math.round(simulation.alpha() * 1000) / 1000,
-          nodes: nodes.length,
-          edges: validatedEdges.length,
-          quality: qualityProfileRef.current.tier,
-          spatial
-        };
-        (window as any).__graphPerf = stats;
-        if ((window as any).debugLog) {
-          const level = stats.avgTickMs > 8 || stats.fps < 30 ? '⚠️' : '✅';
-          (window as any).debugLog('Perf', `${level} fps=${stats.fps} tick avg=${stats.avgTickMs}ms p95=${stats.p95TickMs}ms dropped=${stats.droppedFrames} alpha=${stats.alpha}`, stats);
-          const driftLevel = spatial.rmsFromSavedPx > 25 ? '⚠️' : '✅';
-          (window as any).debugLog('Drift', `${driftLevel} moving=${spatial.movingNodes} maxStep=${spatial.maxStepPx}px meanStep=${spatial.meanStepPx}px rmsFromSaved=${spatial.rmsFromSavedPx}px`, spatial);
-        }
-      }
+      if (now - lastPerfReport > 2000) publishPerf(now);
     });
 
     // Update zoom with LOD updates
     zoom.on('zoom', (event) => {
+      // D3 sets sourceEvent only for direct wheel/pointer gestures. Programmatic
+      // fit/restore transforms must remain distinguishable so an automatic fit
+      // that later clips a restored task can be repaired on reload.
+      if (event.sourceEvent) cameraManuallyPositionedRef.current = true;
       g.attr('transform', event.transform);
       setCurrentTransform({
         x: event.transform.x,
@@ -3988,6 +4138,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           const cam = {
             x: event.transform.x, y: event.transform.y, k: event.transform.k,
             w: containerRef.current?.clientWidth || 0, h: containerRef.current?.clientHeight || 0,
+            manual: cameraManuallyPositionedRef.current,
           };
           if (cameraSaveTimerRef.current) clearTimeout(cameraSaveTimerRef.current);
           cameraSaveTimerRef.current = setTimeout(() => {
@@ -4036,12 +4187,15 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         g.selectAll('.node-title-group' as any)
           .attr('transform', function(this: any) {
             const cy = +(this.getAttribute('data-cy')) || 0;
-            return legibilityTransform(cy, TITLE_BASE_PX, scale);
+            return fittedTitleTransform(this as SVGGElement, scale);
           });
       }
       g.selectAll('.node-description-text' as any)
         .style('opacity', getSmoothedOpacity(LOD_THRESHOLDS.CLOSE));
       // Edge labels + arrows follow the edge LOD module (zoom-aware, crowd-aware).
+      g.selectAll('.edge-label-group' as any)
+        .style('opacity', (d: any) => labelVisibility(scale, d?._pTotal || 1))
+        .style('pointer-events', (d: any) => labelVisibility(scale, d?._pTotal || 1) > 0 ? 'all' : 'none');
       g.selectAll('.edge-label' as any)
         .style('opacity', (d: any) => labelVisibility(scale, d?._pTotal || 1));
       g.selectAll('.edge-label-icon' as any)
@@ -4072,13 +4226,15 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     }
     simulation
       .alpha(hasUnpinnedNodes ? DEFAULT_PHYSICS.alpha.loadEnergy : 0)
-      .alphaDecay(0.015)
+      .alphaDecay(DEFAULT_PHYSICS.alpha.decay)
       .restart();
 
     // When the layout settles: record settle time, persist the arrangement so
     // it's durable across reloads, run a final edge-label de-overlap pass, and
     // center the camera. After this the simulation is idle (one-shot physics).
     simulation.on('end.persist', () => {
+      if (simulationRef.current !== simulation) return;
+      publishPerf(performance.now(), true);
       if (layoutStartRef.current != null && lastSettleMsRef.current == null) {
         lastSettleMsRef.current = Math.round(performance.now() - layoutStartRef.current);
       }
@@ -4088,9 +4244,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     
     // Add method to restart collision detection
     (simulation as any).restartCollisions = () => {
+      if (simulationRef.current !== simulation) return;
       simulation.alphaTarget(0.3).restart();
       setTimeout(() => {
-        simulation.alphaTarget(0);
+        if (simulationRef.current === simulation) simulation.alphaTarget(0);
       }, 2000);
     };
 
@@ -4098,7 +4255,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // Fully-pinned graphs don't tick, so without this their labels would stay at
     // the default midpoint and could overlap → clean starting positions need it.
     runLabelAvoidanceRef.current = () => updateEdgePositions(true);
-    setTimeout(() => updateEdgePositions(true), 500);
+    updateEdgePositions(true);
+    setTimeout(() => { if (simulationRef.current === simulation) updateEdgePositions(true); }, 500);
   }, [nodes, validatedEdges, handleNodeClick, initializeEmptyVisualization]); // Include handleNodeClick to get fresh connection state
 
   // One-shot layout instrumentation + the forced label-avoidance hook.
@@ -4108,6 +4266,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
   // Store simulation reference for resize handling
   const simulationRef = useRef<d3.Simulation<any, any> | null>(null);
+  useEffect(() => () => stopActiveSimulation(), [stopActiveSimulation]);
   const zoomBehaviorRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
   // True only while "Reset layout" is re-flowing — suspends snapshot pinning
   const layoutReflowingRef = useRef(false);
@@ -4117,7 +4276,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   // false if it couldn't yet (no svg/container, or the simulation has no
   // positioned nodes) — the once-per-graph framing polls on this so a slow data
   // load doesn't leave the graph pinned off-screen (the live-guest bug).
-  const fitViewToNodes = useCallback((): boolean => {
+  const fitViewToNodes = useCallback((animate = true): boolean => {
     if (!svgRef.current || !containerRef.current) return false;
     // Bounds must come from the LIVE simulation objects (the React-state
     // nodes are different objects since the identity merge and may hold
@@ -4149,17 +4308,71 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     const boundsWidth = Math.max(1, maxX - minX);
     const boundsHeight = Math.max(1, maxY - minY);
 
-    // Fit, but never zoom IN past 1.25 (a 3-node graph shouldn't fill the screen)
-    const scale = Math.min(width / boundsWidth, height / boundsHeight, 1.25);
+    // Fixed graph controls can cover an otherwise correctly fitted card. Find
+    // the largest useful rectangle that avoids every control and the MiniMap,
+    // then fit the cards inside it. This keeps fitted cards readable and
+    // clickable in phone landscape as well as on desktop.
+    let fitRegion = { x: 0, y: 0, width, height };
+    const containerRect = container.getBoundingClientRect();
+    const gap = 12;
+    const obstacles = Array.from(document.querySelectorAll<HTMLElement>('[data-graph-fit-obstacle="true"]'))
+      .map(element => {
+        const rect = element.getBoundingClientRect();
+        return {
+          left: Math.max(0, Math.min(width, rect.left - containerRect.left - gap)),
+          top: Math.max(0, Math.min(height, rect.top - containerRect.top - gap)),
+          right: Math.max(0, Math.min(width, rect.right - containerRect.left + gap)),
+          bottom: Math.max(0, Math.min(height, rect.bottom - containerRect.top + gap)),
+        };
+      })
+      .filter(obstacle => obstacle.right > obstacle.left && obstacle.bottom > obstacle.top);
+    if (obstacles.length > 0) {
+      const xs = Array.from(new Set([0, width, ...obstacles.flatMap(obstacle => [obstacle.left, obstacle.right])])).sort((a, b) => a - b);
+      const ys = Array.from(new Set([0, height, ...obstacles.flatMap(obstacle => [obstacle.top, obstacle.bottom])])).sort((a, b) => a - b);
+      const candidates: typeof fitRegion[] = [];
+      for (let leftIndex = 0; leftIndex < xs.length - 1; leftIndex += 1) {
+        for (let rightIndex = leftIndex + 1; rightIndex < xs.length; rightIndex += 1) {
+          for (let topIndex = 0; topIndex < ys.length - 1; topIndex += 1) {
+            for (let bottomIndex = topIndex + 1; bottomIndex < ys.length; bottomIndex += 1) {
+              const region = {
+                x: xs[leftIndex],
+                y: ys[topIndex],
+                width: xs[rightIndex] - xs[leftIndex],
+                height: ys[bottomIndex] - ys[topIndex],
+              };
+              const overlapsObstacle = obstacles.some(obstacle =>
+                region.x < obstacle.right && region.x + region.width > obstacle.left
+                && region.y < obstacle.bottom && region.y + region.height > obstacle.top
+              );
+              if (!overlapsObstacle && region.width > 0 && region.height > 0) candidates.push(region);
+            }
+          }
+        }
+      }
+      const fitScale = (region: typeof fitRegion) =>
+        Math.min(region.width / boundsWidth, region.height / boundsHeight, 1.25);
+      if (candidates.length > 0) {
+        fitRegion = candidates.reduce((best, region) => {
+          const bestScale = fitScale(best);
+          const nextScale = fitScale(region);
+          if (nextScale !== bestScale) return nextScale > bestScale ? region : best;
+          return region.width * region.height > best.width * best.height ? region : best;
+        });
+      }
+    }
 
-    const translateX = width / 2 - ((minX + maxX) / 2) * scale;
-    const translateY = height / 2 - ((minY + maxY) / 2) * scale;
+    // Fit, but never zoom IN past 1.25 (a 3-node graph shouldn't fill the screen)
+    const scale = Math.min(fitRegion.width / boundsWidth, fitRegion.height / boundsHeight, 1.25);
+
+    const translateX = fitRegion.x + fitRegion.width / 2 - ((minX + maxX) / 2) * scale;
+    const translateY = fitRegion.y + fitRegion.height / 2 - ((minY + maxY) / 2) * scale;
     const transform = d3.zoomIdentity.translate(translateX, translateY).scale(scale);
 
     // Use the component's own zoom behavior so handlers fire and state stays
     // coherent; animate so the user keeps spatial context.
     if (zoomBehaviorRef.current) {
-      svg.transition().duration(450).call(zoomBehaviorRef.current.transform as any, transform);
+      if (animate) svg.transition().duration(450).call(zoomBehaviorRef.current.transform as any, transform);
+      else svg.interrupt().call(zoomBehaviorRef.current.transform as any, transform);
     } else {
       svg.call(d3.zoom<SVGSVGElement, unknown>().transform as any, transform);
     }
@@ -4171,10 +4384,62 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const fitViewRef = useRef(fitViewToNodes);
   fitViewRef.current = fitViewToNodes;
 
+  // Position the canvas menu from its rendered size instead of assuming a
+  // fixed height. The Undo label is dynamic, and short landscape viewports can
+  // otherwise place the final action below the screen.
+  useLayoutEffect(() => {
+    if (!contextMenuPosition) {
+      setContextMenuPlacement(null);
+      return undefined;
+    }
+    const placeMenu = () => {
+      const menu = contextMenuRef.current;
+      if (!menu) return;
+      const margin = 8;
+      const graphBounds = containerRef.current?.getBoundingClientRect();
+      const leftEdge = Math.max(margin, graphBounds?.left ?? margin);
+      const rightEdge = Math.min(window.innerWidth - margin, graphBounds?.right ?? window.innerWidth - margin);
+      const topEdge = Math.max(margin, graphBounds?.top ?? margin);
+      const bottomEdge = Math.min(window.innerHeight - margin, graphBounds?.bottom ?? window.innerHeight - margin);
+      const maxHeight = Math.max(44, bottomEdge - topEdge);
+      const menuWidth = menu.offsetWidth;
+      const renderedHeight = Math.min(menu.offsetHeight, maxHeight);
+      const clampX = (value: number) => Math.max(leftEdge, Math.min(value, rightEdge - menuWidth));
+      const clampY = (value: number) => Math.max(topEdge, Math.min(value, bottomEdge - renderedHeight));
+      const obstacles = Array.from(document.querySelectorAll<HTMLElement>('[data-graph-fit-obstacle="true"]'))
+        .map(element => element.getBoundingClientRect())
+        .filter(rect => rect.left < rightEdge && rect.right > leftEdge && rect.top < bottomEdge && rect.bottom > topEdge);
+      const xs = new Set([clampX(contextMenuPosition.x), leftEdge, rightEdge - menuWidth]);
+      const ys = new Set([clampY(contextMenuPosition.y), topEdge, bottomEdge - renderedHeight]);
+      obstacles.forEach(rect => {
+        xs.add(clampX(rect.left - menuWidth - margin));
+        xs.add(clampX(rect.right + margin));
+        ys.add(clampY(rect.top - renderedHeight - margin));
+        ys.add(clampY(rect.bottom + margin));
+      });
+      const candidates = Array.from(xs).flatMap(left => Array.from(ys).map(top => ({ left, top })))
+        .filter(candidate => !obstacles.some(rect =>
+          candidate.left < rect.right + margin && candidate.left + menuWidth > rect.left - margin
+          && candidate.top < rect.bottom + margin && candidate.top + renderedHeight > rect.top - margin
+        ));
+      const placement = (candidates.length > 0 ? candidates : [{ left: clampX(contextMenuPosition.x), top: clampY(contextMenuPosition.y) }])
+        .reduce((best, candidate) => {
+          const distance = (candidate.left - contextMenuPosition.x) ** 2 + (candidate.top - contextMenuPosition.y) ** 2;
+          const bestDistance = (best.left - contextMenuPosition.x) ** 2 + (best.top - contextMenuPosition.y) ** 2;
+          return distance < bestDistance ? candidate : best;
+        });
+      setContextMenuPlacement({ ...placement, maxHeight });
+    };
+    placeMenu();
+    window.addEventListener('resize', placeMenu);
+    return () => window.removeEventListener('resize', placeMenu);
+  }, [contextMenuPosition, undoLabel]);
+
   // Mini-map click → pan the main view to that graph point at current zoom
   useEffect(() => {
     (window as any).miniMapNavigate = (graphX: number, graphY: number) => {
       if (!svgRef.current || !containerRef.current || !zoomBehaviorRef.current) return;
+      cameraManuallyPositionedRef.current = true;
       const svg = d3.select(svgRef.current);
       const k = d3.zoomTransform(svgRef.current).k || 1;
       const w = containerRef.current.clientWidth;
@@ -4187,6 +4452,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // zoom; applied via the shared zoom behavior so state + handlers stay in sync.
     (window as any).miniMapZoom = (graphX: number, graphY: number, targetK: number) => {
       if (!svgRef.current || !containerRef.current || !zoomBehaviorRef.current) return;
+      cameraManuallyPositionedRef.current = true;
       const svg = d3.select(svgRef.current);
       const k = Math.max(0.1, Math.min(4, targetK));
       const w = containerRef.current.clientWidth;
@@ -4213,20 +4479,38 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       const upd = (window as { updateMiniMapPositions?: (p: Record<string, { x: number; y: number }>) => void }).updateMiniMapPositions;
       if (!sim || !upd) return;
       const simNodes = sim.nodes() as { id: string; x?: number; y?: number; type?: string }[];
-      if (!simNodes?.length) return;
       const positions: Record<string, { x: number; y: number }> = {};
       const types: Record<string, string> = {};
       for (const nd of simNodes) {
         if (nd.x !== undefined && nd.y !== undefined) { positions[nd.id] = { x: nd.x, y: nd.y }; types[nd.id] = nd.type as string; }
       }
-      if (Object.keys(positions).length) {
+      {
         upd(positions);
         (window as { updateMiniMapTypes?: (t: Record<string, string>) => void }).updateMiniMapTypes?.(types);
       }
     };
+    const snapshot = () => {
+      publish();
+      if (svgRef.current) (window as any).updateMiniMapViewport?.(d3.zoomTransform(svgRef.current));
+      // Reopening the MiniMap must not leave an existing task underneath it.
+      // Preserve the person's camera when there is no collision; refit only
+      // when the newly mounted panel actually blocks a card.
+      requestAnimationFrame(() => {
+        const obstacle = document.querySelector<HTMLElement>('[data-graph-fit-obstacle="true"]');
+        if (!obstacle || !svgRef.current) return;
+        const obstacleRect = obstacle.getBoundingClientRect();
+        const covered = Array.from(svgRef.current.querySelectorAll<SVGGraphicsElement>('.node-bg')).some(node => {
+          const card = node.getBoundingClientRect();
+          return card.right > obstacleRect.left && card.left < obstacleRect.right
+            && card.bottom > obstacleRect.top && card.top < obstacleRect.bottom;
+        });
+        if (covered) fitViewRef.current(false);
+      });
+    };
+    window.addEventListener('graphdone:minimap-open', snapshot);
     const id = setInterval(() => { publish(); if (++n >= 5) clearInterval(id); }, 800);
     publish();
-    return () => clearInterval(id);
+    return () => { clearInterval(id); window.removeEventListener('graphdone:minimap-open', snapshot); };
   }, [currentGraph?.id, workItemsData?.workItems?.length]);
 
   // Center on specific node
@@ -4345,11 +4629,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     }, 2500);
   }, [nodes, initializeVisualization, fitViewToNodes, persistAllPositions]);
 
-  // Layout mode (#30): 'force' = organic spring layout (default); 'hierarchical'
-  // pins each node's fy to its dependency-layer Y (computed by the pure module)
-  // so the graph settles into prerequisite layers while X stays force-arranged.
-  // Non-destructive + reversible: switching back to 'force' restores the fy each
-  // node had before we pinned it (saved-snapshot pins survive the round-trip).
+  // Hierarchical mode packs actual card sizes into compact dependency rows.
+  // Pin both axes so repulsion cannot spread a finished row across the viewport.
+  // Switching back restores both original pins, including saved-position pins.
   const layoutModeRef = useRef<LayoutMode>(
     parseLayoutMode(typeof window !== 'undefined' ? window.localStorage?.getItem(LAYOUT_MODE_STORAGE_KEY) : null)
   );
@@ -4361,27 +4643,32 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     if (!sim || !container) return;
     const simNodes = sim.nodes() as any[];
     if (isHierarchicalLayout(mode)) {
-      const ys = computeNodeLayerY(
+      const positions = computeCompactLayout(
         simNodes, validatedEdges as any[],
-        { width: container.clientWidth, height: container.clientHeight },
+        { width: container.clientWidth, height: container.clientHeight }, getNodeDimensions,
       );
       simNodes.forEach((node: any) => {
-        const y = ys.get(node.id);
-        if (y == null) return;
-        if (!node.__layerPinned) node.__preLayerFy = node.fy ?? null;
+        const point = positions.get(node.id);
+        if (!point) return;
+        if (!node.__layerPinned) { node.__preLayerFy = node.fy ?? null; node.__preLayerFx = node.fx ?? null; }
         node.__layerPinned = true;
-        node.fy = y;
+        node.fx = node.x = point.x;
+        node.fy = node.y = point.y;
+        node.vx = node.vy = 0;
       });
     } else {
       simNodes.forEach((node: any) => {
         if (!node.__layerPinned) return;
         node.fy = node.__preLayerFy ?? null;
+        node.fx = node.__preLayerFx ?? null;
+        delete node.__preLayerFx;
         node.__layerPinned = false;
         delete node.__preLayerFy;
       });
     }
     sim.alpha(DEFAULT_PHYSICS.alpha.loadEnergy).restart();
-  }, [validatedEdges]);
+    if (isHierarchicalLayout(mode)) requestAnimationFrame(() => fitViewToNodes());
+  }, [validatedEdges, getNodeDimensions, fitViewToNodes]);
   // Stable handle so the window hook + load effect don't churn when the edge
   // poll re-creates applyLayoutMode (which would reheat the sim every poll).
   const applyLayoutModeRef = useRef(applyLayoutMode);
@@ -4464,30 +4751,36 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   // a graph change. We wait briefly for the one-shot layout to settle, then fit.
   const hasNodes = nodes.length > 0;
 
-  // Re-frame the graph when the container changes size SIGNIFICANTLY (window
+  // Re-frame the graph when the container changes size (window
   // resize, rotate, sidebar/panel toggle) so a camera framed for the old size
   // isn't left mis-centred. A ResizeObserver on the container is more reliable
   // than the window 'resize' event (which didn't fire in headless tests) and
-  // also catches layout-driven size changes. Debounced + gated on a >20% size
-  // delta so it doesn't fight a user nudging the window edge or a normal pan.
+  // also catches layout-driven size changes. Coalesce notifications per frame;
+  // a percentage threshold loses gradual resizes as its baseline advances.
+  // Resize only changes the camera, never the nodes' saved positions.
   useEffect(() => {
     const el = containerRef.current;
     if (!el || !hasNodes) return undefined;
     let last = { w: el.clientWidth || 0, h: el.clientHeight || 0 };
-    let t: ReturnType<typeof setTimeout> | null = null;
+    let frame = 0;
     const ro = new ResizeObserver(() => {
-      if (t) clearTimeout(t);
-      t = setTimeout(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
         const w = el.clientWidth || 0, h = el.clientHeight || 0;
-        if (!w || !h || !last.w || !last.h) { last = { w, h }; return; }
-        const changed = Math.abs(w - last.w) / last.w > 0.2 || Math.abs(h - last.h) / last.h > 0.2;
+        if (!w || !h) return;
+        const changed = w !== last.w || h !== last.h;
         last = { w, h };
-        if (changed) fitViewRef.current();
-      }, 250);
+        // Do not start competing animated zooms while the window edge moves.
+        if (changed) fitViewRef.current(false);
+      });
     });
     ro.observe(el);
-    return () => { if (t) clearTimeout(t); ro.disconnect(); };
-  }, [hasNodes]);
+    return () => { cancelAnimationFrame(frame); ro.disconnect(); };
+  // Loading can briefly render a placeholder after cached nodes already make
+  // hasNodes true. Re-run when either query settles so the observer follows the
+  // graph container that is actually mounted, rather than returning once on a
+  // missing ref and leaving future phone/desktop resizes unframed.
+  }, [hasNodes, loading, edgesLoading]);
 
   const isDenseGraph = nodes.length > DENSE_GRAPH_NODE_THRESHOLD;
   const isSimplified = isDenseGraph && (currentTransform?.scale ?? 1) < SIMPLIFY_SCALE;
@@ -4535,12 +4828,17 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   // spin. fitViewRef is used (not fitViewToNodes) so its identity churn during
   // physics settle doesn't cancel the loop.
   useEffect(() => {
-    if (!hasNodes || !currentGraphId) return undefined;
+    // `cache-and-network` can render an older one-node snapshot before the
+    // durable offline result adds the rest. Fitting that partial graph and
+    // marking it done strands later nodes at the old camera. Wait until both
+    // graph queries settle before accepting or replacing a saved transform.
+    if (!hasNodes || !currentGraphId || loading || edgesLoading) return undefined;
     if (fittedGraphsRef.current.has(currentGraphId)) return undefined;
     const gid = currentGraphId;
 
-    let saved: { x: number; y: number; k: number; w?: number; h?: number } | null = null;
+    let saved: { x: number; y: number; k: number; w?: number; h?: number; manual?: boolean } | null = null;
     try { const r = localStorage.getItem(`graphdone:camera:${gid}`); saved = r ? JSON.parse(r) : null; } catch { /* ignore */ }
+    cameraManuallyPositionedRef.current = saved?.manual === true;
     // A saved camera framed for a very different viewport (resized window, rotated
     // device) would mis-frame the graph now — prefer a fresh fit in that case.
     const sizeMatches = (s: { w?: number; h?: number }): boolean => {
@@ -4550,8 +4848,40 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     };
     const hasSaved = !!(saved && typeof saved.k === 'number' && sizeMatches(saved));
 
+    // Preserve an explicitly panned/zoomed focus as long as it still shows a
+    // task, but require an automatically saved fit to keep every task framed.
+    // In both cases a fixed control must not cover a card. This distinction lets
+    // recovery repair stale automatic cameras without discarding user intent.
+    const savedCameraIsUsable = (): boolean => {
+      const frame = containerRef.current?.getBoundingClientRect();
+      const svg = svgRef.current;
+      if (!frame || !svg) return false;
+      const cards = Array.from(svg.querySelectorAll<SVGGraphicsElement>('.node-bg'))
+        .map(node => node.getBoundingClientRect());
+      const showsANode = cards.some(card => card.width > 0 && card.height > 0
+          && card.right >= frame.left && card.left <= frame.right
+          && card.bottom >= frame.top && card.top <= frame.bottom);
+      const framesEveryNode = cards.length > 0 && cards.every(card => card.width > 0 && card.height > 0
+        && card.left >= frame.left && card.right <= frame.right
+        && card.top >= frame.top && card.bottom <= frame.bottom);
+      const obstacle = document.querySelector<HTMLElement>('[data-graph-fit-obstacle="true"]');
+      const showsExpectedContent = cameraManuallyPositionedRef.current ? showsANode : framesEveryNode;
+      if (!obstacle) return showsExpectedContent;
+      const obstacleRect = obstacle.getBoundingClientRect();
+      const blocksACard = cards.some(card => card.right > obstacleRect.left && card.left < obstacleRect.right
+        && card.bottom > obstacleRect.top && card.top < obstacleRect.bottom);
+      return showsExpectedContent && !blocksACard;
+    };
+
     let timer: ReturnType<typeof setTimeout> | null = null;
     let tries = 0;
+    let lastPositions = new Map<string, { x: number; y: number }>();
+    let stableSamples = 0;
+    // Once a person touches the canvas, preserve their camera choice.
+    const canvas = containerRef.current;
+    const stopFraming = () => fittedGraphsRef.current.add(gid);
+    canvas?.addEventListener('pointerdown', stopFraming);
+    canvas?.addEventListener('wheel', stopFraming, { passive: true });
     const MAX_TRIES = 60; // ~15s at 250ms — covers a cold Worker/D1 first paint
 
     const attempt = () => {
@@ -4572,9 +4902,19 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
             zoomBehaviorRef.current.transform as any,
             d3.zoomIdentity.translate(saved!.x, saved!.y).scale(saved!.k)
           );
-          ok = true;
+          ok = savedCameraIsUsable() || fitViewRef.current(false);
         } else {
-          ok = fitViewRef.current(); // false until the sim has positioned nodes
+          const liveNodes = (simulationRef.current?.nodes() || []) as { id: string; x: number; y: number }[];
+          const stable = liveNodes.length > 0 && liveNodes.every(node => {
+            const previous = lastPositions.get(node.id);
+            return previous && Math.hypot(node.x - previous.x, node.y - previous.y) < 1;
+          });
+          stableSamples = stable ? stableSamples + 1 : 0;
+          lastPositions = new Map(liveNodes.map(node => [node.id, { x: node.x, y: node.y }]));
+          // Frame the moving layout too: fitting once mid-settle can strand all
+          // nodes below a short landscape viewport after the forces move them.
+          const framed = fitViewRef.current(false);
+          ok = framed && stableSamples >= 4;
         }
       }
 
@@ -4591,8 +4931,12 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
     // Small initial delay so the first simulation build/tick has run.
     timer = setTimeout(attempt, 300);
-    return () => { if (timer) clearTimeout(timer); };
-  }, [hasNodes, currentGraphId]);
+    return () => {
+      if (timer) clearTimeout(timer);
+      canvas?.removeEventListener('pointerdown', stopFraming);
+      canvas?.removeEventListener('wheel', stopFraming);
+    };
+  }, [hasNodes, currentGraphId, loading, edgesLoading]);
 
   // PR-3: keep the expand-in-place panel glued to its node through drags, ticks
   // and pan/zoom (same rAF technique as the rename box). The panel sits beside
@@ -4609,7 +4953,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         const n = simNodes?.find((m: any) => m.id === expandedNodeId);
         // The node was deleted / its graph left → close the peek instead of
         // leaving a frozen, stale panel (and stop spinning this rAF loop).
-        if (simNodes && !n) { setExpandedNode(null); return; }
+        if (simNodes && !n) { closeExpandedNode(); return; }
         if (n) {
           const rect = svgEl.getBoundingClientRect();
           const t = d3.zoomTransform(svgEl);
@@ -4630,25 +4974,40 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     };
     raf = requestAnimationFrame(sync);
     return () => cancelAnimationFrame(raf);
+  }, [expandedNodeId, closeExpandedNode]);
+
+  useEffect(() => {
+    if (!expandedNodeId) return undefined;
+    const raf = requestAnimationFrame(() => {
+      expandPanelRef.current?.querySelector<HTMLElement>('button[title="Close"]')
+        ?.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(raf);
   }, [expandedNodeId]);
 
   // Esc closes the expand panel; switching graphs dismisses it (its node is gone).
   useEffect(() => {
     if (!expandedNodeId) return undefined;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setExpandedNode(null); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') closeExpandedNode(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [expandedNodeId]);
-  useEffect(() => { setExpandedNode(null); }, [currentGraphId]);
+  }, [expandedNodeId, closeExpandedNode]);
+  useEffect(() => {
+    expandedReturnFocusIdRef.current = null;
+    setExpandedNode(null);
+  }, [currentGraphId]);
 
   // Esc closes the quick editor; switching graphs dismisses it (node is gone).
   useEffect(() => {
     if (!quickEditNodeId) return undefined;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setQuickEditNode(null); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') closeQuickEdit(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [quickEditNodeId]);
-  useEffect(() => { setQuickEditNode(null); }, [currentGraphId]);
+  }, [quickEditNodeId, closeQuickEdit]);
+  useEffect(() => {
+    quickEditReturnFocusIdRef.current = null;
+    setQuickEditNode(null);
+  }, [currentGraphId]);
 
   // Expose reset function to parent component
   useEffect(() => {
@@ -4780,11 +5139,11 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       // Update SVG dimensions
       svg.attr('width', newWidth).attr('height', newHeight);
       
-      // Update simulation center force with new dimensions
-      simulationRef.current
-        .force('center', d3.forceCenter(newCenterX, newCenterY))
-        .alpha(0.3) // Restart simulation with some energy
-        .restart();
+      // Resizing the viewport must not disturb the user's placed nodes.
+      const sim = simulationRef.current;
+      if (sim.nodes().every((n: any) => n.fx != null && n.fy != null)) return;
+      sim.force('center', d3.forceCenter(newCenterX, newCenterY).strength(DEFAULT_PHYSICS.centering.center))
+        .alphaTarget(0).alpha(DEFAULT_PHYSICS.reheat.resize).restart();
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
@@ -4796,7 +5155,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     loading, // Re-init when loading completes
     edgesLoading, // Re-init when edges loading completes
     // Track node property changes for selective updates (only titles, descriptions, types)
-    nodes.map(n => `${n.id}:${n.title}:${n.description}:${n.type}:${n.status}`).join(','),
+    nodes.map(n => `${n.id}:${n.title}:${n.description}:${n.type}:${n.status}:${n.priority}`).join(','),
     // Track edge type/direction changes so a relationship edit or flip rebuilds
     validatedEdges.map((e: any) => {
       const sId = typeof e.source === 'object' ? e.source?.id : e.source;
@@ -4835,7 +5194,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
   if (loading || edgesLoading) {
     return (
-      <div className="graph-container relative w-full h-full flex items-center justify-center">
+      <div ref={containerRef} className="graph-container relative w-full h-full flex items-center justify-center">
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <div className="text-green-300 text-lg font-medium">Loading graph data...</div>
@@ -5054,7 +5413,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       }
     }).then(() => {
       // Deleting is safe because undo can rebuild it — no confirm() popup
-      undoStackRef.current.push({
+      undoStack.push({
         label: 'Delete relationship',
         undo: async () => {
           await createEdgeMutation({
@@ -5084,26 +5443,29 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         aria-describedby="graph-a11y-desc"
       />
       <p id="graph-a11y-desc" className="sr-only">
-        Force-directed graph of work items and their dependencies. Use the view switcher to see the same data as a list, table, or board, which are keyboard-navigable.
+        Force-directed graph of work items and their dependencies. Double-click with a mouse or tap an item to edit it. Use the view switcher to see the same data as a list, table, or board, which are keyboard-navigable.
       </p>
 
       
       {/* Empty State Overlay */}
       {showEmptyStateOverlay && (
-        <div className="absolute inset-0 flex items-start justify-center pointer-events-none pt-16 pl-32">
-          <div className="max-w-lg text-center bg-gray-800/90 backdrop-blur-sm rounded-xl p-8 border border-gray-600/50 shadow-2xl pointer-events-auto">
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none p-3 overflow-auto">
+          <div className="w-full max-w-lg text-center bg-gray-800/90 backdrop-blur-sm rounded-xl p-4 sm:p-6 border border-gray-600/50 shadow-2xl pointer-events-auto">
             <div className="text-green-400 text-4xl mb-4">
               🌱
             </div>
             <h3 className="text-2xl font-bold bg-gradient-to-r from-emerald-400 via-green-300 to-blue-400 bg-clip-text text-transparent mb-3">
-              Transform Your Vision
+              Start with one idea
             </h3>
             <div className="text-gray-200 mb-8 leading-relaxed text-base max-w-md mx-auto">
-              Break free from rigid hierarchies. Create your first work item and experience how GraphDone intelligently connects ideas, surfaces priorities, and accelerates meaningful outcomes.
+              Add a work item, give it a name, then use + to grow a connected idea.
             </div>
             
             <button 
-              onClick={() => createInlineNode(400, 300)}
+              onClick={() => {
+                const rect = containerRef.current?.getBoundingClientRect();
+                createInlineNode(((rect?.width ?? 800) / 2 - currentTransform.x) / currentTransform.scale, ((rect?.height ?? 600) / 2 - currentTransform.y) / currentTransform.scale);
+              }}
               className="bg-gradient-to-r from-emerald-700 to-green-700 hover:from-emerald-600 hover:to-green-600 text-white px-8 py-4 rounded-xl font-semibold text-lg transition-all duration-300 flex items-center gap-3 mx-auto pointer-events-auto cursor-pointer shadow-lg hover:shadow-xl hover:shadow-green-500/25 transform hover:-translate-y-0.5 hover:scale-105"
             >
               <div className="w-5 h-5 bg-white/20 rounded-full flex items-center justify-center">
@@ -5118,7 +5480,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       {/* No Graph Selected Overlay */}
       {showNoGraphMessage && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="max-w-lg text-center bg-gray-800/90 backdrop-blur-sm rounded-xl p-8 border border-gray-600/50 shadow-2xl pointer-events-auto">
+          <div className="w-full max-w-lg text-center bg-gray-800/90 backdrop-blur-sm rounded-xl p-4 sm:p-6 border border-gray-600/50 shadow-2xl pointer-events-auto">
             <div className="text-yellow-300 text-4xl mb-4">
               📊
             </div>
@@ -5168,7 +5530,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
             updateWorkItemMutation({
               variables: { where: { id: inlineEdit.nodeId }, update: { title } }
             }).then(() => {
-              undoStackRef.current.push({
+              undoStack.push({
                 label: 'Rename item',
                 undo: async () => {
                   await updateWorkItemMutation({
@@ -5217,7 +5579,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         const onCommit = (c: QuickEditCommit) => {
           updateWorkItemMutation({ variables: { where: { id: quickEditNode.id }, update: c.update } })
             .then(() => {
-              undoStackRef.current.push({
+              undoStack.push({
                 label: c.label,
                 undo: async () => {
                   await updateWorkItemMutation({ variables: { where: { id: quickEditNode.id }, update: c.prev } });
@@ -5227,9 +5589,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
             .catch(() => showError(`Could not ${c.label.toLowerCase()}`));
         };
         return (
-          <div className="absolute z-50" style={{ left, top, transform: 'translate(-50%, -50%)' }}>
-            <NodeQuickEdit key={quickEditNode.id} node={dataNode} onCommit={onCommit} onClose={() => setQuickEditNode(null)} />
-          </div>
+          <QuickEditSurface x={left + (containerRef.current?.getBoundingClientRect().left ?? 0)} y={top + (containerRef.current?.getBoundingClientRect().top ?? 0)} onClose={closeQuickEdit}>
+            <NodeQuickEdit key={quickEditNode.id} node={dataNode} onCommit={onCommit} onClose={closeQuickEdit} onOpenDetails={() => { quickEditReturnFocusIdRef.current = null; setQuickEditNode(null); handleEditNode(dataNode); }} />
+          </QuickEditSurface>
         );
       })()}
 
@@ -5239,7 +5601,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       {expandedNode && createPortal(
         <div
           ref={expandPanelRef}
+          id={`node-expand-panel-${expandedNode.id}`}
           data-testid="node-expand-panel"
+          role="dialog"
+          aria-label={`Expanded ${expandedNode.title}`}
           className="fixed z-[999999] w-80 max-w-[90vw]"
           style={{ left: -9999, top: -9999 }}
         >
@@ -5247,7 +5612,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
             node={expandedNode}
             compact
             rootTestId="node-expand-inspector"
-            onClose={() => setExpandedNode(null)}
+            onClose={closeExpandedNode}
+            onEdit={() => { expandedReturnFocusIdRef.current = null; setQuickEditNode(expandedNode); setExpandedNode(null); }}
           />
         </div>,
         document.body
@@ -5621,10 +5987,15 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       {/* Context Menu */}
       {contextMenuPosition && (
         <div
-          className="fixed z-50 bg-black/90 backdrop-blur-md border border-white/10 rounded-lg shadow-2xl overflow-hidden min-w-[200px]"
+          ref={contextMenuRef}
+          data-testid="graph-context-menu"
+          className="fixed z-50 bg-black/90 backdrop-blur-md border border-white/10 rounded-lg shadow-2xl overflow-x-hidden overflow-y-auto"
           style={{
-            left: Math.min(contextMenuPosition?.x || 0, window.innerWidth - 220),
-            top: Math.min(contextMenuPosition?.y || 0, window.innerHeight - 120),
+            left: contextMenuPlacement?.left ?? 8,
+            top: contextMenuPlacement?.top ?? 8,
+            visibility: contextMenuPlacement ? 'visible' : 'hidden',
+            maxHeight: contextMenuPlacement?.maxHeight ?? 'calc(100dvh - 16px)',
+            width: 'min(216px, calc(100vw - 32px))',
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.05)',
             animation: 'slideInScale 0.2s ease-out'
           }}
@@ -5639,7 +6010,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
               }}
               disabled={!undoLabel}
               data-testid="context-undo"
-              className={`w-full text-left px-4 py-3 flex items-center space-x-3 transition-all duration-300 ease-out group rounded-lg mx-2 border-b border-white/5 mb-2 ${undoLabel ? 'hover:bg-amber-500/10 text-gray-200' : 'opacity-40 cursor-not-allowed text-gray-500'}`}
+              className={`w-[calc(100%-1rem)] text-left px-4 py-3 flex items-center space-x-3 transition-all duration-300 ease-out group rounded-lg mx-2 border-b border-white/5 mb-2 ${undoLabel ? 'hover:bg-amber-500/10 text-gray-200' : 'opacity-40 cursor-not-allowed text-gray-500'}`}
             >
               <div className="w-6 h-6 rounded-lg bg-gray-700/50 flex items-center justify-center group-hover:bg-amber-500/20 transition-all duration-300 ease-out">
                 <Undo2 className="h-4 w-4 text-gray-400 group-hover:text-amber-400 transition-colors duration-300" />
@@ -5655,7 +6026,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
                 createInlineNode(contextMenuPosition?.graphX || 0, contextMenuPosition?.graphY || 0);
                 setContextMenuPosition(null);
               }}
-              className="w-full text-left px-4 py-3 hover:bg-white/8 text-gray-200 flex items-center space-x-3 transition-all duration-300 ease-out group rounded-lg mx-2"
+              className="w-[calc(100%-1rem)] text-left px-4 py-3 hover:bg-white/8 text-gray-200 flex items-center space-x-3 transition-all duration-300 ease-out group rounded-lg mx-2"
             >
               <div className="w-6 h-6 rounded-lg bg-gray-700/50 flex items-center justify-center group-hover:bg-emerald-500/20 transition-all duration-300 ease-out">
                 <Plus className="h-4 w-4 text-gray-400 group-hover:text-emerald-400 transition-colors duration-300" />
@@ -5668,74 +6039,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
             
             <button
               onClick={() => {
-                // Zoom to fit button clicked
-                // Zoom to fit all nodes - completely rewritten for proper detection
-                const svg = d3.select(svgRef.current);
-                const containerRect = containerRef.current?.getBoundingClientRect();
-                if (svg.node() && containerRect && nodes.length > 0) {
-                  // Get all node positions (both from simulation and stored positions)
-                  const allPositions = nodes.map(node => ({
-                    x: node.x !== undefined ? node.x : (node.positionX || 0),
-                    y: node.y !== undefined ? node.y : (node.positionY || 0)
-                  })).filter(pos => pos.x !== undefined && pos.y !== undefined);
-                  
-                  if (allPositions.length === 0) {
-                    // No valid node positions found
-                    setContextMenuPosition(null);
-                    return;
-                  }
-                  
-                  // Find the absolute bounds of all nodes
-                  const minX = Math.min(...allPositions.map(p => p.x));
-                  const maxX = Math.max(...allPositions.map(p => p.x));
-                  const minY = Math.min(...allPositions.map(p => p.y));
-                  const maxY = Math.max(...allPositions.map(p => p.y));
-                  
-                  // Add generous padding for node sizes and breathing room
-                  const nodePadding = 150; // Account for node size
-                  const extraMargin = 300; // Extra breathing room
-                  const totalPadding = nodePadding + extraMargin;
-                  
-                  const boundsWidth = (maxX - minX) + (2 * totalPadding);
-                  const boundsHeight = (maxY - minY) + (2 * totalPadding);
-                  
-                  // Calculate how much we need to scale to fit everything
-                  const containerWidth = containerRect.width;
-                  const containerHeight = containerRect.height;
-                  
-                  const scaleX = containerWidth / boundsWidth;
-                  const scaleY = containerHeight / boundsHeight;
-                  const scale = Math.min(scaleX, scaleY, 0.2); // Very conservative max scale for wide zoom out
-                  
-                  // Find the center of all nodes
-                  const centerX = (minX + maxX) / 2;
-                  const centerY = (minY + maxY) / 2;
-                  
-                  // Calculate translation to center the nodes
-                  const translateX = (containerWidth / 2) - (centerX * scale);
-                  const translateY = (containerHeight / 2) - (centerY * scale);
-                  
-                  // Zoom to fit calculation complete
-                  
-                  // Create the transform and update D3's zoom behavior state properly
-                  const newTransform = d3.zoomIdentity.translate(translateX, translateY).scale(scale);
-                  
-                  // Update D3's internal zoom state immediately (no transition)
-                  svg.property('__zoom', newTransform);
-                  
-                  // Apply the visual transform with transition
-                  const g = svg.select('g');
-                  g.transition()
-                    .duration(750)
-                    .attr('transform', newTransform.toString())
-                    .on('end', () => {
-                      // Update the current transform state
-                      setCurrentTransform({ x: translateX, y: translateY, scale: scale });
-                    });
-                }
+                fitViewRef.current();
                 setContextMenuPosition(null);
               }}
-              className="w-full text-left px-4 py-3 hover:bg-white/8 text-gray-200 flex items-center space-x-3 transition-all duration-300 ease-out group rounded-lg mx-2"
+              className="w-[calc(100%-1rem)] text-left px-4 py-3 hover:bg-white/8 text-gray-200 flex items-center space-x-3 transition-all duration-300 ease-out group rounded-lg mx-2"
             >
               <div className="w-6 h-6 rounded-lg bg-gray-700/50 flex items-center justify-center group-hover:bg-blue-500/20 transition-all duration-300 ease-out">
                 <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-400 transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -5801,6 +6108,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
             node={freshNode}
             edges={validatedEdges}
             nodes={validatedNodes}
+            undoStack={undoStack}
             onConnectToExisting={(node) => {
               setShowNodeDetailsModal(false);
               handleConnectToExistingNodes(node);
@@ -5818,6 +6126,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         <CreateWorkItemModal
           isOpen={showCreateNodeModal}
           onClose={handleCloseCreateNodeModal}
+          undoStack={undoStack}
           onSubmit={async (nodeData) => {
             // Handle node creation
             handleCloseCreateNodeModal();

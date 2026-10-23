@@ -1,3 +1,5 @@
+> Historical exploration, superseded by [the current human-first Core/hosted strategy](product/CORE_HOSTED_STRATEGY.md). Do not implement this older pet-agent direction as the product roadmap.
+
 # Simple AI Agent - Reality Check
 
 > **🎯 THIS IS THE ACTUAL PLAN** - Start here for AI agents in GraphDone

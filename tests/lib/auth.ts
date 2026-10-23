@@ -89,6 +89,7 @@ export async function getAuthState(page: Page): Promise<AuthState> {
     'button:has-text("Profile")',
     // Workspace-specific indicators
     '[data-testid="graph-selector"]',
+    '[data-testid="graph-selector-mobile"]',
     '.graph-selector',
     'text="Graph Viewer"',
     // Error indicators
@@ -106,7 +107,7 @@ export async function getAuthState(page: Page): Promise<AuthState> {
       
       // Check for error messages
       if (indicator.includes('Failed') || indicator.includes('error') || indicator.includes('alert')) {
-        const text = await element.textContent();
+        const text = (await element.textContent())?.trim();
         if (text) errors.push(text);
       }
     }
@@ -418,6 +419,7 @@ async function waitForLoginCompletion(page: Page, timeout: number): Promise<void
       // Additional verification - look for workspace elements  
       const workspaceIndicators = [
         '[data-testid="graph-selector"]',
+        '[data-testid="graph-selector-mobile"]',
         '.graph-selector',
         'text="Graph Viewer"'
       ];
@@ -595,6 +597,7 @@ export async function navigateToWorkspace(page: Page): Promise<void> {
   // Check workspace readiness
   const workspaceElements = [
     '[data-testid="graph-selector"]',
+    '[data-testid="graph-selector-mobile"]',
     '.graph-selector', 
     'text="Graph Viewer"'
   ];

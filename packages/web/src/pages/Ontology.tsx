@@ -56,17 +56,32 @@ export function Ontology() {
   const [showRelationshipModal, setShowRelationshipModal] = useState(false);
   const [relationshipSearchTerm, setRelationshipSearchTerm] = useState('');
 
+  const { data: coverageWorkItemsData, loading: itemsLoading, error: itemsError } = useQuery(GET_WORK_ITEMS, {
+    variables: currentGraph ? { where: { graph: { id: currentGraph.id } } } : { where: {} },
+    skip: !currentGraph,
+    fetchPolicy: 'cache-and-network'
+  });
+
+  const { data: coverageEdgesData, loading: edgesLoading, error: edgesError } = useQuery(GET_EDGES, {
+    variables: currentGraph ? { where: { source: { graph: { id: currentGraph.id } } } } : { where: {} },
+    skip: !currentGraph,
+    fetchPolicy: 'cache-and-network'
+  });
+
+  const allWorkItems: CoverageWorkItem[] = coverageWorkItemsData?.workItems ?? [];
+  const allEdges: CoverageEdge[] = coverageEdgesData?.edges ?? [];
+
   // Generate work item types from centralized constants
-  const mockNodeTypes: NodeType[] = Object.entries(WORK_ITEM_TYPES).map(([key, config]) => ({
+  const nodeTypes: NodeType[] = Object.entries(WORK_ITEM_TYPES).map(([key, config]) => ({
     id: key.toLowerCase(),
     name: config.label,
     description: config.description || 'No description available',
     color: key.toLowerCase(),
     icon: key as WorkItemType,
     isBuiltIn: true,
-    usageCount: Math.floor(Math.random() * 100) + 5, // Mock usage data
+    usageCount: allWorkItems.filter(item => item.type === key).length,
     createdBy: 'system',
-    createdAt: '2024-01-01',
+    createdAt: 'Built-in definition',
     fields: [
       { id: 'title', name: 'title', type: 'text' as const, required: true },
       { id: 'description', name: 'description', type: 'text' as const, required: false },
@@ -79,7 +94,7 @@ export function Ontology() {
     ]
   }));
 
-  const filteredTypes = mockNodeTypes.filter(type =>
+  const filteredTypes = nodeTypes.filter(type =>
     type.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     type.description.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -94,9 +109,9 @@ export function Ontology() {
     color: config.color,
     hexColor: config.hexColor,
     isBuiltIn: true,
-    usageCount: Math.floor(Math.random() * 50) + 10, // Mock usage data
+    usageCount: allEdges.filter(edge => edge.type === config.type).length,
     createdBy: 'system',
-    createdAt: '2024-01-01'
+    createdAt: 'Built-in definition'
   }));
 
   const filteredRelationships = relationshipTypes.filter(rel =>
@@ -104,18 +119,6 @@ export function Ontology() {
     rel.description.toLowerCase().includes(relationshipSearchTerm.toLowerCase())
   );
 
-  const { data: coverageWorkItemsData } = useQuery(GET_WORK_ITEMS, {
-    variables: currentGraph ? { where: { graph: { id: currentGraph.id } } } : { where: {} },
-    fetchPolicy: currentGraph ? 'cache-and-network' : 'cache-only'
-  });
-
-  const { data: coverageEdgesData } = useQuery(GET_EDGES, {
-    variables: currentGraph ? { where: { source: { graph: { id: currentGraph.id } } } } : { where: {} },
-    fetchPolicy: currentGraph ? 'cache-and-network' : 'cache-only'
-  });
-
-  const allWorkItems: CoverageWorkItem[] = coverageWorkItemsData?.workItems ?? [];
-  const allEdges: CoverageEdge[] = coverageEdgesData?.edges ?? [];
   const requirements = allWorkItems.filter(wi => wi.type === REQUIREMENT_WORK_ITEM_TYPE);
   const tasks = allWorkItems.filter(wi => wi.type === 'TASK');
   const requirementCoverage = groupSatisfyingTasks(requirements, tasks, allEdges);
@@ -139,7 +142,7 @@ export function Ontology() {
   };
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full min-h-0 min-w-0 flex flex-col">
       {/* Header */}
       <div className="bg-gray-900/30 backdrop-blur-md border-b border-gray-700/30 px-3 py-3 sm:px-6 sm:py-4">
         <div className="flex items-center justify-between">
@@ -151,34 +154,18 @@ export function Ontology() {
               </span>
             </div>
             <p className="text-sm text-gray-400 mt-1">
-              Define work item types, relationships, and schemas for {currentGraph?.name || 'your graphs'}
+              Explore built-in types and requirement coverage for {currentGraph?.name || 'your graphs'}
             </p>
           </div>
           
-          <div className="flex items-center space-x-3">
-            <button
-              type="button"
-              className="btn btn-secondary"
-            >
-              <Settings className="h-4 w-4 mr-2" />
-              Schema Settings
-            </button>
-            
-            <button
-              type="button"
-              className="btn btn-primary"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              New Type
-            </button>
-          </div>
+
         </div>
       </div>
 
       {/* Tabs */}
       <div className="bg-gray-900/20 backdrop-blur-md border-b border-gray-700/30">
-        <div className="px-6">
-          <nav className="flex space-x-8">
+        <div className="px-3 sm:px-6">
+          <nav aria-label="Ontology sections" className="grid grid-cols-2 sm:flex sm:flex-wrap gap-x-3">
             <button
               onClick={() => setActiveTab('types')}
               className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
@@ -228,7 +215,7 @@ export function Ontology() {
       {/* Content */}
       <div className="flex-1 overflow-auto">
         {activeTab === 'types' && (
-          <div className="p-6">
+          <div className="p-3 sm:p-6">
             {/* Search and filters */}
             <div className="mb-6 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
               <div className="flex-1 relative">
@@ -264,7 +251,7 @@ export function Ontology() {
                           ) : (
                             <span className="bg-green-900 text-green-300 px-2 py-1 rounded">Custom</span>
                           )}
-                          <span>{nodeType.usageCount} used</span>
+                          <span>{itemsError ? "Usage unavailable" : itemsLoading ? "Loading usage…" : `${nodeType.usageCount} in this graph`}</span>
                         </div>
                       </div>
                     </div>
@@ -321,7 +308,7 @@ export function Ontology() {
         )}
 
         {activeTab === 'relationships' && (
-          <div className="p-6">
+          <div className="p-3 sm:p-6">
             {/* Search and filters */}
             <div className="mb-6 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
               <div className="flex-1 relative">
@@ -353,7 +340,7 @@ export function Ontology() {
                         <h3 className="font-semibold text-gray-100">{relType.label}</h3>
                         <div className="flex items-center space-x-2 text-xs text-gray-400">
                           <span className="bg-gray-700 text-gray-300 px-2 py-1 rounded">Built-in</span>
-                          <span>{relType.usageCount} used</span>
+                          <span>{edgesError ? "Usage unavailable" : edgesLoading ? "Loading usage…" : `${relType.usageCount} in this graph`}</span>
                         </div>
                       </div>
                     </div>
@@ -394,13 +381,14 @@ export function Ontology() {
         )}
 
         {activeTab === 'templates' && (
-          <div className="p-6">
+          <div className="p-3 sm:p-6">
             <div className="text-center py-12">
               <h3 className="text-lg font-medium text-gray-100 mb-2">Work Item Templates</h3>
               <p className="text-gray-400 mb-4">
                 Pre-configured work item templates for common patterns
               </p>
-              <button className="btn btn-primary">
+              <p id="templates-unavailable" className="text-sm text-gray-300 mb-4">Coming soon — reusable templates are not available yet.</p>
+              <button disabled aria-describedby="templates-unavailable" className="inline-flex items-center justify-center min-h-[44px] px-4 py-2 rounded-lg border border-gray-600 bg-gray-800 text-gray-400 cursor-not-allowed">
                 <Plus className="h-4 w-4 mr-2" />
                 Create Template
               </button>
@@ -409,7 +397,7 @@ export function Ontology() {
         )}
 
         {activeTab === 'coverage' && (
-          <div className="p-6">
+          <div className="p-3 sm:p-6">
             {requirementCoverage.length === 0 ? (
               <div className="text-center py-12">
                 <ShieldCheck className="h-10 w-10 text-gray-500 mx-auto mb-3" />

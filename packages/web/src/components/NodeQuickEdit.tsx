@@ -24,6 +24,7 @@ interface NodeQuickEditProps {
   /** Persist one field change (optimistic); parent wires the mutation + undo. */
   onCommit: (c: QuickEditCommit) => void;
   onClose: () => void;
+  onOpenDetails?: () => void;
   rootTestId?: string;
 }
 
@@ -38,7 +39,7 @@ const STATUSES = STATUS_OPTIONS.filter((s) => s.value !== 'all');
  * mutation + an undo entry. Positioning is handled by the parent (like the inline
  * rename box).
  */
-export function NodeQuickEdit({ node, onCommit, onClose, rootTestId = 'node-quick-edit' }: NodeQuickEditProps) {
+export function NodeQuickEdit({ node, onCommit, onClose, onOpenDetails, rootTestId = 'node-quick-edit' }: NodeQuickEditProps) {
   const [title, setTitle] = useState<string>(node.title || '');
   const [description, setDescription] = useState<string>(node.description || '');
   const [priority, setPriority] = useState<number>(Math.round(((node.priority ?? 0) as number) * 100));
@@ -86,48 +87,48 @@ export function NodeQuickEdit({ node, onCommit, onClose, rootTestId = 'node-quic
   return (
     <div
       data-testid={rootTestId}
-      className="w-72 bg-gray-900/95 backdrop-blur-md border border-gray-700/60 rounded-xl shadow-2xl overflow-hidden text-sm"
+      className="w-full bg-gray-900/95 backdrop-blur-md border border-gray-700/60 rounded-xl shadow-2xl overflow-hidden text-sm"
       onPointerDown={(e) => e.stopPropagation()}
       onDoubleClick={(e) => e.stopPropagation()}
     >
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-700/60">
-        <span className="text-[10px] uppercase tracking-wide font-semibold" style={{ color: typeCfg.hexColor }}>{typeCfg.label}</span>
-        <span className="text-[10px] text-gray-500">Quick edit</span>
-        <button onClick={onClose} className="ml-auto p-1 text-gray-400 hover:text-white rounded hover:bg-gray-700/50" title="Close" aria-label="Close quick edit">
+      <div className="sticky top-0 z-10 bg-gray-900 flex items-center gap-2 px-3 py-2 border-b border-gray-700/60">
+        <span className="text-xs uppercase tracking-wide font-semibold" style={{ color: typeCfg.hexColor }}>{typeCfg.label}</span>
+        <span className="text-xs text-gray-400">Quick edit</span>
+        <button onClick={onClose} className="ml-auto min-h-[44px] min-w-[44px] flex items-center justify-center text-gray-400 hover:text-white rounded hover:bg-gray-700/50" title="Close" aria-label="Close quick edit">
           <X className="h-4 w-4" />
         </button>
       </div>
 
-      <div className="p-3 space-y-3 max-h-[60vh] overflow-y-auto">
+      <div className="p-3 space-y-4">
         {/* Title */}
         <label className="block">
-          <span className="block text-[11px] text-gray-500 mb-1">Title</span>
+          <span className="block text-sm text-gray-400 mb-1">Title</span>
           <input
             data-testid="quick-title"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             onBlur={commitTitle}
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); commitTitle(); } }}
-            className="w-full px-2 py-1.5 rounded-lg bg-gray-800 border border-gray-700 text-white outline-none focus:border-emerald-400"
+            className="text-base w-full min-h-[44px] px-2 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white outline-none focus:border-emerald-400"
           />
         </label>
 
         {/* Description */}
         <label className="block">
-          <span className="block text-[11px] text-gray-500 mb-1">Description</span>
+          <span className="block text-sm text-gray-400 mb-1">Description</span>
           <textarea
             data-testid="quick-description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             onBlur={commitDescription}
             rows={3}
-            className="w-full px-2 py-1.5 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 outline-none focus:border-emerald-400 resize-y"
+            className="text-base w-full min-h-[44px] px-2 py-2 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 outline-none focus:border-emerald-400 resize-y"
           />
         </label>
 
         {/* Type */}
         <div>
-          <span className="block text-[11px] text-gray-500 mb-1">Type</span>
+          <span className="block text-sm text-gray-400 mb-1">Type</span>
           <div className="flex flex-wrap gap-1" data-testid="quick-type">
             {TYPES.map((t) => {
               const active = t.value === node.type;
@@ -135,7 +136,8 @@ export function NodeQuickEdit({ node, onCommit, onClose, rootTestId = 'node-quic
                 <button
                   key={t.value}
                   onClick={() => commitType(t.value)}
-                  className={`px-2 py-0.5 rounded-full text-[11px] border transition-colors ${active ? 'text-white' : 'text-gray-300 hover:text-white border-gray-700 hover:border-gray-500'}`}
+                  aria-pressed={active}
+                  className={`min-h-[44px] px-3 py-2 rounded-full text-sm border transition-colors ${active ? 'text-white' : 'text-gray-300 hover:text-white border-gray-700 hover:border-gray-500'}`}
                   style={active ? { backgroundColor: `${t.hexColor}33`, borderColor: t.hexColor, color: t.hexColor } : undefined}
                   title={t.label}
                 >
@@ -149,24 +151,25 @@ export function NodeQuickEdit({ node, onCommit, onClose, rootTestId = 'node-quic
         {/* Priority */}
         <div>
           <div className="flex items-center justify-between mb-1">
-            <span className="text-[11px] text-gray-500">Priority</span>
-            <span className="text-[11px] font-semibold text-gray-300" data-testid="quick-priority-value">{priority}%</span>
+            <span className="text-sm text-gray-400">Priority</span>
+            <span className="text-sm font-semibold text-gray-300" data-testid="quick-priority-value">{priority}%</span>
           </div>
           <input
             type="range" min={0} max={100} step={5}
             value={priority}
             data-testid="quick-priority"
+            aria-label="Priority"
             onChange={(e) => setPriority(Number(e.target.value))}
             onMouseUp={commitPriority}
             onTouchEnd={commitPriority}
             onKeyUp={commitPriority}
-            className="w-full accent-emerald-400"
+            className="text-base w-full min-h-[44px] accent-emerald-400"
           />
         </div>
 
         {/* Status */}
         <div>
-          <span className="block text-[11px] text-gray-500 mb-1">Status</span>
+          <span className="block text-sm text-gray-400 mb-1">Status</span>
           <div className="flex flex-wrap gap-1" data-testid="quick-status">
             {STATUSES.map((s) => {
               const active = s.value === node.status;
@@ -175,7 +178,8 @@ export function NodeQuickEdit({ node, onCommit, onClose, rootTestId = 'node-quic
                 <button
                   key={s.value}
                   onClick={() => commitStatus(s.value)}
-                  className={`px-2 py-0.5 rounded-full text-[11px] border transition-colors ${active ? '' : 'text-gray-300 hover:text-white border-gray-700 hover:border-gray-500'}`}
+                  aria-pressed={active}
+                  className={`min-h-[44px] px-3 py-2 rounded-full text-sm border transition-colors ${active ? '' : 'text-gray-300 hover:text-white border-gray-700 hover:border-gray-500'}`}
                   style={active ? { backgroundColor: `${cfg.hexColor}33`, borderColor: cfg.hexColor, color: cfg.hexColor } : undefined}
                   title={s.label}
                 >
@@ -188,21 +192,22 @@ export function NodeQuickEdit({ node, onCommit, onClose, rootTestId = 'node-quic
 
         {/* Status notes — timestamped, editable updates (like comments) */}
         <div data-testid="quick-status-notes">
-          <span className="block text-[11px] text-gray-500 mb-1">Status notes</span>
+          <span className="block text-sm text-gray-400 mb-1">Status notes</span>
           <div className="flex gap-1">
             <input
               data-testid="quick-note-input"
+              aria-label="Status update"
               value={noteText}
               onChange={(e) => setNoteText(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addNote(); } }}
               placeholder="Add a status update…"
-              className="flex-1 min-w-0 px-2 py-1.5 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 outline-none focus:border-emerald-400"
+              className="flex-1 min-w-0 min-h-[44px] px-2 py-2 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 outline-none focus:border-emerald-400"
             />
             <button
               data-testid="quick-note-add"
               onClick={addNote}
               disabled={!noteText.trim()}
-              className="px-2 py-1.5 rounded-lg bg-emerald-600/80 hover:bg-emerald-500 text-white text-[11px] font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+              className="min-h-[44px] px-2 py-2 rounded-lg bg-emerald-600/80 hover:bg-emerald-500 text-white text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Add
             </button>
@@ -212,10 +217,10 @@ export function NodeQuickEdit({ node, onCommit, onClose, rootTestId = 'node-quic
               {notes.map((n) => (
                 <li key={n.id} className="group rounded-lg bg-gray-800/60 border border-gray-700/60 px-2 py-1.5">
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] text-gray-500">{fmtTime(n.at)}</span>
+                    <span className="text-xs text-gray-400">{fmtTime(n.at)}</span>
                     <button
                       onClick={() => commitMeta(deleteStatusNote(meta, n.id))}
-                      className="ml-auto p-0.5 text-gray-500 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="ml-auto min-h-[44px] min-w-[44px] flex items-center justify-center text-gray-400 hover:text-rose-400 opacity-100 transition-opacity"
                       title="Delete note" aria-label="Delete note"
                     >
                       <Trash2 className="h-3 w-3" />
@@ -230,10 +235,10 @@ export function NodeQuickEdit({ node, onCommit, onClose, rootTestId = 'node-quic
                         if (e.key === 'Enter') { commitMeta(editStatusNote(meta, n.id, (e.target as HTMLInputElement).value)); setEditingNote(null); }
                         if (e.key === 'Escape') setEditingNote(null);
                       }}
-                      className="mt-1 w-full px-1.5 py-1 rounded bg-gray-900 border border-emerald-400 text-gray-100 text-[12px] outline-none"
+                      className="mt-1 w-full px-1.5 py-1 rounded bg-gray-900 border border-emerald-400 text-gray-100 text-sm outline-none"
                     />
                   ) : (
-                    <div className="text-[12px] text-gray-200 whitespace-pre-wrap cursor-text" onClick={() => setEditingNote(n.id)} title="Click to edit">
+                    <div className="text-sm text-gray-200 whitespace-pre-wrap cursor-text" onClick={() => setEditingNote(n.id)} title="Click to edit">
                       {n.text}
                     </div>
                   )}
@@ -242,6 +247,7 @@ export function NodeQuickEdit({ node, onCommit, onClose, rootTestId = 'node-quic
             </ul>
           )}
         </div>
+        {onOpenDetails && <button onClick={onOpenDetails} className="min-h-[44px] w-full rounded-lg border border-gray-600 px-3 py-2 text-sm text-gray-200 hover:bg-gray-800">Details & connections</button>}
       </div>
     </div>
   );

@@ -75,7 +75,7 @@
 #
 #   Section 3: Dependency Checks
 #   └─ Git: Checks version, installs/upgrades if needed
-#   └─ Node.js: Ensures 18+, installs via Homebrew (macOS) or nvm (Linux)
+#   └─ Node.js: Ensures 22.18+, installs via Homebrew (macOS) or nvm (Linux)
 #   └─ Docker: Installs OrbStack (macOS) or Docker Engine (Linux)
 #
 #   Section 4: Code Installation
@@ -1369,21 +1369,21 @@ check_and_prompt_git() {
 # ============================================================================
 # Detects Node.js status and automatically installs/upgrades as needed.
 #
-# CASE 1: Current Node.js (>= 18) + npm (>= 9)
-#   - Condition: Node.js >= 18 AND npm >= 9
+# CASE 1: Current Node.js (>= 22.18) + npm (>= 9)
+#   - Condition: Node.js >= 22.18 AND npm >= 9
 #   - Action: Skip installation (already current)
-#   - Example: "Node.js v22.11.0 and npm 10.9.0"
+#   - Example: "Node.js v22.18.0 and npm 10.9.0"
 #
-# CASE 2: Current Node.js (>= 18) but outdated/missing npm
-#   - Condition: Node.js >= 18 AND (npm < 9 OR npm missing)
+# CASE 2: Current Node.js (>= 22.18) but outdated/missing npm
+#   - Condition: Node.js >= 22.18 AND (npm < 9 OR npm missing)
 #   - Action: Update npm via setup_nodejs.sh (no prompt)
-#   - Example: "Node.js v20.0.0 OK, but npm needs update"
+#   - Example: "Node.js v22.18.0 OK, but npm needs update"
 #   - When: npm was corrupted or manually removed
 #
-# CASE 3: Outdated Node.js (< 18)
-#   - Condition: Node.js installed AND version < 18
+# CASE 3: Outdated Node.js (< 22.18)
+#   - Condition: Node.js installed AND version < 22.18
 #   - Action: Upgrade to latest LTS (no prompt)
-#   - Example: "Node.js v16.20.0 outdated (need >= 18.0.0)"
+#   - Example: "Node.js v16.20.0 outdated (need >= 22.18.0)"
 #   - When: Old Homebrew installation not updated
 #
 # CASE 4: Missing Node.js
@@ -1394,7 +1394,7 @@ check_and_prompt_git() {
 # Decision Flow:
 #   Node.js installed?
 #     NO  → CASE 4 (Missing)
-#     YES → Version >= 18?
+#     YES → Version >= 22.18?
 #             NO  → CASE 3 (Outdated)
 #             YES → npm >= 9?
 #                     YES → CASE 1 (Current)
@@ -1414,21 +1414,21 @@ check_and_prompt_git() {
 # ============================================================================
 # Detects Node.js status and automatically installs/upgrades as needed on Linux.
 #
-# CASE 1: Current Node.js (>= 18) + npm (>= 9)
-#   - Condition: Node.js >= 18 AND npm >= 9
+# CASE 1: Current Node.js (>= 22.18) + npm (>= 9)
+#   - Condition: Node.js >= 22.18 AND npm >= 9
 #   - Action: Skip installation (already current)
-#   - Example: "Node.js v22.11.0 and npm 10.9.0"
+#   - Example: "Node.js v22.18.0 and npm 10.9.0"
 #
-# CASE 2: Current Node.js (>= 18) but outdated/missing npm
-#   - Condition: Node.js >= 18 AND (npm < 9 OR npm missing)
+# CASE 2: Current Node.js (>= 22.18) but outdated/missing npm
+#   - Condition: Node.js >= 22.18 AND (npm < 9 OR npm missing)
 #   - Action: Update npm via setup_nodejs.sh (no prompt)
-#   - Example: "Node.js v20.0.0 OK, but npm needs update"
+#   - Example: "Node.js v22.18.0 OK, but npm needs update"
 #   - When: npm was corrupted or manually removed
 #
-# CASE 3: Outdated Node.js (< 18)
-#   - Condition: Node.js installed AND version < 18
+# CASE 3: Outdated Node.js (< 22.18)
+#   - Condition: Node.js installed AND version < 22.18
 #   - Action: Upgrade to latest LTS (no prompt)
-#   - Example: "Node.js v14.21.3 outdated (need >= 18.0.0)"
+#   - Example: "Node.js v14.21.3 outdated (need >= 22.18.0)"
 #   - When: Old system package not updated
 #
 # CASE 4: Missing Node.js
@@ -1439,7 +1439,7 @@ check_and_prompt_git() {
 # Decision Flow:
 #   Node.js installed?
 #     NO  → CASE 4 (Missing)
-#     YES → Version >= 18?
+#     YES → Version >= 22.18?
 #             NO  → CASE 3 (Outdated)
 #             YES → npm >= 9?
 #                     YES → CASE 1 (Current)
@@ -1510,12 +1510,12 @@ check_and_prompt_nodejs_macos() {
             # Check if Node.js is installed with correct version
             if command -v node >/dev/null 2>&1; then
                 NODE_VERSION=$(node --version 2>/dev/null | sed 's/v//' | cut -d. -f1 || echo "0")
-                if [ "$NODE_VERSION" -ge 18 ]; then
-                    # Node.js is current (>= 18), check npm version
+                if node -e 'const [a,b]=process.versions.node.split(".").map(Number);process.exit(a>22||(a===22&&b>=18)?0:1)'; then
+                    # Node.js is current (>= 22.18), check npm version
                     if command -v npm >/dev/null 2>&1; then
                         NPM_VERSION=$(npm --version 2>/dev/null | cut -d. -f1 || echo "0")
                         if [ "$NPM_VERSION" -ge 9 ]; then
-                            check_result="current"  # macOS CASE 1: Node.js >= 18 + npm >= 9
+                            check_result="current"  # macOS CASE 1: Node.js >= 22.18 + npm >= 9
                         else
                             check_result="npm_old"  # macOS CASE 2: Node.js OK but npm < 9
                         fi
@@ -1523,7 +1523,7 @@ check_and_prompt_nodejs_macos() {
                         check_result="npm_missing"  # macOS CASE 2: Node.js OK but npm missing
                     fi
                 else
-                    check_result="outdated"  # macOS CASE 3: Node.js < 18
+                    check_result="outdated"  # macOS CASE 3: Node.js < 22.18
                 fi
             else
                 check_result="missing"  # macOS CASE 4: Node.js not installed
@@ -1542,7 +1542,7 @@ check_and_prompt_nodejs_macos() {
     sleep 0.3
 
     # ========================================================================
-    # MACOS CASE 1: Current Node.js (>= 18) + npm (>= 9) - Skip installation
+    # MACOS CASE 1: Current Node.js (>= 22.18) + npm (>= 9) - Skip installation
     # ========================================================================
     if [ "$check_result" = "current" ]; then
         # Get full version info
@@ -1613,7 +1613,7 @@ check_and_prompt_nodejs_macos() {
         return 0
 
     # ========================================================================
-    # MACOS CASE 3: Outdated Node.js (< 18) - Upgrade to LTS (no prompt)
+    # MACOS CASE 3: Outdated Node.js (< 22.18) - Upgrade to LTS (no prompt)
     # ========================================================================
     elif [ "$check_result" = "outdated" ]; then
         NODE_VERSION_OLD=$(node --version 2>/dev/null || echo "unknown")
@@ -1775,12 +1775,12 @@ check_and_prompt_nodejs_linux() {
             # Check if Node.js is installed with correct version
             if command -v node >/dev/null 2>&1; then
                 NODE_VERSION=$(node --version 2>/dev/null | sed 's/v//' | cut -d. -f1 || echo "0")
-                if [ "$NODE_VERSION" -ge 18 ]; then
-                    # Node.js is current (>= 18), check npm version
+                if node -e 'const [a,b]=process.versions.node.split(".").map(Number);process.exit(a>22||(a===22&&b>=18)?0:1)'; then
+                    # Node.js is current (>= 22.18), check npm version
                     if command -v npm >/dev/null 2>&1; then
                         NPM_VERSION=$(npm --version 2>/dev/null | cut -d. -f1 || echo "0")
                         if [ "$NPM_VERSION" -ge 9 ]; then
-                            check_result="current"  # LINUX CASE 1: Node.js >= 18 + npm >= 9
+                            check_result="current"  # LINUX CASE 1: Node.js >= 22.18 + npm >= 9
                         else
                             check_result="npm_old"  # LINUX CASE 2: Node.js OK but npm < 9
                         fi
@@ -1788,7 +1788,7 @@ check_and_prompt_nodejs_linux() {
                         check_result="npm_missing"  # LINUX CASE 2: Node.js OK but npm missing
                     fi
                 else
-                    check_result="outdated"  # LINUX CASE 3: Node.js < 18
+                    check_result="outdated"  # LINUX CASE 3: Node.js < 22.18
                 fi
             else
                 check_result="missing"  # LINUX CASE 4: Node.js not installed
@@ -1807,7 +1807,7 @@ check_and_prompt_nodejs_linux() {
     sleep 0.3
 
     # ========================================================================
-    # LINUX CASE 1: Current Node.js (>= 18) + npm (>= 9) - Skip installation
+    # LINUX CASE 1: Current Node.js (>= 22.18) + npm (>= 9) - Skip installation
     # ========================================================================
     if [ "$check_result" = "current" ]; then
         # Get full version info
@@ -1879,7 +1879,7 @@ check_and_prompt_nodejs_linux() {
         return 0
 
     # ========================================================================
-    # LINUX CASE 3: Outdated Node.js (< 18) - Upgrade to LTS (no prompt)
+    # LINUX CASE 3: Outdated Node.js (< 22.18) - Upgrade to LTS (no prompt)
     # ========================================================================
     elif [ "$check_result" = "outdated" ]; then
         NODE_VERSION_OLD=$(node --version 2>/dev/null || echo "unknown")
