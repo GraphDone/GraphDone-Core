@@ -4,7 +4,7 @@ On 2026-10-23, the shared SQLite magic-link verifier accepted one token more tha
 
 ## Correction
 
-The verifier now awaits an update guarded by token identity, unused state, and a fresh expiry check. Only an update affecting exactly one row may continue to account lookup or creation. Other contenders return `{ valid: false }`. An inactive account also returns false, and its token remains consumed. Existing successful callers still receive `{ valid: true, email, userId }`; a fresh link still creates a new account, and existing accounts can redeem independent valid links.
+The verifier now awaits an update guarded by token identity, unused state, and SQLite's current time when the statement executes. Only an update affecting exactly one row may continue to account lookup or creation. Other contenders return `{ valid: false }`. An inactive account also returns false, and its token remains consumed. Existing successful callers still receive `{ valid: true, email, userId }`; a fresh link still creates a new account, and existing accounts can redeem independent valid links.
 
 A database error during consumption rejects before returning identity. If the update failed, the unused token can be retried after the database problem is repaired. If consumption succeeded but the later account lookup fails, the token remains used; the user must request a fresh link. This is intentional failure behavior, not a transaction spanning account creation and token consumption.
 
@@ -20,9 +20,11 @@ npm run test --workspace @graphdone/server -- tests/magic-link.test.ts -t 'exist
 
 The selected controls produced **2 failures, 1 pass**, with seven unrelated cases filtered out. Twelve concurrent redemptions of one existing account's token returned multiple successful identities. The inactive-account case returned a successful identity as well.
 
-After correction, `npm run test --workspace @graphdone/server` passed **38/38**, including all **10 magic-link cases**. Coverage includes concurrent existing/new accounts, distinct valid tokens, expired/used/missing tokens, inactive accounts and reactivation, missing-table lookup errors, a real SQLite trigger that rejects the consumption update, and an account-lookup failure after consumption. The existing server suite passes too. Server typecheck/build and whitespace checks pass; ESLint reports zero errors with existing legacy warnings.
+Self-review of the first fix (`4f4b782`) found that binding a JavaScript timestamp before scheduling the write could accept a token whose expiry passes before SQLite executes it. A controlled write-delay regression failed against that revision. It holds the consumption call, lets the actual SQLite token expire, confirms expiry using SQLite's clock, and releases the real write. Moving the expiry check and consumption timestamp into the SQL statement makes the case pass without consuming the expired token.
 
-Local evidence: `/tmp/graphdone-magic-link-red.log`, `/tmp/graphdone-magic-link-green.log`, `/tmp/graphdone-magic-link-typecheck.log`, and `/tmp/graphdone-magic-link-server-build.log`. Public PR checks and independent review provide subsequent commit-specific evidence.
+After correction, `npm run test --workspace @graphdone/server` passed **39/39**, including all **11 magic-link cases**. Coverage includes concurrent existing/new accounts, distinct valid tokens, expired/used/missing tokens, expiry during a delayed write, inactive accounts and reactivation, missing-table lookup errors, a real SQLite trigger that rejects the consumption update, and an account-lookup failure after consumption. The existing server suite passes too. Server typecheck/build and whitespace checks pass; ESLint reports zero errors with existing legacy warnings.
+
+Local evidence: `/tmp/graphdone-magic-link-red.log`, `/tmp/graphdone-magic-link-green.log`, `/tmp/graphdone-magic-link-expiry-red.log`, `/tmp/graphdone-magic-link-expiry-green.log`, `/tmp/graphdone-magic-link-typecheck.log`, and `/tmp/graphdone-magic-link-server-build.log`. Public PR checks and independent review provide subsequent commit-specific evidence.
 
 ## Remaining scope
 
