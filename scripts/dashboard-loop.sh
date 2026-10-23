@@ -22,7 +22,11 @@ PORT="${DASHBOARD_PORT:-3199}"
 AGENT_TIMEOUT="${AGENT_TIMEOUT:-1500}"
 
 # cron runs with a minimal env — put nvm node + ~/.local/bin (claude) on PATH
-export PATH="/home/scubasonar/.nvm/versions/node/v20.20.2/bin:/home/scubasonar/.local/bin:$PATH"
+export PATH="$HOME/.local/bin:$PATH"
+if ! command -v node >/dev/null 2>&1 || ! node -e 'const [a,b]=process.versions.node.split(".").map(Number);process.exit(a>22||(a===22&&b>=18)?0:1)'; then
+  echo "Node.js 22.18+ must be on PATH before running the dashboard loop." >&2
+  exit 1
+fi
 export NODE_NO_WARNINGS=1
 
 mkdir -p "$STATE"
@@ -96,7 +100,7 @@ fi
 log "dashboard health=$(health)"
 
 # 2) self-check the dashboard tool (cheap; does NOT fabricate runs)
-if node --test tests/lib/dashboard/ >>"$LOG" 2>&1; then log "dashboard lib tests ok"; else log "dashboard lib tests FAILED"; fi
+if node --test "tests/lib/dashboard/*.test.mjs" >>"$LOG" 2>&1; then log "dashboard lib tests ok"; else log "dashboard lib tests FAILED"; fi
 
 # 2.5) keep the narrated report current with the latest runs
 refresh_narration_if_stale

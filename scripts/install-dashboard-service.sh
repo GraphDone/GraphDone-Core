@@ -12,7 +12,11 @@ set -euo pipefail
 
 CORE="/home/scubasonar/Code/graphdone-repos/GraphDone-Core"
 PORT="${DASHBOARD_PORT:-3199}"
-NODE="$(command -v node || echo /home/scubasonar/.nvm/versions/node/v20.20.2/bin/node)"
+NODE="$(command -v node || true)"
+if [ -z "$NODE" ] || ! "$NODE" -e 'const [a,b]=process.versions.node.split(".").map(Number);process.exit(a>22||(a===22&&b>=18)?0:1)'; then
+  echo "Node.js 22.18+ must be on PATH before installing the dashboard service." >&2
+  exit 1
+fi
 UNIT_DIR="$HOME/.config/systemd/user"
 UNIT="$UNIT_DIR/graphdone-dashboard.service"
 
