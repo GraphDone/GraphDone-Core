@@ -6,8 +6,16 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { prepareOutput } from './unified-options.mjs';
+import { SEQUENCES } from '../../sequences/unified.config.mjs';
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
+
+test('required performance and mobile gates select their bounded suites without retries', () => {
+  assert.deepEqual(SEQUENCES['perf-budgets'].args, ['tests/perf/graph-perf.spec.ts', '--project=perf', '--workers=1', '--retries=0']);
+  assert.equal(SEQUENCES['perf-budgets'].blocking, true);
+  assert.deepEqual(SEQUENCES.mobile.args, ['--grep', '@mobile|@audit', '--project=GraphDone-Core/dev-neo4j/chromium', '--workers=1', '--retries=0']);
+  assert.equal(SEQUENCES.mobile.blocking, true);
+});
 function fixture(t) {
   const dir = mkdtempSync(join(tmpdir(), 'graphdone-unified-cli-'));
   mkdirSync(join(dir, 'tests'), { recursive: true });
@@ -96,6 +104,23 @@ test('CLI explicitly optional absent audit remains skipped without a fabricated 
   assert.equal(report.rollup.status, 'skipped');
   assert.equal(report.rollup.totals.passed, 0);
 });
+
+for (const sequence of ['perf-budgets', 'mobile']) {
+  test(`CLI rejects a successful process with skipped required ${sequence} cases`, t => {
+    const { dir, run } = fixture(t);
+    const report = { suites: [{ specs: Array.from({ length: 3 }, (_, i) => ({
+      title: `required case ${i}`, ok: true,
+      tests: [{ status: 'skipped', expectedStatus: 'skipped', results: [{ status: 'skipped' }] }],
+    })) }], stats: { expected: 0, unexpected: 0, flaky: 0, skipped: 3 }, errors: [] };
+    writeFileSync(join(dir, 'bin/npx'), `#!${process.execPath}\nprocess.stdout.write(${JSON.stringify(JSON.stringify(report))});\n`, { mode: 0o700 });
+    const result = run(['--sequence', sequence]);
+    assert.equal(result.status, 1, result.stdout);
+    const unified = JSON.parse(readFileSync(join(dir, 'test-artifacts/unified/report.json')));
+    assert.equal(unified.rollup.status, 'failed');
+    assert.equal(unified.rollup.totals.passed, 0);
+    assert.equal(unified.rollup.totals.skipped, 3);
+  });
+}
 test('CLI detects a source edit while tests are running', t => {
   const { dir, run } = fixture(t);
   const fake = join(dir, 'bin/npx');

@@ -31,8 +31,8 @@ export const SEQUENCES = {
   ], blocking: true },
   'e2e-auth': { adapter: 'playwright', title: 'Auth e2e — passwordless focus', args: ['tests/e2e/auth/passwordless-focus.spec.ts', `--project=${PW}`], blocking: true },
   'e2e-graph': { adapter: 'playwright', title: 'Graph e2e — camera', args: ['tests/e2e/graph/camera.spec.ts', `--project=${PW}`], blocking: true },
-  'mobile': { adapter: 'playwright', title: 'Mobile audit', args: ['--grep', '@mobile|@audit', `--project=${PW}`], blocking: false },
-  'perf-budgets': { adapter: 'playwright', title: 'Perf budgets (ADAPT-8)', args: ['--project=perf'], blocking: false },
+  'mobile': { adapter: 'playwright', title: 'Mobile audit', args: ['--grep', '@mobile|@audit', `--project=${PW}`, '--workers=1', '--retries=0'], blocking: true },
+  'perf-budgets': { adapter: 'playwright', title: 'Perf budgets (ADAPT-8)', args: ['tests/perf/graph-perf.spec.ts', '--project=perf', '--workers=1', '--retries=0'], blocking: true },
   // Capture-heavy, report-only (own Playwright projects; specs under tests/e2e/reports/)
   'diagnostics': { adapter: 'playwright', title: 'Graph-geometry diagnostics', args: ['--project=geometry'], blocking: false },
   'showcase': { adapter: 'playwright', title: 'Showcase — video + screenshots', args: ['--project=showcase'], blocking: false },
