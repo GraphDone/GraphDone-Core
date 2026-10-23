@@ -57,7 +57,9 @@ export const authTypeDefs = gql`
   }
 
   # Folder Management Types
-  type Folder {
+  type Folder
+    @query(read: false, aggregate: false)
+    @mutation(operations: []) {
     id: String!
     name: String!
     parentId: String
@@ -75,7 +77,9 @@ export const authTypeDefs = gql`
     graphs: [GraphFolderMapping!]!
   }
 
-  type GraphFolderMapping {
+  type GraphFolderMapping
+    @query(read: false, aggregate: false)
+    @mutation(operations: []) {
     graphId: String!
     folderId: String!
     position: Int!
