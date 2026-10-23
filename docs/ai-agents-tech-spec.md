@@ -1159,7 +1159,7 @@ class AgentManager {
     agent.conversationHistory.push({ role: 'user', content: userMessage });
     
     // Build context-aware prompt
-    const systemPrompt = `You are ${agent.name}, a helpful AI assistant working in GraphDone, a graph-based project management system. Your personality is ${agent.personality}. 
+    const systemPrompt = `You are ${agent.name}, a helpful AI assistant working in GraphDone, a graph-based management system. Your personality is ${agent.personality}. 
     
 Current context:
 - You are currently at position (${agent.position.x}, ${agent.position.y}) on the graph
@@ -1435,7 +1435,7 @@ Respond naturally and helpfully, offering insights about the user's work and sug
     });
     
     // Build context-aware prompt for planning with tools
-    const planningPrompt = `You are a helpful AI assistant working in GraphDone, a graph-based project management system.
+    const planningPrompt = `You are a helpful AI assistant working in GraphDone, a graph-based management system.
 
 User wants you to plan: "${prompt}"
 Target node: "${targetNodeId}"  

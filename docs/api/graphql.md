@@ -124,6 +124,38 @@ enum UserRole {
 }
 ```
 
+### Folder authorization
+
+The SQLite folder APIs use the current account role and team membership on each
+request. A revoked account or a stale administrator token cannot retain access.
+Guests and viewers are read-only. Personal folders belong to their user; team
+folders are available to current team members. System folders are readable by
+authenticated guests and accounts, and writable only by administrators. An
+administrator does not gain access to another user's personal folder merely by
+holding that role.
+
+Folder creation fixes personal ownership to the caller. Parent folders must be
+writable and in the same user, team, or system domain; cycles are rejected.
+Deletion also checks every existing descendant, including legacy hierarchies
+created before these checks. Cross-domain descendants block deletion before
+any graph references move. A deletion destination must be outside that subtree.
+Moves, deletion with a destination, and reordering validate every source,
+destination, and referenced graph before changing a mapping. A graph reference
+is visible only when its graph belongs to the caller or is shared, matching the
+graph read policy. Without a graph backend, folder structure remains readable,
+graph references are omitted, and mapping writes fail with `SERVICE_UNAVAILABLE`.
+Guest reads do not create persistent personal folders.
+
+The generated Neo4j schema does not expose automatic folder or folder-mapping
+CRUD operations; the custom SQLite-backed resolvers are the authorization
+boundary for these types.
+
+`npm run test --workspace @graphdone/server -- tests/folder-authorization.test.ts`
+executes the permission matrix through both the standalone and generated Neo4j
+GraphQL schemas with a real in-memory SQLite store. Graph metadata and the
+Neo4j version probe are simulated; this gate does not prove a live Neo4j or
+browser workflow.
+
 ### Graph
 
 Represents a graph/workspace/project.

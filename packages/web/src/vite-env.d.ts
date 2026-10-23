@@ -8,6 +8,7 @@ interface ImportMetaEnv {
   readonly VITE_ENABLE_SUBSCRIPTIONS?: string
   readonly VITE_ENABLE_3D_VIEW?: string
   readonly VITE_ENABLE_AI_AGENTS?: string
+  readonly VITE_API_URL?: string
 }
 
 interface ImportMeta {

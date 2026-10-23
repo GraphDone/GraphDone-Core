@@ -1,3 +1,5 @@
+import { hostedUsageEnabled, skipBackgroundPoll } from '../lib/hostedUsage';
+import { apiUrl } from '../lib/apiUrl';
 import { useState, useEffect, useCallback } from 'react';
 
 export interface ServiceHealth {
@@ -19,8 +21,8 @@ export interface HealthCheckResult {
   timestamp: string;
   services: {
     graphql: ServiceHealth & { port: number };
-    neo4j: ServiceHealth & { uri: string };
-    mcp: McpHealth;
+    neo4j?: ServiceHealth & { uri: string };
+    mcp?: McpHealth;
   };
 }
 
@@ -51,8 +53,6 @@ export function useHealthCheck(options: UseHealthCheckOptions = {}) {
   const [error, setError] = useState<string | null>(null);
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
 
-  const API_BASE_URL = ''; // Always use relative URLs to leverage Vite proxy in all environments
-
   const checkHealth = useCallback(async () => {
     // Create AbortController for proper timeout handling
     const controller = new AbortController();
@@ -69,7 +69,7 @@ export function useHealthCheck(options: UseHealthCheckOptions = {}) {
       }, 10000) as unknown as number;
 
       // Fetch general health status
-      const healthResponse = await fetch(`${API_BASE_URL}/health`, {
+      const healthResponse = await fetch(apiUrl('/health'), {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -91,7 +91,7 @@ export function useHealthCheck(options: UseHealthCheckOptions = {}) {
 
       // Fetch MCP-specific status
       try {
-        const mcpResponse = await fetch(`${API_BASE_URL}/mcp/status`, {
+        const mcpResponse = await fetch(apiUrl('/mcp/status'), {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -132,7 +132,7 @@ export function useHealthCheck(options: UseHealthCheckOptions = {}) {
       }
       setLoading(false);
     }
-  }, [API_BASE_URL]);
+  }, []);
 
   // Initial check
   useEffect(() => {
@@ -145,7 +145,7 @@ export function useHealthCheck(options: UseHealthCheckOptions = {}) {
   useEffect(() => {
     if (!enabled || !interval) return;
 
-    const intervalId = setInterval(checkHealth, interval);
+    const intervalId = setInterval(() => { if (!skipBackgroundPoll()) void checkHealth(); }, hostedUsageEnabled ? Math.max(interval,60000) : interval);
 
     return () => clearInterval(intervalId);
   }, [enabled, interval, checkHealth]);
@@ -158,11 +158,15 @@ export function useHealthCheck(options: UseHealthCheckOptions = {}) {
   const getOverallStatus = useCallback((): 'healthy' | 'degraded' | 'unhealthy' | 'unknown' => {
     if (!health) return 'unknown';
     
-    const criticalServices = [health.services.graphql, health.services.neo4j];
-    const hasCriticalIssue = criticalServices.some(s => s.status === 'unhealthy');
-    
+    const criticalServices = [health.services.graphql];
+    const hasCriticalIssue = criticalServices.some(s => s?.status === 'unhealthy');
+
     if (hasCriticalIssue) return 'unhealthy';
-    if (health.status === 'degraded' || health.services.mcp.status === 'unhealthy') return 'degraded';
+    if (
+      health.status === 'degraded' ||
+      health.services.mcp?.status === 'unhealthy' ||
+      health.services.neo4j?.status === 'unhealthy'
+    ) return 'degraded';
     
     return 'healthy';
   }, [health]);

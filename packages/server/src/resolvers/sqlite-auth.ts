@@ -2,11 +2,22 @@ import { GraphQLError } from 'graphql';
 import { sqliteAuthStore } from '../auth/sqlite-auth.js';
 import { generateToken } from '../utils/auth.js';
 import { verifyCaptcha } from '../utils/captcha.js';
+import { randomUUID } from 'node:crypto';
+import { folderActor, folderCreationOwner, folderResponse, requireFolderAccess, requireFolderDeletion, requireFolderParent, requireGraphAccess, visibleFolderGraphs } from '../auth/folder-access.js';
+import { passwordLoginLimiter, PasswordLoginLimitError } from '../auth/password-login-limiter.js';
 
 interface LoginInput {
   emailOrUsername: string;
   password: string;
   captchaPayload?: string;
+}
+
+interface LoginContext {
+  req?: {
+    ip?: string;
+    socket?: { remoteAddress?: string };
+    connection?: { remoteAddress?: string };
+  };
 }
 
 interface SignupInput {
@@ -174,17 +185,13 @@ export const sqliteAuthResolvers = {
     
     // Get user's folder structure
     folders: async (_: any, __: any, context: any) => {
-      if (!context.user) {
-        throw new GraphQLError('Authentication required', {
-          extensions: { code: 'UNAUTHENTICATED' }
-        });
-      }
+      const actor = await folderActor(context);
 
       try {
         // Ensure user has personal folders
-        await sqliteAuthStore.createUserPersonalFolders(context.user.userId, context.user.teamId);
+        if (['USER', 'ADMIN'].includes(actor.role)) await sqliteAuthStore.createUserPersonalFolders(actor.userId, actor.teamId);
         
-        const folders = await sqliteAuthStore.getUserFolders(context.user.userId);
+        const folders = (await sqliteAuthStore.getUserFolders(actor.userId)).filter(folder => actor.role !== 'GUEST' || folder.type === 'system');
         
         // Build hierarchical structure
         const folderMap = new Map();
@@ -193,7 +200,7 @@ export const sqliteAuthResolvers = {
         // First pass: create folder objects
         folders.forEach(folder => {
           folderMap.set(folder.id, {
-            ...folder,
+            ...folderResponse(folder),
             children: [],
             graphs: []
           });
@@ -214,7 +221,7 @@ export const sqliteAuthResolvers = {
 
         // Third pass: get graphs for each folder
         for (const folder of folders) {
-          const graphs = await sqliteAuthStore.getFolderGraphs(folder.id);
+          const graphs = await visibleFolderGraphs(folder.id, context, actor);
           const folderObj = folderMap.get(folder.id);
           if (folderObj) {
             folderObj.graphs = graphs;
@@ -230,24 +237,15 @@ export const sqliteAuthResolvers = {
 
     // Get specific folder by ID
     folder: async (_: any, { id }: { id: string }, context: any) => {
-      if (!context.user) {
-        throw new GraphQLError('Authentication required', {
-          extensions: { code: 'UNAUTHENTICATED' }
-        });
-      }
+      const actor = await folderActor(context);
+      if (!await sqliteAuthStore.findFolderById(id)) return null;
+      const folder = await requireFolderAccess(id, actor);
 
       try {
-        const folders = await sqliteAuthStore.getUserFolders(context.user.userId);
-        const folder = folders.find(f => f.id === id);
-        
-        if (!folder) {
-          return null;
-        }
-
-        const graphs = await sqliteAuthStore.getFolderGraphs(folder.id);
+        const graphs = await visibleFolderGraphs(folder.id, context, actor);
         
         return {
-          ...folder,
+          ...folderResponse(folder),
           children: [],
           graphs
         };
@@ -259,14 +257,11 @@ export const sqliteAuthResolvers = {
 
     // Get graphs in a specific folder
     folderGraphs: async (_: any, { folderId }: { folderId: string }, context: any) => {
-      if (!context.user) {
-        throw new GraphQLError('Authentication required', {
-          extensions: { code: 'UNAUTHENTICATED' }
-        });
-      }
+      const actor = await folderActor(context);
+      await requireFolderAccess(folderId, actor);
 
       try {
-        return await sqliteAuthStore.getFolderGraphs(folderId);
+        return await visibleFolderGraphs(folderId, context, actor);
       } catch (error: any) {
         console.error('❌ Get folder graphs error:', error);
         throw new GraphQLError('Failed to get folder graphs');
@@ -321,14 +316,24 @@ export const sqliteAuthResolvers = {
 
   Mutation: {
     // Login mutation - SQLite only
-    login: async (_: any, { input }: { input: LoginInput }) => {
+    login: async (_: any, { input }: { input: LoginInput }, context: LoginContext = {}) => {
       console.log(`🔐 Login attempt for: ${input.emailOrUsername}`);
+      let ipAttempt: ReturnType<typeof passwordLoginLimiter.reserveIp> | undefined;
+      let accountAttempt: ReturnType<typeof passwordLoginLimiter.reserveAccount> | undefined;
+      let outcome: 'success' | 'failure' | 'cancel' = 'cancel';
 
       try {
+        const ip = context?.req?.ip || context?.req?.socket?.remoteAddress || context?.req?.connection?.remoteAddress || 'unknown';
+        ipAttempt = passwordLoginLimiter.reserveIp(ip);
+        const identifier = input.emailOrUsername.trim().toLowerCase();
+        const user = await sqliteAuthStore.findUserByEmailOrUsername(identifier);
+        accountAttempt = passwordLoginLimiter.reserveAccount(user ? `user:${user.id}` : `identifier:${identifier}`);
+
         // Verify CAPTCHA if provided
         if (input.captchaPayload) {
           const isCaptchaValid = await verifyCaptcha(input.captchaPayload);
           if (!isCaptchaValid) {
+            outcome = 'failure';
             console.log('❌ CAPTCHA verification failed');
             throw new GraphQLError('CAPTCHA verification failed', {
               extensions: { code: 'CAPTCHA_FAILED' }
@@ -337,10 +342,8 @@ export const sqliteAuthResolvers = {
           console.log('✅ CAPTCHA verified');
         }
 
-        // SQLite-only authentication
-        const user = await sqliteAuthStore.findUserByEmailOrUsername(input.emailOrUsername);
-        
         if (!user) {
+          outcome = 'failure';
           console.log('❌ User not found:', input.emailOrUsername);
           throw new GraphQLError('Invalid credentials', {
             extensions: { code: 'UNAUTHENTICATED' }
@@ -352,6 +355,7 @@ export const sqliteAuthResolvers = {
         // Verify password
         const validPassword = await sqliteAuthStore.validatePassword(user, input.password);
         if (!validPassword) {
+          outcome = 'failure';
           console.log('❌ Invalid password for user:', user.username);
           throw new GraphQLError('Invalid credentials', {
             extensions: { code: 'UNAUTHENTICATED' }
@@ -360,6 +364,7 @@ export const sqliteAuthResolvers = {
 
         // Check if user is active
         if (!user.isActive) {
+          outcome = 'failure';
           console.log('❌ User is deactivated:', user.username);
           throw new GraphQLError('Account is deactivated', {
             extensions: { code: 'FORBIDDEN' }
@@ -367,6 +372,7 @@ export const sqliteAuthResolvers = {
         }
 
         const token = generateToken(user.id, user.email, user.role);
+        outcome = 'success';
         console.log(`✅ Login successful: ${user.username} (${user.role})`);
 
         return {
@@ -377,6 +383,12 @@ export const sqliteAuthResolvers = {
           }
         };
       } catch (error) {
+        if (error instanceof PasswordLoginLimitError) {
+          outcome = 'failure';
+          throw new GraphQLError(error.message, {
+            extensions: { code: 'RATE_LIMIT_EXCEEDED', retryAfter: error.retryAfter, rateLimitExceeded: true, http: { status: 429 } },
+          });
+        }
         if (error instanceof GraphQLError) {
           throw error;
         }
@@ -384,13 +396,16 @@ export const sqliteAuthResolvers = {
         throw new GraphQLError('Login failed', {
           extensions: { code: 'INTERNAL_SERVER_ERROR' }
         });
+      } finally {
+        accountAttempt?.finish(outcome);
+        ipAttempt?.finish(outcome);
       }
     },
 
     // Guest login
     guestLogin: async () => {
       const guestUser = {
-        id: 'guest-' + Date.now(),
+        id: `guest-${randomUUID()}`,
         email: 'guest@demo.local',
         username: 'guest',
         name: 'Guest User',
@@ -675,22 +690,15 @@ export const sqliteAuthResolvers = {
 
     // Create new folder
     createFolder: async (_: any, { input }: { input: any }, context: any) => {
-      if (!context.user) {
-        throw new GraphQLError('Authentication required', {
-          extensions: { code: 'UNAUTHENTICATED' }
-        });
-      }
+      const actor = await folderActor(context, true);
+      const folderData = { ...input, ...await folderCreationOwner(input, actor) };
+      await requireFolderParent(folderData, input.parentId, actor);
 
       try {
-        const folderData = {
-          ...input,
-          ownerId: input.ownerId || context.user.userId
-        };
-
         const folder = await sqliteAuthStore.createFolder(folderData);
         
         return {
-          ...folder,
+          ...folderResponse(folder),
           children: [],
           graphs: []
         };
@@ -702,18 +710,16 @@ export const sqliteAuthResolvers = {
 
     // Update folder
     updateFolder: async (_: any, { id, input }: { id: string; input: any }, context: any) => {
-      if (!context.user) {
-        throw new GraphQLError('Authentication required', {
-          extensions: { code: 'UNAUTHENTICATED' }
-        });
-      }
+      const actor = await folderActor(context, true);
+      const existing = await requireFolderAccess(id, actor, true);
+      if (input.parentId !== undefined) await requireFolderParent(existing, input.parentId, actor);
 
       try {
         const folder = await sqliteAuthStore.updateFolder(id, input);
-        const graphs = await sqliteAuthStore.getFolderGraphs(id);
+        const graphs = await visibleFolderGraphs(id, context, actor);
         
         return {
-          ...folder,
+          ...folderResponse(folder),
           children: [],
           graphs
         };
@@ -725,16 +731,17 @@ export const sqliteAuthResolvers = {
 
     // Delete folder
     deleteFolder: async (_: any, { id, moveGraphsTo }: { id: string; moveGraphsTo?: string }, context: any) => {
-      if (!context.user) {
-        throw new GraphQLError('Authentication required', {
-          extensions: { code: 'UNAUTHENTICATED' }
-        });
+      const actor = await folderActor(context, true);
+      await requireFolderDeletion(id, actor, moveGraphsTo);
+      const graphs = moveGraphsTo ? await sqliteAuthStore.getFolderGraphs(id) : [];
+      if (moveGraphsTo) {
+        await requireFolderAccess(moveGraphsTo, actor, true);
+        await requireGraphAccess(graphs.map(graph => graph.graphId), context, actor);
       }
 
       try {
         // If moveGraphsTo is specified, move all graphs first
         if (moveGraphsTo) {
-          const graphs = await sqliteAuthStore.getFolderGraphs(id);
           for (const graph of graphs) {
             await sqliteAuthStore.removeGraphFromFolder(graph.graphId, id);
             await sqliteAuthStore.addGraphToFolder(graph.graphId, moveGraphsTo, graph.position);
@@ -755,11 +762,9 @@ export const sqliteAuthResolvers = {
 
     // Add graph to folder
     addGraphToFolder: async (_: any, { graphId, folderId, position }: { graphId: string; folderId: string; position?: number }, context: any) => {
-      if (!context.user) {
-        throw new GraphQLError('Authentication required', {
-          extensions: { code: 'UNAUTHENTICATED' }
-        });
-      }
+      const actor = await folderActor(context, true);
+      await requireFolderAccess(folderId, actor, true);
+      await requireGraphAccess([graphId], context, actor);
 
       try {
         await sqliteAuthStore.addGraphToFolder(graphId, folderId, position || 0);
@@ -776,11 +781,9 @@ export const sqliteAuthResolvers = {
 
     // Remove graph from folder
     removeGraphFromFolder: async (_: any, { graphId, folderId }: { graphId: string; folderId: string }, context: any) => {
-      if (!context.user) {
-        throw new GraphQLError('Authentication required', {
-          extensions: { code: 'UNAUTHENTICATED' }
-        });
-      }
+      const actor = await folderActor(context, true);
+      await requireFolderAccess(folderId, actor, true);
+      await requireGraphAccess([graphId], context, actor);
 
       try {
         await sqliteAuthStore.removeGraphFromFolder(graphId, folderId);
@@ -797,11 +800,10 @@ export const sqliteAuthResolvers = {
 
     // Move graph between folders  
     moveGraphBetweenFolders: async (_: any, { graphId, fromFolderId, toFolderId, position }: { graphId: string; fromFolderId: string; toFolderId: string; position?: number }, context: any) => {
-      if (!context.user) {
-        throw new GraphQLError('Authentication required', {
-          extensions: { code: 'UNAUTHENTICATED' }
-        });
-      }
+      const actor = await folderActor(context, true);
+      await requireFolderAccess(fromFolderId, actor, true);
+      await requireFolderAccess(toFolderId, actor, true);
+      await requireGraphAccess([graphId], context, actor);
 
       try {
         await sqliteAuthStore.removeGraphFromFolder(graphId, fromFolderId);
@@ -819,11 +821,9 @@ export const sqliteAuthResolvers = {
 
     // Reorder graphs in folder
     reorderGraphsInFolder: async (_: any, { folderId, graphOrders }: { folderId: string; graphOrders: Array<{ graphId: string; position: number }> }, context: any) => {
-      if (!context.user) {
-        throw new GraphQLError('Authentication required', {
-          extensions: { code: 'UNAUTHENTICATED' }
-        });
-      }
+      const actor = await folderActor(context, true);
+      await requireFolderAccess(folderId, actor, true);
+      await requireGraphAccess(graphOrders.map(order => order.graphId), context, actor);
 
       try {
         // Update position for each graph

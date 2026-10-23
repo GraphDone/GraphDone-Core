@@ -88,7 +88,7 @@ export function DisconnectWorkItemModal({ isOpen, onClose, sourceNode, onAllConn
       }
     },
     skip: !isOpen,
-    pollInterval: 1000, // Poll every second for real-time updates
+    pollInterval: 0, // Poll every second for real-time updates
     fetchPolicy: 'cache-and-network' // Always check for updates
   });
 
@@ -722,7 +722,7 @@ export function ConnectWorkItemModal({ isOpen, onClose, sourceNode, initialTab =
       }
     },
     skip: !isOpen,
-    pollInterval: 1000, // Poll every second for real-time updates
+    pollInterval: 0, // Poll every second for real-time updates
     fetchPolicy: 'cache-and-network' // Always check for updates
   });
 

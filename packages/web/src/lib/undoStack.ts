@@ -21,6 +21,7 @@ export class UndoStack {
   private stack: UndoableAction[] = [];
   private listeners: Listener[] = [];
   private readonly capacity: number;
+  private clearGeneration = 0;
 
   constructor(capacity = 36) {
     this.capacity = capacity;
@@ -56,7 +57,12 @@ export class UndoStack {
     return this.stack.length;
   }
 
+  get generation(): number {
+    return this.clearGeneration;
+  }
+
   clear(): void {
+    this.clearGeneration += 1;
     this.stack = [];
     this.emit();
   }

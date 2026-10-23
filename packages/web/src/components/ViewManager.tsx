@@ -1,3 +1,4 @@
+import { skipBackgroundPoll } from '../lib/hostedUsage';
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useQuery } from '@apollo/client';
 import { Search, X, ChevronDown, BarChart3, PanelRightClose, PanelRightOpen } from 'lucide-react';
@@ -16,6 +17,7 @@ import RightSidebar from './RightSidebar';
 import GanttChart from './GanttChart';
 import CalendarView from './CalendarView';
 import ActivityFeed from './ActivityFeed';
+import type { UndoStack } from '../lib/undoStack';
 
 // WorkItem interface matching GraphQL schema
 interface WorkItem {
@@ -42,10 +44,12 @@ type ViewType = 'dashboard' | 'table' | 'cards' | 'kanban' | 'gantt' | 'calendar
 
 interface ViewManagerProps {
   viewMode: ViewType;
+  undoStack?: UndoStack;
 }
 
-const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
+const ViewManager: React.FC<ViewManagerProps> = ({ viewMode, undoStack }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [mobileFiltersOpen,setMobileFiltersOpen]=useState(false);
   const [selectedNode, setSelectedNode] = useState<WorkItem | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -65,6 +69,11 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
   const typeDropdownRef = useRef<HTMLDivElement>(null);
   const priorityDropdownRef = useRef<HTMLDivElement>(null);
   const contributorDropdownRef = useRef<HTMLDivElement>(null);
+  const filterOptionsRef = useRef<HTMLDivElement>(null);
+  const statusTriggerRef = useRef<HTMLButtonElement>(null);
+  const typeTriggerRef = useRef<HTMLButtonElement>(null);
+  const priorityTriggerRef = useRef<HTMLButtonElement>(null);
+  const contributorTriggerRef = useRef<HTMLButtonElement>(null);
 
   const { currentUser } = useAuth();
   const { currentGraph } = useGraph();
@@ -78,7 +87,8 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
         }
       }
     } : { where: {} },
-    pollInterval: currentGraph ? 5000 : 0,
+    pollInterval: 60000,
+    skipPollAttempt: skipBackgroundPoll,
     fetchPolicy: currentGraph ? 'cache-and-network' : 'cache-only'
   });
 
@@ -94,7 +104,8 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
         ]
       }
     } : { where: {} },
-    pollInterval: currentGraph ? 5000 : 0,
+    pollInterval: 60000,
+    skipPollAttempt: skipBackgroundPoll,
     fetchPolicy: currentGraph ? 'cache-and-network' : 'cache-only'
   });
 
@@ -172,6 +183,54 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Escape closes whichever filter menu is open and returns keyboard focus to
+  // its trigger. Pointer users still get the existing outside-click behavior.
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      const trigger = isTypeDropdownOpen ? typeTriggerRef.current
+        : isStatusDropdownOpen ? statusTriggerRef.current
+        : isPriorityDropdownOpen ? priorityTriggerRef.current
+        : isContributorDropdownOpen ? contributorTriggerRef.current
+        : null;
+      if (!trigger) return;
+
+      event.preventDefault();
+      setIsTypeDropdownOpen(false);
+      setIsStatusDropdownOpen(false);
+      setIsPriorityDropdownOpen(false);
+      setIsContributorDropdownOpen(false);
+      requestAnimationFrame(() => trigger.focus());
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [isTypeDropdownOpen, isStatusDropdownOpen, isPriorityDropdownOpen, isContributorDropdownOpen]);
+
+  // Compact layouts position each menu below the complete filter row. Cap the
+  // menu to the space that is actually left so every option remains reachable
+  // after a phone rotates or a short desktop window is resized.
+  useEffect(() => {
+    const options = filterOptionsRef.current;
+    if (!mobileFiltersOpen || !options) return undefined;
+
+    const updateAvailableHeight = () => {
+      const availableHeight = Math.max(96, window.innerHeight - options.getBoundingClientRect().bottom - 16);
+      options.style.setProperty('--task-filter-available-height', `${availableHeight}px`);
+    };
+
+    const animationFrame = requestAnimationFrame(updateAvailableHeight);
+    const resizeObserver = new ResizeObserver(updateAvailableHeight);
+    resizeObserver.observe(options);
+    window.addEventListener('resize', updateAvailableHeight);
+
+    return () => {
+      cancelAnimationFrame(animationFrame);
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', updateAvailableHeight);
+    };
+  }, [mobileFiltersOpen]);
 
   const clearAllFilters = () => {
     setSearchQuery('');
@@ -348,7 +407,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
   const renderView = () => {
     switch (viewMode) {
       case 'dashboard':
-        return <Dashboard filteredNodes={filteredNodes} stats={stats} />;
+        return <Dashboard filteredNodes={filteredNodes} stats={stats} onOpenWork={id => { const item = workItems.find(node => node.id === id); if (item) handleEditNode(item); }} />;
       case 'table':
         return <TableView filteredNodes={filteredNodes} handleEditNode={handleEditNode} edges={edges} />;
       case 'cards':
@@ -362,7 +421,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
       case 'activity':
         return <ActivityFeed filteredNodes={filteredNodes} />;
       default:
-        return <Dashboard filteredNodes={filteredNodes} stats={stats} />;
+        return <Dashboard filteredNodes={filteredNodes} stats={stats} onOpenWork={id => { const item = workItems.find(node => node.id === id); if (item) handleEditNode(item); }} />;
     }
   };
 
@@ -370,17 +429,21 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
   const shouldShowFilters = ['table', 'cards', 'kanban'].includes(viewMode);
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full min-h-0 min-w-0 flex flex-col">
       {/* Search and Filter Bar - Only for table, card, kanban views */}
       {shouldShowFilters && (
-        <div className="bg-gray-800/90 backdrop-blur-sm border-b border-gray-700/50 p-4">
-          <div className="flex flex-col sm:flex-row gap-4 items-center">
+        // relative z-50: backdrop-blur makes this a stacking context, so the filter
+        // dropdowns' z-50 is trapped inside it — without an explicit z-index the
+        // later content area paints over the open dropdowns.
+        <div data-testid="task-filter-bar" className="task-filter-bar relative z-50 bg-gray-800/90 backdrop-blur-sm border-b border-gray-700/50 p-3 sm:p-4">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-stretch sm:items-center">
             {/* Search Input */}
             <div className="relative w-full sm:w-80 md:w-96 lg:w-[28rem]">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search tasks by type, status, priority"
+                aria-label="Search work items"
+                placeholder="Search work"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500"
@@ -395,14 +458,18 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
               )}
             </div>
 
-            {/* Filter Dropdowns */}
-            <div className="flex gap-3">
+            {/* Filter Dropdowns — 2-up grid on phones so all filters fit; inline on desktop */}
+            <button className="mobile-filter-toggle hidden min-h-[44px] px-3 text-sm rounded-lg border border-gray-600" aria-expanded={mobileFiltersOpen} aria-controls="task-filter-options" onClick={()=>setMobileFiltersOpen(!mobileFiltersOpen)}>Filters</button>
+            <div ref={filterOptionsRef} id="task-filter-options" data-open={mobileFiltersOpen} className="task-filter-options flex gap-2 sm:gap-3">
               {/* Type Filter */}
-              <div className="relative" ref={typeDropdownRef}>
+              <div className="hidden sm:block relative" ref={typeDropdownRef}>
                 <button
+                  ref={typeTriggerRef}
                   type="button"
                   onClick={() => setIsTypeDropdownOpen(!isTypeDropdownOpen)}
-                  className="flex items-center justify-between px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent hover:border-gray-500 transition-all duration-200 min-w-[160px]"
+                  aria-expanded={isTypeDropdownOpen}
+                  aria-controls="task-type-filter-menu"
+                  className="flex items-center justify-between px-2.5 sm:px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-xs sm:text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent hover:border-gray-500 transition-all duration-200 w-full sm:w-auto sm:min-w-[150px] min-w-0"
                 >
                   <div className="flex items-center space-x-2">
                     {(() => {
@@ -425,7 +492,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
                 </button>
 
                 {isTypeDropdownOpen && (
-                  <div className="absolute top-full left-0 mt-2 w-full bg-gray-700 border border-gray-600 rounded-lg shadow-2xl z-50 max-h-80 overflow-y-auto">
+                  <div id="task-type-filter-menu" data-testid="filter-dropdown" className="task-filter-popup absolute top-full left-0 mt-2 w-full bg-gray-700 border border-gray-600 rounded-lg shadow-2xl z-50 max-h-80 overflow-y-auto">
                     <div className="p-2">
                       {typeOptions.map((option, index) => (
                         <button
@@ -474,9 +541,12 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
               {/* Status Filter */}
               <div className="relative" ref={statusDropdownRef}>
                 <button
+                  ref={statusTriggerRef}
                   type="button"
                   onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
-                  className="flex items-center justify-between px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent hover:border-gray-500 transition-all duration-200 min-w-[150px]"
+                  aria-expanded={isStatusDropdownOpen}
+                  aria-controls="task-status-filter-menu"
+                  className="flex items-center justify-between px-2.5 sm:px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-xs sm:text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent hover:border-gray-500 transition-all duration-200 w-full sm:w-auto sm:min-w-[150px] min-w-0"
                 >
                   <div className="flex items-center space-x-2">
                     {(() => {
@@ -499,7 +569,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
                 </button>
 
                 {isStatusDropdownOpen && (
-                  <div className="absolute top-full left-0 mt-2 w-full bg-gray-700 border border-gray-600 rounded-lg shadow-2xl z-50 max-h-80 overflow-y-auto">
+                  <div id="task-status-filter-menu" data-testid="filter-dropdown" className="task-filter-popup absolute top-full left-0 mt-2 w-full bg-gray-700 border border-gray-600 rounded-lg shadow-2xl z-50 max-h-80 overflow-y-auto">
                     <div className="p-2">
                       {statusOptions.map((option, index) => (
                         <button
@@ -544,11 +614,14 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
               </div>
 
               {/* Priority Filter */}
-              <div className="relative" ref={priorityDropdownRef}>
+              <div className="hidden sm:block relative" ref={priorityDropdownRef}>
                 <button
+                  ref={priorityTriggerRef}
                   type="button"
                   onClick={() => setIsPriorityDropdownOpen(!isPriorityDropdownOpen)}
-                  className="flex items-center justify-between px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent hover:border-gray-500 transition-all duration-200 min-w-[140px]"
+                  aria-expanded={isPriorityDropdownOpen}
+                  aria-controls="task-priority-filter-menu"
+                  className="flex items-center justify-between px-2.5 sm:px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-xs sm:text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent hover:border-gray-500 transition-all duration-200 w-full sm:w-auto sm:min-w-[150px] min-w-0"
                 >
                   <div className="flex items-center space-x-2">
                     {(() => {
@@ -571,7 +644,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
                 </button>
 
                 {isPriorityDropdownOpen && (
-                  <div className="absolute top-full left-0 mt-2 w-full bg-gray-700 border border-gray-600 rounded-lg shadow-2xl z-50 max-h-80 overflow-y-auto">
+                  <div id="task-priority-filter-menu" data-testid="filter-dropdown" className="task-filter-popup absolute top-full left-0 mt-2 w-full bg-gray-700 border border-gray-600 rounded-lg shadow-2xl z-50 max-h-80 overflow-y-auto">
                     <div className="p-2">
                       {priorityOptions.map((option, index) => (
                         <button
@@ -616,11 +689,14 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
               </div>
 
               {/* Contributors Filter */}
-              <div className="relative" ref={contributorDropdownRef}>
+              <div className="hidden sm:block relative" ref={contributorDropdownRef}>
                 <button
+                  ref={contributorTriggerRef}
                   type="button"
                   onClick={() => setIsContributorDropdownOpen(!isContributorDropdownOpen)}
-                  className="flex items-center justify-between px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent hover:border-gray-500 transition-all duration-200 min-w-[180px]"
+                  aria-expanded={isContributorDropdownOpen}
+                  aria-controls="task-contributor-filter-menu"
+                  className="flex items-center justify-between px-2.5 sm:px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-xs sm:text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent hover:border-gray-500 transition-all duration-200 w-full sm:w-auto sm:min-w-[150px] min-w-0"
                 >
                   <div className="flex items-center space-x-2">
                     {(() => {
@@ -636,7 +712,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
                 </button>
 
                 {isContributorDropdownOpen && (
-                  <div className="absolute top-full left-0 mt-2 w-full bg-gray-700 border border-gray-600 rounded-lg shadow-2xl z-50 max-h-80 overflow-y-auto">
+                  <div id="task-contributor-filter-menu" data-testid="filter-dropdown" className="task-filter-popup absolute top-full left-0 mt-2 w-full bg-gray-700 border border-gray-600 rounded-lg shadow-2xl z-50 max-h-80 overflow-y-auto">
                     <div className="p-2">
                       {contributorOptions.map((option, index) => (
                         <button
@@ -689,7 +765,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
           </div>
 
           {/* Results Count */}
-          <div className="mt-3 text-sm text-gray-400">
+          <div className="task-result-count mt-3 text-sm text-gray-400">
             Showing {filteredNodes.length} of {workItems.length} nodes
             {(searchQuery || statusFilter || typeFilter || priorityFilter || contributorFilter) && (
               <span className="text-green-400 ml-2">
@@ -701,16 +777,20 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
       )}
 
       {/* Main Content Container */}
-      <div className="flex flex-1 overflow-hidden relative">
+      <div className="flex flex-1 min-h-0 min-w-0 overflow-hidden relative">
         {/* Main Content */}
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 min-w-0 overflow-auto" data-testid="view-content">
           {renderView()}
         </div>
 
-        {/* Project Health Toggle Button - Floating */}
+        {/* Project Health Toggle Button - Floating (desktop only: the 320px panel
+            would cover a phone screen, and it's a secondary analytics surface) */}
+        {/* Positioned WITHIN the content container (absolute), like the panel it
+            toggles — not `fixed`, which overlapped the global header. When the
+            320px panel is open, sit just left of it so the toggle stays clickable. */}
         <button
           onClick={() => setShowProjectHealth(!showProjectHealth)}
-          className="fixed right-4 top-20 z-40 p-3 bg-gray-700/60 hover:bg-gray-700/80 backdrop-blur-sm rounded-lg border border-gray-600/50 hover:border-gray-500/70 transition-all duration-200 group"
+          className={`hidden md:block absolute bottom-4 z-40 p-3 bg-gray-700/60 hover:bg-gray-700/80 backdrop-blur-sm rounded-lg border border-gray-600/50 hover:border-gray-500/70 transition-all duration-200 group ${showProjectHealth ? 'right-[21rem]' : 'right-4'}`}
           title={showProjectHealth ? "Hide Project Health" : "Show Project Health"}
         >
           {showProjectHealth ? (
@@ -720,9 +800,9 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
           )}
         </button>
 
-        {/* Right Sidebar - Overlay */}
+        {/* Right Sidebar - Overlay (desktop only) */}
         {showProjectHealth && (
-          <div className="absolute right-0 top-0 bottom-0 z-30">
+          <div className="hidden md:block absolute right-0 top-0 bottom-0 z-30">
             <RightSidebar currentView={viewMode} stats={stats} />
           </div>
         )}
@@ -756,6 +836,7 @@ const ViewManager: React.FC<ViewManagerProps> = ({ viewMode }) => {
           node={selectedNode}
           edges={workItemEdges}
           nodes={filteredNodes}
+          undoStack={undoStack}
         />
       )}
     </div>

@@ -4,6 +4,7 @@ import { useGraph } from '../contexts/GraphContext';
 import { getTypeConfig, getStatusConfig } from '../constants/workItemConstants';
 import type { WorkItemType } from '../constants/workItemConstants';
 import { NodeSubgraphPreview } from './NodeSubgraphPreview';
+import { CopyableId } from './CopyableId';
 
 // Heavy (markdown + Prism) — lazy so it's out of the main bundle until a node's
 // contents are first opened.
@@ -14,15 +15,22 @@ type Mode = 'card' | 'contents' | 'diagram';
 interface NodeInspectorProps {
   node: any;
   onClose: () => void;
+  onEdit?: () => void;
+  /** Tighter type + smaller content for the anchored on-canvas peek (PR-3). */
+  compact?: boolean;
+  /** Override the root data-testid so an anchored instance is distinguishable
+   * from the docked one when both are mounted. */
+  rootTestId?: string;
 }
 
 /**
- * Docked inspector: shows the selected node's Card (summary), Contents (its
- * description rendered as readable markdown/code), or Diagram (its sub-graph),
- * each at full legible size regardless of canvas zoom. The mode is an explicit,
- * per-node toggle — not a side effect of zooming in.
+ * Inspector: shows the selected node's Card (summary), Contents (its description
+ * rendered as readable markdown/code), or Diagram (its sub-graph), each at full
+ * legible size regardless of canvas zoom. The mode is an explicit, per-node
+ * toggle — not a side effect of zooming in. Used both docked (Workspace) and
+ * anchored on-canvas (the expand-in-place peek), the latter via `compact`.
  */
-export function NodeInspector({ node, onClose }: NodeInspectorProps) {
+export function NodeInspector({ node, onClose, onEdit, compact = false, rootTestId = 'node-inspector' }: NodeInspectorProps) {
   const { descendInto } = useGraph();
   const hasSubgraph = !!node?.subgraphId;
   const [modeByNode, setModeByNode] = useState<Record<string, Mode>>({});
@@ -34,16 +42,20 @@ export function NodeInspector({ node, onClose }: NodeInspectorProps) {
 
   return (
     <div
-      data-testid="node-inspector"
-      className="flex flex-col bg-gray-900/95 backdrop-blur-sm border border-gray-700/60 rounded-xl shadow-2xl w-72 max-h-[70vh] overflow-hidden"
+      data-testid={rootTestId}
+      className={`flex flex-col bg-gray-900/95 backdrop-blur-md border border-gray-700/60 rounded-xl shadow-2xl overflow-hidden ${
+        compact ? 'w-full max-h-[60vh]' : 'w-full sm:w-72 max-h-[60vh] sm:max-h-[70vh]'
+      }`}
     >
       {/* Header */}
       <div className="flex items-start gap-2 p-3 border-b border-gray-700/60">
         <div className="flex-1 min-w-0">
           <div className="text-[10px] uppercase tracking-wide" style={{ color: typeCfg.hexColor }}>{typeCfg.label}</div>
           <div className="text-sm font-semibold text-white truncate" title={node.title}>{node.title}</div>
+          <div className="mt-0.5"><CopyableId id={node.id} /></div>
         </div>
-        <button onClick={onClose} className="p-1 text-gray-400 hover:text-white rounded hover:bg-gray-700/50" title="Close">
+        {onEdit && <button onClick={onEdit} className="min-h-[44px] px-3 rounded-lg text-emerald-300 hover:bg-gray-800">Edit</button>}
+        <button onClick={onClose} className="min-h-[44px] min-w-[44px] flex items-center justify-center text-gray-400 hover:text-white rounded hover:bg-gray-700/50" title="Close">
           <X className="h-4 w-4" />
         </button>
       </div>
@@ -83,7 +95,7 @@ export function NodeInspector({ node, onClose }: NodeInspectorProps) {
         {mode === 'contents' && (
           <div className="p-3">
             <Suspense fallback={<div className="text-sm text-gray-500">Loading…</div>}>
-              <NodeContentRenderer content={node.description ?? ''} />
+              <NodeContentRenderer content={node.description ?? ''} compact={compact} />
             </Suspense>
           </div>
         )}
@@ -110,7 +122,7 @@ function ModeBtn({ active, onClick, icon, label, disabled, title }: { active: bo
       onClick={onClick}
       disabled={disabled}
       title={title}
-      className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+      className={`flex-1 flex items-center justify-center gap-1.5 min-h-[44px] px-2 py-1.5 rounded-lg text-sm font-medium transition-colors ${
         disabled
           ? 'text-gray-600 cursor-not-allowed'
           : active

@@ -1,0 +1,12 @@
+# Symptom index
+
+| Symptom | Canonical lesson and regression |
+| --- | --- |
+| Deleting an owned folder removes or orphans another owner's nested folder; a deletion destination disappears with its parent | [Deletion authority includes pre-existing descendant folders](../inbox/2026-10-23-folder-delete-legacy-hierarchy.md); `packages/server/tests/folder-authorization.test.ts` |
+| Build/typecheck pass but API startup, supported-Node launcher, container or repository lint fails | [Startup and save evidence pointer](../inbox/2026-10-23-core-startup-and-save-evidence.md); [runtime validation](../../docs/quality/RUNTIME_VALIDATION_2026-10-23.md) |
+| Production accepts missing/default JWT or session secrets; `.env` key differs from the captured signing key | [Startup and save evidence pointer](../inbox/2026-10-23-core-startup-and-save-evidence.md); `packages/server/tests/production-startup.test.ts`, `production-secrets.test.ts` |
+| Save restores an older date/title after refetch, or a late completion refills another graph's cleared undo history | [Startup and save evidence pointer](../inbox/2026-10-23-core-startup-and-save-evidence.md); `packages/web/src/components/WorkItemDetailsModal.test.tsx` |
+| PR `baseRefOid` differs from another PR or the live target branch during merge inventory | [Verify live refs and transport authority before accepting a merge](../inbox/2026-10-23-pr-base-ref-is-not-live-tip.md); compare the actual remote ref and verify the resulting merge head/tree |
+| `mergePullRequest` refuses a workflow update without OAuth `workflow` scope | [Recorded API refusal and same-account SSH identity check](../inbox/2026-10-23-pr-base-ref-is-not-live-tip.md#a-workflow-scoped-api-refusal-needs-its-own-evidence); authentication alone does not prove write authorization or merge completion |
+| MCP tool calls succeed but the stdio client reports JSON parse errors from startup, CPU or consistency messages | [Successful MCP calls do not prove a clean stdio protocol](../inbox/2026-10-23-mcp-stdio-diagnostics.md); `packages/mcp-server/tests/neo4j-contract.test.ts` checks real subprocess traffic and stderr diagnostics |
+| `dev` has an owner-authorized admin exemption; a review-rule blocker or docs-only change tempts skipping validation | [Dev admin integration playbook](../playbooks/dev-admin-integration.md); [dated authorization and merge evidence](../inbox/2026-10-23-dev-admin-integration.md). Admin authority is not a non-author approval; verify final branch CI before closeout |

@@ -1,6 +1,6 @@
 # GraphDone
 
-> Project management for teams who think differently. Coordinate through dependencies and outcomes, not hierarchies and top-down control.
+> Management for teams who think differently. Coordinate through dependencies and outcomes, not hierarchies and top-down control.
 
 ![GraphDone's living graph — priority glow, breathing nodes, energy flowing along dependencies](./docs/graphdone_ui.png)
 
@@ -12,7 +12,7 @@
 
 ## What is GraphDone?
 
-GraphDone reimagines project management as a collaborative graph where work flows through natural dependencies rather than artificial hierarchies. It's designed for high-quality individual contributors who thrive on autonomy, teams that include AI agents, and organizations ready to embrace democratic coordination.
+GraphDone reimagines management as a collaborative graph where work flows through natural dependencies rather than artificial hierarchies. It's designed for high-quality individual contributors who thrive on autonomy, teams that include AI agents, and organizations ready to embrace democratic coordination.
 
 **Key Features:**
 - 🌊 **A living graph** - in-progress work breathes, priority glows, energy flows along dependencies, completed work celebrates. The graph feels inhabited, not diagrammed
@@ -45,6 +45,10 @@ GraphDone is built on the belief that:
 
 [Read our complete philosophy →](./docs/philosophy.md)
 
+## Public VPS hosting
+
+Use the [self-hosting guide](docs/deployment/SELF_HOSTING.md) and `./scripts/self-host.sh your-domain.example` for a production-oriented installation with generated credentials and private database networking. The development setup below uses demo credentials and is for local development.
+
 ## Quick Start
 
 ### 🚀 One-Line Install (Like Ollama!)
@@ -61,12 +65,12 @@ wget -qO- https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public
 **What the installer does:**
 1. **Pre-flight Checks** - Validates network, disk space (5GB), download/upload speeds
 2. **System Detection** - Detects platform (macOS 10.15+, Linux distros)
-3. **Dependency Installation** - Installs Git, Node.js 18+, Docker if needed
+3. **Dependency Installation** - Installs Git, Node.js 22.18+, Docker if needed
    - macOS: Uses Homebrew + OrbStack (Docker alternative)
    - Linux: Smart sudo authentication (works with curl/wget pipes), uses apt/dnf/yum + Docker Engine (15+ distributions supported)
 4. **Code Setup** - Clones repository to `~/graphdone`, installs npm dependencies
 5. **Security Config** - Generates self-signed TLS certificates for HTTPS
-6. **Service Deployment** - Starts Neo4j, Redis, GraphQL API, React Web App
+6. **Service Deployment** - Starts Neo4j, GraphQL API, React Web App
 7. **Health Verification** - Waits for all services to be healthy (60s timeout)
 
 **Access URLs after installation:**
@@ -114,7 +118,7 @@ sh install.sh
 GraphDone requires:
 - **Docker** - For running Neo4j graph database ([Install Docker](https://docs.docker.com/get-docker/))
 - **Git** - For version control (usually pre-installed)
-- **Node.js 18+** - Optional for development (auto-installed if needed)
+- **Node.js 22.18+** - Optional for development (auto-installed if needed)
 
 ### Manual Installation
 
@@ -137,7 +141,7 @@ That's it! The script will automatically:
 
 Visit **http://localhost:3127** when you see the "GraphDone is Ready!" message.
 
-> 💡 **Don't have Node.js?** No problem! The setup script will detect this and offer to install Node.js 18 for you using nvm (Node Version Manager).
+> 💡 **Don't have Node.js?** No problem! The setup script will detect this and offer to install Node.js 22 for you using nvm (Node Version Manager).
 
 ### What You Get
 
@@ -185,7 +189,7 @@ newgrp docker
 
 **Node.js Missing?**
 ```bash
-./start  # Will offer to install Node.js 18 automatically
+./start  # Will offer to install Node.js 22 automatically
 ```
 
 **Port Already in Use?**

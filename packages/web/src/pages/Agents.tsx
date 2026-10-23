@@ -1,402 +1,58 @@
-import { useState } from 'react';
-import { Plus, Bot, Activity, Settings, Play, Pause, Trash2, Eye, Server } from 'lucide-react';
+import {AgentConnection} from '../components/AgentConnection';
+import { useQuery } from '@apollo/client';
+import { Bot, RefreshCw } from 'lucide-react';
 import { useGraph } from '../contexts/GraphContext';
-import { useAuth } from '../contexts/AuthContext';
-import { AgentSettingsModal } from '../components/AgentSettingsModal';
-import { McpServerCard } from '../components/McpServerCard';
-import { useMcpServers } from '../hooks/useMcpServers';
-import { APP_VERSION } from '../utils/version';
+import { GET_WORK_ITEMS } from '../lib/queries';
+import { getStatusConfig, type WorkItemStatus } from '../constants/workItemConstants';
+import ActivityFeed from '../components/ActivityFeed';
+import type { ActivityWorkItem } from '../lib/recordedActivity';
 
-interface Agent {
-  id: string;
-  name: string;
-  description: string;
-  type: 'analyzer' | 'generator' | 'validator' | 'coordinator';
-  status: 'active' | 'paused' | 'error' | 'idle';
-  capabilities: string[];
-  lastActivity: string;
-  actionsToday: number;
-  connectedGraphs: string[];
-  owner: string;
-}
+type AgentWork = ActivityWorkItem & { contributors?: { id: string; name: string; type: string }[] };
 
 export function Agents() {
-  const { currentGraph } = useGraph();
-  const { } = useAuth();
-  const [activeTab, setActiveTab] = useState<'active' | 'available' | 'marketplace'>('active');
-  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
-  const { mcpServers, isLoading: mcpLoading, refreshMcpServers } = useMcpServers();
-
-  // Mock agents
-  const mockAgents: Agent[] = [
-    {
-      id: 'agent-1',
-      name: 'Priority Analyzer',
-      description: 'Automatically analyzes work item priorities and suggests optimizations',
-      type: 'analyzer',
-      status: 'active',
-      capabilities: ['priority-calculation', 'dependency-analysis', 'bottleneck-detection'],
-      lastActivity: '2 minutes ago',
-      actionsToday: 23,
-      connectedGraphs: ['graph-1', 'graph-2'],
-      owner: 'system'
-    },
-    {
-      id: 'agent-2',
-      name: 'Task Generator',
-      description: 'Breaks down outcomes into actionable tasks',
-      type: 'generator',
-      status: 'active',
-      capabilities: ['task-decomposition', 'requirement-analysis', 'template-matching'],
-      lastActivity: '15 minutes ago',
-      actionsToday: 8,
-      connectedGraphs: ['graph-1'],
-      owner: 'user-1'
-    },
-    {
-      id: 'agent-3',
-      name: 'Dependency Validator',
-      description: 'Validates and suggests improvements for work item dependencies',
-      type: 'validator',
-      status: 'paused',
-      capabilities: ['dependency-validation', 'cycle-detection', 'path-optimization'],
-      lastActivity: '2 hours ago',
-      actionsToday: 0,
-      connectedGraphs: [],
-      owner: 'user-2'
-    },
-    {
-      id: 'agent-4',
-      name: 'Team Coordinator',
-      description: 'Facilitates collaboration and resolves conflicts',
-      type: 'coordinator',
-      status: 'idle',
-      capabilities: ['conflict-resolution', 'resource-allocation', 'timeline-management'],
-      lastActivity: '1 day ago',
-      actionsToday: 2,
-      connectedGraphs: ['graph-1', 'graph-3'],
-      owner: 'system'
-    }
-  ];
-
-  const getStatusColor = (status: Agent['status']) => {
-    switch (status) {
-      case 'active': return 'text-green-400 bg-green-900 border-green-700';
-      case 'paused': return 'text-yellow-400 bg-yellow-900 border-yellow-700';
-      case 'error': return 'text-red-400 bg-red-900 border-red-700';
-      case 'idle': return 'text-gray-400 bg-gray-700 border-gray-600';
-    }
-  };
-
-  const getTypeIcon = (type: Agent['type']) => {
-    switch (type) {
-      case 'analyzer': return '🔍';
-      case 'generator': return '⚡';
-      case 'validator': return '✓';
-      case 'coordinator': return '🤝';
-    }
-  };
-
-  const activeAgents = mockAgents.filter(agent => 
-    agent.status === 'active' && 
-    (agent.connectedGraphs.includes(currentGraph?.id || '') || agent.owner === 'system')
-  );
-
-  const activeMcpServers = mcpServers.filter(server => 
-    server.status === 'active' || server.status === 'unknown'
-  );
-
-  const totalActiveCount = activeAgents.length + activeMcpServers.length;
-
+  const { currentGraph, availableGraphs, selectGraph } = useGraph();
+  const { data, loading, error, refetch } = useQuery<{ workItems: AgentWork[] }>(GET_WORK_ITEMS, {
+    variables: { where: { graph: { id: currentGraph?.id } } }, skip: !currentGraph,
+    fetchPolicy: 'cache-and-network', pollInterval: 0,
+    skipPollAttempt: () => document.visibilityState !== 'visible',
+  });
+  const work = (currentGraph ? data?.workItems || [] : []).filter(item => item.contributors?.some(person => person.type === 'AI_AGENT'));
+  const agents = new Map(work.flatMap(item => (item.contributors || []).filter(person => person.type === 'AI_AGENT').map(person => [person.id, person])));
   return (
-    <div className="h-full flex flex-col">
-      {/* Header */}
-      <div className="bg-gray-900/30 backdrop-blur-md border-b border-gray-700/30 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center space-x-3">
-              <h1 className="text-2xl font-bold text-gray-100">AI & Agents</h1>
-              <span className="text-xs bg-gray-800/50 text-gray-400 px-2 py-1 rounded">
-                v{APP_VERSION}
-              </span>
-            </div>
-            <p className="text-sm text-gray-400 mt-1">
-              Collaborate with AI agents and configure MCP servers for your work graph
-            </p>
-          </div>
-          
-          <div className="flex items-center space-x-3">
-            <button
-              type="button"
-              onClick={() => setSettingsModalOpen(true)}
-              className="btn btn-secondary"
-            >
-              <Settings className="h-4 w-4 mr-2" />
-              AI & Agent Settings
-            </button>
-            
-            <button
-              type="button"
-              className="btn btn-primary"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Agent
-            </button>
-          </div>
+    <div className="h-full min-h-0 overflow-auto p-3 sm:p-6 text-gray-100">
+      <header className="mx-auto max-w-[1600px] flex flex-wrap items-center justify-between gap-3 mb-5">
+        <div><h1 className="text-2xl font-semibold">Working with AI</h1><p className="mt-1 text-sm text-gray-400">Connect an agent, share priorities, and follow its progress.</p></div>
+        <div className="flex w-full sm:w-auto min-w-0 gap-2">
+          <select aria-label="Agent work graph" value={currentGraph?.id || ''} onChange={event => void selectGraph(event.target.value)} className="min-h-[44px] min-w-0 flex-1 max-w-full sm:max-w-[260px] rounded-lg border border-gray-600 bg-gray-800 px-3 text-base">
+            {!currentGraph && <option value="">Select a graph</option>}
+            {availableGraphs.map(graph => <option key={graph.id} value={graph.id}>{graph.name}</option>)}
+          </select>
+          <button aria-label="Refresh agent work" disabled={loading || !currentGraph} onClick={() => void refetch().catch(() => {})} className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg border border-gray-600 disabled:opacity-50"><RefreshCw className="h-4 w-4" /></button>
         </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="bg-gray-900/20 backdrop-blur-md border-b border-gray-700/30">
-        <div className="px-6">
-          <nav className="flex space-x-8">
-            <button
-              onClick={() => setActiveTab('active')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                activeTab === 'active'
-                  ? 'border-green-500 text-green-400'
-                  : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-600'
-              }`}
-            >
-              <Activity className="h-4 w-4 inline mr-2" />
-              Active ({totalActiveCount})
-            </button>
-            <button
-              onClick={() => setActiveTab('available')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                activeTab === 'available'
-                  ? 'border-green-500 text-green-400'
-                  : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-600'
-              }`}
-            >
-              Available ({mockAgents.length})
-            </button>
-            <button
-              onClick={() => setActiveTab('marketplace')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                activeTab === 'marketplace'
-                  ? 'border-green-500 text-green-400'
-                  : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-600'
-              }`}
-            >
-              Marketplace
-            </button>
-          </nav>
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 overflow-auto">
-        <div className="p-6">
-          {activeTab === 'active' && (
-            <div className="space-y-6">
-              {/* Current Graph Context */}
-              {currentGraph && (
-                <div className="bg-green-900 border border-green-700 rounded-lg p-4">
-                  <h3 className="font-medium text-green-300 mb-2">Current Graph: {currentGraph.name}</h3>
-                  <p className="text-green-400 text-sm">
-                    AI agents and MCP servers shown below are active in this graph or available system-wide.
-                  </p>
-                </div>
-              )}
-
-              {/* MCP Servers Section */}
-              {activeMcpServers.length > 0 && (
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-medium text-gray-100 flex items-center">
-                      <Server className="h-5 w-5 mr-2 text-blue-400" />
-                      MCP Servers ({activeMcpServers.length})
-                    </h3>
-                    <button
-                      onClick={refreshMcpServers}
-                      className="text-sm text-gray-400 hover:text-gray-300 transition-colors"
-                      disabled={mcpLoading}
-                    >
-                      {mcpLoading ? 'Refreshing...' : 'Refresh Status'}
-                    </button>
-                  </div>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                    {activeMcpServers.map((server) => (
-                      <McpServerCard
-                        key={server.id}
-                        server={server}
-                        onRefresh={refreshMcpServers}
-                        isRefreshing={mcpLoading}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* AI Agents Section */}
-              {activeAgents.length > 0 && (
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-medium text-gray-100 flex items-center">
-                      <Bot className="h-5 w-5 mr-2 text-green-400" />
-                      AI Agents ({activeAgents.length})
-                    </h3>
-                  </div>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {activeAgents.map((agent) => (
-                  <div key={agent.id} className="bg-gray-800 border border-gray-700 rounded-lg p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-green-900 rounded-lg flex items-center justify-center text-lg">
-                          {getTypeIcon(agent.type)}
-                        </div>
-                        <div>
-                          <h3 className="font-semibold text-gray-100">{agent.name}</h3>
-                          <div className="flex items-center space-x-2">
-                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(agent.status)}`}>
-                              {agent.status}
-                            </span>
-                            <span className="text-xs text-gray-400">{agent.type}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center space-x-1">
-                        <button className="p-2 text-gray-400 hover:text-gray-300 transition-colors">
-                          <Eye className="h-4 w-4" />
-                        </button>
-                        {agent.status === 'active' ? (
-                          <button className="p-2 text-gray-400 hover:text-yellow-400 transition-colors">
-                            <Pause className="h-4 w-4" />
-                          </button>
-                        ) : (
-                          <button className="p-2 text-gray-400 hover:text-green-400 transition-colors">
-                            <Play className="h-4 w-4" />
-                          </button>
-                        )}
-                        <button className="p-2 text-gray-400 hover:text-red-400 transition-colors">
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </div>
-
-                    <p className="text-gray-300 text-sm mb-4">{agent.description}</p>
-
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-400">Last Activity:</span>
-                        <span className="text-gray-100">{agent.lastActivity}</span>
-                      </div>
-                      
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-400">Actions Today:</span>
-                        <span className="text-gray-100">{agent.actionsToday}</span>
-                      </div>
-
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-400">Connected Graphs:</span>
-                        <span className="text-gray-100">{agent.connectedGraphs.length}</span>
-                      </div>
-
-                      <div>
-                        <span className="text-sm text-gray-400 block mb-2">Capabilities:</span>
-                        <div className="flex flex-wrap gap-1">
-                          {agent.capabilities.map((capability) => (
-                            <span key={capability} className="bg-gray-700 text-gray-300 text-xs px-2 py-1 rounded">
-                              {capability}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Empty State */}
-              {totalActiveCount === 0 && (
-                <div className="text-center py-12">
-                  <Bot className="h-16 w-16 mx-auto text-gray-300 mb-4" />
-                  <h3 className="text-lg font-medium text-gray-100 mb-2">No Active AI Agents or MCP Servers</h3>
-                  <p className="text-gray-400 mb-4">
-                    {currentGraph 
-                      ? `No AI agents or MCP servers are currently active in "${currentGraph.name}"`
-                      : 'Select a graph to see active agents and MCP servers'
-                    }
-                  </p>
-                  <div className="flex justify-center space-x-3">
-                    <button className="btn btn-primary">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Activate Agent
-                    </button>
-                    <button 
-                      onClick={() => setSettingsModalOpen(true)}
-                      className="btn btn-secondary"
-                    >
-                      <Server className="h-4 w-4 mr-2" />
-                      Setup MCP Server
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'available' && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {mockAgents.map((agent) => (
-                <div key={agent.id} className="bg-gray-800 border border-gray-700 rounded-lg p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-green-900 rounded-lg flex items-center justify-center text-lg">
-                        {getTypeIcon(agent.type)}
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-gray-100">{agent.name}</h3>
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(agent.status)}`}>
-                          {agent.status}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center space-x-1">
-                      <button className="p-2 text-gray-400 hover:text-gray-300 transition-colors">
-                        <Eye className="h-4 w-4" />
-                      </button>
-                      <button className="p-2 text-gray-400 hover:text-green-400 transition-colors">
-                        <Play className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-
-                  <p className="text-gray-300 text-sm mb-4">{agent.description}</p>
-
-                  <div className="text-sm text-gray-400">
-                    {agent.owner === 'system' ? 'System Agent' : `Created by ${agent.owner}`}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {activeTab === 'marketplace' && (
-            <div className="text-center py-12">
-              <Bot className="h-16 w-16 mx-auto text-gray-300 mb-4" />
-              <h3 className="text-lg font-medium text-gray-100 mb-2">Agent Marketplace</h3>
-              <p className="text-gray-400 mb-4">
-                Discover and install community-created AI agents
-              </p>
-              <button className="btn btn-primary">
-                Browse Marketplace
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Settings Modal */}
-      <AgentSettingsModal 
-        isOpen={settingsModalOpen}
-        onClose={() => setSettingsModalOpen(false)}
-      />
+      </header>
+      <div className="mx-auto grid max-w-[1600px] items-start gap-6 xl:grid-cols-[minmax(0,36rem)_minmax(0,1fr)]">
+      {currentGraph&&<section aria-label="Agent setup" className="mb-5"><AgentConnection key={currentGraph.id} embedded graphId={currentGraph.id} graphName={currentGraph.name} onClose={()=>{}} /></section>}
+      <section aria-label="Recorded agent activity" className="min-w-0">
+      <p className="mb-5 rounded-lg border border-gray-700 bg-gray-800/50 p-3 text-sm text-gray-300">This view follows recorded AI contributors and their work. Starting agents, automatic work claims, and verified execution history are not available yet.</p>
+      {error ? <p role="alert">Could not load agent work. Use refresh to try again.</p> : loading && !data ? <p role="status">Loading agent work…</p> : work.length === 0 ? (
+        <section className="rounded-xl border border-gray-700 p-5 sm:p-8">
+          <Bot className="mb-3 h-7 w-7 text-emerald-400" /><h2 className="text-lg font-medium">No AI contributions recorded here yet</h2>
+          <p className="mt-2 max-w-xl text-sm text-gray-400">When an AI contributor is connected to a work item, its current status and saved notes appear here. The same progress notes are visible in the workspace’s Activity view.</p>
+        </section>
+      ) : (
+        <>
+          <p role="status" className="mb-3 text-sm text-gray-400">{agents.size} recorded AI contributors · {work.length} work items</p>
+          <ul className="grid gap-3 md:grid-cols-2">
+            {work.map(item => <li key={item.id} className="min-w-0 break-words rounded-xl border border-gray-700 p-4">
+              <h2 className="font-medium">{item.title}</h2>
+              <p className="mt-1 text-sm text-emerald-300">{getStatusConfig(item.status as WorkItemStatus).label}</p>
+              <p className="mt-2 text-sm text-gray-400">Contributors: {(item.contributors || []).filter(person => person.type === 'AI_AGENT').map(person => person.name).join(', ')}</p>
+            </li>)}
+          </ul>
+          <ActivityFeed filteredNodes={work} />
+        </>
+      )}
+      </section></div>
     </div>
   );
 }

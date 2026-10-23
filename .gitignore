@@ -118,3 +118,8 @@ tsconfig.tsbuildinfo
 
 # Prisma
 prisma/dev.db
+# Claude Code local worktrees/agent scratch — never commit
+.claude/
+
+# Private self-hosting bootstrap credentials
+deployment/self-host/.env

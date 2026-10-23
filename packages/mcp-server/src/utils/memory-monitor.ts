@@ -31,7 +31,7 @@ export function checkMemoryUsage(): void {
     
     // Force garbage collection if available
     if (global.gc) {
-      console.log('🗑️ Forcing garbage collection...');
+      console.error('🗑️ Forcing garbage collection...');
       global.gc();
       
       // Check memory again after GC
@@ -120,7 +120,7 @@ export function startMemoryMonitoring(): void {
     clearInterval(monitoringInterval);
   });
   
-  console.log(`🛡️ Memory monitoring started (Limit: ${MEMORY_LIMIT_MB}MB, Warning: ${MEMORY_WARNING_MB}MB)`);
+  console.error(`🛡️ Memory monitoring started (Limit: ${MEMORY_LIMIT_MB}MB, Warning: ${MEMORY_WARNING_MB}MB)`);
 }
 
 /**

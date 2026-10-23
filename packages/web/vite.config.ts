@@ -1,3 +1,4 @@
+import { offlineShell } from './offline-shell';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
@@ -6,7 +7,7 @@ import { readFileSync } from 'fs';
 import { existsSync } from 'fs';
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), offlineShell()],
   resolve: {
     alias: {
       '@': resolve(__dirname, './src'),
@@ -37,6 +38,9 @@ export default defineConfig({
     },
     proxy: {
       // apollo.ts uses the nginx-style /api/graphql path; map it in dev too
+      '/api/ops': { target: process.env.VITE_PROXY_TARGET || 'http://localhost:4127', changeOrigin: true },
+      '/api/sync': { target: process.env.VITE_PROXY_TARGET || 'http://localhost:8797', changeOrigin: true },
+      '/api/agent': { target: process.env.VITE_PROXY_TARGET || 'http://localhost:4127', changeOrigin: true, secure: false },
       '/api/graphql': {
         target: process.env.VITE_PROXY_TARGET || (process.env.VITE_HTTPS === 'true' ? 'https://localhost:4128' : 'http://localhost:4127'),
         changeOrigin: true,
@@ -63,9 +67,20 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: true,
+    // No production source maps — serving .js.map publicly leaks original source.
+    // Caught by the live red-team (REDTEAM-SEC). Dev uses the Vite dev server
+    // (its own maps), so debugging is unaffected.
+    sourcemap: false,
     rollupOptions: {
       output: {
+        // Split heavy vendors into separate, independently-cacheable chunks so the
+        // entry isn't one monolithic ~1.5MB file (live-audit perf finding).
+        manualChunks: {
+          react: ['react', 'react-dom', 'react-router-dom'],
+          apollo: ['@apollo/client', 'graphql'],
+          d3: ['d3'],
+          icons: ['lucide-react'],
+        },
         // Force new filenames to break cache
         entryFileNames: `assets/[name]-${Date.now()}.js`,
         chunkFileNames: `assets/[name]-${Date.now()}.js`,

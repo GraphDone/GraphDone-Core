@@ -1,3 +1,4 @@
+import {randomBytes} from 'node:crypto';
 import sqlite3 from 'sqlite3';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
@@ -354,60 +355,28 @@ class SQLiteAuthStore {
   }
 
   private async createDefaultUsers(): Promise<void> {
-    const db = await this.getDb();
-
-    return new Promise((resolve, reject) => {
-      // Check if admin user exists
-      db.get('SELECT id FROM users WHERE username = ?', ['admin'], async (err, row) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-
-        if (!row) {
-          // Create default team
-          const teamId = uuidv4();
-          const now = new Date().toISOString();
-
-          db.run('INSERT INTO teams (id, name, createdAt, updatedAt) VALUES (?, ?, ?, ?)', 
-            [teamId, 'Development Team', now, now]);
-
-          // Create admin user
-          const adminId = uuidv4();
-          const adminPasswordHash = await bcrypt.hash('graphdone', 10);
-          
-          db.run(`INSERT INTO users (id, email, username, name, role, passwordHash, createdAt, updatedAt, isActive, isEmailVerified) 
-                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, 
-            [adminId, 'admin@graphdone.local', 'admin', 'Admin User', 'ADMIN', adminPasswordHash, now, now, 1, 1]);
-
-          // Link admin to team
-          db.run('INSERT INTO user_teams (userId, teamId, role, createdAt) VALUES (?, ?, ?, ?)',
-            [adminId, teamId, 'OWNER', now]);
-
-          // Create viewer user
-          const viewerId = uuidv4();
-          const viewerPasswordHash = await bcrypt.hash('viewer123', 10);
-          
-          db.run(`INSERT INTO users (id, email, username, name, role, passwordHash, createdAt, updatedAt, isActive, isEmailVerified) 
-                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, 
-            [viewerId, 'viewer@graphdone.local', 'viewer', 'Viewer User', 'VIEWER', viewerPasswordHash, now, now, 1, 1]);
-
-          // Link viewer to team
-          db.run('INSERT INTO user_teams (userId, teamId, role, createdAt) VALUES (?, ?, ?, ?)',
-            [viewerId, teamId, 'MEMBER', now], (err) => {
-              if (err) {
-                reject(err);
-              } else {
-                // Default users created successfully
-                resolve();
-              }
-            });
-        } else {
-          // Default users already exist
-          resolve();
-        }
-      });
-    });
+    const db=await this.getDb();
+    const run=(sql:string,args:unknown[])=>new Promise<void>((resolve,reject)=>db.run(sql,args,e=>e?reject(e):resolve()));
+    const existing=await new Promise<any>((resolve,reject)=>db.get("SELECT * FROM users WHERE username='admin'",(e,row)=>e?reject(e):resolve(row)));
+    if(existing)return;
+    const production=process.env.NODE_ENV==='production';
+    let password=process.env.ADMIN_PASSWORD||(production?randomBytes(32).toString('base64url'):'graphdone');
+    if(production&&password.length<20)throw Error('ADMIN_PASSWORD must be at least 20 characters in production.');
+    let email=process.env.ADMIN_EMAIL||'admin@graphdone.local';const now=new Date().toISOString(),adminId=uuidv4(),teamId=uuidv4();
+    if(production&&!process.env.ADMIN_PASSWORD){
+      const filename=path.join(process.cwd(),'data','bootstrap-admin.json');
+      // Retain recoverable first-start credentials on the persistent private volume.
+      if(fs.existsSync(filename)){const saved=JSON.parse(fs.readFileSync(filename,'utf8'));if(typeof saved.password!=='string'||saved.password.length<20||typeof saved.email!=='string')throw Error('Invalid bootstrap credential file');password=saved.password;email=saved.email;}
+      else fs.writeFileSync(filename,JSON.stringify({username:'admin',email,password,createdAt:now},null,2),{mode:0o600,flag:'wx'});
+    }
+    await run('BEGIN IMMEDIATE',[]);
+    try {
+    await run('INSERT INTO teams(id,name,createdAt,updatedAt) VALUES(?,?,?,?)',[teamId,'My team',now,now]);
+    await run('INSERT INTO users(id,email,username,name,role,passwordHash,createdAt,updatedAt,isActive,isEmailVerified) VALUES(?,?,?,?,?,?,?,?,1,1)',[adminId,email,'admin','Administrator','ADMIN',await bcrypt.hash(password,12),now,now]);
+    await run('INSERT INTO user_teams(userId,teamId,role,createdAt) VALUES(?,?,?,?)',[adminId,teamId,'OWNER',now]);
+    if(!production){const viewerId=uuidv4();await run('INSERT INTO users(id,email,username,name,role,passwordHash,createdAt,updatedAt,isActive,isEmailVerified) VALUES(?,?,?,?,?,?,?,?,1,1)',[viewerId,'viewer@graphdone.local','viewer','Viewer','VIEWER',await bcrypt.hash('viewer123',10),now,now]);await run('INSERT INTO user_teams(userId,teamId,role,createdAt) VALUES(?,?,?,?)',[viewerId,teamId,'MEMBER',now]);}
+    await run('COMMIT',[]);
+    }catch(error){await run('ROLLBACK',[]);throw error;}
   }
 
   async findUserByEmailOrUsername(emailOrUsername: string): Promise<User | null> {
@@ -898,6 +867,43 @@ class SQLiteAuthStore {
     });
   }
 
+  async findFolderById(folderId: string): Promise<any | null> {
+    await this.initialize();
+    const db = await this.getDb();
+    return new Promise((resolve, reject) => {
+      db.get('SELECT * FROM folders WHERE id = ?', [folderId], (error, row: any) => {
+        if (error) reject(error);
+        else resolve(row ? { ...row, type: row.type.toLowerCase() } : null);
+      });
+    });
+  }
+
+  async getFolderDescendantIds(folderId: string): Promise<string[]> {
+    await this.initialize();
+    const db = await this.getDb();
+    return new Promise((resolve, reject) => {
+      db.all(`WITH RECURSIVE descendants(id) AS (
+        SELECT id FROM folders WHERE parentId = ?
+        UNION
+        SELECT folders.id FROM folders JOIN descendants ON folders.parentId = descendants.id
+      ) SELECT id FROM descendants`, [folderId], (error, rows: { id: string }[]) => {
+        if (error) reject(error);
+        else resolve(rows.map(row => row.id));
+      });
+    });
+  }
+
+  async isTeamMember(userId: string, teamId: string): Promise<boolean> {
+    await this.initialize();
+    const db = await this.getDb();
+    return new Promise((resolve, reject) => {
+      db.get('SELECT 1 FROM user_teams WHERE userId = ? AND teamId = ?', [userId, teamId], (error, row) => {
+        if (error) reject(error);
+        else resolve(Boolean(row));
+      });
+    });
+  }
+
   // Get user's folder structure
   async getUserFolders(userId: string): Promise<any[]> {
     await this.initialize();
@@ -907,17 +913,17 @@ class SQLiteAuthStore {
       const sql = `
         SELECT f.*, 
           CASE 
-            WHEN f.type = 'team' THEN t.name
-            WHEN f.type = 'user' THEN u.name
+            WHEN LOWER(f.type) = 'team' THEN t.name
+            WHEN LOWER(f.type) = 'user' THEN u.name
             ELSE 'System'
           END as ownerName
         FROM folders f
-        LEFT JOIN teams t ON f.type = 'team' AND f.ownerId = t.id
-        LEFT JOIN users u ON f.type = 'user' AND f.ownerId = u.id
+        LEFT JOIN teams t ON LOWER(f.type) = 'team' AND f.ownerId = t.id
+        LEFT JOIN users u ON LOWER(f.type) = 'user' AND f.ownerId = u.id
         WHERE 
-          f.type = 'system' 
-          OR (f.type = 'user' AND f.ownerId = ?)
-          OR (f.type = 'team' AND f.ownerId IN (
+          LOWER(f.type) = 'system'
+          OR (LOWER(f.type) = 'user' AND f.ownerId = ?)
+          OR (LOWER(f.type) = 'team' AND f.ownerId IN (
             SELECT teamId FROM user_teams WHERE userId = ?
           ))
         ORDER BY f.type, f.position, f.name
@@ -927,7 +933,7 @@ class SQLiteAuthStore {
         if (err) {
           reject(err);
         } else {
-          resolve(rows);
+          resolve(rows.map(row => ({ ...row, type: row.type.toLowerCase() })));
         }
       });
     });
@@ -1076,7 +1082,7 @@ class SQLiteAuthStore {
 
     return new Promise((resolve, reject) => {
       // Check if user already has personal folders
-      db.get('SELECT id FROM folders WHERE type = ? AND ownerId = ?', ['user', userId], (err, row) => {
+      db.get('SELECT id FROM folders WHERE LOWER(type) = ? AND ownerId = ?', ['user', userId], (err, row) => {
         if (err) {
           reject(err);
           return;
@@ -1333,34 +1339,42 @@ class SQLiteAuthStore {
     const db = await this.getDb();
     const now = new Date().toISOString();
 
-    return new Promise((resolve, reject) => {
+    const link = await new Promise<{ id: string; email: string } | undefined>((resolve, reject) => {
       db.get(
-        'SELECT * FROM magic_links WHERE token = ? AND usedAt IS NULL AND expiresAt > ?',
+        'SELECT id, email FROM magic_links WHERE token = ? AND usedAt IS NULL AND expiresAt > ?',
         [token, now],
-        async (err, row: any) => {
-          if (err) {
-            reject(err);
-          } else if (row) {
-            db.run('UPDATE magic_links SET usedAt = ? WHERE id = ?', [now, row.id]);
-
-            let user = await this.findUserByEmailOrUsername(row.email);
-            if (!user) {
-              user = await this.createUser({
-                email: row.email,
-                username: row.email.split('@')[0] + '_' + Math.random().toString(36).substring(7),
-                password: uuidv4(),
-                name: row.email.split('@')[0],
-                role: 'USER'
-              });
-            }
-
-            resolve({ valid: true, email: row.email, userId: user.id });
-          } else {
-            resolve({ valid: false });
-          }
+        (error, row: { id: string; email: string } | undefined) => {
+          if (error) reject(error);
+          else resolve(row);
         }
       );
     });
+    if (!link) return { valid: false };
+
+    const changed = await new Promise<number>((resolve, reject) => {
+      db.run(
+        "UPDATE magic_links SET usedAt = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ? AND token = ? AND usedAt IS NULL AND expiresAt > strftime('%Y-%m-%dT%H:%M:%fZ', 'now')",
+        [link.id, token],
+        function (error) {
+          if (error) reject(error);
+          else resolve(this.changes);
+        }
+      );
+    });
+    if (changed !== 1) return { valid: false };
+
+    let user = await this.findUserByEmailOrUsername(link.email);
+    if (!user) {
+      user = await this.createUser({
+        email: link.email,
+        username: link.email.split('@')[0] + '_' + Math.random().toString(36).substring(7),
+        password: uuidv4(),
+        name: link.email.split('@')[0],
+        role: 'USER'
+      });
+    }
+    if (!user.isActive) return { valid: false };
+    return { valid: true, email: link.email, userId: user.id };
   }
 
   async createShareableLink(data: {

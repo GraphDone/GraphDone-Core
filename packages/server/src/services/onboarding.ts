@@ -46,7 +46,7 @@ export const WELCOME_NODES: OnboardingNode[] = [
     title: 'Welcome to GraphDone!',
     description: `# Welcome to GraphDone! 🎉
 
-GraphDone is a graph-native project management system that reimagines how work flows through dependencies rather than hierarchies.
+GraphDone is a graph-native management system that reimagines how work flows through dependencies rather than hierarchies.
 
 ## Key Concepts:
 - **Nodes** represent work items, ideas, tasks, or outcomes
