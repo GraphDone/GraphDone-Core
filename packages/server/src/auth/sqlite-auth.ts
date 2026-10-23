@@ -1314,11 +1314,10 @@ class SQLiteAuthStore {
     });
     if (!link) return { valid: false };
 
-    const consumedAt = new Date().toISOString();
     const changed = await new Promise<number>((resolve, reject) => {
       db.run(
-        'UPDATE magic_links SET usedAt = ? WHERE id = ? AND token = ? AND usedAt IS NULL AND expiresAt > ?',
-        [consumedAt, link.id, token, consumedAt],
+        "UPDATE magic_links SET usedAt = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ? AND token = ? AND usedAt IS NULL AND expiresAt > strftime('%Y-%m-%dT%H:%M:%fZ', 'now')",
+        [link.id, token],
         function (error) {
           if (error) reject(error);
           else resolve(this.changes);

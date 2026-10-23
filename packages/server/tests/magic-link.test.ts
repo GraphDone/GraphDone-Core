@@ -25,6 +25,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  vi.restoreAllMocks();
   await new Promise<void>((resolve, reject) => db.close(error => error ? reject(error) : resolve()));
   store.db = null;
   store.initialized = false;
@@ -67,6 +68,27 @@ describe('single-use magic links in real SQLite', () => {
     const before = await row('SELECT * FROM magic_links WHERE id=?', [link.id]);
     expect(await sqliteAuthStore.verifyMagicLink(state === 'missing' ? 'missing-fixture-token' : link.token)).toEqual({ valid: false });
     expect(await row('SELECT * FROM magic_links WHERE id=?', [link.id])).toEqual(before);
+  });
+
+  it('rejects a link that expires while its consumption write is delayed', async () => {
+    const link = await sqliteAuthStore.createMagicLink(email);
+    const originalRun = db.run.bind(db);
+    let release!: () => void;
+    const queued = new Promise<void>(resolve => {
+      vi.spyOn(db, 'run').mockImplementationOnce((sql: string, ...args: unknown[]) => {
+        release = () => { originalRun(sql, ...args); };
+        resolve();
+        return db;
+      });
+    });
+    const redemption = sqliteAuthStore.verifyMagicLink(link.token);
+    await queued;
+    await execute('UPDATE magic_links SET expiresAt=? WHERE id=?', [new Date(Date.now() + 25).toISOString(), link.id]);
+    await new Promise(resolve => setTimeout(resolve, 50));
+    expect(await row("SELECT expiresAt <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now') AS expired FROM magic_links WHERE id=?", [link.id])).toEqual({ expired: 1 });
+    release();
+    expect(await redemption).toEqual({ valid: false });
+    expect(await row('SELECT usedAt FROM magic_links WHERE id=?', [link.id])).toEqual({ usedAt: null });
   });
 
   it('rejects an inactive account and keeps its consumed link unusable after reactivation', async () => {
