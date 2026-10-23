@@ -1,5 +1,37 @@
 # Core merge validation — 2026-10-23
 
+## Current disposition — 2026-10-23, 22:29 UTC snapshot
+
+The final frozen PR #157 head
+`385e7679fabc60b80cd65cf0a1aa4cdf3d592514` passed public
+[CI run 40025965786](https://github.com/GraphDone/GraphDone-Core/actions/runs/40025965786)
+and [Comprehensive Test Suite run 40025965837](https://github.com/GraphDone/GraphDone-Core/actions/runs/40025965837).
+The independently inspected
+[browser artifact 12533273048](https://github.com/GraphDone/GraphDone-Core/actions/runs/40025965786/artifacts/12533273048)
+records smoke **6**, new-user **42**, mobile **27** and performance **3** passes;
+the separate living-graph suite passed **3**. The completed validation also
+records **603 unit passes with 26 explicitly DB-gated skips**, **161 harness
+passes** and **9 real disposable-database contract passes**. Required browser
+cases did not pass through skips or flaky retries. Earlier failures below remain
+part of the record.
+
+After the owner's explicit standing authorization changed **only `dev`
+administrator enforcement**, PR #157 merged through native `--admin` at
+`9068cd31824991330c6d92196654e53e04e29063`. Its parents are
+`8a7de052eb60fe517f45681dc42b5b169d09c660` and the frozen `385e767` head;
+its entire tree `6bf014bcc30eb6e21c0deeae4db9c7d4effeaac2` equals that validated
+source. Other protections remain unchanged. This was an owner-authorized
+administrative merge, not a non-author approval, deployment or hosted-acceptance
+claim. See the [current dev integration policy](../../.agents/playbooks/dev-admin-integration.md).
+
+Post-merge CI was still running at this snapshot. Final checks on the latest
+resulting `dev` head and issue closure are not claimed here;
+[issue #156](https://github.com/GraphDone/GraphDone-Core/issues/156) is the
+authoritative post-merge/closeout record. The sections below preserve earlier
+snapshots: their **PENDING** review/CI wording describes those earlier states,
+not a reversal of the confirmed results above. Remaining release limits still
+apply.
+
 ## Follow-up: the fresh production audit held final approval
 
 The snapshot below remains historical evidence. On the subsequent clean merged
