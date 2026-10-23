@@ -99,6 +99,9 @@
     "passport-openidconnect": "^0.1.2"
   },
   "overrides": {
-    "@graphql-tools/utils": "12.1.0"
+    "@graphql-tools/utils": "12.1.0",
+    "@typescript-eslint/typescript-estree@6.21.0": {
+      "minimatch": "9.0.7"
+    }
   }
 }
