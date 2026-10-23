@@ -419,7 +419,7 @@ async function waitForLoginCompletion(page: Page, timeout: number): Promise<void
       // Additional verification - look for workspace elements  
       const workspaceIndicators = [
         '[data-testid="graph-selector"]',
-    '[data-testid="graph-selector-mobile"]',
+        '[data-testid="graph-selector-mobile"]',
         '.graph-selector',
         'text="Graph Viewer"'
       ];
