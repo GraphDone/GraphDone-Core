@@ -135,6 +135,7 @@ function caseHtml(runId, c) {
   const atts = (c.attachments || []).map((a) => {
     const url = mediaUrl(runId, a.href);
     if (a.type === 'video') return `<figure class="att"><video src="${esc(url)}" controls preload="metadata" playsinline></video><figcaption>${esc(decodeMungedName(a.name || a.href))}</figcaption></figure>`;
+    if (a.type === 'file') return `<figure class="att"><a href="${esc(url)}" download>${esc(a.name || 'Download evidence')}</a></figure>`;
     return `<figure class="att"><a href="${esc(url)}" target="_blank"><img src="${esc(url)}" loading="lazy" alt="${esc(a.name || '')}"></a><figcaption>${esc(decodeMungedName(a.name || a.href))}</figcaption></figure>`;
   }).join('');
   return `<div class="case">
@@ -184,6 +185,7 @@ async function renderMedia() {
   $('view').innerHTML = picker + `<div class="atts" style="margin-left:0">${cases.flatMap((c) => (c.attachments || []).map((a) => {
     const url = mediaUrl(ui.mediaRunId, a.href);
     const cap = `${c.ref ? '§' + c.ref + ' ' : ''}${decodeMungedName(a.name || a.href)}`;
+    if (a.type === 'file') return `<figure class="att"><a href="${esc(url)}" download>${esc(cap)}</a></figure>`;
     return a.type === 'video'
       ? `<figure class="att"><video src="${esc(url)}" controls preload="metadata" playsinline></video><figcaption>${esc(cap)}</figcaption></figure>`
       : `<figure class="att"><a href="${esc(url)}" target="_blank"><img src="${esc(url)}" loading="lazy"></a><figcaption>${esc(cap)}</figcaption></figure>`;
