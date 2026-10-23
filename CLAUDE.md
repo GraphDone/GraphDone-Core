@@ -2,6 +2,11 @@
 
 This file provides guidance to Claude Code when working with GraphDone-Core.
 
+Read [AGENTS.md](AGENTS.md) for current integration authority and operational
+lessons. Administrative integration into `dev` must follow the
+[high-validation-bar playbook](.agents/playbooks/dev-admin-integration.md);
+admin merge authority is not a non-author review approval.
+
 ## Project Overview
 
 GraphDone is a graph-native management system that reimagines work coordination through dependencies and democratic prioritization rather than hierarchical assignments. Currently in active development (v0.3.1-alpha) with TLS/SSL production readiness.
