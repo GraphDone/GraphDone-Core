@@ -1,6 +1,6 @@
 # A passing aggregate must include every selected production gate
 
-Date: 2026-10-24 UTC. Scope: GraphDone-Core main promotion, issue #189.
+Date: 2026-10-23 UTC. Scope: GraphDone-Core main promotion, issue #189.
 
 ## Evidence
 
