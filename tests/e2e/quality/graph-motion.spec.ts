@@ -21,10 +21,15 @@ for(const [width,height] of [[390,844],[844,390],[1440,900]]) {
    await page.goto('/');
    const node=page.locator('.graph-container .node').filter({hasText:'Drag this task'});
    await expect(node).toBeVisible();
-   if(width<768) await page.getByTestId('graph-lock-toggle').click();
+   const lock = page.getByTestId('graph-lock-toggle');
+   if (await lock.isVisible()) {
+     if ((await lock.textContent())?.trim() === 'Locked') await lock.click();
+     await expect(lock).toHaveText('Editing');
+   }
    await page.getByRole('button',{name:'Zoom to fit — frame all nodes'}).click();
    await expect.poll(()=>page.evaluate(()=>(window as any).__layoutMetrics?.()?.atRest)).toBe(true);
-   await expect(async()=>{const a=await node.boundingBox();await page.waitForTimeout(120);const b=await node.boundingBox();expect(Math.abs(a!.x-b!.x)+Math.abs(a!.y-b!.y)).toBeLessThan(0.1);}).toPass({timeout:3000});
+   const translation = () => node.evaluate(element => { const matrix = (element as SVGGraphicsElement).getScreenCTM(); return { x: matrix!.e, y: matrix!.f }; });
+   await expect(async()=>{const a=await translation();await page.waitForTimeout(120);const b=await translation();expect(Math.abs(a.x-b.x)+Math.abs(a.y-b.y)).toBeLessThan(0.1);}).toPass({timeout:3000});
    const before=(await gql(page,'query($id:ID!){workItems(where:{graph:{id:$id}}){title positionX positionY}}',{id:graph})).workItems.find((n:any)=>n.title==='Drag this task');
    const box=await node.boundingBox();
    await page.mouse.move(box!.x+box!.width/2,box!.y+box!.height/2);
@@ -63,7 +68,7 @@ for(const [width,height] of [[390,844],[844,390],[1440,900]]) {
    await info.attach('motion-samples.json',{body:JSON.stringify(sample,null,2),contentType:'application/json'});
    expect(sample.frames).toBeGreaterThan(100);
    expect(sample.nodes).toHaveLength(2);
-   for(const sampleNode of sample.nodes){expect(sampleNode.xSpan,'idle horizontal shaking across a full poll interval').toBeLessThanOrEqual(1);expect(sampleNode.ySpan,'idle vertical shaking across a full poll interval').toBeLessThanOrEqual(1);}
+   for(const sampleNode of sample.nodes){expect(sampleNode.xSpan,'idle horizontal shaking during the 17-second sample').toBeLessThanOrEqual(1);expect(sampleNode.ySpan,'idle vertical shaking during the 17-second sample').toBeLessThanOrEqual(1);}
    await page.screenshot({path:`test-artifacts/quality/motion-${width}.png`});
   }finally{
    await gql(page,'mutation($id:ID!){deleteWorkItems(where:{graph:{id:$id}}){nodesDeleted}}',{id:graph});
