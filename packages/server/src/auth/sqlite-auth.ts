@@ -1302,34 +1302,42 @@ class SQLiteAuthStore {
     const db = await this.getDb();
     const now = new Date().toISOString();
 
-    return new Promise((resolve, reject) => {
+    const link = await new Promise<{ id: string; email: string } | undefined>((resolve, reject) => {
       db.get(
-        'SELECT * FROM magic_links WHERE token = ? AND usedAt IS NULL AND expiresAt > ?',
+        'SELECT id, email FROM magic_links WHERE token = ? AND usedAt IS NULL AND expiresAt > ?',
         [token, now],
-        async (err, row: any) => {
-          if (err) {
-            reject(err);
-          } else if (row) {
-            db.run('UPDATE magic_links SET usedAt = ? WHERE id = ?', [now, row.id]);
-
-            let user = await this.findUserByEmailOrUsername(row.email);
-            if (!user) {
-              user = await this.createUser({
-                email: row.email,
-                username: row.email.split('@')[0] + '_' + Math.random().toString(36).substring(7),
-                password: uuidv4(),
-                name: row.email.split('@')[0],
-                role: 'USER'
-              });
-            }
-
-            resolve({ valid: true, email: row.email, userId: user.id });
-          } else {
-            resolve({ valid: false });
-          }
+        (error, row: { id: string; email: string } | undefined) => {
+          if (error) reject(error);
+          else resolve(row);
         }
       );
     });
+    if (!link) return { valid: false };
+
+    const changed = await new Promise<number>((resolve, reject) => {
+      db.run(
+        "UPDATE magic_links SET usedAt = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ? AND token = ? AND usedAt IS NULL AND expiresAt > strftime('%Y-%m-%dT%H:%M:%fZ', 'now')",
+        [link.id, token],
+        function (error) {
+          if (error) reject(error);
+          else resolve(this.changes);
+        }
+      );
+    });
+    if (changed !== 1) return { valid: false };
+
+    let user = await this.findUserByEmailOrUsername(link.email);
+    if (!user) {
+      user = await this.createUser({
+        email: link.email,
+        username: link.email.split('@')[0] + '_' + Math.random().toString(36).substring(7),
+        password: uuidv4(),
+        name: link.email.split('@')[0],
+        role: 'USER'
+      });
+    }
+    if (!user.isActive) return { valid: false };
+    return { valid: true, email: link.email, userId: user.id };
   }
 
   async createShareableLink(data: {
