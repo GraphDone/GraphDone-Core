@@ -8,7 +8,7 @@ export function validateCounter(errors, report, key, expected) {
 export function finishSequence({ id, title, kind, command, res, counts, cases, errors = [], blocking = true }) {
   if (res.timedOut) errors.push('Test process timed out.');
   if (res.code !== 0) errors.push(`Test process did not exit successfully (exit ${res.code ?? 'unknown'}).`);
-  if (res.error) errors.push(`Test process could not start: ${res.error}`);
+  if (res.error) errors.push(`Test process error: ${res.error}`);
   if (counts.passed + counts.failed + counts.skipped === 0) errors.push('No executed test results were reported.');
   if (blocking && counts.skipped > 0) errors.push(`${counts.skipped} required test(s) were skipped.`);
   if (errors.length) {
