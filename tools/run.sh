@@ -237,7 +237,7 @@ case $MODE in
         echo "📦 Starting development servers..."
         
         # Ensure Node.js is available
-        ensure_nodejs
+        ensure_nodejs || return 1
         
         # Check if environment files exist
         if [ ! -f "packages/server/.env" ] || [ ! -f "packages/web/.env" ]; then

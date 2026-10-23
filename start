@@ -493,7 +493,7 @@ cmd_dev() {
     show_banner
     log_info "Welcome to GraphDone! Starting development environment..."
 
-    ensure_nodejs
+    ensure_nodejs || return 1
 
     # Check Docker status (required for GraphDone)
     if ! docker ps &> /dev/null; then
@@ -588,14 +588,14 @@ cmd_dev() {
 cmd_quick() {
     show_banner
     log_info "🏃 Quick start - minimal checks..."
-    ensure_nodejs
+    ensure_nodejs || return 1
     ./tools/run.sh
 }
 
 cmd_clean() {
     show_banner
     log_info "🧹 Cleaning build artifacts and restarting fresh..."
-    ensure_nodejs
+    ensure_nodejs || return 1
     ./tools/cleanup.sh
     ./tools/setup.sh
     ./tools/run.sh
@@ -604,7 +604,7 @@ cmd_clean() {
 cmd_setup() {
     show_banner
     log_info "🔧 Running initial setup..."
-    ensure_nodejs
+    ensure_nodejs || return 1
 
     # Setup Docker first (required for GraphDone)
     log_info "🐳 Setting up Docker..."
@@ -620,7 +620,7 @@ cmd_setup() {
 cmd_test() {
     show_banner
     log_info "🧪 Running test suite..."
-    ensure_nodejs
+    ensure_nodejs || return 1
     
     # Pass all remaining arguments to test.sh
     ./tools/test.sh "${REMAINING_ARGS[@]}"
@@ -629,7 +629,7 @@ cmd_test() {
 cmd_build() {
     show_banner
     log_info "🏗️  Building all packages..."
-    ensure_nodejs
+    ensure_nodejs || return 1
     ./tools/build.sh
 }
 

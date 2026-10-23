@@ -36,3 +36,9 @@ The first remote Node 22 run caught an existing harness command incompatibility:
 All PR bases now trigger CI. Locked installs replace mutating installs. Unit jobs build their workspace dependency first, the harness library regressions run in CI, and smoke runs through the strict evidence adapter. High/critical production dependency advisories now block CI Success. The broader headed new-user, mobile, graph, and performance gates remain enabled. Protected branch approval requirements remain in force.
 
 References: [Apollo Server migration](https://www.apollographql.com/docs/apollo-server/migration), [Node release schedule](https://nodejs.org/en/about/previous-releases). See [testing guidance](../testing/README.md) for evidence limits and [quality guidance](RUNBOOK.md) for user-level validation.
+
+## Independent launcher review
+
+A command-extraction negative control showed `ensure_nodejs` returning failure while its callers continued into a build because these launchers deliberately disable `set -e`. Every caller now propagates failure before starting work. Dashboard scripts also stop before service/cron mutations unless PATH supplies a supported runtime; the hardcoded Node 20 fallback is removed and their self-check uses the compatible test-file glob. No user service was installed or restarted during these checks.
+
+Both API image variants subsequently started with generated credentials against the owned database and returned HTTP 200 with Neo4j healthy. The first container probe could not reach a loopback-only database through the bridge; using host networking with distinct owned ports resolved that fixture issue. The optional MCP subsystem remained offline and is not claimed healthy.
