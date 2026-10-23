@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import neo4j, { Driver } from 'neo4j-driver';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { CallToolResultSchema, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
+import { fileURLToPath } from 'node:url';
 import { GraphService } from '../src/services/graph-service';
 
 /**
@@ -285,5 +289,87 @@ describe.skipIf(!configured)('MCP GraphService — real Neo4j contract', () => {
     const browsed = parse(await svc.browseGraph({ query_type: 'all_nodes', limit: 25 } as any));
     const arr = browsed.nodes ?? browsed.results ?? browsed.workItems;
     expect(Array.isArray(arr), 'browseGraph returns an array of nodes').toBe(true);
+  });
+
+  it('actual MCP stdio keeps diagnostics off the protocol stream and recovers after invalid calls', async () => {
+    const graph = parse(await svc.createGraph({ name: `Contract Stdio ${Date.now()}`, type: 'PROJECT' } as any));
+    const graphId = graph.graph.id;
+    createdGraphs.push(graphId);
+    const transport = new StdioClientTransport({
+      command: process.execPath,
+      args: ['--import', 'tsx', 'src/index.ts'],
+      cwd: fileURLToPath(new URL('../', import.meta.url)),
+      stderr: 'pipe',
+      env: { NEO4J_URI: URI, NEO4J_USER: USER, NEO4J_PASSWORD: PASS, MCP_HEALTH_PORT: '0', CI: 'true' },
+    });
+    const client = new Client({ name: 'graphdone-stdio-contract', version: '1.0.0' }, { capabilities: {} });
+    const protocolErrors: string[] = [];
+    let diagnostics = '';
+    client.onerror = error => {
+      if (protocolErrors.length < 20) protocolErrors.push(error.message.slice(0, 1000));
+    };
+    transport.stderr?.on('data', chunk => {
+      diagnostics += chunk.toString().slice(0, Math.max(0, 16000 - diagnostics.length));
+    });
+    const options = { timeout: 3000, maxTotalTimeout: 3000 };
+    let pid: number | null = null;
+    try {
+      await client.connect(transport, { timeout: 5000, maxTotalTimeout: 5000 });
+      pid = transport.pid;
+      expect(client.getServerVersion()).toEqual({ name: 'graphdone-mcp-server', version: '0.3.1-alpha' });
+      expect(client.getServerCapabilities()).toEqual({ tools: {} });
+      const listed = await client.listTools(undefined, options);
+      expect(listed.tools.find(tool => tool.name === 'create_node')?.inputSchema.required).toEqual(['title', 'type']);
+      expect(listed.tools.find(tool => tool.name === 'get_graph_details')?.inputSchema.required).toEqual(['graphId']);
+
+      const title = `Stdio node ${graphId}`;
+      const created = await client.callTool({ name: 'create_node', arguments: { title, type: 'TASK', graph_id: graphId } }, CallToolResultSchema, options);
+      expect(created.isError).not.toBe(true);
+      const node = JSON.parse((created.content[0] as { text: string }).text).node;
+      createdNodes.push(node.id);
+      expect(node.id).toBeTruthy();
+      const read = await client.callTool({ name: 'get_node_details', arguments: { node_id: node.id } }, CallToolResultSchema, options);
+      expect(read.isError).not.toBe(true);
+      expect(JSON.parse((read.content[0] as { text: string }).text).node).toMatchObject({ id: node.id, title, type: 'TASK' });
+
+      await expect(client.request({ method: 'tools/call', params: { name: 42, arguments: {} } }, CallToolResultSchema, options))
+        .rejects.toMatchObject({ code: ErrorCode.InternalError, message: expect.stringContaining('"name"') });
+      const unknown = await client.callTool({ name: 'contract_unknown_tool', arguments: {} }, CallToolResultSchema, options);
+      expect(unknown).toMatchObject({ isError: true, content: [{ type: 'text', text: 'Error executing contract_unknown_tool: Unknown tool: contract_unknown_tool' }] });
+      const recovered = await client.callTool({ name: 'get_graph_details', arguments: { graphId } }, CallToolResultSchema, options);
+      expect(recovered.isError).not.toBe(true);
+      expect(JSON.parse((recovered.content[0] as { text: string }).text).graph).toMatchObject({ id: graphId, nodeCount: 1, edgeCount: 0 });
+      const session = driver.session();
+      try {
+        const persisted = await session.run('MATCH (w:WorkItem {id: $id})-[:BELONGS_TO]->(g:Graph {id: $graphId}) RETURN w.title AS title', { id: node.id, graphId }, { timeout: 3000 });
+        expect(persisted.records.map(record => record.get('title'))).toEqual([title]);
+      } finally {
+        await session.close();
+      }
+      expect(protocolErrors, 'Only valid JSON-RPC messages may appear on stdout').toEqual([]);
+      expect(diagnostics).toContain('Memory monitoring started');
+      expect(diagnostics).toContain('CPU Monitor: DISABLED for CI environment');
+      expect(diagnostics).toContain('Recorded write consistency for createNode');
+    } finally {
+      pid ??= transport.pid;
+      try {
+        await client.close();
+      } finally {
+        await transport.close();
+      }
+      if (pid) {
+        let alive = true;
+        for (let attempt = 0; attempt < 20; attempt++) {
+          try { process.kill(pid, 0); }
+          catch (error) {
+            if ((error as { code?: string }).code !== 'ESRCH') throw error;
+            alive = false;
+            break;
+          }
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
+        expect(alive, 'The owned MCP subprocess must terminate').toBe(false);
+      }
+    }
   });
 });
