@@ -15,7 +15,7 @@ const knownInsecureSecrets = new Set([
   'your-secure-secret',
 ]);
 
-export function validateProductionSecrets(environment: NodeJS.ProcessEnv): void {
+export function validateProductionSecrets(environment: Record<string, string | undefined>): void {
   if (environment.NODE_ENV !== 'production') return;
 
   const invalid = ['JWT_SECRET', 'SESSION_SECRET'].filter(name => {
