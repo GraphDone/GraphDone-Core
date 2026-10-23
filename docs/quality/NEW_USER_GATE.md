@@ -88,6 +88,22 @@ Use `SCENARIOS.md` for the diverse user/team catalog and `SCENARIO_RESULT_TEMPLA
 
 See `RELEASE_QC.md` for the current sweep and remaining blockers.
 
+### Saved-state and recorded-AI checks
+
+The responsive editing test waits for the exact status mutation, rejects HTTP or
+GraphQL failures, checks its saved-state indicator, and reads the item back from
+the API before navigating to Analytics. The 320px case delays that request by
+750 ms to expose navigation before the save acknowledgement. The final Analytics
+count remains a separate assertion.
+
+The recorded-AI fixture creates and deletes its contributor through the owned
+work item; unrestricted contributor CRUD stays disabled. External API updates
+appear after the user activates **Refresh agent work**, then persist through the
+Activity view and reload. These checks establish recorded progress visibility;
+they do not establish autonomous agent execution or polling. See the
+[2026-10-23 gate review](NEW_USER_GATE_REVIEW_2026-10-23.md) for the failing-before
+evidence and scope.
+
 ### Working with my agent
 
 54. Can I understand from the title page how my agent and I work together?

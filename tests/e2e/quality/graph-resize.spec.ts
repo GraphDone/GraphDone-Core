@@ -2,7 +2,7 @@ import {test, expect} from '@playwright/test';
 import {login, TEST_USERS} from '../../lib/auth';
 import {gql} from '../../lib/graphRequest';
 
- test('graph stays centered through gradual growth, shrink and rotation @motion', async ({page}) => {
+ test('graph stays visible and clear of controls through gradual growth, shrink and rotation @motion', async ({page}) => {
   test.setTimeout(90000);
   await page.setViewportSize({width:1000,height:700});
   await login(page,TEST_USERS.ADMIN);
@@ -14,22 +14,31 @@ import {gql} from '../../lib/graphRequest';
    await page.evaluate(id=>{localStorage.setItem('currentGraphId',id);localStorage.setItem('graphdone:viewMode','graph');},graph);
    await page.goto('/');
    await expect(page.locator('.graph-container .node')).toHaveCount(2);
-   const centered=async()=>{
+   const accessible=async()=>{
     const bounds=await page.locator('.graph-container').evaluate(el=>{
      const viewport=el.getBoundingClientRect();
      const cards=Array.from(el.querySelectorAll('.node-bg')).map(n=>n.getBoundingClientRect());
-     const left=Math.min(...cards.map(r=>r.left)),right=Math.max(...cards.map(r=>r.right));
-     const top=Math.min(...cards.map(r=>r.top)),bottom=Math.max(...cards.map(r=>r.bottom));
-     return {dx:Math.abs((left+right)/2-(viewport.left+viewport.width/2)),dy:Math.abs((top+bottom)/2-(viewport.top+viewport.height/2)),inside:left>=viewport.left&&right<=viewport.right&&top>=viewport.top&&bottom<=viewport.bottom};
+     const obstacles=Array.from(document.querySelectorAll<HTMLElement>('[data-graph-fit-obstacle="true"]')).map(n=>({name:n.getAttribute('aria-label')||n.title||n.textContent,box:n.getBoundingClientRect()})).filter(o=>o.box.width>0&&o.box.height>0);
+     const overlaps=cards.flatMap((card,index)=>obstacles.filter(({box})=>card.left<box.right-1&&card.right>box.left+1&&card.top<box.bottom-1&&card.bottom>box.top+1).map(o=>({card:index,control:o.name})));
+     return {count:cards.length,inside:cards.every(card=>card.left>=viewport.left-1&&card.right<=viewport.right+1&&card.top>=viewport.top-1&&card.bottom<=viewport.bottom+1),overlaps};
     });
-    expect(bounds.dx).toBeLessThan(3);expect(bounds.dy).toBeLessThan(3);expect(bounds.inside).toBe(true);
+    expect(bounds.count).toBe(2);expect(bounds.inside).toBe(true);expect(bounds.overlaps).toEqual([]);
    };
-   await expect(centered).toPass({timeout:5000});
+   await expect(accessible).toPass({timeout:5000});
    const before=await positions();
-   // Every desktop step is below the old 20% threshold. Each must reframe.
+   const translation=()=>page.locator('.graph-container .node').first().evaluate(element=>{
+    const matrix=(element as SVGGraphicsElement).getScreenCTM()!;
+    return {x:matrix.e,y:matrix.f};
+   });
+   // Include small desktop steps below the old 20% threshold. Each must reframe.
    for(const [width,height] of [[1100,750],[1200,800],[1320,850],[1440,900],[1920,1080],[1440,900],[1320,850],[1200,800],[390,844],[844,390],[390,844],[1440,900]]) {
+    const previous=await translation();
     await page.setViewportSize({width,height});
-    await expect(centered).toPass({timeout:3000});
+    await expect.poll(async()=>{
+     const current=await translation();
+     return Math.hypot(current.x-previous.x,current.y-previous.y);
+    },{timeout:3000}).toBeGreaterThan(1);
+    await expect(accessible).toPass({timeout:3000});
     await page.screenshot({path:`test-artifacts/quality/resize-${width}-${height}.png`});
    }
    expect(await positions()).toEqual(before);
