@@ -19,6 +19,7 @@ async function openListView(page: import('@playwright/test').Page) {
     input: [{name: `Mobile dialog ${Date.now()}`, type: 'PROJECT', status: 'ACTIVE', createdBy: owner}],
   })).createGraphs.graphs[0].id;
   const cleanup = async () => {
+    await gql(page, 'mutation($id:ID!){deleteEdges(where:{OR:[{source:{graph:{id:$id}}},{target:{graph:{id:$id}}}]}){nodesDeleted}}', {id: graphId});
     await gql(page, 'mutation($id:ID!){deleteWorkItems(where:{graph:{id:$id}}){nodesDeleted}}', {id: graphId});
     await gql(page, 'mutation($id:ID!){deleteGraphs(where:{id:$id}){nodesDeleted}}', {id: graphId});
   };
