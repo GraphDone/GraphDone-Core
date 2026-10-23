@@ -29,6 +29,8 @@ Commands below ran in an isolated worktree on Node 22.23.4, with a separately ow
 
 Local ignored logs live under `test-artifacts/audit-20261023/`; public PR checks and review comments carry subsequent commit-specific results. These local results precede the other audit branches and must not be presented as integrated or deployed validation. Full dependency audit still includes development-tool advisories; production audit alone is not a security audit. Container build does not prove a deployed image works. Installer changes were syntax/config checked, not installed onto another person's machine.
 
+The first remote Node 22 run caught an existing harness command incompatibility: `node --test tests/lib/` treats the directory as a module on Node 22. A quoted recursive test-file glob runs all 105 cases successfully. Both minimum-Node and Node 24 CI matrix jobs now execute the harness tests too. Static lint and typechecking had passed; the failed harness invocation was not counted as a pass.
+
 ## CI requirements
 
 All PR bases now trigger CI. Locked installs replace mutating installs. Unit jobs build their workspace dependency first, the harness library regressions run in CI, and smoke runs through the strict evidence adapter. High/critical production dependency advisories now block CI Success. The broader headed new-user, mobile, graph, and performance gates remain enabled. Protected branch approval requirements remain in force.
