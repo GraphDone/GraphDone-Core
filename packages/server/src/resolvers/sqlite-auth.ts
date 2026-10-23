@@ -3,7 +3,7 @@ import { sqliteAuthStore } from '../auth/sqlite-auth.js';
 import { generateToken } from '../utils/auth.js';
 import { verifyCaptcha } from '../utils/captcha.js';
 import { randomUUID } from 'node:crypto';
-import { folderActor, folderCreationOwner, folderResponse, requireFolderAccess, requireFolderParent, requireGraphAccess, visibleFolderGraphs } from '../auth/folder-access.js';
+import { folderActor, folderCreationOwner, folderResponse, requireFolderAccess, requireFolderDeletion, requireFolderParent, requireGraphAccess, visibleFolderGraphs } from '../auth/folder-access.js';
 
 interface LoginInput {
   emailOrUsername: string;
@@ -703,7 +703,7 @@ export const sqliteAuthResolvers = {
     // Delete folder
     deleteFolder: async (_: any, { id, moveGraphsTo }: { id: string; moveGraphsTo?: string }, context: any) => {
       const actor = await folderActor(context, true);
-      await requireFolderAccess(id, actor, true);
+      await requireFolderDeletion(id, actor, moveGraphsTo);
       const graphs = moveGraphsTo ? await sqliteAuthStore.getFolderGraphs(id) : [];
       if (moveGraphsTo) {
         await requireFolderAccess(moveGraphsTo, actor, true);

@@ -136,6 +136,9 @@ holding that role.
 
 Folder creation fixes personal ownership to the caller. Parent folders must be
 writable and in the same user, team, or system domain; cycles are rejected.
+Deletion also checks every existing descendant, including legacy hierarchies
+created before these checks. Cross-domain descendants block deletion before
+any graph references move. A deletion destination must be outside that subtree.
 Moves, deletion with a destination, and reordering validate every source,
 destination, and referenced graph before changing a mapping. A graph reference
 is visible only when its graph belongs to the caller or is shared, matching the
