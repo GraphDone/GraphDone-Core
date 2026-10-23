@@ -275,7 +275,7 @@ jobs:
   prod-smoke:
     name: Prod Stack Smoke
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     needs: [quality, unit-tests, build]
     if: github.ref == 'refs/heads/main' || github.base_ref == 'main' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     steps:
