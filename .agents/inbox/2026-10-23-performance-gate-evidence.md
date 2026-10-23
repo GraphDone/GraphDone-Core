@@ -13,9 +13,12 @@ in the unified manifest even though CI required them using raw Playwright exits.
 Before correction, `node --test tests/lib/runner/unified-cli.test.mjs` failed the
 three new regression cases: both required sequences accepted a successful child
 process reporting only skipped cases, and their manifest selection was optional
-with retries inherited from CI. After correction, `npm run test:unified:lib`
-passed 151/151 tests, including bad metric/data samples and staged cleanup failure
-controls. Actual Playwright `--list` collected 3 performance and 27 mobile cases.
+with retries inherited from CI. After correction on combined base `33b3016`,
+`npm run test:unified:lib` passed 151/151 tests, including bad metric/data samples
+and staged cleanup failure controls. The exact public head `4a4a11f`, rebased
+without functional changes onto `5f0f454`, passed 150/150: that base excludes an
+unrelated minimatch harness regression. Actual Playwright `--list` collected
+3 performance and 27 mobile cases.
 Commands ran on Node 22.23.4; regression logs are retained under
 `/tmp/core-perf-gate-{red,lib-final}.log` in the audit environment.
 
@@ -45,6 +48,26 @@ and a terminal snapshot, rejects inactive/wrong-graph simulations and zero
 samples, and clears old metrics when stopping/replacing/emptying the simulation.
 The browser gate also requires the matching graph ID and terminal snapshot.
 
+Post-fix validation used the same three cases at exact test revision `4a4a11f`
+against clean combined application `b009245035559fccadd350a02c106b6da42347c6`:
+
+```text
+Same headed command, one worker, zero retries: 3 passed (33.9s); 0 skipped
+Both metric cases: 4 nodes, 3 edges, 1 actual tick sample, alpha 0, settled true
+Average measured tick: 0.2 ms; measured saved-snapshot drift: 0 px
+20 successful exact-data PerfWorkItems responses: p95 13.7 ms
+```
+
+Each snapshot carried its own matching graph ID. The saved-position case also
+compared all four live world positions with the known fixture coordinates and
+verified unchanged persisted coordinates through the API. All fixture cleanup
+stages passed. JSON attachments, traces, and logs are retained alongside the
+negative control as `perf-final*`; the public PR records the review and outcome.
+Fresh owned `npm ci --legacy-peer-deps`, core build, 275/275 web tests, and web
+typecheck passed on the scoped public head. Initial checks using an incomplete
+dependency link failed to resolve nested AJV; subsequent checks used this
+branch's pinned dependencies and built workspace types.
+
 Corrective rule: required suites must fail on missing evidence, use owned
 deterministic fixtures, verify every timed response, and identify the operation
 actually measured. A measured zero differs from no samples. Keep existing
@@ -54,5 +77,7 @@ cleanup that could have detached surviving children.
 
 Limits: passing the small placed fixture cannot establish large-graph or unplaced
 layout performance, MCP latency, distributed service capacity, or deployed-site
-health. The initial browser failures establish the instrumentation defect; the
-post-fix browser validation must be recorded separately before merge approval.
+health. One measured pinned tick is not a frame-rate benchmark (the meter's FPS
+is zero because there is no inter-frame interval). The combined application and
+test revisions above identify the browser evidence; final integrated acceptance
+and public merge validation remain separate gates.
