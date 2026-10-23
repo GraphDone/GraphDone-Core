@@ -18,7 +18,7 @@ export function workItem(row:Row,s:Snapshot):any {
 function edge(row:Row,s:Snapshot):any {return {__typename:'Edge',id:row.id,type:row.type,weight:row.weight,createdBy:null,source:s.nodes.find(n=>n.id===row.source_id)?workItem(s.nodes.find(n=>n.id===row.source_id)!,s):null,target:s.nodes.find(n=>n.id===row.target_id)?workItem(s.nodes.find(n=>n.id===row.target_id)!,s):null,createdAt:iso(row.created_at||now())};}
 function matches(row:any,where:any):boolean {
  if(!where)return true;
- return Object.entries(where).every(([key,value])=>key==='OR'?(value as any[]).some(w=>matches(row,w)):key==='AND'?(value as any[]).every(w=>matches(row,w)):typeof value==='object'&&value!==null?matches(row?.[key],value):row?.[key]===value);
+ return Object.entries(where).every(([key,value])=>key==='OR'?(value as any[]).some(w=>matches(row,w)):key==='AND'?(value as any[]).every(w=>matches(row,w)):key.endsWith('_IN')?Array.isArray(value)&&value.includes(row?.[key.slice(0,-3)]):typeof value==='object'&&value!==null?matches(row?.[key],value):row?.[key]===value);
 }
 function projectResult(value:any,selection:any,variables:any,fragments:Map<string,any>):any {
  if(value==null)return null;if(Array.isArray(value))return value.map(v=>projectResult(v,selection,variables,fragments));if(!selection)return value;

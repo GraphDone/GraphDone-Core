@@ -1,13 +1,13 @@
 import { offlineLink } from './offline/link';
 import { ownerId, offlineEnabled } from './offline/engine';
 import { ApolloClient, ApolloLink, InMemoryCache, createHttpLink, split, from } from '@apollo/client';
-import { setContext } from '@apollo/client/link/context';
+import { authLink } from './authLink';
 import { onError } from '@apollo/client/link/error';
 import { getMainDefinition } from '@apollo/client/utilities';
 import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
 import { createClient } from 'graphql-ws';
 import { cloudFailure, preserveCloudDraft, refreshHostedUsage } from './hostedUsage';
-import { getToken, clearSession } from './authStorage';
+import { getToken, getSessionOwnerId, clearSession } from './authStorage';
 
 // Dynamically construct GraphQL URLs based on current host
 const getGraphQLUrl = () => {
@@ -31,17 +31,9 @@ const httpLink = createHttpLink({
   uri: getGraphQLUrl(),
 });
 
-const authLink = setContext((_, { headers }) => {
-  const token = getToken();
-  return {
-    headers: {
-      ...headers,
-      authorization: token ? `Bearer ${token}` : '',
-    }
-  };
-});
-
-const errorLink = onError(({ graphQLErrors, networkError, operation, forward }) => {
+export const errorLink = onError(({ graphQLErrors, networkError, operation, forward }) => {
+  const expectedOwnerId = operation.getContext().expectedOwnerId;
+  if (expectedOwnerId !== undefined && expectedOwnerId !== getSessionOwnerId()) return;
   if (graphQLErrors?.length || networkError) {
     const definition = getMainDefinition(operation.query);
     if (definition.kind === 'OperationDefinition' && definition.operation === 'mutation' && /workitem|edge|graph/i.test(operation.operationName)) preserveCloudDraft(operation.operationName, operation.variables);
