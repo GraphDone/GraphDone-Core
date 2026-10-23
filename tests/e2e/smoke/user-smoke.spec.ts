@@ -1,5 +1,30 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { login, TEST_USERS } from '../../lib/auth';
+import { seedLargeGraph } from '../../lib/seedGraph';
+import { gql } from '../../lib/graphRequest';
+
+const ownedGraphs = new WeakMap<Page, string[]>();
+
+async function selectPopulatedGraph(page: Page) {
+  const graph = await seedLargeGraph(page, { size: 2, edgeFactor: 0.5, spacing: 240, namePrefix: 'Smoke' });
+  ownedGraphs.set(page, [...(ownedGraphs.get(page) || []), graph.graphId]);
+  await page.evaluate(id => {
+    localStorage.setItem('currentGraphId', id);
+    localStorage.setItem('graphdone:viewMode', 'graph');
+  }, graph.graphId);
+  await page.reload();
+  await expect(page.locator('.graph-container svg .node')).toHaveCount(2);
+  await expect(page.locator('.graph-container svg .edge')).toHaveCount(1);
+  return graph;
+}
+
+test.afterEach(async ({ page }) => {
+  for (const id of ownedGraphs.get(page) || []) {
+    await gql(page, 'mutation($id:ID!){deleteEdges(where:{source:{graph:{id:$id}}}){nodesDeleted}}', { id });
+    await gql(page, 'mutation($id:ID!){deleteWorkItems(where:{graph:{id:$id}}){nodesDeleted}}', { id });
+    await gql(page, 'mutation($id:ID!){deleteGraphs(where:{id:$id}){nodesDeleted}}', { id });
+  }
+});
 
 /**
  * THE GATE. This spec sees the app exactly as a user does — if it fails,
@@ -12,6 +37,7 @@ import { login, TEST_USERS } from '../../lib/auth';
  */
 test.describe('user smoke: the app works from a user point of view @smoke', () => {
   test('login → graph renders nodes AND edges → no errors anywhere', async ({ page }) => {
+    test.setTimeout(60000);
     const pageErrors: string[] = [];
     const gqlErrors: string[] = [];
     const serverErrors: string[] = [];
@@ -34,7 +60,7 @@ test.describe('user smoke: the app works from a user point of view @smoke', () =
     });
 
     await login(page, TEST_USERS.ADMIN);
-    await page.waitForTimeout(6000); // graph load + simulation settle
+    const fixture = await selectPopulatedGraph(page);
 
     // 1) The canvas exists and has nodes
     const nodes = await page.locator('.graph-container svg .node').count();
@@ -42,6 +68,7 @@ test.describe('user smoke: the app works from a user point of view @smoke', () =
 
     // 2) Edges render AND match what the API says this graph has
     const domEdges = await page.locator('.graph-container svg .edge').count();
+    expect(domEdges).toBe(fixture.edgeCount);
     const graphId = await page.evaluate(() => {
       const node = document.querySelector('.graph-container svg .node') as (Element & { __data__?: { graph?: { id?: string } } }) | null;
       return node?.__data__?.graph?.id ?? null;
@@ -90,7 +117,7 @@ test.describe('user smoke: the app works from a user point of view @smoke', () =
     //    own origin (catches optional-subsystem endpoints returning 503 for a
     //    normal "offline" state, which logs a console error site-wide).
     for (const route of ['/settings', '/backend', '/ontology', '/']) {
-      await page.goto(route).catch(() => {});
+      await page.goto(route);
       await page.waitForTimeout(2500);
     }
     expect(serverErrors, `server 5xx responses during the session: ${serverErrors[0] ?? ''}`).toEqual([]);
@@ -190,7 +217,7 @@ test.describe('user smoke: the app works from a user point of view @smoke', () =
       }
       return null;
     });
-    test.skip(!spot, 'no empty canvas spot found at this viewport');
+    expect(spot, 'the graph must offer empty canvas for the grow flow').not.toBeNull();
     await page.mouse.click(spot!.x, spot!.y);
     const rename = page.locator('[data-testid="inline-rename"]');
     await expect(rename, 'inline rename must open after grow').toBeVisible({ timeout: 10000 });
@@ -303,14 +330,16 @@ test.describe('user smoke: the app works from a user point of view @smoke', () =
   // must come back where they left it (the force sim must not drift a placed
   // node). Tolerance ≤25px. Regression guard for the position-persistence bug.
   test('layout persistence: an arranged node survives a reload @smoke', async ({ page }) => {
+    test.setTimeout(60000);
     await login(page, TEST_USERS.ADMIN);
+    await selectPopulatedGraph(page);
     await page.waitForTimeout(6000);
 
     const nodeSel = '.graph-container svg .node';
-    test.skip((await page.locator(nodeSel).count()) === 0, 'no graph with nodes auto-selected');
+    await expect(page.locator(nodeSel)).toHaveCount(2);
 
     const firstId = await page.evaluate((sel) => (document.querySelector(sel) as any)?.__data__?.id ?? null, nodeSel);
-    test.skip(!firstId, 'could not read a node id');
+    expect(firstId, 'fixture node identity must be available').toBeTruthy();
 
     // Drag the node by a clear offset so it becomes "placed" and is saved
     const box = await page.evaluate((id) => {

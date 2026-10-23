@@ -19,7 +19,8 @@
     "create-hierarchy-demo": "tsx src/scripts/create-hierarchy-demo.ts"
   },
   "dependencies": {
-    "@apollo/server": "^4.9.0",
+    "@apollo/server": "^5.5.1",
+    "@as-integrations/express4": "^1.1.2",
     "@graphdone/core": "*",
     "@graphql-tools/merge": "^9.1.1",
     "@graphql-tools/schema": "^10.0.0",

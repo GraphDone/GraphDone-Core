@@ -4,7 +4,6 @@ on:
   push:
     branches: [main, dev]
   pull_request:
-    branches: [main, dev]
   schedule:
     - cron: '0 3 * * *'   # nightly full prod-stack smoke
   workflow_dispatch:
@@ -15,7 +14,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: '22'
 
 jobs:
   # ── Static quality: lint (0 errors) + full TypeScript type check ───────────
@@ -28,16 +27,14 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-      # `npm install` (not `npm ci`) dodges the npm optional-deps bug that
-      # leaves the platform-specific @rollup/rollup-linux-* binary missing
-      # (npm/cli#4828). This is why CI used to "disable" Vitest — it never
-      # needed disabling, just a real install.
       - name: Install dependencies
-        run: npm install --legacy-peer-deps
+        run: npm ci --legacy-peer-deps
       - name: ESLint (fails only on errors)
         run: npm run lint
       - name: TypeScript type check (all packages)
         run: npm run typecheck
+      - name: Test evidence and runner regressions
+        run: npm run test:unified:lib
 
   # ── The real unit suites, one job per package, run in parallel ─────────────
   unit-tests:
@@ -54,9 +51,9 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
       - name: Install dependencies
-        run: npm install --legacy-peer-deps
+        run: npm ci --legacy-peer-deps
       - name: Run @graphdone/${{ matrix.package }} tests
-        run: npm run test --workspace=@graphdone/${{ matrix.package }}
+        run: npm run build --workspace=@graphdone/core && npm run test --workspace=@graphdone/${{ matrix.package }}
 
   # ── MCP server against a REAL Neo4j (catches Cypher/DB drift) ──────────────
   # The unit suites use a mock driver; this runs the MCP GraphService's own
@@ -81,6 +78,7 @@ jobs:
           - 7687:7687
     env:
       RUN_DB_CONTRACT: '1'
+      GRAPHDONE_DISPOSABLE_NEO4J: '1'
       NEO4J_URI: bolt://localhost:7687
       NEO4J_USER: neo4j
       NEO4J_PASSWORD: graphdone_password
@@ -91,7 +89,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
       - name: Install dependencies
-        run: npm install --legacy-peer-deps
+        run: npm ci --legacy-peer-deps
       - name: Run real-Neo4j contract test
         run: npx vitest --run tests/neo4j-contract.test.ts
         working-directory: packages/mcp-server
@@ -107,13 +105,13 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
       - name: Install dependencies
-        run: npm install --legacy-peer-deps
+        run: npm ci --legacy-peer-deps
       - name: Build all packages
         run: npm run build
       - name: Bundle size budget (ADAPT-8)
         run: npm run perf:bundle
 
-  # ── Security scan (advisory) ───────────────────────────────────────────────
+  # ── Production dependency security gate ───────────────────────────────────
   security-scan:
     name: Security Scan
     runs-on: ubuntu-latest
@@ -124,10 +122,9 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
       - name: Install dependencies
-        run: npm install --legacy-peer-deps
-      - name: npm audit (advisory — does not block)
-        run: npm audit --audit-level moderate
-        continue-on-error: true
+        run: npm ci --legacy-peer-deps
+      - name: Reject high and critical production dependency advisories
+        run: npm audit --omit=dev --audit-level=high
 
   # ── THE GATE: the app works from a user's point of view ────────────────────
   # Fast feedback on every PR: boots the dev stack against a Neo4j service
@@ -165,7 +162,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
       - name: Install dependencies
-        run: npm install --legacy-peer-deps
+        run: npm ci --legacy-peer-deps
       - name: Build (dev runtime imports built @graphdone/core)
         run: npm run build
       - name: Install Playwright (chromium)
@@ -179,7 +176,7 @@ jobs:
       - name: Seed demo data
         run: npm run db:seed
       - name: THE GATE — user smoke suite
-        run: npm run test:smoke
+        run: node tests/run-unified.mjs --sequence smoke --out test-artifacts/ci-smoke
         env:
           TEST_URL: http://localhost:3127
           CI: true
@@ -251,7 +248,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
       - name: Install dependencies
-        run: npm install --legacy-peer-deps
+        run: npm ci --legacy-peer-deps
       - name: Build
         run: npm run build
       - name: Install Playwright (chromium)
@@ -289,7 +286,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
       - name: Install dependencies
-        run: npm install --legacy-peer-deps
+        run: npm ci --legacy-peer-deps
       - name: Install Playwright (chromium)
         run: npx playwright install --with-deps chromium
       - name: Generate development certificates
@@ -329,7 +326,7 @@ jobs:
   ci-success:
     name: CI Success
     runs-on: ubuntu-latest
-    needs: [quality, unit-tests, mcp-contract, build, smoke-gate]
+    needs: [quality, unit-tests, mcp-contract, build, security-scan, smoke-gate]
     if: always()
     steps:
       - name: Verify required jobs passed
@@ -342,6 +339,7 @@ jobs:
              && "${{ needs.unit-tests.result }}" == "success" \
              && "${{ needs.mcp-contract.result }}" == "success" \
              && "${{ needs.build.result }}" == "success" \
+             && "${{ needs.security-scan.result }}" == "success" \
              && "${{ needs.smoke-gate.result }}" == "success" ]]; then
             echo "✅ CI green — lint, types, every unit suite, the build, and the user smoke gate all passed."
           else

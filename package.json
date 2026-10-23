@@ -86,7 +86,7 @@
     "typescript": "^5.3.0"
   },
   "engines": {
-    "node": ">=20.17.0",
+    "node": ">=22.18.0",
     "npm": ">=9.0.0"
   },
   "repository": {
@@ -95,6 +95,10 @@
   },
   "license": "MIT",
   "dependencies": {
+    "@apollo/server": "^5.5.1",
     "passport-openidconnect": "^0.1.2"
+  },
+  "overrides": {
+    "@graphql-tools/utils": "12.1.0"
   }
 }

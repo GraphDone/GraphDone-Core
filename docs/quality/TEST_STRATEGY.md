@@ -24,3 +24,7 @@ Start with graph-first controls: graph selector/create/switch; new item/create/c
 Run one headed browser at a time on localhost with disposable graphs. Increase dataset size and concurrency separately. Record node/edge count, viewport, quality setting, load time, full rendered count, actual successful drag, frame gaps, interaction latency, API p50/p95, settling time, overlap counts and persistence after reload. Stop escalation on sustained unresponsiveness, server errors or failed correctness; retain the failing size. A maximum tested size is not the application limit. Do not run the entire unbounded MCP chaos suite alongside the browser: its previous run exhausted memory.
 
 Security demand-control checks follow the [OWASP GraphQL testing guidance](https://github.com/OWASP/www-project-web-security-testing-guide/blob/master/v42/4-Web_Application_Security_Testing/12-API_Testing/01-Testing_GraphQL.md). They complement authorization, payload, request-rate and data-volume limits; no single depth check establishes security.
+
+## Runtime and evidence incidents
+
+- [2026-10-23 runtime validation](RUNTIME_VALIDATION_2026-10-23.md): API peer-resolution failure after a successful build, obsolete Node/container minimums, a missing disposable-DB CI marker, and smoke assertions depending on a populated default graph.

@@ -1,7 +1,7 @@
 import { operationsApi } from './operations-api.js';
 import { agentApi } from './agent-api.js';
 import { ApolloServer } from '@apollo/server';
-import { expressMiddleware } from '@apollo/server/express4';
+import { expressMiddleware, type ExpressContextFunctionArgument } from '@as-integrations/express4';
 import { ApolloServerPluginDrainHttpServer } from '@apollo/server/plugin/drainHttpServer';
 import express from 'express';
 import { createServer } from 'http';
@@ -418,7 +418,7 @@ async function startServer() {
     cors<cors.CorsRequest>(),
     express.json(),
     expressMiddleware(apolloServer, {
-      context: async ({ req }) => {
+      context: async ({ req }: ExpressContextFunctionArgument) => {
         return {
           ...await graphContext(req.headers.authorization),
           req,

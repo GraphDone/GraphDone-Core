@@ -128,7 +128,7 @@ wait_for_neo4j_interactive() {
 # Function to ensure Node.js is available
 ensure_nodejs() {
     # If node/npm not found, try to source nvm
-    if ! command -v node &> /dev/null || ! command -v npm &> /dev/null; then
+    if ! command -v node &> /dev/null || ! command -v npm &> /dev/null || ! node -e 'const [a,b]=process.versions.node.split(".").map(Number);process.exit(a>22||(a===22&&b>=18)?0:1)'; then
         echo "⚠️  Node.js/npm not found in PATH, attempting to load from nvm..."
         
         # Try to load nvm
@@ -139,9 +139,9 @@ ensure_nodejs() {
                 source "$NVM_DIR/bash_completion"
             fi
             
-            # Use the latest installed version or 18
-            if nvm list | grep -q "v18"; then
-                nvm use 18
+            # Use the latest installed version or 22
+            if nvm list | grep -q "v22"; then
+                nvm use 22
             else
                 nvm use node
             fi
@@ -154,6 +154,10 @@ ensure_nodejs() {
             echo "  ./tools/run.sh"
             exit 1
         fi
+    fi
+    if ! node -e 'const [a,b]=process.versions.node.split(".").map(Number);process.exit(a>22||(a===22&&b>=18)?0:1)'; then
+        echo "Node.js 22.18+ is required. Run ./scripts/setup_nodejs.sh to upgrade."
+        return 1
     fi
 }
 

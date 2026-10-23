@@ -1,4 +1,4 @@
-FROM node:18-alpine AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
@@ -11,14 +11,14 @@ ENV VITE_GRAPHQL_URL=${VITE_GRAPHQL_URL}
 ENV VITE_GRAPHQL_WS_URL=${VITE_GRAPHQL_WS_URL}
 
 # Copy all package files for monorepo workspace
-COPY package.json turbo.json ./
+COPY package.json package-lock.json turbo.json ./
 COPY packages/core/package.json ./packages/core/
 COPY packages/server/package.json ./packages/server/
 COPY packages/web/package.json ./packages/web/
 COPY packages/mcp-server/package.json ./packages/mcp-server/
 
 # Install all dependencies (monorepo workspace)
-RUN npm install --legacy-peer-deps
+RUN npm ci --legacy-peer-deps
 
 # Copy all source code (needed for monorepo dependencies)
 COPY packages/ ./packages/

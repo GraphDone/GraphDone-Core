@@ -30,10 +30,10 @@ log_warning() {
 log_info "Checking Node.js version..."
 test_node_version=$(node --version)
 echo "Node.js version: $test_node_version"
-if node -e 'const [a,b]=process.versions.node.split(".").map(Number);process.exit(a>20||(a===20&&b>=17)?0:1)'; then
+if node -e 'const [a,b]=process.versions.node.split(".").map(Number);process.exit(a>22||(a===22&&b>=18)?0:1)'; then
     log_success "Node.js version is compatible"
 else
-    log_error "Node.js version is too old (need >= 20.17)"
+    log_error "Node.js version is too old (need >= 22.18)"
     exit 1
 fi
 
