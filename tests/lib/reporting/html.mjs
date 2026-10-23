@@ -94,6 +94,7 @@ footer{color:#475569;font-size:12px;margin-top:30px;text-align:center}
   <span class="rollup" style="background:${COLOR[r.status] || '#888'}">${ICON[r.status] || ''} ${esc(r.status || 'n/a')}</span>
 </h1>
 <div class="meta">${esc(when)} · target ${esc(report.target || 'n/a')} · ${esc((report.env && report.env.node) || '')} · ${report.durationMs != null ? (report.durationMs / 1000).toFixed(1) + 's' : ''}</div>
+${report.source ? `<div class="meta">Source <code>${esc(report.source.started?.revision)}</code> · ${report.source.started?.dirty ? 'uncommitted changes included' : 'clean tree'} · ${report.source.changedDuringRun ? 'CHANGED DURING RUN' : 'unchanged during run'}<br>Fingerprint <code>${esc(report.source.started?.fingerprint)}</code></div>` : ''}
 <div class="cards">
   <div class="card"><div class="n">${t.sequences || 0}</div><div class="l">Sequences</div></div>
   <div class="card"><div class="n">${t.cases || 0}</div><div class="l">Cases</div></div>
