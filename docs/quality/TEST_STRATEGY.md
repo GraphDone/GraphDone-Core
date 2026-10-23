@@ -2,6 +2,12 @@
 
 No current suite proves that every button, menu, role and failure mode works. Passing a route render is not interaction coverage. A test which skips, catches a failed click, returns when data is absent, or only checks that some nodes render is not a release gate for that action.
 
+The [2026-10-23 Core merge-validation ledger](CORE_VALIDATION_2026-10-23.md) is the
+canonical record for this sweep's source heads, retained failures, final combined
+gates and release limits. Its pending fields must be completed with actual
+results; scoped PR evidence is not proof of the deployed site or all 62
+[new-user acceptance questions](NEW_USER_GATE.md).
+
 | Area | Repeatable evidence | Remaining gate |
 |---|---|---|
 | Entry and responsive dialogs | `guest-dialog-layout`, `graph-details`, `admin-dialog-responsive` | Real account recovery, provider failures, mobile keyboard, native assistive technology |
@@ -9,7 +15,7 @@ No current suite proves that every button, menu, role and failure mode works. Pa
 | Task lifecycle | Six `persona-lifecycle` scenarios, saved notes/status/date | Multi-actor assignment, conflicts, retry after interrupted save |
 | Graph interactions | `user-smoke`, `graph-details`, `graph-motion`, `graph-resize` | Strict connection menu matrix, labels crossing cards, dense graph interaction budgets |
 | Layout | `graph-layout`: 12 stacked, 50 and 200 connected cards | Larger sizes, edge routing and intentional collapsed groups |
-| Security | Cloud `test-multiple-graphs`, `test-security-limits` | Core role/ownership matrix, expiry/replay, session fixation, injection/XSS, upload/export, dependency remediation |
+| Security | [Bounded Core folder/current-role, queue-owner, magic-link, password-budget and production-startup regressions](CORE_VALIDATION_2026-10-23.md); separate Cloud `test-multiple-graphs`, `test-security-limits` | Complete permission/session matrix; server CAPTCHA, token purpose, OAuth linking, injection/XSS, upload/export, residual dependencies and hosted parity; see [dated security scope](SECURITY_SCOPE_2026-10-23.md) |
 | Cost bounds | Local D1 eight concurrent batches at 295/300 nodes | Distributed Worker concurrency, edge/project quotas, rate-limiter binding, long soak |
 | Release | Build/typecheck/unit checks and Pages artifact script | Exact deployed artifact, migrations, rollback and live account journey |
 
