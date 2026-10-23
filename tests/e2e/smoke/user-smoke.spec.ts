@@ -1,5 +1,30 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page, type Route } from '@playwright/test';
 import { login, TEST_USERS } from '../../lib/auth';
+import { seedLargeGraph } from '../../lib/seedGraph';
+import { gql } from '../../lib/graphRequest';
+
+const ownedGraphs = new WeakMap<Page, string[]>();
+
+async function selectPopulatedGraph(page: Page) {
+  const graph = await seedLargeGraph(page, { size: 2, edgeFactor: 0.5, spacing: 240, namePrefix: 'Smoke' });
+  ownedGraphs.set(page, [...(ownedGraphs.get(page) || []), graph.graphId]);
+  await page.evaluate(id => {
+    localStorage.setItem('currentGraphId', id);
+    localStorage.setItem('graphdone:viewMode', 'graph');
+  }, graph.graphId);
+  await page.reload();
+  await expect(page.locator('.graph-container svg .node')).toHaveCount(2);
+  await expect(page.locator('.graph-container svg .edge')).toHaveCount(1);
+  return graph;
+}
+
+test.afterEach(async ({ page }) => {
+  for (const id of ownedGraphs.get(page) || []) {
+    await gql(page, 'mutation($id:ID!){deleteEdges(where:{source:{graph:{id:$id}}}){nodesDeleted}}', { id });
+    await gql(page, 'mutation($id:ID!){deleteWorkItems(where:{graph:{id:$id}}){nodesDeleted}}', { id });
+    await gql(page, 'mutation($id:ID!){deleteGraphs(where:{id:$id}){nodesDeleted}}', { id });
+  }
+});
 
 /**
  * THE GATE. This spec sees the app exactly as a user does — if it fails,
@@ -12,6 +37,7 @@ import { login, TEST_USERS } from '../../lib/auth';
  */
 test.describe('user smoke: the app works from a user point of view @smoke', () => {
   test('login → graph renders nodes AND edges → no errors anywhere', async ({ page }) => {
+    test.setTimeout(60000);
     const pageErrors: string[] = [];
     const gqlErrors: string[] = [];
     const serverErrors: string[] = [];
@@ -34,7 +60,7 @@ test.describe('user smoke: the app works from a user point of view @smoke', () =
     });
 
     await login(page, TEST_USERS.ADMIN);
-    await page.waitForTimeout(6000); // graph load + simulation settle
+    const fixture = await selectPopulatedGraph(page);
 
     // 1) The canvas exists and has nodes
     const nodes = await page.locator('.graph-container svg .node').count();
@@ -42,6 +68,7 @@ test.describe('user smoke: the app works from a user point of view @smoke', () =
 
     // 2) Edges render AND match what the API says this graph has
     const domEdges = await page.locator('.graph-container svg .edge').count();
+    expect(domEdges).toBe(fixture.edgeCount);
     const graphId = await page.evaluate(() => {
       const node = document.querySelector('.graph-container svg .node') as (Element & { __data__?: { graph?: { id?: string } } }) | null;
       return node?.__data__?.graph?.id ?? null;
@@ -90,7 +117,7 @@ test.describe('user smoke: the app works from a user point of view @smoke', () =
     //    own origin (catches optional-subsystem endpoints returning 503 for a
     //    normal "offline" state, which logs a console error site-wide).
     for (const route of ['/settings', '/backend', '/ontology', '/']) {
-      await page.goto(route).catch(() => {});
+      await page.goto(route);
       await page.waitForTimeout(2500);
     }
     expect(serverErrors, `server 5xx responses during the session: ${serverErrors[0] ?? ''}`).toEqual([]);
@@ -190,7 +217,7 @@ test.describe('user smoke: the app works from a user point of view @smoke', () =
       }
       return null;
     });
-    test.skip(!spot, 'no empty canvas spot found at this viewport');
+    expect(spot, 'the graph must offer empty canvas for the grow flow').not.toBeNull();
     await page.mouse.click(spot!.x, spot!.y);
     const rename = page.locator('[data-testid="inline-rename"]');
     await expect(rename, 'inline rename must open after grow').toBeVisible({ timeout: 10000 });
@@ -303,14 +330,16 @@ test.describe('user smoke: the app works from a user point of view @smoke', () =
   // must come back where they left it (the force sim must not drift a placed
   // node). Tolerance ≤25px. Regression guard for the position-persistence bug.
   test('layout persistence: an arranged node survives a reload @smoke', async ({ page }) => {
+    test.setTimeout(60000);
     await login(page, TEST_USERS.ADMIN);
+    await selectPopulatedGraph(page);
     await page.waitForTimeout(6000);
 
     const nodeSel = '.graph-container svg .node';
-    test.skip((await page.locator(nodeSel).count()) === 0, 'no graph with nodes auto-selected');
+    await expect(page.locator(nodeSel)).toHaveCount(2);
 
     const firstId = await page.evaluate((sel) => (document.querySelector(sel) as any)?.__data__?.id ?? null, nodeSel);
-    test.skip(!firstId, 'could not read a node id');
+    expect(firstId, 'fixture node identity must be available').toBeTruthy();
 
     // Drag the node by a clear offset so it becomes "placed" and is saved
     const box = await page.evaluate((id) => {
@@ -339,4 +368,140 @@ test.describe('user smoke: the app works from a user point of view @smoke', () =
     const drift = Math.round(Math.hypot(before!.x - after!.x, before!.y - after!.y));
     expect(drift, `arranged node drifted ${drift}px across reload (tolerance 25px)`).toBeLessThanOrEqual(25);
   });
+
+  test('failed layout save keeps the latest drag through Work list navigation and reload @smoke', async ({ page }, testInfo) => {
+    test.setTimeout(90_000);
+    await page.setViewportSize({ width: 1180, height: 900 });
+    const pageErrors: string[] = [];
+    page.on('pageerror', error => pageErrors.push(error.message));
+    await login(page, TEST_USERS.ADMIN);
+    const owner = (await gql(page, '{ me { id } }')).me.id;
+    const created = await gql(page,
+      'mutation($input:[GraphCreateInput!]!){createGraphs(input:$input){graphs{id}}}',
+      { input: [{ name: `[E2E] Layout retry ${Date.now()}`, type: 'PROJECT', status: 'ACTIVE', createdBy: owner, isShared: true }] });
+    const graphId = created.createGraphs.graphs[0].id as string;
+    ownedGraphs.set(page, [...(ownedGraphs.get(page) || []), graphId]);
+    const items = await gql(page,
+      'mutation($input:[WorkItemCreateInput!]!){createWorkItems(input:$input){workItems{id}}}',
+      { input: [-240, 240].map((x, index) => ({
+        title: `Layout retry ${index}`, type: 'TASK', status: 'IN_PROGRESS', priority: 0.5,
+        positionX: x, positionY: 0, positionZ: 0,
+        owner: { connect: { where: { node: { id: owner } } } },
+        graph: { connect: { where: { node: { id: graphId } } } },
+      })) });
+    const [nodeId, otherId] = items.createWorkItems.workItems.map((item: { id: string }) => item.id) as string[];
+    await gql(page, 'mutation($input:[EdgeCreateInput!]!){createEdges(input:$input){edges{id}}}', {
+      input: [{ type: 'DEPENDS_ON', weight: 1,
+        source: { connect: { where: { node: { id: nodeId } } } },
+        target: { connect: { where: { node: { id: otherId } } } },
+      }],
+    });
+    await page.evaluate(id => {
+      localStorage.setItem('currentGraphId', id);
+      localStorage.setItem('graphdone:viewMode', 'graph');
+    }, graphId);
+    await page.reload();
+    await expect(page.locator('.graph-container svg .node')).toHaveCount(2);
+    await expect(page.locator('.graph-container svg .edge')).toHaveCount(1);
+    await expect.poll(() => page.evaluate(() => (window as any).__layoutMetrics?.()?.atRest)).toBe(true);
+
+    const readPosition = () => page.locator('.graph-container svg .node').evaluateAll((nodes, id) => {
+      const data = (nodes.find(node => (node as any).__data__?.id === id) as any)?.__data__;
+      return data ? { x: data.x as number, y: data.y as number } : null;
+    }, nodeId);
+    const readSaved = async () => {
+      const data = await gql(page, 'query($graph:ID!){workItems(where:{graph:{id:$graph}}){id positionX positionY}}', { graph: graphId });
+      const item = data.workItems.find((item: { id: string }) => item.id === nodeId);
+      expect(item, 'owned dragged task still exists in the API').toBeDefined();
+      return { x: item.positionX as number, y: item.positionY as number };
+    };
+    const initial = await readSaved();
+    const attempts: Array<{ x: number; y: number }> = [];
+    let injectedFailures = 0;
+    let releaseFailure!: () => void;
+    const failureGate = new Promise<void>(resolve => { releaseFailure = resolve; });
+    const routeLayout = async (route: Route) => {
+      const request = route.request();
+      const body = request.method() === 'POST' ? request.postDataJSON() : null;
+      const update = body?.variables?.update;
+      const matchesLayout = body?.operationName === 'UpdateWorkItems'
+        && body?.variables?.where?.id === nodeId
+        && body?.variables?.where?.graph?.id === graphId
+        && Object.keys(update || {}).sort().join(',') === 'positionX,positionY';
+      if (!matchesLayout) { await route.continue(); return; }
+      attempts.push({ x: update.positionX, y: update.positionY });
+      if (attempts.length === 1) {
+        await failureGate;
+        injectedFailures++;
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
+          errors: [{ message: 'Injected one-time layout save failure', extensions: { code: 'INTERNAL_SERVER_ERROR' } }],
+        }) });
+      } else await route.continue();
+    };
+    await page.route('**/graphql', routeLayout);
+    const drag = async () => {
+      const card = page.locator('.graph-container svg .node')
+        .filter({ has: page.locator(`[data-node-id="${nodeId}"]`) }).locator('.node-bg');
+      await expect(card).toBeInViewport({ ratio: 1 });
+      let previous: { x: number; y: number } | null = null;
+      let stable = 0;
+      await expect.poll(async () => {
+        const box = await card.boundingBox();
+        if (!box) return 0;
+        stable = previous && Math.hypot(box.x - previous.x, box.y - previous.y) < 1 ? stable + 1 : 0;
+        previous = { x: box.x, y: box.y };
+        return stable;
+      }, { timeout: 10_000, intervals: [150] }).toBeGreaterThanOrEqual(3);
+      const box = (await card.boundingBox())!;
+      const center = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+      await page.mouse.move(center.x, center.y);
+      await page.mouse.down();
+      await page.mouse.move(center.x + 75, center.y + 45, { steps: 12 });
+      await page.mouse.up();
+    };
+    try {
+      await drag();
+      await expect.poll(() => attempts.length).toBe(1);
+      const first = attempts[0];
+      expect(Math.hypot(first.x - initial.x, first.y - initial.y)).toBeGreaterThan(10);
+      await drag();
+      const latest = await readPosition();
+      expect(latest, 'latest actual drag position is readable').not.toBeNull();
+      expect(Math.hypot(latest!.x - first.x, latest!.y - first.y)).toBeGreaterThan(10);
+      await expect.poll(() => page.evaluate(() => (window as any).__layoutMetrics?.()?.atRest)).toBe(true);
+      await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))));
+      expect(attempts).toHaveLength(1);
+      releaseFailure();
+      await expect(page.getByText('Layout could not be saved', { exact: true })).toBeVisible();
+      await page.getByLabel('Workspace view', { exact: true }).selectOption('cards');
+      await expect(page.locator('.graph-container svg')).toHaveCount(0);
+      await expect(page.getByLabel('Search work items', { exact: true })).toBeVisible();
+      expect(await readSaved(), 'failed writes have not reached the server while in Work list').toEqual(initial);
+      expect(attempts, 'the inactive graph does not send retries').toHaveLength(1);
+
+      await page.getByLabel('Workspace view', { exact: true }).selectOption('graph');
+      await expect.poll(() => attempts.length).toBe(2);
+      expect(attempts[1], 'remount retries the latest drag, not the failed older coordinates').toEqual(latest);
+      const rounded = (position: { x: number; y: number }) => ({ x: Number(position.x.toFixed(3)), y: Number(position.y.toFixed(3)) });
+      await expect.poll(async () => rounded(await readSaved()), { timeout: 15_000 }).toEqual(rounded(latest!));
+      expect(injectedFailures).toBe(1);
+      await page.reload();
+      await expect(page.locator('.graph-container svg .node')).toHaveCount(2);
+      await expect(page.locator('.graph-container svg .edge')).toHaveCount(1);
+      await expect.poll(async () => {
+        const restored = await readPosition();
+        return restored ? rounded(restored) : null;
+      }).toEqual(rounded(latest!));
+      expect(rounded(await readSaved())).toEqual(rounded(latest!));
+      expect(pageErrors).toEqual([]);
+      await testInfo.attach('layout-save-recovery.json', {
+        contentType: 'application/json',
+        body: JSON.stringify({ graphId, nodeId, initial, first, latest, attempts, injectedFailures, saved: await readSaved() }, null, 2),
+      });
+    } finally {
+      releaseFailure();
+      await page.unroute('**/graphql', routeLayout);
+    }
+  });
+
 });

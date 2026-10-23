@@ -65,7 +65,7 @@ wget -qO- https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public
 **What the installer does:**
 1. **Pre-flight Checks** - Validates network, disk space (5GB), download/upload speeds
 2. **System Detection** - Detects platform (macOS 10.15+, Linux distros)
-3. **Dependency Installation** - Installs Git, Node.js 20.17+, Docker if needed
+3. **Dependency Installation** - Installs Git, Node.js 22.18+, Docker if needed
    - macOS: Uses Homebrew + OrbStack (Docker alternative)
    - Linux: Smart sudo authentication (works with curl/wget pipes), uses apt/dnf/yum + Docker Engine (15+ distributions supported)
 4. **Code Setup** - Clones repository to `~/graphdone`, installs npm dependencies
@@ -118,7 +118,7 @@ sh install.sh
 GraphDone requires:
 - **Docker** - For running Neo4j graph database ([Install Docker](https://docs.docker.com/get-docker/))
 - **Git** - For version control (usually pre-installed)
-- **Node.js 20.17+** - Optional for development (auto-installed if needed)
+- **Node.js 22.18+** - Optional for development (auto-installed if needed)
 
 ### Manual Installation
 

@@ -1,5 +1,5 @@
 import {offlineEnabled} from '../lib/offline/engine';
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import {
   X, User, Flag, Edit3, Save, ChevronDown, Plus, Unlink, Trash2,
@@ -58,6 +58,44 @@ const copyWorkItem = (item: WorkItem): WorkItem => ({
   tags: [...(item.tags || [])],
   assignedTo: item.assignedTo && typeof item.assignedTo === 'object' ? { ...item.assignedTo } : item.assignedTo,
 });
+
+const editableFields = ['title', 'description', 'type', 'status', 'priority', 'tags', 'assignedTo', 'dueDate'] as const;
+const fieldValue = (item: WorkItem, field: typeof editableFields[number]) => {
+  if (field === 'tags') return JSON.stringify(item.tags || []);
+  if (field === 'assignedTo') return assigneeId(item) ?? null;
+  if (field === 'dueDate') return item.dueDate ?? null;
+  return item[field];
+};
+const hasDraftChanges = (draft: WorkItem, saved: WorkItem) => editableFields.some(field => fieldValue(draft, field) !== fieldValue(saved, field));
+const mergeSavedWorkItem = (saved: WorkItem, submitted: WorkItem, draft: WorkItem): WorkItem => ({
+  ...copyWorkItem(saved),
+  ...Object.fromEntries(editableFields
+    .filter(field => fieldValue(draft, field) !== fieldValue(submitted, field))
+    .map(field => [field, draft[field]])),
+});
+
+const confirmedWorkItem = (result: { data?: { updateWorkItems?: { workItems?: WorkItem[] } } | null; errors?: readonly { message: string }[] }, id: string): WorkItem => {
+  if (result.errors?.length) throw new Error(result.errors[0].message);
+  const items = result.data?.updateWorkItems?.workItems;
+  if (items?.length !== 1 || items[0].id !== id) throw new Error('The server did not confirm the expected work item update.');
+  return copyWorkItem(items[0]);
+};
+
+interface EditorSession {
+  nodeId: string | undefined;
+  graphId: string | undefined;
+  ownerId: string | undefined;
+  open: boolean;
+}
+
+const beginUpdate = (pending: Map<EditorSession, number>, session: EditorSession) => {
+  pending.set(session, (pending.get(session) || 0) + 1);
+  return () => {
+    const remaining = (pending.get(session) || 1) - 1;
+    if (remaining) pending.set(session, remaining);
+    else pending.delete(session);
+  };
+};
 
 const edgeEndpointId = (endpoint: unknown): string | null => {
   if (typeof endpoint === 'string') return endpoint;
@@ -153,8 +191,14 @@ export function WorkItemDetailsModal({
   const { showSuccess, showError, showWarning } = useNotifications();
   const [editedNode, setEditedNode] = useState<WorkItem | null>(null);
   const [savedNode, setSavedNode] = useState<WorkItem | null>(null);
+  const savedNodeRef = useRef(savedNode);
+  savedNodeRef.current = savedNode;
   const draftDirtyRef = useRef(false);
-  const draftNodeIdRef = useRef<string | null>(null);
+  const editorSession = useMemo(() => ({ nodeId: node?.id, graphId: currentGraph?.id, ownerId: currentUser?.id, open: isOpen }), [node?.id, currentGraph?.id, currentUser?.id, isOpen]);
+  const activeSessionRef = useRef<EditorSession | null>(editorSession);
+  activeSessionRef.current = editorSession;
+  const draftSessionRef = useRef<EditorSession | null>(null);
+  const pendingUpdatesRef = useRef(new Map<EditorSession, number>());
   const [showTypeDropdown, setShowTypeDropdown] = useState(false);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [showConnectDropdown, setShowConnectDropdown] = useState(false);
@@ -189,12 +233,23 @@ export function WorkItemDetailsModal({
   useEffect(() => {
     // Background refreshes produce fresh objects for the same work item.
     // They must not wipe a person's unfinished form.
-    if (node && (draftNodeIdRef.current !== node.id || !draftDirtyRef.current)) {
-      draftNodeIdRef.current = node.id;
-      setEditedNode({ ...node });
-      setSavedNode({ ...node });
+    if (node && isOpen && (draftSessionRef.current !== editorSession || (!draftDirtyRef.current && !pendingUpdatesRef.current.has(editorSession)))) {
+      draftSessionRef.current = editorSession;
+      setEditedNode(copyWorkItem(node));
+      setSavedNode(copyWorkItem(node));
     }
-  }, [node]);
+  }, [node, isOpen, editorSession]);
+
+  useEffect(() => {
+    activeSessionRef.current = editorSession;
+    return () => { if (activeSessionRef.current === editorSession) activeSessionRef.current = null; };
+  }, [editorSession]);
+
+  const applySavedNode = useCallback((updated: WorkItem, submitted: WorkItem, session: EditorSession) => {
+    if (activeSessionRef.current !== session || updated.id !== session.nodeId) return;
+    setSavedNode(copyWorkItem(updated));
+    setEditedNode(draft => draft?.id === updated.id ? mergeSavedWorkItem(updated, submitted, draft) : draft);
+  }, []);
 
   useEffect(() => {
     if (isOpen && modalRef.current) {
@@ -426,19 +481,6 @@ export function WorkItemDetailsModal({
       { query: GET_EDGES }
     ],
     awaitRefetchQueries: true,
-    onCompleted: (data) => {
-      if (data?.updateWorkItems?.workItems?.[0]) {
-        const updatedNode = data.updateWorkItems.workItems[0];
-        setEditedNode({ ...updatedNode });
-        setSavedNode({ ...updatedNode });
-      }
-
-      showSuccess('Work item updated successfully');
-    },
-    onError: (error) => {
-      showError(`Failed to update work item: ${error.message}`);
-      // Keep the draft available for correction or retry after a failed save.
-    }
   });
 
   const [deleteWorkItem, { loading: deleting }] = useMutation(DELETE_WORK_ITEM, {
@@ -472,12 +514,14 @@ export function WorkItemDetailsModal({
   });
 
   const handleSave = useCallback(async () => {
-    if (!editedNode || !node || isSavingRef.current) return;
+    if (!editedNode || !node || editedNode.id !== node.id || isSavingRef.current || pendingUpdatesRef.current.has(editorSession)) return;
 
     // Capture current values immediately to prevent stale closures
-    const nodeToSave = { ...editedNode };
+    const nodeToSave = copyWorkItem(editedNode);
     const currentNodeRef = node;
     const previousNode = copyWorkItem(savedNode || currentNodeRef);
+    const undoGeneration = undoStack?.generation;
+    const endUpdate = beginUpdate(pendingUpdatesRef.current, editorSession);
 
     isSavingRef.current = true;
     setIsSaving(true);
@@ -486,7 +530,7 @@ export function WorkItemDetailsModal({
       const result = await updateWorkItem({
         variables: {
           where: { id: currentNodeRef.id },
-          update: workItemUpdate(nodeToSave, currentNodeRef),
+          update: workItemUpdate(nodeToSave, previousNode),
         },
         // The direct save stays instant. Undo deliberately has no optimistic
         // response, so its visible completion means the durable local mutation
@@ -499,27 +543,39 @@ export function WorkItemDetailsModal({
           },
         },
       });
-      if (result.data?.updateWorkItems?.workItems?.[0]) {
-        const editedSnapshot = copyWorkItem(nodeToSave);
-        undoStack?.push({
-          label: 'Edit item',
-          undo: async () => {
-            await updateWorkItem({
+      const editedSnapshot = confirmedWorkItem(result, currentNodeRef.id);
+      applySavedNode(editedSnapshot, nodeToSave, editorSession);
+      if (activeSessionRef.current === editorSession) showSuccess('Work item updated successfully');
+      if (undoStack?.generation === undoGeneration && (!activeSessionRef.current || (activeSessionRef.current.graphId === editorSession.graphId && activeSessionRef.current.ownerId === editorSession.ownerId))) undoStack?.push({
+        label: 'Edit item',
+        undo: async () => {
+          const activeSession = activeSessionRef.current;
+          const undoSession = activeSession?.open && activeSession.nodeId === currentNodeRef.id && activeSession.graphId === editorSession.graphId && activeSession.ownerId === editorSession.ownerId ? activeSession : null;
+          const undoBaseline = copyWorkItem(undoSession && savedNodeRef.current ? savedNodeRef.current : editedSnapshot);
+          const endUndo = undoSession ? beginUpdate(pendingUpdatesRef.current, undoSession) : () => {};
+          try {
+            const undone = await updateWorkItem({
               variables: {
                 where: { id: currentNodeRef.id },
                 update: workItemUpdate(previousNode, editedSnapshot),
               },
             });
-          },
-        });
-      }
+            const restored = confirmedWorkItem(undone, currentNodeRef.id);
+            if (undoSession) applySavedNode(restored, undoBaseline, undoSession);
+          } finally {
+            endUndo();
+          }
+        },
+      });
     } catch (error) {
+      if (activeSessionRef.current === editorSession) showError(`Failed to update work item: ${error instanceof Error ? error.message : 'Unknown error'}`);
       console.error('Failed to update work item:', error);
     } finally {
+      endUpdate();
       isSavingRef.current = false;
       setIsSaving(false);
     }
-  }, [editedNode, node, savedNode, undoStack, updateWorkItem]);
+  }, [editedNode, node, savedNode, undoStack, updateWorkItem, editorSession, applySavedNode, showError, showSuccess]);
 
   useEffect(() => {
     handleSaveRef.current = handleSave;
@@ -578,17 +634,7 @@ export function WorkItemDetailsModal({
   const currentNode = editedNode || node;
 
   // Check if any changes have been made (compare with savedNode instead of node prop)
-  const hasChanges = editedNode && savedNode && (
-    editedNode.title !== savedNode.title ||
-    editedNode.description !== savedNode.description ||
-    editedNode.type !== savedNode.type ||
-    editedNode.status !== savedNode.status ||
-    editedNode.priority !== savedNode.priority ||
-    JSON.stringify(editedNode.tags || []) !== JSON.stringify(savedNode.tags || []) ||
-    (typeof editedNode.assignedTo === 'string' ? editedNode.assignedTo : editedNode.assignedTo?.id) !==
-    (typeof savedNode.assignedTo === 'string' ? savedNode.assignedTo : savedNode.assignedTo?.id) ||
-    editedNode.dueDate !== savedNode.dueDate
-  );
+  const hasChanges = editedNode && savedNode && hasDraftChanges(editedNode, savedNode);
 
   // Use the same priority calculation as ListView for consistency
   const getNodePriority = (node: WorkItem) => {

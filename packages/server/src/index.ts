@@ -1,7 +1,8 @@
+import './config/environment.js';
 import { operationsApi } from './operations-api.js';
 import { agentApi } from './agent-api.js';
 import { ApolloServer } from '@apollo/server';
-import { expressMiddleware } from '@apollo/server/express4';
+import { expressMiddleware, type ExpressContextFunctionArgument } from '@as-integrations/express4';
 import { ApolloServerPluginDrainHttpServer } from '@apollo/server/plugin/drainHttpServer';
 import express from 'express';
 import { createServer } from 'http';
@@ -9,7 +10,6 @@ import { createServer as createHttpsServer } from 'https';
 import { WebSocketServer } from 'ws';
 import { useServer } from 'graphql-ws/lib/use/ws';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import os from 'os';
 import session from 'express-session';
 import passport from 'passport';
@@ -98,9 +98,6 @@ async function getTotalGraphDoneMemory(): Promise<{ memory: number, label: strin
     };
   }
 }
-
-dotenv.config();
-// OAuth LinkedIn and GitHub credentials updated
 
 const PORT = Number(process.env.PORT) || 4127;
 
@@ -418,7 +415,7 @@ async function startServer() {
     cors<cors.CorsRequest>(),
     express.json(),
     expressMiddleware(apolloServer, {
-      context: async ({ req }) => {
+      context: async ({ req }: ExpressContextFunctionArgument) => {
         return {
           ...await graphContext(req.headers.authorization),
           req,

@@ -6,31 +6,31 @@ echo "🚀 Setting up GraphDone development environment..."
 
 # Function to install Node.js using Node Version Manager (nvm)
 install_nodejs() {
-    echo "🔧 Installing Node.js 18..."
+    echo "🔧 Installing Node.js 22 LTS..."
     
     # Check if nvm is available
     if command -v nvm &> /dev/null; then
         echo "📦 Using existing nvm to install Node.js..."
-        nvm install 18
-        nvm use 18
+        nvm install 22
+        nvm use 22
     elif [ -f "$HOME/.nvm/nvm.sh" ]; then
         echo "📦 Loading nvm and installing Node.js..."
         source "$HOME/.nvm/nvm.sh"
-        nvm install 18
-        nvm use 18
+        nvm install 22
+        nvm use 22
     else
         echo "📥 Installing nvm (Node Version Manager) first..."
         curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
         export NVM_DIR="$HOME/.nvm"
         [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
         [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
-        nvm install 18
-        nvm use 18
+        nvm install 22
+        nvm use 22
     fi
     
     # Update PATH to include node and npm
     export PATH="$HOME/.nvm/versions/node/$(nvm current)/bin:$PATH"
-    echo "✅ Node.js 18 installed successfully!"
+    echo "✅ Node.js 22 LTS installed successfully!"
     echo "📍 Node.js location: $(which node)"
     echo "📍 npm location: $(which npm)"
 }
@@ -40,20 +40,20 @@ check_nodejs() {
     if ! command -v node &> /dev/null; then
         echo "❌ Node.js is required but not installed."
         echo ""
-        echo "🚀 Would you like to install Node.js 18 automatically? (y/n)"
+        echo "🚀 Would you like to install Node.js 22.18 automatically? (y/n)"
         read -r response
         if [[ "$response" =~ ^[Yy]$ ]]; then
             install_nodejs
             NODE_INSTALLED=1
         else
             echo ""
-            echo "📋 Please install Node.js 18+ manually using one of these methods:"
+            echo "📋 Please install Node.js 22.18+ manually using one of these methods:"
             echo ""
             echo "🔹 Using Node Version Manager (nvm) - RECOMMENDED:"
             echo "   curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash"
             echo "   source ~/.nvm/nvm.sh"
-            echo "   nvm install 18"
-            echo "   nvm use 18"
+            echo "   nvm install 22"
+            echo "   nvm use 22"
             echo ""
             echo "🔹 Download from official website:"
             echo "   https://nodejs.org/en/download/"
@@ -70,16 +70,16 @@ check_nodejs() {
     
     # Check Node.js version
     NODE_VERSION=$(node --version | cut -d'v' -f2 | cut -d'.' -f1)
-    if [ "$NODE_VERSION" -lt 18 ]; then
-        echo "❌ Node.js 18+ is required. Current version: $(node --version)"
+    if ! node -e 'const [a,b]=process.versions.node.split(".").map(Number);process.exit(a>22||(a===22&&b>=18)?0:1)'; then
+        echo "❌ Node.js 22.18+ is required. Current version: $(node --version)"
         echo ""
-        echo "🚀 Would you like to upgrade to Node.js 18 automatically? (y/n)"
+        echo "🚀 Would you like to upgrade to Node.js 22.18 automatically? (y/n)"
         read -r response
         if [[ "$response" =~ ^[Yy]$ ]]; then
             install_nodejs
             NODE_INSTALLED=1
         else
-            echo "Please upgrade Node.js to version 18 or higher and run setup again."
+            echo "Please upgrade Node.js to version 22.18 or higher and run setup again."
             exit 1
         fi
     fi
