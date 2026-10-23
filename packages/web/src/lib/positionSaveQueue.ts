@@ -30,13 +30,19 @@ export async function drainWithLimit<T>(
 export function createPositionSaveQueue(opts: {
   save: (s: PositionSave) => Promise<void>;
   concurrency?: number;
+  maxPending?: number;
 }) {
   const pending = new Map<string, PositionSave>();
+  const retainedIds = new Set<string>();
   const concurrency = opts.concurrency ?? 4;
   let flushing: Promise<void> | undefined;
 
   /** Queue/overwrite a node's pending position (last write wins — coalesced). */
   const queue = (id: string, x: number, y: number): void => {
+    if (!retainedIds.has(id) && retainedIds.size >= (opts.maxPending ?? Infinity)) {
+      throw new Error('Too many pending layout changes. Reconnect and save before moving more tasks.');
+    }
+    retainedIds.add(id);
     pending.set(id, { id, x, y });
   };
 
@@ -48,6 +54,7 @@ export function createPositionSaveQueue(opts: {
       await drainWithLimit(batch, concurrency, async (position) => {
         try {
           await opts.save(position);
+          if (!pending.has(position.id)) retainedIds.delete(position.id);
         } catch (error) {
           if (!pending.has(position.id)) pending.set(position.id, position);
           failures.push(error);
