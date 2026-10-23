@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
+import { runInNewContext } from 'node:vm';
 
 const { load } = createRequire(import.meta.url)('js-yaml');
 const workflow = name => load(readFileSync(new URL(`../../../.github/workflows/${name}.yml`, import.meta.url), 'utf8'));
@@ -69,5 +70,22 @@ for (const name of required) {
       results[name] = state;
       assert.equal(aggregate(results, true).status, 1);
     }
+  });
+}
+
+for (const [event_name, ref, base_ref, selected] of [
+  ['push', 'refs/heads/main', '', true],
+  ['push', 'refs/heads/dev', '', false],
+  ['pull_request', 'refs/pull/191/merge', 'main', true],
+  ['pull_request', 'refs/pull/191/merge', 'dev', false],
+  ['schedule', 'refs/heads/main', '', true],
+  ['workflow_dispatch', 'refs/heads/audit/candidate', '', true],
+]) {
+  test(`production selection agrees with aggregate for ${event_name}/${ref}/${base_ref}`, () => {
+    const context = { github: { event_name, ref, base_ref } };
+    const condition = ci.jobs['prod-smoke'].if;
+    const aggregateCondition = ci.jobs['ci-success'].steps[0].env.PROD_REQUIRED.slice(3, -2).trim();
+    assert.equal(runInNewContext(condition, context), selected);
+    assert.equal(runInNewContext(aggregateCondition, context), selected);
   });
 }
