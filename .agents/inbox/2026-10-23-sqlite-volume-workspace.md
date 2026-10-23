@@ -46,6 +46,19 @@ HTTP login before and after recreating only the owned API service. Its execution
 against the final HTTPS stack is a separate release gate; these unit cases do
 not claim that result.
 
+The development image was also built locally from `8e42a59` with
+`docker build --pull=false -f packages/server/Dockerfile.dev -t graphdone-sqlite-dev-test:8e42a59 .`
+(exit 0). Image
+`sha256:1c464d180bfe705325d7ad88867d497c0751040df46b6a4e5da0aec5c2d0b93a`
+passed an additional temporary probe that ran two recreated containers as
+UID/GID 1001 through npm's actual workspace and the TypeScript authentication
+module. The mounted directory belonged to UID 1001; the owned account ID,
+password validation, administrator ID and mode-0600 bootstrap contents survived.
+The private fixture environment, both containers and the named volume were
+removed. `dev-image-build.log` and `dev-image-persistence.json` in the same
+artifact directory retain that bounded check. This additional probe is local
+evidence, not a claimed committed HTTP/browser regression.
+
 ## Corrective rule and limits
 
 Test removal and recreation with the real workspace and volume, rather than
