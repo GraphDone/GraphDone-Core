@@ -57,9 +57,10 @@ export function Workspace() {
     (window as any).triggerLayoutMode?.(next);
   };
   const { currentGraph, availableGraphs, getBreadcrumb, ascendTo, canEditGraph } = useGraph();
+  const { currentTeam, currentUser } = useAuth();
   const [undoStack] = useState(() => new UndoStack(36));
   const { showSuccess, showError } = useNotifications();
-  useEffect(() => { undoStack.clear(); }, [currentGraph?.id, undoStack]);
+  useEffect(() => { undoStack.clear(); }, [currentGraph?.id, currentUser?.id, undoStack]);
   const runUndo = useCallback(async () => {
     try {
       const action = await undoStack.undo();
@@ -82,7 +83,6 @@ export function Workspace() {
   const breadcrumb = getBreadcrumb();
   const [inspectorNode, setInspectorNode] = useState<any>(null);
   const [quickEditRequest, setQuickEditRequest] = useState<WorkItem | null>(null);
-  const { currentTeam, currentUser } = useAuth();
   const { health, loading: healthLoading, error: healthError } = useHealthStatus();
 
   useEffect(() => {
