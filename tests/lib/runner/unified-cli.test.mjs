@@ -11,9 +11,9 @@ import { SEQUENCES } from '../../sequences/unified.config.mjs';
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 
 test('required performance and mobile gates select their bounded suites without retries', () => {
-  assert.deepEqual(SEQUENCES['perf-budgets'].args, ['tests/perf/graph-perf.spec.ts', '--project=perf', '--workers=1', '--retries=0']);
+  assert.deepEqual(SEQUENCES['perf-budgets'].args, ['tests/perf/graph-perf.spec.ts', '--project=perf', '--workers=1', '--retries=0', '--trace=retain-on-failure']);
   assert.equal(SEQUENCES['perf-budgets'].blocking, true);
-  assert.deepEqual(SEQUENCES.mobile.args, ['--grep', '@mobile|@audit', '--project=GraphDone-Core/dev-neo4j/chromium', '--workers=1', '--retries=0']);
+  assert.deepEqual(SEQUENCES.mobile.args, ['--grep', '@mobile|@audit', '--project=GraphDone-Core/dev-neo4j/chromium', '--workers=1', '--retries=0', '--trace=retain-on-failure']);
   assert.equal(SEQUENCES.mobile.blocking, true);
 });
 function fixture(t) {
@@ -35,6 +35,84 @@ function fixture(t) {
     cwd: dir, env: { ...process.env, PATH: `${join(dir, 'bin')}:${process.env.PATH}` }, encoding: 'utf8', timeout: 10000,
   });
   return { dir, run };
+}
+
+for (const sequence of ['new-user', 'mobile', 'perf-budgets']) {
+  test(`CLI forwards failure-only tracing without retries for ${sequence}`, t => {
+    const { dir, run } = fixture(t);
+    const report = { suites: [{ specs: [{ title: 'fixture', ok: true,
+      tests: [{ status: 'expected', expectedStatus: 'passed', results: [{ status: 'passed' }] }],
+    }] }], stats: { expected: 1, unexpected: 0, flaky: 0, skipped: 0 }, errors: [] };
+    writeFileSync(join(dir, 'bin/npx'), `#!${process.execPath}\nconst fs=require('node:fs'); fs.writeFileSync('bin/argv.json', JSON.stringify(process.argv.slice(2))); process.stdout.write(${JSON.stringify(JSON.stringify(report))});\n`, { mode: 0o700 });
+    const result = run(['--sequence', sequence]);
+    assert.equal(result.status, 0, result.stdout);
+    const args = JSON.parse(readFileSync(join(dir, 'bin/argv.json')));
+    assert.deepEqual(args.filter(arg => arg.startsWith('--trace=')), ['--trace=retain-on-failure']);
+    assert.deepEqual(args.filter(arg => arg.startsWith('--retries=')), ['--retries=0']);
+    assert.deepEqual(args.filter(arg => arg.startsWith('--workers=')), ['--workers=1']);
+  });
+}
+
+test('failed browser traces and diagnostics survive later Playwright output cleanup', t => {
+  const { dir, run } = fixture(t);
+  const original = join(dir, 'test-artifacts/playwright-output');
+  mkdirSync(original, { recursive: true });
+  const trace = join(original, 'trace.zip');
+  const diagnostics = join(original, 'button-navigation-diagnostics.json');
+  writeFileSync(trace, 'owned trace bytes');
+  writeFileSync(diagnostics, '{"navigation":{"route":"/agents","width":320}}');
+  const report = { suites: [{ specs: [{ title: 'navigation failed', ok: false,
+    tests: [{ status: 'unexpected', expectedStatus: 'passed', results: [{ status: 'failed', attachments: [
+      { name: 'trace', contentType: 'application/zip', path: trace },
+      { name: 'button-navigation-diagnostics.json', contentType: 'application/json', path: diagnostics },
+    ] }] }],
+  }] }], stats: { expected: 0, unexpected: 1, flaky: 0, skipped: 0 }, errors: [] };
+  writeFileSync(join(dir, 'bin/npx'), `#!${process.execPath}\nprocess.stdout.write(${JSON.stringify(JSON.stringify(report))}); process.exitCode=1;\n`, { mode: 0o700 });
+  assert.equal(run(['--sequence', 'new-user']).status, 1);
+  const out = join(dir, 'test-artifacts/unified');
+  const result = JSON.parse(readFileSync(join(out, 'report.json')));
+  const attachments = result.sequences[0].cases[0].attachments;
+  assert.equal(attachments.length, 2);
+  assert.ok(attachments.every(attachment => attachment.type === 'file' && !attachment.srcPath));
+  rmSync(original, { recursive: true });
+  assert.equal(readFileSync(join(out, attachments[0].href), 'utf8'), 'owned trace bytes');
+  assert.equal(JSON.parse(readFileSync(join(out, attachments[1].href))).navigation.route, '/agents');
+  const html = readFileSync(join(out, 'report.html'), 'utf8');
+  for (const attachment of attachments) assert.ok(html.includes(`<a href="${attachment.href}" download>`));
+});
+
+for (const location of ['outside-root', 'symlink', 'directory-symlink', 'directory']) {
+  test(`CLI rejects ${location} sources for downloadable evidence`, t => {
+    const { dir, run } = fixture(t);
+    const outside = mkdtempSync(join(tmpdir(), 'graphdone-outside-evidence-'));
+    t.after(() => rmSync(outside, { recursive: true, force: true }));
+    const sentinel = join(outside, 'sentinel.json');
+    writeFileSync(sentinel, 'unrelated owned sentinel');
+    const artifacts = join(dir, 'test-artifacts/playwright-output');
+    mkdirSync(artifacts, { recursive: true });
+    let source = sentinel;
+    if (location === 'symlink') {
+      source = join(artifacts, 'alias.json');
+      symlinkSync(sentinel, source);
+    } else if (location === 'directory-symlink') {
+      const alias = join(artifacts, 'linked-directory');
+      symlinkSync(outside, alias, 'dir');
+      source = join(alias, 'sentinel.json');
+    } else if (location === 'directory') source = artifacts;
+    const report = { suites: [{ specs: [{ title: 'declared file', ok: true,
+      tests: [{ status: 'expected', expectedStatus: 'passed', results: [{ status: 'passed', attachments: [
+        { name: 'diagnostics', contentType: 'application/json', path: source },
+      ] }] }],
+    }] }], stats: { expected: 1, unexpected: 0, flaky: 0, skipped: 0 }, errors: [] };
+    writeFileSync(join(dir, 'bin/npx'), `#!${process.execPath}\nprocess.stdout.write(${JSON.stringify(JSON.stringify(report))});\n`, { mode: 0o700 });
+    const result = run(['--sequence', 'new-user']);
+    assert.equal(result.status, 1, result.stdout);
+    const unified = JSON.parse(readFileSync(join(dir, 'test-artifacts/unified/report.json')));
+    assert.equal(unified.rollup.status, 'failed');
+    assert.match(unified.sequences[0].evidenceErrors.join(' '), /file attachment/i);
+    assert.ok(unified.sequences[0].cases.every(result => result.attachments.length === 0));
+    assert.equal(readFileSync(sentinel, 'utf8'), 'unrelated owned sentinel');
+  });
 }
 
 for (const args of [['--sequence', 'does-not-exist'], ['--profile', 'does-not-exist'], ['--out']]) {
