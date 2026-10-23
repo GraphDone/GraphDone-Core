@@ -2,6 +2,7 @@
 
 | Symptom | Canonical lesson and regression |
 | --- | --- |
+| Login accounts or generated bootstrap credentials disappear after API container recreation despite a named volume | [SQLite persistence must cover the actual npm workspace](../inbox/2026-10-23-sqlite-volume-workspace.md); `scripts/test-sqlite-container-persistence.mjs` and the production HTTP recreation hook; back up old writable-layer data before upgrade |
 | Deleting an owned folder removes or orphans another owner's nested folder; a deletion destination disappears with its parent | [Deletion authority includes pre-existing descendant folders](../inbox/2026-10-23-folder-delete-legacy-hierarchy.md); `packages/server/tests/folder-authorization.test.ts` |
 | Build/typecheck pass but API startup, supported-Node launcher, container or repository lint fails | [Startup and save evidence pointer](../inbox/2026-10-23-core-startup-and-save-evidence.md); [runtime validation](../../docs/quality/RUNTIME_VALIDATION_2026-10-23.md) |
 | Production accepts missing/default JWT or session secrets; `.env` key differs from the captured signing key | [Startup and save evidence pointer](../inbox/2026-10-23-core-startup-and-save-evidence.md); `packages/server/tests/production-startup.test.ts`, `production-secrets.test.ts` |
