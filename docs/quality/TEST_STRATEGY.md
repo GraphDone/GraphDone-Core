@@ -27,4 +27,6 @@ Security demand-control checks follow the [OWASP GraphQL testing guidance](https
 
 ## Runtime and evidence incidents
 
+- [2026-10-23 delayed details-save completion](DETAILS_SAVE_COMPLETION_2026-10-23.md): an acknowledged mutation's pending refetch erased a newer due-date edit; a delayed completion also repopulated cleared undo history after graph changes. Controlled Apollo component tests retain both the failing baseline and correction.
+
 - [2026-10-23 runtime validation](RUNTIME_VALIDATION_2026-10-23.md): API peer-resolution failure after a successful build, obsolete Node/container minimums, a missing disposable-DB CI marker, and smoke assertions depending on a populated default graph.
