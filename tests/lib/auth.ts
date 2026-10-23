@@ -1,4 +1,5 @@
 import { Page, expect } from '@playwright/test';
+import { testAdminCredentials } from './auth-credentials.mjs';
 
 /**
  * CRITICAL AUTHENTICATION HELPER
@@ -24,8 +25,7 @@ export interface LoginCredentials {
 // Production-ready test credentials
 export const TEST_USERS = {
   ADMIN: {
-    username: 'admin',
-    password: 'graphdone',
+    ...testAdminCredentials(),
     role: 'admin' as const
   },
   MEMBER: {
