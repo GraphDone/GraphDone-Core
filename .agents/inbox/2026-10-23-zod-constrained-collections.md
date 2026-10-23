@@ -7,6 +7,26 @@ against the locked Zod 3.25.76 package. The advisory lists versions below 4.6.6
 as affected and 4.6.6 as patched. Its later audit appearance does not establish
 when the vulnerability became reachable or why earlier audit responses differed.
 
+The public advisory was published October 1 and reviewed/updated October 23;
+it was not newly published when the final check failed. On unchanged
+`78a90cc7899e44c33aa27117bccb19ea7cbe85f6`, the fresh production audit exited 1
+with eight moderate findings and this one high finding, while the earlier CI
+response contained eight moderate findings only. Repeating with CI's npm
+10.9.9 also reported the high finding. The exact registry/cache/backend cause
+of the differing responses is unproven. The CI audit step now uses its own
+runner-temporary cache for each run attempt, retaining the existing install
+cache and unchanged high/critical threshold. This removes restored audit-cache
+reuse as one variable; it does not guarantee registry freshness.
+
+The direct MCP dependency is pinned to 4.6.7. A manifest-only install initially
+left the vulnerable 3.25.76 copy hoisted for the SDK and nested the new version
+under MCP. A targeted `npm update zod --package-lock-only --ignore-scripts
+--legacy-peer-deps` resolved the single root copy instead. The final lock delta
+changes only that root version, its registry integrity, and the MCP constraint;
+SDK 1.32.2 stays unchanged. `npm ls zod --all --omit=dev` confirms both the SDK
+and zod-to-json-schema deduplicate to 4.6.7. Do not equate the manifest pin alone
+with remediation of the consumer's resolved dependency.
+
 The [upstream fix, PR #6652](https://github.com/colinhacks/zod/pull/6652), rejects
 oversized collections before parsing their elements when a leading upper-size
 check applies. Later refinements do not run after that rejection. Unbounded

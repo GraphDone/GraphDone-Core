@@ -1,5 +1,29 @@
 # Core merge validation — 2026-10-23
 
+## Follow-up: the fresh production audit held final approval
+
+The snapshot below remains historical evidence. On the subsequent clean merged
+head `78a90cc7899e44c33aa27117bccb19ea7cbe85f6`, a new pinned installation passed
+build, 590 unit tests (25 explicitly DB-gated skips), 161 harness tests, types,
+lint, bundle and eight real Neo4j contract checks. Its production high/critical
+audit instead exited 1 with eight moderate findings plus the Zod high advisory
+[GHSA-mrhx-c7xc-m3w5](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5). That
+fresh failure blocked final approval despite the earlier green CI response.
+The exact metadata/cache cause of the discrepancy is not established.
+
+The [bounded-validation and consumer-compatibility lesson](../../.agents/inbox/2026-10-23-zod-constrained-collections.md)
+records the targeted Zod 4.6.7 correction and unchanged MCP SDK 1.32.2. The same
+13 small regression fixtures fail five cases on the old dependency and pass
+all 13 on the patch. The patch's build and production audit pass; a complete
+unit run at `ea46e39` passes 603 cases with 25 DB-gated skips. The SDK's actual
+dependency path is verified, including avoiding a nested patched copy that
+would leave its hoisted dependency vulnerable. CI gives only the audit step a
+fresh per-attempt cache; the threshold is unchanged. These results do not prove
+unbounded-collection protection, full MCP denial-of-service resistance or a
+hosted deployment. Final combined public CI and protected review remain pending.
+
+## Earlier functional integration snapshot
+
 **Snapshot: all planned local gates pass and the scoped stack is merged into
 the public audit branch. Final public integration CI and protected `dev` merge
 approval remain PENDING.** Public functional integration:

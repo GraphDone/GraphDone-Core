@@ -124,6 +124,8 @@ jobs:
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
       - name: Reject high and critical production dependency advisories
+        env:
+          NPM_CONFIG_CACHE: ${{ runner.temp }}/graphdone-audit-${{ github.run_id }}-${{ github.run_attempt }}
         run: npm audit --omit=dev --audit-level=high
 
   # ── THE GATE: the app works from a user's point of view ────────────────────
