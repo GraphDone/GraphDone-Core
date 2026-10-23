@@ -1,4 +1,4 @@
-FROM node:18-alpine
+FROM node:22-alpine
 
 # Install curl for health checks
 RUN apk add --no-cache curl
@@ -6,14 +6,14 @@ RUN apk add --no-cache curl
 WORKDIR /app
 
 # Copy all package files for monorepo workspace
-COPY package.json turbo.json ./
+COPY package.json package-lock.json turbo.json ./
 COPY packages/core/package.json ./packages/core/
 COPY packages/server/package.json ./packages/server/
 COPY packages/web/package.json ./packages/web/
 COPY packages/mcp-server/package.json ./packages/mcp-server/
 
 # Install all dependencies (monorepo workspace)
-RUN npm install --legacy-peer-deps
+RUN npm ci --legacy-peer-deps
 
 # Copy all source code (needed for monorepo dependencies)
 COPY packages/ ./packages/

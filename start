@@ -375,11 +375,11 @@ safe_docker() {
 
 # Function to ensure Node.js is available
 ensure_nodejs() {
-    if command -v node &> /dev/null && command -v npm &> /dev/null; then
+    if command -v node &> /dev/null && command -v npm &> /dev/null && node -e 'const [a,b]=process.versions.node.split(".").map(Number);process.exit(a>22||(a===22&&b>=18)?0:1)'; then
         log_success "✅ Node.js found: $(node --version), npm: $(npm --version)"
         return 0
     else
-        log_warning "⚠️  Node.js not found - checking for existing installations..."
+        log_warning "⚠️  Node.js 22.18+ is required - checking for existing installations..."
         
         export NVM_DIR="$HOME/.nvm"
         if [ -s "$NVM_DIR/nvm.sh" ]; then
@@ -388,8 +388,8 @@ ensure_nodejs() {
                 source "$NVM_DIR/bash_completion"
             fi
             
-            if nvm list | grep -q "v18"; then
-                nvm use 18
+            if nvm list | grep -q "v22"; then
+                nvm use 22
             else
                 nvm use node
             fi
@@ -436,7 +436,7 @@ ensure_nodejs() {
                 esac
 
                 # Verify Node.js is now available
-                if command -v node &> /dev/null && command -v npm &> /dev/null; then
+                if command -v node &> /dev/null && command -v npm &> /dev/null && node -e 'const [a,b]=process.versions.node.split(".").map(Number);process.exit(a>22||(a===22&&b>=18)?0:1)'; then
                     log_success "✅ Node.js automatically installed: $(node --version)"
                     return 0
                 fi
@@ -471,6 +471,10 @@ ensure_nodejs() {
             echo "  ${CYAN}Then restart terminal and run: ./start${NC}"
             exit 1
         fi
+    fi
+    if ! node -e 'const [a,b]=process.versions.node.split(".").map(Number);process.exit(a>22||(a===22&&b>=18)?0:1)'; then
+        log_error "Node.js 22.18+ is required. Run ./scripts/setup_nodejs.sh to upgrade."
+        return 1
     fi
 }
 
