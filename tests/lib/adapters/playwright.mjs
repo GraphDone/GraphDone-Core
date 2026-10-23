@@ -2,6 +2,7 @@ import { mkdtempSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runCommand } from '../runner/runSequence.mjs';
+import { ownedEvidencePath } from '../runner/evidence-path.mjs';
 import { finishSequence, validateCounter } from './execution-evidence.mjs';
 
 /**
@@ -51,7 +52,8 @@ export async function runPlaywrightSequence({ id, title, args = [], target, time
               if ((a.contentType || '').startsWith('video')) attachments.push({ type: 'video', name: spec.title, srcPath: a.path });
               else if ((a.contentType || '').startsWith('image')) attachments.push({ type: 'image', name: a.name || spec.title, srcPath: a.path });
               else if ((a.name === 'trace' && a.contentType === 'application/zip') || a.contentType === 'application/json') {
-                attachments.push({ type: 'file', name: a.name || spec.title, srcPath: a.path });
+                try { attachments.push({ type: 'file', name: a.name || spec.title, srcPath: ownedEvidencePath(process.cwd(), a.path) }); }
+                catch (error) { errors.push(`Rejected file attachment: ${error.message}`); }
               }
             }
           }
