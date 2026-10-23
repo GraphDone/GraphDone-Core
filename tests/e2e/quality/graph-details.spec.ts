@@ -36,7 +36,7 @@ for(const [width,height] of [[390,844],[844,390],[1440,900]]){
    await expect(dialog).toBeVisible();
    await dialog.locator('input[type="date"]').fill('2026-09-14');
    await dialog.getByPlaceholder('Add Tag').fill('graph-first');await page.keyboard.press('Enter');
-   // Cross the regular refresh interval while a human has an unfinished draft.
+   // Keep a human draft open for 16 seconds; controlled refetch coverage is in WorkItemDetailsModal.test.tsx.
    await page.waitForTimeout(16000);
    await expect(dialog.locator('input[type="date"]')).toHaveValue('2026-09-14');
    await expect(dialog.getByText('graph-first',{exact:true})).toBeVisible();
