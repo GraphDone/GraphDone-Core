@@ -16,7 +16,7 @@ stack. Image builds alone do not prove that those services work together.
 Deploy and Release are explicitly disabled. Their manual actions fail before
 checkout, credentials, version edits, tags, releases or deployment. The previous
 placeholder echo statements were not deployment implementations. A main merge
-therefore does not update graphdone.com or move a release tag.
+is not deployment evidence. These workflows do not deploy graphdone.com or move a release tag.
 
 Release implementation is tracked in [issue #190](https://github.com/GraphDone/GraphDone-Core/issues/190).
 Before enabling publication in a separately reviewed change:
