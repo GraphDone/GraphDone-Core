@@ -8,8 +8,9 @@
  *
  *   node tests/run-unified.mjs [--profile smoke|pr|full|report] [--sequence <id>] [--open]
  */
-import { mkdirSync, copyFileSync, rmSync } from 'node:fs';
+import { mkdirSync, copyFileSync } from 'node:fs';
 import { join, extname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { runVitestSequence } from './lib/adapters/vitest.mjs';
 import { runPlaywrightSequence } from './lib/adapters/playwright.mjs';
 import { cloudAuditSequence, findLatestCloudFindings } from './lib/adapters/cloud-audit.mjs';
@@ -18,32 +19,30 @@ import { writeJsonReport } from './lib/reporting/json.mjs';
 import { renderHtml } from './lib/reporting/html.mjs';
 import { writeFileSync } from 'node:fs';
 import { SEQUENCES, PROFILES } from './sequences/unified.config.mjs';
+import { parseOptions, prepareOutput } from './lib/runner/unified-options.mjs';
+import { sourceState } from './lib/runner/source-state.mjs';
 
-const args = process.argv.slice(2);
-const flag = (name, def) => { const i = args.indexOf(name); return i >= 0 ? (args[i + 1] && !args[i + 1].startsWith('--') ? args[i + 1] : true) : def; };
-const profile = flag('--profile', 'smoke');
-const single = flag('--sequence', null);
-const open = !!flag('--open', false);
-const outDir = resolve(String(flag('--out', 'test-artifacts/unified')));
+let options;
+try { options = parseOptions(process.argv.slice(2), PROFILES, SEQUENCES); }
+catch (error) { console.error(error.message); process.exit(2); }
+const { profile, ids, open } = options;
+const root = fileURLToPath(new URL('..', import.meta.url));
+let outDir;
 const target = process.env.TEST_URL || 'http://localhost:3127';
-
-const ids = single ? [single] : (PROFILES[profile] || PROFILES.smoke);
 
 const ICON = { passed: '✅', failed: '❌', warn: '⚠️', skipped: '⏭️' };
 
 async function runOne(id) {
   const def = SEQUENCES[id];
-  if (!def) return { id, title: id, kind: 'unknown', status: 'skipped', counts: { passed: 0, failed: 0, warned: 0, skipped: 1 }, cases: [], notes: 'unknown sequence id' };
   process.stdout.write(`\n▶ ${id} — ${def.title}\n`);
-  if (def.adapter === 'vitest') return runVitestSequence({ id, title: def.title, cwd: def.cwd });
-  if (def.adapter === 'playwright') return runPlaywrightSequence({ id, title: def.title, args: def.args, target });
+  if (def.adapter === 'vitest') return runVitestSequence({ id, title: def.title, cwd: def.cwd, blocking: def.blocking !== false });
+  if (def.adapter === 'playwright') return runPlaywrightSequence({ id, title: def.title, args: def.args, target, blocking: def.blocking !== false });
   if (def.adapter === 'cloud-audit') {
     const cloudDir = def.cloudRepoDir || resolve(process.cwd(), '..', 'GraphDone-Cloud');
-    const explicit = flag('--cloud-findings', null);
-    const findingsPath = typeof explicit === 'string' ? explicit : findLatestCloudFindings(cloudDir);
+    const findingsPath = options.cloudFindings || findLatestCloudFindings(cloudDir);
     return cloudAuditSequence({ id, title: def.title, findingsPath });
   }
-  return { id, title: def.title, status: 'skipped', counts: { passed: 0, failed: 0, warned: 0, skipped: 1 }, cases: [] };
+  throw new Error(`Unsupported adapter for ${id}`);
 }
 
 // Copy a sequence's harvested artifacts into outDir/assets/<id>/ and set href.
@@ -68,8 +67,8 @@ function materializeArtifacts(seq) {
 
 (async () => {
   const startedAt = Date.now();
-  try { rmSync(outDir, { recursive: true, force: true }); } catch { /* fresh */ }
-  mkdirSync(outDir, { recursive: true });
+  outDir = prepareOutput(resolve(options.out), root);
+  const startedSource = sourceState(root, outDir);
 
   const sequences = [];
   for (const id of ids) {
@@ -80,9 +79,17 @@ function materializeArtifacts(seq) {
     sequences.push(seq);
   }
 
+  const finishedSource = sourceState(root, outDir);
+  const changedDuringRun = startedSource.fingerprint !== finishedSource.fingerprint;
+  if (changedDuringRun) sequences.push({
+    id: 'source-integrity', title: 'Source changed during test execution', kind: 'verification', status: 'failed',
+    counts: { passed: 0, failed: 1, warned: 0, skipped: 0 },
+    cases: [{ title: 'Source remained unchanged', status: 'failed', error: 'The tested repository changed during this run; rerun against a stable source tree.' }],
+  });
   const report = buildReport({
     sequences, startedAt, finishedAt: Date.now(), target,
-    env: { node: process.version, platform: process.platform, profile },
+    env: { node: process.version, platform: process.platform, profile, sequences: ids },
+    source: { started: startedSource, finished: finishedSource, changedDuringRun },
   });
 
   const { mainPath } = writeJsonReport(report, outDir);
@@ -99,4 +106,4 @@ function materializeArtifacts(seq) {
     spawn(process.platform === 'darwin' ? 'open' : 'xdg-open', [htmlPath], { stdio: 'ignore', detached: true });
   }
   process.exit(r.status === 'failed' ? 1 : 0);
-})();
+})().catch(error => { console.error(`Unified test run failed: ${error.message}`); process.exitCode = 1; });
