@@ -50,6 +50,9 @@ export async function runPlaywrightSequence({ id, title, args = [], target, time
               if (!a?.path) continue;
               if ((a.contentType || '').startsWith('video')) attachments.push({ type: 'video', name: spec.title, srcPath: a.path });
               else if ((a.contentType || '').startsWith('image')) attachments.push({ type: 'image', name: a.name || spec.title, srcPath: a.path });
+              else if ((a.name === 'trace' && a.contentType === 'application/zip') || a.contentType === 'application/json') {
+                attachments.push({ type: 'file', name: a.name || spec.title, srcPath: a.path });
+              }
             }
           }
           cases.push({ title: spec.title, status, durationMs: last.duration, error: last.error?.message || (status === 'failed' ? 'Expected an executed, non-flaky passing test result.' : undefined), attachments });

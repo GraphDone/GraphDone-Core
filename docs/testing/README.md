@@ -96,6 +96,18 @@ TEST_URL=http://localhost:3127 node tests/run-unified.mjs --sequence perf-budget
 TEST_URL=http://localhost:3127 node tests/run-unified.mjs --sequence mobile --out test-artifacts/runs/mobile-check
 ```
 
+Strict `new-user`, `mobile`, and `perf-budgets` sequences retain traces on failure
+even though retries are disabled. The adapter copies trace ZIPs and path-backed
+JSON attachments into the run's report assets, with download links in HTML, so
+the next Playwright invocation cannot erase that evidence. The button-content
+sweep labels each route/viewport step and attaches its navigation context plus
+the latest 50 console warning/error, page-error, and failed-request events on
+failure. Messages are capped at 1,000 characters; request URL queries/fragments
+and common credential patterns are removed. This attachment does not collect
+headers, request/response bodies, or browser storage. It preserves the original
+failure and does not change assertion deadlines. See the
+[static-shell evidence lesson](../../.agents/inbox/2026-10-23-browser-startup-evidence.md).
+
 `perf-budgets` selects only the three cases in `tests/perf/graph-perf.spec.ts`.
 Each creates its own four-node, three-edge placed graph and selects that graph
 explicitly. Missing nodes, missing or stale metrics, skipped cases, and failed
