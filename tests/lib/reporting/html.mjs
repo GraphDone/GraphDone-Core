@@ -1,6 +1,6 @@
 /**
  * Pure HTML renderer for the unified report. Takes the aggregated report object
- * (sequences may carry attachments {type:'image'|'video', name, href} whose href
+ * (sequences may carry attachments {type:'image'|'video'|'file', name, href} whose href
  * is already relative to the report dir) and returns a self-contained HTML string
  * embedding <img> screenshots and <video> .webm clips. No I/O.
  */
@@ -13,6 +13,7 @@ function attachmentHtml(a) {
   if (a.type === 'video') {
     return `<figure class="att"><video src="${esc(a.href)}" controls preload="metadata" playsinline></video><figcaption>${esc(a.name || '')}</figcaption></figure>`;
   }
+  if (a.type === 'file') return `<figure class="att"><a href="${esc(a.href)}" download>${esc(a.name || 'Download evidence')}</a></figure>`;
   return `<figure class="att"><a href="${esc(a.href)}" target="_blank"><img src="${esc(a.href)}" loading="lazy" alt="${esc(a.name || '')}"></a><figcaption>${esc(a.name || '')}</figcaption></figure>`;
 }
 
