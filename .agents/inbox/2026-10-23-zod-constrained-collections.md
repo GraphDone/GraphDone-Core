@@ -92,3 +92,13 @@ behavior test and real consumer compatibility checks. Preserve accepted input,
 default and failure behavior without relying on complete error-message text.
 Do not describe this bounded-collection correction as complete request-resource
 protection, a deployed fix, or a new authentication/data-isolation guarantee.
+
+The combined candidate `df1fac165a5f1421602c3706db8b86090b54a4f5` subsequently
+passed all 603 unit cases (26 gated skips), 161 harness cases and nine real
+Neo4j/entry-point contract cases with the separate stderr-diagnostic correction.
+Its compiled production-mode MCP probe recorded zero protocol errors and
+verified owned child/data cleanup. The fresh-cache production audit exited 0
+with eight moderate findings and no high/critical finding. The consolidated
+[validation ledger](../../docs/quality/CORE_VALIDATION_2026-10-23.md#follow-up-the-fresh-production-audit-held-final-approval)
+keeps this combined evidence separate from the focused SDK fixture and from
+pending final public CI/review.
