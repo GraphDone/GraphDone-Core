@@ -34,8 +34,16 @@ The final-fixture failing-before log is retained in the owned regression worktre
 in `zod-sdk-baseline.log` in the same directory. Install output is retained
 as `/tmp/graphdone-zod-baseline-install.log`. The test is
 [`packages/mcp-server/tests/zod-sdk-compatibility.test.ts`](../../packages/mcp-server/tests/zod-sdk-compatibility.test.ts).
-Patched-dependency results must be recorded separately before this test patch
-is merged with the dependency correction.
+After cherry-picking the separate manifest/lock correction
+`b843a1baef4b5de1efbca3cd73c1a0346806afff` onto the regression branch, the
+combined local head was `8d206e2cd2698082ee71d709cd86a3d3d0d7fc58`. A fresh
+`npm ci --legacy-peer-deps --no-audit --no-fund` installed Zod 4.6.7 with unchanged
+SDK 1.32.2. The same command and unchanged test file then passed **13/13**,
+zero failures/skips, exit 0 in 441ms. All five previously failing bounded cases
+passed; the eight SDK compatibility/control cases stayed passing. Logs are
+`zod-patched-install.log` and `zod-sdk-patched.log` beside the retained baseline.
+No production audit or complete application result is inferred from this
+focused run.
 
 No GraphDone application source imports Zod directly. The MCP SDK already uses
 `zod/v4` from the 3.25.76 package for the low-level `Server` and stdio schemas;
@@ -45,6 +53,12 @@ arguments, default result content, malformed calls, invalid results and later
 recovery. A small stdio buffer checks invalid-envelope rejection, next-message
 parsing and the configured byte cap. These fixture handlers do not start the
 GraphDone entry point or prove GraphService/Neo4j behavior.
+
+Malformed call parameters reject before fixture dispatch. The SDK's existing
+low-level parse path maps these schema failures to an MCP error; the tests do
+not require a specific message or claim every request error is `InvalidParams`.
+Invalid handler results do use `InvalidParams`, and the next valid result still
+succeeds. Schema/default compatibility here does not establish every SDK API.
 
 Core registers `tools/list` and `tools/call`, not completion. The constrained
 completion schema is an SDK regression surface, not proof of a reachable Core
