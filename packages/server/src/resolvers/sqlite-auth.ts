@@ -3,11 +3,20 @@ import { sqliteAuthStore } from '../auth/sqlite-auth.js';
 import { generateToken } from '../utils/auth.js';
 import { verifyCaptcha } from '../utils/captcha.js';
 import { randomUUID } from 'node:crypto';
+import { passwordLoginLimiter, PasswordLoginLimitError } from '../auth/password-login-limiter.js';
 
 interface LoginInput {
   emailOrUsername: string;
   password: string;
   captchaPayload?: string;
+}
+
+interface LoginContext {
+  req?: {
+    ip?: string;
+    socket?: { remoteAddress?: string };
+    connection?: { remoteAddress?: string };
+  };
 }
 
 interface SignupInput {
@@ -322,14 +331,24 @@ export const sqliteAuthResolvers = {
 
   Mutation: {
     // Login mutation - SQLite only
-    login: async (_: any, { input }: { input: LoginInput }) => {
+    login: async (_: any, { input }: { input: LoginInput }, context: LoginContext = {}) => {
       console.log(`🔐 Login attempt for: ${input.emailOrUsername}`);
+      let ipAttempt: ReturnType<typeof passwordLoginLimiter.reserveIp> | undefined;
+      let accountAttempt: ReturnType<typeof passwordLoginLimiter.reserveAccount> | undefined;
+      let outcome: 'success' | 'failure' | 'cancel' = 'cancel';
 
       try {
+        const ip = context?.req?.ip || context?.req?.socket?.remoteAddress || context?.req?.connection?.remoteAddress || 'unknown';
+        ipAttempt = passwordLoginLimiter.reserveIp(ip);
+        const identifier = input.emailOrUsername.trim().toLowerCase();
+        const user = await sqliteAuthStore.findUserByEmailOrUsername(identifier);
+        accountAttempt = passwordLoginLimiter.reserveAccount(user ? `user:${user.id}` : `identifier:${identifier}`);
+
         // Verify CAPTCHA if provided
         if (input.captchaPayload) {
           const isCaptchaValid = await verifyCaptcha(input.captchaPayload);
           if (!isCaptchaValid) {
+            outcome = 'failure';
             console.log('❌ CAPTCHA verification failed');
             throw new GraphQLError('CAPTCHA verification failed', {
               extensions: { code: 'CAPTCHA_FAILED' }
@@ -338,10 +357,8 @@ export const sqliteAuthResolvers = {
           console.log('✅ CAPTCHA verified');
         }
 
-        // SQLite-only authentication
-        const user = await sqliteAuthStore.findUserByEmailOrUsername(input.emailOrUsername);
-        
         if (!user) {
+          outcome = 'failure';
           console.log('❌ User not found:', input.emailOrUsername);
           throw new GraphQLError('Invalid credentials', {
             extensions: { code: 'UNAUTHENTICATED' }
@@ -353,6 +370,7 @@ export const sqliteAuthResolvers = {
         // Verify password
         const validPassword = await sqliteAuthStore.validatePassword(user, input.password);
         if (!validPassword) {
+          outcome = 'failure';
           console.log('❌ Invalid password for user:', user.username);
           throw new GraphQLError('Invalid credentials', {
             extensions: { code: 'UNAUTHENTICATED' }
@@ -361,6 +379,7 @@ export const sqliteAuthResolvers = {
 
         // Check if user is active
         if (!user.isActive) {
+          outcome = 'failure';
           console.log('❌ User is deactivated:', user.username);
           throw new GraphQLError('Account is deactivated', {
             extensions: { code: 'FORBIDDEN' }
@@ -368,6 +387,7 @@ export const sqliteAuthResolvers = {
         }
 
         const token = generateToken(user.id, user.email, user.role);
+        outcome = 'success';
         console.log(`✅ Login successful: ${user.username} (${user.role})`);
 
         return {
@@ -378,6 +398,12 @@ export const sqliteAuthResolvers = {
           }
         };
       } catch (error) {
+        if (error instanceof PasswordLoginLimitError) {
+          outcome = 'failure';
+          throw new GraphQLError(error.message, {
+            extensions: { code: 'RATE_LIMIT_EXCEEDED', retryAfter: error.retryAfter, rateLimitExceeded: true, http: { status: 429 } },
+          });
+        }
         if (error instanceof GraphQLError) {
           throw error;
         }
@@ -385,6 +411,9 @@ export const sqliteAuthResolvers = {
         throw new GraphQLError('Login failed', {
           extensions: { code: 'INTERNAL_SERVER_ERROR' }
         });
+      } finally {
+        accountAttempt?.finish(outcome);
+        ipAttempt?.finish(outcome);
       }
     },
 
