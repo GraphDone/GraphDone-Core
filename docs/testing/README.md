@@ -39,6 +39,18 @@ Supplied summary counters must be valid and agree with the individual results.
 Vitest's legacy nonfailed total may include skipped/todo cases; the harness still
 derives its passing count from assertions that actually passed.
 
+On POSIX systems, each command owns a separate process group. A timeout sends
+that group SIGTERM, allows a one-second grace period, then sends SIGKILL even if
+the wrapper already closed. Output draining is limited to another 100 ms.
+SIGINT/SIGTERM cancellation immediately stops all active owned command groups;
+the runner exits with 130/143 unless a caller already owns signal handling.
+Unrelated processes are never selected for cleanup. On Windows, only the direct
+child is terminated; output draining is bounded but descendant cleanup is not
+yet supported or validated. Process groups are not a sandbox: descendants that
+deliberately create a new session/group can escape cleanup. OS-level stalls and
+event-loop starvation can also delay timers. See the
+[timeout incident and regressions](../quality/TEST_TIMEOUT_REVIEW_2026-10-23.md).
+
 Reports include the starting/ending Git revision, dirty flag, and SHA-256 source
 fingerprint. A source change during execution fails the run. Dirty trees are
 identified rather than presented as clean commits. The fingerprint covers Git
@@ -100,6 +112,9 @@ that write passing, empty, malformed, skipped, and flaky reports before success,
 failure, or timeout. `tests/lib/runner/unified-cli.test.mjs` uses disposable Git
 repositories to check selection validation, output preservation, provenance, and
 source-change rejection. These are harness regressions, not product acceptance.
+`tests/lib/runner/runSequence.test.mjs` spawns real, disposable process trees to
+check bounded timeouts, forced teardown, cancellation, and unrelated-process
+preservation. POSIX-specific checks are explicitly skipped on Windows.
 
 ## Authentication in tests
 Use the battle-tested helper for every authenticated spec:
