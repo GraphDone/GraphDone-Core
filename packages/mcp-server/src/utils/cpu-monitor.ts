@@ -73,7 +73,7 @@ export class CPUMonitor {
     }
     // Production test servers: Set ENABLE_CPU_THROTTLING_IN_TESTS=true to enable
     else if (process.env.ENABLE_CPU_THROTTLING_IN_TESTS === 'true') {
-      console.log('🔒 CPU Monitor: Production test server mode - CPU throttling ENABLED');
+      console.error('🔒 CPU Monitor: Production test server mode - CPU throttling ENABLED');
       // Use production settings even in test environment
     }
     
@@ -95,7 +95,7 @@ export class CPUMonitor {
     this.maxCpuPercent = 95; // Much higher threshold for tests
     this.maxOperationsPerWindow = 5000; // Allow more operations during testing
     this.heavyOperationThreshold = 500; // Allow longer operations during testing
-    console.log('🧪 CPU Monitor: Test mode enabled - relaxed throttling');
+    console.error('🧪 CPU Monitor: Test mode enabled - relaxed throttling');
   }
   
   /**
@@ -106,7 +106,7 @@ export class CPUMonitor {
     this.maxCpuPercent = 80;
     this.maxOperationsPerWindow = 1000;
     this.heavyOperationThreshold = 100;
-    console.log('🏭 CPU Monitor: Production mode enabled - strict throttling');
+    console.error('🏭 CPU Monitor: Production mode enabled - strict throttling');
   }
 
   /**
@@ -117,7 +117,7 @@ export class CPUMonitor {
     this.maxCpuPercent = 999; // Effectively disabled
     this.maxOperationsPerWindow = 999999; // Effectively unlimited
     this.heavyOperationThreshold = 999999; // No throttling for heavy operations
-    console.log('🚫 CPU Monitor: DISABLED for CI environment - no throttling');
+    console.error('🚫 CPU Monitor: DISABLED for CI environment - no throttling');
   }
 
   /**
