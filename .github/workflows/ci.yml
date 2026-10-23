@@ -181,7 +181,7 @@ jobs:
           TEST_URL: http://localhost:3127
           CI: true
       - name: New-user quality gate (headed under virtual display)
-        run: xvfb-run --auto-servernum npm run qc:new-user
+        run: xvfb-run --auto-servernum node tests/run-unified.mjs --sequence new-user --out test-artifacts/ci-new-user
         env:
           TEST_URL: http://localhost:3127
           CI: true
