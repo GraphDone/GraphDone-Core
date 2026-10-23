@@ -313,6 +313,7 @@ describe.skipIf(!configured)('MCP GraphService — real Neo4j contract', () => {
     });
     const options = { timeout: 3000, maxTotalTimeout: 3000 };
     let pid: number | null = null;
+    let createdNodeId: string | null = null;
     try {
       await client.connect(transport, { timeout: 5000, maxTotalTimeout: 5000 });
       pid = transport.pid;
@@ -327,6 +328,7 @@ describe.skipIf(!configured)('MCP GraphService — real Neo4j contract', () => {
       expect(created.isError).not.toBe(true);
       const node = JSON.parse((created.content[0] as { text: string }).text).node;
       createdNodes.push(node.id);
+      createdNodeId = node.id;
       expect(node.id).toBeTruthy();
       const read = await client.callTool({ name: 'get_node_details', arguments: { node_id: node.id } }, CallToolResultSchema, options);
       expect(read.isError).not.toBe(true);
@@ -346,30 +348,66 @@ describe.skipIf(!configured)('MCP GraphService — real Neo4j contract', () => {
       } finally {
         await session.close();
       }
-      expect(protocolErrors, 'Only valid JSON-RPC messages may appear on stdout').toEqual([]);
-      expect(diagnostics).toContain('Memory monitoring started');
-      expect(diagnostics).toContain('CPU Monitor: DISABLED for CI environment');
-      expect(diagnostics).toContain('Recorded write consistency for createNode');
     } finally {
-      pid ??= transport.pid;
       try {
-        await client.close();
-      } finally {
-        await transport.close();
-      }
-      if (pid) {
-        let alive = true;
-        for (let attempt = 0; attempt < 20; attempt++) {
-          try { process.kill(pid, 0); }
-          catch (error) {
-            if ((error as { code?: string }).code !== 'ESRCH') throw error;
-            alive = false;
-            break;
-          }
-          await new Promise(resolve => setTimeout(resolve, 50));
+        pid ??= transport.pid;
+        try {
+          await client.close();
+        } finally {
+          await transport.close();
         }
-        expect(alive, 'The owned MCP subprocess must terminate').toBe(false);
+        if (pid) {
+          let alive = true;
+          for (let attempt = 0; attempt < 20; attempt++) {
+            try { process.kill(pid, 0); }
+            catch (error) {
+              if ((error as { code?: string }).code !== 'ESRCH') throw error;
+              alive = false;
+              break;
+            }
+            await new Promise(resolve => setTimeout(resolve, 50));
+          }
+          expect(alive, 'The owned MCP subprocess must terminate').toBe(false);
+        }
+      } finally {
+        createdGraphs.splice(createdGraphs.indexOf(graphId), 1);
+        if (createdNodeId) createdNodes.splice(createdNodes.indexOf(createdNodeId), 1);
+        const cleanup = driver.session();
+        try {
+          const edges = await cleanup.run(`
+            MATCH (g:Graph {id: $graphId})
+            OPTIONAL MATCH (g)<-[:BELONGS_TO]-(w:WorkItem)
+            OPTIONAL MATCH (w)<-[:EDGE_SOURCE|EDGE_TARGET]-(e:Edge)
+            WITH collect(DISTINCT e) AS items
+            FOREACH (e IN items | DETACH DELETE e)
+            RETURN size(items) AS deleted`, { graphId }, { timeout: 3000 });
+          expect(edges.records[0].get('deleted').toNumber(), 'This fixture creates no edges').toBe(0);
+          expect(edges.summary.counters.updates().nodesDeleted).toBe(0);
+          const nodes = await cleanup.run(`
+            MATCH (w:WorkItem)-[:BELONGS_TO]->(:Graph {id: $graphId})
+            WITH collect(w) AS items, collect(w.id) AS ids
+            FOREACH (w IN items | DETACH DELETE w)
+            RETURN ids`, { graphId }, { timeout: 3000 });
+          const removedIds = nodes.records[0].get('ids') as string[];
+          expect(removedIds).toEqual(createdNodeId ? [createdNodeId] : []);
+          expect(nodes.summary.counters.updates().nodesDeleted).toBe(removedIds.length);
+          const graph = await cleanup.run(`
+            MATCH (g:Graph {id: $graphId})
+            WITH collect(g) AS items
+            FOREACH (g IN items | DETACH DELETE g)
+            RETURN size(items) AS deleted`, { graphId }, { timeout: 3000 });
+          expect(graph.records[0].get('deleted').toNumber()).toBe(1);
+          expect(graph.summary.counters.updates().nodesDeleted).toBe(1);
+          const absent = await cleanup.run('MATCH (n) WHERE n.id IN $ids RETURN count(n) AS remaining', { ids: [graphId, ...removedIds] }, { timeout: 3000 });
+          expect(absent.records[0].get('remaining').toNumber()).toBe(0);
+        } finally {
+          await cleanup.close();
+        }
       }
     }
+    expect(protocolErrors, 'Only valid JSON-RPC messages may appear on stdout, including shutdown').toEqual([]);
+    expect(diagnostics).toContain('Memory monitoring started');
+    expect(diagnostics).toContain('CPU Monitor: DISABLED for CI environment');
+    expect(diagnostics).toContain('Recorded write consistency for createNode');
   });
 });
