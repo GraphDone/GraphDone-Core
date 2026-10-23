@@ -19,7 +19,8 @@ page at fixed coordinates, opening a work item and blocking the next nav click.
 
 The two dialog cases now create their own graph and named task, select actual
 visible controls/current headings, retain every viewport/paint-order assertion,
-and clean up only that graph's fixture. The navigation case asserts that Escape
+and clean up only that graph's fixture, deleting edges before work items and
+the graph so failed cleanup preserves ownership links. The navigation case asserts that Escape
 hides More, removing the blind follow-up click and swallowed keyboard failure.
 
 The final functional patch ran against the unchanged application on
@@ -38,3 +39,7 @@ still required. This emulated browser evidence does not establish native mobile
 keyboard or screen-reader behavior. Logs/screenshots are retained in the owned
 worktrees' ignored `test-artifacts/audit-20261023/` directories and summarized in
 public review comments.
+
+Independent review required the repository's edge-first cleanup rule. After
+adding graph-scoped edge deletion before tasks/graph, the same four headed
+cases passed again in 35.6 seconds on the unchanged application (exit 0).
