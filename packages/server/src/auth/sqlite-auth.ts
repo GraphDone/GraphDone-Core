@@ -867,6 +867,28 @@ class SQLiteAuthStore {
     });
   }
 
+  async findFolderById(folderId: string): Promise<any | null> {
+    await this.initialize();
+    const db = await this.getDb();
+    return new Promise((resolve, reject) => {
+      db.get('SELECT * FROM folders WHERE id = ?', [folderId], (error, row: any) => {
+        if (error) reject(error);
+        else resolve(row ? { ...row, type: row.type.toLowerCase() } : null);
+      });
+    });
+  }
+
+  async isTeamMember(userId: string, teamId: string): Promise<boolean> {
+    await this.initialize();
+    const db = await this.getDb();
+    return new Promise((resolve, reject) => {
+      db.get('SELECT 1 FROM user_teams WHERE userId = ? AND teamId = ?', [userId, teamId], (error, row) => {
+        if (error) reject(error);
+        else resolve(Boolean(row));
+      });
+    });
+  }
+
   // Get user's folder structure
   async getUserFolders(userId: string): Promise<any[]> {
     await this.initialize();
@@ -876,17 +898,17 @@ class SQLiteAuthStore {
       const sql = `
         SELECT f.*, 
           CASE 
-            WHEN f.type = 'team' THEN t.name
-            WHEN f.type = 'user' THEN u.name
+            WHEN LOWER(f.type) = 'team' THEN t.name
+            WHEN LOWER(f.type) = 'user' THEN u.name
             ELSE 'System'
           END as ownerName
         FROM folders f
-        LEFT JOIN teams t ON f.type = 'team' AND f.ownerId = t.id
-        LEFT JOIN users u ON f.type = 'user' AND f.ownerId = u.id
+        LEFT JOIN teams t ON LOWER(f.type) = 'team' AND f.ownerId = t.id
+        LEFT JOIN users u ON LOWER(f.type) = 'user' AND f.ownerId = u.id
         WHERE 
-          f.type = 'system' 
-          OR (f.type = 'user' AND f.ownerId = ?)
-          OR (f.type = 'team' AND f.ownerId IN (
+          LOWER(f.type) = 'system'
+          OR (LOWER(f.type) = 'user' AND f.ownerId = ?)
+          OR (LOWER(f.type) = 'team' AND f.ownerId IN (
             SELECT teamId FROM user_teams WHERE userId = ?
           ))
         ORDER BY f.type, f.position, f.name
@@ -896,7 +918,7 @@ class SQLiteAuthStore {
         if (err) {
           reject(err);
         } else {
-          resolve(rows);
+          resolve(rows.map(row => ({ ...row, type: row.type.toLowerCase() })));
         }
       });
     });
@@ -1045,7 +1067,7 @@ class SQLiteAuthStore {
 
     return new Promise((resolve, reject) => {
       // Check if user already has personal folders
-      db.get('SELECT id FROM folders WHERE type = ? AND ownerId = ?', ['user', userId], (err, row) => {
+      db.get('SELECT id FROM folders WHERE LOWER(type) = ? AND ownerId = ?', ['user', userId], (err, row) => {
         if (err) {
           reject(err);
           return;
