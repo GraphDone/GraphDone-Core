@@ -20,6 +20,7 @@ const SHOT_ROOT = path.resolve(process.cwd(), 'test-artifacts/matrix');
 const VIEWPORTS = [
   { name: 'phone-360', width: 360, height: 640 },
   { name: 'phone-390', width: 390, height: 844 },
+  { name: 'phone-landscape', width: 844, height: 390 },
   { name: 'tablet-768', width: 768, height: 1024 },
   { name: 'tablet-1024', width: 1024, height: 768 },
   { name: 'laptop-1440', width: 1440, height: 900 },

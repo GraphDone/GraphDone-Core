@@ -67,6 +67,26 @@ test.describe('overlay dismissal: Esc + click-outside @dismissal', () => {
     expect(await isGone(page, '[data-testid="details-type-badge"]'), 'details modal closed on Escape').toBe(true);
   });
 
+  test('detail pickers consume Escape without losing an unsaved draft', async ({ page }) => {
+    await openWorkspace(page, 'cards');
+    await page.locator('[data-testid="view-content"] .grid > div').first().click().catch(() => {});
+    await page.waitForTimeout(1000);
+    const title = page.getByLabel('Work item title');
+    if (!(await title.isVisible().catch(() => false))) test.skip(true, 'details modal did not open');
+
+    const draft = `Unsaved draft ${Date.now()}`;
+    await title.fill(draft);
+    for (const picker of ['type', 'status']) {
+      const badge = page.locator(`[data-testid="details-${picker}-badge"]`);
+      await badge.click();
+      await expect(page.locator(`[data-testid="details-${picker}-dropdown"]`)).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(page.locator(`[data-testid="details-${picker}-dropdown"]`)).toBeHidden();
+      await expect(title, `${picker} picker Escape preserves the open editor and draft`).toHaveValue(draft);
+      await expect(badge).toBeFocused();
+    }
+  });
+
   test('work-item details modal closes on backdrop click', async ({ page }) => {
     await openWorkspace(page, 'cards');
     await page.locator('[data-testid="view-content"] .grid > div').first().click().catch(() => {});

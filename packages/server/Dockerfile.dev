@@ -1,4 +1,4 @@
-FROM node:18-alpine
+FROM node:22-alpine
 
 # Install security updates and curl for health checks
 RUN apk update && apk upgrade && apk add --no-cache curl dumb-init
@@ -23,7 +23,7 @@ COPY --chown=appuser:appgroup packages/web/package.json packages/web/
 COPY --chown=appuser:appgroup packages/mcp-server/package.json packages/mcp-server/
 
 # Install all dependencies
-RUN npm ci
+RUN npm ci --legacy-peer-deps
 
 # Copy source code
 COPY --chown=appuser:appgroup packages/ packages/

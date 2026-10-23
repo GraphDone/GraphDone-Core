@@ -73,11 +73,9 @@ const globalDialogManager = new DialogManager();
 if (typeof window !== 'undefined') {
   window.addEventListener('keydown', (event) => {
     if (event.key !== 'Escape') return;
-    // Let focused inputs handle their own Escape (e.g. cancel inline edit)
-    const target = event.target as HTMLElement | null;
-    const inEditable =
-      target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
-    if (!inEditable && globalDialogManager.handleEscape()) {
+    // Inline editors can consume Escape with preventDefault/stopPropagation.
+    // Ordinary modal fields must still allow dismissal.
+    if (!event.defaultPrevented && globalDialogManager.handleEscape()) {
       event.stopPropagation();
     }
   });

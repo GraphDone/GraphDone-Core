@@ -1,0 +1,218 @@
+[
+  {
+    "id": "HOME-01",
+    "name": "Household planning",
+    "actor": "A parent organizing a family week",
+    "teamSize": 1,
+    "goal": "Permission form, transport and a packed lunch are ready.",
+    "preconditions": [
+      "Authenticated development admin on Core (role coverage tested separately), or isolated ephemeral guest on local D1",
+      "Empty owned graph; no existing user data changed"
+    ],
+    "viewport": {
+      "width": 360,
+      "height": 640
+    },
+    "input": {
+      "title": "Prepare a school trip",
+      "note": "Family arrangements confirmed.",
+      "status": "Completed"
+    },
+    "steps": [
+      {
+        "action": "Create the first task through New work item and enter its title",
+        "expected": "Exactly one task persists in the selected graph"
+      },
+      {
+        "action": "Open the task, record a progress note and change status",
+        "expected": "The saved title, note and status match user input"
+      },
+      {
+        "action": "Reload Activity and open Analytics",
+        "expected": "Recorded progress and totals survive navigation and reload"
+      }
+    ],
+    "scope": "Single actor lifecycle in a team context; does not verify invitations, simultaneous editors, role enforcement or scale",
+    "automation": "tests/e2e/quality/persona-lifecycle.spec.ts"
+  },
+  {
+    "id": "STUDENT-01",
+    "name": "Student project",
+    "actor": "A student coordinating a four-person assignment",
+    "teamSize": 4,
+    "goal": "A reproducible demo and a clear explanation are ready for teammates.",
+    "preconditions": [
+      "Authenticated development admin on Core (role coverage tested separately), or isolated ephemeral guest on local D1",
+      "Empty owned graph; no existing user data changed"
+    ],
+    "viewport": {
+      "width": 844,
+      "height": 390
+    },
+    "input": {
+      "title": "Prepare the project demonstration",
+      "note": "Demo tested; teammates can review the walkthrough.",
+      "status": "In Review"
+    },
+    "steps": [
+      {
+        "action": "Create the first task through New work item and enter its title",
+        "expected": "Exactly one task persists in the selected graph"
+      },
+      {
+        "action": "Open the task, record a progress note and change status",
+        "expected": "The saved title, note and status match user input"
+      },
+      {
+        "action": "Reload Activity and open Analytics",
+        "expected": "Recorded progress and totals survive navigation and reload"
+      }
+    ],
+    "scope": "Single actor lifecycle in a team context; does not verify invitations, simultaneous editors, role enforcement or scale",
+    "automation": "tests/e2e/quality/persona-lifecycle.spec.ts"
+  },
+  {
+    "id": "SOLO-01",
+    "name": "Solo engineering",
+    "actor": "An independent developer",
+    "teamSize": 1,
+    "goal": "Keyboard users can sign in and recover from validation errors.",
+    "preconditions": [
+      "Authenticated development admin on Core (role coverage tested separately), or isolated ephemeral guest on local D1",
+      "Empty owned graph; no existing user data changed"
+    ],
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "input": {
+      "title": "Fix an inaccessible sign-in form",
+      "note": "Keyboard path verified after the fix.",
+      "status": "Completed"
+    },
+    "steps": [
+      {
+        "action": "Create the first task through New work item and enter its title",
+        "expected": "Exactly one task persists in the selected graph"
+      },
+      {
+        "action": "Open the task, record a progress note and change status",
+        "expected": "The saved title, note and status match user input"
+      },
+      {
+        "action": "Reload Activity and open Analytics",
+        "expected": "Recorded progress and totals survive navigation and reload"
+      }
+    ],
+    "scope": "Single actor lifecycle in a team context; does not verify invitations, simultaneous editors, role enforcement or scale",
+    "automation": "tests/e2e/quality/persona-lifecycle.spec.ts"
+  },
+  {
+    "id": "TEAM-01",
+    "name": "Small team",
+    "actor": "A coordinator in a six-person community team",
+    "teamSize": 6,
+    "goal": "The venue and accessibility arrangements must be confirmed before invitations.",
+    "preconditions": [
+      "Authenticated development admin on Core (role coverage tested separately), or isolated ephemeral guest on local D1",
+      "Empty owned graph; no existing user data changed"
+    ],
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "input": {
+      "title": "Confirm the community event venue",
+      "note": "Waiting for the venue to confirm step-free access.",
+      "status": "Blocked"
+    },
+    "steps": [
+      {
+        "action": "Create the first task through New work item and enter its title",
+        "expected": "Exactly one task persists in the selected graph"
+      },
+      {
+        "action": "Open the task, record a progress note and change status",
+        "expected": "The saved title, note and status match user input"
+      },
+      {
+        "action": "Reload Activity and open Analytics",
+        "expected": "Recorded progress and totals survive navigation and reload"
+      }
+    ],
+    "scope": "Single actor lifecycle in a team context; does not verify invitations, simultaneous editors, role enforcement or scale",
+    "automation": "tests/e2e/quality/persona-lifecycle.spec.ts"
+  },
+  {
+    "id": "LARGE-01",
+    "name": "Large team",
+    "actor": "A release coordinator in a 60-person engineering organization",
+    "teamSize": 60,
+    "goal": "Dependencies, verification evidence and outstanding risks are visible.",
+    "preconditions": [
+      "Authenticated development admin on Core (role coverage tested separately), or isolated ephemeral guest on local D1",
+      "Empty owned graph; no existing user data changed"
+    ],
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "input": {
+      "title": "Review the release readiness checklist",
+      "note": "Readiness evidence collected; release review requested.",
+      "status": "In Review"
+    },
+    "steps": [
+      {
+        "action": "Create the first task through New work item and enter its title",
+        "expected": "Exactly one task persists in the selected graph"
+      },
+      {
+        "action": "Open the task, record a progress note and change status",
+        "expected": "The saved title, note and status match user input"
+      },
+      {
+        "action": "Reload Activity and open Analytics",
+        "expected": "Recorded progress and totals survive navigation and reload"
+      }
+    ],
+    "scope": "Single actor lifecycle in a team context; does not verify invitations, simultaneous editors, role enforcement or scale",
+    "automation": "tests/e2e/quality/persona-lifecycle.spec.ts"
+  },
+  {
+    "id": "RESEARCH-01",
+    "name": "Research team",
+    "actor": "A researcher in a 12-person aerospace team",
+    "teamSize": 12,
+    "goal": "Record model inputs, units, assumptions and reproducibility evidence.",
+    "preconditions": [
+      "Authenticated development admin on Core (role coverage tested separately), or isolated ephemeral guest on local D1",
+      "Empty owned graph; no existing user data changed"
+    ],
+    "viewport": {
+      "width": 768,
+      "height": 1024
+    },
+    "input": {
+      "title": "Reproduce the trajectory simulation",
+      "note": "Simulation rerun with documented inputs; independent review pending.",
+      "status": "In Review"
+    },
+    "steps": [
+      {
+        "action": "Create the first task through New work item and enter its title",
+        "expected": "Exactly one task persists in the selected graph"
+      },
+      {
+        "action": "Open the task, record a progress note and change status",
+        "expected": "The saved title, note and status match user input"
+      },
+      {
+        "action": "Reload Activity and open Analytics",
+        "expected": "Recorded progress and totals survive navigation and reload"
+      }
+    ],
+    "scope": "Single actor lifecycle in a team context; does not verify invitations, simultaneous editors, role enforcement or scale",
+    "automation": "tests/e2e/quality/persona-lifecycle.spec.ts"
+  }
+]

@@ -4,12 +4,18 @@ GraphDone has one reproducible test entry — the **unified harness** — plus t
 focused **smoke gate** that must pass before any "it works" claim.
 
 ```bash
-TEST_URL=http://localhost:3127 npm run test:smoke   # THE GATE (blocking, ~30s)
+TEST_URL=http://localhost:3127 npm run test:smoke   # THE GATE against a disposable stack
 npm run test:unified                                # full battery → dual report
 npm run test:unified:smoke                          # fast subset (unit + gate + a focused e2e)
 npm run test:unified:open                            # full battery, then open the HTML report
 npm run test:unified:lib                             # the harness's own unit tests (node --test)
 ```
+
+Run from the repository root; the harness rejects a different working directory
+so tests and source provenance cannot refer to different checkouts. Browser suites mutate data: use an owned disposable
+local stack with test accounts and seeded data. `TEST_URL` selects an existing
+stack; it does not make that stack disposable. `npm test` runs package unit tests,
+not these browser workflows.
 
 ## Dual output (one run, two artifacts)
 The harness writes to `test-artifacts/unified/`:
@@ -18,9 +24,48 @@ The harness writes to `test-artifacts/unified/`:
   plus the cloud-audit summary. To share it, zip the whole folder (assets are
   referenced relatively).
 - **`report.json`** — machine-parsable (`schema: graphdone.unified-report/1`):
-  rollup status + totals + per-sequence counts. Per-sequence raw JSON lands in
+  rollup status + totals + per-sequence counts. Per-sequence normalized JSON lands in
   `test-artifacts/unified/sequences/`.
-- **exit code** = rollup status (any blocking failure → 1), so it doubles as a CI gate.
+- **exit code** is nonzero on execution/evidence failure; unknown profiles,
+  sequences, missing option values, and unsafe output targets fail before tests
+  run. Optional skipped reports exit zero with an explicit `skipped` status.
+
+The adapters require actual case results and a successful process exit. Missing,
+malformed, or empty reports cannot become passes. A nonzero exit, timeout, global
+test error, or flaky retry fails even if some cases passed. Required sequences
+also fail when cases are skipped. Explicitly optional report sequences may skip
+when their prerequisites are absent; those cases never count as passing.
+Supplied summary counters must be valid and agree with the individual results.
+Vitest's legacy nonfailed total may include skipped/todo cases; the harness still
+derives its passing count from assertions that actually passed.
+
+On POSIX systems, each command owns a separate process group. A timeout sends
+that group SIGTERM, allows a one-second grace period, then sends SIGKILL even if
+the wrapper already closed. Output draining is limited to another 100 ms.
+SIGINT/SIGTERM cancellation immediately stops all active owned command groups;
+the runner exits with 130/143 unless a caller already owns signal handling.
+Unrelated processes are never selected for cleanup. On Windows, only the direct
+child is terminated; output draining is bounded but descendant cleanup is not
+yet supported or validated. Process groups are not a sandbox: descendants that
+deliberately create a new session/group can escape cleanup. OS-level stalls and
+event-loop starvation can also delay timers. See the
+[timeout incident and regressions](../quality/TEST_TIMEOUT_REVIEW_2026-10-23.md).
+
+Reports include the starting/ending Git revision, dirty flag, and SHA-256 source
+fingerprint. A source change during execution fails the run. Dirty trees are
+identified rather than presented as clean commits. The fingerprint covers Git
+HEAD, tracked changes, and nonignored untracked source; ignored build outputs,
+external services, and deployed artifacts need separate identity checks. A local
+passing report does not establish production parity or complete feature coverage.
+
+Use a unique `--out test-artifacts/runs/<run-id>` for retained or parallel runs.
+The default output slot remains compatible with the dashboard. A rerun can
+refresh a harness-owned output directory without recursively deleting its
+contents. Repository roots/ancestors, actual Git directories (including linked
+worktree/common metadata and aliases), symbolic links inside report
+directories, and nonempty unrelated output directories are rejected. The current
+`report.json` identifies the cases and attachments belonging to that run; older
+unreferenced artifacts may remain in a reused slot.
 
 ## How it's wired
 - `tests/run-unified.mjs` — the entry. `--profile {smoke|pr|full|report}`,
@@ -39,9 +84,54 @@ The harness writes to `test-artifacts/unified/`:
 | profile | sequences | use |
 | --- | --- | --- |
 | `smoke` | unit-web, smoke gate, a focused auth e2e | fast blocking signal |
-| `pr` | + graph e2e, mobile, perf budgets | broader blocking set for PRs |
+| `pr` | + graph e2e, mobile, perf budgets | broader PR signal; optional sequences remain identified |
 | `full` | + diagnostics, showcase (video), matrix, vlm, perf-scale, cloud-audit | everything |
 | `report` | the capture-heavy report sequences only | regenerate galleries |
+
+The required performance and mobile sequences use one worker, zero test retries,
+and the strict reporter in CI. Run them against an owned disposable stack with:
+
+```bash
+TEST_URL=http://localhost:3127 node tests/run-unified.mjs --sequence perf-budgets --out test-artifacts/runs/perf-check
+TEST_URL=http://localhost:3127 node tests/run-unified.mjs --sequence mobile --out test-artifacts/runs/mobile-check
+```
+
+Strict `new-user`, `mobile`, and `perf-budgets` sequences retain traces on failure
+even though retries are disabled. The adapter copies trace ZIPs and path-backed
+JSON attachments into the run's report assets, with download links in HTML and
+the dashboard, so the next Playwright invocation cannot erase that evidence.
+These downloadable files must be regular files inside the repository's
+`test-artifacts` directory, without symbolic links; unrelated source paths fail
+the evidence check. The button-content
+sweep labels each route/viewport step and attaches its navigation context plus
+the latest 50 console warning/error, page-error, and failed-request events on
+failure. In that custom JSON attachment, messages are capped at 1,000 characters;
+request URL queries/fragments and common credential patterns are removed. That
+JSON capture does not collect headers, request/response bodies, or browser
+storage. Playwright trace ZIPs are separate, unsanitized evidence and can contain
+raw network headers/bodies; keep raw traces with the disposable test artifacts,
+and publish summaries rather than raw traces. The diagnostic capture preserves the original
+failure and does not change assertion deadlines. See the
+[static-shell evidence lesson](../../.agents/inbox/2026-10-23-browser-startup-evidence.md).
+
+`perf-budgets` selects only the three cases in `tests/perf/graph-perf.spec.ts`.
+Each creates its own four-node, three-edge placed graph and selects that graph
+explicitly. Missing nodes, missing or stale metrics, skipped cases, and failed
+HTTP/GraphQL responses fail the gate. Saved-snapshot checks compare rendered
+world positions with the fixture and read the saved coordinates back from the
+API. All 20 timed `workItems` responses must contain exactly the owned fixture
+data before contributing to the latency result. This does not measure the MCP
+`get_graph_context` operation.
+
+Budgets remain 12 seconds to settle, alpha at most 0.02, average measured tick at
+most 8 ms, saved-snapshot drift at most 25 world-coordinate pixels, and query p95
+at most 800 ms. The existing conservative 20-sample percentile takes the largest
+sample. This small placed graph does not establish large-graph, unplaced-layout,
+or production performance; the separate scale sweep remains report-only.
+Cleanup deletes owned edges before work items and the graph. If a stage fails or
+its count is unconfirmed, cleanup fails and retains the remaining ownership path
+for diagnosis rather than detaching children. See the
+[evidence and instrumentation incident](../../.agents/inbox/2026-10-23-performance-gate-evidence.md).
 
 ## Test tree
 - `tests/e2e/<domain>/` — `smoke` (THE GATE), `auth`, `graph`, `ui`, `a11y`,
@@ -61,6 +151,15 @@ The harness writes to `test-artifacts/unified/`:
   and list it in the relevant profile(s). Blocking sequences belong in `smoke`/`pr`.
 - **The smoke gate** lives at `tests/e2e/smoke/user-smoke.spec.ts` — keep it the
   honest "a real user can use the app" check.
+
+`tests/lib/adapters/execution-evidence.test.mjs` runs controlled child processes
+that write passing, empty, malformed, skipped, and flaky reports before success,
+failure, or timeout. `tests/lib/runner/unified-cli.test.mjs` uses disposable Git
+repositories to check selection validation, output preservation, provenance, and
+source-change rejection. These are harness regressions, not product acceptance.
+`tests/lib/runner/runSequence.test.mjs` spawns real, disposable process trees to
+check bounded timeouts, forced teardown, cancellation, and unrelated-process
+preservation. POSIX-specific checks are explicitly skipped on Windows.
 
 ## Authentication in tests
 Use the battle-tested helper for every authenticated spec:

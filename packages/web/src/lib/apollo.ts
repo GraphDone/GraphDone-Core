@@ -1,10 +1,13 @@
-import { ApolloClient, InMemoryCache, createHttpLink, split, from } from '@apollo/client';
-import { setContext } from '@apollo/client/link/context';
+import { offlineLink } from './offline/link';
+import { ownerId, offlineEnabled } from './offline/engine';
+import { ApolloClient, ApolloLink, InMemoryCache, createHttpLink, split, from } from '@apollo/client';
+import { authLink } from './authLink';
 import { onError } from '@apollo/client/link/error';
 import { getMainDefinition } from '@apollo/client/utilities';
 import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
 import { createClient } from 'graphql-ws';
-import { getToken, clearSession } from './authStorage';
+import { cloudFailure, preserveCloudDraft, refreshHostedUsage } from './hostedUsage';
+import { getToken, getSessionOwnerId, clearSession } from './authStorage';
 
 // Dynamically construct GraphQL URLs based on current host
 const getGraphQLUrl = () => {
@@ -28,24 +31,22 @@ const httpLink = createHttpLink({
   uri: getGraphQLUrl(),
 });
 
-const authLink = setContext((_, { headers }) => {
-  const token = getToken();
-  return {
-    headers: {
-      ...headers,
-      authorization: token ? `Bearer ${token}` : '',
-    }
-  };
-});
-
-const errorLink = onError(({ graphQLErrors, networkError, operation, forward }) => {
+export const errorLink = onError(({ graphQLErrors, networkError, operation, forward }) => {
+  const expectedOwnerId = operation.getContext().expectedOwnerId;
+  if (expectedOwnerId !== undefined && expectedOwnerId !== getSessionOwnerId()) return;
+  if (graphQLErrors?.length || networkError) {
+    const definition = getMainDefinition(operation.query);
+    if (definition.kind === 'OperationDefinition' && definition.operation === 'mutation' && /workitem|edge|graph/i.test(operation.operationName)) preserveCloudDraft(operation.operationName, operation.variables);
+    for (const error of graphQLErrors || []) cloudFailure(String(error.extensions?.code || ''));
+    if (networkError && 'result' in networkError) cloudFailure((networkError.result as any)?.code);
+  }
   if (graphQLErrors) {
     for (const error of graphQLErrors) {
       // Check for authentication errors
       if (error.extensions?.code === 'UNAUTHENTICATED' || 
           error.message.includes('Invalid token') ||
           error.message.includes('Unauthorized')) {
-        clearSession();
+        if (!offlineEnabled || !ownerId()) clearSession();
         // Don't reload immediately - let auth context handle it
         return;
       }
@@ -55,7 +56,7 @@ const errorLink = onError(({ graphQLErrors, networkError, operation, forward }) 
   if (networkError) {
     // Handle 401/403 network errors
     if ('statusCode' in networkError && (networkError.statusCode === 401 || networkError.statusCode === 403)) {
-      clearSession();
+      if (!offlineEnabled || !ownerId()) clearSession();
       // Don't reload immediately - let auth context handle it
       return;
     }
@@ -74,6 +75,8 @@ const wsLink = new GraphQLWsLink(
   })
 );
 
+const usageLink = new ApolloLink((operation,forward) => forward(operation).map(result => { void refreshHostedUsage(); return result; }));
+
 const splitLink = split(
   ({ query }) => {
     const definition = getMainDefinition(query);
@@ -83,7 +86,7 @@ const splitLink = split(
     );
   },
   wsLink,
-  from([errorLink, authLink, httpLink])
+  from([offlineLink, errorLink, authLink, usageLink, httpLink])
 );
 
 export const apolloClient = new ApolloClient({
@@ -120,3 +123,6 @@ export const apolloClient = new ApolloClient({
     }
   }
 });
+let cacheOwner=ownerId();
+window.addEventListener('graphdone-session',()=>{const next=ownerId();if(next!==cacheOwner){cacheOwner=next;void apolloClient.clearStore();}});
+window.addEventListener('graphdone-sync-refresh',()=>{void apolloClient.refetchQueries({include:['GetGraphs','GetGraphsByUser','GetGraph','GetWorkItems','GetWorkItemById','GetEdges']}).catch(()=>{});});

@@ -53,7 +53,7 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
   const [typeDropdownOpen, setTypeDropdownOpen] = useState(false);
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  
+
   // Filter and group nodes by date
   const nodesByDate = useMemo(() => {
     const filtered = filteredNodes.filter(node => {
@@ -67,7 +67,7 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
           return false;
         }
       }
-      
+
       if (!showCompleted && node.status === 'COMPLETED') return false;
       if (filterPriority !== 'all') {
         const priority = node.priority || 0;
@@ -80,7 +80,7 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
     });
 
     const grouped: Record<string, WorkItem[]> = {};
-    
+
     filtered.forEach(node => {
       if (node.dueDate) {
         const dateKey = new Date(node.dueDate).toDateString();
@@ -89,7 +89,7 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
         }
         grouped[dateKey].push(node);
       }
-      
+
       // Also add created date for context (only if it has a due date)
       if (node.dueDate) {
         const createdKey = new Date(node.createdAt).toDateString();
@@ -99,7 +99,7 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
         }
       }
     });
-    
+
     // Sort tasks within each day by priority
     Object.keys(grouped).forEach(dateKey => {
       grouped[dateKey].sort((a, b) => {
@@ -108,7 +108,7 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
         return bPriority - aPriority;
       });
     });
-    
+
     return grouped;
   }, [filteredNodes, showCompleted, filterPriority, filterType, filterStatus, searchQuery]);
 
@@ -124,21 +124,21 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
   const calendarDays = useMemo(() => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
-    
+
     const firstDayOfMonth = new Date(year, month, 1);
     const lastDayOfMonth = new Date(year, month + 1, 0);
     const firstCalendarDay = new Date(firstDayOfMonth);
     firstCalendarDay.setDate(firstCalendarDay.getDate() - firstDayOfMonth.getDay());
-    
+
     const days = [];
     const currentDay = new Date(firstCalendarDay);
-    
+
     // Generate 42 days (6 weeks)
     for (let i = 0; i < 42; i++) {
       days.push(new Date(currentDay));
       currentDay.setDate(currentDay.getDate() + 1);
     }
-    
+
     return days;
   }, [currentDate]);
 
@@ -214,13 +214,13 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col min-h-full min-w-0">
       {/* Header */}
-      <div className="p-6 border-b border-gray-700">
-        <div className="flex items-center justify-between mb-4">
+      <div className="p-3 sm:p-4 border-b border-gray-700">
+        <div className="flex items-center justify-between mb-2">
           <div className="flex items-center space-x-3">
             <CalendarDays className="h-6 w-6 text-green-400" />
-            <h2 className="text-2xl font-bold text-white">Calendar View</h2>
+            <h2 className="text-xl font-semibold text-white">Calendar View</h2>
           </div>
           <div className="flex items-center space-x-2">
             <button
@@ -231,7 +231,31 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
             </button>
           </div>
         </div>
-        
+
+        {/* Controls */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* View Mode */}
+          <div className="flex items-center space-x-2">
+            <label className="text-sm font-medium text-gray-300">View:</label>
+            <div className="flex bg-gray-700 rounded-lg p-1">
+              {(['month', 'week', 'agenda'] as const).map(mode => (
+                <button
+                  key={mode}
+                  onClick={() => setViewMode(mode)}
+                  className={`min-h-[44px] px-3 py-1 text-sm rounded-md transition-colors ${
+                    viewMode === mode
+                      ? 'bg-green-600 text-white'
+                      : 'text-gray-300 hover:text-white'
+                  }`}
+                >
+                  {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <details className="open:w-full">
+            <summary className="min-h-[44px] flex items-center cursor-pointer text-sm text-gray-300">Search & filters</summary>
         {/* Search Bar */}
         <div className="relative mb-4">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -251,29 +275,9 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
             </button>
           )}
         </div>
-        
-        {/* Controls */}
-        <div className="flex flex-wrap items-center gap-4 mb-4">
-          {/* View Mode */}
-          <div className="flex items-center space-x-2">
-            <label className="text-sm font-medium text-gray-300">View:</label>
-            <div className="flex bg-gray-700 rounded-lg p-1">
-              {(['month', 'week', 'agenda'] as const).map(mode => (
-                <button
-                  key={mode}
-                  onClick={() => setViewMode(mode)}
-                  className={`px-3 py-1 text-xs rounded-md transition-colors ${
-                    viewMode === mode 
-                      ? 'bg-green-600 text-white' 
-                      : 'text-gray-300 hover:text-white'
-                  }`}
-                >
-                  {mode.charAt(0).toUpperCase() + mode.slice(1)}
-                </button>
-              ))}
-            </div>
-          </div>
 
+
+            <div className="flex flex-wrap gap-3 py-2">
           {/* Type Filter */}
           <div className="flex items-center space-x-2 relative" data-dropdown="type">
             <Target className="h-4 w-4 text-gray-400" />
@@ -286,8 +290,8 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
                   const selectedOption = TYPE_OPTIONS.find(opt => opt.value === filterType);
                   return (
                     <>
-                      {selectedOption?.icon && React.createElement(selectedOption.icon as any, { 
-                        className: `h-3 w-3 ${selectedOption.color || 'text-gray-400'}` 
+                      {selectedOption?.icon && React.createElement(selectedOption.icon as any, {
+                        className: `h-3 w-3 ${selectedOption.color || 'text-gray-400'}`
                       })}
                       <span className="truncate">{selectedOption?.label || 'All Types'}</span>
                       <ChevronDown className="h-3 w-3 ml-auto" />
@@ -306,8 +310,8 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
                       }}
                       className="w-full px-3 py-2 text-left text-sm text-white hover:bg-gray-600 flex items-center space-x-2 first:rounded-t-lg last:rounded-b-lg"
                     >
-                      {option.icon && React.createElement(option.icon as any, { 
-                        className: `h-3 w-3 ${option.color || 'text-gray-400'}` 
+                      {option.icon && React.createElement(option.icon as any, {
+                        className: `h-3 w-3 ${option.color || 'text-gray-400'}`
                       })}
                       <span>{option.label}</span>
                     </button>
@@ -329,8 +333,8 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
                   const selectedOption = STATUS_OPTIONS.find(opt => opt.value === filterStatus);
                   return (
                     <>
-                      {selectedOption?.icon && React.createElement(selectedOption.icon as any, { 
-                        className: `h-3 w-3 ${selectedOption.color || 'text-gray-400'}` 
+                      {selectedOption?.icon && React.createElement(selectedOption.icon as any, {
+                        className: `h-3 w-3 ${selectedOption.color || 'text-gray-400'}`
                       })}
                       <span className="truncate">{selectedOption?.label || 'All Status'}</span>
                       <ChevronDown className="h-3 w-3 ml-auto" />
@@ -349,8 +353,8 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
                       }}
                       className="w-full px-3 py-2 text-left text-sm text-white hover:bg-gray-600 flex items-center space-x-2 first:rounded-t-lg last:rounded-b-lg"
                     >
-                      {option.icon && React.createElement(option.icon as any, { 
-                        className: `h-3 w-3 ${option.color || 'text-gray-400'}` 
+                      {option.icon && React.createElement(option.icon as any, {
+                        className: `h-3 w-3 ${option.color || 'text-gray-400'}`
                       })}
                       <span>{option.label}</span>
                     </button>
@@ -372,8 +376,8 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
                   const selectedOption = PRIORITY_OPTIONS.find(opt => opt.value === filterPriority);
                   return (
                     <>
-                      {selectedOption?.icon && React.createElement(selectedOption.icon as any, { 
-                        className: `h-3 w-3 ${selectedOption.color || 'text-gray-400'}` 
+                      {selectedOption?.icon && React.createElement(selectedOption.icon as any, {
+                        className: `h-3 w-3 ${selectedOption.color || 'text-gray-400'}`
                       })}
                       <span className="truncate">{selectedOption?.label || 'All Priority'}</span>
                       <ChevronDown className="h-3 w-3 ml-auto" />
@@ -392,8 +396,8 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
                       }}
                       className="w-full px-3 py-2 text-left text-sm text-white hover:bg-gray-600 flex items-center space-x-2 first:rounded-t-lg last:rounded-b-lg"
                     >
-                      {option.icon && React.createElement(option.icon as any, { 
-                        className: `h-3 w-3 ${option.color || 'text-gray-400'}` 
+                      {option.icon && React.createElement(option.icon as any, {
+                        className: `h-3 w-3 ${option.color || 'text-gray-400'}`
                       })}
                       <span>{option.label}</span>
                     </button>
@@ -403,11 +407,13 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
             </div>
           </div>
 
+            </div>
+          </details>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-hidden p-6">
+      <div className="flex-1 min-h-[240px] p-3 sm:p-4">
         <div className="bg-gray-800/50 backdrop-blur-sm rounded-lg border border-gray-700/50 h-full flex flex-col">
           {/* Calendar Header */}
           <div className="flex items-center justify-between p-4 border-b border-gray-700">
@@ -417,11 +423,11 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
             >
               <ChevronLeft className="h-5 w-5" />
             </button>
-            
+
             <h3 className="text-xl font-semibold text-white">
               {formatDateRange()}
             </h3>
-            
+
             <button
               onClick={() => navigateMonth('next')}
               className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
@@ -432,7 +438,7 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
 
           {/* Agenda List */}
           {viewMode === 'agenda' && (
-            <div className="flex-1 p-2 sm:p-4 overflow-y-auto space-y-4">
+            <div className="flex-1 p-2 sm:p-4 space-y-4">
               {agendaDays.length === 0 ? (
                 <div className="text-center py-12 text-gray-400">
                   <CalendarDays className="h-8 w-8 mx-auto mb-2 opacity-50" />
@@ -504,7 +510,7 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
 
           {/* Calendar Grid */}
           {viewMode !== 'agenda' && (
-          <div className="flex-1 p-2 overflow-auto">
+          <div className="flex-1 min-w-0 p-2">
             <div className="grid grid-cols-7 gap-1 h-full">
               {calendarDays.map((day, index) => {
                 const dateKey = day.toDateString();
@@ -551,14 +557,14 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
                         </div>
                       )}
                     </div>
-                    
+
                     {/* Tasks */}
                     <div className="space-y-1">
                       {dayNodes.slice(0, 4).map((node, nodeIndex) => {
                         const statusConfig = getStatusConfig(node.status as WorkItemStatus);
                         const typeConfig = getTypeConfig(node.type as WorkItemType);
                         const priority = node.priority || 0;
-                        
+
                         return (
                           <div
                             key={nodeIndex}
@@ -567,23 +573,23 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
                               setSelectedTask(selectedTask === node.id ? null : node.id);
                             }}
                             className={`text-xs px-2 py-1 rounded-md truncate transition-all cursor-pointer border ${
-                              selectedTask === node.id 
-                                ? `${WORK_ITEM_STATUSES.COMPLETED.borderColor} ${WORK_ITEM_STATUSES.COMPLETED.bgColor}` 
+                              selectedTask === node.id
+                                ? `${WORK_ITEM_STATUSES.COMPLETED.borderColor} ${WORK_ITEM_STATUSES.COMPLETED.bgColor}`
                                 : `${statusConfig.bgColor} ${statusConfig.color} border-transparent hover:border-gray-400`
                             }`}
                             title={`${node.title}\nType: ${node.type}\nStatus: ${node.status.replace('_', ' ')}\nPriority: ${Math.round(priority * 100)}%\nDue: ${node.dueDate ? new Date(node.dueDate).toLocaleDateString() : 'No due date'}`}
                           >
                             <div className="flex items-center space-x-1">
                               <span className="text-xs opacity-70">{React.createElement(typeConfig.icon as any, { className: 'h-3 w-3' })}</span>
-                              <span className="truncate">
-                                {node.title.length > 15 ? node.title.substring(0, 15) + '...' : node.title}
+                              <span className="truncate min-w-0">
+                                {node.title}
                               </span>
                             </div>
                           </div>
                         );
                       })}
                       {dayNodes.length > 4 && (
-                        <div 
+                        <div
                           className="text-xs text-gray-400 px-2 py-1 hover:text-gray-300 cursor-pointer"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -607,11 +613,11 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
           <div className="mt-4 bg-gray-800/50 backdrop-blur-sm rounded-lg border border-gray-700/50 p-4">
             <div className="flex items-center justify-between mb-3">
               <h4 className="text-lg font-semibold text-white">
-                {selectedDate.toLocaleDateString('en-US', { 
-                  weekday: 'long', 
-                  year: 'numeric', 
-                  month: 'long', 
-                  day: 'numeric' 
+                {selectedDate.toLocaleDateString('en-US', {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric'
                 })}
               </h4>
               <button
@@ -621,7 +627,7 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
                 ×
               </button>
             </div>
-            
+
             {nodesByDate[selectedDate.toDateString()]?.length ? (
               <div className="space-y-2">
                 {nodesByDate[selectedDate.toDateString()].map((node, index) => {
@@ -629,7 +635,7 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
                   const typeConfig = getTypeConfig(node.type as WorkItemType);
                   const priority = node.priority || 0;
                   const priorityConfig = getPriorityConfig(priority);
-                  
+
                   return (
                     <div key={index} className="flex items-center justify-between p-3 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors">
                       <div className="flex items-center space-x-3">
@@ -669,27 +675,28 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
       </div>
 
       {/* Footer Statistics */}
-      <div className="border-t border-gray-700/50 p-4 bg-gray-800/50 backdrop-blur-sm">
+      <details className="border-t border-gray-700/50 p-3 bg-gray-800/50 backdrop-blur-sm">
+        <summary className="min-h-[44px] flex items-center cursor-pointer text-sm text-gray-300">Summary</summary>
         <div className="grid grid-cols-2 md:grid-cols-6 gap-4 text-center">
           <div>
             <div className="text-xl font-bold text-white">
               {Object.values(nodesByDate).flat().filter(node => {
                 if (!node.dueDate) return false;
                 const dueDate = new Date(node.dueDate);
-                return dueDate.getMonth() === currentDate.getMonth() && 
+                return dueDate.getMonth() === currentDate.getMonth() &&
                        dueDate.getFullYear() === currentDate.getFullYear();
               }).length}
             </div>
             <div className="text-xs text-gray-400">This Month</div>
           </div>
-          
+
           <div>
             <div className="text-xl font-bold text-yellow-400">
               {(nodesByDate[new Date().toDateString()] || []).length}
             </div>
             <div className="text-xs text-gray-400">Due Today</div>
           </div>
-          
+
           <div>
             <div className="text-xl font-bold text-red-400">
               {filteredNodes.filter(node => {
@@ -699,21 +706,21 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
             </div>
             <div className="text-xs text-gray-400">Overdue</div>
           </div>
-          
+
           <div>
             <div className="text-xl font-bold text-green-400">
               {filteredNodes.filter(node => node.status === 'COMPLETED').length}
             </div>
             <div className="text-xs text-gray-400">Completed</div>
           </div>
-          
+
           <div>
             <div className="text-xl font-bold text-blue-400">
               {filteredNodes.filter(node => node.status === 'IN_PROGRESS').length}
             </div>
             <div className="text-xs text-gray-400">In Progress</div>
           </div>
-          
+
           <div>
             <div className="text-xl font-bold text-purple-400">
               {filteredNodes.filter(node => !node.dueDate).length}
@@ -721,7 +728,7 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({ filteredNodes }) =
             <div className="text-xs text-gray-400">No Due Date</div>
           </div>
         </div>
-      </div>
+      </details>
     </div>
   );
 };

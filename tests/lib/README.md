@@ -33,4 +33,4 @@ sequences from `tests/sequences/unified.config.mjs` and emits DUAL output to
 Profiles: `smoke` (fast blocking) · `pr` (broader blocking) · `full` (everything
 incl. capture-heavy report sequences + cloud audit) · `report` (captures only).
 
-Run the lib's own unit tests with `npm run test:unified:lib` (`node --test tests/lib/`).
+Run the lib's own unit tests with `npm run test:unified:lib` (`node --test "tests/lib/**/*.test.mjs"`).

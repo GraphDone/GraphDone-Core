@@ -1,6 +1,6 @@
 name: Comprehensive Test Suite
 
-# Complements ci.yml (Node 20 + full-stack smoke gate) by proving the real
+# Complements ci.yml (Node 22 + full-stack smoke gate) by proving the real
 # unit suites also pass on the minimum supported Node version, and by
 # validating the installer + deployment config. Runs daily so flakes and
 # dependency drift surface even without a push.
@@ -9,7 +9,6 @@ on:
   push:
     branches: [main, dev]
   pull_request:
-    branches: [main, dev]
   schedule:
     - cron: '0 2 * * *'   # daily 02:00 UTC
   workflow_dispatch:
@@ -19,7 +18,7 @@ permissions:
   pull-requests: write
 
 jobs:
-  # Real unit suites across the supported Node range (engines: >=18)
+  # Real unit suites across the supported Node range (engines: >=22.18)
   unit-matrix:
     name: Unit Tests (Node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
@@ -27,18 +26,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node-version: ['18.x', '20.x']
+        node-version: ['22.18.0', '24.x']
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
-      # npm install (not ci) avoids the rollup optional-deps bug (npm/cli#4828)
       - name: Install dependencies
-        run: npm install --legacy-peer-deps
+        run: npm ci --legacy-peer-deps
       - name: Run all unit suites (core, web, server, mcp-server)
-        run: npm run test
+        run: npm run test && npm run test:unified:lib
 
   # Genuinely-real checks: the installer exists, deployment compose parses
   installer-and-deploy-config:
@@ -75,7 +73,7 @@ jobs:
             const body = [
               '## 🧪 Comprehensive Test Suite',
               '',
-              `- **Unit suites (Node 18.x & 20.x)** — core, web, server, mcp-server: ${mark(unit)}`,
+              `- **Unit suites (Node 22.18.0 & 24.x)** — core, web, server, mcp-server: ${mark(unit)}`,
               `- **Installer & deploy config**: ${mark(cfg)}`,
               '',
               '_Full-stack smoke gate runs in the **CI** workflow._',

@@ -1,4 +1,4 @@
-import nodemailer from 'nodemailer';
+import nodemailer, {type Transporter} from 'nodemailer';
 
 interface EmailOptions {
   to: string;
@@ -9,7 +9,7 @@ interface EmailOptions {
 
 class EmailService {
   private isDevelopment = process.env.NODE_ENV === 'development';
-  private transporter: nodemailer.Transporter | null = null;
+  private transporter: Transporter | null = null;
 
   constructor() {
     this.setupTransporter();

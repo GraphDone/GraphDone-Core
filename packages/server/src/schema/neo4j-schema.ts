@@ -215,6 +215,10 @@ export const typeDefs = gql`
     ADMIN           # System admin - full system access and user management
   }
 
+  type JWTPayload @jwt {
+    roles: [String!]!
+  }
+
   enum GraphType {
     PROJECT
     WORKSPACE
@@ -230,7 +234,14 @@ export const typeDefs = gql`
   }
 
   # User entity - represents authenticated users in the system
-  type User {
+  type User
+    @query(read: false, aggregate: false)
+    @mutation(operations: [])
+    @authorization(filter: [{ where: { OR: [
+      { node: { id: "$jwt.sub" } }
+      { node: { team: { members: { id: "$jwt.sub" } } } }
+    ] } }])
+    @authentication(operations: [CREATE, UPDATE, DELETE], jwt: { roles_INCLUDES: "ADMIN" }) {
     id: ID! @id
     email: String! @unique
     username: String! @unique
@@ -266,7 +277,11 @@ export const typeDefs = gql`
   }
 
   # Team entity - represents teams/organizations
-  type Team {
+  type Team
+    @query(read: false, aggregate: false)
+    @mutation(operations: [])
+    @authorization(filter: [{ where: { node: { members: { id: "$jwt.sub" } } } }])
+    @authentication(operations: [CREATE, UPDATE, DELETE], jwt: { roles_INCLUDES: "ADMIN" }) {
     id: ID! @id
     name: String! @unique
     description: String
@@ -283,7 +298,21 @@ export const typeDefs = gql`
   }
 
   # Graph entity - represents a graph/workspace/project
-  type Graph {
+  type Graph
+  @authentication(
+    operations: [CREATE, UPDATE, DELETE, CREATE_RELATIONSHIP, DELETE_RELATIONSHIP]
+    jwt: { OR: [{ roles_INCLUDES: "USER" }, { roles_INCLUDES: "ADMIN" }] }
+  )
+  @authorization(
+    filter: [
+      { operations: [READ, AGGREGATE], where: { OR: [
+        { node: { createdBy: "$jwt.sub" } }
+        { node: { isShared: true } }
+      ] } }
+      { operations: [UPDATE, DELETE, CREATE_RELATIONSHIP, DELETE_RELATIONSHIP], where: { node: { createdBy: "$jwt.sub" } } }
+    ]
+    validate: [{ operations: [CREATE, UPDATE], when: [AFTER], where: { node: { createdBy: "$jwt.sub" } } }]
+  ) {
     id: ID! @id
     name: String!
     description: String
@@ -319,7 +348,21 @@ export const typeDefs = gql`
   }
 
   # WorkItem entity - represents work items in the graph
-  type WorkItem {
+  type WorkItem
+  @authentication(
+    operations: [CREATE, UPDATE, DELETE, CREATE_RELATIONSHIP, DELETE_RELATIONSHIP]
+    jwt: { OR: [{ roles_INCLUDES: "USER" }, { roles_INCLUDES: "ADMIN" }] }
+  )
+  @authorization(
+    filter: [
+      { operations: [READ, AGGREGATE], where: { OR: [
+        { node: { graph: { createdBy: "$jwt.sub" } } }
+        { node: { graph: { isShared: true } } }
+      ] } }
+      { operations: [UPDATE, DELETE, CREATE_RELATIONSHIP, DELETE_RELATIONSHIP], where: { node: { graph: { createdBy: "$jwt.sub" } } } }
+    ]
+    validate: [{ operations: [CREATE, UPDATE], when: [AFTER], where: { node: { graph: { createdBy: "$jwt.sub" } } } }]
+  ) {
     id: ID! @id
     type: NodeType!
     title: String!
@@ -357,7 +400,14 @@ export const typeDefs = gql`
   }
 
   # Contributor entity - humans and AI agents (legacy - kept for AI agents)
-  type Contributor {
+  type Contributor
+    @query(read: false, aggregate: false)
+    @mutation(operations: [])
+    @authentication(
+      operations: [CREATE, UPDATE, DELETE, CREATE_RELATIONSHIP, DELETE_RELATIONSHIP]
+      jwt: { OR: [{ roles_INCLUDES: "USER" }, { roles_INCLUDES: "ADMIN" }] }
+    )
+    @authorization(filter: [{ where: { node: { workItems: { graph: { createdBy: "$jwt.sub" } } } } }]) {
     id: ID! @id
     type: ContributorType!
     name: String!
@@ -375,7 +425,21 @@ export const typeDefs = gql`
   }
 
   # Edge entity - relationships between nodes
-  type Edge {
+  type Edge
+  @authentication(
+    operations: [CREATE, UPDATE, DELETE, CREATE_RELATIONSHIP, DELETE_RELATIONSHIP]
+    jwt: { OR: [{ roles_INCLUDES: "USER" }, { roles_INCLUDES: "ADMIN" }] }
+  )
+  @authorization(
+    filter: [
+      { operations: [READ, AGGREGATE], where: { OR: [
+        { node: { source: { graph: { createdBy: "$jwt.sub" } }, target: { graph: { createdBy: "$jwt.sub" } } } }
+        { node: { source: { graph: { isShared: true } }, target: { graph: { isShared: true } } } }
+      ] } }
+      { operations: [UPDATE, DELETE, CREATE_RELATIONSHIP, DELETE_RELATIONSHIP], where: { node: { source: { graph: { createdBy: "$jwt.sub" } }, target: { graph: { createdBy: "$jwt.sub" } } } } }
+    ]
+    validate: [{ operations: [CREATE, UPDATE], when: [AFTER], where: { node: { source: { graph: { createdBy: "$jwt.sub" } }, target: { graph: { createdBy: "$jwt.sub" } } } } }]
+  ) {
     id: ID! @id
     type: EdgeType!
     weight: Float! @default(value: 1.0)

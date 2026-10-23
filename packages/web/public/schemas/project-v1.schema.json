@@ -1,0 +1,232 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://graphdone.com/schemas/project-v1.schema.json",
+  "title": "GraphDone project v1",
+  "type": "object",
+  "properties": {
+    "format": {
+      "const": "graphdone-project"
+    },
+    "version": {
+      "const": 1
+    },
+    "exportedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "project": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 120,
+          "minLength": 1
+        },
+        "created_at": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "nodes": {
+      "type": "array",
+      "maxItems": 300,
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1
+          },
+          "type": {
+            "type": "string",
+            "maxLength": 60
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "type": "string",
+            "maxLength": 60
+          },
+          "priority": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "position_x": {
+            "type": "number"
+          },
+          "position_y": {
+            "type": "number"
+          },
+          "due_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "anyOf": [
+                  {
+                    "format": "date"
+                  },
+                  {
+                    "format": "date-time"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tags": {
+            "type": "array",
+            "maxItems": 50,
+            "items": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          "metadata": {
+            "type": "string",
+            "maxLength": 10000
+          },
+          "created_at": {
+            "type": "number"
+          },
+          "updated_at": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "type",
+          "status",
+          "priority",
+          "position_x",
+          "position_y",
+          "tags",
+          "metadata"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "edges": {
+      "type": "array",
+      "maxItems": 600,
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "source_id": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "target_id": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "type": {
+            "type": "string",
+            "maxLength": 60
+          },
+          "weight": {
+            "type": "number"
+          },
+          "created_at": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "source_id",
+          "target_id",
+          "type",
+          "weight"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "notes": {
+      "type": "array",
+      "maxItems": 2000,
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "actor": {
+            "type": "string",
+            "maxLength": 254
+          },
+          "actor_type": {
+            "type": "string",
+            "maxLength": 60
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "body",
+          "actor",
+          "actor_type",
+          "created_at"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "format",
+    "version",
+    "project",
+    "nodes",
+    "edges",
+    "notes"
+  ],
+  "additionalProperties": false
+}

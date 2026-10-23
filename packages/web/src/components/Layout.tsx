@@ -1,4 +1,8 @@
+import {useCompactWorkspace} from '../hooks/useCompactWorkspace';
+import {FeedbackButton,PublicAnnouncement} from './Feedback';
+import { OfflineStatus } from './OfflineStatus';
 import React from 'react';
+import { HostedUsage } from './HostedUsage';
 import { Link, useLocation } from 'react-router-dom';
 import { Brain, Bot, BarChart3, Settings, Server, Globe, Shield, Users, Terminal } from 'lucide-react';
 import { UserSelector } from './UserSelector';
@@ -17,6 +21,7 @@ interface LayoutProps {
 
 export function Layout({ children }: LayoutProps) {
   const location = useLocation();
+  const compactWorkspace=useCompactWorkspace();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const [showFloatingConsole, setShowFloatingConsole] = React.useState(false);
   const desktopSidebarCollapsed = true; // Zen mode permanently on
@@ -28,8 +33,8 @@ export function Layout({ children }: LayoutProps) {
   const navigation = [
     { name: 'Workspace', href: '/', icon: Globe, description: 'Main work' },
     { name: 'Ontology', href: '/ontology', icon: Brain, description: 'Node schemas' },
-    { name: 'AI & Agents', href: '/agents', icon: Bot, description: 'AI collaboration', comingSoon: true },
-    { name: 'Analytics', href: '/analytics', icon: BarChart3, description: 'Priority insights', comingSoon: true },
+    { name: 'AI & Agents', href: '/agents', icon: Bot, description: 'Recorded AI contributions' },
+    { name: 'Analytics', href: '/analytics', icon: BarChart3, description: 'Live graph progress' },
     { name: 'Settings', href: '/settings', icon: Settings, description: 'User preferences' },
     { name: 'Admin', href: '/admin', icon: Shield, description: 'System administration', hidden: !canAccessAdmin(currentUser?.role) },
     { name: 'System', href: '/backend', icon: Server, description: 'Backend status', hidden: !canAccessBackend(currentUser?.role) },
@@ -37,7 +42,8 @@ export function Layout({ children }: LayoutProps) {
 
   return (
     <div
-      className="h-dvh-screen flex flex-col bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 relative overflow-hidden"
+      data-compact-workspace={compactWorkspace ? "true" : "false"}
+      className="workspace-surface h-dvh-screen flex flex-col relative overflow-hidden"
       style={{
         '--sidebar-width': desktopSidebarCollapsed ? '4rem' : '16rem'
       } as React.CSSProperties}
@@ -45,18 +51,20 @@ export function Layout({ children }: LayoutProps) {
       {/* Insecure-connection warning — an in-flow strip at the very top, so it
           reserves its own space and never overlaps the app (only over HTTP). */}
       <InsecureConnectionBanner className="relative z-30" />
+      <div className="workspace-status-strips"><PublicAnnouncement /><HostedUsage compact /><OfflineStatus compact /></div>
 
       {/* Static gradient background - optimized for all browsers */}
-      <div className="lagoon-caustics"></div>
-      
+
+
       {/* Phone top bar: just the project selector on the workspace (no hamburger —
           the bottom nav handles navigation). Other pages use their own header. */}
       {isWorkspaceRoute && (
-        <div className="md:hidden relative z-30 pt-safe">
+        <div data-workspace-header className="mobile-project-header md:hidden relative z-30 pt-safe">
           <div className="flex items-center bg-gray-800/90 backdrop-blur-sm px-3 py-2 border-b border-gray-700/50">
             <div className="flex-1 min-w-0">
               <GraphSelector testId="graph-selector-mobile" />
             </div>
+            <button aria-label="New work item" onClick={()=>window.dispatchEvent(new Event('graphdone-create-task'))} className="min-h-[44px] min-w-[44px] ml-2 rounded-lg bg-violet-700 text-white text-xl">+</button>
           </div>
         </div>
       )}
@@ -64,15 +72,15 @@ export function Layout({ children }: LayoutProps) {
       <div className="flex flex-1 min-h-0">
         {/* Sidebar */}
         <div className={`
-          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+          workspace-sidebar ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
           md:translate-x-0 md:static md:inset-0
           fixed inset-y-0 left-0 z-50 bg-gray-800/95 backdrop-blur-sm border-r border-gray-700/50
           transform transition-all duration-200 ease-in-out
-          w-64 ${desktopSidebarCollapsed ? 'md:w-16' : ''}
+          w-64 shrink-0 overflow-y-auto overscroll-contain ${desktopSidebarCollapsed ? 'md:w-16' : ''}
         `}>
-          <div className="flex flex-col h-full">
+          <div className="flex flex-col min-h-full">
             {/* Logo */}
-            <div className={`flex items-center h-16 px-6 border-b border-gray-700 ${desktopSidebarCollapsed ? 'md:justify-center md:px-4' : ''}`}>
+            <div className={`flex shrink-0 items-center h-16 px-6 border-b border-gray-700 ${desktopSidebarCollapsed ? 'md:justify-center md:px-4' : ''}`}>
               <Link to="/" className="flex items-center hover:opacity-80 transition-opacity">
                 <img src="/favicon.svg" alt="GraphDone Logo" className="h-8 w-8" />
                 {!desktopSidebarCollapsed && (
@@ -84,7 +92,7 @@ export function Layout({ children }: LayoutProps) {
             </div>
 
             {/* Navigation Buttons - Section 2 */}
-            <nav className="flex-1 px-4 py-6 space-y-2">
+            <nav className="flex-1 px-4 md:px-2 py-6 space-y-2">
               {navigation.map((item) => {
                 const Icon = item.icon;
                 const isActive = location.pathname === item.href;
@@ -92,7 +100,7 @@ export function Layout({ children }: LayoutProps) {
                 // greyed) — no point advertising a page they can never open.
                 if ((item as { hidden?: boolean }).hidden) return null;
                 const isRestricted = (item as { comingSoon?: boolean }).comingSoon;
-                
+
                 if (isRestricted) {
                   const restrictionMessage = (item as { comingSoon?: boolean }).comingSoon
                     ? 'Coming soon'
@@ -101,7 +109,7 @@ export function Layout({ children }: LayoutProps) {
                     : item.name === 'System'
                     ? 'User or Admin access required'
                     : 'Access restricted';
-                  
+
                   return (
                     <div
                       key={item.name}
@@ -120,23 +128,18 @@ export function Layout({ children }: LayoutProps) {
                           {restrictionMessage}
                         </div>
                       </div>
-                      {/* Tooltip for collapsed mode */}
-                      {desktopSidebarCollapsed && (
-                        <div className="hidden md:group-hover:block absolute left-full top-1/2 transform -translate-y-1/2 ml-2 px-2 py-1 bg-gray-800 border border-gray-600 rounded shadow-lg text-sm whitespace-nowrap z-50">
-                          <div className="font-medium text-gray-500">{item.name}</div>
-                          <div className="text-xs text-gray-600">{restrictionMessage}</div>
-                        </div>
-                      )}
                     </div>
                   );
                 }
-                
+
                 return (
                   <Link
                     key={item.name}
                     to={item.href}
+                    aria-label={item.name}
+                    aria-current={location.pathname === item.href ? 'page' : undefined}
                     className={`
-                      flex items-center px-3 py-3 rounded-lg transition-colors group relative
+                      flex items-center min-h-[44px] px-3 py-3 rounded-lg transition-colors group relative
                       ${desktopSidebarCollapsed ? 'md:justify-center md:px-2' : ''}
                       ${isActive
                         ? 'bg-green-900/30 text-green-300 border border-green-500/30'
@@ -155,13 +158,6 @@ export function Layout({ children }: LayoutProps) {
                         {item.description}
                       </div>
                     </div>
-                    {/* Tooltip for collapsed mode */}
-                    {desktopSidebarCollapsed && (
-                      <div className="hidden md:group-hover:block absolute left-full top-1/2 transform -translate-y-1/2 ml-2 px-2 py-1 bg-gray-800 border border-gray-600 rounded shadow-lg text-sm whitespace-nowrap z-50">
-                        <div className="font-medium">{item.name}</div>
-                        <div className="text-xs text-gray-400">{item.description}</div>
-                      </div>
-                    )}
                   </Link>
                 );
               })}
@@ -210,7 +206,7 @@ export function Layout({ children }: LayoutProps) {
                 </div>
               )}
             </div>
-            
+
             {/* Console & Tools Section - Section 4 */}
             <div className={`p-4 border-t border-gray-700/50 ${desktopSidebarCollapsed ? 'md:px-2' : ''}`}>
               {!desktopSidebarCollapsed ? (
@@ -231,7 +227,7 @@ export function Layout({ children }: LayoutProps) {
                       )}
                     </button>
                   </div>
-                  
+
                   {currentTeam && (
                     <div className="mb-2">
                       <p className="text-xs text-gray-300 font-medium">{currentTeam.name}</p>
@@ -262,7 +258,8 @@ export function Layout({ children }: LayoutProps) {
                 </div>
               )}
             </div>
-            
+
+            <div className="flex justify-center"><FeedbackButton compact /></div>
             {/* Footer Info Section */}
             <div className={`p-4 border-t border-gray-700/30 ${desktopSidebarCollapsed ? 'md:px-2' : ''}`}>
               {!desktopSidebarCollapsed && (

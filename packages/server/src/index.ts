@@ -1,5 +1,8 @@
+import './config/environment.js';
+import { operationsApi } from './operations-api.js';
+import { agentApi } from './agent-api.js';
 import { ApolloServer } from '@apollo/server';
-import { expressMiddleware } from '@apollo/server/express4';
+import { expressMiddleware, type ExpressContextFunctionArgument } from '@as-integrations/express4';
 import { ApolloServerPluginDrainHttpServer } from '@apollo/server/plugin/drainHttpServer';
 import express from 'express';
 import { createServer } from 'http';
@@ -7,7 +10,6 @@ import { createServer as createHttpsServer } from 'https';
 import { WebSocketServer } from 'ws';
 import { useServer } from 'graphql-ws/lib/use/ws';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import os from 'os';
 import session from 'express-session';
 import passport from 'passport';
@@ -19,10 +21,12 @@ import { authTypeDefs } from './schema/auth-schema.js';
 import { authOnlyTypeDefs } from './schema/auth-only-schema.js';
 import { sqliteAuthResolvers } from './resolvers/sqlite-auth.js';
 import { graphProtectionResolvers } from './resolvers/graph-protection.js';
+import { workItemRecoveryResolvers } from './resolvers/work-item-recovery.js';
 import { extractUserFromToken } from './middleware/auth.js';
 import { mergeTypeDefs } from '@graphql-tools/merge';
 import { driver, NEO4J_URI } from './db.js';
 import { sqliteAuthStore } from './auth/sqlite-auth.js';
+import { ensureGraphIdentity } from './auth/graph-identity.js';
 import { configureOAuthStrategies } from './auth/oauth-strategies.js';
 import { generateToken } from './utils/auth.js';
 import { createTlsConfig, validateTlsConfig, type TlsConfig } from './config/tls.js';
@@ -94,9 +98,6 @@ async function getTotalGraphDoneMemory(): Promise<{ memory: number, label: strin
     };
   }
 }
-
-dotenv.config();
-// OAuth LinkedIn and GitHub credentials updated
 
 const PORT = Number(process.env.PORT) || 4127;
 
@@ -309,6 +310,8 @@ async function startServer() {
           ...sqliteAuthResolvers.Mutation,
           // Graph protection (prevent Welcome graph deletion)
           ...graphProtectionResolvers.Mutation,
+          // Preserve task identity when a user undoes deletion.
+          ...workItemRecoveryResolvers.Mutation,
         },
         Query: {
           ...sqliteAuthResolvers.Query,
@@ -364,7 +367,30 @@ async function startServer() {
     path: '/graphql',
   });
 
-  const serverCleanup = useServer({ schema }, wsServer);
+  const graphContext = async (authHeader?: string) => {
+    const claims = extractUserFromToken(authHeader);
+    const account = claims ? await sqliteAuthStore.findUserById(claims.userId) : null;
+    if (account?.isActive && isNeo4jAvailable) await ensureGraphIdentity(driver, account);
+    const user = account?.isActive
+      ? { userId: account.id, email: account.email, role: account.role }
+      : (claims?.role === 'GUEST' && /^guest-[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(claims.userId) ? claims : null);
+    return {
+      driver: isNeo4jAvailable ? driver : null,
+      user,
+      // This value is created only from a server-verified token. Neo4j GraphQL
+      // uses it for tenant filters; client-supplied decoded JWT objects are ignored.
+      jwt: user ? { sub: user.userId, roles: [user.role] } : undefined,
+      isNeo4jAvailable,
+    };
+  };
+
+  const serverCleanup = useServer({
+    schema,
+    context: async connection => {
+      const supplied = connection.connectionParams?.authorization ?? connection.connectionParams?.Authorization;
+      return graphContext(typeof supplied === 'string' ? supplied : undefined);
+    },
+  }, wsServer);
 
   const apolloServer = new ApolloServer({
     schema,
@@ -389,12 +415,9 @@ async function startServer() {
     cors<cors.CorsRequest>(),
     express.json(),
     expressMiddleware(apolloServer, {
-      context: async ({ req }) => {
-        const user = extractUserFromToken(req.headers.authorization);
+      context: async ({ req }: ExpressContextFunctionArgument) => {
         return {
-          driver: isNeo4jAvailable ? driver : null,
-          user,
-          isNeo4jAvailable,
+          ...await graphContext(req.headers.authorization),
           req,
         };
       },
@@ -402,6 +425,10 @@ async function startServer() {
   );
 
   // Enhanced health check endpoint that checks all services
+  app.use('/api/agent', agentApi);
+  if(process.env.TRUST_PROXY==='1'||process.env.TRUST_PROXY==='2')app.set('trust proxy',Number(process.env.TRUST_PROXY));
+  app.use('/api/ops', operationsApi);
+
   app.get('/health', cors<cors.CorsRequest>(), async (_req, res) => {
     const health: {
       status: string;
