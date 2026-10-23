@@ -1,3 +1,4 @@
+import './stable-cpu';
 import { describe, it, expect, beforeAll } from 'vitest';
 import { GraphService } from '../src/services/graph-service';
 import { createMockDriver } from './mock-neo4j';
