@@ -18,6 +18,7 @@ import { Signin } from './pages/Signin';
 import { ForgotPassword } from './pages/ForgotPassword';
 import { ResetPassword } from './pages/ResetPassword';
 import { InteractiveGraphVisualization } from './components/InteractiveGraphVisualization';
+import { PositionSaveProvider } from './hooks/usePositionSaveQueue';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { GraphProvider } from './contexts/GraphContext';
 import { ViewModeProvider } from './contexts/ViewModeContext';
@@ -133,7 +134,9 @@ function AuthenticatedApp() {
 function App() {
   return (
     <AuthProvider>
-      <AuthenticatedApp /><FeedbackHost />
+      <PositionSaveProvider>
+        <AuthenticatedApp /><FeedbackHost />
+      </PositionSaveProvider>
     </AuthProvider>
   );
 }

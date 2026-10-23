@@ -41,6 +41,17 @@ export function getUserRaw(): string | null {
   return safeGet(localStorage, USER_KEY) ?? safeGet(sessionStorage, USER_KEY);
 }
 
+export function getSessionOwnerId(token = getToken()): string | null {
+  try {
+    const userId = JSON.parse(getUserRaw() || 'null')?.id;
+    if (!token || typeof userId !== 'string' || !userId) return null;
+    if (token === 'local-guest') return userId;
+    const claims = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    const tokenOwner = claims.uid ?? claims.userId ?? claims.id;
+    return tokenOwner === userId ? userId : null;
+  } catch { return null; }
+}
+
 /** Whether the user chose to stay logged in. Defaults to true (keep me in). */
 export function isKept(): boolean {
   return safeGet(localStorage, KEEP_KEY) !== 'false';
