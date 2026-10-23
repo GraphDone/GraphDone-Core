@@ -754,9 +754,11 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   
   // Function to save node position to database
   const saveNodePosition = useCallback(async (nodeId: string, x: number, y: number) => {
+    if (!currentUser || !currentGraph) throw new Error('A signed-in owner and graph are required.');
     const result = await updateWorkItemMutation({
+      context: { expectedOwnerId: currentUser.id },
       variables: {
-        where: { id: nodeId },
+        where: { id: nodeId, graph: { id: currentGraph.id } },
         update: {
           positionX: x,
           positionY: y
@@ -766,11 +768,12 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     if (result.errors?.length || !result.data?.updateWorkItems?.workItems?.some((item: { id: string }) => item.id === nodeId)) {
       throw new Error('The task position was not saved.');
     }
-  }, [updateWorkItemMutation]);
+  }, [updateWorkItemMutation, currentUser?.id, currentGraph?.id]);
 
   const positionSaveQueue = usePositionSaveQueue(
     position => saveNodePosition(position.id, position.x, position.y),
-    () => showError('Layout could not be saved', 'Keep this tab open and reconnect to retry your pending positions.'),
+    message => showError('Layout could not be saved', message || 'Keep this tab open and return to this graph after reconnecting to retry your pending positions.'),
+    currentUser && currentGraph ? { ownerId: currentUser.id, graphId: currentGraph.id } : null,
   );
   const positionSaveQueueRef = useRef(positionSaveQueue);
   positionSaveQueueRef.current = positionSaveQueue;
@@ -791,9 +794,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // concurrency — one reflow of N nodes does at most `concurrency` writes at a
     // time instead of N in parallel (#95).
     moved.forEach((n: any) => {
-      n.positionX = n.x;
-      n.positionY = n.y;
-      positionSaveQueueRef.current.queue(n.id, n.x, n.y);
+      if (positionSaveQueueRef.current.queue(n.id, n.x, n.y)) {
+        n.positionX = n.x;
+        n.positionY = n.y;
+      }
     });
     positionSaveQueueRef.current.flush();
   }, []);

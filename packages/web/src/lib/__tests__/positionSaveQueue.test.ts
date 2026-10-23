@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { drainWithLimit, createPositionSaveQueue } from '../positionSaveQueue';
 
 const defer = () => { let resolve!: () => void; const p = new Promise<void>((r) => { resolve = r; }); return { p, resolve }; };
@@ -161,5 +161,26 @@ describe('createPositionSaveQueue', () => {
     await q.flush();
     expect(peak).toBe(2);
     expect(q.size).toBe(0);
+  });
+});
+
+
+describe('bounded pending position retention', () => {
+  it('counts in-flight tasks toward the bound and retains the newest accepted position', async () => {
+    let resolve!: () => void;
+    const save = vi.fn().mockImplementationOnce(() => new Promise<void>(done => { resolve = done; })).mockResolvedValue(undefined);
+    const queue = createPositionSaveQueue({ save, maxPending: 1 });
+    queue.queue('task-a', 1, 2);
+    const saving = queue.flush();
+    expect(() => queue.queue('task-b', 3, 4)).toThrow('Too many pending layout changes');
+    expect(() => queue.queue('task-a', 5, 6)).not.toThrow();
+    resolve();
+    await saving;
+    expect(save.mock.calls.map(([position]) => position)).toEqual([
+      { id: 'task-a', x: 1, y: 2 }, { id: 'task-a', x: 5, y: 6 },
+    ]);
+    expect(() => queue.queue('task-b', 3, 4)).not.toThrow();
+    await queue.flush();
+    expect(save).toHaveBeenLastCalledWith({ id: 'task-b', x: 3, y: 4 });
   });
 });

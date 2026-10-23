@@ -1,7 +1,7 @@
 import { offlineLink } from './offline/link';
 import { ownerId, offlineEnabled } from './offline/engine';
 import { ApolloClient, ApolloLink, InMemoryCache, createHttpLink, split, from } from '@apollo/client';
-import { setContext } from '@apollo/client/link/context';
+import { authLink } from './authLink';
 import { onError } from '@apollo/client/link/error';
 import { getMainDefinition } from '@apollo/client/utilities';
 import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
@@ -31,20 +31,11 @@ const httpLink = createHttpLink({
   uri: getGraphQLUrl(),
 });
 
-const authLink = setContext((_, { headers }) => {
-  const token = getToken();
-  return {
-    headers: {
-      ...headers,
-      authorization: token ? `Bearer ${token}` : '',
-    }
-  };
-});
-
 const errorLink = onError(({ graphQLErrors, networkError, operation, forward }) => {
   if (graphQLErrors?.length || networkError) {
     const definition = getMainDefinition(operation.query);
-    if (definition.kind === 'OperationDefinition' && definition.operation === 'mutation' && /workitem|edge|graph/i.test(operation.operationName)) preserveCloudDraft(operation.operationName, operation.variables);
+    const expectedOwnerId = operation.getContext().expectedOwnerId;
+    if ((expectedOwnerId === undefined || expectedOwnerId === ownerId()) && definition.kind === 'OperationDefinition' && definition.operation === 'mutation' && /workitem|edge|graph/i.test(operation.operationName)) preserveCloudDraft(operation.operationName, operation.variables);
     for (const error of graphQLErrors || []) cloudFailure(String(error.extensions?.code || ''));
     if (networkError && 'result' in networkError) cloudFailure((networkError.result as any)?.code);
   }
