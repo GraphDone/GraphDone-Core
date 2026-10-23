@@ -57,7 +57,7 @@ export function assignRefs(sequences) {
   return sequences;
 }
 
-export function buildReport({ sequences = [], startedAt, finishedAt, target = '', env = {} } = {}) {
+export function buildReport({ sequences = [], startedAt, finishedAt, target = '', env = {}, source } = {}) {
   assignRefs(sequences);
   const { totals, byStatus } = sumCounts(sequences);
   return {
@@ -67,6 +67,7 @@ export function buildReport({ sequences = [], startedAt, finishedAt, target = ''
     durationMs: startedAt != null && finishedAt != null ? finishedAt - startedAt : null,
     target,
     env,
+    ...(source ? { source } : {}),
     rollup: { status: rollupStatus(sequences.map((s) => s.status)), totals, byStatus },
     sequences,
   };
