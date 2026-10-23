@@ -24,3 +24,14 @@ Start with graph-first controls: graph selector/create/switch; new item/create/c
 Run one headed browser at a time on localhost with disposable graphs. Increase dataset size and concurrency separately. Record node/edge count, viewport, quality setting, load time, full rendered count, actual successful drag, frame gaps, interaction latency, API p50/p95, settling time, overlap counts and persistence after reload. Stop escalation on sustained unresponsiveness, server errors or failed correctness; retain the failing size. A maximum tested size is not the application limit. Do not run the entire unbounded MCP chaos suite alongside the browser: its previous run exhausted memory.
 
 Security demand-control checks follow the [OWASP GraphQL testing guidance](https://github.com/OWASP/www-project-web-security-testing-guide/blob/master/v42/4-Web_Application_Security_Testing/12-API_Testing/01-Testing_GraphQL.md). They complement authorization, payload, request-rate and data-volume limits; no single depth check establishes security.
+
+## Runtime and evidence incidents
+
+- [2026-10-23 production secret startup](PRODUCTION_SECRETS_2026-10-23.md): missing/default JWT or session secrets, environment loading after signing-key capture, and direct API containers lacking production mode.
+- [2026-10-23 delayed details-save completion](DETAILS_SAVE_COMPLETION_2026-10-23.md): an acknowledged mutation's pending refetch erased a newer due-date edit; a delayed completion also repopulated cleared undo history after graph changes. Controlled Apollo component tests retain both the failing baseline and correction.
+
+- [2026-10-23 runtime validation](RUNTIME_VALIDATION_2026-10-23.md): API peer-resolution failure after a successful build, obsolete Node/container minimums, a missing disposable-DB CI marker, and smoke assertions depending on a populated default graph.
+
+- 2026-10-23 mobile login evidence: a headed 360px admin scenario successfully signed in but the shared helper checked only the hidden desktop selector/user menu. It retried login on the authenticated workspace and ultimately reported a missing password field. Include the existing visible `graph-selector-mobile` marker in the positive workspace indicators; retain the login-form exclusion. Reproduce with `tests/e2e/graph/admin-dialog-responsive.spec.ts` at 360, 844, and 1440px. This helper observes workspace entry; it is not a complete session/identity authorization test. The initial failure screenshot and log are retained in the audit artifacts.
+
+- The same admin scenario also assumed the Users panel was the default; the current default is Feedback & operations. Navigate through the visible Users button before opening Create User. Keep the dialog visibility, focus, viewport, dismissal, and focus-restoration assertions intact.

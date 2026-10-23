@@ -54,8 +54,8 @@ test.describe('mobile experience @mobile', () => {
     for (const label of ['Dashboard', 'Table', 'Board', 'Gantt', 'Calendar', 'Activity']) {
       await expect(sheet.getByText(label, { exact: true }), `${label} in More sheet`).toBeVisible();
     }
-    await page.keyboard.press('Escape').catch(() => {});
-    await page.mouse.click(10, 200); // dismiss the sheet
+    await page.keyboard.press('Escape');
+    await expect(sheet).toBeHidden();
 
     // Switch to the graph via the bottom nav and verify the mobile-clean treatment.
     await nav.getByText('Graph', { exact: true }).click();

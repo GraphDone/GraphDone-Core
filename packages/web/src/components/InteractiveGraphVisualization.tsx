@@ -1333,6 +1333,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const stopActiveSimulation = useCallback(() => {
     simulationRef.current?.on('tick', null).on('end.persist', null).alphaTarget(0).stop();
     simulationRef.current = null;
+    delete (window as any).__graphPerf;
   }, []);
 
   // Initialize empty visualization canvas
@@ -3968,7 +3969,35 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // console + window.__graphPerf) so dynamics work stays evidence-based.
     const perfMeter = new PerfMeter(240);
     const driftMeter = new DriftMeter();
-    let lastPerfReport = 0;
+    let lastPerfReport = -Infinity;
+    const measuredGraphId = currentGraphIdRef.current;
+    const publishPerf = (now: number, settled = false) => {
+      if (simulationRef.current !== simulation || currentGraphIdRef.current !== measuredGraphId) return;
+      const summary = perfMeter.summary();
+      if (summary.samples === 0) return;
+      lastPerfReport = now;
+      // Drift = node movement, the actual "slip and drift" signal that
+      // frame stats can't show. rmsFromSavedPx near 0 means the layout
+      // matches what's saved (snapshot fidelity).
+      const spatial = driftMeter.sample(simulation.nodes() as any[]);
+      const stats = {
+        ...summary,
+        graphId: measuredGraphId,
+        settled,
+        alpha: Math.round(simulation.alpha() * 1000) / 1000,
+        nodes: nodes.length,
+        edges: validatedEdges.length,
+        quality: qualityProfileRef.current.tier,
+        spatial
+      };
+      (window as any).__graphPerf = stats;
+      if ((window as any).debugLog) {
+        const level = stats.avgTickMs > 8 || stats.fps < 30 ? '⚠️' : '✅';
+        (window as any).debugLog('Perf', `${level} fps=${stats.fps} tick avg=${stats.avgTickMs}ms p95=${stats.p95TickMs}ms dropped=${stats.droppedFrames} alpha=${stats.alpha}`, stats);
+        const driftLevel = spatial.rmsFromSavedPx > 25 ? '⚠️' : '✅';
+        (window as any).debugLog('Drift', `${driftLevel} moving=${spatial.movingNodes} maxStep=${spatial.maxStepPx}px meanStep=${spatial.meanStepPx}px rmsFromSaved=${spatial.rmsFromSavedPx}px`, spatial);
+      }
+    };
 
     // Viewport culling (large graphs only). At 1000 nodes the dominant frame
     // cost is the browser repainting every on-screen SVG element each time a
@@ -4083,28 +4112,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       const now = performance.now();
       perfMeter.tick(now - tickStart);
       perfMeter.frame(now);
-      if (now - lastPerfReport > 2000) {
-        lastPerfReport = now;
-        // Drift = node movement, the actual "slip and drift" signal that
-        // frame stats can't show. rmsFromSavedPx near 0 means the layout
-        // matches what's saved (snapshot fidelity).
-        const spatial = driftMeter.sample(simulation.nodes() as any[]);
-        const stats = {
-          ...perfMeter.summary(),
-          alpha: Math.round(simulation.alpha() * 1000) / 1000,
-          nodes: nodes.length,
-          edges: validatedEdges.length,
-          quality: qualityProfileRef.current.tier,
-          spatial
-        };
-        (window as any).__graphPerf = stats;
-        if ((window as any).debugLog) {
-          const level = stats.avgTickMs > 8 || stats.fps < 30 ? '⚠️' : '✅';
-          (window as any).debugLog('Perf', `${level} fps=${stats.fps} tick avg=${stats.avgTickMs}ms p95=${stats.p95TickMs}ms dropped=${stats.droppedFrames} alpha=${stats.alpha}`, stats);
-          const driftLevel = spatial.rmsFromSavedPx > 25 ? '⚠️' : '✅';
-          (window as any).debugLog('Drift', `${driftLevel} moving=${spatial.movingNodes} maxStep=${spatial.maxStepPx}px meanStep=${spatial.meanStepPx}px rmsFromSaved=${spatial.rmsFromSavedPx}px`, spatial);
-        }
-      }
+      if (now - lastPerfReport > 2000) publishPerf(now);
     });
 
     // Update zoom with LOD updates
@@ -4226,6 +4234,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // center the camera. After this the simulation is idle (one-shot physics).
     simulation.on('end.persist', () => {
       if (simulationRef.current !== simulation) return;
+      publishPerf(performance.now(), true);
       if (layoutStartRef.current != null && lastSettleMsRef.current == null) {
         lastSettleMsRef.current = Math.round(performance.now() - layoutStartRef.current);
       }

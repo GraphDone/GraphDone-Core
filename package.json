@@ -26,7 +26,7 @@
     "test:unified": "node tests/run-unified.mjs --profile full",
     "test:unified:smoke": "node tests/run-unified.mjs --profile smoke",
     "test:unified:open": "node tests/run-unified.mjs --profile full --open",
-    "test:unified:lib": "node --test tests/lib/",
+    "test:unified:lib": "node --test \"tests/lib/**/*.test.mjs\"",
     "dashboard": "node tests/lib/dashboard/server.mjs",
     "dashboard:open": "node tests/lib/dashboard/server.mjs --open",
     "dashboard:narrate": "node scripts/narrate-report.mjs",
@@ -86,7 +86,7 @@
     "typescript": "^5.3.0"
   },
   "engines": {
-    "node": ">=20.17.0",
+    "node": ">=22.18.0",
     "npm": ">=9.0.0"
   },
   "repository": {
@@ -95,6 +95,13 @@
   },
   "license": "MIT",
   "dependencies": {
+    "@apollo/server": "^5.5.1",
     "passport-openidconnect": "^0.1.2"
+  },
+  "overrides": {
+    "@graphql-tools/utils": "12.1.0",
+    "@typescript-eslint/typescript-estree@6.21.0": {
+      "minimatch": "9.0.7"
+    }
   }
 }

@@ -82,7 +82,7 @@ modules the Node unit tests do — served as native ES modules, no bundler.
 - `app.mjs` — browser entry (fetch APIs, render, live-update over SSE).
 - `server.mjs` — orchestrator: index → serve → push.
 
-Unit tests: `node --test tests/lib/dashboard/`.
+Unit tests: `node --test "tests/lib/dashboard/*.test.mjs"`.
 
 ## Security
 
@@ -96,7 +96,7 @@ allowlist of media extensions; `/static/` serves a fixed three-file allowlist.
 So the dashboard keeps living and improving across sessions/reboots, a cron-driven
 loop runs `scripts/dashboard-loop.sh once` every ~30 min (system crontab, tagged
 `# graphdone-dashboard-loop`). Each iteration: (1) ensures the dashboard server is
-up, (2) self-checks it (`node --test tests/lib/dashboard/`), (3) runs ONE bounded
+up, (2) self-checks it (`node --test "tests/lib/dashboard/*.test.mjs"`), (3) runs ONE bounded
 headless `claude -p` improvement iteration against `scripts/dashboard-loop.prompt.txt`.
 A `flock` lock prevents overlap; the agent prompt has hard constraints (never
 deploy, never touch secrets, never merge a failing gate). Run mechanical-only with
