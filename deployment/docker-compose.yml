@@ -48,6 +48,8 @@ services:
       - NODE_ENV=production
       - JWT_SECRET=${JWT_SECRET:-}
       - SESSION_SECRET=${SESSION_SECRET:-}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@graphdone.local}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
       - NEO4J_URI=bolt://graphdone-neo4j:7687
       - NEO4J_USER=neo4j
       - NEO4J_PASSWORD=graphdone_password
@@ -68,7 +70,7 @@ services:
     volumes:
       - ../packages/server/.env:/app/.env
       - logs:/app/logs
-      - sqlite_auth_data:/app/data
+      - sqlite_auth_data:/app/packages/server/data
       - ./certs:/app/certs:ro  # Mount SSL certificates
     healthcheck:
       test: ["CMD", "curl", "-k", "-f", "https://localhost:4128/health"]

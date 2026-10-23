@@ -32,8 +32,8 @@ COPY --chown=appuser:appgroup packages/ packages/
 RUN cd packages/core && npm run build
 
 # Create directories for volumes with proper permissions
-RUN mkdir -p /app/logs /app/data && \
-    chown -R appuser:appgroup /app/logs /app/data
+RUN mkdir -p /app/logs /app/packages/server/data && \
+    chown -R appuser:appgroup /app/logs /app/packages/server/data
 
 EXPOSE 4127
 

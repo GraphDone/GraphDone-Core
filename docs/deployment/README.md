@@ -93,6 +93,37 @@ VITE_ENABLE_3D_VIEW=true
 
 ## Docker Deployment
 
+### Preserve existing SQLite data before recreating legacy API containers
+
+The HTTPS, HTTP and development Compose files retain the named volume
+`sqlite_auth_data` and mount it at `/app/packages/server/data`, matching the
+server workspace. This protects `auth.db`, `operations.db` and any private
+`bootstrap-admin.json`. The separate self-host stack already uses this path.
+
+Older versions mounted that volume at `/app/data` while the API wrote to its
+container's `/app/packages/server/data` directory. Before upgrading an existing
+installation, identify and stop its API container without removing it, then
+copy that entire runtime data directory into a private backup. Stopping the
+writer first preserves a consistent SQLite database and any journal files.
+Retain the original container and existing named volume until restoration and
+login have been verified. Inspect both the backup and existing volume before
+choosing the authoritative data; do not blindly overwrite either. Restore the
+chosen backup into the same volume at the corrected mount, preserving file
+permissions (development uses UID/GID 1001), then recreate and verify the same
+account ID and login. Do not use `down -v` for this migration. This change does
+not automatically extract data from an old container's writable layer.
+
+For a new production database, optionally supply `ADMIN_EMAIL` and a private
+`ADMIN_PASSWORD` of at least 20 characters through the Compose environment.
+Without a password, production still generates one and saves it as a mode-0600
+`bootstrap-admin.json` in the persistent directory. Setting these variables does
+not reset an existing administrator's credentials. CI supplies a disposable
+password and passes the same value as `TEST_ADMIN_PASSWORD` to the browser
+helper; these fixture values must not appear in logs or committed files.
+
+The [recreation regression and migration limits](../../.agents/inbox/2026-10-23-sqlite-volume-workspace.md)
+record the failure and recovery evidence.
+
 ### Production Stack
 
 1. **Build and start services:**
