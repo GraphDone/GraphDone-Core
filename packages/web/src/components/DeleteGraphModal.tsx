@@ -19,8 +19,8 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
   const [step, setStep] = useState<'warning' | 'confirm'>('warning');
   const [understandRisks, setUnderstandRisks] = useState(false);
   const [confirmDeletion, setConfirmDeletion] = useState(false);
-  const [nodeCount, setNodeCount] = useState<number>(0);
   const [nodes, setNodes] = useState<any[]>([]);
+  const nodeCount = nodes.length;
   const [nodeConnections, setNodeConnections] = useState<{[key: string]: any[]}>({});
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
 
@@ -37,7 +37,6 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
     fetchPolicy: 'network-only',
     onCompleted: (data) => {
       const workItems = data?.workItems || [];
-      setNodeCount(workItems.length);
       setNodes(workItems);
     }
   });
@@ -143,7 +142,6 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
       
       // Update local state
       setNodes(prev => prev.filter(node => node.id !== nodeId));
-      setNodeCount(prev => prev - 1);
       
     } catch (error) {
       showError(
@@ -404,23 +402,25 @@ export function DeleteGraphModal({ isOpen, onClose }: DeleteGraphModalProps) {
                                   try {
                                     // Bulk delete all unconnected nodes in single operation
                                     const nodeIds = unconnectedNodes.map(node => node.id);
-                                    await deleteWorkItem({
+                                    const result = await deleteWorkItem({
                                       variables: { 
                                         where: { 
+                                          graph: { id: currentGraph.id },
                                           id_IN: nodeIds
                                         }
-                                      }
+                                      },
+                                      awaitRefetchQueries: true,
                                     });
+                                    if (result.data?.deleteWorkItems?.nodesDeleted !== unconnectedNodeCount) {
+                                      throw new Error('Not all selected work items were deleted. The graph has been refreshed; review it before trying again.');
+                                    }
                                     
                                     // Single success notification for bulk operation
                                     showSuccess(
                                       'Work Items Deletion Completed Successfully!',
                                       `Removed ${unconnectedNodeCount} work item${unconnectedNodeCount !== 1 ? 's' : ''} from ${currentGraph.name}.`
                                     );
-                                    
-                                    // Update local state
-                                    setNodes(prev => prev.filter(node => !unconnectedNodes.some(deleted => deleted.id === node.id)));
-                                    setNodeCount(prev => prev - unconnectedNodeCount);
+                                    setNodes(prev => prev.filter(node => !nodeIds.includes(node.id)));
                                     
                                   } catch (error) {
                                     showError(
