@@ -10,7 +10,7 @@ const interruptHandlers = Object.fromEntries(['SIGINT', 'SIGTERM'].map(signal =>
 function registerCommand(stop) {
   activeCommands.add(stop);
   if (activeCommands.size === 1) {
-    for (const [signal, handler] of Object.entries(interruptHandlers)) process.on(signal, handler);
+    for (const [signal, handler] of Object.entries(interruptHandlers)) process.prependListener(signal, handler);
   }
   return () => {
     activeCommands.delete(stop);

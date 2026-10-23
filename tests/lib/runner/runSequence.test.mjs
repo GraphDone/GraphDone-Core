@@ -150,11 +150,12 @@ for (const [signal, exitCode] of [['SIGINT', 130], ['SIGTERM', 143]]) {
   });
 }
 
-test('interrupt cleanup preserves a caller-owned signal handler', posixOnly, async t => {
+for (const immediateExit of [false, true]) {
+test(`interrupt cleanup precedes a caller-owned signal handler (immediate exit: ${immediateExit})`, posixOnly, async t => {
   const { wrapper, pid } = fixture(t, { ignoreTerm: true });
   const runner = spawn(process.execPath, ['--input-type=module', '-e', `
     import { runCommand } from ${JSON.stringify(new URL('./runSequence.mjs', import.meta.url).href)};
-    process.on('SIGINT', () => { process.exitCode = 42; });
+    process.on('SIGINT', () => { ${immediateExit ? 'process.exit(42);' : 'process.exitCode = 42;'} });
     const result = await runCommand(process.execPath, ['-e', ${JSON.stringify(wrapper)}], { timeoutMs: 8000 });
     console.log(result.error);
   `]);
@@ -170,5 +171,6 @@ test('interrupt cleanup preserves a caller-owned signal handler', posixOnly, asy
   runner.kill('SIGINT');
   assert.deepEqual(await close, [42, null]);
   await assertStopped(descendantPid);
-  assert.match(output, /Command interrupted by SIGINT/);
+  if (!immediateExit) assert.match(output, /Command interrupted by SIGINT/);
 });
+}
