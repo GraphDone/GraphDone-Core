@@ -20,22 +20,26 @@ The committed regression extends the existing disposable Neo4j contract. From
 ```sh
 RUN_DB_CONTRACT=1 GRAPHDONE_DISPOSABLE_NEO4J=1 CI=true \
   npx vitest --run tests/neo4j-contract.test.ts -t 'actual MCP stdio'
-# Before the source fix: 1 failed, 8 filtered-out cases skipped (6.50 s).
+# Before the source fix: 1 failed, 8 filtered-out cases skipped (6.67 s).
 # Only valid JSON-RPC messages may appear on stdout:
 #   "Memory", "CPU Monitor", "Recorded write", "Waiting for" are not valid JSON.
 
 RUN_DB_CONTRACT=1 GRAPHDONE_DISPOSABLE_NEO4J=1 CI=true \
   npx vitest --run tests/neo4j-contract.test.ts
-# After the source fix: 9 passed, 0 skipped (9.36 s).
+# After the source fix: 9 passed, 0 skipped (8.82 s).
 ```
 
 The test launches the actual entry point with `node --import tsx src/index.ts`
 so the existing CI contract job does not require a compiled build. It checks
 initialization, real tool definitions, an owned node creation/read, independent
 Neo4j readback, invalid-call rejection, continued valid use, zero stdout parse
-errors, retained stderr diagnostics and owned-child termination. It shares the
-suite's explicit disposable-DB guard and fixture cleanup; the new case creates
-no edges. The implementation changes only eight operational `console.log`
+errors through child shutdown, retained stderr diagnostics and owned-child
+termination. It shares the suite's explicit disposable-DB guard. Independent
+review caught that inherited cleanup swallowed failures; this fixture now uses
+its own verified edge → node → graph cleanup, fails on an unconfirmed stage,
+and retains the remaining ownership links. The new case creates no edges. Both
+the final negative control and passing run confirmed cleanup before checking
+the protocol-error channel. The implementation changes only eight operational `console.log`
 calls to `console.error` in the memory, CPU and consistency utilities.
 
 Keep stdout exclusively for MCP protocol messages. Verify both real results
