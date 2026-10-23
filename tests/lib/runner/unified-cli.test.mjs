@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync, spawnSync } from 'node:child_process';
+import { prepareOutput } from './unified-options.mjs';
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 function fixture(t) {
@@ -105,3 +106,28 @@ test('CLI detects a source edit while tests are running', t => {
   assert.equal(report.source.changedDuringRun, true);
   assert.equal(report.rollup.status, 'failed');
 });
+
+test('CLI refuses to stamp one repository while executing from another', t => {
+  const a = fixture(t);
+  const b = fixture(t);
+  const result = spawnSync(process.execPath, [join(a.dir, 'tests/run-unified.mjs'), '--sequence', 'unit-web'], {
+    cwd: b.dir, env: { ...process.env, PATH: `${join(b.dir, 'bin')}:${process.env.PATH}` }, encoding: 'utf8', timeout: 10000,
+  });
+  assert.notEqual(result.status, 0, result.stdout);
+  assert.ok(!existsSync(join(b.dir, 'test-artifacts/unified/report.json')));
+});
+
+for (const location of ['git-dir', 'git-common-dir', 'symlink']) {
+  test(`linked worktree output rejects actual Git metadata: ${location}`, t => {
+    const { dir } = fixture(t);
+    const linked = join(dir, 'test-artifacts/linked');
+    execFileSync('git', ['worktree', 'add', '--detach', linked, 'HEAD'], { cwd: dir, stdio: 'pipe' });
+    const gitDir = execFileSync('git', ['rev-parse', '--absolute-git-dir'], { cwd: linked, encoding: 'utf8' }).trim();
+    const common = resolve(linked, execFileSync('git', ['rev-parse', '--git-common-dir'], { cwd: linked, encoding: 'utf8' }).trim());
+    const alias = join(dir, 'test-artifacts/metadata-alias');
+    if (location === 'symlink') symlinkSync(gitDir, alias, 'dir');
+    const output = join(location === 'git-dir' ? gitDir : location === 'git-common-dir' ? common : alias, 'review-output');
+    assert.throws(() => prepareOutput(output, linked), /Git metadata/);
+    assert.ok(!existsSync(output));
+  });
+}
