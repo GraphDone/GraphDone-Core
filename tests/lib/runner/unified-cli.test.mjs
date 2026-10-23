@@ -81,6 +81,40 @@ test('failed browser traces and diagnostics survive later Playwright output clea
   for (const attachment of attachments) assert.ok(html.includes(`<a href="${attachment.href}" download>`));
 });
 
+for (const location of ['outside-root', 'symlink', 'directory-symlink', 'directory']) {
+  test(`CLI rejects ${location} sources for downloadable evidence`, t => {
+    const { dir, run } = fixture(t);
+    const outside = mkdtempSync(join(tmpdir(), 'graphdone-outside-evidence-'));
+    t.after(() => rmSync(outside, { recursive: true, force: true }));
+    const sentinel = join(outside, 'sentinel.json');
+    writeFileSync(sentinel, 'unrelated owned sentinel');
+    const artifacts = join(dir, 'test-artifacts/playwright-output');
+    mkdirSync(artifacts, { recursive: true });
+    let source = sentinel;
+    if (location === 'symlink') {
+      source = join(artifacts, 'alias.json');
+      symlinkSync(sentinel, source);
+    } else if (location === 'directory-symlink') {
+      const alias = join(artifacts, 'linked-directory');
+      symlinkSync(outside, alias, 'dir');
+      source = join(alias, 'sentinel.json');
+    } else if (location === 'directory') source = artifacts;
+    const report = { suites: [{ specs: [{ title: 'declared file', ok: true,
+      tests: [{ status: 'expected', expectedStatus: 'passed', results: [{ status: 'passed', attachments: [
+        { name: 'diagnostics', contentType: 'application/json', path: source },
+      ] }] }],
+    }] }], stats: { expected: 1, unexpected: 0, flaky: 0, skipped: 0 }, errors: [] };
+    writeFileSync(join(dir, 'bin/npx'), `#!${process.execPath}\nprocess.stdout.write(${JSON.stringify(JSON.stringify(report))});\n`, { mode: 0o700 });
+    const result = run(['--sequence', 'new-user']);
+    assert.equal(result.status, 1, result.stdout);
+    const unified = JSON.parse(readFileSync(join(dir, 'test-artifacts/unified/report.json')));
+    assert.equal(unified.rollup.status, 'failed');
+    assert.match(unified.sequences[0].evidenceErrors.join(' '), /file attachment/i);
+    assert.ok(unified.sequences[0].cases.every(result => result.attachments.length === 0));
+    assert.equal(readFileSync(sentinel, 'utf8'), 'unrelated owned sentinel');
+  });
+}
+
 for (const args of [['--sequence', 'does-not-exist'], ['--profile', 'does-not-exist'], ['--out']]) {
   test(`CLI rejects invalid selection before touching output: ${args.join(' ')}`, t => {
     const { dir, run } = fixture(t);
