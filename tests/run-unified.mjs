@@ -21,6 +21,7 @@ import { writeFileSync } from 'node:fs';
 import { SEQUENCES, PROFILES } from './sequences/unified.config.mjs';
 import { parseOptions, prepareOutput } from './lib/runner/unified-options.mjs';
 import { sourceState } from './lib/runner/source-state.mjs';
+import { ownedEvidencePath } from './lib/runner/evidence-path.mjs';
 
 let options;
 try { options = parseOptions(process.argv.slice(2), PROFILES, SEQUENCES); }
@@ -60,10 +61,12 @@ function materializeArtifacts(seq) {
         const rel = join('assets', seq.id, `${n++}${ext}`);
         const dest = join(outDir, rel);
         mkdirSync(join(outDir, 'assets', seq.id), { recursive: true });
-        copyFileSync(a.srcPath, dest);
+        copyFileSync(a.type === 'file' ? ownedEvidencePath(root, a.srcPath) : a.srcPath, dest);
         a.href = rel;
         delete a.srcPath;
-      } catch { /* skip unreadable artifact */ }
+      } catch (error) {
+        if (a.type === 'file') throw new Error(`Could not retain file evidence: ${error.message}`);
+      }
     }
   }
   return seq;

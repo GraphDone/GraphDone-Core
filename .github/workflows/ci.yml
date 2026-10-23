@@ -186,7 +186,7 @@ jobs:
           TEST_URL: http://localhost:3127
           CI: true
       - name: Mobile UI audit (layout / contrast / dialogs across every screen)
-        run: npm run test:mobile
+        run: node tests/run-unified.mjs --sequence mobile --out test-artifacts/ci-mobile
         env:
           TEST_URL: http://localhost:3127
           CI: true
@@ -196,7 +196,7 @@ jobs:
           TEST_URL: http://localhost:3127
           CI: true
       - name: Performance budgets (ADAPT-8)
-        run: npm run test:perf
+        run: node tests/run-unified.mjs --sequence perf-budgets --out test-artifacts/ci-perf
         env:
           TEST_URL: http://localhost:3127
           CI: true

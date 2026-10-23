@@ -88,6 +88,51 @@ unreferenced artifacts may remain in a reused slot.
 | `full` | + diagnostics, showcase (video), matrix, vlm, perf-scale, cloud-audit | everything |
 | `report` | the capture-heavy report sequences only | regenerate galleries |
 
+The required performance and mobile sequences use one worker, zero test retries,
+and the strict reporter in CI. Run them against an owned disposable stack with:
+
+```bash
+TEST_URL=http://localhost:3127 node tests/run-unified.mjs --sequence perf-budgets --out test-artifacts/runs/perf-check
+TEST_URL=http://localhost:3127 node tests/run-unified.mjs --sequence mobile --out test-artifacts/runs/mobile-check
+```
+
+Strict `new-user`, `mobile`, and `perf-budgets` sequences retain traces on failure
+even though retries are disabled. The adapter copies trace ZIPs and path-backed
+JSON attachments into the run's report assets, with download links in HTML and
+the dashboard, so the next Playwright invocation cannot erase that evidence.
+These downloadable files must be regular files inside the repository's
+`test-artifacts` directory, without symbolic links; unrelated source paths fail
+the evidence check. The button-content
+sweep labels each route/viewport step and attaches its navigation context plus
+the latest 50 console warning/error, page-error, and failed-request events on
+failure. In that custom JSON attachment, messages are capped at 1,000 characters;
+request URL queries/fragments and common credential patterns are removed. That
+JSON capture does not collect headers, request/response bodies, or browser
+storage. Playwright trace ZIPs are separate, unsanitized evidence and can contain
+raw network headers/bodies; keep raw traces with the disposable test artifacts,
+and publish summaries rather than raw traces. The diagnostic capture preserves the original
+failure and does not change assertion deadlines. See the
+[static-shell evidence lesson](../../.agents/inbox/2026-10-23-browser-startup-evidence.md).
+
+`perf-budgets` selects only the three cases in `tests/perf/graph-perf.spec.ts`.
+Each creates its own four-node, three-edge placed graph and selects that graph
+explicitly. Missing nodes, missing or stale metrics, skipped cases, and failed
+HTTP/GraphQL responses fail the gate. Saved-snapshot checks compare rendered
+world positions with the fixture and read the saved coordinates back from the
+API. All 20 timed `workItems` responses must contain exactly the owned fixture
+data before contributing to the latency result. This does not measure the MCP
+`get_graph_context` operation.
+
+Budgets remain 12 seconds to settle, alpha at most 0.02, average measured tick at
+most 8 ms, saved-snapshot drift at most 25 world-coordinate pixels, and query p95
+at most 800 ms. The existing conservative 20-sample percentile takes the largest
+sample. This small placed graph does not establish large-graph, unplaced-layout,
+or production performance; the separate scale sweep remains report-only.
+Cleanup deletes owned edges before work items and the graph. If a stage fails or
+its count is unconfirmed, cleanup fails and retains the remaining ownership path
+for diagnosis rather than detaching children. See the
+[evidence and instrumentation incident](../../.agents/inbox/2026-10-23-performance-gate-evidence.md).
+
 ## Test tree
 - `tests/e2e/<domain>/` — `smoke` (THE GATE), `auth`, `graph`, `ui`, `a11y`,
   `mobile`, `responsive`, `api`, `admin`, and `reports/` (capture-heavy, own
