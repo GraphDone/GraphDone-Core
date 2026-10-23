@@ -73,6 +73,18 @@ export async function requireFolderParent(folder: Omit<Folder, 'id'> & { id?: st
   }
 }
 
+export async function requireFolderDeletion(folderId: string, actor: FolderActor, moveGraphsTo?: string) {
+  const folder = await requireFolderAccess(folderId, actor, true);
+  const descendants = await sqliteAuthStore.getFolderDescendantIds(folderId);
+  for (const descendantId of descendants) {
+    const descendant = await requireFolderAccess(descendantId, actor, true);
+    if (descendant.type !== folder.type || descendant.ownerId !== folder.ownerId) throw deny();
+  }
+  if (moveGraphsTo && (moveGraphsTo === folderId || descendants.includes(moveGraphsTo))) {
+    throw new GraphQLError('Graph destination must be outside the deleted folder hierarchy', { extensions: { code: 'BAD_USER_INPUT' } });
+  }
+}
+
 async function readableGraphIds(ids: string[], context: FolderContext, actor: FolderActor, required: boolean) {
   const readable = new Set<string>();
   if (!ids.length) return readable;

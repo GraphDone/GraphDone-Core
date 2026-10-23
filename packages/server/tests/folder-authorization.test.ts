@@ -169,6 +169,52 @@ describe.each(['sqlite', 'neo4j'])('%s folder authorization', mode => {
     expect(await snapshot()).toEqual(before);
   });
 
+  it.each([0, 1])('preserves legacy foreign descendants when deleting with foreign_keys=%s', async foreignKeys => {
+    const child = await sqliteAuthStore.createFolder({ name: 'owned child', type: 'user', ownerId: accounts.owner.id, parentId: 'owner-folder' });
+    await execute('UPDATE folders SET parentId=? WHERE id=?', [child.id, 'other-folder']);
+    await execute(`PRAGMA foreign_keys=${foreignKeys}`);
+    try {
+      expect((await rows('PRAGMA foreign_keys'))[0].foreign_keys).toBe(foreignKeys);
+      const before = await snapshot();
+      const result = await call('mutation {deleteFolder(id:"owner-folder",moveGraphsTo:"team-folder"){success}}');
+      expect(await rows('SELECT id FROM folders WHERE id=?', ['other-folder'])).toEqual([{ id: 'other-folder' }]);
+      denied(result);
+      expect(await snapshot()).toEqual(before);
+    } finally {
+      await execute('PRAGMA foreign_keys=OFF');
+    }
+  });
+
+  it('keeps authorized same-domain deletion available with enforced cascades', async () => {
+    const child = await sqliteAuthStore.createFolder({ name: 'owned child', type: 'user', ownerId: accounts.owner.id, parentId: 'owner-folder' });
+    await execute('PRAGMA foreign_keys=ON');
+    try {
+      const result = await call('mutation {deleteFolder(id:"owner-folder",moveGraphsTo:"team-folder"){success}}');
+      expect(result.errors).toBeUndefined();
+      expect(await rows('SELECT id FROM folders WHERE id IN (?,?)', ['owner-folder', child.id])).toEqual([]);
+      expect(await rows('SELECT graphId FROM graph_folders WHERE folderId=?', ['team-folder'])).toEqual([{ graphId: 'owner-graph' }]);
+      expect(await rows('SELECT id FROM folders WHERE id=?', ['other-folder'])).toEqual([{ id: 'other-folder' }]);
+    } finally {
+      await execute('PRAGMA foreign_keys=OFF');
+    }
+  });
+
+  it('rejects legacy descendants in a different writable ownership domain', async () => {
+    await execute('UPDATE folders SET parentId=? WHERE id=?', ['owner-folder', 'team-folder']);
+    const before = await snapshot();
+    denied(await call('mutation {deleteFolder(id:"owner-folder"){success}}'));
+    expect(await snapshot()).toEqual(before);
+  });
+
+  it.each(['self', 'descendant'])('rejects the %s as graph destination before deleting the subtree', async target => {
+    const child = await sqliteAuthStore.createFolder({ name: 'owned child', type: 'user', ownerId: accounts.owner.id, parentId: 'owner-folder' });
+    const destination = target === 'self' ? 'owner-folder' : child.id;
+    const before = await snapshot();
+    const result = await call('mutation($destination:String!){deleteFolder(id:"owner-folder",moveGraphsTo:$destination){success}}', 'owner', { destination });
+    expect(result.errors?.[0]?.extensions.code).toBe('BAD_USER_INPUT');
+    expect(await snapshot()).toEqual(before);
+  });
+
   it('rejects forged owners, foreign parents and hierarchy changes across ownership domains', async () => {
     const before = await snapshot();
     denied(await call('mutation($owner:String!){createFolder(input:{name:"intrusion",type:USER,ownerId:$owner}){id}}', 'owner', { owner: accounts.outsider.id }));

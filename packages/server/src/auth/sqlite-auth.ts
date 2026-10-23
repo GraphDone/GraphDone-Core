@@ -878,6 +878,21 @@ class SQLiteAuthStore {
     });
   }
 
+  async getFolderDescendantIds(folderId: string): Promise<string[]> {
+    await this.initialize();
+    const db = await this.getDb();
+    return new Promise((resolve, reject) => {
+      db.all(`WITH RECURSIVE descendants(id) AS (
+        SELECT id FROM folders WHERE parentId = ?
+        UNION
+        SELECT folders.id FROM folders JOIN descendants ON folders.parentId = descendants.id
+      ) SELECT id FROM descendants`, [folderId], (error, rows: { id: string }[]) => {
+        if (error) reject(error);
+        else resolve(rows.map(row => row.id));
+      });
+    });
+  }
+
   async isTeamMember(userId: string, teamId: string): Promise<boolean> {
     await this.initialize();
     const db = await this.getDb();
