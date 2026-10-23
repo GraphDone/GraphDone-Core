@@ -4,12 +4,18 @@ GraphDone has one reproducible test entry — the **unified harness** — plus t
 focused **smoke gate** that must pass before any "it works" claim.
 
 ```bash
-TEST_URL=http://localhost:3127 npm run test:smoke   # THE GATE (blocking, ~30s)
+TEST_URL=http://localhost:3127 npm run test:smoke   # THE GATE against a disposable stack
 npm run test:unified                                # full battery → dual report
 npm run test:unified:smoke                          # fast subset (unit + gate + a focused e2e)
 npm run test:unified:open                            # full battery, then open the HTML report
 npm run test:unified:lib                             # the harness's own unit tests (node --test)
 ```
+
+Run from the repository root; the harness rejects a different working directory
+so tests and source provenance cannot refer to different checkouts. Browser suites mutate data: use an owned disposable
+local stack with test accounts and seeded data. `TEST_URL` selects an existing
+stack; it does not make that stack disposable. `npm test` runs package unit tests,
+not these browser workflows.
 
 ## Dual output (one run, two artifacts)
 The harness writes to `test-artifacts/unified/`:
@@ -18,9 +24,36 @@ The harness writes to `test-artifacts/unified/`:
   plus the cloud-audit summary. To share it, zip the whole folder (assets are
   referenced relatively).
 - **`report.json`** — machine-parsable (`schema: graphdone.unified-report/1`):
-  rollup status + totals + per-sequence counts. Per-sequence raw JSON lands in
+  rollup status + totals + per-sequence counts. Per-sequence normalized JSON lands in
   `test-artifacts/unified/sequences/`.
-- **exit code** = rollup status (any blocking failure → 1), so it doubles as a CI gate.
+- **exit code** is nonzero on execution/evidence failure; unknown profiles,
+  sequences, missing option values, and unsafe output targets fail before tests
+  run. Optional skipped reports exit zero with an explicit `skipped` status.
+
+The adapters require actual case results and a successful process exit. Missing,
+malformed, or empty reports cannot become passes. A nonzero exit, timeout, global
+test error, or flaky retry fails even if some cases passed. Required sequences
+also fail when cases are skipped. Explicitly optional report sequences may skip
+when their prerequisites are absent; those cases never count as passing.
+Supplied summary counters must be valid and agree with the individual results.
+Vitest's legacy nonfailed total may include skipped/todo cases; the harness still
+derives its passing count from assertions that actually passed.
+
+Reports include the starting/ending Git revision, dirty flag, and SHA-256 source
+fingerprint. A source change during execution fails the run. Dirty trees are
+identified rather than presented as clean commits. The fingerprint covers Git
+HEAD, tracked changes, and nonignored untracked source; ignored build outputs,
+external services, and deployed artifacts need separate identity checks. A local
+passing report does not establish production parity or complete feature coverage.
+
+Use a unique `--out test-artifacts/runs/<run-id>` for retained or parallel runs.
+The default output slot remains compatible with the dashboard. A rerun can
+refresh a harness-owned output directory without recursively deleting its
+contents. Repository roots/ancestors, actual Git directories (including linked
+worktree/common metadata and aliases), symbolic links inside report
+directories, and nonempty unrelated output directories are rejected. The current
+`report.json` identifies the cases and attachments belonging to that run; older
+unreferenced artifacts may remain in a reused slot.
 
 ## How it's wired
 - `tests/run-unified.mjs` — the entry. `--profile {smoke|pr|full|report}`,
@@ -39,7 +72,7 @@ The harness writes to `test-artifacts/unified/`:
 | profile | sequences | use |
 | --- | --- | --- |
 | `smoke` | unit-web, smoke gate, a focused auth e2e | fast blocking signal |
-| `pr` | + graph e2e, mobile, perf budgets | broader blocking set for PRs |
+| `pr` | + graph e2e, mobile, perf budgets | broader PR signal; optional sequences remain identified |
 | `full` | + diagnostics, showcase (video), matrix, vlm, perf-scale, cloud-audit | everything |
 | `report` | the capture-heavy report sequences only | regenerate galleries |
 
@@ -61,6 +94,12 @@ The harness writes to `test-artifacts/unified/`:
   and list it in the relevant profile(s). Blocking sequences belong in `smoke`/`pr`.
 - **The smoke gate** lives at `tests/e2e/smoke/user-smoke.spec.ts` — keep it the
   honest "a real user can use the app" check.
+
+`tests/lib/adapters/execution-evidence.test.mjs` runs controlled child processes
+that write passing, empty, malformed, skipped, and flaky reports before success,
+failure, or timeout. `tests/lib/runner/unified-cli.test.mjs` uses disposable Git
+repositories to check selection validation, output preservation, provenance, and
+source-change rejection. These are harness regressions, not product acceptance.
 
 ## Authentication in tests
 Use the battle-tested helper for every authenticated spec:
