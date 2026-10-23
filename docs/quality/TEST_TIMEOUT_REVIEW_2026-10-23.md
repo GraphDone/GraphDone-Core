@@ -39,8 +39,9 @@ when the wrapper exited with code zero.
 Detaching a command also separates it from the terminal's process group. The
 runner therefore shares one SIGINT/SIGTERM cleanup handler across all active
 commands, immediately forces cleanup of their owned groups, and removes its
-handlers when the last command settles. Existing caller-owned handlers remain
-in control of exit behavior; otherwise cancellation exits with 130/143.
+handlers when the last command settles. Cleanup is prepended ahead of existing
+caller-owned handlers, including handlers that exit immediately; those handlers
+remain in control of exit behavior. Otherwise cancellation exits with 130/143.
 
 ## Regression coverage and limits
 
@@ -51,7 +52,7 @@ interrupts, listener removal, and preservation of caller signal handling.
 Success output, working directory, environment, literal argv, and spawn errors
 remain covered. The existing `npm run test:unified:lib` discovers these tests.
 
-On 2026-10-23, `node --test tests/lib/` passed all 116 tests, including the 11
+On 2026-10-23, `node --test tests/lib/` passed all 117 tests, including the 12
 new process-runner cases; `git diff --check` passed. The failing-before cases
 establish that the new checks detect the previous timeout behavior.
 
