@@ -26,7 +26,7 @@
     "test:unified": "node tests/run-unified.mjs --profile full",
     "test:unified:smoke": "node tests/run-unified.mjs --profile smoke",
     "test:unified:open": "node tests/run-unified.mjs --profile full --open",
-    "test:unified:lib": "node --test tests/lib/",
+    "test:unified:lib": "node --test \"tests/lib/**/*.test.mjs\"",
     "dashboard": "node tests/lib/dashboard/server.mjs",
     "dashboard:open": "node tests/lib/dashboard/server.mjs --open",
     "dashboard:narrate": "node scripts/narrate-report.mjs",
