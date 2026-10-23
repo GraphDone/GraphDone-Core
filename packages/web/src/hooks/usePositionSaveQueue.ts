@@ -1,6 +1,6 @@
 import { createContext, createElement, useCallback, useContext, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { createPositionSaveQueue, type PositionSave } from '../lib/positionSaveQueue';
-import { getToken, getUserRaw } from '../lib/authStorage';
+import { getSessionOwnerId } from '../lib/authStorage';
 
 export interface PositionSaveScope { ownerId: string; graphId: string; }
 type Attachment = { save: (position: PositionSave) => Promise<void>; onError: (message?: string) => void };
@@ -9,11 +9,6 @@ type Entry = PositionSaveScope & {
   attachment?: Attachment;
   reportedFailure: boolean;
 };
-
-function currentOwner() {
-  try { return getToken() ? JSON.parse(getUserRaw() || 'null')?.id : undefined; }
-  catch { return undefined; }
-}
 
 function createRegistry() {
   const entries = new Map<string, Entry>();
@@ -33,7 +28,7 @@ function createRegistry() {
         queue: createPositionSaveQueue({
           maxPending: 10000,
           save: async position => {
-            if (currentOwner() !== next.ownerId || !next.attachment) throw new Error('Layout saving is waiting for its graph and signed-in owner.');
+            if (getSessionOwnerId() !== next.ownerId || !next.attachment) throw new Error('Layout saving is waiting for its graph and signed-in owner.');
             await next.attachment.save(position);
           },
         }),
@@ -44,12 +39,12 @@ function createRegistry() {
     return entry;
   };
   const flush = async (entry: Entry) => {
-    if (!entry.attachment || currentOwner() !== entry.ownerId) return;
+    if (!entry.attachment || getSessionOwnerId() !== entry.ownerId) return;
     try {
       await entry.queue.flush();
       entry.reportedFailure = false;
     } catch {
-      if (entry.attachment && currentOwner() === entry.ownerId && !entry.reportedFailure) {
+      if (entry.attachment && getSessionOwnerId() === entry.ownerId && !entry.reportedFailure) {
         entry.reportedFailure = true;
         entry.attachment.onError();
       }
@@ -122,7 +117,7 @@ export function usePositionSaveQueue(
 
   const queue = useCallback((id: string, x: number, y: number) => {
     const entry = active.current;
-    if (!entry || entry.attachment !== attachment || latest.current.key !== key || currentOwner() !== entry.ownerId) {
+    if (!entry || entry.attachment !== attachment || latest.current.key !== key || getSessionOwnerId() !== entry.ownerId) {
       attachment.onError('Layout saving is unavailable. Return to this graph while signed in as its owner before moving tasks.');
       return false;
     }
