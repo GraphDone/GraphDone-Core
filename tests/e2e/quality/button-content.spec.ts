@@ -31,7 +31,7 @@ import {login,TEST_USERS} from '../../lib/auth';
   for(const route of ['/','/analytics','/agents','/settings','/backend','/ontology','/admin']){
    await page.goto(route);await expect(page.locator('main')).toBeVisible();await page.waitForTimeout(400);await inspect(width,route);
    if(route==='/'){
-    const selector=page.getByTestId(width<768?'graph-selector-mobile':'graph-selector').and(page.locator(':visible'));await expect(selector).toBeVisible();
+    const selector=page.locator('[data-testid="graph-selector"], [data-testid="graph-selector-mobile"]').and(page.locator(':visible'));await expect(selector).toBeVisible();
     const name=selector.getByTestId('graph-selector-name');expect((await name.boundingBox())!.width,'project name has usable space').toBeGreaterThanOrEqual(100);
     await selector.click();await expect(page.getByTestId('graph-selector-dropdown')).toBeVisible();await inspect(width,'graph selector menu');await page.keyboard.press('Escape');
    }
