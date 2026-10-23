@@ -293,6 +293,8 @@ jobs:
         run: ./scripts/generate-dev-certs.sh
       - name: Start GraphDone (production stack)
         run: |
+          export JWT_SECRET="$(openssl rand -hex 32)"
+          export SESSION_SECRET="$(openssl rand -hex 32)"
           npm run docker:prod &
           echo "Waiting for the stack to be healthy (cold image build can take minutes)..."
           timeout 1200 bash -c 'until curl -k https://localhost:3128/health 2>/dev/null; do sleep 5; done'

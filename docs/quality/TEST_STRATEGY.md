@@ -27,4 +27,5 @@ Security demand-control checks follow the [OWASP GraphQL testing guidance](https
 
 ## Runtime and evidence incidents
 
+- [2026-10-23 production secret startup](PRODUCTION_SECRETS_2026-10-23.md): missing/default JWT or session secrets, environment loading after signing-key capture, and direct API containers lacking production mode.
 - [2026-10-23 runtime validation](RUNTIME_VALIDATION_2026-10-23.md): API peer-resolution failure after a successful build, obsolete Node/container minimums, a missing disposable-DB CI marker, and smoke assertions depending on a populated default graph.
