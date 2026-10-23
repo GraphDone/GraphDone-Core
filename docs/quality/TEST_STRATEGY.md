@@ -28,3 +28,7 @@ Security demand-control checks follow the [OWASP GraphQL testing guidance](https
 ## Runtime and evidence incidents
 
 - [2026-10-23 runtime validation](RUNTIME_VALIDATION_2026-10-23.md): API peer-resolution failure after a successful build, obsolete Node/container minimums, a missing disposable-DB CI marker, and smoke assertions depending on a populated default graph.
+
+- 2026-10-23 mobile login evidence: a headed 360px admin scenario successfully signed in but the shared helper checked only the hidden desktop selector/user menu. It retried login on the authenticated workspace and ultimately reported a missing password field. Include the existing visible `graph-selector-mobile` marker in the positive workspace indicators; retain the login-form exclusion. Reproduce with `tests/e2e/graph/admin-dialog-responsive.spec.ts` at 360, 844, and 1440px. This helper observes workspace entry; it is not a complete session/identity authorization test. The initial failure screenshot and log are retained in the audit artifacts.
+
+- The same admin scenario also assumed the Users panel was the default; the current default is Feedback & operations. Navigate through the visible Users button before opening Create User. Keep the dialog visibility, focus, viewport, dismissal, and focus-restoration assertions intact.

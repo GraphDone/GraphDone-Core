@@ -6,6 +6,7 @@ for (const viewport of [{ width: 360, height: 640 }, { width: 844, height: 390 }
     await page.setViewportSize(viewport);
     await login(page, TEST_USERS.ADMIN);
     await page.goto('/admin');
+    await page.getByRole('button', { name: 'Users', exact: true }).click();
     await page.getByRole('button', { name: 'Create User', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'Create new user' });
     await expect(dialog).toBeVisible();

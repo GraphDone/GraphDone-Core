@@ -13,6 +13,7 @@ const modes = [
 for (const [width,height] of [[360,640],[844,390],[1440,900]]) {
   test(`same saved work in all modes ${width}×${height} @newuser`, async ({page},info) => {
     test.setTimeout(120000);
+    page.setDefaultTimeout(10000);
     expect(['localhost','127.0.0.1']).toContain(new URL(base).hostname);
     if(cloud) expect(['localhost','127.0.0.1']).toContain(new URL(api).hostname);
     await page.setViewportSize({width,height});
@@ -48,15 +49,19 @@ for (const [width,height] of [[360,640],[844,390],[1440,900]]) {
       expect(saved.tags).toEqual(['qc']);
       await page.evaluate(id=>{localStorage.setItem('currentGraphId',id);localStorage.setItem('graphdone:viewMode','cards');},graph);
       await page.goto(base);
+      const navigation = page.getByTestId('mobile-bottom-nav')
+        .or(page.getByRole('combobox',{name:'Workspace view'}))
+        .or(page.getByTitle('Card View',{exact:true}));
+      await expect(navigation.and(page.locator(':visible')).first()).toBeVisible();
       for(const [mode,label,title] of modes) {
-        if(width<768) {
+        if(await page.getByTestId('mobile-bottom-nav').isVisible()) {
           const nav=page.getByTestId('mobile-bottom-nav');
           if(mode==='cards'||mode==='graph') await nav.getByRole('button',{name:label,exact:true}).click();
           else {
             await nav.getByRole('button',{name:'More',exact:true}).click();
             await page.getByRole('dialog',{name:'More navigation'}).getByRole('button',{name:label,exact:true}).click();
           }
-        } else if(width<1280) await page.getByRole('combobox',{name:'Workspace view'}).selectOption(mode);
+        } else if(await page.getByRole('combobox',{name:'Workspace view'}).isVisible()) await page.getByRole('combobox',{name:'Workspace view'}).selectOption(mode);
         else await page.getByTitle(title,{exact:true}).click();
         await expect.poll(()=>page.evaluate(()=>localStorage.getItem('graphdone:viewMode'))).toBe(mode);
         const scope=mode==='graph'?page.locator('.graph-container'):page.getByTestId('view-content');
