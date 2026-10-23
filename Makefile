@@ -1,7 +1,7 @@
 # GraphDone Makefile for Test Automation
 # Run all tests and generate HTML report with: make test-all
 
-.PHONY: help test test-all test-https test-e2e test-unit test-report deploy clean
+.PHONY: help test test-all test-https test-e2e test-unit test-report dashboard dashboard-narrate deploy clean
 
 # Default target - show help
 help:
@@ -23,10 +23,10 @@ help:
 
 # Run all comprehensive tests
 test-all: check-deploy
-	@echo "🧪 Running comprehensive test suite..."
+	@echo "🧪 Running comprehensive test suite (unified harness)..."
 	@npm run test:comprehensive
 	@echo "✅ Tests complete! Opening HTML report..."
-	@open test-results/reports/index.html
+	@open test-artifacts/unified/report.html
 
 # Run HTTPS/SSL tests only
 test-https: check-deploy
@@ -48,12 +48,22 @@ test-unit:
 
 # Open test report
 test-report:
-	@if [ -f test-results/reports/index.html ]; then \
-		open test-results/reports/index.html; \
-		echo "📊 Opening test report in browser..."; \
+	@if [ -f test-artifacts/unified/report.html ]; then \
+		open test-artifacts/unified/report.html; \
+		echo "📊 Opening unified test report in browser..."; \
 	else \
-		echo "❌ No test report found. Run 'make test-all' first."; \
+		echo "❌ No test report found. Run 'make test-all' (or npm run test:unified) first."; \
 	fi
+
+# Live test dashboard (auto-opens browser; watches test runs + updates live)
+dashboard:
+	@echo "📊 Starting live test dashboard at http://localhost:3199 ..."
+	@npm run dashboard:open
+
+# Generate the piper-tts narrated progress report (Narrated tab in the dashboard)
+dashboard-narrate:
+	@echo "🎧 Generating narrated progress report (piper-tts)..."
+	@npm run dashboard:narrate
 
 # Start production deployment
 deploy:

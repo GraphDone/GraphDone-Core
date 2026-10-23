@@ -1,4 +1,4 @@
-import nodemailer from 'nodemailer';
+import nodemailer, {type Transporter} from 'nodemailer';
 
 interface EmailOptions {
   to: string;
@@ -9,7 +9,7 @@ interface EmailOptions {
 
 class EmailService {
   private isDevelopment = process.env.NODE_ENV === 'development';
-  private transporter: nodemailer.Transporter | null = null;
+  private transporter: Transporter | null = null;
 
   constructor() {
     this.setupTransporter();
@@ -160,7 +160,7 @@ class EmailService {
 
           <div class="footer">
             <p>If you didn't request this link, you can safely ignore this email.</p>
-            <p>GraphDone - Project management for teams who think differently</p>
+            <p>GraphDone - Management for teams who think differently</p>
           </div>
         </div>
       </body>
@@ -275,7 +275,7 @@ class EmailService {
 
           <div class="footer">
             <p>If you didn't request this password reset, you can safely ignore this email.</p>
-            <p>GraphDone - Project management for teams who think differently</p>
+            <p>GraphDone - Management for teams who think differently</p>
           </div>
         </div>
       </body>

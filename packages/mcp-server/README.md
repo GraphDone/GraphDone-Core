@@ -11,7 +11,7 @@ This MCP (Model Context Protocol) server acts as a bridge between Claude Code an
 
 ## What You Get
 
-Transform how you interact with your project management graph:
+Transform how you interact with your management graph:
 
 - 🔍 **Smart Browsing**: Query nodes by type, status, contributor, priority, or search terms
 - ➕ **Easy Creation**: Create tasks, epics, bugs, and features through conversation
@@ -152,6 +152,31 @@ Add this configuration:
 ```bash
 npm run build    # Build TypeScript
 npm run dev      # Development with watch mode
-npm run test     # Run tests
+npm run test     # Run mock/unit tests; never opens a Neo4j connection
 npm run lint     # Lint code
 ```
+
+The real-database integration mutates data and only accepts an explicitly
+owned loopback fixture. Use a disposable Neo4j instance on its own port:
+
+```bash
+GRAPHDONE_DISPOSABLE_NEO4J=1 \
+NEO4J_URI=bolt://127.0.0.1:17687 \
+NEO4J_USER=neo4j \
+NEO4J_PASSWORD=disposable-test-password \
+npm run test:integration:local
+```
+
+The separate MCP Cypher contract uses the same owned fixture policy:
+
+```bash
+GRAPHDONE_DISPOSABLE_NEO4J=1 \
+NEO4J_URI=bolt://127.0.0.1:17687 \
+NEO4J_USER=neo4j \
+NEO4J_PASSWORD=disposable-test-password \
+npm run test:contract:local
+```
+
+Both commands fail before connecting when the disposable marker, URI, or
+credentials are missing, and they reject non-loopback database addresses. Do
+not point either command at a development, shared, or production database.

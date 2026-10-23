@@ -1,7 +1,7 @@
 {
   "name": "graphdone",
   "version": "0.3.1-alpha",
-  "description": "Project management for teams who think differently",
+  "description": "Management for teams who think differently",
   "private": true,
   "workspaces": [
     "packages/*",
@@ -17,16 +17,22 @@
     "test:coverage": "turbo run test:coverage",
     "test:e2e": "playwright test",
     "test:e2e:core": "playwright test --grep=\"@core\"",
-    "test:e2e:error-handling": "playwright test tests/e2e/graph-error-handling.spec.ts",
-    "test:e2e:visual": "playwright test tests/e2e/visual-regression-suite.spec.ts",
+    "test:e2e:visual": "playwright test tests/e2e/reports/visual-regression.spec.ts",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
     "test:all": "npm run test:unit && npm run test:e2e",
-    "test:comprehensive": "node tests/run-all-tests.js",
-    "test:pr": "node tests/run-pr-tests.js",
+    "test:comprehensive": "node tests/run-unified.mjs --profile full",
+    "test:pr": "node tests/run-unified.mjs --profile pr",
+    "test:unified": "node tests/run-unified.mjs --profile full",
+    "test:unified:smoke": "node tests/run-unified.mjs --profile smoke",
+    "test:unified:open": "node tests/run-unified.mjs --profile full --open",
+    "test:unified:lib": "node --test \"tests/lib/**/*.test.mjs\"",
+    "dashboard": "node tests/lib/dashboard/server.mjs",
+    "dashboard:open": "node tests/lib/dashboard/server.mjs --open",
+    "dashboard:narrate": "node scripts/narrate-report.mjs",
     "test:installation": "./scripts/test-installation-simple.sh",
-    "test:https": "node tests/ssl-certificate-analysis.js && node tests/mobile-https-compatibility-test.js",
-    "test:report": "open test-results/reports/index.html",
+    "test:https": "node tests/integration/ssl-certificate-analysis.js && node tests/integration/mobile-https-compatibility-test.js",
+    "test:report": "open test-artifacts/unified/report.html",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "clean": "turbo run clean && rm -rf node_modules",
@@ -34,15 +40,40 @@
     "db:seed": "cd packages/server && npm run db:seed",
     "docker:dev": "docker compose -f deployment/docker-compose.dev.yml up",
     "docker:prod": "docker compose -f deployment/docker-compose.yml up",
-    "test:smoke": "playwright test tests/e2e/user-smoke.spec.ts --reporter=line",
-    "report:showcase": "playwright test --project=showcase && node tests/generate-showcase-report.mjs",
+    "test:smoke": "playwright test tests/e2e/smoke/user-smoke.spec.ts --reporter=line",
+    "test:mobile": "playwright test --grep \"@mobile|@audit\" --project=\"GraphDone-Core/dev-neo4j/chromium\" --reporter=line",
+    "report:showcase": "playwright test --project=showcase && node tests/lib/reporting/generate-showcase-report.mjs",
+    "report:matrix": "playwright test --project=matrix --reporter=line,html && node tests/lib/reporting/generate-matrix-report.mjs",
+    "report:matrix:open": "open test-artifacts/matrix/index.html 2>/dev/null || xdg-open test-artifacts/matrix/index.html 2>/dev/null || echo 'Open test-artifacts/matrix/index.html'",
     "test:perf": "playwright test --project=perf --reporter=line",
-    "test:perf:scale": "playwright test --project=perf-scale --reporter=line && node tests/generate-perf-report.mjs",
-    "report:perf": "node tests/generate-perf-report.mjs",
-    "test:vlm": "playwright test --project=vlm --reporter=line && node tests/generate-vlm-report.mjs",
+    "test:perf:scale": "playwright test --project=perf-scale --reporter=line && node tests/lib/reporting/generate-perf-report.mjs",
+    "report:perf": "node tests/lib/reporting/generate-perf-report.mjs",
+    "test:vlm": "playwright test --project=vlm --reporter=line && node tests/lib/reporting/generate-vlm-report.mjs",
     "test:geometry": "playwright test --project=geometry --reporter=line",
-    "report:vlm": "node tests/generate-vlm-report.mjs",
-    "perf:bundle": "node tests/perf/check-bundle-size.mjs"
+    "report:vlm": "node tests/lib/reporting/generate-vlm-report.mjs",
+    "perf:bundle": "node tests/perf/check-bundle-size.mjs",
+    "qc:modes": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line tests/e2e/quality/new-user-modes.spec.ts",
+    "qc:new-user": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line tests/e2e/quality/new-user-modes.spec.ts tests/e2e/quality/button-content.spec.ts tests/e2e/graph/guest-dialog-layout.spec.ts tests/e2e/graph/responsive-real-workflows.spec.ts tests/e2e/graph/overview-board-actions.spec.ts tests/e2e/graph/recorded-ai-work.spec.ts tests/e2e/graph/admin-dialog-responsive.spec.ts tests/e2e/smoke/user-smoke.spec.ts tests/e2e/quality/persona-lifecycle.spec.ts tests/e2e/quality/graph-motion.spec.ts tests/e2e/quality/graph-resize.spec.ts tests/e2e/quality/graph-details.spec.ts",
+    "qc:personas": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line tests/e2e/quality/persona-lifecycle.spec.ts",
+    "qc:motion": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line tests/e2e/quality/graph-motion.spec.ts tests/e2e/quality/graph-resize.spec.ts",
+    "qc:graph-first": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line tests/e2e/quality/graph-first-journey.spec.ts",
+    "qc:visual": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line tests/e2e/quality/visual-style.spec.ts",
+    "qc:buttons": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line tests/e2e/quality/button-content.spec.ts",
+    "qc:controls": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line tests/e2e/quality/graph-controls.spec.ts",
+    "qc:layout": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line tests/e2e/quality/graph-layout.spec.ts",
+    "qc:verification": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line tests/e2e/quality/turnstile-guest.spec.ts",
+    "qc:graph": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line tests/e2e/quality/graph-motion.spec.ts tests/e2e/quality/graph-resize.spec.ts tests/e2e/quality/graph-details.spec.ts tests/e2e/quality/graph-controls.spec.ts tests/e2e/smoke/user-smoke.spec.ts",
+    "qc:agents": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 tests/e2e/quality/agent-collaboration.spec.ts",
+    "qc:modals": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 tests/e2e/quality/modal-header.spec.ts",
+    "qc:real-agents": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 tests/e2e/quality/real-agent-journey.spec.ts",
+    "qc:reported-controls": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 tests/e2e/quality/reported-controls.spec.ts",
+    "qc:signup": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 tests/e2e/quality/signup-delivery.spec.ts",
+    "qc:offline": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 tests/e2e/quality/offline-sync.spec.ts",
+    "qc:hosted-usage": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 tests/e2e/quality/hosted-usage.spec.ts",
+    "qc:project-transfer": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line tests/e2e/quality/project-transfer.spec.ts",
+    "qc:operations": "playwright test tests/e2e/quality/operations.spec.ts --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line",
+    "qc:operator-login": "playwright test tests/e2e/quality/operator-login.spec.ts --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line",
+    "test:operations": "tsx scripts/test-operations-local.mts && tsx scripts/test-admin-bootstrap.mts"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
@@ -55,7 +86,7 @@
     "typescript": "^5.3.0"
   },
   "engines": {
-    "node": ">=18.0.0",
+    "node": ">=22.18.0",
     "npm": ">=9.0.0"
   },
   "repository": {
@@ -64,6 +95,13 @@
   },
   "license": "MIT",
   "dependencies": {
+    "@apollo/server": "^5.5.1",
     "passport-openidconnect": "^0.1.2"
+  },
+  "overrides": {
+    "@graphql-tools/utils": "12.1.0",
+    "@typescript-eslint/typescript-estree@6.21.0": {
+      "minimatch": "9.0.7"
+    }
   }
 }

@@ -1,4 +1,4 @@
-// Project management specific types and mock data
+// Management specific types and mock data
 
 export type RelationshipType = 
   | 'DEPENDS_ON'      // This node depends on another to be completed
@@ -50,7 +50,7 @@ export interface MockEdge {
   createdAt: string;
 }
 
-// Mock project management data
+// Mock management data
 export const mockProjectNodes: MockNode[] = [
   {
     id: 'epic-1',

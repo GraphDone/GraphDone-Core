@@ -1,4 +1,6 @@
+import {FeedbackButton} from '../components/Feedback';
 import React from 'react';
+import { HostedUsage } from '../components/HostedUsage';
 import { Settings as SettingsIcon } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { CustomDropdown } from '../components/CustomDropdown';
@@ -13,7 +15,7 @@ export function Settings() {
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="bg-gray-900/30 backdrop-blur-md border-b border-gray-700/30 px-6 py-4">
+      <div className="bg-gray-900/30 backdrop-blur-md border-b border-gray-700/30 px-3 py-3 sm:px-6 sm:py-4">
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center space-x-3">
@@ -35,9 +37,11 @@ export function Settings() {
         <div className="max-w-4xl mx-auto px-6 py-8">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-semibold text-gray-100">Application Settings</h2>
+              <FeedbackButton />
             </div>
             
             <div className="space-y-8">
+              <HostedUsage />
               {/* Performance (ADAPT-6) */}
               <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
                 <h2 className="text-lg font-semibold text-gray-100 mb-4">Performance</h2>
@@ -52,17 +56,19 @@ export function Settings() {
                     <p className="text-sm text-gray-400 mb-2">
                       Auto adapts to your device and network — effects scale down before responsiveness ever does. Pin a tier if auto guesses wrong.
                     </p>
-                    <CustomDropdown
-                      options={[
-                        { value: 'AUTO', label: 'Auto (recommended)' },
-                        { value: 'LOW', label: 'Low — fastest, no effects' },
-                        { value: 'MEDIUM', label: 'Medium — glow, light animation' },
-                        { value: 'HIGH', label: 'High — full living graph' },
-                        { value: 'ULTRA', label: 'Ultra — everything on' }
-                      ]}
-                      value={override ?? 'AUTO'}
-                      onChange={(value) => setOverride(value === 'AUTO' ? null : (value as QualityTier))}
-                    />
+                    <div data-testid="settings-quality-dropdown">
+                      <CustomDropdown
+                        options={[
+                          { value: 'AUTO', label: 'Auto (recommended)' },
+                          { value: 'LOW', label: 'Low — fastest, no effects' },
+                          { value: 'MEDIUM', label: 'Medium — glow, light animation' },
+                          { value: 'HIGH', label: 'High — full living graph' },
+                          { value: 'ULTRA', label: 'Ultra — everything on' }
+                        ]}
+                        value={override ?? 'AUTO'}
+                        onChange={(value) => setOverride(value === 'AUTO' ? null : (value as QualityTier))}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   GitBranch,
   ArrowRight,
@@ -114,6 +114,7 @@ const getContributorAvatar = (contributor?: string) => {
 };
 
 const KanbanView: React.FC<KanbanViewProps> = ({ filteredNodes, handleEditNode, edges }) => {
+  const [showEmpty, setShowEmpty] = useState(false);
   const statuses = Object.keys(WORK_ITEM_STATUSES) as WorkItemStatus[];
 
   const nodesByStatus = statuses.reduce((acc, status) => {
@@ -122,13 +123,19 @@ const KanbanView: React.FC<KanbanViewProps> = ({ filteredNodes, handleEditNode, 
   }, {} as Record<string, WorkItem[]>);
 
   return (
-    <div className="flex space-x-4 p-6 overflow-x-auto h-full">
-      {statuses.map((status) => {
+    <div className="h-full min-h-0 flex flex-col">
+      <label className="min-h-[44px] px-3 sm:px-6 flex items-center gap-2 text-sm text-gray-300 shrink-0">
+        <input type="checkbox" checked={showEmpty} onChange={event => setShowEmpty(event.target.checked)} className="h-4 w-4 accent-emerald-500" />
+        Show empty lanes
+      </label>
+      {filteredNodes.length === 0 && !showEmpty && <p className="p-6 text-gray-400">No work matches this view. Clear filters or add a work item to get started.</p>}
+      <div className="flex-1 min-h-0 flex flex-col gap-4 p-3 overflow-y-auto sm:flex-row sm:space-x-4 sm:gap-0 sm:p-6 sm:overflow-x-auto">
+      {statuses.filter(status => showEmpty || nodesByStatus[status].length > 0).map((status) => {
         const nodes = nodesByStatus[status] || [];
         const config = getStatusConfig(status);
-        
+
         return (
-          <div key={status} className="flex-shrink-0 w-80">
+          <div key={status} className="w-full sm:w-80 flex-shrink-0">
             <div className="bg-gray-800/40 backdrop-blur-sm rounded-lg h-full">
               <div className={`p-4 border-b border-gray-600/30`}>
                 <div className="flex items-center justify-between">
@@ -155,6 +162,10 @@ const KanbanView: React.FC<KanbanViewProps> = ({ filteredNodes, handleEditNode, 
                   .map((node) => (
                   <div
                     key={node.id}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Edit ${node.title}`}
+                    onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); handleEditNode(node); } }}
                     onClick={() => handleEditNode(node)}
                     className={`${getNodeTypeKanbanBackground(node.type)} rounded-lg p-4 shadow-md hover:shadow-lg hover:shadow-white/10 transition-all duration-200 cursor-pointer border border-gray-600/40 hover:border-gray-500/60 hover:scale-[1.02] hover:-translate-y-1 hover:brightness-125 group backdrop-blur-sm`}
                     style={{
@@ -312,6 +323,7 @@ const KanbanView: React.FC<KanbanViewProps> = ({ filteredNodes, handleEditNode, 
           </div>
         );
       })}
+      </div>
     </div>
   );
 };

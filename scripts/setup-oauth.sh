@@ -163,7 +163,7 @@ ENVEXAMPLE
         # Direct edit
         echo ""
         echo -e "${CYAN}Opening $ENV_FILE for editing...${NC}"
-        echo -e "${YELLOW}💡 Refer to docs/oauth-setup-guide.md for detailed setup steps${NC}"
+        echo -e "${YELLOW}💡 Refer to docs/security/oauth-setup-guide.md for detailed setup steps${NC}"
         sleep 2
         ${EDITOR:-nano} "$ENV_FILE"
         echo ""
@@ -243,5 +243,5 @@ esac
 echo ""
 echo -e "${GREEN}${BOLD}✅ Setup complete!${NC}"
 echo ""
-echo -e "${CYAN}📚 For more details, see: ${YELLOW}docs/oauth-setup-guide.md${NC}"
+echo -e "${CYAN}📚 For more details, see: ${YELLOW}docs/security/oauth-setup-guide.md${NC}"
 echo ""

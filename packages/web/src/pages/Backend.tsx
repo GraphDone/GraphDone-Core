@@ -66,14 +66,18 @@ export function Backend() {
       const services: ServiceStatus[] = [];
       
       // GraphQL API Server (main backend)
-      const graphqlStatus = healthData.services?.graphql?.status === 'healthy' ? 'healthy' : 'down';
+      const graphqlReportedStatus = healthData.services?.graphql?.status;
+      const graphqlStatus = graphqlReportedStatus === 'healthy' || graphqlReportedStatus === 'available' ? 'healthy' : 'down';
+      const graphqlWasProbed = graphqlReportedStatus === 'healthy';
       services.push({
         name: 'GraphQL API Server',
         status: graphqlStatus,
         responseTime: responseTime,
         lastChecked: now,
-        description: graphqlStatus === 'healthy' 
-          ? `Apollo Server running on port ${healthData.services?.graphql?.port || 4127}`
+        description: graphqlStatus === 'healthy'
+          ? graphqlWasProbed
+            ? `Graph API responding on port ${healthData.services?.graphql?.port || 4127}`
+            : 'Graph API route is available; storage is checked by real operations'
           : 'GraphQL API Server not responding'
       });
       debug.push(`🖥️  GraphQL API: ${graphqlStatus}`);
@@ -90,39 +94,47 @@ export function Backend() {
         dependencies: ['GraphQL API Server']
       });
 
-      // Neo4j Graph Database
+      // Graph store
       const neo4jStatus = healthData.services?.neo4j?.status;
       let neo4jServiceStatus: 'healthy' | 'degraded' | 'down' = 'down';
-      let neo4jDescription = 'Neo4j connection status unknown';
-      
+      let neo4jDescription = 'Graph store connection status unknown';
+
       if (neo4jStatus === 'healthy') {
         neo4jServiceStatus = 'healthy';
-        neo4jDescription = `Connected to ${healthData.services.neo4j.uri}`;
-        debug.push(`🗄️  Neo4j: healthy at ${healthData.services.neo4j.uri}`);
+        neo4jDescription = healthData.services?.neo4j?.uri
+          ? `Connected to ${healthData.services.neo4j.uri}`
+          : 'Graph store connected';
+        debug.push(`🗄️  Graph store: healthy${healthData.services?.neo4j?.uri ? ` at ${healthData.services.neo4j.uri}` : ''}`);
+      } else if (neo4jStatus === 'not_probed' || neo4jStatus === 'unknown') {
+        neo4jServiceStatus = 'degraded';
+        neo4jDescription = 'Not probed by this zero-read liveness check; real operations report storage failures';
+        debug.push(`🗄️  Graph store: not probed`);
       } else if (neo4jStatus === 'unhealthy') {
         neo4jServiceStatus = 'down';
-        const error = healthData.services.neo4j.error || 'Connection failed';
+        const error = healthData.services?.neo4j?.error || 'Connection failed';
         neo4jDescription = `Connection failed: ${error.substring(0, 100)}${error.length > 100 ? '...' : ''}`;
-        debug.push(`❌ Neo4j: down - ${error}`);
+        debug.push(`❌ Graph store: down - ${error}`);
       }
-      
+
       services.push({
-        name: 'Neo4j Graph Database',
+        name: 'Graph store',
         status: neo4jServiceStatus,
         responseTime: neo4jServiceStatus === 'healthy' ? 8 : undefined,
         lastChecked: now,
         description: neo4jDescription
       });
 
-      // SQLite Auth Database (always healthy if server is running)
+      // Authentication service. Hosted passwordless auth may use the managed store;
+      // this liveness response does not spend a read to verify it.
+      const storageWasProbed = neo4jStatus === 'healthy';
       services.push({
         name: 'SQLite Auth Database',
-        status: 'healthy',
-        responseTime: 2,
+        status: storageWasProbed ? 'healthy' : 'degraded',
+        responseTime: storageWasProbed ? 2 : undefined,
         lastChecked: now,
-        description: 'User authentication and configuration (always available when API is running)'
+        description: storageWasProbed ? 'Authentication storage is responding' : 'Authentication route is loaded; storage was not probed'
       });
-      debug.push(`📁 SQLite: healthy (embedded database)`);
+      debug.push(`📁 Authentication storage: ${storageWasProbed ? 'healthy' : 'not probed'}`);
 
       // MCP Server
       const mcpStatus = healthData.services?.mcp?.status;
@@ -197,7 +209,7 @@ export function Backend() {
             description: 'Unavailable (depends on GraphQL API)'
           },
           {
-            name: 'Neo4j Graph Database',
+            name: 'Graph store',
             status: 'down',
             lastChecked: new Date(),
             description: 'Status unknown (server unreachable)'
@@ -420,10 +432,10 @@ export function Backend() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'healthy': return 'text-green-600';
-      case 'degraded': return 'text-yellow-600';
-      case 'down': return 'text-red-600';
-      default: return 'text-gray-600';
+      case 'healthy': return 'text-green-400';
+      case 'degraded': return 'text-yellow-400';
+      case 'down': return 'text-red-400';
+      default: return 'text-gray-400';
     }
   };
 
@@ -462,7 +474,7 @@ export function Backend() {
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="bg-gray-900/30 backdrop-blur-md border-b border-gray-700/30 px-6 py-4">
+      <div className="bg-gray-900/30 backdrop-blur-md border-b border-gray-700/30 px-3 py-3 sm:px-6 sm:py-4">
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center space-x-3">
@@ -586,7 +598,7 @@ export function Backend() {
                     <text x="165" y="467" textAnchor="middle" className="fill-pink-200 text-xs">SQLite Auth</text>
                     
                     <rect x="250" y="450" width="130" height="25" fill="#9d174d" stroke="#ec4899" rx="4" />
-                    <text x="315" y="467" textAnchor="middle" className="fill-pink-200 text-xs">Neo4j (Optional)</text>
+                    <text x="315" y="467" textAnchor="middle" className="fill-pink-200 text-xs">Graph store</text>
                     
                     <rect x="400" y="450" width="130" height="25" fill="#9d174d" stroke="#ec4899" rx="4" />
                     <text x="465" y="467" textAnchor="middle" className="fill-pink-200 text-xs">MCP Server</text>
@@ -713,14 +725,14 @@ export function Backend() {
               <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-400">Graph Database</p>
+                    <p className="text-sm text-gray-400">Graph database</p>
                     <p className="text-2xl font-bold text-gray-100">
-                      {systemHealth.services.find(s => s.name === 'Neo4j Graph Database')?.status === 'healthy' ? 'Online' : 'Offline'}
+                      {systemHealth.services.find(s => s.name === 'Graph store')?.status === 'healthy' ? 'Online' : systemHealth.services.find(s => s.name === 'Graph store')?.status === 'degraded' ? 'Not checked' : 'Offline'}
                     </p>
                   </div>
                   <Database className={`h-8 w-8 ${
-                    systemHealth.services.find(s => s.name === 'Neo4j Graph Database')?.status === 'healthy' 
-                      ? 'text-green-400' : 'text-red-400'
+                    systemHealth.services.find(s => s.name === 'Graph store')?.status === 'healthy'
+                      ? 'text-green-400' : systemHealth.services.find(s => s.name === 'Graph store')?.status === 'degraded' ? 'text-yellow-400' : 'text-red-400'
                   }`} />
                 </div>
               </div>
@@ -964,7 +976,7 @@ export function Backend() {
                       setDebugInfo(debug);
                     }
                   }}
-                  className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center justify-center space-x-2"
+                  className="bg-yellow-500 hover:bg-yellow-600 text-gray-900 px-4 py-2 rounded-lg transition-colors flex items-center justify-center space-x-2"
                 >
                   <AlertCircle className="h-4 w-4" />
                   <span>Check Data</span>

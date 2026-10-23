@@ -1,13 +1,18 @@
-import { useState, useEffect } from 'react';
+import {FeedbackButton,PublicAnnouncement} from '../components/Feedback';
+import { WorkIllustration } from '../components/WorkIllustration';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, gql } from '@apollo/client';
 import { Eye, EyeOff, ArrowRight, Mail, Lock, Users, Github, Zap, Check, CheckCircle, XCircle, AlertTriangle, Shield } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { setToken } from '../lib/authStorage';
 import { InsecureConnectionBanner } from '../components/TlsStatusIndicator';
 import { GuestModeDialog } from '../components/GuestModeDialog';
 import { PasswordRequirements } from '../components/PasswordRequirements';
 import { isValidEmail } from '../utils/validation';
 import { CodeCaptcha } from '../components/CodeCaptcha';
+import { magicLinkFocusTarget, hasEnteredEmail } from '../lib/loginFocus';
+import { formatLoginCodeInput, isCompleteLoginCode } from '../lib/loginCode';
 
 const LOGIN_MUTATION = gql`
   mutation Login($input: LoginInput!) {
@@ -79,7 +84,7 @@ const GET_SYSTEM_SETTINGS = gql`
   }
 `;
 
-export function Signin() {
+export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean } = {}) {
   const navigate = useNavigate();
   const { login: setAuthUser } = useAuth();
   const [searchParams] = useSearchParams();
@@ -91,19 +96,28 @@ export function Signin() {
   });
   const [captchaPayload, setCaptchaPayload] = useState<string | null>(null);
   const [magicLinkCaptchaPayload, setMagicLinkCaptchaPayload] = useState<string | null>(null);
+  const magicLinkEmailRef = useRef<HTMLInputElement>(null);
+  const [loginCodeInput, setLoginCodeInput] = useState('');
+  const [codeVerifying, setCodeVerifying] = useState(false);
+  const [codeError, setCodeError] = useState<string | null>(null);
 
   const [showPassword, setShowPassword] = useState(false);
-  const [useMagicLink, setUseMagicLink] = useState(false);
+  const [useMagicLink, setUseMagicLink] = useState(initialMagicLink);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
+  const [existingCode, setExistingCode] = useState(false);
   const [magicLinkLoading, setMagicLinkLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [rememberMe, setRememberMe] = useState(false);
+  // Default ON — keep users signed in on this device so they don't have to log
+  // in over and over (clearly labelled below; uncheck for a session-only login).
+  const [rememberMe, setRememberMe] = useState(true);
   const [emailValid, setEmailValid] = useState<boolean | null>(null);
   const [magicLinkEmailValid, setMagicLinkEmailValid] = useState<boolean | null>(null);
   const [loginAttempts, setLoginAttempts] = useState(0);
   const [lockoutTime, setLockoutTime] = useState<Date | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [turnstileSiteKey, setTurnstileSiteKey] = useState<string | undefined>();
+  const [guestDescription, setGuestDescription] = useState<string | undefined>();
   const [showGuestInfo, setShowGuestInfo] = useState(false);
   const [oauthConfig, setOauthConfig] = useState<{
     google: { enabled: boolean; configured: boolean };
@@ -114,16 +128,20 @@ export function Signin() {
   useEffect(() => {
     const fetchOAuthConfig = async () => {
       try {
-        const apiUrl = import.meta.env.VITE_API_URL || 'https://localhost:4128';
+        const apiUrl = import.meta.env.VITE_API_URL || window.location.origin;
         const response = await fetch(`${apiUrl}/config`);
         if (response.ok) {
           const config = await response.json();
+          if (typeof config.guest?.turnstileSiteKey === 'string') setTurnstileSiteKey(config.guest.turnstileSiteKey);
+          if (typeof config.guest?.description === 'string') setGuestDescription(config.guest.description);
           if (config.oauth && config.oauth.providers) {
             setOauthConfig(config.oauth.providers);
           }
         }
-      } catch (error) {
-        console.error('Failed to fetch OAuth config:', error);
+      } catch {
+        // OAuth config is optional (e.g. the D1-first cloud has no OAuth backend);
+        // a fetch failure just means "no social providers", not an app error.
+        console.debug('OAuth config unavailable; hiding social sign-in.');
       }
     };
     fetchOAuthConfig();
@@ -168,7 +186,7 @@ export function Signin() {
       };
       const errorDetail = errorMessages[error];
       if (errorDetail) {
-        setErrors({ 
+        setErrors({
           submit: errorDetail.message,
           submitTitle: errorDetail.title,
           submitAction: errorDetail.action
@@ -177,7 +195,10 @@ export function Signin() {
         setErrors({ submit: 'Authentication failed. Please try again.' });
       }
     } else if (token) {
-      localStorage.setItem('authToken', token);
+      // Magic-link sign-in: keep them signed in on this device by default
+      // (they clicked their own link). The user is loaded by the ME query
+      // after reload.
+      setToken(token, true);
       window.history.replaceState({}, '', '/login');
       window.location.reload();
     }
@@ -217,6 +238,20 @@ export function Signin() {
     return undefined;
   }, [lockoutTime]);
 
+  // When passwordless mode becomes active, put the cursor where the user will
+  // type next: the email field if they haven't entered one yet, otherwise the
+  // captcha (whose own autoFocus is gated to that case). Runs on mode entry and
+  // when returning from the "link sent" view, not on every keystroke.
+  useEffect(() => {
+    const target = magicLinkFocusTarget({
+      active: useMagicLink,
+      magicLinkSent,
+      hasEmail: hasEnteredEmail(formData.magicLinkEmail),
+    });
+    const wideScreen = typeof window.matchMedia !== 'function' || window.matchMedia('(min-width: 1024px)').matches;
+    if (target === 'email' && wideScreen) magicLinkEmailRef.current?.focus();
+  }, [useMagicLink, magicLinkSent]);
+
   // Check if guest access is enabled
   const { data: systemSettings } = useQuery(GET_SYSTEM_SETTINGS);
   const isGuestEnabled = systemSettings?.systemSettings?.allowAnonymousGuest ?? true;
@@ -237,14 +272,14 @@ export function Signin() {
       setLoginAttempts(0);
       localStorage.removeItem('loginAttempts');
       localStorage.removeItem('lockoutTime');
-      setAuthUser(data.login.user, data.login.token);
+      setAuthUser(data.login.user, data.login.token, rememberMe);
       navigate('/');
     },
     onError: (error) => {
       const newAttempts = loginAttempts + 1;
       setLoginAttempts(newAttempts);
       localStorage.setItem('loginAttempts', newAttempts.toString());
-      
+
       if (newAttempts >= 5) {
         const lockout = new Date(Date.now() + 15 * 60 * 1000);
         setLockoutTime(lockout);
@@ -268,21 +303,26 @@ export function Signin() {
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
-    
+
     if (!formData.emailOrUsername) {
       newErrors.emailOrUsername = 'Email or username is required';
     }
-    
+
     if (!formData.password) {
       newErrors.password = 'Password is required';
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (useMagicLink) {
+      if (magicLinkSent) await handleVerifyCode();
+      else await handleMagicLinkRequest(e);
+      return;
+    }
 
     if (!validateForm()) {
       return;
@@ -305,8 +345,8 @@ export function Signin() {
     });
   };
 
-  const handleGuestLogin = async () => {
-    await guestLogin();
+  const handleGuestLogin = async (token?: string) => {
+    await guestLogin(token ? { context: { headers: { 'X-Turnstile-Token': token } } } : {});
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -371,6 +411,7 @@ export function Signin() {
       return;
     }
 
+    if (!magicLinkCaptchaPayload) { setErrors({ submit: 'Please finish the verification first.' }); return; }
     setMagicLinkLoading(true);
     setErrors({});
 
@@ -389,10 +430,11 @@ export function Signin() {
 
       const data = await response.json();
 
-      if (response.ok) {
+      if (response.ok && data.sent !== false) {
         if (data.userExists === false) {
           setErrors({ magicLinkEmail: 'This email is not registered in our system.' });
         } else {
+          setExistingCode(false);
           setMagicLinkSent(true);
           setResendCooldown(60);
         }
@@ -402,10 +444,10 @@ export function Signin() {
           rateLimitRetryAfter: data.retryAfter
         });
       } else {
-        setErrors({ submit: data.error || 'Failed to send magic link' });
+        setErrors({ submit: data.message || 'We could not send your sign-in email. Please try again shortly.' });
       }
     } catch {
-      setErrors({ submit: 'Failed to send magic link. Please try again.' });
+      setErrors({ submit: 'We could not reach the sign-in service. Please try again shortly.' });
     } finally {
       setMagicLinkLoading(false);
     }
@@ -417,29 +459,78 @@ export function Signin() {
     await handleMagicLinkRequest({ preventDefault: () => {} } as React.FormEvent);
   };
 
+  // Verify the type-in code from the email (alternative to clicking the link, so
+  // a user on a shared device never has to open their inbox there). On success the
+  // Worker returns a session token; persist it and reload into the app.
+  const handleVerifyCode = async () => {
+    if (!isCompleteLoginCode(loginCodeInput)) return;
+    setCodeVerifying(true);
+    setCodeError(null);
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:4127';
+      const response = await fetch(`${apiUrl}/auth/code/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: formData.magicLinkEmail, code: loginCodeInput }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (response.ok && data.token) {
+        setToken(data.token, true);
+        window.location.assign('/');
+      } else {
+        setCodeError(data.message || 'Incorrect code. Please check and try again.');
+      }
+    } catch {
+      setCodeError('Could not verify the code. Please try again.');
+    } finally {
+      setCodeVerifying(false);
+    }
+  };
+
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4 relative overflow-hidden">
+    <div className="signin-surface min-h-screen flex items-center justify-center p-4 lg:py-3 relative overflow-hidden">
       {/* Static gradient background - optimized for all browsers */}
-      <div className="lagoon-caustics"></div>
-      <div className="max-w-md w-full relative z-10">
+
+      {/* Design religion: fit the window. On large screens the branding sits
+          BESIDE the form (wider, 2-column) so the page never needs vertical
+          scrolling; on small screens it stacks above as before. */}
+      <div className="w-full max-w-md lg:max-w-4xl relative z-10">
+       <PublicAnnouncement />
+       <div className="lg:grid lg:grid-cols-2 lg:gap-12 lg:items-center">
         {/* Header */}
-        <div className="text-center mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
-          <Link to="/" className="inline-flex items-center justify-center mb-6 hover:opacity-90 transition-all duration-300 hover:scale-105 group">
-            <img src="/favicon.svg" alt="GraphDone Logo" className="h-16 w-16 drop-shadow-lg group-hover:drop-shadow-2xl transition-all duration-300" />
-            <span className="ml-4 text-5xl font-bold bg-gradient-to-r from-teal-400 via-cyan-400 to-blue-500 bg-clip-text text-transparent drop-shadow-2xl tracking-tight">GraphDone</span>
+        <div className="signin-intro text-center lg:text-left mb-6 lg:mb-0">
+          <Link to="/" className="inline-flex items-center justify-center lg:justify-start mb-6 hover:opacity-90 transition-opacity group">
+            <img src="/favicon.svg" alt="GraphDone Logo" className="h-10 w-10 sm:h-12 sm:w-12" />
+            <span className="ml-3 sm:ml-4 text-3xl sm:text-4xl font-semibold text-stone-100 tracking-tight">GraphDone</span>
           </Link>
-          <h1 className="text-3xl font-bold text-gray-100 mb-3">Welcome Back</h1>
-          <p className="text-gray-400 text-lg">Enter your credentials to join the team</p>
+          <h1 className="text-3xl font-bold text-gray-100 mb-3">Your agents keep moving.<br /><span className="signin-headline-accent">You stay in the loop.</span></h1>
+          <p className="text-gray-400 text-lg">Connect the agents you already use. They can coordinate through tasks and notes while you’re away—with clear limits and a simple place to check progress, set priorities, and step in.</p>
+          <button
+            type="button"
+            data-testid="compact-guest-entry"
+            onClick={() => setShowGuestInfo(true)}
+            disabled={!isGuestEnabled || loading || guestLoading || magicLinkLoading || (lockoutTime !== null && new Date() < lockoutTime)}
+            className="mt-4 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl border border-[#da70d6]/50 bg-[#da70d6]/20 px-5 text-base font-semibold text-white transition-colors hover:bg-[#da70d6]/30 disabled:cursor-not-allowed disabled:opacity-50 lg:hidden"
+            title={!isGuestEnabled ? "Guest access has been disabled by the administrator" : undefined}
+          >
+            {guestLoading ? <><div className="h-5 w-5 animate-spin rounded-full border-b-2 border-white" /><span>Opening workspace…</span></> : <><Users className="h-5 w-5" /><span>Continue as Guest</span></>}
+          </button>
+          <WorkIllustration />
+          <FeedbackButton />
         </div>
 
         {/* Login Form */}
-        <form onSubmit={handleSubmit} className="bg-gray-800/50 backdrop-blur-xl border border-gray-700/50 rounded-2xl p-8 space-y-5 shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-700">
-          {/* Social Login Buttons */}
+        <form onSubmit={handleSubmit} className="signin-card border border-stone-500/20 rounded-xl p-5 sm:p-8 lg:py-6 space-y-5 lg:space-y-4">
+          {/* Social Login Buttons — only when at least one provider is actually
+              configured; otherwise the whole block (and its divider) is hidden so
+              no setup hints leak to end users (cloud uses email + guest). */}
+          {(oauthConfig?.google?.configured || oauthConfig?.linkedin?.configured || oauthConfig?.github?.configured) && (
+          <>
           <div className="grid grid-cols-3 gap-3">
             <button
               type="button"
-              onClick={() => oauthConfig?.google.configured && (window.location.href = `${import.meta.env.VITE_API_URL || 'https://localhost:4128'}/auth/google`)}
+              onClick={() => oauthConfig?.google.configured && (window.location.href = `${import.meta.env.VITE_API_URL || window.location.origin}/auth/google`)}
               disabled={!oauthConfig?.google.configured}
               className={`group relative flex items-center justify-center p-3 backdrop-blur-sm border rounded-lg transition-all duration-200 ${
                 oauthConfig?.google.configured
@@ -459,13 +550,13 @@ export function Signin() {
                   ? 'text-teal-400 bg-gray-900/95 border border-teal-500/30'
                   : 'text-gray-300 bg-gray-900/95 border border-gray-700/50'
               }`}>
-                {oauthConfig?.google.configured ? 'Sign in with Google' : 'Run: ./scripts/setup-oauth.sh'}
+                {oauthConfig?.google.configured ? 'Sign in with Google' : 'Not configured'}
               </span>
             </button>
 
             <button
               type="button"
-              onClick={() => oauthConfig?.linkedin.configured && (window.location.href = `${import.meta.env.VITE_API_URL || 'https://localhost:4128'}/auth/linkedin`)}
+              onClick={() => oauthConfig?.linkedin.configured && (window.location.href = `${import.meta.env.VITE_API_URL || window.location.origin}/auth/linkedin`)}
               disabled={!oauthConfig?.linkedin.configured}
               className={`group relative flex items-center justify-center p-3 backdrop-blur-sm border rounded-lg transition-all duration-200 ${
                 oauthConfig?.linkedin.configured
@@ -482,13 +573,13 @@ export function Signin() {
                   ? 'text-teal-400 bg-gray-900/95 border border-teal-500/30'
                   : 'text-gray-300 bg-gray-900/95 border border-gray-700/50'
               }`}>
-                {oauthConfig?.linkedin.configured ? 'Sign in with LinkedIn' : 'Run: ./scripts/setup-oauth.sh'}
+                {oauthConfig?.linkedin.configured ? 'Sign in with LinkedIn' : 'Not configured'}
               </span>
             </button>
 
             <button
               type="button"
-              onClick={() => oauthConfig?.github.configured && (window.location.href = `${import.meta.env.VITE_API_URL || 'https://localhost:4128'}/auth/github`)}
+              onClick={() => oauthConfig?.github.configured && (window.location.href = `${import.meta.env.VITE_API_URL || window.location.origin}/auth/github`)}
               disabled={!oauthConfig?.github.configured}
               className={`group relative flex items-center justify-center p-3 backdrop-blur-sm border rounded-lg transition-all duration-200 ${
                 oauthConfig?.github.configured
@@ -503,12 +594,12 @@ export function Signin() {
                   ? 'text-teal-400 bg-gray-900/95 border border-teal-500/30'
                   : 'text-gray-300 bg-gray-900/95 border border-gray-700/50'
               }`}>
-                {oauthConfig?.github.configured ? 'Sign in with GitHub' : 'Run: ./scripts/setup-oauth.sh'}
+                {oauthConfig?.github.configured ? 'Sign in with GitHub' : 'Not configured'}
               </span>
             </button>
           </div>
 
-          <div className="relative">
+          <div className="relative hidden lg:block">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-gray-600" />
             </div>
@@ -516,11 +607,15 @@ export function Signin() {
               <span className="px-2 bg-gray-800 text-gray-400">Or sign in with your credentials</span>
             </div>
           </div>
+          </>
+          )}
 
           {/* Sign In Method Toggle */}
-          <div className="flex items-center justify-center gap-2">
+          <div className="flex items-center justify-center gap-2" role="tablist" aria-label="Sign-in method">
             <button
               type="button"
+              role="tab"
+              aria-selected={!useMagicLink}
               onClick={() => {
                 setUseMagicLink(false);
                 setMagicLinkSent(false);
@@ -528,7 +623,7 @@ export function Signin() {
               }}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 !useMagicLink
-                  ? 'bg-teal-600 text-white'
+                  ? 'bg-teal-700 text-white'
                   : 'bg-gray-700/50 text-gray-400 hover:bg-gray-600/50 hover:text-gray-300'
               }`}
             >
@@ -537,6 +632,8 @@ export function Signin() {
             </button>
             <button
               type="button"
+              role="tab"
+              aria-selected={useMagicLink}
               onClick={() => {
                 setUseMagicLink(true);
                 setMagicLinkSent(false);
@@ -544,7 +641,7 @@ export function Signin() {
               }}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 useMagicLink
-                  ? 'bg-gradient-to-r from-teal-600 to-cyan-600 text-white shadow-lg shadow-teal-500/30'
+                  ? 'bg-gradient-to-r from-teal-700 to-cyan-700 text-white shadow-lg shadow-teal-500/30'
                   : 'bg-gray-700/50 text-gray-400 hover:bg-gray-600/50 hover:text-gray-300'
               }`}
             >
@@ -560,9 +657,9 @@ export function Signin() {
                 <div className="flex items-center justify-center mb-3">
                   <Mail className="h-8 w-8 text-teal-400" />
                 </div>
-                <h3 className="text-lg font-semibold text-teal-300 text-center mb-2">Check Your Email!</h3>
+                <h3 className="text-lg font-semibold text-teal-300 text-center mb-2">{existingCode ? 'Enter your sign-in code' : 'Check Your Email!'}</h3>
                 <p className="text-sm text-teal-200/80 text-center mb-4">
-                  We've sent a magic link to <strong>{formData.magicLinkEmail}</strong>
+                  {existingCode ? 'Use the code sent to ' : "We've sent a magic link to "}<strong>{formData.magicLinkEmail}</strong>
                 </p>
                 <div className="space-y-2">
                   <p className="text-xs text-teal-300/60 text-center">
@@ -574,8 +671,53 @@ export function Signin() {
                   <p className="text-xs text-teal-300/60 text-center">
                     📂 Don't see it? Check your spam folder after 3 minutes
                   </p>
+                  <p className="text-xs text-teal-300/80 text-center font-medium">
+                    ✅ Once you click it you'll stay signed in on this device — no need to log in again
+                  </p>
                 </div>
-                
+
+                {/* Type-in code — alternative to clicking the link, so you can
+                    sign in on a device where you don't want to open your email. */}
+                <div className="pt-4 border-t border-teal-500/20">
+                  <label htmlFor="loginCode" className="block text-sm font-medium text-teal-200 mb-2 text-center">
+                    Or enter the code from the email
+                  </label>
+                  <input
+                    id="loginCode"
+                    type="text"
+                    inputMode="text"
+                    autoComplete="one-time-code"
+                    autoFocus
+                    value={loginCodeInput}
+                    onChange={(e) => { setLoginCodeInput(formatLoginCodeInput(e.target.value)); setCodeError(null); }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void handleVerifyCode(); } }}
+                    placeholder="XXXX-XXXX-XXXX"
+                    aria-label="Sign-in code from email"
+                    className="w-full px-4 py-3 bg-gray-900/60 border border-teal-500/40 rounded-xl text-gray-100 font-mono text-center text-lg tracking-[0.25em] uppercase focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500/50"
+                  />
+                  {codeError && (
+                    <p className="mt-2 text-xs text-red-400 text-center" role="alert">{codeError}</p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleVerifyCode}
+                    disabled={!isCompleteLoginCode(loginCodeInput) || codeVerifying}
+                    className="mt-3 w-full bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 border border-teal-400/50 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center space-x-2"
+                  >
+                    {codeVerifying ? (
+                      <>
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                        <span>Verifying…</span>
+                      </>
+                    ) : (
+                      <>
+                        <ArrowRight className="h-5 w-5" />
+                        <span>Enter code &amp; sign in</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
                 <div className="pt-4 border-t border-teal-500/20 space-y-2">
                   <button
                     type="button"
@@ -591,6 +733,8 @@ export function Signin() {
                       setMagicLinkSent(false);
                       setFormData({ ...formData, magicLinkEmail: '' });
                       setResendCooldown(0);
+                      setLoginCodeInput('');
+                      setCodeError(null);
                     }}
                     className="w-full text-sm text-teal-400 hover:text-teal-300"
                   >
@@ -609,13 +753,13 @@ export function Signin() {
                       <Mail className="h-5 w-5 text-gray-400" />
                     </div>
                     <input
+                      ref={magicLinkEmailRef}
                       type="email"
                       id="magicLinkEmail"
                       name="magicLinkEmail"
                       value={formData.magicLinkEmail}
                       onChange={handleChange}
                       autoComplete="email"
-                      autoFocus
                       className={`w-full pl-10 py-3 bg-gray-700/50 backdrop-blur-sm border rounded-xl text-gray-100 focus:outline-none focus:ring-2 transition-all ${
                         magicLinkEmailValid === false
                           ? 'pr-10 border-red-500/50 focus:ring-red-500/50'
@@ -677,11 +821,13 @@ export function Signin() {
                   )}
                 </div>
 
-                {/* CAPTCHA for Magic Link */}
+                {/* CAPTCHA for Magic Link — only auto-focuses when an email is
+                    already entered; otherwise the email field gets focus first. */}
                 <div>
-                  <CodeCaptcha
+                  <CodeCaptcha compact
                     onVerified={(code) => setMagicLinkCaptchaPayload(code)}
                     className="w-full"
+                    autoFocus={hasEnteredEmail(formData.magicLinkEmail)}
                   />
                 </div>
 
@@ -704,6 +850,10 @@ export function Signin() {
                   )}
                 </button>
 
+                <button type="button" className="w-full min-h-[44px] text-teal-200 hover:text-teal-100 underline underline-offset-4" onClick={() => {
+                  if (!isValidEmail(formData.magicLinkEmail)) { setErrors({ submit: 'Enter your email address first, then use your existing code.' }); return; }
+                  setErrors({}); setExistingCode(true); setMagicLinkSent(true);
+                }}>Already have a code?</button>
                 <div className="p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
                   <p className="text-xs text-blue-300 text-center">
                     We'll email you a secure link to sign in. No password needed.
@@ -793,10 +943,10 @@ export function Signin() {
             {errors.password && <p id="password-error" className="mt-1 text-xs text-red-400" role="alert">{errors.password}</p>}
           </div>
 
-          {/* Remember Me & Forgot Password */}
-          <div className="flex items-center justify-between">
-            <label className="flex items-center cursor-pointer group">
-              <div className="relative">
+          {/* Keep me logged in & Forgot Password */}
+          <div className="flex items-start justify-between gap-3">
+            <label className="flex items-start cursor-pointer group">
+              <div className="relative mt-0.5">
                 <input
                   type="checkbox"
                   checked={rememberMe}
@@ -809,11 +959,16 @@ export function Signin() {
                   )}
                 </div>
               </div>
-              <span className="ml-3 text-sm text-gray-300 group-hover:text-gray-100 transition-colors">
-                Remember me
+              <span className="ml-3 leading-tight">
+                <span className="block text-sm text-gray-200 group-hover:text-gray-100 transition-colors">
+                  Keep me logged in
+                </span>
+                <span className="block text-xs text-gray-400">
+                  Stay signed in on this device — uncheck on shared computers
+                </span>
               </span>
             </label>
-            <Link to="/forgot-password" className="text-sm text-teal-400 hover:text-teal-300 transition-colors">
+            <Link to="/forgot-password" className="text-sm text-teal-400 hover:text-teal-300 transition-colors whitespace-nowrap">
               Forgot password?
             </Link>
           </div>
@@ -852,19 +1007,6 @@ export function Signin() {
             </div>
           )}
 
-          {/* Submit Error */}
-          {errors.submit && !lockoutTime && (
-            <div className="p-3 bg-red-900 border border-red-700 rounded-lg">
-              {errors.submitTitle && (
-                <p className="text-sm text-red-300 font-semibold mb-1">{errors.submitTitle}</p>
-              )}
-              <p className="text-sm text-red-300">{errors.submit}</p>
-              {errors.submitAction && (
-                <p className="text-xs text-red-200/70 mt-2">💡 {errors.submitAction}</p>
-              )}
-            </div>
-          )}
-
           {/* Submit Button */}
           <button
             type="submit"
@@ -887,6 +1029,19 @@ export function Signin() {
             </>
           )}
 
+          {/* Submit Error */}
+          {errors.submit && !lockoutTime && (
+            <div role="alert" className="p-3 bg-red-900 border border-red-700 rounded-lg">
+              {errors.submitTitle && (
+                <p className="text-sm text-red-300 font-semibold mb-1">{errors.submitTitle}</p>
+              )}
+              <p className="text-sm text-red-300">{errors.submit}</p>
+              {errors.submitAction && (
+                <p className="text-xs text-red-200/70 mt-2">💡 {errors.submitAction}</p>
+              )}
+            </div>
+          )}
+
           {/* Guest Mode Button */}
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
@@ -901,7 +1056,7 @@ export function Signin() {
             type="button"
             onClick={() => setShowGuestInfo(true)}
             disabled={!isGuestEnabled || loading || guestLoading || magicLinkLoading || (lockoutTime !== null && new Date() < lockoutTime)}
-            className="w-full bg-[#da70d6]/20 hover:bg-[#da70d6]/30 backdrop-blur-sm border border-[#da70d6]/30 hover:border-[#da70d6]/50 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-[#da70d6]/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:translate-y-0 flex items-center justify-center space-x-2"
+            className="hidden w-full bg-[#da70d6]/20 hover:bg-[#da70d6]/30 backdrop-blur-sm border border-[#da70d6]/30 hover:border-[#da70d6]/50 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-[#da70d6]/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:translate-y-0 lg:flex items-center justify-center space-x-2"
             title={!isGuestEnabled ? "Guest access has been disabled by the administrator" : undefined}
           >
             {guestLoading ? (
@@ -918,7 +1073,7 @@ export function Signin() {
           </button>
 
           {/* Guest Mode Dialog */}
-          <GuestModeDialog 
+          <GuestModeDialog turnstileSiteKey={turnstileSiteKey} guestDescription={guestDescription}
             isOpen={showGuestInfo}
             onClose={() => setShowGuestInfo(false)}
             onConfirm={handleGuestLogin}
@@ -928,7 +1083,7 @@ export function Signin() {
           {isGuestEnabled ? (
             <div className="p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
               <p className="text-xs text-blue-300 text-center">
-                <strong>Guest Mode:</strong> Explore GraphDone with read-only access. No account required.
+                <strong>Guest Mode:</strong> Try GraphDone without creating an account.
               </p>
             </div>
           ) : (
@@ -939,6 +1094,7 @@ export function Signin() {
             </div>
           )}
         </form>
+       </div>
 
         {/* Development Mode - Default Credentials */}
         {showDefaultCredentials && (
@@ -991,7 +1147,7 @@ export function Signin() {
         </div>
 
       </div>
-      
+
       {/* Insecure-connection warning (top strip, only over HTTP) */}
       <InsecureConnectionBanner fixed />
     </div>
