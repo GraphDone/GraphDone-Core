@@ -21,6 +21,41 @@ This guide covers various deployment options for GraphDone, from local developme
 
 ## Environment Variables
 
+### Required production signing secrets
+
+With `NODE_ENV=production`, the API refuses to start if `JWT_SECRET` or
+`SESSION_SECRET` is missing, blank, or a published GraphDone default/example
+value. This applies to direct Node startup and containers. Development and test
+startup retain their existing defaults.
+
+Generate two independent secrets once for each deployment, store them privately,
+and retain them across restarts. For example, create a new file outside this
+checkout without printing its contents:
+
+```bash
+(umask 077; set -o noclobber; printf 'JWT_SECRET=%s\nSESSION_SECRET=%s\n' \
+  "$(openssl rand -hex 32)" "$(openssl rand -hex 32)" > /secure/path/graphdone.env)
+```
+
+Supply that file to the legacy production Compose variants:
+
+```bash
+docker compose --env-file /secure/path/graphdone.env -f deployment/docker-compose.yml up -d
+```
+
+The HTTP and registry variants use the same variables. `scripts/self-host.sh`
+already creates separate random secrets in its private environment file. For
+direct `npm start --workspace=@graphdone/server` or `node dist/index.js`, set both
+environment variables, or put them in `.env` in the server process's working
+directory; configuration loads before authentication modules initialize.
+
+Existing production installations using defaults must configure both secrets
+before upgrading. Replacing a JWT key invalidates existing bearer tokens;
+replacing a session key invalidates signed sessions, so users must sign in again.
+The guard rejects known unsafe configuration; it does not measure arbitrary
+secret strength. Use a secret manager or cryptographically random values such
+as those above. [Startup regression evidence and limits](../quality/PRODUCTION_SECRETS_2026-10-23.md).
+
 ### Server (.env)
 ```bash
 # Database
@@ -33,8 +68,9 @@ NODE_ENV=production
 PORT=4000
 CORS_ORIGIN=https://yourdomain.com
 
-# Authentication (when implemented)
-JWT_SECRET=your-secure-secret
+# Authentication
+JWT_SECRET=
+SESSION_SECRET=
 AUTH0_DOMAIN=your-domain.auth0.com
 AUTH0_CLIENT_ID=your-client-id
 AUTH0_CLIENT_SECRET=your-client-secret
@@ -124,10 +160,12 @@ kubectl get ingress graphdone-ingress
 1. **Create secrets:**
    ```bash
    kubectl create secret generic graphdone-secrets \
-     --from-literal=neo4j-uri="bolt://..." \
-     --from-literal=neo4j-password="your-password" \
-     --from-literal=jwt-secret="your-secret"
+     --from-env-file=/secure/path/graphdone.env
    ```
+
+   Use the privately generated file described above. Map its `JWT_SECRET` and
+   `SESSION_SECRET` keys into the API container environment, for example with
+   `envFrom.secretRef`. Supply the deployment's Neo4j configuration separately.
 
 2. **Configure ingress:**
    ```yaml
