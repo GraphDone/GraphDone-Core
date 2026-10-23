@@ -1,5 +1,10 @@
 # GraphDone Authentication Security Guide
 
+For dated source/probe evidence and current follow-up priorities, see the
+[2026-10-23 security scope](../quality/SECURITY_SCOPE_2026-10-23.md).
+This older guide contains historical plans and examples; it is not evidence
+that every listed control is implemented or that deployment settings were verified.
+
 ## Overview
 
 GraphDone uses a hybrid authentication system with SQLite for user credentials and Neo4j for graph data. This guide documents security practices, identifies vulnerabilities, and provides implementation roadmap.
