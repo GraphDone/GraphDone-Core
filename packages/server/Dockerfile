@@ -25,6 +25,8 @@ RUN npm run build --workspace=@graphdone/core
 # Build server package
 RUN npm run build --workspace=@graphdone/server
 
+ENV NODE_ENV=production
+
 EXPOSE 4127
 
 CMD ["npm", "run", "start", "--workspace=@graphdone/server"]

@@ -1,3 +1,4 @@
+import './config/environment.js';
 import { operationsApi } from './operations-api.js';
 import { agentApi } from './agent-api.js';
 import { ApolloServer } from '@apollo/server';
@@ -9,7 +10,6 @@ import { createServer as createHttpsServer } from 'https';
 import { WebSocketServer } from 'ws';
 import { useServer } from 'graphql-ws/lib/use/ws';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import os from 'os';
 import session from 'express-session';
 import passport from 'passport';
@@ -98,9 +98,6 @@ async function getTotalGraphDoneMemory(): Promise<{ memory: number, label: strin
     };
   }
 }
-
-dotenv.config();
-// OAuth LinkedIn and GitHub credentials updated
 
 const PORT = Number(process.env.PORT) || 4127;
 
