@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   getToken,
+  getSessionOwnerId,
   getUserRaw,
   isKept,
   setSession,
@@ -76,5 +77,27 @@ describe('authStorage', () => {
     expect(sessionStorage.getItem(TOKEN)).toBeNull();
     // The keep preference is intentionally retained for the next login.
     expect(isKept()).toBe(false);
+  });
+});
+
+
+describe('session owner consistency', () => {
+  it.each(['uid', 'userId', 'id'])('accepts the %s identity only when it matches the cached user', claim => {
+    const token = `header.${btoa(JSON.stringify({ [claim]: 'owner-a' }))}.signature`;
+    setSession(token, { id: 'owner-a' }, true);
+    expect(getSessionOwnerId()).toBe('owner-a');
+    setUser({ id: 'owner-b' });
+    expect(getSessionOwnerId()).toBeNull();
+  });
+
+  it('accepts local guest sessions and rejects malformed or missing token identities', () => {
+    setSession('local-guest', { id: 'guest-a' }, true);
+    expect(getSessionOwnerId()).toBe('guest-a');
+    setToken('invalid', true);
+    expect(getSessionOwnerId()).toBeNull();
+    setToken(`header.${btoa('{}')}.signature`, true);
+    expect(getSessionOwnerId()).toBeNull();
+    clearSession();
+    expect(getSessionOwnerId()).toBeNull();
   });
 });

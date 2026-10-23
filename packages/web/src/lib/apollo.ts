@@ -7,7 +7,7 @@ import { getMainDefinition } from '@apollo/client/utilities';
 import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
 import { createClient } from 'graphql-ws';
 import { cloudFailure, preserveCloudDraft, refreshHostedUsage } from './hostedUsage';
-import { getToken, clearSession } from './authStorage';
+import { getToken, getSessionOwnerId, clearSession } from './authStorage';
 
 // Dynamically construct GraphQL URLs based on current host
 const getGraphQLUrl = () => {
@@ -31,11 +31,12 @@ const httpLink = createHttpLink({
   uri: getGraphQLUrl(),
 });
 
-const errorLink = onError(({ graphQLErrors, networkError, operation, forward }) => {
+export const errorLink = onError(({ graphQLErrors, networkError, operation, forward }) => {
+  const expectedOwnerId = operation.getContext().expectedOwnerId;
+  if (expectedOwnerId !== undefined && expectedOwnerId !== getSessionOwnerId()) return;
   if (graphQLErrors?.length || networkError) {
     const definition = getMainDefinition(operation.query);
-    const expectedOwnerId = operation.getContext().expectedOwnerId;
-    if ((expectedOwnerId === undefined || expectedOwnerId === ownerId()) && definition.kind === 'OperationDefinition' && definition.operation === 'mutation' && /workitem|edge|graph/i.test(operation.operationName)) preserveCloudDraft(operation.operationName, operation.variables);
+    if (definition.kind === 'OperationDefinition' && definition.operation === 'mutation' && /workitem|edge|graph/i.test(operation.operationName)) preserveCloudDraft(operation.operationName, operation.variables);
     for (const error of graphQLErrors || []) cloudFailure(String(error.extensions?.code || ''));
     if (networkError && 'result' in networkError) cloudFailure((networkError.result as any)?.code);
   }

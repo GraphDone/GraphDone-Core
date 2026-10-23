@@ -5,6 +5,7 @@ import { PositionSaveProvider, usePositionSaveQueue, type PositionSaveScope } fr
 import { clearSession, setSession } from '../../lib/authStorage';
 import type { PositionSave } from '../../lib/positionSaveQueue';
 
+const token = (id: string) => `header.${btoa(JSON.stringify({ userId: id }))}.signature`;
 const scope = { ownerId: 'owner-a', graphId: 'graph-a' };
 function navigation(save: (position: PositionSave) => Promise<void>, onError = vi.fn(), initialScope = scope) {
   let queue!: ReturnType<typeof usePositionSaveQueue>;
@@ -31,7 +32,7 @@ function leaving() {
 beforeEach(() => {
   localStorage.clear();
   sessionStorage.clear();
-  setSession('token-a', { id: 'owner-a' }, true);
+  setSession(token('owner-a'), { id: 'owner-a' }, true);
 });
 
 describe('position saving in the graph', () => {
@@ -121,7 +122,7 @@ describe('position saving in the graph', () => {
     expect(save).toHaveBeenCalledTimes(4);
     act(() => { clearSession(); });
     view.go(false);
-    act(() => { setSession('token-b', { id: 'owner-b' }, true); });
+    act(() => { setSession(token('owner-b'), { id: 'owner-b' }, true); });
     view.go(true, { ownerId: 'owner-b', graphId: scope.graphId });
     act(() => { window.dispatchEvent(new Event('online')); });
     expect(save).toHaveBeenCalledTimes(4);
@@ -130,7 +131,7 @@ describe('position saving in the graph', () => {
     expect(save).toHaveBeenCalledTimes(4);
     view.go(false);
     save.mockResolvedValue(undefined);
-    act(() => { setSession('token-a-new', { id: 'owner-a' }, true); });
+    act(() => { setSession(token('owner-a'), { id: 'owner-a' }, true); });
     view.go(true);
     await act(() => view.queue.flush());
     expect(save).toHaveBeenCalledTimes(5);
@@ -146,7 +147,7 @@ describe('position saving in the graph', () => {
     act(() => { clearSession(); window.dispatchEvent(new Event('online')); });
     expect(save).toHaveBeenCalledTimes(1);
     view.go(false);
-    act(() => { setSession('token-b', { id: 'owner-b' }, true); });
+    act(() => { setSession(token('owner-b'), { id: 'owner-b' }, true); });
     view.go(true, { ownerId: 'owner-b', graphId: scope.graphId });
     await act(() => view.queue.flush());
     expect(save).toHaveBeenCalledTimes(1);
@@ -155,7 +156,7 @@ describe('position saving in the graph', () => {
     await act(() => view.queue.flush());
     expect(save).toHaveBeenLastCalledWith({ id: 'task', x: 8, y: 9 });
     view.go(false);
-    act(() => { setSession('token-a-new', { id: 'owner-a' }, true); });
+    act(() => { setSession(token('owner-a'), { id: 'owner-a' }, true); });
     view.go(true);
     await act(() => view.queue.flush());
     expect(save).toHaveBeenLastCalledWith({ id: 'task', x: 1, y: 2 });
