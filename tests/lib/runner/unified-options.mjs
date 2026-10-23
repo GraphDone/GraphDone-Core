@@ -1,5 +1,6 @@
 import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
+import { execFileSync } from 'node:child_process';
 
 export function parseOptions(args, profiles, sequences) {
   const options = { profile: 'smoke', out: 'test-artifacts/unified', open: false };
@@ -52,7 +53,8 @@ function rejectSymlinks(dir) {
 export function prepareOutput(output, repository) {
   const dir = canonicalPath(output);
   const root = realpathSync(repository);
-  if (contains(dir, root) || contains(join(root, '.git'), dir)) throw new Error('Report output must not be the repository, its ancestor, or Git metadata.');
+  const metadata = ['--git-dir', '--git-common-dir'].map(flag => canonicalPath(resolve(root, execFileSync('git', ['rev-parse', flag], { cwd: root, encoding: 'utf8' }).trim())));
+  if (contains(dir, root) || contains(join(root, '.git'), dir) || metadata.some(path => contains(path, dir))) throw new Error('Report output must not be the repository, its ancestor, or Git metadata.');
   const marker = join(dir, '.graphdone-unified-output');
   if (existsSync(dir)) {
     if (!lstatSync(dir).isDirectory()) throw new Error('Report output must be a directory.');

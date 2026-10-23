@@ -11,7 +11,8 @@ npm run test:unified:open                            # full battery, then open t
 npm run test:unified:lib                             # the harness's own unit tests (node --test)
 ```
 
-Run from the repository root. Browser suites mutate data: use an owned disposable
+Run from the repository root; the harness rejects a different working directory
+so tests and source provenance cannot refer to different checkouts. Browser suites mutate data: use an owned disposable
 local stack with test accounts and seeded data. `TEST_URL` selects an existing
 stack; it does not make that stack disposable. `npm test` runs package unit tests,
 not these browser workflows.
@@ -34,6 +35,9 @@ malformed, or empty reports cannot become passes. A nonzero exit, timeout, globa
 test error, or flaky retry fails even if some cases passed. Required sequences
 also fail when cases are skipped. Explicitly optional report sequences may skip
 when their prerequisites are absent; those cases never count as passing.
+Supplied summary counters must be valid and agree with the individual results.
+Vitest's legacy nonfailed total may include skipped/todo cases; the harness still
+derives its passing count from assertions that actually passed.
 
 Reports include the starting/ending Git revision, dirty flag, and SHA-256 source
 fingerprint. A source change during execution fails the run. Dirty trees are
@@ -45,7 +49,8 @@ passing report does not establish production parity or complete feature coverage
 Use a unique `--out test-artifacts/runs/<run-id>` for retained or parallel runs.
 The default output slot remains compatible with the dashboard. A rerun can
 refresh a harness-owned output directory without recursively deleting its
-contents. Repository roots/ancestors, Git metadata, symbolic links inside report
+contents. Repository roots/ancestors, actual Git directories (including linked
+worktree/common metadata and aliases), symbolic links inside report
 directories, and nonempty unrelated output directories are rejected. The current
 `report.json` identifies the cases and attachments belonging to that run; older
 unreferenced artifacts may remain in a reused slot.

@@ -49,7 +49,7 @@ for (const adapter of ['playwright', 'vitest']) {
   });
   const skipped = adapter === 'playwright'
     ? playwrightReport([{ status: 'skipped', expectedStatus: 'skipped', results: [{ status: 'skipped' }] }])
-    : vitestReport([{ title: 'not configured', status: 'pending' }]);
+    : vitestReport([{ title: 'not configured', status: 'skipped' }]);
   test(`${adapter}: required skips are a failure`, async t => {
     assert.equal((await execute(t, adapter, skipped)).status, 'failed');
   });
@@ -73,3 +73,32 @@ test('playwright: global setup/teardown errors override passing cases', async t 
 test('vitest: failed suite without failed assertion overrides passing cases', async t => {
   assert.equal((await execute(t, 'vitest', { ...vitestReport(), success: false, numFailedTestSuites: 1 })).status, 'failed');
 });
+
+for (const [key, value] of [['expected', 0], ['unexpected', 2], ['skipped', 1], ['flaky', 1], ['expected', -1], ['expected', '1'], ['expected', 1.5]]) {
+  test(`playwright: contradictory or invalid ${key}=${value} summary fails`, async t => {
+    const report = { ...playwrightReport(), stats: { expected: 1, unexpected: 0, skipped: 0, flaky: 0, [key]: value } };
+    assert.equal((await execute(t, 'playwright', report)).status, 'failed');
+  });
+}
+for (const [key, value] of [['numPassedTests', 0], ['numFailedTests', 1], ['numPendingTests', 1], ['numTodoTests', 1], ['numPassedTests', -1], ['numFailedTests', '0'], ['numPendingTests', 0.5]]) {
+  test(`vitest: contradictory or invalid ${key}=${value} summary fails`, async t => {
+    const report = { ...vitestReport(), numPassedTests: 1, numFailedTests: 0, numPendingTests: 0, numTodoTests: 0, [key]: value };
+    assert.equal((await execute(t, 'vitest', report)).status, 'failed');
+  });
+}
+test('vitest: legacy nonfailed total never converts optional skipped/todo cases into passes', async t => {
+  const report = { ...vitestReport([{ title: 'passed', status: 'passed' }, { title: 'skipped', status: 'skipped' }, { title: 'todo', status: 'todo' }]), numPassedTests: 3, numFailedTests: 0, numPendingTests: 0, numTodoTests: 1 };
+  const result = await execute(t, 'vitest', report, { blocking: false });
+  assert.equal(result.status, 'passed');
+  assert.equal(result.counts.passed, 1);
+  assert.equal(result.counts.skipped, 2);
+});
+test('vitest: a still-pending execution fails even for an optional sequence', async t => {
+  const report = { ...vitestReport([{ title: 'unfinished', status: 'pending' }]), numPassedTests: 1, numFailedTests: 0, numPendingTests: 1, numTodoTests: 0 };
+  assert.equal((await execute(t, 'vitest', report, { blocking: false })).status, 'failed');
+});
+for (const suites of [{ numTotalTestSuites: 0, numPassedTestSuites: 0 }, { numTotalTestSuites: 2, numPassedTestSuites: 1 }]) {
+  test(`vitest: suite totals cannot contradict file evidence: ${JSON.stringify(suites)}`, async t => {
+    assert.equal((await execute(t, 'vitest', { ...vitestReport(), ...suites })).status, 'failed');
+  });
+}

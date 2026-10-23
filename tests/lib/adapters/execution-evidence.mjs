@@ -1,3 +1,10 @@
+export function validateCounter(errors, report, key, expected) {
+  if (!Object.hasOwn(report, key)) return;
+  const value = report[key];
+  if (!Number.isSafeInteger(value) || value < 0) errors.push(`Invalid test summary counter: ${key}.`);
+  else if (expected !== undefined && !(Array.isArray(expected) ? expected : [expected]).includes(value)) errors.push(`Test summary counter ${key} does not match its test results.`);
+}
+
 export function finishSequence({ id, title, kind, command, res, counts, cases, errors = [], blocking = true }) {
   if (res.timedOut) errors.push('Test process timed out.');
   if (res.code !== 0) errors.push(`Test process did not exit successfully (exit ${res.code ?? 'unknown'}).`);

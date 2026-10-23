@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runCommand } from '../runner/runSequence.mjs';
-import { finishSequence } from './execution-evidence.mjs';
+import { finishSequence, validateCounter } from './execution-evidence.mjs';
 
 /**
  * Run a Playwright invocation and normalise its JSON report into a unified
@@ -27,6 +27,7 @@ export async function runPlaywrightSequence({ id, title, args = [], target, time
   const counts = { passed: 0, failed: 0, warned: 0, skipped: 0 };
   const cases = [];
   const errors = [];
+  const outcomes = { expected: 0, unexpected: 0, flaky: 0, skipped: 0 };
   const walk = (suites = []) => {
     if (!Array.isArray(suites)) { errors.push('Invalid Playwright suite list.'); return; }
     for (const s of suites) {
@@ -34,6 +35,7 @@ export async function runPlaywrightSequence({ id, title, args = [], target, time
       for (const spec of s.specs || []) {
         if (!spec || !Array.isArray(spec.tests) || !spec.tests.length) { errors.push('Playwright spec has no test instances.'); continue; }
         for (const t of spec.tests || []) {
+          if (Object.hasOwn(outcomes, t?.status)) outcomes[t.status]++;
           const results = Array.isArray(t?.results) ? t.results : [];
           const last = results.at(-1) || {};
           const skipped = t?.status === 'skipped' || last.status === 'skipped';
@@ -59,5 +61,9 @@ export async function runPlaywrightSequence({ id, title, args = [], target, time
   if (parsed && Array.isArray(parsed.suites)) walk(parsed.suites);
   else errors.push('No valid Playwright JSON report was produced.');
   if (parsed?.errors !== undefined && (!Array.isArray(parsed.errors) || parsed.errors.length)) errors.push('Playwright reported global execution errors.');
+  if (parsed?.stats !== undefined) {
+    if (!parsed.stats || typeof parsed.stats !== 'object' || Array.isArray(parsed.stats)) errors.push('Invalid Playwright statistics.');
+    else for (const [key, expected] of Object.entries(outcomes)) validateCounter(errors, parsed.stats, key, expected);
+  }
   return finishSequence({ id, title, kind: 'e2e', command: `playwright test ${args.join(' ')}`, res, counts, cases, errors, blocking });
 }

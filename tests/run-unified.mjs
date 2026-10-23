@@ -8,7 +8,7 @@
  *
  *   node tests/run-unified.mjs [--profile smoke|pr|full|report] [--sequence <id>] [--open]
  */
-import { mkdirSync, copyFileSync } from 'node:fs';
+import { mkdirSync, copyFileSync, realpathSync } from 'node:fs';
 import { join, extname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runVitestSequence } from './lib/adapters/vitest.mjs';
@@ -27,6 +27,10 @@ try { options = parseOptions(process.argv.slice(2), PROFILES, SEQUENCES); }
 catch (error) { console.error(error.message); process.exit(2); }
 const { profile, ids, open } = options;
 const root = fileURLToPath(new URL('..', import.meta.url));
+if (realpathSync(process.cwd()) !== realpathSync(root)) {
+  console.error(`Run the unified harness from its repository root: ${root}`);
+  process.exit(2);
+}
 let outDir;
 const target = process.env.TEST_URL || 'http://localhost:3127';
 
