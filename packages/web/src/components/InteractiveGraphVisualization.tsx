@@ -56,7 +56,7 @@ import { edgeBorderEndpoints, minEdgeLength, clampToMinNeighbors } from '../lib/
 import { directionStrategy, arrowVisibility, labelVisibility, perpendicularOffset } from '../lib/edgeLOD';
 import { assignParallelEdgeIndices } from '../lib/parallelEdges';
 import { isTap, touchHitSize, isCoarsePointer } from '../lib/touchInteraction';
-import { createPositionSaveQueue } from '../lib/positionSaveQueue';
+import { usePositionSaveQueue } from '../hooks/usePositionSaveQueue';
 import { spawnCelebration } from '../lib/celebration';
 import { buildNeighborhood } from '../lib/graphAdjacency';
 import { UndoStack } from '../lib/undoStack';
@@ -754,33 +754,26 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   
   // Function to save node position to database
   const saveNodePosition = useCallback(async (nodeId: string, x: number, y: number) => {
-    try {
-      await updateWorkItemMutation({
-        variables: {
-          where: { id: nodeId },
-          update: { 
-            positionX: x,
-            positionY: y
-          }
+    const result = await updateWorkItemMutation({
+      variables: {
+        where: { id: nodeId },
+        update: {
+          positionX: x,
+          positionY: y
         }
-      });
-      // Position saved successfully
-    } catch (error) {
-      // Error saving position, continue without logging
+      }
+    });
+    if (result.errors?.length || !result.data?.updateWorkItems?.workItems?.some((item: { id: string }) => item.id === nodeId)) {
+      throw new Error('The task position was not saved.');
     }
   }, [updateWorkItemMutation]);
 
-  // #95: coalescing, concurrency-bounded position writes. A large-graph reflow
-  // moves hundreds of nodes at once; without this each fired its own mutation in
-  // parallel (a D1 write-amplification spike). The queue keeps only the latest
-  // position per node and drains with a hard cap on in-flight writes. Bound to
-  // the latest saveNodePosition via a ref so the queue itself is created once.
-  const saveNodePositionRef = useRef(saveNodePosition);
-  saveNodePositionRef.current = saveNodePosition;
-  const positionSaveQueueRef = useRef(createPositionSaveQueue({
-    save: (s) => saveNodePositionRef.current(s.id, s.x, s.y),
-    concurrency: 4,
-  }));
+  const positionSaveQueue = usePositionSaveQueue(
+    position => saveNodePosition(position.id, position.x, position.y),
+    () => showError('Layout could not be saved', 'Keep this tab open and reconnect to retry your pending positions.'),
+  );
+  const positionSaveQueueRef = useRef(positionSaveQueue);
+  positionSaveQueueRef.current = positionSaveQueue;
 
   // Durable layout: persist the current position of every node whose live
   // position has moved away from its last-saved position by more than a pixel.
