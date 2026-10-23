@@ -16,10 +16,11 @@ for (const [width, height] of [[320,568], [390,844], [844,390], [768,1024], [102
     const result = await gql(page, 'mutation($input: [GraphCreateInput!]!) { createGraphs(input: $input) { graphs { id } } }', { input: [{ name: `Responsive ${width} ${Date.now()}`, type: 'PROJECT', status: 'ACTIVE', createdBy: me.me.id, isShared: true }] });
     const graphId = result.createGraphs.graphs[0].id;
     try {
-      await gql(page, 'mutation($input: [WorkItemCreateInput!]!) { createWorkItems(input: $input) { workItems { id } } }', { input: [
+      const created = await gql(page, 'mutation($input: [WorkItemCreateInput!]!) { createWorkItems(input: $input) { workItems { id title } } }', { input: [
         { title: 'Ship the first idea', type: 'TASK', status: 'IN_PROGRESS', priority: .8 },
         { title: 'Celebrate progress', type: 'TASK', status: 'COMPLETED', priority: .3 },
       ].map(item => ({ ...item, positionX: 0, positionY: 0, positionZ: 0, owner: { connect: { where: { node: { id: me.me.id } } } }, graph: { connect: { where: { node: { id: graphId } } } } })) });
+      const editedItemId = created.createWorkItems.workItems.find((item: { id: string; title: string }) => item.title === 'Ship the first idea').id;
       await page.evaluate(id => { localStorage.setItem('currentGraphId', id); localStorage.setItem('graphdone:viewMode', 'graph'); }, graphId);
       await page.goto('/analytics');
       await expect(page.getByTestId('metric-work-items')).toHaveText('2');
@@ -66,9 +67,27 @@ for (const [width, height] of [[320,568], [390,844], [844,390], [768,1024], [102
       await page.getByTestId('quick-title').blur();
       await expect.poll(async () => (await gql(page, 'query($id: ID!) { workItems(where: { graph: { id: $id } }) { title } }', { id: graphId })).workItems.some((i: {title: string}) => i.title === `A real idea at ${width}`)).toBe(true);
       const complete = page.getByTestId('quick-status').getByRole('button', { name: 'Completed', exact: true });
+      if (width === 320) await page.route('**/graphql', async route => {
+        const body = route.request().postDataJSON();
+        if (body?.variables?.update?.status === 'COMPLETED') await new Promise(resolve => setTimeout(resolve, 750));
+        await route.continue();
+      });
       await complete.scrollIntoViewIfNeeded();
       expect((await complete.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+      const savedStatus = page.waitForResponse(response => {
+        if (!response.url().endsWith('/graphql') || response.request().method() !== 'POST') return false;
+        const body = response.request().postDataJSON();
+        return body?.variables?.where?.id === editedItemId && body?.variables?.update?.status === 'COMPLETED';
+      });
       await complete.click();
+      const response = await savedStatus;
+      expect(response.ok()).toBe(true);
+      const saved = await response.json();
+      expect(saved.errors).toBeUndefined();
+      expect(saved.data.updateWorkItems.workItems).toEqual(expect.arrayContaining([expect.objectContaining({ id: editedItemId, status: 'COMPLETED' })]));
+      await expect(complete).toHaveAttribute('aria-pressed', 'true');
+      const persisted = await gql(page, 'query($id: ID!) { workItems(where: { id: $id }) { id status } }', { id: editedItemId });
+      expect(persisted.workItems).toEqual([{ id: editedItemId, status: 'COMPLETED' }]);
       await page.screenshot({ path: `test-artifacts/responsive-editor-${width}x${height}.png` });
       await page.keyboard.press('Escape');
       await expect(surface).toHaveCount(0);
