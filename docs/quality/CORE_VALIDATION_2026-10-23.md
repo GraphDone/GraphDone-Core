@@ -22,6 +22,24 @@ fresh per-attempt cache; the threshold is unchanged. These results do not prove
 unbounded-collection protection, full MCP denial-of-service resistance or a
 hosted deployment. Final combined public CI and protected review remain pending.
 
+The subsequent combined candidate
+`df1fac165a5f1421602c3706db8b86090b54a4f5` includes the separate MCP stdout
+correction in [PR #179](https://github.com/GraphDone/GraphDone-Core/pull/179)
+and the dependency correction in [PR #180](https://github.com/GraphDone/GraphDone-Core/pull/180).
+A fresh install on that clean, unchanged source passes build, **603 unit cases
+with 26 DB-gated skips**, **161 harness cases**, types, lint, bundle, and the
+fresh-cache production audit (zero high/critical, eight moderate). All **nine
+real Neo4j contract cases** pass, including the actual MCP entry point's
+create/read/error/recovery path, verified fixture cleanup and zero protocol
+parse errors through shutdown. A separate compiled production-mode MCP probe
+also initializes, lists 31 tools, reads an owned two-node/one-edge graph,
+rejects malformed/unknown calls and recovers, with zero stdout protocol errors
+and confirmed child/edge/node/graph cleanup. It is a one-off probe, distinct
+from the committed nine-case contract. Evidence is retained in
+`core-mcp-final-candidate-20261023/test-artifacts/audit-20261023/{final-mcp-combined,zod-stdio}/`.
+These local combined results do not replace final public-head CI or a real
+non-author approval of protected PR #157.
+
 ## Earlier functional integration snapshot
 
 **Snapshot: all planned local gates pass and the scoped stack is merged into
