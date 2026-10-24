@@ -89,6 +89,10 @@ export function GraphProvider({ children }: GraphProviderProps) {
       return;
     }
 
+    // A failed read is not an empty account. Keep the visible graph and never
+    // auto-create a welcome project while cloud access is unavailable.
+    if (graphsError) return;
+
     // Combine user graphs, shared graphs, and system graphs
     // Remove duplicates by graph ID (some graphs may appear in multiple categories)
     const graphsMap = new Map();
@@ -131,8 +135,8 @@ export function GraphProvider({ children }: GraphProviderProps) {
           zoomLevel: 1.0
         },
         permissions: g.permissions ? JSON.parse(g.permissions) : {
-          owner: currentUser?.id || 'unknown',
-          admins: [currentUser?.id || 'unknown'],
+          owner: g.createdBy || 'unknown',
+          admins: g.createdBy ? [g.createdBy] : [],
           editors: [],
           viewers: [],
           teamPermission: 'VIEW'

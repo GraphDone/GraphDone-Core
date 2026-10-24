@@ -199,6 +199,27 @@ export const CREATE_WORK_ITEM = gql`
   }
 `;
 
+export const RESTORE_WORK_ITEM = gql`
+  mutation RestoreWorkItem($input: WorkItemRestoreInput!) {
+    restoreWorkItem(input: $input) {
+      id
+      title
+      description
+      type
+      status
+      priority
+      dueDate
+      tags
+      metadata
+      positionX
+      positionY
+      positionZ
+      createdAt
+      updatedAt
+    }
+  }
+`;
+
 export const UPDATE_WORK_ITEM = gql`
   mutation UpdateWorkItems($where: WorkItemWhere!, $update: WorkItemUpdateInput!) {
     updateWorkItems(where: $where, update: $update) {

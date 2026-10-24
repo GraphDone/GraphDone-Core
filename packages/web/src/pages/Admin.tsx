@@ -1,6 +1,10 @@
+import {hostedUsageEnabled} from '../lib/hostedUsage';
+import {AdminOperations} from '../components/AdminOperations';
 import React, { useState, useEffect } from 'react';
+import { Navigate } from 'react-router-dom';
 import { Users, Database, Shield, Download, Upload, Settings2, RefreshCw, AlertCircle, Lock, Key, Globe, CheckCircle, XCircle, AlertTriangle, FileText, Calendar, Server, Network, Copy, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { canAccessAdmin } from '../lib/roleAccess';
 import { AdminUserManagement } from '../components/AdminUserManagement';
 import { CustomDropdown } from '../components/CustomDropdown';
 import { APP_VERSION } from '../utils/version';
@@ -10,22 +14,19 @@ import { GET_OAUTH_PROVIDER_CONFIGS, UPDATE_OAUTH_PROVIDER_CONFIG } from '../lib
 
 export function Admin() {
   const { currentUser } = useAuth();
-  const [activeTab, setActiveTab] = useState('users');
+  const [activeTab, setActiveTab] = useState('operations');
 
-  // Redirect if not ADMIN
-  if (currentUser?.role !== 'ADMIN') {
-    return (
-      <div className="h-full flex items-center justify-center">
-        <div className="text-center">
-          <Shield className="h-16 w-16 text-red-400 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-100 mb-2">Access Denied</h1>
-          <p className="text-gray-400">Only ADMIN users can access the Admin panel.</p>
-        </div>
-      </div>
-    );
+  // Hard lockout for non-admins: redirect away rather than render any admin
+  // chrome/tabs. This is defense-in-depth — the /admin route is already gated by
+  // <RequireRole can={canAccessAdmin}> and the Worker rejects admin operations
+  // server-side — but the page also fails closed on its own so admin UI can
+  // never mount for a non-admin even if the route guard is ever changed.
+  if (!canAccessAdmin(currentUser?.role)) {
+    return <Navigate to="/" replace />;
   }
 
   const tabs = [
+    {id:'operations',name:'Feedback & operations',icon:FileText,description:'Reports, usage and improvement agents'},
     { id: 'users', name: 'Users', icon: Users, description: 'Manage user roles and permissions' },
     { id: 'settings', name: 'Registration', icon: Settings2, description: 'User registration policies and defaults' },
     { id: 'oauth', name: 'OAuth Providers', icon: Key, description: 'Configure OAuth authentication providers' },
@@ -36,6 +37,7 @@ export function Admin() {
 
   const renderTabContent = () => {
     switch (activeTab) {
+      case 'operations': return <AdminOperations />;
       case 'users':
         return <AdminUserManagement />;
       case 'settings':
@@ -54,9 +56,9 @@ export function Admin() {
   };
 
   return (
-    <div className="h-screen flex flex-col">
+    <div className="h-full min-h-0 flex flex-col">
       {/* Header */}
-      <div className="bg-gray-900/30 backdrop-blur-md border-b border-gray-700/30 px-6 py-4">
+      <div className="bg-gray-900/30 backdrop-blur-md border-b border-gray-700/30 px-3 py-3 sm:px-6 sm:py-4">
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center space-x-3">
@@ -76,22 +78,24 @@ export function Admin() {
         
         {/* Tab Navigation */}
         <div className="mt-6">
-          <nav className="flex space-x-1">
+          <nav className="flex flex-wrap gap-1">
             {tabs.map((tab) => {
               const Icon = tab.icon;
+              const unavailable = tab.id === 'settings' || (hostedUsageEnabled && ['oauth','database','security'].includes(tab.id));
               return (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`px-4 py-2 rounded-lg flex items-center space-x-2 text-sm font-medium transition-colors ${
+                  disabled={unavailable}
+                  className={`px-4 py-2 rounded-lg flex items-center space-x-2 text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
                     activeTab === tab.id
                       ? 'bg-yellow-900/30 text-yellow-300 border border-yellow-500/30'
                       : 'text-gray-400 hover:text-gray-300 hover:bg-gray-800'
                   }`}
-                  title={tab.description}
+                  title={unavailable ? 'Not available in this release; configure deployment settings on the server.' : tab.description}
                 >
                   <Icon className="h-4 w-4" />
-                  <span>{tab.name}</span>
+                  <span>{tab.name}{unavailable ? ' · unavailable' : ''}</span>
                 </button>
               );
             })}
@@ -759,7 +763,7 @@ function DatabaseManagement() {
         </div>
         
         {/* Database Statistics */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
           <div className="bg-gray-700 border border-gray-600 rounded-lg p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -816,7 +820,7 @@ function DatabaseManagement() {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-6">
           <button
             onClick={async () => {
               const debug = [...debugInfo];
@@ -1279,7 +1283,7 @@ certbot renew --dry-run
                 <g transform="translate(120, 95)">
                   <line x1="0" y1="10" x2="80" y2="10" stroke="rgb(34, 197, 94)" strokeWidth="2" markerEnd="url(#arrowhead)"/>
                   <text x="40" y="0" textAnchor="middle" className="fill-green-400 text-xs font-medium">
-                    {config ? `HTTPS:${config.services.proxy.httpsPort}` : 'HTTPS:8443'}
+                    {`HTTPS:${config?.services?.proxy?.httpsPort ?? '8443'}`}
                   </text>
                 </g>
                 
@@ -1296,10 +1300,10 @@ certbot renew --dry-run
                   <line x1="0" y1="10" x2="50" y2="-20" stroke="rgb(34, 197, 94)" strokeWidth="2" markerEnd="url(#arrowhead)"/>
                   <line x1="0" y1="10" x2="50" y2="40" stroke="rgb(34, 197, 94)" strokeWidth="2" markerEnd="url(#arrowhead)"/>
                   <text x="25" y="-10" textAnchor="middle" className="fill-green-400 text-xs">
-                    {config ? `HTTP:${config.services.web.port}` : 'HTTP:3127'}
+                    {`HTTP:${config?.services?.web?.port ?? '3127'}`}
                   </text>
                   <text x="25" y="55" textAnchor="middle" className="fill-green-400 text-xs">
-                    {config ? `HTTP:${config.services.api.port}` : 'HTTP:4127'}
+                    {`HTTP:${config?.services?.api?.port ?? '4127'}`}
                   </text>
                 </g>
                 
@@ -1321,14 +1325,14 @@ certbot renew --dry-run
                 <g transform="translate(540, 140)">
                   <line x1="0" y1="5" x2="80" y2="5" stroke="rgb(14, 165, 233)" strokeWidth="2" markerEnd="url(#arrowhead)"/>
                   <text x="40" y="-5" textAnchor="middle" className="fill-sky-400 text-xs">
-                    {config ? `Neo4j:${config.services.neo4j.port}` : 'Neo4j:7687'}
+                    {`Graph DB:${config?.services?.neo4j?.port ?? '7687'}`}
                   </text>
                 </g>
-                
-                {/* Neo4j Database */}
+
+                {/* Graph Database */}
                 <g transform="translate(640, 120)">
                   <rect x="0" y="0" width="100" height="50" rx="6" fill="rgb(14, 165, 233)" fillOpacity="0.2" stroke="rgb(14, 165, 233)" strokeWidth="2"/>
-                  <text x="50" y="20" textAnchor="middle" className="fill-sky-300 text-sm font-medium">Neo4j</text>
+                  <text x="50" y="20" textAnchor="middle" className="fill-sky-300 text-sm font-medium">Graph DB</text>
                   <text x="50" y="35" textAnchor="middle" className="fill-sky-300 text-xs">Database</text>
                 </g>
                 
@@ -1340,7 +1344,7 @@ certbot renew --dry-run
                 </defs>
               </svg>
               
-              <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+              <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
                 <div className="flex items-center space-x-2" title="End user browsers connecting via HTTPS">
                   <div className="w-3 h-3 bg-blue-500/30 border border-blue-500 rounded"></div>
                   <span className="text-blue-300">Client Browser</span>
@@ -1360,7 +1364,7 @@ certbot renew --dry-run
               </div>
               
               <div className="mt-3 text-xs text-gray-400" title="Traffic flow explanation">
-                <strong className="text-green-400">Traffic Flow:</strong> Browser → HTTPS ({config?.services.proxy.httpsPort || '8443'}) → Nginx Proxy → HTTP backends ({config?.services.web.port || '3127'} Web, {config?.services.api.port || '4127'} API) → Neo4j ({config?.services.neo4j.port || '7687'})
+                <strong className="text-green-400">Traffic Flow:</strong> Browser → HTTPS ({config?.services?.proxy?.httpsPort || '8443'}) → Nginx Proxy → HTTP backends ({config?.services?.web?.port || '3127'} Web, {config?.services?.api?.port || '4127'} API) → Graph DB ({config?.services?.neo4j?.port || '7687'})
               </div>
               
               {lastUpdated && (
@@ -1767,7 +1771,7 @@ For more details, see: /docs/tls-ssl-setup.md
                     addDebugMessage(`📊 Status code: ${healthResponse.status}`);
                     addDebugMessage(`🔍 Server status: ${healthData.status}`);
                     addDebugMessage(`💾 GraphQL service: ${healthData.services?.graphql?.status || 'unknown'}`);
-                    addDebugMessage(`🗄️ Neo4j status: ${healthData.services?.neo4j?.status || 'unknown'}`);
+                    addDebugMessage(`🗄️ Graph store status: ${healthData.services?.neo4j?.status || 'unknown'}`);
                     
                     if (healthResponse.ok) {
                       addDebugMessage('✅ Health endpoint test PASSED');

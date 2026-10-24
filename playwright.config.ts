@@ -20,6 +20,12 @@ export default defineConfig({
     /* Base URL to use in actions like `await page.goto('/')`. */
     baseURL: process.env.TEST_URL || 'https://localhost:3128',
 
+    /* Stream isolated headed QC through scripts/headed-viewer.mjs while using
+     * the installed Chrome build instead of requiring a bundled browser. */
+    ...(process.env.QC_BROWSER_PORT
+      ? { channel: 'chrome', launchOptions: { args: [`--remote-debugging-port=${process.env.QC_BROWSER_PORT}`] } }
+      : {}),
+
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
     
@@ -38,11 +44,27 @@ export default defineConfig({
   projects: [
     {
       name: 'GraphDone-Core/dev-neo4j/chromium',
-      // The showcase tour and the local-VLM visual eval run in their own
-      // capture-heavy projects below; keep them out of the default (fast)
+      // Capture-heavy, report-only specs live under tests/e2e/reports/ and run in
+      // their own projects below; keep that whole folder out of the default (fast)
       // project so the smoke gate stays quick.
-      testIgnore: [/showcase\.spec\.ts/, /visual-vlm\.spec\.ts/],
+      testIgnore: '**/reports/**',
       use: { ...devices['Desktop Chrome'] },
+    },
+
+    /* The massive resolution × feature report: every screen + key feature,
+     * screenshotted + audited at every viewport, into the Playwright HTML report.
+     * Local + heavy; run via `npm run report:matrix`. One shared login (the
+     * matrix-setup dependency) feeds storageState so the ~100 cells don't re-login. */
+    {
+      name: 'matrix-setup',
+      testMatch: /matrix\.setup\.ts/,
+      use: { ...devices['Desktop Chrome'] },
+    },
+    {
+      name: 'matrix',
+      testMatch: /feature-matrix\.spec\.ts/,
+      dependencies: ['matrix-setup'],
+      use: { ...devices['Desktop Chrome'], storageState: 'test-artifacts/matrix-auth.json', screenshot: 'on' },
     },
 
     /* Showcase: records web-friendly .webm video + full-page screenshots of
@@ -56,6 +78,23 @@ export default defineConfig({
         video: 'on',
         screenshot: 'on',
         trace: 'retain-on-failure',
+      },
+    },
+
+    /* LIVE Cloudflare user journey: drives the real production SPA as a guest on
+     * desktop + phone, recording .webm video + a labelled screenshot per step.
+     * Run via the unified harness:
+     *   TEST_URL=https://graphdone-cloud.pages.dev node tests/run-unified.mjs --profile live --out ...
+     * Heavy + network-bound; report-only, never part of the smoke gate. */
+    {
+      name: 'live-journey',
+      testMatch: /live-cloud-journey\.spec\.ts/,
+      use: {
+        ...devices['Desktop Chrome'],
+        video: 'on',
+        screenshot: 'on',
+        trace: 'retain-on-failure',
+        ignoreHTTPSErrors: true,
       },
     },
 
@@ -87,7 +126,7 @@ export default defineConfig({
     {
       name: 'vlm',
       testDir: './tests/e2e',
-      testMatch: /visual-vlm\.spec\.ts/,
+      testMatch: /vlm-evaluation\.spec\.ts/,
       use: { ...devices['Desktop Chrome'], screenshot: 'on' },
     },
 

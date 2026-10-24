@@ -206,15 +206,15 @@ export function EditWorkItemModal({ isOpen, onClose, node }: EditWorkItemModalPr
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex items-center justify-center min-h-screen px-4">
+    <div data-modal-backdrop className="fixed inset-0 z-50 overflow-y-auto">
+      <div className="modal-stage">
         <div className="fixed inset-0 bg-black bg-opacity-75 dark:bg-black dark:bg-opacity-80" onClick={onClose} />
         
-        <div 
+        <div data-modal-panel data-task-editor role="dialog" aria-modal="true" aria-label="Edit work item"
           className="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+          <div className="task-edit-heading flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center space-x-2">
               <Edit className="h-5 w-5 text-blue-500" />
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">

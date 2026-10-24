@@ -1,0 +1,21 @@
+GraphDone autonomous continuous-improvement iteration. The live test dashboard (http://localhost:3199, `npm run dashboard`) is your guiding light. Repos: Core = /home/scubasonar/Code/graphdone-repos/GraphDone-Core (work on branch dev), Cloud = /home/scubasonar/Code/graphdone-repos/GraphDone-Cloud (branch main). Read the memory index at /home/scubasonar/.claude/projects/-home-scubasonar-Code-graphdone-repos/memory/MEMORY.md first. Do ONE short, safe, well-scoped iteration, then stop and exit.
+
+CONTEXT: The mechanical upkeep (keeping the dashboard server alive + running test suites to feed it fresh data) has ALREADY been done by the shell driver before you were invoked. Your job is the judgment part: look at the data and make at most one concrete improvement.
+
+STEPS:
+1. Read the current dashboard state: `curl -s http://localhost:3199/api/state`. Identify the newest runs, any failing/warn checks, and any regression vs prior runs in the metric trends (FPS, pass-rate, durations, drift).
+2. If there is a CONCRETE, low-risk, well-scoped fix or improvement (a failing/warn check to fix, a flaky test to stabilize, a clear perf regression, a small dashboard enhancement): implement it. Write or adjust a test first where feasible. Run the relevant gate — when you touch data, the graph, or deletion paths run `TEST_URL=http://localhost:3127 npm run test:smoke` (only if the dev stack at :3127 is up; if it is not up, restrict yourself to changes provable by `node --test` / unit tests and do NOT claim the smoke gate passed).
+3. If (and only if) your change is complete and its gate is green, commit on a feature branch and merge to dev via the branch-protection bypass:
+   gh api -X DELETE repos/GraphDone/GraphDone-Core/branches/dev/protection/required_pull_request_reviews
+   gh pr merge <n> --merge --delete-branch
+   gh api -X PATCH repos/GraphDone/GraphDone-Core/branches/dev/protection/required_pull_request_reviews -F required_approving_review_count=1
+   Use scoped `git add <paths>` (NEVER `git add -A`). End the commit message with:
+   Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
+4. Record anything durable in memory (one file per fact, update MEMORY.md index).
+
+HARD CONSTRAINTS (never violate):
+- NEVER deploy to Cloudflare (do not run scripts/deploy.sh) — deploys are user-triggered only.
+- NEVER read, log, expose, or commit secrets (ADMIN_PASSWORD, GUEST_JWT_SECRET, RESEND key); admin login stays secret-backed only; no end-user passwords.
+- NEVER weaken auth, tenant isolation, or any security control. Tear down any test fixtures you create.
+- NEVER merge anything that fails THE GATE or whose gate you could not actually run.
+- If there is nothing safe and concrete to do this iteration, do nothing further and exit cleanly. Do not invent risky or speculative work. Brevity over volume.

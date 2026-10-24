@@ -1,12 +1,18 @@
+import {useCompactWorkspace} from '../hooks/useCompactWorkspace';
+import {FeedbackButton,PublicAnnouncement} from './Feedback';
+import { OfflineStatus } from './OfflineStatus';
 import React from 'react';
+import { HostedUsage } from './HostedUsage';
 import { Link, useLocation } from 'react-router-dom';
-import { Brain, Bot, BarChart3, Settings, Menu, Server, Globe, Shield, Users, Terminal } from 'lucide-react';
+import { Brain, Bot, BarChart3, Settings, Server, Globe, Shield, Users, Terminal } from 'lucide-react';
 import { UserSelector } from './UserSelector';
 import { GraphSelector } from './GraphSelector';
 import { useAuth } from '../contexts/AuthContext';
+import { canAccessAdmin, canAccessBackend } from '../lib/roleAccess';
 import { McpHealthIndicator } from './McpHealthIndicator';
 import FloatingConsole from './FloatingConsole';
 import { InsecureConnectionBanner } from './TlsStatusIndicator';
+import { MobileBottomNav } from './MobileBottomNav';
 import { APP_VERSION } from '../utils/version';
 
 interface LayoutProps {
@@ -15,24 +21,29 @@ interface LayoutProps {
 
 export function Layout({ children }: LayoutProps) {
   const location = useLocation();
+  const compactWorkspace=useCompactWorkspace();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const [showFloatingConsole, setShowFloatingConsole] = React.useState(false);
   const desktopSidebarCollapsed = true; // Zen mode permanently on
   const { currentTeam, currentUser } = useAuth();
+  // On the workspace, the mobile top bar carries the project selector (row 1 of a
+  // 2-row mobile header: project selection, then the view bar in the page below).
+  const isWorkspaceRoute = location.pathname === '/' || location.pathname === '/workspace';
 
   const navigation = [
     { name: 'Workspace', href: '/', icon: Globe, description: 'Main work' },
     { name: 'Ontology', href: '/ontology', icon: Brain, description: 'Node schemas' },
-    { name: 'AI & Agents', href: '/agents', icon: Bot, description: 'AI collaboration', comingSoon: true },
-    { name: 'Analytics', href: '/analytics', icon: BarChart3, description: 'Priority insights', comingSoon: true },
+    { name: 'AI & Agents', href: '/agents', icon: Bot, description: 'Recorded AI contributions' },
+    { name: 'Analytics', href: '/analytics', icon: BarChart3, description: 'Live graph progress' },
     { name: 'Settings', href: '/settings', icon: Settings, description: 'User preferences' },
-    { name: 'Admin', href: '/admin', icon: Shield, description: 'System administration', restricted: currentUser?.role !== 'ADMIN' },
-    { name: 'System', href: '/backend', icon: Server, description: 'Backend status', restricted: currentUser?.role === 'VIEWER' || currentUser?.role === 'GUEST' },
+    { name: 'Admin', href: '/admin', icon: Shield, description: 'System administration', hidden: !canAccessAdmin(currentUser?.role) },
+    { name: 'System', href: '/backend', icon: Server, description: 'Backend status', hidden: !canAccessBackend(currentUser?.role) },
   ];
 
   return (
     <div
-      className="h-screen flex flex-col bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 relative overflow-hidden"
+      data-compact-workspace={compactWorkspace ? "true" : "false"}
+      className="workspace-surface h-dvh-screen flex flex-col relative overflow-hidden"
       style={{
         '--sidebar-width': desktopSidebarCollapsed ? '4rem' : '16rem'
       } as React.CSSProperties}
@@ -40,40 +51,36 @@ export function Layout({ children }: LayoutProps) {
       {/* Insecure-connection warning — an in-flow strip at the very top, so it
           reserves its own space and never overlaps the app (only over HTTP). */}
       <InsecureConnectionBanner className="relative z-30" />
+      <div className="workspace-status-strips"><PublicAnnouncement /><HostedUsage compact /><OfflineStatus compact /></div>
 
       {/* Static gradient background - optimized for all browsers */}
-      <div className="lagoon-caustics"></div>
-      
-      {/* Mobile menu button */}
-      <div className="lg:hidden relative z-30">
-        <div className="flex items-center justify-between bg-gray-800/90 backdrop-blur-sm px-4 py-2 border-b border-gray-700/50">
-          <div className="flex items-center">
-            <button
-              type="button"
-              className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-300 hover:bg-gray-700"
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-            >
-              <Menu className="h-6 w-6" aria-hidden="true" />
-            </button>
-            <Link to="/" className="ml-3 text-xl font-bold text-green-400 hover:text-green-300 transition-colors">
-              GraphDone
-            </Link>
+
+
+      {/* Phone top bar: just the project selector on the workspace (no hamburger —
+          the bottom nav handles navigation). Other pages use their own header. */}
+      {isWorkspaceRoute && (
+        <div data-workspace-header className="mobile-project-header md:hidden relative z-30 pt-safe">
+          <div className="flex items-center bg-gray-800/90 backdrop-blur-sm px-3 py-2 border-b border-gray-700/50">
+            <div className="flex-1 min-w-0">
+              <GraphSelector testId="graph-selector-mobile" />
+            </div>
+            <button aria-label="New work item" onClick={()=>window.dispatchEvent(new Event('graphdone-create-task'))} className="min-h-[44px] min-w-[44px] ml-2 rounded-lg bg-violet-700 text-white text-xl">+</button>
           </div>
         </div>
-      </div>
+      )}
 
       <div className="flex flex-1 min-h-0">
         {/* Sidebar */}
         <div className={`
-          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-          lg:translate-x-0 lg:static lg:inset-0
+          workspace-sidebar ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+          md:translate-x-0 md:static md:inset-0
           fixed inset-y-0 left-0 z-50 bg-gray-800/95 backdrop-blur-sm border-r border-gray-700/50
           transform transition-all duration-200 ease-in-out
-          ${desktopSidebarCollapsed ? 'lg:w-16' : 'w-64'}
+          w-64 shrink-0 overflow-y-auto overscroll-contain ${desktopSidebarCollapsed ? 'md:w-16' : ''}
         `}>
-          <div className="flex flex-col h-full">
+          <div className="flex flex-col min-h-full">
             {/* Logo */}
-            <div className={`flex items-center h-16 px-6 border-b border-gray-700 ${desktopSidebarCollapsed ? 'lg:justify-center lg:px-4' : ''}`}>
+            <div className={`flex shrink-0 items-center h-16 px-6 border-b border-gray-700 ${desktopSidebarCollapsed ? 'md:justify-center md:px-4' : ''}`}>
               <Link to="/" className="flex items-center hover:opacity-80 transition-opacity">
                 <img src="/favicon.svg" alt="GraphDone Logo" className="h-8 w-8" />
                 {!desktopSidebarCollapsed && (
@@ -85,12 +92,15 @@ export function Layout({ children }: LayoutProps) {
             </div>
 
             {/* Navigation Buttons - Section 2 */}
-            <nav className="flex-1 px-4 py-6 space-y-2">
+            <nav className="flex-1 px-4 md:px-2 py-6 space-y-2">
               {navigation.map((item) => {
                 const Icon = item.icon;
                 const isActive = location.pathname === item.href;
-                const isRestricted = item.restricted || (item as { comingSoon?: boolean }).comingSoon;
-                
+                // Role-gated items the user can't reach are hidden entirely (not
+                // greyed) — no point advertising a page they can never open.
+                if ((item as { hidden?: boolean }).hidden) return null;
+                const isRestricted = (item as { comingSoon?: boolean }).comingSoon;
+
                 if (isRestricted) {
                   const restrictionMessage = (item as { comingSoon?: boolean }).comingSoon
                     ? 'Coming soon'
@@ -99,43 +109,38 @@ export function Layout({ children }: LayoutProps) {
                     : item.name === 'System'
                     ? 'User or Admin access required'
                     : 'Access restricted';
-                  
+
                   return (
                     <div
                       key={item.name}
                       className={`
                         flex items-center px-3 py-3 rounded-lg transition-colors group cursor-not-allowed opacity-50 relative
-                        ${desktopSidebarCollapsed ? 'lg:justify-center lg:px-2' : ''}
+                        ${desktopSidebarCollapsed ? 'md:justify-center md:px-2' : ''}
                       `}
                       title={desktopSidebarCollapsed ? `${item.name}: ${restrictionMessage}` : `${item.description} (${restrictionMessage})`}
                     >
                       <Icon className="h-5 w-5 flex-shrink-0 text-gray-500" />
-                      {!desktopSidebarCollapsed && (
-                        <div className="flex-1 min-w-0 ml-3">
-                          <div className="text-sm font-medium text-gray-500">{item.name}</div>
-                          <div className="text-xs text-gray-600 truncate">
-                            {restrictionMessage}
-                          </div>
+                      {/* Labels show in the expanded mobile drawer; hidden in the
+                          collapsed desktop (zen) rail, which uses hover tooltips. */}
+                      <div className="flex-1 min-w-0 ml-3 md:hidden">
+                        <div className="text-sm font-medium text-gray-500">{item.name}</div>
+                        <div className="text-xs text-gray-600 truncate">
+                          {restrictionMessage}
                         </div>
-                      )}
-                      {/* Tooltip for collapsed mode */}
-                      {desktopSidebarCollapsed && (
-                        <div className="hidden lg:group-hover:block absolute left-full top-1/2 transform -translate-y-1/2 ml-2 px-2 py-1 bg-gray-800 border border-gray-600 rounded shadow-lg text-sm whitespace-nowrap z-50">
-                          <div className="font-medium text-gray-500">{item.name}</div>
-                          <div className="text-xs text-gray-600">{restrictionMessage}</div>
-                        </div>
-                      )}
+                      </div>
                     </div>
                   );
                 }
-                
+
                 return (
                   <Link
                     key={item.name}
                     to={item.href}
+                    aria-label={item.name}
+                    aria-current={location.pathname === item.href ? 'page' : undefined}
                     className={`
-                      flex items-center px-3 py-3 rounded-lg transition-colors group relative
-                      ${desktopSidebarCollapsed ? 'lg:justify-center lg:px-2' : ''}
+                      flex items-center min-h-[44px] px-3 py-3 rounded-lg transition-colors group relative
+                      ${desktopSidebarCollapsed ? 'md:justify-center md:px-2' : ''}
                       ${isActive
                         ? 'bg-green-900/30 text-green-300 border border-green-500/30'
                         : 'text-gray-300 hover:bg-gray-700'
@@ -145,23 +150,14 @@ export function Layout({ children }: LayoutProps) {
                     title={desktopSidebarCollapsed ? `${item.name}: ${item.description}` : item.description}
                   >
                     <Icon className="h-5 w-5 flex-shrink-0" />
-                    {!desktopSidebarCollapsed && (
-                      <>
-                        <div className="flex-1 min-w-0 ml-3">
-                          <div className="text-sm font-medium">{item.name}</div>
-                          <div className="text-xs text-gray-400 truncate group-hover:text-gray-300">
-                            {item.description}
-                          </div>
-                        </div>
-                      </>
-                    )}
-                    {/* Tooltip for collapsed mode */}
-                    {desktopSidebarCollapsed && (
-                      <div className="hidden lg:group-hover:block absolute left-full top-1/2 transform -translate-y-1/2 ml-2 px-2 py-1 bg-gray-800 border border-gray-600 rounded shadow-lg text-sm whitespace-nowrap z-50">
-                        <div className="font-medium">{item.name}</div>
-                        <div className="text-xs text-gray-400">{item.description}</div>
+                    {/* Labels show in the expanded mobile drawer; hidden in the
+                        collapsed desktop (zen) rail, which uses hover tooltips. */}
+                    <div className="flex-1 min-w-0 ml-3 md:hidden">
+                      <div className="text-sm font-medium">{item.name}</div>
+                      <div className="text-xs text-gray-400 truncate group-hover:text-gray-300">
+                        {item.description}
                       </div>
-                    )}
+                    </div>
                   </Link>
                 );
               })}
@@ -170,13 +166,13 @@ export function Layout({ children }: LayoutProps) {
             {/* Graph Selector */}
             {!desktopSidebarCollapsed && (
               <div className="border-t border-gray-700">
-                <GraphSelector />
+                <GraphSelector testId="graph-selector-sidebar" />
               </div>
             )}
 
-            {/* Guest Mode Indicator */}
-            {currentUser?.role === 'GUEST' && !desktopSidebarCollapsed && (
-              <div className="border-t border-gray-700 p-4">
+            {/* Guest Mode Indicator (mobile drawer + expanded desktop) */}
+            {currentUser?.role === 'GUEST' && (
+              <div className="border-t border-gray-700 p-4 md:hidden">
                 <div className="bg-purple-900/30 border border-purple-500/30 rounded-lg p-3">
                   <div className="flex items-center space-x-2">
                     <Users className="h-4 w-4 text-purple-400" />
@@ -195,7 +191,7 @@ export function Layout({ children }: LayoutProps) {
             </div>
 
             {/* Status Section - Section 3 */}
-            <div className={`p-4 border-t border-gray-700 ${desktopSidebarCollapsed ? 'lg:px-2' : ''}`}>
+            <div className={`p-4 border-t border-gray-700 ${desktopSidebarCollapsed ? 'md:px-2' : ''}`}>
               {!desktopSidebarCollapsed ? (
                 <>
                   {/* MCP Health Indicator */}
@@ -210,9 +206,9 @@ export function Layout({ children }: LayoutProps) {
                 </div>
               )}
             </div>
-            
+
             {/* Console & Tools Section - Section 4 */}
-            <div className={`p-4 border-t border-gray-700/50 ${desktopSidebarCollapsed ? 'lg:px-2' : ''}`}>
+            <div className={`p-4 border-t border-gray-700/50 ${desktopSidebarCollapsed ? 'md:px-2' : ''}`}>
               {!desktopSidebarCollapsed ? (
                 <>
                   {/* Debug Console Toggle */}
@@ -231,7 +227,7 @@ export function Layout({ children }: LayoutProps) {
                       )}
                     </button>
                   </div>
-                  
+
                   {currentTeam && (
                     <div className="mb-2">
                       <p className="text-xs text-gray-300 font-medium">{currentTeam.name}</p>
@@ -262,9 +258,10 @@ export function Layout({ children }: LayoutProps) {
                 </div>
               )}
             </div>
-            
+
+            <div className="flex justify-center"><FeedbackButton compact /></div>
             {/* Footer Info Section */}
-            <div className={`p-4 border-t border-gray-700/30 ${desktopSidebarCollapsed ? 'lg:px-2' : ''}`}>
+            <div className={`p-4 border-t border-gray-700/30 ${desktopSidebarCollapsed ? 'md:px-2' : ''}`}>
               {!desktopSidebarCollapsed && (
                 <>
                   {currentTeam && (
@@ -290,19 +287,22 @@ export function Layout({ children }: LayoutProps) {
         {/* Overlay for mobile */}
         {sidebarOpen && (
           <div
-            className="fixed inset-0 z-40 bg-gray-600 bg-opacity-75 lg:hidden"
+            className="fixed inset-0 z-40 bg-gray-600 bg-opacity-75 md:hidden"
             onClick={() => setSidebarOpen(false)}
           />
         )}
 
         {/* Main content */}
-        <div className="flex-1 flex flex-col min-w-0 relative z-20">
+        <div className="flex-1 flex flex-col min-w-0 min-h-0 relative z-20">
           <main className="flex-1 select-none min-h-0">
             {children}
           </main>
         </div>
       </div>
-      
+
+      {/* Consistent mobile footer across every page */}
+      <MobileBottomNav />
+
       {/* Global Floating Console */}
       <FloatingConsole
         isVisible={showFloatingConsole}

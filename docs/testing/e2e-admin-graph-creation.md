@@ -443,7 +443,7 @@ test.describe('Graph View Modes', () => {
 ## Test Helper Functions
 
 ```typescript
-// tests/helpers/graph-creation.ts
+// tests/lib/graph-creation.ts
 import { Page, expect } from '@playwright/test';
 
 export async function navigateToTestGraph(page: Page, graphName: string) {

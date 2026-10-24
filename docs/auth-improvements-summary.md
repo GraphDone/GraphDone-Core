@@ -1,5 +1,9 @@
 # Authentication Improvements Summary
 
+The login lockout described below is browser-side behavior, not server-side
+password-login throttling. See the [2026-10-23 security scope](quality/SECURITY_SCOPE_2026-10-23.md)
+for current API findings, tested boundaries, and remaining work.
+
 ## ✅ Completed Enhancements (2025-01-09)
 
 ### 1. **Rate Limiting & Brute Force Protection** ⭐ HIGH PRIORITY

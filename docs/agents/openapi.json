@@ -1,0 +1,370 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "GraphDone agent collaboration",
+    "version": "1.0.0",
+    "description": "Project-scoped human and agent collaboration. No model execution. Token management requires a human login token."
+  },
+  "servers": [
+    {
+      "url": "/api/agent"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  },
+  "paths": {
+    "/context": {
+      "get": {
+        "summary": "Review project tasks, priorities, capabilities and latest notes",
+        "operationId": "getContext",
+        "parameters": [
+          {
+            "name": "graphId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The project bound to this token."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Missing, invalid, expired or revoked credential"
+          },
+          "403": {
+            "description": "Project ownership or scope denied"
+          },
+          "404": {
+            "description": "Work item or operation not found"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Storage service unavailable"
+          }
+        }
+      }
+    },
+    "/items": {
+      "patch": {
+        "summary": "Update task status or priority (collaboration scope)",
+        "operationId": "patchItems",
+        "parameters": [
+          {
+            "name": "graphId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The project bound to this token."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Missing, invalid, expired or revoked credential"
+          },
+          "403": {
+            "description": "Project ownership or scope denied"
+          },
+          "404": {
+            "description": "Work item or operation not found"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Storage service unavailable"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "NOT_STARTED",
+                      "PROPOSED",
+                      "PLANNED",
+                      "IN_PROGRESS",
+                      "IN_REVIEW",
+                      "BLOCKED",
+                      "ON_HOLD",
+                      "COMPLETED",
+                      "CANCELLED"
+                    ]
+                  },
+                  "priority": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                },
+                "required": [
+                  "id"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notes": {
+      "post": {
+        "summary": "Leave a server-attributed note (collaboration scope)",
+        "operationId": "postNotes",
+        "parameters": [
+          {
+            "name": "graphId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The project bound to this token."
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Missing, invalid, expired or revoked credential"
+          },
+          "403": {
+            "description": "Project ownership or scope denied"
+          },
+          "404": {
+            "description": "Work item or operation not found"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Storage service unavailable"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "body": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4000
+                  },
+                  "workItemId": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "body"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tokens": {
+      "get": {
+        "summary": "List connection metadata; human login required",
+        "operationId": "getTokens",
+        "parameters": [
+          {
+            "name": "graphId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The project bound to this token."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Missing, invalid, expired or revoked credential"
+          },
+          "403": {
+            "description": "Project ownership or scope denied"
+          },
+          "404": {
+            "description": "Work item or operation not found"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Storage service unavailable"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a token shown once; human login required",
+        "operationId": "postTokens",
+        "parameters": [
+          {
+            "name": "graphId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The project bound to this token."
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Missing, invalid, expired or revoked credential"
+          },
+          "403": {
+            "description": "Project ownership or scope denied"
+          },
+          "404": {
+            "description": "Work item or operation not found"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Storage service unavailable"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 60
+                  },
+                  "scope": {
+                    "type": "string",
+                    "enum": [
+                      "read",
+                      "collaborate"
+                    ]
+                  }
+                },
+                "required": [
+                  "name",
+                  "scope"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Revoke a connection; human login required",
+        "operationId": "deleteTokens",
+        "parameters": [
+          {
+            "name": "graphId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The project bound to this token."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Missing, invalid, expired or revoked credential"
+          },
+          "403": {
+            "description": "Project ownership or scope denied"
+          },
+          "404": {
+            "description": "Work item or operation not found"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Storage service unavailable"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

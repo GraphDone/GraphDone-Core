@@ -8,13 +8,17 @@ GraphDone is architected around three core principles:
 2. **Real-Time First**: Changes propagate immediately to all participants
 3. **Democratic Coordination**: Priority emerges from community validation, not top-down assignment
 
+> **Client / UI layer:** for the web app's structure (view system, graph canvas,
+> mobile shell, node inspector) see [web-ui-architecture.md](./web-ui-architecture.md).
+> Some sections below describe the forward-looking server/infra target, not all of
+> which is wired up today.
+
 ## Current Architecture (v0.3.1-alpha)
 
 ```mermaid
 graph TB
     subgraph "Client Applications"
-        WEB[Web Application<br/>React + TypeScript + D3.js<br/>Touch-optimized UI<br/>Port 3127]
-        IOS[iPhone App<br/>SwiftUI<br/>Separate GraphDone-iOS repo]
+        WEB[Web Application<br/>React + TypeScript + D3.js<br/>Responsive desktop + mobile web<br/>Port 3127]
         CLAUDE[Claude Code MCP<br/>Natural language interface<br/>Port 3128]
     end
     
@@ -25,7 +29,7 @@ graph TB
     
     subgraph "Data Layer"
         SQLITE[(SQLite<br/>User authentication<br/>User settings & preferences<br/>Fast local storage)]
-        NEO4J[(Neo4j 5.15-community<br/>Project management graph<br/>Work items & dependencies<br/>APOC plugins<br/>Port 7687)]
+        NEO4J[(Neo4j 5.15-community<br/>Management graph<br/>Work items & dependencies<br/>APOC plugins<br/>Port 7687)]
         REDIS[(Redis 8-alpine<br/>Available in Docker<br/>Not yet integrated<br/>Port 6379)]
     end
     
@@ -36,7 +40,6 @@ graph TB
     end
     
     WEB --> GQL
-    IOS --> GQL
     CLAUDE --> NEO4J
     GQL --> SQLITE
     GQL --> NEO4J
@@ -231,7 +234,7 @@ GraphDone uses a hybrid database approach, optimizing each database for its spec
 - No network latency for auth operations
 
 **Neo4j: Graph Data**
-- Project management nodes (tasks, outcomes, milestones)
+- Management nodes (tasks, outcomes, milestones)
 - Dependencies and relationships between work items
 - Graph traversal and pathfinding operations
 - Complex graph queries and analytics

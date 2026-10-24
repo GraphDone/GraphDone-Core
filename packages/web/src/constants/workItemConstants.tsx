@@ -96,7 +96,7 @@ export {
 // ============================
 
 // Work item types define what kind of work this represents
-export type WorkItemType = 'EPIC' | 'MILESTONE' | 'OUTCOME' | 'FEATURE' | 'TASK' | 'BUG' | 'IDEA' | 'RESEARCH' | 'DEFAULT';
+export type WorkItemType = 'EPIC' | 'MILESTONE' | 'OUTCOME' | 'FEATURE' | 'TASK' | 'BUG' | 'IDEA' | 'RESEARCH' | 'REQUIREMENT' | 'DEFAULT';
 
 // Work item statuses represent the current state of progress (9 total statuses)
 // NOT_STARTED is the default status for new items
@@ -164,6 +164,16 @@ export const WORK_ITEM_TYPES: Record<WorkItemType, TypeOption> = {
     bgColor: 'bg-gray-600/20',
     borderColor: 'border-gray-500/30',
     hexColor: '#9ca3af'
+  },
+  REQUIREMENT: {
+    value: 'REQUIREMENT',
+    label: 'Requirement',
+    description: 'A requirement that tasks satisfy (ontology layer)',
+    icon: ClipboardList,
+    color: 'text-sky-400',
+    bgColor: 'bg-sky-400/10',
+    borderColor: 'border-sky-400/30',
+    hexColor: '#38bdf8'
   },
   EPIC: {
     value: 'EPIC',
@@ -620,6 +630,7 @@ export type RelationshipType =
   | 'VALIDATES'       // Source tests/validates target
   | 'REFERENCES'      // Source references/cites target
   | 'CONTAINS'        // Source contains/encompasses target
+  | 'SATISFIES'       // Source (task) satisfies target (requirement) — ontology layer
   | 'DEFAULT_EDGE';   // Generic connection
 
 export interface RelationshipOption {
@@ -639,6 +650,14 @@ export const RELATIONSHIP_TYPES: Record<RelationshipType, RelationshipOption> = 
     icon: Paperclip,
     color: 'text-gray-400',
     hexColor: '#9ca3af'
+  },
+  SATISFIES: {
+    type: 'SATISFIES',
+    label: 'Satisfies',
+    description: 'Source task satisfies the target requirement (ontology layer)',
+    icon: CheckCircle,
+    color: 'text-sky-400',
+    hexColor: '#38bdf8'
   },
   DEPENDS_ON: {
     type: 'DEPENDS_ON',
@@ -743,6 +762,10 @@ export const RELATIONSHIP_TYPES: Record<RelationshipType, RelationshipOption> = 
 // ============================
 
 // Get relationship configuration
+export const isValidRelationshipType = (type: string): type is RelationshipType => {
+  return Object.keys(RELATIONSHIP_TYPES).includes(type as RelationshipType);
+};
+
 export const getRelationshipConfig = (type: RelationshipType): RelationshipOption => {
   return RELATIONSHIP_TYPES[type] || RELATIONSHIP_TYPES.RELATES_TO;
 };

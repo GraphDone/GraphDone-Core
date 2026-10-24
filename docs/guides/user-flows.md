@@ -4,7 +4,7 @@
 
 ### 1. New User Onboarding Flow
 
-Understanding how users first experience GraphDone's unique approach to project management.
+Understanding how users first experience GraphDone's unique approach to management.
 
 ```mermaid
 journey
@@ -391,4 +391,4 @@ graph LR
     style L3 fill:#f3e5f5
 ```
 
-These user flows demonstrate how GraphDone's unique approach to project management creates natural, intuitive workflows that scale from individual contributors to large organizations while maintaining the core principles of democratic coordination and human-AI collaboration.
+These user flows demonstrate how GraphDone's unique approach to management creates natural, intuitive workflows that scale from individual contributors to large organizations while maintaining the core principles of democratic coordination and human-AI collaboration.

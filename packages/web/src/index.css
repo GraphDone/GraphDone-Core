@@ -32,9 +32,6 @@
   --lagoon-3-opacity-max: 0.35;
   
   /* Shimmer Parameters */
-  --lagoon-shimmer-duration: 28s;
-  --lagoon-shimmer-opacity-min: 0.06;
-  --lagoon-shimmer-opacity-max: 0.24;
   
   /* Color Parameters */
   --lagoon-color-1-opacity: 0.16;
@@ -67,117 +64,6 @@
 }
 
 /* Tropical lagoon light scattering animation - sinusoidal wave motion for organic flow */
-@keyframes lagoonCaustics1 {
-  0% {
-    transform: translateX(-20%) translateY(-5%) scale(0.8) rotate(0deg);
-    opacity: 0.12;
-  }
-  12.5% {
-    transform: translateX(-14%) translateY(-12%) scale(0.92) rotate(45deg);
-    opacity: 0.18;
-  }
-  25% {
-    transform: translateX(15%) translateY(-10%) scale(1.1) rotate(90deg);
-    opacity: 0.22;
-  }
-  37.5% {
-    transform: translateX(23%) translateY(2%) scale(1.18) rotate(135deg);
-    opacity: 0.25;
-  }
-  50% {
-    transform: translateX(-5%) translateY(0%) scale(0.9) rotate(180deg);
-    opacity: 0.15;
-  }
-  62.5% {
-    transform: translateX(-13%) translateY(-8%) scale(0.82) rotate(225deg);
-    opacity: 0.20;
-  }
-  75% {
-    transform: translateX(25%) translateY(-5%) scale(1.2) rotate(270deg);
-    opacity: 0.28;
-  }
-  87.5% {
-    transform: translateX(18%) translateY(-15%) scale(1.05) rotate(315deg);
-    opacity: 0.16;
-  }
-  100% {
-    transform: translateX(-20%) translateY(-5%) scale(0.8) rotate(360deg);
-    opacity: 0.12;
-  }
-}
-
-@keyframes lagoonCaustics2 {
-  0% {
-    transform: translateX(30%) translateY(20%) scale(1.1) rotate(45deg);
-    opacity: 0.15;
-  }
-  16.7% {
-    transform: translateX(8%) translateY(18%) scale(0.85) rotate(105deg);
-    opacity: 0.28;
-  }
-  33% {
-    transform: translateX(-10%) translateY(5%) scale(0.7) rotate(165deg);
-    opacity: 0.32;
-  }
-  50% {
-    transform: translateX(-2%) translateY(-8%) scale(0.95) rotate(225deg);
-    opacity: 0.20;
-  }
-  66% {
-    transform: translateX(20%) translateY(-15%) scale(1.3) rotate(285deg);
-    opacity: 0.11;
-  }
-  83.3% {
-    transform: translateX(35%) translateY(8%) scale(1.18) rotate(345deg);
-    opacity: 0.18;
-  }
-  100% {
-    transform: translateX(30%) translateY(20%) scale(1.1) rotate(405deg);
-    opacity: 0.15;
-  }
-}
-
-@keyframes lagoonCaustics3 {
-  0% {
-    transform: translateX(-15%) translateY(20%) scale(0.9) rotate(180deg);
-    opacity: 0.18;
-  }
-  40% {
-    transform: translateX(35%) translateY(-10%) scale(1.4) rotate(270deg);
-    opacity: 0.08;
-  }
-  80% {
-    transform: translateX(-25%) translateY(5%) scale(0.6) rotate(360deg);
-    opacity: 0.35;
-  }
-  100% {
-    transform: translateX(-15%) translateY(20%) scale(0.9) rotate(540deg);
-    opacity: 0.18;
-  }
-}
-
-@keyframes lagoonShimmer {
-  0% {
-    background-position: 0% 0%;
-    opacity: 0.06;
-  }
-  25% {
-    background-position: 100% 50%;
-    opacity: 0.18;
-  }
-  50% {
-    background-position: 0% 100%;
-    opacity: 0.10;
-  }
-  75% {
-    background-position: 50% 0%;
-    opacity: 0.24;
-  }
-  100% {
-    background-position: 0% 0%;
-    opacity: 0.06;
-  }
-}
 
 /* Lagoon caustics utility classes - Simplified static gradient approach */
 .lagoon-caustics {
@@ -191,121 +77,16 @@
     radial-gradient(ellipse 80% 50% at 50% -20%, rgba(59, 130, 246, 0.15), transparent),
     radial-gradient(ellipse 60% 50% at 80% 50%, rgba(16, 185, 129, 0.12), transparent),
     radial-gradient(ellipse 60% 50% at 20% 80%, rgba(139, 92, 246, 0.10), transparent);
-}
-
-.caustic-layer {
-  position: absolute;
-  width: 150%;
-  height: 150%;
-  top: -25%;
-  left: -25%;
-  background: radial-gradient(
-    ellipse at 25% 35%,
-    rgba(59, 130, 246, 0.03) 0%,
-    rgba(59, 130, 246, 0.02) 20%,
-    transparent 45%
-  ),
-  radial-gradient(
-    ellipse at 75% 25%,
-    rgba(16, 185, 129, 0.04) 0%,
-    rgba(16, 185, 129, 0.02) 18%,
-    transparent 40%
-  ),
-  radial-gradient(
-    ellipse at 40% 70%,
-    rgba(139, 92, 246, 0.02) 0%,
-    rgba(139, 92, 246, 0.01) 25%,
-    transparent 50%
-  ),
-  radial-gradient(
-    ellipse at 60% 50%,
-    rgba(34, 197, 94, 0.025) 0%,
-    rgba(34, 197, 94, 0.01) 22%,
-    transparent 48%
-  ),
-  radial-gradient(
-    ellipse at 85% 80%,
-    rgba(14, 165, 233, 0.03) 0%,
-    rgba(14, 165, 233, 0.015) 16%,
-    transparent 38%
-  );
-  background-size: 25% 35%, 30% 28%, 22% 40%, 28% 32%, 26% 30%;
-  mix-blend-mode: screen;
-  filter: blur(0.5px);
-  pointer-events: none;
+  /* Promote this static backdrop to its own compositor layer so it is NOT
+     repainted every frame the SVG graph animates above it. On small graphs this
+     backdrop is the dominant idle-FPS cost (measured ~7 fps); isolating it as a
+     GPU layer recovers it without changing the look. (#62) */
+  transform: translateZ(0);
   will-change: transform;
-  transform: translate3d(0, 0, 0);
+  contain: layout paint style;
   backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-  -webkit-transform: translate3d(0, 0, 0);
-  -webkit-font-smoothing: subpixel-antialiased;
-  contain: layout paint;
-  isolation: isolate;
 }
 
-/* Caustic layers with immediate animation start and varied initial positions */
-.caustic-layer-1 { animation: lagoonCaustics1 45s ease-in-out infinite; transform: translate3d(-10%, 5%, 0) scale(0.95) rotate(45deg); }
-.caustic-layer-2 { animation: lagoonCaustics2 38s ease-in-out infinite reverse; transform: translate3d(15%, -8%, 0) scale(1.05) rotate(120deg); }
-.caustic-layer-3 { animation: lagoonCaustics3 52s ease-in-out infinite; transform: translate3d(-5%, 12%, 0) scale(0.8) rotate(270deg); }
-
-/* Additional caustic layers with immediate start, varied positions and reduced opacity for clean effect */
-.caustic-layer-4 { animation: lagoonCaustics1 62s ease-in-out infinite -15s; opacity: 0.4; transform: translate3d(20%, -15%, 0) scale(1.1) rotate(180deg); }
-.caustic-layer-5 { animation: lagoonCaustics2 33s ease-in-out infinite reverse -8s; opacity: 0.5; transform: translate3d(-25%, 10%, 0) scale(0.7) rotate(60deg); }
-.caustic-layer-6 { animation: lagoonCaustics3 71s ease-in-out infinite -22s; opacity: 0.3; transform: translateX(12%) translateY(20%) scale(0.9) rotate(300deg); }
-.caustic-layer-7 { animation: lagoonCaustics1 29s ease-in-out infinite reverse -5s; opacity: 0.6; transform: translateX(-18%) translateY(-5%) scale(1.2) rotate(90deg); }
-.caustic-layer-8 { animation: lagoonCaustics2 58s ease-in-out infinite -30s; opacity: 0.4; transform: translateX(8%) translateY(15%) scale(0.85) rotate(210deg); }
-.caustic-layer-9 { animation: lagoonCaustics3 41s ease-in-out infinite reverse -12s; opacity: 0.5; transform: translateX(-22%) translateY(-10%) scale(1.0) rotate(150deg); }
-.caustic-layer-10 { animation: lagoonCaustics1 76s ease-in-out infinite -18s; opacity: 0.3; transform: translateX(25%) translateY(8%) scale(0.75) rotate(330deg); }
-.caustic-layer-11 { animation: lagoonCaustics2 35s ease-in-out infinite reverse -25s; opacity: 0.6; transform: translateX(-8%) translateY(-18%) scale(1.15) rotate(45deg); }
-.caustic-layer-12 { animation: lagoonCaustics3 49s ease-in-out infinite -7s; opacity: 0.4; transform: translateX(18%) translateY(-12%) scale(0.9) rotate(240deg); }
-.caustic-layer-13 { animation: lagoonCaustics1 67s ease-in-out infinite reverse -35s; opacity: 0.5; transform: translateX(-15%) translateY(25%) scale(0.8) rotate(135deg); }
-.caustic-layer-14 { animation: lagoonCaustics2 31s ease-in-out infinite -14s; opacity: 0.3; transform: translateX(22%) translateY(-8%) scale(1.1) rotate(15deg); }
-.caustic-layer-15 { animation: lagoonCaustics3 84s ease-in-out infinite reverse -40s; opacity: 0.6; transform: translateX(-12%) translateY(18%) scale(0.65) rotate(285deg); }
-.caustic-layer-16 { animation: lagoonCaustics1 43s ease-in-out infinite -28s; opacity: 0.4; transform: translateX(28%) translateY(5%) scale(1.0) rotate(195deg); }
-.caustic-layer-17 { animation: lagoonCaustics2 69s ease-in-out infinite reverse -33s; opacity: 0.5; transform: translateX(-20%) translateY(-22%) scale(0.9) rotate(75deg); }
-.caustic-layer-18 { animation: lagoonCaustics3 37s ease-in-out infinite -10s; opacity: 0.3; transform: translateX(5%) translateY(22%) scale(1.25) rotate(345deg); }
-.caustic-layer-19 { animation: lagoonCaustics1 54s ease-in-out infinite reverse -45s; opacity: 0.6; transform: translateX(-28%) translateY(-2%) scale(0.7) rotate(165deg); }
-.caustic-layer-20 { animation: lagoonCaustics2 78s ease-in-out infinite -20s; opacity: 0.4; transform: translateX(15%) translateY(-25%) scale(1.05) rotate(255deg); }
-
-.lagoon-shimmer {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    75deg,
-    transparent 35%,
-    rgba(59, 130, 246, 0.02) 38%,
-    rgba(16, 185, 129, 0.025) 41%,
-    rgba(59, 130, 246, 0.015) 44%,
-    transparent 47%,
-    transparent 53%,
-    rgba(139, 92, 246, 0.015) 56%,
-    rgba(16, 185, 129, 0.02) 59%,
-    transparent 62%
-  );
-  background-size: 400% 400%;
-  animation: lagoonShimmer 28s linear infinite;
-  pointer-events: none;
-  mix-blend-mode: screen;
-  filter: blur(0.8px);
-  will-change: background-position;
-  transform: translate3d(0, 0, 0);
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-  -webkit-transform: translate3d(0, 0, 0);
-  contain: layout paint;
-  isolation: isolate;
-}
-
-/* Additional shimmer variations with immediate start at different animation phases */
-.lagoon-shimmer-2 { animation: lagoonShimmer 34s linear infinite -12s; transform: rotate(15deg) translateZ(0); opacity: 0.8; }
-.lagoon-shimmer-3 { animation: lagoonShimmer 42s linear infinite -18s; transform: rotate(-22deg) translateZ(0); opacity: 0.6; }
-.lagoon-shimmer-4 { animation: lagoonShimmer 31s linear infinite -8s; transform: rotate(8deg) translateZ(0); opacity: 0.7; }
-.lagoon-shimmer-5 { animation: lagoonShimmer 39s linear infinite -25s; transform: rotate(-12deg) translateZ(0); opacity: 0.5; }
-.lagoon-shimmer-6 { animation: lagoonShimmer 45s linear infinite -15s; transform: rotate(25deg) translateZ(0); opacity: 0.9; }
-.lagoon-shimmer-7 { animation: lagoonShimmer 33s linear infinite -20s; transform: rotate(-18deg) translateZ(0); opacity: 0.4; }
-.lagoon-shimmer-8 { animation: lagoonShimmer 38s linear infinite -10s; transform: rotate(11deg) translateZ(0); opacity: 0.8; }
-.lagoon-shimmer-9 { animation: lagoonShimmer 41s linear infinite -30s; transform: rotate(-28deg) translateZ(0); opacity: 0.6; }
-.lagoon-shimmer-10 { animation: lagoonShimmer 36s linear infinite -5s; transform: rotate(19deg) translateZ(0); opacity: 0.5; }
 
 @layer base {
   html {
@@ -315,9 +96,10 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
+  /* Keep body untransformed: portals with position:fixed must anchor to the
+     viewport, including when a long sign-in page has already scrolled. */
   body {
     @apply bg-gray-900 text-gray-100;
-    transform: translateZ(0);
     -webkit-backface-visibility: hidden;
     backface-visibility: hidden;
   }
@@ -334,18 +116,28 @@
     -webkit-transform: translateZ(0);
   }
 
+  /* Quiet scroll chrome: scrolling stays available, but tracks do not create
+     permanent visual rails. Reveal the thumb on hover or keyboard focus. */
+  * { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+  *:hover, *:focus-within { scrollbar-color: #6b7280 transparent; }
   /* Custom scrollbar */
   ::-webkit-scrollbar {
-    width: 8px;
+    width: 6px;
+    height: 6px;
   }
 
   ::-webkit-scrollbar-track {
-    background: #374151;
+    background: transparent;
   }
 
   ::-webkit-scrollbar-thumb {
-    background: #6B7280;
+    background: transparent;
     border-radius: 4px;
+  }
+
+  *:hover::-webkit-scrollbar-thumb,
+  *:focus-within::-webkit-scrollbar-thumb {
+    background: #6b7280;
   }
 
   ::-webkit-scrollbar-thumb:hover {
@@ -688,6 +480,27 @@ input[type="date"]:focus {
   input, textarea, [contenteditable], .select-text {
     user-select: text !important;
   }
+
+  /* Hide the scrollbar on horizontally-scrollable strips (mobile view tabs etc.)
+     while keeping them swipe-scrollable. */
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Dynamic viewport height: fills the visible area on mobile browsers, accounting
+     for the collapsing address bar (falls back to vh where dvh is unsupported). */
+  .h-dvh-screen {
+    height: 100vh;
+    height: 100dvh;
+  }
+
+  /* Safe-area insets for notched devices (requires viewport-fit=cover). */
+  .pt-safe { padding-top: env(safe-area-inset-top); }
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
 }
 
 @keyframes fadeIn {
@@ -835,6 +648,7 @@ input[type="date"]:focus {
 .graph-container[data-simplify="true"] svg .node-edit-icon,
 .graph-container[data-simplify="true"] svg .node-relationship-icon,
 .graph-container[data-simplify="true"] svg .node-descend-icon,
+.graph-container[data-simplify="true"] svg .node-expand-icon,
 .graph-container[data-simplify="true"] svg .status-icon-svg,
 .graph-container[data-simplify="true"] svg .status-label-text,
 .graph-container[data-simplify="true"] svg .status-percentage-text,
@@ -917,4 +731,247 @@ input[type="date"]:focus {
     animation: none;
     stroke-width: 5;
   }
+}
+
+/* ── Audit / high-contrast theme ─────────────────────────────────────────────
+   A deliberately flat, no-texture, no-glow render (set via <html data-theme=
+   "contrast">). It is a REAL browser render — layout, positions and sizes are
+   unchanged — but the decorative lagoon background, grid, blur and glows are
+   stripped so OpenCV layout/balance scans get a clean, deterministic image.
+   This is also the groundwork for a real high-contrast accessibility theme. */
+html[data-theme="contrast"] body,
+html[data-theme="contrast"] #root {
+  background: #050608 !important;
+}
+html[data-theme="contrast"] .lagoon-caustics,
+html[data-theme="contrast"] .grid-overlay {
+  display: none !important;
+}
+html[data-theme="contrast"] .graph-container,
+html[data-theme="contrast"] .graph-container svg {
+  background: #050608 !important;
+}
+/* strip decoration that muddies pixel analysis: blur, glow, soft shadows, gradients-on-text */
+html[data-theme="contrast"] *,
+html[data-theme="contrast"] *::before,
+html[data-theme="contrast"] *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+/* node glow/drop-shadow filters off → solid, crisp shapes for detection */
+html[data-theme="contrast"] .graph-container svg .node,
+html[data-theme="contrast"] .graph-container svg .node *,
+html[data-theme="contrast"] .node-selected {
+  filter: none !important;
+}
+
+/* Touch surfaces retain swipe scrolling without permanent scrollbar chrome. */
+@media (hover: none) and (pointer: coarse) {
+  * { scrollbar-width: none; }
+  ::-webkit-scrollbar { display: none; }
+}
+@media (forced-colors: active) {
+  * { scrollbar-width: auto; scrollbar-color: auto; }
+  ::-webkit-scrollbar { display: block; }
+}
+
+/* GraphDone studio. Shared surfaces and a single interaction accent; status
+   colors remain semantic. All texture is static, outside the moving canvas. */
+:root {
+  --gd-canvas: #111929;
+  --gd-surface: #202941;
+  --gd-chrome: #192139;
+  --gd-line: #3b4565;
+  --gd-ink: #eeece5;
+  --gd-muted: #b2bace;
+  --gd-accent: #b4efd0;
+  --gd-action: #6950de;
+}
+.workspace-surface, .signin-surface {
+  background-color: var(--gd-canvas);
+  color: var(--gd-ink);
+  font-family: 'Segoe UI', 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.signin-surface::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: url('/paper-grain.svg') repeat; opacity: .055;
+}
+.signin-intro h1 {
+  font-family: Georgia, 'Times New Roman', serif; font-weight: 400;
+  letter-spacing: -.035em; line-height: 1.12;
+}
+.signin-intro p { color: var(--gd-muted); line-height: 1.6; font-size: 1rem; }
+@media (min-width: 1024px) { .signin-intro h1 { font-size: 3.8rem; max-width: 25rem; } }
+.signin-card { background: var(--gd-surface); box-shadow: 0 20px 64px #0003; }
+.signin-surface button[class*="bg-gradient"] { background-image: none; background-color: var(--gd-action); box-shadow: none; }
+.signin-surface button:hover { transform: none; }
+.workspace-toolbar { background: var(--gd-chrome); border-color: var(--gd-line); }
+.workspace-view-switcher { display: flex; align-items: center; gap: 2px; }
+.workspace-view-tab {
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  min-height: 44px; padding: 10px 9px; white-space: nowrap;
+  border-bottom: 2px solid transparent; color: var(--gd-muted);
+  transition: color 120ms, border-color 120ms;
+}
+.workspace-view-tab > svg { display: none; }
+.workspace-view-tab > div { font-size: 12px; font-weight: 500; }
+.workspace-view-tab:hover { color: var(--gd-ink); border-color: var(--gd-line); }
+.workspace-view-tab[aria-pressed="true"] { color: var(--gd-accent); border-color: var(--gd-accent); }
+@media (min-width: 1600px) { .workspace-view-tab > svg { display: block; width: 17px; height: 17px; } }
+.workspace-create { background: var(--gd-action); color: #f5f4ee; border: 1px solid #a68cff; }
+.workspace-create:hover { background: #7e63f0; }
+.project-switcher { background: var(--gd-surface); border-color: var(--gd-line); box-shadow: 0 1px 2px #0002; }
+.project-switcher:hover { background: #293452; border-color: #8d7ae1; }
+.project-menu { background: var(--gd-surface); }
+html:not([data-theme="contrast"]) .workspace-surface .graph-container { background: var(--gd-canvas); }
+html:not([data-theme="contrast"]) .workspace-surface .graph-container .node-bg { fill: #26314a; }
+.workspace-surface .graph-container .node-title-bar { fill-opacity: .55; stroke-opacity: .65; }
+.workspace-surface .graph-container .node-type-text { letter-spacing: .06em; }
+html:not([data-theme="contrast"]) .workspace-surface .graph-container .node-title-text { fill: var(--gd-ink); }
+.workspace-surface .graph-container .edge { stroke-opacity: .55; }
+.workspace-surface .graph-container .edge-label-bg { stroke-opacity: .55; }
+.workspace-surface button:focus-visible, .signin-surface button:focus-visible {
+  outline: 2px solid var(--gd-accent); outline-offset: 3px;
+}
+
+/* Color has a job: violet actions, mint selection, coral editorial emphasis. */
+.signin-headline-accent { color: #f6a280; }
+.work-illustration { display: none; width: 100%; max-width: 420px; margin-top: 28px; }
+@media (min-width: 1024px) and (min-height: 700px) { .work-illustration { display: block; } }
+.workspace-view-tab[aria-pressed="true"] { background: #302951; border-radius: 6px 6px 0 0; }
+.signin-card { border-top: 3px solid #9678ff; }
+.workspace-surface nav a[aria-current="page"] { background: #342e59; color: #e0d4ff; box-shadow: inset 3px 0 #a186ff; }
+
+/* Illustration text deliberately differs from the legacy graph-wide white
+   SVG labels. Keep dark ink on the light coral and mint panels. */
+.work-illustration .ink-on-violet { fill: #fff8ef !important; }
+.work-illustration .ink-on-coral { fill: #312024 !important; }
+.work-illustration .ink-on-mint { fill: #183a30 !important; }
+
+[data-modal-backdrop] { --modal-header-offset: 0px; }
+.modal-stage {
+  min-height: 100dvh; display: flex; align-items: center; justify-content: center;
+  padding: calc(var(--modal-header-offset) + 12px) 12px 12px;
+}
+[data-modal-backdrop] [data-modal-panel] {
+  margin-top: 0; margin-bottom: 0;
+  max-height: calc(100dvh - var(--modal-header-offset) - 24px);
+  overflow-y: auto;
+}
+[data-modal-backdrop][role="dialog"] {
+  padding-top: calc(var(--modal-header-offset) + 12px);
+  padding-bottom: 12px;
+}
+
+/* Phone workspace: the work gets the screen, including when the phone rotates. */
+@media (max-width: 767px), (max-height: 500px) and (max-width: 1023px) {
+  .workspace-status-strips { display: none; }
+  .workspace-sidebar, .workspace-toolbar { display: none !important; }
+  .mobile-project-header { display: block !important; }
+  .mobile-project-header > div { padding: 4px 8px; }
+  [data-testid="mobile-bottom-nav"] { display: flex !important; }
+  [data-testid="mobile-bottom-nav"] > button { min-height: 48px; padding: 4px; }
+  .task-filter-bar { padding: 4px 8px; }
+  .task-filter-bar > div { display: flex; flex-flow: row wrap; gap: 6px; }
+  .task-filter-bar > div > div:first-child { flex: 1; width: auto; min-width: 0; }
+  .task-filter-bar input { min-height: 44px; font-size: 16px; }
+  .mobile-filter-toggle { display: block; }
+  .task-filter-options { display: none; }
+  .task-filter-options[data-open="true"] { display: flex; flex-wrap: wrap; width: 100%; position: relative; }
+  .task-filter-options > div { display: block; flex: 1; min-width: 0; position: static; }
+  .task-filter-popup {
+    width: min(22rem, 100%) !important;
+    min-width: min(14rem, 100%);
+    max-width: 100%;
+    max-height: min(20rem, var(--task-filter-available-height, 20rem)) !important;
+  }
+  .task-filter-options > div:nth-child(n + 3) .task-filter-popup {
+    left: auto;
+    right: 0;
+  }
+  [data-modal-backdrop] { --modal-header-offset: 0px !important; padding: 0 !important; }
+  [data-modal-backdrop] [data-modal-panel] {
+    max-width: none; width: 100%; height: 100dvh; max-height: 100dvh;
+    border-radius: 0; margin: 0; border: 0;
+  }
+  [data-modal-backdrop] .modal-stage { padding: 0; }
+  .task-editor-heading { padding: 4px 12px; }
+  .task-editor-heading > div > div:first-child > div:first-child { display: none; }
+  .task-editor-heading h2 { font-size: 16px; }
+  .task-editor-heading p { display: none; }
+  .task-editor-heading button { min-width: 44px; min-height: 44px; }
+  [data-task-editor] .task-detail-control { min-height: 44px; font-size: 16px; }
+  [data-task-editor] .task-priority-slider {
+    min-height: 44px; height: 44px; background-color: transparent;
+    background-size: 100% 8px; background-position: center; background-repeat: no-repeat;
+  }
+  [data-task-editor] .task-detail-tag-entry { flex: 1 1 100%; }
+  [data-task-editor] .task-detail-tag { width: 100% !important; min-width: 0; }
+  [data-task-editor] .task-detail-tag-chip { min-height: 44px; }
+  [data-task-editor] .task-detail-tag-remove { min-width: 44px; min-height: 44px; }
+  [data-task-editor] > div:nth-last-child(1) { padding-bottom: env(safe-area-inset-bottom); }
+}
+@media (max-height: 500px) and (min-width: 600px) and (max-width: 1023px) {
+  .workspace-surface[data-compact-workspace="true"] { padding-left: calc(52px + env(safe-area-inset-left)); }
+  [data-testid="mobile-bottom-nav"] {
+    position: absolute; left: 0; top: 0; bottom: 0; width: calc(52px + env(safe-area-inset-left));
+    flex-direction: column; border-top: 0; border-right: 1px solid #374151; padding-left: env(safe-area-inset-left);
+  }
+}
+@media (max-width: 767px), (max-height: 500px) and (max-width: 1023px) {
+  .task-result-count { display: none; }
+  .task-filter-options > div > button { min-width: 0; min-height: 44px; }
+  [title="Show Project Health"], [title="Hide Project Health"] { display: none !important; }
+}
+@media (max-width: 767px), (max-height: 500px) and (max-width: 1023px) {
+  .mobile-project-header .project-switcher { padding: 6px 10px; min-height: 44px; }
+  .mobile-project-header .project-switcher .text-xs { display: none; }
+  .task-result-count { display: none !important; }
+  .task-list { padding: 8px; gap: 8px; }
+  .task-list > [role="button"] { padding: 10px 12px; transform: none; }
+  .task-card-priority { padding: 0; margin-bottom: 6px; border: 0; background: transparent; }
+  .task-card-priority > div:first-child { display: none; }
+  .task-card-priority > div:last-child { gap: 12px; }
+  .task-card-priority [class*="h-9"], .task-card-priority [class*="Schedule"] { display: none; }
+}
+@media (max-width: 767px), (max-height: 500px) and (max-width: 1023px) {
+  .task-create-heading, .task-edit-heading { padding: 4px 12px; min-height: 48px; }
+  .task-create-heading > div > div:first-child, .task-create-heading p, .task-edit-heading svg:not(button svg) { display: none; }
+  .task-create-heading h3, .task-edit-heading h2 { font-size: 16px; line-height: 20px; margin: 0; }
+  .task-create-heading button, .task-edit-heading button { min-height: 44px; min-width: 44px; padding: 8px; }
+  [data-task-create] form { padding: 12px; }
+  [data-task-create] label > div { display: none; }
+  [data-task-create] input:not([type="checkbox"]), [data-task-create] textarea { font-size: 16px; min-height: 44px; padding: 8px 10px; }
+  [data-task-create] label { font-size: 14px; font-weight: 500; }
+  .task-create-actions button { min-height: 44px; font-size: 14px; }
+  .task-extra-fields > summary { list-style: none; }
+  .task-extra-fields > summary::after { content: '⌄'; margin-left: auto; }
+  .task-extra-fields[open] > summary::after { content: '⌃'; }
+  .task-extra-fields > div { margin-top: 10px; }
+  .task-filter-bar > div > .task-filter-options:not([data-open="true"]) { display: none !important; }
+}
+@media (max-width: 767px), (max-height: 500px) and (max-width: 1023px) {
+  .workspace-surface .task-filter-bar { padding: 4px 8px; }
+  .workspace-surface .task-list { padding: 8px; gap: 8px; }
+  [data-modal-backdrop] .task-create-heading, [data-modal-backdrop] .task-edit-heading { padding: 4px 12px; }
+  [data-modal-backdrop] [data-task-create] form { padding: 12px; }
+  .workspace-surface .task-card-priority { padding: 0; margin-bottom: 6px; border: 0; background: transparent; }
+}
+
+/* Keep choice fields readable on wide displays without constraining phone forms. */
+.workspace-surface select, .modal-stage select { max-width: min(100%, 24rem); }
+
+.task-editor-title-compact { display: none; }
+@media (max-width: 767px), (max-height: 500px) and (max-width: 1023px) {
+  .task-editor-title-wide { display: none; }
+  .task-editor-title-compact { display: inline; }
+  .task-editor-heading h2 { white-space: nowrap; line-height: 24px; }
+  .task-editor-heading > div > div:first-child > div { margin-left: 0; }
+  .task-editor-badges > div { gap: 8px; width: 100%; min-width: 0; }
+  .task-editor-badges > div > div { flex: 1; min-width: 0; margin-left: 0; }
+  .task-editor-badges [data-testid$="-badge"] { width: 100%; min-height: 44px; padding: 6px 8px; gap: 4px; transform: none; }
+  .task-editor-badges [data-testid="details-status-dropdown"] { left: auto; right: 0; }
 }

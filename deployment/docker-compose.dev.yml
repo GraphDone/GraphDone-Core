@@ -97,7 +97,7 @@ services:
         condition: service_healthy
     volumes:
       - logs:/app/logs
-      - sqlite_auth_data:/app/data
+      - sqlite_auth_data:/app/packages/server/data
     networks:
       - graphdone-internal
     # Security configurations
