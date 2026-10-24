@@ -251,8 +251,8 @@ async function attemptLogin(
       await loginLink.click();
       await page.waitForTimeout(1000);
     } else {
-      console.log('   🗺️  No login link found, navigating directly to /login-form');
-      await page.goto(`${baseURL}/login-form`, { waitUntil: 'domcontentloaded' });
+      console.log('   🗺️  No login link found, navigating directly to /login');
+      await page.goto(`${baseURL}/login`, { waitUntil: 'domcontentloaded' });
     }
   }
   
@@ -307,6 +307,11 @@ async function attemptQuickLogin(page: Page, credentials: LoginCredentials): Pro
  */
 async function performFormLogin(page: Page, credentials: LoginCredentials, timeout: number): Promise<void> {
   console.log('   📝 Performing form login...');
+  const passwordTab = page.getByRole('tab', { name: 'Password', exact: true });
+  await passwordTab.click({ timeout });
+  await expect(passwordTab).toHaveAttribute('aria-selected', 'true', { timeout });
+  await expect(page.getByRole('textbox', { name: 'Email address or username', exact: true })).toBeVisible({ timeout });
+  await expect(page.getByLabel('Password', { exact: true })).toBeVisible({ timeout });
   
   // Find form fields with multiple selector strategies
   const usernameSelectors = [
