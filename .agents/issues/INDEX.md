@@ -2,6 +2,7 @@
 
 | Symptom | Canonical lesson and regression |
 | --- | --- |
+| Main-promotion audit flags Undici through SQLite's optional native-build dependency | [Narrow consumer-verified dependency update](../inbox/2026-10-24-undici-native-build-dependency.md); [security audit index](security-audit-index.md) |
 | Login accounts or generated bootstrap credentials disappear after API container recreation despite a named volume | [SQLite persistence must cover the actual npm workspace](../inbox/2026-10-23-sqlite-volume-workspace.md); `scripts/test-sqlite-container-persistence.mjs` and the production HTTP recreation hook; back up old writable-layer data before upgrade |
 | Production browser login reports “Password field not found” while development quick login passes | [Development quick login does not verify manual sign-in](../inbox/2026-10-24-production-login-exercises-manual-mode.md); strict `prod-smoke` sequence and `tests/lib/auth.ts` |
 | Production smoke accepts an HTTP error page, uses development credentials, or loses build failure evidence | [Production smoke must prove its own stack, identity and data](../inbox/2026-10-24-production-smoke-needs-owned-runtime-evidence.md); `scripts/test-production-stack.mjs`, `tests/lib/runner/production-stack.test.mjs` |
