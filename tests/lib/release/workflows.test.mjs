@@ -89,3 +89,13 @@ for (const [event_name, ref, base_ref, selected] of [
     assert.equal(runInNewContext(aggregateCondition, context), selected);
   });
 }
+
+test('public production artifacts exclude raw browser traces and unsanitized nested reports', () => {
+  const upload = ci.jobs['prod-smoke'].steps.find(step => step.uses?.startsWith('actions/upload-artifact'));
+  assert.equal(upload.if, 'always()');
+  assert.equal(upload.with['if-no-files-found'], 'error');
+  assert.deepEqual(upload.with.path.trim().split(/\s+/), [
+    'test-artifacts/ci-prod-stack/run-*/report.json',
+    'test-artifacts/ci-prod-stack/run-*/*.log',
+  ]);
+});

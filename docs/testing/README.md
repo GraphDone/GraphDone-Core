@@ -203,3 +203,8 @@ import { login, navigateToWorkspace, TEST_USERS } from '../../lib/auth';
 > Retired/legacy test files (and the previous `run-all-tests.js` / `run-pr-tests.js`
 > runners these guides used to describe) are preserved under
 > `archive/2026-06-test-cleanup/` with a MANIFEST — mine them before deleting.
+
+Public CI uploads only each production run's top-level `report.json` and redacted
+stage `.log` files. Raw browser traces and nested smoke reports are excluded;
+retain them locally as private diagnostic evidence. The public logs retain
+failure outcomes and aggregate counts, not full per-case trace diagnostics.

@@ -49,3 +49,14 @@ bodies and must not be published unreviewed. The runner removes its containers,
 volumes and networks, retaining local image tags for cache/evidence. It neither
 publishes images nor deploys anything. Full-stack evidence must come from a
 separate completed run and must name its exact candidate and report.
+
+## Public evidence excludes raw network traces
+
+On 2026-10-24 UTC, independent review found that the initial CI directory upload
+also included raw failure traces. Those traces can contain the disposable admin
+password or token even though stage text logs redact them. The upload now allows
+only `run-*/report.json` and `run-*/*.log`; nested smoke reports, ZIP traces and
+screenshots stay local. The new workflow regression failed once against the
+broad upload (28 other cases passed), then all 29 cases passed with the allowlist.
+This preserves public stage outcomes/counts and source/cleanup evidence, not
+full per-case raw diagnostics. Runtime, retries and smoke assertions are unchanged.
