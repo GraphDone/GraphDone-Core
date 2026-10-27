@@ -57,7 +57,9 @@ version-scoped UUID 11.1.1 override. Server deduplicates to that patched copy;
 Mermaid retains 14.0.3. Subgraph/federation remain 2.14.4 after a 2.15.1 schema
 compatibility failure. The [consumer lesson](../../.agents/inbox/2026-10-27-federation-consumers-bound-uuid-upgrades.md)
 records negative controls, exact paths, clean install and four dependency
-regressions. Current fresh-cache production audit has two moderate router
-entries and the high Undici entry separately handled by #194; the earlier
-inventory above remains historical. No Tailwind declaration was reclassified.
+regressions. The pre-composition fresh-cache production audit had two moderate router
+entries and high Undici. After composing merged dev #194 at `aba24a34d193b60e2318cd5b197f66e64f320215`,
+a clean install and a second fresh-cache installed audit reported **two moderate
+router entries, zero high/critical entries**, and no UUID/federation finding.
+The earlier inventory above remains historical. No Tailwind declaration was reclassified.
 This change does not close the router, CSS, dev-tool or hosted acceptance work.
