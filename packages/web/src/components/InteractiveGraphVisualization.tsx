@@ -4320,7 +4320,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     previousOverview.current = { active: semanticOverviewActive, graphId: currentGraph?.id };
     if (previous.active && previous.graphId === currentGraph?.id && !semanticOverviewActive && svgRef.current && !simplifiedRef.current) {
       const k = d3.zoomTransform(svgRef.current).k;
-      d3.select(svgRef.current).select('.main-group')
+      d3.select(svgRef.current).select('.main-graph-group')
         .selectAll<SVGGElement, unknown>('.node-title-group')
         .attr('transform', function() { return fittedTitleTransform(this, k); });
     }
