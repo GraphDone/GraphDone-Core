@@ -14,3 +14,5 @@
 | A fresh audit reports Zod high severity after an earlier green scan; bounded collections still walk rejected elements | [Zod consumer and bounded-validation lesson](../inbox/2026-10-23-zod-constrained-collections.md); recheck the resolved SDK dependency and use an isolated audit cache without inferring why older metadata differed |
 | Browser login lockout is mistaken for server throttling; one-use email token succeeds concurrently | [Remaining authentication work](../../docs/quality/SECURITY_SCOPE_2026-10-23.md#remaining-authentication-work) |
 | A federation upgrade removes UUID findings but breaks Neo4j schema generation; an override leaves the old lock resolution | [Validate federation consumers and installed UUID paths](../inbox/2026-10-27-federation-consumers-bound-uuid-upgrades.md); `tests/lib/dependencies/uuid.test.mjs` |
+
+Runtime image pruning and actual OS/npm inventories: [2026-10-27 consumer/persistence lesson](../inbox/2026-10-27-runtime-images-need-installed-consumer-proof.md), [image provenance and residuals](../../docs/quality/RUNTIME_IMAGE_PACKAGING_2026-10-27.md).
