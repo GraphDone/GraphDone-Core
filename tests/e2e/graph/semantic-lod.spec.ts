@@ -199,6 +199,25 @@ for (const width of [1440, 390])
           (element as SVGSVGElement & { __zoom: { k: number } }).__zoom.k
         )).toBeCloseTo(0.5);
       }
+      await zoomToTitle(1.1, true);
+      await page.evaluate(({ x, y }) => {
+        (window as unknown as { miniMapZoom: (x: number, y: number, k: number) => void }).miniMapZoom(x, y, 1.2);
+      }, { x: longTitleItem.positionX, y: longTitleItem.positionY });
+      let exitedBeforeTarget = false;
+      for (let frame = 0; frame < 12; frame++) {
+        await page.clock.runFor(16);
+        const k = await svg.evaluate(element =>
+          (element as SVGSVGElement & { __zoom: { k: number } }).__zoom.k
+        );
+        if (k > 1.15 && k < 1.2 && await overview.getAttribute('data-active') === 'false') exitedBeforeTarget = true;
+      }
+      expect(exitedBeforeTarget).toBe(true);
+      expect(await svg.evaluate(element =>
+        (element as SVGSVGElement & { __zoom: { k: number } }).__zoom.k
+      )).toBeCloseTo(1.2);
+      await expect(overview).toHaveAttribute('data-active', 'false');
+      await zoomToTitle(0.5, true);
+      await expect(overview).toHaveAttribute('data-active', 'true');
       await page.clock.resume();
       const geometry = await overviewGeometry();
       await info.attach('overview-geometry.json', {
