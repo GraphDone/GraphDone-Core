@@ -144,7 +144,7 @@ export const sqliteAuthResolvers = {
 
     // Get development mode info and default credentials
     developmentInfo: async () => {
-      const isDevelopment = process.env.NODE_ENV !== 'production';
+      const isDevelopment = ['development', 'test'].includes(process.env.NODE_ENV || '');
       
       return {
         isDevelopment,
