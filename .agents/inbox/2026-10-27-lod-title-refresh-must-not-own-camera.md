@@ -33,10 +33,29 @@ Thus a presentation refresh cancelled the same animation that crossed the LOD
 threshold, saving an intermediate camera position.
 
 Refresh source-title geometry directly using the live camera scale after source
-elements become visible. Scope the selection to the source `.main-group`, retain
+elements become visible. Scope the selection to the source `.main-graph-group`, retain
 the same-graph transition guard, and respect simplified rendering. Do not emit a
 camera command merely to refresh presentation. Camera transitions belong to the
 navigation operation that initiated them.
+
+## A live renderer selector needs its own observation
+
+Follow-up review found the initial title-only change used `.main-group`, while
+both renderer initializers create `.main-graph-group`. The effect was therefore
+a no-op. Animated zoom still passed because later frames refitted the titles.
+An initial fixed-camera geometry-only check also passed; neither result proved
+the explicit refresh actually ran. These passing-but-insufficient controls are
+retained rather than presented as a negative control.
+
+The strengthened fixed-camera Overview→Items phase instruments the selected
+real SVG title's native `getBBox` method, retaining its actual geometry result.
+It requires a visible measurement, bounded title geometry, an identical camera
+and zero minimap camera publications, with the animation clock paused. The
+incorrect selector fails with zero visible measurements. With the actual source
+selector, both desktop and phone cases pass in 4.2 minutes with zero retries;
+the source selector
+must be taken from the actual renderer. Do not infer presentation work occurred
+merely because an animation reached its target.
 
 ## Limits
 
