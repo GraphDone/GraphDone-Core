@@ -365,7 +365,7 @@ export const sqliteAuthResolvers = {
           });
         }
 
-        const token = generateToken(user.id, user.email, user.role);
+        const token = generateToken(user.id, user.email, user.role, user.authVersion);
         outcome = 'success';
         console.log(`✅ Login successful: ${user.username} (${user.role})`);
 
@@ -411,7 +411,7 @@ export const sqliteAuthResolvers = {
         team: null
       };
 
-      const token = generateToken(guestUser.id, guestUser.email, guestUser.role);
+      const token = generateToken(guestUser.id, guestUser.email, guestUser.role, 0);
       
       return {
         token,
@@ -460,7 +460,7 @@ export const sqliteAuthResolvers = {
           role: 'USER'
         });
 
-        const token = generateToken(user.id, user.email, user.role);
+        const token = generateToken(user.id, user.email, user.role, user.authVersion);
 
         return {
           token,
@@ -514,11 +514,11 @@ export const sqliteAuthResolvers = {
       }
 
       const user = await sqliteAuthStore.findUserById(context.user.userId);
-      if (!user) {
-        throw new GraphQLError('User not found');
+      if (!user?.isActive || user.authVersion !== context.user.authVersion) {
+        throw new GraphQLError('Session expired', { extensions: { code: 'UNAUTHENTICATED' } });
       }
 
-      const token = generateToken(user.id, user.email, user.role);
+      const token = generateToken(user.id, user.email, user.role, user.authVersion);
 
       return {
         token,

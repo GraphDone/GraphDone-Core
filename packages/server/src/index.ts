@@ -1,4 +1,5 @@
 import './config/environment.js';
+import { verifyMagicLinkHandler, resetPasswordHandler } from './auth/email-link-handlers.js';
 import { operationsApi } from './operations-api.js';
 import { agentApi } from './agent-api.js';
 import { ApolloServer } from '@apollo/server';
@@ -22,7 +23,8 @@ import { authOnlyTypeDefs } from './schema/auth-only-schema.js';
 import { sqliteAuthResolvers } from './resolvers/sqlite-auth.js';
 import { graphProtectionResolvers } from './resolvers/graph-protection.js';
 import { workItemRecoveryResolvers } from './resolvers/work-item-recovery.js';
-import { extractUserFromToken } from './middleware/auth.js';
+import { resolveActiveAuthUser } from './middleware/auth.js';
+import { webSocketAuthentication } from './auth/websocket-auth.js';
 import { mergeTypeDefs } from '@graphql-tools/merge';
 import { driver, NEO4J_URI } from './db.js';
 import { sqliteAuthStore } from './auth/sqlite-auth.js';
@@ -369,12 +371,11 @@ async function startServer() {
   });
 
   const graphContext = async (authHeader?: string) => {
-    const claims = extractUserFromToken(authHeader);
-    const account = claims ? await sqliteAuthStore.findUserById(claims.userId) : null;
-    if (account?.isActive && isNeo4jAvailable) await ensureGraphIdentity(driver, account);
-    const user = account?.isActive
-      ? { userId: account.id, email: account.email, role: account.role }
-      : (claims?.role === 'GUEST' && /^guest-[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(claims.userId) ? claims : null);
+    const user = await resolveActiveAuthUser(authHeader);
+    if (user && isNeo4jAvailable) {
+      const account = await sqliteAuthStore.findUserById(user.userId);
+      if (account) await ensureGraphIdentity(driver, account);
+    }
     return {
       driver: isNeo4jAvailable ? driver : null,
       user,
@@ -387,6 +388,7 @@ async function startServer() {
 
   const serverCleanup = useServer({
     schema,
+    ...webSocketAuthentication,
     context: async connection => {
       const supplied = connection.connectionParams?.authorization ?? connection.connectionParams?.Authorization;
       return graphContext(typeof supplied === 'string' ? supplied : undefined);
@@ -663,7 +665,7 @@ async function startServer() {
       console.log('🔐 Google OAuth callback received'); // eslint-disable-line no-console
       const user = req.user as any;
       console.log('👤 User from OAuth:', user?.email || 'No user'); // eslint-disable-line no-console
-      const token = generateToken(user.id, user.email, user.role);
+      const token = generateToken(user.id, user.email, user.role, user.authVersion);
       console.log('🎫 Generated token:', token?.substring(0, 20) + '...'); // eslint-disable-line no-console
       const clientUrl = process.env.CLIENT_URL || 'http://localhost:3127';
       const redirectUrl = `${clientUrl}/login?token=${token}`;
@@ -681,7 +683,7 @@ async function startServer() {
       console.log('🔐 LinkedIn OAuth callback received'); // eslint-disable-line no-console
       const user = req.user as any;
       console.log('👤 User from OAuth:', user?.email || 'No user'); // eslint-disable-line no-console
-      const token = generateToken(user.id, user.email, user.role);
+      const token = generateToken(user.id, user.email, user.role, user.authVersion);
       console.log('🎫 Generated token:', token?.substring(0, 20) + '...'); // eslint-disable-line no-console
       const clientUrl = process.env.CLIENT_URL || 'http://localhost:3127';
       const redirectUrl = `${clientUrl}/login?token=${token}`;
@@ -699,7 +701,7 @@ async function startServer() {
       console.log('🔐 GitHub OAuth callback received'); // eslint-disable-line no-console
       const user = req.user as any;
       console.log('👤 User from OAuth:', user?.email || 'No user'); // eslint-disable-line no-console
-      const token = generateToken(user.id, user.email, user.role);
+      const token = generateToken(user.id, user.email, user.role, user.authVersion);
       console.log('🎫 Generated token:', token?.substring(0, 20) + '...'); // eslint-disable-line no-console
       const clientUrl = process.env.CLIENT_URL || 'http://localhost:3127';
       const redirectUrl = `${clientUrl}/login?token=${token}`;
@@ -731,10 +733,11 @@ async function startServer() {
         return res.status(400).json({ error: 'CAPTCHA verification failed' });
       }
 
-      const user = await sqliteAuthStore.findUserByEmailOrUsername(email);
+      const account = await sqliteAuthStore.findUserByEmailOrUsername(email);
+      const user = account?.isActive ? account : null;
 
       if (user) {
-        const magicLink = await sqliteAuthStore.createMagicLink(email);
+        const magicLink = await sqliteAuthStore.createMagicLink(email, 'login');
         await emailService.sendMagicLink(email, magicLink.token);
         console.log(`✉️  Magic link sent to: ${email}`); // eslint-disable-line no-console
       } else {
@@ -755,31 +758,7 @@ async function startServer() {
     }
   });
 
-  app.get('/auth/magic-link/verify', async (req, res) => {
-    try {
-      const { token } = req.query;
-
-      if (!token || typeof token !== 'string') {
-        return res.redirect(`${process.env.CLIENT_URL || 'http://localhost:3127'}/login?error=invalid_magic_link`);
-      }
-
-      const result = await sqliteAuthStore.verifyMagicLink(token);
-
-      if (!result.valid || !result.userId) {
-        return res.redirect(`${process.env.CLIENT_URL || 'http://localhost:3127'}/login?error=expired_magic_link`);
-      }
-
-      const jwtToken = generateToken(result.userId, result.email!, 'USER');
-      const clientUrl = process.env.CLIENT_URL || 'http://localhost:3127';
-      const redirectUrl = `${clientUrl}/login?token=${jwtToken}`;
-
-      console.log(`🔐 Magic link verified for: ${result.email}`); // eslint-disable-line no-console
-      res.redirect(redirectUrl);
-    } catch (error) {
-      console.error('❌ Magic link verification failed:', error); // eslint-disable-line no-console
-      res.redirect(`${process.env.CLIENT_URL || 'http://localhost:3127'}/login?error=magic_link_failed`);
-    }
-  });
+  app.get('/auth/magic-link/verify', verifyMagicLinkHandler);
 
   const forgotPasswordCorsOptions = {
     origin: process.env.CORS_ORIGIN || 'http://localhost:3127',
@@ -805,11 +784,12 @@ async function startServer() {
       }
 
       // Check if user exists
-      const user = await sqliteAuthStore.findUserByEmailOrUsername(email);
+      const account = await sqliteAuthStore.findUserByEmailOrUsername(email);
+      const user = account?.isActive ? account : null;
 
       if (user) {
         // User exists - create reset link and send email
-        const resetLink = await sqliteAuthStore.createMagicLink(email);
+        const resetLink = await sqliteAuthStore.createMagicLink(email, 'password-reset');
         await emailService.sendPasswordReset(email, resetLink.token);
         console.log(`🔐 Password reset link sent to: ${email}`); // eslint-disable-line no-console
       } else {
@@ -860,52 +840,12 @@ async function startServer() {
 
   app.options('/auth/reset-password', cors<cors.CorsRequest>(resetPasswordCorsOptions));
 
-  app.post('/auth/reset-password', cors<cors.CorsRequest>(resetPasswordCorsOptions), express.json(), async (req, res) => {
-    try {
-      const { token, newPassword, captchaPayload } = req.body;
-
-      if (!token || typeof token !== 'string') {
-        return res.status(400).json({ error: 'Reset token is required' });
-      }
-
-      if (!newPassword || typeof newPassword !== 'string') {
-        return res.status(400).json({ error: 'New password is required' });
-      }
-
-      if (newPassword.length < 8) {
-        return res.status(400).json({ error: 'Password must be at least 8 characters' });
-      }
-
-      // Verify CAPTCHA
-      const isCaptchaValid = await verifyCaptcha(captchaPayload, 'reset-password');
-      if (!isCaptchaValid) {
-        return res.status(400).json({ error: 'CAPTCHA verification failed' });
-      }
-
-      const result = await sqliteAuthStore.verifyMagicLink(token);
-
-      if (!result.valid || !result.userId) {
-        return res.status(400).json({ error: 'Invalid or expired reset token' });
-      }
-
-      await sqliteAuthStore.updateUserPassword(result.userId, newPassword);
-
-      console.log(`🔐 Password updated successfully for: ${result.email}`); // eslint-disable-line no-console
-
-      return res.json({
-        success: true,
-        message: 'Password updated successfully'
-      });
-    } catch (error) {
-      console.error('❌ Password update failed:', error); // eslint-disable-line no-console
-      return res.status(500).json({ error: 'Failed to update password' });
-    }
-  });
+  app.post('/auth/reset-password', cors<cors.CorsRequest>(resetPasswordCorsOptions), express.json(), resetPasswordHandler);
 
   app.post('/share/create', cors<cors.CorsRequest>(), express.json(), async (req, res) => {
     try {
       const authHeader = req.headers.authorization;
-      const user = extractUserFromToken(authHeader);
+      const user = await resolveActiveAuthUser(authHeader);
 
       if (!user) {
         return res.status(401).json({ error: 'Authentication required' });
