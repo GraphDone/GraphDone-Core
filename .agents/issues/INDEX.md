@@ -2,6 +2,7 @@
 
 | Symptom | Canonical lesson and regression |
 | --- | --- |
+| GitHub connector can read a repo but PR creation returns `Resource not accessible by integration` | [Client-specific write permissions](../inbox/2026-10-27-github-connector-write-permissions.md); verify existing authorized access without changing credentials or policy |
 | LOD inspection moves the camera but loses selection; hidden source controls or nested SVG definitions leak across renderers | [Display projections need explicit renderer ownership](../inbox/2026-10-27-lod-projections-need-renderer-ownership.md); `semantic-lod.spec.ts`, `semanticLOD.test.ts` |
 | A new LOD design overlooks CodeGraph or treats an unused helper as a shipped shared engine | [CodeGraph reuse map](../../docs/architecture/codegraph-lod-reuse.md); [consumer-evidence lesson](../inbox/2026-10-27-lod-reuse-needs-live-consumer-evidence.md) |
 | Dense graph loses all names at fit scale; an old LOD preview is mistaken for shipped behavior | [Dynamic graph LOD continuation](../../docs/architecture/dynamic-graph-lod.md); current state, staged delivery and explicit completion gates |
