@@ -2,6 +2,7 @@
 
 | Symptom | Canonical lesson and regression |
 | --- | --- |
+| Minimap zoom or overview inspection is overwritten while a newly loaded graph settles | [Explicit camera input must stop automatic framing](../inbox/2026-10-27-explicit-camera-input-must-stop-auto-fit.md); timer-controlled `semantic-lod.spec.ts` negative control |
 | Dense-graph browser case exhausts its timeout after slow API fixture creation; cleanup errors disappear | [Bound fixture setup separately and fail on cleanup errors](../inbox/2026-10-27-cold-lod-fixtures-need-separate-budgets.md); `tests/e2e/graph/semantic-lod.spec.ts` |
 | GitHub connector can read a repo but PR creation returns `Resource not accessible by integration` | [Client-specific write permissions](../inbox/2026-10-27-github-connector-write-permissions.md); verify existing authorized access without changing credentials or policy |
 | LOD inspection moves the camera but loses selection; hidden source controls or nested SVG definitions leak across renderers | [Display projections need explicit renderer ownership](../inbox/2026-10-27-lod-projections-need-renderer-ownership.md); `semantic-lod.spec.ts`, `semanticLOD.test.ts` |

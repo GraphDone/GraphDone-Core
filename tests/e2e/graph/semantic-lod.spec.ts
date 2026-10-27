@@ -127,10 +127,13 @@ for (const width of [1440, 390])
         localStorage.setItem('currentGraphId', id);
         localStorage.setItem('graphdone:viewMode', 'graph');
       }, seeded.graphId);
+      await page.clock.install();
+      await page.clock.pauseAt(new Date(Date.now() + 100));
       await page.goto('/');
       await expect(page.locator('.graph-container .node')).toHaveCount(301, {
         timeout: 30000,
       });
+      await page.clock.runFor(350);
       const overview = page.locator('.semantic-overview');
       await expect(overview).toHaveAttribute('data-active', 'true');
       const cards = page.locator('[data-lod-group]');
@@ -139,6 +142,37 @@ for (const width of [1440, 390])
         element.setAttribute('data-lod-identity', 'retained');
       });
       expect(await cards.count()).toBeGreaterThan(0);
+      const longTitleItem = before.find(
+        (item: { id: string }) => item.id === seeded.nodeIds[8]
+      );
+      const zoomToTitle = async (scale: number, advanceClock = false) => {
+        await page.evaluate(
+          ({ x, y, scale }) =>
+            (
+              window as unknown as {
+                miniMapZoom: (x: number, y: number, k: number) => void;
+              }
+            ).miniMapZoom(x, y, scale),
+          { x: longTitleItem.positionX, y: longTitleItem.positionY, scale }
+        );
+        if (advanceClock) await page.clock.runFor(150);
+        await expect
+          .poll(() =>
+            svg.evaluate(
+              element =>
+                (element as SVGSVGElement & { __zoom: { k: number } }).__zoom.k
+            )
+          )
+          .toBeCloseTo(scale);
+      };
+      await zoomToTitle(0.5, true);
+      for (let sample = 0; sample < 6; sample++) {
+        await page.clock.runFor(250);
+        expect(await svg.evaluate(element =>
+          (element as SVGSVGElement & { __zoom: { k: number } }).__zoom.k
+        )).toBeCloseTo(0.5);
+      }
+      await page.clock.resume();
       const geometry = await cards.evaluateAll(elements =>
         elements.map(element => {
           const rect = element.getBoundingClientRect();
@@ -174,28 +208,6 @@ for (const width of [1440, 390])
       await page.screenshot({
         path: `test-artifacts/quality/semantic-lod-${width}.png`,
       });
-      const longTitleItem = before.find(
-        (item: { id: string }) => item.id === seeded.nodeIds[8]
-      );
-      const zoomToTitle = async (scale: number) => {
-        await page.evaluate(
-          ({ x, y, scale }) =>
-            (
-              window as unknown as {
-                miniMapZoom: (x: number, y: number, k: number) => void;
-              }
-            ).miniMapZoom(x, y, scale),
-          { x: longTitleItem.positionX, y: longTitleItem.positionY, scale }
-        );
-        await expect
-          .poll(() =>
-            svg.evaluate(
-              element =>
-                (element as SVGSVGElement & { __zoom: { k: number } }).__zoom.k
-            )
-          )
-          .toBeCloseTo(scale);
-      };
       for (const scale of [0.5, 0.9, 0.99, 1.1]) {
         await zoomToTitle(scale);
         await expect(overview).toHaveAttribute('data-active', 'true');

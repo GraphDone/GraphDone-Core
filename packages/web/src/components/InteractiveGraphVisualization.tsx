@@ -4127,7 +4127,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       // D3 sets sourceEvent only for direct wheel/pointer gestures. Programmatic
       // fit/restore transforms must remain distinguishable so an automatic fit
       // that later clips a restored task can be repaired on reload.
-      if (event.sourceEvent) cameraManuallyPositionedRef.current = true;
+      if (event.sourceEvent) {
+        cameraManuallyPositionedRef.current = true;
+        if (currentGraphIdRef.current) fittedGraphsRef.current.add(currentGraphIdRef.current);
+      }
       g.attr('transform', event.transform);
       setCurrentTransform({
         x: event.transform.x,
@@ -4294,6 +4297,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     setSelectedNodes(new Set([id]));
     setEditingEdge(null);
     cameraManuallyPositionedRef.current = true;
+    fittedGraphsRef.current.add(currentGraphIdRef.current);
     const k = 1.2;
     const transform = d3.zoomIdentity.translate(containerRef.current.clientWidth / 2 - item.x * k, containerRef.current.clientHeight / 2 - item.y * k).scale(k);
     d3.select(svgRef.current).interrupt().call(zoomBehaviorRef.current.transform, transform);
@@ -4489,6 +4493,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     (window as any).miniMapNavigate = (graphX: number, graphY: number) => {
       if (!svgRef.current || !containerRef.current || !zoomBehaviorRef.current) return;
       cameraManuallyPositionedRef.current = true;
+      if (currentGraphIdRef.current) fittedGraphsRef.current.add(currentGraphIdRef.current);
       const svg = d3.select(svgRef.current);
       const k = d3.zoomTransform(svgRef.current).k || 1;
       const w = containerRef.current.clientWidth;
@@ -4502,6 +4507,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     (window as any).miniMapZoom = (graphX: number, graphY: number, targetK: number) => {
       if (!svgRef.current || !containerRef.current || !zoomBehaviorRef.current) return;
       cameraManuallyPositionedRef.current = true;
+      if (currentGraphIdRef.current) fittedGraphsRef.current.add(currentGraphIdRef.current);
       const svg = d3.select(svgRef.current);
       const k = Math.max(0.1, Math.min(4, targetK));
       const w = containerRef.current.clientWidth;
