@@ -8,13 +8,26 @@ const root = new URL('../../../', import.meta.url);
 const require = createRequire(new URL('package.json', root));
 const coreRequire = createRequire(new URL('packages/core/package.json', root));
 const federationRequire = createRequire(require.resolve('@apollo/federation-internals'));
+const semver = require('semver');
+const affectedRange = '<11.1.1 || >=12.0.0 <12.0.1 || >=13.0.0 <13.0.1';
+const hasBufferFix = version => Boolean(semver.valid(version))
+  && !semver.satisfies(version, affectedRange, { includePrerelease: true });
+
+test('the advisory guard rejects affected releases on every maintained major', () => {
+  for (const version of ['9.0.1', '11.1.0', '11.1.1-beta.0', '12.0.0', '13.0.0', 'invalid']) {
+    assert.equal(hasBufferFix(version), false, version);
+  }
+  for (const version of ['11.1.1', '12.0.1', '13.0.1', '14.0.3']) {
+    assert.equal(hasBufferFix(version), true, version);
+  }
+});
 
 test('every locked UUID path has the buffered-output fix', async () => {
   const lock = JSON.parse(await readFile(new URL('package-lock.json', root), 'utf8'));
   const paths = Object.entries(lock.packages).filter(([path]) => /(^|\/)node_modules\/uuid$/.test(path));
   assert.ok(paths.length > 0);
   for (const [path, entry] of paths) {
-    assert.ok(require('semver').gte(entry.version, '11.1.1'), `${path}: ${entry.version}`);
+    assert.ok(hasBufferFix(entry.version), `${path}: ${entry.version}`);
   }
 });
 

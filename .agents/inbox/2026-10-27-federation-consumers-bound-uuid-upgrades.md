@@ -47,8 +47,8 @@ execution remains the separate real-Neo4j contract gate.
 
 A fresh-cache `npm audit --omit=dev --json` after the correction reported
 **2 moderate router entries and 1 high Undici entry**, with no UUID/federation
-finding. Undici is separately addressed by #194; this branch starts from the
-older dev base. This count is dated dependency metadata, not a live exposure or
+finding. Undici is separately addressed by #194; that audit preceded composition with
+merged dev #194. This count is dated dependency metadata, not a live exposure or
 full-security claim. Complete runtime, browser and final CI results belong in
 the associated PR discussion; no merge/deployment is established here.
 
@@ -56,3 +56,24 @@ Corrective rule: upgrade the narrowest compatible consumer chain, keep the
 broken-upstream evidence, test both module systems and the actual schema API,
 and verify the resolved lock and installed paths after a clean install. Revisit
 the version-scoped override when federation changes; do not widen it silently.
+
+## Review and composed validation
+
+Independent review found that a simple `>=11.1.1` lock guard would wrongly
+accept affected 12.0.0 and 13.0.0. The regression now uses the complete advisory
+union and affected/fixed controls on every listed major, including malformed
+versions and an unfixed prerelease. The selected 11.1.1/14.0.3 versions were
+already patched; the correction prevents a future false green.
+
+Composition `aba24a34d193b60e2318cd5b197f66e64f320215` incorporates reviewed dev
+`32149ee61ea5436831d95d76e4c4b6dc2db619a3`. A clean install and fresh installed
+production audit reported **2 moderate router entries and 0 high/critical**.
+All four package unit suites passed with one task/worker at a time, retaining
+their original timeouts, and the composed harness passed 167/167 before the
+additional advisory-range control. An earlier concurrent web run hit the
+existing five-second save-test deadline under host load; its single-worker
+rerun passed 326/326. The following earlier harness ran while composition was
+changed and is discarded as provenance, not counted as validation. Freeze the
+source/dependencies throughout a run and use bounded local concurrency. The
+final advisory-test change requires its own harness run and exact-head CI;
+results are recorded in the PR discussion. No failed run was erased.
