@@ -59,6 +59,8 @@ export interface SeedOptions {
   titleForIndex?: (index: number, type: string) => string;
   /** Smaller repeated mutation shapes avoid Neo4j planning hundreds of creates. */
   batchSize?: number;
+  /** Register ownership before node/edge setup, so partial setup can be cleaned. */
+  onGraphCreated?: (graphId: string) => void;
 }
 
 export async function seedLargeGraph(page: Page, opts: SeedOptions): Promise<SeededGraph> {
@@ -72,6 +74,7 @@ export async function seedLargeGraph(page: Page, opts: SeedOptions): Promise<See
     { input: [{ name: `${TEST_GRAPH_PREFIX} ${namePrefix} ${size}n ${Date.now()}`, type: 'PROJECT', status: 'ACTIVE', createdBy: userId, isShared: true }] }
   );
   const graphId = g.createGraphs.graphs[0].id as string;
+  opts.onGraphCreated?.(graphId);
 
   // Grid layout centered on the origin so the sim starts from a real arrangement.
   const cols = Math.ceil(Math.sqrt(size));
@@ -141,17 +144,18 @@ export async function seedLargeGraph(page: Page, opts: SeedOptions): Promise<See
   return { graphId, nodeIds, edgeCount };
 }
 
-export async function deleteGraphDeep(page: Page, graphId: string): Promise<void> {
+export async function deleteGraphDeep(page: Page, graphId: string, options: { strict?: boolean } = {}): Promise<void> {
+  const handleFailure = (error: unknown) => { if (options.strict) throw error; };
   // Edges first (orphan edges break the edges query), then nodes, then graph.
   await gql(
     page,
     `mutation($id: ID!) { deleteEdges(where: { source: { graph: { id: $id } } }) { nodesDeleted } }`,
     { id: graphId }
-  ).catch(() => {});
+  ).catch(handleFailure);
   await gql(
     page,
     `mutation($id: ID!) { deleteWorkItems(where: { graph: { id: $id } }) { nodesDeleted } }`,
     { id: graphId }
-  ).catch(() => {});
-  await gql(page, `mutation($id: ID!) { deleteGraphs(where: { id: $id }) { nodesDeleted } }`, { id: graphId }).catch(() => {});
+  ).catch(handleFailure);
+  await gql(page, `mutation($id: ID!) { deleteGraphs(where: { id: $id }) { nodesDeleted } }`, { id: graphId }).catch(handleFailure);
 }

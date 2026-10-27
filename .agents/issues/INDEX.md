@@ -2,6 +2,7 @@
 
 | Symptom | Canonical lesson and regression |
 | --- | --- |
+| Dense-graph browser case exhausts its timeout after slow API fixture creation; cleanup errors disappear | [Bound fixture setup separately and fail on cleanup errors](../inbox/2026-10-27-cold-lod-fixtures-need-separate-budgets.md); `tests/e2e/graph/semantic-lod.spec.ts` |
 | GitHub connector can read a repo but PR creation returns `Resource not accessible by integration` | [Client-specific write permissions](../inbox/2026-10-27-github-connector-write-permissions.md); verify existing authorized access without changing credentials or policy |
 | LOD inspection moves the camera but loses selection; hidden source controls or nested SVG definitions leak across renderers | [Display projections need explicit renderer ownership](../inbox/2026-10-27-lod-projections-need-renderer-ownership.md); `semantic-lod.spec.ts`, `semanticLOD.test.ts` |
 | A new LOD design overlooks CodeGraph or treats an unused helper as a shipped shared engine | [CodeGraph reuse map](../../docs/architecture/codegraph-lod-reuse.md); [consumer-evidence lesson](../inbox/2026-10-27-lod-reuse-needs-live-consumer-evidence.md) |
