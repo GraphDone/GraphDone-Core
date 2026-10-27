@@ -48,3 +48,18 @@ Source locations are relative to `packages/server/src/` and anchored to the snap
 ## Coverage still needed
 
 The folder tests do not establish all generated Graph/WorkItem/Edge permissions, concurrent deletion integrity, MCP/agent grant revocation, share-link scopes, session/cookie policy, uploads, backups, email delivery, or deployed proxy controls. Those need isolated contracts and user-level tests with current roles, multiple accounts, races, and negative cases. Dependency counts, passing smoke tests, and absence of a discovered source sink are separate pieces of evidence; none is a full security assessment.
+
+## UUID/federation follow-up on 2026-10-27
+
+The #186 UUID correction starts from dev `ef495eff15ed7aac51e72dc7a1db1bb96d2b3695`.
+Core's direct UUID 9.0.1 becomes ^11.1.1; federation-internals 2.14.4 has a
+version-scoped UUID 11.1.1 override. Server deduplicates to that patched copy;
+Mermaid retains 14.0.3. Subgraph/federation remain 2.14.4 after a 2.15.1 schema
+compatibility failure. The [consumer lesson](../../.agents/inbox/2026-10-27-federation-consumers-bound-uuid-upgrades.md)
+records negative controls, exact paths, clean install and four dependency
+regressions. The pre-composition fresh-cache production audit had two moderate router
+entries and high Undici. After composing merged dev #194 at `aba24a34d193b60e2318cd5b197f66e64f320215`,
+a clean install and a second fresh-cache installed audit reported **two moderate
+router entries, zero high/critical entries**, and no UUID/federation finding.
+The earlier inventory above remains historical. No Tailwind declaration was reclassified.
+This change does not close the router, CSS, dev-tool or hosted acceptance work.
