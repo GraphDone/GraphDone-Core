@@ -125,7 +125,6 @@ export function SemanticGraphOverview({
   // anchors; only changed membership/viewport/controls triggers label placement.
   const layout = useMemo(
     () => placeOverviewLabels(anchors, size.width, size.height, obstacles),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [projection, size.width, size.height, obstacleKey, active]
   );
   const anchorById = new Map(anchors.map(anchor => [anchor.id, anchor]));
