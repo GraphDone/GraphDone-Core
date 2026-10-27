@@ -45,6 +45,26 @@ Follow-up implementation on 2026-10-23: [PR #169](https://github.com/GraphDone/G
 
 Source locations are relative to `packages/server/src/` and anchored to the snapshot above. Local, secret-free evidence is under `/tmp/graphdone-residual-*-audit.json`, `/tmp/graphdone-minimatch-*.log`, and `/tmp/graphdone-residual-auth-probe.log`; the latter reports only `parallelMagicLinkSuccesses: 2` and `arbitraryCaptchaAccepted: true`.
 
+## CSS advisory reconciliation on 2026-10-27
+
+The historical three CSS entries above remain the result of the October 23
+inventory. On October 27, the [official advisory](https://github.com/advisories/GHSA-rj75-hqrm-r3gf)
+lists parser 6.1.5 and 7.1.6 as patched; affected ranges are `<6.1.5` and
+`>=7.0.0 <7.1.6`. Its metadata was updated on October 26 and it is not withdrawn.
+Live dev `8712389` already locks parser 6.1.5 for Tailwind 3.4.19 and
+postcss-nested 6.2.0, the same parser resolution present in `36c02c0` on October 23.
+The fresh-cache production audit has no CSS-chain finding. This follow-up does
+not alter any dependency declaration, lockfile or production/dev classification.
+
+The dedicated guard checks every locked parser path and both actual CSS
+consumers. Semantic tests preserve flat and nested selectors and generated
+responsive Tailwind utilities; they are not a timing benchmark. This resolves
+the named advisory for the current locked chain, without forcing a Tailwind
+migration. Keep earlier audit counts as dated observations and do not infer a
+cache cause. The [canonical lesson](../../.agents/inbox/2026-10-27-reconcile-advisory-backports-with-locked-consumers.md)
+records commands, sources and limits. Final build/browser/CI evidence belongs
+to the separate CSS review. Router, UUID and toolchain work remain separate.
+
 ## Coverage still needed
 
 The folder tests do not establish all generated Graph/WorkItem/Edge permissions, concurrent deletion integrity, MCP/agent grant revocation, share-link scopes, session/cookie policy, uploads, backups, email delivery, or deployed proxy controls. Those need isolated contracts and user-level tests with current roles, multiple accounts, races, and negative cases. Dependency counts, passing smoke tests, and absence of a discovered source sink are separate pieces of evidence; none is a full security assessment.
