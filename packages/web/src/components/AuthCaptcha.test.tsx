@@ -9,15 +9,19 @@ describe('authentication verification UI', () => {
   it('clears proof on expiry and retry, and requests the intended server action', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ captcha: { provider: 'altcha' } }) }));
     const verified = vi.fn();
-    const { container, rerender } = render(<AuthCaptcha action="login" onVerified={verified} />);
+    const readiness = vi.fn();
+    const { container, rerender } = render(<AuthCaptcha action="login" onVerified={verified} onReadyChange={readiness} />);
+    expect(readiness).toHaveBeenLastCalledWith(false);
     await screen.findByTestId('server-captcha');
     const widget = container.querySelector('altcha-widget')!;
     expect(widget.getAttribute('challengeurl')).toContain('/api/captcha/challenge?action=login');
     act(() => widget.dispatchEvent(new CustomEvent('statechange', { detail: { state: 'verified', payload: 'issued-proof' } })));
     expect(verified).toHaveBeenLastCalledWith('issued-proof');
+    expect(readiness).toHaveBeenLastCalledWith(true);
     expect(screen.getByRole('status')).toHaveTextContent('Verification complete');
     act(() => widget.dispatchEvent(new CustomEvent('statechange', { detail: { state: 'expired' } })));
     expect(verified).toHaveBeenLastCalledWith('');
+    expect(readiness).toHaveBeenLastCalledWith(false);
     expect(screen.getByRole('status')).toHaveTextContent('expired');
     fireEvent.click(screen.getByRole('button', { name: 'Retry verification' }));
     expect(container.querySelector('altcha-widget')).not.toBe(widget);
@@ -44,5 +48,13 @@ describe('authentication verification UI', () => {
     const { container } = render(<AuthCaptcha action="login" onVerified={() => {}} />);
     await waitFor(() => expect(screen.queryByRole('status')).toBeNull());
     expect(container.querySelector('altcha-widget')).toBeNull();
+  });
+
+  it('allows an explicitly optional Core action without asking for proof', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ captcha: { provider: 'altcha', requiredActions: ['magic-link'] } }) }));
+    const readiness = vi.fn();
+    render(<AuthCaptcha action="login" onVerified={() => {}} onReadyChange={readiness} />);
+    await waitFor(() => expect(readiness).toHaveBeenLastCalledWith(true));
+    expect(screen.queryByTestId('server-captcha')).toBeNull();
   });
 });

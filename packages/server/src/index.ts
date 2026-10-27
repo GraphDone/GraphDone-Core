@@ -34,7 +34,8 @@ import { emailService } from './auth/email-service.js';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
-import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
+import rateLimit from 'express-rate-limit';
+import { createCaptchaChallengeLimiter } from './utils/captcha-rate-limit.js';
 import { createCaptchaChallenge, verifyCaptcha, isCaptchaAction, captchaRequired, CAPTCHA_ACTIONS, CaptchaCapacityError } from './utils/captcha.js';
 
 const execAsync = promisify(exec);
@@ -971,11 +972,7 @@ async function startServer() {
 
   app.options('/api/captcha/challenge', cors<cors.CorsRequest>(captchaCorsOptions));
 
-  const captchaChallengeLimiter = rateLimit({
-    windowMs: 60000, limit: 30, standardHeaders: 'draft-8', legacyHeaders: false,
-    // Preserve Core's current socket-IP policy; never trust a caller's forwarded header.
-    keyGenerator: req => ipKeyGenerator(req.ip || req.socket.remoteAddress || 'unknown'),
-  });
+  const captchaChallengeLimiter = createCaptchaChallengeLimiter();
   app.get('/api/captcha/challenge', cors<cors.CorsRequest>(captchaCorsOptions), captchaChallengeLimiter, async (req, res) => {
     try {
       if (!isCaptchaAction(req.query.action)) return res.status(400).json({ error: 'Invalid verification action' });

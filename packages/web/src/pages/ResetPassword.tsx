@@ -70,6 +70,7 @@ export function ResetPassword() {
     } catch {
       setError('Failed to reset password. Please try again.');
     } finally {
+      setCaptchaPayload('');
       setCaptchaReset(value => value + 1);
       setLoading(false);
     }

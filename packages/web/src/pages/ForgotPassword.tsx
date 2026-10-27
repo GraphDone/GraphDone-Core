@@ -61,6 +61,7 @@ export function ForgotPassword() {
     } catch {
       setError('Failed to send reset link. Please try again.');
     } finally {
+      setCaptchaPayload('');
       setCaptchaReset(value => value + 1);
       setLoading(false);
     }

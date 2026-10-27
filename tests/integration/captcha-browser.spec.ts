@@ -65,12 +65,36 @@ for (const width of [390, 1440]) test(`real proof, failed password and accessibl
   await expect(page).toHaveURL(/\/$/);
 });
 
-test('policy failure stays visible and keyboard retry recovers', async ({ page }) => {
-  await page.route('**/config', route => route.abort());
+test('pending, failed and expired verification cannot submit a password; keyboard retry recovers', async ({ page }) => {
+  let logins = 0;
+  page.on('request', request => {
+    try { if (request.postDataJSON()?.operationName === 'Login') logins++; } catch { /* non-JSON requests */ }
+  });
+  let release!: () => void;
+  const pending = new Promise<void>(resolve => { release = resolve; });
+  await page.route('**/config', async route => { await pending; await route.abort().catch(() => {}); });
   await page.goto('/login-form');
-  await expect(page.getByRole('alert')).toContainText('Verification is unavailable');
+  await page.getByRole('tab', { name: 'Password', exact: true }).click();
+  await page.getByLabel('Email address or username', { exact: true }).fill('admin');
+  await page.getByLabel('Password', { exact: true }).fill(process.env.CAPTCHA_TEST_PASSWORD!);
+  const submit = page.getByRole('button', { name: 'Sign In', exact: true });
+  await expect(submit).toBeDisabled();
+  await page.locator('form').dispatchEvent('submit');
+  expect(logins).toBe(0);
+  release();
+  await expect(page.getByRole('alert').filter({ hasText: 'Verification is unavailable' })).toBeVisible();
+  await expect(submit).toBeDisabled();
+  await page.locator('form').dispatchEvent('submit');
+  expect(logins).toBe(0);
   await page.unroute('**/config');
   await page.getByRole('button', { name: 'Retry verification' }).focus();
   await page.keyboard.press('Enter');
   await verify(page);
+  await expect(submit).toBeEnabled();
+  // Isolate the UI's expiry-event contract; actual server expiry is covered by
+  // the clock-controlled helper negative, without a five-minute browser sleep.
+  await page.locator('altcha-widget').evaluate(element => element.dispatchEvent(new CustomEvent('statechange', { detail: { state: 'expired' } })));
+  await expect(submit).toBeDisabled();
+  await page.locator('form').dispatchEvent('submit');
+  expect(logins).toBe(0);
 });

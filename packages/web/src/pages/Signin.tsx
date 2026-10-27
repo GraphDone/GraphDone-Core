@@ -96,6 +96,7 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
   });
   const [captchaPayload, setCaptchaPayload] = useState<string | null>(null);
   const [captchaReset, setCaptchaReset] = useState(0);
+  const [passwordCaptchaReady, setPasswordCaptchaReady] = useState(false);
   const [magicLinkCaptchaPayload, setMagicLinkCaptchaPayload] = useState<string | null>(null);
   const magicLinkEmailRef = useRef<HTMLInputElement>(null);
   const [loginCodeInput, setLoginCodeInput] = useState('');
@@ -265,6 +266,9 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
   const [login, { loading }] = useMutation(LOGIN_MUTATION, {
     onCompleted: (data) => {
       if (!data.login.user.isEmailVerified) {
+        setPasswordCaptchaReady(false);
+        setCaptchaPayload(null);
+        setCaptchaReset(value => value + 1);
         setErrors({
           submit: 'Please verify your email before logging in. Check your inbox for the verification link.'
         });
@@ -277,6 +281,8 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
       navigate('/');
     },
     onError: (error) => {
+      setPasswordCaptchaReady(false);
+      setCaptchaPayload(null);
       setCaptchaReset(value => value + 1);
       const newAttempts = loginAttempts + 1;
       setLoginAttempts(newAttempts);
@@ -327,6 +333,10 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
     }
 
     if (!validateForm()) {
+      return;
+    }
+    if (!passwordCaptchaReady) {
+      setErrors({ submit: 'Please complete verification before signing in.' });
       return;
     }
 
@@ -451,6 +461,7 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
     } catch {
       setErrors({ submit: 'We could not reach the sign-in service. Please try again shortly.' });
     } finally {
+      setMagicLinkCaptchaPayload(null);
       setCaptchaReset(value => value + 1);
       setMagicLinkLoading(false);
     }
@@ -946,7 +957,7 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
             {errors.password && <p id="password-error" className="mt-1 text-xs text-red-400" role="alert">{errors.password}</p>}
           </div>
 
-          <AuthCaptcha key="login" action="login" onVerified={setCaptchaPayload} resetKey={captchaReset} className="w-full" />
+          <AuthCaptcha key="login" action="login" onVerified={setCaptchaPayload} onReadyChange={setPasswordCaptchaReady} resetKey={captchaReset} className="w-full" />
 
           {/* Keep me logged in & Forgot Password */}
           <div className="flex items-start justify-between gap-3">
@@ -1015,7 +1026,7 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
           {/* Submit Button */}
           <button
             type="submit"
-            disabled={loading || guestLoading}
+            disabled={loading || guestLoading || !passwordCaptchaReady}
             className="w-full bg-gradient-to-r from-teal-600 to-blue-600 hover:from-teal-500 hover:to-blue-500 border border-teal-400/50 hover:border-teal-300 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-teal-500/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:translate-y-0 flex items-center justify-center space-x-2"
           >
             {loading ? (
