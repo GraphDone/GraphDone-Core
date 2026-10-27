@@ -55,6 +55,10 @@ export interface SeedOptions {
   /** grid spacing in px (default 130). */
   spacing?: number;
   namePrefix?: string;
+  metadataForIndex?: (index: number) => Record<string, unknown>;
+  titleForIndex?: (index: number, type: string) => string;
+  /** Smaller repeated mutation shapes avoid Neo4j planning hundreds of creates. */
+  batchSize?: number;
 }
 
 export async function seedLargeGraph(page: Page, opts: SeedOptions): Promise<SeededGraph> {
@@ -81,19 +85,20 @@ export async function seedLargeGraph(page: Page, opts: SeedOptions): Promise<See
     const priority = ((i * 37) % 100) / 100;
     return {
       type,
-      title: `${type} ${i}`,
+      title: opts.titleForIndex?.(i, type) ?? `${type} ${i}`,
       status,
       priority,
       positionX: col * spacing - half,
       positionY: row * spacing - half,
       positionZ: 0,
+      ...(opts.metadataForIndex ? { metadata: JSON.stringify(opts.metadataForIndex(i)) } : {}),
       owner: { connect: { where: { node: { id: userId } } } },
       graph: { connect: { where: { node: { id: graphId } } } },
     };
   });
 
   const nodeIds: string[] = [];
-  for (const batch of chunk(nodeInputs, 100)) {
+  for (const batch of chunk(nodeInputs, opts.batchSize ?? 100)) {
     const res = await gql(
       page,
       `mutation($input: [WorkItemCreateInput!]!) { createWorkItems(input: $input) { workItems { id } } }`,
@@ -124,7 +129,7 @@ export async function seedLargeGraph(page: Page, opts: SeedOptions): Promise<See
   }
 
   let edgeCount = 0;
-  for (const batch of chunk(edgeInputs, 100)) {
+  for (const batch of chunk(edgeInputs, opts.batchSize ?? 100)) {
     const res = await gql(
       page,
       `mutation($input: [EdgeCreateInput!]!) { createEdges(input: $input) { edges { id } } }`,

@@ -406,13 +406,57 @@ after acceptance; retain the manual detail control and accessible relation list.
 Ship the exact reviewed Core revision through each installation's existing
 release path. Recheck #191/#189/#190 rather than assuming their October status.
 
-The next action is LOD-0/LOD-1 preparation on current dev, followed by the first
-production overview. This plan is complete as a planning artifact; the feature
+The first implementation below advances LOD-1/2 on current dev. The feature
 remains open until the checklist above has evidence on the delivered application.
 
 CodeGraph-informed refinement: LOD-0 includes intermediate-zoom coverage, label
 self-resolution and stable-page/camera tests. LOD-1 adopts parent fallback and
-explicit page accumulation/epochs from the outset. LOD-3 evaluates extraction of
-shared geometry/transition primitives with tests against both consumers; LOD-7
+explicit page accumulation/epochs from the outset. LOD-3 applies geometry/transition ideas in GraphDone's own implementation; LOD-7
 adapts generation-bound, coalesced loading. Domain-specific edge projection and
 GraphDone edit/persistence behavior remain explicit responsibilities.
+
+Owner clarification (2026-10-27): reuse ideas in both directions with CodeGraph;
+keep implementations independent. No shared libraries or common package.
+
+## 8. First production-renderer slice (2026-10-27)
+
+`packages/web/src/lib/semanticLOD.ts` now projects loaded source items into
+top-level groups. Precedence is explicit `metadata.lod.groupPath` (or
+`metadata.groupPath`), native containment, release `lane`, `kind`, then item type.
+Metadata may be a JSON string or an object. For example:
+
+```json
+{"lod":{"groupPath":["Payments","Settlement workers"]}}
+```
+
+This initial cut displays **Payments**; nested spatial expansion is still pending.
+Containment directions are normalized, cycles terminate deterministically, and
+multiple-parent/conflicting-path diagnostics remain visible in the group list.
+Every loaded relationship is accounted for as an internal link, a typed directed
+bundle, or a pending-endpoint edge. Canonical items/edges are retained unchanged.
+
+`SemanticGraphOverview` is integrated into `InteractiveGraphVisualization`, not a
+standalone preview. Graphs with at least 40 loaded items offer Auto, Overview and
+Items. Auto retains summaries through a hysteresis band. Group labels use fixed
+14px screen-space text, avoid current graph controls, and keep their slots during
+camera gestures. Leaders connect labels to source centroids; arrows show bundled
+directions. The group browser supplies exact typed counts and full member titles.
+Groups that cannot fit on a phone remain available through the complete group
+list. Inspecting a member selects the original item in the existing inspector;
+Back restores the entry camera and detail mode.
+
+The summary layer is a React-owned SVG `foreignObject` inside the existing D3
+camera surface. Native wheel, mouse and touch gestures use the existing zoom
+behavior. D3 owns only its sibling graph layers and direct-child definitions.
+Source layers are removed from painting/hit testing while Overview is active;
+projected coordinates never enter the source simulation or position-save queue.
+
+This is a useful **overview and navigation slice**, not completion of LOD-2/3.
+It still loads and constructs the full source SVG. The next implementation work
+is a nested spatial cut with stable group anchors, continuous readable transitions,
+selected/search-path expansion, per-region density budgets, and typed relationship
+inspection. Type fallback is explicit, not claimed topology clustering. Streaming,
+worker cancellation, import limits, Cloud parity and the 1k/10k capacity gates
+remain open. The existing autosave behavior for newly laid-out or overlapping
+source items is outside this slice; zero-write navigation is tested on pinned,
+non-overlapping owned fixtures rather than asserted for every legacy graph.
