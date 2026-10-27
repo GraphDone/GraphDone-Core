@@ -45,6 +45,28 @@ Follow-up implementation on 2026-10-23: [PR #169](https://github.com/GraphDone/G
 
 Source locations are relative to `packages/server/src/` and anchored to the snapshot above. Local, secret-free evidence is under `/tmp/graphdone-residual-*-audit.json`, `/tmp/graphdone-minimatch-*.log`, and `/tmp/graphdone-residual-auth-probe.log`; the latter reports only `parallelMagicLinkSuccesses: 2` and `arbitraryCaptchaAccepted: true`.
 
+## Router correction on 2026-10-27
+
+The dedicated #186 router change replaces Router/DOM6.30.6 with7.18.4, removes
+the old `@remix-run/router` resolution and retains the existing declarative SPA.
+Official advisories [GHSA-wrjc-x8rr-h8h6](https://github.com/advisories/GHSA-wrjc-x8rr-h8h6)
+and [GHSA-337j-9hxr-rhxg](https://github.com/advisories/GHSA-337j-9hxr-rhxg)
+identify7.18.0 as fixed. Existing app routes use fixed destinations, with no
+observed SSR hydration path; upgrading is not a claim that a live exploit was
+demonstrated. The DOM compatibility package is retained to keep imports stable.
+
+The locked dependency regression checks every installed resolution. Navigation
+controls reject external-looking mixed separators and preserve internal query,
+fragment and history behavior; existing role guards remain covered. Six required
+browser cases exercise public and authenticated deep links, reload, lazy pages,
+desktop links/phone navigation, back/forward, role rejection and a fresh-context
+login callback. The callback uses an owned password-issued token and does not
+establish provider/email authentication. Initial negative and fixture-contract
+failures are retained in the [dated lesson](../../.agents/inbox/2026-10-27-router-upgrades-need-current-consumer-contracts.md).
+Fresh full-suite, browser, audit and final composition results are recorded on
+the reviewable PR; UUID, CSS evidence, tooling and hosted acceptance remain
+separate work.
+
 ## Coverage still needed
 
 The folder tests do not establish all generated Graph/WorkItem/Edge permissions, concurrent deletion integrity, MCP/agent grant revocation, share-link scopes, session/cookie policy, uploads, backups, email delivery, or deployed proxy controls. Those need isolated contracts and user-level tests with current roles, multiple accounts, races, and negative cases. Dependency counts, passing smoke tests, and absence of a discovered source sink are separate pieces of evidence; none is a full security assessment.
