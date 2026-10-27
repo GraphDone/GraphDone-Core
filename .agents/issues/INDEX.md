@@ -2,6 +2,7 @@
 
 | Symptom | Canonical lesson and regression |
 | --- | --- |
+| CI development quick login fails required proof and exhausts login attempts with NODE_ENV unset | [Declare mode in the dev entry point without overriding production](../inbox/2026-10-27-dev-launch-must-declare-mode.md); `development-startup.test.ts` and actual dev smoke |
 | Arbitrary client CAPTCHA strings succeed, or direct login/signup omits proof | [Require server-issued action-bound proof and atomic consumption](../inbox/2026-10-27-captcha-proof-must-be-server-issued.md); server `captcha` / `captcha-auth` tests and `qc:captcha` |
 | A dependency fix exists in pending main promotion but dev still fails the audit | [Backport the reviewed patch and refresh target-branch evidence](../inbox/2026-10-27-dev-undici-backport.md); PR #194 |
 | Main-promotion audit flags Undici through SQLite's optional native-build dependency | [Narrow consumer-verified dependency update](../inbox/2026-10-24-undici-native-build-dependency.md); [security audit index](security-audit-index.md) |
