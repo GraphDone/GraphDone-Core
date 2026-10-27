@@ -37,7 +37,7 @@ not their selectors or historical pass counts.
 | **Projected-size hierarchy walk** in [mandala `enlighten.html`][mandala], around `walk`, `childRk` and `drawDirNode` | LOD-1/2: retain a named parent until its children can actually appear. Decide locally per group, not solely from global zoom or total node count. | The circle-pack estimate `parent radius / sqrt(child count)` is specific to that geometry. For GraphDone cards/pinned layouts, measure projected child bounds and label occupancy. Never expand into an unreadable or unloaded empty region. |
 | **Parent-first collision-aware labels**, `placeLabels` and `labelAlphaFor` in [mandala][mandala] | LOD-3: keep navigation identities readable, then admit item names according to available space. | GraphDone adds focus/search/blocker priorities, measured text bounds, panel obstacles and stable tie-breaking. Retain its proposed 14px group / 12px item floors; CodeGraph's 10px/9px floors and 600-label cap are not suitable defaults to copy. |
 | **Separate enter/exit thresholds and bounded rich cards** in [mandala][mandala] | LOD-3: avoid flickering representations; limit expensive detail panels while keeping ordinary compact items accessible. | Existing card thresholds are 80/58 projected radius, max four transient cards, with selection work on a 180ms cadence. Reuse the state-machine/cost separation, not those exact values. Camera motion stays frame-synchronous; expensive detail admission can be coalesced. |
-| **Pure fade/band/swap/hysteresis functions** in [`lib/lod.js`][lod] | Candidate common primitive for transition math and contract tests across both apps. | It is not currently wired into viewers. Extract/adapt live behavior first and compare outputs before wiring; opacity conservation alone does not ensure readable labels or correct pointer ownership. |
+| **Pure fade/band/swap/hysteresis functions** in [`lib/lod.js`][lod] | Reference for independently implemented transition math and regression cases in each app. | It is not currently wired into viewers. Extract/adapt live behavior first and compare outputs before wiring; opacity conservation alone does not ensure readable labels or correct pointer ownership. |
 | **Stable world coordinates while pages arrive**, `layoutChild`/`acceptTree` in [Structure workspace][structure] | LOD-1/7: append data without moving already-visible anchors; keep graph identity separate from page state. | CodeGraph assigns a child slot using stable index and total before all pages arrive. GraphDone must preserve authored positions and semantic group anchors; do not re-tile the user's saved graph or mistake unloaded items for deletions. |
 | **Bounded, coalesced, cancellable loading**, `enqueueTree`/`pump`/`lazyLoad` in [Structure workspace][structure] | LOD-7, with the contract established in LOD-1: load visible detail only, cancel obsolete scope, reject stale results. | CodeGraph uses 100-entry pages, two requests, a 140ms lazy-load delay, AbortControllers, scope/project epochs and response-generation tokens. Bind GraphDone jobs to owner + graph + revision + grouping/filter lens; keep unloaded-edge endpoints pending. |
 | **One retained renderer/camera**, `worldAt`/`screen`, pointer gestures, visibility messages and `requestDraw` in [Structure workspace][structure] | LOD-2/3: overview→subsystem→item remains one spatial world; preserve pointer anchor and camera on mode return; pause hidden work. | Keep GraphDone's existing D3 camera/inspector integration initially. Do not transplant the CodeGraph shell, iframe routing or filesystem UI. Canvas plus accessible DOM targets is a reference if profiling later warrants a hybrid renderer. |
@@ -52,7 +52,7 @@ still need GraphDone-specific contracts.
 
 ## Regression techniques worth sharing first
 
-The strongest immediate transfer is the test intent, before any runtime package:
+The strongest immediate transfer is the test intent:
 
 | CodeGraph control | GraphDone counterpart |
 | --- | --- |
@@ -64,9 +64,8 @@ The strongest immediate transfer is the test intent, before any runtime package:
 | Late-source/foreign-generation/unavailable-inventory controls in [portfolio tests][portfolio-tests] | A delayed response cannot replace a newer graph, selected item or account. Failed/incomplete inventory retains honest context; it does not become an empty graph or confirmed removal. |
 
 Run these in GraphDone's existing Playwright/Vitest/report stack using owned
-synthetic fixtures. Keep CodeGraph's Python/browser harness in its repo. Shared
-fixture data and invariant definitions can have adapters for both harnesses;
-there is no need to import one application's entire test infrastructure.
+synthetic fixtures. Keep CodeGraph's Python/browser harness in its repo. Translate
+fixture shapes and invariant definitions into each harness independently.
 
 ## Sharing boundary and delivery order
 
@@ -78,32 +77,22 @@ there is no need to import one application's entire test infrastructure.
    GraphDone's pure cut/projection boundary using parent fallback and stable
    anchors. Define page accumulation/epochs early, even while the first slice
    still receives a complete graph. This avoids rewriting the boundary in LOD-7.
-3. **LOD-3: consolidate genuinely common primitives.** Candidates are projected
-   size bands, hysteresis state, label ordering/box collision and camera transform
-   math. A small renderer-neutral JavaScript/TypeScript interface can consume
-   geometry/intent and return decisions; it should know nothing about React,
-   D3, Neo4j, filesystem paths or repository tokens. Supply policy/budgets through
-   adapters. Use behavior-comparison tests against the live inline implementation
-   before replacing it. Do not call it shared until both consumers are wired.
-4. **LOD-7: adapt the modern request lifecycle.** Keep browser request scheduling
-   reusable in concept; application-specific transport/auth/response validation
-   stays in each adapter. Add GraphDone's mutable-data and pending-edge semantics
-   rather than copying CodeGraph's immutable directory API.
-5. **Then evaluate a common package.** Require two real consumers, attribution,
-   versioned interface, tests and packaging without service dependencies. Reusing
-   techniques and contracts is useful immediately; a new package is not a
-   prerequisite for delivering the first GraphDone overview.
+3. **LOD-3: apply the ideas independently.** Projected size bands, hysteresis,
+   label ordering/box collision and camera math inform GraphDone's own modules.
+   Compare observable behavior with the live CodeGraph implementation; keep
+   application policy and tests in their respective repositories.
+4. **LOD-7: adapt the modern request lifecycle.** Implement GraphDone's own
+   bounded scheduling, cancellation and revision checks, including mutable-data
+   and pending-edge semantics.
 
-CodeGraph's package declares `LicenseRef-Valpatel-Proprietary`; GraphDone-Core
-is MIT. This review copies no implementation into Core and publishes nothing.
-Any source extraction into a distributed shared package or public Core needs an
-explicit licensing choice; technique reuse and project-specific implementation
-can proceed without silently relicensing private source.
+The owner clarified on 2026-10-27: **no shared libraries**. Exchange techniques,
+regression lessons and design findings in both directions. Do not create a common
+package, extract CodeGraph source, or couple either application's release cycle.
+This review uses ideas; each project keeps its own implementation and harness.
 
 Useful return flow to CodeGraph: GraphDone's exact typed-edge accounting,
 partial-count semantics, selection through aggregation, graph edit protection,
-and generic hierarchy-conflict tests should become cross-project contract cases.
-That would improve both products rather than leave two unrelated LOD forks.
+and generic hierarchy-conflict tests can inform CodeGraph's own regression cases. Record those opportunities without creating a shared dependency.
 
 ## Current related CodeGraph work
 
