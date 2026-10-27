@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type {} from 'altcha';
 import { CodeCaptcha } from './CodeCaptcha';
 
@@ -57,7 +57,7 @@ export function AuthCaptcha({ action, onVerified, onReadyChange, resetKey = 0, a
     return () => { active = false; controller.abort(); window.clearTimeout(timeout); };
   }, [apiUrl, reload]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     callback.current('');
     readiness.current?.(optional);
     setStatus('Complete verification before continuing.');
