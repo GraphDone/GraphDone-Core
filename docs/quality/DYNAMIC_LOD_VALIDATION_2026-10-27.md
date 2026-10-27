@@ -15,8 +15,9 @@ shared library was introduced.
   `5f11f3bcc97fa3e90ffa1ea31f8e75f97a1ace16`. Its only application-source change
   from `8ddd573` removes an unsupported lint-rule directive; the runtime behavior
   is unchanged. Other changes enroll the browser tests in headed acceptance.
-- Independent agent review found no outstanding findings at all three heads.
-  This is not a GitHub non-author approval.
+- Independent review found no blocking findings at `df5d1ca`; its two nonblocking
+  follow-ups were addressed in `8ddd573`, and subsequent code reviews had no
+  findings. This is not a GitHub non-author approval.
 - Node 22.18.0, npm 10.8.2; clean `npm ci --no-audit --no-fund` installed 1,221
   packages. Dependencies and lockfile remain unchanged from the reviewed base.
 - Chrome 151.0.7922.71, headed under Xvfb, one browser worker and zero retries.
