@@ -49,3 +49,26 @@ not retrospectively certified. New provider tokens/raw profiles are not stored;
 callback logs no longer expose credential-bearing redirects. Private traces and
 raw tokens must stay out of repository notes. No deployed provider acceptance
 or hosted account clearance follows from these local tests.
+
+## Independent review corrections
+
+Review of `c4561ae` found a preregistration takeover path: an existing unverified
+local account kept its earlier password and JWT when verified OAuth linked to
+its email. The added negative uses the actual password-login resolver and
+current-account JWT resolver before attempting the link; it failed against
+`c4561ae` because the link succeeded. The corrected transaction rejects an
+unverified existing email match. A separate verified-account positive remains.
+No account transfer or credential reset is silently performed.
+
+The review also drove the actual OIDC strategy with asynchronous provider
+callbacks. Malformed userinfo JSON reached an installed library catch block
+that calls undefined `done`, causing an uncaught ReferenceError. GitHub's email
+loader also parses JSON outside a safe error boundary. The final implementation
+disables those library profile loaders and fetches their fixed HTTPS endpoints
+with bounded time/body size, redirect rejection and explicit JSON/status checks.
+It retains the authenticated ID-token subject for LinkedIn and exact GitHub
+verification metadata. Asynchronous malformed/error/oversize/abort controls now
+fail authentication without account lookup. The synchronous first fixtures had
+not exercised this exception path; provider doubles must preserve asynchronous
+callback boundaries. The focused corrected set passed 49 cases. Full final
+review and gates remain in the PR rather than inferred from this count.

@@ -10,6 +10,8 @@ import { oauthLoginCallback } from '../src/auth/oauth-callback';
 import { verifyToken } from '../src/utils/auth';
 import passport from 'passport';
 import { configureOAuthStrategies } from '../src/auth/oauth-strategies';
+import { sqliteAuthResolvers } from '../src/resolvers/sqlite-auth';
+import { resolveActiveAuthUser } from '../src/middleware/auth';
 
 let directory: string;
 let database: sqlite3.Database;
@@ -43,6 +45,7 @@ afterEach(async () => {
   await rm(directory, { recursive: true, force: true });
   vi.restoreAllMocks();
   vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
 });
 
 describe('OAuth account identity boundary', () => {
@@ -85,11 +88,24 @@ describe('OAuth account identity boundary', () => {
 
   it('links a verified email without confusing a matching username for ownership', async () => {
     const admin = await sqliteAuthStore.findUserByEmailOrUsername('oauth-admin@example.invalid');
+    expect(admin!.isEmailVerified).toBe(true);
     await execute('UPDATE users SET username = ? WHERE id = ?', ['owned-oauth@example.invalid', admin!.id]);
     const created = await sqliteAuthStore.findOrCreateUserFromOAuth(identity());
     expect(created.id).not.toBe(admin!.id);
     const linked = await sqliteAuthStore.findOrCreateUserFromOAuth(identity({ providerId: 'owned-admin-subject', email: admin!.email }));
     expect(linked.id).toBe(admin!.id);
+  });
+
+  it('rejects linking to a preregistered unverified account with another password and session', async () => {
+    const account = await sqliteAuthStore.createUser({ email: 'owned-oauth@example.invalid', username: 'preregistered',
+      password: 'PreRegisteredPassword!2026', name: 'Unverified registration' });
+    expect(account.isEmailVerified).toBe(false);
+    const login = await sqliteAuthResolvers.Mutation.login(null,
+      { input: { emailOrUsername: account.email, password: 'PreRegisteredPassword!2026' } }, { req: { ip: '127.0.0.77' } } as any);
+    expect((await resolveActiveAuthUser(`Bearer ${login.token}`))?.userId).toBe(account.id);
+    await expect(sqliteAuthStore.findOrCreateUserFromOAuth(identity())).rejects.toThrow('Existing account recovery required');
+    expect(await row('SELECT count(*) AS count FROM oauth_providers WHERE userId = ?', [account.id])).toEqual({ count: 0 });
+    expect((await sqliteAuthStore.findUserById(account.id))!.isEmailVerified).toBe(false);
   });
 
   it('rejects verified email linking to a disabled account', async () => {
@@ -178,6 +194,12 @@ describe('OAuth account identity boundary', () => {
         _json: { sub: subject, email: address, email_verified: verified, hd: 'example.invalid' },
         emails: address ? [{ value: address, primary: true, verified }] : [],
       };
+      vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+        await new Promise<void>(resolve => setImmediate(resolve));
+        const data = url.includes('/user/emails') ? (address ? [{ email: address, primary: true, verified }] : []) :
+          { ...profile._json, id: subject, name: profile.displayName };
+        return new Response(JSON.stringify(data), { headers: { 'content-type': 'application/json' } });
+      }));
       const done = (error: Error | null, user: unknown) => error ? reject(error) : resolve(user);
       if (provider === 'linkedin') strategy._verify('https://www.linkedin.com', profile, { id: subject }, {}, '', '', '', {}, done);
       else strategy._verify('owned-access-token', 'owned-refresh-token', profile, done);

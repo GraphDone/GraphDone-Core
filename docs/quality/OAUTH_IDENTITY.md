@@ -21,19 +21,25 @@ the existing server-side authorization-code strategy and authenticated
 userinfo, not a client-submitted ID token.
 
 [GitHub documents](https://docs.github.com/en/rest/users/emails#list-email-addresses-for-the-authenticated-user)
-the authenticated email endpoint and required `user:email` scope. The installed
-Passport GitHub strategy already fetches it, but its default primary-email
-projection drops verification metadata. `allRawEmails` retains that evidence.
-Missing, unverified or ambiguous primary candidates cannot establish a new link.
-There is no fallback to the public profile email. Pagination beyond the
-strategy's current response is not added; absent proof fails closed.
+the authenticated email endpoint and required `user:email` scope. Core fetches
+that metadata directly and retains verification/primary flags. Missing,
+unverified or ambiguous primary candidates cannot establish a new link. There
+is no fallback to the public profile email. The bounded request uses
+`per_page=100`; pagination beyond that response is not added. Absent proof fails
+closed rather than guessing ownership.
 
 [LinkedIn documents](https://learn.microsoft.com/en-us/linkedin/consumer/integrations/self-serve/sign-in-with-linkedin-v2)
 the issuer, userinfo endpoint and optional boolean verification field. The
-installed OIDC strategy's nine-argument callback requests userinfo and exposes
-it separately from the ID-token profile. The previous three-argument callback
-skipped userinfo by default. Core compares both subjects before using its
-email claim. This authenticates a provider account, not a person's legal identity.
+nine-argument OIDC callback exposes the authenticated ID-token profile. Core
+fetches userinfo safely and compares both subjects before using its email claim.
+The library's own userinfo loader is explicitly disabled: its malformed-JSON
+handler references an undefined callback. This authenticates a provider account,
+not a person's legal identity.
+
+GitHub and LinkedIn profile requests use fixed HTTPS endpoints, reject redirects,
+require successful JSON responses, enforce a five-second deadline and cap each
+body at 64 KiB. Errors fail authentication without returning provider response
+bodies or tokens. Google retains its existing parsed authenticated userinfo path.
 
 All configured providers use session-bound state. Google/GitHub enable the
 existing Passport state store; LinkedIn retains its default session store.
@@ -47,16 +53,23 @@ tests verify state rejection before token exchange and single-use consumption.
 An existing provider-and-subject binding is authoritative for account selection.
 Changing or omitting its email cannot switch the user to another account.
 Disabled bound accounts fail before email fallback. New bindings require the
-proof above and match only account email, never username. Disabled or ambiguous
-case-folded email matches fail. Both helper return and HTTP callback recheck the
+proof above and match only account email, never username. Disabled, unverified or ambiguous
+case-folded email matches fail. Verified provider proof cannot attach the mailbox
+owner to a preregistered local account whose earlier password/session remains
+controlled by someone else. Both helper return and HTTP callback recheck the
 active account and the authenticated session revision; they cannot upgrade an
 old snapshot after reset or reactivation.
 
 Existing accounts and provider bindings are retained without a schema migration.
 This does not retrospectively prove how an old link was established. An existing
 bound subject can continue signing in when its email is absent or unverified.
-For a new unproved binding, use an existing password or email sign-in/recovery
-method; no implicit merge or account transfer occurs. Administrator review of
+For a new unproved binding, existing password or email sign-in/recovery methods
+remain available; no implicit merge or account transfer occurs. Ordinary local
+accounts currently have no implemented verification/linking flow that upgrades
+them for automatic OAuth linking. Unverified local accounts therefore cannot add
+a new OAuth binding in this change. A future explicit recovery/linking flow must
+establish ownership and handle prior credentials/sessions; merely setting a
+verification flag is not a recovery procedure. Administrator review of
 a disputed historical binding remains a separate action. Old stored provider
 credentials are not deleted by this change; new callbacks neither persist
 access/refresh tokens or raw profiles nor log token-bearing redirects.

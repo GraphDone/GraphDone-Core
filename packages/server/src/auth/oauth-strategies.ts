@@ -3,13 +3,14 @@ import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import { Strategy as OpenIDConnectStrategy } from 'passport-openidconnect';
 import { Strategy as GitHubStrategy } from 'passport-github2';
 import { sqliteAuthStore } from './sqlite-auth.js';
-import { googleIdentity, githubIdentity, linkedinIdentity, type OAuthIdentity } from './oauth-identity.js';
+import { googleIdentity, type OAuthIdentity } from './oauth-identity.js';
+import { fetchGitHubIdentity, fetchLinkedInIdentity } from './oauth-profile-fetch.js';
 
 type Complete = (error: Error | null, user?: any) => void;
 
-async function authenticateIdentity(readIdentity: () => OAuthIdentity, done: Complete) {
+async function authenticateIdentity(readIdentity: () => OAuthIdentity | Promise<OAuthIdentity>, done: Complete) {
   try {
-    done(null, await sqliteAuthStore.findOrCreateUserFromOAuth(readIdentity()));
+    done(null, await sqliteAuthStore.findOrCreateUserFromOAuth(await readIdentity()));
   } catch (error) {
     done(error as Error);
   }
@@ -39,9 +40,10 @@ export function configureOAuthStrategies(authenticator: Pick<typeof passport, 'u
       clientSecret: process.env.LINKEDIN_CLIENT_SECRET,
       callbackURL: process.env.LINKEDIN_CALLBACK_URL || 'http://localhost:4127/auth/linkedin/callback',
       scope: ['openid', 'profile', 'email'],
-    }, (issuer: string, userInfo: any, idProfile: any, _context: unknown, _idToken: string,
-      _accessToken: string, _refreshToken: string, _params: unknown, done: Complete) => {
-      void authenticateIdentity(() => linkedinIdentity(issuer, userInfo, idProfile), done);
+      skipUserProfile: true,
+    }, (issuer: string, _userInfo: any, idProfile: any, _context: unknown, _idToken: string,
+      accessToken: string, _refreshToken: string, _params: unknown, done: Complete) => {
+      void authenticateIdentity(() => fetchLinkedInIdentity(issuer, idProfile, accessToken), done);
     }));
   }
 
@@ -52,10 +54,10 @@ export function configureOAuthStrategies(authenticator: Pick<typeof passport, 'u
       clientSecret: process.env.GITHUB_CLIENT_SECRET,
       callbackURL: process.env.GITHUB_CALLBACK_URL || 'https://localhost:4128/auth/github/callback',
       scope: ['user:email'],
-      allRawEmails: true,
+      skipUserProfile: true,
       state: true as any,
-    }, (_accessToken: string, _refreshToken: string, profile: any, done: Complete) => {
-      void authenticateIdentity(() => githubIdentity(profile), done);
+    }, (accessToken: string, _refreshToken: string, _profile: any, done: Complete) => {
+      void authenticateIdentity(() => fetchGitHubIdentity(accessToken), done);
     }));
   }
 
