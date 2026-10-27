@@ -4316,8 +4316,11 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // that would persist an unfitted/default (or previous graph's) camera.
     const previous = previousOverview.current;
     previousOverview.current = { active: semanticOverviewActive, graphId: currentGraph?.id };
-    if (previous.active && previous.graphId === currentGraph?.id && !semanticOverviewActive && svgRef.current && zoomBehaviorRef.current) {
-      d3.select(svgRef.current).call(zoomBehaviorRef.current.transform, d3.zoomTransform(svgRef.current));
+    if (previous.active && previous.graphId === currentGraph?.id && !semanticOverviewActive && svgRef.current && !simplifiedRef.current) {
+      const k = d3.zoomTransform(svgRef.current).k;
+      d3.select(svgRef.current).select('.main-group')
+        .selectAll<SVGGElement, unknown>('.node-title-group')
+        .attr('transform', function() { return fittedTitleTransform(this, k); });
     }
   }, [semanticOverviewActive, currentGraph?.id]);
 
