@@ -150,7 +150,7 @@ describe('semantic graph projection', () => {
 describe('readable overview', () => {
   it('retains parent coverage across the zoom dead zone and resists boundary jitter', () => {
     let visible = false;
-    const states = [0.1, 0.84, 0.86, 0.84, 0.99, 1.01, 0.99, 0.86, 0.84].map(
+    const states = [0.1, 0.99, 1.01, 0.99, 1.14, 1.16, 1.14, 1.01, 0.99].map(
       scale => (visible = overviewAtScale(visible, scale))
     );
     expect(states).toEqual([
