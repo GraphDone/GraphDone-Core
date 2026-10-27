@@ -30,6 +30,10 @@ const fakePage = {
       calls.push('created');
       return { createGraphs: { graphs: [{ id: 'owned-graph' }] } };
     }
+    if (query.includes('createWorkItems') || query.includes('createEdges')) {
+      calls.push('unexpected-post-timeout-write');
+      throw new Error('Seeding wrote after setup timed out');
+    }
     if (variables.id !== 'owned-graph') throw new Error('Unexpected graph ownership');
     const operation = ['deleteEdges', 'deleteWorkItems', 'deleteGraphs', 'graphs('].find(name => query.includes(name));
     calls.push(operation);
