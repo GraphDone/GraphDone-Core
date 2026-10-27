@@ -2,12 +2,15 @@ import { test as base, expect, type CDPSession } from '@playwright/test';
 import { login, TEST_USERS } from '../../lib/auth';
 import { gql } from '../../lib/graphRequest';
 import { seedLargeGraph } from '../../lib/seedGraph';
-import { ownedGraphIdsFixture } from '../../lib/ownedGraphIdsFixture';
+import {
+  ownedGraphIdsFixture,
+  type OwnedGraphs,
+} from '../../lib/ownedGraphIdsFixture';
 
 // Cold Neo4j query planning belongs to fixture setup, not the interaction
 // budget. Both budgets are bounded; slow clicks and assertions still fail.
 const test = base.extend<{
-  ownedGraphIds: string[];
+  ownedGraphIds: OwnedGraphs;
   lodFixture: {
     seeded: Awaited<ReturnType<typeof seedLargeGraph>>;
     otherGraph?: Awaited<ReturnType<typeof seedLargeGraph>>;
@@ -27,13 +30,12 @@ const test = base.extend<{
             maxTouchPoints: 2,
           });
         await login(page, TEST_USERS.ADMIN);
-        const seeded = await seedLargeGraph(page, {
+        const seeded = await ownedGraphIds.seed({
           size: 301,
           spacing: 300,
           edgeFactor: 370 / 301,
           namePrefix: 'Semantic LOD',
           batchSize: 20,
-          onGraphCreated: id => ownedGraphIds.push(id),
           titleForIndex: (index, type) =>
             index === 8
               ? `${type} 8 — Follow a request through gateway validation, event delivery, retries, settlement and reconciliation across the entire system`
@@ -44,12 +46,11 @@ const test = base.extend<{
         });
         const otherGraph =
           width === 1440
-            ? await seedLargeGraph(page, {
+            ? await ownedGraphIds.seed({
                 size: 40,
                 spacing: 300,
                 batchSize: 20,
                 namePrefix: 'LOD switch target',
-                onGraphCreated: id => ownedGraphIds.push(id),
               })
             : undefined;
         await use({ seeded, otherGraph, touch });
