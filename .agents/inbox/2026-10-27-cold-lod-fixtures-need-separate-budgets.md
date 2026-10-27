@@ -27,13 +27,21 @@ incident; this trace does not separately profile the database planner.
 ## Corrective rule
 
 Use a bounded Playwright fixture for expensive real API setup and teardown.
-The LOD fixture gets 180 seconds per fixture phase; the interaction test keeps
-120 seconds, 10-second actions and its existing assertion timeouts. Preserve
+The LOD setup fixture gets 180 seconds; the interaction test keeps
+120 seconds, 10-second actions and its existing assertion timeouts. An ownership
+dependency fixture has an independent 60-second cleanup budget. Preserve
 the 301-item / 370-edge graph, all assertions, and zero retries. Register owned
 graph IDs immediately after creation so partial setup can be cleaned. Teardown
 runs before the page closes, removes the write guard, deletes edges before
 items/graph, verifies graph removal, and surfaces cleanup failures. A teardown
 failure must fail the test, not silently leave fixtures behind.
+
+Independent review caught a flaw in the first correction: Playwright 1.63 shares
+a fixture's timeout slot between setup and teardown and can skip teardown after
+setup exhausts it. Moving ownership/cleanup into a dependency fixture keeps its
+budget independent. Do not describe one fixture timeout as a separate allowance
+for each phase. The harness negative control must intentionally time out its
+dependent setup and still observe strict edge/item/graph cleanup and readback.
 
 ## Limits
 
