@@ -55,7 +55,8 @@ identify 7.18.0 as fixed. Existing app routes use fixed destinations, with no
 observed SSR hydration path; upgrading is not a claim that a live exploit was
 demonstrated. The DOM compatibility package is retained to keep imports stable.
 
-The locked dependency regression checks every installed resolution. Navigation
+The dependency regression checks every locked path and the actual web consumers
+against both the patched range and their resolved lock entries. Navigation
 controls reject external-looking mixed separators and preserve internal query,
 fragment and history behavior; existing role guards remain covered. Six required
 browser cases exercise public and authenticated deep links, reload, lazy pages,

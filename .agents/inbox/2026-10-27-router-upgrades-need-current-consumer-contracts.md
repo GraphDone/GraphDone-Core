@@ -43,3 +43,11 @@ callback, deployed revision or broad security clearance is claimed. Test tokens
 are confined to disposable local/CI accounts; failure traces are not public
 credential samples. Local evidence is retained in
 `/tmp/graphdone-resolution-20261027/router-*` and this record travels with the fix.
+
+At frozen `3e5a761dc0b067ed3827dd29fca50d45fb5d3952`, the corrected browser suite
+passed 6/6 without retries, the full web suite passed 340/340 and the harness
+passed 167/167. Review found the inventory overstated the installed-version guard:
+it checked locked ranges and installed-pair equality, which could accept two
+equally stale installed copies. The guard now requires each actual web consumer
+to satisfy the fixed range and match its resolved lock entry. The inventory
+states that exact scope. Refresh the changed harness and final CI before merge.
