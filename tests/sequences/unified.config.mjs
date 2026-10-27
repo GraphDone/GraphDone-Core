@@ -22,6 +22,7 @@ export const SEQUENCES = {
     'tests/e2e/graph/overview-board-actions.spec.ts',
     'tests/e2e/graph/recorded-ai-work.spec.ts',
     'tests/e2e/graph/admin-dialog-responsive.spec.ts',
+    'tests/e2e/graph/semantic-lod.spec.ts',
     'tests/e2e/smoke/user-smoke.spec.ts',
     'tests/e2e/quality/persona-lifecycle.spec.ts',
     'tests/e2e/quality/graph-motion.spec.ts',
