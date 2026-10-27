@@ -50,3 +50,16 @@ Existing requests authorized before reset are not rolled back. Idle sockets
 are denied at their next operation/result, not claimed to be instantly closed
 across API processes. Do not infer verified-provider email or account-linking
 safety from token-purpose tests; that remains separate work in #184.
+
+Independent review of `b79ecd593ef92a12e9d4b3070da68e42f9254477` found two
+additional live consumers: human JWTs in `agent-api.ts` and `operations-api.ts`
+still used signature extraction without checking the account revision. On
+2026-10-27, four real-router negative controls all failed with HTTP201 instead
+of401: reset and disable/reactivate sessions could mint new scoped credentials
+in each API. The agent route used a bounded graph adapter, while both auth and
+operations stores used real SQLite. Signature verification is not session
+authorization; enumerate every live token consumer when adding revocation.
+Both human paths now call the common active-account/revision resolver. Existing
+scoped credentials keep their explicit separate contract. The corrected
+16-case HTTP/SQLite/WebSocket suite passed; full frozen-head checks and review
+follow in the PR. The operations smoke script also now signs explicit revisions.
