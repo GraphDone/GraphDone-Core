@@ -1,0 +1,62 @@
+# Cold database fixture setup must not consume the browser interaction budget
+
+Date: 2026-10-27. Searched the symptom index and the existing LOD ownership and
+performance-evidence lessons. Final PR #192 CI at
+`4abce30030e45e1e9d468c67e414302f270d45e9` failed the strict headed new-user
+sequence even though the earlier focused local browser run passed.
+
+## Evidence and cause
+
+```sh
+gh run view 40541503856 --repo GraphDone/GraphDone-Core --job 122322370157 --log-failed
+gh run download 40541503856 --repo GraphDone/GraphDone-Core \
+  --name smoke-results-e2599a1245884c450fd1635d89b92cc60871a033 --dir <owned-evidence-directory>
+```
+
+The basic smoke sequence passed 6/6. New-user reported 43 pass / 2 fail: one
+desktop LOD case hit its 120-second whole-test timeout, and the second entry
+was the harness's process-exit failure. The phone LOD case passed in 55.3s.
+The trace records eight fixture mutation calls taking approximately 5.7–11.6s
+each. Those calls consumed most of the shared setup/interaction budget on this
+cold database. Navigation, graph switching and camera-restoration assertions
+completed; the timeout interrupted the final source-position readback. That is
+an incomplete persistence check, not a passing journey or proof of a renderer
+hang. Cold query planning is consistent with the earlier local batch-size
+incident; this trace does not separately profile the database planner.
+
+## Corrective rule
+
+Use a bounded Playwright fixture for expensive real API setup and teardown.
+The LOD setup fixture gets 180 seconds; the interaction test keeps
+120 seconds, 10-second actions and its existing assertion timeouts. An ownership
+dependency fixture has an independent 60-second cleanup budget. Preserve
+the 301-item / 370-edge graph, all assertions, and zero retries. Register owned
+graph IDs immediately after creation so partial setup can be cleaned. Teardown
+runs before the page closes, removes the write guard, deletes edges before
+items/graph, verifies graph removal, and surfaces cleanup failures. A teardown
+failure must fail the test, not silently leave fixtures behind.
+
+Independent review caught a flaw in the first correction: Playwright 1.63 shares
+a fixture's timeout slot between setup and teardown and can skip teardown after
+setup exhausts it. Moving ownership/cleanup into a dependency fixture keeps its
+budget independent. Do not describe one fixture timeout as a separate allowance
+for each phase. The harness negative control must intentionally time out its
+dependent setup and still observe strict edge/item/graph cleanup and readback.
+
+The next review identified a late-response race: Playwright timeout does not
+cancel an in-flight create. Cleanup now first aborts future seed batches and
+drains tracked seed promises, retaining the response's graph ID before deletion.
+The ownership fixture rejects new seed work once cleanup starts. A deferred-create
+negative control releases the response after setup timeout and checks that no
+item creation follows and the late graph is still deleted. A request that never
+settles can exhaust cleanup's independent budget; that is a reported failed
+cleanup, not a claim that remote cancellation or lost-ack recovery was proved.
+
+## Limits
+
+This isolates fixture provisioning from interaction correctness; it neither
+improves measured application speed nor proves the large-graph performance
+target. Rerun the complete strict CI sequence and record its actual result.
+Raw CI artifacts are retained under the owned resolution evidence directory;
+they are not added to the public repository because traces can contain fixture
+sessions. The run link remains the canonical CI failure evidence.
