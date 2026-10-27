@@ -34,8 +34,11 @@ therefore cannot revive an earlier session or link. The migration also supplies
 the existing status API's missing `deactivationDate` column, and status updates
 return the inactive account without making it available to authentication.
 
-HTTP GraphQL context and the share-link creation route verify the current
-active account and revision. WebSocket connection authentication and every
+HTTP GraphQL context, share-link creation and human sessions in the agent and
+operations APIs verify the current active account and revision. Existing scoped
+`gd_agent_` and `gd_ops_` credentials retain their separate expiry, revocation,
+scope and active-owner checks; password reset does not revoke those credentials.
+WebSocket connection authentication and every
 outgoing result recheck the revision. A rejected socket closes with code4403;
 an idle transport can remain open until its next operation/result, without
 restoring authorization. Requests already authorized before a concurrent reset
@@ -56,6 +59,13 @@ expiry and database-error controls. Production startup tests retain environment
 loading and signing-secret checks. Owned-fixture CAPTCHA proofs are genuinely
 solved and verified; the test uses a bounded Node SHA-256 loop to avoid async
 WebCrypto scheduling costs. It does not lower production challenge difficulty.
+
+The same suite mounts the real agent and operations routers and attempts
+credential issuance with reset and disabled/reactivated JWTs. The operations
+store is real in-memory SQLite; the agent graph driver is a bounded test adapter,
+so these cases prove the HTTP authorization boundary, not Neo4j execution. Both
+stale-session paths must return401 without issuing a credential or querying graph
+content, while a fresh password login must succeed.
 
 These tests do not exercise live email delivery, a provider callback, Cloud D1,
 shared databases or a deployment. The old unused Neo4j authentication modules

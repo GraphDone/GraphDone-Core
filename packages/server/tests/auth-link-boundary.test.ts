@@ -18,8 +18,18 @@ import { sqliteAuthResolvers } from '../src/resolvers/sqlite-auth';
 import { resolveActiveAuthUser } from '../src/middleware/auth';
 import { webSocketAuthentication } from '../src/auth/websocket-auth';
 import { generateToken, verifyToken } from '../src/utils/auth';
+import { agentApi } from '../src/agent-api';
+import { createOperationsApi, SQLiteOperationsDatabase } from '../src/operations-api';
+
+const graphFixture = vi.hoisted(() => ({ run: vi.fn(), write: vi.fn(), close: vi.fn() }));
+vi.mock('../src/db', () => ({ driver: { session: () => ({
+  run: graphFixture.run,
+  executeWrite: graphFixture.write,
+  close: graphFixture.close,
+}) } }));
 
 let database: sqlite3.Database;
+let operationsDatabase: SQLiteOperationsDatabase;
 let server: Server;
 let endpoint: string;
 let apollo: ApolloServer;
@@ -91,6 +101,17 @@ beforeEach(async () => {
   });
   store.db = database; store.initialized = false;
   await sqliteAuthStore.initialize();
+  operationsDatabase = new SQLiteOperationsDatabase(':memory:');
+  await operationsDatabase.ready;
+  graphFixture.run.mockReset().mockImplementation(async (query: string) => {
+    if (query.includes('RETURN g.name AS name')) return { records: [{ get: () => 'Owned auth fixture' }] };
+    if (query.includes('RETURN g.id')) return { records: [{ get: () => 'owned-auth-graph' }] };
+    if (query.includes('RETURN count(t) AS total')) return { records: [{ get: () => ({ toNumber: () => 0 }) }] };
+    if (query.startsWith('CREATE (t:AgentAccess)')) return { records: [] };
+    throw new Error('Unexpected owned graph query');
+  });
+  graphFixture.write.mockReset().mockImplementation(async work => work({ run: graphFixture.run }));
+  graphFixture.close.mockReset().mockResolvedValue(undefined);
   clients = [];
   const schema = makeExecutableSchema({ typeDefs: authOnlyTypeDefs, resolvers: {
     Query: { me: sqliteAuthResolvers.Query.me },
@@ -101,6 +122,8 @@ beforeEach(async () => {
   const app = express();
   app.get('/auth/magic-link/verify', verifyMagicLinkHandler);
   app.post('/auth/reset-password', express.json(), resetPasswordHandler);
+  app.use('/api/agent', agentApi);
+  app.use('/api/ops', createOperationsApi(() => operationsDatabase));
   app.use('/graphql', express.json(), expressMiddleware(apollo, {
     context: async ({ req }) => ({ user: await resolveActiveAuthUser(req.headers.authorization), req }),
   }));
@@ -122,12 +145,55 @@ afterEach(async () => {
   await disposeSockets();
   await apollo.stop();
   await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+  await operationsDatabase.close();
   await new Promise<void>((resolve, reject) => database.close(error => error ? reject(error) : resolve()));
   store.db = null; store.initialized = false;
   vi.restoreAllMocks(); vi.unstubAllEnvs();
 });
 
 describe('purpose-bound email links at the real HTTP handlers', () => {
+  for (const route of ['agent', 'ops']) {
+    const issueCredential = (token: string) => fetch(`${endpoint}/api/${route}/tokens`, {
+      method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+      body: JSON.stringify({ graphId: 'owned-auth-graph', name: 'Owned revocation fixture', scope: 'read' }),
+    });
+
+    it(`rejects reset sessions before credential issuance in the real ${route} router`, async () => {
+      const account = await sqliteAuthStore.findUserByEmailOrUsername(email);
+      const token = generateToken(account!.id, email, account!.role, account!.authVersion);
+      expect((await issueCredential(token)).status).toBe(201);
+      const link = await sqliteAuthStore.createMagicLink(email, 'password-reset');
+      expect((await reset(link.token)).status).toBe(200);
+      const graphCalls = graphFixture.run.mock.calls.length;
+      const tokensBefore = await operationsDatabase.all('SELECT * FROM ops_tokens');
+      expect((await issueCredential(token)).status).toBe(401);
+      expect(graphFixture.run).toHaveBeenCalledTimes(graphCalls);
+      expect(await operationsDatabase.all('SELECT * FROM ops_tokens')).toEqual(tokensBefore);
+      const fresh = await graphRequest('mutation($input:LoginInput!){login(input:$input){token}}', undefined,
+        { input: { emailOrUsername: 'admin', password: 'ChangedPurposeFixture!2026' } });
+      expect(fresh.errors).toBeUndefined();
+      expect((await issueCredential(fresh.data.login.token)).status).toBe(201);
+    });
+
+    it(`does not revive disabled sessions in the real ${route} router`, async () => {
+      const account = await sqliteAuthStore.findUserByEmailOrUsername(email);
+      const token = generateToken(account!.id, email, account!.role, account!.authVersion);
+      expect((await issueCredential(token)).status).toBe(201);
+      await sqliteAuthStore.updateUserStatus(account!.id, false);
+      expect([401, 403]).toContain((await issueCredential(token)).status);
+      await sqliteAuthStore.updateUserStatus(account!.id, true);
+      const graphCalls = graphFixture.run.mock.calls.length;
+      const tokensBefore = await operationsDatabase.all('SELECT * FROM ops_tokens');
+      expect((await issueCredential(token)).status).toBe(401);
+      expect(graphFixture.run).toHaveBeenCalledTimes(graphCalls);
+      expect(await operationsDatabase.all('SELECT * FROM ops_tokens')).toEqual(tokensBefore);
+      const fresh = await graphRequest('mutation($input:LoginInput!){login(input:$input){token}}', undefined,
+        { input: { emailOrUsername: 'admin', password: 'OwnedPurposeFixture!2026' } });
+      expect(fresh.errors).toBeUndefined();
+      expect((await issueCredential(fresh.data.login.token)).status).toBe(201);
+    });
+  }
+
   it('rejects a password-reset link at login without issuing a session', async () => {
     const link = await sqliteAuthStore.createMagicLink(email, 'password-reset');
     const response = await fetch(`${endpoint}/auth/magic-link/verify?token=${encodeURIComponent(link.token)}`, { redirect: 'manual' });
