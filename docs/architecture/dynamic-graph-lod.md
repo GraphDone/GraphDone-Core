@@ -421,6 +421,9 @@ keep implementations independent. No shared libraries or common package.
 
 ## 8. First production-renderer slice (2026-10-27)
 
+See the [validation record and screenshots](../quality/DYNAMIC_LOD_VALIDATION_2026-10-27.md)
+for exact revisions, passing checks, retained failures and remaining integration gates.
+
 `packages/web/src/lib/semanticLOD.ts` now projects loaded source items into
 top-level groups. Precedence is explicit `metadata.lod.groupPath` (or
 `metadata.groupPath`), native containment, release `lane`, `kind`, then item type.
