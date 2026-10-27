@@ -4273,6 +4273,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const layoutStartRef = useRef<number | null>(null);
   const lastSettleMsRef = useRef<number | null>(null);
   const runLabelAvoidanceRef = useRef<(() => void) | null>(null);
+  const cameraViewportRef = useRef<{ w: number; h: number } | null>(null);
+  const cameraResizeFrameRef = useRef<number | null>(null);
 
   // Store simulation reference for resize handling
   const simulationRef = useRef<d3.Simulation<any, any> | null>(null);
@@ -4318,7 +4320,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     previousOverview.current = { active: semanticOverviewActive, graphId: currentGraph?.id };
     if (previous.active && previous.graphId === currentGraph?.id && !semanticOverviewActive && svgRef.current && !simplifiedRef.current) {
       const k = d3.zoomTransform(svgRef.current).k;
-      d3.select(svgRef.current).select('.main-group')
+      d3.select(svgRef.current).select('.main-graph-group')
         .selectAll<SVGGElement, unknown>('.node-title-group')
         .attr('transform', function() { return fittedTitleTransform(this, k); });
     }
@@ -4784,6 +4786,12 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       return {
         simRunning: !atRest,
         atRest,
+        cameraReady: cameraViewportRef.current !== null
+          && cameraViewportRef.current.w === containerRef.current?.clientWidth
+          && cameraViewportRef.current.h === containerRef.current?.clientHeight
+          && cameraResizeFrameRef.current === null
+          && !(svgRef.current as (SVGSVGElement & { __transition?: unknown }) | null)?.__transition,
+        cameraViewport: cameraViewportRef.current,
         alpha: Math.round(alpha * 10000) / 10000,
         lastSettleMs: lastSettleMsRef.current,
         nodeCount: ns.length,
@@ -4820,20 +4828,27 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     const el = containerRef.current;
     if (!el || !hasNodes) return undefined;
     let last = { w: el.clientWidth || 0, h: el.clientHeight || 0 };
-    let frame = 0;
+    cameraViewportRef.current = last;
     const ro = new ResizeObserver(() => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => {
+      if (cameraResizeFrameRef.current !== null) cancelAnimationFrame(cameraResizeFrameRef.current);
+      cameraResizeFrameRef.current = requestAnimationFrame(() => {
+        cameraResizeFrameRef.current = null;
         const w = el.clientWidth || 0, h = el.clientHeight || 0;
         if (!w || !h) return;
         const changed = w !== last.w || h !== last.h;
         last = { w, h };
         // Do not start competing animated zooms while the window edge moves.
         if (changed) fitViewRef.current(false);
+        cameraViewportRef.current = last;
       });
     });
     ro.observe(el);
-    return () => { cancelAnimationFrame(frame); ro.disconnect(); };
+    return () => {
+      if (cameraResizeFrameRef.current !== null) cancelAnimationFrame(cameraResizeFrameRef.current);
+      cameraResizeFrameRef.current = null;
+      cameraViewportRef.current = null;
+      ro.disconnect();
+    };
   // Loading can briefly render a placeholder after cached nodes already make
   // hasNodes true. Re-run when either query settles so the observer follows the
   // graph container that is actually mounted, rather than returning once on a
