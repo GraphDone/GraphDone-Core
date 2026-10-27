@@ -51,3 +51,22 @@ it checked locked ranges and installed-pair equality, which could accept two
 equally stale installed copies. The guard now requires each actual web consumer
 to satisfy the fixed range and match its resolved lock entry. The inventory
 states that exact scope. Refresh the changed harness and final CI before merge.
+
+## Empty-account CI correction
+
+Composed Router head `14a4fcc` [CI 40584829418](https://github.com/GraphDone/GraphDone-Core/actions/runs/40584829418)
+completed 50 browser cases in 854 seconds: 48 passed, two viewer cases failed,
+plus the harness's failed-process row. This was not a process-budget timeout.
+Retained screenshots show the authenticated empty workspace at both widths.
+The desktop assertion incorrectly required a populated graph's `view-content`;
+the phone login helper did not recognize an authenticated account without a
+graph selector. The local fixture had graphs and hid both assumptions.
+
+Use the existing authenticated `workspace-content` container for account-level
+route checks and keep login-form exclusion. Router cases additionally assert
+`me.role === VIEWER` through the real API before and after the fresh-context
+callback. A standalone real-browser control recognizes an empty workspace,
+rejects a password form even with workspace markup, and rejects a loading page.
+With the old helper, the empty-workspace positive failed deterministically;
+this helper correction adds no retry, wait or timeout. Original CI artifacts
+remain evidence, and final current-head browser/full CI gates still apply.

@@ -1,5 +1,15 @@
 import { test, expect, type Page } from '@playwright/test';
-import { login, TEST_USERS, getBaseURL } from '../../lib/auth';
+import { login, TEST_USERS, getBaseURL, getAuthState } from '../../lib/auth';
+import { gql } from '../../lib/graphRequest';
+
+test('auth state recognizes an empty authenticated workspace and rejects a login form @router', async ({ page }) => {
+  await page.setContent('<main data-testid="workspace-content"><h1>No Graphs Available</h1></main>');
+  expect((await getAuthState(page)).isLoggedIn).toBe(true);
+  await page.setContent('<main data-testid="workspace-content"></main><input type="password">');
+  expect((await getAuthState(page)).isLoggedIn).toBe(false);
+  await page.setContent('<main>Loading</main>');
+  expect((await getAuthState(page)).isLoggedIn).toBe(false);
+});
 
 for (const width of [1440, 390]) {
   test.describe(`application route compatibility at ${width}px @router`, () => {
@@ -56,10 +66,11 @@ for (const width of [1440, 390]) {
 
     test('viewer route guards and a fresh-context login callback preserve authorization', async ({ page, browser }) => {
       await login(page, TEST_USERS.VIEWER, { retries: 1 });
+      expect((await gql(page, '{ me { role } }')).me.role).toBe('VIEWER');
       for (const route of ['/admin', '/backend']) {
         await page.goto(`${getBaseURL()}${route}`);
         await expect(page).toHaveURL(new URL('/', getBaseURL()).href);
-        await expect(page.locator('[data-testid="view-content"]')).toBeVisible();
+        await expect(page.getByTestId('workspace-content')).toBeVisible();
         await expect(page.getByRole('heading', { name: 'System Administration', exact: true })).toHaveCount(0);
       }
       const token = await page.evaluate(() => localStorage.getItem('authToken') || sessionStorage.getItem('authToken'));
@@ -72,7 +83,8 @@ for (const width of [1440, 390]) {
         await callback.addInitScript(() => localStorage.setItem('graphdone:viewMode', 'cards'));
         await callback.goto(`${getBaseURL()}/login?token=${encodeURIComponent(token!)}`);
         await expect(callback).toHaveURL(new URL('/', getBaseURL()).href);
-        await expect(callback.locator('[data-testid="view-content"]')).toBeVisible();
+        await expect(callback.getByTestId('workspace-content')).toBeVisible();
+        expect((await gql(callback, '{ me { role } }')).me.role).toBe('VIEWER');
         expect(await callback.evaluate(() => !window.location.search.includes('token='))).toBe(true);
         await callback.goto(`${getBaseURL()}/admin`);
         await expect(callback).toHaveURL(new URL('/', getBaseURL()).href);
