@@ -64,9 +64,11 @@ export async function resolveOAuthAccount(database: sqlite3.Database, identity: 
         }
         const matches = await get<{ count: number }>('SELECT count(*) AS count FROM users WHERE lower(email) = ?', [identity.email]);
         if (matches && matches.count > 1) throw new Error('Account unavailable');
-        account = await get<{ id: string; authVersion: number; isActive: number }>(
-          'SELECT id, authVersion, isActive FROM users WHERE lower(email) = ?', [identity.email]);
+        const existing = await get<{ id: string; authVersion: number; isActive: number; isEmailVerified: number }>(
+          'SELECT id, authVersion, isActive, isEmailVerified FROM users WHERE lower(email) = ?', [identity.email]);
+        account = existing;
         if (account && !account.isActive) throw new Error('Account unavailable');
+        if (existing && existing.isEmailVerified !== 1) throw new Error('Existing account recovery required');
         const now = new Date().toISOString();
         if (!account) {
           const id = randomUUID();

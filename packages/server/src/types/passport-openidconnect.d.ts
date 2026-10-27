@@ -11,6 +11,7 @@ declare module 'passport-openidconnect' {
     clientSecret: string;
     callbackURL: string;
     scope?: string[];
+    skipUserProfile?: boolean;
   }
 
   export type VerifyCallback = (error: Error | null, user?: any, info?: any) => void;
