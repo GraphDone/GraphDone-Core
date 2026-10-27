@@ -2,6 +2,9 @@
 
 | Symptom | Canonical lesson and regression |
 | --- | --- |
+| Dense graph loses all names at fit scale; an old LOD preview is mistaken for shipped behavior | [Dynamic graph LOD continuation](../../docs/architecture/dynamic-graph-lod.md); current state, staged delivery and explicit completion gates |
+| Read-only graph inspection attempts position writes without dragging | [Guard viewing before navigation and retain attempted-write failures](../inbox/2026-10-27-live-graph-review-can-attempt-layout-writes.md); existing capture guard failed correctly; owned reproduction planned |
+| A proposed progressive page merge would erase earlier nodes or drop unloaded-endpoint edges | [Snapshot replacement is not page append](../inbox/2026-10-27-snapshot-merges-are-not-page-appends.md); existing merge tests establish snapshot semantics |
 | Deleting an owned folder removes or orphans another owner's nested folder; a deletion destination disappears with its parent | [Deletion authority includes pre-existing descendant folders](../inbox/2026-10-23-folder-delete-legacy-hierarchy.md); `packages/server/tests/folder-authorization.test.ts` |
 | Build/typecheck pass but API startup, supported-Node launcher, container or repository lint fails | [Startup and save evidence pointer](../inbox/2026-10-23-core-startup-and-save-evidence.md); [runtime validation](../../docs/quality/RUNTIME_VALIDATION_2026-10-23.md) |
 | Production accepts missing/default JWT or session secrets; `.env` key differs from the captured signing key | [Startup and save evidence pointer](../inbox/2026-10-23-core-startup-and-save-evidence.md); `packages/server/tests/production-startup.test.ts`, `production-secrets.test.ts` |
