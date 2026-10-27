@@ -15,6 +15,7 @@ Welcome to the GraphDone documentation! This directory contains comprehensive gu
 - [Systems Reference](./SYSTEMS.md) - **What's shipped and where it lives** — every subsystem mapped to its code, tests, and story
 - [Interaction Model — the friction-free contract](./design/interaction-model.md) - UX constitution: modes, exits, click budgets
 - [Progressive Streaming design](./design/progressive-streaming.md) - ADAPT-4: scale to huge graphs on slow links
+- [Dynamic graph LOD continuation](./architecture/dynamic-graph-lod.md) - Current evidence, semantic zoom, generic AI-authored systems, staged delivery and completion gates
 - [Testing & Refinement Plan](./TESTING_AND_REFINEMENT_PLAN.md) - The never-done loop; current cycle's verification debt
 - [AI Agents Quickstart](./api/AI_AGENTS.md) - 5-minute MCP/GraphQL setup for agent teammates
 
