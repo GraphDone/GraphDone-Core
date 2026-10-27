@@ -47,11 +47,11 @@ Source locations are relative to `packages/server/src/` and anchored to the snap
 
 ## Router correction on 2026-10-27
 
-The dedicated #186 router change replaces Router/DOM6.30.6 with7.18.4, removes
+The dedicated #186 router change replaces Router/DOM 6.30.6 with 7.18.4, removes
 the old `@remix-run/router` resolution and retains the existing declarative SPA.
 Official advisories [GHSA-wrjc-x8rr-h8h6](https://github.com/advisories/GHSA-wrjc-x8rr-h8h6)
 and [GHSA-337j-9hxr-rhxg](https://github.com/advisories/GHSA-337j-9hxr-rhxg)
-identify7.18.0 as fixed. Existing app routes use fixed destinations, with no
+identify 7.18.0 as fixed. Existing app routes use fixed destinations, with no
 observed SSR hydration path; upgrading is not a claim that a live exploit was
 demonstrated. The DOM compatibility package is retained to keep imports stable.
 

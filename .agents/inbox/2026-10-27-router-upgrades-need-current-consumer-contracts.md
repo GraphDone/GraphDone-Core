@@ -5,23 +5,23 @@ On 2026-10-27, the #186 router work started at dev
 reported five moderate entries: Router/DOM and UUID/federation/subgraph. The
 [navigation advisory](https://github.com/advisories/GHSA-wrjc-x8rr-h8h6) and
 [hydration advisory](https://github.com/advisories/GHSA-337j-9hxr-rhxg) both
-identify7.18.0 as fixed. The selected Router/DOM7.18.4 retains React18 and the
-existing declarative BrowserRouter; its Node20 minimum fits supported Node22/24.
+identify 7.18.0 as fixed. The selected Router/DOM 7.18.4 retains React 18 and the
+existing declarative BrowserRouter; its Node 20 minimum fits supported Node 22/24.
 The [versioned migration guide](https://reactrouter.com/7.18.4/upgrading/v6)
 was checked. No multi-segment splat route, data router or component-local lazy
 page declaration was found in the live app routes.
 
 The first navigation test copied an older upstream normalization expectation.
-Router6.30.6 failed three mixed-separator cases; installed7.18.4 rejected all four
+Router 6.30.6 failed three mixed-separator cases; installed 7.18.4 rejected all four
 external-looking destinations instead of navigating to a normalized internal
 path. That four-case failure was a test-contract mismatch, not an application
 regression. Inspection of the installed `validateNavigationTarget` established
 the actual rejection boundary. The corrected control captures the thrown error
-and requires the route to remain unchanged. Reinstalling the original locked6.30.6
-then running the final control produced **4 failures and1 history pass**;
-the7.18.4 control plus existing role guards produced **9 passes**.
+and requires the route to remain unchanged. Reinstalling the original locked 6.30.6
+then running the final control produced **4 failures and 1 history pass**;
+the 7.18.4 control plus existing role guards produced **9 passes**.
 
-The first six actual-browser cases produced **4 failures and2 passes**, with no
+The first six actual-browser cases produced **4 failures and 2 passes**, with no
 retries. The two failing assumptions on each viewport were that the sign-in
 page always selected Password, and that Admin opened its Users tab. The current
 UI preserves the sign-in method and opens Feedback & operations. The corrected
@@ -37,7 +37,7 @@ or a successful install as proof that navigation remains usable. The lock
 regression checks every Router/DOM resolution, not just the manifest range.
 
 Limits: MemoryRouter tests establish library navigation behavior, while the
-actual-browser suite covers GraphDone routes at1440px and390px. No hostile
+actual-browser suite covers GraphDone routes at 1440px and 390px. No hostile
 application-controlled destination, SSR hydration surface, live provider
 callback, deployed revision or broad security clearance is claimed. Test tokens
 are confined to disposable local/CI accounts; failure traces are not public
