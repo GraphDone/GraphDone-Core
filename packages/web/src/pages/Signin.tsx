@@ -10,7 +10,7 @@ import { InsecureConnectionBanner } from '../components/TlsStatusIndicator';
 import { GuestModeDialog } from '../components/GuestModeDialog';
 import { PasswordRequirements } from '../components/PasswordRequirements';
 import { isValidEmail } from '../utils/validation';
-import { CodeCaptcha } from '../components/CodeCaptcha';
+import { AuthCaptcha } from '../components/AuthCaptcha';
 import { magicLinkFocusTarget, hasEnteredEmail } from '../lib/loginFocus';
 import { formatLoginCodeInput, isCompleteLoginCode } from '../lib/loginCode';
 
@@ -95,6 +95,7 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
     magicLinkEmail: ''
   });
   const [captchaPayload, setCaptchaPayload] = useState<string | null>(null);
+  const [captchaReset, setCaptchaReset] = useState(0);
   const [magicLinkCaptchaPayload, setMagicLinkCaptchaPayload] = useState<string | null>(null);
   const magicLinkEmailRef = useRef<HTMLInputElement>(null);
   const [loginCodeInput, setLoginCodeInput] = useState('');
@@ -276,6 +277,7 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
       navigate('/');
     },
     onError: (error) => {
+      setCaptchaReset(value => value + 1);
       const newAttempts = loginAttempts + 1;
       setLoginAttempts(newAttempts);
       localStorage.setItem('loginAttempts', newAttempts.toString());
@@ -416,7 +418,7 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
     setErrors({});
 
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:4127';
+      const apiUrl = import.meta.env.VITE_API_URL || window.location.origin;
       const response = await fetch(`${apiUrl}/auth/magic-link/request`, {
         method: 'POST',
         headers: {
@@ -449,6 +451,7 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
     } catch {
       setErrors({ submit: 'We could not reach the sign-in service. Please try again shortly.' });
     } finally {
+      setCaptchaReset(value => value + 1);
       setMagicLinkLoading(false);
     }
   };
@@ -467,7 +470,7 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
     setCodeVerifying(true);
     setCodeError(null);
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:4127';
+      const apiUrl = import.meta.env.VITE_API_URL || window.location.origin;
       const response = await fetch(`${apiUrl}/auth/code/verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -824,7 +827,7 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
                 {/* CAPTCHA for Magic Link — only auto-focuses when an email is
                     already entered; otherwise the email field gets focus first. */}
                 <div>
-                  <CodeCaptcha compact
+                  <AuthCaptcha key="magic-link" action="magic-link" resetKey={captchaReset} compact
                     onVerified={(code) => setMagicLinkCaptchaPayload(code)}
                     className="w-full"
                     autoFocus={hasEnteredEmail(formData.magicLinkEmail)}
@@ -942,6 +945,8 @@ export function Signin({ initialMagicLink = true }: { initialMagicLink?: boolean
             </div>
             {errors.password && <p id="password-error" className="mt-1 text-xs text-red-400" role="alert">{errors.password}</p>}
           </div>
+
+          <AuthCaptcha key="login" action="login" onVerified={setCaptchaPayload} resetKey={captchaReset} className="w-full" />
 
           {/* Keep me logged in & Forgot Password */}
           <div className="flex items-start justify-between gap-3">

@@ -1,7 +1,7 @@
 import { GraphQLError } from 'graphql';
 import { sqliteAuthStore } from '../auth/sqlite-auth.js';
 import { generateToken } from '../utils/auth.js';
-import { verifyCaptcha } from '../utils/captcha.js';
+import { verifyAuthCaptcha } from '../utils/captcha.js';
 import { randomUUID } from 'node:crypto';
 import { folderActor, folderCreationOwner, folderResponse, requireFolderAccess, requireFolderDeletion, requireFolderParent, requireGraphAccess, visibleFolderGraphs } from '../auth/folder-access.js';
 import { passwordLoginLimiter, PasswordLoginLimitError } from '../auth/password-login-limiter.js';
@@ -329,17 +329,11 @@ export const sqliteAuthResolvers = {
         const user = await sqliteAuthStore.findUserByEmailOrUsername(identifier);
         accountAttempt = passwordLoginLimiter.reserveAccount(user ? `user:${user.id}` : `identifier:${identifier}`);
 
-        // Verify CAPTCHA if provided
-        if (input.captchaPayload) {
-          const isCaptchaValid = await verifyCaptcha(input.captchaPayload);
-          if (!isCaptchaValid) {
-            outcome = 'failure';
-            console.log('❌ CAPTCHA verification failed');
-            throw new GraphQLError('CAPTCHA verification failed', {
-              extensions: { code: 'CAPTCHA_FAILED' }
-            });
-          }
-          console.log('✅ CAPTCHA verified');
+        if (!await verifyAuthCaptcha(input.captchaPayload, 'login')) {
+          outcome = 'failure';
+          throw new GraphQLError('Please complete verification and try again.', {
+            extensions: { code: 'CAPTCHA_FAILED' }
+          });
         }
 
         if (!user) {
@@ -441,16 +435,10 @@ export const sqliteAuthResolvers = {
           });
         }
 
-        // Verify CAPTCHA if provided
-        if (input.captchaPayload) {
-          const isCaptchaValid = await verifyCaptcha(input.captchaPayload);
-          if (!isCaptchaValid) {
-            console.log('❌ CAPTCHA verification failed');
-            throw new GraphQLError('CAPTCHA verification failed', {
-              extensions: { code: 'CAPTCHA_FAILED' }
-            });
-          }
-          console.log('✅ CAPTCHA verified');
+        if (!await verifyAuthCaptcha(input.captchaPayload, 'signup')) {
+          throw new GraphQLError('Please complete verification and try again.', {
+            extensions: { code: 'CAPTCHA_FAILED' }
+          });
         }
 
         // Check if user already exists

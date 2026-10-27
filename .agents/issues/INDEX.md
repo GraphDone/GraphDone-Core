@@ -2,6 +2,7 @@
 
 | Symptom | Canonical lesson and regression |
 | --- | --- |
+| Arbitrary client CAPTCHA strings succeed, or direct login/signup omits proof | [Require server-issued action-bound proof and atomic consumption](../inbox/2026-10-27-captcha-proof-must-be-server-issued.md); server `captcha` / `captcha-auth` tests and `qc:captcha` |
 | Deleting an owned folder removes or orphans another owner's nested folder; a deletion destination disappears with its parent | [Deletion authority includes pre-existing descendant folders](../inbox/2026-10-23-folder-delete-legacy-hierarchy.md); `packages/server/tests/folder-authorization.test.ts` |
 | Build/typecheck pass but API startup, supported-Node launcher, container or repository lint fails | [Startup and save evidence pointer](../inbox/2026-10-23-core-startup-and-save-evidence.md); [runtime validation](../../docs/quality/RUNTIME_VALIDATION_2026-10-23.md) |
 | Production accepts missing/default JWT or session secrets; `.env` key differs from the captured signing key | [Startup and save evidence pointer](../inbox/2026-10-23-core-startup-and-save-evidence.md); `packages/server/tests/production-startup.test.ts`, `production-secrets.test.ts` |

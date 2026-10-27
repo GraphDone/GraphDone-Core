@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Mail, ArrowLeft, CheckCircle, XCircle, Shield } from 'lucide-react';
 import { InsecureConnectionBanner } from '../components/TlsStatusIndicator';
-import { CodeCaptcha } from '../components/CodeCaptcha';
+import { AuthCaptcha } from '../components/AuthCaptcha';
 import { isValidEmail } from '../utils/validation';
 
 export function ForgotPassword() {
@@ -14,6 +14,7 @@ export function ForgotPassword() {
   const [rateLimitError, setRateLimitError] = useState('');
   const [rateLimitRetryAfter, setRateLimitRetryAfter] = useState<number | null>(null);
   const [captchaPayload, setCaptchaPayload] = useState<string>('');
+  const [captchaReset, setCaptchaReset] = useState(0);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,7 +35,7 @@ export function ForgotPassword() {
     setRateLimitRetryAfter(null);
 
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:4127';
+      const apiUrl = import.meta.env.VITE_API_URL || window.location.origin;
       const response = await fetch(`${apiUrl}/auth/forgot-password`, {
         method: 'POST',
         headers: {
@@ -60,6 +61,7 @@ export function ForgotPassword() {
     } catch {
       setError('Failed to send reset link. Please try again.');
     } finally {
+      setCaptchaReset(value => value + 1);
       setLoading(false);
     }
   };
@@ -192,9 +194,8 @@ export function ForgotPassword() {
               </div>
 
               {/* CAPTCHA */}
-              <CodeCaptcha
+              <AuthCaptcha action="forgot-password" resetKey={captchaReset}
                 onVerified={(code) => setCaptchaPayload(code)}
-                onError={() => setCaptchaPayload('')}
               />
 
               {/* Submit Button */}

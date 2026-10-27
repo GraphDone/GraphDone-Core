@@ -34,8 +34,8 @@ import { emailService } from './auth/email-service.js';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
-import rateLimit from 'express-rate-limit';
-import { createCaptchaChallenge, verifyCaptcha } from './utils/captcha.js';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
+import { createCaptchaChallenge, verifyCaptcha, isCaptchaAction, captchaRequired, CAPTCHA_ACTIONS, CaptchaCapacityError } from './utils/captcha.js';
 
 const execAsync = promisify(exec);
 
@@ -506,6 +506,7 @@ async function startServer() {
   // Live system configuration endpoint
   app.get('/config', cors<cors.CorsRequest>(), async (_req, res) => {
     const config = {
+      captcha: { provider: 'altcha', requiredActions: CAPTCHA_ACTIONS.filter(captchaRequired) },
       timestamp: new Date().toISOString(),
       services: {
         api: {
@@ -724,7 +725,7 @@ async function startServer() {
       }
 
       // Verify CAPTCHA
-      const isCaptchaValid = await verifyCaptcha(captchaPayload);
+      const isCaptchaValid = await verifyCaptcha(captchaPayload, 'magic-link');
       if (!isCaptchaValid) {
         return res.status(400).json({ error: 'CAPTCHA verification failed' });
       }
@@ -797,7 +798,7 @@ async function startServer() {
       }
 
       // Verify CAPTCHA
-      const isCaptchaValid = await verifyCaptcha(captchaPayload);
+      const isCaptchaValid = await verifyCaptcha(captchaPayload, 'forgot-password');
       if (!isCaptchaValid) {
         return res.status(400).json({ error: 'CAPTCHA verification failed' });
       }
@@ -875,7 +876,7 @@ async function startServer() {
       }
 
       // Verify CAPTCHA
-      const isCaptchaValid = await verifyCaptcha(captchaPayload);
+      const isCaptchaValid = await verifyCaptcha(captchaPayload, 'reset-password');
       if (!isCaptchaValid) {
         return res.status(400).json({ error: 'CAPTCHA verification failed' });
       }
@@ -970,13 +971,21 @@ async function startServer() {
 
   app.options('/api/captcha/challenge', cors<cors.CorsRequest>(captchaCorsOptions));
 
-  app.get('/api/captcha/challenge', cors<cors.CorsRequest>(captchaCorsOptions), async (_req, res) => {
+  const captchaChallengeLimiter = rateLimit({
+    windowMs: 60000, limit: 30, standardHeaders: 'draft-8', legacyHeaders: false,
+    // Preserve Core's current socket-IP policy; never trust a caller's forwarded header.
+    keyGenerator: req => ipKeyGenerator(req.ip || req.socket.remoteAddress || 'unknown'),
+  });
+  app.get('/api/captcha/challenge', cors<cors.CorsRequest>(captchaCorsOptions), captchaChallengeLimiter, async (req, res) => {
     try {
-      const challenge = await createCaptchaChallenge();
-      res.json(challenge);
+      if (!isCaptchaAction(req.query.action)) return res.status(400).json({ error: 'Invalid verification action' });
+      const challenge = await createCaptchaChallenge(req.query.action);
+      res.setHeader('Cache-Control', 'no-store');
+      return res.json(challenge);
     } catch (error) {
-      console.error('❌ CAPTCHA challenge creation failed:', error); // eslint-disable-line no-console
-      res.status(500).json({ error: 'Failed to create CAPTCHA challenge' });
+      if (error instanceof CaptchaCapacityError) return res.status(503).json({ error: error.message });
+      console.error('CAPTCHA challenge creation failed'); // eslint-disable-line no-console
+      return res.status(500).json({ error: 'Failed to create CAPTCHA challenge' });
     }
   });
 

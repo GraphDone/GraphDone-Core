@@ -86,6 +86,7 @@ describe('production API startup secret boundary', () => {
     ['blank SESSION_SECRET', 'SESSION_SECRET', '  '],
     ['fallback JWT_SECRET', 'JWT_SECRET', 'your-dev-secret-key'],
     ['fallback SESSION_SECRET', 'SESSION_SECRET', 'graphdone-default-secret-change-in-production'],
+    ['fallback ALTCHA_HMAC_KEY', 'ALTCHA_HMAC_KEY', 'your-secret-hmac-key-change-in-production'],
   ])('rejects %s before database initialization or listening', async (_label, name, value) => {
     if (value === undefined) delete process.env[name!];
     else vi.stubEnv(name!, value);
