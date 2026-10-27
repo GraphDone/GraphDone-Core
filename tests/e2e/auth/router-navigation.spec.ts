@@ -5,7 +5,9 @@ import { gql } from '../../lib/graphRequest';
 test('auth state recognizes an empty authenticated workspace and rejects a login form @router', async ({ page }) => {
   await page.setContent('<main data-testid="workspace-content"><h1>No Graphs Available</h1></main>');
   expect((await getAuthState(page)).isLoggedIn).toBe(true);
-  await page.setContent('<main data-testid="workspace-content"></main><input type="password">');
+  await page.setContent('<main data-testid="workspace-content"><h1>No Graphs Available</h1></main><input type="password">');
+  await expect(page.getByTestId('workspace-content')).toBeVisible();
+  await expect(page.locator('input[type="password"]')).toBeVisible();
   expect((await getAuthState(page)).isLoggedIn).toBe(false);
   await page.setContent('<main>Loading</main>');
   expect((await getAuthState(page)).isLoggedIn).toBe(false);
