@@ -1,60 +1,108 @@
-import { test, expect } from '@playwright/test';
+import { test as base, expect, type CDPSession } from '@playwright/test';
 import { login, TEST_USERS } from '../../lib/auth';
 import { gql } from '../../lib/graphRequest';
 import { seedLargeGraph, deleteGraphDeep } from '../../lib/seedGraph';
 
+// Cold Neo4j query planning belongs to fixture setup, not the interaction
+// budget. Both budgets are bounded; slow clicks and assertions still fail.
+const test = base.extend<{
+  lodFixture: {
+    seeded: Awaited<ReturnType<typeof seedLargeGraph>>;
+    otherGraph?: Awaited<ReturnType<typeof seedLargeGraph>>;
+    touch: CDPSession | null;
+  };
+}>({
+  lodFixture: [
+    async ({ page }, use) => {
+      const width = page.viewportSize()!.width;
+      const ownedGraphIds: string[] = [];
+      const touch =
+        width === 390 ? await page.context().newCDPSession(page) : null;
+      try {
+        if (touch)
+          await touch.send('Emulation.setTouchEmulationEnabled', {
+            enabled: true,
+            maxTouchPoints: 2,
+          });
+        await login(page, TEST_USERS.ADMIN);
+        const seeded = await seedLargeGraph(page, {
+          size: 301,
+          spacing: 300,
+          edgeFactor: 370 / 301,
+          namePrefix: 'Semantic LOD',
+          batchSize: 20,
+          onGraphCreated: id => ownedGraphIds.push(id),
+          titleForIndex: (index, type) =>
+            index === 8
+              ? `${type} 8 — Follow a request through gateway validation, event delivery, retries, settlement and reconciliation across the entire system`
+              : `${type} ${index}`,
+          metadataForIndex: index => ({
+            lod: { groupPath: [`Subsystem ${index % 8}`, 'Worker'] },
+          }),
+        });
+        const otherGraph =
+          width === 1440
+            ? await seedLargeGraph(page, {
+                size: 40,
+                spacing: 300,
+                batchSize: 20,
+                namePrefix: 'LOD switch target',
+                onGraphCreated: id => ownedGraphIds.push(id),
+              })
+            : undefined;
+        await use({ seeded, otherGraph, touch });
+      } finally {
+        // Fixture teardown runs before Playwright closes its page, including on
+        // assertion failure. Surface cleanup failures instead of swallowing them.
+        await page.unroute('**/api/graphql');
+        const cleanup = await Promise.allSettled(
+          ownedGraphIds.map(async id => {
+            await deleteGraphDeep(page, id, { strict: true });
+            const result = await gql(
+              page,
+              'query($id:ID!){graphs(where:{id:$id}){id}}',
+              { id }
+            );
+            expect(result.graphs).toEqual([]);
+          })
+        );
+        await touch?.detach();
+        const failures = cleanup.filter(result => result.status === 'rejected');
+        if (failures.length)
+          throw new AggregateError(
+            failures.map(result => result.reason),
+            'LOD fixture cleanup failed'
+          );
+      }
+    },
+    { timeout: 180000 },
+  ],
+});
+
 test.use({ actionTimeout: 10000 });
 
 for (const width of [1440, 390])
-  test(`semantic overview preserves 301 items and layout at ${width}px @lod`, async ({
-    page,
-  }, info) => {
-    test.setTimeout(120000);
-    await page.setViewportSize({ width, height: 900 });
-    const touch =
-      width === 390 ? await page.context().newCDPSession(page) : null;
-    if (touch)
-      await touch.send('Emulation.setTouchEmulationEnabled', {
-        enabled: true,
-        maxTouchPoints: 2,
-      });
-    await login(page, TEST_USERS.ADMIN);
-    const seeded = await seedLargeGraph(page, {
-      size: 301,
-      spacing: 300,
-      edgeFactor: 370 / 301,
-      namePrefix: 'Semantic LOD',
-      batchSize: 20,
-      titleForIndex: (index, type) =>
-        index === 8
-          ? `${type} 8 — Follow a request through gateway validation, event delivery, retries, settlement and reconciliation across the entire system`
-          : `${type} ${index}`,
-      metadataForIndex: index => ({
-        lod: { groupPath: [`Subsystem ${index % 8}`, 'Worker'] },
-      }),
-    });
-    const attemptedWrites: string[] = [];
-    let otherGraph: Awaited<ReturnType<typeof seedLargeGraph>> | undefined;
-    const pageErrors: string[] = [];
-    page.on('pageerror', error => pageErrors.push(error.message));
-    const snapshot = async () =>
-      (
-        await gql(
-          page,
-          `query($id:ID!){workItems(where:{graph:{id:$id}}){id positionX positionY}}`,
-          { id: seeded.graphId }
-        )
-      ).workItems.sort((a: { id: string }, b: { id: string }) =>
-        a.id.localeCompare(b.id)
-      );
-    try {
-      if (width === 1440)
-        otherGraph = await seedLargeGraph(page, {
-          size: 40,
-          spacing: 300,
-          batchSize: 20,
-          namePrefix: 'LOD switch target',
-        });
+  test.describe(`${width}px LOD`, () => {
+    test.use({ viewport: { width, height: 900 } });
+    test(`semantic overview preserves 301 items and layout at ${width}px @lod`, async ({
+      page,
+      lodFixture,
+    }, info) => {
+      test.setTimeout(120000);
+      const { seeded, otherGraph, touch } = lodFixture;
+      const attemptedWrites: string[] = [];
+      const pageErrors: string[] = [];
+      page.on('pageerror', error => pageErrors.push(error.message));
+      const snapshot = async () =>
+        (
+          await gql(
+            page,
+            `query($id:ID!){workItems(where:{graph:{id:$id}}){id positionX positionY}}`,
+            { id: seeded.graphId }
+          )
+        ).workItems.sort((a: { id: string }, b: { id: string }) =>
+          a.id.localeCompare(b.id)
+        );
       const graphNames = (await gql(page, 'query{graphs{id name}}')).graphs as {
         id: string;
         name: string;
@@ -432,12 +480,5 @@ for (const width of [1440, 390])
       await expect(page.locator('.graph-container .node')).toHaveCount(301);
       expect(await snapshot()).toEqual(before);
       expect(attemptedWrites).toEqual([]);
-    } finally {
-      if (!page.isClosed()) {
-        await page.unroute('**/api/graphql');
-        await deleteGraphDeep(page, seeded.graphId);
-        if (otherGraph) await deleteGraphDeep(page, otherGraph.graphId);
-      }
-      await touch?.detach();
-    }
+    });
   });
