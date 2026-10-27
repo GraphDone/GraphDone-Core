@@ -142,6 +142,33 @@ for (const width of [1440, 390])
         element.setAttribute('data-lod-identity', 'retained');
       });
       expect(await cards.count()).toBeGreaterThan(0);
+      const overviewGeometry = async () => {
+        const geometry = await cards.evaluateAll(elements =>
+          elements.map(element => {
+            const rect = element.getBoundingClientRect();
+            return {
+              x: rect.x,
+              y: rect.y,
+              right: rect.right,
+              bottom: rect.bottom,
+              font: parseFloat(
+                getComputedStyle(element.querySelector('span')!).fontSize
+              ),
+            };
+          })
+        );
+        for (const a of geometry) {
+          expect(a.font).toBeGreaterThanOrEqual(14);
+          expect(a.x).toBeGreaterThanOrEqual(0);
+          expect(a.right).toBeLessThanOrEqual(width);
+          for (const b of geometry.filter(b => b !== a))
+            expect(
+              a.x < b.right && a.right > b.x && a.y < b.bottom && a.bottom > b.y
+            ).toBe(false);
+        }
+        return geometry;
+      };
+      const initialGeometry = await overviewGeometry();
       const longTitleItem = before.find(
         (item: { id: string }) => item.id === seeded.nodeIds[8]
       );
@@ -173,34 +200,13 @@ for (const width of [1440, 390])
         )).toBeCloseTo(0.5);
       }
       await page.clock.resume();
-      const geometry = await cards.evaluateAll(elements =>
-        elements.map(element => {
-          const rect = element.getBoundingClientRect();
-          return {
-            x: rect.x,
-            y: rect.y,
-            right: rect.right,
-            bottom: rect.bottom,
-            font: parseFloat(
-              getComputedStyle(element.querySelector('span')!).fontSize
-            ),
-          };
-        })
-      );
-      for (const a of geometry) {
-        expect(a.font).toBeGreaterThanOrEqual(14);
-        expect(a.x).toBeGreaterThanOrEqual(0);
-        expect(a.right).toBeLessThanOrEqual(width);
-        for (const b of geometry.filter(b => b !== a))
-          expect(
-            a.x < b.right && a.right > b.x && a.y < b.bottom && a.bottom > b.y
-          ).toBe(false);
-      }
+      const geometry = await overviewGeometry();
       await info.attach('overview-geometry.json', {
         body: JSON.stringify({
           width,
           nodes: before.length,
           edges: seeded.edgeCount,
+          initialGeometry,
           geometry,
         }),
         contentType: 'application/json',

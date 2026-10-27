@@ -41,3 +41,9 @@ Limits: these checks cover camera intent and immutable stored positions on the
 1k/10k performance, hosted behavior or deployed-source identity. Preserve the
 original failed CI artifacts and the warm negative-control pass alongside the
 deterministic failure; a later green run must not erase either observation.
+
+Independent review identified a lost initial-fit geometry sample after moving
+zoom earlier. The test now checks font size, viewport bounds and card overlap
+both at the first automatic fit and after explicit zoom, retaining both samples
+in its geometry attachment. Clock control keeps the first sample from waiting
+out the pending fit loop.
