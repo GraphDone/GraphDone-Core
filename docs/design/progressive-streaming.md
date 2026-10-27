@@ -3,6 +3,13 @@
 > Status: design accepted (2026-06-11). Implementation next.
 > Story: ADAPT-4 in [USER_STORIES.md](../USER_STORIES.md). Budget: TTFP < 2s on simulated 3G for a 1k-node graph.
 
+> **2026-10-27 review:** implementation remains pending. The current merge helpers
+> consume complete snapshots, remove absent nodes and drop edges with unloaded
+> endpoints; passing each page directly to them is unsafe. Follow the
+> [dynamic LOD continuation](../architecture/dynamic-graph-lod.md) for the revised
+> source-registry, summary-first loading, revision/cursor and completeness
+> contracts. The mechanics below are historical design, not shipped behavior.
+
 ## Problem
 
 The graph view fetches **every** work item and edge in the graph in one query. At 1k+ nodes on a slow link this blows the time-to-first-paint budget, and most of those nodes land outside the initial viewport anyway. Quality tiers already bound how much we *render* (`maxInitialNodes`); nothing bounds what we *fetch*.
