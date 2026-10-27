@@ -1,7 +1,8 @@
 # Dynamic graph LOD: continuation through delivery
 
-Reviewed 2026-10-27 UTC. Status: implementation plan, with fresh source, GitHub,
-and localhost evidence. This document does not claim semantic LOD is implemented.
+Reviewed 2026-10-27 UTC. Status: the first production-renderer overview slice is
+implemented on the feature branch (section 8); the full dynamic LOD path remains
+open. Source, GitHub and localhost observations below describe the reviewed base.
 The stage IDs below are proposed work items, not existing GitHub issue numbers.
 
 The owner's CodeGraph reuse direction is incorporated in the

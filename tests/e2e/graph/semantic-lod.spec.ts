@@ -165,34 +165,38 @@ for (const width of [1440, 390])
           )
           .toBeCloseTo(scale);
       };
-      for (const scale of [0.5, 0.9, 0.99]) {
+      for (const scale of [0.5, 0.9, 0.99, 1.1]) {
         await zoomToTitle(scale);
         await expect(overview).toHaveAttribute('data-active', 'true');
       }
-      await zoomToTitle(1.05);
-      await expect(overview).toHaveAttribute('data-active', 'false');
-      const titleSizes = await svg.locator('.node-title-text').evaluateAll(
-        (elements, id) =>
-          elements
-            .filter(
-              element =>
-                (
-                  element.closest('.node') as Element & {
-                    __data__?: { id: string };
-                  }
-                )?.__data__?.id === id
-            )
-            .map(element => {
-              const matrix = (element as SVGGraphicsElement).getScreenCTM()!;
-              return (
-                parseFloat(getComputedStyle(element).fontSize) *
-                Math.hypot(matrix.a, matrix.b)
-              );
-            }),
-        seeded.nodeIds[8]
-      );
-      expect(titleSizes.length).toBeGreaterThan(0);
-      expect(Math.min(...titleSizes)).toBeGreaterThanOrEqual(12);
+      for (const scale of [1.2, 1.14, 1.01]) {
+        await zoomToTitle(scale);
+        await expect(overview).toHaveAttribute('data-active', 'false');
+        const titleSizes = await svg.locator('.node-title-text').evaluateAll(
+          (elements, id) =>
+            elements
+              .filter(
+                element =>
+                  (
+                    element.closest('.node') as Element & {
+                      __data__?: { id: string };
+                    }
+                  )?.__data__?.id === id
+              )
+              .map(element => {
+                const matrix = (element as SVGGraphicsElement).getScreenCTM()!;
+                return (
+                  parseFloat(getComputedStyle(element).fontSize) *
+                  Math.hypot(matrix.a, matrix.b)
+                );
+              }),
+          seeded.nodeIds[8]
+        );
+        expect(titleSizes.length).toBeGreaterThan(0);
+        expect(Math.min(...titleSizes)).toBeGreaterThanOrEqual(12);
+      }
+      await zoomToTitle(0.99);
+      await expect(overview).toHaveAttribute('data-active', 'true');
       await zoomToTitle(0.23);
       await expect(overview).toHaveAttribute('data-active', 'true');
       await overview

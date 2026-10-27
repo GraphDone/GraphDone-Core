@@ -194,7 +194,7 @@ export function projectSemanticGraph(
 export function overviewAtScale(previous: boolean, scale: number): boolean {
   // Long, multiline source titles are fitted inside cards; the nominal 12px
   // counter-scale alone cannot keep them readable below normal item scale.
-  return previous ? scale < 1 : scale < 0.85;
+  return previous ? scale < 1.15 : scale < 1;
 }
 
 export interface OverviewAnchor {
