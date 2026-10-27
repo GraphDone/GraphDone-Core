@@ -9,6 +9,7 @@ import { sqliteAuthStore } from '../src/auth/sqlite-auth';
 import { sqliteAuthResolvers } from '../src/resolvers/sqlite-auth';
 import { authOnlyTypeDefs } from '../src/schema/auth-only-schema';
 import { createCaptchaChallenge, type CaptchaAction } from '../src/utils/captcha';
+import { createCaptchaChallengeLimiter } from '../src/utils/captcha-rate-limit';
 
 let database: sqlite3.Database;
 let server: Server;
@@ -49,6 +50,8 @@ beforeAll(async () => {
   } } });
   await apollo.start();
   const app = express();
+  app.set('trust proxy', 2);
+  app.get('/challenge-budget', createCaptchaChallengeLimiter(), (_req, res) => res.json({ allowed: true }));
   app.use('/graphql', express.json(), expressMiddleware(apollo, { context: async ({ req }) => ({ req }) }));
   server = createServer(app);
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -66,6 +69,14 @@ afterAll(async () => {
 });
 
 describe('production CAPTCHA at the actual HTTP GraphQL boundary', () => {
+  it('cannot rotate forwarded IPs to bypass the socket issuance budget with trust proxy enabled', async () => {
+    for (let attempt = 0; attempt < 31; attempt++) {
+      const response = await fetch(endpoint.replace('/graphql', '/challenge-budget'), {
+        headers: { 'x-forwarded-for': `198.51.100.${attempt + 1}` },
+      });
+      expect(response.status).toBe(attempt < 30 ? 200 : 429);
+    }
+  });
   it('refuses missing and forged proofs despite a correct password', async () => {
     for (const captchaPayload of [undefined, 'ABC123']) {
       const result = await request('login', { emailOrUsername: account.email, password, captchaPayload });

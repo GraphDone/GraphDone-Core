@@ -80,3 +80,29 @@ Unresponsive, restarted or over-capacity verification fails closed. Email token
 purpose, OAuth linking and reset-session revocation remain #184. Hosted parity,
 distributed limits, release/deployment and actual email delivery remain separate
 work. Independent exact-head review and final CI are still required.
+
+## Review corrections
+
+Independent review of `b12ef2c1f0064ac7cc838ac1e806c52134a6802f` found that
+`req.ip` can incorporate caller-supplied forwarding headers with the shipped
+`TRUST_PROXY=2` configuration. The challenge limiter now reads only
+`req.socket.remoteAddress`; an actual HTTP negative rotates 31 forwarded IPs
+under Express trust proxy 2 and confirms that the 31st request is denied.
+
+Review also found that an enabled password button could spend login attempts
+while proof was missing/expired or policy loading failed. The UI now honors
+advertised `requiredActions`, disables ordinary submission until ready, and
+guards the submit handler too. Tests assert zero Login mutations in those
+states, preserving explicitly optional development/legacy actions. A
+non-navigating unverified-email result also clears consumed proof. Reset/recovery
+forms clear their payload before releasing their loading state.
+
+The focus regression exposed that ALTCHA's autofocus concerns completion,
+not initial mode entry. Initial checkbox focus is now explicit on desktop mode
+entry and user-requested retry; typing an email does not transfer focus. The
+existing empty-email test now actually leaves and re-enters passwordless mode
+instead of clicking the already-selected tab. Both focus tests passed after
+that correction. Earlier test implementation errors (Fetch `status` property
+versus Playwright's `status()` method and an unsupported Testing Library
+`exact` option) are retained in local logs and were corrected before accepting
+the results. Final composed evidence belongs in the PR discussion.
