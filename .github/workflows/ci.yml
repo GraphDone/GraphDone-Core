@@ -169,6 +169,8 @@ jobs:
         run: npm run build
       - name: Install Playwright (chromium)
         run: npx playwright install --with-deps chromium
+      - name: Vite proxy, hot reload and offline-shell contract
+        run: npm run test:toolchain
       - name: Start GraphDone (dev stack)
         run: |
           npm run dev > /tmp/dev.log 2>&1 &

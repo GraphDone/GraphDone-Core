@@ -1,19 +1,17 @@
-import { defineConfig } from 'vitest/config';
+import { configDefaults, defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
+    exclude: [...configDefaults.exclude, '**/dist/**'],
     environment: 'node',
     testTimeout: 30000,
     pool: 'forks', // Use forked processes for better isolation
-    poolOptions: {
-      forks: {
-        // Keep database-backed functional suites isolated.
-        singleFork: true,
-        isolate: true, // Isolate each test file
-      },
-    },
+    maxWorkers: 1,
+    fileParallelism: false,
+    isolate: true,
     coverage: {
       provider: 'v8',
+      include: ['src/**/*.ts'],
       reporter: ['text', 'html'],
       exclude: [
         'node_modules/',
