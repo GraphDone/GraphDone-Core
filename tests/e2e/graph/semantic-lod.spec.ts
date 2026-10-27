@@ -1,21 +1,23 @@
 import { test as base, expect, type CDPSession } from '@playwright/test';
 import { login, TEST_USERS } from '../../lib/auth';
 import { gql } from '../../lib/graphRequest';
-import { seedLargeGraph, deleteGraphDeep } from '../../lib/seedGraph';
+import { seedLargeGraph } from '../../lib/seedGraph';
+import { ownedGraphIdsFixture } from '../../lib/ownedGraphIdsFixture';
 
 // Cold Neo4j query planning belongs to fixture setup, not the interaction
 // budget. Both budgets are bounded; slow clicks and assertions still fail.
 const test = base.extend<{
+  ownedGraphIds: string[];
   lodFixture: {
     seeded: Awaited<ReturnType<typeof seedLargeGraph>>;
     otherGraph?: Awaited<ReturnType<typeof seedLargeGraph>>;
     touch: CDPSession | null;
   };
 }>({
+  ownedGraphIds: [ownedGraphIdsFixture, { timeout: 60000 }],
   lodFixture: [
-    async ({ page }, use) => {
+    async ({ page, ownedGraphIds }, use) => {
       const width = page.viewportSize()!.width;
-      const ownedGraphIds: string[] = [];
       const touch =
         width === 390 ? await page.context().newCDPSession(page) : null;
       try {
@@ -52,27 +54,7 @@ const test = base.extend<{
             : undefined;
         await use({ seeded, otherGraph, touch });
       } finally {
-        // Fixture teardown runs before Playwright closes its page, including on
-        // assertion failure. Surface cleanup failures instead of swallowing them.
-        await page.unroute('**/api/graphql');
-        const cleanup = await Promise.allSettled(
-          ownedGraphIds.map(async id => {
-            await deleteGraphDeep(page, id, { strict: true });
-            const result = await gql(
-              page,
-              'query($id:ID!){graphs(where:{id:$id}){id}}',
-              { id }
-            );
-            expect(result.graphs).toEqual([]);
-          })
-        );
         await touch?.detach();
-        const failures = cleanup.filter(result => result.status === 'rejected');
-        if (failures.length)
-          throw new AggregateError(
-            failures.map(result => result.reason),
-            'LOD fixture cleanup failed'
-          );
       }
     },
     { timeout: 180000 },
