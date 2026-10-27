@@ -218,6 +218,53 @@ for (const width of [1440, 390])
       await expect(overview).toHaveAttribute('data-active', 'false');
       await zoomToTitle(0.5, true);
       await expect(overview).toHaveAttribute('data-active', 'true');
+      const fixedCamera = await svg.evaluate(element => {
+        const camera = (element as SVGSVGElement & { __zoom: { x: number; y: number; k: number } }).__zoom;
+        return { x: camera.x, y: camera.y, k: camera.k };
+      });
+      await page.evaluate(id => {
+        const target = window as any;
+        const node = Array.from(document.querySelectorAll('.main-graph-group .node')).find(element => (element as any).__data__?.id === id)!;
+        const title = node.querySelector('.node-title-group') as SVGGElement;
+        const measure = title.getBBox.bind(title);
+        target.__lodVisibleTitleMeasurements = 0;
+        target.__lodRestoreTitleMeasurement = () => { delete (title as any).getBBox; };
+        title.getBBox = () => {
+          if (!title.closest('[data-overview="true"]')) target.__lodVisibleTitleMeasurements++;
+          return measure();
+        };
+        target.__lodCameraRefreshCount = 0;
+        target.__lodOriginalViewportUpdate = target.updateMiniMapViewport;
+        target.updateMiniMapViewport = (...args: unknown[]) => {
+          target.__lodCameraRefreshCount++;
+          return target.__lodOriginalViewportUpdate?.(...args);
+        };
+      }, seeded.nodeIds[8]);
+      await overview.getByRole('combobox', { name: 'Graph detail' }).selectOption('items');
+      await expect(overview).toHaveAttribute('data-active', 'false');
+      await expect.poll(() => svg.locator('.main-graph-group .node').evaluateAll((elements, id) => {
+        const node = elements.find(element => (element as Element & { __data__?: { id: string } }).__data__?.id === id)!;
+        const title = node.querySelector('.node-title-group')!.getBoundingClientRect();
+        const card = node.querySelector('.node-bg')!.getBoundingClientRect();
+        return title.width > 0 && title.left >= card.left && title.right <= card.right && title.top >= card.top && title.bottom <= card.bottom;
+      }, seeded.nodeIds[8])).toBe(true);
+      expect(await svg.evaluate(element => {
+        const camera = (element as SVGSVGElement & { __zoom: { x: number; y: number; k: number } }).__zoom;
+        return { x: camera.x, y: camera.y, k: camera.k };
+      })).toEqual(fixedCamera);
+      await expect.poll(() => page.evaluate(() => (window as any).__lodVisibleTitleMeasurements)).toBeGreaterThan(0);
+      expect(await page.evaluate(() => (window as any).__lodCameraRefreshCount)).toBe(0);
+      await page.evaluate(() => {
+        const target = window as any;
+        target.updateMiniMapViewport = target.__lodOriginalViewportUpdate;
+        delete target.__lodOriginalViewportUpdate;
+        delete target.__lodCameraRefreshCount;
+        target.__lodRestoreTitleMeasurement();
+        delete target.__lodRestoreTitleMeasurement;
+        delete target.__lodVisibleTitleMeasurements;
+      });
+      await overview.getByRole('combobox', { name: 'Graph detail' }).selectOption('auto');
+      await expect(overview).toHaveAttribute('data-active', 'true');
       await page.clock.resume();
       const geometry = await overviewGeometry();
       await info.attach('overview-geometry.json', {
