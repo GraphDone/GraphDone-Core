@@ -76,7 +76,7 @@
     "qc:operator-login": "playwright test tests/e2e/quality/operator-login.spec.ts --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line",
     "test:operations": "tsx scripts/test-operations-local.mts && tsx scripts/test-admin-bootstrap.mts",
     "qc:captcha": "playwright test --config playwright.captcha.config.ts --headed --workers=1 --retries=0",
-    "test:toolchain": "node --test tests/toolchain/vite-contract.mjs"
+    "test:toolchain": "node --test tests/toolchain/*-contract.mjs"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
@@ -85,7 +85,7 @@
     "eslint": "^8.54.0",
     "eslint-config-prettier": "^9.0.0",
     "prettier": "^3.1.0",
-    "turbo": "^1.13.4",
+    "turbo": "^2.11.10",
     "typescript": "^5.3.0"
   },
   "engines": {
@@ -109,5 +109,6 @@
     "@apollo/federation-internals@2.14.4": {
       "uuid": "11.1.1"
     }
-  }
+  },
+  "packageManager": "npm@10.8.2"
 }
