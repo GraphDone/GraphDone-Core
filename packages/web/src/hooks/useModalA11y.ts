@@ -86,6 +86,9 @@ export function useModalA11y(ref: RefObject<HTMLElement>, opts: ModalA11yOptions
       // Defer past paint so portaled fields/buttons exist before we grab focus,
       // and prefer the first real form field over an icon-only Close button.
       raf = requestAnimationFrame(() => {
+        const active = document.activeElement;
+        if (!el.isConnected || el.contains(active) ||
+            (active && active !== document.body && active !== previouslyFocused)) return;
         const items = focusables();
         const target = items.find(isField) || items[0];
         if (target) {

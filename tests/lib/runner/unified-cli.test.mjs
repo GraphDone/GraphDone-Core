@@ -47,7 +47,10 @@ for (const sequence of ['new-user', 'mobile', 'perf-budgets']) {
     const result = run(['--sequence', sequence]);
     assert.equal(result.status, 0, result.stdout);
     const args = JSON.parse(readFileSync(join(dir, 'bin/argv.json')));
-    if (sequence === 'new-user') assert.ok(args.includes('tests/e2e/graph/semantic-lod.spec.ts'));
+    if (sequence === 'new-user') {
+      assert.ok(args.includes('tests/e2e/graph/semantic-lod.spec.ts'));
+      assert.ok(args.includes('tests/e2e/auth/router-navigation.spec.ts'));
+    }
     assert.deepEqual(args.filter(arg => arg.startsWith('--trace=')), ['--trace=retain-on-failure']);
     assert.deepEqual(args.filter(arg => arg.startsWith('--retries=')), ['--retries=0']);
     assert.deepEqual(args.filter(arg => arg.startsWith('--workers=')), ['--workers=1']);
