@@ -2,6 +2,7 @@
 
 | Symptom | Canonical lesson and regression |
 | --- | --- |
+| Disposable Git fixture teardown reports ENOTEMPTY under .git after a synchronous commit | [Prevent detached fixture maintenance](../inbox/2026-10-27-disposable-git-fixtures-must-own-maintenance.md); `tests/lib/runner/unified-cli.test.mjs` |
 | A router major update passes install but path handling or route UI assertions differ | [Validate installed navigation and current UI contracts](../inbox/2026-10-27-router-upgrades-need-current-consumer-contracts.md); `routerNavigation.test.tsx`, `router-navigation.spec.ts`, dependency guard |
 | Status-note text lands in the title and Add remains disabled after quick edit opens | [Delayed autofocus must preserve chosen focus](../inbox/2026-10-27-delayed-autofocus-must-preserve-chosen-focus.md); `QuickEditSurface.test.tsx` controls the pending frame |
 | Minimap zoom or overview inspection is overwritten while a newly loaded graph settles | [Explicit camera input must stop automatic framing](../inbox/2026-10-27-explicit-camera-input-must-stop-auto-fit.md); timer-controlled `semantic-lod.spec.ts` negative control |
