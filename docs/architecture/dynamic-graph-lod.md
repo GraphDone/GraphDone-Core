@@ -4,6 +4,12 @@ Reviewed 2026-10-27 UTC. Status: implementation plan, with fresh source, GitHub,
 and localhost evidence. This document does not claim semantic LOD is implemented.
 The stage IDs below are proposed work items, not existing GitHub issue numbers.
 
+The owner's CodeGraph reuse direction is incorporated in the
+[cross-project technique and source map](codegraph-lod-reuse.md). Use the working
+mandala hierarchy/label logic and modern continuous Structure loading lifecycle
+as implementation references. CodeGraph's standalone `lod.js` is not currently
+wired into its viewers; do not mistake its self-test for production integration.
+
 The outcome is a graph that remains understandable while moving between an
 entire system, its subsystems, a neighborhood, and an individual item. Zooming
 out must replace detail with readable meaning. Zooming back in must recover
@@ -403,3 +409,10 @@ release path. Recheck #191/#189/#190 rather than assuming their October status.
 The next action is LOD-0/LOD-1 preparation on current dev, followed by the first
 production overview. This plan is complete as a planning artifact; the feature
 remains open until the checklist above has evidence on the delivered application.
+
+CodeGraph-informed refinement: LOD-0 includes intermediate-zoom coverage, label
+self-resolution and stable-page/camera tests. LOD-1 adopts parent fallback and
+explicit page accumulation/epochs from the outset. LOD-3 evaluates extraction of
+shared geometry/transition primitives with tests against both consumers; LOD-7
+adapts generation-bound, coalesced loading. Domain-specific edge projection and
+GraphDone edit/persistence behavior remain explicit responsibilities.

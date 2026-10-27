@@ -16,6 +16,7 @@ Welcome to the GraphDone documentation! This directory contains comprehensive gu
 - [Interaction Model — the friction-free contract](./design/interaction-model.md) - UX constitution: modes, exits, click budgets
 - [Progressive Streaming design](./design/progressive-streaming.md) - ADAPT-4: scale to huge graphs on slow links
 - [Dynamic graph LOD continuation](./architecture/dynamic-graph-lod.md) - Current evidence, semantic zoom, generic AI-authored systems, staged delivery and completion gates
+- [CodeGraph LOD reuse](./architecture/codegraph-lod-reuse.md) - Working techniques, source references and regression contracts to share with GraphDone
 - [Testing & Refinement Plan](./TESTING_AND_REFINEMENT_PLAN.md) - The never-done loop; current cycle's verification debt
 - [AI Agents Quickstart](./api/AI_AGENTS.md) - 5-minute MCP/GraphQL setup for agent teammates
 

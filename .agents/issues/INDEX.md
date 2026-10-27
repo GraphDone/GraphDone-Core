@@ -2,6 +2,7 @@
 
 | Symptom | Canonical lesson and regression |
 | --- | --- |
+| A new LOD design overlooks CodeGraph or treats an unused helper as a shipped shared engine | [CodeGraph reuse map](../../docs/architecture/codegraph-lod-reuse.md); [consumer-evidence lesson](../inbox/2026-10-27-lod-reuse-needs-live-consumer-evidence.md) |
 | Dense graph loses all names at fit scale; an old LOD preview is mistaken for shipped behavior | [Dynamic graph LOD continuation](../../docs/architecture/dynamic-graph-lod.md); current state, staged delivery and explicit completion gates |
 | Read-only graph inspection attempts position writes without dragging | [Guard viewing before navigation and retain attempted-write failures](../inbox/2026-10-27-live-graph-review-can-attempt-layout-writes.md); existing capture guard failed correctly; owned reproduction planned |
 | A proposed progressive page merge would erase earlier nodes or drop unloaded-endpoint edges | [Snapshot replacement is not page append](../inbox/2026-10-27-snapshot-merges-are-not-page-appends.md); existing merge tests establish snapshot semantics |
