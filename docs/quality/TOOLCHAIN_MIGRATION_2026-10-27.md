@@ -68,9 +68,12 @@ Node 24 core/server/MCP coverage passed; current web coverage passed all 353
 cases after correcting the fixture costs below. Final branch CI runs coverage
 for both supported Node versions and remains required before integration.
 
-The current harness passes 190/190. The real unified web adapter passes 353
+The current harness passes 192/192. The real unified web adapter passes 353
 with no skips or warnings. The installed runner's real pass/fail/skip JSON is
-also checked through the adapter; required skips must fail.
+also checked through the adapter. Vitest 4 includes explicitly skipped assertions
+in `numPendingTests`; the adapter accepts that documented-by-output shape and
+the prior zero-pending shape, while unfinished assertions and required skips
+still fail. Optional skips remain skipped and never become passes.
 
 `npm run test:toolchain` uses an owned browser/backend/build fixture and proves
 React hot reload preserves state and document identity, HTTP and GraphQL
@@ -98,6 +101,11 @@ Retained failures and corrections:
 6. Initial dependency guards assumed a coverage-package engine field and an
    exported React-plugin manifest. Corrected guards check the actual contracts;
    they do not weaken supported-runner or version checks.
+
+7. Real Vitest 4 intentional-skip output initially produced a counter mismatch
+   for an optional sequence. Explicit skipped-assertion accounting corrected
+   it; the regression failed before the fix. Real pass/failure/required-skip/
+   optional-skip controls now preserve all four outcomes.
 
 Fresh isolated-cache audit: full inventory has three residual package entries
 (Turbo moderate, Mermaid/KaTeX low); production-only has zero. Historical counts

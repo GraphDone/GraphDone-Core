@@ -25,11 +25,19 @@ A local CPU-protected database run failed six cases on the busy host; a separate
 CI-equivalent run passed all 136, without claiming production CPU acceptance.
 All earlier failures remain under the dated evidence directory on the test host.
 
-Current harness: 190/190; actual unified web adapter: 353/353. An owned browser
+Current harness: 192/192; actual unified web adapter: 353/353. An owned browser
 contract exercises real HMR/state, HTTP/WebSocket proxying, secret denial and
 compiled offline loading. Supported-Node coverage is a required CI matrix check.
 See [the migration evidence and limits](../../docs/quality/TOOLCHAIN_MIGRATION_2026-10-27.md)
 for commands, versions, authoritative references and remaining work.
+
+`node --test tests/lib/adapters/execution-evidence.test.mjs` initially failed
+the new optional-skip case: real Vitest 4 reports an explicitly skipped assertion
+inside `numPendingTests`. The adapter now reconciles that count against actual
+skipped assertions while still rejecting unfinished pending assertions, required
+skips and counter contradictions. Real installed-runner controls separately
+reported pass, failure, required-skip failure and optional skip, with zero
+passes for either skip. The complete harness then passed 192/192.
 
 ## Cause and corrective rule
 
