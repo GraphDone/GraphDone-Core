@@ -51,3 +51,37 @@ it checked locked ranges and installed-pair equality, which could accept two
 equally stale installed copies. The guard now requires each actual web consumer
 to satisfy the fixed range and match its resolved lock entry. The inventory
 states that exact scope. Refresh the changed harness and final CI before merge.
+
+## Empty-account CI correction
+
+Composed Router head `14a4fcc` [CI 40584829418](https://github.com/GraphDone/GraphDone-Core/actions/runs/40584829418)
+completed 50 browser cases in 854 seconds: 48 passed, two viewer cases failed,
+plus the harness's failed-process row. This was not a process-budget timeout.
+Retained screenshots show the authenticated empty workspace at both widths.
+The desktop assertion incorrectly required a populated graph's `view-content`;
+the phone login helper did not recognize an authenticated account without a
+graph selector. The local fixture had graphs and hid both assumptions.
+
+Use the existing authenticated `workspace-content` container for account-level
+route checks and keep login-form exclusion. Router cases additionally assert
+`me.role === VIEWER` through the real API before and after the fresh-context
+callback. A standalone real-browser control recognizes an empty workspace,
+rejects a password form even with workspace markup, and rejects a loading page.
+With the old helper, the empty-workspace positive failed deterministically;
+this helper correction adds no retry, wait or timeout. Original CI artifacts
+remain evidence, and final current-head browser/full CI gates still apply.
+
+The first empty-workspace/password-form negative used a zero-height empty main;
+independent review measured it invisible, so that case could pass for the wrong
+reason. It now retains visible content and asserts both the workspace and the
+password field are visible before requiring an unauthenticated result.
+
+Gate capacity is separate from that failure: focus CI's 44-case new-user sequence
+passed in 892 seconds, only eight below the 900-second process budget; UUID's
+same suite took 768 seconds. Required LOD and route acceptance now run as separate
+blocking sequences after the 42-case new-user suite. All 51 cases remain required
+(42 existing, two LOD, seven route/helper controls), with unchanged per-action
+and per-test deadlines, one worker and zero retries. CI runs and uploads each
+result independently; pr/full profiles also include both new sequences. CLI
+contract tests execute the enrollment/trace arguments. Do not describe this as
+fixing the original two viewer failures or count superseded runs as passes.

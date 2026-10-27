@@ -37,7 +37,7 @@ function fixture(t) {
   return { dir, run };
 }
 
-for (const sequence of ['new-user', 'mobile', 'perf-budgets']) {
+for (const sequence of ['new-user', 'semantic-lod', 'router-navigation', 'mobile', 'perf-budgets']) {
   test(`CLI forwards failure-only tracing without retries for ${sequence}`, t => {
     const { dir, run } = fixture(t);
     const report = { suites: [{ specs: [{ title: 'fixture', ok: true,
@@ -48,8 +48,16 @@ for (const sequence of ['new-user', 'mobile', 'perf-budgets']) {
     assert.equal(result.status, 0, result.stdout);
     const args = JSON.parse(readFileSync(join(dir, 'bin/argv.json')));
     if (sequence === 'new-user') {
-      assert.ok(args.includes('tests/e2e/graph/semantic-lod.spec.ts'));
-      assert.ok(args.includes('tests/e2e/auth/router-navigation.spec.ts'));
+      assert.ok(!args.includes('tests/e2e/graph/semantic-lod.spec.ts'));
+      assert.ok(!args.includes('tests/e2e/auth/router-navigation.spec.ts'));
+    }
+    if (sequence === 'semantic-lod' || sequence === 'router-navigation') {
+      const spec = sequence === 'semantic-lod' ? 'tests/e2e/graph/semantic-lod.spec.ts' : 'tests/e2e/auth/router-navigation.spec.ts';
+      assert.ok(args.includes(spec));
+      assert.equal(SEQUENCES[sequence].blocking, true);
+      const workflow = readFileSync(join(root, '.github/workflows/ci.yml'), 'utf8');
+      const command = `run: xvfb-run --auto-servernum node tests/run-unified.mjs --sequence ${sequence} --out test-artifacts/ci-${sequence}`;
+      assert.equal(workflow.split(command).length, 2);
     }
     assert.deepEqual(args.filter(arg => arg.startsWith('--trace=')), ['--trace=retain-on-failure']);
     assert.deepEqual(args.filter(arg => arg.startsWith('--retries=')), ['--retries=0']);

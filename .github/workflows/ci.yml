@@ -187,6 +187,16 @@ jobs:
         env:
           TEST_URL: http://localhost:3127
           CI: true
+      - name: Semantic LOD acceptance
+        run: xvfb-run --auto-servernum node tests/run-unified.mjs --sequence semantic-lod --out test-artifacts/ci-semantic-lod
+        env:
+          TEST_URL: http://localhost:3127
+          CI: true
+      - name: Route compatibility acceptance
+        run: xvfb-run --auto-servernum node tests/run-unified.mjs --sequence router-navigation --out test-artifacts/ci-router-navigation
+        env:
+          TEST_URL: http://localhost:3127
+          CI: true
       - name: Mobile UI audit (layout / contrast / dialogs across every screen)
         run: node tests/run-unified.mjs --sequence mobile --out test-artifacts/ci-mobile
         env:
