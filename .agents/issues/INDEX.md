@@ -2,6 +2,7 @@
 
 | Symptom | Canonical lesson and regression |
 | --- | --- |
+| Login and reset links cross-use, or a reset/reactivation revives old sessions | [Bind purpose and session revision at the write](../inbox/2026-10-27-email-purpose-and-revision-are-auth-boundaries.md); real SQLite/HTTP/WebSocket `auth-link-boundary.test.ts` |
 | Arbitrary client CAPTCHA strings succeed, or direct login/signup omits proof | [Require server-issued action-bound proof and atomic consumption](../inbox/2026-10-27-captcha-proof-must-be-server-issued.md); server `captcha` / `captcha-auth` tests and `qc:captcha` |
 | A dependency fix exists in pending main promotion but dev still fails the audit | [Backport the reviewed patch and refresh target-branch evidence](../inbox/2026-10-27-dev-undici-backport.md); PR #194 |
 | Main-promotion audit flags Undici through SQLite's optional native-build dependency | [Narrow consumer-verified dependency update](../inbox/2026-10-24-undici-native-build-dependency.md); [security audit index](security-audit-index.md) |
