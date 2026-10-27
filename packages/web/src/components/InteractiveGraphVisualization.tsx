@@ -1,6 +1,7 @@
 import { skipBackgroundPoll } from '../lib/hostedUsage';
 import { QuickEditSurface } from './QuickEditSurface';
-import React, { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { SemanticGraphOverview } from './SemanticGraphOverview';
 import ReactDOM from 'react-dom/client';
 import { createPortal } from 'react-dom';
 import * as d3 from 'd3';
@@ -656,7 +657,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     if (!svgRef.current) return;
     
     const svg = d3.select(svgRef.current);
-    const defs = svg.select('defs');
+    const defs = svg.select(':scope > defs');
     
     const nodeTypeConfig = getTypeConfig(node.type as WorkItemType);
     const nodeColor = nodeTypeConfig.hexColor;
@@ -675,7 +676,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     if (!svgRef.current) return;
     
     const svg = d3.select(svgRef.current);
-    const defs = svg.select('defs');
+    const defs = svg.select(':scope > defs');
     
     // Remove glow and reset properties from all elements first
     svg.selectAll('.node-bg').style('filter', null);
@@ -982,7 +983,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       // Clicks inside the docked inspector (a sibling tree) must not deselect
       // the node — otherwise its own Card/Contents/Diagram controls close it.
       const target = event.target as Element | null;
-      if (target && target.closest('[data-testid="node-inspector"], [role="dialog"]')) {
+      if (target && target.closest('[data-testid="node-inspector"], [role="dialog"], .semantic-overview')) {
         return;
       }
       setNodeMenu(prev => ({ ...prev, visible: false }));
@@ -1144,12 +1145,13 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     }
   }, [currentGraph?.id, refetch, refetchEdges]);
 
-  const workItemEdges: WorkItemEdge[] = [];
+  const workItemEdges = useMemo(() => {
+  const result: WorkItemEdge[] = [];
   
   // Add edges from Neo4j Edge entities
   if (edgesData?.edges) {
     edgesData.edges.forEach((edge: any) => {
-      workItemEdges.push({
+      result.push({
         id: edge.id,
         source: edge.source.id,
         target: edge.target.id,
@@ -1168,7 +1170,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     workItems.forEach(item => {
       if (item.dependencies) {
         item.dependencies.forEach((dep: WorkItem) => {
-          workItemEdges.push({
+          result.push({
             id: `edge-${dep.id}-${item.id}`,
             source: item.id,
             target: dep.id,
@@ -1180,6 +1182,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       }
     });
   }
+
+  return result;
+  }, [edgesData, workItems]);
 
   // Validate and sanitize data before D3 processing
   const currentValidationResult = validateGraphData(workItems, workItemEdges);
@@ -1356,7 +1361,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     
     if (isFirstInit) {
       // First initialization - clear everything and create core structure
-      svg.selectAll('*').remove();
+      svg.selectAll(':scope > :not(.semantic-overview-host)').remove();
       d3.select(containerRef.current).selectAll('.node-labels-container').remove();
     } else {
       // Surgical update - only clear data elements, preserve core structure
@@ -1373,6 +1378,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     
     // Create zoom behavior for empty canvas with reversed wheel direction
     const zoom = d3.zoom<SVGSVGElement, unknown>()
+      .filter(event => !(event.target as Element)?.closest('[data-lod-controls]') && (!event.ctrlKey || event.type === 'wheel') && !event.button)
       .scaleExtent([0.1, 3])
       .wheelDelta((event: WheelEvent) => {
         // Standard direction (like maps/most apps): scroll UP (deltaY<0) zooms IN.
@@ -1385,7 +1391,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         }
       });
 
-    const g = isFirstInit ? svg.append('g').attr('class', 'main-graph-group') : existingMainGroup;
+    const g = isFirstInit ? svg.insert('g', '.semantic-overview-host').attr('class', 'main-graph-group') : existingMainGroup;
     
     // Create grid pattern and overlay (only on first init)
     if (isFirstInit) {
@@ -1820,7 +1826,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     
     if (isFirstInit) {
       // First initialization - clear everything and create core structure
-      svg.selectAll('*').remove();
+      svg.selectAll(':scope > :not(.semantic-overview-host)').remove();
       d3.select(containerRef.current).selectAll('.node-labels-container').remove();
     } else {
       // Surgical update - only clear data elements, preserve core structure
@@ -1841,13 +1847,14 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     
     // Create or reuse zoom behavior with reversed wheel direction
     const zoom = d3.zoom<SVGSVGElement, unknown>()
+      .filter(event => !(event.target as Element)?.closest('[data-lod-controls]') && (!event.ctrlKey || event.type === 'wheel') && !event.button)
       .scaleExtent([0.1, 4])
       .wheelDelta((event: WheelEvent) => {
         // Standard direction (like maps/most apps): scroll UP (deltaY<0) zooms IN.
         return -event.deltaY * (event.deltaMode === 1 ? 0.05 : event.deltaMode ? 1 : 0.002);
       });
 
-    const g = isFirstInit ? svg.append('g').attr('class', 'main-graph-group') : existingMainGroup;
+    const g = isFirstInit ? svg.insert('g', '.semantic-overview-host').attr('class', 'main-graph-group') : existingMainGroup;
 
     // Create or reuse background for capturing clicks  
     let background = g.select('rect.background');
@@ -2278,7 +2285,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       });
 
     // Create or get defs element for filters
-    let filterDefs = svg.select('defs') as any;
+    let filterDefs = svg.select(':scope > defs') as any;
     if (filterDefs.empty()) {
       filterDefs = svg.append('defs') as any;
     }
@@ -4120,7 +4127,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       // D3 sets sourceEvent only for direct wheel/pointer gestures. Programmatic
       // fit/restore transforms must remain distinguishable so an automatic fit
       // that later clips a restored task can be repaired on reload.
-      if (event.sourceEvent) cameraManuallyPositionedRef.current = true;
+      if (event.sourceEvent) {
+        cameraManuallyPositionedRef.current = true;
+        if (currentGraphIdRef.current) fittedGraphsRef.current.add(currentGraphIdRef.current);
+      }
       g.attr('transform', event.transform);
       setCurrentTransform({
         x: event.transform.x,
@@ -4268,6 +4278,49 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const simulationRef = useRef<d3.Simulation<any, any> | null>(null);
   useEffect(() => () => stopActiveSimulation(), [stopActiveSimulation]);
   const zoomBehaviorRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
+  const [semanticOverviewActive, setSemanticOverviewActive] = useState(false);
+  const handleOverviewActive = useCallback((active: boolean) => {
+    setSemanticOverviewActive(active);
+    if (active) setSelectedNode(null);
+  }, []);
+  const closeOverviewInspector = useCallback(() => setSelectedNode(null), []);
+  const overviewReturnCamera = useRef<{ graphId: string; transform: d3.ZoomTransform } | null>(null);
+  const readOverviewPositions = useCallback(() => simulationRef.current?.nodes() ?? [], []);
+  const inspectOverviewItem = useCallback((id: string, beginSession: boolean) => {
+    const item = simulationRef.current?.nodes().find(node => node.id === id);
+    if (!item || !svgRef.current || !containerRef.current || !zoomBehaviorRef.current || !currentGraphIdRef.current) return;
+    if (beginSession || overviewReturnCamera.current?.graphId !== currentGraphIdRef.current) {
+      overviewReturnCamera.current = { graphId: currentGraphIdRef.current, transform: d3.zoomTransform(svgRef.current) };
+    }
+    // Selection is intentional here; never invoke the Grow/connect click path.
+    setSelectedNode(item);
+    setSelectedNodes(new Set([id]));
+    setEditingEdge(null);
+    cameraManuallyPositionedRef.current = true;
+    fittedGraphsRef.current.add(currentGraphIdRef.current);
+    const k = 1.2;
+    const transform = d3.zoomIdentity.translate(containerRef.current.clientWidth / 2 - item.x * k, containerRef.current.clientHeight / 2 - item.y * k).scale(k);
+    d3.select(svgRef.current).interrupt().call(zoomBehaviorRef.current.transform, transform);
+  }, []);
+  const returnToOverview = useCallback(() => {
+    setSelectedNode(null);
+    const saved = overviewReturnCamera.current;
+    if (!saved || saved.graphId !== currentGraphIdRef.current || !svgRef.current || !zoomBehaviorRef.current) return;
+    d3.select(svgRef.current).interrupt().call(zoomBehaviorRef.current.transform, saved.transform);
+    overviewReturnCamera.current = null;
+  }, []);
+  const previousOverview = useRef({ active: false, graphId: currentGraph?.id });
+  useEffect(() => {
+    // Source title fitting needs measurable elements after display:none is lifted.
+    // Do not synthesize a camera event on initial load or across graph scopes:
+    // that would persist an unfitted/default (or previous graph's) camera.
+    const previous = previousOverview.current;
+    previousOverview.current = { active: semanticOverviewActive, graphId: currentGraph?.id };
+    if (previous.active && previous.graphId === currentGraph?.id && !semanticOverviewActive && svgRef.current && zoomBehaviorRef.current) {
+      d3.select(svgRef.current).call(zoomBehaviorRef.current.transform, d3.zoomTransform(svgRef.current));
+    }
+  }, [semanticOverviewActive, currentGraph?.id]);
+
   // True only while "Reset layout" is re-flowing — suspends snapshot pinning
   const layoutReflowingRef = useRef(false);
   const mousedownNodeRef = useRef<any>(null);
@@ -4440,6 +4493,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     (window as any).miniMapNavigate = (graphX: number, graphY: number) => {
       if (!svgRef.current || !containerRef.current || !zoomBehaviorRef.current) return;
       cameraManuallyPositionedRef.current = true;
+      if (currentGraphIdRef.current) fittedGraphsRef.current.add(currentGraphIdRef.current);
       const svg = d3.select(svgRef.current);
       const k = d3.zoomTransform(svgRef.current).k || 1;
       const w = containerRef.current.clientWidth;
@@ -4453,6 +4507,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     (window as any).miniMapZoom = (graphX: number, graphY: number, targetK: number) => {
       if (!svgRef.current || !containerRef.current || !zoomBehaviorRef.current) return;
       cameraManuallyPositionedRef.current = true;
+      if (currentGraphIdRef.current) fittedGraphsRef.current.add(currentGraphIdRef.current);
       const svg = d3.select(svgRef.current);
       const k = Math.max(0.1, Math.min(4, targetK));
       const w = containerRef.current.clientWidth;
@@ -5434,17 +5489,34 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
 
   return (
-    <div ref={containerRef} className="graph-container relative w-full h-full overflow-hidden select-none" data-quality={qualityTier} data-dense={isDenseGraph ? 'true' : undefined} data-simplify={isSimplified ? 'true' : undefined} data-dots={isDotMode ? 'true' : undefined}>
+    <div ref={containerRef} className="graph-container relative w-full h-full overflow-hidden select-none" data-overview={semanticOverviewActive || undefined} data-quality={qualityTier} data-dense={isDenseGraph ? 'true' : undefined} data-simplify={isSimplified ? 'true' : undefined} data-dots={isDotMode ? 'true' : undefined}>
       <svg
         ref={svgRef}
         className="w-full h-full"
-        role="img"
+        role="group"
         aria-label="Interactive work-item dependency graph"
         aria-describedby="graph-a11y-desc"
-      />
+      >
+        <foreignObject className="semantic-overview-host" width="100%" height="100%" style={{ pointerEvents: 'none' }}>
+      {currentGraph && workItems.length >= 40 && <SemanticGraphOverview
+        key={currentGraph.id}
+        items={workItems}
+        edges={workItemEdges}
+        camera={currentTransform}
+        readPositions={readOverviewPositions}
+        onActiveChange={handleOverviewActive}
+        selectedId={Array.from(selectedNodes).slice(-1)[0]}
+        onBrowse={closeOverviewInspector}
+        onInspect={inspectOverviewItem}
+        onBack={returnToOverview}
+      />}
+        </foreignObject>
+      </svg>
       <p id="graph-a11y-desc" className="sr-only">
         Force-directed graph of work items and their dependencies. Double-click with a mouse or tap an item to edit it. Use the view switcher to see the same data as a list, table, or board, which are keyboard-navigable.
       </p>
+
+
 
       
       {/* Empty State Overlay */}
