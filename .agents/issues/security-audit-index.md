@@ -2,6 +2,7 @@
 
 | Symptom | Evidence and corrective rule |
 | --- | --- |
+| A toolchain upgrade changes test counts, loses matcher types or drops unimported coverage | [Preserve discovery and consumer behavior](../inbox/2026-10-27-toolchain-upgrades-must-preserve-test-contracts.md); [migration evidence](../../docs/quality/TOOLCHAIN_MIGRATION_2026-10-27.md) |
 | OAuth email metadata loses verification or callbacks log credential-bearing redirects | [Provider proof and isolated atomic linking](../inbox/2026-10-27-oauth-linking-needs-provider-proof-and-atomicity.md); [provider/recovery contract](../../docs/quality/OAUTH_IDENTITY.md) |
 | Login and reset links cross-use, or a reset/reactivation revives old sessions | [Bind purpose and session revision at the write](../inbox/2026-10-27-email-purpose-and-revision-are-auth-boundaries.md); real SQLite/HTTP/WebSocket `auth-link-boundary.test.ts` |
 | CAPTCHA validates only a client string's format or skips missing GraphQL proof | [Server policy, signed action/expiry and bounded replay](../inbox/2026-10-27-captcha-proof-must-be-server-issued.md); `packages/server/tests/captcha*.test.ts`, `qc:captcha` |

@@ -1,5 +1,5 @@
 import { offlineShell } from './offline-shell';
-import { defineConfig } from 'vite';
+import { configDefaults, defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
 import { hostname } from 'os';
@@ -70,6 +70,7 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
+    target: ['es2020', 'chrome87', 'edge88', 'firefox78', 'safari14'],
     // No production source maps — serving .js.map publicly leaks original source.
     // Caught by the live red-team (REDTEAM-SEC). Dev uses the Vite dev server
     // (its own maps), so debugging is unaffected.
@@ -92,11 +93,14 @@ export default defineConfig({
     }
   },
   test: {
+    maxWorkers: 2,
+    exclude: [...configDefaults.exclude, '**/dist/**'],
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     coverage: {
       provider: 'v8',
+      include: ['src/**/*.{ts,tsx}', 'offline-shell.ts'],
       reporter: ['text', 'json', 'html'],
       exclude: [
         'node_modules/',

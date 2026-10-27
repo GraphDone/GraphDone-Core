@@ -75,7 +75,8 @@
     "qc:operations": "playwright test tests/e2e/quality/operations.spec.ts --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line",
     "qc:operator-login": "playwright test tests/e2e/quality/operator-login.spec.ts --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line",
     "test:operations": "tsx scripts/test-operations-local.mts && tsx scripts/test-admin-bootstrap.mts",
-    "qc:captcha": "playwright test --config playwright.captcha.config.ts --headed --workers=1 --retries=0"
+    "qc:captcha": "playwright test --config playwright.captcha.config.ts --headed --workers=1 --retries=0",
+    "test:toolchain": "node --test tests/toolchain/vite-contract.mjs"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",

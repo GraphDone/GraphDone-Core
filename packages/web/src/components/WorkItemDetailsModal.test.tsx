@@ -91,9 +91,13 @@ function editor() {
   };
 }
 
-const title = () => screen.getByRole('textbox', { name: 'Work item title' });
+const title = () => screen.getByLabelText('Work item title');
 const dueDate = () => screen.getByLabelText('Due date');
-const save = () => screen.getByRole('button', { name: /Save changes to work item|No changes to save/ });
+const save = () => {
+  const button = screen.getByLabelText(/Save changes to work item|No changes to save/);
+  expect(button.tagName).toBe('BUTTON');
+  return button;
+};
 
 beforeEach(() => {
   context.ownerId = 'owner-a';
@@ -108,7 +112,7 @@ afterEach(() => { vi.unstubAllGlobals(); });
 describe('work item save completion', () => {
   it('preserves edits made after the mutation commits while its refetch is pending, then saves and undoes both snapshots', async () => {
     const view = editor();
-    await screen.findByRole('textbox', { name: 'Work item title' });
+    await screen.findByLabelText('Work item title');
     fireEvent.change(dueDate(), { target: { value: '2026-09-14' } });
     fireEvent.click(save());
     await view.acknowledgeMutation();
@@ -149,7 +153,7 @@ describe('work item save completion', () => {
 
   it('does not apply a late completion to a different item with a newer draft', async () => {
     const view = editor();
-    await screen.findByRole('textbox', { name: 'Work item title' });
+    await screen.findByLabelText('Work item title');
     fireEvent.change(title(), { target: { value: 'Saved first item' } });
     fireEvent.click(save());
     await view.acknowledgeMutation();
@@ -166,7 +170,7 @@ describe('work item save completion', () => {
 
   it('does not replace a draft from a later opening of the same item', async () => {
     const view = editor();
-    await screen.findByRole('textbox', { name: 'Work item title' });
+    await screen.findByLabelText('Work item title');
     fireEvent.change(title(), { target: { value: 'Submitted title' } });
     fireEvent.click(save());
     await view.acknowledgeMutation();
@@ -180,7 +184,7 @@ describe('work item save completion', () => {
 
   it('retains a deliberate return to the original value across the mutation cache write and refetch', async () => {
     const view = editor();
-    await screen.findByRole('textbox', { name: 'Work item title' });
+    await screen.findByLabelText('Work item title');
     fireEvent.change(title(), { target: { value: 'Submitted title' } });
     fireEvent.click(save());
     fireEvent.change(title(), { target: { value: 'First item' } });
@@ -193,14 +197,14 @@ describe('work item save completion', () => {
 
   it.each(['owner', 'graph'] as const)('ignores success from an earlier %s context', async scope => {
     const view = editor();
-    await screen.findByRole('textbox', { name: 'Work item title' });
+    await screen.findByLabelText('Work item title');
     fireEvent.change(title(), { target: { value: 'Submitted in old context' } });
     fireEvent.click(save());
     await view.acknowledgeMutation();
     if (scope === 'owner') context.ownerId = 'owner-b';
     else context.graphId = 'graph-b';
     view.navigate();
-    await screen.findByRole('textbox', { name: 'Work item title' });
+    await screen.findByLabelText('Work item title');
     fireEvent.change(title(), { target: { value: 'Current context draft' } });
     await view.completeRefetch();
     await waitFor(() => expect(save()).toBeEnabled());
@@ -210,7 +214,7 @@ describe('work item save completion', () => {
 
   it('retains a newer draft on failure and retries without registering failed undo history', async () => {
     const view = editor();
-    await screen.findByRole('textbox', { name: 'Work item title' });
+    await screen.findByLabelText('Work item title');
     fireEvent.change(title(), { target: { value: 'Failed title' } });
     fireEvent.click(save());
     fireEvent.change(title(), { target: { value: 'Retry this newer title' } });
@@ -228,7 +232,7 @@ describe('work item save completion', () => {
 
   it('does not report a stale failure in a different item session', async () => {
     const view = editor();
-    await screen.findByRole('textbox', { name: 'Work item title' });
+    await screen.findByLabelText('Work item title');
     fireEvent.change(title(), { target: { value: 'Failed title' } });
     fireEvent.click(save());
     view.navigate('item-b');
@@ -241,7 +245,7 @@ describe('work item save completion', () => {
 
   it('preserves unsaved fields before and during undo while updating the saved baseline', async () => {
     const view = editor();
-    await screen.findByRole('textbox', { name: 'Work item title' });
+    await screen.findByLabelText('Work item title');
     fireEvent.change(title(), { target: { value: 'Saved title' } });
     fireEvent.click(save());
     await view.acknowledgeMutation();
@@ -261,7 +265,7 @@ describe('work item save completion', () => {
 
   it.each(['mounted', 'unmounted'])('does not repopulate history cleared for another graph while a save is pending (%s)', async mode => {
     const view = editor();
-    await screen.findByRole('textbox', { name: 'Work item title' });
+    await screen.findByLabelText('Work item title');
     fireEvent.change(title(), { target: { value: 'Saved in graph A' } });
     fireEvent.click(save());
     await view.acknowledgeMutation();
@@ -271,7 +275,7 @@ describe('work item save completion', () => {
     else {
       context.graphId = 'graph-b';
       view.navigate('item-b');
-      await screen.findByRole('textbox', { name: 'Work item title' });
+      await screen.findByLabelText('Work item title');
     }
     await view.completeRefetch();
     expect(view.undoStack.size()).toBe(1);
@@ -280,7 +284,7 @@ describe('work item save completion', () => {
 
   it('keeps a successful save undoable after normal modal unmount when history was not cleared', async () => {
     const view = editor();
-    await screen.findByRole('textbox', { name: 'Work item title' });
+    await screen.findByLabelText('Work item title');
     fireEvent.change(title(), { target: { value: 'Saved before closing' } });
     fireEvent.click(save());
     await view.acknowledgeMutation();
@@ -298,7 +302,7 @@ describe('work item save completion', () => {
 
   it.each(['graphql', 'empty', 'wrong-item'] as const)('reports a %s save response and retains the newer draft for retry', async failure => {
     const view = editor();
-    await screen.findByRole('textbox', { name: 'Work item title' });
+    await screen.findByLabelText('Work item title');
     fireEvent.change(title(), { target: { value: 'Submitted title' } });
     fireEvent.click(save());
     fireEvent.change(title(), { target: { value: 'Keep this newer draft' } });
@@ -317,7 +321,7 @@ describe('work item save completion', () => {
 
   it.each(['graphql', 'empty', 'wrong-item'] as const)('rejects a %s undo acknowledgement without changing the saved form', async failure => {
     const view = editor();
-    await screen.findByRole('textbox', { name: 'Work item title' });
+    await screen.findByLabelText('Work item title');
     fireEvent.change(title(), { target: { value: 'Confirmed title' } });
     fireEvent.click(save());
     await view.acknowledgeMutation();
