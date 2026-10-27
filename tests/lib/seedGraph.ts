@@ -61,13 +61,17 @@ export interface SeedOptions {
   batchSize?: number;
   /** Register ownership before node/edge setup, so partial setup can be cleaned. */
   onGraphCreated?: (graphId: string) => void;
+  /** Stop future writes, while draining an in-flight create for its owned ID. */
+  signal?: AbortSignal;
 }
 
 export async function seedLargeGraph(page: Page, opts: SeedOptions): Promise<SeededGraph> {
   const { size, edgeFactor = 1.4, spacing = 130, namePrefix = 'Scale' } = opts;
+  opts.signal?.throwIfAborted();
   const me = await gql(page, '{ me { id } }');
   const userId = me.me.id;
 
+  opts.signal?.throwIfAborted();
   const g = await gql(
     page,
     `mutation($input: [GraphCreateInput!]!) { createGraphs(input: $input) { graphs { id } } }`,
@@ -102,6 +106,7 @@ export async function seedLargeGraph(page: Page, opts: SeedOptions): Promise<See
 
   const nodeIds: string[] = [];
   for (const batch of chunk(nodeInputs, opts.batchSize ?? 100)) {
+    opts.signal?.throwIfAborted();
     const res = await gql(
       page,
       `mutation($input: [WorkItemCreateInput!]!) { createWorkItems(input: $input) { workItems { id } } }`,
@@ -133,6 +138,7 @@ export async function seedLargeGraph(page: Page, opts: SeedOptions): Promise<See
 
   let edgeCount = 0;
   for (const batch of chunk(edgeInputs, opts.batchSize ?? 100)) {
+    opts.signal?.throwIfAborted();
     const res = await gql(
       page,
       `mutation($input: [EdgeCreateInput!]!) { createEdges(input: $input) { edges { id } } }`,

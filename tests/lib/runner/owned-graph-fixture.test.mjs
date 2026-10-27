@@ -8,7 +8,7 @@ import { spawnSync } from 'node:child_process';
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 
-for (const scenario of ['setup-timeout', 'cleanup-failure']) {
+for (const scenario of ['setup-timeout', 'late-create-response', 'cleanup-failure']) {
   test(`owned graph cleanup remains strict after ${scenario}`, t => {
     const dir = mkdtempSync(join(tmpdir(), 'graphdone-fixture-negative-'));
     t.after(() => rmSync(dir, { recursive: true, force: true }));
@@ -23,6 +23,13 @@ const calls = [];
 const fakePage = {
   async unroute() { calls.push('unroute'); },
   async evaluate(_callback, { query, variables }) {
+    if (query.includes(' me ')) return { me: { id: 'owned-user' } };
+    if (query.includes('createGraphs')) {
+      calls.push('createRequested');
+      if (${JSON.stringify(scenario)} === 'late-create-response') await new Promise(resolve => setTimeout(resolve, 250));
+      calls.push('created');
+      return { createGraphs: { graphs: [{ id: 'owned-graph' }] } };
+    }
     if (variables.id !== 'owned-graph') throw new Error('Unexpected graph ownership');
     const operation = ['deleteEdges', 'deleteWorkItems', 'deleteGraphs', 'graphs('].find(name => query.includes(name));
     calls.push(operation);
@@ -34,7 +41,7 @@ const test = base.extend({
   page: async ({}, use) => { try { await use(fakePage); } finally { writeFileSync(${JSON.stringify(events)}, JSON.stringify(calls)); } },
   ownedGraphIds: [ownedGraphIdsFixture, { timeout: 3000 }],
   setup: [async ({ ownedGraphIds }, use) => {
-    ownedGraphIds.push('owned-graph');
+    await ownedGraphIds.seed({ size: ${scenario === 'late-create-response' ? 1 : 0} });
     if (${JSON.stringify(scenario)} === 'setup-timeout') await new Promise(() => {});
     await use(true);
   }, { timeout: 100 }],
@@ -48,10 +55,10 @@ test('intentional negative control', async ({ setup }) => {});
     const report = JSON.parse(result.stdout);
     assert.equal(report.stats.unexpected, 1, result.stdout);
     assert.equal(report.stats.skipped, 0);
-    assert.deepEqual(JSON.parse(readFileSync(events, 'utf8')), scenario === 'setup-timeout'
-      ? ['unroute', 'deleteEdges', 'deleteWorkItems', 'deleteGraphs', 'graphs(']
-      : ['unroute', 'deleteEdges']);
+    assert.deepEqual(JSON.parse(readFileSync(events, 'utf8')), scenario !== 'cleanup-failure'
+      ? ['createRequested', 'created', 'unroute', 'deleteEdges', 'deleteWorkItems', 'deleteGraphs', 'graphs(']
+      : ['createRequested', 'created', 'unroute', 'deleteEdges']);
     const errors = report.suites[0].specs[0].tests[0].results[0].errors.map(error => error.message).join('\n');
-    assert.match(errors, scenario === 'setup-timeout' ? /Fixture "setup" timeout/ : /Owned graph cleanup failed/);
+    assert.match(errors, scenario !== 'cleanup-failure' ? /Fixture "setup" timeout/ : /Owned graph cleanup failed/);
   });
 }

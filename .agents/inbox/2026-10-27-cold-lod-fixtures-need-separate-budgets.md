@@ -43,6 +43,15 @@ budget independent. Do not describe one fixture timeout as a separate allowance
 for each phase. The harness negative control must intentionally time out its
 dependent setup and still observe strict edge/item/graph cleanup and readback.
 
+The next review identified a late-response race: Playwright timeout does not
+cancel an in-flight create. Cleanup now first aborts future seed batches and
+drains tracked seed promises, retaining the response's graph ID before deletion.
+The ownership fixture rejects new seed work once cleanup starts. A deferred-create
+negative control releases the response after setup timeout and checks that no
+item creation follows and the late graph is still deleted. A request that never
+settles can exhaust cleanup's independent budget; that is a reported failed
+cleanup, not a claim that remote cancellation or lost-ack recovery was proved.
+
 ## Limits
 
 This isolates fixture provisioning from interaction correctness; it neither
