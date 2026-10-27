@@ -18,6 +18,21 @@ for(const [width,height] of [[390,844],[844,390],[1440,900]]) {
     {title:'Keep this task still',positionX:750,positionY:550},
    ].map(n=>({...n,type:'TASK',status:'IN_PROGRESS',positionZ:0,graph:{connect:{where:{node:{id:graph}}}}}))});
    await page.evaluate(id=>{localStorage.setItem('currentGraphId',id);localStorage.setItem('graphdone:viewMode','graph');},graph);
+   await page.addInitScript(() => {
+    const Native = window.ResizeObserver;
+    const target = window as any;
+    target.__holdGraphResize = false;
+    target.__pendingGraphResizes = [];
+    window.ResizeObserver = class extends Native {
+     constructor(callback: ResizeObserverCallback) {
+      super((entries, observer) => {
+       const deliver = () => callback(entries, observer);
+       if (target.__holdGraphResize && entries.some(entry => entry.target.matches('.graph-container'))) target.__pendingGraphResizes.push(deliver);
+       else deliver();
+      });
+     }
+    };
+   });
    await page.goto('/');
    const node=page.locator('.graph-container .node').filter({hasText:'Drag this task'});
    await expect(node).toBeVisible();
@@ -40,13 +55,39 @@ for(const [width,height] of [[390,844],[844,390],[1440,900]]) {
    // A fully pinned graph has nothing to solve after release. It must not
    // keep reheating for seconds or fight the user's chosen placement.
    await expect.poll(()=>page.evaluate(()=>(window as any).__layoutMetrics?.()?.atRest),{timeout:2000}).toBe(true);
+   await expect.poll(()=>page.evaluate(()=>(window as any).__layoutMetrics?.()?.cameraReady)).toBe(true);
    await node.locator('.node-edit-icon').click();
    await expect(page.getByTestId('quick-edit-surface')).toBeVisible();
    await page.getByTestId('quick-type').getByRole('button',{name:'Idea',exact:true}).click();
    await page.keyboard.press('Escape');
-   await expect.poll(()=>page.evaluate(()=>(window as any).__layoutMetrics?.()?.atRest),{timeout:2000}).toBe(true);
-   if(width===390){await page.setViewportSize({width:844,height:390});await page.setViewportSize({width,height});}
-   await expect.poll(()=>page.evaluate(()=>(window as any).__layoutMetrics?.()?.atRest),{timeout:2000}).toBe(true);
+   await expect.poll(async()=>{
+    const items=(await gql(page,'query($id:ID!){workItems(where:{graph:{id:$id}}){title type}}',{id:graph})).workItems;
+    return items.find((item:any)=>item.title==='Drag this task')?.type;
+   }).toBe('IDEA');
+   await expect(node.locator('.node-type-text')).toHaveText(/idea/i);
+   const ready = () => page.evaluate(() => {
+    const metrics = (window as any).__layoutMetrics?.();
+    return metrics?.atRest === true && metrics?.cameraReady === true;
+   });
+   await expect.poll(ready,{timeout:2000}).toBe(true);
+   if(width===390){
+    await page.evaluate(() => { (window as any).__holdGraphResize = true; });
+    await page.setViewportSize({width:844,height:390});
+    await expect.poll(()=>page.evaluate(()=>(window as any).__pendingGraphResizes.length)).toBeGreaterThan(0);
+    const held = await page.evaluate(() => (window as any).__layoutMetrics());
+    expect(held.atRest).toBe(true);
+    expect(held.cameraReady).toBe(false);
+    expect(await page.evaluate(() => {
+     const target = window as any;
+     target.__holdGraphResize = false;
+     for(const deliver of target.__pendingGraphResizes.splice(0)) deliver();
+     return target.__layoutMetrics().cameraReady;
+    })).toBe(false);
+    await expect.poll(ready,{timeout:2000}).toBe(true);
+    await page.setViewportSize({width,height});
+    await expect.poll(ready,{timeout:2000}).toBe(true);
+   }
+   await expect.poll(ready,{timeout:2000}).toBe(true);
    const sample=await page.evaluate(async()=>{
     const samples:Record<string,Array<{x:number;y:number}>>={};
     const start=performance.now();let frames=0,maxGap=0,last=start;
