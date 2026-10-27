@@ -22,13 +22,18 @@ export const SEQUENCES = {
     'tests/e2e/graph/overview-board-actions.spec.ts',
     'tests/e2e/graph/recorded-ai-work.spec.ts',
     'tests/e2e/graph/admin-dialog-responsive.spec.ts',
-    'tests/e2e/graph/semantic-lod.spec.ts',
     'tests/e2e/smoke/user-smoke.spec.ts',
     'tests/e2e/quality/persona-lifecycle.spec.ts',
     'tests/e2e/quality/graph-motion.spec.ts',
     'tests/e2e/quality/graph-resize.spec.ts',
     'tests/e2e/quality/graph-details.spec.ts',
     `--project=${PW}`, '--headed', '--workers=1', '--retries=0', '--trace=retain-on-failure',
+  ], blocking: true },
+  'semantic-lod': { adapter: 'playwright', title: 'Semantic LOD acceptance', args: [
+    'tests/e2e/graph/semantic-lod.spec.ts', `--project=${PW}`, '--headed', '--workers=1', '--retries=0', '--trace=retain-on-failure',
+  ], blocking: true },
+  'router-navigation': { adapter: 'playwright', title: 'Route compatibility acceptance', args: [
+    'tests/e2e/auth/router-navigation.spec.ts', `--project=${PW}`, '--headed', '--workers=1', '--retries=0', '--trace=retain-on-failure',
   ], blocking: true },
   'e2e-auth': { adapter: 'playwright', title: 'Auth e2e — passwordless focus', args: ['tests/e2e/auth/passwordless-focus.spec.ts', `--project=${PW}`], blocking: true },
   'e2e-graph': { adapter: 'playwright', title: 'Graph e2e — camera', args: ['tests/e2e/graph/camera.spec.ts', `--project=${PW}`], blocking: true },
@@ -51,8 +56,8 @@ export const SEQUENCES = {
 
 export const PROFILES = {
   smoke: ['unit-web', 'smoke', 'e2e-auth'],
-  pr: ['unit-web', 'smoke', 'e2e-auth', 'e2e-graph', 'mobile', 'perf-budgets'],
-  full: ['unit-web', 'smoke', 'e2e-auth', 'e2e-graph', 'mobile', 'perf-budgets', 'diagnostics', 'showcase', 'matrix', 'vlm', 'perf-scale', 'cloud-audit'],
+  pr: ['unit-web', 'smoke', 'e2e-auth', 'e2e-graph', 'semantic-lod', 'router-navigation', 'mobile', 'perf-budgets'],
+  full: ['unit-web', 'smoke', 'e2e-auth', 'e2e-graph', 'semantic-lod', 'router-navigation', 'mobile', 'perf-budgets', 'diagnostics', 'showcase', 'matrix', 'vlm', 'perf-scale', 'cloud-audit'],
   report: ['diagnostics', 'showcase', 'matrix', 'vlm', 'perf-scale', 'cloud-audit'],
   live: ['live-journey'],
 };
