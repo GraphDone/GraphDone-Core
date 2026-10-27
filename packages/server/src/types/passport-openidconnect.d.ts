@@ -17,7 +17,13 @@ declare module 'passport-openidconnect' {
 
   export type VerifyFunction = (
     issuer: string,
-    profile: any,
+    userInfo: any,
+    idProfile: any,
+    context: unknown,
+    idToken: string,
+    accessToken: string,
+    refreshToken: string,
+    params: unknown,
     done: VerifyCallback
   ) => void;
 

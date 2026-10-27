@@ -2,6 +2,7 @@
 
 | Symptom | Evidence and corrective rule |
 | --- | --- |
+| OAuth email metadata loses verification or callbacks log credential-bearing redirects | [Provider proof and isolated atomic linking](../inbox/2026-10-27-oauth-linking-needs-provider-proof-and-atomicity.md); [provider/recovery contract](../../docs/quality/OAUTH_IDENTITY.md) |
 | Login and reset links cross-use, or a reset/reactivation revives old sessions | [Bind purpose and session revision at the write](../inbox/2026-10-27-email-purpose-and-revision-are-auth-boundaries.md); real SQLite/HTTP/WebSocket `auth-link-boundary.test.ts` |
 | CAPTCHA validates only a client string's format or skips missing GraphQL proof | [Server policy, signed action/expiry and bounded replay](../inbox/2026-10-27-captcha-proof-must-be-server-issued.md); `packages/server/tests/captcha*.test.ts`, `qc:captcha` |
 | Fresh production audit flags Undici through optional SQLite build tooling without a direct application import | [Trace the native-build consumer and patch its actual resolved copy](../inbox/2026-10-24-undici-native-build-dependency.md); `tests/lib/dependencies/undici.test.mjs` rejects affected locked and installed consumer versions |

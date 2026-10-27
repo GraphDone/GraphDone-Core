@@ -1,4 +1,6 @@
 import {randomBytes} from 'node:crypto';
+import { resolveOAuthAccount } from './oauth-account.js';
+import type { OAuthIdentity } from './oauth-identity.js';
 import sqlite3 from 'sqlite3';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
@@ -1208,57 +1210,12 @@ class SQLiteAuthStore {
     });
   }
 
-  async findOrCreateUserFromOAuth(oauthData: {
-    provider: string;
-    providerId: string;
-    email: string;
-    name: string;
-    avatar?: string;
-    accessToken?: string;
-    refreshToken?: string;
-    profile?: any;
-  }): Promise<User> {
+  async findOrCreateUserFromOAuth(identity: OAuthIdentity): Promise<User> {
     await this.initialize();
-    const db = await this.getDb();
-
-    const existingUser = await this.findUserByOAuthProvider(oauthData.provider, oauthData.providerId);
-    if (existingUser) {
-      await this.updateOAuthProvider(existingUser.id, oauthData);
-      return existingUser;
-    }
-
-    const userByEmail = await this.findUserByEmailOrUsername(oauthData.email);
-    if (userByEmail) {
-      await this.linkOAuthProvider(userByEmail.id, oauthData);
-      return userByEmail;
-    }
-
-    const userId = uuidv4();
-    const now = new Date().toISOString();
-    const username = oauthData.email.split('@')[0] + '_' + Math.random().toString(36).substring(7);
-    const passwordHash = await bcrypt.hash(uuidv4(), 10);
-
-    return new Promise((resolve, reject) => {
-      db.serialize(() => {
-        db.run(`INSERT INTO users (id, email, username, name, role, passwordHash, createdAt, updatedAt, isActive, isEmailVerified)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [userId, oauthData.email.toLowerCase(), username, oauthData.name, 'USER', passwordHash, now, now, 1, 1],
-          async (err) => {
-            if (err) {
-              reject(err);
-              return;
-            }
-
-            try {
-              await this.linkOAuthProvider(userId, oauthData);
-              const newUser = await this.findUserById(userId);
-              resolve(newUser!);
-            } catch (linkErr) {
-              reject(linkErr);
-            }
-          });
-      });
-    });
+    const snapshot = await resolveOAuthAccount(await this.getDb(), identity);
+    const user = await this.findUserById(snapshot.id);
+    if (!user || user.authVersion !== snapshot.authVersion) throw new Error('Account changed during authentication');
+    return user;
   }
 
   async linkOAuthProvider(userId: string, oauthData: {
