@@ -501,3 +501,18 @@ followed by LOD-7 authorized revision-aware loading and LOD-8 hosted acceptance.
 The completion checklist in section 7 remains authoritative. See the
 [nested validation ledger](../quality/NESTED_LOD_VALIDATION_2026-10-28.md) for
 failing-before evidence, candidate checks and explicit remaining gates.
+
+## 10. Schematic visual direction — 2026-10-28 (#219)
+
+The owner requires harness/PCB-style visual organization: clean ports, routed
+wires, explicit buses and small regression fixtures that reject spaghetti.
+The [schematic connection plan](schematic-connections.md) governs the next visual
+slice alongside #218 exact relationship inspection. Nested cuts in #216 remain
+useful foundations, but do not establish visual completion. Item-level routing,
+focused bus tracing, generic imports and the scale/loading gates remain open.
+
+Local full-stack test batches are paused under the workstation constraint after
+the reported desktop crash. Use small serial geometry/component checks and
+static contact sheets locally; broad integration/browser/image matrices run in
+CI. Retain failures and interruptions honestly. Do not change the owner's local
+graph or represent an empty/mostly hidden diagram as proof of clear routing.

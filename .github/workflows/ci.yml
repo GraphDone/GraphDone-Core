@@ -35,6 +35,17 @@ jobs:
         run: npm run typecheck
       - name: Test evidence and runner regressions
         run: npm run test:unified:lib
+      - name: Schematic routing visual gate
+        run: |
+          npm run report:schematic -- --out test-artifacts/ci-schematic-routing
+          npm run test:schematic
+      - name: Retain schematic fixtures and geometry metrics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: schematic-routing-${{ github.sha }}
+          path: test-artifacts/ci-schematic-routing/
+          if-no-files-found: error
 
   # ── The real unit suites, one job per package, run in parallel ─────────────
   unit-tests:
@@ -171,6 +182,8 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Vite proxy, hot reload and offline-shell contract
         run: npm run test:toolchain
+      - name: Schematic fixture visual acceptance
+        run: node tests/run-unified.mjs --sequence schematic-visual --out test-artifacts/ci-schematic-visual
       - name: Start GraphDone (dev stack)
         run: |
           npm run dev > /tmp/dev.log 2>&1 &
