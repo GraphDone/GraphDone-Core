@@ -47,3 +47,13 @@ failed `dock-trace-phone1` artifacts are retained.
 The corrected phone hierarchy/trace journey passed in 25.3s in
 `dock-trace-phone2`, including its original overlap/readability checks and the
 8px trace-text negative. No oracle assertion was relaxed.
+
+Independent review of `fe84973` used the actual dock/status components and the
+production D3 zoom filter. A wheel over status prevented native scrolling and
+changed camera scale from 1 to 0.8705505633. Marking the shared dock with the
+existing `data-lod-controls` boundary leaves the wheel default intact and scale
+at 1. The pending-layout browser case now adds a 390×500 viewport, requires
+actual dock overflow, wheels over its status area, and verifies native scrolling
+with an unchanged camera before discarding the owned receipt.
+The complete amended pending-layout journey passed in 15.7s on 2026-10-28,
+with one headed Chrome, one worker and zero retries (`dock-native-scroll1`).
