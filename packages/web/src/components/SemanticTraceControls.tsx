@@ -35,7 +35,7 @@ export function SemanticTraceControls({
       data-lod-trace="true"
       data-lod-controls="true"
       data-graph-fit-obstacle="true"
-      className="absolute left-3 right-3 bottom-24 sm:left-16 sm:right-auto sm:w-96 min-h-36 pointer-events-auto rounded-xl border border-slate-600 bg-gradient-to-br from-slate-900 to-slate-950 px-4 py-3 text-sm text-gray-100"
+      className="w-full min-h-36 pointer-events-auto rounded-xl border border-slate-600 bg-gradient-to-br from-slate-900 to-slate-950 px-4 py-3 text-sm text-gray-100"
     >
       <h2
         className="truncate text-base font-semibold text-emerald-100"

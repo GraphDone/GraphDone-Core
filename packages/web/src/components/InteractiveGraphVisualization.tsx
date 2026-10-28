@@ -5,6 +5,7 @@ import { SemanticGraphOverview } from './SemanticGraphOverview';
 import { SemanticRelationshipBrowser } from './SemanticRelationshipBrowser';
 import { indexSemanticRelationships, type RelationshipScope } from '../lib/semanticRelationships';
 import { LayoutSaveStatus } from './LayoutSaveStatus';
+import { GraphStatusDock } from './GraphStatusDock';
 import ReactDOM from 'react-dom/client';
 import { createPortal } from 'react-dom';
 import * as d3 from 'd3';
@@ -4858,7 +4859,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <div className="text-green-300 text-lg font-medium">Loading graph data...</div>
-          <LayoutSaveStatus queue={positionSaveQueue} />
+          <GraphStatusDock><LayoutSaveStatus queue={positionSaveQueue} /></GraphStatusDock>
           <div className="text-gray-400 text-sm mt-2">{layoutRecoveryReady ? 'Connecting to database...' : 'Recovering saved layout...'}</div>
         </div>
       </div>
@@ -5096,14 +5097,16 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
   return (
     <div ref={containerRef} className="graph-container relative w-full h-full overflow-hidden select-none" data-overview={semanticOverviewActive || undefined} data-quality={qualityTier} data-dense={isDenseGraph ? 'true' : undefined} data-simplify={isSimplified ? 'true' : undefined} data-dots={isDotMode ? 'true' : undefined}>
+      {!semanticOverviewActive && <GraphStatusDock>
       <LayoutSaveStatus queue={positionSaveQueue} />
-      {!semanticOverviewActive && workItemEdges.length > 0 && <button
+      {workItemEdges.length > 0 && <button
         ref={itemRelationshipTriggerRef}
         data-graph-fit-obstacle="true"
-        className="absolute bottom-3 left-16 z-20 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 shadow-lg"
+        className="max-w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 shadow-lg"
         onClick={() => setItemRelationshipScope({ kind: 'all' })}
         aria-label={`${workItemEdges.length} relationships, ${itemLabelCount} labels shown. Browse all relationships`}
       >{workItemEdges.length} connections · {itemLabelCount} labels · Browse</button>}
+      </GraphStatusDock>}
       {itemRelationshipScope && !semanticOverviewActive && <SemanticRelationshipBrowser
         index={itemRelationshipIndex}
         scope={itemRelationshipScope}
@@ -5138,6 +5141,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         camera={currentTransform}
         readPositions={readOverviewPositions}
         onActiveChange={handleOverviewActive}
+        layoutStatus={<LayoutSaveStatus queue={positionSaveQueue} />}
         selectedId={Array.from(selectedNodes).slice(-1)[0]}
         onBrowse={closeOverviewInspector}
         onInspect={inspectOverviewItem}
