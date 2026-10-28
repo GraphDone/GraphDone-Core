@@ -45,6 +45,64 @@ Follow-up implementation on 2026-10-23: [PR #169](https://github.com/GraphDone/G
 
 Source locations are relative to `packages/server/src/` and anchored to the snapshot above. Local, secret-free evidence is under `/tmp/graphdone-residual-*-audit.json`, `/tmp/graphdone-minimatch-*.log`, and `/tmp/graphdone-residual-auth-probe.log`; the latter reports only `parallelMagicLinkSuccesses: 2` and `arbitraryCaptchaAccepted: true`.
 
+## CSS advisory reconciliation on 2026-10-27
+
+The historical three CSS entries above remain the result of the October 23
+inventory. On October 27, the [official advisory](https://github.com/advisories/GHSA-rj75-hqrm-r3gf)
+lists parser 6.1.5 and 7.1.6 as patched; affected ranges are `<6.1.5` and
+`>=7.0.0 <7.1.6`. Its metadata was updated on October 26 and it is not withdrawn.
+Live dev `8712389` already locks parser 6.1.5 for Tailwind 3.4.19 and
+postcss-nested 6.2.0, the same parser resolution present in `36c02c0` on October 23.
+The fresh-cache production audit has no CSS-chain finding. This follow-up does
+not alter any dependency declaration, lockfile or production/dev classification.
+
+The dedicated guard checks every locked parser path and both actual CSS
+consumers. Semantic tests preserve flat and nested selectors and generated
+responsive Tailwind utilities; they are not a timing benchmark. This resolves
+the named advisory for the current locked chain, without forcing a Tailwind
+migration. Keep earlier audit counts as dated observations and do not infer a
+cache cause. The [canonical lesson](../../.agents/inbox/2026-10-27-reconcile-advisory-backports-with-locked-consumers.md)
+records commands, sources and limits. Final build/browser/CI evidence belongs
+to the separate CSS review. Router, UUID and toolchain work remain separate.
+
+## Router correction on 2026-10-27
+
+The dedicated #186 router change replaces Router/DOM 6.30.6 with 7.18.4, removes
+the old `@remix-run/router` resolution and retains the existing declarative SPA.
+Official advisories [GHSA-wrjc-x8rr-h8h6](https://github.com/advisories/GHSA-wrjc-x8rr-h8h6)
+and [GHSA-337j-9hxr-rhxg](https://github.com/advisories/GHSA-337j-9hxr-rhxg)
+identify 7.18.0 as fixed. Existing app routes use fixed destinations, with no
+observed SSR hydration path; upgrading is not a claim that a live exploit was
+demonstrated. The DOM compatibility package is retained to keep imports stable.
+
+The dependency regression checks every locked path and the actual web consumers
+against both the patched range and their resolved lock entries. Navigation
+controls reject external-looking mixed separators and preserve internal query,
+fragment and history behavior; existing role guards remain covered. Six required
+browser cases exercise public and authenticated deep links, reload, lazy pages,
+desktop links/phone navigation, back/forward, role rejection and a fresh-context
+login callback. The callback uses an owned password-issued token and does not
+establish provider/email authentication. Initial negative and fixture-contract
+failures are retained in the [dated lesson](../../.agents/inbox/2026-10-27-router-upgrades-need-current-consumer-contracts.md).
+Fresh full-suite, browser, audit and final composition results are recorded on
+the reviewable PR; UUID, CSS evidence, tooling and hosted acceptance remain
+separate work.
+
 ## Coverage still needed
 
 The folder tests do not establish all generated Graph/WorkItem/Edge permissions, concurrent deletion integrity, MCP/agent grant revocation, share-link scopes, session/cookie policy, uploads, backups, email delivery, or deployed proxy controls. Those need isolated contracts and user-level tests with current roles, multiple accounts, races, and negative cases. Dependency counts, passing smoke tests, and absence of a discovered source sink are separate pieces of evidence; none is a full security assessment.
+
+## UUID/federation follow-up on 2026-10-27
+
+The #186 UUID correction starts from dev `ef495eff15ed7aac51e72dc7a1db1bb96d2b3695`.
+Core's direct UUID 9.0.1 becomes ^11.1.1; federation-internals 2.14.4 has a
+version-scoped UUID 11.1.1 override. Server deduplicates to that patched copy;
+Mermaid retains 14.0.3. Subgraph/federation remain 2.14.4 after a 2.15.1 schema
+compatibility failure. The [consumer lesson](../../.agents/inbox/2026-10-27-federation-consumers-bound-uuid-upgrades.md)
+records negative controls, exact paths, clean install and four dependency
+regressions. The pre-composition fresh-cache production audit had two moderate router
+entries and high Undici. After composing merged dev #194 at `aba24a34d193b60e2318cd5b197f66e64f320215`,
+a clean install and a second fresh-cache installed audit reported **two moderate
+router entries, zero high/critical entries**, and no UUID/federation finding.
+The earlier inventory above remains historical. No Tailwind declaration was reclassified.
+This change does not close the router, CSS, dev-tool or hosted acceptance work.

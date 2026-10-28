@@ -132,7 +132,7 @@ export async function resolveConflict(id:string,choice:'local'|'cloud') {
 export async function prepareOffline() {const list=await listProjects(true);for(const p of list){const owner=ownerId();if(!owner||!await canConnect(owner))break;await getProject(p.id);}}
 export async function exportOffline() {
  const owner=ownerId();if(!owner)return;
- const account=await readAccount(owner);delete account.user;
+ const account=await readAccount(owner);delete account.user;delete account.layoutOutbox;delete account.layoutFences;
  const blob=new Blob([JSON.stringify({format:'graphdone-offline-v1',exportedAt:new Date().toISOString(),account},null,2)],{type:'application/json'});
  const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='graphdone-offline-backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);
 }

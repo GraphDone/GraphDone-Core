@@ -19,3 +19,12 @@ The provider retains at most 16 graph/account scopes and 10,000 distinct pending
 ## Limits
 
 Pending layouts are tab-memory state, not a persistent outbox: a forced close, crash, or browser ignoring the unload warning can still lose them. While in List or another route, the queue waits for the original graph to reopen; the user-facing retry message says so. Already-issued requests can complete under their original account, but later requests cannot use a replacement account's credentials. These tests do not establish browser rendering, live-service health, cross-device conflict resolution, or backend atomic deletion protection; those require separate integration/release checks.
+
+
+## 2026-10-28 follow-up
+
+The historical memory-only limit above is addressed by issue #181's
+[network-backed layout recovery implementation and evidence](LAYOUT_RECOVERY_2026-10-28.md).
+It reuses the existing account IndexedDB store, adds account/graph/node receipts
+and bounded local generation fences, and keeps offline-sync durability separate.
+The original navigation, owner/token and deletion regressions remain required.

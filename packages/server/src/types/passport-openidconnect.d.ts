@@ -11,13 +11,20 @@ declare module 'passport-openidconnect' {
     clientSecret: string;
     callbackURL: string;
     scope?: string[];
+    skipUserProfile?: boolean;
   }
 
   export type VerifyCallback = (error: Error | null, user?: any, info?: any) => void;
 
   export type VerifyFunction = (
     issuer: string,
-    profile: any,
+    userInfo: any,
+    idProfile: any,
+    context: unknown,
+    idToken: string,
+    accessToken: string,
+    refreshToken: string,
+    params: unknown,
     done: VerifyCallback
   ) => void;
 

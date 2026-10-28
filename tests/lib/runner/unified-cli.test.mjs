@@ -28,8 +28,10 @@ function fixture(t) {
   writeFileSync(join(dir, 'sentinel.txt'), 'keep source');
   writeFileSync(join(dir, 'bin/npx'), `#!${process.execPath}\nconst fs=require('node:fs'); const report={success:true,numTotalTests:1,testResults:[{status:'passed',assertionResults:[{title:'fixture',status:'passed'}]}]}; process.stdout.write(JSON.stringify(report));\n`, { mode: 0o700 });
   execFileSync('git', ['init', '-q'], { cwd: dir });
+  execFileSync('git', ['config', '--local', 'maintenance.auto', 'false'], { cwd: dir });
+  execFileSync('git', ['config', '--local', 'gc.auto', '0'], { cwd: dir });
   execFileSync('git', ['add', '.'], { cwd: dir });
-  execFileSync('git', ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'fixture'], { cwd: dir });
+  execFileSync('git', ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'fixture'], { cwd: dir, env: { ...process.env, GIT_TRACE2_EVENT: join(dir, 'bin/git-trace.jsonl') } });
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const run = args => spawnSync(process.execPath, ['tests/run-unified.mjs', ...args], {
     cwd: dir, env: { ...process.env, PATH: `${join(dir, 'bin')}:${process.env.PATH}` }, encoding: 'utf8', timeout: 10000,
@@ -37,7 +39,14 @@ function fixture(t) {
   return { dir, run };
 }
 
-for (const sequence of ['new-user', 'mobile', 'perf-budgets']) {
+test('disposable Git fixture commits do not spawn background maintenance', t => {
+  const { dir } = fixture(t);
+  const events = readFileSync(join(dir, 'bin/git-trace.jsonl'), 'utf8').trim().split('\n').map(line => JSON.parse(line));
+  assert.ok(events.some(event => event.event === 'exit' && event.code === 0));
+  assert.deepEqual(events.filter(event => event.event === 'child_start' && event.argv?.includes('maintenance')), []);
+});
+
+for (const sequence of ['new-user', 'semantic-lod', 'nested-lod', 'layout-recovery', 'router-navigation', 'mobile', 'perf-budgets']) {
   test(`CLI forwards failure-only tracing without retries for ${sequence}`, t => {
     const { dir, run } = fixture(t);
     const report = { suites: [{ specs: [{ title: 'fixture', ok: true,
@@ -47,6 +56,18 @@ for (const sequence of ['new-user', 'mobile', 'perf-budgets']) {
     const result = run(['--sequence', sequence]);
     assert.equal(result.status, 0, result.stdout);
     const args = JSON.parse(readFileSync(join(dir, 'bin/argv.json')));
+    if (sequence === 'new-user') {
+      assert.ok(!args.includes('tests/e2e/graph/semantic-lod.spec.ts'));
+      assert.ok(!args.includes('tests/e2e/auth/router-navigation.spec.ts'));
+    }
+    if (sequence === 'nested-lod' || sequence === 'semantic-lod' || sequence === 'layout-recovery' || sequence === 'router-navigation') {
+      const spec = sequence === 'nested-lod' ? 'tests/e2e/graph/nested-semantic-lod.spec.ts' : sequence === 'semantic-lod' ? 'tests/e2e/graph/semantic-lod.spec.ts' : sequence === 'layout-recovery' ? 'tests/e2e/graph/layout-recovery.spec.ts' : 'tests/e2e/auth/router-navigation.spec.ts';
+      assert.ok(args.includes(spec));
+      assert.equal(SEQUENCES[sequence].blocking, true);
+      const workflow = readFileSync(join(root, '.github/workflows/ci.yml'), 'utf8');
+      const command = `run: xvfb-run --auto-servernum node tests/run-unified.mjs --sequence ${sequence} --out test-artifacts/ci-${sequence}`;
+      assert.equal(workflow.split(command).length, 2);
+    }
     assert.deepEqual(args.filter(arg => arg.startsWith('--trace=')), ['--trace=retain-on-failure']);
     assert.deepEqual(args.filter(arg => arg.startsWith('--retries=')), ['--retries=0']);
     assert.deepEqual(args.filter(arg => arg.startsWith('--workers=')), ['--workers=1']);

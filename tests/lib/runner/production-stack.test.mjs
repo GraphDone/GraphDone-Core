@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -99,10 +100,19 @@ test('build, startup, health, fixture and recreation failures each stop downstre
   }
 });
 
-function fixtureRequest({ badReadback = false, failedCleanup = '', remaining = '' } = {}) {
+function fixtureRequest({ badReadback = false, failedCleanup = '', remaining = '', requireCaptcha = false } = {}) {
   const calls = [];
-  return { calls, request: async (_url, { body }) => {
+  const challenge = { algorithm: 'SHA-256', salt: 'owned-fixture?action=login&', maxnumber: 9,
+    challenge: createHash('sha256').update('owned-fixture?action=login&7').digest('hex'), signature: 'a'.repeat(64) };
+  return { calls, request: async (url, { body } = {}) => {
+    if (url.endsWith('/api/captcha/challenge?action=login')) return { status: 200, body: challenge };
     const query = body.query;
+    if (requireCaptcha && query.includes('login(')) {
+      const proof = JSON.parse(Buffer.from(body.variables.input.captchaPayload || '', 'base64').toString() || '{}');
+      if (proof.number !== 7 || proof.challenge !== challenge.challenge || proof.signature !== challenge.signature) {
+        return { status: 200, body: { errors: [{ message: 'Server proof required' }] } };
+      }
+    }
     calls.push(query);
     if (failedCleanup && query.includes(failedCleanup)) return { status: 200, body: { errors: [{ message: 'injected cleanup error' }] } };
     const data = query.includes('login(') ? { login: { token: 'owned-token', user: { id: 'owner', username: 'admin' } } }
@@ -149,7 +159,7 @@ test('real CLI child rejects failed builds/startup and confirms owned cleanup wi
   const temp = mkdtempSync(join(tmpdir(), 'prod-runner-test-'));
   const root = join(temp, 'repo');
   mkdirSync(root);
-  for (const file of ['scripts/test-production-stack.mjs', 'tests/lib/runner/runSequence.mjs', 'tests/lib/runner/source-state.mjs', 'tests/lib/runner/production-stack.mjs']) {
+  for (const file of ['scripts/test-production-stack.mjs', 'tests/lib/runner/runSequence.mjs', 'tests/lib/runner/source-state.mjs', 'tests/lib/runner/production-stack.mjs', 'tests/lib/production/auth-captcha.mjs']) {
     mkdirSync(dirname(join(root, file)), { recursive: true });
     writeFileSync(join(root, file), readFileSync(join(source, file)));
   }
@@ -192,4 +202,12 @@ test('real CLI child rejects failed builds/startup and confirms owned cleanup wi
     assert.match(dirty.stderr, /clean committed source/);
     assert.equal(readdirSync(temp).includes('dirty.jsonl'), false);
   } finally { rmSync(temp, { recursive: true, force: true }); rmSync(output, { recursive: true, force: true }); }
+});
+
+
+test('production fixture login solves a server-issued proof before seeding', async () => {
+  const fixture = fixtureRequest({ requireCaptcha: true });
+  const result = await verifyOwnedFixture({ target: 'https://127.0.0.1:1234', env: { TEST_ADMIN_USERNAME: 'admin' }, request: fixture.request });
+  assert.deepEqual(result.nodeIds, ['a', 'b']);
+  assert.equal(result.cleanup.length, 3);
 });

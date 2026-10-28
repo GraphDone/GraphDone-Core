@@ -14,6 +14,7 @@ export async function runVitestSequence({ id, title, cwd, timeoutMs = 300000, bl
   const cases = [];
   const errors = [];
   let pending = 0;
+  let skipped = 0;
   let todo = 0;
   if (parsed && Array.isArray(parsed.testResults)) {
     for (const f of parsed.testResults) {
@@ -22,6 +23,7 @@ export async function runVitestSequence({ id, title, cwd, timeoutMs = 300000, bl
       for (const a of f.assertionResults || []) {
         const st = a?.status === 'passed' ? 'passed' : ['pending', 'skipped', 'todo'].includes(a?.status) ? 'skipped' : 'failed';
         if (a?.status === 'pending') pending++;
+        if (a?.status === 'skipped') skipped++;
         if (a?.status === 'todo') todo++;
         counts[st]++;
         if (st !== 'passed') cases.push({ title: [...(a?.ancestorTitles || []), a?.title || 'unnamed assertion'].join(' › '), status: st, error: (a?.failureMessages || []).join('\n').slice(-1500) });
@@ -33,7 +35,7 @@ export async function runVitestSequence({ id, title, cwd, timeoutMs = 300000, bl
     validateCounter(errors, parsed, 'numTotalTests', counts.passed + counts.failed + counts.skipped);
     validateCounter(errors, parsed, 'numPassedTests', [counts.passed, counts.passed + counts.skipped]);
     validateCounter(errors, parsed, 'numFailedTests', counts.failed);
-    validateCounter(errors, parsed, 'numPendingTests', pending);
+    validateCounter(errors, parsed, 'numPendingTests', [pending, pending + skipped]);
     validateCounter(errors, parsed, 'numTodoTests', todo);
     for (const key of ['numTotalTestSuites', 'numPassedTestSuites', 'numFailedTestSuites', 'numPendingTestSuites', 'numRuntimeErrorTestSuites']) validateCounter(errors, parsed, key);
     if (parsed.numTotalTestSuites < (parsed.testResults?.length || 0)) errors.push('Vitest suite total is smaller than its reported test files.');

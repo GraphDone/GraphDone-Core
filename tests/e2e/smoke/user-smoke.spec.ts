@@ -472,7 +472,7 @@ test.describe('user smoke: the app works from a user point of view @smoke', () =
       await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))));
       expect(attempts).toHaveLength(1);
       releaseFailure();
-      await expect(page.getByText('Layout could not be saved', { exact: true })).toBeVisible();
+      await expect(page.getByText('Layout needs attention', { exact: true })).toBeVisible();
       await page.getByLabel('Workspace view', { exact: true }).selectOption('cards');
       await expect(page.locator('.graph-container svg')).toHaveCount(0);
       await expect(page.getByLabel('Search work items', { exact: true })).toBeVisible();

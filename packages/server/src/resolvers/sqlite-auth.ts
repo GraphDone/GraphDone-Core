@@ -1,7 +1,7 @@
 import { GraphQLError } from 'graphql';
 import { sqliteAuthStore } from '../auth/sqlite-auth.js';
 import { generateToken } from '../utils/auth.js';
-import { verifyCaptcha } from '../utils/captcha.js';
+import { verifyAuthCaptcha } from '../utils/captcha.js';
 import { randomUUID } from 'node:crypto';
 import { folderActor, folderCreationOwner, folderResponse, requireFolderAccess, requireFolderDeletion, requireFolderParent, requireGraphAccess, visibleFolderGraphs } from '../auth/folder-access.js';
 import { passwordLoginLimiter, PasswordLoginLimitError } from '../auth/password-login-limiter.js';
@@ -144,7 +144,7 @@ export const sqliteAuthResolvers = {
 
     // Get development mode info and default credentials
     developmentInfo: async () => {
-      const isDevelopment = process.env.NODE_ENV !== 'production';
+      const isDevelopment = ['development', 'test'].includes(process.env.NODE_ENV || '');
       
       return {
         isDevelopment,
@@ -329,17 +329,11 @@ export const sqliteAuthResolvers = {
         const user = await sqliteAuthStore.findUserByEmailOrUsername(identifier);
         accountAttempt = passwordLoginLimiter.reserveAccount(user ? `user:${user.id}` : `identifier:${identifier}`);
 
-        // Verify CAPTCHA if provided
-        if (input.captchaPayload) {
-          const isCaptchaValid = await verifyCaptcha(input.captchaPayload);
-          if (!isCaptchaValid) {
-            outcome = 'failure';
-            console.log('❌ CAPTCHA verification failed');
-            throw new GraphQLError('CAPTCHA verification failed', {
-              extensions: { code: 'CAPTCHA_FAILED' }
-            });
-          }
-          console.log('✅ CAPTCHA verified');
+        if (!await verifyAuthCaptcha(input.captchaPayload, 'login')) {
+          outcome = 'failure';
+          throw new GraphQLError('Please complete verification and try again.', {
+            extensions: { code: 'CAPTCHA_FAILED' }
+          });
         }
 
         if (!user) {
@@ -371,7 +365,7 @@ export const sqliteAuthResolvers = {
           });
         }
 
-        const token = generateToken(user.id, user.email, user.role);
+        const token = generateToken(user.id, user.email, user.role, user.authVersion);
         outcome = 'success';
         console.log(`✅ Login successful: ${user.username} (${user.role})`);
 
@@ -417,7 +411,7 @@ export const sqliteAuthResolvers = {
         team: null
       };
 
-      const token = generateToken(guestUser.id, guestUser.email, guestUser.role);
+      const token = generateToken(guestUser.id, guestUser.email, guestUser.role, 0);
       
       return {
         token,
@@ -441,16 +435,10 @@ export const sqliteAuthResolvers = {
           });
         }
 
-        // Verify CAPTCHA if provided
-        if (input.captchaPayload) {
-          const isCaptchaValid = await verifyCaptcha(input.captchaPayload);
-          if (!isCaptchaValid) {
-            console.log('❌ CAPTCHA verification failed');
-            throw new GraphQLError('CAPTCHA verification failed', {
-              extensions: { code: 'CAPTCHA_FAILED' }
-            });
-          }
-          console.log('✅ CAPTCHA verified');
+        if (!await verifyAuthCaptcha(input.captchaPayload, 'signup')) {
+          throw new GraphQLError('Please complete verification and try again.', {
+            extensions: { code: 'CAPTCHA_FAILED' }
+          });
         }
 
         // Check if user already exists
@@ -472,7 +460,7 @@ export const sqliteAuthResolvers = {
           role: 'USER'
         });
 
-        const token = generateToken(user.id, user.email, user.role);
+        const token = generateToken(user.id, user.email, user.role, user.authVersion);
 
         return {
           token,
@@ -526,11 +514,11 @@ export const sqliteAuthResolvers = {
       }
 
       const user = await sqliteAuthStore.findUserById(context.user.userId);
-      if (!user) {
-        throw new GraphQLError('User not found');
+      if (!user?.isActive || user.authVersion !== context.user.authVersion) {
+        throw new GraphQLError('Session expired', { extensions: { code: 'UNAUTHENTICATED' } });
       }
 
-      const token = generateToken(user.id, user.email, user.role);
+      const token = generateToken(user.id, user.email, user.role, user.authVersion);
 
       return {
         token,

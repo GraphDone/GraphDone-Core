@@ -1,4 +1,5 @@
 import { request as httpsRequest } from 'node:https';
+import { productionLoginProof } from '../production/auth-captcha.mjs';
 
 export function assertHealthy(response) {
   if (response.status !== 200 || response.body?.status !== 'healthy'
@@ -107,7 +108,7 @@ export async function verifyOwnedFixture({ target, env, request }) {
     return response.body.data;
   };
   const login = await gql('mutation($input:LoginInput!){login(input:$input){token user{id username}}}',
-    { input: { emailOrUsername: env.TEST_ADMIN_USERNAME, password: env.TEST_ADMIN_PASSWORD } });
+    { input: { emailOrUsername: env.TEST_ADMIN_USERNAME, password: env.TEST_ADMIN_PASSWORD, captchaPayload: await productionLoginProof({ target, request }) } });
   token = login.login?.token;
   const owner = login.login?.user?.id;
   if (!token || !owner || login.login.user.username !== env.TEST_ADMIN_USERNAME) throw new Error('Generated production admin login failed.');
