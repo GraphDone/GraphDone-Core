@@ -52,14 +52,15 @@ import { useAdaptiveQuality } from '../hooks/useAdaptiveQuality';
 import { nodeLifeClasses, nodeGlowFilter, isActiveStatus, isCompletedStatus, edgeFlowClass } from '../lib/nodeAnimations';
 import { mergeSimulationNodes, mergeSimulationEdges } from '../lib/graphDataMerge';
 import type { ObstacleBox } from '../lib/edgeLabelLayout';
-import { createParallelEdgeRoute, edgeRouteLabel, edgeRouteArrowBounds, projectEdgeRoutePointer, type EdgeRouteGeometry, type EdgeRouteLabel } from '../lib/edgeRouteGeometry';
+import { createParallelEdgeRoute, edgeRouteLabel, edgeRouteArrowBounds, edgeSegmentHitsBox, projectEdgeRoutePointer, type EdgeRouteGeometry, type EdgeRouteLabel } from '../lib/edgeRouteGeometry';
 import { PerfMeter, DriftMeter } from '../lib/perfMeter';
 import { graphItemLayout, measureGraphText, edgeLabelDimensions, GRAPH_FONT_FAMILY, ITEM_TITLE_SIZE, ITEM_TITLE_LINE, ITEM_HEADER_HEIGHT, EDGE_LABEL_SIZE } from '../lib/graphSymbolLayout';
+import { placeItemLabels } from '../lib/edgeLabelPlacement';
 import { separateCards } from '../lib/separateCards';
 import { DEFAULT_PHYSICS, collisionRadius, linkDistance, linkMaxDistance, linkStrength } from '../lib/physicsConfig';
 import { computeCompactLayout, isHierarchicalLayout, parseLayoutMode, LAYOUT_MODE_STORAGE_KEY, type LayoutMode } from '../lib/layoutAlgorithms';
 import { edgeBorderEndpoints, minEdgeLength, clampToMinNeighbors } from '../lib/edgeGeometry';
-import { directionStrategy, arrowVisibility, labelVisibility, perpendicularOffset } from '../lib/edgeLOD';
+import { directionStrategy, arrowVisibility, perpendicularOffset } from '../lib/edgeLOD';
 import { assignParallelEdgeIndices } from '../lib/parallelEdges';
 import { isTap, touchHitSize, isCoarsePointer } from '../lib/touchInteraction';
 import { usePositionSaveQueue } from '../hooks/usePositionSaveQueue';
@@ -102,34 +103,6 @@ const getSmoothedOpacity = (scale: number, threshold: number, fadeRange: number 
   return (scale - (threshold - fadeRange)) / (fadeRange * 2);
 };
 
-// PR-4 legibility floor: zoom does double duty in this app — it's both spatial
-// navigation AND the readability control (text is rendered at a fixed font size,
-// so the parent `g` zoom scales it down with everything else). Past a certain
-// zoom-out the primary label is sub-readable. Rather than forcing the user to
-// zoom IN to read a label, counter-scale the title/type so their ON-SCREEN size
-// never drops below a readable floor within the working band. Beyond the band
-// the existing LOD opacity cull still hides them for overview/perf.
-const TYPE_BASE_PX = 13;  // matches .node-type-text font-size
-const LEGIBLE_FLOOR_PX = 12; // smallest on-screen size we keep text at
-const LEGIBLE_MAX_BOOST = 1.9; // cap the counter-scale so text never balloons
-// Title appears (and gets the floor) from this zoom — lower than the old
-// title-visible threshold so the label is readable across the working band, not
-// only when zoomed all the way in. Perf-safe: dense graphs hide node text via
-// the data-simplify CSS below SIMPLIFY_SCALE (0.45) regardless of opacity.
-const TITLE_VISIBLE_SCALE = 0.4;
-const legibilityScale = (basePx: number, k: number) => {
-  if (!k || k <= 0) return 1;
-  return Math.min(LEGIBLE_MAX_BOOST, Math.max(1, LEGIBLE_FLOOR_PX / (basePx * k)));
-};
-// A scale about a stored vertical anchor (data-cy) so multi-line title blocks
-// grow/shrink as a unit (font AND line-spacing together → never overlap).
-const legibilityTransform = (cy: number, basePx: number, k: number) => {
-  const s = legibilityScale(basePx, k);
-  return `translate(0,${cy}) scale(${s}) translate(0,${-cy})`;
-};
-
-// The legibility boost must never let text escape its card. The full title
-// remains available in the editor; at overview zoom the card is the boundary.
 function fittedTitleTransform(element: SVGGElement): string {
   const cy = Number(element.getAttribute('data-cy')) || 0;
   const scale = Number(element.getAttribute('data-title-scale')) || 1;
@@ -288,7 +261,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         containerRef.current?.querySelectorAll<SVGGElement>('.node-expand-icon') ?? []
       ).find(element => element.dataset.nodeId === returnFocusId);
       trigger?.setAttribute('aria-expanded', 'false');
-      trigger?.focus({ preventScroll: true });
+      const card = trigger?.closest<SVGGElement>('.node');
+      (card?.getAttribute('data-detail') === 'compact' ? card : trigger)?.focus({ preventScroll: true });
     });
   }, []);
   const toggleExpandedNode = useCallback((n: WorkItem) => {
@@ -482,6 +456,11 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const [selectedEdge, setSelectedEdge] = useState<WorkItemEdge | null>(null);
   const [itemLabelCount, setItemLabelCount] = useState(0);
   const [itemRelationshipScope, setItemRelationshipScope] = useState<RelationshipScope | null>(null);
+  const itemRelationshipTriggerRef = useRef<HTMLButtonElement>(null);
+  const closeItemRelationships = useCallback(() => {
+    setItemRelationshipScope(null);
+    requestAnimationFrame(() => itemRelationshipTriggerRef.current?.focus({preventScroll:true}));
+  }, []);
   useEffect(() => { setItemRelationshipScope(null); setItemLabelCount(0); }, [currentGraph?.id]);
   const [createNodePosition, setCreateNodePosition] = useState<{ x: number; y: number; z: number } | undefined>(undefined);
   const [currentTransform, setCurrentTransform] = useState({ x: 0, y: 0, scale: 1 });
@@ -3414,12 +3393,13 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       element.select('.long-press-feedback').remove();
     });
 
-    let presentedScale = NaN;
+    const nodePresentationScales = new WeakMap<WorkItem, number>();
     const updateNodePresentation = () => {
-      if (presentedScale === itemPresentationScaleRef.current) return;
-      presentedScale = itemPresentationScaleRef.current;
+      const presentedScale = itemPresentationScaleRef.current;
       g.attr('data-presentation-scale', presentedScale);
       nodeElements.each(function(d: WorkItem) {
+        if ((cullActive && (d as any)._culled) || nodePresentationScales.get(d) === presentedScale) return;
+        nodePresentationScales.set(d, presentedScale);
         const node = d3.select(this), layout = getNodeDimensions(d);
         node.attr('data-detail', layout.compact ? 'compact' : 'full').attr('role', layout.compact ? 'button' : 'group').attr('tabindex', layout.compact ? 0 : null).attr('aria-label', `${d.title}, ${getTypeConfig(d.type as WorkItemType).label}`);
         node.on('keydown.compact', (event: KeyboardEvent) => {
@@ -3497,9 +3477,6 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       });
       labelAvoidCounter++;
       const runAvoidance = forceAvoid || (simulation.alpha() < 0.1 && labelAvoidCounter % 15 === 0);
-      if (runAvoidance) nodeLabelObstacles = (simulation.nodes() as any[]).map(n => ({
-        x: n.x || 0, y: n.y || 0, ...getNodeDimensions(n)
-      }));
       if (!runAvoidance) {
         if (simulation.alpha() > 0.0015) { edgeLabelGroups.style('display', 'none'); setItemLabelCount(0); }
         return;
@@ -3513,25 +3490,27 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         if (!rect.width || !rect.height) return [];
         return [{ x: (rect.x + rect.width / 2 - viewportRect.x - camera.x) / liveK, y: (rect.y + rect.height / 2 - viewportRect.y - camera.y) / liveK, width: rect.width / liveK, height: rect.height / liveK }];
       });
-      routeSegments = visibleEdges.flatMap((edge: any) => edge._route?.segments ?? []);
-      routeObstacles = visibleEdges.filter((edge: any) => edge._route).map((edge: any) => edgeRouteArrowBounds(edge._route, arrowVisibility(liveK, edge._pTotal || 1).scale));
-      const placed: ObstacleBox[] = [];
-      edgeLabelGroups.sort((a: any, b: any) => a.id.localeCompare(b.id)).each(function(d: any) {
-        const route = d._route as EdgeRouteGeometry | null;
+      const intersectsViewport = (box: ObstacleBox) => Math.abs(box.x - labelViewport!.x) <= (box.width + labelViewport!.width) / 2 + 8 && Math.abs(box.y - labelViewport!.y) <= (box.height + labelViewport!.height) / 2 + 8;
+      nodeLabelObstacles = (simulation.nodes() as any[]).map(n => ({ x: n.x || 0, y: n.y || 0, ...getNodeDimensions(n) })).filter(intersectsViewport);
+      const drawnEdges = visibleEdges.filter((edge: any) => edgeDisplay(edge) !== 'none');
+      routeSegments = drawnEdges.flatMap((edge: any) => edge._route?.segments ?? []).filter(segment => edgeSegmentHitsBox(segment, labelViewport!, 8));
+      routeObstacles = drawnEdges.map((edge: any) => edgeRouteArrowBounds(edge._route, arrowVisibility(liveK, edge._pTotal || 1).scale)).filter(intersectsViewport);
+      const result = placeItemLabels(edgeLabelGroups.data().map((d: any) => {
         d._labelScale = Math.max(1, 1 / liveK);
-        const offset = (d._routeLabel?.offset < 0 ? -1 : 1) * (22 * d._labelScale + 3);
-        const dims = { width: d._labelDims.width * d._labelScale, height: d._labelDims.height * d._labelScale };
-        const placement = route && liveK >= 0.6 && placed.length < 32
-          ? edgeRouteLabel(route, {
-              dims, t: d.labelT, offset, offsets: [offset, -offset],
-              obstacles: nodeLabelObstacles.concat(uiLabelObstacles, routeObstacles, placed), segments: routeSegments, viewport: labelViewport
-            }) : null;
+        return {
+          id: d.id, route: d._route, eligible: liveK >= 0.6 && edgeDisplay(d) !== 'none',
+          dims: { width: d._labelDims.width * d._labelScale, height: d._labelDims.height * d._labelScale },
+          t: d.labelT, offset: (d._routeLabel?.offset < 0 ? -1 : 1) * (22 * d._labelScale + 3),
+        };
+      }), { viewport: labelViewport, obstacles: nodeLabelObstacles.concat(uiLabelObstacles.filter(intersectsViewport), routeObstacles), segments: routeSegments });
+      edgeLabelGroups.each(function(d: any) {
+        const placement = result.placements.get(d.id) ?? null;
         d._labelBlocked = !placement;
         applyLabel(this, d, placement);
-        const box = labelRects.get(d.id);
-        if (box) placed.push(box);
       });
-      setItemLabelCount(placed.length);
+      g.attr('data-label-attempts', result.attempts);
+      g.attr('data-label-checks', result.checks);
+      setItemLabelCount(result.placements.size);
     };
 
     edgeLabelGroups
@@ -3718,6 +3697,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     });
 
     // Update zoom with LOD updates
+    let labelsShownAtScale = liveScale >= 0.6;
     zoom.on('zoom', (event) => {
       // D3 sets sourceEvent only for direct wheel/pointer gestures. Programmatic
       // fit/restore transforms must remain distinguishable so an automatic fit
@@ -3778,37 +3758,25 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       };
       
       // Update text opacities with smooth transitions
-      g.selectAll('.node-type-text' as any)
+      const activeNodes = nodeElements.filter((d: any) => !cullActive || !d._culled);
+      activeNodes.selectAll('.node-type-text' as any)
         .style('opacity', getSmoothedOpacity(LOD_THRESHOLDS.FAR));
       // Title appears across the working band (not only when zoomed all the way
       // in) and is counter-scaled to a legibility floor so it stays readable. The
       // group transform is updated live here (the only path that runs on zoom).
-      g.selectAll('.node-title-text' as any)
+      activeNodes.selectAll('.node-title-text' as any)
         .style('opacity', scale >= 0.3 ? 1 : 0);
-      // Counter-scale the title block to the legibility floor. Skipped on dense
-      // graphs in data-simplify mode (titles hidden via CSS → no visible effect,
-      // so don't walk 1000+ groups every pan frame).
-      if (!simplifiedRef.current) {
-        g.selectAll('.node-title-group' as any)
-          .attr('transform', function(this: any) {
-            const cy = +(this.getAttribute('data-cy')) || 0;
-            return fittedTitleTransform(this as SVGGElement);
-          });
-      }
-      g.selectAll('.node-description-text' as any)
+      activeNodes.selectAll('.node-description-text' as any)
         .style('opacity', getSmoothedOpacity(LOD_THRESHOLDS.CLOSE));
       // Edge labels + arrows follow the edge LOD module (zoom-aware, crowd-aware).
-      g.selectAll('.edge-label-group' as any)
-        .style('opacity', (d: any) => (scale >= 0.6 ? 1 : 0))
-        .style('pointer-events', (d: any) => (scale >= 0.6 ? 1 : 0) > 0 ? 'all' : 'none');
-      g.selectAll('.edge-label' as any)
-        .style('opacity', 1);
-      g.selectAll('.edge-label-icon' as any)
-        .style('opacity', 1);
-      g.selectAll('.arrow' as any)
+      if (labelsShownAtScale !== (scale >= 0.6)) {
+        labelsShownAtScale = scale >= 0.6;
+        edgeLabelGroups.style('opacity', labelsShownAtScale ? 1 : 0).style('pointer-events', labelsShownAtScale ? 'all' : 'none');
+      }
+      arrowElements.filter((d: any) => edgeDisplay(d) !== 'none')
         .style('opacity', (d: any) =>
           directionStrategy(scale) === 'hidden' ? 0 : arrowVisibility(scale, d?._pTotal || 1).opacity);
-      g.selectAll('.edge' as any)
+      linkElements.filter((d: any) => edgeDisplay(d) !== 'none')
         .style('opacity', Math.max(0.1, getSmoothedOpacity(LOD_THRESHOLDS.VERY_FAR, 0.1)))
         .attr('stroke-width', function(d: any) {
           // Don't override stroke width if this edge has an active dialog
@@ -3868,6 +3836,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // the default midpoint and could overlap → clean starting positions need it.
     runLabelAvoidanceRef.current = () => updateEdgePositions(true);
     itemPresentationScaleRef.current = svg.node() ? d3.zoomTransform(svg.node()!).k : 1;
+    if (cullEnabled) applyViewportCull();
     updateNodePresentation();
     updateEdgePositions(true);
     setTimeout(() => { if (simulationRef.current === simulation) updateEdgePositions(true); }, 500);
@@ -5115,6 +5084,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     <div ref={containerRef} className="graph-container relative w-full h-full overflow-hidden select-none" data-overview={semanticOverviewActive || undefined} data-quality={qualityTier} data-dense={isDenseGraph ? 'true' : undefined} data-simplify={isSimplified ? 'true' : undefined} data-dots={isDotMode ? 'true' : undefined}>
       <LayoutSaveStatus queue={positionSaveQueue} />
       {!semanticOverviewActive && workItemEdges.length > 0 && <button
+        ref={itemRelationshipTriggerRef}
         data-graph-fit-obstacle="true"
         className="absolute bottom-3 left-16 z-20 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 shadow-lg"
         onClick={() => setItemRelationshipScope({ kind: 'all' })}
@@ -5126,7 +5096,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         contextFor={id => itemRelationshipIndex.hierarchy.paths.get(id)?.map(key => itemRelationshipIndex.hierarchy.groups.get(key)?.label).filter(Boolean).join(' / ') || 'Ungrouped'}
         onScope={setItemRelationshipScope}
         onInspect={id => { setItemRelationshipScope(null); inspectOverviewItem(id, true); }}
-        onBack={() => setItemRelationshipScope(null)}
+        onBack={closeItemRelationships}
         backLabel="Back to graph"
         visible={true}
         onEdit={id => {
