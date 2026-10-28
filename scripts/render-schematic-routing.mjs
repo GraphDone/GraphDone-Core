@@ -109,7 +109,18 @@ for (const fixture of schematicFixtures) {
     ),
     routedBranches: result.routes.length,
     metrics: result.metrics,
-    deferred: result.deferred,
+    deferred: Object.fromEntries(
+      [...new Set(result.deferred.map(route => route.reason))].map(reason => [
+        reason,
+        {
+          branches: result.deferred.filter(route => route.reason === reason)
+            .length,
+          relationships: result.deferred
+            .filter(route => route.reason === reason)
+            .reduce((sum, route) => sum + route.edgeIds.length, 0),
+        },
+      ])
+    ),
   });
 }
 const negativeMetrics = measureSchematicClutter(
