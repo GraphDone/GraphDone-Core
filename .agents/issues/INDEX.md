@@ -2,6 +2,7 @@
 
 | Symptom | Canonical lesson and regression |
 | --- | --- |
+| Auto Back returns to a different grouping, or zoom removes the focused summary | [Restore hysteresis and reconcile owned focus](../inbox/2026-10-28-lod-return-needs-hysteresis-and-focus.md); `SemanticGraphOverview.test.tsx` and nested browser Auto-return regression |
 | All browser cases pass but unified source-integrity fails after staging | [Freeze the index as well as source](../inbox/2026-10-28-freeze-index-for-strict-runs.md); commit before the gate, leave repository content and index unchanged |
 | Switching accounts briefly exposes another account’s pending graph IDs after a delayed error | [Async errors must retain account ownership](../inbox/2026-10-28-async-errors-must-retain-account-ownership.md); `useLayoutRecovery.test.ts` delayed A-discard → B-load → A-return regression |
 | A persisted layout replays after another tab saved, cleanup failure resends accepted work, or discard races recovery | [Persisted receipts do not authorize replay](../inbox/2026-10-28-persisted-layout-receipts-do-not-authorize-replay.md); `recoverablePositionQueue.test.ts`, `layoutPersistence.test.ts`, `layout-recovery.spec.ts`; retained stale/volatile replay and hydration-switch negatives |

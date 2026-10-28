@@ -1,4 +1,11 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   overviewAtScale,
   placeOverviewLabels,
@@ -110,6 +117,11 @@ export function SemanticGraphOverview({
   const [search, setSearch] = useState('');
   const [canReturn, setCanReturn] = useState(false);
   const returnMode = useRef<typeof mode>('auto');
+  const returnAutomatic = useRef({ depth: automaticDepth, active: automatic });
+  const focusedSummary = useRef<{
+    element: HTMLButtonElement;
+    memberIds: string[];
+  } | null>(null);
   const returnExpanded = useRef<ReadonlySet<string>>(new Set());
   const closeButton = useRef<HTMLButtonElement>(null);
   const backButton = useRef<HTMLButtonElement>(null);
@@ -178,6 +190,26 @@ export function SemanticGraphOverview({
     anchorX: anchorById.get(entry.id)!.x,
     anchorY: anchorById.get(entry.id)!.y,
   }));
+  useLayoutEffect(() => {
+    const focused = focusedSummary.current;
+    if (!focused || focused.element.isConnected) return;
+    focusedSummary.current = null;
+    if (document.activeElement !== document.body) return;
+    const member =
+      selectedId &&
+      focused.memberIds.includes(selectedId) &&
+      projection.membership.has(selectedId)
+        ? selectedId
+        : focused.memberIds.find(id => projection.membership.has(id));
+    const representative = member
+      ? projection.membership.get(member)
+      : undefined;
+    const target = Array.from(
+      host.current?.querySelectorAll<HTMLButtonElement>('[data-lod-group]') ??
+        []
+    ).find(element => element.dataset.lodGroup === representative);
+    (target ?? groupListButton.current)?.focus();
+  }, [projection, layout, active, selectedId]);
   const hidden = layout.hidden;
   const placedById = new Map(placed.map(entry => [entry.id, entry]));
   const groupsById = new Map(projection.groups.map(entry => [entry.id, entry]));
@@ -200,6 +232,8 @@ export function SemanticGraphOverview({
     closeBrowser();
     setMode(returnMode.current);
     setExpanded(returnExpanded.current);
+    setAutomaticDepth(returnAutomatic.current.depth);
+    setAutomatic(returnAutomatic.current.active);
     setCanReturn(false);
     onBack();
   };
@@ -346,6 +380,16 @@ export function SemanticGraphOverview({
               <button
                 key={entry.id}
                 data-lod-group={summary.id}
+                onFocus={event => {
+                  focusedSummary.current = {
+                    element: event.currentTarget,
+                    memberIds: summary.members.map(item => item.id),
+                  };
+                }}
+                onBlur={event => {
+                  if (focusedSummary.current?.element === event.currentTarget)
+                    focusedSummary.current = null;
+                }}
                 aria-current={
                   summary.members.some(item => item.id === selectedId)
                     ? 'true'
@@ -500,6 +544,10 @@ export function SemanticGraphOverview({
                         onClick={() => {
                           if (!canReturn) {
                             returnMode.current = mode;
+                            returnAutomatic.current = {
+                              depth: automaticDepth,
+                              active: automatic,
+                            };
                             returnExpanded.current = new Set(effectiveExpanded);
                           }
                           setCanReturn(true);
