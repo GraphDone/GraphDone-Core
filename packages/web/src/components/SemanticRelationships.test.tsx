@@ -12,6 +12,7 @@ import { SemanticGraphOverview } from './SemanticGraphOverview';
 import { SemanticRelationshipBrowser } from './SemanticRelationshipBrowser';
 import { indexSemanticRelationships } from '../lib/semanticRelationships';
 import type { SemanticEdge, SemanticItem } from '../lib/semanticLOD';
+import { projectRelationshipPriority } from '../lib/relationshipPriority';
 
 const items: SemanticItem[] = ['Gateway', 'Queue', 'Worker', 'Inventory'].map(
   (title, index) => ({
@@ -367,7 +368,7 @@ it('accounts for routed, internal and unresolved relationships in the Connection
   render(<Fixture />);
   expect(
     screen.getByRole('button', {
-      name: '6 relationships, 3 not drawn: 2 internal, 1 awaiting endpoints, 0 external connections in list',
+      name: '6 relationships, 3 not drawn: 2 internal, 1 awaiting endpoints, 0 summarized by priority, 0 external connections in list',
     })
   ).toBeVisible();
 });
@@ -438,4 +439,15 @@ it('bounds relationship rows while retaining search, exact editing and every pag
     target: { value: '' },
   });
   expect(edgeIds()).toEqual(many.slice(0, 250).map(edge => edge.id));
+});
+
+
+it('accounts for priority-summarized links separately while inspection retains every original', () => {
+  const priority = projectRelationshipPriority(items, edges, 'essential');
+  render(<SemanticGraphOverview items={items} edges={edges} camera={{x:20,y:30,scale:0.4}} readPositions={positions} onActiveChange={noop} onBrowse={noop} onInspect={noop} onBack={noop} relationshipPriority={priority} />);
+  const control = screen.getByRole('button', {name:'6 relationships, 4 not drawn: 2 internal, 1 awaiting endpoints, 1 summarized by priority, 0 external connections in list'});
+  expect(control).toBeVisible();
+  expect(document.querySelector('.semantic-overview')).toHaveAttribute('data-priority-summarized','1');
+  fireEvent.click(control);
+  expect(edgeIds().sort()).toEqual(edges.map(edge => edge.id).sort());
 });

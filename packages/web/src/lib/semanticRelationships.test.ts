@@ -39,6 +39,12 @@ const ids = (value: readonly SemanticEdge[]) =>
   value.map(edge => edge.id).sort();
 
 describe('semantic relationship exploration', () => {
+  it('opens every original between a pair, including reverse links, while excluding unrelated neighbors', () => {
+    const index = indexSemanticRelationships(items, edges);
+    expect(ids(scopedRelationships(index, { kind: 'pair', endpoints: ['n0', 'n1'] }))).toEqual(['hub-n1', 'parallel', 'reverse']);
+    expect(ids(scopedRelationships(index, { kind: 'pair', endpoints: ['n1', 'n0'] }))).toEqual(['hub-n1', 'parallel', 'reverse']);
+    expect(ids(scopedRelationships(index, { kind: 'pair', endpoints: ['n0', 'n0'] }))).toEqual(['loop']);
+  });
   it('keeps direct parent membership separate from descendants in a stable group selector', () => {
     const members = ['a', 'b', 'child'].map(id => ({
       id,

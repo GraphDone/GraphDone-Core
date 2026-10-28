@@ -12,6 +12,7 @@ export interface RelationshipGroup {
 }
 export type RelationshipScope =
   | { kind: 'all' }
+  | { kind: 'pair'; endpoints: readonly [string, string] }
   | { kind: 'internal'; group: RelationshipGroup }
   | {
       kind: 'bundle';
@@ -70,6 +71,13 @@ export function scopedRelationships(
   hops: 1 | 2 = 1
 ): readonly SemanticEdge[] {
   if (scope.kind === 'all') return index.edges;
+  if (scope.kind === 'pair') {
+    const [a, b] = scope.endpoints;
+    return index.edges.filter(edge => {
+      const source = relationshipEndpoint(edge.source), target = relationshipEndpoint(edge.target);
+      return (source === a && target === b) || (source === b && target === a);
+    });
+  }
   const belongs = (id: string, reference: RelationshipGroup) => {
     const path = index.hierarchy.paths.get(id);
     return Boolean(
