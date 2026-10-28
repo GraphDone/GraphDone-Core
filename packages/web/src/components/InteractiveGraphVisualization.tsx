@@ -145,7 +145,7 @@ function renderItemTitle(element: SVGGElement, item: WorkItem, layout: ReturnTyp
     group.append('text').attr('class', 'node-title-text').attr('x', 0).attr('y', layout.titleY + index * ITEM_TITLE_LINE)
       .attr('text-anchor', 'middle').attr('dominant-baseline', 'middle').text(line)
       .style('font-family', GRAPH_FONT_FAMILY).style('font-size', `${ITEM_TITLE_SIZE}px`).style('font-weight', '600')
-      .style('fill', isCompletedStatus(item.status) ? '#b9c7d7' : '#f1f5f9').style('pointer-events', 'none');
+      .style('fill', isCompletedStatus(item.status) ? '#b9c7d7' : '#f1f5f9').style('opacity', layout.titleVisible ? 1 : 0).style('pointer-events', 'none');
   });
   group.attr('transform', fittedTitleTransform(group.node()!));
 }
@@ -3414,7 +3414,11 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       element.select('.long-press-feedback').remove();
     });
 
+    let presentedScale = NaN;
     const updateNodePresentation = () => {
+      if (presentedScale === itemPresentationScaleRef.current) return;
+      presentedScale = itemPresentationScaleRef.current;
+      g.attr('data-presentation-scale', presentedScale);
       nodeElements.each(function(d: WorkItem) {
         const node = d3.select(this), layout = getNodeDimensions(d);
         node.attr('data-detail', layout.compact ? 'compact' : 'full').attr('role', layout.compact ? 'button' : 'group').attr('tabindex', layout.compact ? 0 : null).attr('aria-label', `${d.title}, ${getTypeConfig(d.type as WorkItemType).label}`);
@@ -3444,6 +3448,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     const labelRects = new Map<string, ObstacleBox>();
     let routeSegments: EdgeRouteGeometry['segments'][number][] = [];
     let routeObstacles: ObstacleBox[] = [];
+    let labelViewport: ObstacleBox | undefined;
+    let uiLabelObstacles: ObstacleBox[] = [];
     const applyLabel = (element: SVGGElement, d: any, placement: EdgeRouteLabel | null) => {
       d._routeLabel = placement;
       const label = d3.select(element);
@@ -3498,6 +3504,15 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         if (simulation.alpha() > 0.0015) { edgeLabelGroups.style('display', 'none'); setItemLabelCount(0); }
         return;
       }
+      const camera = d3.zoomTransform(svg.node()!);
+      const viewportRect = svg.node()!.getBoundingClientRect();
+      labelViewport = { x: (viewportRect.width / 2 - camera.x) / liveK, y: (viewportRect.height / 2 - camera.y) / liveK, width: viewportRect.width / liveK, height: viewportRect.height / liveK };
+      uiLabelObstacles = Array.from(document.querySelectorAll<HTMLElement>('[data-graph-fit-obstacle="true"], [data-lod-controls="true"]')).flatMap(element => {
+        if (getComputedStyle(element).display === 'none' || !element.getClientRects().length) return [];
+        const rect = element.getBoundingClientRect();
+        if (!rect.width || !rect.height) return [];
+        return [{ x: (rect.x + rect.width / 2 - viewportRect.x - camera.x) / liveK, y: (rect.y + rect.height / 2 - viewportRect.y - camera.y) / liveK, width: rect.width / liveK, height: rect.height / liveK }];
+      });
       routeSegments = visibleEdges.flatMap((edge: any) => edge._route?.segments ?? []);
       routeObstacles = visibleEdges.filter((edge: any) => edge._route).map((edge: any) => edgeRouteArrowBounds(edge._route, arrowVisibility(liveK, edge._pTotal || 1).scale));
       const placed: ObstacleBox[] = [];
@@ -3509,7 +3524,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         const placement = route && liveK >= 0.6 && placed.length < 32
           ? edgeRouteLabel(route, {
               dims, t: d.labelT, offset, offsets: [offset, -offset],
-              obstacles: nodeLabelObstacles.concat(routeObstacles, placed), segments: routeSegments
+              obstacles: nodeLabelObstacles.concat(uiLabelObstacles, routeObstacles, placed), segments: routeSegments, viewport: labelViewport
             }) : null;
         d._labelBlocked = !placement;
         applyLabel(this, d, placement);
@@ -3539,7 +3554,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           const placement = edgeRouteLabel(d._route, {
             dims: { width: d._labelDims.width * d._labelScale, height: d._labelDims.height * d._labelScale }, t,
             offset: d._routeLabel?.offset ?? 25, segments: routeSegments,
-            obstacles: nodeLabelObstacles.concat(routeObstacles, [...labelRects].filter(([id]) => id !== d.id).map(([, box]) => box))
+            viewport: labelViewport,
+            obstacles: nodeLabelObstacles.concat(uiLabelObstacles, routeObstacles, [...labelRects].filter(([id]) => id !== d.id).map(([, box]) => box))
           });
           if (placement) {
             d.labelTUser = true;

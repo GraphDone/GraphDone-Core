@@ -252,7 +252,7 @@ for (const width of [1440, 390])
         const camera = (element as SVGSVGElement & { __zoom: { x: number; y: number; k: number } }).__zoom;
         return { x: camera.x, y: camera.y, k: camera.k };
       })).toEqual(fixedCamera);
-      await expect.poll(() => page.evaluate(() => (window as any).__lodVisibleTitleMeasurements)).toBeGreaterThan(0);
+      await expect.poll(() => page.evaluate(() => (window as any).__lodVisibleTitleMeasurements)).toBe(0);
       expect(await page.evaluate(() => (window as any).__lodCameraRefreshCount)).toBe(0);
       await page.evaluate(() => {
         const target = window as any;

@@ -230,7 +230,7 @@ test.describe('user smoke: the app works from a user point of view @smoke', () =
     expect(after.nodes, 'a node must be created').toBe(before.nodes + 1);
     expect(after.edges, 'a connecting edge must be created').toBe(before.edges + 1);
     // ...and the user actually sees the newly named node on the canvas.
-    await expect(page.locator(`text=${name}`).first()).toBeVisible();
+    await expect(page.locator('.node-title-text').filter({ hasText: name }).first()).toBeVisible();
 
     // Undo must walk it back: Ctrl+Z undoes the rename, then the creation.
     await page.keyboard.press('Control+z');
