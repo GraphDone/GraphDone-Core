@@ -3,6 +3,8 @@ import {
   createEdgeRoute,
   createParallelEdgeRoute,
   edgeRouteLabel,
+  edgeRouteArrowBounds,
+  edgeSegmentHitsBox,
   pointOnEdgeRoute,
   projectEdgeRoutePointer,
 } from '../edgeRouteGeometry';
@@ -218,5 +220,76 @@ describe('item wire geometry', () => {
     expect(
       edgeRouteLabel(route, { dims: { width: NaN, height: 20 } })
     ).toBeNull();
+  });
+  it('places opposite-direction labels on clear sides instead of covering the neighboring wire', () => {
+    const upper = createEdgeRoute([
+      { x: 0, y: -7 },
+      { x: 400, y: -7 },
+    ])!;
+    const lower = createEdgeRoute([
+      { x: 400, y: 7 },
+      { x: 0, y: 7 },
+    ])!;
+    const segments = [...upper.segments, ...lower.segments];
+    const dims = { width: 110, height: 26 };
+    const first = edgeRouteLabel(upper, {
+      dims,
+      offset: 25,
+      offsets: [25, -25],
+      segments,
+    })!;
+    const second = edgeRouteLabel(lower, {
+      dims,
+      offset: 25,
+      offsets: [25, -25],
+      segments,
+    })!;
+    expect(first.y).toBe(-32);
+    expect(second.y).toBe(32);
+    expect(second.offset).toBe(-25);
+    for (const label of [first, second])
+      expect(
+        segments.some(segment =>
+          edgeSegmentHitsBox(segment, { ...label, ...dims }, 8)
+        )
+      ).toBe(false);
+  });
+
+  it('reserves arrowheads and rejects diagonal wires through a label footprint', () => {
+    const route = createEdgeRoute([
+      { x: 0, y: 0 },
+      { x: 0, y: 300 },
+    ])!;
+    const arrow = edgeRouteArrowBounds(route);
+    expect(arrow.x).toBeCloseTo(0);
+    expect(arrow).toMatchObject({
+      y: 292,
+      width: 16,
+      height: 16,
+    });
+    const box = { x: 50, y: 50, width: 20, height: 20 };
+    expect(
+      edgeSegmentHitsBox(
+        { source: { x: 0, y: 0 }, target: { x: 100, y: 100 } },
+        box
+      )
+    ).toBe(true);
+    expect(
+      edgeSegmentHitsBox(
+        { source: { x: 0, y: 0 }, target: { x: 20, y: 100 } },
+        box
+      )
+    ).toBe(false);
+    const horizontal = createEdgeRoute([
+      { x: 0, y: 0 },
+      { x: 300, y: 0 },
+    ])!;
+    const label = edgeRouteLabel(horizontal, {
+      dims: { width: 70, height: 26 },
+      t: 1,
+      offset: 25,
+      obstacles: [edgeRouteArrowBounds(horizontal)],
+    })!;
+    expect(label.x + 35).toBeLessThanOrEqual(300);
   });
 });

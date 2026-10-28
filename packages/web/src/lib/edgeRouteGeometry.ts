@@ -23,6 +23,7 @@ export interface EdgeRouteLabel {
   t: number;
   rotation: number;
   iconRotation: number;
+  offset: number;
 }
 
 const finitePoint = (point: Point) =>
@@ -159,6 +160,60 @@ export function projectEdgeRoutePointer(
   return bestT;
 }
 
+export function edgeRouteArrowBounds(
+  route: EdgeRouteGeometry,
+  scale = 1
+): ObstacleBox {
+  const angle = (route.target.angle * Math.PI) / 180;
+  const points = [
+    [-16, -8],
+    [0, 0],
+    [-16, 8],
+    [-8, 0],
+  ].map(([x, y]) => ({
+    x: route.target.x + (x * Math.cos(angle) - y * Math.sin(angle)) * scale,
+    y: route.target.y + (x * Math.sin(angle) + y * Math.cos(angle)) * scale,
+  }));
+  const left = Math.min(...points.map(p => p.x)),
+    right = Math.max(...points.map(p => p.x));
+  const top = Math.min(...points.map(p => p.y)),
+    bottom = Math.max(...points.map(p => p.y));
+  return {
+    x: (left + right) / 2,
+    y: (top + bottom) / 2,
+    width: right - left,
+    height: bottom - top,
+  };
+}
+
+export function edgeSegmentHitsBox(
+  segment: Pick<EdgeRouteSegment, 'source' | 'target'>,
+  box: ObstacleBox,
+  padding = 0
+) {
+  let first = 0,
+    last = 1;
+  for (const [axis, span] of [
+    ['x', 'width'],
+    ['y', 'height'],
+  ] as const) {
+    const low = box[axis] - box[span] / 2 - padding,
+      high = box[axis] + box[span] / 2 + padding;
+    const delta = segment.target[axis] - segment.source[axis];
+    if (delta === 0) {
+      if (segment.source[axis] < low || segment.source[axis] > high)
+        return false;
+    } else {
+      const a = (low - segment.source[axis]) / delta,
+        b = (high - segment.source[axis]) / delta;
+      first = Math.max(first, Math.min(a, b));
+      last = Math.min(last, Math.max(a, b));
+      if (first > last) return false;
+    }
+  }
+  return true;
+}
+
 export function edgeRouteLabel(
   route: EdgeRouteGeometry,
   options: {
@@ -167,6 +222,8 @@ export function edgeRouteLabel(
     offset?: number;
     padding?: number;
     obstacles?: readonly ObstacleBox[];
+    segments?: readonly Pick<EdgeRouteSegment, 'source' | 'target'>[];
+    offsets?: readonly number[];
   }
 ) {
   const { dims, obstacles = [] } = options;
@@ -196,42 +253,54 @@ export function edgeRouteLabel(
     const height =
       Math.abs(Math.sin(radians)) * dims.width +
       Math.abs(Math.cos(radians)) * dims.height;
-    for (const distance of new Set([
-      clamp(desired, low, high),
-      (low + high) / 2,
-      low,
-      high,
-    ])) {
-      const local = (distance - segment.start) / segment.length;
-      const x =
-        segment.source.x +
-        (segment.target.x - segment.source.x) * local +
-        Math.sin(radians) * offset;
-      const y =
-        segment.source.y +
-        (segment.target.y - segment.source.y) * local -
-        Math.cos(radians) * offset;
-      if (
-        obstacles.some(
-          box =>
-            Math.abs(x - box.x) < (width + box.width) / 2 + padding &&
-            Math.abs(y - box.y) < (height + box.height) / 2 + padding
+    for (const candidateOffset of options.offsets ?? [offset]) {
+      if (!Number.isFinite(candidateOffset)) continue;
+      for (const distance of new Set([
+        clamp(desired, low, high),
+        (low + high) / 2,
+        low,
+        high,
+      ])) {
+        const local = (distance - segment.start) / segment.length;
+        const x =
+          segment.source.x +
+          (segment.target.x - segment.source.x) * local +
+          Math.sin(radians) * candidateOffset;
+        const y =
+          segment.source.y +
+          (segment.target.y - segment.source.y) * local -
+          Math.cos(radians) * candidateOffset;
+        if (
+          obstacles.some(
+            box =>
+              Math.abs(x - box.x) < (width + box.width) / 2 + padding &&
+              Math.abs(y - box.y) < (height + box.height) / 2 + padding
+          )
         )
-      )
-        continue;
-      const delta = Math.abs(distance - desired);
-      if (
-        delta < bestDistance ||
-        (delta === bestDistance && distance / route.length < best!.t)
-      ) {
-        bestDistance = delta;
-        best = {
-          x,
-          y,
-          t: distance / route.length,
-          rotation,
-          iconRotation: flipped ? 180 : 0,
-        };
+          continue;
+        if (
+          options.segments?.some(part =>
+            edgeSegmentHitsBox(part, { x, y, width, height }, padding)
+          )
+        )
+          continue;
+        const delta =
+          Math.abs(distance - desired) +
+          Math.abs(candidateOffset - offset) * 0.01;
+        if (
+          delta < bestDistance ||
+          (delta === bestDistance && distance / route.length < best!.t)
+        ) {
+          bestDistance = delta;
+          best = {
+            x,
+            y,
+            t: distance / route.length,
+            rotation,
+            iconRotation: flipped ? 180 : 0,
+            offset: candidateOffset,
+          };
+        }
       }
     }
   }
