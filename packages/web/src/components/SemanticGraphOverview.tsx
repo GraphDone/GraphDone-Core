@@ -23,6 +23,11 @@ import {
 } from '../lib/semanticRelationships';
 import { SemanticRelationshipBrowser } from './SemanticRelationshipBrowser';
 import { routeSchematicConnections } from '../lib/schematicRouting';
+import {
+  projectSemanticTrace,
+  type SemanticTraceSelection,
+} from '../lib/semanticTrace';
+import { SemanticTraceControls } from './SemanticTraceControls';
 
 interface Props {
   items: readonly SemanticItem[];
@@ -58,27 +63,42 @@ export function SemanticGraphOverview({
   const [relationshipScope, setRelationshipScope] =
     useState<RelationshipScope | null>(null);
   const [relationshipFocus, setRelationshipFocus] = useState<string>();
+  const [trace, setTrace] = useState<SemanticTraceSelection | null>(null);
   const relationshipGroup = useRef<string | null>(null);
   const relationshipTrigger = useRef<string | null>(null);
   const host = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
-  const bounds = host.current?.getBoundingClientRect();
-  const obstacles = bounds
-    ? Array.from(
-        document.querySelectorAll<HTMLElement>(
-          '[data-graph-fit-obstacle="true"]'
+  const [obstacles, setObstacles] = useState<
+    Array<{ left: number; right: number; top: number; bottom: number }>
+  >([]);
+  useLayoutEffect(() => {
+    const bounds = host.current?.getBoundingClientRect();
+    const measured = bounds
+      ? Array.from(
+          document.querySelectorAll<HTMLElement>(
+            '[data-graph-fit-obstacle="true"]'
+          )
         )
-      )
-        .filter(element => element.getAttribute('role') !== 'region')
-        .map(element => element.getBoundingClientRect())
-        .filter(rect => rect.width > 0 && rect.height > 0)
-        .map(rect => ({
-          left: rect.left - bounds.left,
-          right: rect.right - bounds.left,
-          top: rect.top - bounds.top,
-          bottom: rect.bottom - bounds.top,
-        }))
-    : [];
+          .filter(
+            element =>
+              element.getAttribute('role') !== 'region' ||
+              element.hasAttribute('data-lod-trace')
+          )
+          .map(element => element.getBoundingClientRect())
+          .filter(rect => rect.width > 0 && rect.height > 0)
+          .map(rect => ({
+            left: rect.left - bounds.left,
+            right: rect.right - bounds.left,
+            top: rect.top - bounds.top,
+            bottom: rect.bottom - bounds.top,
+          }))
+      : [];
+    setObstacles(previous =>
+      JSON.stringify(previous) === JSON.stringify(measured)
+        ? previous
+        : measured
+    );
+  });
   const obstacleKey = JSON.stringify(obstacles);
   const [mode, setMode] = useState<'auto' | 'overview' | 'items'>('auto');
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(
@@ -147,6 +167,18 @@ export function SemanticGraphOverview({
   const active = mode === 'overview' || (mode === 'auto' && automatic);
   const markerId = `lod-arrow-${useId().replace(/:/g, '')}`;
   const group = projection.groups.find(candidate => candidate.id === groupId);
+  const traceProjection = useMemo(
+    () =>
+      trace
+        ? projectSemanticTrace(
+            projection.groups,
+            projection.bundles,
+            trace,
+            overviewLabelCapacity(size.width, size.height, obstacles)
+          )
+        : null,
+    [projection, trace, size.width, size.height, obstacleKey]
+  );
   useEffect(() => {
     setAutomatic(previous => overviewAtScale(previous, camera.scale));
     setAutomaticDepth(previous => semanticDepthAtScale(previous, camera.scale));
@@ -171,6 +203,21 @@ export function SemanticGraphOverview({
     }
   }, [groupId, group]);
   const layout = useMemo(() => {
+    if (traceProjection) {
+      return placeOverviewLabels(
+        traceProjection.groups.map((entry, index) => ({
+          id: entry.id,
+          x: size.width * (index === 0 ? 0.25 : 0.75),
+          y:
+            index === 0
+              ? size.height / 2
+              : (size.height * index) / traceProjection.groups.length,
+        })),
+        size.width,
+        size.height,
+        obstacles
+      );
+    }
     const positions = new Map(
       readPositions().map(position => [position.id, position])
     );
@@ -191,7 +238,15 @@ export function SemanticGraphOverview({
       };
     });
     return placeOverviewLabels(anchors, size.width, size.height, obstacles);
-  }, [projection, size.width, size.height, obstacleKey, active, readPositions]);
+  }, [
+    projection,
+    traceProjection,
+    size.width,
+    size.height,
+    obstacleKey,
+    active,
+    readPositions,
+  ]);
   const placed = layout.placed;
   useLayoutEffect(() => {
     const focused = focusedSummary.current;
@@ -219,7 +274,7 @@ export function SemanticGraphOverview({
     () =>
       routeSchematicConnections(
         layout.placed,
-        projection.bundles.map(bundle => ({
+        (traceProjection?.bundles ?? projection.bundles).map(bundle => ({
           id: bundle.id,
           source: bundle.source,
           target: bundle.target,
@@ -234,14 +289,30 @@ export function SemanticGraphOverview({
           y: rect.top,
           width: rect.right - rect.left,
           height: rect.bottom - rect.top,
-        }))
+        })),
+        {
+          sharedEndpoint: trace?.direction === 'incoming' ? 'target' : 'source',
+        }
       ),
-    [layout, projection, size.width, size.height, obstacleKey]
+    [
+      layout,
+      projection,
+      traceProjection,
+      trace?.direction,
+      size.width,
+      size.height,
+      obstacleKey,
+    ]
   );
-  const collapsedConnections = wiring.deferred.reduce(
+  const drawnConnections = wiring.routes.reduce(
     (count, bus) => count + bus.edgeIds.length,
     0
   );
+  const collapsedConnections =
+    projection.bundles.reduce(
+      (count, bundle) => count + bundle.edges.length,
+      0
+    ) - drawnConnections;
   const internalConnections = projection.groups.reduce(
     (count, group) => count + group.internalEdges.length,
     0
@@ -355,6 +426,7 @@ export function SemanticGraphOverview({
             value={mode}
             onChange={event => {
               const next = event.target.value as typeof mode;
+              setTrace(null);
               if (next === 'overview') setExpanded(new Set());
               setMode(next);
               closeBrowser();
@@ -385,6 +457,7 @@ export function SemanticGraphOverview({
             className="rounded bg-gray-950/95 border border-gray-600 px-3 py-2 min-h-11 text-gray-100"
             onClick={() => {
               setExpanded(new Set());
+              setTrace(null);
               setMode('overview');
               closeBrowser();
               groupListButton.current?.focus();
@@ -432,6 +505,8 @@ export function SemanticGraphOverview({
                   .map(connection => connection.type)
                   .join(' ')}
                 data-lod-bus-source={bus.source}
+                data-lod-bus-target={bus.target}
+                data-lod-bus-id={bus.bus}
                 data-count={bus.edgeIds.length}
                 d={bus.points
                   .map(
@@ -440,7 +515,7 @@ export function SemanticGraphOverview({
                   )
                   .join(' ')}
                 fill="none"
-                stroke={busColor(bus.source)}
+                stroke={busColor(bus.bus)}
                 strokeWidth="2.5"
                 strokeLinejoin="round"
                 strokeLinecap="round"
@@ -517,6 +592,28 @@ export function SemanticGraphOverview({
             );
           })}
         </>
+      )}
+      {active && trace && traceProjection && (
+        <SemanticTraceControls
+          selection={trace}
+          label={
+            traceProjection.focus
+              ? groupLabel(traceProjection.focus.id)
+              : undefined
+          }
+          page={traceProjection.page}
+          pages={traceProjection.pages}
+          shownNeighbors={traceProjection.shownNeighbors}
+          totalNeighbors={traceProjection.totalNeighbors}
+          hasRoom={traceProjection.hasRoom}
+          drawn={drawnConnections}
+          total={edges.length}
+          onChange={setTrace}
+          onExit={() => {
+            setTrace(null);
+            groupListButton.current?.focus();
+          }}
+        />
       )}
       {active && (
         <button
@@ -596,6 +693,29 @@ export function SemanticGraphOverview({
                 internal relationships · {group.blocked} blocked ·{' '}
                 {group.completed} completed · grouped by {group.basis}
               </p>
+              <div className="flex flex-wrap gap-2 mb-3">
+                {(['outgoing', 'incoming'] as const).map(direction => (
+                  <button
+                    key={direction}
+                    className="min-h-11 rounded border border-emerald-700 px-3 text-xs text-emerald-200"
+                    onClick={() => {
+                      setExpanded(new Set(effectiveExpanded));
+                      setMode('overview');
+                      setTrace({ groupId: group.id, direction, page: 0 });
+                      closeBrowser();
+                      requestAnimationFrame(() =>
+                        host.current
+                          ?.querySelector<HTMLButtonElement>(
+                            '[data-lod-trace] button'
+                          )
+                          ?.focus()
+                      );
+                    }}
+                  >
+                    Trace {direction} connections
+                  </button>
+                ))}
+              </div>
               <button
                 data-lod-relationships="internal"
                 onClick={() =>
@@ -626,6 +746,7 @@ export function SemanticGraphOverview({
                         .join(' / ')}`}
                       onClick={() => {
                         const next = new Set(effectiveExpanded);
+                        setTrace(null);
                         next.delete(id);
                         setExpanded(next);
                         setMode('overview');
@@ -645,6 +766,7 @@ export function SemanticGraphOverview({
                 <button
                   className="w-full min-h-11 rounded border border-emerald-700 px-3 py-2 mb-3 text-sm text-left text-emerald-200"
                   onClick={() => {
+                    setTrace(null);
                     setExpanded(
                       new Set([...effectiveExpanded, group.hierarchyId])
                     );

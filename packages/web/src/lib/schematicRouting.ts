@@ -21,6 +21,7 @@ export interface SchematicSegment {
 }
 export interface SchematicRoute {
   id: string;
+  bus: string;
   source: string;
   target: string;
   connections: readonly SchematicConnection[];
@@ -211,7 +212,11 @@ export function routeSchematicConnections(
   width: number,
   height: number,
   obstacles: readonly SchematicCard[] = [],
-  budget: { maxAttempts?: number; maxExpandedStates?: number } = {}
+  budget: {
+    maxAttempts?: number;
+    maxExpandedStates?: number;
+    sharedEndpoint?: 'source' | 'target';
+  } = {}
 ) {
   const byId = new Map(cards.map(card => [card.id, card]));
   const grouped = new Map<string, SchematicConnection[]>();
@@ -224,6 +229,7 @@ export function routeSchematicConnections(
   }
   const buses = [...grouped].map(([id, entries]) => ({
     id,
+    bus: entries[0][budget.sharedEndpoint ?? 'source'],
     source: entries[0].source,
     target: entries[0].target,
     connections: entries,
@@ -307,7 +313,7 @@ export function routeSchematicConnections(
     work.attempts++;
     const conflicts = (segment: SchematicSegment) =>
       occupied.some(
-        other => other.bus !== bus.source && segmentContact(segment, other)
+        other => other.bus !== bus.bus && segmentContact(segment, other)
       );
     const availablePorts = (card: SchematicCard) =>
       ports(card).filter(
@@ -315,11 +321,11 @@ export function routeSchematicConnections(
           xs.includes(outer.x) &&
           ys.includes(outer.y) &&
           valid(outer) &&
-          !conflicts({ a: inner, b: outer, bus: bus.source }) &&
+          !conflicts({ a: inner, b: outer, bus: bus.bus }) &&
           !blocks.some(
             other =>
               other.id !== card.id &&
-              segmentHitsCard({ a: inner, b: outer, bus: bus.source }, other, 5)
+              segmentHitsCard({ a: inner, b: outer, bus: bus.bus }, other, 5)
           )
       );
     const starts = availablePorts(source),
@@ -369,7 +375,7 @@ export function routeSchematicConnections(
           y = current.y + dy;
         if (x < 0 || x >= xs.length || y < 0 || y >= ys.length) continue;
         const next = { x: xs[x], y: ys[y] };
-        const segment = { a: p, b: next, bus: bus.source };
+        const segment = { a: p, b: next, bus: bus.bus };
         if (
           !valid(next) ||
           blocks.some(card => segmentHitsCard(segment, card, 5)) ||
@@ -378,7 +384,7 @@ export function routeSchematicConnections(
           continue;
         const shared = occupied.some(
           other =>
-            other.bus === bus.source &&
+            other.bus === bus.bus &&
             segmentContact(segment, other) === 'overlap'
         );
         const cost =
@@ -414,7 +420,7 @@ export function routeSchematicConnections(
       current = current.previous;
     }
     const route = { ...bus, points: compact(points.reverse()) };
-    const segments = schematicSegments(route.points, bus.source);
+    const segments = schematicSegments(route.points, bus.bus);
     if (segments.some(segment => same(segment.a, segment.b))) {
       deferred.push({ ...bus, reason: 'routing-budget' });
       continue;

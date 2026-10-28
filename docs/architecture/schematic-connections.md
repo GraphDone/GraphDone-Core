@@ -21,8 +21,9 @@ not a shared library or shared release dependency.
   self-loops and unresolved endpoints remain distinct. Incoming/outgoing refers
   to stored direction, not a guessed dependency execution order.
 - Dense scenes disclose connections that cannot be routed clearly. The complete
-  list stays reachable. Further work must provide a named focused-bus view so
-  users can trace a selected area without turning every connection back on.
+  list stays reachable. A named incoming/outgoing trace pages through connected
+  groups without turning every connection back on; all outside connections stay
+  counted and accessible.
 - Camera movement keeps screen-space lanes and ports fixed while the cut and
   viewport remain unchanged. Source positions are sampled for placement when
   that placement changes, not rescanned for each pan event. Inspection and Back
@@ -50,6 +51,21 @@ indices. Stable hierarchy selectors resolve current membership and headings when
 items move or are added; a disappeared group is explicitly unavailable. Type/text filters disclose their denominator. Source inspection returns
 to the relationship context; missing endpoints cannot be clicked as if loaded.
 These controls still require strict real browser/database acceptance in CI.
+
+The group browser now offers incoming and outgoing connection traces. A trace
+keeps its selected group and at most five connected neighbors on a page, bounded
+further by available label slots. Stable neighbor ordering makes every connected
+group reachable. Paging, direction changes and live removals retain truthful
+counts; a removed selected group is explicit. Incoming branches share their
+actual target trunk without reversing stored source/target identities or arrows.
+The current cut is held in manual Overview while tracing; item inspection and
+Back retain the trace. Exiting returns to the same cut. If fewer than two slots
+fit, the selected group takes priority and the complete list remains available.
+
+Controls are measured after commit so a newly mounted trace bar is a routing
+obstacle immediately. Camera pans do not rescan source positions or reroute the
+unchanged trace. This remains group-level exploration; internal/item-level wires
+and arbitrary selected multi-group paths still need their own implementation.
 
 ## Lightweight visual gate
 
@@ -86,13 +102,13 @@ spacing, readable names or a useful hierarchy.
 
 1. Review the actual overview at desktop/phone sizes, add long/multilingual names
    and obstacle fixtures, and test expanding a routed bus into its exact links.
-2. Add selected-source/selected-path tracing with clear outside-context counts.
-   A dense fixture with many deferred branches is not the final exploration UX.
+2. Accept the selected-group trace in real desktop/phone CI, inspect its pictures,
+   and extend it to selected item paths. Group paging alone is not full path tracing.
 3. Carry organized ports/routing into item/neighborhood wiring; the existing
    item renderer still uses its previous edge geometry. Preserve drag/edit/save
    behavior and use a suitable detail budget rather than drawing every link.
-4. Add small screenshot/DOM geometry checks in CI for actual integration, then
-   measure larger fixtures there. Local full-stack and image matrices are paused
+4. Pass the new actual overview screenshot/DOM geometry and direction checks in
+   the existing CI journeys, then measure larger fixtures there. Local full-stack and image matrices are paused
    under the owner's workstation constraint; never call skipped checks passed.
 5. Reconcile reviewed nested hierarchy #216, this visual slice, import/MCP #217
    and the remaining LOD scale/loading/hosted requirements before release.

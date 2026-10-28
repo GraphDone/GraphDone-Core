@@ -509,7 +509,9 @@ wires, explicit buses and small regression fixtures that reject spaghetti.
 The [schematic connection plan](schematic-connections.md) governs the next visual
 slice alongside #218 exact relationship inspection. Nested cuts in #216 remain
 useful foundations, but do not establish visual completion. Item-level routing,
-focused bus tracing, generic imports and the scale/loading gates remain open.
+acceptance of the new focused group trace, generic imports and the scale/loading
+gates remain open. The candidate pages incoming/outgoing neighbors with honest
+not-drawn counts; it does not yet trace detailed item paths.
 
 Local full-stack test batches are paused under the workstation constraint after
 the reported desktop crash. Use small serial geometry/component checks and

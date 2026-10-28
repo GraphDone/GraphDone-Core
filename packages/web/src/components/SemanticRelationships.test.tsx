@@ -215,6 +215,92 @@ it('keeps schematic lanes fixed and does no source-position scan for a camera pa
   expect(positions).not.toHaveBeenCalled();
 });
 
+it('traces outgoing and incoming buses separately and preserves the trace after source inspection', () => {
+  render(<Fixture />);
+  openPayments();
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Trace outgoing connections' })
+  );
+  expect(
+    screen.getByRole('region', { name: 'Connection trace' })
+  ).toHaveTextContent('Outgoing · Payments');
+  const paths = () =>
+    Array.from(document.querySelectorAll('[data-lod-bundle]'));
+  expect(paths()).toHaveLength(1);
+  expect(paths()[0]).toHaveAttribute('data-count', '2');
+  expect(
+    screen.getByRole('region', { name: 'Connection trace' })
+  ).toHaveTextContent('2 of 6 relationships drawn');
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Trace incoming connections' })
+  );
+  expect(paths()).toHaveLength(1);
+  expect(paths()[0]).toHaveAttribute('data-count', '1');
+  openPayments();
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Browse 2 internal relationships' })
+  );
+  fireEvent.click(
+    screen.getAllByRole('button', { name: 'Inspect Gateway' })[0]
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Back to overview' }));
+  expect(
+    screen.getByRole('region', { name: 'Connection trace' })
+  ).toHaveTextContent('Incoming · Payments');
+  expect(paths()).toHaveLength(1);
+});
+
+it('pages every connected group in a bounded trace and exposes removal of its live source', () => {
+  render(<Fixture />);
+  const neighbors = Array.from({ length: 13 }, (_, i) => ({
+    ...items[0],
+    id: `neighbor-${i}`,
+    title: `Neighbor ${i}`,
+    metadata: { lod: { groupPath: [`Neighbor ${i}`] } },
+  }));
+  act(() => {
+    replaceItems([...items, ...neighbors]);
+    replaceEdges(
+      neighbors.map(item => ({
+        id: `edge-${item.id}`,
+        source: 'n0',
+        target: item.id,
+        type: 'BLOCKS',
+      }))
+    );
+  });
+  fireEvent.click(screen.getByRole('button', { name: '15 groups · 17 items' }));
+  fireEvent.click(screen.getByRole('button', { name: /^Payments 3 items/ }));
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Trace outgoing connections' })
+  );
+  const seen = new Set<string>();
+  let pages = 0;
+  while (true) {
+    const cards = Array.from(document.querySelectorAll('[data-lod-group]'));
+    expect(cards.length).toBeLessThanOrEqual(6);
+    expect(cards.some(card => card.textContent?.includes('Payments'))).toBe(
+      true
+    );
+    for (const card of cards) seen.add(card.getAttribute('data-lod-group')!);
+    pages++;
+    expect(pages).toBeLessThanOrEqual(4);
+    const next = screen.getByRole('button', { name: 'Next connected groups' });
+    if (next.hasAttribute('disabled')) break;
+    fireEvent.click(next);
+  }
+  expect(seen.size).toBe(14);
+  expect(pages).toBe(3);
+  act(() => replaceItems(neighbors));
+  expect(
+    screen.getByRole('region', { name: 'Connection trace' })
+  ).toHaveTextContent('This group is no longer present');
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Exit connection trace' })
+  );
+  expect(screen.queryByRole('region', { name: 'Connection trace' })).toBeNull();
+});
+
 it('removes edges from an open internal view when a live update moves their endpoint out of the group', () => {
   render(<Fixture />);
   openPayments();

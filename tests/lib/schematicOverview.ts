@@ -44,7 +44,11 @@ export async function inspectSchematicOverview(
       const controls = Array.from(
         document.querySelectorAll('[data-graph-fit-obstacle="true"]')
       )
-        .filter(element => element.getAttribute('role') !== 'region')
+        .filter(
+          element =>
+            element.getAttribute('role') !== 'region' ||
+            element.hasAttribute('data-lod-trace')
+        )
         .map(rectangle)
         .filter(rect => rect.width > 0 && rect.height > 0);
       const routes = Array.from(
@@ -53,7 +57,12 @@ export async function inspectSchematicOverview(
         const matrix = path.getScreenCTM()!;
         const style = getComputedStyle(path);
         return {
-          source: path.getAttribute('data-lod-bus-source')!,
+          source:
+            path.getAttribute('data-lod-bus-id') ??
+            path.getAttribute('data-lod-bus-source')!,
+          from: path.getAttribute('data-lod-bus-source'),
+          to: path.getAttribute('data-lod-bus-target'),
+          arrow: path.getAttribute('marker-end'),
           count: Number(path.getAttribute('data-count')),
           painted:
             visible(path) &&
@@ -113,6 +122,28 @@ export async function inspectSchematicOverview(
         point => Number.isFinite(point.x) && Number.isFinite(point.y)
       )
     ).toBe(true);
+    expect(route.arrow).toMatch(/^url\(#/);
+    for (const [id, point] of [
+      [route.from, route.points[0]],
+      [route.to, route.points[route.points.length - 1]],
+    ] as const) {
+      const card = geometry.cards.find(card => card.id === id);
+      expect(card).toBeTruthy();
+      const boundaryDistance = Math.min(
+        Math.abs(point.x - card!.x),
+        Math.abs(point.x - card!.x - card!.width),
+        Math.abs(point.y - card!.y),
+        Math.abs(point.y - card!.y - card!.height)
+      );
+      expect(
+        boundaryDistance,
+        'Wire must meet its original endpoint card'
+      ).toBeLessThan(0.01);
+      expect(point.x).toBeGreaterThanOrEqual(card!.x - 0.01);
+      expect(point.x).toBeLessThanOrEqual(card!.x + card!.width + 0.01);
+      expect(point.y).toBeGreaterThanOrEqual(card!.y - 0.01);
+      expect(point.y).toBeLessThanOrEqual(card!.y + card!.height + 0.01);
+    }
   }
   const metrics = measureSchematicClutter(
     [...geometry.cards, ...geometry.controls],

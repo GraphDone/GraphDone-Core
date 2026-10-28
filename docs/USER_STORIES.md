@@ -43,6 +43,12 @@ The [dynamic graph LOD continuation](architecture/dynamic-graph-lod.md) specifie
 the current ADAPT-4/ADAPT-7 delivery path. Its stage IDs are proposed PR-sized
 work, not issued GitHub tickets or completed features.
 
+## Schematic graph exploration
+
+| ID | Story | Acceptance | Test mapping | Status |
+|----|-------|------------|--------------|--------|
+| LOD-WIRE-1 | As a user exploring a large system, I want readable group buses and focused incoming/outgoing traces so I can follow connections without a wire ball. | Wires avoid cards/controls and unrelated buses; exact IDs/directions remain inspectable; every neighbor is reachable through bounded pages; outside connections are counted; camera/selection return and saved layout are preserved. | `tests/visual/schematic-routing.test.mjs`, `tests/visual/schematic-browser.spec.ts`, `tests/e2e/graph/nested-semantic-lod.spec.ts`, `SemanticRelationships.test.tsx`, `semanticTrace.test.ts` | 🧪 Candidate; strict CI and item wiring remain open (#219) |
+
 ## Epic 3: Responsive Everywhere 📱💻
 *Phone, tablet, PC — same living graph, appropriately shaped.*
 
