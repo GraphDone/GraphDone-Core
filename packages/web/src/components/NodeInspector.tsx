@@ -16,7 +16,6 @@ interface NodeInspectorProps {
   node: any;
   onClose: () => void;
   onEdit?: () => void;
-  /** Tighter type + smaller content for the anchored on-canvas peek (PR-3). */
   compact?: boolean;
   /** Override the root data-testid so an anchored instance is distinguishable
    * from the docked one when both are mounted. */
@@ -45,15 +44,15 @@ export function NodeInspector({ node, onClose, onEdit, compact = false, rootTest
     <div
       data-testid={rootTestId}
       style={{ maxHeight }}
-      className={`flex flex-col bg-gray-900/95 backdrop-blur-md border border-gray-700/60 rounded-xl shadow-2xl overflow-hidden ${
+      className={`flex flex-col bg-gray-900/95 backdrop-blur-md border border-gray-700/60 rounded-xl shadow-2xl overflow-y-auto ${
         compact ? 'w-full max-h-[60vh]' : 'w-full sm:w-72 max-h-[60vh] sm:max-h-[70vh]'
       }`}
     >
       {/* Header */}
-      <div className="flex items-start gap-2 p-3 border-b border-gray-700/60">
+      <div className="shrink-0 flex items-start gap-2 p-3 border-b border-gray-700/60">
         <div className="flex-1 min-w-0">
           <div className="text-xs uppercase tracking-wide" style={{ color: typeCfg.hexColor }}>{typeCfg.label}</div>
-          <div className="text-base font-semibold text-white [overflow-wrap:anywhere]" title={node.title}>{node.title}</div>
+          <div className="max-h-24 overflow-y-auto text-base font-semibold text-white [overflow-wrap:anywhere]" tabIndex={0} title={node.title}>{node.title}</div>
           <div className="mt-0.5"><CopyableId id={node.id} /></div>
         </div>
         {onEdit && <button onClick={onEdit} className="min-h-[44px] px-3 rounded-lg text-emerald-300 hover:bg-gray-800">Edit</button>}
@@ -63,14 +62,14 @@ export function NodeInspector({ node, onClose, onEdit, compact = false, rootTest
       </div>
 
       {/* Mode toggle */}
-      <div className="flex gap-1 p-2 border-b border-gray-700/60">
+      <div className="shrink-0 flex gap-1 p-2 border-b border-gray-700/60">
         <ModeBtn active={mode === 'card'} onClick={() => setMode('card')} icon={<CreditCard className="h-3.5 w-3.5" />} label="Card" />
         <ModeBtn active={mode === 'contents'} onClick={() => setMode('contents')} icon={<FileText className="h-3.5 w-3.5" />} label="Contents" />
         <ModeBtn active={mode === 'diagram'} onClick={() => setMode('diagram')} icon={<Network className="h-3.5 w-3.5" />} label="Diagram" disabled={!hasSubgraph} title={hasSubgraph ? 'Sub-graph' : 'No sub-graph'} />
       </div>
 
       {/* Body */}
-      <div className="overflow-y-auto">
+      <div className="shrink-0">
         {mode === 'card' && (
           <div className="p-3 space-y-3 text-sm">
             <Row label="Type" value={typeCfg.label} color={typeCfg.hexColor} />

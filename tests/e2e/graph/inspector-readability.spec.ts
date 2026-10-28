@@ -11,6 +11,8 @@ const test = base.extend<{ ownedGraphIds: OwnedGraphs }>({
   ownedGraphIds: [ownedGraphIdsFixture, { timeout: 60000 }],
 });
 test.use({ actionTimeout: 10000 });
+const parentTitle =
+  'Readable inspector — AI subsystem coordination and reliability '.repeat(6);
 
 const inspectText = async (root: Locator) => {
   const samples = await root.evaluate(host => {
@@ -84,7 +86,7 @@ for (const width of [1440, 390]) {
       spacing: 600,
       edgeFactor: 0,
       namePrefix: 'Readable inspector',
-      titleForIndex: () => 'Readable inspector',
+      titleForIndex: () => parentTitle,
     });
     const markdown = [
       '# Service contract',
@@ -155,6 +157,40 @@ for (const width of [1440, 390]) {
       await expect(
         inspector.getByTestId('node-content-rendered')
       ).toContainText('request_id');
+      const inspectTitle = async (root: Locator) => {
+        const title = root.locator('[title]').filter({ hasText: parentTitle });
+        await expect(title).toHaveText(parentTitle);
+        const bounds = await title.evaluate(element => ({
+          height: element.clientHeight,
+          scroll: element.scrollHeight,
+          overflow: getComputedStyle(element).overflowY,
+        }));
+        expect(bounds.height).toBeLessThanOrEqual(96);
+        expect(bounds.scroll).toBeGreaterThan(bounds.height);
+        expect(bounds.overflow).toBe('auto');
+        await title.focus();
+        await title.press('End');
+        await expect
+          .poll(() =>
+            title.evaluate(
+              element =>
+                element.scrollTop + element.clientHeight - element.scrollHeight
+            )
+          )
+          .toBeGreaterThanOrEqual(-1);
+        await title.press('Home');
+        await expect
+          .poll(() => title.evaluate(element => element.scrollTop))
+          .toBe(0);
+        await expect(
+          root.getByRole('button', { name: 'Contents', exact: true })
+        ).toBeInViewport();
+        await expect(
+          root.getByTestId('node-content-rendered')
+        ).toBeInViewport();
+        return bounds;
+      };
+      const regularTitle = await inspectTitle(inspector);
       await inspector.locator('pre').first().scrollIntoViewIfNeeded();
       const regular = await inspectText(inspector);
       const tiny = inspector.locator('pre code').first();
@@ -212,16 +248,47 @@ for (const width of [1440, 390]) {
         path: info.outputPath('inspector-code.png'),
         contentType: 'image/png',
       });
+      await page.setViewportSize({ width, height: 560 });
+      await code.evaluate(element =>
+        element.scrollIntoView({ block: 'center', behavior: 'instant' })
+      );
+      await expect(code).toBeInViewport({ ratio: 0.9 });
+      await page.screenshot({
+        path: info.outputPath('inspector-short-window.png'),
+      });
+      await info.attach('inspector-short-window', {
+        path: info.outputPath('inspector-short-window.png'),
+        contentType: 'image/png',
+      });
+      await page.setViewportSize({ width, height: 900 });
       await inspector
         .getByRole('button', { name: 'Close', exact: true })
         .click();
+      const scale = await page
+        .locator('.graph-container > svg')
+        .evaluate(element => (element as any).__zoom.k);
+      if (scale < 1) {
+        const item = await page
+          .locator('.graph-container g.node .node-bg')
+          .boundingBox();
+        await page.mouse.move(
+          item!.x + item!.width / 2,
+          item!.y + item!.height / 2
+        );
+        await page.mouse.wheel(0, -Math.log2(1.05 / scale) / 0.002);
+        await expect(page.locator('.graph-container g.node')).toHaveAttribute(
+          'data-detail',
+          'full'
+        );
+      }
       await page
-        .getByRole('button', { name: 'Expand Readable inspector', exact: true })
+        .getByRole('button', { name: `Expand ${parentTitle}`, exact: true })
         .click();
       const compact = page.getByTestId('node-expand-inspector');
       await expect(compact.getByTestId('node-content-rendered')).toContainText(
         'request_id'
       );
+      const compactTitle = await inspectTitle(compact);
       await compact.locator('pre').first().scrollIntoViewIfNeeded();
       const compactText = await inspectText(compact);
       await compact
@@ -270,6 +337,8 @@ for (const width of [1440, 390]) {
         width,
         childItems: child.nodeIds.length,
         childEdges: child.edgeCount,
+        regularTitle,
+        compactTitle,
         regular,
         compact: compactText,
         preview: previewText,

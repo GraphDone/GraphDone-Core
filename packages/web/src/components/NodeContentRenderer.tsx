@@ -20,7 +20,6 @@ const readableCodeTheme = {
  */
 interface NodeContentRendererProps {
   content: string;
-  /** Smaller type + tighter spacing for the on-canvas peek panel. */
   compact?: boolean;
   className?: string;
 }
