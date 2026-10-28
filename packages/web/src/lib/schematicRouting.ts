@@ -13,6 +13,7 @@ export interface SchematicConnection {
   target: string;
   type: string;
   edgeIds: readonly string[];
+  priority?: number;
 }
 export interface SchematicSegment {
   a: SchematicPoint;
@@ -234,9 +235,10 @@ export function routeSchematicConnections(
     target: entries[0].target,
     connections: entries,
     edgeIds: entries.flatMap(entry => entry.edgeIds),
+    priority: entries.reduce((best, entry) => Math.min(best, entry.priority ?? 0), Infinity),
   }));
   buses.sort(
-    (a, b) => b.edgeIds.length - a.edgeIds.length || a.id.localeCompare(b.id)
+    (a, b) => a.priority - b.priority || b.edgeIds.length - a.edgeIds.length || a.id.localeCompare(b.id)
   );
   const blocks = [...cards, ...obstacles];
   const xs = [

@@ -3,6 +3,8 @@ import { QuickEditSurface } from './QuickEditSurface';
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { SemanticGraphOverview } from './SemanticGraphOverview';
 import { SemanticRelationshipBrowser } from './SemanticRelationshipBrowser';
+import { RelationshipPriorityControl } from './RelationshipPriorityControl';
+import { projectRelationshipPriority, relationshipPriorityLevel, relationshipPriorityTier, type RelationshipPriorityLevel } from '../lib/relationshipPriority';
 import { indexSemanticRelationships, type RelationshipScope } from '../lib/semanticRelationships';
 import { LayoutSaveStatus } from './LayoutSaveStatus';
 import ReactDOM from 'react-dom/client';
@@ -457,14 +459,17 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const [itemLabelCount, setItemLabelCount] = useState(0);
   const [itemRelationshipScope, setItemRelationshipScope] = useState<RelationshipScope | null>(null);
   const itemRelationshipTriggerRef = useRef<HTMLButtonElement>(null);
+  const itemPairTriggerRef = useRef<SVGGElement | null>(null);
   const closeItemRelationships = useCallback(() => {
+    const trigger = itemPairTriggerRef.current;
+    itemPairTriggerRef.current = null;
     setItemRelationshipScope(null);
     requestAnimationFrame(() => {
       if (document.activeElement && document.activeElement !== document.body) return;
-      itemRelationshipTriggerRef.current?.focus({preventScroll:true});
+      (trigger?.isConnected ? trigger : itemRelationshipTriggerRef.current)?.focus({preventScroll:true});
     });
   }, []);
-  useEffect(() => { setItemRelationshipScope(null); setItemLabelCount(0); }, [currentGraph?.id]);
+  useEffect(() => { setItemRelationshipScope(null); setItemLabelCount(0); itemPairTriggerRef.current = null; }, [currentGraph?.id]);
   const [createNodePosition, setCreateNodePosition] = useState<{ x: number; y: number; z: number } | undefined>(undefined);
   const [currentTransform, setCurrentTransform] = useState({ x: 0, y: 0, scale: 1 });
   const [editingEdge, setEditingEdge] = useState<{ edge: WorkItemEdge; position: { x: number; y: number } } | null>(null);
@@ -1208,6 +1213,22 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
   return result;
   }, [edgesData, workItems]);
+
+  const [relationshipLevel, setRelationshipLevel] = useState<RelationshipPriorityLevel>(() => {
+    try { return relationshipPriorityLevel(localStorage.getItem('graphdone:relationship-priority')); }
+    catch { return 'essential'; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('graphdone:relationship-priority', relationshipLevel); }
+    catch {}
+  }, [relationshipLevel]);
+  const priorityProjection = useMemo(() => projectRelationshipPriority(workItems, workItemEdges, relationshipLevel), [workItems, workItemEdges, relationshipLevel]);
+  const relationshipPriorityRef = useRef(priorityProjection);
+  relationshipPriorityRef.current = priorityProjection;
+  const inspectedPair = useMemo(() => itemRelationshipScope?.kind === 'pair'
+    ? priorityProjection.pairs.find(pair => pair.id === JSON.stringify(itemRelationshipScope.endpoints))
+    : undefined, [priorityProjection, itemRelationshipScope]);
+  const priorityControl = <RelationshipPriorityControl value={relationshipLevel} onChange={setRelationshipLevel} />;
 
   // Validate and sanitize data before D3 processing
   const currentValidationResult = validateGraphData(workItems, workItemEdges);
@@ -2063,6 +2084,15 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       setShowRelationshipWindow(true);
       setEditingEdge({ edge, position: { x: event.clientX, y: event.clientY } });
       setDragOffset({ x: 0, y: 0 });
+    };
+    const openPriorityPair = (event: MouseEvent | KeyboardEvent, edge: WorkItemEdge) => {
+      const pair = relationshipPriorityRef.current.byEdge.get(edge.id);
+      if (!pair || pair.primary.id !== edge.id || !pair.summarized.length) return false;
+      event.preventDefault();
+      event.stopPropagation();
+      itemPairTriggerRef.current = event.currentTarget as SVGGElement;
+      setItemRelationshipScope({ kind: 'pair', endpoints: pair.endpoints });
+      return true;
     };
 
     // Create edges FIRST (so they render under nodes)
@@ -2977,7 +3007,13 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .style('opacity', (d: any) => (liveScale >= 0.6 ? 1 : 0))
       .style('pointer-events', (d: any) => (liveScale >= 0.6 ? 1 : 0) > 0 ? 'all' : 'none')
       .style('cursor', 'pointer')
-      .on('click', openEdgeEditor);
+      .on('click', (event: MouseEvent, edge: WorkItemEdge) => {
+        if (!openPriorityPair(event, edge)) openEdgeEditor(event, edge);
+      })
+      .on('keydown.priority', (event: KeyboardEvent, edge: WorkItemEdge) => {
+        if (event.key === 'Enter' || event.key === ' ') openPriorityPair(event, edge);
+      });
+    edgeLabelGroups.append('title').attr('class', 'edge-priority-description');
 
     // Nodes always stack ABOVE edge labels/arrows — labels were stealing
     // clicks from node controls (the + icon) when they drifted over a card.
@@ -3463,8 +3499,40 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         height: (Math.abs(Math.sin(angle)) * d._labelDims.width + Math.abs(Math.cos(angle)) * d._labelDims.height) * (d._labelScale || 1)
       });
     };
+    let displayedPriority: typeof priorityProjection | null = null;
     const updateEdgePositions = (forceAvoid = false) => {
       if (dotModeRef.current && !forceAvoid) return;
+      const priority = relationshipPriorityRef.current;
+      if (displayedPriority !== priority) {
+        displayedPriority = priority;
+        const parallels = assignParallelEdgeIndices(validatedEdges.filter(edge => priority.representedIds.has(edge.id)) as any[]);
+        for (const edge of validatedEdges as any[]) {
+          edge._priorityVisible = priority.representedIds.has(edge.id);
+          const parallel = parallels.get(edge.id);
+          edge._pIndex = parallel?.index ?? 0;
+          edge._pTotal = parallel?.total ?? 1;
+        }
+        linkElements.attr('data-priority-visible', (edge: any) => String(edge._priorityVisible));
+        edgeLabelGroups.each(function(edge: any) {
+          const pair = priority.byEdge.get(edge.id);
+          const more = pair && pair.primary.id === edge.id ? pair.summarized.length : 0;
+          const text = `${getRelationshipConfig(edge.type as RelationshipType).label}${more ? ` +${more}` : ''}`;
+          const group = d3.select(this);
+          if (edge._priorityText !== text) {
+            edge._priorityText = text;
+            edge._labelDims = edgeLabelDimensions(measureGraphText(text, EDGE_LABEL_SIZE));
+            edge._labelIconCenter = { x: -edge._labelDims.width / 2 + 15, y: 0 };
+            group.select('.edge-label').text(text).attr('x', -edge._labelDims.width / 2 + 30);
+            group.select('.edge-label-bg').attr('width', edge._labelDims.width).attr('height', edge._labelDims.height).attr('x', -edge._labelDims.width / 2).attr('y', -edge._labelDims.height / 2);
+            group.select('.edge-label-icon').attr('x', -edge._labelDims.width / 2 + 8);
+          }
+          group.attr('role', more ? 'button' : null).attr('tabindex', more ? 0 : null)
+            .attr('aria-label', more ? `Browse ${pair!.original.length} relationships for this connection` : null);
+          group.select('.edge-priority-description').text(pair
+            ? `${edge.type}. ${pair.fallback ? 'Highest available types retained for this pair.' : `Priority: ${priority.level}.`} ${pair.original.length} original relationships; ${pair.summarized.length} summarized.${more ? ' Open to inspect every original.' : ''}`
+            : edge.type);
+        });
+      }
       const liveK = svg.node() ? d3.zoomTransform(svg.node() as Element).k : 1;
       linkElements.each(function(d: any) {
         const ep = edgeBorderEndpoints(
@@ -3511,7 +3579,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       const result = placeItemLabels(edgeLabelGroups.data().map((d: any) => {
         d._labelScale = Math.max(1, 1 / liveK);
         return {
-          id: d.id, route: d._route, eligible: liveK >= 0.6 && edgeDisplay(d) !== 'none',
+          id: d.id, route: d._route, eligible: liveK >= 0.6 && edgeDisplay(d) !== 'none', priority: relationshipPriorityTier(d.type),
           dims: { width: d._labelDims.width * d._labelScale, height: d._labelDims.height * d._labelScale },
           t: d.labelT, offset: (d._routeLabel?.offset < 0 ? -1 : 1) * (26 * d._labelScale + 3),
         };
@@ -3610,7 +3678,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     const CULL_MIN_SCALE = 0.5;
     let cullCounter = 0;
     let cullActive = false;
-    const edgeDisplay = (d: any) => !d._route || (cullActive && d.source?._culled && d.target?._culled) ? 'none' : null;
+    const edgeDisplay = (d: any) => d._priorityVisible === false || !d._route || (cullActive && d.source?._culled && d.target?._culled) ? 'none' : null;
     const applyEdgeDisplays = () => {
       linkElements.style('display', edgeDisplay);
       clickableEdges.style('display', edgeDisplay);
@@ -3868,6 +3936,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   useLayoutEffect(() => () => stopActiveSimulation(), [layoutScope, stopActiveSimulation]);
   const zoomBehaviorRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
   const [semanticOverviewActive, setSemanticOverviewActive] = useState(false);
+  useLayoutEffect(() => {
+    if (!semanticOverviewActive) runLabelAvoidanceRef.current?.();
+  }, [priorityProjection, semanticOverviewActive]);
   const handleOverviewActive = useCallback((active: boolean) => {
     setSemanticOverviewActive(active);
     if (active) setSelectedNode(null);
@@ -5095,15 +5166,18 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
 
   return (
-    <div ref={containerRef} className="graph-container relative w-full h-full overflow-hidden select-none" data-overview={semanticOverviewActive || undefined} data-quality={qualityTier} data-dense={isDenseGraph ? 'true' : undefined} data-simplify={isSimplified ? 'true' : undefined} data-dots={isDotMode ? 'true' : undefined}>
+    <div ref={containerRef} className="graph-container relative w-full h-full overflow-hidden select-none" data-overview={semanticOverviewActive || undefined} data-quality={qualityTier} data-dense={isDenseGraph ? 'true' : undefined} data-simplify={isSimplified ? 'true' : undefined} data-dots={isDotMode ? 'true' : undefined}
+      data-relationship-priority={relationshipLevel} data-relationship-total={workItemEdges.length}
+      data-priority-summarized={priorityProjection.summarized.length} data-priority-represented={priorityProjection.represented.length} data-priority-pending={priorityProjection.pending.length}>
+      {workItems.length < 40 && <div data-graph-fit-obstacle="true" className="absolute left-3 right-16 top-16 md:left-16 md:right-40 md:top-3 z-20 flex flex-wrap gap-3">{priorityControl}</div>}
       <LayoutSaveStatus queue={positionSaveQueue} />
       {!semanticOverviewActive && workItemEdges.length > 0 && <button
         ref={itemRelationshipTriggerRef}
         data-graph-fit-obstacle="true"
-        className="absolute bottom-3 left-16 z-20 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 shadow-lg"
-        onClick={() => setItemRelationshipScope({ kind: 'all' })}
-        aria-label={`${workItemEdges.length} relationships, ${itemLabelCount} labels shown. Browse all relationships`}
-      >{workItemEdges.length} connections · {itemLabelCount} labels · Browse</button>}
+        className="absolute bottom-3 left-16 z-20 max-w-[calc(100%-5rem)] rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 shadow-lg"
+        onClick={() => { itemPairTriggerRef.current = null; setItemRelationshipScope({ kind: 'all' }); }}
+        aria-label={`${workItemEdges.length} relationships, ${itemLabelCount} labels shown, ${priorityProjection.summarized.length} summarized by priority. Browse all relationships`}
+      ><span className="block">{workItemEdges.length} connections · Browse</span><span className="block text-slate-300">{priorityProjection.summarized.length} summarized · {itemLabelCount} labels</span></button>}
       {itemRelationshipScope && !semanticOverviewActive && <SemanticRelationshipBrowser
         index={itemRelationshipIndex}
         scope={itemRelationshipScope}
@@ -5113,6 +5187,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         onBack={closeItemRelationships}
         backLabel="Back to graph"
         visible={true}
+        presentationSummary={itemRelationshipScope.kind === 'pair' ? inspectedPair
+          ? `${getRelationshipConfig(inspectedPair.primary.type as RelationshipType).label} is this pair’s highest-priority type. The ${relationshipLevel} view represents ${inspectedPair.represented.length} and summarizes ${inspectedPair.summarized.length}. All ${inspectedPair.original.length} originals are listed below.`
+          : 'No loaded relationships remain between these items.' : undefined}
         onEdit={id => {
           const edge = workItemEdges.find(edge => edge.id === id);
           if (!edge) return;
@@ -5135,6 +5212,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         key={currentGraph.id}
         items={workItems}
         edges={workItemEdges}
+        relationshipPriority={priorityProjection}
+        relationshipControl={priorityControl}
         camera={currentTransform}
         readPositions={readOverviewPositions}
         onActiveChange={handleOverviewActive}

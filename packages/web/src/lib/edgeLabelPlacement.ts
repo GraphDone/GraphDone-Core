@@ -14,6 +14,7 @@ export interface ItemLabelCandidate {
   dims: Dims;
   t: number;
   offset: number;
+  priority?: number;
 }
 
 export const ITEM_LABEL_BUDGET = {
@@ -35,7 +36,7 @@ export function placeItemLabels(
   const budget = { remaining: ITEM_LABEL_BUDGET.checks as number };
   let attempts = 0;
   for (const candidate of [...candidates].sort((a, b) =>
-    a.id.localeCompare(b.id)
+    (a.priority ?? 0) - (b.priority ?? 0) || a.id.localeCompare(b.id)
   )) {
     if (
       placements.size >= ITEM_LABEL_BUDGET.labels ||

@@ -1,0 +1,249 @@
+import { test as base, expect } from '@playwright/test';
+import { login, TEST_USERS } from '../../lib/auth';
+import { gql } from '../../lib/graphRequest';
+import {
+  ownedGraphIdsFixture,
+  type OwnedGraphs,
+} from '../../lib/ownedGraphIdsFixture';
+
+const test = base.extend<{ ownedGraphIds: OwnedGraphs }>({
+  ownedGraphIds: [ownedGraphIdsFixture, { timeout: 60000 }],
+});
+test.use({ actionTimeout: 10000 });
+
+for (const width of [1440, 390]) {
+  test(`relationship priority retains connected pairs and exact editing at ${width} @item-wires`, async ({
+    page,
+    ownedGraphIds,
+  }, info) => {
+    test.setTimeout(120000);
+    await page.setViewportSize({ width, height: 900 });
+    await login(page, TEST_USERS.ADMIN);
+    const seeded = await ownedGraphIds.seed({
+      size: 4,
+      spacing: 600,
+      edgeFactor: 0,
+      namePrefix: 'Relationship priority',
+      titleForIndex: index => ['Gateway', 'Worker', 'Queue', 'Store'][index],
+      additionalEdges: [
+        { sourceIndex: 1, targetIndex: 0, type: 'BLOCKS' },
+        { sourceIndex: 0, targetIndex: 1, type: 'REFERENCES' },
+      ],
+    });
+    await gql(
+      page,
+      'mutation($id:ID!){updateWorkItems(where:{id:$id},update:{positionX:1,positionY:1}){workItems{id}}}',
+      { id: seeded.nodeIds[3] }
+    );
+    await gql(
+      page,
+      'mutation($source:ID!,$target:ID!){updateEdges(where:{source:{id:$source},target:{id:$target}},update:{type:REFERENCES}){edges{id}}}',
+      { source: seeded.nodeIds[2], target: seeded.nodeIds[3] }
+    );
+    const snapshot = async () => {
+      const data = await gql(
+        page,
+        'query($id:ID!){workItems(where:{graph:{id:$id}}){id title positionX positionY} edges(where:{source:{graph:{id:$id}}}){id type source{id} target{id}}}',
+        { id: seeded.graphId }
+      );
+      data.workItems.sort((a: { id: string }, b: { id: string }) =>
+        a.id.localeCompare(b.id)
+      );
+      data.edges.sort((a: { id: string }, b: { id: string }) =>
+        a.id.localeCompare(b.id)
+      );
+      return data;
+    };
+    const before = await snapshot();
+    const blocker = before.edges.find(
+      (edge: { type: string }) => edge.type === 'BLOCKS'
+    );
+    const primaryIds = before.edges
+      .filter(
+        (edge: {
+          id: string;
+          type: string;
+          source: { id: string };
+          target: { id: string };
+        }) =>
+          edge.id === blocker.id ||
+          (edge.source.id === seeded.nodeIds[1] &&
+            edge.target.id === seeded.nodeIds[2]) ||
+          (edge.source.id === seeded.nodeIds[2] &&
+            edge.target.id === seeded.nodeIds[3])
+      )
+      .map((edge: { id: string }) => edge.id)
+      .sort();
+    expect(before.edges).toHaveLength(5);
+    expect(primaryIds).toHaveLength(3);
+    const writes: unknown[] = [],
+      errors: string[] = [];
+    let allowDelete = false;
+    page.on('pageerror', error => errors.push(error.message));
+    await page.route('**/api/graphql', async route => {
+      const body = route.request().postDataJSON();
+      if (/^\s*mutation\b/.test(body?.query ?? '')) {
+        writes.push({
+          operation: body.operationName,
+          variables: body.variables,
+        });
+        if (
+          allowDelete &&
+          body.operationName === 'DeleteEdges' &&
+          body.variables?.where?.id === blocker.id
+        )
+          await route.continue();
+        else await route.abort();
+      } else await route.continue();
+    });
+    await page.evaluate(id => {
+      localStorage.setItem('currentGraphId', id);
+      localStorage.setItem('graphdone:viewMode', 'graph');
+      localStorage.removeItem('graphdone:relationship-priority');
+    }, seeded.graphId);
+    await page.goto('/');
+    const graph = page.locator('.graph-container');
+    const priority = page.getByRole('combobox', {
+      name: 'Relationship priority',
+    });
+    await expect(graph.locator('.node')).toHaveCount(4);
+    await expect
+      .poll(() =>
+        page.evaluate(() => (window as any).__layoutMetrics?.()?.cameraReady)
+      )
+      .toBe(true);
+    await expect(priority).toHaveValue('essential');
+    await page.evaluate(
+      y => (window as any).miniMapZoom(-300, y, 0.75),
+      width === 390 ? -600 : -300
+    );
+    await expect(graph.locator('.main-graph-group')).toHaveAttribute(
+      'data-presentation-scale',
+      '0.75'
+    );
+    const camera = () =>
+      graph.locator(':scope > svg').evaluate(svg => {
+        const { x, y, k } = (svg as any).__zoom;
+        return { x, y, k };
+      });
+    const represented = () =>
+      graph.locator('.edges-group .edge').evaluateAll(paths =>
+        paths
+          .filter(path => path.getAttribute('data-priority-visible') === 'true')
+          .map(path => path.getAttribute('data-edge-id'))
+          .sort()
+      );
+    const savedCamera = await camera();
+    await expect.poll(represented).toEqual(primaryIds);
+    await expect(graph).toHaveAttribute('data-priority-summarized', '2');
+    const label = graph.locator(
+      `.edge-label-group[data-edge-id="${blocker.id}"]`
+    );
+    await expect(label).toBeVisible();
+    await expect(label.locator('.edge-label')).toHaveText('Blocks +2');
+    expect(
+      await label.locator('.edge-label').evaluate(element => {
+        const matrix = (element as SVGGraphicsElement).getScreenCTM()!;
+        return (
+          parseFloat(getComputedStyle(element).fontSize) *
+          Math.hypot(matrix.a, matrix.b)
+        );
+      })
+    ).toBeGreaterThanOrEqual(14);
+    await label.focus();
+    await page.keyboard.press('Enter');
+    const browser = page.getByRole('region', { name: 'Graph relationships' });
+    await expect(browser).toBeVisible();
+    const pairIds = before.edges
+      .filter((edge: { source: { id: string }; target: { id: string } }) =>
+        [edge.source.id, edge.target.id].every(id =>
+          [seeded.nodeIds[0], seeded.nodeIds[1]].includes(id)
+        )
+      )
+      .map((edge: { id: string }) => edge.id)
+      .sort();
+    expect(
+      await browser
+        .locator('[data-lod-edge-id]')
+        .evaluateAll(rows =>
+          rows.map(row => row.getAttribute('data-lod-edge-id')).sort()
+        )
+    ).toEqual(pairIds);
+    await expect(browser).toContainText('All 3 originals are listed below.');
+    await page.keyboard.press('Escape');
+    await expect(browser).toHaveCount(0);
+    await expect(label).toBeFocused();
+    expect(await camera()).toEqual(savedCamera);
+    const stages: unknown[] = [];
+    for (const [level, count] of [
+      ['dependencies', 4],
+      ['all', 5],
+      ['essential', 3],
+    ] as const) {
+      await priority.focus();
+      await page.keyboard.press(level === 'all' ? 'End' : 'Home');
+      if (level === 'dependencies') await page.keyboard.press('ArrowDown');
+      await expect(priority).toHaveValue(level);
+      await expect(graph).toHaveAttribute('data-relationship-priority', level);
+      await expect.poll(async () => (await represented()).length).toBe(count);
+      expect(await camera()).toEqual(savedCamera);
+      stages.push({ level, ids: await represented(), camera: await camera() });
+    }
+    expect(await snapshot()).toEqual(before);
+    expect(writes).toEqual([]);
+    await page.reload();
+    await expect(priority).toHaveValue('essential');
+    await expect.poll(represented).toEqual(primaryIds);
+    await graph
+      .getByRole('button', { name: /Browse all relationships/ })
+      .click();
+    await browser
+      .getByRole('button', {
+        name: `Edit relationship ${blocker.id}`,
+        exact: true,
+      })
+      .click();
+    const editor = page.getByRole('dialog', {
+      name: 'Edit relationship',
+      exact: true,
+    });
+    await expect(editor).toBeVisible();
+    allowDelete = true;
+    await editor
+      .getByRole('button', { name: 'Delete Relationship', exact: true })
+      .click();
+    await expect(editor).toHaveCount(0);
+    await expect(graph.locator('.edges-group .edge')).toHaveCount(4);
+    await expect.poll(async () => (await represented()).length).toBe(3);
+    const dependency = before.edges.find(
+      (edge: {
+        type: string;
+        source: { id: string };
+        target: { id: string };
+      }) =>
+        edge.type === 'DEPENDS_ON' &&
+        edge.source.id === seeded.nodeIds[0] &&
+        edge.target.id === seeded.nodeIds[1]
+    );
+    expect(await represented()).toContain(dependency.id);
+    expect(await represented()).not.toContain(blocker.id);
+    await expect(graph).toHaveAttribute('data-priority-summarized', '1');
+    const after = await snapshot();
+    expect(after.workItems).toEqual(before.workItems);
+    expect(after.edges).toEqual(
+      before.edges.filter((edge: { id: string }) => edge.id !== blocker.id)
+    );
+    expect(writes).toEqual([
+      { operation: 'DeleteEdges', variables: { where: { id: blocker.id } } },
+    ]);
+    expect(errors).toEqual([]);
+    await info.attach('priority-accounting.json', {
+      body: JSON.stringify({ stages, before, after, writes, errors }),
+      contentType: 'application/json',
+    });
+    await info.attach('priority-fallback.png', {
+      body: await page.screenshot(),
+      contentType: 'image/png',
+    });
+  });
+}

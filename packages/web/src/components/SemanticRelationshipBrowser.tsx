@@ -19,6 +19,7 @@ interface Props {
   visible: boolean;
   backLabel?: string;
   onEdit?: (id: string) => void;
+  presentationSummary?: string;
 }
 
 export function SemanticRelationshipBrowser({
@@ -32,6 +33,7 @@ export function SemanticRelationshipBrowser({
   visible,
   backLabel = 'Back to groups',
   onEdit,
+  presentationSummary,
 }: Props) {
   const [page, setPage] = useState(0);
   const [type, setType] = useState('');
@@ -88,6 +90,8 @@ export function SemanticRelationshipBrowser({
   const title =
     scope.kind === 'all'
       ? 'All loaded relationships'
+      : scope.kind === 'pair'
+        ? `Relationships between ${scope.endpoints.map(id => index.byId.get(id)?.title ?? id).join(' and ')}`
       : scope.kind === 'node'
         ? `Relationships of ${index.byId.get(scope.id)?.title ?? scope.id}`
         : scope.kind === 'internal'
@@ -160,6 +164,7 @@ export function SemanticRelationshipBrowser({
       aria-label="Graph relationships"
       data-lod-controls="true"
       data-graph-fit-obstacle="true"
+      onClick={event => event.stopPropagation()}
       onFocusCapture={event => {
         ownedFocus.current = event.target as HTMLElement;
       }}
@@ -182,6 +187,7 @@ export function SemanticRelationshipBrowser({
         {backLabel}
       </button>
       <h2 className="text-base font-semibold break-words">{title}</h2>
+      {presentationSummary && <p className="my-2 text-sm text-emerald-200">{presentationSummary}</p>}
       {missingGroup && (
         <p className="text-sm text-amber-200 my-2">
           This group is no longer present in the loaded graph.

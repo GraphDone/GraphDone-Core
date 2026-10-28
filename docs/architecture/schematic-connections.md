@@ -258,8 +258,8 @@ parallel-edge fixture should show the primary label replacing redundant visual
 labels, with all original records still accessible. Extend the2000-item gate to
 exercise the stops, meaningful coverage and conserved counts. Keep the existing
 clutter/typography budgets and deliberate spaghetti negatives. The type-tier
-mapping and control labels are proposed defaults pending visual review, not an
-implemented feature or completed acceptance claim.
+mapping and control labels are implemented in the candidate below; final visual
+review and acceptance are still required.
 
 The first priority candidate adds `relationshipPriority.ts`: canonical endpoint
 pairs retain every original ID and direction; the selected stop admits all ties
@@ -267,7 +267,8 @@ up to its tier, or the best available tier when none qualify. Unknown imported
 types use the contextual tier and remain available through pair fallback and
 All. Missing endpoints stay a separate pending partition. Applying its admitted
 IDs to canonical semantic bundles retains other lower-tier member pairs and
-does not rebuild containment. This helper is not yet wired to the application.
+does not rebuild containment. The candidate now wires this projection into item visibility, primary labels,
+label admission and semantic bundles while retaining canonical data.
 
 On 2026-10-28, eight serial Vitest cases passed in 0.877s using the existing
 owned dependency fixture (99ms test bodies). They cover semantic direction,
@@ -276,3 +277,20 @@ pair keys, reorder/monotonicity, pre-aggregation coverage and exact conservation
 of 50,000 edges across 10,000 items. This is pure projection evidence, not browser
 capacity or completed priority-control acceptance. The earlier scaffold could
 not import the absent module; no behavioral red-suite pass is implied.
+
+The draft #224 UI uses a 16px Links control with Essential, Dependencies and All
+stops, saved per browser. A primary label such as “Blocks +2” opens every
+original relationship for that endpoint pair; unrelated pairs keep their best
+available tier before group aggregation. Display changes preserve the camera,
+physics inputs and API data. Item and overview counts distinguish summarized
+relationships from pending/internal/geometrically deferred records.
+
+On 2026-10-28, the scoped candidate passed 41 component/helper tests, 10 schematic
+routing tests and web types. The two headed priority journeys at 1440/390px passed
+in 23.1s: keyboard level changes, persisted choice, exact pair inspection with
+focus restoration, unchanged data, and explicit deletion of a blocker revealing
+the dependency fallback. Their first run exposed the separate relationship-panel
+click propagation bug corrected in #223. Local probes use an owned dependency
+fixture. The extended thousands-of-items priority acceptance, exact-source review,
+full CI and dev integration remain pending. Actual obstacle-aware item routing
+and buses remain issue #220.

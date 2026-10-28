@@ -20,6 +20,14 @@ const candidate = (id: string): ItemLabelCandidate => ({
 });
 const viewport = { x: 150, y: 0, width: 600, height: 400 };
 
+it('spends contested label space on the higher-priority relationship first', () => {
+  const result = placeItemLabels([
+    { ...candidate('a-context'), priority: 2 },
+    { ...candidate('z-blocker'), priority: 0 },
+  ], { viewport: { x: 150, y: 25, width: 130, height: 50 }, obstacles: [], segments: route.segments });
+  expect([...result.placements.keys()]).toEqual(['z-blocker']);
+});
+
 it('bounds failed attempts even when every label is blocked', () => {
   const result = placeItemLabels(
     Array.from({ length: 2000 }, (_, index) => candidate(String(index))),
