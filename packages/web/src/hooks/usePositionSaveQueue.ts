@@ -96,16 +96,23 @@ export function useLayoutRecovery(requestedOwnerId?: string) {
   if (!registry) throw new Error('PositionSaveProvider is required.');
   const version = useSyncExternalStore(registry.subscribe, registry.snapshot);
   const [saved, setSaved] = useState<{ ownerId?: string; scopes: Awaited<ReturnType<typeof readLayoutScopes>>; error: string }>({ scopes: [], error: '' });
-  const [busy, setBusy] = useState(false);
+  const active = useRef({ ownerId });
+  if (active.current.ownerId !== ownerId) active.current = { ownerId };
+  const scope = active.current;
+  const [busyScope, setBusyScope] = useState<typeof scope>();
+  const busy = busyScope === scope;
+  const isCurrent = () => active.current === scope && getSessionOwnerId() === ownerId;
   useEffect(() => {
     if (!ownerId || import.meta.env.VITE_OFFLINE_SYNC === 'true') return;
     let cancelled = false;
+    let request = 0;
     const refresh = async () => {
+      const currentRequest = ++request;
       try {
         const scopes = await readLayoutScopes(ownerId);
-        if (!cancelled) setSaved({ ownerId, scopes, error: '' });
+        if (!cancelled && currentRequest === request && active.current === scope && getSessionOwnerId() === ownerId) setSaved({ ownerId, scopes, error: '' });
       } catch (error) {
-        if (!cancelled) setSaved({ ownerId, scopes: [], error: error instanceof Error ? error.message : 'Device layout storage is unavailable.' });
+        if (!cancelled && currentRequest === request && active.current === scope && getSessionOwnerId() === ownerId) setSaved({ ownerId, scopes: [], error: error instanceof Error ? error.message : 'Device layout storage is unavailable.' });
       }
     };
     void refresh();
@@ -116,7 +123,7 @@ export function useLayoutRecovery(requestedOwnerId?: string) {
       window.removeEventListener('graphdone-local-change', refresh);
       channel?.removeEventListener('message', refresh);
     };
-  }, [ownerId, registry, version]);
+  }, [ownerId, registry, version, scope]);
   const scopes = new Map<string, Set<string>>();
   if (saved.ownerId === ownerId) for (const scope of saved.scopes) scopes.set(scope.graphId, new Set(scope.positions.map(position => position.id)));
   for (const entry of registry.entries().filter(entry => entry.ownerId === ownerId && entry.queue.size)) {
@@ -126,14 +133,15 @@ export function useLayoutRecovery(requestedOwnerId?: string) {
   }
   const discard = async (graphId: string) => {
     if (!ownerId || busy) return;
-    setBusy(true);
+    setBusyScope(scope);
     try {
       await registry.discardScope({ ownerId, graphId });
+      if (!isCurrent()) return;
       const scopes = await readLayoutScopes(ownerId);
-      setSaved({ ownerId, scopes, error: '' });
+      if (isCurrent()) setSaved({ ownerId, scopes, error: '' });
     } catch (error) {
-      setSaved(previous => ({ ...previous, ownerId, error: error instanceof Error ? error.message : 'The pending layout could not be discarded.' }));
-    } finally { setBusy(false); }
+      if (isCurrent()) setSaved(previous => ({ ownerId, scopes: previous.ownerId === ownerId ? previous.scopes : [], error: error instanceof Error ? error.message : 'The pending layout could not be discarded.' }));
+    } finally { setBusyScope(previous => previous === scope ? undefined : previous); }
   };
   return { scopes: [...scopes].map(([graphId, ids]) => ({ graphId, count: ids.size })), loading: !!ownerId && saved.ownerId !== ownerId, error: requestedOwnerId && !ownerId ? 'Sign in again to inspect this account’s pending layouts.' : saved.ownerId === ownerId ? saved.error : '', busy, discard };
 }

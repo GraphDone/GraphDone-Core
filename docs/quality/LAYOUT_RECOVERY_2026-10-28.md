@@ -125,5 +125,15 @@ and verifies graph removal. The process-loss case owns and removes only its
 temporary browser profile. Local Chrome and CI Chromium are separate browser
 builds; neither is evidence for all engines, real phones or hosted D1.
 
+The frozen `c4df01e1567af10b6c4b0dc9d666ad946c1e0b75` run passed all nine
+browser cases in 266.9 seconds, with exit 0, no timeout/evidence errors, and clean
+matching start/end fingerprints. Its full unit invocation passed 740 tests
+(with the same 26 gated database skips), and 193 harness tests passed. Build,
+types and lint passed. Independent review then found a separate delayed Settings
+discard/account-switch race; that candidate was not cleared for integration.
+The new hook regression failed before correction and all 43 focused tests pass
+after it. See the [account-label lesson](../../.agents/inbox/2026-10-28-async-errors-must-retain-account-ownership.md).
+The containing corrected commit still requires renewed exact-head gates.
+
 The existing smoke Graph→List→Graph/ACK/reload case, auth-link token checks,
 offline project transfer, semantic LOD and motion gates remain required.
