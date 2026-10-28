@@ -422,6 +422,33 @@ for (const width of [1440, 390])
         exact: true,
       });
       await expect(trace).toContainText('Outgoing · Payments');
+      const topControls = [
+        page.getByRole('combobox', { name: 'Graph detail', exact: true }),
+        page.getByRole('combobox', {
+          name: 'Relationship priority',
+          exact: true,
+        }),
+        count(2),
+        page.getByTestId('graph-zoom-extents'),
+        ...(width === 390 ? [page.getByTestId('graph-lock-toggle')] : []),
+      ];
+      const controlBounds = await Promise.all(
+        topControls.map(control => control.boundingBox())
+      );
+      for (const [index, bounds] of controlBounds.entries()) {
+        expect(bounds).not.toBeNull();
+        for (const other of controlBounds.slice(index + 1)) {
+          expect(other).not.toBeNull();
+          const overlaps =
+            bounds!.x < other!.x + other!.width &&
+            bounds!.x + bounds!.width > other!.x &&
+            bounds!.y < other!.y + other!.height &&
+            bounds!.y + bounds!.height > other!.y;
+          expect(overlaps, 'Graph controls must not cover one another').toBe(
+            false
+          );
+        }
+      }
       const traceText = trace.locator('p').first();
       await traceText.evaluate(element => (element.style.fontSize = '8px'));
       try {
@@ -447,6 +474,26 @@ for (const width of [1440, 390])
         })
       );
       await expect(trace).toContainText('Incoming · Payments');
+      await expect(
+        page.getByRole('combobox', {
+          name: 'Relationship priority',
+          exact: true,
+        })
+      ).toHaveValue('essential');
+      const paymentGroupId = await overview
+        .getByRole('button', {
+          name: 'Payments, 36 items, 9 blocked',
+          exact: true,
+        })
+        .getAttribute('data-lod-group');
+      const incomingDependency = overview.locator(
+        '[data-lod-bundle~="DEPENDS_ON"]'
+      );
+      await expect(incomingDependency).toHaveCount(1);
+      await expect(incomingDependency).toHaveAttribute(
+        'data-lod-bus-target',
+        paymentGroupId!
+      );
       await inspectSchematicOverview(
         overview,
         info,

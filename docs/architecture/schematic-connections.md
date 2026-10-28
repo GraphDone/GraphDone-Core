@@ -294,3 +294,13 @@ click propagation bug corrected in #223. Local probes use an owned dependency
 fixture. The extended thousands-of-items priority acceptance, exact-source review,
 full CI and dev integration remain pending. Actual obstacle-aware item routing
 and buses remain issue #220.
+
+
+Explicit incoming/outgoing traces apply the chosen priority tier within that
+original direction before paging/routing. An opposite-direction blocker can
+remain the global winner without erasing the only incoming dependency. The
+trace adds its per-member-pair fallback IDs to the represented external set,
+keeps all other partitions exact, and restores the global set on exit. This is
+a scoped presentation decision; the persisted Links setting and canonical
+relationships do not change. See the dated trace-scope/control-space lesson for
+the failed full-CI cases and the screenshot-rejected first phone correction.

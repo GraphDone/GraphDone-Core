@@ -10,6 +10,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { SemanticGraphOverview } from './SemanticGraphOverview';
 import * as routing from '../lib/schematicRouting';
 import type { SemanticItem } from '../lib/semanticLOD';
+import { projectRelationshipPriority } from '../lib/relationshipPriority';
 
 const items: SemanticItem[] = Array.from({ length: 4 }, (_, index) => ({
   id: `n${index}`,
@@ -149,5 +150,74 @@ it('does no hidden overview routing and resumes the current summaries on return'
   expect(route).toHaveBeenCalled();
   expect(summaries()).toHaveLength(1);
   expect(summaries()[0]).toHaveAccessibleName(/System, 2 items/);
+  route.mockRestore();
+});
+
+it('keeps original member-pair fallback inside a directional trace and restores global priority on exit', () => {
+  const source = items.map((item, index) => ({
+    ...item,
+    metadata: { lod: { groupPath: [index < 2 ? 'Left' : 'Right'] } },
+  }));
+  const relationships = [
+    { id: 'block', source: 'n0', target: 'n2', type: 'BLOCKS' },
+    { id: 'reverse', source: 'n2', target: 'n0', type: 'DEPENDS_ON' },
+    { id: 'lower', source: 'n2', target: 'n0', type: 'REFERENCES' },
+    { id: 'fallback', source: 'n3', target: 'n1', type: 'REFERENCES' },
+    { id: 'internal', source: 'n0', target: 'n1', type: 'CONTAINS' },
+    { id: 'pending', source: 'n0', target: 'absent', type: 'BLOCKS' },
+  ];
+  const original = JSON.stringify({ source, relationships });
+  const route = vi.spyOn(routing, 'routeSchematicConnections');
+  const fixture = (level: 'essential' | 'dependencies' | 'all') => (
+    <SemanticGraphOverview
+      items={source}
+      edges={relationships}
+      camera={{ x: 0, y: 0, scale: 0.2 }}
+      readPositions={positions}
+      onActiveChange={noop}
+      onBrowse={noop}
+      onInspect={noop}
+      onBack={noop}
+      relationshipPriority={projectRelationshipPriority(
+        source,
+        relationships,
+        level
+      )}
+    />
+  );
+  const { container, rerender } = render(fixture('essential'));
+  const routed = () =>
+    route.mock.calls
+      .at(-1)![1]
+      .flatMap(bundle => bundle.edgeIds)
+      .sort();
+  const overview = container.querySelector('.semantic-overview')!;
+  expect(routed()).toEqual(['block', 'fallback']);
+  expect(overview).toHaveAttribute('data-priority-summarized', '2');
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Left, 2 items, 0 blocked' })
+  );
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Trace incoming connections' })
+  );
+  expect(routed()).toEqual(['fallback', 'reverse']);
+  expect(overview).toHaveAttribute('data-priority-summarized', '1');
+  expect(overview).toHaveAttribute('data-geometry-deferred', '1');
+  expect(overview).toHaveAttribute('data-internal-relationships', '1');
+  expect(overview).toHaveAttribute('data-pending-relationships', '1');
+  rerender(fixture('all'));
+  expect(routed()).toEqual(['fallback', 'lower', 'reverse']);
+  expect(overview).toHaveAttribute('data-priority-summarized', '0');
+  rerender(fixture('essential'));
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Trace outgoing connections' })
+  );
+  expect(routed()).toEqual(['block']);
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Exit connection trace' })
+  );
+  expect(routed()).toEqual(['block', 'fallback']);
+  expect(overview).toHaveAttribute('data-priority-summarized', '2');
+  expect(JSON.stringify({ source, relationships })).toBe(original);
   route.mockRestore();
 });
