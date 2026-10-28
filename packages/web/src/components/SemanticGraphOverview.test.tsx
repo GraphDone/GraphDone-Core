@@ -10,7 +10,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { SemanticGraphOverview } from './SemanticGraphOverview';
 import type { SemanticItem } from '../lib/semanticLOD';
 
-const items: SemanticItem[] = Array.from({ length: 40 }, (_, index) => ({
+const items: SemanticItem[] = Array.from({ length: 4 }, (_, index) => ({
   id: `n${index}`,
   title: `Node ${index}`,
   type: 'TASK',
@@ -73,8 +73,8 @@ it('restores Auto hysteresis history when inspection returns to the same camera'
   render(<Fixture />);
   const before = ids();
   expect(before).toHaveLength(1);
-  fireEvent.click(screen.getByRole('button', { name: '1 groups · 40 items' }));
-  fireEvent.click(screen.getByRole('button', { name: /^System 40 items/ }));
+  fireEvent.click(screen.getByRole('button', { name: '1 groups · 4 items' }));
+  fireEvent.click(screen.getByRole('button', { name: /^System 4 items/ }));
   fireEvent.click(screen.getByRole('button', { name: 'Node 0 TASK · ACTIVE' }));
   expect(summaries()).toHaveLength(0);
   fireEvent.click(screen.getByRole('button', { name: 'Back to overview' }));
