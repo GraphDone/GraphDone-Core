@@ -77,12 +77,43 @@ test('item wire paths, hitboxes, arrows and dragged labels retain original relat
   await expect(labels).toHaveCount(2);
   await expect
     .poll(() =>
-      page.evaluate(() => (window as any).__layoutMetrics?.()?.atRest)
+      page.evaluate(() => {
+        const metrics = (window as any).__layoutMetrics?.();
+        return metrics?.atRest === true && metrics?.cameraReady === true;
+      })
     )
     .toBe(true);
 
   const capture = async (name: string) => {
     const geometry = await page.locator('.graph-container').evaluate(host => {
+      const visible = (element: Element) => {
+        for (
+          let current: Element | null = element;
+          current;
+          current = current.parentElement
+        ) {
+          const style = getComputedStyle(current);
+          if (
+            style.display === 'none' ||
+            style.visibility !== 'visible' ||
+            Number(style.opacity) === 0
+          )
+            return false;
+        }
+        return true;
+      };
+      const cards = Array.from(host.querySelectorAll<SVGGElement>('.node')).map(
+        node => {
+          const rect = node.querySelector('.node-bg')!.getBoundingClientRect();
+          return {
+            id: (node as any).__data__.id as string,
+            x: rect.x,
+            y: rect.y,
+            width: rect.width,
+            height: rect.height,
+          };
+        }
+      );
       const rows = Array.from(
         host.querySelectorAll<SVGPathElement>('.edges-group .edge')
       ).map(path => {
@@ -97,6 +128,13 @@ test('item wire paths, hitboxes, arrows and dragged labels retain original relat
         const end = path.getPointAtLength(length),
           near = path.getPointAtLength(Math.max(0, length - 0.1));
         const matrix = arrow.transform.baseVal.consolidate()?.matrix;
+        const start = path.getPointAtLength(0);
+        const screenStart = new DOMPoint(start.x, start.y).matrixTransform(
+          path.getScreenCTM()!
+        );
+        const screenEnd = new DOMPoint(end.x, end.y).matrixTransform(
+          path.getScreenCTM()!
+        );
         const style = getComputedStyle(path),
           hitStyle = getComputedStyle(hitbox);
         const arrowStyle = getComputedStyle(arrow);
@@ -107,16 +145,22 @@ test('item wire paths, hitboxes, arrows and dragged labels retain original relat
           hitPath: hitbox.getAttribute('d'),
           length,
           painted:
-            style.display !== 'none' &&
-            style.visibility !== 'hidden' &&
-            Number(style.opacity) > 0 &&
+            visible(path) &&
+            style.stroke !== 'none' &&
             Number(style.strokeOpacity) > 0 &&
             parseFloat(style.strokeWidth) > 0,
-          hit:
-            hitStyle.display !== 'none' && hitStyle.pointerEvents === 'stroke',
+          hit: visible(hitbox) && hitStyle.pointerEvents === 'stroke',
           arrowVisible:
-            arrowStyle.display !== 'none' && Number(arrowStyle.opacity) > 0,
+            visible(arrow) &&
+            ((arrowStyle.fill !== 'none' &&
+              Number(arrowStyle.fillOpacity) > 0) ||
+              (arrowStyle.stroke !== 'none' &&
+                Number(arrowStyle.strokeOpacity) > 0 &&
+                parseFloat(arrowStyle.strokeWidth) > 0)) &&
+            arrow.getTotalLength() > 0,
           end: { x: end.x, y: end.y },
+          screenStart: { x: screenStart.x, y: screenStart.y },
+          screenEnd: { x: screenEnd.x, y: screenEnd.y },
           tangent: Math.atan2(end.y - near.y, end.x - near.x),
           arrow: matrix
             ? {
@@ -127,19 +171,42 @@ test('item wire paths, hitboxes, arrows and dragged labels retain original relat
             : null,
         };
       });
-      return rows.sort((a, b) => a.id.localeCompare(b.id));
+      return { cards, rows: rows.sort((a, b) => a.id.localeCompare(b.id)) };
     });
-    expect(geometry.map(row => row.id)).toEqual(
+    expect(geometry.rows.map(row => row.id)).toEqual(
       before.edges.map((edge: { id: string }) => edge.id)
     );
-    for (const row of geometry) {
+    for (const row of geometry.rows) {
+      const original = before.edges.find(
+        (edge: { id: string }) => edge.id === row.id
+      )!;
+      for (const [id, point] of [
+        [original.source.id, row.screenStart],
+        [original.target.id, row.screenEnd],
+      ] as const) {
+        const card = geometry.cards.find(card => card.id === id)!;
+        expect(card).toBeTruthy();
+        expect(point.x).toBeGreaterThanOrEqual(card.x - 0.01);
+        expect(point.x).toBeLessThanOrEqual(card.x + card.width + 0.01);
+        expect(point.y).toBeGreaterThanOrEqual(card.y - 0.01);
+        expect(point.y).toBeLessThanOrEqual(card.y + card.height + 0.01);
+        expect(
+          Math.min(
+            Math.abs(point.x - card.x),
+            Math.abs(point.x - card.x - card.width),
+            Math.abs(point.y - card.y),
+            Math.abs(point.y - card.y - card.height)
+          ),
+          'Wire must meet the original directed endpoint'
+        ).toBeLessThan(0.01);
+      }
       expect(row.tag).toBe('path');
       expect(row.path).toBeTruthy();
       expect(row.hitPath).toBe(row.path);
       expect(row.length).toBeGreaterThan(1);
-      expect(row.painted).toBe(true);
+      expect(row.painted, 'Item wire must be painted').toBe(true);
       expect(row.hit).toBe(true);
-      expect(row.arrowVisible).toBe(true);
+      expect(row.arrowVisible, 'Item arrow must be painted').toBe(true);
       expect(row.arrow).toBeTruthy();
       expect(row.arrow!.x).toBeCloseTo(row.end.x, 2);
       expect(row.arrow!.y).toBeCloseTo(row.end.y, 2);
@@ -156,6 +223,58 @@ test('item wire paths, hitboxes, arrows and dragged labels retain original relat
     await info.attach(name, { path: png, contentType: 'image/png' });
   };
   await capture('initial-item-wires');
+  for (const negative of [
+    {
+      selector: '.edges-group',
+      property: 'opacity',
+      value: '0',
+      error: 'Item wire must be painted',
+    },
+    {
+      selector: '.edges-group .edge',
+      property: 'stroke',
+      value: 'none',
+      error: 'Item wire must be painted',
+    },
+    {
+      selector: '.arrows-group',
+      property: 'display',
+      value: 'none',
+      error: 'Item arrow must be painted',
+    },
+  ]) {
+    const target = page
+      .locator(`.graph-container ${negative.selector}`)
+      .first();
+    const original = await target.evaluate((element, change) => {
+      const style = (element as SVGElement).style;
+      const original = {
+        value: style.getPropertyValue(change.property),
+        priority: style.getPropertyPriority(change.property),
+      };
+      style.setProperty(change.property, change.value);
+      return original;
+    }, negative);
+    try {
+      await expect(capture('invisible-item-negative')).rejects.toThrow(
+        negative.error
+      );
+    } finally {
+      await target.evaluate(
+        (element, restore) => {
+          const style = (element as SVGElement).style;
+          if (restore.value)
+            style.setProperty(
+              restore.property,
+              restore.value,
+              restore.priority
+            );
+          else style.removeProperty(restore.property);
+        },
+        { property: negative.property, ...original }
+      );
+    }
+  }
   const label = labels.first();
   const edgeId = await label.getAttribute('data-edge-id');
   const initialT = await label.evaluate(el => (el as any).__data__.labelT);
@@ -213,12 +332,30 @@ test('item wire paths, hitboxes, arrows and dragged labels retain original relat
   await expect(
     editor.getByRole('button', { name: 'Flip Direction', exact: true })
   ).toBeVisible();
+  const original = before.edges.find(
+    (edge: { id: string }) => edge.id === edgeId
+  )!;
+  const title = (id: string) =>
+    before.workItems.find((node: { id: string }) => node.id === id)!.title;
+  const assertOriginalEditor = async () => {
+    await expect(
+      editor.getByText(
+        `Editing relationship: ${title(original.source.id)} → ${title(original.target.id)}`,
+        { exact: true }
+      )
+    ).toBeVisible();
+    await expect(editor.getByRole('button', { pressed: true })).toHaveText(
+      original.type === 'DEPENDS_ON' ? 'Depends On' : 'Blocks'
+    );
+  };
+  await assertOriginalEditor();
   await editor
     .getByRole('button', { name: 'Close relationship editor', exact: true })
     .click();
   await expect(editor).toHaveCount(0);
   await label.click();
   await expect(editor).toBeVisible();
+  await assertOriginalEditor();
   await editor
     .getByRole('button', { name: 'Close relationship editor', exact: true })
     .click();
