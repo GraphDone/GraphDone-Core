@@ -8,6 +8,8 @@ import fs from 'fs';
 // SQLite-based authentication system
 // Separate from Neo4j for better availability and security
 
+export type AuthLinkPurpose = 'login' | 'password-reset';
+
 interface User {
   id: string;
   email: string;
@@ -15,6 +17,7 @@ interface User {
   name: string;
   role: 'ADMIN' | 'USER' | 'VIEWER' | 'GUEST';
   passwordHash: string;
+  authVersion: number;
   createdAt: string;
   updatedAt: string;
   isActive: boolean;
@@ -28,6 +31,7 @@ interface User {
 class SQLiteAuthStore {
   private db: sqlite3.Database | null = null;
   private initialized = false;
+  private initializing: Promise<void> | null = null;
 
   private async getDb(): Promise<sqlite3.Database> {
     if (this.db) return this.db;
@@ -55,6 +59,13 @@ class SQLiteAuthStore {
 
   async initialize(): Promise<void> {
     if (this.initialized) return;
+    if (!this.initializing) {
+      this.initializing = this.initializeDatabase().finally(() => { this.initializing = null; });
+    }
+    return this.initializing;
+  }
+
+  private async initializeDatabase(): Promise<void> {
 
     const db = await this.getDb();
     
@@ -296,6 +307,7 @@ class SQLiteAuthStore {
           }
 
           try {
+            await this.migrateAuthLinks();
             await this.createDefaultUsers();
             await this.createDefaultFolders();
             this.initialized = true;
@@ -306,6 +318,29 @@ class SQLiteAuthStore {
         });
       });
     });
+  }
+
+  private async migrateAuthLinks(): Promise<void> {
+    const db = await this.getDb();
+    const run = (sql: string) => new Promise<void>((resolve, reject) => db.run(sql, error => error ? reject(error) : resolve()));
+    for (const [table, columns] of Object.entries({
+      users: { authVersion: 'INTEGER NOT NULL DEFAULT 0', deactivationDate: 'TEXT' },
+      magic_links: { purpose: "TEXT CHECK(purpose IN ('login', 'password-reset'))", authVersion: 'INTEGER' },
+    })) {
+      const existing = await new Promise<{ name: string }[]>((resolve, reject) => {
+        db.all(`PRAGMA table_info(${table})`, (error, rows: { name: string }[]) => error ? reject(error) : resolve(rows));
+      });
+      for (const [name, definition] of Object.entries(columns)) {
+        if (!existing.some(column => column.name === name)) await run(`ALTER TABLE ${table} ADD COLUMN ${name} ${definition}`);
+      }
+    }
+    await run("UPDATE magic_links SET usedAt = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE purpose IS NULL AND usedAt IS NULL");
+    await run(`CREATE TRIGGER IF NOT EXISTS revoke_links_on_auth_version
+      AFTER UPDATE OF authVersion ON users WHEN NEW.authVersion != OLD.authVersion
+      BEGIN
+        UPDATE magic_links SET usedAt = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+        WHERE usedAt IS NULL AND (userId = NEW.id OR (userId IS NULL AND email = NEW.email));
+      END`);
   }
 
   private async createDefaultFolders(): Promise<void> {
@@ -404,6 +439,7 @@ class SQLiteAuthStore {
             name: row.name,
             role: row.role,
             passwordHash: row.passwordHash,
+            authVersion: row.authVersion,
             createdAt: row.createdAt,
             updatedAt: row.updatedAt,
             isActive: Boolean(row.isActive),
@@ -421,7 +457,7 @@ class SQLiteAuthStore {
     });
   }
 
-  async findUserById(id: string): Promise<User | null> {
+  async findUserById(id: string, includeInactive = false): Promise<User | null> {
     await this.initialize();
     const db = await this.getDb();
 
@@ -432,10 +468,10 @@ class SQLiteAuthStore {
         LEFT JOIN user_teams ut ON u.id = ut.userId
         LEFT JOIN teams t ON ut.teamId = t.id
         WHERE u.id = ?
-        AND u.isActive = 1
+        AND (? = 1 OR u.isActive = 1)
       `;
       
-      db.get(sql, [id], (err, row: any) => {
+      db.get(sql, [id, includeInactive ? 1 : 0], (err, row: any) => {
         if (err) {
           reject(err);
         } else if (row) {
@@ -446,6 +482,7 @@ class SQLiteAuthStore {
             name: row.name,
             role: row.role,
             passwordHash: row.passwordHash,
+            authVersion: row.authVersion,
             createdAt: row.createdAt,
             updatedAt: row.updatedAt,
             isActive: Boolean(row.isActive),
@@ -488,6 +525,7 @@ class SQLiteAuthStore {
             name: row.name,
             role: row.role,
             passwordHash: row.passwordHash,
+            authVersion: row.authVersion,
             createdAt: row.createdAt,
             updatedAt: row.updatedAt,
             isActive: Boolean(row.isActive),
@@ -536,6 +574,7 @@ class SQLiteAuthStore {
               name: userData.name,
               role: 'ADMIN',
               passwordHash,
+              authVersion: 0,
               createdAt: now,
               updatedAt: now,
               isActive: true,
@@ -563,6 +602,7 @@ class SQLiteAuthStore {
             name: row.name,
             role: row.role,
             passwordHash: row.passwordHash,
+            authVersion: row.authVersion,
             createdAt: row.createdAt,
             updatedAt: row.updatedAt,
             isActive: Boolean(row.isActive),
@@ -625,6 +665,7 @@ class SQLiteAuthStore {
                   name: row.name,
                   role: row.role,
                   passwordHash: row.passwordHash,
+                  authVersion: row.authVersion,
                   createdAt: row.createdAt,
                   updatedAt: row.updatedAt,
                   isActive: Boolean(row.isActive),
@@ -779,13 +820,16 @@ class SQLiteAuthStore {
     const deactivationDate = isActive ? null : now;
 
     return new Promise((resolve, reject) => {
-      db.run('UPDATE users SET isActive = ?, deactivationDate = ?, updatedAt = ? WHERE id = ?', 
-        [isActive ? 1 : 0, deactivationDate, now, userId], (err) => {
+      db.run('UPDATE users SET authVersion = authVersion + CASE WHEN isActive != ? THEN 1 ELSE 0 END, isActive = ?, deactivationDate = ?, updatedAt = ? WHERE id = ?',
+        [isActive ? 1 : 0, isActive ? 1 : 0, deactivationDate, now, userId], (err) => {
         if (err) {
           reject(err);
         } else {
           // Return updated user
-          this.findUserById(userId).then(user => resolve(user!)).catch(reject);
+          this.findUserById(userId, true).then(user => {
+            if (!user) throw new Error('User not found');
+            resolve(user);
+          }).catch(reject);
         }
       });
     });
@@ -799,7 +843,7 @@ class SQLiteAuthStore {
     const now = new Date().toISOString();
 
     return new Promise((resolve, reject) => {
-      db.run('UPDATE users SET passwordHash = ?, updatedAt = ? WHERE id = ?', 
+      db.run('UPDATE users SET passwordHash = ?, authVersion = authVersion + 1, updatedAt = ? WHERE id = ?',
         [passwordHash, now, userId], (err) => {
         if (err) {
           reject(err);
@@ -1146,6 +1190,7 @@ class SQLiteAuthStore {
             name: row.name,
             role: row.role,
             passwordHash: row.passwordHash,
+            authVersion: row.authVersion,
             createdAt: row.createdAt,
             updatedAt: row.updatedAt,
             isActive: Boolean(row.isActive),
@@ -1309,10 +1354,13 @@ class SQLiteAuthStore {
     });
   }
 
-  async createMagicLink(email: string): Promise<{ id: string; token: string; expiresAt: string }> {
+  async createMagicLink(email: string, purpose: AuthLinkPurpose): Promise<{ id: string; token: string; expiresAt: string }> {
     await this.initialize();
     const db = await this.getDb();
 
+    if (purpose !== 'login' && purpose !== 'password-reset') throw new Error('Invalid email link purpose');
+    const account = await this.findUserByEmailOrUsername(email);
+    if ((account && !account.isActive) || (purpose === 'password-reset' && !account)) throw new Error('Email link unavailable');
     const id = uuidv4();
     const token = uuidv4() + uuidv4();
     const now = new Date();
@@ -1321,8 +1369,8 @@ class SQLiteAuthStore {
 
     return new Promise((resolve, reject) => {
       db.run(
-        'INSERT INTO magic_links (id, email, token, expiresAt, createdAt) VALUES (?, ?, ?, ?, ?)',
-        [id, email.toLowerCase(), token, expiresAt.toISOString(), createdAt],
+        'INSERT INTO magic_links (id, email, token, expiresAt, createdAt, purpose, userId, authVersion) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [id, email.toLowerCase(), token, expiresAt.toISOString(), createdAt, purpose, account?.id ?? null, account?.authVersion ?? 0],
         (err) => {
           if (err) {
             reject(err);
@@ -1334,16 +1382,16 @@ class SQLiteAuthStore {
     });
   }
 
-  async verifyMagicLink(token: string): Promise<{ valid: boolean; email?: string; userId?: string }> {
+  async verifyMagicLink(token: string): Promise<{ valid: boolean; email?: string; userId?: string; authVersion?: number; role?: string }> {
     await this.initialize();
     const db = await this.getDb();
     const now = new Date().toISOString();
 
-    const link = await new Promise<{ id: string; email: string } | undefined>((resolve, reject) => {
+    const link = await new Promise<{ id: string; email: string; userId: string | null; authVersion: number } | undefined>((resolve, reject) => {
       db.get(
-        'SELECT id, email FROM magic_links WHERE token = ? AND usedAt IS NULL AND expiresAt > ?',
+        "SELECT id, email, userId, authVersion FROM magic_links WHERE token = ? AND purpose = 'login' AND authVersion IS NOT NULL AND usedAt IS NULL AND expiresAt > ?",
         [token, now],
-        (error, row: { id: string; email: string } | undefined) => {
+        (error, row: { id: string; email: string; userId: string | null; authVersion: number } | undefined) => {
           if (error) reject(error);
           else resolve(row);
         }
@@ -1353,7 +1401,13 @@ class SQLiteAuthStore {
 
     const changed = await new Promise<number>((resolve, reject) => {
       db.run(
-        "UPDATE magic_links SET usedAt = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ? AND token = ? AND usedAt IS NULL AND expiresAt > strftime('%Y-%m-%dT%H:%M:%fZ', 'now')",
+        `UPDATE magic_links SET usedAt = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+         WHERE id = ? AND token = ? AND purpose = 'login' AND usedAt IS NULL
+         AND expiresAt > strftime('%Y-%m-%dT%H:%M:%fZ', 'now') AND (
+           EXISTS (SELECT 1 FROM users WHERE users.email = magic_links.email AND users.isActive = 1
+             AND users.authVersion = magic_links.authVersion AND (magic_links.userId IS NULL OR users.id = magic_links.userId))
+           OR (userId IS NULL AND authVersion = 0 AND NOT EXISTS (SELECT 1 FROM users WHERE users.email = magic_links.email))
+         )`,
         [link.id, token],
         function (error) {
           if (error) reject(error);
@@ -1373,8 +1427,27 @@ class SQLiteAuthStore {
         role: 'USER'
       });
     }
-    if (!user.isActive) return { valid: false };
-    return { valid: true, email: link.email, userId: user.id };
+    if (!user.isActive || user.authVersion !== link.authVersion || (link.userId && link.userId !== user.id)) return { valid: false };
+    return { valid: true, email: link.email, userId: user.id, authVersion: link.authVersion, role: user.role };
+  }
+
+  async resetPasswordWithLink(token: string, newPassword: string): Promise<boolean> {
+    await this.initialize();
+    const db = await this.getDb();
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    const changed = await new Promise<number>((resolve, reject) => {
+      db.run(`UPDATE users SET passwordHash = ?, authVersion = authVersion + 1,
+        updatedAt = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+        WHERE isActive = 1 AND EXISTS (
+          SELECT 1 FROM magic_links WHERE token = ? AND purpose = 'password-reset'
+          AND userId = users.id AND email = users.email AND authVersion = users.authVersion
+          AND usedAt IS NULL AND expiresAt > strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+        )`, [passwordHash, token], function (error) {
+          if (error) reject(error);
+          else resolve(this.changes);
+        });
+    });
+    return changed === 1;
   }
 
   async createShareableLink(data: {

@@ -35,9 +35,9 @@ afterEach(async () => {
 describe('single-use magic links in real SQLite', () => {
   it('permits exactly one concurrent redemption for an existing account', async () => {
     const account = await sqliteAuthStore.findUserByEmailOrUsername(email);
-    const link = await sqliteAuthStore.createMagicLink(email);
+    const link = await sqliteAuthStore.createMagicLink(email, 'login');
     const results = await Promise.all(Array.from({ length: 12 }, () => sqliteAuthStore.verifyMagicLink(link.token)));
-    expect(results.filter(result => result.valid)).toEqual([{ valid: true, email, userId: account!.id }]);
+    expect(results.filter(result => result.valid)).toEqual([{ valid: true, email, userId: account!.id, authVersion: 0, role: 'ADMIN' }]);
     expect(results.filter(result => !result.valid)).toHaveLength(11);
     expect((await row<{ usedAt: string }>('SELECT usedAt FROM magic_links WHERE id=?', [link.id])).usedAt).toBeTruthy();
     expect(await sqliteAuthStore.verifyMagicLink(link.token)).toEqual({ valid: false });
@@ -45,24 +45,24 @@ describe('single-use magic links in real SQLite', () => {
 
   it('creates one new account when a fresh link is redeemed concurrently', async () => {
     const newEmail = 'new-magic-link-fixture@graphdone.invalid';
-    const link = await sqliteAuthStore.createMagicLink(newEmail);
+    const link = await sqliteAuthStore.createMagicLink(newEmail, 'login');
     const results = await Promise.all(Array.from({ length: 12 }, () => sqliteAuthStore.verifyMagicLink(link.token)));
     const account = await sqliteAuthStore.findUserByEmailOrUsername(newEmail);
-    expect(results.filter(result => result.valid)).toEqual([{ valid: true, email: newEmail, userId: account!.id }]);
+    expect(results.filter(result => result.valid)).toEqual([{ valid: true, email: newEmail, userId: account!.id, authVersion: 0, role: 'USER' }]);
     expect(results.filter(result => !result.valid)).toHaveLength(11);
     expect(await row('SELECT COUNT(*) AS count FROM users WHERE email=?', [newEmail])).toEqual({ count: 1 });
     expect(account?.isActive).toBe(true);
   });
 
   it('allows independent valid links to identify the same existing account', async () => {
-    const links = await Promise.all([sqliteAuthStore.createMagicLink(email), sqliteAuthStore.createMagicLink(email)]);
+    const links = await Promise.all([sqliteAuthStore.createMagicLink(email, 'login'), sqliteAuthStore.createMagicLink(email, 'login')]);
     const results = await Promise.all(links.map(link => sqliteAuthStore.verifyMagicLink(link.token)));
     expect(results.every(result => result.valid)).toBe(true);
     expect(results[0].userId).toBe(results[1].userId);
   });
 
   it.each(['expired', 'used', 'missing'])('rejects an %s link without changing its record', async state => {
-    const link = await sqliteAuthStore.createMagicLink(email);
+    const link = await sqliteAuthStore.createMagicLink(email, 'login');
     if (state === 'expired') await execute('UPDATE magic_links SET expiresAt=? WHERE id=?', ['2000-01-01T00:00:00.000Z', link.id]);
     if (state === 'used') await execute('UPDATE magic_links SET usedAt=? WHERE id=?', ['2000-01-01T00:00:00.000Z', link.id]);
     const before = await row('SELECT * FROM magic_links WHERE id=?', [link.id]);
@@ -71,7 +71,7 @@ describe('single-use magic links in real SQLite', () => {
   });
 
   it('rejects a link that expires while its consumption write is delayed', async () => {
-    const link = await sqliteAuthStore.createMagicLink(email);
+    const link = await sqliteAuthStore.createMagicLink(email, 'login');
     const originalRun = db.run.bind(db);
     let release!: () => void;
     const queued = new Promise<void>(resolve => {
@@ -92,10 +92,12 @@ describe('single-use magic links in real SQLite', () => {
   });
 
   it('rejects an inactive account and keeps its consumed link unusable after reactivation', async () => {
-    await execute('UPDATE users SET isActive=0 WHERE email=?', [email]);
-    const link = await sqliteAuthStore.createMagicLink(email);
+    const account = await sqliteAuthStore.findUserByEmailOrUsername(email);
+    const link = await sqliteAuthStore.createMagicLink(email, 'login');
+    await sqliteAuthStore.updateUserStatus(account!.id, false);
+    await expect(sqliteAuthStore.createMagicLink(email, 'login')).rejects.toThrow('Email link unavailable');
     expect(await sqliteAuthStore.verifyMagicLink(link.token)).toEqual({ valid: false });
-    await execute('UPDATE users SET isActive=1 WHERE email=?', [email]);
+    await sqliteAuthStore.updateUserStatus(account!.id, true);
     expect(await sqliteAuthStore.verifyMagicLink(link.token)).toEqual({ valid: false });
   });
 
@@ -105,7 +107,7 @@ describe('single-use magic links in real SQLite', () => {
   });
 
   it('awaits consumption errors and allows a retry only after the failed update is repaired', async () => {
-    const link = await sqliteAuthStore.createMagicLink(email);
+    const link = await sqliteAuthStore.createMagicLink(email, 'login');
     await execute("CREATE TRIGGER reject_magic_consumption BEFORE UPDATE OF usedAt ON magic_links BEGIN SELECT RAISE(ABORT, 'fixture consumption failure'); END");
     await expect(sqliteAuthStore.verifyMagicLink(link.token)).rejects.toThrow('fixture consumption failure');
     expect(await row('SELECT usedAt FROM magic_links WHERE id=?', [link.id])).toEqual({ usedAt: null });
@@ -115,7 +117,7 @@ describe('single-use magic links in real SQLite', () => {
   });
 
   it('fails closed if identity lookup fails after the token was consumed', async () => {
-    const link = await sqliteAuthStore.createMagicLink(email);
+    const link = await sqliteAuthStore.createMagicLink(email, 'login');
     const schema = await row<{ sql: string }>("SELECT sql FROM sqlite_master WHERE name='user_teams'");
     await execute('DROP TABLE user_teams');
     await expect(sqliteAuthStore.verifyMagicLink(link.token)).rejects.toThrow('no such table');

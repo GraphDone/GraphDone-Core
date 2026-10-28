@@ -11,7 +11,7 @@ const dir=await mkdtemp(join(tmpdir(),'graphdone-ops-core-'));process.chdir(dir)
 await sqliteAuthStore.initialize();
 const admin=await sqliteAuthStore.findUserByEmailOrUsername('admin');
 const users=[];for(const name of ['person','other'])users.push(await sqliteAuthStore.createUser({email:name+'@operations.invalid',username:name,name,password:'local-fixture-only-strong',role:'USER'}));
-const identity={admin:generateToken(admin!.id,admin!.email,'ADMIN'),user:generateToken(users[0].id,users[0].email,'USER'),other:generateToken(users[1].id,users[1].email,'USER'),forgedAdmin:generateToken(users[0].id,users[0].email,'ADMIN')};
+const identity={admin:generateToken(admin!.id,admin!.email,'ADMIN',admin!.authVersion),user:generateToken(users[0].id,users[0].email,'USER',users[0].authVersion),other:generateToken(users[1].id,users[1].email,'USER',users[1].authVersion),forgedAdmin:generateToken(users[0].id,users[0].email,'ADMIN',users[0].authVersion)};
 const app=express();app.use('/api/ops',operationsApi);const server=app.listen(0,'127.0.0.1');await new Promise<void>(ok=>server.once('listening',ok));
 const address=server.address() as any;
 try{await operationsContract(async(path:string,method='GET',body?:unknown,token?:string)=>{const r=await fetch(`http://127.0.0.1:${address.port}/api/ops`+path,{method,headers:{'Content-Type':'application/json',...token?{Authorization:'Bearer '+token}:{}},...body?{body:JSON.stringify(body)}:{}});return {status:r.status,body:await r.json()};},identity);}finally{server.close();await rm(dir,{recursive:true,force:true});}

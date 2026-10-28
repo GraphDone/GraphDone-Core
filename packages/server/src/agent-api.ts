@@ -5,7 +5,7 @@ import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { driver } from './db.js';
-import { extractUserFromToken } from './middleware/auth.js';
+import { resolveActiveAuthUser } from './middleware/auth.js';
 import { sqliteAuthStore } from './auth/sqlite-auth.js';
 
 const hash = (value: string) => createHash('sha256').update(value).digest('hex');
@@ -31,7 +31,7 @@ agentApi.all('*', async (req, res) => {
       if (!token) return res.status(401).json({ error: 'Token expired, revoked, or invalid for this project' });
       ownerId = token.ownerId; actor = token.name; actorId = token.id; scope = token.scope;
     } else {
-      const user = extractUserFromToken(req.headers.authorization);
+      const user = await resolveActiveAuthUser(req.headers.authorization);
       if (!user) return res.status(401).json({ error: 'Authentication required' });
       ownerId = user.userId; actorId = user.userId; actor = user.email;
     }
