@@ -122,3 +122,14 @@ The same failed CI run's actual large-symbols artifact is clean and unchanged:
 wall 4.303/4.503/3.724s; three cards and one admitted label at each detail view,
 no attempted writes or page errors. Retain those successful stage artifacts
 alongside the failed overall run. The later hierarchy/mobile stages did not run.
+
+A final active-consumer audit found `RadarChart` bypassing the global typography
+with13px axis labels and11px,400-weight,0.7-opacity tick numbers. Dashboard's
+expanded distributions and Analytics use this component. The axis measurement
+and painted text now both use14px; tick numbers use14px/500/0.9. In the owned
+64-item Dashboard preview, all29 painted labels/numbers computed to14px/500 and
+none extended outside their SVG bounds at normal chart zoom. This is a targeted
+typography check, not a complete responsive chart-layout or manual chart-zoom
+acceptance claim. `GraphVisualization`'s legacy12px labels have no active import
+consumer beyond the unreferenced `GraphView` file; decorative illustration text
+is not application control text. Preserve the broader scope limits above.
