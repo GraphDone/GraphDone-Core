@@ -2,7 +2,11 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   overviewAtScale,
   placeOverviewLabels,
-  projectSemanticGraph,
+  buildSemanticHierarchy,
+  projectSemanticHierarchy,
+  semanticDepthAtScale,
+  automaticSemanticExpansion,
+  overviewLabelCapacity,
   type SemanticEdge,
   type SemanticItem,
 } from '../lib/semanticLOD';
@@ -34,13 +38,70 @@ export function SemanticGraphOverview({
   selectedId,
   onBrowse,
 }: Props) {
-  const projection = useMemo(
-    () => projectSemanticGraph(items, edges),
+  const hierarchy = useMemo(
+    () => buildSemanticHierarchy(items, edges),
     [items, edges]
   );
   const host = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
+  const bounds = host.current?.getBoundingClientRect();
+  const obstacles = bounds
+    ? Array.from(
+        document.querySelectorAll<HTMLElement>(
+          '[data-graph-fit-obstacle="true"]'
+        )
+      )
+        .filter(element => element.getAttribute('role') !== 'region')
+        .map(element => element.getBoundingClientRect())
+        .filter(rect => rect.width > 0 && rect.height > 0)
+        .map(rect => ({
+          left: rect.left - bounds.left,
+          right: rect.right - bounds.left,
+          top: rect.top - bounds.top,
+          bottom: rect.bottom - bounds.top,
+        }))
+    : [];
+  const obstacleKey = JSON.stringify(obstacles);
   const [mode, setMode] = useState<'auto' | 'overview' | 'items'>('auto');
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(
+    () => new Set()
+  );
+  const [automaticDepth, setAutomaticDepth] = useState(() =>
+    semanticDepthAtScale(1, camera.scale)
+  );
+  const expansionKey = useMemo(
+    () =>
+      JSON.stringify(
+        [
+          ...(mode === 'auto'
+            ? automaticSemanticExpansion(
+                hierarchy,
+                automaticDepth,
+                overviewLabelCapacity(size.width, size.height, obstacles)
+              )
+            : expanded),
+        ]
+          .filter(id => hierarchy.groups.get(id)?.children.length)
+          .sort()
+      ),
+    [
+      hierarchy,
+      mode,
+      automaticDepth,
+      expanded,
+      size.width,
+      size.height,
+      obstacleKey,
+    ]
+  );
+  const effectiveExpanded = useMemo(
+    () => new Set<string>(JSON.parse(expansionKey)),
+    [expansionKey]
+  );
+  const projection = useMemo(
+    () => projectSemanticHierarchy(hierarchy, effectiveExpanded),
+    [hierarchy, effectiveExpanded]
+  );
   const [automatic, setAutomatic] = useState(() =>
     overviewAtScale(false, camera.scale)
   );
@@ -49,6 +110,7 @@ export function SemanticGraphOverview({
   const [search, setSearch] = useState('');
   const [canReturn, setCanReturn] = useState(false);
   const returnMode = useRef<typeof mode>('auto');
+  const returnExpanded = useRef<ReadonlySet<string>>(new Set());
   const closeButton = useRef<HTMLButtonElement>(null);
   const backButton = useRef<HTMLButtonElement>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
@@ -64,6 +126,7 @@ export function SemanticGraphOverview({
   const group = projection.groups.find(candidate => candidate.id === groupId);
   useEffect(() => {
     setAutomatic(previous => overviewAtScale(previous, camera.scale));
+    setAutomaticDepth(previous => semanticDepthAtScale(previous, camera.scale));
   }, [camera.scale]);
   useEffect(() => {
     onActiveChange(active);
@@ -103,24 +166,6 @@ export function SemanticGraphOverview({
       y: y * camera.scale + camera.y,
     };
   });
-  const bounds = host.current?.getBoundingClientRect();
-  const obstacles = bounds
-    ? Array.from(
-        document.querySelectorAll<HTMLElement>(
-          '[data-graph-fit-obstacle="true"]'
-        )
-      )
-        .filter(element => element.getAttribute('role') !== 'region')
-        .map(element => element.getBoundingClientRect())
-        .filter(rect => rect.width > 0 && rect.height > 0)
-        .map(rect => ({
-          left: rect.left - bounds.left,
-          right: rect.right - bounds.left,
-          top: rect.top - bounds.top,
-          bottom: rect.bottom - bounds.top,
-        }))
-    : [];
-  const obstacleKey = JSON.stringify(obstacles);
   // Keep slots fixed through camera gestures. Leaders still follow live source
   // anchors; only changed membership/viewport/controls triggers label placement.
   const layout = useMemo(
@@ -154,6 +199,7 @@ export function SemanticGraphOverview({
   const back = () => {
     closeBrowser();
     setMode(returnMode.current);
+    setExpanded(returnExpanded.current);
     setCanReturn(false);
     onBack();
   };
@@ -175,7 +221,9 @@ export function SemanticGraphOverview({
             aria-label="Graph detail"
             value={mode}
             onChange={event => {
-              setMode(event.target.value as typeof mode);
+              const next = event.target.value as typeof mode;
+              if (next === 'overview') setExpanded(new Set());
+              setMode(next);
               closeBrowser();
             }}
             className="bg-gray-900 text-white"
@@ -187,15 +235,30 @@ export function SemanticGraphOverview({
         </label>
         <button
           ref={groupListButton}
-          className="rounded bg-gray-950/95 border border-gray-600 px-3 py-2 text-gray-100"
+          aria-label={`${projection.groups.length} groups · ${items.length} items`}
+          className="rounded bg-gray-950/95 border border-gray-600 px-3 py-1 w-28 h-11 shrink-0 text-gray-100"
           onClick={() => {
             returnFocus.current = document.activeElement as HTMLElement;
             setBrowse(true);
             setGroupId(null);
           }}
         >
-          {projection.groups.length} groups · {items.length} items
+          <span className="block">{projection.groups.length} groups</span>
+          <span className="block">{items.length} items</span>
         </button>
+        {mode === 'overview' && effectiveExpanded.size > 0 && (
+          <button
+            className="rounded bg-gray-950/95 border border-gray-600 px-3 py-2 min-h-11 text-gray-100"
+            onClick={() => {
+              setExpanded(new Set());
+              setMode('overview');
+              closeBrowser();
+              groupListButton.current?.focus();
+            }}
+          >
+            Top-level groups
+          </button>
+        )}
         {canReturn && (
           <button
             ref={backButton}
@@ -283,6 +346,11 @@ export function SemanticGraphOverview({
               <button
                 key={entry.id}
                 data-lod-group={summary.id}
+                aria-current={
+                  summary.members.some(item => item.id === selectedId)
+                    ? 'true'
+                    : undefined
+                }
                 className="absolute pointer-events-auto rounded-lg border border-emerald-700 bg-gray-950 text-left px-3 py-2 shadow-lg hover:border-emerald-300 focus:outline focus:outline-2 focus:outline-emerald-300"
                 style={{
                   left: entry.x,
@@ -290,7 +358,13 @@ export function SemanticGraphOverview({
                   width: entry.width,
                   height: entry.height,
                 }}
-                aria-label={`${summary.label}, ${summary.members.length} items, ${summary.blocked} blocked`}
+                title={[
+                  ...summary.ancestors.map(
+                    id => hierarchy.groups.get(id)!.label
+                  ),
+                  summary.isDirect ? 'Direct items' : summary.label,
+                ].join(' / ')}
+                aria-label={`${[...summary.ancestors.map(id => hierarchy.groups.get(id)!.label), summary.isDirect ? 'Direct items' : summary.label].join(' / ')}, ${summary.members.length} items, ${summary.blocked} blocked`}
                 onClick={() => openGroup(summary.id)}
               >
                 <span className="block truncate text-sm font-semibold text-emerald-100">
@@ -303,8 +377,12 @@ export function SemanticGraphOverview({
                   {summary.members.length} items ·{' '}
                   {summary.internalEdges.length} internal links
                 </span>
-                <span className="block text-xs text-gray-300">
-                  {summary.blocked} blocked · {summary.completed} completed
+                <span className="block truncate text-xs text-gray-300">
+                  {summary.ancestors.length > 0
+                    ? summary.ancestors
+                        .map(id => hierarchy.groups.get(id)!.label)
+                        .join(' / ')
+                    : `${summary.blocked} blocked · ${summary.completed} completed`}
                 </span>
               </button>
             );
@@ -351,8 +429,55 @@ export function SemanticGraphOverview({
               </button>
               <p className="text-xs text-gray-300 mb-3">
                 {group.members.length} items · {group.internalEdges.length}{' '}
-                internal relationships · grouped by {group.basis}
+                internal relationships · {group.blocked} blocked ·{' '}
+                {group.completed} completed · grouped by {group.basis}
               </p>
+              {group.ancestors.length > 0 && (
+                <nav
+                  aria-label="Group path"
+                  className="flex flex-wrap gap-2 mb-3"
+                >
+                  {group.ancestors.map((id, index) => (
+                    <button
+                      key={id}
+                      className="min-h-11 rounded border border-gray-700 px-3 py-2 text-sm text-left break-words text-emerald-200"
+                      aria-label={`Collapse to ${group.ancestors
+                        .slice(0, index + 1)
+                        .map(ancestor => hierarchy.groups.get(ancestor)!.label)
+                        .join(' / ')}`}
+                      onClick={() => {
+                        const next = new Set(effectiveExpanded);
+                        next.delete(id);
+                        setExpanded(next);
+                        setMode('overview');
+                        setGroupId(null);
+                        setSearch('');
+                        requestAnimationFrame(() =>
+                          closeButton.current?.focus()
+                        );
+                      }}
+                    >
+                      {hierarchy.groups.get(id)!.label}
+                    </button>
+                  ))}
+                </nav>
+              )}
+              {group.children.length > 0 && (
+                <button
+                  className="w-full min-h-11 rounded border border-emerald-700 px-3 py-2 mb-3 text-sm text-left text-emerald-200"
+                  onClick={() => {
+                    setExpanded(
+                      new Set([...effectiveExpanded, group.hierarchyId])
+                    );
+                    setMode('overview');
+                    setGroupId(null);
+                    setSearch('');
+                    requestAnimationFrame(() => closeButton.current?.focus());
+                  }}
+                >
+                  Show {group.children.length} subgroups
+                </button>
+              )}
               <label className="block text-sm">
                 Find an item
                 <input
@@ -373,7 +498,10 @@ export function SemanticGraphOverview({
                       <button
                         className="w-full rounded bg-gray-900 p-3 text-left hover:bg-gray-800"
                         onClick={() => {
-                          if (!canReturn) returnMode.current = mode;
+                          if (!canReturn) {
+                            returnMode.current = mode;
+                            returnExpanded.current = new Set(effectiveExpanded);
+                          }
                           setCanReturn(true);
                           closeBrowser();
                           setMode('auto');
@@ -436,9 +564,21 @@ export function SemanticGraphOverview({
                   <li key={entry.id}>
                     <button
                       onClick={() => openGroup(entry.id)}
+                      aria-current={
+                        entry.members.some(item => item.id === selectedId)
+                          ? 'true'
+                          : undefined
+                      }
                       className="w-full rounded bg-gray-900 p-3 text-left text-sm"
                     >
-                      <span className="block break-words">{entry.label}</span>
+                      <span className="block break-words">
+                        {[
+                          ...entry.ancestors.map(
+                            id => hierarchy.groups.get(id)!.label
+                          ),
+                          entry.isDirect ? 'Direct items' : entry.label,
+                        ].join(' / ')}
+                      </span>
                       <span className="text-xs text-gray-300">
                         {entry.members.length} items · {entry.blocked} blocked ·{' '}
                         {entry.basis}

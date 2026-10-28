@@ -46,7 +46,7 @@ test('disposable Git fixture commits do not spawn background maintenance', t => 
   assert.deepEqual(events.filter(event => event.event === 'child_start' && event.argv?.includes('maintenance')), []);
 });
 
-for (const sequence of ['new-user', 'semantic-lod', 'layout-recovery', 'router-navigation', 'mobile', 'perf-budgets']) {
+for (const sequence of ['new-user', 'semantic-lod', 'nested-lod', 'layout-recovery', 'router-navigation', 'mobile', 'perf-budgets']) {
   test(`CLI forwards failure-only tracing without retries for ${sequence}`, t => {
     const { dir, run } = fixture(t);
     const report = { suites: [{ specs: [{ title: 'fixture', ok: true,
@@ -60,8 +60,8 @@ for (const sequence of ['new-user', 'semantic-lod', 'layout-recovery', 'router-n
       assert.ok(!args.includes('tests/e2e/graph/semantic-lod.spec.ts'));
       assert.ok(!args.includes('tests/e2e/auth/router-navigation.spec.ts'));
     }
-    if (sequence === 'semantic-lod' || sequence === 'layout-recovery' || sequence === 'router-navigation') {
-      const spec = sequence === 'semantic-lod' ? 'tests/e2e/graph/semantic-lod.spec.ts' : sequence === 'layout-recovery' ? 'tests/e2e/graph/layout-recovery.spec.ts' : 'tests/e2e/auth/router-navigation.spec.ts';
+    if (sequence === 'nested-lod' || sequence === 'semantic-lod' || sequence === 'layout-recovery' || sequence === 'router-navigation') {
+      const spec = sequence === 'nested-lod' ? 'tests/e2e/graph/nested-semantic-lod.spec.ts' : sequence === 'semantic-lod' ? 'tests/e2e/graph/semantic-lod.spec.ts' : sequence === 'layout-recovery' ? 'tests/e2e/graph/layout-recovery.spec.ts' : 'tests/e2e/auth/router-navigation.spec.ts';
       assert.ok(args.includes(spec));
       assert.equal(SEQUENCES[sequence].blocking, true);
       const workflow = readFileSync(join(root, '.github/workflows/ci.yml'), 'utf8');

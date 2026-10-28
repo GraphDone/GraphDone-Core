@@ -194,6 +194,11 @@ jobs:
         env:
           TEST_URL: http://localhost:3127
           CI: true
+      - name: Nested semantic LOD acceptance
+        run: xvfb-run --auto-servernum node tests/run-unified.mjs --sequence nested-lod --out test-artifacts/ci-nested-lod
+        env:
+          TEST_URL: http://localhost:3127
+          CI: true
       - name: Durable layout recovery acceptance
         run: xvfb-run --auto-servernum node tests/run-unified.mjs --sequence layout-recovery --out test-artifacts/ci-layout-recovery
         env:
