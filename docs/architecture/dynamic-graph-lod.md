@@ -1,8 +1,10 @@
 # Dynamic graph LOD: continuation through delivery
 
-Reviewed 2026-10-27 UTC. Status: the first production-renderer overview slice is
-implemented on the feature branch (section 8); the full dynamic LOD path remains
-open. Source, GitHub and localhost observations below describe the reviewed base.
+Baseline reviewed 2026-10-27 UTC; implementation status updated 2026-10-28 UTC.
+The first production-renderer overview and durable layout recovery are integrated
+into dev. The nested hierarchy continuation is under validation in #215 (section 9).
+The full dynamic LOD path remains open. Source, GitHub and localhost observations
+below describe the original reviewed base, not current branch tips.
 The stage IDs below are proposed work items, not existing GitHub issue numbers.
 
 The owner's CodeGraph reuse direction is incorporated in the
@@ -464,3 +466,38 @@ worker cancellation, import limits, Cloud parity and the 1k/10k capacity gates
 remain open. The existing autosave behavior for newly laid-out or overlapping
 source items is outside this slice; zero-write navigation is tested on pinned,
 non-overlapping owned fixtures rather than asserted for every legacy graph.
+
+
+## 9. Nested hierarchy continuation (2026-10-28, #215)
+
+The current candidate consumes every explicit path segment and normalized native
+containment as a deterministic hierarchy, with display-only cuts at any supported
+depth. Stable semantic path keys and canonical source IDs are separate. Children
+replace a parent only as a complete partition; items directly in an expanded
+parent have a separate direct-items representative. Cycles, multiple containers,
+invalid segments and depth beyond 32 retain exact source coverage and expose
+visible diagnostics. Every typed directed relationship remains internal, bundled
+or pending its endpoint; self-links and parallel relationships are not discarded.
+
+The production group browser supports subgroup expansion, ancestor collapse and
+complete original member inspection. Manual Overview starts at the roots. Auto
+uses zoom hysteresis and the available non-overlapping screen-space label slots:
+when all child representatives cannot fit, their named parent remains visible.
+Selection stays attached to the original item and its current summary; Back
+restores the entry camera and cut. Membership is memoized separately from camera
+movement, and label slots stay fixed during a gesture within the same cut.
+
+This adapts CodeGraph's parent fallback, independent camera and stable hierarchy
+ideas within GraphDone. It adds no shared library and changes no CodeGraph source.
+It advances LOD-1/2 and the transition portion of LOD-3. It does **not** complete
+per-region projected geometry/density, source DOM virtualization, relationship
+inspection, AI import/export/MCP round trips, progressive loading, or hosted parity.
+All source SVG nodes are still constructed, and graph data is fully loaded. Global
+zoom bands and a label-slot budget are not evidence of measured 1k/10k capacity.
+
+Next bounded slices remain LOD-4 exact relationship exploration, LOD-5 portable
+AI-authoring round trips, then LOD-3/6 region budgets and measured bounded rendering,
+followed by LOD-7 authorized revision-aware loading and LOD-8 hosted acceptance.
+The completion checklist in section 7 remains authoritative. See the
+[nested validation ledger](../quality/NESTED_LOD_VALIDATION_2026-10-28.md) for
+failing-before evidence, candidate checks and explicit remaining gates.

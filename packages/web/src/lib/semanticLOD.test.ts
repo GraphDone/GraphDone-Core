@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   metadataRecord,
+  buildSemanticHierarchy,
+  projectSemanticHierarchy,
+  MAX_SEMANTIC_DEPTH,
   overviewAtScale,
+  semanticDepthAtScale,
+  automaticSemanticExpansion,
+  overviewLabelCapacity,
   placeOverviewLabels,
   projectSemanticGraph,
   type SemanticItem,
@@ -147,7 +153,276 @@ describe('semantic graph projection', () => {
   });
 });
 
+describe('nested semantic cuts', () => {
+  it('reveals explicit children while retaining direct members and exact edge accounting', () => {
+    const items = [
+      item('system', { lod: { groupPath: ['System'] } }),
+      item('api', { lod: { groupPath: ['System', 'API'] } }),
+      item('worker', { lod: { groupPath: ['System', 'Workers', 'Queue'] } }),
+      item('other', { lod: { groupPath: ['Other'] } }),
+    ];
+    const edges = [
+      edge('1', 'system', 'api'),
+      edge('2', 'api', 'worker'),
+      edge('3', 'worker', 'api', 'BLOCKS'),
+      edge('4', 'worker', 'other'),
+      edge('5', 'worker', 'unloaded'),
+    ];
+    const top = projectSemanticGraph(items, edges);
+    const system = top.membership.get('system')!;
+    const expanded = projectSemanticGraph(items, edges, new Set([system]));
+    expect(expanded.groups.map(group => group.label).sort()).toEqual([
+      'API',
+      'Other',
+      'System · direct items',
+      'Workers',
+    ]);
+    expect(
+      expanded.groups
+        .flatMap(group => group.members)
+        .map(member => member.id)
+        .sort()
+    ).toEqual(items.map(member => member.id).sort());
+    expect(
+      [
+        ...expanded.groups.flatMap(group => group.internalEdges),
+        ...expanded.bundles.flatMap(bundle => bundle.edges),
+        ...expanded.pendingEdges,
+      ]
+        .map(link => link.id)
+        .sort()
+    ).toEqual(edges.map(link => link.id).sort());
+    const workers = expanded.membership.get('worker')!;
+    const nested = projectSemanticGraph(
+      items,
+      edges,
+      new Set([system, workers])
+    );
+    expect(
+      nested.groups.find(group =>
+        group.members.some(member => member.id === 'worker')
+      )?.label
+    ).toBe('Queue');
+    expect(projectSemanticGraph(items, edges).membership).toEqual(
+      top.membership
+    );
+  });
+
+  it('conserves every source entity through all cuts and reordered snapshots', () => {
+    const items = Array.from({ length: 200 }, (_, i) => ({
+      ...item(`n${i}`, {
+        lod: {
+          groupPath: [
+            `System ${i % 4}`,
+            `Service ${i % 9}`,
+            `Component ${i % 7}`,
+          ],
+        },
+        untouched: { keep: true },
+      }),
+      status: i % 5 === 0 ? 'BLOCKED' : i % 7 === 0 ? 'COMPLETED' : 'ACTIVE',
+    }));
+    const edges = Array.from({ length: 503 }, (_, i) =>
+      edge(
+        `e${i}`,
+        `n${i % 200}`,
+        i % 31 === 0 ? 'unloaded' : `n${(i * 17) % 200}`,
+        i % 3 ? 'DEPENDS_ON' : 'BLOCKS'
+      )
+    );
+    const before = JSON.stringify({ items, edges });
+    const hierarchy = buildSemanticHierarchy(items, edges);
+    const reordered = buildSemanticHierarchy(
+      [...items].reverse(),
+      [...edges].reverse()
+    );
+    for (const depth of [0, 1, 2, 3, 32]) {
+      const expanded = new Set(
+        [...hierarchy.groups.values()]
+          .filter(group => group.ancestors.length < depth)
+          .map(group => group.id)
+      );
+      expanded.add('missing group');
+      const cut = projectSemanticHierarchy(hierarchy, expanded);
+      const other = projectSemanticHierarchy(reordered, expanded);
+      expect(cut).toEqual(other);
+      const members = cut.groups.flatMap(group => group.members);
+      expect(members.map(member => member.id).sort()).toEqual(
+        items.map(member => member.id).sort()
+      );
+      expect(
+        [
+          ...cut.groups.flatMap(group => group.internalEdges),
+          ...cut.bundles.flatMap(bundle => bundle.edges),
+          ...cut.pendingEdges,
+        ]
+          .map(link => link.id)
+          .sort()
+      ).toEqual(edges.map(link => link.id).sort());
+      for (const group of cut.groups) {
+        expect(group.blocked).toBe(
+          group.members.filter(member => member.status === 'BLOCKED').length
+        );
+        expect(group.completed).toBe(
+          group.members.filter(member => member.status === 'COMPLETED').length
+        );
+        for (const member of group.members)
+          expect(items.find(source => source.id === member.id)).toBe(member);
+      }
+    }
+    expect(JSON.stringify({ items, edges })).toBe(before);
+  });
+
+  it('keeps a parent when its children cannot all fit the automatic label budget', () => {
+    const hierarchy = buildSemanticHierarchy(
+      [
+        item('direct', { groupPath: ['System'] }),
+        ...['A', 'B', 'C'].map(id => item(id, { groupPath: ['System', id] })),
+      ],
+      []
+    );
+    const top = projectSemanticHierarchy(hierarchy);
+    expect(automaticSemanticExpansion(hierarchy, 3, 3).size).toBe(0);
+    expect(
+      projectSemanticHierarchy(
+        hierarchy,
+        automaticSemanticExpansion(hierarchy, 3, 3)
+      ).groups
+    ).toEqual(top.groups);
+    const expanded = automaticSemanticExpansion(hierarchy, 3, 4);
+    expect(expanded.size).toBe(1);
+    expect(projectSemanticHierarchy(hierarchy, expanded).groups).toHaveLength(
+      4
+    );
+    expect(automaticSemanticExpansion(hierarchy, 3, Number.NaN).size).toBe(0);
+  });
+
+  it('keeps cyclic parents finite and their descendants expandable', () => {
+    const items = ['a', 'b', 'c', 'd'].map(id => item(id));
+    const edges = [
+      edge('1', 'a', 'b', 'IS_PART_OF'),
+      edge('2', 'b', 'a', 'IS_PART_OF'),
+      edge('3', 'c', 'b', 'IS_PART_OF'),
+      edge('4', 'd', 'c', 'IS_PART_OF'),
+    ];
+    const hierarchy = buildSemanticHierarchy(items, edges);
+    const root = hierarchy.paths.get('a')![0];
+    const cut = projectSemanticHierarchy(hierarchy, new Set([root]));
+    expect(cut.membership.get('a')).toBe(cut.membership.get('b'));
+    expect(cut.membership.get('c')).toBe(cut.membership.get('d'));
+    expect(cut.membership.get('a')).not.toBe(cut.membership.get('c'));
+    expect(cut.groups.flatMap(group => group.members)).toHaveLength(4);
+    expect(cut.diagnostics.some(message => message.includes('cycles'))).toBe(
+      true
+    );
+  });
+
+  it('bounds deep paths without recursive traversal or losing descendant items', () => {
+    const items = Array.from({ length: 2000 }, (_, i) => item(`n${i}`));
+    const edges = items
+      .slice(1)
+      .map((entry, i) => edge(`e${i}`, entry.id, items[i].id, 'IS_PART_OF'));
+    const hierarchy = buildSemanticHierarchy(items, edges);
+    expect(
+      Math.max(...[...hierarchy.paths.values()].map(path => path.length))
+    ).toBe(MAX_SEMANTIC_DEPTH);
+    expect(hierarchy.groups.size).toBe(MAX_SEMANTIC_DEPTH);
+    const cut = projectSemanticHierarchy(
+      hierarchy,
+      new Set(hierarchy.groups.keys())
+    );
+    expect(cut.groups.flatMap(group => group.members)).toHaveLength(2000);
+    expect(cut.diagnostics.some(message => message.includes('32 levels'))).toBe(
+      true
+    );
+    const explicit = buildSemanticHierarchy(
+      [
+        item('long', {
+          groupPath: Array.from({ length: 100 }, (_, i) => `level${i}`),
+        }),
+      ],
+      []
+    );
+    expect(explicit.paths.get('long')).toHaveLength(MAX_SEMANTIC_DEPTH);
+    expect(projectSemanticHierarchy(explicit).groups[0].members).toHaveLength(
+      1
+    );
+  });
+
+  it('keeps literal path segments distinct and falls back after invalid segments', () => {
+    const items = [
+      item('a', { groupPath: ['System/a', 'b'] }),
+      item('b', { groupPath: ['System', 'a/b'] }),
+      item('c', { groupPath: ['System', null, 'ignored'] }),
+      item('d', { groupPath: [null], lane: 'Fallback' }),
+    ];
+    const hierarchy = buildSemanticHierarchy(items, []);
+    expect(hierarchy.paths.get('a')![0]).not.toBe(hierarchy.paths.get('b')![0]);
+    expect(hierarchy.paths.get('c')).toHaveLength(1);
+    expect(
+      projectSemanticHierarchy(hierarchy).groups.find(group =>
+        group.members.some(member => member.id === 'd')
+      )?.label
+    ).toBe('Fallback');
+    expect(
+      hierarchy.diagnostics.some(message =>
+        message.includes('Invalid group path')
+      )
+    ).toBe(true);
+  });
+
+  it('expands native containment without treating dependency links as hierarchy', () => {
+    const items = ['system', 'service', 'component', 'other'].map(id =>
+      item(id)
+    );
+    const edges = [
+      edge('1', 'system', 'service', 'CONTAINS'),
+      edge('2', 'component', 'service', 'IS_PART_OF'),
+      edge('3', 'other', 'component'),
+    ];
+    const top = projectSemanticGraph(items, edges);
+    const cut = projectSemanticGraph(
+      items,
+      edges,
+      new Set([top.membership.get('system')!])
+    );
+    expect(cut.membership.get('component')).toBe(cut.membership.get('service'));
+    expect(cut.membership.get('system')).not.toBe(
+      cut.membership.get('service')
+    );
+    expect(cut.membership.get('other')).not.toBe(cut.membership.get('service'));
+    expect(cut.groups.flatMap(group => group.members)).toHaveLength(4);
+  });
+});
+
 describe('readable overview', () => {
+  it('uses stable nested detail bands and preserves the previous band on invalid scale', () => {
+    let depth = 1;
+    expect(
+      [0.1, 0.45, 0.44, 0.9, 0.89, 0.73, 0.71, 0.37, 0.35].map(
+        scale => (depth = semanticDepthAtScale(depth, scale))
+      )
+    ).toEqual([1, 2, 2, 3, 3, 3, 2, 2, 1]);
+    expect(semanticDepthAtScale(3, Number.NaN)).toBe(3);
+    expect(semanticDepthAtScale(3, 0)).toBe(3);
+    expect(semanticDepthAtScale(1, Number.MAX_VALUE)).toBe(MAX_SEMANTIC_DEPTH);
+  });
+  it('uses the same usable label slots for automatic expansion and placement', () => {
+    const anchors = Array.from({ length: 100 }, (_, i) => ({
+      id: `a${i}`,
+      x: 500,
+      y: 400,
+    }));
+    const obstacles = [{ left: 0, top: 0, right: 700, bottom: 180 }];
+    const placed = placeOverviewLabels(anchors, 1200, 800, obstacles);
+    expect(overviewLabelCapacity(1200, 800, obstacles)).toBe(
+      placed.placed.length
+    );
+    expect(overviewLabelCapacity(1200, 800, obstacles)).toBeLessThan(
+      overviewLabelCapacity(1200, 800)
+    );
+  });
+
   it('retains parent coverage across the zoom dead zone and resists boundary jitter', () => {
     let visible = false;
     const states = [0.1, 0.99, 1.01, 0.99, 1.14, 1.16, 1.14, 1.01, 0.99].map(
