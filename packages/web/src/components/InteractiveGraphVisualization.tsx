@@ -2,6 +2,8 @@ import { skipBackgroundPoll } from '../lib/hostedUsage';
 import { QuickEditSurface } from './QuickEditSurface';
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { SemanticGraphOverview } from './SemanticGraphOverview';
+import { SemanticRelationshipBrowser } from './SemanticRelationshipBrowser';
+import { indexSemanticRelationships, type RelationshipScope } from '../lib/semanticRelationships';
 import { LayoutSaveStatus } from './LayoutSaveStatus';
 import ReactDOM from 'react-dom/client';
 import { createPortal } from 'react-dom';
@@ -50,8 +52,9 @@ import { useAdaptiveQuality } from '../hooks/useAdaptiveQuality';
 import { nodeLifeClasses, nodeGlowFilter, isActiveStatus, isCompletedStatus, edgeFlowClass } from '../lib/nodeAnimations';
 import { mergeSimulationNodes, mergeSimulationEdges } from '../lib/graphDataMerge';
 import type { ObstacleBox } from '../lib/edgeLabelLayout';
-import { createParallelEdgeRoute, edgeRouteLabel, projectEdgeRoutePointer, type EdgeRouteGeometry, type EdgeRouteLabel } from '../lib/edgeRouteGeometry';
+import { createParallelEdgeRoute, edgeRouteLabel, edgeRouteArrowBounds, projectEdgeRoutePointer, type EdgeRouteGeometry, type EdgeRouteLabel } from '../lib/edgeRouteGeometry';
 import { PerfMeter, DriftMeter } from '../lib/perfMeter';
+import { graphItemLayout, measureGraphText, edgeLabelDimensions, GRAPH_FONT_FAMILY, ITEM_TITLE_SIZE, ITEM_TITLE_LINE, ITEM_HEADER_HEIGHT, EDGE_LABEL_SIZE } from '../lib/graphSymbolLayout';
 import { separateCards } from '../lib/separateCards';
 import { DEFAULT_PHYSICS, collisionRadius, linkDistance, linkMaxDistance, linkStrength } from '../lib/physicsConfig';
 import { computeCompactLayout, isHierarchicalLayout, parseLayoutMode, LAYOUT_MODE_STORAGE_KEY, type LayoutMode } from '../lib/layoutAlgorithms';
@@ -106,7 +109,6 @@ const getSmoothedOpacity = (scale: number, threshold: number, fadeRange: number 
 // zoom IN to read a label, counter-scale the title/type so their ON-SCREEN size
 // never drops below a readable floor within the working band. Beyond the band
 // the existing LOD opacity cull still hides them for overview/perf.
-const TITLE_BASE_PX = 14; // matches .node-title-text font-size
 const TYPE_BASE_PX = 13;  // matches .node-type-text font-size
 const LEGIBLE_FLOOR_PX = 12; // smallest on-screen size we keep text at
 const LEGIBLE_MAX_BOOST = 1.9; // cap the counter-scale so text never balloons
@@ -128,18 +130,38 @@ const legibilityTransform = (cy: number, basePx: number, k: number) => {
 
 // The legibility boost must never let text escape its card. The full title
 // remains available in the editor; at overview zoom the card is the boundary.
-function fittedTitleTransform(element: SVGGElement, k: number): string {
+function fittedTitleTransform(element: SVGGElement): string {
   const cy = Number(element.getAttribute('data-cy')) || 0;
-  const card = element.parentElement?.querySelector('.node-bg');
-  const box = element.getBBox();
-  const width = Number(card?.getAttribute('width')) || 170;
-  const height = Number(card?.getAttribute('height')) || 110;
-  const top = -height / 2 + 34;
-  const bottom = height / 2 - 32;
-  const availableHeight = Math.max(1, 2 * Math.min(cy - top, bottom - cy));
-  const boost = Math.min(legibilityScale(TITLE_BASE_PX, k),
-    (width - 16) / Math.max(1, box.width), availableHeight / Math.max(1, box.height));
-  return `translate(0,${cy}) scale(${boost}) translate(0,${-cy})`;
+  const scale = Number(element.getAttribute('data-title-scale')) || 1;
+  return `translate(0,${cy}) scale(${scale}) translate(0,${-cy})`;
+}
+
+function renderItemTitle(element: SVGGElement, item: WorkItem, layout: ReturnType<typeof graphItemLayout>) {
+  const node = d3.select(element);
+  node.selectAll('.node-title-group').remove();
+  const group = node.append('g').attr('class', 'node-title-group').attr('data-cy', layout.titleCenterY).attr('data-title-scale', layout.titleScale);
+  group.append('title').text(item.title);
+  layout.title.forEach((line, index) => {
+    group.append('text').attr('class', 'node-title-text').attr('x', 0).attr('y', layout.titleY + index * ITEM_TITLE_LINE)
+      .attr('text-anchor', 'middle').attr('dominant-baseline', 'middle').text(line)
+      .style('font-family', GRAPH_FONT_FAMILY).style('font-size', `${ITEM_TITLE_SIZE}px`).style('font-weight', '600')
+      .style('fill', isCompletedStatus(item.status) ? '#b9c7d7' : '#f1f5f9').style('pointer-events', 'none');
+  });
+  group.attr('transform', fittedTitleTransform(group.node()!));
+}
+
+function renderItemMetadata(element: SVGGElement, item: WorkItem, layout: ReturnType<typeof graphItemLayout>) {
+  const group = d3.select(element);
+  group.selectAll('.node-meta').remove();
+  const meta = group.append('g').attr('class', 'node-meta').style('pointer-events', 'none').style('display', () => layout.compact ? 'none' : null);
+  const status = getStatusConfig(item.status as WorkItemStatus);
+  const priority = Math.round((item.priority || 0) * 100);
+  meta.append('circle').attr('cx', -layout.width / 2 + 17).attr('cy', layout.footerY).attr('r', 3.5).attr('fill', status.hexColor);
+  meta.append('text').attr('class', 'status-percentage-text').attr('x', -layout.width / 2 + 28).attr('y', layout.footerY)
+    .attr('dominant-baseline', 'middle').text(status.label).style('font-family', GRAPH_FONT_FAMILY).style('font-size', '12px').style('font-weight', '500').style('fill', '#dbe5ee');
+  meta.append('text').attr('class', 'priority-percentage-text').attr('x', layout.width / 2 - 14).attr('y', layout.footerY)
+    .attr('text-anchor', 'end').attr('dominant-baseline', 'middle').text(`P ${priority}%`).style('font-family', GRAPH_FONT_FAMILY).style('font-size', '12px').style('font-weight', '500').style('fill', '#b9c7d7')
+    .append('title').text(`Priority ${priority}%`);
 }
 
 // Hex color → normalized 0..1 RGB for SVG feColorMatrix glow filters.
@@ -458,6 +480,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   }, [selectedNode, onNodeSelected]);
   const lastSelectedNodeRef = useRef<any>(null); // Track last selected node for centering
   const [selectedEdge, setSelectedEdge] = useState<WorkItemEdge | null>(null);
+  const [itemLabelCount, setItemLabelCount] = useState(0);
+  const [itemRelationshipScope, setItemRelationshipScope] = useState<RelationshipScope | null>(null);
+  useEffect(() => { setItemRelationshipScope(null); setItemLabelCount(0); }, [currentGraph?.id]);
   const [createNodePosition, setCreateNodePosition] = useState<{ x: number; y: number; z: number } | undefined>(undefined);
   const [currentTransform, setCurrentTransform] = useState({ x: 0, y: 0, scale: 1 });
   const [editingEdge, setEditingEdge] = useState<{ edge: WorkItemEdge; position: { x: number; y: number } } | null>(null);
@@ -1141,11 +1166,11 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         .style('opacity', getSmoothedOpacity(scale, LOD_THRESHOLDS.FAR));
       (g.selectAll('.node-title-text') as any)
         .style('visibility', 'visible')
-        .style('opacity', getSmoothedOpacity(scale, TITLE_VISIBLE_SCALE));
+        .style('opacity', scale >= 0.3 ? 1 : 0);
       (g.selectAll('.node-title-group') as any)
         .attr('transform', function(this: any) {
           const cy = +(this.getAttribute('data-cy')) || 0;
-          return fittedTitleTransform(this as SVGGElement, scale);
+          return fittedTitleTransform(this as SVGGElement);
         });
       (g.selectAll('.node-description-text') as any)
         .style('visibility', 'visible')
@@ -1567,58 +1592,16 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     return undefined;
   };
 
-  // Helper function to calculate node dimensions (shared between init and update)
+  const itemRelationshipIndex = useMemo(() => indexSemanticRelationships(workItems, workItemEdges), [workItems, workItemEdges]);
+
+  const itemPresentationScaleRef = useRef(1);
+  const itemLayoutCache = useRef(new WeakMap<object, { title: string; type: string; description: unknown; subgraphId: unknown; scale: number; layout: ReturnType<typeof graphItemLayout> }>());
   const getNodeDimensions = useCallback((d: WorkItem) => {
-    // Larger base dimensions by type - increased for 3-line support
-    const baseDimensions = (() => {
-      switch (d.type) {
-        case 'EPIC': return { width: 200, height: 120 };
-        case 'MILESTONE': return { width: 190, height: 115 };
-        case 'FEATURE': return { width: 180, height: 110 };
-        case 'OUTCOME': return { width: 185, height: 115 };
-        case 'TASK': return { width: 170, height: 105 };
-        case 'BUG': return { width: 165, height: 100 };
-        case 'IDEA': return { width: 160, height: 95 };
-        default: return { width: 170, height: 105 };
-      }
-    })();
-
-    // Use base width for consistent layout
-    const width = baseDimensions.width;
-
-    // Calculate actual text wrapping based on word breaks - up to 3 lines
-    const maxCharsPerLine = Math.floor(width / 8); // ~8px per character for more conservative wrapping
-    const words = d.title.split(' ');
-    let lines = 1;
-    let currentLineLength = 0;
-
-    for (const word of words) {
-      const wordLength = word.length;
-      // Check if adding this word would exceed line length
-      if (currentLineLength + wordLength + 1 > maxCharsPerLine && currentLineLength > 0) {
-        lines++;
-        currentLineLength = wordLength;
-        if (lines >= 3) break; // Maximum 3 lines
-      } else {
-        currentLineLength += wordLength + (currentLineLength > 0 ? 1 : 0); // +1 for space
-      }
-    }
-
-    lines = Math.min(lines, 3); // Maximum 3 lines
-
-    // Height is the SUM of the content rows, not a guess: title bar (28) +
-    // gap (12) + title lines (16 each) + description row (22 when present) +
-    // status/priority block (42) anchored at the bottom. A fixed base height
-    // let long titles overlap the status row.
-    const contentHeight = 28 + 12 + lines * 16 + (d.description ? 22 : 6) + 42;
-    const finalHeight = Math.max(baseDimensions.height, contentHeight);
-
-    return {
-      width: width,
-      height: finalHeight,
-      titleLines: lines,
-      maxCharsPerLine: maxCharsPerLine
-    };
+    const cached = itemLayoutCache.current.get(d);
+    if (cached && cached.title === d.title && cached.type === d.type && cached.description === d.description && cached.subgraphId === d.subgraphId && cached.scale === itemPresentationScaleRef.current) return cached.layout;
+    const layout = graphItemLayout(d, measureGraphText, itemPresentationScaleRef.current);
+    itemLayoutCache.current.set(d, { title: d.title, type: d.type, description: d.description, subgraphId: d.subgraphId, scale: itemPresentationScaleRef.current, layout });
+    return layout;
   }, []);
 
   // Smart data update function - only reinitializes when necessary, preserves camera position
@@ -1697,82 +1680,12 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       const updatedNode = nodes.find(n => n.id === d.id);
       if (!updatedNode) return;
 
-      // Update title text elements (must mirror the creation path exactly,
-      // or cards shift layout on every poll — incl. the legibility-floor group)
-      nodeGroup.selectAll('.node-title-group').remove();
-      nodeGroup.selectAll('.node-title-text').remove();
-      const maxCharsPerLine = getNodeDimensions(updatedNode).maxCharsPerLine;
-      const maxLines = 3;
-      let lines: string[] = [];
-      const words = updatedNode.title.split(' ');
-      let currentLine = '';
-
-      for (const word of words) {
-        const testLine = currentLine ? `${currentLine} ${word}` : word;
-        if (testLine.length > maxCharsPerLine && currentLine) {
-          lines.push(currentLine);
-          currentLine = word;
-          if (lines.length >= maxLines) break;
-        } else {
-          currentLine = testLine;
-        }
-      }
-      if (currentLine && lines.length < maxLines) {
-        lines.push(currentLine);
-      }
-      if (lines.length === 0) {
-        lines.push(updatedNode.title.substring(0, maxCharsPerLine - 3) + '...');
-      }
-
       const dimensions = getNodeDimensions(updatedNode);
-      const titleBarHeight = 28;
-      const startY = -dimensions.height / 2 + titleBarHeight + 18;
-      const liveK = svgRef.current ? d3.zoomTransform(svgRef.current).k : 1;
-      const titleCy = startY + ((lines.length - 1) * 16) / 2;
-      const titleGroup = nodeGroup.append('g')
-        .attr('class', 'node-title-group')
-        .attr('data-cy', titleCy)
-        .attr('transform', legibilityTransform(titleCy, TITLE_BASE_PX, liveK));
-      lines.forEach((line, index) => {
-        titleGroup.append('text')
-          .attr('class', 'node-title-text')
-          .attr('x', 0)
-          .attr('y', startY + (index * 16))
-          .attr('text-anchor', 'middle')
-          .attr('dominant-baseline', 'middle')
-          .text(line)
-          .style('opacity', getSmoothedOpacity(liveK, TITLE_VISIBLE_SCALE))
-          .style('font-size', '14px')
-          .style('font-weight', '600')
-          .style('fill', () => {
-            const isCompleted = updatedNode.status === 'COMPLETED' || updatedNode.status === 'Completed' || updatedNode.status === 'Done' || updatedNode.status === 'DONE';
-            return isCompleted ? '#9ca3af' : '#ffffff';
-          })
-          .style('pointer-events', 'none');
-      });
-
-      titleGroup.attr('transform', function() { return fittedTitleTransform(this as SVGGElement, liveK); });
-
-      // Saved state must update on the canvas without rebuilding the graph.
-      const status = getStatusConfig(updatedNode.status as WorkItemStatus);
-      const completion = getStatusCompletionPercentage(updatedNode.status as WorkItemStatus);
-      nodeGroup.select('.status-percentage-text').text(status.label).style('fill', status.hexColor);
-      nodeGroup.select('.status-progress-fill').attr('width', 40 * completion / 100).attr('fill', status.hexColor);
-      nodeGroup.select('.status-icon-svg path').attr('d', getStatusIconSvgPath(updatedNode.status)).attr('stroke', status.hexColor);
-      const priority = updatedNode.priority || 0;
-      const priorityColor = priority >= .8 ? '#ef4444' : priority >= .6 ? '#f97316' : priority >= .4 ? '#eab308' : priority >= .2 ? '#3b82f6' : '#6b7280';
-      nodeGroup.select('.priority-percentage-text').text(`${Math.round(priority * 100)}%`).style('fill', priorityColor);
-      nodeGroup.select('.priority-progress-fill').attr('width', 40 * priority).attr('fill', priorityColor);
-      nodeGroup.select('.priority-icon-svg path').attr('d', getPriorityIconSvgPath(priority)).attr('stroke', priorityColor);
+      renderItemTitle(this as SVGGElement, updatedNode, dimensions);
+      renderItemMetadata(this as SVGGElement, updatedNode, dimensions);
       const completed = isCompletedStatus(updatedNode.status);
       nodeGroup.select('.node-bg').attr('class', `node-bg ${nodeLifeClasses(updatedNode.status)}`)
         .attr('fill', completed ? '#374151' : '#1f2937');
-      nodeGroup.selectAll('.completion-indicator').data(completed ? [updatedNode] : []).join('text')
-        .attr('class', 'completion-indicator').attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
-        .attr('x', 0)
-          .attr('y', (d: any) => getNodeDimensions(d).height / 2 - 13)
-          .attr('font-size', '18').attr('font-weight', '900').attr('fill', '#10b981').attr('stroke', '#10b981')
-        .attr('stroke-width', '1').attr('pointer-events', 'none').text('✓');
 
       // Update node type badge text
       nodeGroup.select('.node-type-text')
@@ -1781,18 +1694,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           return config.label.toUpperCase();
         });
 
-      // Update description — mirror the build path's honest preview exactly
-      // (width-responsive truncation + ellipsis), or the card text mutates on
-      // the next data poll.
-      nodeGroup.select('.node-description-text')
-        .text(() => {
-          if (!updatedNode.description) return '';
-          const maxLength = Math.floor(getNodeDimensions(updatedNode).width / 6.5);
-          const oneLine = updatedNode.description.replace(/\s+/g, ' ').trim();
-          return oneLine.length > maxLength
-            ? oneLine.slice(0, Math.max(1, maxLength - 1)).trimEnd() + '…'
-            : oneLine;
-        });
+      nodeGroup.select('.node-description-text').text(dimensions.description);
     });
 
     // Physics is one-shot: it settles a graph, then stays idle. A routine
@@ -2029,7 +1931,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // Imported or previously saved coordinates can already intersect. Pins
     // prevent any collision force from fixing that. Repair once before paint,
     // then persist the repaired snapshot through the normal settle queue.
-    const repairedCards = separateCards(nodes, getNodeDimensions);
+    const repairedCards = separateCards(nodes, node => graphItemLayout(node, measureGraphText));
     nodes.forEach((node: any) => {
       if (repairedCards.has(node.id) && node.fx != null) {
         node.fx = node.x;
@@ -2161,8 +2063,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       e._pIndex = info ? info.index : 0;
       e._pTotal = info ? info.total : 1;
       const label = getRelationshipConfig(e.type as RelationshipType)?.label || '';
-      e._labelDims = { width: label.length * 7 + 36, height: 22 };
-      e._labelIconCenter = { x: -e._labelDims.width / 2 + 13, y: 0 };
+      e._labelDims = edgeLabelDimensions(measureGraphText(label, EDGE_LABEL_SIZE));
+      e._labelIconCenter = { x: -e._labelDims.width / 2 + 15, y: 0 };
     });
     const liveScale = svg.node() ? d3.zoomTransform(svg.node() as Element).k : 1;
     // Arrow opacity routed through the edge LOD module: hidden direction → 0,
@@ -2608,7 +2510,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       });
 
     // Colored title bar at top (like Monopoly property cards)
-    const titleBarHeight = 28;
+    const titleBarHeight = ITEM_HEADER_HEIGHT;
     nodeElements.append('rect')
       .attr('class', 'node-title-bar')
       .attr('x', (d: WorkItem) => -getNodeDimensions(d).width / 2 + 2)
@@ -2650,7 +2552,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .attr('dominant-baseline', 'central')
       .text((d: WorkItem) => d.type)
       .style('opacity', (currentTransform?.k || 1) >= LOD_THRESHOLDS.FAR ? 1 : 0)
-      .style('font-size', '13px')
+      .style('font-size', '12px')
+      .style('font-family', GRAPH_FONT_FAMILY)
       .style('font-weight', '700')
       .style('fill', (d: WorkItem) => {
         const config = getTypeConfig(d.type as WorkItemType);
@@ -3023,114 +2926,19 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         return `▸ ${n} nodes · ${e} edges`;
       });
 
-    // Node title section - with text wrapping
-    nodeElements.each(function(d: WorkItem) {
-      const nodeGroup = d3.select(this);
-      const dimensions = getNodeDimensions(d);
-      const { maxCharsPerLine } = dimensions;
-      
-      // Split title into lines with proper word wrapping - 3-line maximum
-      const words = d.title.split(' ');
-      const lines: string[] = [];
-      let currentLine = '';
-      let hasMoreText = false;
-      
-      for (let i = 0; i < words.length; i++) {
-        const word = words[i];
-        const testLine = currentLine + (currentLine ? ' ' : '') + word;
-        
-        // Check if this line would be too long
-        if (testLine.length <= maxCharsPerLine) {
-          currentLine = testLine;
-        } else {
-          // Need to wrap to next line
-          if (lines.length < 2) {
-            // Can still add another line (we allow up to 3 lines)
-            lines.push(currentLine || word); // Handle case where first word is too long
-            currentLine = currentLine ? word : '';
-          } else {
-            // Already have 2 lines, this would be fourth line - truncate
-            hasMoreText = true;
-            break;
-          }
-        }
-      }
-      
-      // Add the final line
-      if (currentLine) {
-        if (hasMoreText && lines.length === 2) {
-          // Truncate third line with ellipsis
-          const availableSpace = maxCharsPerLine - 3; // Reserve space for "..."
-          const truncated = currentLine.length > availableSpace 
-            ? currentLine.substring(0, availableSpace) + '...'
-            : currentLine + '...';
-          lines.push(truncated);
-        } else {
-          lines.push(currentLine);
-        }
-      }
-      
-      // Ensure we always have at least one line
-      if (lines.length === 0) {
-        lines.push(d.title.substring(0, maxCharsPerLine - 3) + '...');
-      }
-      
-      // Create text elements for each line, inside a group that the legibility
-      // floor counter-scales as a unit (font + line-spacing together → readable
-      // when zoomed out, no overlap). data-cy = the title block's vertical center
-      // so the scale grows about the title, not the node origin. (PR-4)
-      const startY = -dimensions.height / 2 + titleBarHeight + 18;
-      const liveK = svgRef.current ? d3.zoomTransform(svgRef.current).k : 1;
-      const titleCy = startY + ((lines.length - 1) * 16) / 2;
-      const titleGroup = nodeGroup.append('g')
-        .attr('class', 'node-title-group')
-        .attr('data-cy', titleCy)
-        .attr('transform', legibilityTransform(titleCy, TITLE_BASE_PX, liveK));
-      lines.forEach((line, index) => {
-        titleGroup.append('text')
-          .attr('class', 'node-title-text')
-          .attr('x', 0)
-          .attr('y', startY + (index * 16))
-          .attr('text-anchor', 'middle')
-          .attr('dominant-baseline', 'middle')
-          .text(line)
-          .style('opacity', getSmoothedOpacity(liveK, TITLE_VISIBLE_SCALE))
-          .style('font-size', '14px')
-          .style('font-weight', '600')
-          .style('fill', () => {
-            const isCompleted = d.status === 'COMPLETED' || d.status === 'Completed' || d.status === 'Done' || d.status === 'DONE';
-            return isCompleted ? '#9ca3af' : '#ffffff';
-          })
-          .style('pointer-events', 'none');
-      });
-      titleGroup.attr('transform', function() { return fittedTitleTransform(this as SVGGElement, liveK); });
-
-    });
+    nodeElements.each(function(d: WorkItem) { renderItemTitle(this, d, getNodeDimensions(d)); });
 
     // Description section - bigger and more readable
     nodeElements.append('text')
       .attr('class', 'node-description-text')
       .attr('x', 0)
-      .attr('y', (d: WorkItem) => {
-        const dimensions = getNodeDimensions(d);
-        const titleLinesHeight = dimensions.titleLines * 16;
-        return -dimensions.height / 2 + titleBarHeight + 18 + titleLinesHeight + 8;
-      })
+      .attr('y', (d: WorkItem) => getNodeDimensions(d).descriptionY)
       .attr('text-anchor', 'middle')
       .attr('dominant-baseline', 'middle')
-      .text((d: WorkItem) => {
-        if (!d.description) return '';
-        // Honest preview: truncate with an ellipsis instead of silently hiding
-        // long descriptions (the old behavior made content vanish with no cue).
-        // The ⛶ expand icon / inspector show the full contents (PR-3/PR-4).
-        const maxLength = Math.floor(getNodeDimensions(d).width / 6.5);
-        const oneLine = d.description.replace(/\s+/g, ' ').trim();
-        return oneLine.length > maxLength
-          ? oneLine.slice(0, Math.max(1, maxLength - 1)).trimEnd() + '…'
-          : oneLine;
-      })
+      .text((d: WorkItem) => getNodeDimensions(d).description)
       .style('opacity', (currentTransform?.k || 1) >= LOD_THRESHOLDS.CLOSE ? 1 : 0)
-      .style('font-size', '11px')
+      .style('font-size', '12px')
+      .style('font-family', GRAPH_FONT_FAMILY)
       .style('font-weight', '400')
       .style('fill', (d: WorkItem) => {
         const isCompleted = d.status === 'COMPLETED' || d.status === 'Completed' || d.status === 'Done' || d.status === 'DONE';
@@ -3138,212 +2946,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       })
       .style('pointer-events', 'none');
 
-    // Status progress bar and percentage (bottom left)
     nodeElements.each(function(d: WorkItem) {
-      const nodeGroup = d3.select(this);
-      const dimensions = getNodeDimensions(d);
-      
-      // Calculate status percentage using centralized function
-      const statusPercentage = getStatusCompletionPercentage(d.status as WorkItemStatus);
-      
-      // Get status color from centralized constants
-      const statusColor = getStatusConfig(d.status as WorkItemStatus).hexColor;
-      
-      const barWidth = 40;
-      const barHeight = 3;
-      const barX = -dimensions.width / 2 + 8;
-      const barY = dimensions.height / 2 - 15;
-      
-      // Status progress bar background
-      nodeGroup.append('rect')
-        .attr('class', 'status-progress-bg')
-        .attr('x', barX)
-        .attr('y', barY)
-        .attr('width', barWidth)
-        .attr('height', barHeight)
-        .attr('rx', 1.5)
-        .attr('fill', '#374151')
-        .style('pointer-events', 'none');
-      
-      // Status progress bar fill
-      nodeGroup.append('rect')
-        .attr('class', 'status-progress-fill')
-        .attr('x', barX)
-        .attr('y', barY)
-        .attr('width', (barWidth * statusPercentage) / 100)
-        .attr('height', barHeight)
-        .attr('rx', 1.5)
-        .attr('fill', statusColor)
-        .style('pointer-events', 'none');
-      
-      // Status icon (SVG) - using centralized icon system
-      const statusLabelX = barX + barWidth / 2 - 8;
-      const statusIconX = statusLabelX + 15; // Position after "Status" text
-      const statusConfig = getStatusConfig(d.status as any);
-      const statusIconSvg = nodeGroup.append('svg')
-        .attr('class', 'status-icon-svg')
-        .attr('x', statusIconX)
-        .attr('y', barY - 22)
-        .attr('width', 10)
-        .attr('height', 10)
-        .attr('viewBox', '0 0 24 24')
-        .style('pointer-events', 'none');
-      
-      // Add the correct icon path based on status
-      const statusIconPath = getStatusIconSvgPath(d.status as string);
-      if (statusIconPath) {
-        statusIconSvg.append('path')
-          .attr('d', statusIconPath)
-          .attr('fill', 'none')
-          .attr('stroke', statusColor)
-          .attr('stroke-width', '2')
-          .attr('stroke-linecap', 'round')
-          .attr('stroke-linejoin', 'round');
-      }
-
-      // Status label (above percentage)
-      nodeGroup.append('text')
-        .attr('class', 'status-label-text')
-        .attr('x', barX + barWidth / 2 - 8)
-        .attr('y', barY - 16)
-        .attr('text-anchor', 'middle')
-        .attr('dominant-baseline', 'middle')
-        .text('Status')
-        .style('font-size', '8px')
-        .style('font-weight', '400')
-        .style('fill', '#9ca3af')
-        .style('pointer-events', 'none');
-
-      // Status percentage text (above bar)
-      nodeGroup.append('text')
-        .attr('class', 'status-percentage-text')
-        .attr('x', barX + barWidth / 2)
-        .attr('y', barY - 4)
-        .attr('text-anchor', 'middle')
-        .attr('dominant-baseline', 'middle')
-        .text(statusConfig.label)
-        .style('font-size', '9px')
-        .style('font-weight', '500')
-        .style('fill', statusColor)
-        .style('pointer-events', 'none');
-    });
-
-    // Priority progress bar and percentage (bottom right)
-    nodeElements.each(function(d: WorkItem) {
-      const nodeGroup = d3.select(this);
-      const dimensions = getNodeDimensions(d);
-      
-      const priority = d.priority || 0;
-      const priorityPercentage = Math.round(priority * 100);
-      
-      // Get priority color
-      const priorityColor = (() => {
-        if (priority >= 0.8) return '#ef4444'; // Critical - red
-        if (priority >= 0.6) return '#f97316'; // High - orange  
-        if (priority >= 0.4) return '#eab308'; // Medium - yellow
-        if (priority >= 0.2) return '#3b82f6'; // Low - blue
-        return '#6b7280'; // Minimal - gray
-      })();
-      
-      const barWidth = 40;
-      const barHeight = 3;
-      const barX = dimensions.width / 2 - 8 - barWidth;
-      const barY = dimensions.height / 2 - 15;
-      
-      // Priority progress bar background
-      nodeGroup.append('rect')
-        .attr('class', 'priority-progress-bg')
-        .attr('x', barX)
-        .attr('y', barY)
-        .attr('width', barWidth)
-        .attr('height', barHeight)
-        .attr('rx', 1.5)
-        .attr('fill', '#374151')
-        .style('pointer-events', 'none');
-      
-      // Priority progress bar fill
-      nodeGroup.append('rect')
-        .attr('class', 'priority-progress-fill')
-        .attr('x', barX)
-        .attr('y', barY)
-        .attr('width', (barWidth * priorityPercentage) / 100)
-        .attr('height', barHeight)
-        .attr('rx', 1.5)
-        .attr('fill', priorityColor)
-        .style('pointer-events', 'none');
-      
-      // Priority icon (SVG) - using correct icon based on priority value
-      const priorityLabelX = barX + barWidth / 2;
-      const priorityIconX = priorityLabelX + 18 - 2; // Position after "Priority" text, shifted left by 2
-      const prioritySvg = nodeGroup.append('svg')
-        .attr('class', 'priority-icon-svg')
-        .attr('x', priorityIconX)
-        .attr('y', barY - 22)
-        .attr('width', 10)
-        .attr('height', 10)
-        .attr('viewBox', '0 0 24 24')
-        .style('pointer-events', 'none');
-      
-      // Add correct priority icon path
-      const priorityIconPath = getPriorityIconSvgPath(priority);
-      if (priorityIconPath) {
-        prioritySvg.append('path')
-          .attr('d', priorityIconPath)
-          .attr('fill', 'none')
-          .attr('stroke', priorityColor)
-          .attr('stroke-width', '2')
-          .attr('stroke-linecap', 'round')
-          .attr('stroke-linejoin', 'round');
-      }
-
-      // Priority label (above percentage)
-      nodeGroup.append('text')
-        .attr('class', 'priority-label-text')
-        .attr('x', barX + barWidth / 2)
-        .attr('y', barY - 16)
-        .attr('text-anchor', 'middle')
-        .attr('dominant-baseline', 'middle')
-        .text('Priority')
-        .style('font-size', '8px')
-        .style('font-weight', '400')
-        .style('fill', '#9ca3af')
-        .style('pointer-events', 'none');
-
-      // Priority percentage text (above bar)
-      nodeGroup.append('text')
-        .attr('class', 'priority-percentage-text')
-        .attr('x', barX + barWidth / 2)
-        .attr('y', barY - 4)
-        .attr('text-anchor', 'middle')
-        .attr('dominant-baseline', 'middle')
-        .text(`${priorityPercentage}%`)
-        .style('font-size', '9px')
-        .style('font-weight', '500')
-        .style('fill', priorityColor)
-        .style('pointer-events', 'none');
-    });
-
-    // Add completion indicators (checkmarks) for completed nodes
-    nodeElements.each(function(d: WorkItem) {
-      const nodeGroup = d3.select(this);
-      
-      // Add checkmark for completed nodes
-      if (d.status === 'COMPLETED' || d.status === 'Completed' || d.status === 'Done' || d.status === 'DONE') {
-        nodeGroup.append('text')
-          .attr('class', 'completion-indicator')
-          .attr('text-anchor', 'middle')
-          .attr('dominant-baseline', 'central')
-          .attr('x', 0)
-          .attr('y', (d: any) => getNodeDimensions(d).height / 2 - 13)
-          .attr('font-size', '18')
-          .attr('font-weight', '900')
-          .attr('fill', '#10b981')
-          .attr('stroke', '#10b981')
-          .attr('stroke-width', '1')
-          .attr('pointer-events', 'none')
-          .text('✓');
-      }
-      
+      renderItemMetadata(this, d, getNodeDimensions(d));
     });
 
     // Create arrow symbols for middle of edges
@@ -3381,8 +2985,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .append('g')
       .attr('class', 'edge-label-group')
       .attr('data-edge-id', (d: WorkItemEdge) => d.id)
-      .style('opacity', (d: any) => labelVisibility(liveScale, d._pTotal || 1))
-      .style('pointer-events', (d: any) => labelVisibility(liveScale, d._pTotal || 1) > 0 ? 'all' : 'none')
+      .style('opacity', (d: any) => (liveScale >= 0.6 ? 1 : 0))
+      .style('pointer-events', (d: any) => (liveScale >= 0.6 ? 1 : 0) > 0 ? 'all' : 'none')
       .style('cursor', 'pointer')
       .on('click', openEdgeEditor);
 
@@ -3394,10 +2998,11 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     edgeLabelGroups
       .append('text')
       .attr('class', 'edge-label')
-      .attr('x', (d: any) => -d._labelDims.width / 2 + 28)
+      .attr('x', (d: any) => -d._labelDims.width / 2 + 30)
       .attr('text-anchor', 'start')
       .attr('dominant-baseline', 'middle')
-      .style('font-size', '10px')
+      .style('font-size', `${EDGE_LABEL_SIZE}px`)
+      .style('font-family', GRAPH_FONT_FAMILY)
       .style('font-weight', '600')
       .style('fill', '#ffffff')
       .style('pointer-events', 'none')
@@ -3405,16 +3010,16 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         const config = getRelationshipConfig(d.type as RelationshipType);
         return config.label;
       })
-      .style('opacity', (d: WorkItemEdge) => labelVisibility(liveScale, (d as any)._pTotal || 1));
+      .style('opacity', 1);
 
     // Add icons positioned to the left of text
     edgeLabelGroups
       .append('foreignObject')
-      .style('opacity', (d: WorkItemEdge) => labelVisibility(liveScale, (d as any)._pTotal || 1))
+      .style('opacity', 1)
       .attr('class', 'edge-label-icon')
       .attr('width', 14)
       .attr('height', 14)
-      .attr('x', (d: any) => -d._labelDims.width / 2 + 6)
+      .attr('x', (d: any) => -d._labelDims.width / 2 + 8)
       .attr('y', -7)
       .style('pointer-events', 'none')
       .each(function(d: WorkItemEdge) {
@@ -3489,10 +3094,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           if (!(bbox.width > 0 && bbox.height > 0)) return;
           const iconWidth = 14;
           const spacing = 8;
-          const paddingLeft = 6;
-          const paddingRight = 8;
-          const totalWidth = paddingLeft + iconWidth + spacing + bbox.width + paddingRight;
-          const totalHeight = Math.max(22, bbox.height + 8);
+          const paddingLeft = 8;
+          const { width: totalWidth, height: totalHeight } = edgeLabelDimensions(bbox.width, bbox.height);
           (d as any)._labelDims = { width: totalWidth, height: totalHeight };
           (d as any)._labelIconCenter = { x: -totalWidth / 2 + paddingLeft + 7, y: 0 };
           
@@ -3811,9 +3414,36 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       element.select('.long-press-feedback').remove();
     });
 
+    const updateNodePresentation = () => {
+      nodeElements.each(function(d: WorkItem) {
+        const node = d3.select(this), layout = getNodeDimensions(d);
+        node.attr('data-detail', layout.compact ? 'compact' : 'full').attr('role', layout.compact ? 'button' : 'group').attr('tabindex', layout.compact ? 0 : null).attr('aria-label', `${d.title}, ${getTypeConfig(d.type as WorkItemType).label}`);
+        node.on('keydown.compact', (event: KeyboardEvent) => {
+          if (layout.compact && event.target === this && (event.key === 'Enter' || event.key === ' ')) openQuickEdit(event, d);
+        });
+        node.select('.node-bg').attr('x', -layout.width / 2).attr('y', -layout.height / 2).attr('width', layout.width).attr('height', layout.height);
+        node.select('.node-title-bar').attr('x', -layout.width / 2 + 2).attr('y', -layout.height / 2 + 2).attr('width', layout.width - 4);
+        node.select('.node-type-text').attr('y', -layout.height / 2 + ITEM_HEADER_HEIGHT / 2 + 2);
+        for (const [selector, x, y] of [
+          ['.node-edit-icon', -layout.width / 2 + iconSize / 2 + 12, -layout.height / 2 + ITEM_HEADER_HEIGHT / 2 + 2],
+          ['.node-relationship-icon', layout.width / 2 - iconSize / 2 - 12, -layout.height / 2 + ITEM_HEADER_HEIGHT / 2 + 2],
+          ['.node-expand-icon', layout.width / 2 - iconSize / 2 - 12 - iconSize - 8, -layout.height / 2 + ITEM_HEADER_HEIGHT / 2 + 2],
+          ['.node-descend-icon', layout.width / 2 - iconSize / 2 - 8, layout.height / 2 - iconSize / 2 - 6],
+        ] as const) node.select(selector).attr('transform', `translate(${x},${y})`);
+        node.select('.node-description-text').attr('y', layout.descriptionY).text(layout.description);
+        node.select('.node-subgraph-count').attr('y', layout.height / 2 - 10);
+        renderItemTitle(this, d, layout);
+        renderItemMetadata(this, d, layout);
+        node.selectAll('.node-title-bar, .node-type-text, .node-edit-icon, .node-relationship-icon, .node-expand-icon, .node-descend-icon, .node-description-text, .node-meta, .node-subgraph-count, .node-subgraph-stack')
+          .style('display', () => layout.compact ? 'none' : null);
+      });
+    };
+
     let labelAvoidCounter = 0;
     let nodeLabelObstacles: ObstacleBox[] = [];
     const labelRects = new Map<string, ObstacleBox>();
+    let routeSegments: EdgeRouteGeometry['segments'][number][] = [];
+    let routeObstacles: ObstacleBox[] = [];
     const applyLabel = (element: SVGGElement, d: any, placement: EdgeRouteLabel | null) => {
       d._routeLabel = placement;
       const label = d3.select(element);
@@ -3823,15 +3453,15 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         return;
       }
       d.labelT = placement.t;
-      label.attr('transform', `translate(${placement.x},${placement.y}) rotate(${placement.rotation})`);
+      label.attr('transform', `translate(${placement.x},${placement.y}) rotate(${placement.rotation}) scale(${d._labelScale || 1})`);
       const center = d._labelIconCenter;
       label.select('.edge-label-icon').attr('transform', placement.iconRotation
         ? `rotate(${placement.iconRotation}, ${center.x}, ${center.y})` : null);
       const angle = placement.rotation * Math.PI / 180;
       labelRects.set(d.id, {
         x: placement.x, y: placement.y,
-        width: Math.abs(Math.cos(angle)) * d._labelDims.width + Math.abs(Math.sin(angle)) * d._labelDims.height,
-        height: Math.abs(Math.sin(angle)) * d._labelDims.width + Math.abs(Math.cos(angle)) * d._labelDims.height
+        width: (Math.abs(Math.cos(angle)) * d._labelDims.width + Math.abs(Math.sin(angle)) * d._labelDims.height) * (d._labelScale || 1),
+        height: (Math.abs(Math.sin(angle)) * d._labelDims.width + Math.abs(Math.cos(angle)) * d._labelDims.height) * (d._labelScale || 1)
       });
     };
     const updateEdgePositions = (forceAvoid = false) => {
@@ -3864,19 +3494,29 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       if (runAvoidance) nodeLabelObstacles = (simulation.nodes() as any[]).map(n => ({
         x: n.x || 0, y: n.y || 0, ...getNodeDimensions(n)
       }));
+      if (!runAvoidance) {
+        if (simulation.alpha() > 0.0015) { edgeLabelGroups.style('display', 'none'); setItemLabelCount(0); }
+        return;
+      }
+      routeSegments = visibleEdges.flatMap((edge: any) => edge._route?.segments ?? []);
+      routeObstacles = visibleEdges.filter((edge: any) => edge._route).map((edge: any) => edgeRouteArrowBounds(edge._route, arrowVisibility(liveK, edge._pTotal || 1).scale));
       const placed: ObstacleBox[] = [];
-      edgeLabelGroups.each(function(d: any) {
+      edgeLabelGroups.sort((a: any, b: any) => a.id.localeCompare(b.id)).each(function(d: any) {
         const route = d._route as EdgeRouteGeometry | null;
-        const placement = route && (runAvoidance || !d._labelBlocked)
+        d._labelScale = Math.max(1, 1 / liveK);
+        const offset = (d._routeLabel?.offset < 0 ? -1 : 1) * (22 * d._labelScale + 3);
+        const dims = { width: d._labelDims.width * d._labelScale, height: d._labelDims.height * d._labelScale };
+        const placement = route && liveK >= 0.6 && placed.length < 32
           ? edgeRouteLabel(route, {
-              dims: d._labelDims, t: d.labelT,
-              obstacles: runAvoidance ? nodeLabelObstacles.concat(placed) : []
+              dims, t: d.labelT, offset, offsets: [offset, -offset],
+              obstacles: nodeLabelObstacles.concat(routeObstacles, placed), segments: routeSegments
             }) : null;
-        if (runAvoidance) d._labelBlocked = !placement;
+        d._labelBlocked = !placement;
         applyLabel(this, d, placement);
         const box = labelRects.get(d.id);
         if (box) placed.push(box);
       });
+      setItemLabelCount(placed.length);
     };
 
     edgeLabelGroups
@@ -3895,10 +3535,11 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           const [x, y] = d3.pointer(event, g.node() as any);
           const t = projectEdgeRoutePointer(d._route, {
             x: x - d._labelGrab.x, y: y - d._labelGrab.y
-          }, d.labelT, { offset: 22 });
+          }, d.labelT, { offset: d._routeLabel?.offset ?? 25 });
           const placement = edgeRouteLabel(d._route, {
-            dims: d._labelDims, t,
-            obstacles: nodeLabelObstacles.concat([...labelRects].filter(([id]) => id !== d.id).map(([, box]) => box))
+            dims: { width: d._labelDims.width * d._labelScale, height: d._labelDims.height * d._labelScale }, t,
+            offset: d._routeLabel?.offset ?? 25, segments: routeSegments,
+            obstacles: nodeLabelObstacles.concat(routeObstacles, [...labelRects].filter(([id]) => id !== d.id).map(([, box]) => box))
           });
           if (placement) {
             d.labelTUser = true;
@@ -4022,7 +3663,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
                 const scale = currentTransform.k;
                 const classList = d3.select(this as any).attr('class');
                 if (classList?.includes('node-type-text')) return getSmoothedOpacity(scale, LOD_THRESHOLDS.FAR);
-                if (classList?.includes('node-title-text')) return getSmoothedOpacity(scale, TITLE_VISIBLE_SCALE);
+                if (classList?.includes('node-title-text')) return scale >= 0.3 ? 1 : 0;
                 if (classList?.includes('node-description-text')) return getSmoothedOpacity(scale, LOD_THRESHOLDS.CLOSE);
               }
             }
@@ -4127,7 +3768,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       // in) and is counter-scaled to a legibility floor so it stays readable. The
       // group transform is updated live here (the only path that runs on zoom).
       g.selectAll('.node-title-text' as any)
-        .style('opacity', getSmoothedOpacity(TITLE_VISIBLE_SCALE));
+        .style('opacity', scale >= 0.3 ? 1 : 0);
       // Counter-scale the title block to the legibility floor. Skipped on dense
       // graphs in data-simplify mode (titles hidden via CSS → no visible effect,
       // so don't walk 1000+ groups every pan frame).
@@ -4135,19 +3776,19 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         g.selectAll('.node-title-group' as any)
           .attr('transform', function(this: any) {
             const cy = +(this.getAttribute('data-cy')) || 0;
-            return fittedTitleTransform(this as SVGGElement, scale);
+            return fittedTitleTransform(this as SVGGElement);
           });
       }
       g.selectAll('.node-description-text' as any)
         .style('opacity', getSmoothedOpacity(LOD_THRESHOLDS.CLOSE));
       // Edge labels + arrows follow the edge LOD module (zoom-aware, crowd-aware).
       g.selectAll('.edge-label-group' as any)
-        .style('opacity', (d: any) => labelVisibility(scale, d?._pTotal || 1))
-        .style('pointer-events', (d: any) => labelVisibility(scale, d?._pTotal || 1) > 0 ? 'all' : 'none');
+        .style('opacity', (d: any) => (scale >= 0.6 ? 1 : 0))
+        .style('pointer-events', (d: any) => (scale >= 0.6 ? 1 : 0) > 0 ? 'all' : 'none');
       g.selectAll('.edge-label' as any)
-        .style('opacity', (d: any) => labelVisibility(scale, d?._pTotal || 1));
+        .style('opacity', 1);
       g.selectAll('.edge-label-icon' as any)
-        .style('opacity', (d: any) => labelVisibility(scale, d?._pTotal || 1));
+        .style('opacity', 1);
       g.selectAll('.arrow' as any)
         .style('opacity', (d: any) =>
           directionStrategy(scale) === 'hidden' ? 0 : arrowVisibility(scale, d?._pTotal || 1).opacity);
@@ -4160,6 +3801,13 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           }
           return scale >= LOD_THRESHOLDS.FAR ? 1 : Math.max(0.3, scale * 0.8);
         });
+    });
+
+    zoom.on('end.labels', event => {
+      if (simulationRef.current !== simulation) return;
+      itemPresentationScaleRef.current = event.transform.k;
+      updateNodePresentation();
+      updateEdgePositions(true);
     });
 
     // Configure simulation for stability. Start hot only if there are
@@ -4203,6 +3851,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // Fully-pinned graphs don't tick, so without this their labels would stay at
     // the default midpoint and could overlap → clean starting positions need it.
     runLabelAvoidanceRef.current = () => updateEdgePositions(true);
+    itemPresentationScaleRef.current = svg.node() ? d3.zoomTransform(svg.node()!).k : 1;
+    updateNodePresentation();
     updateEdgePositions(true);
     setTimeout(() => { if (simulationRef.current === simulation) updateEdgePositions(true); }, 500);
   }, [nodes, validatedEdges, handleNodeClick, initializeEmptyVisualization]); // Include handleNodeClick to get fresh connection state
@@ -4260,7 +3910,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       const k = d3.zoomTransform(svgRef.current).k;
       d3.select(svgRef.current).select('.main-graph-group')
         .selectAll<SVGGElement, unknown>('.node-title-group')
-        .attr('transform', function() { return fittedTitleTransform(this, k); });
+        .attr('transform', function() { return fittedTitleTransform(this); });
     }
   }, [semanticOverviewActive, currentGraph?.id]);
 
@@ -5104,7 +4754,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // Detect a node TYPE change (same count → length checks miss it). The
     // selective path refreshes the badge text but not the card color/icon. (#30)
     const nodeSig = (nodes as any[])
-      .map((n) => `${n.id}:${n.type}`)
+      .map((n) => JSON.stringify([n.id, n.type, n.title, n.description, n.subgraphId]))
       .sort()
       .join(',');
     const nodesChanged = prevNodeSigRef.current !== '' && prevNodeSigRef.current !== nodeSig;
@@ -5448,6 +5098,31 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   return (
     <div ref={containerRef} className="graph-container relative w-full h-full overflow-hidden select-none" data-overview={semanticOverviewActive || undefined} data-quality={qualityTier} data-dense={isDenseGraph ? 'true' : undefined} data-simplify={isSimplified ? 'true' : undefined} data-dots={isDotMode ? 'true' : undefined}>
       <LayoutSaveStatus queue={positionSaveQueue} />
+      {!semanticOverviewActive && workItemEdges.length > 0 && <button
+        data-graph-fit-obstacle="true"
+        className="absolute bottom-3 left-16 z-20 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 shadow-lg"
+        onClick={() => setItemRelationshipScope({ kind: 'all' })}
+        aria-label={`${workItemEdges.length} relationships, ${itemLabelCount} labels shown. Browse all relationships`}
+      >{workItemEdges.length} connections · {itemLabelCount} labels · Browse</button>}
+      {itemRelationshipScope && !semanticOverviewActive && <SemanticRelationshipBrowser
+        index={itemRelationshipIndex}
+        scope={itemRelationshipScope}
+        contextFor={id => itemRelationshipIndex.hierarchy.paths.get(id)?.map(key => itemRelationshipIndex.hierarchy.groups.get(key)?.label).filter(Boolean).join(' / ') || 'Ungrouped'}
+        onScope={setItemRelationshipScope}
+        onInspect={id => { setItemRelationshipScope(null); inspectOverviewItem(id, true); }}
+        onBack={() => setItemRelationshipScope(null)}
+        backLabel="Back to graph"
+        visible={true}
+        onEdit={id => {
+          const edge = workItemEdges.find(edge => edge.id === id);
+          if (!edge) return;
+          setItemRelationshipScope(null);
+          setSelectedEdge(edge);
+          setShowRelationshipWindow(true);
+          setEditingEdge({ edge, position: { x: window.innerWidth / 2, y: window.innerHeight / 2 } });
+          setDragOffset({ x: 0, y: 0 });
+        }}
+      />}
       <svg
         ref={svgRef}
         className="w-full h-full"

@@ -17,6 +17,8 @@ interface Props {
   onBack: () => void;
   focusId?: string;
   visible: boolean;
+  backLabel?: string;
+  onEdit?: (id: string) => void;
 }
 
 export function SemanticRelationshipBrowser({
@@ -28,6 +30,8 @@ export function SemanticRelationshipBrowser({
   onBack,
   focusId,
   visible,
+  backLabel = 'Back to groups',
+  onEdit,
 }: Props) {
   const [type, setType] = useState('');
   const [search, setSearch] = useState('');
@@ -164,7 +168,7 @@ export function SemanticRelationshipBrowser({
         onClick={onBack}
         className="min-h-11 text-sm text-emerald-200"
       >
-        Back to groups
+        {backLabel}
       </button>
       <h2 className="text-base font-semibold break-words">{title}</h2>
       {missingGroup && (
@@ -241,6 +245,7 @@ export function SemanticRelationshipBrowser({
             className="rounded border border-gray-700 bg-gray-900 p-3"
           >
             <p className="text-xs text-gray-300 break-all">{edge.id}</p>
+            {onEdit && <button className="min-h-11 text-sm text-emerald-200" onClick={() => onEdit(edge.id)} aria-label={`Edit relationship ${edge.id}`}>Edit relationship</button>}
             {endpoint(relationshipEndpoint(edge.source))}
             <p className="text-sm font-semibold my-1">→ {edge.type}</p>
             {endpoint(relationshipEndpoint(edge.target))}
