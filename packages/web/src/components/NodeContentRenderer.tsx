@@ -3,6 +3,11 @@ import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
+const readableCodeTheme = {
+  ...oneDark,
+  comment: { ...oneDark.comment, color: '#a9b7c7' },
+};
+
 /**
  * Renders a node's contents (its `description`) as readable, GitHub-flavored
  * markdown with syntax-highlighted fenced code blocks — at a fixed legible size,
@@ -20,45 +25,104 @@ interface NodeContentRendererProps {
   className?: string;
 }
 
-export default function NodeContentRenderer({ content, compact = false, className = '' }: NodeContentRendererProps) {
+export default function NodeContentRenderer({
+  content,
+  compact = false,
+  className = '',
+}: NodeContentRendererProps) {
   const trimmed = (content ?? '').trim();
   if (!trimmed) {
     return <div className="text-sm text-gray-500 italic">No contents yet.</div>;
   }
 
-  const prose = compact
-    ? 'text-xs leading-relaxed'
-    : 'text-sm leading-relaxed';
+  const prose = compact ? 'text-xs leading-relaxed' : 'text-sm leading-relaxed';
 
   return (
     <div
       data-testid="node-content-rendered"
-      className={`node-content text-gray-200 ${prose} ${className}`}
+      className={`node-content min-w-0 max-w-full text-gray-200 font-normal [overflow-wrap:anywhere] ${prose} ${className}`}
     >
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
           // Headings — readable hierarchy without a full prose framework.
-          h1: ({ children }) => <h1 className={`font-bold text-gray-100 ${compact ? 'text-sm' : 'text-lg'} mt-3 mb-1.5 first:mt-0`}>{children}</h1>,
-          h2: ({ children }) => <h2 className={`font-bold text-gray-100 ${compact ? 'text-sm' : 'text-base'} mt-3 mb-1.5 first:mt-0`}>{children}</h2>,
-          h3: ({ children }) => <h3 className={`font-semibold text-gray-100 ${compact ? 'text-xs' : 'text-sm'} mt-2 mb-1 first:mt-0`}>{children}</h3>,
+          h1: ({ children }) => (
+            <h1
+              className={`font-bold text-gray-100 ${compact ? 'text-sm' : 'text-lg'} mt-3 mb-1.5 first:mt-0`}
+            >
+              {children}
+            </h1>
+          ),
+          h2: ({ children }) => (
+            <h2
+              className={`font-bold text-gray-100 ${compact ? 'text-sm' : 'text-base'} mt-3 mb-1.5 first:mt-0`}
+            >
+              {children}
+            </h2>
+          ),
+          h3: ({ children }) => (
+            <h3
+              className={`font-semibold text-gray-100 ${compact ? 'text-xs' : 'text-sm'} mt-2 mb-1 first:mt-0`}
+            >
+              {children}
+            </h3>
+          ),
           p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-          ul: ({ children }) => <ul className="list-disc ml-5 mb-2 space-y-0.5">{children}</ul>,
-          ol: ({ children }) => <ol className="list-decimal ml-5 mb-2 space-y-0.5">{children}</ol>,
+          pre: ({ children }) => <div className="max-w-full">{children}</div>,
+          ul: ({ children }) => (
+            <ul className="list-disc ml-5 mb-2 space-y-0.5">{children}</ul>
+          ),
+          ol: ({ children }) => (
+            <ol className="list-decimal ml-5 mb-2 space-y-0.5">{children}</ol>
+          ),
           li: ({ children }) => <li>{children}</li>,
-          a: ({ href, children }) => <a href={href} target="_blank" rel="noreferrer" className="text-blue-400 hover:text-blue-300 underline">{children}</a>,
-          strong: ({ children }) => <strong className="font-semibold text-white">{children}</strong>,
-          blockquote: ({ children }) => <blockquote className="border-l-2 border-gray-600 pl-3 text-gray-400 italic my-2">{children}</blockquote>,
-          table: ({ children }) => <table className="border-collapse my-2 text-xs">{children}</table>,
-          th: ({ children }) => <th className="border border-gray-700 px-2 py-1 bg-gray-800 text-left">{children}</th>,
-          td: ({ children }) => <td className="border border-gray-700 px-2 py-1">{children}</td>,
+          a: ({ href, children }) => (
+            <a
+              href={href}
+              target="_blank"
+              rel="noreferrer"
+              className="text-blue-400 hover:text-blue-300 underline"
+            >
+              {children}
+            </a>
+          ),
+          strong: ({ children }) => (
+            <strong className="font-semibold text-white">{children}</strong>
+          ),
+          blockquote: ({ children }) => (
+            <blockquote className="border-l-2 border-gray-600 pl-3 text-gray-400 italic my-2">
+              {children}
+            </blockquote>
+          ),
+          table: ({ children }) => (
+            <div className="max-w-full overflow-x-auto">
+              <table className="w-max min-w-full border-collapse my-2 text-sm">
+                {children}
+              </table>
+            </div>
+          ),
+          th: ({ children }) => (
+            <th className="min-w-32 max-w-xs border border-gray-700 px-2 py-1 bg-gray-800 text-left">
+              {children}
+            </th>
+          ),
+          td: ({ children }) => (
+            <td className="min-w-32 max-w-xs border border-gray-700 px-2 py-1">
+              {children}
+            </td>
+          ),
           code(props) {
             const { children, className: cn, ...rest } = props as any;
             const match = /language-(\w+)/.exec(cn || '');
-            const isInline = !(cn || '').includes('language-') && !String(children).includes('\n');
+            const isInline =
+              !(cn || '').includes('language-') &&
+              !String(children).includes('\n');
             if (isInline) {
               return (
-                <code className="bg-gray-800 text-emerald-300 rounded px-1 py-0.5 text-[0.85em]" {...rest}>
+                <code
+                  className="bg-gray-800 text-emerald-300 rounded px-1 py-0.5 text-sm font-normal"
+                  {...rest}
+                >
                   {children}
                 </code>
               );
@@ -66,14 +130,24 @@ export default function NodeContentRenderer({ content, compact = false, classNam
             return (
               <SyntaxHighlighter
                 language={match ? match[1] : 'text'}
-                style={oneDark}
+                style={readableCodeTheme}
                 customStyle={{
                   margin: '0.5rem 0',
                   borderRadius: '0.5rem',
-                  fontSize: compact ? '0.7rem' : '0.8rem',
+                  fontSize: '0.875rem',
+                  fontWeight: 500,
+                  lineHeight: 1.6,
+                  maxWidth: '100%',
                   background: '#1e1e2e',
                 }}
-                PreTag="div"
+                codeTagProps={{
+                  style: {
+                    fontSize: 'inherit',
+                    fontWeight: 500,
+                    lineHeight: 1.6,
+                  },
+                }}
+                PreTag="pre"
               >
                 {String(children).replace(/\n$/, '')}
               </SyntaxHighlighter>

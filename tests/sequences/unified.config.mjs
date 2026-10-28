@@ -27,6 +27,7 @@ export const SEQUENCES = {
     'tests/e2e/quality/graph-motion.spec.ts',
     'tests/e2e/quality/graph-resize.spec.ts',
     'tests/e2e/quality/graph-details.spec.ts',
+    'tests/e2e/graph/inspector-readability.spec.ts',
     `--project=${PW}`, '--headed', '--workers=1', '--retries=0', '--trace=retain-on-failure',
   ], blocking: true },
   'semantic-lod': { adapter: 'playwright', title: 'Semantic LOD acceptance', args: [

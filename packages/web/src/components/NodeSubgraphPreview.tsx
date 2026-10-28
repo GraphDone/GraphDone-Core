@@ -1,115 +1,200 @@
+import { useMemo } from 'react';
 import { useQuery } from '@apollo/client';
-import { Maximize2 } from 'lucide-react';
+import { Boxes, Maximize2 } from 'lucide-react';
 import { GET_WORK_ITEMS, GET_EDGES } from '../lib/queries';
-import { getTypeConfig } from '../constants/workItemConstants';
-import type { WorkItemType } from '../constants/workItemConstants';
+import {
+  projectSubgraphPreview,
+  SUBGRAPH_PREVIEW_ITEMS,
+  SUBGRAPH_PREVIEW_EDGES,
+} from '../lib/subgraphPreview';
+import type { SemanticItem, SemanticEdge } from '../lib/semanticLOD';
 
-/**
- * A STATIC, legible render of a node's sub-graph (its "diagram"), drawn from the
- * sub-graph's persisted node positions — no force simulation. Lets you READ a
- * diagram at a useful scale without navigating away; "Open" descends into it.
- */
 interface NodeSubgraphPreviewProps {
   subgraphId: string;
   subgraphName?: string;
   onOpen: () => void;
 }
 
-export function NodeSubgraphPreview({ subgraphId, subgraphName, onOpen }: NodeSubgraphPreviewProps) {
-  // A preview is a thumbnail — cap the payload so even a 1000-node sub-graph
-  // loads fast and stays legible. "Open" shows the full thing.
-  const PREVIEW_LIMIT = 300;
-  const { data: wiData, loading } = useQuery(GET_WORK_ITEMS, {
-    variables: { where: { graph: { id: subgraphId } }, options: { limit: PREVIEW_LIMIT } },
+const noItems: SemanticItem[] = [];
+const noEdges: SemanticEdge[] = [];
+
+export function NodeSubgraphPreview({
+  subgraphId,
+  subgraphName,
+  onOpen,
+}: NodeSubgraphPreviewProps) {
+  const itemsQuery = useQuery<{ workItems: SemanticItem[] }>(GET_WORK_ITEMS, {
+    variables: {
+      where: { graph: { id: subgraphId } },
+      options: { limit: SUBGRAPH_PREVIEW_ITEMS },
+    },
     fetchPolicy: 'cache-and-network',
   });
-  const { data: edgeData } = useQuery(GET_EDGES, {
-    variables: { where: { source: { graph: { id: subgraphId } } }, options: { limit: 600 } },
+  const edgesQuery = useQuery<{ edges: SemanticEdge[] }>(GET_EDGES, {
+    variables: {
+      where: {
+        OR: [
+          { source: { graph: { id: subgraphId } } },
+          { target: { graph: { id: subgraphId } } },
+        ],
+      },
+      options: { limit: SUBGRAPH_PREVIEW_EDGES },
+    },
     fetchPolicy: 'cache-and-network',
   });
-
-  const nodes: any[] = wiData?.workItems ?? [];
-  const edges: any[] = edgeData?.edges ?? [];
-
-  if (loading && nodes.length === 0) {
-    return <div className="text-sm text-gray-500 p-4">Loading diagram…</div>;
-  }
-  if (nodes.length === 0) {
-    return (
-      <div className="p-4 space-y-3">
-        <div className="text-sm text-gray-500">This sub-graph is empty.</div>
-        <OpenButton onOpen={onOpen} name={subgraphName} />
-      </div>
-    );
-  }
-
-  // Bounds from persisted positions, scaled to fit the preview viewBox.
-  const W = 320;
-  const H = 240;
-  const pad = 30;
-  const xs = nodes.map((n) => n.positionX ?? 0);
-  const ys = nodes.map((n) => n.positionY ?? 0);
-  const minX = Math.min(...xs);
-  const maxX = Math.max(...xs);
-  const minY = Math.min(...ys);
-  const maxY = Math.max(...ys);
-  const spanX = Math.max(1, maxX - minX);
-  const spanY = Math.max(1, maxY - minY);
-  const scale = Math.min((W - pad * 2) / spanX, (H - pad * 2) / spanY);
-  const ox = (W - spanX * scale) / 2;
-  const oy = (H - spanY * scale) / 2;
-  const toX = (x: number) => ox + (x - minX) * scale;
-  const toY = (y: number) => oy + (y - minY) * scale;
-  const byId: Record<string, any> = {};
-  for (const n of nodes) byId[n.id] = n;
-
-  // Cap labels so a dense sub-graph stays readable, not a wall of text.
-  const showLabels = nodes.length <= 40;
-
-  return (
-    <div className="p-3 space-y-3">
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-gray-400">{nodes.length} nodes · {edges.length} edges</span>
-        <OpenButton onOpen={onOpen} name={subgraphName} />
-      </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full rounded-lg bg-gray-900/60 border border-gray-700/50" data-testid="subgraph-preview">
-        {edges.map((e) => {
-          const s = byId[typeof e.source === 'object' ? e.source?.id : e.source];
-          const t = byId[typeof e.target === 'object' ? e.target?.id : e.target];
-          if (!s || !t) return null;
-          return (
-            <line key={e.id} x1={toX(s.positionX ?? 0)} y1={toY(s.positionY ?? 0)} x2={toX(t.positionX ?? 0)} y2={toY(t.positionY ?? 0)} stroke="#4b5563" strokeWidth={0.75} strokeOpacity={0.6} />
-          );
-        })}
-        {nodes.map((n) => {
-          const color = getTypeConfig(n.type as WorkItemType).hexColor;
-          const x = toX(n.positionX ?? 0);
-          const y = toY(n.positionY ?? 0);
-          return (
-            <g key={n.id}>
-              <circle cx={x} cy={y} r={3.5} fill={color} fillOpacity={0.9} />
-              {showLabels && (
-                <text x={x + 5} y={y + 3} fontSize={6} fill="#cbd5e1">
-                  {String(n.title).slice(0, 18)}
-                </text>
-              )}
-            </g>
-          );
-        })}
-      </svg>
-    </div>
+  const items = itemsQuery.data?.workItems ?? noItems;
+  const edges = edgesQuery.data?.edges ?? noEdges;
+  const preview = useMemo(
+    () => projectSubgraphPreview(items, edges),
+    [items, edges]
   );
-}
+  const partialItems = items.length === SUBGRAPH_PREVIEW_ITEMS;
+  const partialEdges = edges.length === SUBGRAPH_PREVIEW_EDGES;
+  const failed = itemsQuery.error || edgesQuery.error;
 
-function OpenButton({ onOpen, name }: { onOpen: () => void; name?: string }) {
   return (
-    <button
-      onClick={onOpen}
-      className="flex items-center gap-1.5 text-xs font-medium text-indigo-300 hover:text-white bg-indigo-500/20 hover:bg-indigo-500/40 border border-indigo-400/30 rounded-lg px-2.5 py-1 transition-colors"
-      title={name ? `Open ${name}` : 'Open sub-graph'}
+    <section
+      data-testid="subgraph-preview"
+      aria-label="Diagram preview"
+      className="p-3 space-y-4 text-sm font-normal text-slate-200 [overflow-wrap:anywhere]"
     >
-      <Maximize2 className="h-3.5 w-3.5" />
-      Open
-    </button>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="flex items-center gap-2 text-base font-semibold text-slate-50">
+          <Boxes
+            aria-hidden="true"
+            className="h-5 w-5 shrink-0 text-teal-300"
+          />
+          Diagram
+        </h2>
+        <button
+          onClick={onOpen}
+          className="flex min-h-11 items-center gap-2 rounded-lg border border-teal-500/40 bg-teal-500/10 px-3 text-sm font-semibold text-teal-100 hover:bg-teal-500/20"
+          title={subgraphName ? `Open ${subgraphName}` : 'Open sub-graph'}
+        >
+          <Maximize2 aria-hidden="true" className="h-5 w-5" />
+          Open graph
+        </button>
+      </div>
+      {failed && (
+        <p
+          role="alert"
+          className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-amber-100"
+        >
+          Some diagram data could not load. Open the graph to try again.
+        </p>
+      )}
+      {itemsQuery.loading && !items.length && (
+        <p role="status">Loading diagram…</p>
+      )}
+      {!itemsQuery.loading && !itemsQuery.error && !items.length && (
+        <p>This sub-graph is empty.</p>
+      )}
+      {items.length > 0 && (
+        <>
+          <p data-preview-counts="true">
+            {items.length}
+            {partialItems ? '+' : ''} items ·{' '}
+            {edgesQuery.loading
+              ? 'loading connections…'
+              : edgesQuery.error
+                ? 'connections unavailable'
+                : `${edges.length}${partialEdges ? '+' : ''} connections`}
+          </p>
+          {(partialItems || partialEdges) && (
+            <p className="text-slate-300">
+              Partial preview. Open the graph for all details.
+            </p>
+          )}
+          <div className="space-y-3">
+            {preview.visibleGroups.map(group => (
+              <article
+                key={group.id}
+                data-preview-group={group.id}
+                className="rounded-xl border border-slate-600 bg-slate-800/60 p-3 space-y-2"
+              >
+                <h3 className="border-l-2 border-teal-300 pl-2 text-base font-semibold text-slate-50">
+                  {group.label}
+                </h3>
+                <p>
+                  {group.members.length} items ·{' '}
+                  {edgesQuery.loading
+                    ? 'loading links…'
+                    : edgesQuery.error
+                      ? 'links unavailable'
+                      : `${group.internalEdges.length} internal links`}
+                </p>
+                {group.blocked > 0 && (
+                  <p className="text-amber-200">{group.blocked} blocked</p>
+                )}
+                <ul
+                  aria-label={`Example items in ${group.label}`}
+                  className="space-y-1 text-slate-200"
+                >
+                  {group.examples.map(item => (
+                    <li key={item.id} data-preview-item={item.id}>
+                      {item.title}
+                    </li>
+                  ))}
+                </ul>
+                {group.members.length > group.examples.length && (
+                  <p className="text-slate-300">
+                    {group.members.length - group.examples.length} more items in
+                    this group
+                  </p>
+                )}
+              </article>
+            ))}
+          </div>
+          {preview.groups.length > preview.visibleGroups.length && (
+            <p>
+              {preview.groups.length - preview.visibleGroups.length} more groups
+              in the full graph
+            </p>
+          )}
+          {!edgesQuery.loading &&
+            !edgesQuery.error &&
+            preview.visibleConnections.length > 0 && (
+              <div className="space-y-2">
+                <h3 className="text-base font-semibold text-slate-50">
+                  Connections
+                </h3>
+                <ol aria-label="Grouped connections" className="space-y-3">
+                  {preview.visibleConnections.map(connection => (
+                    <li
+                      key={connection.id}
+                      data-preview-connection={connection.id}
+                      className="border-l-2 border-slate-500 pl-3"
+                    >
+                      <span className="capitalize font-semibold text-teal-100">
+                        {connection.type.toLowerCase().replace(/_/g, ' ')} ·{' '}
+                        {connection.edges.length}
+                      </span>
+                      <p>
+                        {connection.source === connection.target
+                          ? `Within ${connection.sourceLabel}`
+                          : `${connection.sourceLabel} → ${connection.targetLabel}`}
+                      </p>
+                    </li>
+                  ))}
+                </ol>
+                {preview.connections.length >
+                  preview.visibleConnections.length && (
+                  <p>
+                    {preview.connections.length -
+                      preview.visibleConnections.length}{' '}
+                    more connection groups
+                  </p>
+                )}
+              </div>
+            )}
+          {preview.pending.length > 0 && (
+            <p>
+              {preview.pending.length} connections reach items outside this
+              preview
+            </p>
+          )}
+        </>
+      )}
+    </section>
   );
 }

@@ -2261,7 +2261,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           }
           
           // Store initial position and connected nodes for cluster behavior
-          d._dragging = true;
+          d._dragging = false;
           d._dragStart = { x: d.x, y: d.y };
           d._connectedNodes = validatedEdges
             .filter(edge => edge.source.id === d.id || edge.target.id === d.id)
@@ -2273,13 +2273,16 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
                 wasFixed: connectedNode.fx != null || connectedNode.fy != null
               };
             });
-          
-          // Normal drag behavior
-          if (!event.active) simulation.alphaTarget(0.2).restart();
-          d.fx = d.x;
-          d.fy = d.y;
+
         })
         .on('drag', (event, d: any) => {
+          if (event.sourceEvent.altKey) return;
+          if (!d._dragging) {
+            d._dragging = true;
+            simulation.alphaTarget(0.2).restart();
+            d.fx = d.x;
+            d.fy = d.y;
+          }
           // Calculate drag distance from start
           const dragDistance = Math.sqrt(
             Math.pow(event.x - d._dragStart.x, 2) + 
@@ -2361,10 +2364,14 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
             return;
           }
           
+          if (!d._dragging) {
+            mousedownNodeRef.current = null;
+            delete d._dragStart;
+            delete d._connectedNodes;
+            return;
+          }
           // Keep the dropped snapshot authoritative during polls and rebuilds.
           d._dragging = false;
-          d.positionX = d.fx;
-          d.positionY = d.fy;
           if (!event.active) {
             const needsLayout = simulation.nodes().some((n: any) => n.fx == null || n.fy == null);
             // One last tick paints the final pointer position; a fully pinned
@@ -2378,8 +2385,11 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           
           // Save the new position via the coalescing queue (#95) so a drag during
           // a reflow doesn't add another parallel write.
-          positionSaveQueueRef.current.queue(d.id, d.fx, d.fy);
-          positionSaveQueueRef.current.flush();
+          if ((d.fx !== d.positionX || d.fy !== d.positionY) && positionSaveQueueRef.current.queue(d.id, d.fx, d.fy)) {
+            d.positionX = d.fx;
+            d.positionY = d.fy;
+            positionSaveQueueRef.current.flush();
+          }
           
           mousedownNodeRef.current = null;
         }));

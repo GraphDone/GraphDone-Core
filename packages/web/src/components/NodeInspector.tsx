@@ -21,6 +21,7 @@ interface NodeInspectorProps {
   /** Override the root data-testid so an anchored instance is distinguishable
    * from the docked one when both are mounted. */
   rootTestId?: string;
+  maxHeight?: string;
 }
 
 /**
@@ -30,7 +31,7 @@ interface NodeInspectorProps {
  * toggle — not a side effect of zooming in. Used both docked (Workspace) and
  * anchored on-canvas (the expand-in-place peek), the latter via `compact`.
  */
-export function NodeInspector({ node, onClose, onEdit, compact = false, rootTestId = 'node-inspector' }: NodeInspectorProps) {
+export function NodeInspector({ node, onClose, onEdit, compact = false, rootTestId = 'node-inspector', maxHeight }: NodeInspectorProps) {
   const { descendInto } = useGraph();
   const hasSubgraph = !!node?.subgraphId;
   const [modeByNode, setModeByNode] = useState<Record<string, Mode>>({});
@@ -43,6 +44,7 @@ export function NodeInspector({ node, onClose, onEdit, compact = false, rootTest
   return (
     <div
       data-testid={rootTestId}
+      style={{ maxHeight }}
       className={`flex flex-col bg-gray-900/95 backdrop-blur-md border border-gray-700/60 rounded-xl shadow-2xl overflow-hidden ${
         compact ? 'w-full max-h-[60vh]' : 'w-full sm:w-72 max-h-[60vh] sm:max-h-[70vh]'
       }`}
@@ -51,7 +53,7 @@ export function NodeInspector({ node, onClose, onEdit, compact = false, rootTest
       <div className="flex items-start gap-2 p-3 border-b border-gray-700/60">
         <div className="flex-1 min-w-0">
           <div className="text-xs uppercase tracking-wide" style={{ color: typeCfg.hexColor }}>{typeCfg.label}</div>
-          <div className="text-sm font-semibold text-white truncate" title={node.title}>{node.title}</div>
+          <div className="text-base font-semibold text-white [overflow-wrap:anywhere]" title={node.title}>{node.title}</div>
           <div className="mt-0.5"><CopyableId id={node.id} /></div>
         </div>
         {onEdit && <button onClick={onEdit} className="min-h-[44px] px-3 rounded-lg text-emerald-300 hover:bg-gray-800">Edit</button>}
