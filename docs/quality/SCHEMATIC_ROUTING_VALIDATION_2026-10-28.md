@@ -101,3 +101,10 @@ two small owned fixtures; no extra database or local browser is started.
 The final two cases were discovered successfully in the owned lightweight probe
 (`schematic-integration-current-discovery.log`); discovery is not execution. Their
 new assertions require actual CI execution before acceptance.
+
+Independent review of 41127f0 found ambiguous long-title selectors after adding
+relationship buttons, and a geometry oracle that could accept transparent wires.
+The member selectors now use their visible title text. Cards must have positive
+visible bounds inside the viewport; wires must have visible ancestor styles and
+actual stroke paint. An intentional opacity-zero wire in the real journey must
+be rejected before restoration. These corrections remain pending CI execution.

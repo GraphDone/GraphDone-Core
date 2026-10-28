@@ -11,6 +11,22 @@ export async function inspectSchematicOverview(
 ) {
   const read = () =>
     overview.evaluate(host => {
+      const visible = (element: Element) => {
+        for (
+          let current: Element | null = element;
+          current;
+          current = current.parentElement
+        ) {
+          const style = getComputedStyle(current);
+          if (
+            style.display === 'none' ||
+            style.visibility !== 'visible' ||
+            Number(style.opacity) === 0
+          )
+            return false;
+        }
+        return true;
+      };
       const rectangle = (element: Element, index: number) => {
         const bounds = element.getBoundingClientRect();
         return {
@@ -19,6 +35,7 @@ export async function inspectSchematicOverview(
           y: bounds.y,
           width: bounds.width,
           height: bounds.height,
+          visible: visible(element),
         };
       };
       const cards = Array.from(host.querySelectorAll('[data-lod-group]')).map(
@@ -34,9 +51,16 @@ export async function inspectSchematicOverview(
         host.querySelectorAll<SVGPathElement>('[data-lod-bundle]')
       ).map(path => {
         const matrix = path.getScreenCTM()!;
+        const style = getComputedStyle(path);
         return {
           source: path.getAttribute('data-lod-bus-source')!,
           count: Number(path.getAttribute('data-count')),
+          painted:
+            visible(path) &&
+            style.stroke !== 'none' &&
+            Number(style.strokeOpacity) > 0 &&
+            parseFloat(style.strokeWidth) > 0 &&
+            path.getTotalLength() > 0,
           points: (path.getAttribute('d')!.match(/[ML][^ML]+/g) ?? []).map(
             command => {
               const [x, y] = command.slice(1).split(',').map(Number);
@@ -49,14 +73,39 @@ export async function inspectSchematicOverview(
       const accounting = host
         .querySelector('[aria-label*="relationships,"]')
         ?.getAttribute('aria-label');
-      return { cards, controls, routes, accounting };
+      const bounds = host.getBoundingClientRect();
+      return {
+        cards,
+        controls,
+        routes,
+        accounting,
+        bounds: {
+          left: Math.max(0, bounds.left),
+          right: Math.min(innerWidth, bounds.right),
+          top: Math.max(0, bounds.top),
+          bottom: Math.min(innerHeight, bounds.bottom),
+        },
+      };
     });
   await expect.poll(async () => (await read()).cards.length).toBe(2);
   await expect
     .poll(async () => (await read()).routes.length)
     .toBeGreaterThan(0);
   const geometry = await read();
+  for (const card of geometry.cards) {
+    expect(card.visible, 'Schematic card must be visible').toBe(true);
+    expect(
+      card.width,
+      'Schematic card must have visible width'
+    ).toBeGreaterThan(0);
+    expect(card.height).toBeGreaterThan(0);
+    expect(card.x).toBeGreaterThanOrEqual(geometry.bounds.left);
+    expect(card.x + card.width).toBeLessThanOrEqual(geometry.bounds.right);
+    expect(card.y).toBeGreaterThanOrEqual(geometry.bounds.top);
+    expect(card.y + card.height).toBeLessThanOrEqual(geometry.bounds.bottom);
+  }
   for (const route of geometry.routes) {
+    expect(route.painted, 'Schematic wire must be painted').toBe(true);
     expect(route.count).toBeGreaterThan(0);
     expect(route.points.length).toBeGreaterThanOrEqual(2);
     expect(

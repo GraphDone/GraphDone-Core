@@ -213,6 +213,19 @@ for (const width of [1440, 390])
       await detail.selectOption('overview');
       await expect(count(2)).toBeVisible();
       await inspectSchematicOverview(overview, info, before.edges.length);
+      const firstWire = overview.locator('[data-lod-bundle]').first();
+      await firstWire.evaluate(
+        element => ((element as SVGElement).style.opacity = '0')
+      );
+      try {
+        await expect(
+          inspectSchematicOverview(overview, info, before.edges.length)
+        ).rejects.toThrow('Schematic wire must be painted');
+      } finally {
+        await firstWire.evaluate(element =>
+          (element as SVGElement).style.removeProperty('opacity')
+        );
+      }
       await activate(
         overview.getByRole('button', {
           name: /^\d+ relationships, \d+ not drawn:/,
@@ -363,7 +376,9 @@ for (const width of [1440, 390])
       await queue
         .getByRole('textbox', { name: 'Find an item' })
         .fill('Request delivery');
-      const longItem = queue.getByRole('button', { name: /Request delivery/ });
+      const longItem = queue
+        .getByRole('button')
+        .filter({ hasText: 'Request delivery' });
       await expect(longItem).toBeVisible();
       expect(
         await longItem.evaluate(
@@ -518,7 +533,7 @@ for (const width of [1440, 390])
         .getByRole('textbox', { name: 'Find an item' })
         .fill('Request delivery');
       await activate(
-        payments.getByRole('button', { name: /Request delivery/ })
+        payments.getByRole('button').filter({ hasText: 'Request delivery' })
       );
       await expect(page.getByTestId('node-inspector')).toContainText(
         'Request delivery'
