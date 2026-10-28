@@ -16,7 +16,7 @@ export function RelationshipPriorityControl({
     <label
       data-relationship-priority-control="true"
       onClick={event => event.stopPropagation()}
-      className="flex min-h-11 max-w-full items-center gap-3 rounded-xl border border-slate-600 bg-slate-900/95 px-3 py-2 text-base text-slate-100 shadow-lg"
+      className="flex min-h-11 max-w-full items-center gap-2 rounded-xl border border-slate-600 bg-slate-900/95 px-3 py-2 text-base text-slate-100 shadow-lg"
       title="Choose relationship priority. Each connected pair keeps its highest available types when no higher-priority type is present."
     >
       Links

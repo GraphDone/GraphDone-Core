@@ -9,6 +9,7 @@ import {
 } from 'react';
 import {
   prioritySemanticBundles,
+  projectRelationshipPriority,
   relationshipPriorityTier,
   type RelationshipPriorityLevel,
 } from '../lib/relationshipPriority';
@@ -160,16 +161,29 @@ export function SemanticGraphOverview({
     () => projectSemanticHierarchy(hierarchy, effectiveExpanded),
     [hierarchy, effectiveExpanded]
   );
-  const representedBundles = useMemo(
-    () =>
-      relationshipPriority
-        ? prioritySemanticBundles(
-            projection.bundles,
-            relationshipPriority.representedIds
-          )
-        : projection.bundles,
-    [projection, relationshipPriority]
-  );
+  const representedBundles = useMemo(() => {
+    if (!relationshipPriority) return projection.bundles;
+    const representedIds = new Set(relationshipPriority.representedIds);
+    if (trace) {
+      const endpoint = trace.direction === 'incoming' ? 'target' : 'source';
+      const related = projection.bundles
+        .filter(bundle => bundle[endpoint] === trace.groupId)
+        .flatMap(bundle => bundle.edges);
+      const scoped = projectRelationshipPriority(
+        items,
+        related,
+        relationshipPriority.level
+      );
+      for (const edge of scoped.represented) representedIds.add(edge.id);
+    }
+    return prioritySemanticBundles(projection.bundles, representedIds);
+  }, [
+    projection,
+    relationshipPriority,
+    items,
+    trace?.groupId,
+    trace?.direction,
+  ]);
   const [automatic, setAutomatic] = useState(() =>
     overviewAtScale(false, camera.scale)
   );
@@ -503,7 +517,7 @@ export function SemanticGraphOverview({
       <div
         data-lod-controls="true"
         data-graph-fit-obstacle="true"
-        className="absolute left-3 top-3 right-36 md:left-16 md:right-40 flex flex-wrap items-center gap-3 pointer-events-auto text-base"
+        className="absolute left-3 top-3 right-36 md:left-16 md:right-40 flex flex-wrap items-center gap-2 md:gap-3 pointer-events-auto text-base"
       >
         <label className="flex min-h-11 items-center gap-3 rounded-xl bg-slate-900/95 px-3 py-2 text-slate-200 border border-slate-600 shadow-lg">
           Detail
@@ -528,7 +542,7 @@ export function SemanticGraphOverview({
         <button
           ref={groupListButton}
           aria-label={`${projection.groups.length} groups · ${items.length} items`}
-          className="rounded-xl bg-slate-900/95 border border-slate-600 px-4 py-1 w-32 h-14 shrink-0 text-slate-100 shadow-lg"
+          className="flex md:block items-center justify-center gap-2 rounded-xl bg-slate-900/95 border border-slate-600 px-3 py-1 min-h-11 md:w-32 md:h-14 max-w-full text-slate-100 shadow-lg"
           onClick={() => {
             returnFocus.current = document.activeElement as HTMLElement;
             setRelationshipScope(null);
@@ -536,8 +550,11 @@ export function SemanticGraphOverview({
             setGroupId(null);
           }}
         >
-          <span className="block">{projection.groups.length} groups</span>
-          <span className="block">{items.length} items</span>
+          <span className="md:block">{projection.groups.length} groups</span>
+          <span className="md:hidden" aria-hidden="true">
+            ·
+          </span>
+          <span className="md:block">{items.length} items</span>
         </button>
         {mode === 'overview' && effectiveExpanded.size > 0 && (
           <button
