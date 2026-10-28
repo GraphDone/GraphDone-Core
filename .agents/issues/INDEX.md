@@ -2,6 +2,7 @@
 
 | Symptom | Canonical lesson and regression |
 | --- | --- |
+| Inspector code remains11–13px, nested previews have microscopic labels, or inspection clicks enqueue unchanged positions | [Readable preview levels and read-only gestures](../inbox/2026-10-28-inspector-previews-need-readable-levels.md); inspector-readability browser journey and subgraph preview conservation/component cases |
 | An incoming trace loses its only dependency, or a new toolbar leaves only one group / covers another control | [Scope trace fallback and preserve measured room](../inbox/2026-10-28-trace-fallback-needs-directional-scope.md); directional component conservation and desktop/phone nested geometry/control regressions |
 | Deleting a relationship updates the canvas but leaves the graph header count stale | [Refresh matching subscribed edge queries](../inbox/2026-10-28-edge-deletion-must-refresh-subscribed-counts.md); desktop/phone delete-and-fallback journeys assert the header and API agree |
 | A preview still shows tiny/thin text although typography configuration matches the reviewed source | [Refresh the owned preview and verify rendered styles](../inbox/2026-10-28-preview-styles-need-rendered-verification.md); desktop/phone computed typography and 12px/400 negative in relationship-priority journeys |
