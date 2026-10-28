@@ -15,9 +15,10 @@ test.describe('passwordless login focus order @loginfocus', () => {
 
   test('empty email → email field is focused first', async ({ page }) => {
     await page.goto(`${getBaseURL()}/login`, { waitUntil: 'domcontentloaded' });
+    await page.getByRole('tab', { name: 'Password', exact: true }).click();
     await page.locator('button:has-text("Passwordless")').click();
     await expect(page.locator('#magicLinkEmail')).toBeFocused();
-    await expect(page.locator('#captcha-input')).not.toBeFocused();
+    await expect(page.getByTestId('server-captcha').getByRole('checkbox').or(page.locator('#captcha-input'))).not.toBeFocused();
   });
 
   test('email already present → captcha is focused on re-entry', async ({ page }) => {
@@ -27,6 +28,6 @@ test.describe('passwordless login focus order @loginfocus', () => {
     // Leave and re-enter passwordless mode; the email value persists.
     await page.locator('button:has-text("Password")').first().click();
     await page.locator('button:has-text("Passwordless")').click();
-    await expect(page.locator('#captcha-input')).toBeFocused();
+    await expect(page.getByTestId('server-captcha').getByRole('checkbox').or(page.locator('#captcha-input'))).toBeFocused();
   });
 });

@@ -52,6 +52,7 @@ export const authOnlyTypeDefs = gql`
   }
 
   input SignupInput {
+    captchaPayload: String
     email: String!
     username: String!
     password: String!
@@ -60,6 +61,7 @@ export const authOnlyTypeDefs = gql`
   }
 
   input LoginInput {
+    captchaPayload: String
     emailOrUsername: String!
     password: String!
   }

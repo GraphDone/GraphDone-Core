@@ -23,6 +23,11 @@ export function validateProductionSecrets(environment: Record<string, string | u
     return !value || knownInsecureSecrets.has(value.toLowerCase());
   });
 
+  const captchaKey = environment.ALTCHA_HMAC_KEY?.trim();
+  if (captchaKey !== undefined && (captchaKey.length < 32 || captchaKey === 'your-secret-hmac-key-change-in-production')) {
+    invalid.push('ALTCHA_HMAC_KEY');
+  }
+
   if (invalid.length) {
     throw new Error(`Invalid production secrets: ${invalid.join(', ')}. Configure independent random secrets before starting the API.`);
   }
