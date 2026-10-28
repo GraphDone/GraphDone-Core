@@ -1,6 +1,7 @@
 import {FeedbackButton} from '../components/Feedback';
 import React from 'react';
 import { HostedUsage } from '../components/HostedUsage';
+import { LayoutRecoverySettings } from '../components/LayoutRecoverySettings';
 import { Settings as SettingsIcon } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { CustomDropdown } from '../components/CustomDropdown';
@@ -42,6 +43,7 @@ export function Settings() {
             
             <div className="space-y-8">
               <HostedUsage />
+              <LayoutRecoverySettings />
               {/* Performance (ADAPT-6) */}
               <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
                 <h2 className="text-lg font-semibold text-gray-100 mb-4">Performance</h2>
