@@ -1,0 +1,105 @@
+{
+  "schema": "graphdone.schematic-study/1",
+  "fixtures": [
+    {
+      "name": "chain",
+      "title": "A clear service path",
+      "sourceRelationships": 36,
+      "routedRelationships": 36,
+      "collapsedRelationships": 0,
+      "routedBranches": 3,
+      "metrics": {
+        "cardIntersections": 0,
+        "unrelatedCrossings": 0,
+        "unrelatedOverlaps": 0,
+        "diagonalSegments": 0,
+        "maxBusesPerCell": 1
+      },
+      "work": {
+        "attempts": 3,
+        "expandedStates": 23,
+        "maxAttempts": 32,
+        "maxExpandedStates": 6000
+      },
+      "deferred": {}
+    },
+    {
+      "name": "fanout",
+      "title": "One source, shared bus, exact branches",
+      "sourceRelationships": 30,
+      "routedRelationships": 30,
+      "collapsedRelationships": 0,
+      "routedBranches": 4,
+      "metrics": {
+        "cardIntersections": 0,
+        "unrelatedCrossings": 0,
+        "unrelatedOverlaps": 0,
+        "diagonalSegments": 0,
+        "maxBusesPerCell": 1
+      },
+      "work": {
+        "attempts": 4,
+        "expandedStates": 617,
+        "maxAttempts": 32,
+        "maxExpandedStates": 6000
+      },
+      "deferred": {}
+    },
+    {
+      "name": "dense-cycle",
+      "title": "Dense systems disclose collapsed connections",
+      "sourceRelationships": 112,
+      "routedRelationships": 33,
+      "collapsedRelationships": 79,
+      "routedBranches": 13,
+      "metrics": {
+        "cardIntersections": 0,
+        "unrelatedCrossings": 0,
+        "unrelatedOverlaps": 0,
+        "diagonalSegments": 0,
+        "maxBusesPerCell": 2
+      },
+      "work": {
+        "attempts": 32,
+        "expandedStates": 3495,
+        "maxAttempts": 32,
+        "maxExpandedStates": 6000
+      },
+      "deferred": {
+        "routing-budget": {
+          "branches": 43,
+          "relationships": 79
+        }
+      }
+    },
+    {
+      "name": "phone",
+      "title": "Narrow screens keep readable ports",
+      "sourceRelationships": 23,
+      "routedRelationships": 23,
+      "collapsedRelationships": 0,
+      "routedBranches": 3,
+      "metrics": {
+        "cardIntersections": 0,
+        "unrelatedCrossings": 0,
+        "unrelatedOverlaps": 0,
+        "diagonalSegments": 0,
+        "maxBusesPerCell": 1
+      },
+      "work": {
+        "attempts": 3,
+        "expandedStates": 166,
+        "maxAttempts": 12,
+        "maxExpandedStates": 6000
+      },
+      "deferred": {}
+    }
+  ],
+  "rejectedNegative": {
+    "cardIntersections": 2,
+    "unrelatedCrossings": 3,
+    "unrelatedOverlaps": 1,
+    "diagonalSegments": 1,
+    "maxBusesPerCell": 3
+  }
+}

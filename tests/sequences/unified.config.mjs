@@ -32,6 +32,12 @@ export const SEQUENCES = {
   'semantic-lod': { adapter: 'playwright', title: 'Semantic LOD acceptance', args: [
     'tests/e2e/graph/semantic-lod.spec.ts', `--project=${PW}`, '--headed', '--workers=1', '--retries=0', '--trace=retain-on-failure',
   ], blocking: true },
+  'nested-lod': { adapter: 'playwright', title: 'Nested semantic LOD acceptance', args: [
+    'tests/e2e/graph/nested-semantic-lod.spec.ts', `--project=${PW}`, '--headed', '--workers=1', '--retries=0', '--trace=retain-on-failure',
+  ], blocking: true },
+  'schematic-visual': { adapter: 'playwright', title: 'Schematic fixture visual acceptance', args: [
+    '--config=playwright.schematic.config.ts', '--workers=1', '--retries=0', '--trace=retain-on-failure',
+  ], blocking: true },
   'layout-recovery': { adapter: 'playwright', title: 'Durable layout recovery acceptance', args: [
     'tests/e2e/graph/layout-recovery.spec.ts', `--project=${PW}`, '--headed', '--workers=1', '--retries=0', '--trace=retain-on-failure',
   ], blocking: true },
@@ -59,8 +65,8 @@ export const SEQUENCES = {
 
 export const PROFILES = {
   smoke: ['unit-web', 'smoke', 'e2e-auth'],
-  pr: ['unit-web', 'smoke', 'e2e-auth', 'e2e-graph', 'semantic-lod', 'layout-recovery', 'router-navigation', 'mobile', 'perf-budgets'],
-  full: ['unit-web', 'smoke', 'e2e-auth', 'e2e-graph', 'semantic-lod', 'layout-recovery', 'router-navigation', 'mobile', 'perf-budgets', 'diagnostics', 'showcase', 'matrix', 'vlm', 'perf-scale', 'cloud-audit'],
+  pr: ['unit-web', 'smoke', 'e2e-auth', 'e2e-graph', 'semantic-lod', 'nested-lod', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'perf-budgets'],
+  full: ['unit-web', 'smoke', 'e2e-auth', 'e2e-graph', 'semantic-lod', 'nested-lod', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'perf-budgets', 'diagnostics', 'showcase', 'matrix', 'vlm', 'perf-scale', 'cloud-audit'],
   report: ['diagnostics', 'showcase', 'matrix', 'vlm', 'perf-scale', 'cloud-audit'],
   live: ['live-journey'],
 };

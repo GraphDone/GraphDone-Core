@@ -328,8 +328,8 @@ for (const width of [1440, 390])
         .click();
       const members = page.getByRole('region', { name: 'Subsystem 0 members' });
       await expect(
-        members.getByRole('button', {
-          name: /TASK|BUG|FEATURE|MILESTONE|OUTCOME/,
+        members.getByRole('button').filter({
+          hasText: /TASK|BUG|FEATURE|MILESTONE|OUTCOME/,
         })
       ).toHaveCount(38);
       await members

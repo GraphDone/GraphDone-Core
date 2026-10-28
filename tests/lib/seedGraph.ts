@@ -57,6 +57,7 @@ export interface SeedOptions {
   namePrefix?: string;
   metadataForIndex?: (index: number) => Record<string, unknown>;
   titleForIndex?: (index: number, type: string) => string;
+  additionalEdges?: ReadonlyArray<{ sourceIndex: number; targetIndex: number; type: string }>;
   /** Smaller repeated mutation shapes avoid Neo4j planning hundreds of creates. */
   batchSize?: number;
   /** Register ownership before node/edge setup, so partial setup can be cleaned. */
@@ -67,6 +68,10 @@ export interface SeedOptions {
 
 export async function seedLargeGraph(page: Page, opts: SeedOptions): Promise<SeededGraph> {
   const { size, edgeFactor = 1.4, spacing = 130, namePrefix = 'Scale' } = opts;
+  for (const edge of opts.additionalEdges ?? []) {
+    if ([edge.sourceIndex, edge.targetIndex].some(index => !Number.isInteger(index) || index < 0 || index >= size))
+      throw new Error('Additional fixture edge endpoint is outside the requested graph');
+  }
   opts.signal?.throwIfAborted();
   const me = await gql(page, '{ me { id } }');
   const userId = me.me.id;
@@ -137,6 +142,7 @@ export async function seedLargeGraph(page: Page, opts: SeedOptions): Promise<See
   }
 
   let edgeCount = 0;
+  for (const edge of opts.additionalEdges ?? []) link(nodeIds[edge.sourceIndex], nodeIds[edge.targetIndex], edge.type);
   for (const batch of chunk(edgeInputs, opts.batchSize ?? 100)) {
     opts.signal?.throwIfAborted();
     const res = await gql(
@@ -144,6 +150,7 @@ export async function seedLargeGraph(page: Page, opts: SeedOptions): Promise<See
       `mutation($input: [EdgeCreateInput!]!) { createEdges(input: $input) { edges { id } } }`,
       { input: batch }
     );
+    if (res.createEdges.edges.length !== batch.length) throw new Error(`Fixture edge batch returned ${res.createEdges.edges.length} edges; expected ${batch.length}`);
     edgeCount += res.createEdges.edges.length;
   }
 
