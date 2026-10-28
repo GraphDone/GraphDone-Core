@@ -3,8 +3,9 @@ import { spawn } from 'node:child_process';
 import { randomUUID, randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
-const [image, expectedUid] = process.argv.slice(2);
-assert.ok(image && ['0', '1000', '1001'].includes(expectedUid), 'Usage: node tests/runtime/run-image.mjs IMAGE EXPECTED_UID');
+const [image, expectedUid, baselineImage] = process.argv.slice(2);
+assert.ok(image && ['0', '1000', '1001'].includes(expectedUid), 'Usage: node tests/runtime/run-image.mjs IMAGE EXPECTED_UID [IMMUTABLE_BASELINE_IMAGE_ID]');
+if (baselineImage) assert.match(baselineImage, /^sha256:[0-9a-f]{64}$/, 'The baseline must be an immutable local image ID.');
 assert.equal(process.env.GRAPHDONE_DISPOSABLE_NEO4J, '1');
 for (const name of ['NEO4J_URI', 'NEO4J_USER', 'NEO4J_PASSWORD']) assert.ok(process.env[name], `Missing ${name}`);
 assert.ok(['127.0.0.1', 'localhost', '[::1]'].includes(new URL(process.env.NEO4J_URI).hostname));
@@ -49,18 +50,24 @@ try {
   const installed = JSON.parse(inventory.stdout);
   assert.equal(installed.nativeSQLite, 'passed');
   await docker(['volume', 'create', volume]);
-  for (const restart of [false, true]) {
-    const name = `graphdone-image-runtime-${restart ? 'restart' : 'initial'}-${suffix}`;
+  const stages = [
+    ...(baselineImage ? [{ image: baselineImage, phase: 'baseline', restart: false }] : []),
+    { image, phase: 'initial', restart: !!baselineImage },
+    { image, phase: 'replacement', restart: true },
+    ...(baselineImage ? [{ image: baselineImage, phase: 'rollback', restart: true }] : []),
+  ];
+  for (const stage of stages) {
+    const name = `graphdone-image-runtime-${stage.phase}-${suffix}`;
     containers.push(name);
-    env.GRAPHDONE_REQUIRE_RECOVERY = restart ? '1' : '0';
+    env.GRAPHDONE_REQUIRE_RECOVERY = stage.restart ? '1' : '0';
     const keys = ['NEO4J_URI', 'NEO4J_USER', 'NEO4J_PASSWORD', 'GRAPHDONE_DISPOSABLE_NEO4J', 'JWT_SECRET', 'SESSION_SECRET', 'ADMIN_EMAIL', 'ADMIN_PASSWORD', 'SSL_ENABLED', 'GRAPHDONE_REQUIRE_RECOVERY'];
     if (env.GRAPHDONE_IMAGE_TEST_PORT) keys.push('GRAPHDONE_IMAGE_TEST_PORT');
-    const result = await docker(['run', '--rm', '--name', name, '--network', 'host', '--mount', `type=volume,source=${volume},target=/app/packages/server/data`, ...keys.flatMap(key => ['-e', key]), '--entrypoint', 'node', '-i', image, '--input-type=module'], { input: readFileSync(new URL('./image-contract.mjs', import.meta.url)) });
+    const result = await docker(['run', '--rm', '--name', name, '--network', 'host', '--mount', `type=volume,source=${volume},target=/app/packages/server/data`, ...keys.flatMap(key => ['-e', key]), '--entrypoint', 'node', '-i', stage.image, '--input-type=module'], { input: readFileSync(new URL('./image-contract.mjs', import.meta.url)) });
     const outcome = JSON.parse(result.stdout);
     assert.equal(outcome.independentNeo4jReadback, 'passed');
-    console.log(JSON.stringify({ image, restart, ...outcome }));
+    console.log(JSON.stringify({ image: stage.image, phase: stage.phase, restart: stage.restart, ...outcome }));
   }
-  console.log(JSON.stringify({ image, uid: expectedUid, installedPackageCount: installed.installedPackages.length, nativeSQLite: 'passed', defaultSecretRejection: 'passed', replacementContainerRecovery: 'passed' }));
+  console.log(JSON.stringify({ image, uid: expectedUid, installedPackageCount: installed.installedPackages.length, nativeSQLite: 'passed', defaultSecretRejection: 'passed', replacementContainerRecovery: 'passed', ...(baselineImage ? { baselineImage, upgradeAndRollbackRecovery: 'passed' } : {}) }));
 } finally {
   for (const name of containers) {
     const existing = await docker(['container', 'ls', '--all', '--filter', `name=^/${name}$`, '--format', '{{.Names}}']);
