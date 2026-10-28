@@ -99,6 +99,26 @@ Evidence: `nested-1baac30-coverage.log`, `nested-existing-lod-1baac30/`,
 `nested-small-fixture-positive.log` (five passes with coverage), all under the
 retained evidence directory above.
 
+## Initial-load readiness correction
+
+Frozen1874acb passed full755 unit cases (plus26 existing DB-gated skips),194
+harness cases, types/lint/build with the smaller component fixture. Its strict
+nested run then failed the first desktop72-node assertion while phone passed.
+The source stayed clean/identical. Retained trace shows app queries beginning
+1.35s after navigation returned, then taking1.40s/1.92s; the screenshot after the
+assertion deadline shows the loaded graph. The8.44s query elsewhere in that trace
+was fixture edge creation, not this initial graph read, and is not cited as the
+startup cause.
+
+The test now awaits the actual owned graph's GetWorkItems and full GetEdges
+responses, checks HTTP/GraphQL success and exact source IDs against the seeded
+snapshot, then applies the existing5s72-node rendering assertion. It uses the
+normal bounded Playwright response wait inside the unchanged150s journey budget.
+This clarifies the data-readiness boundary; it does not establish a first-paint
+performance budget or improve application startup. No browser fixture, navigation
+assertion, existing timeout or retry count changes. Retained failure:
+`nested-lod-1874acb/`; fresh acceptance is still required.
+
 ## Acceptance still required at the frozen candidate
 
 Run strict nested, existing 301/370 semantic LOD, layout recovery and smoke browser

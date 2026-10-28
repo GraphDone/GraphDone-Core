@@ -132,7 +132,44 @@ for (const width of [1440, 390])
         localStorage.setItem('currentGraphId', id);
         localStorage.setItem('graphdone:viewMode', 'graph');
       }, seeded.graphId);
-      await page.goto('/');
+      const workItemsLoaded = page.waitForResponse(response => {
+        if (!response.url().endsWith('/api/graphql')) return false;
+        const body = response.request().postDataJSON();
+        return (
+          body?.operationName === 'GetWorkItems' &&
+          body.variables?.where?.graph?.id === seeded.graphId
+        );
+      });
+      const edgesLoaded = page.waitForResponse(response => {
+        if (!response.url().endsWith('/api/graphql')) return false;
+        const body = response.request().postDataJSON();
+        return (
+          body?.operationName === 'GetEdges' &&
+          body.variables?.where?.OR?.some(
+            (part: { source?: { graph?: { id?: string } } }) =>
+              part.source?.graph?.id === seeded.graphId
+          )
+        );
+      });
+      const [, workItemsResponse, edgesResponse] = await Promise.all([
+        page.goto('/'),
+        workItemsLoaded,
+        edgesLoaded,
+      ]);
+      expect(workItemsResponse.status()).toBe(200);
+      expect(edgesResponse.status()).toBe(200);
+      const workItemsBody = await workItemsResponse.json();
+      const edgesBody = await edgesResponse.json();
+      expect(workItemsBody.errors).toBeUndefined();
+      expect(edgesBody.errors).toBeUndefined();
+      expect(
+        workItemsBody.data.workItems
+          .map((item: { id: string }) => item.id)
+          .sort()
+      ).toEqual([...seeded.nodeIds].sort());
+      expect(
+        edgesBody.data.edges.map((edge: { id: string }) => edge.id).sort()
+      ).toEqual(before.edges.map((edge: { id: string }) => edge.id));
       await expect(page.locator('.graph-container .node')).toHaveCount(72);
       const overview = page.locator('.semantic-overview');
       const detail = overview.getByRole('combobox', { name: 'Graph detail' });
