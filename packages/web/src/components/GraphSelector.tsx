@@ -466,7 +466,7 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
                                   </div>
                                   <div className="flex-1 min-w-0">
                                     <div className="text-xs font-medium truncate">{child.name}</div>
-                                    <div className="text-[10px] text-gray-400">{child.nodeCount || 0} nodes • {child.edgeCount || 0} edges</div>
+                                    <div className="text-xs text-gray-400">{child.nodeCount || 0} nodes • {child.edgeCount || 0} edges</div>
                                   </div>
                                 </button>
                               ))}
@@ -516,7 +516,7 @@ export function GraphSelector({ onCreateGraph, onEditGraph, onDeleteGraph, testI
       {/* Tooltip Portal */}
       {hoveredTooltip && createPortal(
         <div
-          className="fixed px-2 py-1 bg-red-600 text-white text-[10px] rounded whitespace-nowrap pointer-events-none z-[9999999999] -translate-y-1/2"
+          className="fixed px-2 py-1 bg-red-600 text-white text-xs rounded whitespace-nowrap pointer-events-none z-[9999999999] -translate-y-1/2"
           style={{
             left: hoveredTooltip.x,
             top: hoveredTooltip.y

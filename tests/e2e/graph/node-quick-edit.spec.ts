@@ -46,7 +46,7 @@ test.describe('node quick-edit @quickedit', () => {
     await page.waitForTimeout(1200); // mutation + graph refresh
 
     // The graph should now show the new title somewhere.
-    await expect(page.locator('.graph-container svg').getByText(marker, { exact: false }).first()).toBeVisible({ timeout: 8000 });
+    await expect(page.locator('.graph-container .node-title-text').filter({ hasText: marker }).first()).toBeVisible({ timeout: 8000 });
 
     // Revert so the seed data is unchanged.
     if (original) {

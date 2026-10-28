@@ -2,6 +2,7 @@
 
 | Symptom | Canonical lesson and regression |
 | --- | --- |
+| Browse covers layout Retry/Discard, or original relationship Edit opens Create instead | [Share control flow and stop panel click propagation](../inbox/2026-10-28-graph-controls-need-shared-flow.md); durable layout desktop/phone and exact relationship-browser editing |
 | Hidden item labels acquire tiny backgrounds, reverse wires share a lane, or line-only diagnostics fail after path conversion | [Preserve conservative dimensions and shared path consumers](../inbox/2026-10-28-hidden-labels-need-valid-measurement.md); item-wire browser sequence and opposite-direction lane regression |
 | A dragged offset label jumps to a nearby return wire despite a prior-leg tie-breaker | [Project onto the displayed offset path](../inbox/2026-10-28-offset-label-drag-needs-offset-path.md); close-return-leg geometry negative and correction |
 | Extra graph-fixture batches can continue while timeout cleanup deletes their graph | [Keep additional edges inside tracked seeding](../inbox/2026-10-28-fixture-extras-must-share-cancellation.md); delayed edge-response owned-fixture regression |
@@ -46,3 +47,5 @@
 | MCP tool calls succeed but the stdio client reports JSON parse errors from startup, CPU or consistency messages | [Successful MCP calls do not prove a clean stdio protocol](../inbox/2026-10-23-mcp-stdio-diagnostics.md); `packages/mcp-server/tests/neo4j-contract.test.ts` checks real subprocess traffic and stderr diagnostics |
 | `dev` has an owner-authorized admin exemption; a review-rule blocker or docs-only change tempts skipping validation | [Dev admin integration playbook](../playbooks/dev-admin-integration.md); [dated authorization and merge evidence](../inbox/2026-10-23-dev-admin-integration.md). Admin authority is not a non-author approval; verify final branch CI before closeout |
 | A federation upgrade removes UUID findings but breaks Neo4j schema generation; an override leaves the old lock resolution | [Validate federation consumers and installed UUID paths](../inbox/2026-10-27-federation-consumers-bound-uuid-upgrades.md); `tests/lib/dependencies/uuid.test.mjs` |
+
+| Tiny card text, wasted space, clipped or wire-overlapped labels after zoom | [Reserve the displayed symbol footprint](../inbox/2026-10-28-readable-symbols-need-reserved-geometry.md); `graphSymbolLayout.test.ts`, `edgeRouteGeometry.test.ts`; issue #222 requires actual browser and thousands-of-item evidence |

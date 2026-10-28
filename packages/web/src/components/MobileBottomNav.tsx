@@ -77,18 +77,18 @@ export function MobileBottomNav() {
       >
         <button onClick={() => goView('cards')} className={tabActive(onWorkspace && viewMode === 'cards')}>
           <CreditCard className="h-5 w-5" strokeWidth={1.75} />
-          <span className="text-[11px] font-medium">List</span>
+          <span className="text-xs font-medium">List</span>
         </button>
         <button onClick={() => goView('graph')} className={tabActive(onWorkspace && viewMode === 'graph')}>
           <Network className="h-5 w-5" strokeWidth={1.75} />
-          <span className="text-[11px] font-medium">Graph</span>
+          <span className="text-xs font-medium">Graph</span>
         </button>
         <button
           onClick={() => setMoreOpen(true)}
           className={tabActive(moreOpen || (onWorkspace && !['cards', 'graph'].includes(viewMode)) || !onWorkspace)}
         >
           <MoreHorizontal className="h-5 w-5" strokeWidth={1.75} />
-          <span className="text-[11px] font-medium">More</span>
+          <span className="text-xs font-medium">More</span>
         </button>
         <MobileStorageStatus />
       </nav>
@@ -155,7 +155,7 @@ export function MobileBottomNav() {
                 <UserCircle className="h-7 w-7 text-gray-400 flex-shrink-0" />
                 <div className="min-w-0">
                   <div className="text-sm font-medium text-gray-100 truncate">{currentUser?.name || currentUser?.username || 'Account'}</div>
-                  {currentUser?.role && <div className="text-[11px] text-gray-400">{currentUser.role}</div>}
+                  {currentUser?.role && <div className="text-xs text-gray-400">{currentUser.role}</div>}
                 </div>
               </div>
               <button

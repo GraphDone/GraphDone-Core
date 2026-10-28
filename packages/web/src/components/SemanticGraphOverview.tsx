@@ -1,4 +1,5 @@
 import {
+  type ReactNode,
   useEffect,
   useId,
   useLayoutEffect,
@@ -6,6 +7,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { GraphStatusDock } from './GraphStatusDock';
 import {
   overviewAtScale,
   placeOverviewLabels,
@@ -38,6 +40,7 @@ interface Props {
   onInspect: (id: string, beginSession: boolean) => void;
   selectedId?: string;
   onBrowse: () => void;
+  layoutStatus?: ReactNode;
   onBack: () => void;
 }
 
@@ -51,6 +54,7 @@ export function SemanticGraphOverview({
   onBack,
   selectedId,
   onBrowse,
+  layoutStatus,
 }: Props) {
   const hierarchy = useMemo(
     () => buildSemanticHierarchy(items, edges),
@@ -203,6 +207,7 @@ export function SemanticGraphOverview({
     }
   }, [groupId, group]);
   const layout = useMemo(() => {
+    if (!active) return { placed: [], hidden: [] };
     if (traceProjection) {
       return placeOverviewLabels(
         traceProjection.groups.map((entry, index) => ({
@@ -272,29 +277,33 @@ export function SemanticGraphOverview({
   const groupsById = new Map(projection.groups.map(entry => [entry.id, entry]));
   const wiring = useMemo(
     () =>
-      routeSchematicConnections(
-        layout.placed,
-        (traceProjection?.bundles ?? projection.bundles).map(bundle => ({
-          id: bundle.id,
-          source: bundle.source,
-          target: bundle.target,
-          type: bundle.type,
-          edgeIds: bundle.edges.map(edge => edge.id),
-        })),
-        size.width,
-        size.height,
-        obstacles.map((rect, index) => ({
-          id: `control-${index}`,
-          x: rect.left,
-          y: rect.top,
-          width: rect.right - rect.left,
-          height: rect.bottom - rect.top,
-        })),
-        {
-          sharedEndpoint: trace?.direction === 'incoming' ? 'target' : 'source',
-        }
-      ),
+      active
+        ? routeSchematicConnections(
+            layout.placed,
+            (traceProjection?.bundles ?? projection.bundles).map(bundle => ({
+              id: bundle.id,
+              source: bundle.source,
+              target: bundle.target,
+              type: bundle.type,
+              edgeIds: bundle.edges.map(edge => edge.id),
+            })),
+            size.width,
+            size.height,
+            obstacles.map((rect, index) => ({
+              id: `control-${index}`,
+              x: rect.left,
+              y: rect.top,
+              width: rect.right - rect.left,
+              height: rect.bottom - rect.top,
+            })),
+            {
+              sharedEndpoint:
+                trace?.direction === 'incoming' ? 'target' : 'source',
+            }
+          )
+        : null,
     [
+      active,
       layout,
       projection,
       traceProjection,
@@ -304,7 +313,7 @@ export function SemanticGraphOverview({
       obstacleKey,
     ]
   );
-  const drawnConnections = wiring.routes.reduce(
+  const drawnConnections = (wiring?.routes ?? []).reduce(
     (count, bus) => count + bus.edgeIds.length,
     0
   );
@@ -417,9 +426,9 @@ export function SemanticGraphOverview({
       <div
         data-lod-controls="true"
         data-graph-fit-obstacle="true"
-        className="absolute left-3 top-3 right-36 md:left-16 md:right-40 flex flex-wrap items-center gap-2 pointer-events-auto text-xs"
+        className="absolute left-3 top-3 right-36 md:left-16 md:right-40 flex flex-wrap items-center gap-3 pointer-events-auto text-base"
       >
-        <label className="flex items-center gap-2 rounded bg-gray-950/95 px-2 py-1.5 text-gray-200 border border-gray-600">
+        <label className="flex min-h-11 items-center gap-3 rounded-xl bg-slate-900/95 px-3 py-2 text-slate-200 border border-slate-600 shadow-lg">
           Detail
           <select
             aria-label="Graph detail"
@@ -431,7 +440,7 @@ export function SemanticGraphOverview({
               setMode(next);
               closeBrowser();
             }}
-            className="bg-gray-900 text-white"
+            className="rounded-lg bg-slate-800 px-2 py-1 text-base font-medium text-white"
           >
             <option value="auto">Auto</option>
             <option value="overview">Overview</option>
@@ -441,7 +450,7 @@ export function SemanticGraphOverview({
         <button
           ref={groupListButton}
           aria-label={`${projection.groups.length} groups · ${items.length} items`}
-          className="rounded bg-gray-950/95 border border-gray-600 px-3 py-1 w-28 h-11 shrink-0 text-gray-100"
+          className="rounded-xl bg-slate-900/95 border border-slate-600 px-4 py-1 w-32 h-14 shrink-0 text-slate-100 shadow-lg"
           onClick={() => {
             returnFocus.current = document.activeElement as HTMLElement;
             setRelationshipScope(null);
@@ -498,7 +507,7 @@ export function SemanticGraphOverview({
                 <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8" />
               </marker>
             </defs>
-            {wiring.routes.map(bus => (
+            {wiring?.routes.map(bus => (
               <path
                 key={bus.id}
                 data-lod-bundle={bus.connections
@@ -516,7 +525,7 @@ export function SemanticGraphOverview({
                   .join(' ')}
                 fill="none"
                 stroke={busColor(bus.bus)}
-                strokeWidth="2.5"
+                strokeWidth="3.5"
                 strokeLinejoin="round"
                 strokeLinecap="round"
                 markerEnd={`url(#${markerId})`}
@@ -524,7 +533,7 @@ export function SemanticGraphOverview({
                 <title>{`${groupsById.get(bus.source)!.label} → ${groupsById.get(bus.target)!.label}: ${bus.edgeIds.length} relationships · ${bus.connections.map(connection => `${connection.edgeIds.length} ${connection.type}`).join(', ')}`}</title>
               </path>
             ))}
-            {wiring.junctions.map(point => (
+            {wiring?.junctions.map(point => (
               <circle
                 key={`${point.bus}:${point.x}:${point.y}`}
                 cx={point.x}
@@ -555,7 +564,7 @@ export function SemanticGraphOverview({
                     ? 'true'
                     : undefined
                 }
-                className="absolute pointer-events-auto rounded-lg border border-emerald-700 bg-gray-950 text-left px-3 py-2 shadow-lg hover:border-emerald-300 focus:outline focus:outline-2 focus:outline-emerald-300"
+                className="absolute pointer-events-auto overflow-hidden rounded-xl border border-slate-600 bg-gradient-to-br from-slate-800 to-slate-950 text-left px-4 py-3 shadow-lg shadow-black/30 hover:border-teal-300 focus:outline focus:outline-2 focus:outline-teal-300"
                 style={{
                   left: entry.x,
                   top: entry.y,
@@ -571,17 +580,17 @@ export function SemanticGraphOverview({
                 aria-label={`${[...summary.ancestors.map(id => hierarchy.groups.get(id)!.label), summary.isDirect ? 'Direct items' : summary.label].join(' / ')}, ${summary.members.length} items, ${summary.blocked} blocked`}
                 onClick={() => openGroup(summary.id)}
               >
-                <span className="block truncate text-sm font-semibold text-emerald-100">
+                <span className="block truncate border-l-2 border-teal-400 pl-2 text-lg leading-6 font-semibold tracking-tight text-slate-50">
                   {summary.members.some(item => item.id === selectedId)
                     ? '● '
                     : ''}
                   {summary.label}
                 </span>
-                <span className="block text-xs text-gray-200">
+                <span className="mt-1 block text-sm leading-5 text-slate-200">
                   {summary.members.length} items ·{' '}
                   {summary.internalEdges.length} internal links
                 </span>
-                <span className="block truncate text-xs text-gray-300">
+                <span className="block truncate text-sm leading-5 text-slate-400">
                   {summary.ancestors.length > 0
                     ? summary.ancestors
                         .map(id => hierarchy.groups.get(id)!.label)
@@ -593,50 +602,55 @@ export function SemanticGraphOverview({
           })}
         </>
       )}
-      {active && trace && traceProjection && (
-        <SemanticTraceControls
-          selection={trace}
-          label={
-            traceProjection.focus
-              ? groupLabel(traceProjection.focus.id)
-              : undefined
-          }
-          page={traceProjection.page}
-          pages={traceProjection.pages}
-          shownNeighbors={traceProjection.shownNeighbors}
-          totalNeighbors={traceProjection.totalNeighbors}
-          hasRoom={traceProjection.hasRoom}
-          drawn={drawnConnections}
-          total={edges.length}
-          onChange={setTrace}
-          onExit={() => {
-            setTrace(null);
-            groupListButton.current?.focus();
-          }}
-        />
-      )}
       {active && (
-        <button
-          data-graph-fit-obstacle="true"
-          data-lod-controls="true"
-          className="absolute bottom-3 left-3 pointer-events-auto rounded bg-gray-950 border border-gray-600 px-3 py-1 w-36 h-11 text-xs text-gray-100"
-          aria-label={`${edges.length} relationships, ${notDrawnConnections} not drawn: ${internalConnections} internal, ${pendingConnections} awaiting endpoints, ${collapsedConnections} external connections in list`}
-          onClick={() => {
-            returnFocus.current = document.activeElement as HTMLElement;
-            setBrowse(true);
-            setGroupId(null);
-            openRelationships({ kind: 'all' }, 'all');
-          }}
-        >
-          <span className="block">Connections</span>
-          <span
-            className={`block ${notDrawnConnections ? 'text-amber-200' : 'text-emerald-200'}`}
-          >
-            {notDrawnConnections
-              ? `${notDrawnConnections} not drawn`
-              : 'Browse all'}
-          </span>
-        </button>
+        <GraphStatusDock>
+          {layoutStatus}
+          {trace && traceProjection && (
+            <SemanticTraceControls
+              selection={trace}
+              label={
+                traceProjection.focus
+                  ? groupLabel(traceProjection.focus.id)
+                  : undefined
+              }
+              page={traceProjection.page}
+              pages={traceProjection.pages}
+              shownNeighbors={traceProjection.shownNeighbors}
+              totalNeighbors={traceProjection.totalNeighbors}
+              hasRoom={traceProjection.hasRoom}
+              drawn={drawnConnections}
+              total={edges.length}
+              onChange={setTrace}
+              onExit={() => {
+                setTrace(null);
+                groupListButton.current?.focus();
+              }}
+            />
+          )}
+          {active && (
+            <button
+              data-graph-fit-obstacle="true"
+              data-lod-controls="true"
+              className="pointer-events-auto rounded-xl bg-slate-900/95 border border-slate-600 px-4 py-2 min-w-36 min-h-14 text-sm leading-5 text-slate-100 shadow-lg"
+              aria-label={`${edges.length} relationships, ${notDrawnConnections} not drawn: ${internalConnections} internal, ${pendingConnections} awaiting endpoints, ${collapsedConnections} external connections in list`}
+              onClick={() => {
+                returnFocus.current = document.activeElement as HTMLElement;
+                setBrowse(true);
+                setGroupId(null);
+                openRelationships({ kind: 'all' }, 'all');
+              }}
+            >
+              <span className="block">Connections</span>
+              <span
+                className={`block ${notDrawnConnections ? 'text-amber-200' : 'text-emerald-200'}`}
+              >
+                {notDrawnConnections
+                  ? `${notDrawnConnections} not drawn`
+                  : 'Browse all'}
+              </span>
+            </button>
+          )}
+        </GraphStatusDock>
       )}
       {relationshipScope && (
         <SemanticRelationshipBrowser
@@ -688,7 +702,7 @@ export function SemanticGraphOverview({
               >
                 All groups
               </button>
-              <p className="text-xs text-gray-300 mb-3">
+              <p className="text-sm text-gray-300 mb-3">
                 {group.members.length} items · {group.internalEdges.length}{' '}
                 internal relationships · {group.blocked} blocked ·{' '}
                 {group.completed} completed · grouped by {group.basis}
@@ -697,7 +711,7 @@ export function SemanticGraphOverview({
                 {(['outgoing', 'incoming'] as const).map(direction => (
                   <button
                     key={direction}
-                    className="min-h-11 rounded border border-emerald-700 px-3 text-xs text-emerald-200"
+                    className="min-h-11 rounded border border-emerald-700 px-3 text-sm text-emerald-200"
                     onClick={() => {
                       setExpanded(new Set(effectiveExpanded));
                       setMode('overview');
@@ -803,7 +817,7 @@ export function SemanticGraphOverview({
                         <span className="block text-sm break-words">
                           {item.title}
                         </span>
-                        <span className="text-xs text-gray-400">
+                        <span className="text-sm text-gray-400">
                           {item.type} · {item.status}
                         </span>
                       </button>
@@ -816,7 +830,7 @@ export function SemanticGraphOverview({
                             `node:${item.id}`
                           )
                         }
-                        className="min-h-11 text-xs text-emerald-200 px-3"
+                        className="min-h-11 text-sm text-emerald-200 px-3"
                       >
                         Relationships
                       </button>
@@ -826,7 +840,7 @@ export function SemanticGraphOverview({
               <h3 className="mt-4 mb-2 text-sm font-semibold">
                 Relationships between groups
               </h3>
-              <ul className="space-y-2 text-xs">
+              <ul className="space-y-2 text-sm">
                 {projection.bundles
                   .filter(
                     bundle =>
@@ -865,7 +879,7 @@ export function SemanticGraphOverview({
             </>
           ) : (
             <>
-              <p className="text-xs text-gray-300 mb-3">
+              <p className="text-sm text-gray-300 mb-3">
                 {items.length} loaded items · {edges.length} loaded
                 relationships
                 {projection.pendingEdges.length > 0
@@ -899,7 +913,7 @@ export function SemanticGraphOverview({
                           entry.isDirect ? 'Direct items' : entry.label,
                         ].join(' / ')}
                       </span>
-                      <span className="text-xs text-gray-300">
+                      <span className="text-sm text-gray-300">
                         {entry.members.length} items · {entry.blocked} blocked ·{' '}
                         {entry.basis}
                       </span>
@@ -908,7 +922,7 @@ export function SemanticGraphOverview({
                 ))}
               </ul>
               {projection.diagnostics.map(message => (
-                <p key={message} className="mt-3 text-xs text-amber-200">
+                <p key={message} className="mt-3 text-sm text-amber-200">
                   {message}
                 </p>
               ))}

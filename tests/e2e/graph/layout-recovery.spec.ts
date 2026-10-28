@@ -518,4 +518,33 @@ test('pending layout keeps semantic overview labels fixed during pan and zoom @l
   expect(attempts).toHaveLength(1);
   expect(rounded((await readReceipt(page, graph.graphId, nodeId)).receipt)).toEqual(rounded(latest));
   expect(await readSaved(page, graph.graphId, nodeId)).toEqual(initial);
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect.poll(() => page.evaluate(() => (window as any).__layoutMetrics?.()?.cameraReady)).toBe(true);
+    const status = page.getByTestId('layout-save-status');
+    const connections = page.locator('.semantic-overview').getByRole('button', { name: /relationships, .*not drawn:/ });
+    const statusBox = (await status.boundingBox())!;
+    const connectionBox = (await connections.boundingBox())!;
+    expect(statusBox.y + statusBox.height).toBeLessThanOrEqual(connectionBox.y);
+    await page.getByRole('button', { name: 'Retry layout save' }).click();
+    await expect.poll(() => attempts.length).toBe(width === 1440 ? 2 : 3);
+    expect(await readSaved(page, graph.graphId, nodeId)).toEqual(initial);
+    await connections.click();
+    await expect(page.getByRole('region', { name: 'Graph relationships' })).toBeVisible();
+    await page.getByRole('button', { name: 'Back to groups', exact: true }).click();
+    await page.getByRole('button', { name: 'Close group browser', exact: true }).click();
+  }
+  await page.setViewportSize({ width: 390, height: 500 });
+  await expect.poll(() => page.evaluate(() => (window as any).__layoutMetrics?.()?.cameraReady)).toBe(true);
+  const dock = page.locator('.semantic-overview [data-graph-status-dock]');
+  expect(await dock.evaluate(element => element.scrollHeight > element.clientHeight)).toBe(true);
+  const dockBox = (await dock.boundingBox())!;
+  const cameraBeforeScroll = await camera();
+  await page.mouse.move(dockBox.x + 15, dockBox.y + 15);
+  await page.mouse.wheel(0, 160);
+  await expect.poll(() => dock.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
+  expect(await camera()).toEqual(cameraBeforeScroll);
+  await page.getByRole('button', { name: 'Discard unsent layout' }).click();
+  await expect(page.getByTestId('layout-save-status')).toHaveCount(0);
+  expect((await readReceipt(page, graph.graphId, nodeId)).receipt).toBeUndefined();
 });

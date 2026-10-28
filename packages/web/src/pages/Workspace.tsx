@@ -1,10 +1,11 @@
 import {COMPACT_WORKSPACE_QUERY} from '../hooks/useCompactWorkspace';
 import { offlineEnabled } from '../lib/offline/engine';
 import { skipBackgroundPoll, useHostedUsage } from '../lib/hostedUsage';
+import { WorkspaceViewTabs } from '../components/WorkspaceViewTabs';
 import { AgentConnection } from '../components/AgentConnection';
 import type { WorkItem } from '../types/graph';
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Share2, Users, Table, Activity, Network, CreditCard, Columns, CalendarDays, GanttChartSquare, LayoutDashboard, Database, AlertTriangle, Map, X, Minimize2, Maximize2, Edit3, Trash2, FolderPlus, ChevronLeft, ChevronRight, Lock, Unlock } from 'lucide-react';
+import { Plus, Share2, Users, Network, Database, AlertTriangle, Map, X, Minimize2, Maximize2, Edit3, Trash2, FolderPlus, ChevronLeft, ChevronRight, Lock, Unlock } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useQuery } from '@apollo/client';
 import { SafeGraphVisualization } from '../components/SafeGraphVisualization';
@@ -169,97 +170,8 @@ export function Workspace() {
 
           {/* Center Section: View Mode Buttons — desktop/tablet only. Phones use the
               bottom tab bar (List / Graph / More) instead of this strip. */}
-          <div className="hidden xl:flex flex-1 min-w-0 justify-start xl:justify-center md:order-2 overflow-x-auto no-scrollbar -mx-3 px-3 sm:mx-0 sm:px-0">
-            <div className="workspace-view-switcher" role="group" aria-label="Workspace views">
-              <button
-                onClick={() => setViewMode('graph')}
-                aria-pressed={viewMode === 'graph'}
-                className="workspace-view-tab"
-                title="Graph View"
-              >
-                <Network className="h-5 w-5 sm:h-7 sm:w-7 lg:h-8 lg:w-8" strokeWidth={1.5} />
-                <div className="text-[10px] sm:text-xs text-center font-medium leading-tight">
-                  Graph
-                </div>
-              </button>
-              <button
-                onClick={() => setViewMode('dashboard')}
-                aria-pressed={viewMode === 'dashboard'}
-                className="workspace-view-tab"
-                title="Dashboard View"
-              >
-                <LayoutDashboard className="h-5 w-5 sm:h-7 sm:w-7 lg:h-8 lg:w-8" strokeWidth={1.5} />
-                <div className="text-[10px] sm:text-xs text-center font-medium leading-tight">
-                  Dashboard
-                </div>
-              </button>
-              <button
-                onClick={() => setViewMode('table')}
-                aria-pressed={viewMode === 'table'}
-                className="workspace-view-tab"
-                title="Table View"
-              >
-                <Table className="h-5 w-5 sm:h-7 sm:w-7 lg:h-8 lg:w-8" strokeWidth={1.5} />
-                <div className="text-[10px] sm:text-xs text-center font-medium leading-tight">
-                  Table
-                </div>
-              </button>
-              <button
-                onClick={() => setViewMode('cards')}
-                aria-pressed={viewMode === 'cards'}
-                className="workspace-view-tab"
-                title="Card View"
-              >
-                <CreditCard className="h-5 w-5 sm:h-7 sm:w-7 lg:h-8 lg:w-8" strokeWidth={1.5} />
-                <div className="text-[10px] sm:text-xs text-center font-medium leading-tight">
-                  Card
-                </div>
-              </button>
-              <button
-                onClick={() => setViewMode('kanban')}
-                aria-pressed={viewMode === 'kanban'}
-                className="workspace-view-tab"
-                title="Kanban View"
-              >
-                <Columns className="h-5 w-5 sm:h-7 sm:w-7 lg:h-8 lg:w-8" strokeWidth={1.5} />
-                <div className="text-[10px] sm:text-xs text-center font-medium leading-tight">
-                  Kanban
-                </div>
-              </button>
-              <button
-                onClick={() => setViewMode('gantt')}
-                aria-pressed={viewMode === 'gantt'}
-                className="workspace-view-tab"
-                title="Gantt Chart"
-              >
-                <GanttChartSquare className="h-5 w-5 sm:h-7 sm:w-7 lg:h-8 lg:w-8" strokeWidth={1.5} />
-                <div className="text-[10px] sm:text-xs text-center font-medium leading-tight">
-                  Gantt
-                </div>
-              </button>
-              <button
-                onClick={() => setViewMode('calendar')}
-                aria-pressed={viewMode === 'calendar'}
-                className="workspace-view-tab"
-                title="Calendar View"
-              >
-                <CalendarDays className="h-5 w-5 sm:h-7 sm:w-7 lg:h-8 lg:w-8" strokeWidth={1.5} />
-                <div className="text-[10px] sm:text-xs text-center font-medium leading-tight">
-                  Calendar
-                </div>
-              </button>
-              <button
-                onClick={() => setViewMode('activity')}
-                aria-pressed={viewMode === 'activity'}
-                className="workspace-view-tab"
-                title="Activity Feed"
-              >
-                <Activity className="h-5 w-5 sm:h-7 sm:w-7 lg:h-8 lg:w-8" strokeWidth={1.5} />
-                <div className="text-[10px] sm:text-xs text-center font-medium leading-tight">
-                  Activity
-                </div>
-              </button>
-            </div>
+          <div className="hidden xl:flex flex-1 min-w-0 justify-start xl:justify-center md:order-2">
+            <WorkspaceViewTabs value={viewMode} onChange={setViewMode} />
           </div>
 
           <select aria-label="Workspace view" value={viewMode} onChange={event => setViewMode(event.target.value as typeof viewMode)} className="xl:hidden min-h-[44px] flex-1 min-w-0 rounded-lg border border-gray-600 bg-gray-800 px-3 text-base text-white">

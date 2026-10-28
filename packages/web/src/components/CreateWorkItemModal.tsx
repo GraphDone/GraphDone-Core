@@ -348,7 +348,7 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
                             {relation.label}
                           </span>
                         </div>
-                        <p className="text-[10px] text-gray-400">
+                        <p className="text-xs text-gray-400">
                           {relation.description}
                         </p>
                       </button>
@@ -498,7 +498,7 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
                               </span>
                             </div>
                             {formData.status === option.value && (
-                              <div className="w-5 h-5 bg-gradient-to-br from-emerald-500 to-green-600 text-white rounded-full flex items-center justify-center text-[10px] ml-1 flex-shrink-0 shadow-lg shadow-emerald-500/30 animate-in zoom-in duration-200">
+                              <div className="w-5 h-5 bg-gradient-to-br from-emerald-500 to-green-600 text-white rounded-full flex items-center justify-center text-xs ml-1 flex-shrink-0 shadow-lg shadow-emerald-500/30 animate-in zoom-in duration-200">
                                 ✓
                               </div>
                             )}
@@ -663,7 +663,7 @@ export function CreateWorkItemModal({ isOpen, onClose, parentWorkItemId, positio
                     'accent-gray-500'
                   }`}
                 />
-                <div className={`text-[10px] text-center font-medium ${
+                <div className={`text-xs text-center font-medium ${
                   formData.priority >= 0.8 ? 'text-red-500' :
                   formData.priority >= 0.6 ? 'text-orange-500' :
                   formData.priority >= 0.4 ? 'text-yellow-500' :

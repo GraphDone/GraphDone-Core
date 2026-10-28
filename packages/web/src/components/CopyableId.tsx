@@ -32,7 +32,7 @@ export function CopyableId({ id, length = 8, label = 'ID', testId = 'copyable-id
       onClick={onCopy}
       title={`Copy ${label}: ${id}`}
       aria-label={`Copy ${label}`}
-      className="group inline-flex items-center gap-1.5 font-mono text-[11px] text-gray-400 hover:text-gray-200 rounded px-1.5 py-0.5 hover:bg-gray-700/50 transition-colors"
+      className="group inline-flex items-center gap-1.5 font-mono text-xs text-gray-400 hover:text-gray-200 rounded px-1.5 py-0.5 hover:bg-gray-700/50 transition-colors"
     >
       <span>{shortId(id, length)}</span>
       {copied

@@ -35,9 +35,11 @@ for(const scenario of scenarios) {
    await page.getByRole('button',{name:'Create Work Item',exact:true}).click();
    await expect.poll(async()=>(await read()).length).toBe(1);
    if(scenario.id==='STUDENT-01') expect((await read())[0].dueDate).toContain('2026-09-12T23:59:59');
-   const node=page.locator('.graph-container svg .node').first();
+   const itemId=(await read())[0].id;
+   const node=page.locator('.graph-container svg .node').filter({has:page.locator(`[data-node-id="${itemId}"]`)});
    await expect(node).toBeVisible({timeout:15000});
-   await node.locator('.node-edit-icon').click();
+   await expect.poll(()=>page.evaluate(()=>(window as any).__layoutMetrics?.()?.cameraReady)).toBe(true);
+   await node.dblclick();
    const editor=page.getByTestId('quick-edit-surface');
    await expect(editor).toBeVisible();
    await expect(page.getByTestId('quick-title')).toHaveValue(scenario.input.title);
