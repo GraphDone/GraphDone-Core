@@ -400,6 +400,22 @@ test('initially hidden item labels retain full conservative sizing @item-wires',
     localStorage.setItem('currentGraphId', id);
     localStorage.setItem('graphdone:viewMode', 'graph');
   }, seeded.graphId);
+  await page.addInitScript(() => {
+    const measure = SVGGraphicsElement.prototype.getBBox;
+    (window as any).__hiddenLabelMeasurements = 0;
+    SVGGraphicsElement.prototype.getBBox = function (...args) {
+      const group = this.closest('.edge-label-group');
+      if (
+        this.matches('text.edge-label') &&
+        group &&
+        getComputedStyle(group).display === 'none'
+      ) {
+        (window as any).__hiddenLabelMeasurements++;
+        return new DOMRect();
+      }
+      return measure.apply(this, args);
+    };
+  });
   await page.goto('/');
   await expect(page.locator('.graph-container .node')).toHaveCount(2);
   const label = page.locator('.graph-container .edge-label-group');
@@ -410,6 +426,7 @@ test('initially hidden item labels retain full conservative sizing @item-wires',
     const text = el.querySelector('.edge-label')!.textContent!;
     return {
       text,
+      emptyMeasurements: (window as any).__hiddenLabelMeasurements,
       width: (el as any).__data__._labelDims.width,
       backgroundWidth: Number(
         el.querySelector('.edge-label-bg')!.getAttribute('width')
@@ -417,6 +434,7 @@ test('initially hidden item labels retain full conservative sizing @item-wires',
       display: getComputedStyle(el).display,
     };
   });
+  expect(sizing.emptyMeasurements).toBeGreaterThan(0);
   expect(sizing.width).toBeGreaterThanOrEqual(sizing.text.length * 7 + 34);
   expect(sizing.backgroundWidth).toBe(sizing.width);
   expect(sizing.display).toBe('none');

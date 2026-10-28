@@ -62,3 +62,26 @@ selected type. Relationship type buttons expose their selected state through
 `aria-pressed`. Local discovery still finds2 cases and scoped web types pass;
 actual browser acceptance is pending. These were source-review findings,
 not locally executed browser negatives.
+
+On2026-10-28, exact source `93fe6d2` CI40646515194 failed the hidden-size case:
+expected at least104, received94.90625. The other item-wire case passed,
+including paint negatives and actual dragging/editing. Chromium had returned
+valid measured text dimensions smaller than the conservative estimate; the
+assertion incorrectly assumed hidden SVG always measures zero. This is a test
+precondition defect, not evidence that valid94.90625-unit geometry clips text.
+The amended case deliberately returns an empty box only for hidden edge text,
+counts that branch and retains the full-size/background/visibility assertions.
+
+The owner then requested a visible headed browser. A single installed Chrome,
+one worker, zero retries, on isolated preview28917/API28918 and the previously
+owned Neo4j28687 exercised the regression. With only the positive-measurement
+production guard removed from the disposable preview, the actual case failed
+with width36 versus104, after confirming an empty measurement. Restoring the
+unchanged production guard made both item-wire cases pass in21.9s. Traces,
+screenshots and logs are retained under `item-hidden-negative` and
+`item-wires-headed-positive` in the20261027 evidence directory. This reused a
+matching dependency installation for scoped preview evidence; it is not a
+clean-install/full-tree acceptance run. The source PR remains subject to fresh
+CI and independent review. The owner's further feedback about clipping,
+overlap, tiny text and wasteful cards requires broader visual acceptance;
+passing these two interaction cases does not resolve that feedback.
