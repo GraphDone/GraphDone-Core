@@ -183,3 +183,80 @@ they have not run locally. The partial probe passed11 geometry cases in0.722s,
 [review lesson](../../.agents/inbox/2026-10-28-hidden-labels-need-valid-measurement.md)
 records the evidence and limits. These are straight item paths preparing the
 bounded routing increment, not completion of #220.
+
+
+## Relationship priority with connection fallback (#220, 2026-10-28)
+
+The owner wants a selectable relationship-priority level, while retaining at
+least one connection when a pair has no relationship at that level. This is the
+next bounded presentation increment after readable-symbol #222/#223; it does
+not change canonical edge types, weights, source/target IDs or hierarchy.
+The group-wiring #216 and item-geometry foundation #221 are accepted on dev;
+full item obstacle routing and buses still remain #220.
+
+Use two independent controls: **Detail** chooses semantic/item representation;
+**Relationships** chooses the amount of relationship meaning shown. Start with
+three named priority stops, with readable labels, keyboard/touch support and an
+explicit current value. A manual relationship choice must persist through zoom
+and inspection/Back. Do not make a tiny unlabeled slider or silently switch the
+owner's chosen level as the camera moves. Auto priority may be considered later,
+after the manual behavior is accepted.
+
+Proposed initial stops are **Essential**, **Dependencies**, and **All**. Treat
+type ranking as an explicit presentation policy, not a claim that business
+importance can be inferred perfectly from type. Essential promotes `BLOCKS` and
+`CONFLICTS_WITH`; Dependencies also includes `DEPENDS_ON`, `ENABLES`, `FOLLOWS`,
+`VALIDATES` and `SATISFIES`; All includes structural/reference/general relations.
+The policy needs a conservative known default for unknown imported types and
+one central mapping used by item and group projections. Containment still drives
+hierarchy regardless of the relationship stop. Do not reuse node priority or
+edge weight without a documented semantic contract.
+
+The fallback is **per connected endpoint pair**, not one arbitrary edge in the
+whole graph. For each original pair, retain relationships admitted by the
+selected level; if none qualify, retain its highest available tier. Keep ties
+with distinct directions/types in the represented connection, rather than
+silently dropping a cycle or deciding by incoming array order. Repeated copies
+can share a presentation with a count; their original IDs remain separately
+inspectable. A pair connected only by `REFERENCES` must still have a visible
+representation at Essential. Deleting the last blocker must immediately reveal
+the pair's dependency/reference fallback. Increasing detail must add meaning,
+not unexpectedly remove already represented relationships.
+
+Use priority to select the primary label/color of a shared branch or bus before
+spending route/label budgets. For `A BLOCKS B` and `B DEPENDS_ON A`, emphasize
+`A blocks B` and expose both original relations through its count/inspection.
+`A BLOCKS B` and `A DEPENDS_ON B` have different implications; filtering the
+latter by an explicit priority stop is not semantic deduplication. Never rewrite
+its arrow or state that the records are equivalent. At All, exact types and
+original directions must be available in the drawing's expanded inspection.
+Opposite blocking links and self-links remain meaningful. This is pair-local
+presentation reduction, not transitive reduction of a dependency graph.
+
+At group scale, apply the pair policy before aggregation so one blocker elsewhere
+between two groups cannot erase unrelated lower-tier member-pair coverage.
+Then aggregate represented pairs into bounded, count-preserving buses. All
+original records partition into directly represented, priority-summarized,
+internal, missing-endpoint or geometry-deferred categories with non-overlapping
+counts. Prefer a compact primary label and a count over multiple competing tiny
+labels. Inspection reveals why a representative was chosen and every original
+ID/type/direction. Missing endpoints must not masquerade as routable pairs.
+
+The fallback guarantee is a projection invariant; finite screen space still
+requires explicit geometry deferral. Do not force an illegible wire through a
+card to satisfy it or claim a hidden/deferred pair is drawn. A connected pair
+must remain reachable through a named bus/boundary representation or complete
+inspection with truthful deferred counts. Routing should prioritize blocking
+branches before contextual ones while reserving useful neighborhood coverage.
+
+Before enabling the control, test: blocker plus reverse dependency; same-direction
+non-equivalence; references-only fallback; ties/opposite directions/self-links;
+unknown types; live deletion of a winner; deterministic input reorder; monotonic
+level changes; group aggregation retaining every member-pair; selected-edge/edit
+access; zoom/Back persistence; and unchanged API snapshots. A small headed
+parallel-edge fixture should show the primary label replacing redundant visual
+labels, with all original records still accessible. Extend the2000-item gate to
+exercise the stops, meaningful coverage and conserved counts. Keep the existing
+clutter/typography budgets and deliberate spaghetti negatives. The type-tier
+mapping and control labels are proposed defaults pending visual review, not an
+implemented feature or completed acceptance claim.
