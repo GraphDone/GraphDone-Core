@@ -93,3 +93,12 @@ or artifact acceptance; new exact-source CI remains required. Independenta378
 review also records ordinary minimap occlusion of a full card's far-right strip;
 current geometry checks establish label clearance, not universal card/overlay
 clearance during arbitrary panning.
+
+Independent review5685989836 reproduced a mixed-input tooltip failure: focus
+Graph, hover Dashboard, then leave Dashboard; Graph remained focused but lost
+its visible name. Track hovered and focused view IDs separately, with explicit
+Escape dismissal. The focused label returns when the other hover ends, and
+Escape hides it without moving focus. The desktop headed regression passed
+14.4s on 2026-10-28 (one worker, zero retries; retained output
+`item-symbols-headed15`); final exact-source CI and independent review remain
+required. Isolated hover and keyboard checks alone missed this interaction.

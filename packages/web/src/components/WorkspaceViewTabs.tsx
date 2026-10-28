@@ -29,7 +29,10 @@ export function WorkspaceViewTabs({
   value: ViewMode;
   onChange: (value: ViewMode) => void;
 }) {
-  const [tooltip, setTooltip] = useState<ViewMode | null>(null);
+  const [hovered, setHovered] = useState<ViewMode | null>(null);
+  const [focused, setFocused] = useState<ViewMode | null>(null);
+  const [dismissed, setDismissed] = useState(false);
+  const tooltip = dismissed ? null : (hovered ?? focused);
   return (
     <div
       className="workspace-view-switcher"
@@ -45,17 +48,21 @@ export function WorkspaceViewTabs({
           aria-pressed={value === id}
           aria-describedby={tooltip === id ? `workspace-view-${id}` : undefined}
           onClick={() => onChange(id)}
-          onMouseEnter={() => setTooltip(id)}
-          onMouseLeave={event => {
-            if (document.activeElement !== event.currentTarget)
-              setTooltip(null);
+          onMouseEnter={() => {
+            setHovered(id);
+            setDismissed(false);
           }}
-          onFocus={() => setTooltip(id)}
-          onBlur={() => setTooltip(null)}
+          onMouseLeave={() => setHovered(null)}
+          onFocus={() => {
+            setFocused(id);
+            setHovered(null);
+            setDismissed(false);
+          }}
+          onBlur={() => setFocused(null)}
           onKeyDown={event => {
             if (event.key === 'Escape') {
               event.stopPropagation();
-              setTooltip(null);
+              setDismissed(true);
             }
           }}
         >
