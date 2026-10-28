@@ -27,8 +27,10 @@ export const SEQUENCES = {
     'tests/e2e/quality/graph-motion.spec.ts',
     'tests/e2e/quality/graph-resize.spec.ts',
     'tests/e2e/quality/graph-details.spec.ts',
-    'tests/e2e/graph/inspector-readability.spec.ts',
     `--project=${PW}`, '--headed', '--workers=1', '--retries=0', '--trace=retain-on-failure',
+  ], blocking: true },
+  'inspector-readability': { adapter: 'playwright', title: 'Inspector readability acceptance', args: [
+    'tests/e2e/graph/inspector-readability.spec.ts', `--project=${PW}`, '--headed', '--workers=1', '--retries=0', '--trace=retain-on-failure',
   ], blocking: true },
   'semantic-lod': { adapter: 'playwright', title: 'Semantic LOD acceptance', args: [
     'tests/e2e/graph/semantic-lod.spec.ts', `--project=${PW}`, '--headed', '--workers=1', '--retries=0', '--trace=retain-on-failure',
@@ -72,8 +74,8 @@ export const SEQUENCES = {
 
 export const PROFILES = {
   smoke: ['unit-web', 'smoke', 'e2e-auth'],
-  pr: ['unit-web', 'smoke', 'e2e-auth', 'e2e-graph', 'semantic-lod', 'nested-lod', 'item-wires', 'large-symbols', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'perf-budgets'],
-  full: ['unit-web', 'smoke', 'e2e-auth', 'e2e-graph', 'semantic-lod', 'nested-lod', 'item-wires', 'large-symbols', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'perf-budgets', 'diagnostics', 'showcase', 'matrix', 'vlm', 'perf-scale', 'cloud-audit'],
+  pr: ['unit-web', 'smoke', 'e2e-auth', 'e2e-graph', 'inspector-readability', 'semantic-lod', 'nested-lod', 'item-wires', 'large-symbols', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'perf-budgets'],
+  full: ['unit-web', 'smoke', 'e2e-auth', 'e2e-graph', 'inspector-readability', 'semantic-lod', 'nested-lod', 'item-wires', 'large-symbols', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'perf-budgets', 'diagnostics', 'showcase', 'matrix', 'vlm', 'perf-scale', 'cloud-audit'],
   report: ['diagnostics', 'showcase', 'matrix', 'vlm', 'perf-scale', 'cloud-audit'],
   live: ['live-journey'],
 };
