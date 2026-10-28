@@ -289,6 +289,8 @@ export const RelationshipEditorWindow: React.FC<RelationshipEditorWindowProps> =
   return createPortal(
     <div 
       ref={windowRef}
+      role="dialog"
+      aria-label={isEditingMode ? 'Edit relationship' : 'Create relationship'}
       className="fixed bg-white/5 backdrop-blur-xl border border-white/20 rounded-xl shadow-lg overflow-hidden z-50"
       style={{
         left: `${position.x}px`,
@@ -314,12 +316,14 @@ export const RelationshipEditorWindow: React.FC<RelationshipEditorWindowProps> =
         <div className="flex items-center space-x-1">
           <button
             onClick={() => setIsExpanded(!isExpanded)}
+            aria-label={isExpanded ? 'Collapse relationship editor' : 'Expand relationship editor'}
             className="p-1 rounded text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
           >
             {isExpanded ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
           </button>
           <button
             onClick={onClose}
+            aria-label="Close relationship editor"
             className="p-1 rounded text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
           >
             <X className="h-3 w-3" />
@@ -371,6 +375,7 @@ export const RelationshipEditorWindow: React.FC<RelationshipEditorWindowProps> =
                   return (
                     <button
                       key={option.type}
+                      aria-pressed={isSelected}
                       onClick={() => handleRelationshipTypeChange(option.type)}
                       className={`
                         group relative p-3 rounded-lg border transition-all duration-200
