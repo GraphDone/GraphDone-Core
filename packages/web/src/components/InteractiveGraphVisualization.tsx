@@ -50,7 +50,7 @@ import { useAdaptiveQuality } from '../hooks/useAdaptiveQuality';
 import { nodeLifeClasses, nodeGlowFilter, isActiveStatus, isCompletedStatus, edgeFlowClass } from '../lib/nodeAnimations';
 import { mergeSimulationNodes, mergeSimulationEdges } from '../lib/graphDataMerge';
 import type { ObstacleBox } from '../lib/edgeLabelLayout';
-import { createEdgeRoute, edgeRouteLabel, projectEdgeRoutePointer, type EdgeRouteGeometry, type EdgeRouteLabel } from '../lib/edgeRouteGeometry';
+import { createParallelEdgeRoute, edgeRouteLabel, projectEdgeRoutePointer, type EdgeRouteGeometry, type EdgeRouteLabel } from '../lib/edgeRouteGeometry';
 import { PerfMeter, DriftMeter } from '../lib/perfMeter';
 import { separateCards } from '../lib/separateCards';
 import { DEFAULT_PHYSICS, collisionRadius, linkDistance, linkMaxDistance, linkStrength } from '../lib/physicsConfig';
@@ -2161,8 +2161,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       e._pIndex = info ? info.index : 0;
       e._pTotal = info ? info.total : 1;
       const label = getRelationshipConfig(e.type as RelationshipType)?.label || '';
-      e._labelDims = { width: label.length * 7 + 34, height: 22 };
-      e._labelIconCenter = { x: 0, y: 0 };
+      e._labelDims = { width: label.length * 7 + 36, height: 22 };
+      e._labelIconCenter = { x: -e._labelDims.width / 2 + 13, y: 0 };
     });
     const liveScale = svg.node() ? d3.zoomTransform(svg.node() as Element).k : 1;
     // Arrow opacity routed through the edge LOD module: hidden direction → 0,
@@ -2171,6 +2171,15 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       directionStrategy(k) === 'hidden' ? 0 : arrowVisibility(k, count).opacity;
 
     // Debug: Log edge visibility
+
+    const openEdgeEditor = (event: MouseEvent, edge: WorkItemEdge) => {
+      event.stopPropagation();
+      event.preventDefault();
+      setSelectedEdge(edge);
+      setShowRelationshipWindow(true);
+      setEditingEdge({ edge, position: { x: event.clientX, y: event.clientY } });
+      setDragOffset({ x: 0, y: 0 });
+    };
 
     // Create edges FIRST (so they render under nodes)
     const edgesGroup = g.append('g').attr('class', 'edges-group');
@@ -2270,31 +2279,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .attr('stroke-width', 12)
       .style('pointer-events', 'stroke')
       .style('cursor', 'pointer')
-      .on('click', (event: MouseEvent, d: WorkItemEdge) => {
-        event.stopPropagation();
-        
-        // Position dialog to the side of the edge to avoid obstructing the glow
-        const offset = 100; // Distance from edge
-        const dialogWidth = 300; // Estimated dialog width
-        const dialogHeight = 200; // Estimated dialog height
-        
-        // Calculate position to the right side, but check boundaries
-        let x = event.clientX + offset;
-        let y = event.clientY - dialogHeight / 2;
-        
-        // If dialog would go off right edge, position to the left
-        if (x + dialogWidth > window.innerWidth - 20) {
-          x = event.clientX - offset - dialogWidth;
-        }
-        
-        // Keep dialog within vertical bounds
-        if (y < 20) y = 20;
-        if (y + dialogHeight > window.innerHeight - 20) {
-          y = window.innerHeight - dialogHeight - 20;
-        }
-        
-        setSelectedEdge(d);
-      })
+      .on('click', openEdgeEditor)
       .on('mouseover', function(event: MouseEvent, d: WorkItemEdge) {
         // Highlight the corresponding visible edge
         linkElements
@@ -3399,19 +3384,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .style('opacity', (d: any) => labelVisibility(liveScale, d._pTotal || 1))
       .style('pointer-events', (d: any) => labelVisibility(liveScale, d._pTotal || 1) > 0 ? 'all' : 'none')
       .style('cursor', 'pointer')
-      .on('click', function(event: MouseEvent, d: WorkItemEdge) {
-        event.stopPropagation();
-        event.preventDefault(); // Prevent any default behavior
-        
-        // Open the editor, remembering WHERE the edge was clicked so the
-        // window can position itself away from the edge it edits
-        setShowRelationshipWindow(true);
-        setEditingEdge({
-          edge: d,
-          position: { x: event.clientX, y: event.clientY }
-        });
-        setDragOffset({ x: 0, y: 0 }); // Reset drag offset
-      });
+      .on('click', openEdgeEditor);
 
     // Nodes always stack ABOVE edge labels/arrows — labels were stealing
     // clicks from node controls (the + icon) when they drifted over a card.
@@ -3421,8 +3394,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     edgeLabelGroups
       .append('text')
       .attr('class', 'edge-label')
-      .attr('x', 0)
-      .attr('text-anchor', 'middle')
+      .attr('x', (d: any) => -d._labelDims.width / 2 + 28)
+      .attr('text-anchor', 'start')
       .attr('dominant-baseline', 'middle')
       .style('font-size', '10px')
       .style('font-weight', '600')
@@ -3441,7 +3414,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .attr('class', 'edge-label-icon')
       .attr('width', 14)
       .attr('height', 14)
-      .attr('x', -7) // Will be adjusted after measuring text
+      .attr('x', (d: any) => -d._labelDims.width / 2 + 6)
       .attr('y', -7)
       .style('pointer-events', 'none')
       .each(function(d: WorkItemEdge) {
@@ -3473,6 +3446,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     edgeLabelGroups
       .insert('rect', ':first-child') // Insert before other elements
       .attr('class', 'edge-label-bg')
+      .attr('width', (d: any) => d._labelDims.width)
+      .attr('height', (d: any) => d._labelDims.height)
+      .attr('x', (d: any) => -d._labelDims.width / 2)
+      .attr('y', (d: any) => -d._labelDims.height / 2)
       .attr('rx', 8)
       .attr('ry', 8)
       .style('fill', (d: WorkItemEdge) => {
@@ -3509,6 +3486,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         
         if (textElement) {
           const bbox = textElement.getBBox();
+          if (!(bbox.width > 0 && bbox.height > 0)) return;
           const iconWidth = 14;
           const spacing = 8;
           const paddingLeft = 6;
@@ -3864,14 +3842,11 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           { x: d.source.x || 0, y: d.source.y || 0 }, getNodeDimensions(d.source),
           { x: d.target.x || 0, y: d.target.y || 0 }, getNodeDimensions(d.target)
         );
-        if ((d._pTotal || 1) > 1) {
-          const off = perpendicularOffset(d._pIndex || 0, d._pTotal, liveK);
-          const dx = ep.x2 - ep.x1, dy = ep.y2 - ep.y1;
-          const length = Math.hypot(dx, dy) || 1;
-          ep.x1 -= dy / length * off; ep.y1 += dx / length * off;
-          ep.x2 -= dy / length * off; ep.y2 += dx / length * off;
-        }
-        d._route = createEdgeRoute([{ x: ep.x1, y: ep.y1 }, { x: ep.x2, y: ep.y2 }]);
+        const offset = perpendicularOffset(d._pIndex || 0, d._pTotal || 1, liveK);
+        d._route = createParallelEdgeRoute(
+          { id: d.source.id, x: ep.x1, y: ep.y1 },
+          { id: d.target.id, x: ep.x2, y: ep.y2 }, offset
+        );
       });
       linkElements.attr('d', (d: any) => d._route?.path ?? null);
       clickableEdges.attr('d', (d: any) => d._route?.path ?? null);

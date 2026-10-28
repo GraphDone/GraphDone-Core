@@ -100,6 +100,25 @@ export function pointOnEdgeRoute(route: EdgeRouteGeometry, value: number) {
   };
 }
 
+export function createParallelEdgeRoute(
+  source: Point & { id: string },
+  target: Point & { id: string },
+  offset: number
+) {
+  const dx = target.x - source.x,
+    dy = target.y - source.y;
+  const length = Math.hypot(dx, dy);
+  if (!Number.isFinite(offset) || !Number.isFinite(length) || length === 0)
+    return null;
+  const signed = offset * (source.id < target.id ? 1 : -1);
+  const x = (-dy / length) * signed,
+    y = (dx / length) * signed;
+  return createEdgeRoute([
+    { x: source.x + x, y: source.y + y },
+    { x: target.x + x, y: target.y + y },
+  ]);
+}
+
 export function projectEdgeRoutePointer(
   route: EdgeRouteGeometry,
   pointer: Point,

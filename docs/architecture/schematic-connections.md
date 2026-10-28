@@ -164,3 +164,22 @@ form corrected it, and the same check passed in3.66s. Scoped lint returned
 These checks used the partial probe and are not actual browser acceptance.
 All original runtime/visual/durability gates and new item-wiring cases remain
 required before this branch can be integrated or #220 closed.
+
+Review of the first consumer commit (`d9a0a58`) found empty measurement of
+initially hidden labels and a line-only geometry diagnostic. The correction
+initializes all label parts from conservative dimensions and accepts only
+positive text measurements; diagnostics now read actual SVG path endpoints.
+Opposite-direction parallel edges share a canonical lane normal so they stay
+separate while their arrows retain direction. Wire and label clicks open the
+same original relationship editor, whose controls now have accessible names.
+
+Two real-browser cases are registered as blocking `item-wires` acceptance in
+CI immediately after smoke (one worker, zero retries), retaining actual
+paint/hitbox/arrow geometry and screenshots, pointer drag/edit behavior, hidden
+label dimensions and unchanged graph data. Local discovery found both cases;
+they have not run locally. The partial probe passed11 geometry cases in0.722s,
+32 CLI harness cases in4.56s and scoped types; scoped lint reports0 errors,
+314 warnings across the two components/helper/test. The
+[review lesson](../../.agents/inbox/2026-10-28-hidden-labels-need-valid-measurement.md)
+records the evidence and limits. These are straight item paths preparing the
+bounded routing increment, not completion of #220.

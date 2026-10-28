@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   createEdgeRoute,
+  createParallelEdgeRoute,
   edgeRouteLabel,
   pointOnEdgeRoute,
   projectEdgeRoutePointer,
@@ -14,6 +15,22 @@ const elbow = () =>
   ])!;
 
 describe('item wire geometry', () => {
+  it('keeps opposite directed wires on distinct lanes without reversing their arrows', () => {
+    const a = { id: 'a', x: 0, y: 0 },
+      b = { id: 'b', x: 400, y: 0 };
+    const forward = createParallelEdgeRoute(a, b, -6)!;
+    const reverse = createParallelEdgeRoute(b, a, 6)!;
+    expect(forward.points).toEqual([
+      { x: 0, y: -6 },
+      { x: 400, y: -6 },
+    ]);
+    expect(reverse.points).toEqual([
+      { x: 400, y: 6 },
+      { x: 0, y: 6 },
+    ]);
+    expect(forward.target.angle).toBe(0);
+    expect(reverse.target.angle).toBe(180);
+  });
   it('uses the actual final segment for the target arrow and distance along every bend', () => {
     const route = elbow();
     expect(route.path).toBe('M0,0 L200,0 L200,100');
