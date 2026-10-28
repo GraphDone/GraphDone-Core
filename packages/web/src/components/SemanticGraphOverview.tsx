@@ -1,4 +1,5 @@
 import {
+  type ReactNode,
   useEffect,
   useId,
   useLayoutEffect,
@@ -6,6 +7,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { GraphStatusDock } from './GraphStatusDock';
 import {
   overviewAtScale,
   placeOverviewLabels,
@@ -38,6 +40,7 @@ interface Props {
   onInspect: (id: string, beginSession: boolean) => void;
   selectedId?: string;
   onBrowse: () => void;
+  layoutStatus?: ReactNode;
   onBack: () => void;
 }
 
@@ -51,6 +54,7 @@ export function SemanticGraphOverview({
   onBack,
   selectedId,
   onBrowse,
+  layoutStatus,
 }: Props) {
   const hierarchy = useMemo(
     () => buildSemanticHierarchy(items, edges),
@@ -598,50 +602,55 @@ export function SemanticGraphOverview({
           })}
         </>
       )}
-      {active && trace && traceProjection && (
-        <SemanticTraceControls
-          selection={trace}
-          label={
-            traceProjection.focus
-              ? groupLabel(traceProjection.focus.id)
-              : undefined
-          }
-          page={traceProjection.page}
-          pages={traceProjection.pages}
-          shownNeighbors={traceProjection.shownNeighbors}
-          totalNeighbors={traceProjection.totalNeighbors}
-          hasRoom={traceProjection.hasRoom}
-          drawn={drawnConnections}
-          total={edges.length}
-          onChange={setTrace}
-          onExit={() => {
-            setTrace(null);
-            groupListButton.current?.focus();
-          }}
-        />
-      )}
       {active && (
-        <button
-          data-graph-fit-obstacle="true"
-          data-lod-controls="true"
-          className="absolute bottom-3 left-3 pointer-events-auto rounded-xl bg-slate-900/95 border border-slate-600 px-4 py-2 min-w-36 min-h-14 text-sm leading-5 text-slate-100 shadow-lg"
-          aria-label={`${edges.length} relationships, ${notDrawnConnections} not drawn: ${internalConnections} internal, ${pendingConnections} awaiting endpoints, ${collapsedConnections} external connections in list`}
-          onClick={() => {
-            returnFocus.current = document.activeElement as HTMLElement;
-            setBrowse(true);
-            setGroupId(null);
-            openRelationships({ kind: 'all' }, 'all');
-          }}
-        >
-          <span className="block">Connections</span>
-          <span
-            className={`block ${notDrawnConnections ? 'text-amber-200' : 'text-emerald-200'}`}
-          >
-            {notDrawnConnections
-              ? `${notDrawnConnections} not drawn`
-              : 'Browse all'}
-          </span>
-        </button>
+        <GraphStatusDock>
+          {layoutStatus}
+          {trace && traceProjection && (
+            <SemanticTraceControls
+              selection={trace}
+              label={
+                traceProjection.focus
+                  ? groupLabel(traceProjection.focus.id)
+                  : undefined
+              }
+              page={traceProjection.page}
+              pages={traceProjection.pages}
+              shownNeighbors={traceProjection.shownNeighbors}
+              totalNeighbors={traceProjection.totalNeighbors}
+              hasRoom={traceProjection.hasRoom}
+              drawn={drawnConnections}
+              total={edges.length}
+              onChange={setTrace}
+              onExit={() => {
+                setTrace(null);
+                groupListButton.current?.focus();
+              }}
+            />
+          )}
+          {active && (
+            <button
+              data-graph-fit-obstacle="true"
+              data-lod-controls="true"
+              className="pointer-events-auto rounded-xl bg-slate-900/95 border border-slate-600 px-4 py-2 min-w-36 min-h-14 text-sm leading-5 text-slate-100 shadow-lg"
+              aria-label={`${edges.length} relationships, ${notDrawnConnections} not drawn: ${internalConnections} internal, ${pendingConnections} awaiting endpoints, ${collapsedConnections} external connections in list`}
+              onClick={() => {
+                returnFocus.current = document.activeElement as HTMLElement;
+                setBrowse(true);
+                setGroupId(null);
+                openRelationships({ kind: 'all' }, 'all');
+              }}
+            >
+              <span className="block">Connections</span>
+              <span
+                className={`block ${notDrawnConnections ? 'text-amber-200' : 'text-emerald-200'}`}
+              >
+                {notDrawnConnections
+                  ? `${notDrawnConnections} not drawn`
+                  : 'Browse all'}
+              </span>
+            </button>
+          )}
+        </GraphStatusDock>
       )}
       {relationshipScope && (
         <SemanticRelationshipBrowser
