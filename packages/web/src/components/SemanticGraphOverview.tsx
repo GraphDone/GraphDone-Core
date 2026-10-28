@@ -521,7 +521,7 @@ export function SemanticGraphOverview({
                   .join(' ')}
                 fill="none"
                 stroke={busColor(bus.bus)}
-                strokeWidth="2.5"
+                strokeWidth="3.5"
                 strokeLinejoin="round"
                 strokeLinecap="round"
                 markerEnd={`url(#${markerId})`}

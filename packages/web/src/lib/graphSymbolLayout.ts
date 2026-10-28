@@ -3,6 +3,7 @@ export const ITEM_TITLE_SIZE = 18;
 export const ITEM_TITLE_LINE = 24;
 export const ITEM_HEADER_HEIGHT = 34;
 export const EDGE_LABEL_SIZE = 14;
+export const ITEM_WIRE_WIDTH = 3;
 export const EDGE_LABEL_HEIGHT = 30;
 
 export type TextMeasure = (

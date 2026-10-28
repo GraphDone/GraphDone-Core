@@ -87,6 +87,54 @@ for (const { width, diagonal } of [
           page.evaluate(() => (window as any).__layoutMetrics?.()?.cameraReady)
         )
         .toBe(true);
+      if (width === 1440 && !diagonal) {
+        const navigation = page.getByRole('group', {
+          name: 'Workspace views',
+          exact: true,
+        });
+        await expect(navigation.getByRole('button')).toHaveCount(8);
+        for (const name of [
+          'Graph',
+          'Dashboard',
+          'Table',
+          'Card',
+          'Kanban',
+          'Gantt',
+          'Calendar',
+          'Activity',
+        ]) {
+          const button = navigation.getByRole('button', { name, exact: true });
+          const size = await button.boundingBox();
+          expect(size!.width).toBeGreaterThanOrEqual(44);
+          expect(size!.height).toBeGreaterThanOrEqual(44);
+          await expect(button.locator('svg')).toBeVisible();
+          expect(
+            (await button.locator('svg').boundingBox())!.width
+          ).toBeGreaterThanOrEqual(24);
+          await button.hover();
+          await expect(
+            page.getByRole('tooltip', { name, exact: true })
+          ).toBeVisible();
+        }
+        const graph = navigation.getByRole('button', {
+          name: 'Graph',
+          exact: true,
+        });
+        await graph.focus();
+        await expect(
+          page.getByRole('tooltip', { name: 'Graph', exact: true })
+        ).toBeVisible();
+        await page.keyboard.press('Escape');
+        await expect(page.getByRole('tooltip')).toHaveCount(0);
+        await expect(graph).toBeFocused();
+        await graph.evaluate(element => element.blur());
+        await page.mouse.move(8, 8);
+        expect(
+          await page
+            .locator('.workspace-surface')
+            .evaluate(element => Number(getComputedStyle(element).fontWeight))
+        ).toBeGreaterThanOrEqual(500);
+      }
       const target = before.workItems.find(
         (item: { id: string }) => item.id === seeded.nodeIds[1]
       );
