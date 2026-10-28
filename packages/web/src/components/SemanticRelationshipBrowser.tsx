@@ -33,6 +33,7 @@ export function SemanticRelationshipBrowser({
   backLabel = 'Back to groups',
   onEdit,
 }: Props) {
+  const [page, setPage] = useState(0);
   const [type, setType] = useState('');
   const [search, setSearch] = useState('');
   const [direction, setDirection] = useState<RelationshipDirection>('both');
@@ -67,6 +68,16 @@ export function SemanticRelationshipBrowser({
       ),
     [index, related, type, search]
   );
+  const pageSize = 250;
+  const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
+  const currentPage = Math.min(page, pageCount - 1);
+  const pageRows = rows.slice(
+    currentPage * pageSize,
+    (currentPage + 1) * pageSize
+  );
+  useEffect(() => {
+    setPage(0);
+  }, [scope, type, search, direction, hops]);
   const missingGroup =
     scope.kind === 'internal'
       ? !relationshipGroupLabel(index, scope.group)
@@ -237,15 +248,49 @@ export function SemanticRelationshipBrowser({
       <p role="status" className="text-sm my-3">
         {rows.length} of {related.length} relationships
       </p>
+      {pageCount > 1 && (
+        <nav
+          aria-label="Relationship pages"
+          className="flex items-center justify-between gap-2 my-3 text-sm"
+        >
+          <button
+            className="min-h-11 px-3 rounded border border-gray-600 disabled:opacity-40"
+            disabled={currentPage === 0}
+            onClick={() => setPage(currentPage - 1)}
+          >
+            Previous relationships
+          </button>
+          <span>
+            {currentPage * pageSize + 1}–
+            {Math.min(rows.length, (currentPage + 1) * pageSize)} of{' '}
+            {rows.length}
+          </span>
+          <button
+            className="min-h-11 px-3 rounded border border-gray-600 disabled:opacity-40"
+            disabled={currentPage + 1 === pageCount}
+            onClick={() => setPage(currentPage + 1)}
+          >
+            Next relationships
+          </button>
+        </nav>
+      )}
       <ul className="space-y-3">
-        {rows.map(edge => (
+        {pageRows.map(edge => (
           <li
             key={edge.id}
             data-lod-edge-id={edge.id}
             className="rounded border border-gray-700 bg-gray-900 p-3"
           >
             <p className="text-xs text-gray-300 break-all">{edge.id}</p>
-            {onEdit && <button className="min-h-11 text-sm text-emerald-200" onClick={() => onEdit(edge.id)} aria-label={`Edit relationship ${edge.id}`}>Edit relationship</button>}
+            {onEdit && (
+              <button
+                className="min-h-11 text-sm text-emerald-200"
+                onClick={() => onEdit(edge.id)}
+                aria-label={`Edit relationship ${edge.id}`}
+              >
+                Edit relationship
+              </button>
+            )}
             {endpoint(relationshipEndpoint(edge.source))}
             <p className="text-sm font-semibold my-1">→ {edge.type}</p>
             {endpoint(relationshipEndpoint(edge.target))}

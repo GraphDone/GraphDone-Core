@@ -107,19 +107,18 @@ for (const width of [1440, 390])
         );
         if (width === 1440) expect(geometry.labels.length).toBe(2);
       }
-      const targetNode = page
-        .locator('.node')
-        .filter({
-          has: page.locator('.node-title-group > title', {
-            hasText: target.title,
-          }),
-        });
+      const targetNode = page.locator('.node').filter({
+        has: page.locator('.node-title-group > title', {
+          hasText: target.title,
+        }),
+      });
       await targetNode.focus();
       await page.keyboard.press('Enter');
       await expect(
         page.getByRole('dialog', { name: 'Edit work item', exact: true })
       ).toBeVisible();
       await page.keyboard.press('Escape');
+      await expect(targetNode).toBeFocused();
       await page
         .getByRole('button', {
           name: /2 relationships, .*Browse all relationships/,
@@ -134,6 +133,16 @@ for (const width of [1440, 390])
       await page
         .getByRole('button', { name: 'Back to graph', exact: true })
         .click();
+      const browse = page.getByRole('button', {
+        name: /2 relationships, .*Browse all relationships/,
+      });
+      await expect(browse).toBeFocused();
+      await page.keyboard.press('Enter');
+      await expect(
+        page.getByRole('button', { name: 'Back to graph', exact: true })
+      ).toBeFocused();
+      await page.keyboard.press('Escape');
+      await expect(browse).toBeFocused();
       if (width === 1440) {
         const saved = await page
           .locator('.edge-label-group:visible')

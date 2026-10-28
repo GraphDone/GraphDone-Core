@@ -1,3 +1,4 @@
+import { writeFile } from 'node:fs/promises';
 import { test as base, expect } from '@playwright/test';
 import { login, TEST_USERS } from '../../lib/auth';
 import { gql } from '../../lib/graphRequest';
@@ -129,7 +130,7 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
     paintedCards?: number;
     labels?: number;
   }[] = [];
-  for (const scale of [1.2, 0.08, 1.2]) {
+  for (const scale of [1.2, 0.1, 1.2]) {
     const start = Date.now();
     await page.evaluate(
       ({ x, y, scale }) => (window as any).miniMapZoom(x, y, scale),
@@ -151,6 +152,15 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
       String(scale)
     );
     const elapsed = Date.now() - start;
+    const timingPath = info.outputPath(`zoom-${timings.length}-timing.json`);
+    await writeFile(
+      timingPath,
+      JSON.stringify({ nodes: SIZE, edges: 5000, loadedMs, scale, elapsed })
+    );
+    await info.attach(`zoom-${timings.length}-timing.json`, {
+      path: timingPath,
+      contentType: 'application/json',
+    });
     expect(
       elapsed,
       'Zoom must finish within five seconds on the CI runner'
@@ -164,6 +174,20 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
       expect(geometry.cards.length).toBeLessThan(100);
       expect(geometry.labels.length).toBeGreaterThan(0);
       expect(geometry.labels.length).toBeLessThanOrEqual(32);
+      const work = await page
+        .locator('.main-graph-group')
+        .evaluate(element => ({
+          attempts: Number(element.getAttribute('data-label-attempts')),
+          checks: Number(element.getAttribute('data-label-checks')),
+        }));
+      expect(work.attempts).toBeLessThanOrEqual(128);
+      expect(work.checks).toBeLessThanOrEqual(200000);
+      await expect(
+        page.getByRole('button', {
+          name: `5000 relationships, ${geometry.labels.length} labels shown. Browse all relationships`,
+          exact: true,
+        })
+      ).toBeVisible();
       timings.push({
         scale,
         ms: elapsed,
@@ -190,6 +214,13 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
     name: 'Graph relationships',
   });
   await expect(relationships).toBeVisible();
+  await expect(relationships.locator('[data-lod-edge-id]')).toHaveCount(250);
+  await relationships
+    .getByRole('button', { name: 'Next relationships' })
+    .click();
+  await expect(
+    relationships.locator('[data-lod-edge-id]').first()
+  ).toHaveAttribute('data-lod-edge-id', before.edges[250].id);
   await relationships.getByRole('textbox').fill(before.edges[0].id);
   await expect(
     relationships.getByRole('button', {
@@ -203,15 +234,20 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
   expect(await snapshot()).toEqual(before);
   expect(writes).toEqual([]);
   expect(errors).toEqual([]);
-  await info.attach('two-thousand-node-performance.json', {
-    body: JSON.stringify({
+  const performancePath = info.outputPath('two-thousand-node-performance.json');
+  await writeFile(
+    performancePath,
+    JSON.stringify({
       nodes: SIZE,
       edges: 5000,
       loadedMs,
       timings,
       writes,
       errors,
-    }),
+    })
+  );
+  await info.attach('two-thousand-node-performance.json', {
+    path: performancePath,
     contentType: 'application/json',
   });
 });

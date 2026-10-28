@@ -225,6 +225,7 @@ export function edgeRouteLabel(
     segments?: readonly Pick<EdgeRouteSegment, 'source' | 'target'>[];
     offsets?: readonly number[];
     viewport?: ObstacleBox;
+    budget?: { remaining: number };
   }
 ) {
   const { dims, obstacles = [] } = options;
@@ -280,20 +281,32 @@ export function edgeRouteLabel(
               viewport.height / 2)
         )
           continue;
-        if (
-          obstacles.some(
-            box =>
-              Math.abs(x - box.x) < (width + box.width) / 2 + padding &&
-              Math.abs(y - box.y) < (height + box.height) / 2 + padding
-          )
-        )
-          continue;
-        if (
-          options.segments?.some(part =>
-            edgeSegmentHitsBox(part, { x, y, width, height }, padding)
-          )
-        )
-          continue;
+        let blocked = false;
+        for (const box of obstacles) {
+          if (options.budget) {
+            if (options.budget.remaining <= 0) return best;
+            options.budget.remaining--;
+          }
+          if (
+            Math.abs(x - box.x) < (width + box.width) / 2 + padding &&
+            Math.abs(y - box.y) < (height + box.height) / 2 + padding
+          ) {
+            blocked = true;
+            break;
+          }
+        }
+        if (blocked) continue;
+        for (const part of options.segments ?? []) {
+          if (options.budget) {
+            if (options.budget.remaining <= 0) return best;
+            options.budget.remaining--;
+          }
+          if (edgeSegmentHitsBox(part, { x, y, width, height }, padding)) {
+            blocked = true;
+            break;
+          }
+        }
+        if (blocked) continue;
         const delta =
           Math.abs(distance - desired) +
           Math.abs(candidateOffset - offset) * 0.01;
