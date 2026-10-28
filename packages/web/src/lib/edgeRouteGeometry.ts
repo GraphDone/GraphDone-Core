@@ -214,6 +214,28 @@ export function edgeSegmentHitsBox(
   return true;
 }
 
+export function edgeSegmentHitsRotatedBox(
+  segment: Pick<EdgeRouteSegment, 'source' | 'target'>,
+  box: ObstacleBox,
+  rotation: number,
+  padding = 0
+) {
+  const angle = (rotation * Math.PI) / 180;
+  const local = (point: { x: number; y: number }) => {
+    const x = point.x - box.x,
+      y = point.y - box.y;
+    return {
+      x: x * Math.cos(angle) + y * Math.sin(angle),
+      y: -x * Math.sin(angle) + y * Math.cos(angle),
+    };
+  };
+  return edgeSegmentHitsBox(
+    { source: local(segment.source), target: local(segment.target) },
+    { x: 0, y: 0, width: box.width, height: box.height },
+    padding
+  );
+}
+
 export function edgeRouteLabel(
   route: EdgeRouteGeometry,
   options: {
@@ -334,7 +356,14 @@ export function edgeRouteLabel(
             if (options.budget.remaining <= 0) return best;
             options.budget.remaining--;
           }
-          if (edgeSegmentHitsBox(part, { x, y, width, height }, padding)) {
+          if (
+            edgeSegmentHitsRotatedBox(
+              part,
+              { x, y, width: dims.width, height: dims.height },
+              rotation,
+              padding
+            )
+          ) {
             blocked = true;
             break;
           }

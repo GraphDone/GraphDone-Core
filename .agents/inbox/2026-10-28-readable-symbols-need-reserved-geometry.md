@@ -43,3 +43,31 @@ Revised18px/14px typography passed both focused headed desktop/phone cases in23.
 Independent review5685069307 found the in-browser timer could finish while the parent CSS still hid item layers: child `data-active=false` precedes the passive parent update. The timer now requires the parent gate, actually visible bounded cards and readable titles/labels (or visible overview summaries) for two frames. A deliberate1200ms visibility mask must be included in the measured interval. Hidden overview layout/routing is skipped; projection/accounting remains available and a focused test requires fresh summaries after a hidden live update and return. These changes require subsequent executed validation; neither state attributes nor revised timing alone prove scale acceptance.
 
 Exact5d CI40713075178 passed the small item consumer/symbol cases but failed the2000-item case on zero visible labels. Its retained timing was3709ms browser/5011ms wall and its overview accounting/clutter passed; this is not full scale acceptance, and the timer at that revision had the review gap above. The route search sampled whole-segment midpoint/end positions, missing the visible middle slice of a long connection. Label candidate ranges now intersect the viewport reduced by the full rotated label footprint, then use the same bounded samples/collision checks; a10000-unit route regression covers this case.24 scoped route/overview cases and web TypeScript passed. Both updated headed desktop/phone cases passed in23.3s, including the deliberate1200ms visibility delay, after correcting the shared timing helper to allow small graphs without an overview layer. The initial negative-control run failed on that missing optional layer; its trace is retained. All local probes still reuse owned dependencies.
+
+Independent review5685328335 confirmed the content-aware timing fix, but found
+clear45-degree labels rejected by their own wire because collision used the
+rotated label's axis-aligned bounds. Wire collision now uses label-local axes;
+the visual oracle independently clips segments against actual SVG quadrilaterals.
+Four diagonal directions have clear/crossing pure regressions. The new headed
+negative also exposed that zero-height horizontal paths were excluded from
+painted-wire checks; stroked nonzero-length paths now count. Its first restore
+attempt selected a different path after Playwright considered the horizontal
+negative hidden; restoration now keeps a stable original path locator. Retain
+those failing controls rather than treating them as product passes.
+
+The headed trace review also found12px controls and overlap with the bottom
+Connections control. Trace/browser text is now14px, headings16px, trace height
+fits content and its bottom spacing clears the control. Overview checks enforce
+the14px floor and trace/control separation, including a deliberate8px negative.
+The complete72-item phone hierarchy/trace journey passed in43.8s with one headed
+browser, one worker, zero retries and strict cleanup;42 scoped geometry/overview/
+relationship tests and web types passed. Exact5b CI40716064148 failed its actual
+2000-item visible-content timeout with zero labels; its artifacts are retained.
+The current rotated-label correction still needs fresh scale CI and review.
+
+The corrected diagonal headed journey passed in13.4s: all four zoom stages have
+visible readable labels, the injected horizontal crossing is rejected, restoring
+the original path clears it, exact two-record browsing and the1200ms visibility
+negative pass, and the API snapshot remains unchanged. The existing horizontal
+desktop/phone cases also passed in the preceding35s batch; the batch's diagonal
+negative failure is retained separately.

@@ -422,6 +422,18 @@ for (const width of [1440, 390])
         exact: true,
       });
       await expect(trace).toContainText('Outgoing · Payments');
+      const traceText = trace.locator('p').first();
+      await traceText.evaluate(element => (element.style.fontSize = '8px'));
+      try {
+        await expect(
+          inspectSchematicOverview(overview, info, before.edges.length)
+        ).rejects.toThrow('Graph summaries and controls need readable text');
+      } finally {
+        await traceText.evaluate(element =>
+          element.style.removeProperty('font-size')
+        );
+      }
+
       await inspectSchematicOverview(
         overview,
         info,

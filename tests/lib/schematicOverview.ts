@@ -34,6 +34,7 @@ export async function inspectSchematicOverview(
         const bounds = element.getBoundingClientRect();
         return {
           id: element.getAttribute('data-lod-group') ?? `control-${index}`,
+          trace: element.hasAttribute('data-lod-trace'),
           x: bounds.x,
           y: bounds.y,
           width: bounds.width,
@@ -91,7 +92,27 @@ export async function inspectSchematicOverview(
         .querySelector('[aria-label*="relationships,"]')
         ?.getAttribute('aria-label');
       const bounds = host.getBoundingClientRect();
+      const smallText = Array.from(
+        host.querySelectorAll(
+          '[data-lod-controls] span, [data-lod-controls] p, [data-lod-controls] h2, [data-lod-controls] label, [data-lod-controls] select, [data-lod-controls] button, [data-lod-group] span'
+        )
+      )
+        .filter(
+          element =>
+            visible(element) &&
+            element.getBoundingClientRect().width > 0 &&
+            Array.from(element.childNodes).some(
+              child =>
+                child.nodeType === Node.TEXT_NODE && child.textContent?.trim()
+            )
+        )
+        .filter(element => parseFloat(getComputedStyle(element).fontSize) < 14)
+        .map(element => ({
+          text: element.textContent,
+          size: getComputedStyle(element).fontSize,
+        }));
       return {
+        smallText,
         cards,
         controls,
         routes,
@@ -111,6 +132,22 @@ export async function inspectSchematicOverview(
     .poll(async () => (await read()).routes.length)
     .toBeGreaterThan(0);
   const geometry = await read();
+  expect(
+    geometry.smallText,
+    'Graph summaries and controls need readable text'
+  ).toEqual([]);
+  for (const trace of geometry.controls.filter(control => control.trace)) {
+    for (const other of geometry.controls.filter(control => !control.trace)) {
+      const overlaps =
+        trace.x < other.x + other.width &&
+        trace.x + trace.width > other.x &&
+        trace.y < other.y + other.height &&
+        trace.y + trace.height > other.y;
+      expect(overlaps, 'Trace controls must clear other graph controls').toBe(
+        false
+      );
+    }
+  }
   for (const card of geometry.cards) {
     expect(card.visible, 'Schematic card must be visible').toBe(true);
     expect(
