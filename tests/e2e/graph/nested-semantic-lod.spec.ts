@@ -11,6 +11,7 @@ import {
   type OwnedGraphs,
 } from '../../lib/ownedGraphIdsFixture';
 import type { SeededGraph } from '../../lib/seedGraph';
+import { inspectSchematicOverview } from '../../lib/schematicOverview';
 
 const test = base.extend<{
   ownedGraphIds: OwnedGraphs;
@@ -211,6 +212,120 @@ for (const width of [1440, 390])
         page.getByRole('region', { name: 'Graph groups', exact: true });
       await detail.selectOption('overview');
       await expect(count(2)).toBeVisible();
+      await inspectSchematicOverview(overview, info, before.edges.length);
+      await activate(
+        overview.getByRole('button', {
+          name: /^\d+ relationships, \d+ not drawn:/,
+        })
+      );
+      const relationships = page.getByRole('region', {
+        name: 'Graph relationships',
+        exact: true,
+      });
+      const relationshipIds = () =>
+        relationships
+          .locator('[data-lod-edge-id]')
+          .evaluateAll(rows =>
+            rows.map(row => row.getAttribute('data-lod-edge-id')).sort()
+          );
+      type OriginalEdge = {
+        id: string;
+        type: string;
+        source: { id: string };
+        target: { id: string };
+      };
+      const originalEdges: OriginalEdge[] = before.edges;
+      await expect
+        .poll(relationshipIds)
+        .toEqual(originalEdges.map(edge => edge.id).sort());
+      await relationships
+        .getByLabel('Relationship type', { exact: true })
+        .selectOption('BLOCKS');
+      await relationships
+        .getByLabel('Find a relationship', { exact: true })
+        .fill(seeded.nodeIds[0]);
+      const filteredIds = originalEdges
+        .filter(
+          edge =>
+            edge.type === 'BLOCKS' &&
+            (edge.source.id === seeded.nodeIds[0] ||
+              edge.target.id === seeded.nodeIds[0])
+        )
+        .map(edge => edge.id)
+        .sort();
+      expect(filteredIds.length).toBeGreaterThanOrEqual(2);
+      await expect.poll(relationshipIds).toEqual(filteredIds);
+      const sourceTitle = before.workItems.find(
+        (item: { id: string }) => item.id === seeded.nodeIds[0]
+      ).title;
+      const connectionCamera = await camera();
+      await activate(
+        relationships
+          .getByRole('button', { name: `Inspect ${sourceTitle}`, exact: true })
+          .first()
+      );
+      await expect(page.getByTestId('node-inspector')).toContainText(
+        sourceTitle
+      );
+      await activate(
+        overview.getByRole('button', { name: 'Back to overview', exact: true })
+      );
+      await expect.poll(camera).toEqual(connectionCamera);
+      await expect(
+        relationships.getByLabel('Find a relationship', { exact: true })
+      ).toHaveValue(seeded.nodeIds[0]);
+      await expect.poll(relationshipIds).toEqual(filteredIds);
+      await expect(
+        relationships
+          .getByRole('button', { name: `Inspect ${sourceTitle}`, exact: true })
+          .first()
+      ).toBeFocused();
+      await activate(
+        relationships
+          .getByRole('button', {
+            name: `Explore relationships of ${sourceTitle}`,
+            exact: true,
+          })
+          .first()
+      );
+      for (const direction of ['incoming', 'outgoing'] as const) {
+        await relationships
+          .getByLabel('Relationship direction', { exact: true })
+          .selectOption(direction);
+        const expected = originalEdges
+          .filter(
+            edge =>
+              (direction === 'incoming' ? edge.target.id : edge.source.id) ===
+              seeded.nodeIds[0]
+          )
+          .map(edge => edge.id)
+          .sort();
+        await expect.poll(relationshipIds).toEqual(expected);
+      }
+      await relationships
+        .getByLabel('Neighborhood depth', { exact: true })
+        .selectOption('2');
+      const frontier = new Set([
+        seeded.nodeIds[0],
+        ...originalEdges
+          .filter(edge => edge.source.id === seeded.nodeIds[0])
+          .map(edge => edge.target.id),
+      ]);
+      await expect.poll(relationshipIds).toEqual(
+        originalEdges
+          .filter(edge => frontier.has(edge.source.id))
+          .map(edge => edge.id)
+          .sort()
+      );
+      await activate(
+        relationships.getByRole('button', {
+          name: 'Back to groups',
+          exact: true,
+        })
+      );
+      await activate(
+        list().getByRole('button', { name: 'Close group browser', exact: true })
+      );
       await activate(count(2));
       await activate(
         list().getByRole('button', { name: /^Payments 36 items/ })
