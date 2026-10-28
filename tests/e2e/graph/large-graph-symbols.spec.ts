@@ -37,9 +37,9 @@ const test = base.extend<{
           },
         }),
         additionalEdges: Array.from({ length: 2000 }, (_, index) => ({
-          sourceIndex: index,
-          targetIndex: (index + 17) % SIZE,
-          type: index % 2 ? 'BLOCKS' : 'ENABLES',
+          sourceIndex: index < 500 ? index + 1 : index,
+          targetIndex: index < 500 ? index : (index + 17) % SIZE,
+          type: index < 500 ? 'BLOCKS' : index % 2 ? 'BLOCKS' : 'ENABLES',
         })),
       });
       await gql(
@@ -93,6 +93,7 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
   await page.evaluate(id => {
     localStorage.setItem('currentGraphId', id);
     localStorage.setItem('graphdone:viewMode', 'graph');
+    localStorage.removeItem('graphdone:relationship-priority');
   }, largeGraph.graphId);
   const loadStart = Date.now();
   await page.goto('/');
@@ -122,6 +123,49 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
   const overview = page.locator('.semantic-overview');
   await expect(overview).toHaveAttribute('data-active', 'true');
   await inspectSchematicOverview(overview, info, 5000, '2000-items-fit', 8);
+  const priority = page.getByRole('combobox', {
+    name: 'Relationship priority',
+  });
+  const camera = () =>
+    page.locator('.graph-container > svg').evaluate(svg => {
+      const { x, y, k } = (svg as any).__zoom;
+      return { x, y, k };
+    });
+  const priorityStages: unknown[] = [];
+  const fitCamera = await camera();
+  for (const level of ['all', 'essential']) {
+    await priority.selectOption(level);
+    await expect(page.locator('.graph-container')).toHaveAttribute(
+      'data-relationship-priority',
+      level
+    );
+    await inspectSchematicOverview(
+      overview,
+      info,
+      5000,
+      `2000-overview-${level}`,
+      8
+    );
+    const counts = await overview.evaluate(host => ({
+      drawn: Array.from(host.querySelectorAll('[data-lod-bundle]')).reduce(
+        (sum, path) => sum + Number(path.getAttribute('data-count')),
+        0
+      ),
+      summarized: Number(host.getAttribute('data-priority-summarized')),
+      deferred: Number(host.getAttribute('data-geometry-deferred')),
+      internal: Number(host.getAttribute('data-internal-relationships')),
+      pending: Number(host.getAttribute('data-pending-relationships')),
+    }));
+    expect(Object.values(counts).reduce((sum, count) => sum + count, 0)).toBe(
+      5000
+    );
+    expect(counts.pending).toBe(0);
+    if (level === 'all') expect(counts.summarized).toBe(0);
+    else expect(counts.summarized).toBeGreaterThan(0);
+    expect(await camera()).toEqual(fitCamera);
+    priorityStages.push({ mode: 'overview', level, counts });
+  }
+
   const target = before.workItems.find(
     (item: { id: string }) => item.id === largeGraph.nodeIds[1008]
   );
@@ -179,7 +223,9 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
       expect(work.checks).toBeLessThanOrEqual(200000);
       await expect(
         page.getByRole('button', {
-          name: new RegExp(`^5000 relationships, ${geometry.labels.length} labels shown, [0-9]+ summarized by priority. Browse all relationships$`),
+          name: new RegExp(
+            `^5000 relationships, ${geometry.labels.length} labels shown, [0-9]+ summarized by priority. Browse all relationships$`
+          ),
           exact: true,
         })
       ).toBeVisible();
@@ -201,6 +247,116 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
       timings.push({ scale, ms: elapsed, wallMs });
     }
   }
+  type OriginalEdge = {
+    id: string;
+    type: string;
+    source: { id: string };
+    target: { id: string };
+  };
+  const originalEdges = before.edges as OriginalEdge[];
+  const pairKey = (edge: OriginalEdge) =>
+    JSON.stringify([edge.source.id, edge.target.id].sort());
+  const originalPairs = [...new Set(originalEdges.map(pairKey))].sort();
+  const requiredBlockers = originalEdges.filter(
+    edge =>
+      edge.type === 'BLOCKS' &&
+      largeGraph.nodeIds
+        .slice(0, 500)
+        .some(
+          (id, index) =>
+            edge.target.id === id &&
+            edge.source.id === largeGraph.nodeIds[index + 1]
+        )
+  );
+  expect(requiredBlockers).toHaveLength(500);
+  const detailCamera = await camera();
+  let previousIds: string[] = [];
+  let essentialIds: string[] = [];
+  for (const level of ['essential', 'dependencies', 'all', 'essential']) {
+    await priority.selectOption(level);
+    await expect(page.locator('.graph-container')).toHaveAttribute(
+      'data-relationship-priority',
+      level
+    );
+    await expect
+      .poll(() =>
+        page
+          .locator('.edges-group .edge')
+          .evaluateAll(
+            paths =>
+              paths.filter(
+                path => path.getAttribute('data-priority-visible') === 'true'
+              ).length
+          )
+      )
+      .toBe(
+        Number(
+          await page
+            .locator('.graph-container')
+            .getAttribute('data-priority-represented')
+        )
+      );
+    const ids = await page.locator('.edges-group .edge').evaluateAll(paths =>
+      paths
+        .filter(path => path.getAttribute('data-priority-visible') === 'true')
+        .map(path => path.getAttribute('data-edge-id')!)
+        .sort()
+    );
+    const representedIds = new Set(ids);
+    const represented = originalEdges.filter(edge =>
+      representedIds.has(edge.id)
+    );
+    expect(represented).toHaveLength(ids.length);
+    expect([...new Set(represented.map(pairKey))].sort()).toEqual(
+      originalPairs
+    );
+    for (const blocker of requiredBlockers)
+      expect(representedIds.has(blocker.id)).toBe(true);
+    if (level === 'essential') {
+      expect(ids.length).toBeLessThanOrEqual(4500);
+      if (essentialIds.length) expect(ids).toEqual(essentialIds);
+      else essentialIds = ids;
+      const dependency = originalEdges.find(
+        edge =>
+          edge.type === 'DEPENDS_ON' &&
+          edge.source.id === largeGraph.nodeIds[0] &&
+          edge.target.id === largeGraph.nodeIds[1]
+      )!;
+      expect(representedIds.has(dependency.id)).toBe(false);
+    } else {
+      expect(previousIds.every(id => representedIds.has(id))).toBe(true);
+    }
+    if (level === 'all')
+      expect(ids).toEqual(originalEdges.map(edge => edge.id));
+    await expect(page.locator('.graph-container')).toHaveAttribute(
+      'data-priority-summarized',
+      String(5000 - ids.length)
+    );
+    await expect(page.locator('.graph-container')).toHaveAttribute(
+      'data-priority-pending',
+      '0'
+    );
+    const geometry = await inspectItemSymbols(
+      page,
+      info,
+      `2000-priority-${priorityStages.length}-${level}`
+    );
+    expect(geometry.labels.length).toBeGreaterThan(0);
+    expect(geometry.labels.length).toBeLessThanOrEqual(32);
+    expect(await camera()).toEqual(detailCamera);
+    priorityStages.push({
+      mode: 'items',
+      level,
+      ids,
+      labels: geometry.labels.length,
+      pairs: originalPairs.length,
+    });
+    previousIds = ids;
+  }
+  await info.attach('two-thousand-priority.json', {
+    body: JSON.stringify(priorityStages),
+    contentType: 'application/json',
+  });
   const revealId = largeGraph.nodeIds[1011];
   const reveal = page.locator('.node').filter({
     has: page.locator(`.node-edit-icon[data-node-id="${revealId}"]`),

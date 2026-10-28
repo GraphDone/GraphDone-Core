@@ -7,8 +7,15 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { prioritySemanticBundles, relationshipPriorityTier, type RelationshipPriorityLevel } from '../lib/relationshipPriority';
-import { getRelationshipConfig, type RelationshipType } from '../constants/workItemConstants';
+import {
+  prioritySemanticBundles,
+  relationshipPriorityTier,
+  type RelationshipPriorityLevel,
+} from '../lib/relationshipPriority';
+import {
+  getRelationshipConfig,
+  type RelationshipType,
+} from '../constants/workItemConstants';
 import { GraphStatusDock } from './GraphStatusDock';
 import {
   overviewAtScale,
@@ -44,7 +51,10 @@ interface Props {
   onBrowse: () => void;
   layoutStatus?: ReactNode;
   onBack: () => void;
-  relationshipPriority?: { level: RelationshipPriorityLevel; representedIds: ReadonlySet<string> };
+  relationshipPriority?: {
+    level: RelationshipPriorityLevel;
+    representedIds: ReadonlySet<string>;
+  };
   relationshipControl?: ReactNode;
 }
 
@@ -150,9 +160,16 @@ export function SemanticGraphOverview({
     () => projectSemanticHierarchy(hierarchy, effectiveExpanded),
     [hierarchy, effectiveExpanded]
   );
-  const representedBundles = useMemo(() => relationshipPriority
-    ? prioritySemanticBundles(projection.bundles, relationshipPriority.representedIds)
-    : projection.bundles, [projection, relationshipPriority]);
+  const representedBundles = useMemo(
+    () =>
+      relationshipPriority
+        ? prioritySemanticBundles(
+            projection.bundles,
+            relationshipPriority.representedIds
+          )
+        : projection.bundles,
+    [projection, relationshipPriority]
+  );
   const [automatic, setAutomatic] = useState(() =>
     overviewAtScale(false, camera.scale)
   );
@@ -192,7 +209,13 @@ export function SemanticGraphOverview({
         : null,
     [projection, trace, size.width, size.height, obstacleKey]
   );
-  const traceBundleIds = useMemo(() => traceProjection ? new Set(traceProjection.bundles.map(bundle => bundle.id)) : null, [traceProjection]);
+  const traceBundleIds = useMemo(
+    () =>
+      traceProjection
+        ? new Set(traceProjection.bundles.map(bundle => bundle.id))
+        : null,
+    [traceProjection]
+  );
   useEffect(() => {
     setAutomatic(previous => overviewAtScale(previous, camera.scale));
     setAutomaticDepth(previous => semanticDepthAtScale(previous, camera.scale));
@@ -291,14 +314,19 @@ export function SemanticGraphOverview({
         ? routeSchematicConnections(
             layout.placed,
             (traceBundleIds
-              ? representedBundles.filter(bundle => traceBundleIds.has(bundle.id))
-              : representedBundles).map(bundle => ({
+              ? representedBundles.filter(bundle =>
+                  traceBundleIds.has(bundle.id)
+                )
+              : representedBundles
+            ).map(bundle => ({
               id: bundle.id,
               source: bundle.source,
               target: bundle.target,
               type: bundle.type,
               edgeIds: bundle.edges.map(edge => edge.id),
-              priority: relationshipPriority ? relationshipPriorityTier(bundle.type) : undefined,
+              priority: relationshipPriority
+                ? relationshipPriorityTier(bundle.type)
+                : undefined,
             })),
             size.width,
             size.height,
@@ -338,21 +366,38 @@ export function SemanticGraphOverview({
       (count, bundle) => count + bundle.edges.length,
       0
     ) - drawnConnections;
-  const summarizedConnections = projection.bundles.reduce((count, bundle) => count + bundle.edges.length, 0)
-    - representedBundles.reduce((count, bundle) => count + bundle.edges.length, 0);
+  const summarizedConnections =
+    projection.bundles.reduce(
+      (count, bundle) => count + bundle.edges.length,
+      0
+    ) -
+    representedBundles.reduce(
+      (count, bundle) => count + bundle.edges.length,
+      0
+    );
   const internalConnections = projection.groups.reduce(
     (count, group) => count + group.internalEdges.length,
     0
   );
   const pendingConnections = projection.pendingEdges.length;
   const notDrawnConnections =
-    collapsedConnections + summarizedConnections + internalConnections + pendingConnections;
+    collapsedConnections +
+    summarizedConnections +
+    internalConnections +
+    pendingConnections;
   const busTypes = new Map<string, string>();
   for (const route of wiring?.routes ?? []) {
     for (const connection of route.connections) {
       const current = busTypes.get(route.bus);
-      if (!current || relationshipPriorityTier(connection.type) < relationshipPriorityTier(current)
-        || (relationshipPriorityTier(connection.type) === relationshipPriorityTier(current) && connection.type < current)) busTypes.set(route.bus, connection.type);
+      if (
+        !current ||
+        relationshipPriorityTier(connection.type) <
+          relationshipPriorityTier(current) ||
+        (relationshipPriorityTier(connection.type) ===
+          relationshipPriorityTier(current) &&
+          connection.type < current)
+      )
+        busTypes.set(route.bus, connection.type);
     }
   }
   const busColors = [
@@ -364,12 +409,14 @@ export function SemanticGraphOverview({
     '#c4b5fd',
   ];
   const busColor = (id: string) =>
-    relationshipPriority && busTypes.has(id) ? getRelationshipConfig(busTypes.get(id)! as RelationshipType).hexColor : busColors[
-      Array.from(id).reduce(
-        (hash, char) => (hash * 31 + char.charCodeAt(0)) >>> 0,
-        0
-      ) % busColors.length
-    ];
+    relationshipPriority && busTypes.has(id)
+      ? getRelationshipConfig(busTypes.get(id)! as RelationshipType).hexColor
+      : busColors[
+          Array.from(id).reduce(
+            (hash, char) => (hash * 31 + char.charCodeAt(0)) >>> 0,
+            0
+          ) % busColors.length
+        ];
   const openGroup = (id: string) => {
     if (!browse) returnFocus.current = document.activeElement as HTMLElement;
     setGroupId(id);
