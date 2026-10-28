@@ -39,6 +39,11 @@ export async function inspectSchematicOverview(
           width: bounds.width,
           height: bounds.height,
           visible: visible(element),
+          titleSize: element.hasAttribute('data-lod-group')
+            ? parseFloat(
+                getComputedStyle(element.querySelector('span')!).fontSize
+              )
+            : null,
         };
       };
       const cards = Array.from(host.querySelectorAll('[data-lod-group]')).map(
@@ -99,7 +104,9 @@ export async function inspectSchematicOverview(
         },
       };
     });
-  await expect.poll(async () => (await read()).cards.length).toBe(expectedCards);
+  await expect
+    .poll(async () => (await read()).cards.length)
+    .toBe(expectedCards);
   await expect
     .poll(async () => (await read()).routes.length)
     .toBeGreaterThan(0);
@@ -111,6 +118,7 @@ export async function inspectSchematicOverview(
       'Schematic card must have visible width'
     ).toBeGreaterThan(0);
     expect(card.height).toBeGreaterThan(0);
+    expect(card.titleSize).toBeGreaterThanOrEqual(18);
     expect(card.x).toBeGreaterThanOrEqual(geometry.bounds.left);
     expect(card.x + card.width).toBeLessThanOrEqual(geometry.bounds.right);
     expect(card.y).toBeGreaterThanOrEqual(geometry.bounds.top);

@@ -42,11 +42,11 @@ describe('graph symbol content geometry', () => {
       },
       measure
     );
-    expect(short.height).toBeLessThan(100);
+    expect(short.height).toBeLessThan(110);
     expect(long.height).toBeGreaterThan(short.height);
-    expect(long.width).toBeLessThanOrEqual(300);
+    expect(long.width).toBeLessThanOrEqual(320);
     expect(long.titleY - ITEM_TITLE_SIZE / 2).toBeGreaterThan(
-      -long.height / 2 + 30
+      -long.height / 2 + 34
     );
     expect(long.descriptionY - 6).toBeGreaterThan(
       long.titleY +
@@ -67,7 +67,7 @@ describe('graph symbol content geometry', () => {
       measure
     );
     expect(sheet.height - plain.height).toBe(24);
-    expect(sheet.height / 2 - sheet.footerY).toBe(40);
+    expect(sheet.height / 2 - sheet.footerY).toBe(42);
   });
 
   it('reserves compact title width and height at readable zoom sizes', () => {
@@ -83,7 +83,7 @@ describe('graph symbol content geometry', () => {
       expect(layout.compact).toBe(true);
       expect(
         ITEM_TITLE_SIZE * layout.titleScale * scale
-      ).toBeGreaterThanOrEqual(12);
+      ).toBeGreaterThanOrEqual(14);
       expect(layout.titleCenterY).toBe(0);
       for (const line of layout.title)
         expect(
@@ -96,7 +96,7 @@ describe('graph symbol content geometry', () => {
   });
 
   it('rounds label ink upward and preserves horizontal and vertical padding', () => {
-    expect(edgeLabelDimensions(94.9, 18.2)).toEqual({ width: 135, height: 29 });
-    expect(edgeLabelDimensions(0, 0)).toEqual({ width: 40, height: 26 });
+    expect(edgeLabelDimensions(94.9, 18.2)).toEqual({ width: 135, height: 30 });
+    expect(edgeLabelDimensions(0, 0)).toEqual({ width: 40, height: 30 });
   });
 });

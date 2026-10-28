@@ -1,9 +1,9 @@
 export const GRAPH_FONT_FAMILY = 'system-ui, sans-serif';
-export const ITEM_TITLE_SIZE = 16;
-export const ITEM_TITLE_LINE = 21;
-export const ITEM_HEADER_HEIGHT = 30;
-export const EDGE_LABEL_SIZE = 12;
-export const EDGE_LABEL_HEIGHT = 26;
+export const ITEM_TITLE_SIZE = 18;
+export const ITEM_TITLE_LINE = 24;
+export const ITEM_HEADER_HEIGHT = 34;
+export const EDGE_LABEL_SIZE = 14;
+export const EDGE_LABEL_HEIGHT = 30;
 
 export type TextMeasure = (
   text: string,
@@ -68,14 +68,14 @@ export function graphItemLayout(
 ) {
   const compact = scale < 1;
   const titleScale = compact
-    ? Math.max(1, 12 / (ITEM_TITLE_SIZE * Math.max(0.3, scale)))
+    ? Math.max(1, 14 / (ITEM_TITLE_SIZE * Math.max(0.3, scale)))
     : 1;
   const width = Math.min(
-    compact ? 220 : 300,
+    compact ? 240 : 320,
     Math.max(
-      190,
+      210,
       measure(item.title, ITEM_TITLE_SIZE, 600) + 28,
-      measure(item.type, 12, 700) + 108
+      measure(item.type, 14, 700) + 116
     )
   );
   const title = fitGraphText(
@@ -85,16 +85,16 @@ export function graphItemLayout(
     measure
   );
   const description = item.description
-    ? fitGraphText(item.description, width - 28, 12, measure, 1).lines[0]
+    ? fitGraphText(item.description, width - 28, 14, measure, 1).lines[0]
     : '';
   const height = compact
     ? title.lines.length * ITEM_TITLE_LINE * titleScale + 24
     : ITEM_HEADER_HEIGHT +
       8 +
       title.lines.length * ITEM_TITLE_LINE +
-      (description ? 20 : 0) +
+      (description ? 22 : 0) +
       8 +
-      24 +
+      28 +
       (item.subgraphId ? 24 : 0);
   const titleY = compact
     ? (-(title.lines.length - 1) * ITEM_TITLE_LINE) / 2
@@ -112,8 +112,8 @@ export function graphItemLayout(
     titleY,
     titleCenterY: titleY + ((title.lines.length - 1) * ITEM_TITLE_LINE) / 2,
     description,
-    descriptionY: titleY + (title.lines.length - 1) * ITEM_TITLE_LINE + 21,
-    footerY: height / 2 - 16 - (item.subgraphId ? 24 : 0),
+    descriptionY: titleY + (title.lines.length - 1) * ITEM_TITLE_LINE + 24,
+    footerY: height / 2 - 18 - (item.subgraphId ? 24 : 0),
   };
 }
 

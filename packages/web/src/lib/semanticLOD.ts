@@ -379,8 +379,8 @@ function overviewSlots(
   height: number,
   obstacles: readonly OverviewObstacle[]
 ) {
-  const cardWidth = Math.min(184, Math.max(120, width - 32)),
-    cardHeight = 72;
+  const cardWidth = Math.min(240, Math.max(160, width - 32)),
+    cardHeight = 96;
   const columns = Math.max(1, Math.floor((width - 32) / (cardWidth + 16)));
   const rows = Math.max(0, Math.floor((height - 100) / (cardHeight + 24)));
   const slots: { x: number; y: number }[] = [];
