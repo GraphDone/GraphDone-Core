@@ -39,6 +39,8 @@ export default {
   ],
   theme: {
     extend: {
+      fontSize: { xs: ['0.875rem', { lineHeight: '1.25rem' }] },
+      fontWeight: { normal: '500', medium: '600' },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
       },

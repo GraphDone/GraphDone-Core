@@ -109,6 +109,7 @@
      viewport, including when a long sign-in page has already scrolled. */
   body {
     @apply bg-gray-900 text-gray-100;
+    font-weight: 500;
     -webkit-backface-visibility: hidden;
     backface-visibility: hidden;
   }
@@ -801,7 +802,8 @@ html[data-theme="contrast"] .node-selected {
 .workspace-surface, .signin-surface {
   background-color: var(--gd-canvas);
   color: var(--gd-ink);
-  font-family: 'Segoe UI', 'Helvetica Neue', sans-serif;
+  font-family: system-ui, sans-serif;
+  font-weight: 500;
   -webkit-font-smoothing: antialiased;
 }
 .signin-surface::before {
@@ -818,18 +820,29 @@ html[data-theme="contrast"] .node-selected {
 .signin-surface button[class*="bg-gradient"] { background-image: none; background-color: var(--gd-action); box-shadow: none; }
 .signin-surface button:hover { transform: none; }
 .workspace-toolbar { background: var(--gd-chrome); border-color: var(--gd-line); }
-.workspace-view-switcher { display: flex; align-items: center; gap: 2px; }
-.workspace-view-tab {
-  display: flex; align-items: center; justify-content: center; gap: 7px;
-  min-height: 44px; padding: 10px 9px; white-space: nowrap;
-  border-bottom: 2px solid transparent; color: var(--gd-muted);
-  transition: color 120ms, border-color 120ms;
+.workspace-view-switcher {
+  display: flex; align-items: center; gap: 6px; padding: 5px;
+  border: 1px solid var(--gd-line); border-radius: 16px; background: #11182780;
 }
-.workspace-view-tab > svg { display: none; }
-.workspace-view-tab > div { font-size: 12px; font-weight: 500; }
-.workspace-view-tab:hover { color: var(--gd-ink); border-color: var(--gd-line); }
-.workspace-view-tab[aria-pressed="true"] { color: var(--gd-accent); border-color: var(--gd-accent); }
-@media (min-width: 1600px) { .workspace-view-tab > svg { display: block; width: 17px; height: 17px; } }
+.workspace-view-tab {
+  position: relative; display: flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px; flex-shrink: 0; border-radius: 11px;
+  color: #bdc9d9; border: 1px solid transparent;
+  transition: color 120ms, background-color 120ms, border-color 120ms;
+}
+.workspace-view-tab > svg { display: block; width: 24px; height: 24px; }
+.workspace-view-tab:hover { color: #fff; background: #334155; }
+.workspace-view-tab[aria-pressed="true"] {
+  color: #b3ffe8; background: #25473f; border-color: #5eead4;
+  box-shadow: inset 0 -3px #5eead4;
+}
+.workspace-view-tooltip {
+  position: absolute; top: calc(100% + 10px); left: 50%; transform: translateX(-50%);
+  padding: 7px 12px; border: 1px solid #64748b; border-radius: 8px;
+  background: #0f172a; color: #f1f5f9; font-size: 14px; font-weight: 600;
+  line-height: 20px; white-space: nowrap; pointer-events: none; z-index: 100;
+  box-shadow: 0 6px 20px #0005;
+}
 .workspace-create { background: var(--gd-action); color: #f5f4ee; border: 1px solid #a68cff; }
 .workspace-create:hover { background: #7e63f0; }
 .project-switcher { background: var(--gd-surface); border-color: var(--gd-line); box-shadow: 0 1px 2px #0002; }
@@ -840,8 +853,8 @@ html:not([data-theme="contrast"]) .workspace-surface .graph-container .node-bg {
 .workspace-surface .graph-container .node-title-bar { fill-opacity: .55; stroke-opacity: .65; }
 .workspace-surface .graph-container .node-type-text { letter-spacing: .06em; }
 html:not([data-theme="contrast"]) .workspace-surface .graph-container .node-title-text { fill: var(--gd-ink); }
-.workspace-surface .graph-container .edge { stroke-opacity: .55; }
-.workspace-surface .graph-container .edge-label-bg { stroke-opacity: .55; }
+.workspace-surface .graph-container .edge { stroke-opacity: .9; }
+.workspace-surface .graph-container .edge-label-bg { stroke-opacity: .9; }
 .workspace-surface button:focus-visible, .signin-surface button:focus-visible {
   outline: 2px solid var(--gd-accent); outline-offset: 3px;
 }
@@ -850,7 +863,6 @@ html:not([data-theme="contrast"]) .workspace-surface .graph-container .node-titl
 .signin-headline-accent { color: #f6a280; }
 .work-illustration { display: none; width: 100%; max-width: 420px; margin-top: 28px; }
 @media (min-width: 1024px) and (min-height: 700px) { .work-illustration { display: block; } }
-.workspace-view-tab[aria-pressed="true"] { background: #302951; border-radius: 6px 6px 0 0; }
 .signin-card { border-top: 3px solid #9678ff; }
 .workspace-surface nav a[aria-current="page"] { background: #342e59; color: #e0d4ff; box-shadow: inset 3px 0 #a186ff; }
 

@@ -23,6 +23,7 @@ export interface EdgeRouteLabel {
   t: number;
   rotation: number;
   iconRotation: number;
+  offset: number;
 }
 
 const finitePoint = (point: Point) =>
@@ -159,6 +160,82 @@ export function projectEdgeRoutePointer(
   return bestT;
 }
 
+export function edgeRouteArrowBounds(
+  route: EdgeRouteGeometry,
+  scale = 1
+): ObstacleBox {
+  const angle = (route.target.angle * Math.PI) / 180;
+  const points = [
+    [-16, -8],
+    [0, 0],
+    [-16, 8],
+    [-8, 0],
+  ].map(([x, y]) => ({
+    x: route.target.x + (x * Math.cos(angle) - y * Math.sin(angle)) * scale,
+    y: route.target.y + (x * Math.sin(angle) + y * Math.cos(angle)) * scale,
+  }));
+  const left = Math.min(...points.map(p => p.x)),
+    right = Math.max(...points.map(p => p.x));
+  const top = Math.min(...points.map(p => p.y)),
+    bottom = Math.max(...points.map(p => p.y));
+  return {
+    x: (left + right) / 2,
+    y: (top + bottom) / 2,
+    width: right - left,
+    height: bottom - top,
+  };
+}
+
+export function edgeSegmentHitsBox(
+  segment: Pick<EdgeRouteSegment, 'source' | 'target'>,
+  box: ObstacleBox,
+  padding = 0
+) {
+  let first = 0,
+    last = 1;
+  for (const [axis, span] of [
+    ['x', 'width'],
+    ['y', 'height'],
+  ] as const) {
+    const low = box[axis] - box[span] / 2 - padding,
+      high = box[axis] + box[span] / 2 + padding;
+    const delta = segment.target[axis] - segment.source[axis];
+    if (delta === 0) {
+      if (segment.source[axis] < low || segment.source[axis] > high)
+        return false;
+    } else {
+      const a = (low - segment.source[axis]) / delta,
+        b = (high - segment.source[axis]) / delta;
+      first = Math.max(first, Math.min(a, b));
+      last = Math.min(last, Math.max(a, b));
+      if (first > last) return false;
+    }
+  }
+  return true;
+}
+
+export function edgeSegmentHitsRotatedBox(
+  segment: Pick<EdgeRouteSegment, 'source' | 'target'>,
+  box: ObstacleBox,
+  rotation: number,
+  padding = 0
+) {
+  const angle = (rotation * Math.PI) / 180;
+  const local = (point: { x: number; y: number }) => {
+    const x = point.x - box.x,
+      y = point.y - box.y;
+    return {
+      x: x * Math.cos(angle) + y * Math.sin(angle),
+      y: -x * Math.sin(angle) + y * Math.cos(angle),
+    };
+  };
+  return edgeSegmentHitsBox(
+    { source: local(segment.source), target: local(segment.target) },
+    { x: 0, y: 0, width: box.width, height: box.height },
+    padding
+  );
+}
+
 export function edgeRouteLabel(
   route: EdgeRouteGeometry,
   options: {
@@ -167,6 +244,10 @@ export function edgeRouteLabel(
     offset?: number;
     padding?: number;
     obstacles?: readonly ObstacleBox[];
+    segments?: readonly Pick<EdgeRouteSegment, 'source' | 'target'>[];
+    offsets?: readonly number[];
+    viewport?: ObstacleBox;
+    budget?: { remaining: number };
   }
 ) {
   const { dims, obstacles = [] } = options;
@@ -196,42 +277,115 @@ export function edgeRouteLabel(
     const height =
       Math.abs(Math.sin(radians)) * dims.width +
       Math.abs(Math.cos(radians)) * dims.height;
-    for (const distance of new Set([
-      clamp(desired, low, high),
-      (low + high) / 2,
-      low,
-      high,
-    ])) {
-      const local = (distance - segment.start) / segment.length;
-      const x =
-        segment.source.x +
-        (segment.target.x - segment.source.x) * local +
-        Math.sin(radians) * offset;
-      const y =
-        segment.source.y +
-        (segment.target.y - segment.source.y) * local -
-        Math.cos(radians) * offset;
-      if (
-        obstacles.some(
-          box =>
+    for (const candidateOffset of options.offsets ?? [offset]) {
+      if (!Number.isFinite(candidateOffset)) continue;
+      let visibleLow = low,
+        visibleHigh = high;
+      if (options.viewport) {
+        const center = {
+          x: segment.source.x + Math.sin(radians) * candidateOffset,
+          y: segment.source.y - Math.cos(radians) * candidateOffset,
+        };
+        for (const [axis, span, footprint] of [
+          ['x', 'width', width],
+          ['y', 'height', height],
+        ] as const) {
+          const half = (options.viewport[span] - footprint) / 2 - padding;
+          const delta =
+            (segment.target[axis] - segment.source[axis]) / segment.length;
+          if (
+            half < 0 ||
+            (!delta && Math.abs(center[axis] - options.viewport[axis]) > half)
+          ) {
+            visibleLow = Infinity;
+            break;
+          }
+          if (!delta) continue;
+          const a =
+            segment.start +
+            (options.viewport[axis] - half - center[axis]) / delta;
+          const b =
+            segment.start +
+            (options.viewport[axis] + half - center[axis]) / delta;
+          visibleLow = Math.max(visibleLow, Math.min(a, b));
+          visibleHigh = Math.min(visibleHigh, Math.max(a, b));
+        }
+      }
+      if (visibleLow > visibleHigh) continue;
+      for (const distance of new Set([
+        clamp(desired, visibleLow, visibleHigh),
+        (visibleLow + visibleHigh) / 2,
+        visibleLow,
+        visibleHigh,
+      ])) {
+        const local = (distance - segment.start) / segment.length;
+        const x =
+          segment.source.x +
+          (segment.target.x - segment.source.x) * local +
+          Math.sin(radians) * candidateOffset;
+        const y =
+          segment.source.y +
+          (segment.target.y - segment.source.y) * local -
+          Math.cos(radians) * candidateOffset;
+        const viewport = options.viewport;
+        if (
+          viewport &&
+          (Math.abs(x - viewport.x) + width / 2 + padding >
+            viewport.width / 2 ||
+            Math.abs(y - viewport.y) + height / 2 + padding >
+              viewport.height / 2)
+        )
+          continue;
+        let blocked = false;
+        for (const box of obstacles) {
+          if (options.budget) {
+            if (options.budget.remaining <= 0) return best;
+            options.budget.remaining--;
+          }
+          if (
             Math.abs(x - box.x) < (width + box.width) / 2 + padding &&
             Math.abs(y - box.y) < (height + box.height) / 2 + padding
-        )
-      )
-        continue;
-      const delta = Math.abs(distance - desired);
-      if (
-        delta < bestDistance ||
-        (delta === bestDistance && distance / route.length < best!.t)
-      ) {
-        bestDistance = delta;
-        best = {
-          x,
-          y,
-          t: distance / route.length,
-          rotation,
-          iconRotation: flipped ? 180 : 0,
-        };
+          ) {
+            blocked = true;
+            break;
+          }
+        }
+        if (blocked) continue;
+        for (const part of options.segments ?? []) {
+          if (options.budget) {
+            if (options.budget.remaining <= 0) return best;
+            options.budget.remaining--;
+          }
+          if (
+            edgeSegmentHitsRotatedBox(
+              part,
+              { x, y, width: dims.width, height: dims.height },
+              rotation,
+              padding
+            )
+          ) {
+            blocked = true;
+            break;
+          }
+        }
+        if (blocked) continue;
+        const delta =
+          Math.abs(distance - desired) +
+          Math.abs(candidateOffset - offset) * 0.01;
+        if (
+          delta < bestDistance ||
+          (delta === bestDistance && distance / route.length < best!.t)
+        ) {
+          bestDistance = delta;
+          best = {
+            x,
+            y,
+            t: distance / route.length,
+            rotation,
+            iconRotation: flipped ? 180 : 0,
+            offset: candidateOffset,
+          };
+        }
       }
     }
   }

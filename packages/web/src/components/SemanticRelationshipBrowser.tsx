@@ -17,6 +17,8 @@ interface Props {
   onBack: () => void;
   focusId?: string;
   visible: boolean;
+  backLabel?: string;
+  onEdit?: (id: string) => void;
 }
 
 export function SemanticRelationshipBrowser({
@@ -28,7 +30,10 @@ export function SemanticRelationshipBrowser({
   onBack,
   focusId,
   visible,
+  backLabel = 'Back to groups',
+  onEdit,
 }: Props) {
+  const [page, setPage] = useState(0);
   const [type, setType] = useState('');
   const [search, setSearch] = useState('');
   const [direction, setDirection] = useState<RelationshipDirection>('both');
@@ -63,6 +68,16 @@ export function SemanticRelationshipBrowser({
       ),
     [index, related, type, search]
   );
+  const pageSize = 250;
+  const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
+  const currentPage = Math.min(page, pageCount - 1);
+  const pageRows = rows.slice(
+    currentPage * pageSize,
+    (currentPage + 1) * pageSize
+  );
+  useEffect(() => {
+    setPage(0);
+  }, [scope, type, search, direction, hops]);
   const missingGroup =
     scope.kind === 'internal'
       ? !relationshipGroupLabel(index, scope.group)
@@ -114,7 +129,7 @@ export function SemanticRelationshipBrowser({
             >
               {item.title}
             </button>
-            <p className="text-xs text-gray-300">{contextFor(id)}</p>
+            <p className="text-sm text-gray-300">{contextFor(id)}</p>
             <button
               aria-label={`Explore relationships of ${item.title}`}
               onClick={() => {
@@ -122,7 +137,7 @@ export function SemanticRelationshipBrowser({
                 setSearch('');
                 onScope({ kind: 'node', id });
               }}
-              className="min-h-11 text-xs text-emerald-200 text-left"
+              className="min-h-11 text-sm text-emerald-200 text-left"
             >
               Explore from here
             </button>
@@ -130,10 +145,10 @@ export function SemanticRelationshipBrowser({
         ) : (
           <>
             <span>{id}</span>
-            <p className="text-xs text-amber-200">Endpoint not loaded</p>
+            <p className="text-sm text-amber-200">Endpoint not loaded</p>
           </>
         )}
-        {item && <p className="text-xs text-gray-400 break-all">{id}</p>}
+        {item && <p className="text-sm text-gray-400 break-all">{id}</p>}
       </div>
     );
   };
@@ -145,6 +160,7 @@ export function SemanticRelationshipBrowser({
       aria-label="Graph relationships"
       data-lod-controls="true"
       data-graph-fit-obstacle="true"
+      onClick={event => event.stopPropagation()}
       onFocusCapture={event => {
         ownedFocus.current = event.target as HTMLElement;
       }}
@@ -157,14 +173,14 @@ export function SemanticRelationshipBrowser({
           onBack();
         }
       }}
-      className="absolute inset-x-3 top-28 bottom-3 sm:top-16 sm:inset-x-auto sm:left-16 sm:w-96 pointer-events-auto overflow-auto rounded-xl border border-gray-600 bg-gray-950 p-4 text-gray-100 shadow-xl"
+      className="absolute z-30 inset-x-3 top-28 bottom-3 sm:top-16 sm:inset-x-auto sm:left-16 sm:w-96 pointer-events-auto overflow-auto rounded-xl border border-gray-600 bg-gray-950 p-4 text-gray-100 shadow-xl"
     >
       <button
         ref={back}
         onClick={onBack}
         className="min-h-11 text-sm text-emerald-200"
       >
-        Back to groups
+        {backLabel}
       </button>
       <h2 className="text-base font-semibold break-words">{title}</h2>
       {missingGroup && (
@@ -172,7 +188,7 @@ export function SemanticRelationshipBrowser({
           This group is no longer present in the loaded graph.
         </p>
       )}
-      <p className="my-2 text-xs text-gray-300">
+      <p className="my-2 text-sm text-gray-300">
         Source → target follows the stored relationship direction.
       </p>
       {scope.kind === 'node' && (
@@ -233,14 +249,49 @@ export function SemanticRelationshipBrowser({
       <p role="status" className="text-sm my-3">
         {rows.length} of {related.length} relationships
       </p>
+      {pageCount > 1 && (
+        <nav
+          aria-label="Relationship pages"
+          className="flex items-center justify-between gap-2 my-3 text-sm"
+        >
+          <button
+            className="min-h-11 px-3 rounded border border-gray-600 disabled:opacity-40"
+            disabled={currentPage === 0}
+            onClick={() => setPage(currentPage - 1)}
+          >
+            Previous relationships
+          </button>
+          <span>
+            {currentPage * pageSize + 1}–
+            {Math.min(rows.length, (currentPage + 1) * pageSize)} of{' '}
+            {rows.length}
+          </span>
+          <button
+            className="min-h-11 px-3 rounded border border-gray-600 disabled:opacity-40"
+            disabled={currentPage + 1 === pageCount}
+            onClick={() => setPage(currentPage + 1)}
+          >
+            Next relationships
+          </button>
+        </nav>
+      )}
       <ul className="space-y-3">
-        {rows.map(edge => (
+        {pageRows.map(edge => (
           <li
             key={edge.id}
             data-lod-edge-id={edge.id}
             className="rounded border border-gray-700 bg-gray-900 p-3"
           >
-            <p className="text-xs text-gray-300 break-all">{edge.id}</p>
+            <p className="text-sm text-gray-300 break-all">{edge.id}</p>
+            {onEdit && (
+              <button
+                className="min-h-11 text-sm text-emerald-200"
+                onClick={() => onEdit(edge.id)}
+                aria-label={`Edit relationship ${edge.id}`}
+              >
+                Edit relationship
+              </button>
+            )}
             {endpoint(relationshipEndpoint(edge.source))}
             <p className="text-sm font-semibold my-1">→ {edge.type}</p>
             {endpoint(relationshipEndpoint(edge.target))}

@@ -36,7 +36,10 @@ export const SEQUENCES = {
     'tests/e2e/graph/nested-semantic-lod.spec.ts', `--project=${PW}`, '--headed', '--workers=1', '--retries=0', '--trace=retain-on-failure',
   ], blocking: true },
   'item-wires': { adapter: 'playwright', title: 'Item wire consumer acceptance', args: [
-    'tests/e2e/graph/item-wire-consumers.spec.ts', `--project=${PW}`, '--headed', '--workers=1', '--retries=0', '--trace=retain-on-failure',
+    'tests/e2e/graph/item-wire-consumers.spec.ts', 'tests/e2e/graph/item-symbols.spec.ts', `--project=${PW}`, '--headed', '--workers=1', '--retries=0', '--trace=retain-on-failure',
+  ], blocking: true },
+  'large-symbols': { adapter: 'playwright', title: 'Two thousand item zoom acceptance', args: [
+    'tests/e2e/graph/large-graph-symbols.spec.ts', `--project=${PW}`, '--workers=1', '--retries=0', '--trace=retain-on-failure',
   ], blocking: true },
   'schematic-visual': { adapter: 'playwright', title: 'Schematic fixture visual acceptance', args: [
     '--config=playwright.schematic.config.ts', '--workers=1', '--retries=0', '--trace=retain-on-failure',
@@ -68,8 +71,8 @@ export const SEQUENCES = {
 
 export const PROFILES = {
   smoke: ['unit-web', 'smoke', 'e2e-auth'],
-  pr: ['unit-web', 'smoke', 'e2e-auth', 'e2e-graph', 'semantic-lod', 'nested-lod', 'item-wires', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'perf-budgets'],
-  full: ['unit-web', 'smoke', 'e2e-auth', 'e2e-graph', 'semantic-lod', 'nested-lod', 'item-wires', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'perf-budgets', 'diagnostics', 'showcase', 'matrix', 'vlm', 'perf-scale', 'cloud-audit'],
+  pr: ['unit-web', 'smoke', 'e2e-auth', 'e2e-graph', 'semantic-lod', 'nested-lod', 'item-wires', 'large-symbols', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'perf-budgets'],
+  full: ['unit-web', 'smoke', 'e2e-auth', 'e2e-graph', 'semantic-lod', 'nested-lod', 'item-wires', 'large-symbols', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'perf-budgets', 'diagnostics', 'showcase', 'matrix', 'vlm', 'perf-scale', 'cloud-audit'],
   report: ['diagnostics', 'showcase', 'matrix', 'vlm', 'perf-scale', 'cloud-audit'],
   live: ['live-journey'],
 };

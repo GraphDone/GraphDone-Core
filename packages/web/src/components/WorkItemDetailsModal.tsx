@@ -869,7 +869,7 @@ export function WorkItemDetailsModal({
                             }`}>{type.label}</span>
                           </div>
                           {currentNode.type === type.value && (
-                            <div className="w-5 h-5 bg-gradient-to-br from-emerald-500 to-green-600 text-white rounded-full flex items-center justify-center text-[10px] ml-1 flex-shrink-0 shadow-lg shadow-emerald-500/30 animate-in zoom-in duration-200">
+                            <div className="w-5 h-5 bg-gradient-to-br from-emerald-500 to-green-600 text-white rounded-full flex items-center justify-center text-xs ml-1 flex-shrink-0 shadow-lg shadow-emerald-500/30 animate-in zoom-in duration-200">
                               ✓
                             </div>
                           )}
@@ -929,7 +929,7 @@ export function WorkItemDetailsModal({
                             }`}>{status.label}</span>
                           </div>
                           {currentNode.status === status.value && (
-                            <div className="w-5 h-5 bg-gradient-to-br from-emerald-500 to-green-600 text-white rounded-full flex items-center justify-center text-[10px] ml-1 flex-shrink-0 shadow-lg shadow-emerald-500/30 animate-in zoom-in duration-200">
+                            <div className="w-5 h-5 bg-gradient-to-br from-emerald-500 to-green-600 text-white rounded-full flex items-center justify-center text-xs ml-1 flex-shrink-0 shadow-lg shadow-emerald-500/30 animate-in zoom-in duration-200">
                               ✓
                             </div>
                           )}
@@ -1231,7 +1231,7 @@ export function WorkItemDetailsModal({
                   <GitBranch className="h-8 w-8 text-gray-500 mx-auto" />
                 </div>
                 <p className="text-gray-400 text-xs font-medium mb-1">No connections yet</p>
-                <p className="text-gray-500 text-[10px]">Use Connect button to link nodes</p>
+                <p className="text-gray-500 text-xs">Use Connect button to link nodes</p>
               </div>
             ) : (
 
@@ -1318,7 +1318,7 @@ export function WorkItemDetailsModal({
                     </div>
                     <span className="text-xs text-gray-400 font-medium">Work Item ID</span>
                   </div>
-                  <span className="text-[10px] text-gray-400 font-mono bg-gray-700/50 px-1.5 py-0.5 rounded border border-gray-600/40">{currentNode.id}</span>
+                  <span className="text-xs text-gray-400 font-mono bg-gray-700/50 px-1.5 py-0.5 rounded border border-gray-600/40">{currentNode.id}</span>
                 </div>
               </div>
             </div>

@@ -9,6 +9,8 @@ import {
 } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { SemanticGraphOverview } from './SemanticGraphOverview';
+import { SemanticRelationshipBrowser } from './SemanticRelationshipBrowser';
+import { indexSemanticRelationships } from '../lib/semanticRelationships';
 import type { SemanticEdge, SemanticItem } from '../lib/semanticLOD';
 
 const items: SemanticItem[] = ['Gateway', 'Queue', 'Worker', 'Inventory'].map(
@@ -390,4 +392,50 @@ it('explains when a live regrouping removes the group whose relationships are op
   ).toBeVisible();
   fireEvent.click(screen.getByRole('button', { name: 'Back to groups' }));
   expect(screen.getByRole('region', { name: 'Graph groups' })).toBeVisible();
+});
+
+it('bounds relationship rows while retaining search, exact editing and every page', () => {
+  const many = Array.from({ length: 501 }, (_, index) => ({
+    id: `edge-${String(index).padStart(4, '0')}`,
+    source: 'n0',
+    target: 'n1',
+    type: 'BLOCKS',
+  }));
+  const edit = vi.fn();
+  render(
+    <SemanticRelationshipBrowser
+      index={indexSemanticRelationships(items, many)}
+      scope={{ kind: 'all' }}
+      contextFor={() => ''}
+      onScope={noop}
+      onInspect={noop}
+      onBack={noop}
+      onEdit={edit}
+      visible
+    />
+  );
+  expect(edgeIds()).toEqual(many.slice(0, 250).map(edge => edge.id));
+  expect(screen.getByText('501 of 501 relationships')).toBeVisible();
+  const pages = within(
+    screen.getByRole('navigation', { name: 'Relationship pages' })
+  );
+  fireEvent.click(pages.getByRole('button', { name: 'Next relationships' }));
+  expect(edgeIds()).toEqual(many.slice(250, 500).map(edge => edge.id));
+  fireEvent.click(pages.getByRole('button', { name: 'Next relationships' }));
+  expect(edgeIds()).toEqual(['edge-0500']);
+  expect(
+    pages.getByRole('button', { name: 'Next relationships' })
+  ).toBeDisabled();
+  fireEvent.change(screen.getByLabelText('Find a relationship'), {
+    target: { value: 'edge-0003' },
+  });
+  expect(edgeIds()).toEqual(['edge-0003']);
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Edit relationship edge-0003' })
+  );
+  expect(edit).toHaveBeenCalledWith('edge-0003');
+  fireEvent.change(screen.getByLabelText('Find a relationship'), {
+    target: { value: '' },
+  });
+  expect(edgeIds()).toEqual(many.slice(0, 250).map(edge => edge.id));
 });

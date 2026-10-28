@@ -50,7 +50,7 @@ export function NodeInspector({ node, onClose, onEdit, compact = false, rootTest
       {/* Header */}
       <div className="flex items-start gap-2 p-3 border-b border-gray-700/60">
         <div className="flex-1 min-w-0">
-          <div className="text-[10px] uppercase tracking-wide" style={{ color: typeCfg.hexColor }}>{typeCfg.label}</div>
+          <div className="text-xs uppercase tracking-wide" style={{ color: typeCfg.hexColor }}>{typeCfg.label}</div>
           <div className="text-sm font-semibold text-white truncate" title={node.title}>{node.title}</div>
           <div className="mt-0.5"><CopyableId id={node.id} /></div>
         </div>
@@ -78,7 +78,7 @@ export function NodeInspector({ node, onClose, onEdit, compact = false, rootTest
               <div>
                 <div className="text-xs text-gray-500 mb-1">Tags</div>
                 <div className="flex flex-wrap gap-1">
-                  {node.tags.map((t: string) => <span key={t} className="text-[11px] bg-gray-700/60 text-gray-200 rounded px-1.5 py-0.5">{t}</span>)}
+                  {node.tags.map((t: string) => <span key={t} className="text-xs bg-gray-700/60 text-gray-200 rounded px-1.5 py-0.5">{t}</span>)}
                 </div>
               </div>
             )}

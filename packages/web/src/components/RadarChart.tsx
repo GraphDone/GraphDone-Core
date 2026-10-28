@@ -84,7 +84,7 @@ export function RadarChart({
         .attr('y', labelY)
         .attr('text-anchor', 'middle')
         .attr('dominant-baseline', 'middle')
-        .attr('font-size', '13px')
+        .attr('font-size', '14px')
         .attr('font-weight', '500')
         .attr('opacity', 0)
         .text(labelText);
@@ -112,7 +112,7 @@ export function RadarChart({
         .attr('y', labelY)
         .attr('text-anchor', 'middle')
         .attr('dominant-baseline', 'middle')
-        .attr('font-size', '13px')
+        .attr('font-size', '14px')
         .attr('font-weight', '500')
         .attr('fill', 'white')
         .text(labelText);
@@ -173,10 +173,10 @@ export function RadarChart({
       g.append('text')
         .attr('x', 5)
         .attr('y', -(levelFactor * level) + 3)
-        .attr('font-size', '11px')
-        .attr('font-weight', '400')
+        .attr('font-size', '14px')
+        .attr('font-weight', '500')
         .attr('fill', 'white')
-        .attr('opacity', 0.7)
+        .attr('opacity', 0.9)
         .text(`${value}`);
     }
 

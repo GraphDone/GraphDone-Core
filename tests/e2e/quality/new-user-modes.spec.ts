@@ -5,10 +5,10 @@ const cloud = process.env.QC_BACKEND === 'cloud';
 const base = process.env.TEST_URL || 'http://localhost:3127';
 const api = process.env.QC_API_URL || 'http://localhost:8797/api/graphql';
 const modes = [
-  ['cards','List','Card View'], ['dashboard','Dashboard','Dashboard View'],
-  ['table','Table','Table View'], ['kanban','Board','Kanban View'],
-  ['gantt','Gantt','Gantt Chart'], ['calendar','Calendar','Calendar View'],
-  ['activity','Activity','Activity Feed'], ['graph','Graph','Graph View'],
+  ['cards','List','Card'], ['dashboard','Dashboard','Dashboard'],
+  ['table','Table','Table'], ['kanban','Board','Kanban'],
+  ['gantt','Gantt','Gantt'], ['calendar','Calendar','Calendar'],
+  ['activity','Activity','Activity'], ['graph','Graph','Graph'],
 ];
 for (const [width,height] of [[360,640],[844,390],[1440,900]]) {
   test(`same saved work in all modes ${width}×${height} @newuser`, async ({page},info) => {
@@ -51,9 +51,9 @@ for (const [width,height] of [[360,640],[844,390],[1440,900]]) {
       await page.goto(base);
       const navigation = page.getByTestId('mobile-bottom-nav')
         .or(page.getByRole('combobox',{name:'Workspace view'}))
-        .or(page.getByTitle('Card View',{exact:true}));
+        .or(page.getByRole('group',{name:'Workspace views'}).getByRole('button',{name:'Card',exact:true}));
       await expect(navigation.and(page.locator(':visible')).first()).toBeVisible();
-      for(const [mode,label,title] of modes) {
+      for(const [mode,label,buttonName] of modes) {
         if(await page.getByTestId('mobile-bottom-nav').isVisible()) {
           const nav=page.getByTestId('mobile-bottom-nav');
           if(mode==='cards'||mode==='graph') await nav.getByRole('button',{name:label,exact:true}).click();
@@ -62,7 +62,7 @@ for (const [width,height] of [[360,640],[844,390],[1440,900]]) {
             await page.getByRole('dialog',{name:'More navigation'}).getByRole('button',{name:label,exact:true}).click();
           }
         } else if(await page.getByRole('combobox',{name:'Workspace view'}).isVisible()) await page.getByRole('combobox',{name:'Workspace view'}).selectOption(mode);
-        else await page.getByTitle(title,{exact:true}).click();
+        else await page.getByRole('group',{name:'Workspace views'}).getByRole('button',{name:buttonName,exact:true}).click();
         await expect.poll(()=>page.evaluate(()=>localStorage.getItem('graphdone:viewMode'))).toBe(mode);
         const scope=mode==='graph'?page.locator('.graph-container'):page.getByTestId('view-content');
         await expect(scope.getByText('QC scheduled work',{exact:true}).and(page.locator(':visible')).first()).toBeVisible({timeout:15000});
