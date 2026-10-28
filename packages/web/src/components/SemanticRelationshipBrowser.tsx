@@ -129,7 +129,7 @@ export function SemanticRelationshipBrowser({
             >
               {item.title}
             </button>
-            <p className="text-xs text-gray-300">{contextFor(id)}</p>
+            <p className="text-sm text-gray-300">{contextFor(id)}</p>
             <button
               aria-label={`Explore relationships of ${item.title}`}
               onClick={() => {
@@ -137,7 +137,7 @@ export function SemanticRelationshipBrowser({
                 setSearch('');
                 onScope({ kind: 'node', id });
               }}
-              className="min-h-11 text-xs text-emerald-200 text-left"
+              className="min-h-11 text-sm text-emerald-200 text-left"
             >
               Explore from here
             </button>
@@ -145,10 +145,10 @@ export function SemanticRelationshipBrowser({
         ) : (
           <>
             <span>{id}</span>
-            <p className="text-xs text-amber-200">Endpoint not loaded</p>
+            <p className="text-sm text-amber-200">Endpoint not loaded</p>
           </>
         )}
-        {item && <p className="text-xs text-gray-400 break-all">{id}</p>}
+        {item && <p className="text-sm text-gray-400 break-all">{id}</p>}
       </div>
     );
   };
@@ -187,7 +187,7 @@ export function SemanticRelationshipBrowser({
           This group is no longer present in the loaded graph.
         </p>
       )}
-      <p className="my-2 text-xs text-gray-300">
+      <p className="my-2 text-sm text-gray-300">
         Source → target follows the stored relationship direction.
       </p>
       {scope.kind === 'node' && (
@@ -281,7 +281,7 @@ export function SemanticRelationshipBrowser({
             data-lod-edge-id={edge.id}
             className="rounded border border-gray-700 bg-gray-900 p-3"
           >
-            <p className="text-xs text-gray-300 break-all">{edge.id}</p>
+            <p className="text-sm text-gray-300 break-all">{edge.id}</p>
             {onEdit && (
               <button
                 className="min-h-11 text-sm text-emerald-200"

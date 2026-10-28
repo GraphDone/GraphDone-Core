@@ -18,7 +18,7 @@ export async function readItemSymbols(page: Page) {
       b.x + b.width <= a.x + a.width + 0.5 &&
       b.y + b.height <= a.y + a.height + 0.5;
     const viewport = rect(host);
-    const visible = (element: Element) => {
+    const visible = (element: Element, stroked = false) => {
       for (
         let current: Element | null = element;
         current;
@@ -34,7 +34,9 @@ export async function readItemSymbols(page: Page) {
       }
       const bounds = rect(element);
       return (
-        bounds.width > 0 && bounds.height > 0 && overlaps(bounds, viewport)
+        (stroked
+          ? bounds.width > 0 || bounds.height > 0
+          : bounds.width > 0 && bounds.height > 0) && overlaps(bounds, viewport)
       );
     };
     const font = (element: SVGGraphicsElement) => {
@@ -45,7 +47,7 @@ export async function readItemSymbols(page: Page) {
       );
     };
     const cards = Array.from(host.querySelectorAll<SVGGElement>('.node'))
-      .filter(visible)
+      .filter(element => visible(element))
       .map(node => ({
         id: (node as any).__data__.id as string,
         detail: node.getAttribute('data-detail'),
@@ -53,7 +55,7 @@ export async function readItemSymbols(page: Page) {
         titles: Array.from(
           node.querySelectorAll<SVGGraphicsElement>('.node-title-text')
         )
-          .filter(visible)
+          .filter(element => visible(element))
           .map(text => ({
             text: text.textContent,
             box: rect(text),
@@ -64,16 +66,29 @@ export async function readItemSymbols(page: Page) {
             '.node-type-text, .node-edit-icon, .node-relationship-icon, .node-expand-icon, .node-title-text, .node-description-text, .node-meta text'
           )
         )
-          .filter(visible)
+          .filter(element => visible(element))
           .map(part => ({ kind: part.getAttribute('class'), box: rect(part) })),
       }));
     const labels = Array.from(
       host.querySelectorAll<SVGGElement>('.edge-label-group')
     )
-      .filter(visible)
+      .filter(element => visible(element))
       .map(label => {
         const text = label.querySelector<SVGGraphicsElement>('.edge-label')!;
+        const background = label.querySelector<SVGGraphicsElement>('rect')!;
+        const bounds = background.getBBox();
+        const matrix = background.getScreenCTM()!;
+        const corners = [
+          [bounds.x, bounds.y],
+          [bounds.x + bounds.width, bounds.y],
+          [bounds.x + bounds.width, bounds.y + bounds.height],
+          [bounds.x, bounds.y + bounds.height],
+        ].map(([x, y]) => {
+          const point = new DOMPoint(x, y).matrixTransform(matrix);
+          return { x: point.x, y: point.y };
+        });
         return {
+          corners,
           id: (label as any).__data__.id as string,
           box: rect(label.querySelector('rect')!),
           text: rect(text),
@@ -84,19 +99,19 @@ export async function readItemSymbols(page: Page) {
         };
       });
     const arrows = Array.from(host.querySelectorAll('.arrows-group .arrow'))
-      .filter(visible)
+      .filter(element => visible(element))
       .map(rect);
     const controls = Array.from(
       document.querySelectorAll(
         '[data-graph-fit-obstacle="true"], [data-lod-controls="true"]'
       )
     )
-      .filter(visible)
+      .filter(element => visible(element))
       .map(rect);
     const segments = Array.from(
       host.querySelectorAll<SVGPathElement>('.edges-group .edge')
     )
-      .filter(visible)
+      .filter(path => visible(path, true))
       .flatMap(path => {
         const matrix = path.getScreenCTM()!;
         const points = (path.getAttribute('d')?.match(/[ML][^ML]+/g) ?? []).map(
@@ -112,26 +127,25 @@ export async function readItemSymbols(page: Page) {
       });
     const wireHits = (
       line: (typeof segments)[number],
-      box: ReturnType<typeof rect>
+      corners: { x: number; y: number }[]
     ) => {
       let low = 0,
         high = 1;
-      for (const [axis, span] of [
-        ['x', 'width'],
-        ['y', 'height'],
-      ] as const) {
-        const delta = line.target[axis] - line.source[axis];
-        const min = box[axis] + 0.5,
-          max = box[axis] + box[span] - 0.5;
-        if (!delta) {
-          if (line.source[axis] < min || line.source[axis] > max) return false;
-        } else {
-          const a = (min - line.source[axis]) / delta,
-            b = (max - line.source[axis]) / delta;
-          low = Math.max(low, Math.min(a, b));
-          high = Math.min(high, Math.max(a, b));
-          if (low > high) return false;
-        }
+      for (let index = 0; index < corners.length; index++) {
+        const a = corners[index],
+          b = corners[(index + 1) % corners.length];
+        const dx = b.x - a.x,
+          dy = b.y - a.y,
+          length = Math.hypot(dx, dy);
+        const distance = (p: { x: number; y: number }) =>
+          (dx * (p.y - a.y) - dy * (p.x - a.x)) / length;
+        const first = distance(line.source),
+          delta = distance(line.target) - first;
+        if (Math.abs(delta) < 1e-9) {
+          if (first < 0.5) return false;
+        } else if (delta > 0) low = Math.max(low, (0.5 - first) / delta);
+        else high = Math.min(high, (0.5 - first) / delta);
+        if (low > high) return false;
       }
       return true;
     };
@@ -168,7 +182,7 @@ export async function readItemSymbols(page: Page) {
         ].some(box => overlaps(label.box, box))
       )
         violations.push(`label-overlap:${label.id}`);
-      if (segments.some(segment => wireHits(segment, label.box)))
+      if (segments.some(segment => wireHits(segment, label.corners)))
         violations.push(`label-wire-overlap:${label.id}`);
     }
     return { viewport, cards, labels, segments, violations };

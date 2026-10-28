@@ -17,8 +17,12 @@ const test = base.extend<{ ownedGraphIds: OwnedGraphs }>({
 });
 test.use({ actionTimeout: 10000 });
 
-for (const width of [1440, 390])
-  test.describe(`${width}px symbols`, () => {
+for (const { width, diagonal } of [
+  { width: 1440, diagonal: false },
+  { width: 390, diagonal: false },
+  { width: 1440, diagonal: true },
+])
+  test.describe(`${width}px ${diagonal ? 'diagonal ' : ''}symbols`, () => {
     test.use({ viewport: { width, height: 900 } });
     test('cards and labels reserve readable content through zoom @item-symbols', async ({
       page,
@@ -28,7 +32,7 @@ for (const width of [1440, 390])
       await login(page, TEST_USERS.ADMIN);
       const seeded = await ownedGraphIds.seed({
         size: 2,
-        spacing: 600,
+        spacing: diagonal ? 400 : 600,
         edgeFactor: 0,
         namePrefix: 'Readable symbols',
         titleForIndex: index =>
@@ -37,6 +41,13 @@ for (const width of [1440, 390])
             : 'Review',
         additionalEdges: [{ sourceIndex: 1, targetIndex: 0, type: 'BLOCKS' }],
       });
+      if (diagonal)
+        await gql(
+          page,
+          'mutation($id:ID!){updateWorkItems(where:{id:$id},update:{positionX:1,positionY:1}){workItems{id}}}',
+          { id: seeded.nodeIds[1] }
+        );
+      const cameraX = diagonal ? -200 : -300;
       const snapshot = async () => {
         const data = await gql(
           page,
@@ -79,12 +90,13 @@ for (const width of [1440, 390])
       const target = before.workItems.find(
         (item: { id: string }) => item.id === seeded.nodeIds[1]
       );
+      const cameraY = diagonal ? -200 : target.positionY;
       for (const scale of [0.6, 0.9, 1.2, 0.6]) {
         await page.evaluate(
           ({ x, y, scale }) => (window as any).miniMapZoom(x, y, scale),
           {
-            x: width === 390 ? target.positionX : -300,
-            y: target.positionY,
+            x: width === 390 ? target.positionX : cameraX,
+            y: cameraY,
             scale,
           }
         );
@@ -107,7 +119,8 @@ for (const width of [1440, 390])
           info,
           `symbols-${width}-${scale}`
         );
-        if (width === 1440) expect(geometry.labels.length).toBe(2);
+        if (width === 1440 && !diagonal) expect(geometry.labels.length).toBe(2);
+        if (diagonal) expect(geometry.labels.length).toBeGreaterThan(0);
       }
       const targetNode = page.locator('.node').filter({
         has: page.locator('.node-title-group > title', {
@@ -192,6 +205,34 @@ for (const width of [1440, 390])
             (element, value) => element.setAttribute('width', value!),
             original
           );
+        if (diagonal) {
+          const path = page.locator('.edges-group .edge').first();
+          const savedPath = await path.getAttribute('d');
+          await path.evaluate(element => {
+            const label = document.querySelector<SVGGElement>(
+              '.edge-label-group:not([style*="display: none"])'
+            )!;
+            const point = new DOMPoint(0, 0).matrixTransform(label.getCTM()!);
+            const local = point.matrixTransform(
+              (element.parentElement as unknown as SVGGraphicsElement)
+                .getCTM()!
+                .inverse()
+            );
+            element.setAttribute(
+              'd',
+              `M${local.x - 100},${local.y} L${local.x + 100},${local.y}`
+            );
+          });
+          expect(
+            (await readItemSymbols(page)).violations.some(value =>
+              value.startsWith('label-wire-overlap:')
+            )
+          ).toBe(true);
+          await path.evaluate(
+            (element, value) => element.setAttribute('d', value!),
+            savedPath
+          );
+        }
         await inspectItemSymbols(page, info, 'restored-after-negatives');
         await page.evaluate(() => {
           const zoom = (window as any).miniMapZoom;
@@ -208,8 +249,8 @@ for (const width of [1440, 390])
           };
         });
         const visibleMs = await page.evaluate(measureGraphZoom, {
-          x: -300,
-          y: target.positionY,
+          x: cameraX,
+          y: cameraY,
           scale: 1.2,
         });
         const totalMs = await page.evaluate(

@@ -5,6 +5,7 @@ import {
   edgeRouteLabel,
   edgeRouteArrowBounds,
   edgeSegmentHitsBox,
+  edgeSegmentHitsRotatedBox,
   pointOnEdgeRoute,
   projectEdgeRoutePointer,
 } from '../edgeRouteGeometry';
@@ -312,3 +313,37 @@ describe('item wire geometry', () => {
     ).toBeNull();
   });
 });
+
+it.each([45, 135, -45, -135])(
+  'keeps a clear diagonal label while rejecting a real crossing at %s degrees',
+  angle => {
+    const radians = (angle * Math.PI) / 180;
+    const route = createEdgeRoute([
+      { x: -1000 * Math.cos(radians), y: -1000 * Math.sin(radians) },
+      { x: 1000 * Math.cos(radians), y: 1000 * Math.sin(radians) },
+    ])!;
+    const dims = { width: 140, height: 30 };
+    const label = edgeRouteLabel(route, {
+      dims,
+      offset: 29,
+      segments: route.segments,
+      viewport: { x: 0, y: 0, width: 600, height: 600 },
+    });
+    expect(label).not.toBeNull();
+    const box = { x: label!.x, y: label!.y, ...dims };
+    expect(
+      edgeSegmentHitsRotatedBox(route.segments[0], box, label!.rotation, 8)
+    ).toBe(false);
+    expect(
+      edgeSegmentHitsRotatedBox(
+        {
+          source: { x: box.x - 100, y: box.y },
+          target: { x: box.x + 100, y: box.y },
+        },
+        box,
+        label!.rotation,
+        8
+      )
+    ).toBe(true);
+  }
+);
