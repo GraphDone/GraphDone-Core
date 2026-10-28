@@ -174,6 +174,21 @@ for (const width of [1440, 390]) {
     await expect(browser).toHaveCount(0);
     await expect(label).toBeFocused();
     expect(await camera()).toEqual(savedCamera);
+    await page.keyboard.press('Enter');
+    await expect(browser).toBeVisible();
+    await priority.focus();
+    await page.keyboard.press('End');
+    await expect(priority).toHaveValue('all');
+    await expect(label).not.toHaveAttribute('tabindex');
+    await browser
+      .getByRole('button', { name: 'Back to graph', exact: true })
+      .focus();
+    await page.keyboard.press('Enter');
+    await expect(browser).toHaveCount(0);
+    await expect(
+      graph.getByRole('button', { name: /Browse all relationships/ })
+    ).toBeFocused();
+    expect(await camera()).toEqual(savedCamera);
     const stages: unknown[] = [];
     for (const [level, count] of [
       ['dependencies', 4],
@@ -189,6 +204,28 @@ for (const width of [1440, 390]) {
       expect(await camera()).toEqual(savedCamera);
       stages.push({ level, ids: await represented(), camera: await camera() });
     }
+    await graph
+      .getByRole('button', { name: /Browse all relationships/ })
+      .click();
+    await browser
+      .getByRole('button', { name: 'Inspect Gateway', exact: true })
+      .first()
+      .click();
+    const inspector = page.getByTestId('node-inspector');
+    await expect(inspector).toContainText('Gateway');
+    const inspectionCamera = await camera();
+    await priority.click();
+    await page.keyboard.press('End');
+    await page.keyboard.press('Enter');
+    await expect(priority).toHaveValue('all');
+    await expect(inspector).toContainText('Gateway');
+    expect(await camera()).toEqual(inspectionCamera);
+    await priority.click();
+    await page.keyboard.press('Home');
+    await page.keyboard.press('Enter');
+    await expect(priority).toHaveValue('essential');
+    await expect(inspector).toContainText('Gateway');
+    await inspector.getByRole('button', { name: 'Close', exact: true }).click();
     expect(await snapshot()).toEqual(before);
     expect(writes).toEqual([]);
     await page.reload();

@@ -467,7 +467,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     setItemRelationshipScope(null);
     requestAnimationFrame(() => {
       if (document.activeElement && document.activeElement !== document.body) return;
-      (trigger?.isConnected ? trigger : itemRelationshipTriggerRef.current)?.focus({preventScroll:true});
+      if (trigger?.isConnected) trigger.focus({preventScroll:true});
+      if (document.activeElement !== trigger) itemRelationshipTriggerRef.current?.focus({preventScroll:true});
     });
   }, []);
   useEffect(() => { setItemRelationshipScope(null); setItemLabelCount(0); itemPairTriggerRef.current = null; }, [currentGraph?.id]);
