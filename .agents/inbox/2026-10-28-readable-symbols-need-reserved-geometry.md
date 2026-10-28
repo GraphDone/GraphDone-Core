@@ -71,3 +71,25 @@ the original path clears it, exact two-record browsing and the1200ms visibility
 negative pass, and the API snapshot remains unchanged. The existing horizontal
 desktop/phone cases also passed in the preceding35s batch; the batch's diagonal
 negative failure is retained separately.
+
+The owner's next visual steering requires stronger wires, icon-based workspace
+view navigation with hover/focus labels, and firmer text across the app. The
+previous workspace CSS explicitly hid navigation SVGs below1600px and forced
+12px captions. Replace that override with44px icon controls,24px glyphs and14px
+hover/focus labels, including Escape dismissal and accessible button names.
+Body text uses500 weight, control medium600; standard small text and explicit
+10/11px utility usages now use a14px floor. Readable wire weight is one3px
+screen-space value across zoom/hover restoration, with90% stroke opacity and
+non-scaling12px hit targets. Overview buses use3.5px. This changes presentation,
+not canonical relationship strength or data.
+
+Latest serial headed checks: three item-symbol/navigation cases passed36.2s;
+desktop1440 and phone360 all-eight-view saved-work journeys passed24.6s; the
+phone390 hierarchy/trace journey passed26.0s. Types passed. Small probes reuse
+owned dependencies. The priora378 CI40719477629 completed the actual2000/5000
+stage successfully but its broader suite was still running when this visual
+checkpoint was prepared. Retain that stage metadata without claiming full-run
+or artifact acceptance; new exact-source CI remains required. Independenta378
+review also records ordinary minimap occlusion of a full card's far-right strip;
+current geometry checks establish label clearance, not universal card/overlay
+clearance during arbitrary panning.

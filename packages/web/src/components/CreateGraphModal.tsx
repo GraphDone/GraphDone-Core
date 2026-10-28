@@ -284,7 +284,7 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
                     <div className={`absolute inset-0 bg-gradient-to-br ${type.bgGradient} opacity-0 group-hover:opacity-100 transition-opacity duration-300`}></div>
 
                     {type.comingSoon && (
-                      <div className="absolute top-3 right-3 bg-gradient-to-r from-gray-700 to-gray-600 text-[10px] text-gray-300 px-2.5 py-1 rounded-full font-medium shadow-md">
+                      <div className="absolute top-3 right-3 bg-gradient-to-r from-gray-700 to-gray-600 text-xs text-gray-300 px-2.5 py-1 rounded-full font-medium shadow-md">
                         Soon
                       </div>
                     )}
@@ -397,7 +397,7 @@ export function CreateGraphModal({ isOpen, onClose, parentGraphId }: CreateGraph
                   title="Template functionality coming soon!"
                   className="group p-6 border-2 rounded-2xl text-center transition-all duration-300 relative overflow-hidden border-gray-700/50 bg-gradient-to-br from-gray-800/30 to-gray-900/30 cursor-not-allowed opacity-50"
                 >
-                  <div className="absolute top-3 right-3 bg-gradient-to-r from-gray-700 to-gray-600 text-[10px] text-gray-300 px-2.5 py-1 rounded-full font-medium shadow-md">
+                  <div className="absolute top-3 right-3 bg-gradient-to-r from-gray-700 to-gray-600 text-xs text-gray-300 px-2.5 py-1 rounded-full font-medium shadow-md">
                     Soon
                   </div>
 

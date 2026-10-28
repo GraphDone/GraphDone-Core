@@ -108,23 +108,32 @@ export async function readItemSymbols(page: Page) {
     )
       .filter(element => visible(element))
       .map(rect);
-    const segments = Array.from(
+    const wires = Array.from(
       host.querySelectorAll<SVGPathElement>('.edges-group .edge')
-    )
-      .filter(path => visible(path, true))
-      .flatMap(path => {
-        const matrix = path.getScreenCTM()!;
-        const points = (path.getAttribute('d')?.match(/[ML][^ML]+/g) ?? []).map(
-          command => {
-            const [x, y] = command.slice(1).split(',').map(Number);
-            const point = new DOMPoint(x, y).matrixTransform(matrix);
-            return { x: point.x, y: point.y };
-          }
-        );
-        return points
-          .slice(1)
-          .map((target, index) => ({ source: points[index], target }));
-      });
+    ).filter(path => visible(path, true));
+    const wireWidths = wires.map(path => {
+      const style = getComputedStyle(path),
+        matrix = path.getScreenCTM()!;
+      return (
+        parseFloat(style.strokeWidth) *
+        (style.vectorEffect === 'non-scaling-stroke'
+          ? 1
+          : Math.hypot(matrix.a, matrix.b))
+      );
+    });
+    const segments = wires.flatMap(path => {
+      const matrix = path.getScreenCTM()!;
+      const points = (path.getAttribute('d')?.match(/[ML][^ML]+/g) ?? []).map(
+        command => {
+          const [x, y] = command.slice(1).split(',').map(Number);
+          const point = new DOMPoint(x, y).matrixTransform(matrix);
+          return { x: point.x, y: point.y };
+        }
+      );
+      return points
+        .slice(1)
+        .map((target, index) => ({ source: points[index], target }));
+    });
     const wireHits = (
       line: (typeof segments)[number],
       corners: { x: number; y: number }[]
@@ -185,7 +194,7 @@ export async function readItemSymbols(page: Page) {
       if (segments.some(segment => wireHits(segment, label.corners)))
         violations.push(`label-wire-overlap:${label.id}`);
     }
-    return { viewport, cards, labels, segments, violations };
+    return { viewport, cards, labels, segments, wireWidths, violations };
   });
 }
 
@@ -215,5 +224,9 @@ export async function inspectItemSymbols(
   ).toBeGreaterThan(0);
   expect(geometry.cards.flatMap(card => card.titles).length).toBeGreaterThan(0);
   expect(geometry.violations).toEqual([]);
+  expect(
+    geometry.wireWidths.every(width => width >= 2.99),
+    'Painted wires must retain a three-pixel screen weight'
+  ).toBe(true);
   return geometry;
 }

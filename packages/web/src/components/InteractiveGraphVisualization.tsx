@@ -54,7 +54,7 @@ import { mergeSimulationNodes, mergeSimulationEdges } from '../lib/graphDataMerg
 import type { ObstacleBox } from '../lib/edgeLabelLayout';
 import { createParallelEdgeRoute, edgeRouteLabel, edgeRouteArrowBounds, edgeSegmentHitsBox, projectEdgeRoutePointer, type EdgeRouteGeometry, type EdgeRouteLabel } from '../lib/edgeRouteGeometry';
 import { PerfMeter, DriftMeter } from '../lib/perfMeter';
-import { graphItemLayout, measureGraphText, edgeLabelDimensions, GRAPH_FONT_FAMILY, ITEM_TITLE_SIZE, ITEM_TITLE_LINE, ITEM_HEADER_HEIGHT, EDGE_LABEL_SIZE } from '../lib/graphSymbolLayout';
+import { graphItemLayout, measureGraphText, edgeLabelDimensions, GRAPH_FONT_FAMILY, ITEM_TITLE_SIZE, ITEM_TITLE_LINE, ITEM_HEADER_HEIGHT, EDGE_LABEL_SIZE, ITEM_WIRE_WIDTH } from '../lib/graphSymbolLayout';
 import { placeItemLabels } from '../lib/edgeLabelPlacement';
 import { separateCards } from '../lib/separateCards';
 import { DEFAULT_PHYSICS, collisionRadius, linkDistance, linkMaxDistance, linkStrength } from '../lib/physicsConfig';
@@ -691,7 +691,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     svg.selectAll('.node-bg').style('filter', null);
     svg.selectAll('.edge')
       .style('filter', null)
-      .attr('stroke-width', (d: any) => (d.strength || 0.8) * 3); // Reset to normal thickness
+      .attr('stroke-width', ITEM_WIRE_WIDTH); // Reset to normal thickness
     
     // Apply type-specific glow to active node if nodeMenu is visible
     if (nodeMenu.visible && nodeMenu.node) {
@@ -2075,6 +2075,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .enter()
       .append('path')
       .attr('fill', 'none')
+      .attr('vector-effect', 'non-scaling-stroke')
+      .attr('stroke-linecap', 'round')
+      .attr('stroke-linejoin', 'round')
       .attr('data-edge-id', (d: WorkItemEdge) => d.id)
       .attr('class', (d: WorkItemEdge) => {
         let classes = 'edge';
@@ -2104,14 +2107,14 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         if (editingEdge && editingEdge.edge && editingEdge.edge.id === d.id) {
           return 10; // Very thick to make it obvious
         }
-        return (d.strength || 0.8) * 3;
+        return ITEM_WIRE_WIDTH;
       })
       .attr('stroke-opacity', (d: WorkItemEdge) => {
         // Full opacity for active dialog
         if (editingEdge && editingEdge.edge && editingEdge.edge.id === d.id) {
           return 1;
         }
-        return 0.7;
+        return 0.9;
       })
       .style('filter', (d: WorkItemEdge) => {
         // Apply pulsing glow to edges with active dialogs
@@ -2145,8 +2148,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         const config = getRelationshipConfig(d.type as RelationshipType);
         d3.select(this)
           .style('stroke', config.hexColor)
-          .style('stroke-width', (d.strength || 0.8) * 3)
-          .style('stroke-opacity', '0.7')
+          .style('stroke-width', ITEM_WIRE_WIDTH)
+          .style('stroke-opacity', '0.9')
           .style('filter', null);
       });
     
@@ -2158,6 +2161,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .append('path')
       .attr('class', 'edge-clickable')
       .attr('fill', 'none')
+      .attr('vector-effect', 'non-scaling-stroke')
+      .attr('stroke-linecap', 'round')
+      .attr('stroke-linejoin', 'round')
       .attr('data-edge-id', (d: WorkItemEdge) => d.id)
       .attr('stroke', 'transparent')
       .attr('stroke-width', 12)
@@ -2168,15 +2174,15 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         // Highlight the corresponding visible edge
         linkElements
           .filter((edge: WorkItemEdge) => edge.id === d.id)
-          .attr('stroke-width', (d: WorkItemEdge) => ((d.strength || 0.8) * 3) + 2)
+          .attr('stroke-width', ITEM_WIRE_WIDTH + 2)
           .attr('stroke-opacity', 1);
       })
       .on('mouseout', function(event: MouseEvent, d: WorkItemEdge) {
         // Reset the corresponding visible edge
         linkElements
           .filter((edge: WorkItemEdge) => edge.id === d.id)
-          .attr('stroke-width', (d: WorkItemEdge) => (d.strength || 0.8) * 3)
-          .attr('stroke-opacity', 0.7);
+          .attr('stroke-width', ITEM_WIRE_WIDTH)
+          .attr('stroke-opacity', 0.9);
       });
 
     // Create or get defs element for filters
@@ -2476,7 +2482,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         }
         // Thicker border for selected node
         if (selectedNode && selectedNode.id === d.id) {
-          return 3;
+          return ITEM_WIRE_WIDTH;
         }
         if (d.subgraphId) {
           return 2.5; // Sheet symbol — emphasize it's a container
@@ -2898,7 +2904,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .attr('x', 0)
       .attr('y', (d: WorkItem) => getNodeDimensions(d).height / 2 - 10)
       .attr('text-anchor', 'middle')
-      .style('font-size', '9px')
+      .style('font-size', '14px')
       .style('font-weight', '600')
       .style('fill', '#a5b4fc')
       .style('pointer-events', 'none')
@@ -2922,7 +2928,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .style('opacity', (currentTransform?.k || 1) >= LOD_THRESHOLDS.CLOSE ? 1 : 0)
       .style('font-size', '14px')
       .style('font-family', GRAPH_FONT_FAMILY)
-      .style('font-weight', '400')
+      .style('font-weight', '500')
       .style('fill', (d: WorkItem) => {
         const isCompleted = d.status === 'COMPLETED' || d.status === 'Completed' || d.status === 'Done' || d.status === 'DONE';
         return isCompleted ? '#6b7280' : '#d1d5db';
@@ -3791,7 +3797,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           if (editingEdge && editingEdge.edge && editingEdge.edge.id === d.id) {
             return 10; // Keep thick for active dialog
           }
-          return scale >= LOD_THRESHOLDS.FAR ? 1 : Math.max(0.3, scale * 0.8);
+          return ITEM_WIRE_WIDTH;
         });
     });
 
