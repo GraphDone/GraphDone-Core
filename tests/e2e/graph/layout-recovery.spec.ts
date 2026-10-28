@@ -534,6 +534,16 @@ test('pending layout keeps semantic overview labels fixed during pan and zoom @l
     await page.getByRole('button', { name: 'Back to groups', exact: true }).click();
     await page.getByRole('button', { name: 'Close group browser', exact: true }).click();
   }
+  await page.setViewportSize({ width: 390, height: 500 });
+  await expect.poll(() => page.evaluate(() => (window as any).__layoutMetrics?.()?.cameraReady)).toBe(true);
+  const dock = page.locator('.semantic-overview [data-graph-status-dock]');
+  expect(await dock.evaluate(element => element.scrollHeight > element.clientHeight)).toBe(true);
+  const dockBox = (await dock.boundingBox())!;
+  const cameraBeforeScroll = await camera();
+  await page.mouse.move(dockBox.x + 15, dockBox.y + 15);
+  await page.mouse.wheel(0, 160);
+  await expect.poll(() => dock.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
+  expect(await camera()).toEqual(cameraBeforeScroll);
   await page.getByRole('button', { name: 'Discard unsent layout' }).click();
   await expect(page.getByTestId('layout-save-status')).toHaveCount(0);
   expect((await readReceipt(page, graph.graphId, nodeId)).receipt).toBeUndefined();
