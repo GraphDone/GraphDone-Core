@@ -2,6 +2,7 @@
 
 | Symptom | Canonical lesson and regression |
 | --- | --- |
+| A tool upgrade's negative test exits before the intended failing task executes, or a hoisted renderer path changes | [Require executed consumer evidence](../inbox/2026-10-27-tool-upgrades-need-executed-consumer-evidence.md); installed Turbo and Mermaid contracts |
 | Pruned runtime starts failing imports, retains dev tools or loses auth across container replacement | [Installed consumer and persistence proof](../inbox/2026-10-27-runtime-images-need-installed-consumer-proof.md); `tests/runtime/run-image.mjs` |
 | A toolchain upgrade changes test counts, loses matcher types or drops unimported coverage | [Preserve discovery and consumer behavior](../inbox/2026-10-27-toolchain-upgrades-must-preserve-test-contracts.md); [migration evidence](../../docs/quality/TOOLCHAIN_MIGRATION_2026-10-27.md) |
 | OAuth links an unverified email, changes accounts after a provider email change, or leaves an orphan user after a link failure | [Provider proof and isolated atomic linking](../inbox/2026-10-27-oauth-linking-needs-provider-proof-and-atomicity.md); `oauth-identity`, `oauth-profiles` and actual `oauth-strategies` tests |
