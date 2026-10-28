@@ -49,6 +49,27 @@ Retained local evidence is under `/tmp/graphdone-resolution-20261027/`:
 The strict `nested-lod` sequence is enrolled in PR/full profiles and the CI Smoke
 Gate, with zero retries and retained failure traces. CLI tests verify enrollment.
 
+## Review corrections
+
+Initial frozen candidate `43ada01` passed strict nested 2/2 in 86.5s with clean
+matching source fingerprints; full unit coverage 750 passed plus 26 existing
+DB-gated skips, 194 harness cases, types, lint and build also passed. Independent
+review nonetheless found two P2s: Auto Back lost the entry hysteresis history,
+and automatic replacement of a focused summary left focus on the document body.
+The independent randomized model probe passed 1,200 fixtures / 6,000 cuts; these
+UI findings demonstrate why pure conservation is insufficient.
+
+Four new component regressions failed before correction (depth return, visibility
+return, focused expansion/collapse, live removal); the unrelated-focus control
+passed. The actual desktop browser restored the exact camera but failed the old
+root-group count after Auto Back. Both negatives and their traces are retained.
+The correction saves/restores both Auto state machines and reconciles only lost
+owned summary focus to a surviving member representative or the group list.
+Focused corrected component/model tests passed 23/23, and types passed. See the
+[canonical lesson](../../.agents/inbox/2026-10-28-lod-return-needs-hysteresis-and-focus.md).
+The initial source's green checks do not validate this correction; fresh frozen
+browser, full checks and renewed independent review are required.
+
 ## Acceptance still required at the frozen candidate
 
 Run strict nested, existing 301/370 semantic LOD, layout recovery and smoke browser

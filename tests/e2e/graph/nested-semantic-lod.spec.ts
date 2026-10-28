@@ -353,6 +353,42 @@ for (const width of [1440, 390])
       await page.evaluate(() => (window as any).miniMapZoom(0, 0, 0.2));
       await expect.poll(async () => (await camera()).k).toBeCloseTo(0.2);
       await expect(count(2)).toBeVisible();
+      await page.evaluate(() => (window as any).miniMapZoom(0, 0, 0.4));
+      await expect.poll(async () => (await camera()).k).toBeCloseTo(0.4);
+      await expect(count(2)).toBeVisible();
+      const autoEntryCamera = await camera();
+      const autoEntryCut = await ids();
+      await activate(count(2));
+      await activate(
+        list().getByRole('button', { name: /^Payments 36 items/ })
+      );
+      await payments
+        .getByRole('textbox', { name: 'Find an item' })
+        .fill('Request delivery');
+      await activate(
+        payments.getByRole('button', { name: /Request delivery/ })
+      );
+      await expect(page.getByTestId('node-inspector')).toContainText(
+        'Request delivery'
+      );
+      await activate(
+        overview.getByRole('button', { name: 'Back to overview', exact: true })
+      );
+      await expect.poll(camera).toEqual(autoEntryCamera);
+      await expect(count(2)).toBeVisible();
+      expect(await ids()).toEqual(autoEntryCut);
+      await cards.filter({ hasText: 'Payments' }).focus();
+      await page.evaluate(() => (window as any).miniMapZoom(0, 0, 0.46));
+      await expect.poll(async () => (await camera()).k).toBeCloseTo(0.46);
+      await expect
+        .poll(() =>
+          page.evaluate(() =>
+            document.activeElement?.hasAttribute('data-lod-group')
+          )
+        )
+        .toBe(true);
+      await page.evaluate(() => (window as any).miniMapZoom(0, 0, 0.2));
+      await expect(count(2)).toBeVisible();
       expect(
         await page.evaluate(
           () => document.documentElement.scrollWidth <= innerWidth
