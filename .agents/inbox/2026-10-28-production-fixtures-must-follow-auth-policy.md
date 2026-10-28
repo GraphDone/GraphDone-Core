@@ -39,6 +39,32 @@ Production browser sign-in must exercise the visible verification widget, not
 manufacture or bypass its state. Preserve the fail-closed release workflows and
 both production-stack/runtime-image requirements when composing current dev.
 
+## Additional composition corrections
+
+Independent review of8746e7d found three other stale fixture assumptions. The
+actual owned pruned API image `sha256:4deb93462ed64371cc64a425f099449ad7561f3e4df2a46f336658b44caa8a00`
+failed the old persistence probe's npm Cmd assertion before creating resources.
+The updated probe checks the declared direct-Node command/server working directory
+and runs Node directly; npm is intentionally absent. Actual fresh-image recovery
+still requires validation. `main-refresh-sqlite-image-negative.log` retains this
+failure without credentials.
+
+The aggregate workflow correctly required runtime-images, but inherited test
+inputs omitted it: the executed workflow suite reported27pass/2fail. Include the
+runtime job in successful fixtures and failure/missing-state coverage; do not
+remove the actual required gate. `main-refresh-workflow-negative.log` is retained.
+
+The old production CLI's disposable Git fixture also invoked auto-maintenance.
+Independent trace evidence confirmed the child invocation, not a new ENOTEMPTY
+failure. Apply the [canonical fixture-local maintenance safeguards](2026-10-27-disposable-git-fixtures-must-own-maintenance.md)
+before committing, and verify the actual commit trace contains no maintenance
+child. Keep strict removal and do not change the user's Git configuration.
+
+The grouped correction passed49/49 executable runner, production-helper and
+workflow contracts on2026-10-28, with no skips. Retained output:
+`main-refresh-grouped-contracts.log`. Actual container/browser acceptance remains
+required; this result does not substitute for either.
+
 ## Limits
 
 Synthetic HTTP contracts are not evidence that nginx, the live server ledger or
