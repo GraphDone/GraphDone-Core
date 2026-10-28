@@ -79,6 +79,7 @@ for (const { width, diagonal } of [
       await page.evaluate(id => {
         localStorage.setItem('currentGraphId', id);
         localStorage.setItem('graphdone:viewMode', 'graph');
+    localStorage.setItem('graphdone:relationship-priority', 'all');
       }, seeded.graphId);
       await page.goto('/');
       await expect(page.locator('.graph-container .node')).toHaveCount(2);

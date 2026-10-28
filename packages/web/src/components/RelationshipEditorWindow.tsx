@@ -4,7 +4,7 @@ import { X, Minimize2, Maximize2, Move, Zap } from 'lucide-react';
 import { WorkItemEdge, RelationshipType } from '../types/graph';
 import { getRelationshipConfig, RELATIONSHIP_OPTIONS, getRelationshipIconElement } from '../constants/workItemConstants';
 import { useMutation } from '@apollo/client';
-import { UPDATE_EDGE, CREATE_EDGE, DELETE_EDGE } from '../lib/queries';
+import { UPDATE_EDGE, CREATE_EDGE, DELETE_EDGE, GET_EDGES } from '../lib/queries';
 
 interface RelationshipEditorWindowProps {
   isVisible: boolean;
@@ -270,7 +270,9 @@ export const RelationshipEditorWindow: React.FC<RelationshipEditorWindowProps> =
     
     try {
       await deleteEdgeMutation({
-        variables: { where: { id: editingEdge.edge.id } }
+        variables: { where: { id: editingEdge.edge.id } },
+        refetchQueries: [GET_EDGES],
+        awaitRefetchQueries: true,
       });
       showSuccess('Relationship Deleted', 'Edge removed successfully');
       refetchEdges?.();

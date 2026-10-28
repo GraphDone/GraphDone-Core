@@ -2,6 +2,11 @@
 
 | Symptom | Canonical lesson and regression |
 | --- | --- |
+| An incoming trace loses its only dependency, or a new toolbar leaves only one group / covers another control | [Scope trace fallback and preserve measured room](../inbox/2026-10-28-trace-fallback-needs-directional-scope.md); directional component conservation and desktop/phone nested geometry/control regressions |
+| Deleting a relationship updates the canvas but leaves the graph header count stale | [Refresh matching subscribed edge queries](../inbox/2026-10-28-edge-deletion-must-refresh-subscribed-counts.md); desktop/phone delete-and-fallback journeys assert the header and API agree |
+| A preview still shows tiny/thin text although typography configuration matches the reviewed source | [Refresh the owned preview and verify rendered styles](../inbox/2026-10-28-preview-styles-need-rendered-verification.md); desktop/phone computed typography and 12px/400 negative in relationship-priority journeys |
+| Browser assertions pass but accounting JSON/screenshots disappear from the unified report | [Materialize evidence files before collection](../inbox/2026-10-28-browser-evidence-needs-files.md); priority specs use outputPath files and final artifact audit |
+| Links changes dismiss the inspector, closing a pair leaves a label hidden, or All leaves focus on BODY | [Priority controls preserve context](../inbox/2026-10-28-priority-controls-must-preserve-context.md); actual desktop/phone native-control and keyboard-return regressions |
 | Browse covers layout Retry/Discard, or original relationship Edit opens Create instead | [Share control flow and stop panel click propagation](../inbox/2026-10-28-graph-controls-need-shared-flow.md); durable layout desktop/phone and exact relationship-browser editing |
 | Hidden item labels acquire tiny backgrounds, reverse wires share a lane, or line-only diagnostics fail after path conversion | [Preserve conservative dimensions and shared path consumers](../inbox/2026-10-28-hidden-labels-need-valid-measurement.md); item-wire browser sequence and opposite-direction lane regression |
 | A dragged offset label jumps to a nearby return wire despite a prior-leg tie-breaker | [Project onto the displayed offset path](../inbox/2026-10-28-offset-label-drag-needs-offset-path.md); close-return-leg geometry negative and correction |
