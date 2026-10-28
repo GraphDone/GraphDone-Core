@@ -50,3 +50,23 @@ pleasant spacing, meaningful system grouping, full item/path routing or scale.
 Inspect the retained screenshots and exact-source CI reports. Under the owner's
 workstation constraint, use small serial local tests and remote browser gates;
 discovery-only evidence is never a passing browser journey.
+
+## Exact control names and exported evidence
+
+Actual CI 40633460829 at source88d0115 / tested merge025288dafa5fcbefb282fc2c5a313a58dcddebd2
+passed static visual4, smoke6, new-user42 and semantic-LOD2. Both nested cases then
+failed at `getByLabel('Relationship type', { exact: true }).selectOption('BLOCKS')`;
+the strict sequence correctly failed with its process-exit evidence. Screenshots
+showed the control present. The installed Playwright label selector reads the
+wrapping label's descendant text, including select options. Explicit accessible
+names now keep type, direction and depth labels stable. The exact selectors,
+10-second actions and zero retries remain unchanged. Thirteen scoped relationship
+component cases passed in 5.48s; corrected browser execution remains required.
+
+The same artifact exposed an evidence-export gap: the unified Playwright adapter
+imports path attachments, while the new tests used body-only PNG/JSON attachments.
+Those did not appear in the normal passing report's attachment list. New producers
+write owned output files and attach paths, with distinct overview/outgoing/incoming
+names. Inspect the next actual report for all pictures/geometry, not just success
+counts or images buried inside a failure trace. The adapter's accepted file boundary
+is unchanged. Earlier artifacts and failures are retained.

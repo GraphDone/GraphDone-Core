@@ -8,7 +8,7 @@ import { spawnSync } from 'node:child_process';
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 
-for (const scenario of ['setup-timeout', 'late-create-response', 'cleanup-failure']) {
+for (const scenario of ['setup-timeout', 'late-create-response', 'late-edge-response', 'cleanup-failure']) {
   test(`owned graph cleanup remains strict after ${scenario}`, t => {
     const dir = mkdtempSync(join(tmpdir(), 'graphdone-fixture-negative-'));
     t.after(() => rmSync(dir, { recursive: true, force: true }));
@@ -31,6 +31,16 @@ const fakePage = {
       return { createGraphs: { graphs: [{ id: 'owned-graph' }] } };
     }
     if (query.includes('createWorkItems') || query.includes('createEdges')) {
+      if (${JSON.stringify(scenario)} === 'late-edge-response') {
+        if (query.includes('createWorkItems')) {
+          calls.push('nodesCreated');
+          return { createWorkItems: { workItems: variables.input.map((_, index) => ({ id: 'node-' + index })) } };
+        }
+        calls.push('edgeRequested:' + variables.input.length);
+        if (variables.input.some(edge => edge.type === 'BLOCKS')) await new Promise(resolve => setTimeout(resolve, 250));
+        calls.push('edgeFinished');
+        return { createEdges: { edges: variables.input.map((_, index) => ({ id: 'edge-' + index })) } };
+      }
       calls.push('unexpected-post-timeout-write');
       throw new Error('Seeding wrote after setup timed out');
     }
@@ -45,7 +55,9 @@ const test = base.extend({
   page: async ({}, use) => { try { await use(fakePage); } finally { writeFileSync(${JSON.stringify(events)}, JSON.stringify(calls)); } },
   ownedGraphIds: [ownedGraphIdsFixture, { timeout: 3000 }],
   setup: [async ({ ownedGraphIds }, use) => {
-    await ownedGraphIds.seed({ size: ${scenario === 'late-create-response' ? 1 : 0} });
+    await ownedGraphIds.seed({ size: ${scenario === 'late-edge-response' ? 2 : scenario === 'late-create-response' ? 1 : 0}, batchSize: 2,
+      additionalEdges: ${JSON.stringify(scenario === 'late-edge-response' ? Array.from({ length: 5 }, (_, index) => ({ sourceIndex: 0, targetIndex: index % 2, type: 'BLOCKS' })) : [])}
+    });
     if (${JSON.stringify(scenario)} === 'setup-timeout') await new Promise(() => {});
     await use(true);
   }, { timeout: 100 }],
@@ -59,7 +71,9 @@ test('intentional negative control', async ({ setup }) => {});
     const report = JSON.parse(result.stdout);
     assert.equal(report.stats.unexpected, 1, result.stdout);
     assert.equal(report.stats.skipped, 0);
-    assert.deepEqual(JSON.parse(readFileSync(events, 'utf8')), scenario !== 'cleanup-failure'
+    assert.deepEqual(JSON.parse(readFileSync(events, 'utf8')), scenario === 'late-edge-response'
+      ? ['createRequested', 'created', 'nodesCreated', 'edgeRequested:2', 'edgeFinished', 'unroute', 'deleteEdges', 'deleteWorkItems', 'deleteGraphs', 'graphs(']
+      : scenario !== 'cleanup-failure'
       ? ['createRequested', 'created', 'unroute', 'deleteEdges', 'deleteWorkItems', 'deleteGraphs', 'graphs(']
       : ['createRequested', 'created', 'unroute', 'deleteEdges']);
     const errors = report.suites[0].specs[0].tests[0].results[0].errors.map(error => error.message).join('\n');

@@ -180,6 +180,7 @@ export function SemanticRelationshipBrowser({
           <label className="text-sm">
             Relationship direction
             <select
+              aria-label="Relationship direction"
               value={direction}
               onChange={event =>
                 setDirection(event.target.value as RelationshipDirection)
@@ -194,6 +195,7 @@ export function SemanticRelationshipBrowser({
           <label className="text-sm">
             Neighborhood depth
             <select
+              aria-label="Neighborhood depth"
               value={hops}
               onChange={event => setHops(Number(event.target.value) as 1 | 2)}
               className="block min-h-11 rounded border border-gray-600 bg-gray-900 p-2"
@@ -207,6 +209,7 @@ export function SemanticRelationshipBrowser({
       <label className="block text-sm my-3">
         Relationship type
         <select
+          aria-label="Relationship type"
           value={type}
           onChange={event => setType(event.target.value)}
           className="block w-full min-h-11 rounded border border-gray-600 bg-gray-900 p-2"

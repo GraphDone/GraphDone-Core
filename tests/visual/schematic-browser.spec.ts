@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { schematicFixtures } from './schematic-fixtures.mjs';
 
@@ -92,12 +92,16 @@ for (const fixture of schematicFixtures)
       ).toBeLessThanOrEqual(card.labels[1].y);
     }
     expect(requests).toEqual([]);
+    const geometryPath = info.outputPath('rendered-label-geometry.json');
+    writeFileSync(geometryPath, JSON.stringify(geometry));
     await info.attach('rendered-label-geometry.json', {
-      body: JSON.stringify(geometry),
+      path: geometryPath,
       contentType: 'application/json',
     });
+    const screenshotPath = info.outputPath('schematic.png');
+    await page.screenshot({ path: screenshotPath });
     await info.attach('schematic.png', {
-      body: await page.screenshot(),
+      path: screenshotPath,
       contentType: 'image/png',
     });
   });
