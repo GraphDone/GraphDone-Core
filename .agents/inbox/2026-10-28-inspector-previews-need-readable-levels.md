@@ -46,6 +46,30 @@ old diagram wires; it now distinguishes aria-hidden icons from diagram content.
 The first type check also rejected `replaceAll` under this repository's target;
 use the compatible global replacement without changing the toolchain.
 
+Independent review found another untested boundary at cfd7c24: a long parent
+title was wrapped in a non-scrolling header. A DOM-only408-character probe in
+the owned graph copy produced a498px inspector with840px header, tabs below its
+bottom and a zero-height body. The real phone regression then failed in13.32s:
+title height336px exceeded the96px limit. The correction bounds the full title
+in a keyboard-scrollable region and lets the whole panel scroll; header/tabs/body
+cannot shrink the contents to zero. Desktop/phone regression now includes long
+parent titles, keyboard access to the full text and a560px-high window. The
+first attempted negative accidentally reused the previous short-title spec due
+to a same-source/destination copy; its14.37s green result is not negative proof.
+Only the subsequently copied long-title spec and retained failing trace count.
+The first corrected run still failed phone short-window visibility (88.76% of the
+code block, below the90% oracle). The harness now awaits End/Home scrolling to
+finish and explicitly centers code after resize. A second run passed that check
+but could not find Expand: resize had legitimately selected compact item detail.
+The journey now uses a real wheel gesture to restore full detail before Expand;
+it does not mutate the D3 transform or relax the visibility requirement.
+Final desktop/phone passed2/2 in39.20s, with both inspector variants,560px window,
+zero writes/errors and eight file-backed artifacts. All six PNGs were inspected.
+The existing smoke gate passed6/6 in116.87s on cfd7c24; final complete CI must
+validate the correction as well. Stored child counts are handed to the existing
+portable-authoring issue217 with source evidence; do not silently fix fixture
+properties to conceal that remaining writer-contract limitation.
+
 ## Corrective rule
 
 Compact mode may change spacing and heading hierarchy, but must keep working
