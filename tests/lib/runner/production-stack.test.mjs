@@ -164,10 +164,14 @@ test('real CLI child rejects failed builds/startup and confirms owned cleanup wi
     writeFileSync(join(root, file), readFileSync(join(source, file)));
   }
   writeFileSync(join(root, '.gitignore'), 'test-artifacts/\n');
-  for (const args of [['init', '--quiet'], ['add', '.'], ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '--quiet', '-m', 'Owned test fixture']]) {
-    const git = spawnSync('git', args, { cwd: root, encoding: 'utf8' });
+  const gitTrace = join(temp, 'git-trace.jsonl');
+  for (const args of [['init', '--quiet'], ['config', '--local', 'maintenance.auto', 'false'], ['config', '--local', 'gc.auto', '0'], ['add', '.'], ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '--quiet', '-m', 'Owned test fixture']]) {
+    const git = spawnSync('git', args, { cwd: root, encoding: 'utf8', env: { ...process.env, GIT_TRACE2_EVENT: gitTrace } });
     assert.equal(git.status, 0, git.stderr);
   }
+  const gitEvents = readFileSync(gitTrace, 'utf8').trim().split('\n').map(line => JSON.parse(line));
+  assert.ok(gitEvents.some(event => event.event === 'exit' && event.code === 0));
+  assert.deepEqual(gitEvents.filter(event => event.event === 'child_start' && event.argv?.includes('maintenance')), []);
   const output = join(root, 'test-artifacts', `prod-runner-regression-${Date.now()}`);
   const bin = join(temp, 'bin');
   mkdirSync(bin);

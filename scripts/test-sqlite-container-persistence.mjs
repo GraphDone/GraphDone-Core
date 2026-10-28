@@ -94,7 +94,8 @@ if (!configOnly) {
   assert.ok(image, 'Set GRAPHDONE_TEST_API_IMAGE to an already built local API image; this test never pulls or publishes images');
   const inspected = JSON.parse(docker(['image', 'inspect', image]))[0];
   const imageId = inspected.Id;
-  assert.deepEqual(inspected.Config.Cmd, ['npm', 'run', 'start', '--workspace=@graphdone/server'], 'Use the actual production API image');
+  assert.deepEqual(inspected.Config.Cmd, ['node', 'dist/index.js'], 'Use the actual production API image');
+  assert.equal(inspected.Config.WorkingDir, '/app/packages/server', 'Use the declared production server directory');
   for (const generated of [true, false]) {
     await check(`${generated ? 'generated' : 'configured'} admin and owned account survive container recreation`, () => {
       const name = `graphdone-sqlite-test-${randomUUID()}`;
@@ -117,14 +118,15 @@ if (!configOnly) {
         const run = phase => {
           const container = `${name}-${phase}`;
           containers.push(container);
-          const output = docker(['run', '--rm', '-i', '--pull=never', '--name', container, '--network', 'none', '--label', `graphdone.persistence-test=${name}`, '--mount', `type=volume,src=${name},dst=${mount.target}`, '--env-file', envPath, '-e', `GRAPHDONE_PERSISTENCE_PHASE=${phase}`, imageId, 'npm', 'exec', '--workspace=@graphdone/server', '--', 'node', '--input-type=module'], { input: probe });
+          const output = docker(['run', '--rm', '-i', '--pull=never', '--name', container, '--network', 'none', '--label', `graphdone.persistence-test=${name}`, '--mount', `type=volume,src=${name},dst=${mount.target}`, '--env-file', envPath, '-e', `GRAPHDONE_PERSISTENCE_PHASE=${phase}`, imageId, 'node', '--input-type=module'], { input: probe });
           const line = output.split('\n').find(value => value.startsWith('GRAPHDONE_PERSISTENCE_RESULT='));
           assert.ok(line, 'Container did not return persistence evidence');
           return JSON.parse(line.slice('GRAPHDONE_PERSISTENCE_RESULT='.length));
         };
         const first = run('write');
         const second = run('read');
-        assert.equal(first.cwd, '/app/packages/server', 'Probe must use the image npm workspace');
+        assert.equal(first.cwd, '/app/packages/server', 'Probe must use the image server directory');
+        assert.equal(second.cwd, first.cwd, 'Replacement must use the same server directory');
         assert.ok(first.userId && first.passwordValid, 'Owned account was not created and authenticated');
         assert.ok(second.userId === first.userId && second.passwordValid, 'Owned account identity/password were lost across container recreation');
         assert.ok(first.adminId === second.adminId, 'Admin identity changed across container recreation');
