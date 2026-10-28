@@ -48,6 +48,18 @@ or ancestor (or the complete group list) when that element disappears. Do not
 move focus when another control owns it. Test expand, collapse, live removal
 and deliberate focus movement independently of mouse navigation.
 
+## Validation resource correction
+
+Later full coverage at frozen1baac30 timed out the 40-member component fixture at
+its existing5s limit; concurrently the 301/370 desktop browser exceeded its
+existing120s interaction limit. Retain both failures. Five component assertions
+need only four members under one parent/two children: a clean installed isolated
+worktree proved the smaller fixture still fails the same four old-source bugs
+and passes all five on corrected source with coverage. This does not reduce the
+72-item/301-item browser datasets. Run CPU-heavy local coverage and browser gates
+serially after observing interference; do not raise limits or accept a retry as
+proof of a fix. Fresh exact-source serial validation remains required.
+
 ## Limits
 
 This restores view state only. It must not write source positions or turn summary

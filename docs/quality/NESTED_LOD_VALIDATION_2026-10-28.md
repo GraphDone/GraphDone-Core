@@ -70,6 +70,35 @@ Focused corrected component/model tests passed 23/23, and types passed. See the
 The initial source's green checks do not validate this correction; fresh frozen
 browser, full checks and renewed independent review are required.
 
+## Retained validation failures after review correction
+
+Corrected frozen `1baac30` passed strict nested 2/2 in 103.0s and renewed
+independent review/probes. A concurrent full-coverage run exceeded the existing
+5s limit in the new 40-member component fixture (392 other web cases passed).
+The component test needs only a parent and two nonempty children, so it now uses
+four members with the same five assertions. In an isolated clean-installed
+worktree, the reduced fixture still failed all four intended assertions against
+43ada01 and passed all five against the corrected component with coverage. The
+first attempted isolated run failed before test execution because a symlinked
+install could not resolve the nested Vite plugin; that startup error is retained
+separately and is not counted as the executed negative.
+
+The existing 301/370 desktop browser journey also exceeded its unchanged 120s
+interaction budget during the concurrent coverage workload; the phone case
+passed. Its trace shows generally slow actions and clock advancement (one150ms
+clock advance took6.98s), rather than an assertion for changed semantic behavior.
+Source fingerprints remained clean/identical, and owned teardown completed.
+This run is rejected, not retried into a pass. Final local validation serializes
+CPU-heavy coverage and browser gates to remove this observed interference.
+No 72-item/301-item browser fixture, assertion, timeout or retry policy is reduced.
+If serial acceptance still fails, it remains a blocker requiring investigation.
+
+Evidence: `nested-1baac30-coverage.log`, `nested-existing-lod-1baac30/`,
+`nested-small-fixture-negative.log` (startup failure),
+`nested-small-fixture-executed-negative.log` (four intended failures) and
+`nested-small-fixture-positive.log` (five passes with coverage), all under the
+retained evidence directory above.
+
 ## Acceptance still required at the frozen candidate
 
 Run strict nested, existing 301/370 semantic LOD, layout recovery and smoke browser
