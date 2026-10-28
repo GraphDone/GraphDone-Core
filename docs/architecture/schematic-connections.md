@@ -115,3 +115,28 @@ spacing, readable names or a useful hierarchy.
 
 This is a reviewable candidate path. It does not close dynamic LOD, hosted parity,
 release/deployment work, or the remaining item-level visual problems.
+
+## Detailed item wiring continuation (#220)
+
+The first item-wiring increment starts from dev
+`007148f1a526b8ef028222a429b346a67e5c3c2c`. `edgeRouteGeometry.ts` defines the
+shared display path, final-segment arrow, distance along the route and pointer
+projection needed by the D3 path/hitbox/arrow/label consumers. Consecutive
+coincident points do not produce broken paths; a nonzero closed loop retains
+its travel and direction. Label placement fits an entire label on one segment,
+keeps text upright, retains original icon direction and returns no placement
+when cards or previous labels leave no clear slot. Equal-distance pointer hits
+prefer the prior leg so dragging does not jump across a nearby return wire.
+
+This foundation is not yet connected to the item renderer and does not establish
+routed item acceptance. Next, adapt all four geometry consumers together, then
+add bounded routing/admission, named boundary connections, exact deferred counts
+and accessible original relationships. Routing and obstacle searches belong to
+bounded updates after layout or scope changes, not every camera/simulation tick.
+Preserve edit/Grow, pointer hitboxes, label dragging and canonical positions.
+
+On 2026-10-28, Node22.18 ran the nine pure geometry cases serially in the existing
+clean-installed partial probe: 9 passed, no skips, 0.69s (8ms test bodies).
+Cases cover elbows, reversed segments, closed loops, duplicate/invalid points,
+nearest-leg dragging, ties, long labels and rotated obstacle footprints. This
+is scoped helper evidence, not a full-tree browser/database/performance result.
