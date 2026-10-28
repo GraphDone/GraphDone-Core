@@ -2,6 +2,7 @@
 
 | Symptom | Evidence and corrective rule |
 | --- | --- |
+| Turbo or Mermaid major upgrades clear advisories but can change environment, cache, dependency placement or rendering | [Executed consumer evidence](../inbox/2026-10-27-tool-upgrades-need-executed-consumer-evidence.md); [scoped migration and negative controls](../../docs/quality/REMAINING_TOOLING_2026-10-27.md) |
 | A toolchain upgrade changes test counts, loses matcher types or drops unimported coverage | [Preserve discovery and consumer behavior](../inbox/2026-10-27-toolchain-upgrades-must-preserve-test-contracts.md); [migration evidence](../../docs/quality/TOOLCHAIN_MIGRATION_2026-10-27.md) |
 | OAuth email metadata loses verification or callbacks log credential-bearing redirects | [Provider proof and isolated atomic linking](../inbox/2026-10-27-oauth-linking-needs-provider-proof-and-atomicity.md); [provider/recovery contract](../../docs/quality/OAUTH_IDENTITY.md) |
 | Login and reset links cross-use, or a reset/reactivation revives old sessions | [Bind purpose and session revision at the write](../inbox/2026-10-27-email-purpose-and-revision-are-auth-boundaries.md); real SQLite/HTTP/WebSocket `auth-link-boundary.test.ts` |
