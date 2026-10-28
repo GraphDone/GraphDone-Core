@@ -9,7 +9,8 @@ export async function inspectSchematicOverview(
   overview: Locator,
   info: TestInfo,
   relationships: number,
-  stage = 'overview'
+  stage = 'overview',
+  expectedCards = 2
 ) {
   const read = () =>
     overview.evaluate(host => {
@@ -98,7 +99,7 @@ export async function inspectSchematicOverview(
         },
       };
     });
-  await expect.poll(async () => (await read()).cards.length).toBe(2);
+  await expect.poll(async () => (await read()).cards.length).toBe(expectedCards);
   await expect
     .poll(async () => (await read()).routes.length)
     .toBeGreaterThan(0);

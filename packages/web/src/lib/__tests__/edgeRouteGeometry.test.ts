@@ -292,4 +292,23 @@ describe('item wire geometry', () => {
     })!;
     expect(label.x + 35).toBeLessThanOrEqual(300);
   });
+
+  it('admits only full label footprints within the visible viewport', () => {
+    const route = createEdgeRoute([
+      { x: 0, y: 0 },
+      { x: 300, y: 0 },
+    ])!;
+    expect(
+      edgeRouteLabel(route, {
+        dims: { width: 100, height: 26 },
+        viewport: { x: 150, y: -22, width: 120, height: 50 },
+      })
+    ).not.toBeNull();
+    expect(
+      edgeRouteLabel(route, {
+        dims: { width: 100, height: 26 },
+        viewport: { x: 150, y: -22, width: 80, height: 50 },
+      })
+    ).toBeNull();
+  });
 });

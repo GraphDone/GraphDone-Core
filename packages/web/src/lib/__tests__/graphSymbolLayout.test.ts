@@ -72,13 +72,26 @@ describe('graph symbol content geometry', () => {
 
   it('reserves compact title width and height at readable zoom sizes', () => {
     for (const scale of [0.3, 0.45, 0.6, 0.9]) {
-      const layout = graphItemLayout({ title: 'WWW PaymentGatewayRetryReconciliationHandler WWW', type: 'FEATURE' }, measure, scale);
+      const layout = graphItemLayout(
+        {
+          title: 'WWW PaymentGatewayRetryReconciliationHandler WWW',
+          type: 'FEATURE',
+        },
+        measure,
+        scale
+      );
       expect(layout.compact).toBe(true);
-      expect(ITEM_TITLE_SIZE * layout.titleScale * scale).toBeGreaterThanOrEqual(12);
+      expect(
+        ITEM_TITLE_SIZE * layout.titleScale * scale
+      ).toBeGreaterThanOrEqual(12);
       expect(layout.titleCenterY).toBe(0);
       for (const line of layout.title)
-        expect(measure(line, ITEM_TITLE_SIZE) * layout.titleScale).toBeLessThanOrEqual(layout.width - 28);
-      expect(layout.title.length * ITEM_TITLE_LINE * layout.titleScale).toBeLessThan(layout.height);
+        expect(
+          measure(line, ITEM_TITLE_SIZE) * layout.titleScale
+        ).toBeLessThanOrEqual(layout.width - 28);
+      expect(
+        layout.title.length * ITEM_TITLE_LINE * layout.titleScale
+      ).toBeLessThan(layout.height);
     }
   });
 

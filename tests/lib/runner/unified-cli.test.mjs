@@ -46,7 +46,7 @@ test('disposable Git fixture commits do not spawn background maintenance', t => 
   assert.deepEqual(events.filter(event => event.event === 'child_start' && event.argv?.includes('maintenance')), []);
 });
 
-for (const sequence of ['new-user', 'semantic-lod', 'nested-lod', 'item-wires', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'perf-budgets']) {
+for (const sequence of ['new-user', 'semantic-lod', 'nested-lod', 'item-wires', 'large-symbols', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'perf-budgets']) {
   test(`CLI forwards failure-only tracing without retries for ${sequence}`, t => {
     const { dir, run } = fixture(t);
     const report = { suites: [{ specs: [{ title: 'fixture', ok: true,
@@ -60,6 +60,14 @@ for (const sequence of ['new-user', 'semantic-lod', 'nested-lod', 'item-wires', 
       assert.ok(!args.includes('tests/e2e/graph/semantic-lod.spec.ts'));
       assert.ok(!args.includes('tests/e2e/auth/router-navigation.spec.ts'));
     }
+    if (sequence === 'large-symbols') {
+      assert.ok(args.includes('tests/e2e/graph/large-graph-symbols.spec.ts'));
+      assert.ok(!args.includes('--headed'));
+      assert.equal(SEQUENCES[sequence].blocking, true);
+      for (const profile of ['pr', 'full']) assert.ok(PROFILES[profile].includes(sequence));
+      const workflow = readFileSync(join(root, '.github/workflows/ci.yml'), 'utf8');
+      assert.equal(workflow.split('run: node tests/run-unified.mjs --sequence large-symbols --out test-artifacts/ci-large-symbols').length, 2);
+    }
     if (sequence === 'schematic-visual') {
       assert.ok(args.includes('--config=playwright.schematic.config.ts'));
       assert.equal(SEQUENCES[sequence].blocking, true);
@@ -70,6 +78,7 @@ for (const sequence of ['new-user', 'semantic-lod', 'nested-lod', 'item-wires', 
     if (sequence === 'item-wires' || sequence === 'nested-lod' || sequence === 'semantic-lod' || sequence === 'layout-recovery' || sequence === 'router-navigation') {
       const spec = sequence === 'item-wires' ? 'tests/e2e/graph/item-wire-consumers.spec.ts' : sequence === 'nested-lod' ? 'tests/e2e/graph/nested-semantic-lod.spec.ts' : sequence === 'semantic-lod' ? 'tests/e2e/graph/semantic-lod.spec.ts' : sequence === 'layout-recovery' ? 'tests/e2e/graph/layout-recovery.spec.ts' : 'tests/e2e/auth/router-navigation.spec.ts';
       assert.ok(args.includes(spec));
+      if (sequence === 'item-wires') assert.ok(args.includes('tests/e2e/graph/item-symbols.spec.ts'));
       assert.equal(SEQUENCES[sequence].blocking, true);
       const workflow = readFileSync(join(root, '.github/workflows/ci.yml'), 'utf8');
       const command = `run: xvfb-run --auto-servernum node tests/run-unified.mjs --sequence ${sequence} --out test-artifacts/ci-${sequence}`;

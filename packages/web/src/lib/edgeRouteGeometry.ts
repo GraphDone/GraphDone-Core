@@ -224,6 +224,7 @@ export function edgeRouteLabel(
     obstacles?: readonly ObstacleBox[];
     segments?: readonly Pick<EdgeRouteSegment, 'source' | 'target'>[];
     offsets?: readonly number[];
+    viewport?: ObstacleBox;
   }
 ) {
   const { dims, obstacles = [] } = options;
@@ -270,6 +271,15 @@ export function edgeRouteLabel(
           segment.source.y +
           (segment.target.y - segment.source.y) * local -
           Math.cos(radians) * candidateOffset;
+        const viewport = options.viewport;
+        if (
+          viewport &&
+          (Math.abs(x - viewport.x) + width / 2 + padding >
+            viewport.width / 2 ||
+            Math.abs(y - viewport.y) + height / 2 + padding >
+              viewport.height / 2)
+        )
+          continue;
         if (
           obstacles.some(
             box =>

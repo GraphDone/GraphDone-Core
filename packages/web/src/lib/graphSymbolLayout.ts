@@ -68,7 +68,7 @@ export function graphItemLayout(
 ) {
   const compact = scale < 1;
   const titleScale = compact
-    ? Math.max(1, 12 / (ITEM_TITLE_SIZE * Math.max(0.1, scale)))
+    ? Math.max(1, 12 / (ITEM_TITLE_SIZE * Math.max(0.3, scale)))
     : 1;
   const width = Math.min(
     compact ? 220 : 300,
@@ -78,7 +78,12 @@ export function graphItemLayout(
       measure(item.type, 12, 700) + 108
     )
   );
-  const title = fitGraphText(item.title, (width - 28) / titleScale, ITEM_TITLE_SIZE, measure);
+  const title = fitGraphText(
+    item.title,
+    (width - 28) / titleScale,
+    ITEM_TITLE_SIZE,
+    measure
+  );
   const description = item.description
     ? fitGraphText(item.description, width - 28, 12, measure, 1).lines[0]
     : '';
@@ -92,12 +97,13 @@ export function graphItemLayout(
       24 +
       (item.subgraphId ? 24 : 0);
   const titleY = compact
-    ? -(title.lines.length - 1) * ITEM_TITLE_LINE / 2
+    ? (-(title.lines.length - 1) * ITEM_TITLE_LINE) / 2
     : -height / 2 + ITEM_HEADER_HEIGHT + 8 + ITEM_TITLE_LINE / 2;
   return {
     width,
     height,
     compact,
+    titleVisible: scale >= 0.3,
     titleScale,
     title: title.lines,
     truncated: title.truncated,
