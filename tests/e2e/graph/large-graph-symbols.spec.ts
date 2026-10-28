@@ -353,8 +353,10 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
     });
     previousIds = ids;
   }
+  const priorityPath = info.outputPath('two-thousand-priority.json');
+  await writeFile(priorityPath, JSON.stringify(priorityStages));
   await info.attach('two-thousand-priority.json', {
-    body: JSON.stringify(priorityStages),
+    path: priorityPath,
     contentType: 'application/json',
   });
   const revealId = largeGraph.nodeIds[1011];

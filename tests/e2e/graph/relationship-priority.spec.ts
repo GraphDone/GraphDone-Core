@@ -1,4 +1,5 @@
 import { test as base, expect } from '@playwright/test';
+import { writeFile } from 'node:fs/promises';
 import { login, TEST_USERS } from '../../lib/auth';
 import { gql } from '../../lib/graphRequest';
 import {
@@ -274,12 +275,19 @@ for (const width of [1440, 390]) {
       { operation: 'DeleteEdges', variables: { where: { id: blocker.id } } },
     ]);
     expect(errors).toEqual([]);
+    const accountingPath = info.outputPath('priority-accounting.json');
+    await writeFile(
+      accountingPath,
+      JSON.stringify({ stages, before, after, writes, errors })
+    );
     await info.attach('priority-accounting.json', {
-      body: JSON.stringify({ stages, before, after, writes, errors }),
+      path: accountingPath,
       contentType: 'application/json',
     });
+    const fallbackPath = info.outputPath('priority-fallback.png');
+    await page.screenshot({ path: fallbackPath });
     await info.attach('priority-fallback.png', {
-      body: await page.screenshot(),
+      path: fallbackPath,
       contentType: 'image/png',
     });
   });

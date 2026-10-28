@@ -2,6 +2,7 @@
 
 | Symptom | Canonical lesson and regression |
 | --- | --- |
+| Browser assertions pass but accounting JSON/screenshots disappear from the unified report | [Materialize evidence files before collection](../inbox/2026-10-28-browser-evidence-needs-files.md); priority specs use outputPath files and final artifact audit |
 | Links changes dismiss the inspector, or closing a pair after All leaves focus on BODY | [Priority controls preserve context](../inbox/2026-10-28-priority-controls-must-preserve-context.md); actual desktop/phone native-control and keyboard-return regressions |
 | Browse covers layout Retry/Discard, or original relationship Edit opens Create instead | [Share control flow and stop panel click propagation](../inbox/2026-10-28-graph-controls-need-shared-flow.md); durable layout desktop/phone and exact relationship-browser editing |
 | Hidden item labels acquire tiny backgrounds, reverse wires share a lane, or line-only diagnostics fail after path conversion | [Preserve conservative dimensions and shared path consumers](../inbox/2026-10-28-hidden-labels-need-valid-measurement.md); item-wire browser sequence and opposite-direction lane regression |
