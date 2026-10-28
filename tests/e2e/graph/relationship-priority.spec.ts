@@ -122,6 +122,92 @@ for (const width of [1440, 390]) {
       )
       .toBe(true);
     await expect(priority).toHaveValue('essential');
+    const graphSelector = page
+      .locator(
+        '[data-testid="graph-selector"]:visible, [data-testid="graph-selector-mobile"]:visible, [data-testid="graph-selector-sidebar"]:visible'
+      )
+      .first();
+    const summary = graphSelector.locator('.text-xs');
+    const dockCount = graph
+      .getByRole('button', { name: /Browse all relationships/ })
+      .locator('span')
+      .first();
+    await expect(summary).toContainText('4 nodes, 5 connections');
+    const typographySamples = [
+      {
+        name: 'graph title',
+        element: graphSelector.getByTestId('graph-selector-name'),
+        minSize: 14,
+        minWeight: 600,
+        requireVisible: true,
+      },
+      {
+        name: 'graph counts',
+        element: summary,
+        minSize: 14,
+        minWeight: 500,
+        requireVisible: width === 1440,
+      },
+      {
+        name: 'connection dock',
+        element: dockCount,
+        minSize: 14,
+        minWeight: 500,
+        requireVisible: true,
+      },
+      {
+        name: 'relationship priority',
+        element: priority,
+        minSize: 16,
+        minWeight: 600,
+        requireVisible: true,
+      },
+    ];
+    const readTypography = () =>
+      Promise.all(
+        typographySamples.map(async ({ element, ...sample }) => ({
+          ...sample,
+          visible: await element.isVisible(),
+          ...(await element.evaluate(element => {
+            const style = getComputedStyle(element);
+            return {
+              text: element.textContent?.trim(),
+              fontSize: parseFloat(style.fontSize),
+              fontWeight: Number(style.fontWeight),
+            };
+          })),
+        }))
+      );
+    const typographyViolations = (
+      samples: Awaited<ReturnType<typeof readTypography>>
+    ) =>
+      samples.filter(
+        sample =>
+          sample.fontSize < sample.minSize ||
+          sample.fontWeight < sample.minWeight ||
+          (sample.requireVisible && !sample.visible)
+      );
+    const initialTypography = await readTypography();
+    expect(typographyViolations(initialTypography)).toEqual([]);
+    const negativeTarget = width === 390 ? dockCount : summary;
+    const originalStyle = await negativeTarget.getAttribute('style');
+    let staleTypography: Awaited<ReturnType<typeof readTypography>>;
+    try {
+      await negativeTarget.evaluate(element => {
+        (element as HTMLElement).style.fontSize = '12px';
+        (element as HTMLElement).style.fontWeight = '400';
+      });
+      staleTypography = await readTypography();
+      expect(
+        typographyViolations(staleTypography).map(sample => sample.name)
+      ).toEqual([width === 390 ? 'connection dock' : 'graph counts']);
+    } finally {
+      await negativeTarget.evaluate((element, style) => {
+        if (style === null) element.removeAttribute('style');
+        else element.setAttribute('style', style);
+      }, originalStyle);
+    }
+    expect(typographyViolations(await readTypography())).toEqual([]);
     await page.evaluate(
       ({ x, y }) => (window as any).miniMapZoom(x, y, 0.75),
       framing
@@ -179,8 +265,20 @@ for (const width of [1440, 390]) {
         )
     ).toEqual(pairIds);
     await expect(browser).toContainText('All 3 originals are listed below.');
+    if (width === 390) {
+      await priority.selectOption('all');
+      await expect(graph).toHaveAttribute('data-relationship-priority', 'all');
+      await priority.selectOption('essential');
+      await expect(graph).toHaveAttribute(
+        'data-relationship-priority',
+        'essential'
+      );
+      await expect(label).toBeHidden();
+      await browser.getByRole('button').first().focus();
+    }
     await page.keyboard.press('Escape');
     await expect(browser).toHaveCount(0);
+    await expect(label).toBeVisible();
     await expect(label).toBeFocused();
     expect(await camera()).toEqual(savedCamera);
     await page.keyboard.press('Enter');
@@ -356,6 +454,28 @@ for (const width of [1440, 390]) {
     );
     const geometry = await inspectItemSymbols(page, info, 'priority-fallback');
     expect(geometry.labels.some(item => item.id === dependency.id)).toBe(true);
+    await expect(summary).toContainText('4 nodes, 4 connections');
+    await expect(dockCount).toHaveText('4 connections · Browse');
+    const finalTypography = await readTypography();
+    expect(typographyViolations(finalTypography)).toEqual([]);
+    const typographyPath = info.outputPath('priority-typography.json');
+    await writeFile(
+      typographyPath,
+      JSON.stringify(
+        {
+          width,
+          initial: initialTypography,
+          negative: staleTypography!,
+          final: finalTypography,
+        },
+        null,
+        2
+      )
+    );
+    await info.attach('priority-typography.json', {
+      path: typographyPath,
+      contentType: 'application/json',
+    });
     expect(writes).toEqual([
       { operation: 'DeleteEdges', variables: { where: { id: blocker.id } } },
     ]);

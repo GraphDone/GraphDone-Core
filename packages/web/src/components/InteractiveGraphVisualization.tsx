@@ -3940,7 +3940,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const [semanticOverviewActive, setSemanticOverviewActive] = useState(false);
   useLayoutEffect(() => {
     if (!semanticOverviewActive) runLabelAvoidanceRef.current?.();
-  }, [priorityProjection, semanticOverviewActive]);
+  }, [priorityProjection, semanticOverviewActive, itemRelationshipScope]);
   const handleOverviewActive = useCallback((active: boolean) => {
     setSemanticOverviewActive(active);
     if (active) setSelectedNode(null);
