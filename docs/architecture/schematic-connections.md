@@ -129,10 +129,11 @@ when no sampled slot clears cards or previous labels. This is conservative
 admission, not proof that every possible position is obstructed. Equal-distance pointer hits
 prefer the prior leg so dragging does not jump across a nearby return wire.
 
-This foundation is not yet connected to the item renderer and does not establish
-routed item acceptance. Next, adapt all four geometry consumers together, then
-add bounded routing/admission, named boundary connections, exact deferred counts
-and accessible original relationships. Routing and obstacle searches belong to
+The next committed increment connects this geometry to the D3 path, hitbox,
+arrow and label consumers. It still supplies straight border-to-border paths;
+this does not establish routed item acceptance. Next add bounded routing and
+admission, named boundary connections, exact deferred counts and accessible
+original relationships. Routing and obstacle searches belong to
 bounded updates after layout or scope changes, not every camera/simulation tick.
 Preserve edit/Grow, pointer hitboxes, label dragging and canonical positions.
 
@@ -149,3 +150,17 @@ serially in0.691s and scoped strict ES2020 types passed. Candidate interpolation
 now stays on its current segment and keeps only the best placement, avoiding
 repeated route scans/sorting. The [canonical lesson](../../.agents/inbox/2026-10-28-offset-label-drag-needs-offset-path.md)
 records the negative, correction and runtime integration limits.
+
+The D3 adaptation caches label dimensions after initial text sizing, reuses the
+path for paint and hit testing, places arrows from its final segment and slides
+labels along its displayed offset. Culling composes with route/label visibility
+instead of revealing deferred geometry. Label dragging updates only that label
+against cached obstacles. The interaction diagnostic clicks the actual path
+midpoint; the center of a bent path's bounding box need not lie on the path.
+
+Scoped web typecheck initially rejected a D3 nullable-style overload; the callback
+form corrected it, and the same check passed in3.66s. Scoped lint returned
+0 errors and298 warnings in the existing large renderer; no warning-free claim.
+These checks used the partial probe and are not actual browser acceptance.
+All original runtime/visual/durability gates and new item-wiring cases remain
+required before this branch can be integrated or #220 closed.
