@@ -375,6 +375,7 @@ export const RelationshipEditorWindow: React.FC<RelationshipEditorWindowProps> =
                   return (
                     <button
                       key={option.type}
+                      aria-pressed={isSelected}
                       onClick={() => handleRelationshipTypeChange(option.type)}
                       className={`
                         group relative p-3 rounded-lg border transition-all duration-200

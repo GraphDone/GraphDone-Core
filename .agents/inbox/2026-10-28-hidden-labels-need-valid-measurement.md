@@ -50,3 +50,15 @@ compares original graph data and uses owned fixture cleanup. CI execution and
 artifact review remain required. The route is still straight; these changes
 do not establish bounded obstacle routing, visible detail budgets, complete
 spaghetti detection or closure of #220.
+
+Independent review of `9931b3c` required stronger browser oracles before
+acceptance: pinned physics can be at rest while the450ms Fit transition is
+still moving the camera, and paint checks must inspect ancestors and actual
+stroke/fill. The correction waits for both `atRest` and `cameraReady`, rejects
+hidden ancestors/absent paint, and deliberately hides wire and arrow groups or
+removes a wire stroke to prove rejection. It also compares route endpoints to
+the original API-directed cards and checks the editor's original direction and
+selected type. Relationship type buttons expose their selected state through
+`aria-pressed`. Local discovery still finds2 cases and scoped web types pass;
+actual browser acceptance is pending. These were source-review findings,
+not locally executed browser negatives.
