@@ -260,3 +260,19 @@ exercise the stops, meaningful coverage and conserved counts. Keep the existing
 clutter/typography budgets and deliberate spaghetti negatives. The type-tier
 mapping and control labels are proposed defaults pending visual review, not an
 implemented feature or completed acceptance claim.
+
+The first priority candidate adds `relationshipPriority.ts`: canonical endpoint
+pairs retain every original ID and direction; the selected stop admits all ties
+up to its tier, or the best available tier when none qualify. Unknown imported
+types use the contextual tier and remain available through pair fallback and
+All. Missing endpoints stay a separate pending partition. Applying its admitted
+IDs to canonical semantic bundles retains other lower-tier member pairs and
+does not rebuild containment. This helper is not yet wired to the application.
+
+On 2026-10-28, eight serial Vitest cases passed in 0.877s using the existing
+owned dependency fixture (99ms test bodies). They cover semantic direction,
+ties/repeated originals/self-links, live fallback, unknown types, unambiguous
+pair keys, reorder/monotonicity, pre-aggregation coverage and exact conservation
+of 50,000 edges across 10,000 items. This is pure projection evidence, not browser
+capacity or completed priority-control acceptance. The earlier scaffold could
+not import the absent module; no behavioral red-suite pass is implied.
