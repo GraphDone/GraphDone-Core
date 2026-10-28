@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { Lock, Eye, EyeOff, CheckCircle, XCircle, ArrowLeft } from 'lucide-react';
 import { InsecureConnectionBanner } from '../components/TlsStatusIndicator';
-import { CodeCaptcha } from '../components/CodeCaptcha';
+import { AuthCaptcha } from '../components/AuthCaptcha';
 import { PasswordRequirements } from '../components/PasswordRequirements';
 import { validatePassword, getPasswordStrength } from '../utils/validation';
 
@@ -20,6 +20,7 @@ export function ResetPassword() {
   const [error, setError] = useState('');
   const [passwordsMatch, setPasswordsMatch] = useState<boolean | null>(null);
   const [captchaPayload, setCaptchaPayload] = useState<string>('');
+  const [captchaReset, setCaptchaReset] = useState(0);
 
   useEffect(() => {
     if (!token) {
@@ -47,7 +48,7 @@ export function ResetPassword() {
     setError('');
 
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:4127';
+      const apiUrl = import.meta.env.VITE_API_URL || window.location.origin;
       const response = await fetch(`${apiUrl}/auth/reset-password`, {
         method: 'POST',
         headers: {
@@ -69,6 +70,8 @@ export function ResetPassword() {
     } catch {
       setError('Failed to reset password. Please try again.');
     } finally {
+      setCaptchaPayload('');
+      setCaptchaReset(value => value + 1);
       setLoading(false);
     }
   };
@@ -218,9 +221,8 @@ export function ResetPassword() {
               </div>
 
               {/* CAPTCHA */}
-              <CodeCaptcha
+              <AuthCaptcha action="reset-password" resetKey={captchaReset}
                 onVerified={(code) => setCaptchaPayload(code)}
-                onError={() => setCaptchaPayload('')}
               />
 
               <button

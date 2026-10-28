@@ -86,6 +86,7 @@ describe('production API startup secret boundary', () => {
     ['blank SESSION_SECRET', 'SESSION_SECRET', '  '],
     ['fallback JWT_SECRET', 'JWT_SECRET', 'your-dev-secret-key'],
     ['fallback SESSION_SECRET', 'SESSION_SECRET', 'graphdone-default-secret-change-in-production'],
+    ['fallback ALTCHA_HMAC_KEY', 'ALTCHA_HMAC_KEY', 'your-secret-hmac-key-change-in-production'],
   ])('rejects %s before database initialization or listening', async (_label, name, value) => {
     if (value === undefined) delete process.env[name!];
     else vi.stubEnv(name!, value);
@@ -102,7 +103,7 @@ describe('production API startup secret boundary', () => {
     expect(fixture.session).toHaveBeenCalledOnce();
     expect(listen).toHaveBeenCalledOnce();
     const { generateToken } = await import('../src/utils/auth.js');
-    expect(jwt.verify(generateToken('startup-user', 'startup@example.test', 'USER'), signingSecret)).toMatchObject({ userId: 'startup-user' });
+    expect(jwt.verify(generateToken('startup-user', 'startup@example.test', 'USER', 0), signingSecret)).toMatchObject({ userId: 'startup-user' });
   });
 
   it('loads .env secrets before auth modules capture their signing key', async () => {
@@ -112,7 +113,7 @@ describe('production API startup secret boundary', () => {
     await import('../src/index.js');
     await listening;
     const { generateToken } = await import('../src/utils/auth.js');
-    expect(jwt.verify(generateToken('dotenv-user', 'dotenv@example.test', 'USER'), signingSecret)).toMatchObject({ userId: 'dotenv-user' });
+    expect(jwt.verify(generateToken('dotenv-user', 'dotenv@example.test', 'USER', 0), signingSecret)).toMatchObject({ userId: 'dotenv-user' });
   });
 
   it('preserves development startup without explicit secrets', async () => {

@@ -2,6 +2,8 @@ import {test,expect} from '@playwright/test';
 import {readFile,writeFile,unlink} from 'node:fs/promises';
 import {readFileSync} from 'node:fs';
 import {resolve} from 'node:path';
+import {createRequire} from 'node:module';
+const webRequire=createRequire(resolve('packages/web/package.json'));
 const example=JSON.parse(readFileSync('docs/formats/project-v1.example.json','utf8'));
 async function account(page:any){return page.evaluate(async()=>{
  const owner=JSON.parse(localStorage.getItem('currentUser')||sessionStorage.getItem('currentUser')||'null').id;
@@ -66,8 +68,8 @@ test('student / engineer: portable project round trip, offline, safe Mermaid and
  expect(mmdDownload.suggestedFilename()).toMatch(/\.mmd$/);expect(mmd).not.toContain('<script>');expect(mmd).not.toContain('%%{init');
  // Local blank tab, never send project content to an external Mermaid service.
  const render=await browser.newPage();await render.setContent('<div id="diagram"></div>');
- await render.addScriptTag({path:resolve('node_modules/mermaid/dist/mermaid.min.js')});
- const result=await render.evaluate(async(source)=>{const m=(window as any).mermaid;m.initialize({startOnLoad:false,securityLevel:'strict'});await m.parse(source);const {svg}=await m.render('project-diagram',source);document.querySelector('#diagram')!.innerHTML=svg;return {nodes:document.querySelectorAll('.node').length,edges:document.querySelectorAll('.flowchart-link').length,text:document.body.textContent};},mmd);
+ await render.addScriptTag({path:webRequire.resolve('mermaid/dist/mermaid.min.js')});
+ const result=await render.evaluate(async(source)=>{const m=(window as any).mermaid;m.initialize({startOnLoad:false,securityLevel:'strict',layout:'dagre',theme:'default',look:'classic'});await m.parse(source);const {svg}=await m.render('project-diagram',source);document.querySelector('#diagram')!.innerHTML=svg;return {nodes:document.querySelectorAll('.node').length,edges:document.querySelectorAll('.flowchart-link').length,text:document.body.textContent};},mmd);
  expect(result.nodes).toBe(3);expect(result.edges).toBe(1);expect(result.text).toContain('Plan the launch 🚀');await render.screenshot({path:'test-artifacts/quality/project-mermaid.png'});await render.close();
  for(const [width,height] of [[320,568],[390,844],[844,390],[1024,768],[1440,900],[2560,1440]]){
   await page.keyboard.press('Escape');await page.setViewportSize({width,height});region=await openMenu(page);

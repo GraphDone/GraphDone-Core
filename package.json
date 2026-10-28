@@ -53,13 +53,14 @@
     "report:vlm": "node tests/lib/reporting/generate-vlm-report.mjs",
     "perf:bundle": "node tests/perf/check-bundle-size.mjs",
     "qc:modes": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line tests/e2e/quality/new-user-modes.spec.ts",
-    "qc:new-user": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line tests/e2e/quality/new-user-modes.spec.ts tests/e2e/quality/button-content.spec.ts tests/e2e/graph/guest-dialog-layout.spec.ts tests/e2e/graph/responsive-real-workflows.spec.ts tests/e2e/graph/overview-board-actions.spec.ts tests/e2e/graph/recorded-ai-work.spec.ts tests/e2e/graph/admin-dialog-responsive.spec.ts tests/e2e/smoke/user-smoke.spec.ts tests/e2e/quality/persona-lifecycle.spec.ts tests/e2e/quality/graph-motion.spec.ts tests/e2e/quality/graph-resize.spec.ts tests/e2e/quality/graph-details.spec.ts",
+    "qc:new-user": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line tests/e2e/quality/new-user-modes.spec.ts tests/e2e/quality/button-content.spec.ts tests/e2e/graph/guest-dialog-layout.spec.ts tests/e2e/graph/responsive-real-workflows.spec.ts tests/e2e/graph/overview-board-actions.spec.ts tests/e2e/graph/recorded-ai-work.spec.ts tests/e2e/graph/admin-dialog-responsive.spec.ts tests/e2e/graph/semantic-lod.spec.ts tests/e2e/smoke/user-smoke.spec.ts tests/e2e/quality/persona-lifecycle.spec.ts tests/e2e/quality/graph-motion.spec.ts tests/e2e/quality/graph-resize.spec.ts tests/e2e/quality/graph-details.spec.ts",
     "qc:personas": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line tests/e2e/quality/persona-lifecycle.spec.ts",
     "qc:motion": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line tests/e2e/quality/graph-motion.spec.ts tests/e2e/quality/graph-resize.spec.ts",
     "qc:graph-first": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line tests/e2e/quality/graph-first-journey.spec.ts",
     "qc:visual": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line tests/e2e/quality/visual-style.spec.ts",
     "qc:buttons": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line tests/e2e/quality/button-content.spec.ts",
     "qc:controls": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line tests/e2e/quality/graph-controls.spec.ts",
+    "qc:lod": "playwright test tests/e2e/graph/semantic-lod.spec.ts --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --retries=0 --reporter=line",
     "qc:layout": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line tests/e2e/quality/graph-layout.spec.ts",
     "qc:verification": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line tests/e2e/quality/turnstile-guest.spec.ts",
     "qc:graph": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line tests/e2e/quality/graph-motion.spec.ts tests/e2e/quality/graph-resize.spec.ts tests/e2e/quality/graph-details.spec.ts tests/e2e/quality/graph-controls.spec.ts tests/e2e/smoke/user-smoke.spec.ts",
@@ -73,7 +74,9 @@
     "qc:project-transfer": "playwright test --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line tests/e2e/quality/project-transfer.spec.ts",
     "qc:operations": "playwright test tests/e2e/quality/operations.spec.ts --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line",
     "qc:operator-login": "playwright test tests/e2e/quality/operator-login.spec.ts --project=GraphDone-Core/dev-neo4j/chromium --headed --workers=1 --reporter=line",
-    "test:operations": "tsx scripts/test-operations-local.mts && tsx scripts/test-admin-bootstrap.mts"
+    "test:operations": "tsx scripts/test-operations-local.mts && tsx scripts/test-admin-bootstrap.mts",
+    "qc:captcha": "playwright test --config playwright.captcha.config.ts --headed --workers=1 --retries=0",
+    "test:toolchain": "node --test tests/toolchain/*-contract.mjs"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
@@ -82,7 +85,7 @@
     "eslint": "^8.54.0",
     "eslint-config-prettier": "^9.0.0",
     "prettier": "^3.1.0",
-    "turbo": "^1.13.4",
+    "turbo": "^2.11.10",
     "typescript": "^5.3.0"
   },
   "engines": {
@@ -102,6 +105,10 @@
     "@graphql-tools/utils": "12.1.0",
     "@typescript-eslint/typescript-estree@6.21.0": {
       "minimatch": "9.0.7"
+    },
+    "@apollo/federation-internals@2.14.4": {
+      "uuid": "11.1.1"
     }
-  }
+  },
+  "packageManager": "npm@10.8.2"
 }

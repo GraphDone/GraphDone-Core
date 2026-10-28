@@ -97,6 +97,21 @@ test('vitest: a still-pending execution fails even for an optional sequence', as
   const report = { ...vitestReport([{ title: 'unfinished', status: 'pending' }]), numPassedTests: 1, numFailedTests: 0, numPendingTests: 1, numTodoTests: 0 };
   assert.equal((await execute(t, 'vitest', report, { blocking: false })).status, 'failed');
 });
+for (const blocking of [true, false]) {
+  test(`vitest: version 4 intentional skip remains ${blocking ? 'required failure' : 'optional skip'}`, async t => {
+    const report = {
+      ...vitestReport([{ title: 'intentional skip', status: 'skipped' }]),
+      numPassedTests: 0, numFailedTests: 0, numPendingTests: 1, numTodoTests: 0,
+      numTotalTestSuites: 1, numPassedTestSuites: 1, numPendingTestSuites: 0,
+    };
+    const result = await execute(t, 'vitest', report, { blocking });
+    assert.equal(result.status, blocking ? 'failed' : 'skipped');
+    assert.equal(result.counts.passed, 0);
+    assert.equal(result.counts.skipped, 1);
+    assert.equal(result.evidenceErrors.some(error => error.includes('numPendingTests')), false);
+    assert.equal(result.counts.failed, blocking ? 1 : 0);
+  });
+}
 for (const suites of [{ numTotalTestSuites: 0, numPassedTestSuites: 0 }, { numTotalTestSuites: 2, numPassedTestSuites: 1 }]) {
   test(`vitest: suite totals cannot contradict file evidence: ${JSON.stringify(suites)}`, async t => {
     assert.equal((await execute(t, 'vitest', { ...vitestReport(), ...suites })).status, 'failed');

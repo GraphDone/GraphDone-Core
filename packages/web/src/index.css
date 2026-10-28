@@ -2,6 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Overview summaries own interaction at far zoom. Keep the D3 world/camera alive
+   underneath, but hidden source hit targets must not edit or intercept clicks. */
+.graph-container[data-overview="true"] > svg .nodes-group,
+.graph-container[data-overview="true"] > svg .edges-group,
+.graph-container[data-overview="true"] > svg .arrows-group,
+.graph-container[data-overview="true"] > svg .edge-labels-group {
+  display: none;
+}
+
 /* Lagoon Animation Parameters - Easy to edit and randomize */
 :root {
   /* Layer 1 Parameters */

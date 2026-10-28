@@ -169,6 +169,8 @@ jobs:
         run: npm run build
       - name: Install Playwright (chromium)
         run: npx playwright install --with-deps chromium
+      - name: Vite proxy, hot reload and offline-shell contract
+        run: npm run test:toolchain
       - name: Start GraphDone (dev stack)
         run: |
           npm run dev > /tmp/dev.log 2>&1 &
@@ -184,6 +186,26 @@ jobs:
           CI: true
       - name: New-user quality gate (headed under virtual display)
         run: xvfb-run --auto-servernum node tests/run-unified.mjs --sequence new-user --out test-artifacts/ci-new-user
+        env:
+          TEST_URL: http://localhost:3127
+          CI: true
+      - name: Semantic LOD acceptance
+        run: xvfb-run --auto-servernum node tests/run-unified.mjs --sequence semantic-lod --out test-artifacts/ci-semantic-lod
+        env:
+          TEST_URL: http://localhost:3127
+          CI: true
+      - name: Nested semantic LOD acceptance
+        run: xvfb-run --auto-servernum node tests/run-unified.mjs --sequence nested-lod --out test-artifacts/ci-nested-lod
+        env:
+          TEST_URL: http://localhost:3127
+          CI: true
+      - name: Durable layout recovery acceptance
+        run: xvfb-run --auto-servernum node tests/run-unified.mjs --sequence layout-recovery --out test-artifacts/ci-layout-recovery
+        env:
+          TEST_URL: http://localhost:3127
+          CI: true
+      - name: Route compatibility acceptance
+        run: xvfb-run --auto-servernum node tests/run-unified.mjs --sequence router-navigation --out test-artifacts/ci-router-navigation
         env:
           TEST_URL: http://localhost:3127
           CI: true
@@ -303,11 +325,83 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  runtime-images:
+    name: Runtime Images (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: api
+            dockerfile: packages/server/Dockerfile
+            target: runner
+            uid: '0'
+          - name: generic
+            dockerfile: deployment/Dockerfile
+            target: runner
+            uid: '1001'
+          - name: self-host
+            dockerfile: deployment/self-host/Dockerfile
+            target: api
+            uid: '1000'
+    services:
+      neo4j:
+        image: neo4j:5.26.12
+        env:
+          NEO4J_AUTH: neo4j/graphdone_runtime_fixture
+          NEO4J_PLUGINS: '["apoc"]'
+          NEO4J_dbms_security_procedures_unrestricted: 'apoc.*'
+        options: >-
+          --health-cmd "cypher-shell -u neo4j -p graphdone_runtime_fixture 'RETURN 1'"
+          --health-interval 10s --health-timeout 5s --health-retries 30
+        ports:
+          - 7687:7687
+    env:
+      GRAPHDONE_DISPOSABLE_NEO4J: '1'
+      NEO4J_URI: bolt://127.0.0.1:7687
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: graphdone_runtime_fixture
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Build the final runtime image
+        run: |
+          mkdir -p test-artifacts/runtime
+          docker build --pull --target '${{ matrix.target }}' -f '${{ matrix.dockerfile }}' --iidfile test-artifacts/runtime/image-id .
+      - name: Verify installed packages, production startup, API, MCP and volume recovery
+        shell: bash
+        run: node tests/runtime/run-image.mjs "$(cat test-artifacts/runtime/image-id)" '${{ matrix.uid }}' | tee test-artifacts/runtime/contract.jsonl
+      - name: Record final image OS and npm inventory
+        shell: bash
+        run: |
+          docker save "$(cat test-artifacts/runtime/image-id)" -o "$RUNNER_TEMP/runtime-image.tar"
+          mkdir -p "$RUNNER_TEMP/runtime-trivy-cache"
+          docker run --rm --user "$(id -u):$(id -g)" \
+            --mount "type=bind,source=$RUNNER_TEMP/runtime-image.tar,target=/image.tar,readonly" \
+            --mount "type=bind,source=$RUNNER_TEMP/runtime-trivy-cache,target=/cache" \
+            aquasec/trivy@sha256:790fd66d1697395d8693d1acaa1ea702406a20f109b6fc7bac8db623eca6c06c \
+            image --input /image.tar --cache-dir /cache --scanners vuln --list-all-pkgs --format json \
+            > test-artifacts/runtime/trivy.json
+          cp "$RUNNER_TEMP/runtime-trivy-cache/db/metadata.json" test-artifacts/runtime/trivy-db.json
+          node tests/runtime/check-scan.mjs test-artifacts/runtime/trivy.json
+      - name: Retain image provenance and contract results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-image-${{ matrix.name }}-${{ github.sha }}
+          path: test-artifacts/runtime/
+          retention-days: 7
+
   # ── Overall status ─────────────────────────────────────────────────────────
   ci-success:
     name: CI Success
     runs-on: ubuntu-latest
-    needs: [quality, unit-tests, mcp-contract, build, security-scan, smoke-gate, prod-smoke]
+    needs: [quality, unit-tests, mcp-contract, build, security-scan, smoke-gate, prod-smoke, runtime-images]
     if: always()
     steps:
       - name: Verify required jobs passed
@@ -329,7 +423,8 @@ jobs:
              && "${{ needs.mcp-contract.result }}" == "success" \
              && "${{ needs.build.result }}" == "success" \
              && "${{ needs.security-scan.result }}" == "success" \
-             && "${{ needs.smoke-gate.result }}" == "success" ]]; then
+             && "${{ needs.smoke-gate.result }}" == "success" \
+             && "${{ needs.runtime-images.result }}" == "success" ]]; then
             echo "✅ CI green — lint, types, every unit suite, the build, and the user smoke gate all passed."
           else
             echo "❌ CI failed — see the failing job above."

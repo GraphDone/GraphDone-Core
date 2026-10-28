@@ -90,6 +90,7 @@ export async function getAuthState(page: Page): Promise<AuthState> {
     // Workspace-specific indicators
     '[data-testid="graph-selector"]',
     '[data-testid="graph-selector-mobile"]',
+    '[data-testid="workspace-content"]',
     '.graph-selector',
     'text="Graph Viewer"',
     // Error indicators
@@ -136,6 +137,7 @@ export async function getAuthState(page: Page): Promise<AuthState> {
     ind.includes('Logout') ||
     ind.includes('user-menu') ||
     ind.includes('graph-selector') ||
+    ind.includes('workspace-content') ||
     ind.includes('Graph Viewer')
   );
   

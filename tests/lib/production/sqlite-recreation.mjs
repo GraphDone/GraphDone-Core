@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { productionLoginProof } from './auth-captcha.mjs';
 import { setTimeout as delay } from 'node:timers/promises';
 
 export async function verifySqliteRecreation({ composeArgs, env, target, request, command }) {
@@ -8,7 +9,9 @@ export async function verifySqliteRecreation({ composeArgs, env, target, request
     variables: { input: { emailOrUsername: env.TEST_ADMIN_USERNAME || 'admin', password: env.ADMIN_PASSWORD } },
   };
   async function login() {
-    const response = await request(`${target}/api/graphql`, { method: 'POST', body });
+    const captchaPayload = await productionLoginProof({ target, request });
+    const response = await request(`${target}/api/graphql`, { method: 'POST',
+      body: { ...body, variables: { input: { ...body.variables.input, captchaPayload } } } });
     assert.equal(response.status, 200, 'Persistence login requires HTTP 200');
     assert.ok(!response.body?.errors?.length, 'Persistence login returned GraphQL errors');
     const user = response.body?.data?.login?.user;
