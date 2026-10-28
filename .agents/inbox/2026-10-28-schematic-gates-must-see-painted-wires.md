@@ -39,6 +39,9 @@ source/target port placement and arrows when incoming buses are introduced.
 Select the member inspection control by its actual visible title, while testing
 the adjacent relationship control independently. Keep strict locators; do not
 silence the ambiguity with an arbitrary `.first()`.
+The existing semantic overview journey's 38-member count needs the same visible
+text distinction: relationship buttons include the item title in their accessible
+name. Keep the expected 38 source members, and count the actual member controls.
 
 ## Limits
 
