@@ -140,3 +140,20 @@ includes the trace controls among wire obstacles. Those browser assertions are
 pending; no local browser/database or additional fixture was started. This is
 not detailed item wiring, arbitrary selected-path tracing, a scale benchmark,
 or accepted full application behavior.
+
+## Issue closeout coverage audit
+
+Independent review against the live #215/#218/#219 acceptance bodies found that
+#218's self-loop/high-degree hub, actual keyboard navigation, and direct internal/
+bundle entrypoints needed real browser coverage beyond the existing model tests.
+The same 72-node nested fixture now adds a 71-neighbor hub and one self-loop in
+20-edge batches. API readback verifies every hub neighbor and exactly one loop.
+The journey compares the internal and directional BLOCKS bundle lists against
+API-derived edge IDs, uses Tab/Enter for desktop relationship inspection/Back,
+and preserves existing phone touch actions and final unchanged-data/write guards.
+Node count, fixture/test timeouts, one worker and zero retries are unchanged.
+
+This is a focused test-only completion of the issue criteria, pending exact-source
+CI. It adds no local database/browser workload. #219 defines the first group-routing
+slice; detailed item wiring remains #220 and full LOD remains #193. No issue may be
+closed before its accepted exact-source gates and post-integration dev CI.
