@@ -4,7 +4,7 @@ import express from 'express';
 import { createServer, type Server } from 'node:http';
 import { ApolloServer } from '@apollo/server';
 import { expressMiddleware } from '@as-integrations/express4';
-import { solveChallenge } from 'altcha-lib';
+import { createHash } from 'node:crypto';
 import { sqliteAuthStore } from '../src/auth/sqlite-auth';
 import { sqliteAuthResolvers } from '../src/resolvers/sqlite-auth';
 import { authOnlyTypeDefs } from '../src/schema/auth-only-schema';
@@ -21,9 +21,14 @@ const store = sqliteAuthStore as unknown as { db: sqlite3.Database | null; initi
 
 async function proof(action: CaptchaAction) {
   const challenge = await createCaptchaChallenge(action);
-  const solution = await solveChallenge(challenge.challenge, challenge.salt, challenge.algorithm, challenge.maxnumber).promise;
-  if (!solution) throw new Error('Could not solve owned challenge');
-  return Buffer.from(JSON.stringify({ ...challenge, number: solution.number })).toString('base64');
+  expect(challenge.algorithm).toBe('SHA-256');
+  expect(challenge.maxnumber).toBe(100000);
+  for (let number = 0; number <= challenge.maxnumber; number++) {
+    if (createHash('sha256').update(challenge.salt + number).digest('hex') === challenge.challenge) {
+      return Buffer.from(JSON.stringify({ ...challenge, number })).toString('base64');
+    }
+  }
+  throw new Error('Could not solve owned challenge');
 }
 
 async function request(operation: 'login' | 'signup', input: Record<string, unknown>) {

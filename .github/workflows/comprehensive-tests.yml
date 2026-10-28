@@ -36,7 +36,7 @@ jobs:
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
       - name: Run all unit suites (core, web, server, mcp-server)
-        run: npm run test && npm run test:unified:lib
+        run: npm run test:coverage && npm run test:unified:lib
 
   # Genuinely-real checks: the installer exists, deployment compose parses
   installer-and-deploy-config:
