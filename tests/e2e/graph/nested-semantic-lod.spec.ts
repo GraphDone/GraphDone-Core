@@ -59,30 +59,41 @@ const test = base.extend<{
             };
           },
         });
-        await gql(
-          page,
-          `mutation($input:[EdgeCreateInput!]!){createEdges(input:$input){edges{id}}}`,
-          {
-            input: [
-              [0, 36, 'BLOCKS'],
-              [36, 0, 'DEPENDS_ON'],
-              [0, 36, 'BLOCKS'],
-            ].map(([source, target, type]) => ({
-              type,
-              weight: 1,
-              source: {
-                connect: {
-                  where: { node: { id: seeded.nodeIds[Number(source)] } },
-                },
-              },
-              target: {
-                connect: {
-                  where: { node: { id: seeded.nodeIds[Number(target)] } },
-                },
-              },
-            })),
-          }
-        );
+        const extraEdges = [
+          [0, 36, 'BLOCKS'],
+          [36, 0, 'DEPENDS_ON'],
+          [0, 36, 'BLOCKS'],
+          [0, 0, 'BLOCKS'],
+          ...seeded.nodeIds
+            .slice(1)
+            .map((_, index) => [
+              0,
+              index + 1,
+              index % 2 ? 'BLOCKS' : 'DEPENDS_ON',
+            ]),
+        ].map(([source, target, type]) => ({
+          type,
+          weight: 1,
+          source: {
+            connect: {
+              where: { node: { id: seeded.nodeIds[Number(source)] } },
+            },
+          },
+          target: {
+            connect: {
+              where: { node: { id: seeded.nodeIds[Number(target)] } },
+            },
+          },
+        }));
+        for (let offset = 0; offset < extraEdges.length; offset += 20) {
+          const input = extraEdges.slice(offset, offset + 20);
+          const result = await gql(
+            page,
+            `mutation($input:[EdgeCreateInput!]!){createEdges(input:$input){edges{id}}}`,
+            { input }
+          );
+          expect(result.createEdges.edges).toHaveLength(input.length);
+        }
         await use({ seeded, touch });
       } finally {
         await touch?.detach();
@@ -121,7 +132,9 @@ for (const width of [1440, 390])
       };
       const before = await snapshot();
       expect(before.workItems).toHaveLength(72);
-      expect(before.edges).toHaveLength(seeded.edgeCount + 3);
+      expect(before.edges).toHaveLength(
+        seeded.edgeCount + seeded.nodeIds.length + 3
+      );
       await page.route('**/api/graphql', async route => {
         const body = route.request().postDataJSON();
         if (/^\s*mutation\b/.test(body?.query ?? '')) {
@@ -248,6 +261,22 @@ for (const width of [1440, 390])
         target: { id: string };
       };
       const originalEdges: OriginalEdge[] = before.edges;
+      const hubNeighbors = new Set(
+        originalEdges
+          .filter(
+            edge =>
+              edge.source.id === seeded.nodeIds[0] &&
+              edge.target.id !== seeded.nodeIds[0]
+          )
+          .map(edge => edge.target.id)
+      );
+      expect([...hubNeighbors].sort()).toEqual(seeded.nodeIds.slice(1).sort());
+      const selfLoops = originalEdges.filter(
+        edge =>
+          edge.source.id === seeded.nodeIds[0] &&
+          edge.target.id === seeded.nodeIds[0]
+      );
+      expect(selfLoops).toHaveLength(1);
       await expect
         .poll(relationshipIds)
         .toEqual(originalEdges.map(edge => edge.id).sort());
@@ -272,17 +301,27 @@ for (const width of [1440, 390])
         (item: { id: string }) => item.id === seeded.nodeIds[0]
       ).title;
       const connectionCamera = await camera();
-      await activate(
-        relationships
-          .getByRole('button', { name: `Inspect ${sourceTitle}`, exact: true })
-          .first()
-      );
+      const inspectSource = relationships
+        .getByRole('button', { name: `Inspect ${sourceTitle}`, exact: true })
+        .first();
+      if (touch) await activate(inspectSource);
+      else {
+        await page.keyboard.press('Tab');
+        await expect(inspectSource).toBeFocused();
+        await page.keyboard.press('Enter');
+      }
       await expect(page.getByTestId('node-inspector')).toContainText(
         sourceTitle
       );
-      await activate(
-        overview.getByRole('button', { name: 'Back to overview', exact: true })
-      );
+      const backFromRelationship = overview.getByRole('button', {
+        name: 'Back to overview',
+        exact: true,
+      });
+      if (touch) await activate(backFromRelationship);
+      else {
+        await expect(backFromRelationship).toBeFocused();
+        await page.keyboard.press('Enter');
+      }
       await expect.poll(camera).toEqual(connectionCamera);
       await expect(
         relationships.getByLabel('Find a relationship', { exact: true })
@@ -350,6 +389,54 @@ for (const width of [1440, 390])
       await expect(payments).toContainText('36 items');
       await expect(payments).toContainText('BLOCKS');
       await expect(payments).toContainText('DEPENDS_ON');
+      const paymentIds = new Set(seeded.nodeIds.slice(0, 36));
+      const internalIds = originalEdges
+        .filter(
+          edge =>
+            paymentIds.has(edge.source.id) && paymentIds.has(edge.target.id)
+        )
+        .map(edge => edge.id)
+        .sort();
+      await activate(
+        payments.getByRole('button', {
+          name: `Browse ${internalIds.length} internal relationships`,
+          exact: true,
+        })
+      );
+      await expect.poll(relationshipIds).toEqual(internalIds);
+      await expect(
+        relationships
+          .locator('[data-lod-edge-id]')
+          .filter({ hasText: selfLoops[0].id })
+      ).toHaveCount(1);
+      await activate(
+        relationships.getByRole('button', {
+          name: 'Back to groups',
+          exact: true,
+        })
+      );
+      const bundleIds = originalEdges
+        .filter(
+          edge =>
+            paymentIds.has(edge.source.id) &&
+            !paymentIds.has(edge.target.id) &&
+            edge.type === 'BLOCKS'
+        )
+        .map(edge => edge.id)
+        .sort();
+      await activate(
+        payments.getByRole('button', {
+          name: `Payments → Inventory: ${bundleIds.length} BLOCKS`,
+          exact: true,
+        })
+      );
+      await expect.poll(relationshipIds).toEqual(bundleIds);
+      await activate(
+        relationships.getByRole('button', {
+          name: 'Back to groups',
+          exact: true,
+        })
+      );
       await activate(
         payments.getByRole('button', {
           name: 'Trace outgoing connections',
