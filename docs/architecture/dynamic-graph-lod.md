@@ -2,7 +2,10 @@
 
 Baseline reviewed 2026-10-27 UTC; implementation status updated 2026-10-28 UTC.
 The first production-renderer overview and durable layout recovery are integrated
-into dev. The nested hierarchy continuation is under validation in #215 (section 9).
+into dev. Nested hierarchy and group wiring are accepted through #216; #215/#218/#219 are
+closed. Item geometry #221 is accepted on dev058aaa7. Readable symbols #222/#223
+remain under validation; detailed routing and relationship-priority fallback
+continue in #220 (see the schematic connection plan).
 The full dynamic LOD path remains open. Source, GitHub and localhost observations
 below describe the original reviewed base, not current branch tips.
 The stage IDs below are proposed work items, not existing GitHub issue numbers.
