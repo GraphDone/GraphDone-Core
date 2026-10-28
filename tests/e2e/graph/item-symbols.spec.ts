@@ -124,6 +124,16 @@ for (const { width, diagonal } of [
         await expect(
           page.getByRole('tooltip', { name: 'Graph', exact: true })
         ).toBeVisible();
+        await navigation
+          .getByRole('button', { name: 'Dashboard', exact: true })
+          .hover();
+        await expect(
+          page.getByRole('tooltip', { name: 'Dashboard', exact: true })
+        ).toBeVisible();
+        await page.mouse.move(8, 8);
+        await expect(
+          page.getByRole('tooltip', { name: 'Graph', exact: true })
+        ).toBeVisible();
         await page.keyboard.press('Escape');
         await expect(page.getByRole('tooltip')).toHaveCount(0);
         await expect(graph).toBeFocused();
