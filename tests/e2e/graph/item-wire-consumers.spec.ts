@@ -360,6 +360,12 @@ test('item wire paths, hitboxes, arrows and dragged labels retain original relat
   await editor
     .getByRole('button', { name: 'Close relationship editor', exact: true })
     .click();
+  await page.getByRole('button', { name: /Browse all relationships/ }).click();
+  const browser = page.getByRole('region', { name: 'Graph relationships' });
+  await browser.getByRole('button', { name: `Edit relationship ${edgeId}`, exact: true }).click();
+  await expect(browser).toHaveCount(0);
+  await assertOriginalEditor();
+  await editor.getByRole('button', { name: 'Close relationship editor', exact: true }).click();
   expect(await snapshot()).toEqual(before);
   expect(writes).toEqual([]);
   expect(errors).toEqual([]);

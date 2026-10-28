@@ -2,6 +2,7 @@
 
 | Symptom | Canonical lesson and regression |
 | --- | --- |
+| Browse covers layout Retry/Discard, or original relationship Edit opens Create instead | [Share control flow and stop panel click propagation](../inbox/2026-10-28-graph-controls-need-shared-flow.md); durable layout desktop/phone and exact relationship-browser editing |
 | Hidden item labels acquire tiny backgrounds, reverse wires share a lane, or line-only diagnostics fail after path conversion | [Preserve conservative dimensions and shared path consumers](../inbox/2026-10-28-hidden-labels-need-valid-measurement.md); item-wire browser sequence and opposite-direction lane regression |
 | A dragged offset label jumps to a nearby return wire despite a prior-leg tie-breaker | [Project onto the displayed offset path](../inbox/2026-10-28-offset-label-drag-needs-offset-path.md); close-return-leg geometry negative and correction |
 | Extra graph-fixture batches can continue while timeout cleanup deletes their graph | [Keep additional edges inside tracked seeding](../inbox/2026-10-28-fixture-extras-must-share-cancellation.md); delayed edge-response owned-fixture regression |
