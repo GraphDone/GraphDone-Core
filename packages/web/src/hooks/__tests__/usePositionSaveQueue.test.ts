@@ -1,9 +1,21 @@
 import { createElement, StrictMode } from 'react';
 import { act, render, renderHook, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PositionSaveProvider, usePositionSaveQueue, type PositionSaveScope } from '../usePositionSaveQueue';
 import { clearSession, setSession } from '../../lib/authStorage';
 import type { PositionSave } from '../../lib/positionSaveQueue';
+import { emptyAccount, type Account } from '../../lib/offline/model';
+
+const storage = vi.hoisted(() => new Map<string, Account>());
+vi.mock('../../lib/offline/store', () => ({
+  readAccount: async (owner: string) => structuredClone(storage.get(owner) || emptyAccount()),
+  editAccount: async (owner: string, edit: (account: Account) => unknown) => {
+    const account = structuredClone(storage.get(owner) || emptyAccount());
+    const result = edit(account);
+    storage.set(owner, account);
+    return result;
+  },
+}));
 
 const token = (id: string) => `header.${btoa(JSON.stringify({ userId: id }))}.signature`;
 const scope = { ownerId: 'owner-a', graphId: 'graph-a' };
@@ -29,7 +41,17 @@ function leaving() {
   return event.defaultPrevented;
 }
 
+afterEach(() => vi.unstubAllGlobals());
 beforeEach(() => {
+  const locks = new Map<string, Promise<unknown>>();
+  vi.stubGlobal('navigator', { locks: {
+    request: (name: string, _options: unknown, action: () => Promise<unknown>) => {
+      const operation = (locks.get(name) || Promise.resolve()).catch(() => undefined).then(action);
+      locks.set(name, operation.catch(() => undefined));
+      return operation;
+    },
+  } });
+  storage.clear();
   localStorage.clear();
   sessionStorage.clear();
   setSession(token('owner-a'), { id: 'owner-a' }, true);
@@ -39,6 +61,7 @@ describe('position saving in the graph', () => {
   it('retains failed positions and the unload warning across Graph → List → Graph navigation', async () => {
     const save = vi.fn().mockRejectedValue(new Error('Connection lost'));
     const view = navigation(save);
+    await waitFor(() => expect(view.queue.state?.recovered).toBe(true));
     view.queue.queue('task', 12, 34);
     await act(() => view.queue.flush());
     view.go(false);
@@ -57,6 +80,7 @@ describe('position saving in the graph', () => {
     const save = vi.fn().mockRejectedValue(new Error('Connection lost'));
     const onError = vi.fn();
     const { result } = renderHook(() => usePositionSaveQueue(save, onError, scope), { wrapper: PositionSaveProvider });
+    await waitFor(() => expect(result.current.state?.recovered).toBe(true));
     result.current.queue('task', 12, 34);
     await act(() => result.current.flush());
     expect(onError).toHaveBeenCalledTimes(1);
@@ -77,8 +101,10 @@ describe('position saving in the graph', () => {
     let reject!: (error: Error) => void;
     const save = vi.fn().mockImplementationOnce(() => new Promise<void>((_, fail) => { reject = fail; })).mockResolvedValue(undefined);
     const view = navigation(save);
+    await waitFor(() => expect(view.queue.state?.recovered).toBe(true));
     view.queue.queue('task', 1, 2);
     const saving = view.queue.flush();
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
     view.go(false);
     expect(leaving()).toBe(true);
     view.go(true);
@@ -99,9 +125,11 @@ describe('position saving in the graph', () => {
     }
     const tree = (graphId: 'graph-a' | 'graph-b') => createElement(PositionSaveProvider, { children: createElement(Graph, { graphId }) });
     const view = render(tree('graph-a'));
+    await waitFor(() => expect(queue.state?.recovered).toBe(true));
     queue.queue('same-task', 1, 2);
     await act(() => queue.flush());
     view.rerender(tree('graph-b'));
+    await waitFor(() => expect(queue.state?.recovered).toBe(true));
     queue.queue('same-task', 9, 10);
     await act(() => queue.flush());
     expect(saves['graph-b']).toHaveBeenCalledTimes(1);
@@ -117,9 +145,10 @@ describe('position saving in the graph', () => {
     const resolvers: Array<() => void> = [];
     const save = vi.fn().mockImplementation(() => new Promise<void>(done => { resolvers.push(done); }));
     const view = navigation(save);
+    await waitFor(() => expect(view.queue.state?.recovered).toBe(true));
     for (let index = 0; index < 5; index++) view.queue.queue(`task-${index}`, index, index);
     const saving = view.queue.flush();
-    expect(save).toHaveBeenCalledTimes(4);
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(4));
     act(() => { clearSession(); });
     view.go(false);
     act(() => { setSession(token('owner-b'), { id: 'owner-b' }, true); });
@@ -142,6 +171,7 @@ describe('position saving in the graph', () => {
   it('keeps the original owner’s failed layout isolated until the same account and graph return', async () => {
     const save = vi.fn().mockRejectedValue(new Error('offline'));
     const view = navigation(save);
+    await waitFor(() => expect(view.queue.state?.recovered).toBe(true));
     view.queue.queue('task', 1, 2);
     await act(() => view.queue.flush());
     act(() => { clearSession(); window.dispatchEvent(new Event('online')); });
@@ -169,6 +199,7 @@ describe('position saving in the graph', () => {
     const view = navigation(save, onError);
     for (let index = 0; index < 16; index++) {
       view.go(true, { ...scope, graphId: `graph-${index}` });
+      await waitFor(() => expect(view.queue.state?.recovered).toBe(true));
       expect(view.queue.queue('task', index, index)).toBe(true);
       await act(() => view.queue.flush());
     }
@@ -185,6 +216,7 @@ describe('position saving in the graph', () => {
     const save = vi.fn().mockResolvedValue(undefined);
     const wrapper = ({ children }: { children: React.ReactNode }) => createElement(StrictMode, {}, createElement(PositionSaveProvider, { children }));
     const { result, unmount } = renderHook(() => usePositionSaveQueue(save, vi.fn(), scope), { wrapper });
+    await waitFor(() => expect(result.current.state?.recovered).toBe(true));
     result.current.queue('task', 1, 2);
     await act(() => result.current.flush());
     expect(save).toHaveBeenCalledTimes(1);

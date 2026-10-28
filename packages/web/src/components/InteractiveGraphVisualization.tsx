@@ -2,6 +2,7 @@ import { skipBackgroundPoll } from '../lib/hostedUsage';
 import { QuickEditSurface } from './QuickEditSurface';
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { SemanticGraphOverview } from './SemanticGraphOverview';
+import { LayoutSaveStatus } from './LayoutSaveStatus';
 import ReactDOM from 'react-dom/client';
 import { createPortal } from 'react-dom';
 import * as d3 from 'd3';
@@ -773,9 +774,13 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
   const positionSaveQueue = usePositionSaveQueue(
     position => saveNodePosition(position.id, position.x, position.y),
-    message => showError('Layout could not be saved', message || 'Keep this tab open and return to this graph after reconnecting to retry your pending positions.'),
+    message => showError('Layout needs attention', message || 'Check the layout save status before closing this tab. Return to this graph after reconnecting to retry pending positions.'),
     currentUser && currentGraph ? { ownerId: currentUser.id, graphId: currentGraph.id } : null,
   );
+  const layoutScope = currentUser && currentGraph ? JSON.stringify([currentUser.id, currentGraph.id]) : null;
+  const activeLayoutScopeRef = useRef(layoutScope);
+  activeLayoutScopeRef.current = layoutScope;
+  const simulationLayoutScopeRef = useRef<string | null>(null);
   const positionSaveQueueRef = useRef(positionSaveQueue);
   positionSaveQueueRef.current = positionSaveQueue;
 
@@ -786,7 +791,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   // pin to. Called debounced when the sim settles and on page hide.
   const persistAllPositions = useCallback(() => {
     const sim = simulationRef.current;
-    if (!sim) return;
+    if (!sim || simulationLayoutScopeRef.current !== activeLayoutScopeRef.current) return;
     const moved = (sim.nodes() as any[]).filter((n: any) =>
       typeof n.x === 'number' && typeof n.y === 'number' &&
       (Math.abs((n.positionX ?? 0) - n.x) > 1 || Math.abs((n.positionY ?? 0) - n.y) > 1)
@@ -1105,8 +1110,18 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
   // Remove unused handleEdgeClick to fix TypeScript warning
 
-  const workItems: WorkItem[] = workItemsData?.workItems || [];
-  
+  const layoutRecoveryReady = !currentUser || !currentGraph || !!positionSaveQueue.state?.recovered || !!positionSaveQueue.error;
+  const pendingPositions = positionSaveQueue.state?.positions;
+  const workItems = useMemo<WorkItem[]>(() => {
+    if (!layoutRecoveryReady) return [];
+    const saved: WorkItem[] = workItemsData?.workItems || [];
+    if (!pendingPositions?.size) return saved;
+    return saved.map(item => {
+      const pending = pendingPositions.get(item.id);
+      return pending ? { ...item, positionX: pending.x, positionY: pending.y } : item;
+    });
+  }, [workItemsData?.workItems, pendingPositions, layoutRecoveryReady]);
+
   // Text refresh utility function
   const refreshTextVisibility = useCallback(() => {
     if (!d3 || !containerRef.current) return;
@@ -1338,6 +1353,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const stopActiveSimulation = useCallback(() => {
     simulationRef.current?.on('tick', null).on('end.persist', null).alphaTarget(0).stop();
     simulationRef.current = null;
+    simulationLayoutScopeRef.current = null;
     delete (window as any).__graphPerf;
   }, []);
 
@@ -2032,6 +2048,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     
     // Simple 2D force simulation
     const simulation = d3.forceSimulation(visibleNodes as any);
+    simulationLayoutScopeRef.current = activeLayoutScopeRef.current;
     simulationRef.current = simulation; // Store reference for resize handling
     
     // RESTORE PRESERVED POSITIONS to prevent nodes jumping to origin
@@ -2397,6 +2414,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           d.y = d.fy;
         })
         .on('end', (event, d: any) => {
+          if (simulationRef.current !== simulation || simulationLayoutScopeRef.current !== activeLayoutScopeRef.current) return;
           // Check if this is edge creation end
           if (mousedownNodeRef.current && mousedownNodeRef.current.id !== d.id) {
             const sourceId = mousedownNodeRef.current.id;
@@ -4278,7 +4296,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
   // Store simulation reference for resize handling
   const simulationRef = useRef<d3.Simulation<any, any> | null>(null);
-  useEffect(() => () => stopActiveSimulation(), [stopActiveSimulation]);
+  useLayoutEffect(() => () => stopActiveSimulation(), [layoutScope, stopActiveSimulation]);
   const zoomBehaviorRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
   const [semanticOverviewActive, setSemanticOverviewActive] = useState(false);
   const handleOverviewActive = useCallback((active: boolean) => {
@@ -5265,13 +5283,14 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   // Set empty state overlay when no graph is selected
   const showNoGraphMessage = !currentGraph;
 
-  if (loading || edgesLoading) {
+  if (loading || edgesLoading || !layoutRecoveryReady) {
     return (
       <div ref={containerRef} className="graph-container relative w-full h-full flex items-center justify-center">
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <div className="text-green-300 text-lg font-medium">Loading graph data...</div>
-          <div className="text-gray-400 text-sm mt-2">Connecting to database...</div>
+          <LayoutSaveStatus queue={positionSaveQueue} />
+          <div className="text-gray-400 text-sm mt-2">{layoutRecoveryReady ? 'Connecting to database...' : 'Recovering saved layout...'}</div>
         </div>
       </div>
     );
@@ -5508,6 +5527,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
   return (
     <div ref={containerRef} className="graph-container relative w-full h-full overflow-hidden select-none" data-overview={semanticOverviewActive || undefined} data-quality={qualityTier} data-dense={isDenseGraph ? 'true' : undefined} data-simplify={isSimplified ? 'true' : undefined} data-dots={isDotMode ? 'true' : undefined}>
+      <LayoutSaveStatus queue={positionSaveQueue} />
       <svg
         ref={svgRef}
         className="w-full h-full"

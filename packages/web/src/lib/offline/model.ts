@@ -1,9 +1,11 @@
+import type { LayoutReceipt } from '../positionSaveQueue';
+
 export type Row = {id:string; [key:string]:any};
 export type Snapshot = {project:Row; nodes:Row[]; edges:Row[]; notes:Row[]};
 export type Change = {table:'nodes'|'edges'|'notes'; id:string; action:'put'|'delete'; value?:Row};
 export type PendingRequest = {requestId:string;projectId:string;version:number;attempts?:number;name?:string;deleteProject?:boolean;changes:Change[];sent:Snapshot|null};
 export type Project = {base:Snapshot|null;local:Snapshot|null;request?:PendingRequest;conflicts?:string[];remote?:Snapshot|null;checkedAt:number};
-export type Account = {user?:Record<string,any>;projects:Record<string,Project>;list:Row[];listedAt:number;retryAt:number;error:string;blocked?:'auth'|'validation'};
+export type Account = {user?:Record<string,any>;projects:Record<string,Project>;list:Row[];listedAt:number;retryAt:number;error:string;blocked?:'auth'|'validation';layoutFences?:{version:1;counter:number;floor:number;graphs:Record<string,number>};layoutOutbox?:{version:1;graphs:Record<string,Record<string,LayoutReceipt>>}};
 export const emptyAccount = ():Account=>({projects:{},list:[],listedAt:0,retryAt:0,error:''});
 export const same=(a:any,b:any):boolean=>JSON.stringify(a)===JSON.stringify(b);
 const editable:Record<string,string[]>={nodes:['type','title','description','status','priority','position_x','position_y','due_date','tags','metadata'],edges:['source_id','target_id','type','weight'],notes:['work_item_id','body']};
