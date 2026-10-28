@@ -1,4 +1,5 @@
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useId, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, FileText, Network, CreditCard } from 'lucide-react';
 import { useGraph } from '../contexts/GraphContext';
 import { getTypeConfig, getStatusConfig } from '../constants/workItemConstants';
@@ -62,11 +63,7 @@ export function NodeInspector({ node, onClose, onEdit, compact = false, rootTest
       </div>
 
       {/* Mode toggle */}
-      <div className="shrink-0 flex gap-1 p-2 border-b border-gray-700/60">
-        <ModeBtn active={mode === 'card'} onClick={() => setMode('card')} icon={<CreditCard className="h-3.5 w-3.5" />} label="Card" />
-        <ModeBtn active={mode === 'contents'} onClick={() => setMode('contents')} icon={<FileText className="h-3.5 w-3.5" />} label="Contents" />
-        <ModeBtn active={mode === 'diagram'} onClick={() => setMode('diagram')} icon={<Network className="h-3.5 w-3.5" />} label="Diagram" disabled={!hasSubgraph} title={hasSubgraph ? 'Sub-graph' : 'No sub-graph'} />
-      </div>
+      <InspectorModeTabs key={node.id} mode={mode} onChange={setMode} hasSubgraph={hasSubgraph} />
 
       {/* Body */}
       <div className="shrink-0">
@@ -117,23 +114,127 @@ export function NodeInspector({ node, onClose, onEdit, compact = false, rootTest
   );
 }
 
-function ModeBtn({ active, onClick, icon, label, disabled, title }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string; disabled?: boolean; title?: string }) {
+function InspectorModeTabs({
+  mode,
+  onChange,
+  hasSubgraph,
+}: {
+  mode: Mode;
+  onChange: (mode: Mode) => void;
+  hasSubgraph: boolean;
+}) {
+  const bar = useRef<HTMLDivElement>(null);
+  const hintId = useId();
+  const [hovered, setHovered] = useState<Mode | null>(null);
+  const [focused, setFocused] = useState<Mode | null>(null);
+  const [dismissed, setDismissed] = useState(false);
+  const [anchor, setAnchor] = useState<{
+    left: number;
+    top?: number;
+    bottom?: number;
+  } | null>(null);
+  const tooltip = dismissed ? null : (hovered ?? focused);
+  const options = [
+    { id: 'card', label: 'Card', Icon: CreditCard },
+    { id: 'contents', label: 'Contents', Icon: FileText },
+    { id: 'diagram', label: 'Diagram', Icon: Network },
+  ] as const;
+  useLayoutEffect(() => {
+    if (!tooltip) {
+      setAnchor(null);
+      return;
+    }
+    const button = bar.current?.querySelector(
+      `[data-inspector-mode="${tooltip}"]`
+    );
+    if (!button) return;
+    const bounds = button.getBoundingClientRect();
+    setAnchor({
+      left: Math.max(8, Math.min(window.innerWidth - 232, bounds.left)),
+      ...(window.innerHeight - bounds.bottom >= 72
+        ? { top: bounds.bottom + 8 }
+        : { bottom: window.innerHeight - bounds.top + 8 }),
+    });
+    const dismiss = () => setDismissed(true);
+    const dismissOutside = (event: PointerEvent) => {
+      if (!(event.target instanceof Node) || !bar.current?.contains(event.target)) dismiss();
+    };
+    window.addEventListener('scroll', dismiss, true);
+    window.addEventListener('resize', dismiss);
+    window.addEventListener('wheel', dismiss, { passive: true, capture: true });
+    window.addEventListener('pointerdown', dismissOutside, true);
+    return () => {
+      window.removeEventListener('scroll', dismiss, true);
+      window.removeEventListener('resize', dismiss);
+      window.removeEventListener('wheel', dismiss, true);
+      window.removeEventListener('pointerdown', dismissOutside, true);
+    };
+  }, [tooltip]);
   return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      title={title}
-      className={`flex-1 flex items-center justify-center gap-1.5 min-h-[44px] px-2 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-        disabled
-          ? 'text-gray-600 cursor-not-allowed'
-          : active
-            ? 'bg-emerald-500/25 text-emerald-200 border border-emerald-400/40'
-            : 'text-gray-300 hover:bg-gray-700/50 border border-transparent'
-      }`}
-    >
-      {icon}
-      {label}
-    </button>
+    <>
+      <div
+        ref={bar}
+        role="group"
+        aria-label="Inspector views"
+        className="shrink-0 flex gap-1 p-2 border-b border-gray-700/60"
+      >
+        {options.map(({ id, label, Icon }) => {
+          const disabled = id === 'diagram' && !hasSubgraph;
+          return (
+            <button
+              key={id}
+              type="button"
+              data-inspector-mode={id}
+              aria-label={label}
+              aria-pressed={mode === id}
+              aria-disabled={disabled}
+              aria-describedby={tooltip === id && anchor ? hintId : undefined}
+              onClick={() => {
+              if (!disabled) {
+                setDismissed(true);
+                onChange(id);
+              }
+              }}
+              onMouseEnter={() => {
+                setHovered(id);
+                setDismissed(false);
+              }}
+              onMouseLeave={() => setHovered(null)}
+              onFocus={() => {
+                setFocused(id);
+                setHovered(null);
+                setDismissed(false);
+              }}
+              onBlur={() => setFocused(null)}
+              onKeyDown={event => {
+                if (event.key === 'Escape' && tooltip) {
+                  event.stopPropagation();
+                  setDismissed(true);
+                }
+              }}
+              className={`flex-1 min-w-11 min-h-11 flex items-center justify-center rounded-lg border transition-colors ${disabled ? 'text-gray-500 border-transparent cursor-not-allowed' : mode === id ? 'bg-emerald-500/25 text-emerald-200 border-emerald-400/40' : 'text-gray-300 hover:bg-gray-700/50 border-transparent'}`}
+            >
+              <Icon aria-hidden="true" className="h-6 w-6" strokeWidth={2.25} />
+            </button>
+          );
+        })}
+      </div>
+      {tooltip &&
+        anchor &&
+        createPortal(
+          <span
+            id={hintId}
+            role="tooltip"
+            className="fixed z-[1000000] pointer-events-none w-max max-w-[224px] rounded-lg border border-slate-500 bg-slate-900 px-3 py-2 text-sm font-semibold leading-5 text-slate-100 shadow-lg"
+            style={anchor}
+          >
+            {tooltip === 'diagram' && !hasSubgraph
+              ? 'Diagram: No sub-graph'
+              : options.find(option => option.id === tooltip)!.label}
+          </span>,
+          document.body
+        )}
+    </>
   );
 }
 

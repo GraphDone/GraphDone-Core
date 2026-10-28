@@ -157,6 +157,71 @@ for (const width of [1440, 390]) {
       await expect(
         inspector.getByTestId('node-content-rendered')
       ).toContainText('request_id');
+      const inspectModes = async (root: Locator, capture = false) => {
+        await root.evaluate(element => {
+          element.style.fontFamily = 'DejaVu Sans, sans-serif';
+        });
+        const overflow = await root.evaluate(
+          element => element.scrollWidth - element.clientWidth
+        );
+        expect(
+          overflow,
+          'Inspector controls fit a wider system font'
+        ).toBeLessThanOrEqual(1);
+        const bar = root.getByRole('group', {
+          name: 'Inspector views',
+          exact: true,
+        });
+        await expect(bar.getByRole('button')).toHaveCount(3);
+        const controls = [];
+        for (const name of ['Card', 'Contents', 'Diagram']) {
+          const button = bar.getByRole('button', { name, exact: true });
+          await button.scrollIntoViewIfNeeded();
+          const bounds = await button.boundingBox(),
+            panel = await root.boundingBox();
+          expect(bounds!.width).toBeGreaterThanOrEqual(44);
+          expect(bounds!.height).toBeGreaterThanOrEqual(44);
+          expect(bounds!.x).toBeGreaterThanOrEqual(panel!.x);
+          expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(
+            panel!.x + panel!.width
+          );
+          await button.hover();
+          const tooltip = page.getByRole('tooltip', { name, exact: true });
+          await expect(tooltip).toBeVisible();
+          await button.focus();
+          await page.mouse.move(0, 0);
+          await expect(tooltip).toBeVisible();
+          const tip = await tooltip.evaluate(element => ({
+            size: parseFloat(getComputedStyle(element).fontSize),
+            weight: Number(getComputedStyle(element).fontWeight),
+            box: element.getBoundingClientRect().toJSON(),
+          }));
+          expect(tip.size).toBeGreaterThanOrEqual(14);
+          expect(tip.weight).toBeGreaterThanOrEqual(500);
+          expect(tip.box.x).toBeGreaterThanOrEqual(0);
+          expect(tip.box.right).toBeLessThanOrEqual(width);
+          expect(tip.box.y).toBeGreaterThanOrEqual(0);
+          expect(tip.box.bottom).toBeLessThanOrEqual(
+            page.viewportSize()!.height
+          );
+          controls.push({ name, bounds, tooltip: tip });
+          if (capture && name === 'Contents') {
+            const path = info.outputPath('inspector-tooltip.png');
+            await page.screenshot({ path });
+            await info.attach('inspector-tooltip', {
+              path,
+              contentType: 'image/png',
+            });
+          }
+          await button.press('Escape');
+          await expect(tooltip).toHaveCount(0);
+        }
+        await root.evaluate(element =>
+          element.style.removeProperty('font-family')
+        );
+        return { overflow, controls };
+      };
+      const regularModes = await inspectModes(inspector, true);
       const inspectTitle = async (root: Locator) => {
         const title = root.locator('[title]').filter({ hasText: parentTitle });
         await expect(title).toHaveText(parentTitle);
@@ -249,6 +314,7 @@ for (const width of [1440, 390]) {
         contentType: 'image/png',
       });
       await page.setViewportSize({ width, height: 560 });
+      const shortModes = await inspectModes(inspector);
       await code.evaluate(element =>
         element.scrollIntoView({ block: 'center', behavior: 'instant' })
       );
@@ -289,6 +355,7 @@ for (const width of [1440, 390]) {
         'request_id'
       );
       const compactTitle = await inspectTitle(compact);
+      const compactModes = await inspectModes(compact);
       await compact.locator('pre').first().scrollIntoViewIfNeeded();
       const compactText = await inspectText(compact);
       await compact
@@ -339,6 +406,9 @@ for (const width of [1440, 390]) {
         childEdges: child.edgeCount,
         regularTitle,
         compactTitle,
+        regularModes,
+        shortModes,
+        compactModes,
         regular,
         compact: compactText,
         preview: previewText,
