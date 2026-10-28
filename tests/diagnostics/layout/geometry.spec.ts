@@ -75,16 +75,12 @@ async function readGeometry(page: Page): Promise<{ edges: EdgeGeom[] }> {
       const s = nodeById[sId], t = nodeById[tId];
       if (!s || !t) return;
 
-      // The rendered edge endpoints (screen coords)
-      const le = e as SVGLineElement;
-      const r = le.getBoundingClientRect();
-      // endpoints from attributes mapped to screen via the line's CTM is messy;
-      // instead compare the edge's own bbox extremes to the node centers.
-      const x1 = le.x1.baseVal.value, y1 = le.y1.baseVal.value, x2 = le.x2.baseVal.value, y2 = le.y2.baseVal.value;
-      // map svg-userspace endpoint to screen using the element CTM
-      const m = le.getScreenCTM();
-      const p1 = m ? new DOMPoint(x1, y1).matrixTransform(m) : { x: r.left, y: r.top };
-      const p2 = m ? new DOMPoint(x2, y2).matrixTransform(m) : { x: r.right, y: r.bottom };
+      const path = e as SVGGeometryElement;
+      const matrix = path.getScreenCTM();
+      if (!matrix) throw new Error('Rendered edge has no screen transform');
+      const start = path.getPointAtLength(0), end = path.getPointAtLength(path.getTotalLength());
+      const p1 = new DOMPoint(start.x, start.y).matrixTransform(matrix);
+      const p2 = new DOMPoint(end.x, end.y).matrixTransform(matrix);
 
       const len = Math.hypot(t.cx - s.cx, t.cy - s.cy);
       const ux = (t.cx - s.cx) / (len || 1), uy = (t.cy - s.cy) / (len || 1);

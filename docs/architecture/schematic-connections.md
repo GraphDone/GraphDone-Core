@@ -115,3 +115,71 @@ spacing, readable names or a useful hierarchy.
 
 This is a reviewable candidate path. It does not close dynamic LOD, hosted parity,
 release/deployment work, or the remaining item-level visual problems.
+
+## Detailed item wiring continuation (#220)
+
+The first item-wiring increment starts from dev
+`007148f1a526b8ef028222a429b346a67e5c3c2c`. `edgeRouteGeometry.ts` defines the
+shared display path, final-segment arrow, distance along the route and pointer
+projection needed by the D3 path/hitbox/arrow/label consumers. Consecutive
+coincident points do not produce broken paths; a nonzero closed loop retains
+its travel and direction. Label placement fits an entire label on one segment,
+keeps text upright, retains original icon direction and returns no placement
+when no sampled slot clears cards or previous labels. This is conservative
+admission, not proof that every possible position is obstructed. Equal-distance pointer hits
+prefer the prior leg so dragging does not jump across a nearby return wire.
+
+The next committed increment connects this geometry to the D3 path, hitbox,
+arrow and label consumers. It still supplies straight border-to-border paths;
+this does not establish routed item acceptance. Next add bounded routing and
+admission, named boundary connections, exact deferred counts and accessible
+original relationships. Routing and obstacle searches belong to
+bounded updates after layout or scope changes, not every camera/simulation tick.
+Preserve edit/Grow, pointer hitboxes, label dragging and canonical positions.
+
+On 2026-10-28, Node22.18 ran the nine pure geometry cases serially in the existing
+clean-installed partial probe: 9 passed, no skips, 0.69s (8ms test bodies).
+Cases cover elbows, reversed segments, closed loops, duplicate/invalid points,
+nearest-leg dragging, ties, long labels and rotated obstacle footprints. This
+is scoped helper evidence, not a full-tree browser/database/performance result.
+
+Independent foundation review also required offset-aware dragging beside close
+return wires. The executed negative selected fraction100/440 instead of340/440;
+matching projection to the displayed offset corrected it. All ten cases passed
+serially in0.691s and scoped strict ES2020 types passed. Candidate interpolation
+now stays on its current segment and keeps only the best placement, avoiding
+repeated route scans/sorting. The [canonical lesson](../../.agents/inbox/2026-10-28-offset-label-drag-needs-offset-path.md)
+records the negative, correction and runtime integration limits.
+
+The D3 adaptation caches label dimensions after initial text sizing, reuses the
+path for paint and hit testing, places arrows from its final segment and slides
+labels along its displayed offset. Culling composes with route/label visibility
+instead of revealing deferred geometry. Label dragging updates only that label
+against cached obstacles. The interaction diagnostic clicks the actual path
+midpoint; the center of a bent path's bounding box need not lie on the path.
+
+Scoped web typecheck initially rejected a D3 nullable-style overload; the callback
+form corrected it, and the same check passed in3.66s. Scoped lint returned
+0 errors and298 warnings in the existing large renderer; no warning-free claim.
+These checks used the partial probe and are not actual browser acceptance.
+All original runtime/visual/durability gates and new item-wiring cases remain
+required before this branch can be integrated or #220 closed.
+
+Review of the first consumer commit (`d9a0a58`) found empty measurement of
+initially hidden labels and a line-only geometry diagnostic. The correction
+initializes all label parts from conservative dimensions and accepts only
+positive text measurements; diagnostics now read actual SVG path endpoints.
+Opposite-direction parallel edges share a canonical lane normal so they stay
+separate while their arrows retain direction. Wire and label clicks open the
+same original relationship editor, whose controls now have accessible names.
+
+Two real-browser cases are registered as blocking `item-wires` acceptance in
+CI immediately after smoke (one worker, zero retries), retaining actual
+paint/hitbox/arrow geometry and screenshots, pointer drag/edit behavior, hidden
+label dimensions and unchanged graph data. Local discovery found both cases;
+they have not run locally. The partial probe passed11 geometry cases in0.722s,
+32 CLI harness cases in4.56s and scoped types; scoped lint reports0 errors,
+314 warnings across the two components/helper/test. The
+[review lesson](../../.agents/inbox/2026-10-28-hidden-labels-need-valid-measurement.md)
+records the evidence and limits. These are straight item paths preparing the
+bounded routing increment, not completion of #220.

@@ -118,10 +118,13 @@ test.describe('core interaction matrix @geometry', () => {
     // 6. Click an edge → relationship editor opens
     await page.waitForTimeout(500);
     const edgeBox = await page.evaluate(() => {
-      const e = document.querySelector('.graph-container svg .edge-clickable, .graph-container svg .edge') as SVGLineElement | null;
+      const e = document.querySelector('.graph-container svg .edge-clickable, .graph-container svg .edge') as SVGGeometryElement | null;
       if (!e) return null;
-      const r = e.getBoundingClientRect();
-      return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+      const matrix = e.getScreenCTM();
+      if (!matrix || e.getTotalLength() === 0) return null;
+      const point = e.getPointAtLength(e.getTotalLength() / 2);
+      const screen = new DOMPoint(point.x, point.y).matrixTransform(matrix);
+      return { x: screen.x, y: screen.y };
     });
     if (edgeBox) {
       await page.mouse.click(edgeBox.x, edgeBox.y);

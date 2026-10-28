@@ -46,7 +46,7 @@ test('disposable Git fixture commits do not spawn background maintenance', t => 
   assert.deepEqual(events.filter(event => event.event === 'child_start' && event.argv?.includes('maintenance')), []);
 });
 
-for (const sequence of ['new-user', 'semantic-lod', 'nested-lod', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'perf-budgets']) {
+for (const sequence of ['new-user', 'semantic-lod', 'nested-lod', 'item-wires', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'perf-budgets']) {
   test(`CLI forwards failure-only tracing without retries for ${sequence}`, t => {
     const { dir, run } = fixture(t);
     const report = { suites: [{ specs: [{ title: 'fixture', ok: true,
@@ -67,8 +67,8 @@ for (const sequence of ['new-user', 'semantic-lod', 'nested-lod', 'schematic-vis
       const workflow = readFileSync(join(root, '.github/workflows/ci.yml'), 'utf8');
       assert.equal(workflow.split('run: node tests/run-unified.mjs --sequence schematic-visual --out test-artifacts/ci-schematic-visual').length, 2);
     }
-    if (sequence === 'nested-lod' || sequence === 'semantic-lod' || sequence === 'layout-recovery' || sequence === 'router-navigation') {
-      const spec = sequence === 'nested-lod' ? 'tests/e2e/graph/nested-semantic-lod.spec.ts' : sequence === 'semantic-lod' ? 'tests/e2e/graph/semantic-lod.spec.ts' : sequence === 'layout-recovery' ? 'tests/e2e/graph/layout-recovery.spec.ts' : 'tests/e2e/auth/router-navigation.spec.ts';
+    if (sequence === 'item-wires' || sequence === 'nested-lod' || sequence === 'semantic-lod' || sequence === 'layout-recovery' || sequence === 'router-navigation') {
+      const spec = sequence === 'item-wires' ? 'tests/e2e/graph/item-wire-consumers.spec.ts' : sequence === 'nested-lod' ? 'tests/e2e/graph/nested-semantic-lod.spec.ts' : sequence === 'semantic-lod' ? 'tests/e2e/graph/semantic-lod.spec.ts' : sequence === 'layout-recovery' ? 'tests/e2e/graph/layout-recovery.spec.ts' : 'tests/e2e/auth/router-navigation.spec.ts';
       assert.ok(args.includes(spec));
       assert.equal(SEQUENCES[sequence].blocking, true);
       const workflow = readFileSync(join(root, '.github/workflows/ci.yml'), 'utf8');

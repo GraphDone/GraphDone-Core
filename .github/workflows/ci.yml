@@ -197,6 +197,11 @@ jobs:
         env:
           TEST_URL: http://localhost:3127
           CI: true
+      - name: Item wire consumer acceptance
+        run: xvfb-run --auto-servernum node tests/run-unified.mjs --sequence item-wires --out test-artifacts/ci-item-wires
+        env:
+          TEST_URL: http://localhost:3127
+          CI: true
       - name: New-user quality gate (headed under virtual display)
         run: xvfb-run --auto-servernum node tests/run-unified.mjs --sequence new-user --out test-artifacts/ci-new-user
         env:
