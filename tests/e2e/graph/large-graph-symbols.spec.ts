@@ -7,6 +7,7 @@ import {
   type OwnedGraphs,
 } from '../../lib/ownedGraphIdsFixture';
 import type { SeededGraph } from '../../lib/seedGraph';
+import { measureGraphZoom } from '../../lib/graphZoomReady';
 import { inspectItemSymbols } from '../../lib/itemSymbolVisual';
 import { inspectSchematicOverview } from '../../lib/schematicOverview';
 
@@ -133,47 +134,23 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
   }[] = [];
   for (const scale of [1.2, 0.1, 1.2]) {
     const start = Date.now();
-    const elapsed = await page.evaluate(
-      async ({ x, y, scale }) => {
-        const start = performance.now();
-        const host = document.querySelector('.graph-container')!;
-        const svg = host.querySelector(':scope > svg') as SVGSVGElement & {
-          __zoom: { k: number };
-        };
-        const group = host.querySelector('.main-graph-group')!;
-        const overview = host.querySelector('.semantic-overview')!;
-        (window as any).miniMapZoom(x, y, scale);
-        return await new Promise<number>((resolve, reject) => {
-          let settledFrames = 0;
-          const check = () => {
-            if (performance.now() - start > 15000) {
-              reject(
-                new Error(
-                  'Zoom did not paint its requested detail within15seconds'
-                )
-              );
-              return;
-            }
-            if (
-              Math.abs(svg.__zoom.k - scale) < 0.00001 &&
-              group.getAttribute('data-presentation-scale') === String(scale) &&
-              overview.getAttribute('data-active') === String(scale < 1)
-            )
-              settledFrames++;
-            else settledFrames = 0;
-            if (settledFrames >= 2) resolve(performance.now() - start);
-            else requestAnimationFrame(check);
-          };
-          requestAnimationFrame(check);
-        });
-      },
-      { x: target.positionX, y: target.positionY, scale }
-    );
+    const elapsed = await page.evaluate(measureGraphZoom, {
+      x: target.positionX,
+      y: target.positionY,
+      scale,
+    });
     const wallMs = Date.now() - start;
     const timingPath = info.outputPath(`zoom-${timings.length}-timing.json`);
     await writeFile(
       timingPath,
-      JSON.stringify({ nodes: SIZE, edges: 5000, loadedMs, scale, elapsed, wallMs })
+      JSON.stringify({
+        nodes: SIZE,
+        edges: 5000,
+        loadedMs,
+        scale,
+        elapsed,
+        wallMs,
+      })
     );
     await info.attach(`zoom-${timings.length}-timing.json`, {
       path: timingPath,
@@ -225,11 +202,9 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
     }
   }
   const revealId = largeGraph.nodeIds[1011];
-  const reveal = page
-    .locator('.node')
-    .filter({
-      has: page.locator(`.node-edit-icon[data-node-id="${revealId}"]`),
-    });
+  const reveal = page.locator('.node').filter({
+    has: page.locator(`.node-edit-icon[data-node-id="${revealId}"]`),
+  });
   await expect(reveal).toBeHidden();
   const panStart = await page.evaluate(() =>
     [

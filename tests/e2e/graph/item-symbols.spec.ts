@@ -1,5 +1,7 @@
+import { writeFile } from 'node:fs/promises';
 import { test as base, expect } from '@playwright/test';
 import { login, TEST_USERS } from '../../lib/auth';
+import { measureGraphZoom } from '../../lib/graphZoomReady';
 import { gql } from '../../lib/graphRequest';
 import {
   ownedGraphIdsFixture,
@@ -191,6 +193,42 @@ for (const width of [1440, 390])
             original
           );
         await inspectItemSymbols(page, info, 'restored-after-negatives');
+        await page.evaluate(() => {
+          const zoom = (window as any).miniMapZoom;
+          (window as any).miniMapZoom = (...args: unknown[]) => {
+            (window as any).miniMapZoom = zoom;
+            const mask = document.createElement('style');
+            mask.id = 'timing-visibility-negative';
+            mask.textContent =
+              '.nodes-group { visibility: hidden !important; }';
+            document.head.append(mask);
+            (window as any).__visibilityNegativeStarted = performance.now();
+            setTimeout(() => mask.remove(), 1200);
+            zoom(...args);
+          };
+        });
+        const visibleMs = await page.evaluate(measureGraphZoom, {
+          x: -300,
+          y: target.positionY,
+          scale: 1.2,
+        });
+        const totalMs = await page.evaluate(
+          () => performance.now() - (window as any).__visibilityNegativeStarted
+        );
+        expect(totalMs).toBeGreaterThanOrEqual(1200);
+        expect(visibleMs).toBeGreaterThanOrEqual(1200);
+        await expect(page.locator('#timing-visibility-negative')).toHaveCount(
+          0
+        );
+        const timingPath = info.outputPath('delayed-visible-content.json');
+        await writeFile(
+          timingPath,
+          JSON.stringify({ hiddenForMs: 1200, visibleMs, totalMs })
+        );
+        await info.attach('delayed-visible-content.json', {
+          path: timingPath,
+          contentType: 'application/json',
+        });
       }
       expect(await snapshot()).toEqual(before);
       expect(writes).toEqual([]);
