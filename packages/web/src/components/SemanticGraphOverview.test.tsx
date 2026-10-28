@@ -8,6 +8,7 @@ import {
 } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { SemanticGraphOverview } from './SemanticGraphOverview';
+import * as routing from '../lib/schematicRouting';
 import type { SemanticItem } from '../lib/semanticLOD';
 
 const items: SemanticItem[] = Array.from({ length: 4 }, (_, index) => ({
@@ -129,4 +130,24 @@ it('restores readable Auto summaries when returning within the overview visibili
   expect(summaries()).toHaveLength(0);
   fireEvent.click(screen.getByRole('button', { name: 'Back to overview' }));
   expect(ids()).toEqual(before);
+});
+
+it('does no hidden overview routing and resumes the current summaries on return', () => {
+  const route = vi.spyOn(routing, 'routeSchematicConnections');
+  render(<Fixture />);
+  expect(route).toHaveBeenCalled();
+  act(() => changeScale(1.2));
+  expect(summaries()).toHaveLength(0);
+  route.mockClear();
+  act(() => replaceItems(items.slice(0, 2)));
+  act(() => changeScale(1.8));
+  expect(route).not.toHaveBeenCalled();
+  expect(
+    screen.getByRole('button', { name: '2 groups · 2 items' })
+  ).toBeVisible();
+  act(() => changeScale(0.2));
+  expect(route).toHaveBeenCalled();
+  expect(summaries()).toHaveLength(1);
+  expect(summaries()[0]).toHaveAccessibleName(/System, 2 items/);
+  route.mockRestore();
 });

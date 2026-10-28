@@ -203,6 +203,7 @@ export function SemanticGraphOverview({
     }
   }, [groupId, group]);
   const layout = useMemo(() => {
+    if (!active) return { placed: [], hidden: [] };
     if (traceProjection) {
       return placeOverviewLabels(
         traceProjection.groups.map((entry, index) => ({
@@ -272,29 +273,33 @@ export function SemanticGraphOverview({
   const groupsById = new Map(projection.groups.map(entry => [entry.id, entry]));
   const wiring = useMemo(
     () =>
-      routeSchematicConnections(
-        layout.placed,
-        (traceProjection?.bundles ?? projection.bundles).map(bundle => ({
-          id: bundle.id,
-          source: bundle.source,
-          target: bundle.target,
-          type: bundle.type,
-          edgeIds: bundle.edges.map(edge => edge.id),
-        })),
-        size.width,
-        size.height,
-        obstacles.map((rect, index) => ({
-          id: `control-${index}`,
-          x: rect.left,
-          y: rect.top,
-          width: rect.right - rect.left,
-          height: rect.bottom - rect.top,
-        })),
-        {
-          sharedEndpoint: trace?.direction === 'incoming' ? 'target' : 'source',
-        }
-      ),
+      active
+        ? routeSchematicConnections(
+            layout.placed,
+            (traceProjection?.bundles ?? projection.bundles).map(bundle => ({
+              id: bundle.id,
+              source: bundle.source,
+              target: bundle.target,
+              type: bundle.type,
+              edgeIds: bundle.edges.map(edge => edge.id),
+            })),
+            size.width,
+            size.height,
+            obstacles.map((rect, index) => ({
+              id: `control-${index}`,
+              x: rect.left,
+              y: rect.top,
+              width: rect.right - rect.left,
+              height: rect.bottom - rect.top,
+            })),
+            {
+              sharedEndpoint:
+                trace?.direction === 'incoming' ? 'target' : 'source',
+            }
+          )
+        : null,
     [
+      active,
       layout,
       projection,
       traceProjection,
@@ -304,7 +309,7 @@ export function SemanticGraphOverview({
       obstacleKey,
     ]
   );
-  const drawnConnections = wiring.routes.reduce(
+  const drawnConnections = (wiring?.routes ?? []).reduce(
     (count, bus) => count + bus.edgeIds.length,
     0
   );
@@ -498,7 +503,7 @@ export function SemanticGraphOverview({
                 <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8" />
               </marker>
             </defs>
-            {wiring.routes.map(bus => (
+            {wiring?.routes.map(bus => (
               <path
                 key={bus.id}
                 data-lod-bundle={bus.connections
@@ -524,7 +529,7 @@ export function SemanticGraphOverview({
                 <title>{`${groupsById.get(bus.source)!.label} → ${groupsById.get(bus.target)!.label}: ${bus.edgeIds.length} relationships · ${bus.connections.map(connection => `${connection.edgeIds.length} ${connection.type}`).join(', ')}`}</title>
               </path>
             ))}
-            {wiring.junctions.map(point => (
+            {wiring?.junctions.map(point => (
               <circle
                 key={`${point.bus}:${point.x}:${point.y}`}
                 cx={point.x}

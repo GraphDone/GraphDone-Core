@@ -257,11 +257,44 @@ export function edgeRouteLabel(
       Math.abs(Math.cos(radians)) * dims.height;
     for (const candidateOffset of options.offsets ?? [offset]) {
       if (!Number.isFinite(candidateOffset)) continue;
+      let visibleLow = low,
+        visibleHigh = high;
+      if (options.viewport) {
+        const center = {
+          x: segment.source.x + Math.sin(radians) * candidateOffset,
+          y: segment.source.y - Math.cos(radians) * candidateOffset,
+        };
+        for (const [axis, span, footprint] of [
+          ['x', 'width', width],
+          ['y', 'height', height],
+        ] as const) {
+          const half = (options.viewport[span] - footprint) / 2 - padding;
+          const delta =
+            (segment.target[axis] - segment.source[axis]) / segment.length;
+          if (
+            half < 0 ||
+            (!delta && Math.abs(center[axis] - options.viewport[axis]) > half)
+          ) {
+            visibleLow = Infinity;
+            break;
+          }
+          if (!delta) continue;
+          const a =
+            segment.start +
+            (options.viewport[axis] - half - center[axis]) / delta;
+          const b =
+            segment.start +
+            (options.viewport[axis] + half - center[axis]) / delta;
+          visibleLow = Math.max(visibleLow, Math.min(a, b));
+          visibleHigh = Math.min(visibleHigh, Math.max(a, b));
+        }
+      }
+      if (visibleLow > visibleHigh) continue;
       for (const distance of new Set([
-        clamp(desired, low, high),
-        (low + high) / 2,
-        low,
-        high,
+        clamp(desired, visibleLow, visibleHigh),
+        (visibleLow + visibleHigh) / 2,
+        visibleLow,
+        visibleHigh,
       ])) {
         const local = (distance - segment.start) / segment.length;
         const x =

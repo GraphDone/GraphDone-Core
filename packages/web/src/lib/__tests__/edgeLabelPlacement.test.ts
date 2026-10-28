@@ -76,3 +76,22 @@ it('hidden and offscreen routes cannot consume the visible-label budget', () => 
   expect([...result.placements.keys()]).toEqual(['visible']);
   expect(result.attempts).toBe(1);
 });
+
+it('places labels along the visible slice of a long route without changing its identity', () => {
+  const long = createEdgeRoute([
+    { x: 0, y: 0 },
+    { x: 10000, y: 0 },
+  ])!;
+  const result = placeItemLabels([{ ...candidate('long'), route: long }], {
+    viewport: { x: 9000, y: 0, width: 800, height: 400 },
+    obstacles: [{ x: 8600, y: 0, width: 300, height: 200 }],
+    segments: long.segments,
+  });
+  const label = result.placements.get('long');
+  expect(label).toBeDefined();
+  expect(label!.x).toBeGreaterThan(8800);
+  expect(label!.x + 52).toBeLessThanOrEqual(9392);
+  expect(label!.t).toBeCloseTo(label!.x / long.length);
+  expect(result.attempts).toBe(1);
+  expect(result.checks).toBeLessThan(ITEM_LABEL_BUDGET.checks);
+});
