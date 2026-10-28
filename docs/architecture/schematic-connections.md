@@ -34,7 +34,8 @@ not a shared library or shared release dependency.
 orthogonal grid. It refuses card intersections and contact/overlap with unrelated
 buses. Shared source trunks have a reduced route cost, favoring readable fan-out.
 Original edge IDs partition exactly into routed or explicitly deferred branches.
-Routing has deterministic operation/branch/grid limits; no worker, new dependency
+Routing has one invocation-wide attempt/state allowance, including failed
+searches, plus deterministic branch/grid limits; no worker, new dependency
 or graph mutation is introduced. Grid/card budgets are limits of this candidate,
 not evidence of 1k/10k graph capacity.
 
@@ -45,7 +46,8 @@ inspection and exact camera return. A fixed-size Connections control avoids a
 feedback loop where a changing count moves labels and changes routing again.
 
 `SemanticRelationshipBrowser` uses the canonical edge objects and adjacency
-indices. Type/text filters disclose their denominator. Source inspection returns
+indices. Stable hierarchy selectors resolve current membership and headings when
+items move or are added; a disappeared group is explicitly unavailable. Type/text filters disclose their denominator. Source inspection returns
 to the relationship context; missing endpoints cannot be clicked as if loaded.
 These controls still require strict real browser/database acceptance in CI.
 

@@ -47,8 +47,8 @@ artifacts. A real SVG text-bound/overlap check now lives in the CI-only schemati
 browser sequence. Its four required cases and screenshots are pending actual CI;
 static raster inspection is not a passing browser test.
 
-The dense fixture contains 112 relationships: 36 are represented by 16 routed
-branches and 76 are explicitly collapsed. This is honest accounting and a clean
+The dense fixture contains 112 relationships: 33 are represented by 13 routed
+branches and 79 are explicitly collapsed. This is honest accounting and a clean
 initial overview, not completed dense-graph exploration. Named focused-bus tracing
 is still required so each selected area's full relationships can be followed.
 Item-level D3 wiring still uses its earlier geometry. Neither 1k/10k performance,
@@ -63,3 +63,26 @@ type/lint/runner checks, the new four-case static visual sequence and existing
 strict graph/layout/mobile/new-user/database/runtime gates. Heavy local matrices
 remain stopped. User-directed interruptions and earlier D-Bus failures are kept
 in the linked [workstation lesson](../../.agents/inbox/2026-10-28-browser-acceptance-needs-an-owned-session-bus.md).
+
+## Independent review corrections and retained CI failure
+
+Review of a04fa2b found stale member-ID snapshots in open group/bundle lists and
+a routing allowance that reset for each failed search. Four new component cases
+and an actual failed-search allowance case failed before correction. Stable
+hierarchy selectors now resolve live membership; removed groups are explicit.
+One invocation-wide attempt/state budget covers successful and failed searches.
+The Connections count includes its internal, pending and deferred partitions.
+
+Corrected scoped results: 22 component/model cases passed in 5.53s; 8 geometry/budget
+cases passed in 0.24s; web typecheck passed. Earlier negatives are retained. See the
+[canonical correction lesson](../../.agents/inbox/2026-10-28-bus-views-need-live-membership-and-total-budgets.md).
+The dense fixture now routes 33 original edges through 13 branches, explicitly
+collapses 79, and records 32 attempts/3,495 examined states. This remains a partial
+overview pending focused tracing; the fixture was not reduced.
+
+Actual a04 CI 40629282719 failed the new visual gate: 3 of 4 cases passed, while the
+phone Delivery label entered its required padding by 0.265625px. Its trace and
+screenshot are retained. The generator now wraps more narrowly without changing
+font, card size, assertion tolerance, timeout or retries. The revised four-case
+browser acceptance and broader candidate CI remain pending. Prior green jobs
+and Comprehensive 40629282743 do not accept the revised source.

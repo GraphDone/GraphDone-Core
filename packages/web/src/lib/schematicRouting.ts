@@ -210,7 +210,8 @@ export function routeSchematicConnections(
   connections: readonly SchematicConnection[],
   width: number,
   height: number,
-  obstacles: readonly SchematicCard[] = []
+  obstacles: readonly SchematicCard[] = [],
+  budget: { maxAttempts?: number; maxExpandedStates?: number } = {}
 ) {
   const byId = new Map(cards.map(card => [card.id, card]));
   const grouped = new Map<string, SchematicConnection[]>();
@@ -274,6 +275,18 @@ export function routeSchematicConnections(
   const routes: SchematicRoute[] = [];
   const deferred: SchematicDeferred[] = [];
   const maxRoutes = width < 600 ? 6 : 16;
+  const limit = (value: number | undefined, maximum: number) =>
+    value === undefined
+      ? maximum
+      : Number.isFinite(value)
+        ? Math.max(0, Math.min(maximum, Math.floor(value)))
+        : 0;
+  const work = {
+    attempts: 0,
+    expandedStates: 0,
+    maxAttempts: limit(budget.maxAttempts, width < 600 ? 12 : 32),
+    maxExpandedStates: limit(budget.maxExpandedStates, 6000),
+  };
   for (const bus of buses) {
     const source = byId.get(bus.source),
       target = byId.get(bus.target);
@@ -282,6 +295,8 @@ export function routeSchematicConnections(
       continue;
     }
     if (
+      work.attempts >= work.maxAttempts ||
+      work.expandedStates >= work.maxExpandedStates ||
       routes.length >= maxRoutes ||
       source.id === target.id ||
       xs.length * ys.length > 4000
@@ -289,6 +304,7 @@ export function routeSchematicConnections(
       deferred.push({ ...bus, reason: 'routing-budget' });
       continue;
     }
+    work.attempts++;
     const conflicts = (segment: SchematicSegment) =>
       occupied.some(
         other => other.bus !== bus.source && segmentContact(segment, other)
@@ -328,8 +344,12 @@ export function routeSchematicConnections(
     }));
     const costs = new Map<string, number>();
     let found: State | undefined;
-    let visited = 0;
-    while (queue.length && visited++ < 6000 && goal.size) {
+    while (
+      queue.length &&
+      work.expandedStates < work.maxExpandedStates &&
+      goal.size
+    ) {
+      work.expandedStates++;
       queue.sort((a, b) => b.estimate - a.estimate || b.cost - a.cost);
       const current = queue.pop()!;
       const p = { x: xs[current.x], y: ys[current.y] };
@@ -405,6 +425,7 @@ export function routeSchematicConnections(
   return {
     routes,
     deferred,
+    work,
     metrics: measureSchematicClutter(cards, occupied),
     segments: occupied,
     junctions: schematicJunctions(occupied),
