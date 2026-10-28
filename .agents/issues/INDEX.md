@@ -2,6 +2,9 @@
 
 | Symptom | Canonical lesson and regression |
 | --- | --- |
+| All browser cases pass but unified source-integrity fails after staging | [Freeze the index as well as source](../inbox/2026-10-28-freeze-index-for-strict-runs.md); commit before the gate, leave repository content and index unchanged |
+| Switching accounts briefly exposes another account’s pending graph IDs after a delayed error | [Async errors must retain account ownership](../inbox/2026-10-28-async-errors-must-retain-account-ownership.md); `useLayoutRecovery.test.ts` delayed A-discard → B-load → A-return regression |
+| A persisted layout replays after another tab saved, cleanup failure resends accepted work, or discard races recovery | [Persisted receipts do not authorize replay](../inbox/2026-10-28-persisted-layout-receipts-do-not-authorize-replay.md); `recoverablePositionQueue.test.ts`, `layoutPersistence.test.ts`, `layout-recovery.spec.ts`; retained stale/volatile replay and hydration-switch negatives |
 | A tool upgrade's negative test exits before the intended failing task executes, or a hoisted renderer path changes | [Require executed consumer evidence](../inbox/2026-10-27-tool-upgrades-need-executed-consumer-evidence.md); installed Turbo and Mermaid contracts |
 | Pruned runtime starts failing imports, retains dev tools or loses auth across container replacement | [Installed consumer and persistence proof](../inbox/2026-10-27-runtime-images-need-installed-consumer-proof.md); `tests/runtime/run-image.mjs` |
 | A toolchain upgrade changes test counts, loses matcher types or drops unimported coverage | [Preserve discovery and consumer behavior](../inbox/2026-10-27-toolchain-upgrades-must-preserve-test-contracts.md); [migration evidence](../../docs/quality/TOOLCHAIN_MIGRATION_2026-10-27.md) |
