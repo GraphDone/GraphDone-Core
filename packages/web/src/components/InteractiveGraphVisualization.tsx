@@ -2253,7 +2253,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         // Locked (phone) → reject the drag so the gesture pans the canvas instead.
         .filter((event: any) => !interactionLockedRef.current && !event.ctrlKey && !event.button)
         .on('start', (event, d: any) => {
-
+          d._dragging = false;
+          delete d._dragStart;
+          delete d._connectedNodes;
           // Check if this is an edge creation attempt (Alt/Option key held)
           if (event.sourceEvent.altKey) {
             mousedownNodeRef.current = d;
@@ -2261,7 +2263,6 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           }
           
           // Store initial position and connected nodes for cluster behavior
-          d._dragging = false;
           d._dragStart = { x: d.x, y: d.y };
           d._connectedNodes = validatedEdges
             .filter(edge => edge.source.id === d.id || edge.target.id === d.id)
@@ -2276,7 +2277,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
         })
         .on('drag', (event, d: any) => {
-          if (event.sourceEvent.altKey) return;
+          if (!d._dragStart) return;
           if (!d._dragging) {
             d._dragging = true;
             simulation.alphaTarget(0.2).restart();
@@ -2334,6 +2335,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         })
         .on('end', (event, d: any) => {
           if (simulationRef.current !== simulation || simulationLayoutScopeRef.current !== activeLayoutScopeRef.current) return;
+          const dragged = d._dragging;
+          d._dragging = false;
+          delete d._dragStart;
+          delete d._connectedNodes;
           // Check if this is edge creation end
           if (mousedownNodeRef.current && mousedownNodeRef.current.id !== d.id) {
             const sourceId = mousedownNodeRef.current.id;
@@ -2364,14 +2369,11 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
             return;
           }
           
-          if (!d._dragging) {
+          if (!dragged) {
             mousedownNodeRef.current = null;
-            delete d._dragStart;
-            delete d._connectedNodes;
             return;
           }
           // Keep the dropped snapshot authoritative during polls and rebuilds.
-          d._dragging = false;
           if (!event.active) {
             const needsLayout = simulation.nodes().some((n: any) => n.fx == null || n.fy == null);
             // One last tick paints the final pointer position; a fully pinned
