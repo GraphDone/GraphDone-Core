@@ -131,9 +131,9 @@ function renderItemMetadata(element: SVGGElement, item: WorkItem, layout: Return
   const priority = Math.round((item.priority || 0) * 100);
   meta.append('circle').attr('cx', -layout.width / 2 + 17).attr('cy', layout.footerY).attr('r', 3.5).attr('fill', status.hexColor);
   meta.append('text').attr('class', 'status-percentage-text').attr('x', -layout.width / 2 + 28).attr('y', layout.footerY)
-    .attr('dominant-baseline', 'middle').text(status.label).style('font-family', GRAPH_FONT_FAMILY).style('font-size', '12px').style('font-weight', '500').style('fill', '#dbe5ee');
+    .attr('dominant-baseline', 'middle').text(status.label).style('font-family', GRAPH_FONT_FAMILY).style('font-size', '14px').style('font-weight', '500').style('fill', '#dbe5ee');
   meta.append('text').attr('class', 'priority-percentage-text').attr('x', layout.width / 2 - 14).attr('y', layout.footerY)
-    .attr('text-anchor', 'end').attr('dominant-baseline', 'middle').text(`P ${priority}%`).style('font-family', GRAPH_FONT_FAMILY).style('font-size', '12px').style('font-weight', '500').style('fill', '#b9c7d7')
+    .attr('text-anchor', 'end').attr('dominant-baseline', 'middle').text(`P ${priority}%`).style('font-family', GRAPH_FONT_FAMILY).style('font-size', '14px').style('font-weight', '500').style('fill', '#b9c7d7')
     .append('title').text(`Priority ${priority}%`);
 }
 
@@ -459,7 +459,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const itemRelationshipTriggerRef = useRef<HTMLButtonElement>(null);
   const closeItemRelationships = useCallback(() => {
     setItemRelationshipScope(null);
-    requestAnimationFrame(() => itemRelationshipTriggerRef.current?.focus({preventScroll:true}));
+    requestAnimationFrame(() => {
+      if (document.activeElement && document.activeElement !== document.body) return;
+      itemRelationshipTriggerRef.current?.focus({preventScroll:true});
+    });
   }, []);
   useEffect(() => { setItemRelationshipScope(null); setItemLabelCount(0); }, [currentGraph?.id]);
   const [createNodePosition, setCreateNodePosition] = useState<{ x: number; y: number; z: number } | undefined>(undefined);
@@ -2531,9 +2534,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .attr('dominant-baseline', 'central')
       .text((d: WorkItem) => d.type)
       .style('opacity', (currentTransform?.k || 1) >= LOD_THRESHOLDS.FAR ? 1 : 0)
-      .style('font-size', '12px')
+      .style('font-size', '14px')
       .style('font-family', GRAPH_FONT_FAMILY)
       .style('font-weight', '700')
+      .style('letter-spacing', 'normal')
       .style('fill', (d: WorkItem) => {
         const config = getTypeConfig(d.type as WorkItemType);
         return config.hexColor;
@@ -2916,7 +2920,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .attr('dominant-baseline', 'middle')
       .text((d: WorkItem) => getNodeDimensions(d).description)
       .style('opacity', (currentTransform?.k || 1) >= LOD_THRESHOLDS.CLOSE ? 1 : 0)
-      .style('font-size', '12px')
+      .style('font-size', '14px')
       .style('font-family', GRAPH_FONT_FAMILY)
       .style('font-weight', '400')
       .style('fill', (d: WorkItem) => {
@@ -3394,16 +3398,14 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     });
 
     const nodePresentationScales = new WeakMap<WorkItem, number>();
-    const updateNodePresentation = () => {
+    const updateNodePresentationFor = (element: SVGGElement, d: WorkItem) => {
       const presentedScale = itemPresentationScaleRef.current;
-      g.attr('data-presentation-scale', presentedScale);
-      nodeElements.each(function(d: WorkItem) {
-        if ((cullActive && (d as any)._culled) || nodePresentationScales.get(d) === presentedScale) return;
-        nodePresentationScales.set(d, presentedScale);
-        const node = d3.select(this), layout = getNodeDimensions(d);
+      if (nodePresentationScales.get(d) === presentedScale) return;
+      nodePresentationScales.set(d, presentedScale);
+        const node = d3.select(element), layout = getNodeDimensions(d);
         node.attr('data-detail', layout.compact ? 'compact' : 'full').attr('role', layout.compact ? 'button' : 'group').attr('tabindex', layout.compact ? 0 : null).attr('aria-label', `${d.title}, ${getTypeConfig(d.type as WorkItemType).label}`);
         node.on('keydown.compact', (event: KeyboardEvent) => {
-          if (layout.compact && event.target === this && (event.key === 'Enter' || event.key === ' ')) openQuickEdit(event, d);
+          if (layout.compact && event.target === element && (event.key === 'Enter' || event.key === ' ')) openQuickEdit(event, d);
         });
         node.select('.node-bg').attr('x', -layout.width / 2).attr('y', -layout.height / 2).attr('width', layout.width).attr('height', layout.height);
         node.select('.node-title-bar').attr('x', -layout.width / 2 + 2).attr('y', -layout.height / 2 + 2).attr('width', layout.width - 4);
@@ -3416,10 +3418,15 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         ] as const) node.select(selector).attr('transform', `translate(${x},${y})`);
         node.select('.node-description-text').attr('y', layout.descriptionY).text(layout.description);
         node.select('.node-subgraph-count').attr('y', layout.height / 2 - 10);
-        renderItemTitle(this, d, layout);
-        renderItemMetadata(this, d, layout);
+        renderItemTitle(element, d, layout);
+        renderItemMetadata(element, d, layout);
         node.selectAll('.node-title-bar, .node-type-text, .node-edit-icon, .node-relationship-icon, .node-expand-icon, .node-descend-icon, .node-description-text, .node-meta, .node-subgraph-count, .node-subgraph-stack')
           .style('display', () => layout.compact ? 'none' : null);
+    };
+    const updateNodePresentation = () => {
+      g.attr('data-presentation-scale', itemPresentationScaleRef.current);
+      nodeElements.each(function(d: WorkItem) {
+        if (!cullActive || !(d as any)._culled) updateNodePresentationFor(this, d);
       });
     };
 
@@ -3500,7 +3507,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         return {
           id: d.id, route: d._route, eligible: liveK >= 0.6 && edgeDisplay(d) !== 'none',
           dims: { width: d._labelDims.width * d._labelScale, height: d._labelDims.height * d._labelScale },
-          t: d.labelT, offset: (d._routeLabel?.offset < 0 ? -1 : 1) * (22 * d._labelScale + 3),
+          t: d.labelT, offset: (d._routeLabel?.offset < 0 ? -1 : 1) * (26 * d._labelScale + 3),
         };
       }), { viewport: labelViewport, obstacles: nodeLabelObstacles.concat(uiLabelObstacles.filter(intersectsViewport), routeObstacles), segments: routeSegments });
       edgeLabelGroups.each(function(d: any) {
@@ -3622,11 +3629,12 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       const maxGX = (width + CULL_MARGIN_PX - t.x) / t.k;
       const minGY = (-CULL_MARGIN_PX - t.y) / t.k;
       const maxGY = (height + CULL_MARGIN_PX - t.y) / t.k;
-      nodeElements.style('display', (d: any) => {
+      nodeElements.style('display', function(d: any) {
         const x = d.x ?? 0;
         const y = d.y ?? 0;
         const visible = x >= minGX && x <= maxGX && y >= minGY && y <= maxGY;
         d._culled = !visible;
+        if (visible) updateNodePresentationFor(this, d);
         return visible ? null : 'none';
       });
       applyEdgeDisplays();

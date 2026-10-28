@@ -140,7 +140,7 @@ export async function readItemSymbols(page: Page) {
       for (const title of card.titles) {
         if (!contains(card.box, title.box))
           violations.push(`title-clipped:${card.id}`);
-        if (title.font < 11.9) violations.push(`title-small:${card.id}`);
+        if (title.font < 13.9) violations.push(`title-small:${card.id}`);
       }
       for (const [index, part] of card.parts.entries()) {
         if (!contains(card.box, part.box))
@@ -157,7 +157,7 @@ export async function readItemSymbols(page: Page) {
         violations.push(`label-clipped:${label.id}`);
       if (!contains(viewport, label.box))
         violations.push(`label-offscreen:${label.id}`);
-      if (label.font < 11.9 || label.opacity < 0.99)
+      if (label.font < 13.9 || label.opacity < 0.99)
         violations.push(`label-unreadable:${label.id}`);
       if (
         [

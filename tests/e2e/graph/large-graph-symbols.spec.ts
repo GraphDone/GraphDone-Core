@@ -127,35 +127,53 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
   const timings: {
     scale: number;
     ms: number;
+    wallMs: number;
     paintedCards?: number;
     labels?: number;
   }[] = [];
   for (const scale of [1.2, 0.1, 1.2]) {
     const start = Date.now();
-    await page.evaluate(
-      ({ x, y, scale }) => (window as any).miniMapZoom(x, y, scale),
+    const elapsed = await page.evaluate(
+      async ({ x, y, scale }) => {
+        const start = performance.now();
+        const host = document.querySelector('.graph-container')!;
+        const svg = host.querySelector(':scope > svg') as SVGSVGElement & {
+          __zoom: { k: number };
+        };
+        const group = host.querySelector('.main-graph-group')!;
+        const overview = host.querySelector('.semantic-overview')!;
+        (window as any).miniMapZoom(x, y, scale);
+        return await new Promise<number>((resolve, reject) => {
+          let settledFrames = 0;
+          const check = () => {
+            if (performance.now() - start > 15000) {
+              reject(
+                new Error(
+                  'Zoom did not paint its requested detail within15seconds'
+                )
+              );
+              return;
+            }
+            if (
+              Math.abs(svg.__zoom.k - scale) < 0.00001 &&
+              group.getAttribute('data-presentation-scale') === String(scale) &&
+              overview.getAttribute('data-active') === String(scale < 1)
+            )
+              settledFrames++;
+            else settledFrames = 0;
+            if (settledFrames >= 2) resolve(performance.now() - start);
+            else requestAnimationFrame(check);
+          };
+          requestAnimationFrame(check);
+        });
+      },
       { x: target.positionX, y: target.positionY, scale }
     );
-    await expect
-      .poll(() =>
-        page
-          .locator('.graph-container > svg')
-          .evaluate(element => (element as any).__zoom.k)
-      )
-      .toBeCloseTo(scale);
-    await expect(overview).toHaveAttribute(
-      'data-active',
-      scale < 1 ? 'true' : 'false'
-    );
-    await expect(page.locator('.main-graph-group')).toHaveAttribute(
-      'data-presentation-scale',
-      String(scale)
-    );
-    const elapsed = Date.now() - start;
+    const wallMs = Date.now() - start;
     const timingPath = info.outputPath(`zoom-${timings.length}-timing.json`);
     await writeFile(
       timingPath,
-      JSON.stringify({ nodes: SIZE, edges: 5000, loadedMs, scale, elapsed })
+      JSON.stringify({ nodes: SIZE, edges: 5000, loadedMs, scale, elapsed, wallMs })
     );
     await info.attach(`zoom-${timings.length}-timing.json`, {
       path: timingPath,
@@ -191,6 +209,7 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
       timings.push({
         scale,
         ms: elapsed,
+        wallMs,
         paintedCards: geometry.cards.length,
         labels: geometry.labels.length,
       });
@@ -202,8 +221,66 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
         '2000-items-zoomed-out',
         8
       );
-      timings.push({ scale, ms: elapsed });
+      timings.push({ scale, ms: elapsed, wallMs });
     }
+  }
+  const revealId = largeGraph.nodeIds[1011];
+  const reveal = page
+    .locator('.node')
+    .filter({
+      has: page.locator(`.node-edit-icon[data-node-id="${revealId}"]`),
+    });
+  await expect(reveal).toBeHidden();
+  const panStart = await page.evaluate(() =>
+    [
+      [1200, 300],
+      [1200, 250],
+      [1200, 600],
+    ]
+      .map(([x, y]) => ({ x, y }))
+      .find(point =>
+        document
+          .elementFromPoint(point.x, point.y)
+          ?.classList.contains('background')
+      )
+  );
+  expect(panStart).toBeTruthy();
+  await page.mouse.move(panStart!.x, panStart!.y);
+  await page.mouse.down();
+  try {
+    await page.mouse.move(panStart!.x - 1512, panStart!.y, { steps: 4 });
+    await expect(reveal).toBeVisible();
+    await expect(reveal).toHaveAttribute('data-detail', 'full');
+    const held = await reveal.evaluate(node => {
+      const card = node.querySelector('.node-bg')!.getBoundingClientRect();
+      const title = node
+        .querySelector('.node-title-group')!
+        .getBoundingClientRect();
+      return {
+        card: card.toJSON(),
+        title: title.toJSON(),
+        fit:
+          title.left >= card.left &&
+          title.right <= card.right &&
+          title.top >= card.top &&
+          title.bottom <= card.bottom,
+      };
+    });
+    expect(held.fit).toBe(true);
+    const heldPath = info.outputPath('2000-held-pan-reveal.json');
+    await writeFile(heldPath, JSON.stringify(held));
+    await info.attach('2000-held-pan-reveal.json', {
+      path: heldPath,
+      contentType: 'application/json',
+    });
+    const heldImage = info.outputPath('2000-held-pan-reveal.png');
+    await page.screenshot({ path: heldImage });
+    await info.attach('2000-held-pan-reveal.png', {
+      path: heldImage,
+      contentType: 'image/png',
+    });
+  } finally {
+    await page.mouse.up();
   }
   await page
     .getByRole('button', {
