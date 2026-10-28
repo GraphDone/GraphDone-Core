@@ -2,6 +2,7 @@ import { test as base, expect } from '@playwright/test';
 import { writeFile } from 'node:fs/promises';
 import { login, TEST_USERS } from '../../lib/auth';
 import { gql } from '../../lib/graphRequest';
+import { inspectItemSymbols } from '../../lib/itemSymbolVisual';
 import {
   ownedGraphIdsFixture,
   type OwnedGraphs,
@@ -41,6 +42,13 @@ for (const width of [1440, 390]) {
       'mutation($source:ID!,$target:ID!){updateEdges(where:{source:{id:$source},target:{id:$target}},update:{type:REFERENCES}){edges{id}}}',
       { source: seeded.nodeIds[2], target: seeded.nodeIds[3] }
     );
+    if (width === 390)
+      await gql(
+        page,
+        'mutation($worker:ID!,$queue:ID!){worker:updateWorkItems(where:{id:$worker},update:{positionX:-600,positionY:0}){workItems{id}} queue:updateWorkItems(where:{id:$queue},update:{positionX:0,positionY:-600}){workItems{id}}}',
+        { worker: seeded.nodeIds[1], queue: seeded.nodeIds[2] }
+      );
+    const framing = { x: width === 390 ? -600 : -300, y: -300 };
     const snapshot = async () => {
       const data = await gql(
         page,
@@ -115,8 +123,8 @@ for (const width of [1440, 390]) {
       .toBe(true);
     await expect(priority).toHaveValue('essential');
     await page.evaluate(
-      y => (window as any).miniMapZoom(-300, y, 0.75),
-      width === 390 ? -600 : -300
+      ({ x, y }) => (window as any).miniMapZoom(x, y, 0.75),
+      framing
     );
     await expect(graph.locator('.main-graph-group')).toHaveAttribute(
       'data-presentation-scale',
@@ -232,6 +240,20 @@ for (const width of [1440, 390]) {
     await page.reload();
     await expect(priority).toHaveValue('essential');
     await expect.poll(represented).toEqual(primaryIds);
+    await expect
+      .poll(() =>
+        page.evaluate(() => (window as any).__layoutMetrics?.()?.cameraReady)
+      )
+      .toBe(true);
+    await page.evaluate(
+      ({ x, y }) => (window as any).miniMapZoom(x, y, 0.75),
+      framing
+    );
+    await expect(graph.locator('.main-graph-group')).toHaveAttribute(
+      'data-presentation-scale',
+      '0.75'
+    );
+    await expect(label).toBeVisible();
     await graph
       .getByRole('button', { name: /Browse all relationships/ })
       .click();
@@ -275,6 +297,69 @@ for (const width of [1440, 390]) {
       { operation: 'DeleteEdges', variables: { where: { id: blocker.id } } },
     ]);
     expect(errors).toEqual([]);
+    await expect
+      .poll(() =>
+        page.evaluate(() => (window as any).__layoutMetrics?.()?.cameraReady)
+      )
+      .toBe(true);
+    await page.evaluate(
+      ({ x, y }) => (window as any).miniMapZoom(x, y, 0.75),
+      framing
+    );
+    await expect(graph.locator('.main-graph-group')).toHaveAttribute(
+      'data-presentation-scale',
+      '0.75'
+    );
+    const fallbackLabel = graph.locator(
+      `.edge-label-group[data-edge-id="${dependency.id}"]`
+    );
+    await expect
+      .poll(() =>
+        graph
+          .locator(`.edges-group .edge[data-edge-id="${dependency.id}"]`)
+          .evaluate(element => {
+            for (
+              let current: Element | null = element;
+              current;
+              current = current.parentElement
+            ) {
+              const style = getComputedStyle(current);
+              if (
+                style.display === 'none' ||
+                style.visibility !== 'visible' ||
+                Number(style.opacity) === 0
+              )
+                return false;
+            }
+            const path = element as SVGPathElement;
+            const style = getComputedStyle(path);
+            const box = path.getBoundingClientRect();
+            const viewport = path
+              .closest('.graph-container')!
+              .getBoundingClientRect();
+            return (
+              style.stroke !== 'none' &&
+              Number(style.strokeOpacity) > 0 &&
+              parseFloat(style.strokeWidth) >= 3 &&
+              path.getTotalLength() > 0 &&
+              box.right >= viewport.left &&
+              box.left <= viewport.right &&
+              box.bottom >= viewport.top &&
+              box.top <= viewport.bottom
+            );
+          })
+      )
+      .toBe(true);
+    await expect(fallbackLabel).toBeVisible();
+    await expect(fallbackLabel.locator('.edge-label')).toHaveText(
+      'Depends On +1'
+    );
+    const geometry = await inspectItemSymbols(page, info, 'priority-fallback');
+    expect(geometry.labels.some(item => item.id === dependency.id)).toBe(true);
+    expect(writes).toEqual([
+      { operation: 'DeleteEdges', variables: { where: { id: blocker.id } } },
+    ]);
+    expect(errors).toEqual([]);
     const accountingPath = info.outputPath('priority-accounting.json');
     await writeFile(
       accountingPath,
@@ -283,12 +368,6 @@ for (const width of [1440, 390]) {
     await info.attach('priority-accounting.json', {
       path: accountingPath,
       contentType: 'application/json',
-    });
-    const fallbackPath = info.outputPath('priority-fallback.png');
-    await page.screenshot({ path: fallbackPath });
-    await info.attach('priority-fallback.png', {
-      path: fallbackPath,
-      contentType: 'image/png',
     });
   });
 }

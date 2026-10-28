@@ -29,3 +29,23 @@ Limits: this is a correction to the new test producers, not a claim that all
 legacy inline attachments are collected. Final exact-source CI must execute the
 large case and independently verify its retained counts, screenshots, artifact
 paths and source fingerprint. No runtime or policy behavior changed.
+
+Independent inspection of the materialized 9b8409c image found a second evidence
+gap: the screenshot showed an almost empty canvas after reload/inspection, even
+though canonical fallback IDs were correct. The test now waits for camera
+readiness, frames the owned pair, and requires its actual painted stroke and
+visible “Depends On +1” label. It uses the shared symbol oracle, including useful
+visible titles, minimum text/wire weight, and label/card/wire clearance.
+
+The first strengthened run (`priority-artifacts7`) rejected a painted horizontal
+SVG path because Playwright's area-based visibility predicate sees zero height.
+The replacement checks ancestor visibility, actual stroke/opacity/length and
+viewport intersection. The next run (`priority-artifacts8`) correctly rejected
+the 390px scene: its horizontal endpoint titles were both off-screen. The phone
+fixture now positions the same owned Gateway/Worker pair vertically before the
+API baseline is recorded. No assertion or source-position invariant was relaxed.
+Both desktop 1440 and phone 390 journeys passed in 25.17s in
+`priority-artifacts9`, with actual geometry JSON, PNG and accounting files. The
+phone image shows both endpoint titles and the fallback connection; the desktop
+image shows four cards. All failed reports/images remain retained. This remains
+a test/evidence correction; no product defect was established by these failures.
