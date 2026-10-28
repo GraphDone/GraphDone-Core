@@ -57,3 +57,5 @@
 | A federation upgrade removes UUID findings but breaks Neo4j schema generation; an override leaves the old lock resolution | [Validate federation consumers and installed UUID paths](../inbox/2026-10-27-federation-consumers-bound-uuid-upgrades.md); `tests/lib/dependencies/uuid.test.mjs` |
 
 | Tiny card text, wasted space, clipped or wire-overlapped labels after zoom | [Reserve the displayed symbol footprint](../inbox/2026-10-28-readable-symbols-need-reserved-geometry.md); `graphSymbolLayout.test.ts`, `edgeRouteGeometry.test.ts`; issue #222 requires actual browser and thousands-of-item evidence |
+
+| Whole browser sequence reaches900s with no valid report despite retained screenshots | [Bound browser acceptance by feature](../inbox/2026-10-28-browser-sequences-need-bounded-feature-scope.md); strict sequence enrollment and evidence controls |
