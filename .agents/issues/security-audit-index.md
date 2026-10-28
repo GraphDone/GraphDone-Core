@@ -2,6 +2,7 @@
 
 | Symptom | Evidence and corrective rule |
 | --- | --- |
+| CAPTCHA validates only a client string's format or skips missing GraphQL proof | [Server policy, signed action/expiry and bounded replay](../inbox/2026-10-27-captcha-proof-must-be-server-issued.md); `packages/server/tests/captcha*.test.ts`, `qc:captcha` |
 | Historical CSS audit findings disappear while the lock is unchanged | [Reconcile official backport ranges with actual consumers](../inbox/2026-10-27-reconcile-advisory-backports-with-locked-consumers.md); locked-path and Tailwind/parser regressions |
 | Router advisory requires a major update and older upstream navigation expectations differ | [Installed consumer and route compatibility](../inbox/2026-10-27-router-upgrades-need-current-consumer-contracts.md); every locked Router path plus desktop/phone route gates |
 | Fresh production audit flags Undici through optional SQLite build tooling without a direct application import | [Trace the native-build consumer and patch its actual resolved copy](../inbox/2026-10-24-undici-native-build-dependency.md); `tests/lib/dependencies/undici.test.mjs` rejects affected locked and installed consumer versions |

@@ -37,6 +37,9 @@ export default defineConfig({
       'Expires': '0'
     },
     proxy: {
+      '/config': { target: process.env.VITE_PROXY_TARGET || 'http://localhost:4127', changeOrigin: true },
+      '/auth': { target: process.env.VITE_PROXY_TARGET || 'http://localhost:4127', changeOrigin: true },
+      '/api/captcha': { target: process.env.VITE_PROXY_TARGET || 'http://localhost:4127', changeOrigin: true },
       // apollo.ts uses the nginx-style /api/graphql path; map it in dev too
       '/api/ops': { target: process.env.VITE_PROXY_TARGET || 'http://localhost:4127', changeOrigin: true },
       '/api/sync': { target: process.env.VITE_PROXY_TARGET || 'http://localhost:8797', changeOrigin: true },
