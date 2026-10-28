@@ -115,6 +115,23 @@ test('unplaced endpoints retain their exact edge IDs and explain why no wire is 
   assert.deepEqual(result.deferred[0].edgeIds, ['original-outside']);
 });
 
+test('routing reserves its first attempt for a blocker ahead of a larger contextual bundle', () => {
+  const cards = [
+    { id: 'a', x: 30, y: 100, width: 100, height: 70 },
+    { id: 'b', x: 300, y: 100, width: 100, height: 70 },
+    { id: 'c', x: 570, y: 100, width: 100, height: 70 },
+  ];
+  const connections = [
+    { id: 'context', source: 'a', target: 'b', type: 'REFERENCES', priority: 2, edgeIds: Array.from({ length: 10 }, (_, i) => `context-${i}`) },
+    { id: 'blocker', source: 'b', target: 'c', type: 'BLOCKS', priority: 0, edgeIds: ['blocker'] },
+  ];
+  const result = routeSchematicConnections(cards, connections, 800, 400, [], { maxAttempts: 1 });
+  assert.deepEqual(result.routes.flatMap(route => route.edgeIds), ['blocker']);
+  assert.deepEqual(result.deferred.flatMap(route => route.edgeIds).sort(), connections[0].edgeIds);
+  assertClean(result.metrics);
+  assert.deepEqual(routeSchematicConnections([...cards].reverse(), [...connections].reverse(), 800, 400, [], { maxAttempts: 1 }), result);
+});
+
 test('failed routes consume the shared invocation work budget before later searches', () => {
   const cards = [
     { id: 'a', x: 30, y: 70, width: 80, height: 50 },

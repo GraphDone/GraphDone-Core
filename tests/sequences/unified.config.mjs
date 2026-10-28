@@ -36,7 +36,7 @@ export const SEQUENCES = {
     'tests/e2e/graph/nested-semantic-lod.spec.ts', `--project=${PW}`, '--headed', '--workers=1', '--retries=0', '--trace=retain-on-failure',
   ], blocking: true },
   'item-wires': { adapter: 'playwright', title: 'Item wire consumer acceptance', args: [
-    'tests/e2e/graph/item-wire-consumers.spec.ts', 'tests/e2e/graph/item-symbols.spec.ts', `--project=${PW}`, '--headed', '--workers=1', '--retries=0', '--trace=retain-on-failure',
+    'tests/e2e/graph/item-wire-consumers.spec.ts', 'tests/e2e/graph/item-symbols.spec.ts', 'tests/e2e/graph/relationship-priority.spec.ts', `--project=${PW}`, '--headed', '--workers=1', '--retries=0', '--trace=retain-on-failure',
   ], blocking: true },
   'large-symbols': { adapter: 'playwright', title: 'Two thousand item zoom acceptance', args: [
     'tests/e2e/graph/large-graph-symbols.spec.ts', `--project=${PW}`, '--workers=1', '--retries=0', '--trace=retain-on-failure',

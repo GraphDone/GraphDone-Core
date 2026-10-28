@@ -179,7 +179,7 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
       expect(work.checks).toBeLessThanOrEqual(200000);
       await expect(
         page.getByRole('button', {
-          name: `5000 relationships, ${geometry.labels.length} labels shown. Browse all relationships`,
+          name: new RegExp(`^5000 relationships, ${geometry.labels.length} labels shown, [0-9]+ summarized by priority. Browse all relationships$`),
           exact: true,
         })
       ).toBeVisible();

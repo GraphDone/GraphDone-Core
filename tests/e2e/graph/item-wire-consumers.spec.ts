@@ -54,6 +54,7 @@ test('item wire paths, hitboxes, arrows and dragged labels retain original relat
   await page.evaluate(id => {
     localStorage.setItem('currentGraphId', id);
     localStorage.setItem('graphdone:viewMode', 'graph');
+    localStorage.setItem('graphdone:relationship-priority', 'all');
   }, seeded.graphId);
   const loaded = page.waitForResponse(response => {
     if (!response.url().endsWith('/api/graphql')) return false;
@@ -399,6 +400,7 @@ test('initially hidden item labels retain full conservative sizing @item-wires',
   await page.evaluate(id => {
     localStorage.setItem('currentGraphId', id);
     localStorage.setItem('graphdone:viewMode', 'graph');
+    localStorage.setItem('graphdone:relationship-priority', 'all');
   }, seeded.graphId);
   await page.addInitScript(() => {
     const measure = SVGGraphicsElement.prototype.getBBox;
