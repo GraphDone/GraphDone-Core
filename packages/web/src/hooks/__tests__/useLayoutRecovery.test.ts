@@ -4,11 +4,11 @@ import { PositionSaveProvider, useLayoutRecovery } from '../usePositionSaveQueue
 import { clearSession, setSession } from '../../lib/authStorage';
 import { emptyAccount, type Account } from '../../lib/offline/model';
 
-const fixture = vi.hoisted(() => ({ accounts: new Map<string, Account>(), pause: undefined as Promise<void> | undefined }));
+const fixture = vi.hoisted(() => ({ accounts: new Map<string, Account>(), pause: undefined as Promise<void> | undefined, ownerPauses: new Map<string, Promise<void>>() }));
 vi.mock('../../lib/offline/store', () => ({
   channel: null,
   readAccount: async (owner: string) => {
-    await fixture.pause;
+    await (fixture.ownerPauses.get(owner) || fixture.pause);
     return structuredClone(fixture.accounts.get(owner) || emptyAccount());
   },
   editAccount: async (owner: string, edit: (account: Account) => unknown) => {
@@ -23,6 +23,7 @@ const token = (id: string) => `header.${btoa(JSON.stringify({ userId: id }))}.si
 beforeEach(() => {
   fixture.pause = undefined;
   fixture.accounts.clear();
+  fixture.ownerPauses.clear();
   localStorage.clear();
   sessionStorage.clear();
   setSession(token('owner-a'), { id: 'owner-a' }, true);
@@ -54,6 +55,32 @@ describe('account layout recovery settings', () => {
     expect(view.result.current.error).toMatch(/Sign in again/);
     await act(() => view.result.current.discard('missing-graph'));
     expect(fixture.accounts.get('owner-a')?.layoutOutbox).toBeDefined();
+  });
+
+
+  it('does not relabel a replacement account scopes after a delayed discard rejects', async () => {
+    fixture.accounts.set('owner-b', { ...emptyAccount(), layoutOutbox: { version: 1, graphs: {
+      '"b-private-graph"': { '"b-task"': { id: 'b-task', x: 1, y: 2, updatedAt: 1000, revision: 'b-pending' } },
+    } } });
+    const view = renderHook(({ owner }) => useLayoutRecovery(owner), { initialProps: { owner: 'owner-a' }, wrapper: PositionSaveProvider });
+    await waitFor(() => expect(view.result.current.scopes).toEqual([{ graphId: 'missing-graph', count: 1 }]));
+    let release!: () => void;
+    fixture.ownerPauses.set('owner-a', new Promise<void>(resolve => { release = resolve; }));
+    let discard!: Promise<void>;
+    act(() => { discard = view.result.current.discard('missing-graph'); });
+    act(() => setSession(token('owner-b'), { id: 'owner-b' }, true));
+    view.rerender({ owner: 'owner-b' });
+    await waitFor(() => expect(view.result.current.scopes).toEqual([{ graphId: 'b-private-graph', count: 1 }]));
+    await act(async () => { release(); await discard; });
+    expect(view.result.current.scopes).toEqual([{ graphId: 'b-private-graph', count: 1 }]);
+    fixture.ownerPauses.set('owner-a', new Promise<void>(() => undefined));
+    act(() => setSession(token('owner-a'), { id: 'owner-a' }, true));
+    view.rerender({ owner: 'owner-a' });
+    expect(view.result.current.scopes).toEqual([]);
+    expect(view.result.current.loading).toBe(true);
+    expect(fixture.accounts.get('owner-a')?.layoutOutbox).toBeDefined();
+    expect(fixture.accounts.get('owner-b')?.layoutOutbox).toBeDefined();
+    view.unmount();
   });
 
   it('stops a pending discard when logout occurs before recovery finishes', async () => {
