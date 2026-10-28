@@ -86,3 +86,18 @@ screenshot are retained. The generator now wraps more narrowly without changing
 font, card size, assertion tolerance, timeout or retries. The revised four-case
 browser acceptance and broader candidate CI remain pending. Prior green jobs
 and Comprehensive 40629282743 do not accept the revised source.
+
+## Actual overview integration gate
+
+The existing desktop/phone nested journeys now measure the actual rendered paths
+and card/control rectangles, require visible routes and exact represented/hidden
+accounting, and retain an overview screenshot plus geometry JSON. They also browse
+the real owned graph's full relationship IDs, filter parallel BLOCKS links, inspect
+an endpoint and return with camera/filter/focus preserved, then verify incoming,
+outgoing and two-hop neighborhoods against the original database snapshot. Existing
+write-attempt guards and final database equality remain required. This reuses the
+two small owned fixtures; no extra database or local browser is started.
+
+The final two cases were discovered successfully in the owned lightweight probe
+(`schematic-integration-current-discovery.log`); discovery is not execution. Their
+new assertions require actual CI execution before acceptance.
