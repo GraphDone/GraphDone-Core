@@ -2,6 +2,7 @@
 
 | Symptom | Canonical lesson and regression |
 | --- | --- |
+| A dragged offset label jumps to a nearby return wire despite a prior-leg tie-breaker | [Project onto the displayed offset path](../inbox/2026-10-28-offset-label-drag-needs-offset-path.md); close-return-leg geometry negative and correction |
 | Extra graph-fixture batches can continue while timeout cleanup deletes their graph | [Keep additional edges inside tracked seeding](../inbox/2026-10-28-fixture-extras-must-share-cancellation.md); delayed edge-response owned-fixture regression |
 | A clean schematic metric passes while wires are invisible, or a new relationship button makes an old member locator ambiguous | [Require actual paint and distinct controls](../inbox/2026-10-28-schematic-gates-must-see-painted-wires.md); actual overview bounds/paint/direction checks and opacity-zero negative control |
 | Open bus lists disagree with live groups, failed routing searches multiply work, or hidden-link counts omit a partition | [Resolve live memberships and cap the whole invocation](../inbox/2026-10-28-bus-views-need-live-membership-and-total-budgets.md); relationship/live-update regressions, budget negative, CI text-bound failure |
