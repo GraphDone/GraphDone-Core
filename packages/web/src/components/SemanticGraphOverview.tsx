@@ -17,6 +17,12 @@ import {
   type SemanticEdge,
   type SemanticItem,
 } from '../lib/semanticLOD';
+import {
+  indexSemanticRelationships,
+  type RelationshipScope,
+} from '../lib/semanticRelationships';
+import { SemanticRelationshipBrowser } from './SemanticRelationshipBrowser';
+import { routeSchematicConnections } from '../lib/schematicRouting';
 
 interface Props {
   items: readonly SemanticItem[];
@@ -30,10 +36,6 @@ interface Props {
   onBack: () => void;
 }
 
-/** A display-only companion to the existing D3 camera. Summary labels are placed
- * in screen space and linked to source centroids. No projected object is editable
- * or persisted. The complete group/member list is the fallback when the screen
- * cannot fit every label (especially on phones). */
 export function SemanticGraphOverview({
   items,
   edges,
@@ -49,6 +51,15 @@ export function SemanticGraphOverview({
     () => buildSemanticHierarchy(items, edges),
     [items, edges]
   );
+  const relationshipIndex = useMemo(
+    () => indexSemanticRelationships(items, edges),
+    [items, edges]
+  );
+  const [relationshipScope, setRelationshipScope] =
+    useState<RelationshipScope | null>(null);
+  const [relationshipFocus, setRelationshipFocus] = useState<string>();
+  const relationshipGroup = useRef<string | null>(null);
+  const relationshipTrigger = useRef<string | null>(null);
   const host = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
   const bounds = host.current?.getBoundingClientRect();
@@ -159,37 +170,29 @@ export function SemanticGraphOverview({
       setSearch('');
     }
   }, [groupId, group]);
-  const positions = new Map(
-    readPositions().map(position => [position.id, position])
-  );
-  const anchors = projection.groups.map(entry => {
-    const points = entry.members
-      .map(item => positions.get(item.id))
-      .filter(
-        point => point && Number.isFinite(point.x) && Number.isFinite(point.y)
-      );
-    const x =
-      points.reduce((sum, point) => sum + point!.x, 0) / (points.length || 1);
-    const y =
-      points.reduce((sum, point) => sum + point!.y, 0) / (points.length || 1);
-    return {
-      id: entry.id,
-      x: x * camera.scale + camera.x,
-      y: y * camera.scale + camera.y,
-    };
-  });
-  // Keep slots fixed through camera gestures. Leaders still follow live source
-  // anchors; only changed membership/viewport/controls triggers label placement.
-  const layout = useMemo(
-    () => placeOverviewLabels(anchors, size.width, size.height, obstacles),
-    [projection, size.width, size.height, obstacleKey, active]
-  );
-  const anchorById = new Map(anchors.map(anchor => [anchor.id, anchor]));
-  const placed = layout.placed.map(entry => ({
-    ...entry,
-    anchorX: anchorById.get(entry.id)!.x,
-    anchorY: anchorById.get(entry.id)!.y,
-  }));
+  const layout = useMemo(() => {
+    const positions = new Map(
+      readPositions().map(position => [position.id, position])
+    );
+    const anchors = projection.groups.map(entry => {
+      const points = entry.members
+        .map(item => positions.get(item.id))
+        .filter(
+          point => point && Number.isFinite(point.x) && Number.isFinite(point.y)
+        );
+      const x =
+        points.reduce((sum, point) => sum + point!.x, 0) / (points.length || 1);
+      const y =
+        points.reduce((sum, point) => sum + point!.y, 0) / (points.length || 1);
+      return {
+        id: entry.id,
+        x: x * camera.scale + camera.x,
+        y: y * camera.scale + camera.y,
+      };
+    });
+    return placeOverviewLabels(anchors, size.width, size.height, obstacles);
+  }, [projection, size.width, size.height, obstacleKey, active, readPositions]);
+  const placed = layout.placed;
   useLayoutEffect(() => {
     const focused = focusedSummary.current;
     if (!focused || focused.element.isConnected) return;
@@ -211,16 +214,58 @@ export function SemanticGraphOverview({
     (target ?? groupListButton.current)?.focus();
   }, [projection, layout, active, selectedId]);
   const hidden = layout.hidden;
-  const placedById = new Map(placed.map(entry => [entry.id, entry]));
   const groupsById = new Map(projection.groups.map(entry => [entry.id, entry]));
+  const wiring = useMemo(
+    () =>
+      routeSchematicConnections(
+        layout.placed,
+        projection.bundles.map(bundle => ({
+          id: bundle.id,
+          source: bundle.source,
+          target: bundle.target,
+          type: bundle.type,
+          edgeIds: bundle.edges.map(edge => edge.id),
+        })),
+        size.width,
+        size.height,
+        obstacles.map((rect, index) => ({
+          id: `control-${index}`,
+          x: rect.left,
+          y: rect.top,
+          width: rect.right - rect.left,
+          height: rect.bottom - rect.top,
+        }))
+      ),
+    [layout, projection, size.width, size.height, obstacleKey]
+  );
+  const collapsedConnections = wiring.deferred.reduce(
+    (count, bus) => count + bus.edgeIds.length,
+    0
+  );
+  const busColors = [
+    '#5eead4',
+    '#a5b4fc',
+    '#fbbf24',
+    '#f9a8d4',
+    '#7dd3fc',
+    '#c4b5fd',
+  ];
+  const busColor = (id: string) =>
+    busColors[
+      Array.from(id).reduce(
+        (hash, char) => (hash * 31 + char.charCodeAt(0)) >>> 0,
+        0
+      ) % busColors.length
+    ];
   const openGroup = (id: string) => {
     if (!browse) returnFocus.current = document.activeElement as HTMLElement;
     setGroupId(id);
     setBrowse(true);
     setSearch('');
   };
-  const closeBrowser = () => {
+  const closeBrowser = (clearRelationships = true) => {
     setBrowse(false);
+    if (clearRelationships) setRelationshipScope(null);
     setGroupId(null);
     setSearch('');
     (returnFocus.current?.isConnected
@@ -229,13 +274,60 @@ export function SemanticGraphOverview({
     )?.focus();
   };
   const back = () => {
-    closeBrowser();
+    if (relationshipScope) {
+      setGroupId(relationshipGroup.current);
+      setBrowse(true);
+    } else closeBrowser();
     setMode(returnMode.current);
     setExpanded(returnExpanded.current);
     setAutomaticDepth(returnAutomatic.current.depth);
     setAutomatic(returnAutomatic.current.active);
     setCanReturn(false);
     onBack();
+  };
+  const inspect = (id: string) => {
+    if (!canReturn) {
+      returnMode.current = mode;
+      returnAutomatic.current = { depth: automaticDepth, active: automatic };
+      returnExpanded.current = new Set(effectiveExpanded);
+    }
+    if (relationshipScope) {
+      relationshipGroup.current = groupId;
+      setRelationshipFocus(id);
+    }
+    setCanReturn(true);
+    closeBrowser(false);
+    setMode('auto');
+    onInspect(id, !canReturn);
+    requestAnimationFrame(() => backButton.current?.focus());
+  };
+  const openRelationships = (scope: RelationshipScope, trigger: string) => {
+    relationshipTrigger.current = trigger;
+    setRelationshipFocus(undefined);
+    setRelationshipScope(scope);
+  };
+  useLayoutEffect(() => {
+    if (!browse || relationshipScope || !relationshipTrigger.current) return;
+    const trigger = Array.from(
+      host.current?.querySelectorAll<HTMLButtonElement>(
+        '[data-lod-relationships]'
+      ) ?? []
+    ).find(
+      button => button.dataset.lodRelationships === relationshipTrigger.current
+    );
+    (trigger ?? closeButton.current)?.focus();
+    relationshipTrigger.current = null;
+  }, [browse, relationshipScope]);
+  const groupLabel = (id: string) => {
+    const entry = groupsById.get(id);
+    return entry
+      ? [
+          ...entry.ancestors.map(
+            ancestor => hierarchy.groups.get(ancestor)!.label
+          ),
+          entry.isDirect ? 'Direct items' : entry.label,
+        ].join(' / ')
+      : 'No visible summary';
   };
   return (
     <div
@@ -273,6 +365,7 @@ export function SemanticGraphOverview({
           className="rounded bg-gray-950/95 border border-gray-600 px-3 py-1 w-28 h-11 shrink-0 text-gray-100"
           onClick={() => {
             returnFocus.current = document.activeElement as HTMLElement;
+            setRelationshipScope(null);
             setBrowse(true);
             setGroupId(null);
           }}
@@ -325,53 +418,38 @@ export function SemanticGraphOverview({
                 <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8" />
               </marker>
             </defs>
-            {projection.bundles.map(bundle => {
-              const source = placedById.get(bundle.source),
-                target = placedById.get(bundle.target);
-              if (!source || !target) return null;
-              // Curve from the right side of the source to the left of the target.
-              // Opposing directions use opposite sides; typed counts live in the list.
-              const x1 = source.x + source.width,
-                y1 = source.y + source.height / 2;
-              const x2 = target.x,
-                y2 = target.y + target.height / 2;
-              return (
-                <path
-                  key={bundle.id}
-                  data-lod-bundle={bundle.type}
-                  data-count={bundle.edges.length}
-                  d={`M${x1},${y1} C${x1 + 36},${y1} ${x2 - 36},${y2} ${x2},${y2}`}
-                  fill="none"
-                  stroke={bundle.type === 'BLOCKS' ? '#fb7185' : '#64748b'}
-                  strokeWidth={Math.min(
-                    4,
-                    1 + Math.log2(bundle.edges.length + 1)
-                  )}
-                  markerEnd={`url(#${markerId})`}
-                  opacity="0.7"
-                >
-                  <title>{`${groupsById.get(bundle.source)!.label} → ${groupsById.get(bundle.target)!.label}: ${bundle.edges.length} ${bundle.type}`}</title>
-                </path>
-              );
-            })}
-            {placed.map(entry => (
-              <g key={entry.id}>
-                <line
-                  x1={entry.x + entry.width / 2}
-                  y1={entry.y + entry.height / 2}
-                  x2={entry.anchorX}
-                  y2={entry.anchorY}
-                  stroke="#64748b"
-                  strokeDasharray="3 5"
-                  opacity="0.5"
-                />
-                <circle
-                  cx={entry.anchorX}
-                  cy={entry.anchorY}
-                  r="3"
-                  fill="#6ee7b7"
-                />
-              </g>
+            {wiring.routes.map(bus => (
+              <path
+                key={bus.id}
+                data-lod-bundle={bus.connections
+                  .map(connection => connection.type)
+                  .join(' ')}
+                data-lod-bus-source={bus.source}
+                data-count={bus.edgeIds.length}
+                d={bus.points
+                  .map(
+                    (point, index) =>
+                      `${index ? 'L' : 'M'}${point.x},${point.y}`
+                  )
+                  .join(' ')}
+                fill="none"
+                stroke={busColor(bus.source)}
+                strokeWidth="2.5"
+                strokeLinejoin="round"
+                strokeLinecap="round"
+                markerEnd={`url(#${markerId})`}
+              >
+                <title>{`${groupsById.get(bus.source)!.label} → ${groupsById.get(bus.target)!.label}: ${bus.edgeIds.length} relationships · ${bus.connections.map(connection => `${connection.edgeIds.length} ${connection.type}`).join(', ')}`}</title>
+              </path>
+            ))}
+            {wiring.junctions.map(point => (
+              <circle
+                key={`${point.bus}:${point.x}:${point.y}`}
+                cx={point.x}
+                cy={point.y}
+                r="3.5"
+                fill={busColor(point.bus)}
+              />
             ))}
           </svg>
           {placed.map(entry => {
@@ -433,7 +511,42 @@ export function SemanticGraphOverview({
           })}
         </>
       )}
-      {browse && (
+      {active && (
+        <button
+          data-graph-fit-obstacle="true"
+          data-lod-controls="true"
+          className="absolute bottom-3 left-3 pointer-events-auto rounded bg-gray-950 border border-gray-600 px-3 py-1 w-36 h-11 text-xs text-gray-100"
+          aria-label={`${edges.length} relationships, ${collapsedConnections} connections not drawn`}
+          onClick={() => {
+            returnFocus.current = document.activeElement as HTMLElement;
+            setBrowse(true);
+            setGroupId(null);
+            openRelationships({ kind: 'all' }, 'all');
+          }}
+        >
+          <span className="block">Connections</span>
+          <span
+            className={`block ${collapsedConnections ? 'text-amber-200' : 'text-emerald-200'}`}
+          >
+            {collapsedConnections
+              ? `${collapsedConnections} not drawn`
+              : 'Browse all'}
+          </span>
+        </button>
+      )}
+      {relationshipScope && (
+        <SemanticRelationshipBrowser
+          index={relationshipIndex}
+          scope={relationshipScope}
+          visible={browse}
+          contextFor={id => groupLabel(projection.membership.get(id) ?? '')}
+          onScope={setRelationshipScope}
+          onInspect={inspect}
+          focusId={relationshipFocus}
+          onBack={() => setRelationshipScope(null)}
+        />
+      )}
+      {browse && !relationshipScope && (
         <section
           data-lod-controls="true"
           role="region"
@@ -454,7 +567,7 @@ export function SemanticGraphOverview({
             <button
               ref={closeButton}
               aria-label="Close group browser"
-              onClick={closeBrowser}
+              onClick={() => closeBrowser()}
               className="shrink-0 rounded border border-gray-600 px-3 py-2"
             >
               Close
@@ -476,6 +589,22 @@ export function SemanticGraphOverview({
                 internal relationships · {group.blocked} blocked ·{' '}
                 {group.completed} completed · grouped by {group.basis}
               </p>
+              <button
+                data-lod-relationships="internal"
+                onClick={() =>
+                  openRelationships(
+                    {
+                      kind: 'internal',
+                      members: group.members.map(item => item.id),
+                      label: `Internal relationships of ${groupLabel(group.id)}`,
+                    },
+                    'internal'
+                  )
+                }
+                className="min-h-11 mb-3 text-sm text-emerald-200"
+              >
+                Browse {group.internalEdges.length} internal relationships
+              </button>
               {group.ancestors.length > 0 && (
                 <nav
                   aria-label="Group path"
@@ -541,23 +670,7 @@ export function SemanticGraphOverview({
                     <li key={item.id}>
                       <button
                         className="w-full rounded bg-gray-900 p-3 text-left hover:bg-gray-800"
-                        onClick={() => {
-                          if (!canReturn) {
-                            returnMode.current = mode;
-                            returnAutomatic.current = {
-                              depth: automaticDepth,
-                              active: automatic,
-                            };
-                            returnExpanded.current = new Set(effectiveExpanded);
-                          }
-                          setCanReturn(true);
-                          closeBrowser();
-                          setMode('auto');
-                          onInspect(item.id, !canReturn);
-                          requestAnimationFrame(() =>
-                            backButton.current?.focus()
-                          );
-                        }}
+                        onClick={() => inspect(item.id)}
                       >
                         <span className="block text-sm break-words">
                           {item.title}
@@ -565,6 +678,19 @@ export function SemanticGraphOverview({
                         <span className="text-xs text-gray-400">
                           {item.type} · {item.status}
                         </span>
+                      </button>
+                      <button
+                        data-lod-relationships={`node:${item.id}`}
+                        aria-label={`Relationships of ${item.title}`}
+                        onClick={() =>
+                          openRelationships(
+                            { kind: 'node', id: item.id },
+                            `node:${item.id}`
+                          )
+                        }
+                        className="min-h-11 text-xs text-emerald-200 px-3"
+                      >
+                        Relationships
                       </button>
                     </li>
                   ))}
@@ -581,12 +707,22 @@ export function SemanticGraphOverview({
                   .map(bundle => (
                     <li key={bundle.id}>
                       <button
-                        className="text-left text-emerald-200"
+                        data-lod-relationships={bundle.id}
+                        className="min-h-11 text-left text-emerald-200"
                         onClick={() =>
-                          openGroup(
-                            bundle.source === group.id
-                              ? bundle.target
-                              : bundle.source
+                          openRelationships(
+                            {
+                              kind: 'bundle',
+                              sources: groupsById
+                                .get(bundle.source)!
+                                .members.map(item => item.id),
+                              targets: groupsById
+                                .get(bundle.target)!
+                                .members.map(item => item.id),
+                              type: bundle.type,
+                              label: `${groupLabel(bundle.source)} → ${groupLabel(bundle.target)}: ${bundle.type}`,
+                            },
+                            bundle.id
                           )
                         }
                       >
@@ -607,6 +743,13 @@ export function SemanticGraphOverview({
                   ? ` · ${projection.pendingEdges.length} awaiting endpoints`
                   : ''}
               </p>
+              <button
+                data-lod-relationships="all"
+                onClick={() => openRelationships({ kind: 'all' }, 'all')}
+                className="min-h-11 mb-3 text-sm text-emerald-200"
+              >
+                Browse {edges.length} relationships
+              </button>
               <ul className="space-y-2">
                 {projection.groups.map(entry => (
                   <li key={entry.id}>

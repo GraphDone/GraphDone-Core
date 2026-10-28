@@ -1,0 +1,949 @@
+{
+  "schema": "graphdone.schematic-study/1",
+  "fixtures": [
+    {
+      "name": "chain",
+      "title": "A clear service path",
+      "sourceRelationships": 36,
+      "routedRelationships": 36,
+      "collapsedRelationships": 0,
+      "routedBranches": 3,
+      "metrics": {
+        "cardIntersections": 0,
+        "unrelatedCrossings": 0,
+        "unrelatedOverlaps": 0,
+        "diagonalSegments": 0,
+        "maxBusesPerCell": 1
+      },
+      "deferred": []
+    },
+    {
+      "name": "fanout",
+      "title": "One source, shared bus, exact branches",
+      "sourceRelationships": 30,
+      "routedRelationships": 30,
+      "collapsedRelationships": 0,
+      "routedBranches": 4,
+      "metrics": {
+        "cardIntersections": 0,
+        "unrelatedCrossings": 0,
+        "unrelatedOverlaps": 0,
+        "diagonalSegments": 0,
+        "maxBusesPerCell": 1
+      },
+      "deferred": []
+    },
+    {
+      "name": "dense-cycle",
+      "title": "Dense systems disclose collapsed connections",
+      "sourceRelationships": 112,
+      "routedRelationships": 36,
+      "collapsedRelationships": 76,
+      "routedBranches": 16,
+      "metrics": {
+        "cardIntersections": 0,
+        "unrelatedCrossings": 0,
+        "unrelatedOverlaps": 0,
+        "diagonalSegments": 0,
+        "maxBusesPerCell": 2
+      },
+      "deferred": [
+        {
+          "id": "[\"Service 4\",\"Service 3\"]",
+          "source": "Service 4",
+          "target": "Service 3",
+          "connections": [
+            {
+              "id": "Service 4:Service 3:BLOCKS",
+              "source": "Service 4",
+              "target": "Service 3",
+              "type": "BLOCKS",
+              "edgeIds": [
+                "Service 4:Service 3:BLOCKS:0",
+                "Service 4:Service 3:BLOCKS:1",
+                "Service 4:Service 3:BLOCKS:2"
+              ]
+            }
+          ],
+          "edgeIds": [
+            "Service 4:Service 3:BLOCKS:0",
+            "Service 4:Service 3:BLOCKS:1",
+            "Service 4:Service 3:BLOCKS:2"
+          ],
+          "reason": "routing-budget"
+        },
+        {
+          "id": "[\"Service 4\",\"Service 6\"]",
+          "source": "Service 4",
+          "target": "Service 6",
+          "connections": [
+            {
+              "id": "Service 4:Service 6:BLOCKS",
+              "source": "Service 4",
+              "target": "Service 6",
+              "type": "BLOCKS",
+              "edgeIds": [
+                "Service 4:Service 6:BLOCKS:0",
+                "Service 4:Service 6:BLOCKS:1",
+                "Service 4:Service 6:BLOCKS:2"
+              ]
+            }
+          ],
+          "edgeIds": [
+            "Service 4:Service 6:BLOCKS:0",
+            "Service 4:Service 6:BLOCKS:1",
+            "Service 4:Service 6:BLOCKS:2"
+          ],
+          "reason": "routing-budget"
+        },
+        {
+          "id": "[\"Service 5\",\"Service 2\"]",
+          "source": "Service 5",
+          "target": "Service 2",
+          "connections": [
+            {
+              "id": "Service 5:Service 2:DEPENDS_ON",
+              "source": "Service 5",
+              "target": "Service 2",
+              "type": "DEPENDS_ON",
+              "edgeIds": [
+                "Service 5:Service 2:DEPENDS_ON:0",
+                "Service 5:Service 2:DEPENDS_ON:1",
+                "Service 5:Service 2:DEPENDS_ON:2"
+              ]
+            }
+          ],
+          "edgeIds": [
+            "Service 5:Service 2:DEPENDS_ON:0",
+            "Service 5:Service 2:DEPENDS_ON:1",
+            "Service 5:Service 2:DEPENDS_ON:2"
+          ],
+          "reason": "routing-budget"
+        },
+        {
+          "id": "[\"Service 5\",\"Service 8\"]",
+          "source": "Service 5",
+          "target": "Service 8",
+          "connections": [
+            {
+              "id": "Service 5:Service 8:DEPENDS_ON",
+              "source": "Service 5",
+              "target": "Service 8",
+              "type": "DEPENDS_ON",
+              "edgeIds": [
+                "Service 5:Service 8:DEPENDS_ON:0",
+                "Service 5:Service 8:DEPENDS_ON:1",
+                "Service 5:Service 8:DEPENDS_ON:2"
+              ]
+            }
+          ],
+          "edgeIds": [
+            "Service 5:Service 8:DEPENDS_ON:0",
+            "Service 5:Service 8:DEPENDS_ON:1",
+            "Service 5:Service 8:DEPENDS_ON:2"
+          ],
+          "reason": "routing-budget"
+        },
+        {
+          "id": "[\"Service 6\",\"Service 1\"]",
+          "source": "Service 6",
+          "target": "Service 1",
+          "connections": [
+            {
+              "id": "Service 6:Service 1:BLOCKS",
+              "source": "Service 6",
+              "target": "Service 1",
+              "type": "BLOCKS",
+              "edgeIds": [
+                "Service 6:Service 1:BLOCKS:0",
+                "Service 6:Service 1:BLOCKS:1",
+                "Service 6:Service 1:BLOCKS:2"
+              ]
+            }
+          ],
+          "edgeIds": [
+            "Service 6:Service 1:BLOCKS:0",
+            "Service 6:Service 1:BLOCKS:1",
+            "Service 6:Service 1:BLOCKS:2"
+          ],
+          "reason": "routing-budget"
+        },
+        {
+          "id": "[\"Service 6\",\"Service 4\"]",
+          "source": "Service 6",
+          "target": "Service 4",
+          "connections": [
+            {
+              "id": "Service 6:Service 4:BLOCKS",
+              "source": "Service 6",
+              "target": "Service 4",
+              "type": "BLOCKS",
+              "edgeIds": [
+                "Service 6:Service 4:BLOCKS:0",
+                "Service 6:Service 4:BLOCKS:1",
+                "Service 6:Service 4:BLOCKS:2"
+              ]
+            }
+          ],
+          "edgeIds": [
+            "Service 6:Service 4:BLOCKS:0",
+            "Service 6:Service 4:BLOCKS:1",
+            "Service 6:Service 4:BLOCKS:2"
+          ],
+          "reason": "routing-budget"
+        },
+        {
+          "id": "[\"Service 6\",\"Service 7\"]",
+          "source": "Service 6",
+          "target": "Service 7",
+          "connections": [
+            {
+              "id": "Service 6:Service 7:BLOCKS",
+              "source": "Service 6",
+              "target": "Service 7",
+              "type": "BLOCKS",
+              "edgeIds": [
+                "Service 6:Service 7:BLOCKS:0",
+                "Service 6:Service 7:BLOCKS:1",
+                "Service 6:Service 7:BLOCKS:2"
+              ]
+            }
+          ],
+          "edgeIds": [
+            "Service 6:Service 7:BLOCKS:0",
+            "Service 6:Service 7:BLOCKS:1",
+            "Service 6:Service 7:BLOCKS:2"
+          ],
+          "reason": "routing-budget"
+        },
+        {
+          "id": "[\"Service 7\",\"Service 3\"]",
+          "source": "Service 7",
+          "target": "Service 3",
+          "connections": [
+            {
+              "id": "Service 7:Service 3:DEPENDS_ON",
+              "source": "Service 7",
+              "target": "Service 3",
+              "type": "DEPENDS_ON",
+              "edgeIds": [
+                "Service 7:Service 3:DEPENDS_ON:0",
+                "Service 7:Service 3:DEPENDS_ON:1",
+                "Service 7:Service 3:DEPENDS_ON:2"
+              ]
+            }
+          ],
+          "edgeIds": [
+            "Service 7:Service 3:DEPENDS_ON:0",
+            "Service 7:Service 3:DEPENDS_ON:1",
+            "Service 7:Service 3:DEPENDS_ON:2"
+          ],
+          "reason": "routing-budget"
+        },
+        {
+          "id": "[\"Service 7\",\"Service 6\"]",
+          "source": "Service 7",
+          "target": "Service 6",
+          "connections": [
+            {
+              "id": "Service 7:Service 6:DEPENDS_ON",
+              "source": "Service 7",
+              "target": "Service 6",
+              "type": "DEPENDS_ON",
+              "edgeIds": [
+                "Service 7:Service 6:DEPENDS_ON:0",
+                "Service 7:Service 6:DEPENDS_ON:1",
+                "Service 7:Service 6:DEPENDS_ON:2"
+              ]
+            }
+          ],
+          "edgeIds": [
+            "Service 7:Service 6:DEPENDS_ON:0",
+            "Service 7:Service 6:DEPENDS_ON:1",
+            "Service 7:Service 6:DEPENDS_ON:2"
+          ],
+          "reason": "routing-budget"
+        },
+        {
+          "id": "[\"Service 8\",\"Service 2\"]",
+          "source": "Service 8",
+          "target": "Service 2",
+          "connections": [
+            {
+              "id": "Service 8:Service 2:BLOCKS",
+              "source": "Service 8",
+              "target": "Service 2",
+              "type": "BLOCKS",
+              "edgeIds": [
+                "Service 8:Service 2:BLOCKS:0",
+                "Service 8:Service 2:BLOCKS:1",
+                "Service 8:Service 2:BLOCKS:2"
+              ]
+            }
+          ],
+          "edgeIds": [
+            "Service 8:Service 2:BLOCKS:0",
+            "Service 8:Service 2:BLOCKS:1",
+            "Service 8:Service 2:BLOCKS:2"
+          ],
+          "reason": "routing-budget"
+        },
+        {
+          "id": "[\"Service 8\",\"Service 5\"]",
+          "source": "Service 8",
+          "target": "Service 5",
+          "connections": [
+            {
+              "id": "Service 8:Service 5:BLOCKS",
+              "source": "Service 8",
+              "target": "Service 5",
+              "type": "BLOCKS",
+              "edgeIds": [
+                "Service 8:Service 5:BLOCKS:0",
+                "Service 8:Service 5:BLOCKS:1",
+                "Service 8:Service 5:BLOCKS:2"
+              ]
+            }
+          ],
+          "edgeIds": [
+            "Service 8:Service 5:BLOCKS:0",
+            "Service 8:Service 5:BLOCKS:1",
+            "Service 8:Service 5:BLOCKS:2"
+          ],
+          "reason": "routing-budget"
+        },
+        {
+          "id": "[\"Service 1\",\"Service 5\"]",
+          "source": "Service 1",
+          "target": "Service 5",
+          "connections": [
+            {
+              "id": "Service 1:Service 5:DEPENDS_ON",
+              "source": "Service 1",
+              "target": "Service 5",
+              "type": "DEPENDS_ON",
+              "edgeIds": [
+                "Service 1:Service 5:DEPENDS_ON:0",
+                "Service 1:Service 5:DEPENDS_ON:1"
+              ]
+            }
+          ],
+          "edgeIds": [
+            "Service 1:Service 5:DEPENDS_ON:0",
+            "Service 1:Service 5:DEPENDS_ON:1"
+          ],
+          "reason": "routing-budget"
+        },
+        {
+          "id": "[\"Service 1\",\"Service 8\"]",
+          "source": "Service 1",
+          "target": "Service 8",
+          "connections": [
+            {
+              "id": "Service 1:Service 8:DEPENDS_ON",
+              "source": "Service 1",
+              "target": "Service 8",
+              "type": "DEPENDS_ON",
+              "edgeIds": [
+                "Service 1:Service 8:DEPENDS_ON:0",
+                "Service 1:Service 8:DEPENDS_ON:1"
+              ]
+            }
+          ],
+          "edgeIds": [
+            "Service 1:Service 8:DEPENDS_ON:0",
+            "Service 1:Service 8:DEPENDS_ON:1"
+          ],
+          "reason": "routing-budget"
+        },
+        {
+          "id": "[\"Service 4\",\"Service 2\"]",
+          "source": "Service 4",
+          "target": "Service 2",
+          "connections": [
+            {
+              "id": "Service 4:Service 2:BLOCKS",
+              "source": "Service 4",
+              "target": "Service 2",
+              "type": "BLOCKS",
+              "edgeIds": [
+                "Service 4:Service 2:BLOCKS:0",
+                "Service 4:Service 2:BLOCKS:1"
+              ]
+            }
+          ],
+          "edgeIds": [
+            "Service 4:Service 2:BLOCKS:0",
+            "Service 4:Service 2:BLOCKS:1"
+          ],
+          "reason": "routing-budget"
+        },
+        {
+          "id": "[\"Service 4\",\"Service 5\"]",
+          "source": "Service 4",
+          "target": "Service 5",
+          "connections": [
+            {
+              "id": "Service 4:Service 5:BLOCKS",
+              "source": "Service 4",
+              "target": "Service 5",
+              "type": "BLOCKS",
+              "edgeIds": [
+                "Service 4:Service 5:BLOCKS:0",
+                "Service 4:Service 5:BLOCKS:1"
+              ]
+            }
+          ],
+          "edgeIds": [
+            "Service 4:Service 5:BLOCKS:0",
+            "Service 4:Service 5:BLOCKS:1"
+          ],
+          "reason": "routing-budget"
+        },
+        {
+          "id": "[\"Service 5\",\"Service 1\"]",
+          "source": "Service 5",
+          "target": "Service 1",
+          "connections": [
+            {
+              "id": "Service 5:Service 1:DEPENDS_ON",
+              "source": "Service 5",
+              "target": "Service 1",
+              "type": "DEPENDS_ON",
+              "edgeIds": [
+                "Service 5:Service 1:DEPENDS_ON:0",
+                "Service 5:Service 1:DEPENDS_ON:1"
+              ]
+            }
+          ],
+          "edgeIds": [
+            "Service 5:Service 1:DEPENDS_ON:0",
+            "Service 5:Service 1:DEPENDS_ON:1"
+          ],
+          "reason": "routing-budget"
+        },
+        {
+          "id": "[\"Service 5\",\"Service 4\"]",
+          "source": "Service 5",
+          "target": "Service 4",
+          "connections": [
+            {
+              "id": "Service 5:Service 4:DEPENDS_ON",
+              "source": "Service 5",
+              "target": "Service 4",
+              "type": "DEPENDS_ON",
+              "edgeIds": [
+                "Service 5:Service 4:DEPENDS_ON:0",
+                "Service 5:Service 4:DEPENDS_ON:1"
+              ]
+            }
+          ],
+          "edgeIds": [
+            "Service 5:Service 4:DEPENDS_ON:0",
+            "Service 5:Service 4:DEPENDS_ON:1"
+          ],
+          "reason": "routing-budget"
+        },
+        {
+          "id": "[\"Service 5\",\"Service 7\"]",
+          "source": "Service 5",
+          "target": "Service 7",
+          "connections": [
+            {
+              "id": "Service 5:Service 7:DEPENDS_ON",
+              "source": "Service 5",
+              "target": "Service 7",
+              "type": "DEPENDS_ON",
+              "edgeIds": [
+                "Service 5:Service 7:DEPENDS_ON:0",
+                "Service 5:Service 7:DEPENDS_ON:1"
+              ]
+            }
+          ],
+          "edgeIds": [
+            "Service 5:Service 7:DEPENDS_ON:0",
+            "Service 5:Service 7:DEPENDS_ON:1"
+          ],
+          "reason": "routing-budget"
+        },
+        {
+          "id": "[\"Service 6\",\"Service 3\"]",
+          "source": "Service 6",
+          "target": "Service 3",
+          "connections": [
+            {
+              "id": "Service 6:Service 3:BLOCKS",
+              "source": "Service 6",
+              "target": "Service 3",
+              "type": "BLOCKS",
+              "edgeIds": [
+                "Service 6:Service 3:BLOCKS:0",
+                "Service 6:Service 3:BLOCKS:1"
+              ]
+            }
+          ],
+          "edgeIds": [
+            "Service 6:Service 3:BLOCKS:0",
+            "Service 6:Service 3:BLOCKS:1"
+          ],
+          "reason": "routing-budget"
+        },
+        {
+          "id": "[\"Service 7\",\"Service 2\"]",
+          "source": "Service 7",
+          "target": "Service 2",
+          "connections": [
+            {
+              "id": "Service 7:Service 2:DEPENDS_ON",
+              "source": "Service 7",
+              "target": "Service 2",
+              "type": "DEPENDS_ON",
+              "edgeIds": [
+                "Service 7:Service 2:DEPENDS_ON:0",
+                "Service 7:Service 2:DEPENDS_ON:1"
+              ]
+            }
+          ],
+          "edgeIds": [
+            "Service 7:Service 2:DEPENDS_ON:0",
+            "Service 7:Service 2:DEPENDS_ON:1"
+          ],
+          "reason": "routing-budget"
+        },
+        {
+          "id": "[\"Service 7\",\"Service 5\"]",
+          "source": "Service 7",
+          "target": "Service 5",
+          "connections": [
+            {
+              "id": "Service 7:Service 5:DEPENDS_ON",
+              "source": "Service 7",
+              "target": "Service 5",
+              "type": "DEPENDS_ON",
+              "edgeIds": [
+                "Service 7:Service 5:DEPENDS_ON:0",
+                "Service 7:Service 5:DEPENDS_ON:1"
+              ]
+            }
+          ],
+          "edgeIds": [
+            "Service 7:Service 5:DEPENDS_ON:0",
+            "Service 7:Service 5:DEPENDS_ON:1"
+          ],
+          "reason": "routing-budget"
+        },
+        {
+          "id": "[\"Service 7\",\"Service 8\"]",
+          "source": "Service 7",
+          "target": "Service 8",
+          "connections": [
+            {
+              "id": "Service 7:Service 8:DEPENDS_ON",
+              "source": "Service 7",
+              "target": "Service 8",
+              "type": "DEPENDS_ON",
+              "edgeIds": [
+                "Service 7:Service 8:DEPENDS_ON:0",
+                "Service 7:Service 8:DEPENDS_ON:1"
+              ]
+            }
+          ],
+          "edgeIds": [
+            "Service 7:Service 8:DEPENDS_ON:0",
+            "Service 7:Service 8:DEPENDS_ON:1"
+          ],
+          "reason": "routing-budget"
+        },
+        {
+          "id": "[\"Service 8\",\"Service 1\"]",
+          "source": "Service 8",
+          "target": "Service 1",
+          "connections": [
+            {
+              "id": "Service 8:Service 1:BLOCKS",
+              "source": "Service 8",
+              "target": "Service 1",
+              "type": "BLOCKS",
+              "edgeIds": [
+                "Service 8:Service 1:BLOCKS:0",
+                "Service 8:Service 1:BLOCKS:1"
+              ]
+            }
+          ],
+          "edgeIds": [
+            "Service 8:Service 1:BLOCKS:0",
+            "Service 8:Service 1:BLOCKS:1"
+          ],
+          "reason": "routing-budget"
+        },
+        {
+          "id": "[\"Service 8\",\"Service 4\"]",
+          "source": "Service 8",
+          "target": "Service 4",
+          "connections": [
+            {
+              "id": "Service 8:Service 4:BLOCKS",
+              "source": "Service 8",
+              "target": "Service 4",
+              "type": "BLOCKS",
+              "edgeIds": [
+                "Service 8:Service 4:BLOCKS:0",
+                "Service 8:Service 4:BLOCKS:1"
+              ]
+            }
+          ],
+          "edgeIds": [
+            "Service 8:Service 4:BLOCKS:0",
+            "Service 8:Service 4:BLOCKS:1"
+          ],
+          "reason": "routing-budget"
+        },
+        {
+          "id": "[\"Service 8\",\"Service 7\"]",
+          "source": "Service 8",
+          "target": "Service 7",
+          "connections": [
+            {
+              "id": "Service 8:Service 7:BLOCKS",
+              "source": "Service 8",
+              "target": "Service 7",
+              "type": "BLOCKS",
+              "edgeIds": [
+                "Service 8:Service 7:BLOCKS:0",
+                "Service 8:Service 7:BLOCKS:1"
+              ]
+            }
+          ],
+          "edgeIds": [
+            "Service 8:Service 7:BLOCKS:0",
+            "Service 8:Service 7:BLOCKS:1"
+          ],
+          "reason": "routing-budget"
+        },
+        {
+          "id": "[\"Service 1\",\"Service 4\"]",
+          "source": "Service 1",
+          "target": "Service 4",
+          "connections": [
+            {
+              "id": "Service 1:Service 4:DEPENDS_ON",
+              "source": "Service 1",
+              "target": "Service 4",
+              "type": "DEPENDS_ON",
+              "edgeIds": [
+                "Service 1:Service 4:DEPENDS_ON:0"
+              ]
+            }
+          ],
+          "edgeIds": [
+            "Service 1:Service 4:DEPENDS_ON:0"
+          ],
+          "reason": "routing-budget"
+        },
+        {
+          "id": "[\"Service 1\",\"Service 7\"]",
+          "source": "Service 1",
+          "target": "Service 7",
+          "connections": [
+            {
+              "id": "Service 1:Service 7:DEPENDS_ON",
+              "source": "Service 1",
+              "target": "Service 7",
+              "type": "DEPENDS_ON",
+              "edgeIds": [
+                "Service 1:Service 7:DEPENDS_ON:0"
+              ]
+            }
+          ],
+          "edgeIds": [
+            "Service 1:Service 7:DEPENDS_ON:0"
+          ],
+          "reason": "routing-budget"
+        },
+        {
+          "id": "[\"Service 2\",\"Service 6\"]",
+          "source": "Service 2",
+          "target": "Service 6",
+          "connections": [
+            {
+              "id": "Service 2:Service 6:BLOCKS",
+              "source": "Service 2",
+              "target": "Service 6",
+              "type": "BLOCKS",
+              "edgeIds": [
+                "Service 2:Service 6:BLOCKS:0"
+              ]
+            }
+          ],
+          "edgeIds": [
+            "Service 2:Service 6:BLOCKS:0"
+          ],
+          "reason": "routing-budget"
+        },
+        {
+          "id": "[\"Service 3\",\"Service 2\"]",
+          "source": "Service 3",
+          "target": "Service 2",
+          "connections": [
+            {
+              "id": "Service 3:Service 2:DEPENDS_ON",
+              "source": "Service 3",
+              "target": "Service 2",
+              "type": "DEPENDS_ON",
+              "edgeIds": [
+                "Service 3:Service 2:DEPENDS_ON:0"
+              ]
+            }
+          ],
+          "edgeIds": [
+            "Service 3:Service 2:DEPENDS_ON:0"
+          ],
+          "reason": "routing-budget"
+        },
+        {
+          "id": "[\"Service 4\",\"Service 1\"]",
+          "source": "Service 4",
+          "target": "Service 1",
+          "connections": [
+            {
+              "id": "Service 4:Service 1:BLOCKS",
+              "source": "Service 4",
+              "target": "Service 1",
+              "type": "BLOCKS",
+              "edgeIds": [
+                "Service 4:Service 1:BLOCKS:0"
+              ]
+            }
+          ],
+          "edgeIds": [
+            "Service 4:Service 1:BLOCKS:0"
+          ],
+          "reason": "routing-budget"
+        },
+        {
+          "id": "[\"Service 4\",\"Service 7\"]",
+          "source": "Service 4",
+          "target": "Service 7",
+          "connections": [
+            {
+              "id": "Service 4:Service 7:BLOCKS",
+              "source": "Service 4",
+              "target": "Service 7",
+              "type": "BLOCKS",
+              "edgeIds": [
+                "Service 4:Service 7:BLOCKS:0"
+              ]
+            }
+          ],
+          "edgeIds": [
+            "Service 4:Service 7:BLOCKS:0"
+          ],
+          "reason": "routing-budget"
+        },
+        {
+          "id": "[\"Service 5\",\"Service 3\"]",
+          "source": "Service 5",
+          "target": "Service 3",
+          "connections": [
+            {
+              "id": "Service 5:Service 3:DEPENDS_ON",
+              "source": "Service 5",
+              "target": "Service 3",
+              "type": "DEPENDS_ON",
+              "edgeIds": [
+                "Service 5:Service 3:DEPENDS_ON:0"
+              ]
+            }
+          ],
+          "edgeIds": [
+            "Service 5:Service 3:DEPENDS_ON:0"
+          ],
+          "reason": "routing-budget"
+        },
+        {
+          "id": "[\"Service 5\",\"Service 6\"]",
+          "source": "Service 5",
+          "target": "Service 6",
+          "connections": [
+            {
+              "id": "Service 5:Service 6:DEPENDS_ON",
+              "source": "Service 5",
+              "target": "Service 6",
+              "type": "DEPENDS_ON",
+              "edgeIds": [
+                "Service 5:Service 6:DEPENDS_ON:0"
+              ]
+            }
+          ],
+          "edgeIds": [
+            "Service 5:Service 6:DEPENDS_ON:0"
+          ],
+          "reason": "routing-budget"
+        },
+        {
+          "id": "[\"Service 6\",\"Service 2\"]",
+          "source": "Service 6",
+          "target": "Service 2",
+          "connections": [
+            {
+              "id": "Service 6:Service 2:BLOCKS",
+              "source": "Service 6",
+              "target": "Service 2",
+              "type": "BLOCKS",
+              "edgeIds": [
+                "Service 6:Service 2:BLOCKS:0"
+              ]
+            }
+          ],
+          "edgeIds": [
+            "Service 6:Service 2:BLOCKS:0"
+          ],
+          "reason": "routing-budget"
+        },
+        {
+          "id": "[\"Service 6\",\"Service 5\"]",
+          "source": "Service 6",
+          "target": "Service 5",
+          "connections": [
+            {
+              "id": "Service 6:Service 5:BLOCKS",
+              "source": "Service 6",
+              "target": "Service 5",
+              "type": "BLOCKS",
+              "edgeIds": [
+                "Service 6:Service 5:BLOCKS:0"
+              ]
+            }
+          ],
+          "edgeIds": [
+            "Service 6:Service 5:BLOCKS:0"
+          ],
+          "reason": "routing-budget"
+        },
+        {
+          "id": "[\"Service 6\",\"Service 8\"]",
+          "source": "Service 6",
+          "target": "Service 8",
+          "connections": [
+            {
+              "id": "Service 6:Service 8:BLOCKS",
+              "source": "Service 6",
+              "target": "Service 8",
+              "type": "BLOCKS",
+              "edgeIds": [
+                "Service 6:Service 8:BLOCKS:0"
+              ]
+            }
+          ],
+          "edgeIds": [
+            "Service 6:Service 8:BLOCKS:0"
+          ],
+          "reason": "routing-budget"
+        },
+        {
+          "id": "[\"Service 7\",\"Service 1\"]",
+          "source": "Service 7",
+          "target": "Service 1",
+          "connections": [
+            {
+              "id": "Service 7:Service 1:DEPENDS_ON",
+              "source": "Service 7",
+              "target": "Service 1",
+              "type": "DEPENDS_ON",
+              "edgeIds": [
+                "Service 7:Service 1:DEPENDS_ON:0"
+              ]
+            }
+          ],
+          "edgeIds": [
+            "Service 7:Service 1:DEPENDS_ON:0"
+          ],
+          "reason": "routing-budget"
+        },
+        {
+          "id": "[\"Service 7\",\"Service 4\"]",
+          "source": "Service 7",
+          "target": "Service 4",
+          "connections": [
+            {
+              "id": "Service 7:Service 4:DEPENDS_ON",
+              "source": "Service 7",
+              "target": "Service 4",
+              "type": "DEPENDS_ON",
+              "edgeIds": [
+                "Service 7:Service 4:DEPENDS_ON:0"
+              ]
+            }
+          ],
+          "edgeIds": [
+            "Service 7:Service 4:DEPENDS_ON:0"
+          ],
+          "reason": "routing-budget"
+        },
+        {
+          "id": "[\"Service 8\",\"Service 3\"]",
+          "source": "Service 8",
+          "target": "Service 3",
+          "connections": [
+            {
+              "id": "Service 8:Service 3:BLOCKS",
+              "source": "Service 8",
+              "target": "Service 3",
+              "type": "BLOCKS",
+              "edgeIds": [
+                "Service 8:Service 3:BLOCKS:0"
+              ]
+            }
+          ],
+          "edgeIds": [
+            "Service 8:Service 3:BLOCKS:0"
+          ],
+          "reason": "routing-budget"
+        },
+        {
+          "id": "[\"Service 8\",\"Service 6\"]",
+          "source": "Service 8",
+          "target": "Service 6",
+          "connections": [
+            {
+              "id": "Service 8:Service 6:BLOCKS",
+              "source": "Service 8",
+              "target": "Service 6",
+              "type": "BLOCKS",
+              "edgeIds": [
+                "Service 8:Service 6:BLOCKS:0"
+              ]
+            }
+          ],
+          "edgeIds": [
+            "Service 8:Service 6:BLOCKS:0"
+          ],
+          "reason": "routing-budget"
+        }
+      ]
+    },
+    {
+      "name": "phone",
+      "title": "Narrow screens keep readable ports",
+      "sourceRelationships": 23,
+      "routedRelationships": 23,
+      "collapsedRelationships": 0,
+      "routedBranches": 3,
+      "metrics": {
+        "cardIntersections": 0,
+        "unrelatedCrossings": 0,
+        "unrelatedOverlaps": 0,
+        "diagonalSegments": 0,
+        "maxBusesPerCell": 1
+      },
+      "deferred": []
+    }
+  ],
+  "rejectedNegative": {
+    "cardIntersections": 2,
+    "unrelatedCrossings": 3,
+    "unrelatedOverlaps": 1,
+    "diagonalSegments": 1,
+    "maxBusesPerCell": 3
+  }
+}
