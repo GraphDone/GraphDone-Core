@@ -8,7 +8,8 @@
  * at most `concurrency` writes at a time instead of 500 in parallel. The pure
  * pieces are unit-tested with an injected `save`.
  */
-export interface PositionSave { id: string; x: number; y: number; }
+export interface PositionSave { id: string; x: number; y: number; revision?: string; }
+export interface LayoutReceipt extends PositionSave { revision: string; updatedAt: number; }
 
 /** Run `worker` over `items` with at most `limit` in flight; resolve when all done. */
 export async function drainWithLimit<T>(
@@ -36,26 +37,30 @@ export function createPositionSaveQueue(opts: {
   const retainedIds = new Set<string>();
   const concurrency = opts.concurrency ?? 4;
   let flushing: Promise<void> | undefined;
+  let generation = 0;
 
   /** Queue/overwrite a node's pending position (last write wins — coalesced). */
-  const queue = (id: string, x: number, y: number): void => {
+  const queue = (id: string, x: number, y: number, revision?: string): void => {
     if (!retainedIds.has(id) && retainedIds.size >= (opts.maxPending ?? Infinity)) {
       throw new Error('Too many pending layout changes. Reconnect and save before moving more tasks.');
     }
     retainedIds.add(id);
-    pending.set(id, { id, x, y });
+    pending.set(id, { id, x, y, ...(revision ? { revision } : {}) });
   };
 
   const drain = async (): Promise<void> => {
     while (pending.size > 0) {
       const batch = [...pending.values()];
+      const batchGeneration = generation;
       pending.clear();
       const failures: unknown[] = [];
       await drainWithLimit(batch, concurrency, async (position) => {
+        if (generation !== batchGeneration) return;
         try {
           await opts.save(position);
-          if (!pending.has(position.id)) retainedIds.delete(position.id);
+          if (generation === batchGeneration && !pending.has(position.id)) retainedIds.delete(position.id);
         } catch (error) {
+          if (generation !== batchGeneration) return;
           if (!pending.has(position.id)) pending.set(position.id, position);
           failures.push(error);
         }
@@ -74,6 +79,7 @@ export function createPositionSaveQueue(opts: {
   return {
     queue,
     flush,
+    discard: () => { generation++; pending.clear(); retainedIds.clear(); },
     get size() { return pending.size; },
     get saving() { return flushing !== undefined; },
   };
