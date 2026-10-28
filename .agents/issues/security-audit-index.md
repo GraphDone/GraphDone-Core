@@ -2,6 +2,7 @@
 
 | Symptom | Evidence and corrective rule |
 | --- | --- |
+| OAuth email metadata loses verification or callbacks log credential-bearing redirects | [Provider proof and isolated atomic linking](../inbox/2026-10-27-oauth-linking-needs-provider-proof-and-atomicity.md); [provider/recovery contract](../../docs/quality/OAUTH_IDENTITY.md) |
 | Login and reset links cross-use, or a reset/reactivation revives old sessions | [Bind purpose and session revision at the write](../inbox/2026-10-27-email-purpose-and-revision-are-auth-boundaries.md); real SQLite/HTTP/WebSocket `auth-link-boundary.test.ts` |
 | CAPTCHA validates only a client string's format or skips missing GraphQL proof | [Server policy, signed action/expiry and bounded replay](../inbox/2026-10-27-captcha-proof-must-be-server-issued.md); `packages/server/tests/captcha*.test.ts`, `qc:captcha` |
 | Historical CSS audit findings disappear while the lock is unchanged | [Reconcile official backport ranges with actual consumers](../inbox/2026-10-27-reconcile-advisory-backports-with-locked-consumers.md); locked-path and Tailwind/parser regressions |
