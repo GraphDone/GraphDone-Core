@@ -2,6 +2,7 @@
 
 | Symptom | Canonical lesson and regression |
 | --- | --- |
+| OAuth links an unverified email, changes accounts after a provider email change, or leaves an orphan user after a link failure | [Provider proof and isolated atomic linking](../inbox/2026-10-27-oauth-linking-needs-provider-proof-and-atomicity.md); `oauth-identity`, `oauth-profiles` and actual `oauth-strategies` tests |
 | Login and reset links cross-use, or a reset/reactivation revives old sessions | [Bind purpose and session revision at the write](../inbox/2026-10-27-email-purpose-and-revision-are-auth-boundaries.md); real SQLite/HTTP/WebSocket `auth-link-boundary.test.ts` |
 | CAPTCHA widget is visible but an immediate verification event leaves proof empty | [Attach widget listeners during commit](../inbox/2026-10-27-widget-events-need-commit-phase-listeners.md); `AuthCaptcha.test.tsx` Profiler regression |
 | CI development quick login fails required proof and exhausts login attempts with NODE_ENV unset | [Declare mode in the dev entry point without overriding production](../inbox/2026-10-27-dev-launch-must-declare-mode.md); `development-startup.test.ts` and actual dev smoke |

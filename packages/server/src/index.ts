@@ -30,7 +30,7 @@ import { driver, NEO4J_URI } from './db.js';
 import { sqliteAuthStore } from './auth/sqlite-auth.js';
 import { ensureGraphIdentity } from './auth/graph-identity.js';
 import { configureOAuthStrategies } from './auth/oauth-strategies.js';
-import { generateToken } from './utils/auth.js';
+import { oauthLoginCallback } from './auth/oauth-callback.js';
 import { createTlsConfig, validateTlsConfig, type TlsConfig } from './config/tls.js';
 import { emailService } from './auth/email-service.js';
 import { exec } from 'child_process';
@@ -661,17 +661,7 @@ async function startServer() {
   app.get(
     '/auth/google/callback',
     passport.authenticate('google', { failureRedirect: `${process.env.CLIENT_URL || 'http://localhost:3127'}/login?error=google` }),
-    (req, res) => {
-      console.log('🔐 Google OAuth callback received'); // eslint-disable-line no-console
-      const user = req.user as any;
-      console.log('👤 User from OAuth:', user?.email || 'No user'); // eslint-disable-line no-console
-      const token = generateToken(user.id, user.email, user.role, user.authVersion);
-      console.log('🎫 Generated token:', token?.substring(0, 20) + '...'); // eslint-disable-line no-console
-      const clientUrl = process.env.CLIENT_URL || 'http://localhost:3127';
-      const redirectUrl = `${clientUrl}/login?token=${token}`;
-      console.log('↪️  Redirecting to:', redirectUrl); // eslint-disable-line no-console
-      res.redirect(redirectUrl);
-    }
+    oauthLoginCallback
   );
 
   app.get('/auth/linkedin', passport.authenticate('linkedin', { scope: ['openid', 'profile', 'email'] }));
@@ -679,17 +669,7 @@ async function startServer() {
   app.get(
     '/auth/linkedin/callback',
     passport.authenticate('linkedin', { failureRedirect: `${process.env.CLIENT_URL || 'http://localhost:3127'}/login?error=linkedin` }),
-    (req, res) => {
-      console.log('🔐 LinkedIn OAuth callback received'); // eslint-disable-line no-console
-      const user = req.user as any;
-      console.log('👤 User from OAuth:', user?.email || 'No user'); // eslint-disable-line no-console
-      const token = generateToken(user.id, user.email, user.role, user.authVersion);
-      console.log('🎫 Generated token:', token?.substring(0, 20) + '...'); // eslint-disable-line no-console
-      const clientUrl = process.env.CLIENT_URL || 'http://localhost:3127';
-      const redirectUrl = `${clientUrl}/login?token=${token}`;
-      console.log('↪️  Redirecting to:', redirectUrl); // eslint-disable-line no-console
-      res.redirect(redirectUrl);
-    }
+    oauthLoginCallback
   );
 
   app.get('/auth/github', passport.authenticate('github', { scope: ['user:email'] }));
@@ -697,17 +677,7 @@ async function startServer() {
   app.get(
     '/auth/github/callback',
     passport.authenticate('github', { failureRedirect: `${process.env.CLIENT_URL || 'http://localhost:3127'}/login?error=github` }),
-    (req, res) => {
-      console.log('🔐 GitHub OAuth callback received'); // eslint-disable-line no-console
-      const user = req.user as any;
-      console.log('👤 User from OAuth:', user?.email || 'No user'); // eslint-disable-line no-console
-      const token = generateToken(user.id, user.email, user.role, user.authVersion);
-      console.log('🎫 Generated token:', token?.substring(0, 20) + '...'); // eslint-disable-line no-console
-      const clientUrl = process.env.CLIENT_URL || 'http://localhost:3127';
-      const redirectUrl = `${clientUrl}/login?token=${token}`;
-      console.log('↪️  Redirecting to:', redirectUrl); // eslint-disable-line no-console
-      res.redirect(redirectUrl);
-    }
+    oauthLoginCallback
   );
 
   const magicLinkCorsOptions = {
