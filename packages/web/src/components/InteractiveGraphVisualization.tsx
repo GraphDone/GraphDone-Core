@@ -49,7 +49,8 @@ import { RelationshipType, RELATIONSHIP_OPTIONS, getRelationshipConfig } from '.
 import { useAdaptiveQuality } from '../hooks/useAdaptiveQuality';
 import { nodeLifeClasses, nodeGlowFilter, isActiveStatus, isCompletedStatus, edgeFlowClass } from '../lib/nodeAnimations';
 import { mergeSimulationNodes, mergeSimulationEdges } from '../lib/graphDataMerge';
-import { edgeLabelPlacement, clearSegment, slideTFromPointer, chooseLabelT } from '../lib/edgeLabelLayout';
+import type { ObstacleBox } from '../lib/edgeLabelLayout';
+import { createEdgeRoute, edgeRouteLabel, projectEdgeRoutePointer, type EdgeRouteGeometry, type EdgeRouteLabel } from '../lib/edgeRouteGeometry';
 import { PerfMeter, DriftMeter } from '../lib/perfMeter';
 import { separateCards } from '../lib/separateCards';
 import { DEFAULT_PHYSICS, collisionRadius, linkDistance, linkMaxDistance, linkStrength } from '../lib/physicsConfig';
@@ -2159,6 +2160,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       const info = parallelInfo.get(e.id);
       e._pIndex = info ? info.index : 0;
       e._pTotal = info ? info.total : 1;
+      const label = getRelationshipConfig(e.type as RelationshipType)?.label || '';
+      e._labelDims = { width: label.length * 7 + 34, height: 22 };
+      e._labelIconCenter = { x: 0, y: 0 };
     });
     const liveScale = svg.node() ? d3.zoomTransform(svg.node() as Element).k : 1;
     // Arrow opacity routed through the edge LOD module: hidden direction → 0,
@@ -2176,7 +2180,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .selectAll('.edge')
       .data(visibleEdges)
       .enter()
-      .append('line')
+      .append('path')
+      .attr('fill', 'none')
+      .attr('data-edge-id', (d: WorkItemEdge) => d.id)
       .attr('class', (d: WorkItemEdge) => {
         let classes = 'edge';
         // After force-link binding, source/target are node objects at runtime
@@ -2256,10 +2262,13 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .selectAll('.edge-clickable')
       .data(visibleEdges)
       .enter()
-      .append('line')
+      .append('path')
       .attr('class', 'edge-clickable')
+      .attr('fill', 'none')
+      .attr('data-edge-id', (d: WorkItemEdge) => d.id)
       .attr('stroke', 'transparent')
       .attr('stroke-width', 12)
+      .style('pointer-events', 'stroke')
       .style('cursor', 'pointer')
       .on('click', (event: MouseEvent, d: WorkItemEdge) => {
         event.stopPropagation();
@@ -3356,10 +3365,11 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     const arrowElements = g.append('g')
       .attr('class', 'arrows-group')
       .selectAll('.arrow')
-      .data(validatedEdges)
+      .data(visibleEdges)
       .enter()
       .append('path')
       .attr('class', 'arrow')
+      .attr('data-edge-id', (d: WorkItemEdge) => d.id)
       .attr('d', 'M-16,-8 L0,0 L-16,8 L-8,0 Z')
       .attr('fill', (d: WorkItemEdge) => {
         // Use the relationship color for consistency with edge stroke
@@ -3385,6 +3395,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       .enter()
       .append('g')
       .attr('class', 'edge-label-group')
+      .attr('data-edge-id', (d: WorkItemEdge) => d.id)
       .style('opacity', (d: any) => labelVisibility(liveScale, d._pTotal || 1))
       .style('pointer-events', (d: any) => labelVisibility(liveScale, d._pTotal || 1) > 0 ? 'all' : 'none')
       .style('cursor', 'pointer')
@@ -3491,6 +3502,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
     // Size and position elements after text is rendered
     setTimeout(() => {
+      if (simulationRef.current !== simulation) return;
       edgeLabelGroups.each(function(d: WorkItemEdge) {
         const group = d3.select(this);
         const textElement = group.select('.edge-label').node() as SVGTextElement;
@@ -3503,6 +3515,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           const paddingRight = 8;
           const totalWidth = paddingLeft + iconWidth + spacing + bbox.width + paddingRight;
           const totalHeight = Math.max(22, bbox.height + 8);
+          (d as any)._labelDims = { width: totalWidth, height: totalHeight };
+          (d as any)._labelIconCenter = { x: -totalWidth / 2 + paddingLeft + 7, y: 0 };
           
           // Update rectangle size and center it
           group.select('.edge-label-bg')
@@ -3524,6 +3538,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
             .attr('dominant-baseline', 'middle');
         }
       });
+      updateEdgePositions(true);
     }, 150);
 
     // Node click handling with edge creation
@@ -3819,174 +3834,104 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     });
 
     let labelAvoidCounter = 0;
-    const updateEdgePositions = (forceAvoid = false) => {
-      // Dot mode (extreme zoom-out): all edges/arrows/labels are hidden, so there
-      // is nothing to position — skip the whole 1400-edge per-tick pass.
-      if (dotModeRef.current && !forceAvoid) {
+    let nodeLabelObstacles: ObstacleBox[] = [];
+    const labelRects = new Map<string, ObstacleBox>();
+    const applyLabel = (element: SVGGElement, d: any, placement: EdgeRouteLabel | null) => {
+      d._routeLabel = placement;
+      const label = d3.select(element);
+      label.style('display', () => placement ? edgeDisplay(d) : 'none');
+      if (!placement) {
+        labelRects.delete(d.id);
         return;
       }
-      // Live zoom scale drives the LOD-aware parallel-edge fan-out (collapses to
-      // the centre line when zoomed out) and arrow sizing.
+      d.labelT = placement.t;
+      label.attr('transform', `translate(${placement.x},${placement.y}) rotate(${placement.rotation})`);
+      const center = d._labelIconCenter;
+      label.select('.edge-label-icon').attr('transform', placement.iconRotation
+        ? `rotate(${placement.iconRotation}, ${center.x}, ${center.y})` : null);
+      const angle = placement.rotation * Math.PI / 180;
+      labelRects.set(d.id, {
+        x: placement.x, y: placement.y,
+        width: Math.abs(Math.cos(angle)) * d._labelDims.width + Math.abs(Math.sin(angle)) * d._labelDims.height,
+        height: Math.abs(Math.sin(angle)) * d._labelDims.width + Math.abs(Math.cos(angle)) * d._labelDims.height
+      });
+    };
+    const updateEdgePositions = (forceAvoid = false) => {
+      if (dotModeRef.current && !forceAvoid) return;
       const liveK = svg.node() ? d3.zoomTransform(svg.node() as Element).k : 1;
-
-      // Border-to-border anchors: the edge starts/ends where the center line
-      // crosses each card's border, not at the buried center. Computed once per
-      // edge per tick (shared datum) so line, hitbox and arrow agree. The anchor
-      // slides around the border as the nodes move — shortest border path. For
-      // parallel edges, shift the whole anchored line perpendicular to itself by
-      // perpendicularOffset so siblings don't overlap.
-      linkElements.each(function (d: any) {
+      linkElements.each(function(d: any) {
         const ep = edgeBorderEndpoints(
           { x: d.source.x || 0, y: d.source.y || 0 }, getNodeDimensions(d.source),
           { x: d.target.x || 0, y: d.target.y || 0 }, getNodeDimensions(d.target)
         );
         if ((d._pTotal || 1) > 1) {
           const off = perpendicularOffset(d._pIndex || 0, d._pTotal, liveK);
-          if (off !== 0) {
-            const lx = ep.x2 - ep.x1;
-            const ly = ep.y2 - ep.y1;
-            const len = Math.hypot(lx, ly) || 1;
-            const px = -ly / len;
-            const py = lx / len;
-            ep.x1 += px * off; ep.y1 += py * off;
-            ep.x2 += px * off; ep.y2 += py * off;
-          }
+          const dx = ep.x2 - ep.x1, dy = ep.y2 - ep.y1;
+          const length = Math.hypot(dx, dy) || 1;
+          ep.x1 -= dy / length * off; ep.y1 += dx / length * off;
+          ep.x2 -= dy / length * off; ep.y2 += dx / length * off;
         }
-        d._ep = ep;
+        d._route = createEdgeRoute([{ x: ep.x1, y: ep.y1 }, { x: ep.x2, y: ep.y2 }]);
       });
-
-      // Update visible edge positions
-      linkElements
-        .attr('x1', (d: any) => d._ep.x1)
-        .attr('y1', (d: any) => d._ep.y1)
-        .attr('x2', (d: any) => d._ep.x2)
-        .attr('y2', (d: any) => d._ep.y2);
-
-      // Update clickable edge positions
-      clickableEdges
-        .attr('x1', (d: any) => d._ep.x1)
-        .attr('y1', (d: any) => d._ep.y1)
-        .attr('x2', (d: any) => d._ep.x2)
-        .attr('y2', (d: any) => d._ep.y2);
-
-      // Simplified (dense + zoomed out): arrows and edge labels are hidden
-      // (data-simplify CSS), so skip their per-tick positioning entirely — at
-      // 1400 edges that arrow transform + label placement pass is the bulk of
-      // the remaining per-tick cost in the whole-graph view. forceAvoid (the
-      // one-shot settle pass) still runs so labels are correct when you zoom in.
-      if (simplifiedRef.current && !forceAvoid) {
-        return;
-      }
-
-      // Arrow sits at the TARGET border, pointing into the node. Parallel edges
-      // get a smaller arrow head (arrowVisibility.scale) so crowded siblings stay
-      // legible; lone edges keep the default size.
-      arrowElements
-        .attr('transform', (d: any) => {
-          const ep = d._ep;
-          const angle = Math.atan2(ep.y2 - ep.y1, ep.x2 - ep.x1) * 180 / Math.PI;
-          const size = arrowVisibility(liveK, d._pTotal || 1).scale;
-          return `translate(${ep.x2},${ep.y2}) rotate(${angle}) scale(${size})`;
-        });
-
-      // Edge labels: auto-centered in the clear span between the two node
-      // cards, pushed off ALL node cards once the simulation settles, and
-      // slidable by the user (d.labelT persists because the data merge keeps
-      // edge object identity stable; d.labelTUser pins a manual slide).
+      linkElements.attr('d', (d: any) => d._route?.path ?? null);
+      clickableEdges.attr('d', (d: any) => d._route?.path ?? null);
+      applyEdgeDisplays();
+      if (simplifiedRef.current && !forceAvoid) return;
+      arrowElements.attr('transform', (d: any) => {
+        const route = d._route as EdgeRouteGeometry | null;
+        if (!route) return null;
+        const target = route.target;
+        const size = arrowVisibility(liveK, d._pTotal || 1).scale;
+        return `translate(${target.x},${target.y}) rotate(${target.angle}) scale(${size})`;
+      });
       labelAvoidCounter++;
-      // forceAvoid lets a one-shot caller (layout settle / pinned graphs that
-      // don't tick) run a full label de-overlap pass on demand.
       const runAvoidance = forceAvoid || (simulation.alpha() < 0.1 && labelAvoidCounter % 15 === 0);
-      const obstacles = runAvoidance
-        ? (simulation.nodes() as any[]).map((n: any) => {
-            const dims = getNodeDimensions(n);
-            return { x: n.x || 0, y: n.y || 0, width: dims.width, height: dims.height };
-          })
-        : null;
-
-      // Labels placed earlier in this pass become obstacles for later ones,
-      // so labels avoid each other as well as every node card.
-      const placedLabels: Array<{ x: number; y: number; width: number; height: number }> = [];
-      edgeLabelGroups
-        .attr('transform', function(d: any) {
-          const source = { x: d.source.x || 0, y: d.source.y || 0 };
-          const target = { x: d.target.x || 0, y: d.target.y || 0 };
-          const sourceDims = getNodeDimensions(d.source);
-          const targetDims = getNodeDimensions(d.target);
-
-          let labelW = 60;
-          let labelH = 20;
-          if (obstacles) {
-            const bbox = (this as SVGGElement).getBBox();
-            labelW = bbox.width || 60;
-            labelH = bbox.height || 20;
-            if (!d.labelTUser) {
-              d.labelT = chooseLabelT({
-                source, target, sourceDims, targetDims,
-                obstacles: obstacles.concat(placedLabels),
-                labelDims: { width: labelW, height: labelH }
-              });
-            }
-          }
-
-          const placement = edgeLabelPlacement({ source, target, sourceDims, targetDims, t: d.labelT });
-          // Fan parallel-edge labels off the centre line to match their shifted
-          // paths (same perpendicular offset as the line above).
-          let labelX = placement.x;
-          let labelY = placement.y;
-          if ((d._pTotal || 1) > 1) {
-            const off = perpendicularOffset(d._pIndex || 0, d._pTotal, liveK);
-            if (off !== 0) {
-              const lx = target.x - source.x;
-              const ly = target.y - source.y;
-              const len = Math.hypot(lx, ly) || 1;
-              labelX += (-ly / len) * off;
-              labelY += (lx / len) * off;
-            }
-          }
-          if (obstacles) {
-            placedLabels.push({ x: labelX, y: labelY, width: labelW + 8, height: labelH + 8 });
-          }
-          // edgeLabelPlacement keeps text upright by stripping 180° when the edge
-          // points "backward" — which leaves the directional label icon pointing
-          // the wrong way after a flip. Carry that lost 180° on the icon so its
-          // arrow tracks the real edge direction (and flips when the edge flips).
-          // CRITICAL: rotate around the ICON's own centre — a bare rotate(180)
-          // pivots on the group origin (0,0), which threw the icon across onto the
-          // label text (overlap) and left it upside-down. The icon is a 14×14
-          // foreignObject at (x,y), so its centre is (x+7, y+7).
-          const trueAngle = (Math.atan2(target.y - source.y, target.x - source.x) * 180) / Math.PI;
-          const iconFlipped = trueAngle > 90 || trueAngle < -90;
-          const iconSel = d3.select(this).select('.edge-label-icon');
-          if (iconFlipped) {
-            const ix = parseFloat(iconSel.attr('x') || '-7');
-            const iy = parseFloat(iconSel.attr('y') || '-7');
-            iconSel.attr('transform', `rotate(180, ${ix + 7}, ${iy + 7})`);
-          } else {
-            iconSel.attr('transform', null);
-          }
-          return `translate(${labelX},${labelY}) rotate(${placement.rotation})`;
-        });
+      if (runAvoidance) nodeLabelObstacles = (simulation.nodes() as any[]).map(n => ({
+        x: n.x || 0, y: n.y || 0, ...getNodeDimensions(n)
+      }));
+      const placed: ObstacleBox[] = [];
+      edgeLabelGroups.each(function(d: any) {
+        const route = d._route as EdgeRouteGeometry | null;
+        const placement = route && (runAvoidance || !d._labelBlocked)
+          ? edgeRouteLabel(route, {
+              dims: d._labelDims, t: d.labelT,
+              obstacles: runAvoidance ? nodeLabelObstacles.concat(placed) : []
+            }) : null;
+        if (runAvoidance) d._labelBlocked = !placement;
+        applyLabel(this, d, placement);
+        const box = labelRects.get(d.id);
+        if (box) placed.push(box);
+      });
     };
 
-    // Let users slide a label along its edge, within the clear span.
     edgeLabelGroups
       .style('cursor', 'grab')
       .call(d3.drag<any, any>()
-        // Locked (phone) → reject so the gesture pans instead of sliding the label.
         .filter((event: any) => !interactionLockedRef.current && !event.ctrlKey && !event.button)
-        .on('start', (event) => {
+        .on('start', (event, d: any) => {
           event.sourceEvent?.stopPropagation();
+          const [x, y] = d3.pointer(event, g.node() as any);
+          d._labelGrab = d._routeLabel
+            ? { x: x - d._routeLabel.x, y: y - d._routeLabel.y }
+            : { x: 0, y: 0 };
         })
         .on('drag', function(event, d: any) {
-          const [px, py] = d3.pointer(event, g.node() as any);
-          const source = { x: d.source.x || 0, y: d.source.y || 0 };
-          const target = { x: d.target.x || 0, y: d.target.y || 0 };
-          const segment = clearSegment(source, target, getNodeDimensions(d.source), getNodeDimensions(d.target));
-          d.labelT = slideTFromPointer({ x: px, y: py }, source, target, segment);
-          d.labelTUser = true;
-          updateEdgePositions();
-        }));
+          if (!d._route || !d._labelGrab) return;
+          const [x, y] = d3.pointer(event, g.node() as any);
+          const t = projectEdgeRoutePointer(d._route, {
+            x: x - d._labelGrab.x, y: y - d._labelGrab.y
+          }, d.labelT, { offset: 22 });
+          const placement = edgeRouteLabel(d._route, {
+            dims: d._labelDims, t,
+            obstacles: nodeLabelObstacles.concat([...labelRects].filter(([id]) => id !== d.id).map(([, box]) => box))
+          });
+          if (placement) {
+            d.labelTUser = true;
+            d._labelBlocked = false;
+            applyLabel(this, d, placement);
+          }
+        })
+        .on('end', (_event, d: any) => { delete d._labelGrab; }));
 
     // Simulation tick. Order matters: nodes move first, then every line,
     // arrow and label re-anchors to the nodes' new positions — edges can
@@ -4041,13 +3986,17 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     const CULL_MIN_SCALE = 0.5;
     let cullCounter = 0;
     let cullActive = false;
+    const edgeDisplay = (d: any) => !d._route || (cullActive && d.source?._culled && d.target?._culled) ? 'none' : null;
+    const applyEdgeDisplays = () => {
+      linkElements.style('display', edgeDisplay);
+      clickableEdges.style('display', edgeDisplay);
+      arrowElements.style('display', edgeDisplay);
+      edgeLabelGroups.style('display', (d: any) => d._routeLabel ? edgeDisplay(d) : 'none');
+    };
     const clearCull = () => {
       nodeElements.style('display', null);
-      linkElements.style('display', null);
-      clickableEdges.style('display', null);
-      arrowElements.style('display', null);
-      edgeLabelGroups.style('display', null);
       cullActive = false;
+      applyEdgeDisplays();
     };
     const applyViewportCull = () => {
       const svgEl = svg.node();
@@ -4069,11 +4018,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         d._culled = !visible;
         return visible ? null : 'none';
       });
-      const edgeDisplay = (d: any) => (d.source?._culled && d.target?._culled ? 'none' : null);
-      linkElements.style('display', edgeDisplay);
-      clickableEdges.style('display', edgeDisplay);
-      arrowElements.style('display', edgeDisplay);
-      edgeLabelGroups.style('display', edgeDisplay);
+      applyEdgeDisplays();
     };
 
     simulation.on('tick', () => {
