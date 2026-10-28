@@ -36,6 +36,17 @@ const test = base.extend<{
           spacing: 350,
           edgeFactor: 1.5,
           batchSize: 20,
+          additionalEdges: [
+            { sourceIndex: 0, targetIndex: 36, type: 'BLOCKS' },
+            { sourceIndex: 36, targetIndex: 0, type: 'DEPENDS_ON' },
+            { sourceIndex: 0, targetIndex: 36, type: 'BLOCKS' },
+            { sourceIndex: 0, targetIndex: 0, type: 'BLOCKS' },
+            ...Array.from({ length: 71 }, (_, index) => ({
+              sourceIndex: 0,
+              targetIndex: index + 1,
+              type: index % 2 ? 'BLOCKS' : 'DEPENDS_ON',
+            })),
+          ],
           namePrefix: 'Nested semantic LOD',
           titleForIndex: (index, type) =>
             index === 3
@@ -59,41 +70,6 @@ const test = base.extend<{
             };
           },
         });
-        const extraEdges = [
-          [0, 36, 'BLOCKS'],
-          [36, 0, 'DEPENDS_ON'],
-          [0, 36, 'BLOCKS'],
-          [0, 0, 'BLOCKS'],
-          ...seeded.nodeIds
-            .slice(1)
-            .map((_, index) => [
-              0,
-              index + 1,
-              index % 2 ? 'BLOCKS' : 'DEPENDS_ON',
-            ]),
-        ].map(([source, target, type]) => ({
-          type,
-          weight: 1,
-          source: {
-            connect: {
-              where: { node: { id: seeded.nodeIds[Number(source)] } },
-            },
-          },
-          target: {
-            connect: {
-              where: { node: { id: seeded.nodeIds[Number(target)] } },
-            },
-          },
-        }));
-        for (let offset = 0; offset < extraEdges.length; offset += 20) {
-          const input = extraEdges.slice(offset, offset + 20);
-          const result = await gql(
-            page,
-            `mutation($input:[EdgeCreateInput!]!){createEdges(input:$input){edges{id}}}`,
-            { input }
-          );
-          expect(result.createEdges.edges).toHaveLength(input.length);
-        }
         await use({ seeded, touch });
       } finally {
         await touch?.detach();
@@ -132,9 +108,7 @@ for (const width of [1440, 390])
       };
       const before = await snapshot();
       expect(before.workItems).toHaveLength(72);
-      expect(before.edges).toHaveLength(
-        seeded.edgeCount + seeded.nodeIds.length + 3
-      );
+      expect(before.edges).toHaveLength(seeded.edgeCount);
       await page.route('**/api/graphql', async route => {
         const body = route.request().postDataJSON();
         if (/^\s*mutation\b/.test(body?.query ?? '')) {
@@ -448,7 +422,12 @@ for (const width of [1440, 390])
         exact: true,
       });
       await expect(trace).toContainText('Outgoing · Payments');
-      await inspectSchematicOverview(overview, info, before.edges.length);
+      await inspectSchematicOverview(
+        overview,
+        info,
+        before.edges.length,
+        'trace-outgoing'
+      );
       await activate(
         trace.getByRole('button', {
           name: 'Trace incoming connections',
@@ -456,7 +435,12 @@ for (const width of [1440, 390])
         })
       );
       await expect(trace).toContainText('Incoming · Payments');
-      await inspectSchematicOverview(overview, info, before.edges.length);
+      await inspectSchematicOverview(
+        overview,
+        info,
+        before.edges.length,
+        'trace-incoming'
+      );
       await activate(
         trace.getByRole('button', {
           name: 'Exit connection trace',

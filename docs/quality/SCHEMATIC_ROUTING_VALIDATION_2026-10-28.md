@@ -157,3 +157,24 @@ This is a focused test-only completion of the issue criteria, pending exact-sour
 CI. It adds no local database/browser workload. #219 defines the first group-routing
 slice; detailed item wiring remains #220 and full LOD remains #193. No issue may be
 closed before its accepted exact-source gates and post-integration dev CI.
+
+The first extra-edge implementation (2df89e0) failed source review because its
+batches ran outside owned seeding's cancellation/drain boundary. The corrected
+fixture passes those edges into the existing signalled batch loop. Its browser-free
+ownership regression passed 4 cases in 6.07s after a retained missing-support
+negative; no browser/database launched. See the
+[fixture lesson](../../.agents/inbox/2026-10-28-fixture-extras-must-share-cancellation.md).
+
+Actual CI40633460829 on source88d0115 passed static visual4, smoke6, new-user42 and
+semantic-LOD2 with clean unchanged merge025288dafa5fcbefb282fc2c5a313a58dcddebd2 source,
+no warnings/skips and successful execution. Nested-LOD failed both cases at exact
+relationship-type label lookup; initial geometry/paint checks had executed, but the
+journeys are incomplete. Layout/mobile/performance stages were skipped downstream.
+Explicit accessible names correct the three select controls without relaxing
+locators or timeouts. Scoped relationship components passed 13 cases in 5.48s.
+
+PNG/JSON evidence now uses owned file-path attachments with separate overview,
+outgoing and incoming names, matching the existing unified adapter. Prior body-only
+attachments were omitted from its normal report. The next actual browser report
+must contain the screenshots and geometry before visual acceptance. All current
+corrections and the larger hub fixture still require exact-source CI.

@@ -1,4 +1,5 @@
 import { expect, type Locator, type TestInfo } from '@playwright/test';
+import { writeFileSync } from 'node:fs';
 import {
   measureSchematicClutter,
   schematicSegments,
@@ -7,7 +8,8 @@ import {
 export async function inspectSchematicOverview(
   overview: Locator,
   info: TestInfo,
-  relationships: number
+  relationships: number,
+  stage = 'overview'
 ) {
   const read = () =>
     overview.evaluate(host => {
@@ -165,12 +167,16 @@ export async function inspectSchematicOverview(
     geometry.routes.reduce((sum, route) => sum + route.count, 0) +
       Number(accounting![2])
   ).toBe(relationships);
-  await info.attach('actual-overview-geometry.json', {
-    body: JSON.stringify({ ...geometry, metrics }),
+  const geometryPath = info.outputPath(`${stage}-geometry.json`);
+  writeFileSync(geometryPath, JSON.stringify({ ...geometry, metrics }));
+  await info.attach(`${stage}-geometry.json`, {
+    path: geometryPath,
     contentType: 'application/json',
   });
-  await info.attach('actual-overview.png', {
-    body: await overview.screenshot(),
+  const screenshotPath = info.outputPath(`${stage}.png`);
+  await overview.screenshot({ path: screenshotPath });
+  await info.attach(`${stage}.png`, {
+    path: screenshotPath,
     contentType: 'image/png',
   });
 }
