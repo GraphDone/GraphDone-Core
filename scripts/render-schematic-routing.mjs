@@ -32,7 +32,7 @@ const palette = [
   '#bef264',
   '#fdba74',
 ];
-const words = (label, max = 16) => {
+const words = (label, max = 14) => {
   const lines = [''];
   for (const word of label.split(' ')) {
     if ((lines.at(-1) + word).length > max && lines.at(-1)) lines.push('');
@@ -109,6 +109,7 @@ for (const fixture of schematicFixtures) {
     ),
     routedBranches: result.routes.length,
     metrics: result.metrics,
+    work: result.work,
     deferred: Object.fromEntries(
       [...new Set(result.deferred.map(route => route.reason))].map(reason => [
         reason,

@@ -114,3 +114,69 @@ test('unplaced endpoints retain their exact edge IDs and explain why no wire is 
   assert.equal(result.deferred[0].reason, 'endpoint-not-placed');
   assert.deepEqual(result.deferred[0].edgeIds, ['original-outside']);
 });
+
+test('failed routes consume the shared invocation work budget before later searches', () => {
+  const cards = [
+    { id: 'a', x: 30, y: 70, width: 80, height: 50 },
+    { id: 'b', x: 600, y: 70, width: 80, height: 50 },
+    { id: 'c', x: 30, y: 300, width: 80, height: 50 },
+    { id: 'd', x: 240, y: 300, width: 80, height: 50 },
+  ];
+  const connections = [
+    {
+      id: 'blocked',
+      source: 'a',
+      target: 'b',
+      type: 'BLOCKS',
+      edgeIds: ['blocked-1', 'blocked-2'],
+    },
+    {
+      id: 'reachable',
+      source: 'c',
+      target: 'd',
+      type: 'DEPENDS_ON',
+      edgeIds: ['reachable'],
+    },
+  ];
+  const wall = { id: 'wall', x: 400, y: 0, width: 60, height: 500 };
+  const result = routeSchematicConnections(
+    cards,
+    connections,
+    800,
+    500,
+    [wall],
+    { maxAttempts: 1, maxExpandedStates: 2000 }
+  );
+  assert.equal(
+    result.routes.length,
+    0,
+    'An unsuccessful search must spend the invocation allowance'
+  );
+  assert.equal(result.deferred.length, 2);
+  assert.deepEqual(result.deferred.flatMap(route => route.edgeIds).sort(), [
+    'blocked-1',
+    'blocked-2',
+    'reachable',
+  ]);
+  assert.equal(result.work.attempts, 1);
+  assert.ok(result.work.expandedStates <= 2000);
+});
+
+test('the total expansion budget stops all remaining searches while retaining their source IDs', () => {
+  const fixture = schematicFixtures[0];
+  const result = routeSchematicConnections(
+    fixture.cards,
+    fixture.connections,
+    fixture.width,
+    fixture.height,
+    [],
+    { maxExpandedStates: 1 }
+  );
+  assert.equal(result.work.expandedStates, 1);
+  assert.equal(result.work.attempts, 1);
+  assert.equal(result.routes.length, 0);
+  assert.deepEqual(
+    result.deferred.flatMap(route => route.edgeIds).sort(),
+    fixture.connections.flatMap(connection => connection.edgeIds).sort()
+  );
+});

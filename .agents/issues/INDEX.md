@@ -2,6 +2,7 @@
 
 | Symptom | Canonical lesson and regression |
 | --- | --- |
+| Open bus lists disagree with live groups, failed routing searches multiply work, or hidden-link counts omit a partition | [Resolve live memberships and cap the whole invocation](../inbox/2026-10-28-bus-views-need-live-membership-and-total-budgets.md); relationship/live-update regressions, budget negative, CI text-bound failure |
 | Chrome aborts with `D-Bus connection was disconnected` during strict browser acceptance | [Own the browser session bus and retain the failed run](../inbox/2026-10-28-browser-acceptance-needs-an-owned-session-bus.md); isolated local invocation, unchanged strict cases |
 | Auto Back returns to a different grouping, or zoom removes the focused summary | [Restore hysteresis and reconcile owned focus](../inbox/2026-10-28-lod-return-needs-hysteresis-and-focus.md); `SemanticGraphOverview.test.tsx` and nested browser Auto-return regression |
 | All browser cases pass but unified source-integrity fails after staging | [Freeze the index as well as source](../inbox/2026-10-28-freeze-index-for-strict-runs.md); commit before the gate, leave repository content and index unchanged |

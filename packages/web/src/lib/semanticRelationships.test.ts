@@ -18,14 +18,12 @@ const items: SemanticItem[] = Array.from({ length: 121 }, (_, i) => ({
   metadata: { lod: { groupPath: [i < 60 ? 'A' : 'B', `Area ${i % 3}`] } },
 }));
 const edges: SemanticEdge[] = [
-  ...items
-    .slice(1)
-    .map(item => ({
-      id: `hub-${item.id}`,
-      source: 'n0',
-      target: item.id,
-      type: 'DEPENDS_ON',
-    })),
+  ...items.slice(1).map(item => ({
+    id: `hub-${item.id}`,
+    source: 'n0',
+    target: item.id,
+    type: 'DEPENDS_ON',
+  })),
   {
     id: 'parallel',
     source: { id: 'n0' },
@@ -41,6 +39,41 @@ const ids = (value: readonly SemanticEdge[]) =>
   value.map(edge => edge.id).sort();
 
 describe('semantic relationship exploration', () => {
+  it('keeps direct parent membership separate from descendants in a stable group selector', () => {
+    const members = ['a', 'b', 'child'].map(id => ({
+      id,
+      title: id,
+      type: 'TASK',
+      status: 'ACTIVE',
+      metadata: {
+        lod: { groupPath: id === 'child' ? ['Parent', 'Child'] : ['Parent'] },
+      },
+    }));
+    const links = [
+      { id: 'direct', source: 'a', target: 'b', type: 'BLOCKS' },
+      { id: 'child', source: 'a', target: 'child', type: 'BLOCKS' },
+    ];
+    const index = indexSemanticRelationships(members, links);
+    const id = [...index.hierarchy.groups.values()].find(
+      group => group.label === 'Parent'
+    )!.id;
+    expect(
+      ids(
+        scopedRelationships(index, {
+          kind: 'internal',
+          group: { id, direct: true },
+        })
+      )
+    ).toEqual(['direct']);
+    expect(
+      ids(
+        scopedRelationships(index, {
+          kind: 'internal',
+          group: { id, direct: false },
+        })
+      )
+    ).toEqual(['child', 'direct']);
+  });
   it('partitions every known-endpoint edge exactly once at every cut while retaining original objects', () => {
     const hierarchy = buildSemanticHierarchy(items, edges);
     const index = indexSemanticRelationships(items, edges);
@@ -56,17 +89,21 @@ describe('semantic relationship exploration', () => {
         ...projection.groups.flatMap(group =>
           scopedRelationships(index, {
             kind: 'internal',
-            members: group.members.map(item => item.id),
-            label: group.label,
+            group: { id: group.hierarchyId, direct: group.isDirect },
           })
         ),
         ...projection.bundles.flatMap(bundle =>
           scopedRelationships(index, {
             kind: 'bundle',
-            sources: byGroup.get(bundle.source)!.members.map(item => item.id),
-            targets: byGroup.get(bundle.target)!.members.map(item => item.id),
+            source: {
+              id: byGroup.get(bundle.source)!.hierarchyId,
+              direct: byGroup.get(bundle.source)!.isDirect,
+            },
+            target: {
+              id: byGroup.get(bundle.target)!.hierarchyId,
+              direct: byGroup.get(bundle.target)!.isDirect,
+            },
             type: bundle.type,
-            label: bundle.id,
           })
         ),
         ...projection.pendingEdges,
@@ -121,16 +158,28 @@ describe('semantic relationship exploration', () => {
 
   it('is stable under input reorder and includes current additions without mutating source data', () => {
     const before = JSON.stringify({ items, edges });
+    const scopedItems = items.map((item, i) =>
+      i < 2
+        ? {
+            ...item,
+            metadata: { lod: { groupPath: [i ? 'Target' : 'Source'] } },
+          }
+        : item
+    );
+    const index = indexSemanticRelationships(scopedItems, edges);
+    const groupId = (label: string) =>
+      [...index.hierarchy.groups.values()].find(group => group.label === label)!
+        .id;
     const scope = {
       kind: 'bundle' as const,
-      sources: ['n0'],
-      targets: ['n1'],
+      source: { id: groupId('Source'), direct: false },
+      target: { id: groupId('Target'), direct: false },
       type: 'DEPENDS_ON',
-      label: 'A → B',
     };
-    expect(
-      ids(scopedRelationships(indexSemanticRelationships(items, edges), scope))
-    ).toEqual(['hub-n1', 'parallel']);
+    expect(ids(scopedRelationships(index, scope))).toEqual([
+      'hub-n1',
+      'parallel',
+    ]);
     const addition = {
       id: 'new',
       source: 'n0',
@@ -141,7 +190,7 @@ describe('semantic relationship exploration', () => {
       ids(
         scopedRelationships(
           indexSemanticRelationships(
-            [...items].reverse(),
+            [...scopedItems].reverse(),
             [...edges, addition].reverse()
           ),
           scope

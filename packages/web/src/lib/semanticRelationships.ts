@@ -1,15 +1,23 @@
-import type { SemanticEdge, SemanticItem } from './semanticLOD';
+import {
+  buildSemanticHierarchy,
+  type SemanticEdge,
+  type SemanticItem,
+  type SemanticHierarchy,
+} from './semanticLOD';
 
 export type RelationshipDirection = 'both' | 'incoming' | 'outgoing';
+export interface RelationshipGroup {
+  id: string;
+  direct: boolean;
+}
 export type RelationshipScope =
   | { kind: 'all' }
-  | { kind: 'internal'; members: readonly string[]; label: string }
+  | { kind: 'internal'; group: RelationshipGroup }
   | {
       kind: 'bundle';
-      sources: readonly string[];
-      targets: readonly string[];
+      source: RelationshipGroup;
+      target: RelationshipGroup;
       type: string;
-      label: string;
     }
   | { kind: 'node'; id: string };
 
@@ -18,7 +26,8 @@ export const relationshipEndpoint = (value: SemanticEdge['source']) =>
 
 export function indexSemanticRelationships(
   items: readonly SemanticItem[],
-  edges: readonly SemanticEdge[]
+  edges: readonly SemanticEdge[],
+  hierarchy: SemanticHierarchy = buildSemanticHierarchy(items, edges)
 ) {
   const byId = new Map(items.map(item => [item.id, item]));
   const outgoing = new Map<string, SemanticEdge[]>();
@@ -34,12 +43,25 @@ export function indexSemanticRelationships(
     outgoing.get(source)!.push(edge);
     incoming.get(target)!.push(edge);
   }
-  return { byId, edges: ordered, outgoing, incoming };
+  return { byId, edges: ordered, outgoing, incoming, hierarchy };
 }
 
 export type SemanticRelationshipIndex = ReturnType<
   typeof indexSemanticRelationships
 >;
+
+export function relationshipGroupLabel(
+  index: SemanticRelationshipIndex,
+  reference: RelationshipGroup
+) {
+  const group = index.hierarchy.groups.get(reference.id);
+  if (!group) return undefined;
+  return [
+    ...group.ancestors.map(id => index.hierarchy.groups.get(id)!.label),
+    group.label,
+    ...(reference.direct ? ['Direct items'] : []),
+  ].join(' / ');
+}
 
 export function scopedRelationships(
   index: SemanticRelationshipIndex,
@@ -48,22 +70,28 @@ export function scopedRelationships(
   hops: 1 | 2 = 1
 ): readonly SemanticEdge[] {
   if (scope.kind === 'all') return index.edges;
+  const belongs = (id: string, reference: RelationshipGroup) => {
+    const path = index.hierarchy.paths.get(id);
+    return Boolean(
+      path &&
+        (reference.direct
+          ? path[path.length - 1] === reference.id
+          : path.includes(reference.id))
+    );
+  };
   if (scope.kind === 'internal') {
-    const members = new Set(scope.members);
     return index.edges.filter(
       edge =>
-        members.has(relationshipEndpoint(edge.source)) &&
-        members.has(relationshipEndpoint(edge.target))
+        belongs(relationshipEndpoint(edge.source), scope.group) &&
+        belongs(relationshipEndpoint(edge.target), scope.group)
     );
   }
   if (scope.kind === 'bundle') {
-    const sources = new Set(scope.sources),
-      targets = new Set(scope.targets);
     return index.edges.filter(
       edge =>
         edge.type === scope.type &&
-        sources.has(relationshipEndpoint(edge.source)) &&
-        targets.has(relationshipEndpoint(edge.target))
+        belongs(relationshipEndpoint(edge.source), scope.source) &&
+        belongs(relationshipEndpoint(edge.target), scope.target)
     );
   }
   const visited = new Set<string>();

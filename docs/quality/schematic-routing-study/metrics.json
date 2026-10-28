@@ -15,6 +15,12 @@
         "diagonalSegments": 0,
         "maxBusesPerCell": 1
       },
+      "work": {
+        "attempts": 3,
+        "expandedStates": 23,
+        "maxAttempts": 32,
+        "maxExpandedStates": 6000
+      },
       "deferred": {}
     },
     {
@@ -31,15 +37,21 @@
         "diagonalSegments": 0,
         "maxBusesPerCell": 1
       },
+      "work": {
+        "attempts": 4,
+        "expandedStates": 617,
+        "maxAttempts": 32,
+        "maxExpandedStates": 6000
+      },
       "deferred": {}
     },
     {
       "name": "dense-cycle",
       "title": "Dense systems disclose collapsed connections",
       "sourceRelationships": 112,
-      "routedRelationships": 36,
-      "collapsedRelationships": 76,
-      "routedBranches": 16,
+      "routedRelationships": 33,
+      "collapsedRelationships": 79,
+      "routedBranches": 13,
       "metrics": {
         "cardIntersections": 0,
         "unrelatedCrossings": 0,
@@ -47,10 +59,16 @@
         "diagonalSegments": 0,
         "maxBusesPerCell": 2
       },
+      "work": {
+        "attempts": 32,
+        "expandedStates": 3495,
+        "maxAttempts": 32,
+        "maxExpandedStates": 6000
+      },
       "deferred": {
         "routing-budget": {
-          "branches": 40,
-          "relationships": 76
+          "branches": 43,
+          "relationships": 79
         }
       }
     },
@@ -67,6 +85,12 @@
         "unrelatedOverlaps": 0,
         "diagonalSegments": 0,
         "maxBusesPerCell": 1
+      },
+      "work": {
+        "attempts": 3,
+        "expandedStates": 166,
+        "maxAttempts": 12,
+        "maxExpandedStates": 6000
       },
       "deferred": {}
     }

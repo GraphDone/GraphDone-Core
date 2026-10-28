@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   relationshipEndpoint,
   scopedRelationships,
+  relationshipGroupLabel,
   type RelationshipDirection,
   type RelationshipScope,
   type SemanticRelationshipIndex,
@@ -62,12 +63,21 @@ export function SemanticRelationshipBrowser({
       ),
     [index, related, type, search]
   );
+  const missingGroup =
+    scope.kind === 'internal'
+      ? !relationshipGroupLabel(index, scope.group)
+      : scope.kind === 'bundle'
+        ? !relationshipGroupLabel(index, scope.source) ||
+          !relationshipGroupLabel(index, scope.target)
+        : false;
   const title =
     scope.kind === 'all'
       ? 'All loaded relationships'
       : scope.kind === 'node'
         ? `Relationships of ${index.byId.get(scope.id)?.title ?? scope.id}`
-        : scope.label;
+        : scope.kind === 'internal'
+          ? `Internal relationships of ${relationshipGroupLabel(index, scope.group) ?? 'unavailable group'}`
+          : `${relationshipGroupLabel(index, scope.source) ?? 'Unavailable group'} → ${relationshipGroupLabel(index, scope.target) ?? 'Unavailable group'}: ${scope.type}`;
   useEffect(() => {
     if (!visible) return;
     const focus = Array.from(
@@ -157,6 +167,11 @@ export function SemanticRelationshipBrowser({
         Back to groups
       </button>
       <h2 className="text-base font-semibold break-words">{title}</h2>
+      {missingGroup && (
+        <p className="text-sm text-amber-200 my-2">
+          This group is no longer present in the loaded graph.
+        </p>
+      )}
       <p className="my-2 text-xs text-gray-300">
         Source → target follows the stored relationship direction.
       </p>

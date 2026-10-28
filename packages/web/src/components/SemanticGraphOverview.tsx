@@ -52,8 +52,8 @@ export function SemanticGraphOverview({
     [items, edges]
   );
   const relationshipIndex = useMemo(
-    () => indexSemanticRelationships(items, edges),
-    [items, edges]
+    () => indexSemanticRelationships(items, edges, hierarchy),
+    [items, edges, hierarchy]
   );
   const [relationshipScope, setRelationshipScope] =
     useState<RelationshipScope | null>(null);
@@ -242,6 +242,13 @@ export function SemanticGraphOverview({
     (count, bus) => count + bus.edgeIds.length,
     0
   );
+  const internalConnections = projection.groups.reduce(
+    (count, group) => count + group.internalEdges.length,
+    0
+  );
+  const pendingConnections = projection.pendingEdges.length;
+  const notDrawnConnections =
+    collapsedConnections + internalConnections + pendingConnections;
   const busColors = [
     '#5eead4',
     '#a5b4fc',
@@ -516,7 +523,7 @@ export function SemanticGraphOverview({
           data-graph-fit-obstacle="true"
           data-lod-controls="true"
           className="absolute bottom-3 left-3 pointer-events-auto rounded bg-gray-950 border border-gray-600 px-3 py-1 w-36 h-11 text-xs text-gray-100"
-          aria-label={`${edges.length} relationships, ${collapsedConnections} connections not drawn`}
+          aria-label={`${edges.length} relationships, ${notDrawnConnections} not drawn: ${internalConnections} internal, ${pendingConnections} awaiting endpoints, ${collapsedConnections} external connections in list`}
           onClick={() => {
             returnFocus.current = document.activeElement as HTMLElement;
             setBrowse(true);
@@ -526,10 +533,10 @@ export function SemanticGraphOverview({
         >
           <span className="block">Connections</span>
           <span
-            className={`block ${collapsedConnections ? 'text-amber-200' : 'text-emerald-200'}`}
+            className={`block ${notDrawnConnections ? 'text-amber-200' : 'text-emerald-200'}`}
           >
-            {collapsedConnections
-              ? `${collapsedConnections} not drawn`
+            {notDrawnConnections
+              ? `${notDrawnConnections} not drawn`
               : 'Browse all'}
           </span>
         </button>
@@ -595,8 +602,7 @@ export function SemanticGraphOverview({
                   openRelationships(
                     {
                       kind: 'internal',
-                      members: group.members.map(item => item.id),
-                      label: `Internal relationships of ${groupLabel(group.id)}`,
+                      group: { id: group.hierarchyId, direct: group.isDirect },
                     },
                     'internal'
                   )
@@ -713,14 +719,15 @@ export function SemanticGraphOverview({
                           openRelationships(
                             {
                               kind: 'bundle',
-                              sources: groupsById
-                                .get(bundle.source)!
-                                .members.map(item => item.id),
-                              targets: groupsById
-                                .get(bundle.target)!
-                                .members.map(item => item.id),
+                              source: {
+                                id: groupsById.get(bundle.source)!.hierarchyId,
+                                direct: groupsById.get(bundle.source)!.isDirect,
+                              },
+                              target: {
+                                id: groupsById.get(bundle.target)!.hierarchyId,
+                                direct: groupsById.get(bundle.target)!.isDirect,
+                              },
                               type: bundle.type,
-                              label: `${groupLabel(bundle.source)} → ${groupLabel(bundle.target)}: ${bundle.type}`,
                             },
                             bundle.id
                           )

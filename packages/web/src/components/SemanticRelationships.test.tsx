@@ -40,19 +40,22 @@ const positions = vi.fn(() =>
   items.map((item, index) => ({ id: item.id, x: index * 40, y: index * 20 }))
 );
 let panCamera: () => void;
+let replaceItems: (value: SemanticItem[]) => void;
 let replaceEdges: (value: SemanticEdge[]) => void;
 const inspected = vi.fn();
 function Fixture() {
   const [camera, setCamera] = useState({ x: 20, y: 30, scale: 0.4 });
   const [selectedId, setSelectedId] = useState<string>();
   const entry = useRef(camera);
+  const [sourceItems, setSourceItems] = useState(items);
+  replaceItems = setSourceItems;
   const [sourceEdges, setSourceEdges] = useState(edges);
   replaceEdges = setSourceEdges;
   panCamera = () =>
     setCamera(value => ({ ...value, x: value.x + 20, y: value.y + 20 }));
   return (
     <SemanticGraphOverview
-      items={items}
+      items={sourceItems}
       edges={sourceEdges}
       camera={camera}
       selectedId={selectedId}
@@ -210,4 +213,95 @@ it('keeps schematic lanes fixed and does no source-position scan for a camera pa
   act(() => panCamera());
   expect(paths()).toEqual(before);
   expect(positions).not.toHaveBeenCalled();
+});
+
+it('removes edges from an open internal view when a live update moves their endpoint out of the group', () => {
+  render(<Fixture />);
+  openPayments();
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Browse 2 internal relationships' })
+  );
+  act(() =>
+    replaceItems(
+      items.map(item =>
+        item.id === 'n1'
+          ? { ...item, metadata: { lod: { groupPath: ['Inventory'] } } }
+          : item
+      )
+    )
+  );
+  expect(edgeIds()).toEqual(['self']);
+});
+
+it('includes a newly added member in an already open internal relationship view', () => {
+  render(<Fixture />);
+  openPayments();
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Browse 2 internal relationships' })
+  );
+  act(() => {
+    replaceItems([...items, { ...items[0], id: 'added', title: 'New member' }]);
+    replaceEdges([
+      ...edges,
+      { id: 'new-internal', source: 'n0', target: 'added', type: 'BLOCKS' },
+    ]);
+  });
+  expect(edgeIds().sort()).toEqual(['internal', 'new-internal', 'self']);
+});
+
+it('resolves both ends of an open bundle against live group membership', () => {
+  render(<Fixture />);
+  openPayments();
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Payments → Inventory: 2 BLOCKS' })
+  );
+  act(() => {
+    replaceItems([
+      ...items.map(item =>
+        item.id === 'n3' ? { ...item, metadata: items[0].metadata } : item
+      ),
+      { ...items[3], id: 'new-inventory' },
+    ]);
+    replaceEdges([
+      ...edges,
+      {
+        id: 'new-bundle',
+        source: 'n0',
+        target: 'new-inventory',
+        type: 'BLOCKS',
+      },
+    ]);
+  });
+  expect(edgeIds()).toEqual(['new-bundle']);
+});
+
+it('accounts for routed, internal and unresolved relationships in the Connections control', () => {
+  render(<Fixture />);
+  expect(
+    screen.getByRole('button', {
+      name: '6 relationships, 3 not drawn: 2 internal, 1 awaiting endpoints, 0 external connections in list',
+    })
+  ).toBeVisible();
+});
+
+it('explains when a live regrouping removes the group whose relationships are open', () => {
+  render(<Fixture />);
+  openPayments();
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Browse 2 internal relationships' })
+  );
+  act(() =>
+    replaceItems(
+      items.map(item => ({
+        ...item,
+        metadata: { lod: { groupPath: ['Inventory'] } },
+      }))
+    )
+  );
+  expect(edgeIds()).toEqual([]);
+  expect(
+    screen.getByText('This group is no longer present in the loaded graph.')
+  ).toBeVisible();
+  fireEvent.click(screen.getByRole('button', { name: 'Back to groups' }));
+  expect(screen.getByRole('region', { name: 'Graph groups' })).toBeVisible();
 });
