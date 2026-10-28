@@ -102,3 +102,23 @@ Escape hides it without moving focus. The desktop headed regression passed
 14.4s on 2026-10-28 (one worker, zero retries; retained output
 `item-symbols-headed15`); final exact-source CI and independent review remain
 required. Isolated hover and keyboard checks alone missed this interaction.
+
+CI40726146104 on tested merge da15eb72 failed the new-user sequence with
+39 passing cases, three failing cases and an execution-evidence failure. Both
+phone motion traces stalled on a hidden `.node-edit-icon` after the real drag,
+API save and camera readiness had already passed; the small-team lifecycle
+also attempted that hidden gear. Compact cards deliberately replace header
+actions with a title-only representation. The correction targets the original
+item ID and uses the supported visible-card double-click, waits for camera
+readiness, checks the exact editor title and the updated accessible type label.
+The 17-second idle sample, frame count, one-pixel translation limit and all API
+assertions remain unchanged. The three failing journeys passed locally in 1.2 minutes
+on 2026-10-28 with one headed worker and zero retries. The full-card desktop
+SOLO-01 lifecycle also passed in 11.8s. This is a test-consumer
+correction, not a runtime change or proof of full final acceptance.
+
+The same failed CI run's actual large-symbols artifact is clean and unchanged:
+2,000 items, 5,000 relationships, 20.403s load; browser zoom 3.033/3.231/2.603s,
+wall 4.303/4.503/3.724s; three cards and one admitted label at each detail view,
+no attempted writes or page errors. Retain those successful stage artifacts
+alongside the failed overall run. The later hierarchy/mobile stages did not run.

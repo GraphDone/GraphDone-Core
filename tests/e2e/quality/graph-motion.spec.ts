@@ -13,7 +13,7 @@ for(const [width,height] of [[390,844],[844,390],[1440,900]]) {
   const me=(await gql(page,'{me{id}}')).me.id;
   const graph=(await gql(page,'mutation($input:[GraphCreateInput!]!){createGraphs(input:$input){graphs{id}}}',{input:[{name:`Motion QC ${width} ${Date.now()}`,type:'PROJECT',status:'ACTIVE',createdBy:me}]})).createGraphs.graphs[0].id;
   try{
-   await gql(page,'mutation($input:[WorkItemCreateInput!]!){createWorkItems(input:$input){workItems{id}}}',{input:[
+   const created=await gql(page,'mutation($input:[WorkItemCreateInput!]!){createWorkItems(input:$input){workItems{id title}}}',{input:[
     {title:'Drag this task',positionX:400,positionY:300},
     {title:'Keep this task still',positionX:750,positionY:550},
    ].map(n=>({...n,type:'TASK',status:'IN_PROGRESS',positionZ:0,graph:{connect:{where:{node:{id:graph}}}}}))});
@@ -34,7 +34,8 @@ for(const [width,height] of [[390,844],[844,390],[1440,900]]) {
     };
    });
    await page.goto('/');
-   const node=page.locator('.graph-container .node').filter({hasText:'Drag this task'});
+   const itemId=created.createWorkItems.workItems.find((item:{id:string;title:string})=>item.title==='Drag this task').id;
+   const node=page.locator('.graph-container .node').filter({has:page.locator(`[data-node-id="${itemId}"]`)});
    await expect(node).toBeVisible();
    const lock = page.getByTestId('graph-lock-toggle');
    if (await lock.isVisible()) {
@@ -56,8 +57,9 @@ for(const [width,height] of [[390,844],[844,390],[1440,900]]) {
    // keep reheating for seconds or fight the user's chosen placement.
    await expect.poll(()=>page.evaluate(()=>(window as any).__layoutMetrics?.()?.atRest),{timeout:2000}).toBe(true);
    await expect.poll(()=>page.evaluate(()=>(window as any).__layoutMetrics?.()?.cameraReady)).toBe(true);
-   await node.locator('.node-edit-icon').click();
+   await node.dblclick({timeout:10000});
    await expect(page.getByTestId('quick-edit-surface')).toBeVisible();
+   await expect(page.getByTestId('quick-title')).toHaveValue('Drag this task');
    await page.getByTestId('quick-type').getByRole('button',{name:'Idea',exact:true}).click();
    await page.keyboard.press('Escape');
    await expect.poll(async()=>{
@@ -65,6 +67,7 @@ for(const [width,height] of [[390,844],[844,390],[1440,900]]) {
     return items.find((item:any)=>item.title==='Drag this task')?.type;
    }).toBe('IDEA');
    await expect(node.locator('.node-type-text')).toHaveText(/idea/i);
+   await expect(node).toHaveAttribute('aria-label','Drag this task, Idea');
    const ready = () => page.evaluate(() => {
     const metrics = (window as any).__layoutMetrics?.();
     return metrics?.atRest === true && metrics?.cameraReady === true;
