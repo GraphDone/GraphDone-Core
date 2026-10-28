@@ -1221,7 +1221,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   });
   useEffect(() => {
     try { localStorage.setItem('graphdone:relationship-priority', relationshipLevel); }
-    catch {}
+    catch { return; }
   }, [relationshipLevel]);
   const priorityProjection = useMemo(() => projectRelationshipPriority(workItems, workItemEdges, relationshipLevel), [workItems, workItemEdges, relationshipLevel]);
   const relationshipPriorityRef = useRef(priorityProjection);
