@@ -290,14 +290,6 @@ async function startServer() {
       throw new Error('Neo4j connection timeout - falling back to auth-only mode');
     }
 
-    // Create default admin user for testing if none exists
-    try {
-      await execAsync('npm run create-admin', { cwd: process.cwd() });
-    } catch (error) {
-      // Admin creation is optional - may already exist
-      console.log('ℹ️  Default admin setup completed'); // eslint-disable-line no-console
-    }
-
     // Welcome graphs are now created per-user on first login (handled by frontend)
 
     // Merge type definitions (Neo4j schema + auth schema)

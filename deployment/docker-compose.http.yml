@@ -66,7 +66,7 @@ services:
     volumes:
       - ../packages/server/.env:/app/.env
       - logs:/app/logs
-      - sqlite_auth_data:/app/data
+      - sqlite_auth_data:/app/packages/server/data
       # SSL certificates (uncomment when using HTTPS)
       # - ./certs:/app/certs:ro
     healthcheck:
