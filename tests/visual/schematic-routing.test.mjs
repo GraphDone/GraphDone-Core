@@ -180,3 +180,37 @@ test('the total expansion budget stops all remaining searches while retaining th
     fixture.connections.flatMap(connection => connection.edgeIds).sort()
   );
 });
+
+test('incoming branches share a target trunk without reversing original directions', () => {
+  const fixture = schematicFixtures.find(entry => entry.name === 'fanout');
+  const connections = fixture.connections.map(connection => ({
+    ...connection,
+    source: connection.target,
+    target: connection.source,
+  }));
+  const result = routeSchematicConnections(
+    fixture.cards,
+    connections,
+    fixture.width,
+    fixture.height,
+    [],
+    { sharedEndpoint: 'target' }
+  );
+  assert.equal(result.routes.length, 4);
+  assert.ok(result.junctions.length >= 3);
+  for (const route of result.routes) {
+    assert.equal(route.target, 'API');
+    assert.equal(route.bus, 'API');
+    assert.notEqual(route.source, 'API');
+    assert.deepEqual(
+      route.edgeIds.sort(),
+      connections
+        .filter(connection => connection.source === route.source)
+        .flatMap(connection => connection.edgeIds)
+        .sort()
+    );
+  }
+  assert.equal(result.metrics.cardIntersections, 0);
+  assert.equal(result.metrics.unrelatedCrossings, 0);
+  assert.equal(result.metrics.unrelatedOverlaps, 0);
+});

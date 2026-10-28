@@ -108,3 +108,35 @@ The member selectors now use their visible title text. Cards must have positive
 visible bounds inside the viewport; wires must have visible ancestor styles and
 actual stroke paint. An intentional opacity-zero wire in the real journey must
 be rejected before restoration. These corrections remain pending CI execution.
+
+
+## Focused group buses
+
+The candidate adds incoming/outgoing group tracing with at most five neighbors
+per page and fewer on constrained viewports. Every page retains the selected
+group; all source relationships remain counted and available in the complete
+list. Incoming routing shares the target trunk while preserving actual direction.
+A newly mounted trace control is measured after commit as an obstacle.
+
+Retained failing-before evidence:
+
+- `schematic-incoming-negative.log`: 8 passed, 1 failed; the old router did not
+  produce incoming shared-trunk junctions. The corrected 9 cases passed in 0.28s
+  (`schematic-incoming-positive.log`).
+- `schematic-trace-component-intended-negative.log`: 11 passed, 2 failed at the
+  missing trace controls. The first command used the repository root instead of
+  web's configured test environment and failed with `document is not defined`;
+  `schematic-trace-component-negative.log` is retained as a setup failure, not
+  feature-negative evidence.
+- `schematic-trace-components-final.log`: 28 passed, no skips, 8.31s, one worker
+  with no file parallelism. Includes paging every neighbor, live source removal,
+  incoming/outgoing counts, tiny viewports, current-page clamping, original bundle
+  identity, inspection return and existing nested/relationship regressions.
+- `schematic-trace-typecheck.log`: scoped web typecheck passed.
+
+Actual CI now also traces both directions in the existing two owned nested
+fixtures, checks original source/target port placement and arrow presence, and
+includes the trace controls among wire obstacles. Those browser assertions are
+pending; no local browser/database or additional fixture was started. This is
+not detailed item wiring, arbitrary selected-path tracing, a scale benchmark,
+or accepted full application behavior.

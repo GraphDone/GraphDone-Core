@@ -351,6 +351,36 @@ for (const width of [1440, 390])
       await expect(payments).toContainText('BLOCKS');
       await expect(payments).toContainText('DEPENDS_ON');
       await activate(
+        payments.getByRole('button', {
+          name: 'Trace outgoing connections',
+          exact: true,
+        })
+      );
+      const trace = overview.getByRole('region', {
+        name: 'Connection trace',
+        exact: true,
+      });
+      await expect(trace).toContainText('Outgoing · Payments');
+      await inspectSchematicOverview(overview, info, before.edges.length);
+      await activate(
+        trace.getByRole('button', {
+          name: 'Trace incoming connections',
+          exact: true,
+        })
+      );
+      await expect(trace).toContainText('Incoming · Payments');
+      await inspectSchematicOverview(overview, info, before.edges.length);
+      await activate(
+        trace.getByRole('button', {
+          name: 'Exit connection trace',
+          exact: true,
+        })
+      );
+      await activate(count(2));
+      await activate(
+        list().getByRole('button', { name: /^Payments 36 items/ })
+      );
+      await activate(
         payments.getByRole('button', { name: 'Show 2 subgroups', exact: true })
       );
       await expect(count(4)).toBeVisible();
