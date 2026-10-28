@@ -59,3 +59,4 @@
 | Tiny card text, wasted space, clipped or wire-overlapped labels after zoom | [Reserve the displayed symbol footprint](../inbox/2026-10-28-readable-symbols-need-reserved-geometry.md); `graphSymbolLayout.test.ts`, `edgeRouteGeometry.test.ts`; issue #222 requires actual browser and thousands-of-item evidence |
 
 | Whole browser sequence reaches900s with no valid report despite retained screenshots | [Bound browser acceptance by feature](../inbox/2026-10-28-browser-sequences-need-bounded-feature-scope.md); strict sequence enrollment and evidence controls |
+| A fresh unchanged-source audit reports GraphQL Scalars or Hono node-server | [Remove unused code and validate the actual installed consumer](../inbox/2026-10-28-advisories-follow-installed-consumers.md); isolated static-path negative and Neo4j scalar contract |
