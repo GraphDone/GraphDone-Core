@@ -17,12 +17,22 @@ export interface EdgeRouteGeometry {
   target: Point & { angle: number };
 }
 
+export interface EdgeRouteLabel {
+  x: number;
+  y: number;
+  t: number;
+  rotation: number;
+  iconRotation: number;
+}
+
 const finitePoint = (point: Point) =>
   Number.isFinite(point.x) && Number.isFinite(point.y);
 const clamp = (value: number, low: number, high: number) =>
   Math.max(low, Math.min(high, value));
 const fraction = (value: number) =>
   clamp(Number.isFinite(value) ? value : 0.5, 0, 1);
+const upright = (angle: number) =>
+  angle > 90 ? angle - 180 : angle < -90 ? angle + 180 : angle;
 
 export function createEdgeRoute(
   input: readonly Point[]
@@ -30,9 +40,9 @@ export function createEdgeRoute(
   if (input.some(point => !finitePoint(point))) return null;
   const points: Point[] = [];
   for (const point of input) {
-    const last = points.at(-1);
+    const last = points[points.length - 1];
     if (last?.x === point.x && last.y === point.y) continue;
-    const previous = points.at(-2);
+    const previous = points[points.length - 2];
     if (previous && last) {
       const ax = last.x - previous.x,
         ay = last.y - previous.y;
@@ -93,24 +103,29 @@ export function pointOnEdgeRoute(route: EdgeRouteGeometry, value: number) {
 export function projectEdgeRoutePointer(
   route: EdgeRouteGeometry,
   pointer: Point,
-  previousT = 0.5
+  previousT = 0.5,
+  options: { offset?: number } = {}
 ) {
   const previous = fraction(previousT);
-  if (!finitePoint(pointer)) return previous;
+  const offset = options.offset ?? 0;
+  if (!finitePoint(pointer) || !Number.isFinite(offset)) return previous;
   let bestT = previous,
     bestDistance = Infinity;
   for (const segment of route.segments) {
     const dx = segment.target.x - segment.source.x;
     const dy = segment.target.y - segment.source.y;
+    const angle = (upright(segment.angle) * Math.PI) / 180;
+    const sx = segment.source.x + Math.sin(angle) * offset;
+    const sy = segment.source.y - Math.cos(angle) * offset;
     const along = clamp(
-      ((pointer.x - segment.source.x) * (dx / segment.length) +
-        (pointer.y - segment.source.y) * (dy / segment.length)) /
+      ((pointer.x - sx) * (dx / segment.length) +
+        (pointer.y - sy) * (dy / segment.length)) /
         segment.length,
       0,
       1
     );
-    const x = segment.source.x + along * dx;
-    const y = segment.source.y + along * dy;
+    const x = sx + along * dx;
+    const y = sy + along * dy;
     const distance = Math.hypot(pointer.x - x, pointer.y - y);
     const t = (segment.start + along * segment.length) / route.length;
     if (
@@ -146,22 +161,15 @@ export function edgeRouteLabel(
   )
     return null;
   const desired = fraction(options.t ?? 0.5) * route.length;
-  const candidates: Array<{
-    x: number;
-    y: number;
-    t: number;
-    rotation: number;
-    iconRotation: number;
-  }> = [];
+  let best: EdgeRouteLabel | null = null;
+  let bestDistance = Infinity;
   for (const segment of route.segments) {
     const margin = dims.width / 2 + padding;
     if (segment.length < 2 * margin) continue;
     const low = segment.start + margin,
       high = segment.end - margin;
     const flipped = segment.angle > 90 || segment.angle < -90;
-    const rotation = flipped
-      ? segment.angle + (segment.angle > 90 ? -180 : 180)
-      : segment.angle;
+    const rotation = upright(segment.angle);
     const radians = (rotation * Math.PI) / 180;
     const width =
       Math.abs(Math.cos(radians)) * dims.width +
@@ -175,9 +183,15 @@ export function edgeRouteLabel(
       low,
       high,
     ])) {
-      const point = pointOnEdgeRoute(route, distance / route.length);
-      const x = point.x + Math.sin(radians) * offset;
-      const y = point.y - Math.cos(radians) * offset;
+      const local = (distance - segment.start) / segment.length;
+      const x =
+        segment.source.x +
+        (segment.target.x - segment.source.x) * local +
+        Math.sin(radians) * offset;
+      const y =
+        segment.source.y +
+        (segment.target.y - segment.source.y) * local -
+        Math.cos(radians) * offset;
       if (
         obstacles.some(
           box =>
@@ -186,19 +200,21 @@ export function edgeRouteLabel(
         )
       )
         continue;
-      candidates.push({
-        x,
-        y,
-        t: distance / route.length,
-        rotation,
-        iconRotation: flipped ? 180 : 0,
-      });
+      const delta = Math.abs(distance - desired);
+      if (
+        delta < bestDistance ||
+        (delta === bestDistance && distance / route.length < best!.t)
+      ) {
+        bestDistance = delta;
+        best = {
+          x,
+          y,
+          t: distance / route.length,
+          rotation,
+          iconRotation: flipped ? 180 : 0,
+        };
+      }
     }
   }
-  candidates.sort(
-    (a, b) =>
-      Math.abs(a.t * route.length - desired) -
-        Math.abs(b.t * route.length - desired) || a.t - b.t
-  );
-  return candidates[0] ?? null;
+  return best;
 }

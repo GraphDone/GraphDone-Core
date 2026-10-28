@@ -125,7 +125,8 @@ projection needed by the D3 path/hitbox/arrow/label consumers. Consecutive
 coincident points do not produce broken paths; a nonzero closed loop retains
 its travel and direction. Label placement fits an entire label on one segment,
 keeps text upright, retains original icon direction and returns no placement
-when cards or previous labels leave no clear slot. Equal-distance pointer hits
+when no sampled slot clears cards or previous labels. This is conservative
+admission, not proof that every possible position is obstructed. Equal-distance pointer hits
 prefer the prior leg so dragging does not jump across a nearby return wire.
 
 This foundation is not yet connected to the item renderer and does not establish
@@ -140,3 +141,11 @@ clean-installed partial probe: 9 passed, no skips, 0.69s (8ms test bodies).
 Cases cover elbows, reversed segments, closed loops, duplicate/invalid points,
 nearest-leg dragging, ties, long labels and rotated obstacle footprints. This
 is scoped helper evidence, not a full-tree browser/database/performance result.
+
+Independent foundation review also required offset-aware dragging beside close
+return wires. The executed negative selected fraction100/440 instead of340/440;
+matching projection to the displayed offset corrected it. All ten cases passed
+serially in0.691s and scoped strict ES2020 types passed. Candidate interpolation
+now stays on its current segment and keeps only the best placement, avoiding
+repeated route scans/sorting. The [canonical lesson](../../.agents/inbox/2026-10-28-offset-label-drag-needs-offset-path.md)
+records the negative, correction and runtime integration limits.

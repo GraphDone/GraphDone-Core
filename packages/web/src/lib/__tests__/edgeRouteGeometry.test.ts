@@ -119,6 +119,34 @@ describe('item wire geometry', () => {
     expect(projectEdgeRoutePointer(route, { x: NaN, y: 0 }, 0.8)).toBe(0.8);
   });
 
+  it('drags an offset label along its rendered lane when the neighboring wire is closer', () => {
+    const route = createEdgeRoute([
+      { x: 0, y: 0 },
+      { x: 200, y: 0 },
+      { x: 200, y: 40 },
+      { x: 0, y: 40 },
+    ])!;
+    const label = edgeRouteLabel(route, {
+      dims: { width: 60, height: 20 },
+      t: 340 / 440,
+    })!;
+    expect(label).toMatchObject({
+      x: 100,
+      y: 18,
+      rotation: 0,
+      iconRotation: 180,
+    });
+    expect(projectEdgeRoutePointer(route, label, label.t)).toBeCloseTo(
+      100 / 440
+    );
+    expect(
+      projectEdgeRoutePointer(route, label, label.t, { offset: 22 })
+    ).toBeCloseTo(340 / 440);
+    expect(
+      projectEdgeRoutePointer(route, { x: 80, y: 18 }, label.t, { offset: 22 })
+    ).toBeCloseTo(360 / 440);
+  });
+
   it('fits whole labels on a segment away from bends and retains original arrow orientation', () => {
     const route = createEdgeRoute([
       { x: 200, y: 100 },
