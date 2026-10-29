@@ -214,3 +214,12 @@ describe('semantic relationship exploration', () => {
     expect(JSON.stringify({ items, edges })).toBe(before);
   });
 });
+
+
+it('resolves a local displayed selection through exact current original IDs without requiring group endpoints', () => {
+  const index=indexSemanticRelationships(items,edges);
+  const result=scopedRelationships(index,{kind:'selection',label:'Focused dependencies',edgeIds:['parallel','reverse','removed']});
+  expect(result.map(edge=>edge.id).sort()).toEqual(['parallel','reverse']);
+  expect(result.find(edge=>edge.id==='reverse')?.source).toBe('n1');
+  expect(result.find(edge=>edge.id==='parallel')?.type).toBe('DEPENDS_ON');
+});
