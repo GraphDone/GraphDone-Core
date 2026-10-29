@@ -8,7 +8,10 @@ import {
 } from '../../lib/ownedGraphIdsFixture';
 import type { SeededGraph } from '../../lib/seedGraph';
 import { measureGraphZoom } from '../../lib/graphZoomReady';
-import { inspectLocalItemNeighborhood } from '../../lib/localItemNeighborhood';
+import {
+  inspectLocalItemNeighborhood,
+  readCanonicalItemPositions,
+} from '../../lib/localItemNeighborhood';
 import { inspectItemSymbols } from '../../lib/itemSymbolVisual';
 import { inspectOverviewBus } from '../../lib/overviewBusInspection';
 import { inspectSchematicOverview } from '../../lib/schematicOverview';
@@ -123,6 +126,8 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
         edges.map(edge => edge.getAttribute('data-edge-id')).sort()
       )
   ).toEqual(before.edges.map((edge: { id: string }) => edge.id));
+  const canonicalBefore = await readCanonicalItemPositions(page);
+  expect(canonicalBefore).toHaveLength(SIZE);
   const overview = page.locator('.semantic-overview');
   await expect(overview).toHaveAttribute('data-active', 'true');
   await inspectSchematicOverview(overview, info, 5000, '2000-items-fit', 8);
@@ -525,6 +530,8 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
         8
       );
   }
+  const canonicalAfter = await readCanonicalItemPositions(page);
+  expect(canonicalAfter).toEqual(canonicalBefore);
   const densePath = info.outputPath('two-thousand-dense-local-timings.json');
   await writeFile(
     densePath,
@@ -534,6 +541,8 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
       denseIncident: denseIncident.length,
       timings: denseTimings,
       originalIds: denseOriginals,
+      canonicalBefore,
+      canonicalAfter,
     })
   );
   await info.attach('two-thousand-dense-local-timings.json', {

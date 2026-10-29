@@ -35,6 +35,29 @@ type Snapshot = {
     };
   };
 };
+export async function readCanonicalItemPositions(page: Page) {
+  return page.locator('.main-graph-group .node').evaluateAll(elements =>
+    elements
+      .map(element => {
+        const data = (
+          element as SVGGElement & {
+            __data__: {
+              id: string;
+              x: number;
+              y: number;
+              fx: number | null;
+              fy: number | null;
+            };
+          }
+        ).__data__;
+        if (!data?.id)
+          throw new Error('Canonical item is missing its original D3 datum');
+        return { id: data.id, x: data.x, y: data.y, fx: data.fx, fy: data.fy };
+      })
+      .sort((a, b) => a.id.localeCompare(b.id))
+  );
+}
+
 export async function inspectLocalItemNeighborhood(
   page: Page,
   info: TestInfo,
@@ -123,11 +146,26 @@ export async function inspectLocalItemNeighborhood(
       };
     });
     const container = host.closest('.graph-container')!;
-    const native = [
-      ...container.querySelectorAll(
-        '.main-graph-group .node,.main-graph-group .edge,.main-graph-group .clickable-edge,.main-graph-group .edge-arrow,.main-graph-group .edge-label-group'
-      ),
-    ].filter(painted).length;
+    const nativeInventory = Object.fromEntries(
+      ['node', 'edge', 'edge-clickable', 'arrow', 'edge-label-group'].map(
+        family => {
+          const elements = [
+            ...container.querySelectorAll(`.main-graph-group .${family}`),
+          ];
+          return [
+            family,
+            {
+              total: elements.length,
+              painted: elements.filter(painted).length,
+            },
+          ];
+        }
+      )
+    );
+    const native = Object.values(nativeInventory).reduce(
+      (sum, family) => sum + family.painted,
+      0
+    );
     const snapshot = (window as unknown as { __localItemLOD: Snapshot })
       .__localItemLOD;
     const bounds = container.getBoundingClientRect();
@@ -136,6 +174,7 @@ export async function inspectLocalItemNeighborhood(
       controls,
       routes,
       native,
+      nativeInventory,
       snapshot,
       bounds: {
         x: bounds.x,
@@ -149,6 +188,11 @@ export async function inspectLocalItemNeighborhood(
     geometry.native,
     'Replaced native cards, wires and input targets must stay hidden'
   ).toBe(0);
+  for (const [family, inventory] of Object.entries(geometry.nativeInventory))
+    expect(
+      inventory.total,
+      `Loaded native ${family} inventory must be present`
+    ).toBeGreaterThan(0);
   expect(geometry.cards.length).toBeLessThanOrEqual(7);
   for (const card of geometry.cards) {
     expect(card.painted, 'Local cards must actually be painted').toBe(true);
