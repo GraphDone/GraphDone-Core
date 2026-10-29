@@ -9,6 +9,7 @@ import {
 import type { SeededGraph } from '../../lib/seedGraph';
 import { measureGraphZoom } from '../../lib/graphZoomReady';
 import { inspectItemSymbols } from '../../lib/itemSymbolVisual';
+import { inspectOverviewBus } from '../../lib/overviewBusInspection';
 import { inspectSchematicOverview } from '../../lib/schematicOverview';
 
 const SIZE = 2000;
@@ -63,7 +64,7 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
   page,
   largeGraph,
 }, info) => {
-  test.setTimeout(180000);
+  test.setTimeout(240000);
   const snapshot = async () => {
     const data = await gql(
       page,
@@ -123,6 +124,7 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
   const overview = page.locator('.semantic-overview');
   await expect(overview).toHaveAttribute('data-active', 'true');
   await inspectSchematicOverview(overview, info, 5000, '2000-items-fit', 8);
+  await inspectOverviewBus(page, info, before.edges, Object.fromEntries(largeGraph.nodeIds.map((id, index) => [id, `Subsystem ${Math.floor(index / 250)}`])));
   const priority = page.getByRole('combobox', {
     name: 'Relationship priority',
   });
