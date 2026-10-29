@@ -1,3 +1,4 @@
+import { writeFile } from 'node:fs/promises';
 import { test as base, expect, type CDPSession } from '@playwright/test';
 import { login, TEST_USERS } from '../../lib/auth';
 import { gql } from '../../lib/graphRequest';
@@ -245,7 +246,28 @@ for (const width of [1440, 390])
           return target.__lodOriginalViewportUpdate?.(...args);
         };
       }, seeded.nodeIds[8]);
+      const itemPresentationBefore = await svg.locator('.main-graph-group').evaluate(element => ({
+        passes: Number(element.getAttribute('data-item-presentation-passes')),
+        scale: Number(element.getAttribute('data-item-presentation-scale')),
+      }));
       await overview.getByRole('combobox', { name: 'Graph detail' }).selectOption('items');
+      await expect(svg.locator('.main-graph-group')).toHaveAttribute('data-presentation-kind', 'items');
+      await expect(svg.locator('.main-graph-group')).toHaveAttribute('data-item-presentation-scale', String(fixedCamera.k));
+      expect(await svg.locator('.main-graph-group').getAttribute('data-item-presentation-passes')).toBe(String(itemPresentationBefore.passes + 1));
+      const returnedItems = await svg.locator('.main-graph-group').evaluate(element => ({
+        cards: Array.from(element.querySelectorAll<SVGGElement>('.node')).filter(node => getComputedStyle(node).display !== 'none').map(node => ({
+          detail: node.getAttribute('data-detail'),
+          title: node.querySelector('.node-title-text')?.textContent,
+        })),
+        edges: Array.from(element.querySelectorAll<SVGPathElement>('.edges-group .edge')).filter(edge => getComputedStyle(edge).display !== 'none').map(edge => edge.getAttribute('d')),
+      }));
+      expect(returnedItems.cards.length).toBeGreaterThan(0);
+      expect(returnedItems.cards.every(card => card.detail === 'compact' && !!card.title)).toBe(true);
+      expect(returnedItems.edges.length).toBeGreaterThan(0);
+      expect(returnedItems.edges.every(path => !!path && !/NaN|undefined/.test(path))).toBe(true);
+      const presentationPath = info.outputPath('manual-items-presentation.json');
+      await writeFile(presentationPath, JSON.stringify({ itemPresentationBefore, fixedCamera, returnedItems }));
+      await info.attach('manual-items-presentation.json', { path: presentationPath, contentType: 'application/json' });
       await expect(overview).toHaveAttribute('data-active', 'false');
       await expect.poll(() => svg.locator('.main-graph-group .node').evaluateAll((elements, id) => {
         const node = elements.find(element => (element as Element & { __data__?: { id: string } }).__data__?.id === id)!;
@@ -484,6 +506,24 @@ for (const width of [1440, 390])
         1
       );
       expect(await overview.locator('defs filter').count()).toBe(0);
+      const priorityControl = page.getByRole('combobox', { name: 'Relationship priority', exact: true });
+      const savedPriority = await priorityControl.inputValue();
+      await priorityControl.selectOption('all');
+      await overview.getByRole('combobox', { name: 'Graph detail' }).selectOption('items');
+      await expect(svg.locator('.main-graph-group')).toHaveAttribute('data-presentation-kind', 'items');
+      const itemArrows = await svg.locator('.arrows-group .arrow').evaluateAll(elements => elements
+        .filter(element => getComputedStyle(element).display !== 'none')
+        .map(element => ({ id: element.getAttribute('data-edge-id'), opacity: Number(getComputedStyle(element).opacity), transform: element.getAttribute('transform') })));
+      expect(itemArrows.length).toBeGreaterThan(0);
+      expect(itemArrows.every(arrow => arrow.opacity >= 0.99 && !!arrow.transform && !/NaN|undefined/.test(arrow.transform))).toBe(true);
+      const arrowsPath = info.outputPath('manual-items-priority-arrows.json');
+      await writeFile(arrowsPath, JSON.stringify({ savedPriority, itemArrows }));
+      await info.attach('manual-items-priority-arrows.json', { path: arrowsPath, contentType: 'application/json' });
+      const arrowsScreenshot = info.outputPath('manual-items-priority-arrows.png');
+      await page.screenshot({ path: arrowsScreenshot });
+      await info.attach('manual-items-priority-arrows.png', { path: arrowsScreenshot, contentType: 'image/png' });
+      await overview.getByRole('combobox', { name: 'Graph detail' }).selectOption('overview');
+      await priorityControl.selectOption(savedPriority);
       const inspectFirst = async () => {
         await overview
           .getByRole('button', { name: '8 groups · 301 items' })

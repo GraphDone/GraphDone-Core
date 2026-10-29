@@ -2,6 +2,7 @@
 
 | Symptom | Canonical lesson and regression |
 | --- | --- |
+| Overview zoom exceeds five seconds while original item groups are hidden | [Hidden items must not delay overview](../inbox/2026-10-29-hidden-items-must-not-delay-overview.md); issue #235, retained actual-dev 2k failure |
 | Overview wires cannot be hovered, do not light endpoints, or lose focus when their route disappears | [Interaction geometry and original-edge inspection](../inbox/2026-10-28-overview-wires-need-interaction-geometry.md); `OverviewBusLayer`, semantic LOD and 2k bus inspection journeys |
 | Your agent mixes setup, existing access and notes; narrow permission text clips, or unavailable access looks empty | [Separate task regions and honest availability](../inbox/2026-10-28-agent-setup-needs-separate-task-regions.md); `agent-connection` browser sequence and `AgentConnection.test.tsx` |
 | Inspector code remains11–13px, nested previews have microscopic labels, long titles hide content, or inspection clicks enqueue unchanged positions | [Readable preview levels and read-only gestures](../inbox/2026-10-28-inspector-previews-need-readable-levels.md); inspector-readability browser journey and subgraph preview conservation/component cases |
