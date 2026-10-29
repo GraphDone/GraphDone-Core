@@ -165,6 +165,23 @@ for (const [width, height, size] of [
         work: (window as unknown as { __graphOrganization?: unknown })
           .__graphOrganization,
       }));
+    if (width >= 600) {
+      await expect(page.getByTestId('mini-map-node')).toHaveCount(size);
+      await page.waitForTimeout(4500);
+      await page.evaluate(() => {
+        const host = window as unknown as {
+          updateMiniMapPositions: (
+            positions: Record<string, { x: number; y: number }>
+          ) => void;
+          __organizedMiniMap?: Record<string, { x: number; y: number }>;
+        };
+        const update = host.updateMiniMapPositions;
+        host.updateMiniMapPositions = positions => {
+          host.__organizedMiniMap = positions;
+          update(positions);
+        };
+      });
+    }
     const crowded = await read();
     const beforePng = info.outputPath(`before-organization-${width}.png`);
     await page.screenshot({ path: beforePng });
@@ -301,6 +318,35 @@ for (const [width, height, size] of [
       return hub;
     };
     const hub = await checkReadability(organized);
+    let minimap: unknown;
+    if (width >= 600) {
+      await expect
+        .poll(async () =>
+          page.evaluate(cards => {
+            const positions = (
+              window as unknown as {
+                __organizedMiniMap?: Record<string, { x: number; y: number }>;
+              }
+            ).__organizedMiniMap;
+            return (
+              !!positions &&
+              cards.every(
+                card =>
+                  !!positions[card.id] &&
+                  Math.abs(positions[card.id].x - card.x) < 0.01 &&
+                  Math.abs(positions[card.id].y - card.y) < 0.01
+              )
+            );
+          }, organized.cards)
+        )
+        .toBe(true);
+      await expect(page.getByTestId('mini-map-node')).toHaveCount(size);
+      minimap = await page.evaluate(
+        () =>
+          (window as unknown as { __organizedMiniMap?: unknown })
+            .__organizedMiniMap
+      );
+    }
     const leaves = organized.cards.filter(card => card.id !== hub.id);
     expect(
       leaves.reduce((sum, card) => sum + card.x, 0) / leaves.length
@@ -453,6 +499,7 @@ for (const [width, height, size] of [
         organized,
         saved,
         reloaded,
+        minimap,
         errors,
       })
     );
