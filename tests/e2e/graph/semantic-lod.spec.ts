@@ -203,6 +203,7 @@ for (const width of [1440, 390])
         )).toBeCloseTo(0.5);
       }
       await zoomToTitle(1.1, true);
+      await page.locator('[data-lod-bus-hit]').first().focus();
       await page.evaluate(({ x, y }) => {
         (window as unknown as { miniMapZoom: (x: number, y: number, k: number) => void }).miniMapZoom(x, y, 1.2);
       }, { x: longTitleItem.positionX, y: longTitleItem.positionY });
@@ -215,6 +216,7 @@ for (const width of [1440, 390])
         if (k > 1.15 && k < 1.2 && await overview.getAttribute('data-active') === 'false') exitedBeforeTarget = true;
       }
       expect(exitedBeforeTarget).toBe(true);
+      await expect(page.getByRole('button', { name: /groups · 301 items/ })).toBeFocused();
       expect(await svg.evaluate(element =>
         (element as SVGSVGElement & { __zoom: { k: number } }).__zoom.k
       )).toBeCloseTo(1.2);
