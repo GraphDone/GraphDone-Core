@@ -383,25 +383,43 @@ function overviewSlots(
     cardHeight = 96;
   const columns = Math.max(1, Math.floor((width - 32 + 64) / (cardWidth + 64)));
   const rows = Math.max(0, Math.floor((height - 100 + 64) / (cardHeight + 64)));
-  const slots: { x: number; y: number }[] = [];
   const span = columns * (cardWidth + 64) - 64;
-  for (let row = 0; row < rows; row++)
-    for (let col = 0; col < columns; col++) {
-      const slot = {
-        x: (width - span) / 2 + col * (cardWidth + 64),
-        y: 64 + row * (cardHeight + 64),
-      };
-      if (
-        !obstacles.some(
-          obstacle =>
-            slot.x < obstacle.right + 20 &&
-            slot.x + cardWidth > obstacle.left - 20 &&
-            slot.y < obstacle.bottom + 20 &&
-            slot.y + cardHeight > obstacle.top - 20
+  const step = cardHeight + 64;
+  const phase = (y: number) => 20 + ((((y - 20) % step) + step) % step);
+  const phases = [
+    ...new Set([
+      64,
+      ...obstacles.flatMap(obstacle => [
+        phase(obstacle.bottom + 20),
+        phase(obstacle.top - 20 - cardHeight),
+      ]),
+    ]),
+  ]
+    .sort((a, b) => Math.abs(a - 64) - Math.abs(b - 64) || a - b)
+    .slice(0, 32);
+  let slots: { x: number; y: number }[] = [];
+  for (const offset of phases) {
+    const candidate: { x: number; y: number }[] = [];
+    for (let row = 0; row < rows; row++)
+      for (let col = 0; col < columns; col++) {
+        const slot = {
+          x: (width - span) / 2 + col * (cardWidth + 64),
+          y: offset + row * step,
+        };
+        if (
+          slot.y + cardHeight <= height - 20 &&
+          !obstacles.some(
+            obstacle =>
+              slot.x < obstacle.right + 20 &&
+              slot.x + cardWidth > obstacle.left - 20 &&
+              slot.y < obstacle.bottom + 20 &&
+              slot.y + cardHeight > obstacle.top - 20
+          )
         )
-      )
-        slots.push(slot);
-    }
+          candidate.push(slot);
+      }
+    if (candidate.length > slots.length) slots = candidate;
+  }
   return { slots, cardWidth, cardHeight };
 }
 

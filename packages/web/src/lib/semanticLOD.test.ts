@@ -470,3 +470,41 @@ describe('readable overview', () => {
     }
   );
 });
+
+it('shifts phone rows below measured controls instead of wasting a viable third readable slot', () => {
+  const obstacles = [
+    { left: 12, right: 246, top: 12, bottom: 214 },
+    { left: 64, right: 298, top: 671, bottom: 729 },
+    { left: 284, right: 378, top: 12, bottom: 56 },
+    { left: 334, right: 378, top: 64, bottom: 108 },
+    { left: 334, right: 378, top: 112, bottom: 156 },
+  ];
+  const anchors = Array.from({ length: 8 }, (_, i) => ({
+    id: String(i),
+    x: 195,
+    y: 400,
+  }));
+  const layout = placeOverviewLabels(anchors, 390, 741, obstacles);
+  expect(layout.placed).toHaveLength(3);
+  expect(overviewLabelCapacity(390, 741, obstacles)).toBe(3);
+  expect(layout.hidden).toHaveLength(5);
+  for (const card of layout.placed) {
+    expect(card.width).toBe(240);
+    expect(card.height).toBe(96);
+    for (const other of layout.placed.filter(other => other.id !== card.id))
+      expect(Math.abs(card.y - other.y) - 96).toBeGreaterThanOrEqual(64);
+    for (const obstacle of obstacles) {
+      const dx = Math.max(
+        0,
+        obstacle.left - card.x - card.width,
+        card.x - obstacle.right
+      );
+      const dy = Math.max(
+        0,
+        obstacle.top - card.y - card.height,
+        card.y - obstacle.bottom
+      );
+      expect(Math.hypot(dx, dy)).toBeGreaterThanOrEqual(20);
+    }
+  }
+});
