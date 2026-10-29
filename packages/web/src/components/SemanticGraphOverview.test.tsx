@@ -255,8 +255,8 @@ it('inspects a visible bus with endpoint emphasis, exact originals and keyboard 
 });
 
 it('returns keyboard focus to overview controls when zoom removes the entire bus layer', () => {
-  const frames: FrameRequestCallback[] = [];
-  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => { frames.push(callback); return frames.length; });
+  const frames: ((time: number) => void)[] = [];
+  vi.stubGlobal('requestAnimationFrame', (callback: ((time: number) => void)) => { frames.push(callback); return frames.length; });
   const source = items.map((item, index) => ({ ...item, metadata: { lod: { groupPath: [index < 2 ? 'Left' : 'Right'] } } }));
   const relationships = [{ id: 'link', source: 'n0', target: 'n2', type:'BLOCKS' }];
   const fixture = (scale: number) => <SemanticGraphOverview items={source} edges={relationships} camera={{x:0,y:0,scale}} readPositions={positions} onActiveChange={noop} onBrowse={noop} onInspect={noop} onBack={noop} />;
