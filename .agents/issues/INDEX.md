@@ -3,6 +3,7 @@
 | Symptom | Canonical lesson and regression |
 | --- | --- |
 | Overview wires cannot be hovered, do not light endpoints, or lose focus when their route disappears | [Interaction geometry and original-edge inspection](../inbox/2026-10-28-overview-wires-need-interaction-geometry.md); `OverviewBusLayer`, semantic LOD and 2k bus inspection journeys |
+| Your agent mixes setup, existing access and notes; narrow permission text clips, or unavailable access looks empty | [Separate task regions and honest availability](../inbox/2026-10-28-agent-setup-needs-separate-task-regions.md); `agent-connection` browser sequence and `AgentConnection.test.tsx` |
 | Inspector code remains11–13px, nested previews have microscopic labels, long titles hide content, or inspection clicks enqueue unchanged positions | [Readable preview levels and read-only gestures](../inbox/2026-10-28-inspector-previews-need-readable-levels.md); inspector-readability browser journey and subgraph preview conservation/component cases |
 | Releasing Alt during a gesture crashes or moves a node using an earlier drag's state | [Gesture mode and state must belong to one drag](../inbox/2026-10-28-drag-mode-must-survive-modifier-release.md); native fresh/prior-drag Alt-release cases in layout recovery |
 | Inspector mode labels fit locally but are clipped with another system font | [Navigation must fit without shrinking its labels](../inbox/2026-10-28-inspector-controls-must-fit-system-fonts.md); wider-font fit, icon target and portal-tooltip checks in inspector-readability |
