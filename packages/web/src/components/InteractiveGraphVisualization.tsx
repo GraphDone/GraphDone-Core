@@ -466,8 +466,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const itemRelationshipTriggerRef = useRef<HTMLButtonElement>(null);
   const itemPairTriggerRef = useRef<HTMLElement | SVGElement | null>(null);
   const [localItemActive, setLocalItemActive] = useState(false);
-  const [localFocusRequest, setLocalFocusRequest] = useState<{id:string;sequence:number}>();
-  const requestLocalFocus = useCallback((id:string)=>setLocalFocusRequest(previous=>({id,sequence:(previous?.sequence??0)+1})),[]);
+  const [localFocusRequest, setLocalFocusRequest] = useState<{id:string;sequence:number;scope:string|null}>();
+  const localFocusSequenceRef = useRef(0);
+  const requestLocalFocus = useCallback((id:string)=>setLocalFocusRequest({id,sequence:++localFocusSequenceRef.current,scope:activeLayoutScopeRef.current}),[]);
+  const acknowledgeLocalFocus = useCallback((sequence:number)=>setLocalFocusRequest(previous=>previous?.sequence===sequence?undefined:previous),[]);
   const localItemActiveRef = useRef(false);
   const handleLocalActive = useCallback((active: boolean) => {localItemActiveRef.current=active;setLocalItemActive(active);},[]);
   const localItemBoardRef = useRef(false);
@@ -837,6 +839,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const layoutScope = currentUser && currentGraph ? JSON.stringify([currentUser.id, currentGraph.id]) : null;
   const activeLayoutScopeRef = useRef(layoutScope);
   activeLayoutScopeRef.current = layoutScope;
+  useLayoutEffect(() => setLocalFocusRequest(undefined), [layoutScope]);
   const simulationLayoutScopeRef = useRef<string | null>(null);
   const positionSaveQueueRef = useRef(positionSaveQueue);
   positionSaveQueueRef.current = positionSaveQueue;
@@ -5363,7 +5366,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         representedIds={priorityProjection.representedIds}
         camera={currentTransform}
         selectedId={Array.from(selectedNodes).slice(-1)[0]}
-        navigationRequest={localFocusRequest}
+        navigationRequest={localFocusRequest?.scope===layoutScope?localFocusRequest:undefined}
+        onNavigationHandled={acknowledgeLocalFocus}
         enabled={!semanticOverviewActive}
         readPositions={readOverviewPositions}
         onActive={handleLocalActive}

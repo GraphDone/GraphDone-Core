@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import {
   act,
   cleanup,
@@ -191,8 +191,58 @@ it('distinguishes explicit navigation to an already inspected item from opening 
     />
   );
   expect(focus(view.container)).toBe('B');
-  fireEvent.click(
-    screen.getByRole('button', { name: 'Focus on b0' })
-  );
+  fireEvent.click(screen.getByRole('button', { name: 'Focus on b0' }));
+  expect(focus(view.container)).toBe('b0');
+});
+
+it('consumes navigation requests so graph remounts restore the working focus without replaying old intent', () => {
+  const props = propsFor();
+  function Owner() {
+    const [request, setRequest] = useState<{ id: string; sequence: number }>();
+    const [scope, setScope] = useState('first');
+    const sequence = useRef(0);
+    return (
+      <>
+        <button
+          onClick={() => setRequest({ id: 'B', sequence: ++sequence.current })}
+        >
+          Navigate to B
+        </button>
+        <button
+          onClick={() =>
+            setScope(value => (value === 'first' ? 'second' : 'first'))
+          }
+        >
+          Switch graph
+        </button>
+        <output data-testid="request-state">
+          {request?.sequence ?? 'consumed'}
+        </output>
+        <View
+          key={scope}
+          {...props}
+          viewScope={scope}
+          navigationRequest={request}
+          onNavigationHandled={handled =>
+            setRequest(current =>
+              current?.sequence === handled ? undefined : current
+            )
+          }
+        />
+      </>
+    );
+  }
+  const view = render(<Owner />);
+  fireEvent.click(screen.getByRole('button', { name: 'Navigate to B' }));
+  expect(focus(view.container)).toBe('B');
+  expect(screen.getByTestId('request-state')).toHaveTextContent('consumed');
+  fireEvent.click(screen.getByRole('button', { name: 'Focus on b0' }));
+  expect(focus(view.container)).toBe('b0');
+  fireEvent.click(screen.getByRole('button', { name: 'Navigate to B' }));
+  expect(focus(view.container)).toBe('B');
+  fireEvent.click(screen.getByRole('button', { name: 'Focus on b0' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Switch graph' }));
+  expect(focus(view.container)).toBe('A');
+  fireEvent.click(screen.getByRole('button', { name: 'Switch graph' }));
   expect(focus(view.container)).toBe('b0');
 });
