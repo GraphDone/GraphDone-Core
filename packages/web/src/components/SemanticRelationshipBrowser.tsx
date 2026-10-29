@@ -90,6 +90,8 @@ export function SemanticRelationshipBrowser({
   const title =
     scope.kind === 'all'
       ? 'All loaded relationships'
+      : scope.kind === 'selection'
+        ? scope.label
       : scope.kind === 'pair'
         ? `Relationships between ${scope.endpoints.map(id => index.byId.get(id)?.title ?? id).join(' and ')}`
       : scope.kind === 'node'
