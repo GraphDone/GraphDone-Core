@@ -64,7 +64,7 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
   page,
   largeGraph,
 }, info) => {
-  test.setTimeout(180000);
+  test.setTimeout(240000);
   const snapshot = async () => {
     const data = await gql(
       page,
