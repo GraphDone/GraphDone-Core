@@ -14,8 +14,76 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+it('retains the chosen shared branch when pointer-down focus clears hover before click', () => {
+  vi.stubGlobal('requestAnimationFrame', () => 1);
+  vi.stubGlobal('PointerEvent', MouseEvent);
+  const routes: SchematicRoute[] = ['A', 'B', 'C'].map((id, index) => ({
+    id,
+    bus: index < 2 ? 'shared' : 'other',
+    source: index < 2 ? 'shared' : 'other',
+    target: id,
+    edgeIds: [`edge-${id}`],
+    connections: [
+      {
+        id,
+        source: index < 2 ? 'shared' : 'other',
+        target: id,
+        type: 'BLOCKS',
+        edgeIds: [`edge-${id}`],
+      },
+    ],
+    points:
+      index === 0
+        ? [
+            { x: 100, y: 100 },
+            { x: 300, y: 100 },
+            { x: 300, y: 200 },
+          ]
+        : index === 1
+          ? [
+              { x: 100, y: 100 },
+              { x: 400, y: 100 },
+              { x: 400, y: 300 },
+            ]
+          : [
+              { x: 100, y: 106 },
+              { x: 300, y: 106 },
+            ],
+  }));
+  const inspect = vi.fn(),
+    highlight = vi.fn();
+  render(
+    <OverviewBusLayer
+      routes={routes}
+      junctions={[]}
+      obstacles={[]}
+      width={800}
+      height={600}
+      color={() => '#5eead4'}
+      label={id => id}
+      onHighlight={highlight}
+      onInspect={inspect}
+      onFocusLost={() => {}}
+    />
+  );
+  const b = screen.getByRole('button', {
+    name: 'Inspect shared → B: 1 relationship',
+  });
+  const c = screen.getByRole('button', {
+    name: 'Inspect other → C: 1 relationship',
+  });
+  fireEvent.pointerEnter(b, { clientX: 400, clientY: 250 });
+  fireEvent.pointerMove(c, { clientX: 200, clientY: 100 });
+  expect(highlight).toHaveBeenLastCalledWith('B');
+  fireEvent.pointerDown(c, { clientX: 200, clientY: 100, button: 0 });
+  expect(b).toHaveFocus();
+  fireEvent.click(c, { clientX: 200, clientY: 100, detail: 1 });
+  expect(inspect).toHaveBeenLastCalledWith(routes[1], b);
+});
+
 it('gives new keyboard focus ownership over a stationary hover and keeps a persistent focus cue', () => {
   vi.stubGlobal('requestAnimationFrame', () => 1);
+  vi.stubGlobal('PointerEvent', MouseEvent);
   const routes: SchematicRoute[] = ['A', 'B'].map((id, index) => ({
     id,
     bus: id,
