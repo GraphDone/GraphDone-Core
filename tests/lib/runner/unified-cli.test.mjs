@@ -46,7 +46,7 @@ test('disposable Git fixture commits do not spawn background maintenance', t => 
   assert.deepEqual(events.filter(event => event.event === 'child_start' && event.argv?.includes('maintenance')), []);
 });
 
-for (const sequence of ['new-user', 'semantic-lod', 'nested-lod', 'item-wires', 'large-symbols', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'perf-budgets']) {
+for (const sequence of ['new-user', 'inspector-readability', 'semantic-lod', 'nested-lod', 'item-wires', 'large-symbols', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'perf-budgets']) {
   test(`CLI forwards failure-only tracing without retries for ${sequence}`, t => {
     const { dir, run } = fixture(t);
     const report = { suites: [{ specs: [{ title: 'fixture', ok: true,
@@ -59,6 +59,15 @@ for (const sequence of ['new-user', 'semantic-lod', 'nested-lod', 'item-wires', 
     if (sequence === 'new-user') {
       assert.ok(!args.includes('tests/e2e/graph/semantic-lod.spec.ts'));
       assert.ok(!args.includes('tests/e2e/auth/router-navigation.spec.ts'));
+      assert.ok(!args.includes('tests/e2e/graph/inspector-readability.spec.ts'));
+    }
+    if (sequence === 'inspector-readability') {
+      assert.deepEqual(args.filter(arg => arg.endsWith('.spec.ts')), ['tests/e2e/graph/inspector-readability.spec.ts']);
+      assert.ok(args.includes('--headed'));
+      assert.equal(SEQUENCES[sequence].blocking, true);
+      for (const profile of ['pr', 'full']) assert.ok(PROFILES[profile].includes(sequence));
+      const workflow = readFileSync(join(root, '.github/workflows/ci.yml'), 'utf8');
+      assert.equal(workflow.split('run: xvfb-run --auto-servernum node tests/run-unified.mjs --sequence inspector-readability --out test-artifacts/ci-inspector-readability').length, 2);
     }
     if (sequence === 'large-symbols') {
       assert.ok(args.includes('tests/e2e/graph/large-graph-symbols.spec.ts'));
@@ -90,33 +99,36 @@ for (const sequence of ['new-user', 'semantic-lod', 'nested-lod', 'item-wires', 
   });
 }
 
-test('failed browser traces and diagnostics survive later Playwright output cleanup', t => {
-  const { dir, run } = fixture(t);
-  const original = join(dir, 'test-artifacts/playwright-output');
-  mkdirSync(original, { recursive: true });
-  const trace = join(original, 'trace.zip');
-  const diagnostics = join(original, 'button-navigation-diagnostics.json');
-  writeFileSync(trace, 'owned trace bytes');
-  writeFileSync(diagnostics, '{"navigation":{"route":"/agents","width":320}}');
-  const report = { suites: [{ specs: [{ title: 'navigation failed', ok: false,
-    tests: [{ status: 'unexpected', expectedStatus: 'passed', results: [{ status: 'failed', attachments: [
-      { name: 'trace', contentType: 'application/zip', path: trace },
-      { name: 'button-navigation-diagnostics.json', contentType: 'application/json', path: diagnostics },
-    ] }] }],
-  }] }], stats: { expected: 0, unexpected: 1, flaky: 0, skipped: 0 }, errors: [] };
-  writeFileSync(join(dir, 'bin/npx'), `#!${process.execPath}\nprocess.stdout.write(${JSON.stringify(JSON.stringify(report))}); process.exitCode=1;\n`, { mode: 0o700 });
-  assert.equal(run(['--sequence', 'new-user']).status, 1);
-  const out = join(dir, 'test-artifacts/unified');
-  const result = JSON.parse(readFileSync(join(out, 'report.json')));
-  const attachments = result.sequences[0].cases[0].attachments;
-  assert.equal(attachments.length, 2);
-  assert.ok(attachments.every(attachment => attachment.type === 'file' && !attachment.srcPath));
-  rmSync(original, { recursive: true });
-  assert.equal(readFileSync(join(out, attachments[0].href), 'utf8'), 'owned trace bytes');
-  assert.equal(JSON.parse(readFileSync(join(out, attachments[1].href))).navigation.route, '/agents');
-  const html = readFileSync(join(out, 'report.html'), 'utf8');
-  for (const attachment of attachments) assert.ok(html.includes(`<a href="${attachment.href}" download>`));
-});
+for (const sequence of ['new-user', 'inspector-readability']) {
+  test(`${sequence}: failed browser traces and diagnostics survive later Playwright output cleanup`, t => {
+    const { dir, run } = fixture(t);
+    const original = join(dir, 'test-artifacts/playwright-output');
+    mkdirSync(original, { recursive: true });
+    const trace = join(original, 'trace.zip');
+    const diagnostics = join(original, 'button-navigation-diagnostics.json');
+    writeFileSync(trace, 'owned trace bytes');
+    writeFileSync(diagnostics, '{"navigation":{"route":"/agents","width":320}}');
+    const report = { suites: [{ specs: [{ title: 'navigation failed', ok: false,
+      tests: [{ status: 'unexpected', expectedStatus: 'passed', results: [{ status: 'failed', attachments: [
+        { name: 'trace', contentType: 'application/zip', path: trace },
+        { name: 'button-navigation-diagnostics.json', contentType: 'application/json', path: diagnostics },
+      ] }] }],
+    }] }], stats: { expected: 0, unexpected: 1, flaky: 0, skipped: 0 }, errors: [] };
+    writeFileSync(join(dir, 'bin/npx'), `#!${process.execPath}\nprocess.stdout.write(${JSON.stringify(JSON.stringify(report))}); process.exitCode=1;\n`, { mode: 0o700 });
+    assert.equal(run(['--sequence', sequence]).status, 1);
+    const out = join(dir, 'test-artifacts/unified');
+    const result = JSON.parse(readFileSync(join(out, 'report.json')));
+    const attachments = result.sequences[0].cases[0].attachments;
+    assert.equal(attachments.length, 2);
+    assert.ok(attachments.every(attachment => attachment.type === 'file' && !attachment.srcPath));
+    rmSync(original, { recursive: true });
+    assert.equal(readFileSync(join(out, attachments[0].href), 'utf8'), 'owned trace bytes');
+    assert.equal(JSON.parse(readFileSync(join(out, attachments[1].href))).navigation.route, '/agents');
+    const html = readFileSync(join(out, 'report.html'), 'utf8');
+    for (const attachment of attachments) assert.ok(html.includes(`<a href="${attachment.href}" download>`));
+  });
+
+}
 
 for (const location of ['outside-root', 'symlink', 'directory-symlink', 'directory']) {
   test(`CLI rejects ${location} sources for downloadable evidence`, t => {

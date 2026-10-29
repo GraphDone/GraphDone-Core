@@ -421,8 +421,8 @@ export function Workspace() {
              <Network className="h-4 w-4" />
            </button>
            {inspectorNode && (
-             <div className="absolute z-40 inset-x-3 bottom-3 md:inset-x-auto md:bottom-auto md:top-3 md:right-3">
-               <NodeInspector node={inspectorNode} onClose={() => setInspectorNode(null)} onEdit={() => { setQuickEditRequest(inspectorNode); setInspectorNode(null); }} />
+             <div className={`absolute z-40 inset-x-3 bottom-3 md:inset-x-auto md:top-3 md:right-3 ${showMiniMap ? 'md:bottom-56' : 'md:bottom-3'}`}>
+               <NodeInspector maxHeight={isMobile ? undefined : '100%'} node={inspectorNode} onClose={() => setInspectorNode(null)} onEdit={() => { setQuickEditRequest(inspectorNode); setInspectorNode(null); }} />
              </div>
            )}
           </div>
