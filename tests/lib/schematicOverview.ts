@@ -296,4 +296,5 @@ export async function inspectSchematicOverview(
     path: screenshotPath,
     contentType: 'image/png',
   });
+  return { ...geometry, metrics, clearance };
 }
