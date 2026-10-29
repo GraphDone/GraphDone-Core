@@ -381,23 +381,23 @@ function overviewSlots(
 ) {
   const cardWidth = Math.min(240, Math.max(160, width - 32)),
     cardHeight = 96;
-  const columns = Math.max(1, Math.floor((width - 32) / (cardWidth + 16)));
-  const rows = Math.max(0, Math.floor((height - 100) / (cardHeight + 24)));
+  const columns = Math.max(1, Math.floor((width - 32 + 64) / (cardWidth + 64)));
+  const rows = Math.max(0, Math.floor((height - 100 + 64) / (cardHeight + 64)));
   const slots: { x: number; y: number }[] = [];
-  const span = columns * (cardWidth + 16) - 16;
+  const span = columns * (cardWidth + 64) - 64;
   for (let row = 0; row < rows; row++)
     for (let col = 0; col < columns; col++) {
       const slot = {
-        x: (width - span) / 2 + col * (cardWidth + 16),
-        y: 64 + row * (cardHeight + 24),
+        x: (width - span) / 2 + col * (cardWidth + 64),
+        y: 64 + row * (cardHeight + 64),
       };
       if (
         !obstacles.some(
           obstacle =>
-            slot.x < obstacle.right + 8 &&
-            slot.x + cardWidth > obstacle.left - 8 &&
-            slot.y < obstacle.bottom + 8 &&
-            slot.y + cardHeight > obstacle.top - 8
+            slot.x < obstacle.right + 20 &&
+            slot.x + cardWidth > obstacle.left - 20 &&
+            slot.y < obstacle.bottom + 20 &&
+            slot.y + cardHeight > obstacle.top - 20
         )
       )
         slots.push(slot);
@@ -425,7 +425,8 @@ export function placeOverviewLabels(
     top: number;
     right: number;
     bottom: number;
-  }[] = []
+  }[] = [],
+  preserveOrder = false
 ) {
   const { slots, cardWidth, cardHeight } = overviewSlots(
     width,
@@ -439,7 +440,9 @@ export function placeOverviewLabels(
     height: number;
   })[] = [];
   const hidden: string[] = [];
-  for (const anchor of [...anchors].sort((a, b) => a.id.localeCompare(b.id))) {
+  for (const anchor of preserveOrder
+    ? anchors
+    : [...anchors].sort((a, b) => a.id.localeCompare(b.id))) {
     if (!slots.length) {
       hidden.push(anchor.id);
       continue;

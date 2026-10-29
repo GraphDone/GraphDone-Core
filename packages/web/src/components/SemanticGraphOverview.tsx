@@ -20,7 +20,6 @@ import {
 import { GraphStatusDock } from './GraphStatusDock';
 import {
   overviewAtScale,
-  placeOverviewLabels,
   buildSemanticHierarchy,
   projectSemanticHierarchy,
   semanticDepthAtScale,
@@ -35,6 +34,7 @@ import {
 } from '../lib/semanticRelationships';
 import { SemanticRelationshipBrowser } from './SemanticRelationshipBrowser';
 import { routeSchematicConnections } from '../lib/schematicRouting';
+import { organizeOverview } from '../lib/overviewOrganization';
 import {
   projectSemanticTrace,
   type SemanticTraceSelection,
@@ -256,7 +256,7 @@ export function SemanticGraphOverview({
   const layout = useMemo(() => {
     if (!active) return { placed: [], hidden: [] };
     if (traceProjection) {
-      return placeOverviewLabels(
+      return organizeOverview(
         traceProjection.groups.map((entry, index) => ({
           id: entry.id,
           x: size.width * (index === 0 ? 0.25 : 0.75),
@@ -265,6 +265,7 @@ export function SemanticGraphOverview({
               ? size.height / 2
               : (size.height * index) / traceProjection.groups.length,
         })),
+        representedBundles.filter(bundle => traceBundleIds?.has(bundle.id)),
         size.width,
         size.height,
         obstacles
@@ -289,10 +290,12 @@ export function SemanticGraphOverview({
         y: y * camera.scale + camera.y,
       };
     });
-    return placeOverviewLabels(anchors, size.width, size.height, obstacles);
+    return organizeOverview(anchors, representedBundles, size.width, size.height, obstacles);
   }, [
     projection,
     traceProjection,
+    traceBundleIds,
+    representedBundles,
     size.width,
     size.height,
     obstacleKey,
@@ -352,6 +355,8 @@ export function SemanticGraphOverview({
               height: rect.bottom - rect.top,
             })),
             {
+              cardClearance: 20,
+              wireClearance: 16,
               sharedEndpoint:
                 trace?.direction === 'incoming' ? 'target' : 'source',
             }
