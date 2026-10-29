@@ -1,6 +1,7 @@
 import { test as base, expect, type CDPSession } from '@playwright/test';
 import { login, TEST_USERS } from '../../lib/auth';
 import { gql } from '../../lib/graphRequest';
+import { inspectOverviewBus } from '../../lib/overviewBusInspection';
 import { seedLargeGraph } from '../../lib/seedGraph';
 import {
   ownedGraphIdsFixture,
@@ -116,6 +117,7 @@ for (const width of [1440, 390])
         { id: seeded.graphId }
       );
       const before = await snapshot();
+      const originalEdges = (await gql(page, 'query($id:ID!){edges(where:{source:{graph:{id:$id}}}){id type source{id} target{id}}}', { id: seeded.graphId })).edges;
       await page.route('**/api/graphql', async route => {
         const body = route.request().postDataJSON();
         if (/^\s*mutation\b/.test(body?.query ?? '')) {
@@ -169,6 +171,7 @@ for (const width of [1440, 390])
         return geometry;
       };
       const initialGeometry = await overviewGeometry();
+      await inspectOverviewBus(page, info, originalEdges, Object.fromEntries(seeded.nodeIds.map((id, index) => [id, `Subsystem ${index % 8}`])), ms => page.clock.runFor(ms));
       const longTitleItem = before.find(
         (item: { id: string }) => item.id === seeded.nodeIds[8]
       );
