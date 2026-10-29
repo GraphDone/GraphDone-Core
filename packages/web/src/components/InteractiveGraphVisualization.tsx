@@ -466,6 +466,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const itemRelationshipTriggerRef = useRef<HTMLButtonElement>(null);
   const itemPairTriggerRef = useRef<HTMLElement | SVGElement | null>(null);
   const [localItemActive, setLocalItemActive] = useState(false);
+  const [localFocusRequest, setLocalFocusRequest] = useState<{id:string;sequence:number}>();
+  const requestLocalFocus = useCallback((id:string)=>setLocalFocusRequest(previous=>({id,sequence:(previous?.sequence??0)+1})),[]);
   const localItemActiveRef = useRef(false);
   const handleLocalActive = useCallback((active: boolean) => {localItemActiveRef.current=active;setLocalItemActive(active);},[]);
   const localItemBoardRef = useRef(false);
@@ -479,6 +481,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const inspectLocalItem = useCallback((id: string) => {
     const item = simulationRef.current?.nodes().find(node => node.id === id);
     if (!item) return;
+    const focusId = containerRef.current?.querySelector<HTMLElement>('[data-local-focus]')?.dataset.localFocus;
+    const triggers = Array.from(containerRef.current?.querySelectorAll<HTMLButtonElement>('[data-local-open]') ?? []);
+    (triggers.find(button => button.dataset.localOpen === id) ?? triggers.find(button => button.dataset.localOpen === focusId))?.focus({preventScroll:true});
     setSelectedNode({ ...item });
     setSelectedNodes(new Set([id]));
     setEditingEdge(null);
@@ -532,6 +537,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     requestAnimationFrame(() => {
       const active = document.activeElement;
       if (active && active !== document.body) return;
+      const focusId = containerRef.current?.querySelector<HTMLElement>('[data-local-focus]')?.dataset.localFocus;
+      const projected = Array.from(containerRef.current?.querySelectorAll<HTMLButtonElement>('[data-local-open]') ?? []);
+      const localTrigger = projected.find(button => button.dataset.localOpen === returnFocusId) ?? projected.find(button => button.dataset.localOpen === focusId);
+      if (localTrigger) {localTrigger.focus({preventScroll:true});return;}
       const trigger = Array.from(
         containerRef.current?.querySelectorAll<SVGGElement>('.node-edit-icon') ?? []
       ).find(element => element.dataset.nodeId === returnFocusId);
@@ -542,6 +551,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     if (!quickEditRequest) return;
     setInlineEdit(null);
     setExpandedNode(null);
+    quickEditReturnFocusIdRef.current = quickEditRequest.id;
     setQuickEditNode(quickEditRequest);
     onQuickEditRequestHandled?.();
   }, [quickEditRequest, onQuickEditRequestHandled]);
@@ -4029,6 +4039,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     if (beginSession || overviewReturnCamera.current?.graphId !== currentGraphIdRef.current) {
       overviewReturnCamera.current = { graphId: currentGraphIdRef.current, transform: d3.zoomTransform(svgRef.current) };
     }
+    requestLocalFocus(id);
     // Selection is intentional here; never invoke the Grow/connect click path.
     setSelectedNode(item);
     setSelectedNodes(new Set([id]));
@@ -4038,7 +4049,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     const k = 1.2;
     const transform = d3.zoomIdentity.translate(containerRef.current.clientWidth / 2 - item.x * k, containerRef.current.clientHeight / 2 - item.y * k).scale(k);
     d3.select(svgRef.current).interrupt().call(zoomBehaviorRef.current.transform, transform);
-  }, []);
+  }, [requestLocalFocus]);
   const returnToOverview = useCallback(() => {
     setSelectedNode(null);
     const saved = overviewReturnCamera.current;
@@ -5352,6 +5363,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         representedIds={priorityProjection.representedIds}
         camera={currentTransform}
         selectedId={Array.from(selectedNodes).slice(-1)[0]}
+        navigationRequest={localFocusRequest}
         enabled={!semanticOverviewActive}
         readPositions={readOverviewPositions}
         onActive={handleLocalActive}
@@ -5498,8 +5510,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         const dataNode = (nodes as any[]).find((n: any) => n.id === quickEditNode.id) || quickEditNode;
         const gx = simNode?.x ?? dataNode.x ?? 0;
         const gy = simNode?.y ?? dataNode.y ?? 0;
-        const left = gx * currentTransform.scale + currentTransform.x;
-        const top = gy * currentTransform.scale + currentTransform.y;
+        const projected = localItemActive ? Array.from(containerRef.current?.querySelectorAll<HTMLElement>('[data-original-item]') ?? []).find(element => element.dataset.originalItem === quickEditNode.id)?.getBoundingClientRect() : undefined;
+        const frame = containerRef.current?.getBoundingClientRect();
+        const left = projected ? projected.left + projected.width / 2 - (frame?.left ?? 0) : gx * currentTransform.scale + currentTransform.x;
+        const top = projected ? projected.top + projected.height / 2 - (frame?.top ?? 0) : gy * currentTransform.scale + currentTransform.y;
         const onCommit = (c: QuickEditCommit) => {
           updateWorkItemMutation({ variables: { where: { id: quickEditNode.id }, update: c.update } })
             .then(() => {
