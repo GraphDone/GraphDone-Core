@@ -238,11 +238,11 @@ export function SemanticGraphOverview({
         : null,
     [traceProjection]
   );
-  useEffect(() => {
+  useLayoutEffect(() => {
     setAutomatic(previous => overviewAtScale(previous, camera.scale));
     setAutomaticDepth(previous => semanticDepthAtScale(previous, camera.scale));
   }, [camera.scale]);
-  useEffect(() => {
+  useLayoutEffect(() => {
     onActiveChange(active);
     return () => onActiveChange(false);
   }, [active, onActiveChange]);
