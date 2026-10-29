@@ -1,10 +1,20 @@
+import { useEffect, useState } from 'react';
 import type { usePositionSaveQueue } from '../hooks/usePositionSaveQueue';
 
 export function LayoutSaveStatus({ queue }: { queue: ReturnType<typeof usePositionSaveQueue> }) {
   const { state, error } = queue;
+  const acknowledgedOnly = !!state?.acknowledged && !state.pending && !error && !state.storageError && !state.cleanupError && !state.sendError;
+  const [ackExpired, setAckExpired] = useState(false);
+  useEffect(() => {
+    if (!acknowledgedOnly) { setAckExpired(false); return; }
+    setAckExpired(false);
+    const timer = setTimeout(() => setAckExpired(true), 3500);
+    return () => clearTimeout(timer);
+  }, [acknowledgedOnly]);
+  if (acknowledgedOnly && ackExpired) return null;
   if (!error && (!state || !(state.pending || state.acknowledged || state.storageError || state.cleanupError || state.sendError))) return null;
   return (
-    <div data-graph-fit-obstacle="true" data-testid="layout-save-status" role="status" className="max-w-full rounded-lg bg-gray-950/90 px-3 py-2 text-xs text-gray-100 shadow">
+    <div data-graph-fit-obstacle="true" data-testid="layout-save-status" data-layout-save-progress={!!state?.pending && !error && !state.storageError && !state.cleanupError && !state.sendError} role="status" className="max-w-full rounded-lg bg-gray-950/90 px-3 py-2 text-xs text-gray-100 shadow">
       {error && <p>{error}</p>}
       {state && <>
         {state.pending > 0 && <p>{state.local} saved on this device; {state.pending - state.local} pending only in this tab.</p>}

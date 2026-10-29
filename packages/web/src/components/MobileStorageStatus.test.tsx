@@ -33,29 +33,53 @@ beforeEach(() => {
 
 describe('MobileStorageStatus', () => {
   it('describes pending guest work as device-only because it will never upload', () => {
-    render(<MemoryRouter><MobileStorageStatus expanded /></MemoryRouter>);
+    render(
+      <MemoryRouter>
+        <MobileStorageStatus expanded />
+      </MemoryRouter>
+    );
     const status = screen.getByTestId('mobile-storage-status');
     expect(status.textContent).toContain('Saved on this device');
     expect(status.textContent).not.toContain('waiting to sync');
-    expect(status.getAttribute('aria-label')).toBe('Saved on this device — storage and allowance details');
+    expect(status.getAttribute('aria-label')).toBe(
+      'Saved on this device — storage and allowance details'
+    );
   });
 
   it('keeps the pending-sync state for a signed-in account', () => {
     fixture.guest = false;
-    render(<MemoryRouter><MobileStorageStatus /></MemoryRouter>);
+    render(
+      <MemoryRouter>
+        <MobileStorageStatus />
+      </MemoryRouter>
+    );
     const status = screen.getByTestId('mobile-storage-status');
     expect(status.textContent).toContain('Pending');
-    expect(status.getAttribute('aria-label')).toBe('Saved locally · waiting to sync — storage and allowance details');
+    expect(status.getAttribute('aria-label')).toBe(
+      'Saved locally · waiting to sync — storage and allowance details'
+    );
   });
 
   it('names the action that stopped when the cloud allowance is exhausted', () => {
     fixture.guest = false;
     fixture.usage = { status: 'PERSONAL_LIMIT' };
     fixture.state.pending = 0;
-    render(<MemoryRouter><MobileStorageStatus /></MemoryRouter>);
+    const { rerender } = render(
+      <MemoryRouter>
+        <MobileStorageStatus />
+      </MemoryRouter>
+    );
     const status = screen.getByTestId('mobile-storage-status');
-    expect(status.textContent).toContain('Sync paused');
+    expect(status.textContent).toBe('Paused');
     expect(status.textContent).not.toContain('Local only');
-    expect(status.getAttribute('aria-label')).toBe('Saved locally · sync paused — storage and allowance details');
+    expect(status.getAttribute('aria-label')).toBe(
+      'Saved locally · sync paused — storage and allowance details'
+    );
+    rerender(
+      <MemoryRouter>
+        <MobileStorageStatus expanded />
+      </MemoryRouter>
+    );
+    expect(status.textContent).toContain('Saved locally · sync paused');
   });
 });

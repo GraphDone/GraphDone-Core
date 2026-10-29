@@ -8,6 +8,10 @@ import {
 } from '../../lib/ownedGraphIdsFixture';
 import type { SeededGraph } from '../../lib/seedGraph';
 import { measureGraphZoom } from '../../lib/graphZoomReady';
+import {
+  inspectLocalItemNeighborhood,
+  readCanonicalItemPositions,
+} from '../../lib/localItemNeighborhood';
 import { inspectItemSymbols } from '../../lib/itemSymbolVisual';
 import { inspectOverviewBus } from '../../lib/overviewBusInspection';
 import { inspectSchematicOverview } from '../../lib/schematicOverview';
@@ -38,8 +42,9 @@ const test = base.extend<{
           },
         }),
         additionalEdges: Array.from({ length: 2000 }, (_, index) => ({
-          sourceIndex: index < 500 ? index + 1 : index,
-          targetIndex: index < 500 ? index : (index + 17) % SIZE,
+          sourceIndex: index < 500 ? index + 1 : index < 607 ? 1900 : index,
+          targetIndex:
+            index < 500 ? index : index < 607 ? index : (index + 17) % SIZE,
           type: index < 500 ? 'BLOCKS' : index % 2 ? 'BLOCKS' : 'ENABLES',
         })),
       });
@@ -121,10 +126,22 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
         edges.map(edge => edge.getAttribute('data-edge-id')).sort()
       )
   ).toEqual(before.edges.map((edge: { id: string }) => edge.id));
+  const canonicalBefore = await readCanonicalItemPositions(page);
+  expect(canonicalBefore).toHaveLength(SIZE);
   const overview = page.locator('.semantic-overview');
   await expect(overview).toHaveAttribute('data-active', 'true');
   await inspectSchematicOverview(overview, info, 5000, '2000-items-fit', 8);
-  await inspectOverviewBus(page, info, before.edges, Object.fromEntries(largeGraph.nodeIds.map((id, index) => [id, `Subsystem ${Math.floor(index / 250)}`])));
+  await inspectOverviewBus(
+    page,
+    info,
+    before.edges,
+    Object.fromEntries(
+      largeGraph.nodeIds.map((id, index) => [
+        id,
+        `Subsystem ${Math.floor(index / 250)}`,
+      ])
+    )
+  );
   const priority = page.getByRole('combobox', {
     name: 'Relationship priority',
   });
@@ -178,11 +195,12 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
     paintedCards?: number;
     labels?: number;
   }[] = [];
-  const presentation = () => page.locator('.main-graph-group').evaluate(element => ({
-    kind: element.getAttribute('data-presentation-kind'),
-    itemScale: Number(element.getAttribute('data-item-presentation-scale')),
-    passes: Number(element.getAttribute('data-item-presentation-passes')),
-  }));
+  const presentation = () =>
+    page.locator('.main-graph-group').evaluate(element => ({
+      kind: element.getAttribute('data-presentation-kind'),
+      itemScale: Number(element.getAttribute('data-item-presentation-scale')),
+      passes: Number(element.getAttribute('data-item-presentation-passes')),
+    }));
   for (const scale of [1.2, 0.1, 1.2]) {
     const priorPresentation = await presentation();
     const start = Date.now();
@@ -218,7 +236,9 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
     if (scale > 1) {
       expect(settledPresentation.kind).toBe('items');
       expect(settledPresentation.itemScale).toBe(scale);
-      expect(settledPresentation.passes).toBeGreaterThan(priorPresentation.passes);
+      expect(settledPresentation.passes).toBeGreaterThan(
+        priorPresentation.passes
+      );
       const geometry = await inspectItemSymbols(
         page,
         info,
@@ -458,6 +478,77 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
   await page
     .getByRole('button', { name: 'Back to graph', exact: true })
     .click();
+  const denseTarget = before.workItems.find(
+    (item: { id: string }) => item.id === largeGraph.nodeIds[1900]
+  );
+  const denseIncident = originalEdges.filter(
+    edge =>
+      edge.source.id === denseTarget.id || edge.target.id === denseTarget.id
+  );
+  expect(
+    new Set(
+      denseIncident
+        .flatMap(edge => [edge.source.id, edge.target.id])
+        .filter(id => id !== denseTarget.id)
+    ).size
+  ).toBeGreaterThanOrEqual(107);
+  const denseTimings: { scale: number; ms: number; wallMs: number }[] = [];
+  let denseOriginals: string[] = [];
+  for (const scale of [1.2, 0.1, 1.2]) {
+    const started = Date.now();
+    const ms = await page.evaluate(measureGraphZoom, {
+      x: denseTarget.positionX,
+      y: denseTarget.positionY,
+      scale,
+    });
+    denseTimings.push({ scale, ms, wallMs: Date.now() - started });
+    expect(
+      ms,
+      'Dense local zoom must finish within the unchanged five-second CI budget'
+    ).toBeLessThan(5000);
+    if (scale > 1) {
+      const local = await inspectLocalItemNeighborhood(
+        page,
+        info,
+        originalEdges,
+        `2000-dense-local-${denseTimings.length}`,
+        2
+      );
+      expect(local.snapshot.focusId).toBe(denseTarget.id);
+      expect(local.snapshot.counts.incident).toBe(denseIncident.length);
+      const ids = local.snapshot.cards.flatMap(card =>
+        card.originalId ? [card.originalId] : []
+      );
+      if (denseOriginals.length) expect(ids).toEqual(denseOriginals);
+      else denseOriginals = ids;
+    } else
+      await inspectSchematicOverview(
+        overview,
+        info,
+        5000,
+        '2000-dense-return-overview',
+        8
+      );
+  }
+  const canonicalAfter = await readCanonicalItemPositions(page);
+  expect(canonicalAfter).toEqual(canonicalBefore);
+  const densePath = info.outputPath('two-thousand-dense-local-timings.json');
+  await writeFile(
+    densePath,
+    JSON.stringify({
+      nodes: SIZE,
+      edges: 5000,
+      denseIncident: denseIncident.length,
+      timings: denseTimings,
+      originalIds: denseOriginals,
+      canonicalBefore,
+      canonicalAfter,
+    })
+  );
+  await info.attach('two-thousand-dense-local-timings.json', {
+    path: densePath,
+    contentType: 'application/json',
+  });
   expect(await snapshot()).toEqual(before);
   expect(writes).toEqual([]);
   expect(errors).toEqual([]);
@@ -469,6 +560,7 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
       edges: 5000,
       loadedMs,
       timings,
+      denseTimings,
       writes,
       errors,
     })

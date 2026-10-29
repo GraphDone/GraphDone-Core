@@ -1,3 +1,4 @@
+import { inspectSchematicOverview } from '../../lib/schematicOverview';
 import { writeFile } from 'node:fs/promises';
 import { test as base, expect, type CDPSession } from '@playwright/test';
 import { login, TEST_USERS } from '../../lib/auth';
@@ -172,6 +173,9 @@ for (const width of [1440, 390])
         return geometry;
       };
       const initialGeometry = await overviewGeometry();
+      const visual = await inspectSchematicOverview(overview, info, originalEdges.length, '301-overview', width === 390 ? 3 : 8);
+      expect(visual.coverage.connectedDrawnGroups).toBe(width === 390 ? 3 : 8);
+      expect(visual.coverage.drawnPairs).toBeGreaterThanOrEqual(width === 390 ? 4 : 13);
       await inspectOverviewBus(page, info, originalEdges, Object.fromEntries(seeded.nodeIds.map((id, index) => [id, `Subsystem ${index % 8}`])), ms => page.clock.runFor(ms));
       const longTitleItem = before.find(
         (item: { id: string }) => item.id === seeded.nodeIds[8]

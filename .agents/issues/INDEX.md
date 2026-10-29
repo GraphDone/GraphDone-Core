@@ -2,6 +2,8 @@
 
 | Symptom | Canonical lesson and regression |
 | --- | --- |
+| A dense item shows a fan of essential wires while every neighbor is off screen, despite settled/no-overlap metrics | [Detailed LOD needs a readable local cut](../inbox/2026-10-29-high-degree-detail-needs-local-lod.md); EPIC2215 owned301 failure and local-neighborhood acceptance |
+| Overview has no intersections but wires hug cards/each other, or hubs are flattened into rows | [Measure clearance and organize by topology](../inbox/2026-10-28-clean-layout-needs-clearance-and-topology.md); topology/overview organization tests, real control/save journey and strict schematic clearance |
 | Overview zoom exceeds five seconds while original item groups are hidden | [Hidden items must not delay overview](../inbox/2026-10-29-hidden-items-must-not-delay-overview.md); issue #235, retained actual-dev 2k failure |
 | Overview wires cannot be hovered, do not light endpoints, or lose focus when their route disappears | [Interaction geometry and original-edge inspection](../inbox/2026-10-28-overview-wires-need-interaction-geometry.md); `OverviewBusLayer`, semantic LOD and 2k bus inspection journeys |
 | Your agent mixes setup, existing access and notes; narrow permission text clips, or unavailable access looks empty | [Separate task regions and honest availability](../inbox/2026-10-28-agent-setup-needs-separate-task-regions.md); `agent-connection` browser sequence and `AgentConnection.test.tsx` |

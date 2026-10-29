@@ -20,7 +20,6 @@ import { OverviewBusLayer } from './OverviewBusLayer';
 import { GraphStatusDock } from './GraphStatusDock';
 import {
   overviewAtScale,
-  placeOverviewLabels,
   buildSemanticHierarchy,
   projectSemanticHierarchy,
   semanticDepthAtScale,
@@ -35,6 +34,7 @@ import {
 } from '../lib/semanticRelationships';
 import { SemanticRelationshipBrowser } from './SemanticRelationshipBrowser';
 import { routeSchematicConnections } from '../lib/schematicRouting';
+import { organizeOverview } from '../lib/overviewOrganization';
 import {
   projectSemanticTrace,
   type SemanticTraceSelection,
@@ -57,6 +57,8 @@ interface Props {
     representedIds: ReadonlySet<string>;
   };
   relationshipControl?: ReactNode;
+  itemDetailControl?: ReactNode;
+  viewScope?: string|null;
 }
 
 export function SemanticGraphOverview({
@@ -72,6 +74,8 @@ export function SemanticGraphOverview({
   layoutStatus,
   relationshipPriority,
   relationshipControl,
+  itemDetailControl,
+  viewScope,
 }: Props) {
   const hierarchy = useMemo(
     () => buildSemanticHierarchy(items, edges),
@@ -121,7 +125,10 @@ export function SemanticGraphOverview({
     );
   });
   const obstacleKey = JSON.stringify(obstacles);
-  const [mode, setMode] = useState<'auto' | 'overview' | 'items'>('auto');
+  const [mode, setMode] = useState<'auto' | 'overview' | 'items'>(() => {
+    try {const value=viewScope?localStorage.getItem(`graphdone:detail:${viewScope}`):null;return value==='items'||value==='overview'?value:'auto';}catch{return 'auto';}
+  });
+  useEffect(()=>{if(!viewScope)return;try{localStorage.setItem(`graphdone:detail:${viewScope}`,mode);}catch{return;}},[viewScope,mode]);
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(
     () => new Set()
   );
@@ -257,7 +264,7 @@ export function SemanticGraphOverview({
   const layout = useMemo(() => {
     if (!active) return { placed: [], hidden: [] };
     if (traceProjection) {
-      return placeOverviewLabels(
+      return organizeOverview(
         traceProjection.groups.map((entry, index) => ({
           id: entry.id,
           x: size.width * (index === 0 ? 0.25 : 0.75),
@@ -266,6 +273,7 @@ export function SemanticGraphOverview({
               ? size.height / 2
               : (size.height * index) / traceProjection.groups.length,
         })),
+        representedBundles.filter(bundle => traceBundleIds?.has(bundle.id)),
         size.width,
         size.height,
         obstacles
@@ -290,10 +298,12 @@ export function SemanticGraphOverview({
         y: y * camera.scale + camera.y,
       };
     });
-    return placeOverviewLabels(anchors, size.width, size.height, obstacles);
+    return organizeOverview(anchors, representedBundles, size.width, size.height, obstacles);
   }, [
     projection,
     traceProjection,
+    traceBundleIds,
+    representedBundles,
     size.width,
     size.height,
     obstacleKey,
@@ -353,6 +363,8 @@ export function SemanticGraphOverview({
               height: rect.bottom - rect.top,
             })),
             {
+              cardClearance: 20,
+              wireClearance: 16,
               sharedEndpoint:
                 trace?.direction === 'incoming' ? 'target' : 'source',
             }
@@ -391,6 +403,21 @@ export function SemanticGraphOverview({
       (count, bundle) => count + bundle.edges.length,
       0
     );
+  const externalCoverage = useMemo(
+    () => ({
+      connections: projection.bundles.reduce(
+        (sum, bundle) => sum + bundle.edges.length,
+        0
+      ),
+      pairs: new Set(
+        projection.bundles.map(bundle => `${bundle.source}\0${bundle.target}`)
+      ).size,
+    }),
+    [projection.bundles]
+  );
+  const drawnPairs = new Set(
+    (wiring?.routes ?? []).map(route => `${route.source}\0${route.target}`)
+  ).size;
   const internalConnections = projection.groups.reduce(
     (count, group) => count + group.internalEdges.length,
     0
@@ -516,6 +543,9 @@ export function SemanticGraphOverview({
       data-geometry-deferred={collapsedConnections}
       data-internal-relationships={internalConnections}
       data-pending-relationships={pendingConnections}
+      data-external-relationships={externalCoverage.connections}
+      data-external-pairs={externalCoverage.pairs}
+      data-drawn-external-pairs={drawnPairs}
       onClick={event => event.stopPropagation()}
     >
       <div
@@ -543,6 +573,7 @@ export function SemanticGraphOverview({
           </select>
         </label>
         {relationshipControl}
+        {!active && itemDetailControl ? itemDetailControl : <>
         <button
           ref={groupListButton}
           aria-label={`${projection.groups.length} groups · ${items.length} items`}
@@ -560,6 +591,7 @@ export function SemanticGraphOverview({
           </span>
           <span className="md:block">{items.length} items</span>
         </button>
+        </>}
         {mode === 'overview' && effectiveExpanded.size > 0 && (
           <button
             className="rounded bg-gray-950/95 border border-gray-600 px-3 py-2 min-h-11 text-gray-100"
@@ -712,13 +744,11 @@ export function SemanticGraphOverview({
                 openRelationships({ kind: 'all' }, 'all');
               }}
             >
-              <span className="block">Connections</span>
+              <span className="block font-semibold">{drawnConnections} of {externalCoverage.connections} external links shown</span>
               <span
                 className={`block ${notDrawnConnections ? 'text-amber-200' : 'text-emerald-200'}`}
               >
-                {notDrawnConnections
-                  ? `${notDrawnConnections} not drawn`
-                  : 'Browse all'}
+                {internalConnections} inside groups · Browse all {edges.length}
               </span>
             </button>
           )}

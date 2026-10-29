@@ -73,21 +73,22 @@ export function MobileBottomNav() {
     <>
       <nav
         data-testid="mobile-bottom-nav"
+        aria-label="Main navigation"
         className="md:hidden flex-shrink-0 relative z-30 flex items-stretch border-t border-gray-700/60 bg-gray-900/95 backdrop-blur-md pb-safe"
       >
         <button onClick={() => goView('cards')} className={tabActive(onWorkspace && viewMode === 'cards')}>
-          <CreditCard className="h-5 w-5" strokeWidth={1.75} />
+          <CreditCard className="h-5 w-5" strokeWidth={2} />
           <span className="text-xs font-medium">List</span>
         </button>
         <button onClick={() => goView('graph')} className={tabActive(onWorkspace && viewMode === 'graph')}>
-          <Network className="h-5 w-5" strokeWidth={1.75} />
+          <Network className="h-5 w-5" strokeWidth={2} />
           <span className="text-xs font-medium">Graph</span>
         </button>
         <button
           onClick={() => setMoreOpen(true)}
           className={tabActive(moreOpen || (onWorkspace && !['cards', 'graph'].includes(viewMode)) || !onWorkspace)}
         >
-          <MoreHorizontal className="h-5 w-5" strokeWidth={1.75} />
+          <MoreHorizontal className="h-5 w-5" strokeWidth={2} />
           <span className="text-xs font-medium">More</span>
         </button>
         <MobileStorageStatus />

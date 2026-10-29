@@ -893,8 +893,21 @@ html:not([data-theme="contrast"]) .workspace-surface .graph-container .node-titl
   .workspace-sidebar, .workspace-toolbar { display: none !important; }
   .mobile-project-header { display: block !important; }
   .mobile-project-header > div { padding: 4px 8px; }
-  [data-testid="mobile-bottom-nav"] { display: flex !important; }
-  [data-testid="mobile-bottom-nav"] > button { min-height: 48px; padding: 4px; }
+  [data-testid="mobile-bottom-nav"] {
+    display: grid !important;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    width: 100%;
+  }
+  [data-testid="mobile-bottom-nav"] > button,
+  [data-testid="mobile-bottom-nav"] > a { min-width: 0; min-height: 48px; padding: 4px; }
+  [data-graph-status-dock="true"] {
+    left: 0; right: 0; bottom: 0; max-width: none; align-items: stretch; gap: 0;
+  }
+  [data-graph-status-dock="true"] > button,
+  [data-graph-status-dock="true"] > div {
+    width: 100%; border-radius: 0; border-left: 0; border-right: 0; border-bottom: 0; box-shadow: none;
+  }
   .task-filter-bar { padding: 4px 8px; }
   .task-filter-bar > div { display: flex; flex-flow: row wrap; gap: 6px; }
   .task-filter-bar > div > div:first-child { flex: 1; width: auto; min-width: 0; }
@@ -938,6 +951,7 @@ html:not([data-theme="contrast"]) .workspace-surface .graph-container .node-titl
 @media (max-height: 500px) and (min-width: 600px) and (max-width: 1023px) {
   .workspace-surface[data-compact-workspace="true"] { padding-left: calc(52px + env(safe-area-inset-left)); }
   [data-testid="mobile-bottom-nav"] {
+    display: flex !important;
     position: absolute; left: 0; top: 0; bottom: 0; width: calc(52px + env(safe-area-inset-left));
     flex-direction: column; border-top: 0; border-right: 1px solid #374151; padding-left: env(safe-area-inset-left);
   }
