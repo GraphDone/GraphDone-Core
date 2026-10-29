@@ -79,3 +79,18 @@ attributes, require zero item passes during the 2k overview zoom, and check real
 cards and paths after manual Items selection. These are additional assertions,
 not substituted readiness or timing gates. Hosted exact-source acceptance and
 independent review remain required before claiming the performance issue solved.
+
+## Review correction: route before restoring arrow paint
+
+Author self-audit and the independent reviewer identified a return-order problem
+in the initial implementation (`968e956`). Arrows created during hidden overview
+start at opacity zero. Applying opacity before publishing routes filters those
+arrows out; newly represented priority edges have the same problem. A small
+D3/JSDOM probe extracted the actual `updateZoomPresentation` callback and used
+actual `edgeLOD` functions: old order retained opacity **0**, while route-first
+produced opacity **1** at scale 1.2. This is a demonstrated rendering defect, not
+a timing inference. The return now establishes routes before restoring opacity.
+The existing desktop/phone journey additionally changes priority while hidden,
+returns through the actual Items selector, and records/asserts current arrow
+transforms and full opacity. Its JSON and screenshots are retained. Fresh final
+source CI is required; the earlier `968e956` run is not final acceptance.
