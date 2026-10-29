@@ -132,8 +132,11 @@ export function OverviewBusLayer({
       y: event.clientY - bounds.top,
     };
     const route =
-      nearestOverviewBus(hitGeometry, point, hovered ?? fallback.id) ??
-      fallback;
+      nearestOverviewBus(
+        hitGeometry,
+        point,
+        hovered ?? focused ?? fallback.id
+      ) ?? fallback;
     return {
       route,
       point:
