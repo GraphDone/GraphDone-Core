@@ -11,6 +11,7 @@ import { projectItemNeighborhood } from '../lib/localItemLOD';
 import {
   denseItemCandidates,
   localCardDimensions,
+  localItemCellDimensions,
   localItemSlots,
   nearestDenseItem,
   type LocalCamera,
@@ -339,25 +340,10 @@ export function LocalItemNeighborhood({
       cancelAnimationFrame(second);
     };
   }, [geometry.width, geometry.height, readPoint]);
-  const initial = useMemo(
-    () =>
-      projectItemNeighborhood(index, focusId ?? '', {
-        capacity: 7,
-        page: session?.page ?? 0,
-        groupId: session?.groupId,
-        representedIds,
-      }),
-    [index, focusId, session?.page, session?.groupId, representedIds]
+  const cell = useMemo(
+    () => localItemCellDimensions(geometry.width),
+    [geometry.width]
   );
-  const cell = useMemo(() => {
-    const sizes = initial.cards.map(card =>
-      localCardDimensions(card, geometry.width)
-    );
-    return {
-      width: Math.max(160, ...sizes.map(size => size.width)),
-      height: Math.max(124, ...sizes.map(size => size.height)),
-    };
-  }, [initial.cards, geometry.width]);
   const layout = useMemo(
     () => localItemSlots(geometry, geometry.obstacles, cell),
     [geometry, cell]

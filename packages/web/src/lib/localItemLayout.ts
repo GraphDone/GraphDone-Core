@@ -6,11 +6,18 @@ type Rect = { x: number; y: number; width: number; height: number };
 export type LocalItemObstacle = Rect;
 export type LocalCamera = { x: number; y: number; scale: number };
 
+export function localItemCellDimensions(viewportWidth: number) {
+  return {
+    width: Math.min(320, Math.max(160, viewportWidth - 40)),
+    height: 152,
+  };
+}
+
 export function localCardDimensions(
   card: LocalItemCard,
   viewportWidth: number
 ) {
-  const width = Math.min(320, Math.max(160, viewportWidth - 40));
+  const { width } = localItemCellDimensions(viewportWidth);
   const text = card.kind === 'item' ? card.item.title : card.label;
   const title = fitGraphText(text, width - 28, 18, measureGraphText, 3);
   return { width, height: 80 + title.lines.length * 24, title };

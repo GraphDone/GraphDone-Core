@@ -246,3 +246,58 @@ it('consumes navigation requests so graph remounts restore the working focus wit
   fireEvent.click(screen.getByRole('button', { name: 'Switch graph' }));
   expect(focus(view.container)).toBe('b0');
 });
+
+it('reserves full title height for the actual narrow-screen page rather than a different desktop page', () => {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
+    function (this: HTMLElement) {
+      return this.classList.contains('local-item-neighborhood')
+        ? rectangle(390, 685)
+        : rectangle(0, 0);
+    }
+  );
+  const original = makeIndex();
+  const index = indexSemanticRelationships(
+    [...original.byId.values()].map(item =>
+      item.id === 'a1'
+        ? {
+            ...item,
+            title: `a1 ${'workflow automation reconciliation '.repeat(10)}`,
+          }
+        : item
+    ),
+    original.edges
+  );
+  const scope = 'narrow-title-page';
+  localStorage.setItem(
+    `graphdone:local-items:${scope}`,
+    JSON.stringify({
+      session: { focusId: 'A', page: 1 },
+      history: [],
+      board: false,
+    })
+  );
+  const view = render(
+    <View
+      {...propsFor(index)}
+      viewScope={scope}
+      camera={{ x: -525, y: -107.5, scale: 1 }}
+    />
+  );
+  const cards = [
+    ...view.container.querySelectorAll<HTMLElement>('[data-local-item-card]'),
+  ].map(card => ({
+    x: parseFloat(card.style.left),
+    y: parseFloat(card.style.top),
+    width: parseFloat(card.style.width),
+    height: parseFloat(card.style.height),
+  }));
+  expect(cards.some(card => card.height === 152)).toBe(true);
+  for (const [i, a] of cards.entries())
+    for (const b of cards.slice(i + 1))
+      expect(
+        Math.hypot(
+          Math.max(0, a.x - b.x - b.width, b.x - a.x - a.width),
+          Math.max(0, a.y - b.y - b.height, b.y - a.y - a.height)
+        )
+      ).toBeGreaterThanOrEqual(64);
+});
