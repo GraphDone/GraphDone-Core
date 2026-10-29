@@ -7,16 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import {
-  ArrowLeft,
-  ArrowRight,
-  Compass,
-  FolderTree,
-  List,
-  Move,
-} from 'lucide-react';
 import { projectItemNeighborhood } from '../lib/localItemLOD';
-import { GRAPH_FONT_FAMILY } from '../lib/graphSymbolLayout';
 import {
   denseItemCandidates,
   localCardDimensions,
@@ -36,13 +27,14 @@ import type {
 } from '../lib/semanticRelationships';
 import {
   getRelationshipConfig,
-  getStatusConfig,
-  getTypeConfig,
   type RelationshipType,
-  type WorkItemStatus,
-  type WorkItemType,
 } from '../constants/workItemConstants';
 import { OverviewBusLayer } from './OverviewBusLayer';
+import {
+  LocalItemCardView,
+  LocalItemControls,
+  LocalItemFooter,
+} from './LocalItemNeighborhoodView';
 
 type Session = {
   focusId: string;
@@ -116,7 +108,6 @@ type Props = {
 };
 
 export function LocalItemNeighborhood({
-  graphId,
   viewScope,
   index,
   representedIds,
@@ -453,87 +444,56 @@ export function LocalItemNeighborhood({
   const controls = useMemo(
     () =>
       board && enabled && focusId ? (
-        <button
-          type="button"
-          className="flex min-h-11 items-center gap-2 rounded-xl border border-teal-600 bg-slate-900 px-3 text-sm text-teal-100"
-          onClick={() => {
+        <LocalItemControls
+          kind="board"
+          onExplore={() => {
             origin.current = cameraRef.current;
             worldAnchor.current = readPoint(focusId);
             setBoard(false);
           }}
-        >
-          <Compass size={20} />
-          Explore linked items
-        </button>
+        />
       ) : active && model.focus ? (
-        <div
-          data-lod-controls="true"
-          className="flex flex-wrap items-center gap-2"
-          aria-label="Local item navigation"
-        >
-          <button
-            type="button"
-            className="min-h-11 max-w-full rounded-xl border border-teal-600 bg-slate-900 px-2 text-sm font-semibold text-teal-100"
-            title={`Connections around ${model.focus.title}`}
-            onClick={event => browseFocus(event.currentTarget)}
-          >
-            {model.counts.shownNeighbors} / {model.counts.loadedNeighbors}{' '}
-            linked
-          </button>
-          <button
-            type="button"
-            aria-label={
-              model.page === 0 && history.length > 0
-                ? 'Back to previous item'
-                : 'Previous linked items'
-            }
-            title={
-              model.page === 0 && history.length > 0
-                ? 'Back to previous item'
-                : 'Previous linked items'
-            }
-            disabled={model.page === 0 && history.length === 0}
-            onClick={() => {
-              if (model.page === 0 && history.length > 0) {
-                const previous = history[history.length - 1];
-                setHistory(value => value.slice(0, -1));
-                navigate(previous, false);
-              } else
-                navigate(
-                  {
-                    focusId: focusId!,
-                    page: model.page - 1,
-                    groupId: session?.groupId,
-                  },
-                  false
-                );
-            }}
-            className="flex h-11 w-11 items-center justify-center rounded-lg border border-slate-600 bg-slate-900 disabled:opacity-40"
-          >
-            <ArrowLeft size={20} />
-          </button>
-          <button
-            type="button"
-            aria-label="Next linked items"
-            title="Next linked items"
-            disabled={
-              model.page + 1 >= model.pages || model.counts.shownNeighbors === 0
-            }
-            onClick={() =>
+        <LocalItemControls
+          kind="items"
+          focusTitle={model.focus.title}
+          shownNeighbors={model.counts.shownNeighbors}
+          loadedNeighbors={model.counts.loadedNeighbors}
+          previousLabel={
+            model.page === 0 && history.length > 0
+              ? 'Back to previous item'
+              : 'Previous linked items'
+          }
+          previousDisabled={model.page === 0 && history.length === 0}
+          nextDisabled={
+            model.page + 1 >= model.pages || model.counts.shownNeighbors === 0
+          }
+          onBrowse={browseFocus}
+          onPrevious={() => {
+            if (model.page === 0 && history.length > 0) {
+              const previous = history[history.length - 1];
+              setHistory(value => value.slice(0, -1));
+              navigate(previous, false);
+            } else
               navigate(
                 {
                   focusId: focusId!,
-                  page: model.page + 1,
+                  page: model.page - 1,
                   groupId: session?.groupId,
                 },
                 false
-              )
-            }
-            className="flex h-11 w-11 items-center justify-center rounded-lg border border-slate-600 bg-slate-900 disabled:opacity-40"
-          >
-            <ArrowRight size={20} />
-          </button>
-        </div>
+              );
+          }}
+          onNext={() =>
+            navigate(
+              {
+                focusId: focusId!,
+                page: model.page + 1,
+                groupId: session?.groupId,
+              },
+              false
+            )
+          }
+        />
       ) : null,
     [
       active,
@@ -556,97 +516,24 @@ export function LocalItemNeighborhood({
   const footer = useMemo(
     () =>
       active && model.focus ? (
-        <div
-          className="max-w-full rounded-xl border border-slate-600 bg-slate-900/95 px-2 py-1 text-sm text-slate-100 shadow-lg"
-          data-graph-fit-obstacle="true"
-          data-local-item-status="true"
-        >
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              className="min-h-11 flex-1 px-2 text-left font-semibold"
-              onClick={event => browseFocus(event.currentTarget)}
-            >
-              {model.counts.incident} connections
-            </button>
-            <button
-              type="button"
-              aria-label="Browse all graph relationships"
-              title="Browse all graph relationships"
-              className="flex h-11 w-11 items-center justify-center rounded-lg border border-slate-600"
-              onClick={event => onBrowse({ kind: 'all' }, event.currentTarget)}
-            >
-              <List size={20} />
-            </button>
-            {(model.groups.length > 1 || session?.groupId) && (
-              <label
-                className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-slate-600 focus-within:outline focus-within:outline-2 focus-within:outline-teal-300"
-                title="Linked item group"
-              >
-                <FolderTree size={20} />
-                <select
-                  aria-label="Linked item group"
-                  value={session?.groupId ?? ''}
-                  onChange={event =>
-                    navigate(
-                      {
-                        focusId: focusId!,
-                        page: 0,
-                        groupId: event.target.value || undefined,
-                      },
-                      false
-                    )
-                  }
-                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                >
-                  <option value="">All groups</option>
-                  {model.groups.map(group => (
-                    <option key={group.id} value={group.id}>
-                      {group.label} · {group.members.length}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-            <button
-              type="button"
-              aria-label="Edit saved board positions"
-              title="Edit saved board positions"
-              className="flex h-11 w-11 items-center justify-center rounded-lg border border-slate-600"
-              onClick={() => {
-                setBoard(true);
-                if (focusId) onNavigate(focusId);
-              }}
-            >
-              <Move size={20} />
-            </button>
-          </div>
-          {model.missingGroup && (
-            <div role="status" className="px-2 pb-2 text-amber-100">
-              <p>The selected group changed.</p>
-              <button
-                type="button"
-                className="min-h-11 underline"
-                onClick={() => navigate({ focusId: focusId!, page: 0 }, false)}
-              >
-                Show all linked items
-              </button>
-            </div>
-          )}
-          <p className="px-2 text-slate-300">
-            {drawn} links shown ·{' '}
-            {model.counts.spatialDeferred + routingDeferred} in list
-          </p>
-          {(model.counts.pending > 0 ||
-            model.counts.internal > 0 ||
-            model.counts.prioritySummarized > 0) && (
-            <p className="px-2 text-slate-300">
-              {model.counts.prioritySummarized} by priority ·{' '}
-              {model.counts.internal} internal · {model.counts.pending} awaiting
-              endpoints
-            </p>
-          )}
-        </div>
+        <LocalItemFooter
+          counts={model.counts}
+          groups={model.groups}
+          selectedGroup={session?.groupId}
+          missingGroup={model.missingGroup}
+          drawn={drawn}
+          routingDeferred={routingDeferred}
+          onBrowseFocus={browseFocus}
+          onBrowseAll={trigger => onBrowse({ kind: 'all' }, trigger)}
+          onGroupChange={groupId =>
+            navigate({ focusId: focusId!, page: 0, groupId }, false)
+          }
+          onEditBoard={() => {
+            setBoard(true);
+            if (focusId) onNavigate(focusId);
+          }}
+          onResetGroup={() => navigate({ focusId: focusId!, page: 0 }, false)}
+        />
       ) : null,
     [
       active,
@@ -788,115 +675,36 @@ export function LocalItemNeighborhood({
                 ?.focus()
             }
           />
-          {cards.map(card => {
-            const config =
-              card.kind === 'item'
-                ? getTypeConfig(card.item.type as WorkItemType)
-                : undefined;
-            const Icon = config?.icon ?? FolderTree;
-            const status =
-              card.kind === 'item'
-                ? getStatusConfig(card.item.status as WorkItemStatus)
-                : undefined;
-            const emphasized =
-              route && (route.source === card.id || route.target === card.id);
-            return (
-              <section
-                key={card.id}
-                data-local-item-card={card.id}
-                data-local-kind={card.kind}
-                data-original-item={
-                  card.kind === 'item' ? card.item.id : undefined
-                }
-                className="absolute pointer-events-auto overflow-hidden rounded-xl border bg-slate-900 text-slate-100 shadow-xl"
-                style={{
-                  fontFamily: GRAPH_FONT_FAMILY,
-                  left: card.x,
-                  top: card.y,
-                  width: card.width,
-                  height: card.height,
-                  borderColor: emphasized
-                    ? '#5eead4'
-                    : (config?.hexColor ?? '#64748b'),
-                  outline: emphasized ? '3px solid #5eead4' : undefined,
-                  outlineOffset: 3,
-                }}
-              >
-                <div
-                  className="flex h-7 items-center gap-2 border-b border-slate-700 px-3 text-sm font-semibold"
-                  style={{ color: config?.hexColor ?? '#5eead4' }}
-                >
-                  <Icon size={18} />
-                  <span>{config?.label ?? 'Linked group'}</span>
-                  {card.kind === 'item' && card.isFocus && (
-                    <span className="ml-auto text-slate-200">Focus</span>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  data-local-open={card.id}
-                  className="block w-full px-3.5 py-1 text-left text-lg font-semibold leading-6 hover:bg-slate-800 focus:outline focus:outline-2 focus:outline-teal-300"
-                  title={card.kind === 'item' ? card.item.title : card.label}
-                  aria-label={
-                    card.kind === 'item'
-                      ? `Open ${card.item.title}`
-                      : `Explore ${card.label}`
-                  }
-                  onClick={() =>
-                    card.kind === 'item'
-                      ? onInspect(card.item.id)
-                      : navigate({
-                          focusId: focusId!,
-                          page: 0,
-                          groupId: card.groupId,
-                        })
-                  }
-                >
-                  {card.title.lines.map((line, i) => (
-                    <span key={i} className="block">
-                      {line}
-                    </span>
-                  ))}
-                </button>
-                <div className="flex h-11 items-center justify-between border-t border-slate-700 pl-3 text-sm text-slate-300">
-                  <span>
-                    {card.kind === 'item'
-                      ? (status?.label ?? card.item.status)
-                      : `${card.members.length} connected items`}
-                  </span>
-                  <button
-                    type="button"
-                    className="flex h-11 w-11 items-center justify-center text-teal-200 hover:bg-slate-800"
-                    aria-label={
-                      card.kind === 'item' && card.isFocus
-                        ? 'Browse focused item connections'
-                        : card.kind === 'item'
-                          ? `Focus on ${card.item.title}`
-                          : `Explore ${card.label}`
-                    }
-                    title={
-                      card.kind === 'item' && card.isFocus
-                        ? 'Browse focused item connections'
-                        : 'Explore these connections'
-                    }
-                    onClick={event =>
-                      card.kind === 'item'
-                        ? card.isFocus
-                          ? browseFocus(event.currentTarget)
-                          : navigate({ focusId: card.item.id, page: 0 })
-                        : navigate({
-                            focusId: focusId!,
-                            page: 0,
-                            groupId: card.groupId,
-                          })
-                    }
-                  >
-                    <Compass size={20} />
-                  </button>
-                </div>
-              </section>
-            );
-          })}
+          {cards.map(card => (
+            <LocalItemCardView
+              key={card.id}
+              card={card}
+              emphasized={
+                !!route &&
+                (route.source === card.id || route.target === card.id)
+              }
+              onOpen={() =>
+                card.kind === 'item'
+                  ? onInspect(card.item.id)
+                  : navigate({
+                      focusId: focusId!,
+                      page: 0,
+                      groupId: card.groupId,
+                    })
+              }
+              onExplore={trigger =>
+                card.kind === 'item'
+                  ? card.isFocus
+                    ? browseFocus(trigger)
+                    : navigate({ focusId: card.item.id, page: 0 })
+                  : navigate({
+                      focusId: focusId!,
+                      page: 0,
+                      groupId: card.groupId,
+                    })
+              }
+            />
+          ))}
         </div>
       )}
     </div>
