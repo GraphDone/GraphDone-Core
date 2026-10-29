@@ -2,6 +2,9 @@
 
 | Symptom | Canonical lesson and regression |
 | --- | --- |
+| Inspector code remains11–13px, nested previews have microscopic labels, long titles hide content, or inspection clicks enqueue unchanged positions | [Readable preview levels and read-only gestures](../inbox/2026-10-28-inspector-previews-need-readable-levels.md); inspector-readability browser journey and subgraph preview conservation/component cases |
+| Releasing Alt during a gesture crashes or moves a node using an earlier drag's state | [Gesture mode and state must belong to one drag](../inbox/2026-10-28-drag-mode-must-survive-modifier-release.md); native fresh/prior-drag Alt-release cases in layout recovery |
+| Inspector mode labels fit locally but are clipped with another system font | [Navigation must fit without shrinking its labels](../inbox/2026-10-28-inspector-controls-must-fit-system-fonts.md); wider-font fit, icon target and portal-tooltip checks in inspector-readability |
 | An incoming trace loses its only dependency, or a new toolbar leaves only one group / covers another control | [Scope trace fallback and preserve measured room](../inbox/2026-10-28-trace-fallback-needs-directional-scope.md); directional component conservation and desktop/phone nested geometry/control regressions |
 | Deleting a relationship updates the canvas but leaves the graph header count stale | [Refresh matching subscribed edge queries](../inbox/2026-10-28-edge-deletion-must-refresh-subscribed-counts.md); desktop/phone delete-and-fallback journeys assert the header and API agree |
 | A preview still shows tiny/thin text although typography configuration matches the reviewed source | [Refresh the owned preview and verify rendered styles](../inbox/2026-10-28-preview-styles-need-rendered-verification.md); desktop/phone computed typography and 12px/400 negative in relationship-priority journeys |
@@ -54,3 +57,6 @@
 | A federation upgrade removes UUID findings but breaks Neo4j schema generation; an override leaves the old lock resolution | [Validate federation consumers and installed UUID paths](../inbox/2026-10-27-federation-consumers-bound-uuid-upgrades.md); `tests/lib/dependencies/uuid.test.mjs` |
 
 | Tiny card text, wasted space, clipped or wire-overlapped labels after zoom | [Reserve the displayed symbol footprint](../inbox/2026-10-28-readable-symbols-need-reserved-geometry.md); `graphSymbolLayout.test.ts`, `edgeRouteGeometry.test.ts`; issue #222 requires actual browser and thousands-of-item evidence |
+
+| Whole browser sequence reaches900s with no valid report despite retained screenshots | [Bound browser acceptance by feature](../inbox/2026-10-28-browser-sequences-need-bounded-feature-scope.md); strict sequence enrollment and evidence controls |
+| A fresh unchanged-source audit reports GraphQL Scalars or Hono node-server | [Remove unused code and validate the actual installed consumer](../inbox/2026-10-28-advisories-follow-installed-consumers.md); isolated static-path negative and Neo4j scalar contract |

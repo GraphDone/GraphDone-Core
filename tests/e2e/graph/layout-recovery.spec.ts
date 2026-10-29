@@ -1,7 +1,7 @@
 import { test as base, expect, chromium, type Page, type Route, type Browser, type BrowserContext } from '@playwright/test';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import neo4j from 'neo4j-driver';
@@ -122,21 +122,51 @@ async function holdLayoutReads(context: BrowserContext) {
   };
 }
 
+async function releaseAltDuringGesture(page: Page, nodeId: string) {
+  const before = await readPosition(page, nodeId);
+  const card = page.locator('.graph-container svg .node').filter({ has: page.locator(`[data-node-id="${nodeId}"]`) }).locator('.node-bg');
+  await expect(card).toBeInViewport({ ratio: 1 });
+  const box = (await card.boundingBox())!;
+  const x = box.x + box.width / 2, y = box.y + box.height / 2;
+  await page.mouse.move(x, y);
+  await page.keyboard.down('Alt');
+  await page.mouse.down();
+  try {
+    await page.mouse.move(x + 5, y + 5, { steps: 2 });
+    await page.keyboard.up('Alt');
+    await page.mouse.move(x + 24, y + 24, { steps: 3 });
+  } finally {
+    await page.keyboard.up('Alt');
+    await page.mouse.up();
+  }
+  const after = await readPosition(page, nodeId);
+  expect(after).toEqual(before);
+  return { before, after };
+}
+
 test('latest real drag survives reload before acknowledgement and delayed IndexedDB hydration @layout-recovery', async ({ page, context, ownedGraphIds }, info) => {
   test.setTimeout(90000);
   await login(page, TEST_USERS.ADMIN);
   const graph = await ownedGraphIds.seed({ size: 2, spacing: 600, edgeFactor: 0.5, namePrefix: 'Durable reload' });
   await openGraph(page, graph.graphId);
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
   const nodeId = graph.nodeIds[0];
   const initial = await readSaved(page, graph.graphId, nodeId);
   const attempts: Array<{ x: number; y: number }> = [];
   const route = failLayout(graph.graphId, nodeId, attempts);
   await page.route('**/api/graphql', route);
+  const freshAltGesture = await releaseAltDuringGesture(page, nodeId);
+  expect(errors).toEqual([]);
+  expect(attempts).toEqual([]);
   const first = await drag(page, nodeId);
   await expect.poll(() => attempts.length).toBe(1);
   const latest = await drag(page, nodeId);
   expect(Math.hypot(latest.x - first.x, latest.y - first.y)).toBeGreaterThan(10);
   await expect.poll(() => attempts.length).toBe(2);
+  const priorDragAltGesture = await releaseAltDuringGesture(page, nodeId);
+  expect(errors).toEqual([]);
+  expect(attempts).toHaveLength(2);
   await expect(page.getByTestId('layout-save-status')).toContainText('1 saved on this device; 0 pending only in this tab');
   const durable = await readReceipt(page, graph.graphId, nodeId);
   expect(rounded(durable.receipt)).toEqual(rounded(latest));
@@ -163,7 +193,9 @@ test('latest real drag survives reload before acknowledgement and delayed Indexe
   expect((await readReceipt(page, graph.graphId, nodeId)).receipt).toBeUndefined();
   await page.reload();
   await expect.poll(async () => { const value = await readPosition(page, nodeId); return value && rounded(value); }).toEqual(rounded(latest));
-  await info.attach('layout-reload.json', { contentType: 'application/json', body: JSON.stringify({ graphId: graph.graphId, nodeId, initial, first, latest, attempts, independentReadback: await readSaved(page, graph.graphId, nodeId) }) });
+  const artifact = info.outputPath('layout-reload.json');
+  await writeFile(artifact, JSON.stringify({ graphId: graph.graphId, nodeId, initial, first, latest, attempts, freshAltGesture, priorDragAltGesture, errors, independentReadback: await readSaved(page, graph.graphId, nodeId) }));
+  await info.attach('layout-reload.json', { contentType: 'application/json', path: artifact });
 });
 
 async function startOwnedBrowser(profile: string) {

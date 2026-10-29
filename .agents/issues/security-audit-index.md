@@ -17,3 +17,5 @@
 | A federation upgrade removes UUID findings but breaks Neo4j schema generation; an override leaves the old lock resolution | [Validate federation consumers and installed UUID paths](../inbox/2026-10-27-federation-consumers-bound-uuid-upgrades.md); `tests/lib/dependencies/uuid.test.mjs` |
 
 Runtime image pruning and actual OS/npm inventories: [2026-10-27 consumer/persistence lesson](../inbox/2026-10-27-runtime-images-need-installed-consumer-proof.md), [image provenance and residuals](../../docs/quality/RUNTIME_IMAGE_PACKAGING_2026-10-27.md).
+
+| A fresh unchanged-source audit reports GraphQL Scalars or Hono node-server | [Remove unused code and validate the actual installed consumer](../inbox/2026-10-28-advisories-follow-installed-consumers.md); isolated static-path negative and Neo4j scalar contract |
