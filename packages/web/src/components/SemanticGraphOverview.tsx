@@ -396,6 +396,21 @@ export function SemanticGraphOverview({
       (count, bundle) => count + bundle.edges.length,
       0
     );
+  const externalCoverage = useMemo(
+    () => ({
+      connections: projection.bundles.reduce(
+        (sum, bundle) => sum + bundle.edges.length,
+        0
+      ),
+      pairs: new Set(
+        projection.bundles.map(bundle => `${bundle.source}\0${bundle.target}`)
+      ).size,
+    }),
+    [projection.bundles]
+  );
+  const drawnPairs = new Set(
+    (wiring?.routes ?? []).map(route => `${route.source}\0${route.target}`)
+  ).size;
   const internalConnections = projection.groups.reduce(
     (count, group) => count + group.internalEdges.length,
     0
@@ -521,6 +536,9 @@ export function SemanticGraphOverview({
       data-geometry-deferred={collapsedConnections}
       data-internal-relationships={internalConnections}
       data-pending-relationships={pendingConnections}
+      data-external-relationships={externalCoverage.connections}
+      data-external-pairs={externalCoverage.pairs}
+      data-drawn-external-pairs={drawnPairs}
       onClick={event => event.stopPropagation()}
     >
       <div
@@ -717,13 +735,11 @@ export function SemanticGraphOverview({
                 openRelationships({ kind: 'all' }, 'all');
               }}
             >
-              <span className="block">Connections</span>
+              <span className="block font-semibold">{drawnConnections} of {externalCoverage.connections} external links shown</span>
               <span
                 className={`block ${notDrawnConnections ? 'text-amber-200' : 'text-emerald-200'}`}
               >
-                {notDrawnConnections
-                  ? `${notDrawnConnections} not drawn`
-                  : 'Browse all'}
+                {internalConnections} inside groups · Browse all {edges.length}
               </span>
             </button>
           )}

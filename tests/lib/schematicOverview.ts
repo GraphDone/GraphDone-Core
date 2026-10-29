@@ -118,6 +118,19 @@ export async function inspectSchematicOverview(
         controls,
         routes,
         accounting,
+        coverage: {
+          external: Number(host.getAttribute('data-external-relationships')),
+          eligiblePairs: Number(host.getAttribute('data-external-pairs')),
+          drawnPairs: Number(host.getAttribute('data-drawn-external-pairs')),
+          deferred: Number(host.getAttribute('data-geometry-deferred')),
+          summarized: Number(host.getAttribute('data-priority-summarized')),
+          internal: Number(host.getAttribute('data-internal-relationships')),
+          pending: Number(host.getAttribute('data-pending-relationships')),
+          connectedDrawnGroups: new Set(
+            routes.flatMap(route => [route.from, route.to])
+          ).size,
+          visibleGroups: cards.length,
+        },
         bounds: {
           left: Math.max(0, bounds.left),
           right: Math.min(innerWidth, bounds.right),
@@ -252,6 +265,22 @@ export async function inspectSchematicOverview(
     geometry.routes.reduce((sum, route) => sum + route.count, 0) +
       Number(accounting![2])
   ).toBe(relationships);
+  const drawn = geometry.routes.reduce((sum, route) => sum + route.count, 0);
+  expect(
+    drawn + geometry.coverage.deferred + geometry.coverage.summarized
+  ).toBe(geometry.coverage.external);
+  expect(
+    geometry.coverage.external +
+      geometry.coverage.internal +
+      geometry.coverage.pending
+  ).toBe(relationships);
+  expect(geometry.coverage.drawnPairs).toBeGreaterThan(0);
+  expect(geometry.coverage.drawnPairs).toBeLessThanOrEqual(
+    geometry.coverage.eligiblePairs
+  );
+  expect(geometry.coverage.connectedDrawnGroups).toBeGreaterThanOrEqual(
+    Math.min(2, expectedCards)
+  );
   const geometryPath = info.outputPath(`${stage}-geometry.json`);
   writeFileSync(
     geometryPath,

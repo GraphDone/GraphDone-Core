@@ -194,6 +194,10 @@ it('keeps original member-pair fallback inside a directional trace and restores 
   const overview = container.querySelector('.semantic-overview')!;
   expect(routed()).toEqual(['block', 'fallback']);
   expect(overview).toHaveAttribute('data-priority-summarized', '2');
+  expect(overview).toHaveAttribute('data-external-relationships', '4');
+  expect(overview).toHaveAttribute('data-external-pairs', '2');
+  expect(screen.getByText(/of 4 external links shown/)).toBeVisible();
+  expect(screen.getByText('1 inside groups · Browse all 6')).toBeVisible();
   fireEvent.click(
     screen.getByRole('button', { name: 'Left, 2 items, 0 blocked' })
   );
