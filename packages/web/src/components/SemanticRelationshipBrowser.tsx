@@ -83,7 +83,7 @@ export function SemanticRelationshipBrowser({
   const missingGroup =
     scope.kind === 'internal'
       ? !relationshipGroupLabel(index, scope.group)
-      : scope.kind === 'bundle'
+      : scope.kind === 'bundle' || scope.kind === 'bus'
         ? !relationshipGroupLabel(index, scope.source) ||
           !relationshipGroupLabel(index, scope.target)
         : false;
@@ -96,7 +96,7 @@ export function SemanticRelationshipBrowser({
         ? `Relationships of ${index.byId.get(scope.id)?.title ?? scope.id}`
         : scope.kind === 'internal'
           ? `Internal relationships of ${relationshipGroupLabel(index, scope.group) ?? 'unavailable group'}`
-          : `${relationshipGroupLabel(index, scope.source) ?? 'Unavailable group'} → ${relationshipGroupLabel(index, scope.target) ?? 'Unavailable group'}: ${scope.type}`;
+          : `${relationshipGroupLabel(index, scope.source) ?? 'Unavailable group'} → ${relationshipGroupLabel(index, scope.target) ?? 'Unavailable group'}: ${scope.kind === 'bus' ? 'visible bus' : scope.type}`;
   useEffect(() => {
     if (!visible) return;
     const focus = Array.from(

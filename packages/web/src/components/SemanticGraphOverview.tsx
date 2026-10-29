@@ -1,6 +1,5 @@
 import {
   useEffect,
-  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -17,6 +16,7 @@ import {
   getRelationshipConfig,
   type RelationshipType,
 } from '../constants/workItemConstants';
+import { OverviewBusLayer } from './OverviewBusLayer';
 import { GraphStatusDock } from './GraphStatusDock';
 import {
   overviewAtScale,
@@ -200,7 +200,7 @@ export function SemanticGraphOverview({
   const returnExpanded = useRef<ReadonlySet<string>>(new Set());
   const closeButton = useRef<HTMLButtonElement>(null);
   const backButton = useRef<HTMLButtonElement>(null);
-  const returnFocus = useRef<HTMLElement | null>(null);
+  const returnFocus = useRef<HTMLElement | SVGElement | null>(null);
   const groupListButton = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (browse) {
@@ -209,7 +209,8 @@ export function SemanticGraphOverview({
     }
   }, [browse, onBrowse]);
   const active = mode === 'overview' || (mode === 'auto' && automatic);
-  const markerId = `lod-arrow-${useId().replace(/:/g, '')}`;
+  const [highlightedBus, setHighlightedBus] = useState<string | null>(null);
+  const busReturn = useRef(false);
   const group = projection.groups.find(candidate => candidate.id === groupId);
   const traceProjection = useMemo(
     () =>
@@ -371,6 +372,7 @@ export function SemanticGraphOverview({
       obstacleKey,
     ]
   );
+  const emphasized = wiring?.routes.find(route => route.id === highlightedBus);
   const drawnConnections = (wiring?.routes ?? []).reduce(
     (count, bus) => count + bus.edgeIds.length,
     0
@@ -432,6 +434,8 @@ export function SemanticGraphOverview({
           ) % busColors.length
         ];
   const openGroup = (id: string) => {
+    busReturn.current = false;
+    setRelationshipScope(null);
     if (!browse) returnFocus.current = document.activeElement as HTMLElement;
     setGroupId(id);
     setBrowse(true);
@@ -439,7 +443,7 @@ export function SemanticGraphOverview({
   };
   const closeBrowser = (clearRelationships = true) => {
     setBrowse(false);
-    if (clearRelationships) setRelationshipScope(null);
+    if (clearRelationships) { setRelationshipScope(null); busReturn.current = false; }
     setGroupId(null);
     setSearch('');
     (returnFocus.current?.isConnected
@@ -587,63 +591,34 @@ export function SemanticGraphOverview({
       </div>
       {active && (
         <>
-          <svg className="absolute inset-0 h-full w-full" aria-hidden="true">
-            <defs>
-              <marker
-                id={markerId}
-                viewBox="0 0 10 10"
-                refX="9"
-                refY="5"
-                markerWidth="7"
-                markerHeight="7"
-                markerUnits="userSpaceOnUse"
-                orient="auto-start-reverse"
-              >
-                <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8" />
-              </marker>
-            </defs>
-            {wiring?.routes.map(bus => (
-              <path
-                key={bus.id}
-                data-lod-bundle={bus.connections
-                  .map(connection => connection.type)
-                  .join(' ')}
-                data-lod-bus-source={bus.source}
-                data-lod-bus-target={bus.target}
-                data-lod-bus-id={bus.bus}
-                data-count={bus.edgeIds.length}
-                d={bus.points
-                  .map(
-                    (point, index) =>
-                      `${index ? 'L' : 'M'}${point.x},${point.y}`
-                  )
-                  .join(' ')}
-                fill="none"
-                stroke={busColor(bus.bus)}
-                strokeWidth="3.5"
-                strokeLinejoin="round"
-                strokeLinecap="round"
-                markerEnd={`url(#${markerId})`}
-              >
-                <title>{`${groupsById.get(bus.source)!.label} → ${groupsById.get(bus.target)!.label}: ${bus.edgeIds.length} relationships · ${bus.connections.map(connection => `${connection.edgeIds.length} ${connection.type}`).join(', ')}`}</title>
-              </path>
-            ))}
-            {wiring?.junctions.map(point => (
-              <circle
-                key={`${point.bus}:${point.x}:${point.y}`}
-                cx={point.x}
-                cy={point.y}
-                r="3.5"
-                fill={busColor(point.bus)}
-              />
-            ))}
-          </svg>
+          <OverviewBusLayer
+            routes={wiring?.routes ?? []} junctions={wiring?.junctions ?? []}
+            width={size.width} height={size.height} color={busColor} label={groupLabel}
+            obstacles={[...placed, ...obstacles.map((rect, index) => ({ id: `control-${index}`, x: rect.left, y: rect.top, width: rect.right - rect.left, height: rect.bottom - rect.top }))]}
+            onHighlight={setHighlightedBus}
+            onFocusLost={source => {
+              const summary = Array.from(host.current?.querySelectorAll<HTMLButtonElement>('[data-lod-group]') ?? []).find(element => element.dataset.lodGroup === source);
+              (summary ?? groupListButton.current)?.focus();
+            }}
+            onInspect={(route, trigger) => {
+              returnFocus.current = trigger;
+              busReturn.current = true;
+              setBrowse(true);
+              setGroupId(null);
+              openRelationships({
+                kind: 'bus', edgeIds: route.edgeIds,
+                source: { id: groupsById.get(route.source)!.hierarchyId, direct: groupsById.get(route.source)!.isDirect },
+                target: { id: groupsById.get(route.target)!.hierarchyId, direct: groupsById.get(route.target)!.isDirect },
+              }, `bus:${route.id}`);
+            }}
+          />
           {placed.map(entry => {
             const summary = groupsById.get(entry.id)!;
             return (
               <button
                 key={entry.id}
                 data-lod-group={summary.id}
+                data-bus-highlighted={!browse && (emphasized?.source === summary.id || emphasized?.target === summary.id)}
                 onFocus={event => {
                   focusedSummary.current = {
                     element: event.currentTarget,
@@ -661,6 +636,8 @@ export function SemanticGraphOverview({
                 }
                 className="absolute pointer-events-auto overflow-hidden rounded-xl border border-slate-600 bg-gradient-to-br from-slate-800 to-slate-950 text-left px-4 py-3 shadow-lg shadow-black/30 hover:border-teal-300 focus:outline focus:outline-2 focus:outline-teal-300"
                 style={{
+                  outline: !browse && (emphasized?.source === summary.id || emphasized?.target === summary.id) ? '3px solid #5eead4' : undefined,
+                  outlineOffset: !browse && (emphasized?.source === summary.id || emphasized?.target === summary.id) ? 3 : undefined,
                   left: entry.x,
                   top: entry.y,
                   width: entry.width,
@@ -756,7 +733,8 @@ export function SemanticGraphOverview({
           onScope={setRelationshipScope}
           onInspect={inspect}
           focusId={relationshipFocus}
-          onBack={() => setRelationshipScope(null)}
+          backLabel={busReturn.current ? 'Back to overview' : undefined}
+          onBack={() => busReturn.current ? closeBrowser() : setRelationshipScope(null)}
         />
       )}
       {browse && !relationshipScope && (
