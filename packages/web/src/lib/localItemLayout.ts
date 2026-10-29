@@ -13,7 +13,7 @@ export function localCardDimensions(
   const width = Math.min(320, Math.max(160, viewportWidth - 40));
   const text = card.kind === 'item' ? card.item.title : card.label;
   const title = fitGraphText(text, width - 28, 18, measureGraphText, 3);
-  return { width, height: 88 + title.lines.length * 24, title };
+  return { width, height: 80 + title.lines.length * 24, title };
 }
 
 const clear = (a: Rect, b: Rect, gap: number) =>

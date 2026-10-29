@@ -33,6 +33,13 @@ interface NodeInspectorProps {
  */
 export function NodeInspector({ node, onClose, onEdit, compact = false, rootTestId = 'node-inspector', maxHeight }: NodeInspectorProps) {
   const { descendInto } = useGraph();
+  useLayoutEffect(() => {
+    const trigger = document.activeElement;
+    return () => {requestAnimationFrame(() => {
+      const active = document.activeElement;
+      if (trigger?.isConnected && (active === document.body || !active?.isConnected) && (trigger instanceof HTMLElement || trigger instanceof SVGElement)) trigger.focus({preventScroll:true});
+    });};
+  }, [node.id]);
   const hasSubgraph = !!node?.subgraphId;
   const [modeByNode, setModeByNode] = useState<Record<string, Mode>>({});
   const mode: Mode = modeByNode[node.id] ?? (node.description ? 'contents' : 'card');

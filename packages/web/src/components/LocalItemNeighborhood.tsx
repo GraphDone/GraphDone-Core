@@ -99,6 +99,7 @@ type Props = {
   representedIds: ReadonlySet<string>;
   camera: LocalCamera;
   selectedId?: string;
+  navigationRequest?: { id: string; sequence: number };
   enabled: boolean;
   readPositions: () => readonly { id: string; x: number; y: number }[];
   onActive: (active: boolean) => void;
@@ -120,6 +121,7 @@ export function LocalItemNeighborhood({
   representedIds,
   camera,
   selectedId,
+  navigationRequest,
   enabled,
   readPositions,
   onActive,
@@ -242,10 +244,40 @@ export function LocalItemNeighborhood({
     return () => onActive(false);
   }, [active, onActive]);
   const previousEnabled = useRef(enabled);
-  useEffect(() => {
-    if (enabled && !previousEnabled.current) setBoard(false);
+  const selectionAtExit = useRef(selectedId);
+  useLayoutEffect(() => {
+    const returning = enabled && !previousEnabled.current;
+    if (!enabled && previousEnabled.current)
+      selectionAtExit.current = selectedId;
     previousEnabled.current = enabled;
-  }, [enabled, graphId]);
+    if (!returning) return;
+    setBoard(false);
+    if (
+      selectedId &&
+      selectedId !== selectionAtExit.current &&
+      index.byId.has(selectedId) &&
+      (session || candidates.includes(selectedId))
+    ) {
+      origin.current = camera;
+      worldAnchor.current = readPoint(selectedId);
+      setSession({ focusId: selectedId, page: 0 });
+    }
+  }, [enabled, selectedId, index, candidates, session, camera, readPoint]);
+  const handledNavigation = useRef<number>();
+  useLayoutEffect(() => {
+    if (
+      !navigationRequest ||
+      navigationRequest.sequence === handledNavigation.current ||
+      !index.byId.has(navigationRequest.id)
+    )
+      return;
+    handledNavigation.current = navigationRequest.sequence;
+    if (!session && !candidates.includes(navigationRequest.id)) return;
+    origin.current = camera;
+    worldAnchor.current = readPoint(navigationRequest.id);
+    setBoard(false);
+    setSession({ focusId: navigationRequest.id, page: 0 });
+  }, [navigationRequest, index, candidates, session, camera, readPoint]);
   useLayoutEffect(() => {
     onBoard(board);
     return () => onBoard(false);
@@ -535,7 +567,7 @@ export function LocalItemNeighborhood({
             >
               <List size={20} />
             </button>
-            {model.groups.length > 1 && (
+            {(model.groups.length > 1 || session?.groupId) && (
               <label
                 className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-slate-600 focus-within:outline focus-within:outline-2 focus-within:outline-teal-300"
                 title="Linked item group"
@@ -578,6 +610,18 @@ export function LocalItemNeighborhood({
               <Move size={20} />
             </button>
           </div>
+          {model.missingGroup && (
+            <div role="status" className="px-2 pb-2 text-amber-100">
+              <p>The selected group changed.</p>
+              <button
+                type="button"
+                className="min-h-11 underline"
+                onClick={() => navigate({ focusId: focusId!, page: 0 }, false)}
+              >
+                Show all linked items
+              </button>
+            </div>
+          )}
           <p className="px-2 text-slate-300">
             {drawn} links shown ·{' '}
             {model.counts.spatialDeferred + routingDeferred} in list
@@ -598,6 +642,7 @@ export function LocalItemNeighborhood({
       model.focus,
       model.counts,
       model.groups,
+      model.missingGroup,
       drawn,
       routingDeferred,
       browseFocus,
@@ -767,7 +812,7 @@ export function LocalItemNeighborhood({
                 }}
               >
                 <div
-                  className="flex h-8 items-center gap-2 border-b border-slate-700 px-3 text-sm font-semibold"
+                  className="flex h-7 items-center gap-2 border-b border-slate-700 px-3 text-sm font-semibold"
                   style={{ color: config?.hexColor ?? '#5eead4' }}
                 >
                   <Icon size={18} />
@@ -779,7 +824,7 @@ export function LocalItemNeighborhood({
                 <button
                   type="button"
                   data-local-open={card.id}
-                  className="block w-full px-3.5 py-1.5 text-left text-lg font-semibold leading-6 hover:bg-slate-800 focus:outline focus:outline-2 focus:outline-teal-300"
+                  className="block w-full px-3.5 py-1 text-left text-lg font-semibold leading-6 hover:bg-slate-800 focus:outline focus:outline-2 focus:outline-teal-300"
                   title={card.kind === 'item' ? card.item.title : card.label}
                   aria-label={
                     card.kind === 'item'
@@ -841,14 +886,6 @@ export function LocalItemNeighborhood({
               </section>
             );
           })}
-          {model.missingGroup && (
-            <div
-              role="status"
-              className="absolute left-16 top-32 rounded-lg bg-slate-900 p-4 text-base"
-            >
-              That group is no longer available. Choose All linked groups.
-            </div>
-          )}
         </div>
       )}
     </div>

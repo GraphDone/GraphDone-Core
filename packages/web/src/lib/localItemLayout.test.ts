@@ -86,7 +86,7 @@ describe('local item display geometry', () => {
       width: Math.max(...dimensions.map(value => value.width)),
       height: Math.max(...dimensions.map(value => value.height)),
     };
-    expect(cell).toEqual({ width: 320, height: 160 });
+    expect(cell).toEqual({ width: 320, height: 152 });
     for (const value of dimensions) {
       expect(value.title.lines.length).toBeLessThanOrEqual(3);
       for (const line of value.title.lines)
@@ -146,6 +146,36 @@ describe('local item display geometry', () => {
         height: 160,
       })
     ).toEqual(layout);
+  });
+
+  it('retains a full original neighbor with a phone home-indicator safe area', () => {
+    const { index } = fixture();
+    const viewport = { width: 390, height: 652 };
+    const obstacles = [
+      { x: 12, y: 12, width: 234, height: 154 },
+      { x: 0, y: 579, width: 390, height: 73 },
+      { x: 334, y: 12, width: 44, height: 156 },
+    ];
+    const initial = projectItemNeighborhood(index, 'hub', {
+      capacity: 7,
+      page: 0,
+    });
+    const sizes = initial.cards.map(card =>
+      localCardDimensions(card, viewport.width)
+    );
+    const cell = {
+      width: Math.max(...sizes.map(size => size.width)),
+      height: Math.max(...sizes.map(size => size.height)),
+    };
+    const layout = localItemSlots(viewport, obstacles, cell);
+    assertGeometry(layout, viewport, obstacles);
+    expect(layout.slots).toHaveLength(2);
+    expect(
+      projectItemNeighborhood(index, 'hub', {
+        capacity: layout.slots.length,
+        page: 0,
+      }).cards.filter(card => card.kind === 'item')
+    ).toHaveLength(2);
   });
 
   it('reports one or zero real slots when overlays or a narrow viewport leave no more room', () => {

@@ -18,9 +18,10 @@ it('explains an unavailable diagram without changing the current inspector mode'
     'Diagram: No sub-graph'
   );
   fireEvent.click(diagram);
-  expect(
-    screen.getByRole('button', { name: 'Card' })
-  ).toHaveAttribute('aria-pressed', 'true');
+  expect(screen.getByRole('button', { name: 'Card' })).toHaveAttribute(
+    'aria-pressed',
+    'true'
+  );
   expect(diagram).toHaveAttribute('aria-pressed', 'false');
   fireEvent.keyDown(diagram, { key: 'Escape' });
   expect(screen.queryByRole('tooltip')).toBeNull();
@@ -52,4 +53,27 @@ it('keeps one tooltip, clears it on scrolling and resets it for another inspecte
     <NodeInspector node={{ ...node, id: 'another' }} onClose={() => {}} />
   );
   expect(screen.queryByRole('tooltip')).toBeNull();
+});
+
+it('returns keyboard focus to the original item trigger when the inspector closes', () => {
+  const frames: FrameRequestCallback[] = [];
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    frames.push(callback);
+    return frames.length;
+  });
+  try {
+    const trigger = document.createElement('button');
+    document.body.appendChild(trigger);
+    trigger.focus();
+    const { unmount } = render(
+      <NodeInspector node={node} onClose={() => {}} />
+    );
+    screen.getByRole('button', { name: 'Close' }).focus();
+    unmount();
+    for (const callback of frames) callback(0);
+    expect(trigger).toHaveFocus();
+    trigger.remove();
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });
