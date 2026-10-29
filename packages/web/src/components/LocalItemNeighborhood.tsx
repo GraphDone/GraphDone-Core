@@ -100,6 +100,7 @@ type Props = {
   camera: LocalCamera;
   selectedId?: string;
   navigationRequest?: { id: string; sequence: number };
+  onNavigationHandled?: (sequence: number) => void;
   enabled: boolean;
   readPositions: () => readonly { id: string; x: number; y: number }[];
   onActive: (active: boolean) => void;
@@ -122,6 +123,7 @@ export function LocalItemNeighborhood({
   camera,
   selectedId,
   navigationRequest,
+  onNavigationHandled,
   enabled,
   readPositions,
   onActive,
@@ -272,12 +274,21 @@ export function LocalItemNeighborhood({
     )
       return;
     handledNavigation.current = navigationRequest.sequence;
+    onNavigationHandled?.(navigationRequest.sequence);
     if (!session && !candidates.includes(navigationRequest.id)) return;
     origin.current = camera;
     worldAnchor.current = readPoint(navigationRequest.id);
     setBoard(false);
     setSession({ focusId: navigationRequest.id, page: 0 });
-  }, [navigationRequest, index, candidates, session, camera, readPoint]);
+  }, [
+    navigationRequest,
+    onNavigationHandled,
+    index,
+    candidates,
+    session,
+    camera,
+    readPoint,
+  ]);
   useLayoutEffect(() => {
     onBoard(board);
     return () => onBoard(false);
