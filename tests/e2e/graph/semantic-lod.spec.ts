@@ -1,6 +1,7 @@
 import { test as base, expect, type CDPSession } from '@playwright/test';
 import { login, TEST_USERS } from '../../lib/auth';
 import { gql } from '../../lib/graphRequest';
+import { inspectOverviewBus } from '../../lib/overviewBusInspection';
 import { seedLargeGraph } from '../../lib/seedGraph';
 import {
   ownedGraphIdsFixture,
@@ -116,6 +117,7 @@ for (const width of [1440, 390])
         { id: seeded.graphId }
       );
       const before = await snapshot();
+      const originalEdges = (await gql(page, 'query($id:ID!){edges(where:{source:{graph:{id:$id}}}){id type source{id} target{id}}}', { id: seeded.graphId })).edges;
       await page.route('**/api/graphql', async route => {
         const body = route.request().postDataJSON();
         if (/^\s*mutation\b/.test(body?.query ?? '')) {
@@ -169,6 +171,7 @@ for (const width of [1440, 390])
         return geometry;
       };
       const initialGeometry = await overviewGeometry();
+      await inspectOverviewBus(page, info, originalEdges, Object.fromEntries(seeded.nodeIds.map((id, index) => [id, `Subsystem ${index % 8}`])), ms => page.clock.runFor(ms));
       const longTitleItem = before.find(
         (item: { id: string }) => item.id === seeded.nodeIds[8]
       );
@@ -200,6 +203,7 @@ for (const width of [1440, 390])
         )).toBeCloseTo(0.5);
       }
       await zoomToTitle(1.1, true);
+      await page.locator('[data-lod-bus-hit]').first().focus();
       await page.evaluate(({ x, y }) => {
         (window as unknown as { miniMapZoom: (x: number, y: number, k: number) => void }).miniMapZoom(x, y, 1.2);
       }, { x: longTitleItem.positionX, y: longTitleItem.positionY });
@@ -212,6 +216,7 @@ for (const width of [1440, 390])
         if (k > 1.15 && k < 1.2 && await overview.getAttribute('data-active') === 'false') exitedBeforeTarget = true;
       }
       expect(exitedBeforeTarget).toBe(true);
+      await expect(page.getByRole('button', { name: /groups · 301 items/ })).toBeFocused();
       expect(await svg.evaluate(element =>
         (element as SVGSVGElement & { __zoom: { k: number } }).__zoom.k
       )).toBeCloseTo(1.2);
