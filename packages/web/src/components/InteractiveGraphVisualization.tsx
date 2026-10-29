@@ -3944,8 +3944,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         itemPresentationScaleRef.current = scale;
         if (cullEnabled) applyViewportCull();
         updateNodePresentation();
-        updateZoomPresentation(scale);
         updateEdgePositions(true);
+        updateZoomPresentation(scale);
         g.attr('data-presentation-kind', 'items');
         g.attr('data-item-presentation-scale', scale);
         g.attr('data-item-presentation-passes', ++itemPresentationPasses);

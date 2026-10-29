@@ -506,6 +506,24 @@ for (const width of [1440, 390])
         1
       );
       expect(await overview.locator('defs filter').count()).toBe(0);
+      const priorityControl = page.getByRole('combobox', { name: 'Relationship priority', exact: true });
+      const savedPriority = await priorityControl.inputValue();
+      await priorityControl.selectOption('all');
+      await overview.getByRole('combobox', { name: 'Graph detail' }).selectOption('items');
+      await expect(svg.locator('.main-graph-group')).toHaveAttribute('data-presentation-kind', 'items');
+      const itemArrows = await svg.locator('.arrows-group .arrow').evaluateAll(elements => elements
+        .filter(element => getComputedStyle(element).display !== 'none')
+        .map(element => ({ id: element.getAttribute('data-edge-id'), opacity: Number(getComputedStyle(element).opacity), transform: element.getAttribute('transform') })));
+      expect(itemArrows.length).toBeGreaterThan(0);
+      expect(itemArrows.every(arrow => arrow.opacity >= 0.99 && !!arrow.transform && !/NaN|undefined/.test(arrow.transform))).toBe(true);
+      const arrowsPath = info.outputPath('manual-items-priority-arrows.json');
+      await writeFile(arrowsPath, JSON.stringify({ savedPriority, itemArrows }));
+      await info.attach('manual-items-priority-arrows.json', { path: arrowsPath, contentType: 'application/json' });
+      const arrowsScreenshot = info.outputPath('manual-items-priority-arrows.png');
+      await page.screenshot({ path: arrowsScreenshot });
+      await info.attach('manual-items-priority-arrows.png', { path: arrowsScreenshot, contentType: 'image/png' });
+      await overview.getByRole('combobox', { name: 'Graph detail' }).selectOption('overview');
+      await priorityControl.selectOption(savedPriority);
       const inspectFirst = async () => {
         await overview
           .getByRole('button', { name: '8 groups · 301 items' })
