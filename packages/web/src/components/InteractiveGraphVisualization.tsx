@@ -60,6 +60,7 @@ import { PerfMeter, DriftMeter } from '../lib/perfMeter';
 import { graphItemLayout, measureGraphText, edgeLabelDimensions, GRAPH_FONT_FAMILY, ITEM_TITLE_SIZE, ITEM_TITLE_LINE, ITEM_HEADER_HEIGHT, EDGE_LABEL_SIZE, ITEM_WIRE_WIDTH } from '../lib/graphSymbolLayout';
 import { placeItemLabels } from '../lib/edgeLabelPlacement';
 import { separateCards } from '../lib/separateCards';
+import { organizeTopology } from '../lib/topologyOrganization';
 import { DEFAULT_PHYSICS, collisionRadius, linkDistance, linkMaxDistance, linkStrength } from '../lib/physicsConfig';
 import { computeCompactLayout, isHierarchicalLayout, parseLayoutMode, LAYOUT_MODE_STORAGE_KEY, type LayoutMode } from '../lib/layoutAlgorithms';
 import { edgeBorderEndpoints, minEdgeLength, clampToMinNeighbors } from '../lib/edgeGeometry';
@@ -1655,16 +1656,14 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // strips physics keys (fx/fy) to preserve live velocity, so placed nodes
     // arriving via a graph-switch or poll would otherwise come back unpinned
     // and drift. Snapshot-authoritative load must hold here too.
-    if (!layoutReflowingRef.current) {
-      (nodeMerge.nodes as any[]).forEach((node: any) => {
+    (nodeMerge.nodes as any[]).forEach((node: any) => {
         const placed = !(((node.positionX ?? 0) === 0) && ((node.positionY ?? 0) === 0));
         if (placed && !node._dragging) {
           node.fx = node.positionX;
           node.fy = node.positionY;
           node.userPinned = true;
         }
-      });
-    }
+    });
     simulation.nodes(nodeMerge.nodes as any);
     const linkForce = simulation.force('link') as d3.ForceLink<any, any>;
     if (linkForce) {
@@ -1909,6 +1908,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // never-placed nodes are seeded near center and left free to flow.
     // (This block used to null every node's fx/fy unconditionally, which is
     //  why arrangements never survived a reload — the real drift bug.)
+    const initialOrganization = nodes.length && nodes.every(node => !(node.positionX || node.positionY))
+      ? organizeTopology(nodes, validatedEdges as any[], node => graphItemLayout(node, measureGraphText), {width, height})
+      : null;
     const spreadCols = Math.max(1, Math.ceil(Math.sqrt(nodes.length)));
     const spreadSpacing = 260; // > collision diameter so the spread has no overlaps
     const spreadHalf = (spreadCols * spreadSpacing) / 2;
@@ -1923,13 +1925,17 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         node.fx = node.positionX;
         node.fy = node.positionY;
       } else {
-        node.userPinned = false;
-        node.fx = null;
-        node.fy = null;
-        // Clean grid spread (not a random pile) so physics refines from a
-        // non-overlapping start.
-        if (!node.x) node.x = (i % spreadCols) * spreadSpacing - spreadHalf + ((i * 13) % 23) - 11;
-        if (!node.y) node.y = Math.floor(i / spreadCols) * spreadSpacing - spreadHalf + ((i * 7) % 19) - 9;
+        const point = initialOrganization?.positions.get(node.id);
+        node.userPinned = Boolean(point);
+        node.fx = point?.x ?? null;
+        node.fy = point?.y ?? null;
+        if (point) {
+          node.x = point.x;
+          node.y = point.y;
+        } else {
+          if (!node.x) node.x = (i % spreadCols) * spreadSpacing - spreadHalf + ((i * 13) % 23) - 11;
+          if (!node.y) node.y = Math.floor(i / spreadCols) * spreadSpacing - spreadHalf + ((i * 7) % 19) - 9;
+        }
       }
     });
 
@@ -3998,15 +4004,13 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     }
   }, [semanticOverviewActive, currentGraph?.id]);
 
-  // True only while "Reset layout" is re-flowing — suspends snapshot pinning
-  const layoutReflowingRef = useRef(false);
   const mousedownNodeRef = useRef<any>(null);
 
   // Fit view to show all nodes. Returns true if a fit transform was applied,
   // false if it couldn't yet (no svg/container, or the simulation has no
   // positioned nodes) — the once-per-graph framing polls on this so a slow data
   // load doesn't leave the graph pinned off-screen (the live-guest bug).
-  const fitViewToNodes = useCallback((animate = true): boolean => {
+  const fitViewToNodes = useCallback((animate = true, minimumScale = 0): boolean => {
     if (!svgRef.current || !containerRef.current) return false;
     // Bounds must come from the LIVE simulation objects (the React-state
     // nodes are different objects since the identity merge and may hold
@@ -4092,7 +4096,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     }
 
     // Fit, but never zoom IN past 1.25 (a 3-node graph shouldn't fill the screen)
-    const scale = Math.min(fitRegion.width / boundsWidth, fitRegion.height / boundsHeight, 1.25);
+    const scale = Math.max(minimumScale, Math.min(fitRegion.width / boundsWidth, fitRegion.height / boundsHeight, 1.25));
 
     const translateX = fitRegion.x + fitRegion.width / 2 - ((minX + maxX) / 2) * scale;
     const translateY = fitRegion.y + fitRegion.height / 2 - ((minY + maxY) / 2) * scale;
@@ -4330,36 +4334,32 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   }, []);
 
 
-  // Reset layout = the explicit "re-flow everything" escape hatch. It must
-  // override snapshot-authoritative pinning: clear each node's saved-position
-  // intent (in memory) and unpin, suspend re-pinning while physics rearranges,
-  // then persist the fresh layout once it settles so it becomes the new
-  // authoritative snapshot.
   const resetLayout = useCallback(() => {
-    layoutReflowingRef.current = true;
-    // Unpin + mark unplaced; initializeVisualization will lay the unplaced
-    // nodes out on a CLEAN spread grid (see getUnplacedSpread) so physics
-    // REFINES a non-overlapping start instead of trying to explode a pile.
-    nodes.forEach((node: any) => {
-      node.userPinned = false;
+    const simulation = simulationRef.current, container = containerRef.current;
+    if (!simulation || !container || simulationLayoutScopeRef.current !== activeLayoutScopeRef.current) return;
+    const arranged = organizeTopology(simulation.nodes() as WorkItem[], validatedEdges as any[], node => graphItemLayout(node, measureGraphText), {width:container.clientWidth,height:container.clientHeight});
+    for (const node of simulation.nodes() as any[]) {
+      const point = arranged.positions.get(node.id);
+      if (!point) continue;
+      node.x = node.fx = point.x;
+      node.y = node.fy = point.y;
+      node.vx = node.vy = 0;
+      node.userPinned = true;
+      delete node.__layerPinned;
+      delete node.__preLayerFx;
+      delete node.__preLayerFy;
       node.userPreferredPosition = null;
       node.userPreferenceVector = null;
-      node.fx = null;
-      node.fy = null;
-      node.positionX = 0;
-      node.positionY = 0;
-      node.targetX = null;
-      node.targetY = null;
-      node.x = 0;
-      node.y = 0;
+    }
+    (window as any).__graphOrganization = {components:arranged.components,work:arranged.work};
+    simulation.alpha(0).restart();
+    persistAllPositions();
+    requestAnimationFrame(() => {
+      if (simulationRef.current !== simulation) return;
+      runLabelAvoidanceRef.current?.();
+      fitViewToNodes(true, container.clientWidth < 600 ? 0.65 : 0);
     });
-    initializeVisualization();
-    setTimeout(() => {
-      fitViewToNodes();
-      persistAllPositions();      // the reflowed layout becomes the new snapshot
-      layoutReflowingRef.current = false;
-    }, 2500);
-  }, [nodes, initializeVisualization, fitViewToNodes, persistAllPositions]);
+  }, [validatedEdges, fitViewToNodes, persistAllPositions]);
 
   // Hierarchical mode packs actual card sizes into compact dependency rows.
   // Pin both axes so repulsion cannot spread a finished row across the viewport.

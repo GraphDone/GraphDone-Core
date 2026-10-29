@@ -1,0 +1,19 @@
+# Clean layout needs measured clearance and topology, not only nonintersection
+
+On2026-10-28 the owner rejected the headed overview/detailed scenes as a junk pile. Labels and pointer hit areas had improved, but overview cards still used16/24px gutters, ports8px from cards and auxiliary lanes6px apart. A no-intersection metric could therefore pass an unreadable view. Detailed items began from a jittered grid or optional dependency rows, which did not place a connected hub at the center of its neighborhood.
+
+## Evidence and corrective rule
+
+The initial source audit identified `overviewSlots`, `ports` and the two-mode layout in `InteractiveGraphVisualization`. The correction uses64px overview gutters,20px unrelated-card routing clearance and16px separation between unrelated buses. `overviewOrganization.test.ts` retains a negative with two noncrossing wires6px apart and only4px from a card. It must fail the spacing contract even though exact intersection counts are zero. Positive real-router fixtures must also draw useful routes and conserve every original relationship.
+
+The new pure organizer splits connected components, deduplicates parallel relationships for degree, places hubs centrally with radial neighbors, follows chains/cycles, and bounds adjacent-ring refinement to40,000 edge evaluations. Its first2k/5k fixture accidentally repeated the same degree-two edges, so it never exercised refinement; replacing those with a backbone plus distinct chords covers the intended network branch. Four topology tests plus existing LOD/component cases passed29/29 in2.69s; three overview spacing/actual-router cases passed3/3 in0.81s. Web types and scoped new-file lint pass. The touched legacy renderer/workspace lint reports0errors and316 warnings in the touched legacy files; that is not a warning-free claim.
+
+Detailed organization is explicit and persists through the existing bounded save queue. A completely unplaced scene receives topology placement initially; saved scene positions remain authoritative. Organization does not run on pointer/zoom frames. Overview placement uses the represented relationship projection and bounded slot swaps; a dominant hub retains its central slot.
+
+## Limits and pending acceptance
+
+Tracked by #233/PR234. Actual headed control/save/reload, final hosted strict screenshots/clearance receipts, independent review and post-dev acceptance are pending. The original localhost graph is preserved; use disposable owned fixtures. Large-data loading, detailed obstacle-aware item routing (#220), hosted parity and release readiness remain separate. CodeGraph ideas are adapted without shared packages or CodeGraph edits. Passing placement geometry does not prove every detailed edge is readable.
+
+The first actual organizer journey timed out before exercising organization: it looked for the LOD Detail selector on a nine-item graph, but that control intentionally mounts only at40items. The small fixture now asserts its absence and uses the directly rendered detailed view. The failed run/trace is retained; this is a fixture correction, not evidence that the organizer worked.
+
+The corrected first actual desktop/phone organization/save/reload journey passed2/2 in25.85s, but visual inspection rejected its phone result: fitting all five cards produced short-word fragmentation in narrow compact boxes. This exposed an insufficient acceptance condition (world-space separation and exact persistence alone). The organize action now requests a readable phone zoom floor, and the fixture measures actual projected card width and complete title words after camera paint/settle. Its first stronger probe caught67px before the requested animation; the next check must wait for that specific visible state and verify it survives save/status changes. This final phone correction is still pending; the earlier25.85s run is not final visual acceptance.

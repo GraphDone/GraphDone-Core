@@ -2,6 +2,7 @@
 
 | Symptom | Canonical lesson and regression |
 | --- | --- |
+| Overview has no intersections but wires hug cards/each other, or hubs are flattened into rows | [Measure clearance and organize by topology](../inbox/2026-10-28-clean-layout-needs-clearance-and-topology.md); topology/overview organization tests, real control/save journey and strict schematic clearance |
 | Your agent mixes setup, existing access and notes; narrow permission text clips, or unavailable access looks empty | [Separate task regions and honest availability](../inbox/2026-10-28-agent-setup-needs-separate-task-regions.md); `agent-connection` browser sequence and `AgentConnection.test.tsx` |
 | Inspector code remains11–13px, nested previews have microscopic labels, long titles hide content, or inspection clicks enqueue unchanged positions | [Readable preview levels and read-only gestures](../inbox/2026-10-28-inspector-previews-need-readable-levels.md); inspector-readability browser journey and subgraph preview conservation/component cases |
 | Releasing Alt during a gesture crashes or moves a node using an earlier drag's state | [Gesture mode and state must belong to one drag](../inbox/2026-10-28-drag-mode-must-survive-modifier-release.md); native fresh/prior-drag Alt-release cases in layout recovery |

@@ -5,7 +5,7 @@ import { WorkspaceViewTabs } from '../components/WorkspaceViewTabs';
 import { AgentConnection } from '../components/AgentConnection';
 import type { WorkItem } from '../types/graph';
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Share2, Users, Network, Database, AlertTriangle, Map, X, Minimize2, Maximize2, Edit3, Trash2, FolderPlus, ChevronLeft, ChevronRight, Lock, Unlock } from 'lucide-react';
+import { Plus, Share2, Users, Network, Orbit, Database, AlertTriangle, Map, X, Minimize2, Maximize2, Edit3, Trash2, FolderPlus, ChevronLeft, ChevronRight, Lock, Unlock } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useQuery } from '@apollo/client';
 import { SafeGraphVisualization } from '../components/SafeGraphVisualization';
@@ -402,6 +402,17 @@ export function Workspace() {
              aria-label="Zoom to fit — frame all nodes"
            >
              <Maximize2 className="h-4 w-4" />
+           </button>
+           <button
+             data-testid="graph-organize"
+             data-graph-fit-obstacle="true"
+             disabled={!currentGraph || !canEditGraph(currentGraph.id)}
+             onClick={() => (window as any).__organizeGraph?.()}
+             className="absolute top-28 right-3 md:left-3 md:right-auto z-40 flex items-center justify-center w-11 h-11 rounded-full shadow-lg backdrop-blur-sm border border-teal-500/60 bg-gray-900/90 text-teal-200 hover:text-white hover:border-teal-300 transition-colors"
+             title="Organize around connections — place hubs centrally"
+             aria-label="Organize around connections"
+           >
+             <Orbit className="h-5 w-5" />
            </button>
            {/* Layout mode (desktop): force (organic) vs hierarchical (dependency
                layers). Lives in the graph control cluster under zoom-extents, so

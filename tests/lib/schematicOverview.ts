@@ -2,6 +2,7 @@ import { expect, type Locator, type TestInfo } from '@playwright/test';
 import { writeFileSync } from 'node:fs';
 import {
   measureSchematicClutter,
+  measureSchematicClearance,
   schematicSegments,
 } from '../../packages/web/src/lib/schematicRouting';
 
@@ -160,6 +161,22 @@ export async function inspectSchematicOverview(
     expect(card.x + card.width).toBeLessThanOrEqual(geometry.bounds.right);
     expect(card.y).toBeGreaterThanOrEqual(geometry.bounds.top);
     expect(card.y + card.height).toBeLessThanOrEqual(geometry.bounds.bottom);
+    for (const other of geometry.cards.filter(other => other.id !== card.id)) {
+      const dx = Math.max(
+        0,
+        Math.max(card.x, other.x) -
+          Math.min(card.x + card.width, other.x + other.width)
+      );
+      const dy = Math.max(
+        0,
+        Math.max(card.y, other.y) -
+          Math.min(card.y + card.height, other.y + other.height)
+      );
+      expect(
+        Math.hypot(dx, dy),
+        'Cards need readable gutters'
+      ).toBeGreaterThanOrEqual(63.9);
+    }
   }
   for (const route of geometry.routes) {
     expect(route.painted, 'Schematic wire must be painted').toBe(true);
@@ -204,6 +221,28 @@ export async function inspectSchematicOverview(
   expect(metrics.unrelatedOverlaps).toBe(0);
   expect(metrics.diagonalSegments).toBe(0);
   expect(metrics.maxBusesPerCell).toBeLessThanOrEqual(4);
+  const clearance = measureSchematicClearance(
+    [...geometry.cards, ...geometry.controls],
+    geometry.routes.map((route, index) => ({
+      id: String(index),
+      bus: route.source,
+      source: route.from!,
+      target: route.to!,
+      edgeIds: [],
+      connections: [],
+      points: route.points,
+    }))
+  );
+  if (clearance.minCardClearance !== null)
+    expect(
+      clearance.minCardClearance,
+      'Wires need room around cards and controls'
+    ).toBeGreaterThanOrEqual(19.9);
+  if (clearance.minUnrelatedWireClearance !== null)
+    expect(
+      clearance.minUnrelatedWireClearance,
+      'Unrelated wires need distinct lanes'
+    ).toBeGreaterThanOrEqual(15.9);
   const accounting = geometry.accounting?.match(
     /^(\d+) relationships, (\d+) not drawn:/
   );
@@ -214,7 +253,10 @@ export async function inspectSchematicOverview(
       Number(accounting![2])
   ).toBe(relationships);
   const geometryPath = info.outputPath(`${stage}-geometry.json`);
-  writeFileSync(geometryPath, JSON.stringify({ ...geometry, metrics }));
+  writeFileSync(
+    geometryPath,
+    JSON.stringify({ ...geometry, metrics, clearance })
+  );
   await info.attach(`${stage}-geometry.json`, {
     path: geometryPath,
     contentType: 'application/json',
