@@ -46,7 +46,7 @@ test('disposable Git fixture commits do not spawn background maintenance', t => 
   assert.deepEqual(events.filter(event => event.event === 'child_start' && event.argv?.includes('maintenance')), []);
 });
 
-for (const sequence of ['new-user', 'inspector-readability', 'semantic-lod', 'nested-lod', 'item-wires', 'large-symbols', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'perf-budgets']) {
+for (const sequence of ['new-user', 'agent-connection', 'inspector-readability', 'semantic-lod', 'nested-lod', 'item-wires', 'large-symbols', 'schematic-visual', 'layout-recovery', 'router-navigation', 'mobile', 'perf-budgets']) {
   test(`CLI forwards failure-only tracing without retries for ${sequence}`, t => {
     const { dir, run } = fixture(t);
     const report = { suites: [{ specs: [{ title: 'fixture', ok: true,
@@ -60,6 +60,14 @@ for (const sequence of ['new-user', 'inspector-readability', 'semantic-lod', 'ne
       assert.ok(!args.includes('tests/e2e/graph/semantic-lod.spec.ts'));
       assert.ok(!args.includes('tests/e2e/auth/router-navigation.spec.ts'));
       assert.ok(!args.includes('tests/e2e/graph/inspector-readability.spec.ts'));
+    }
+    if (sequence === 'agent-connection') {
+      assert.deepEqual(args.filter(arg => arg.endsWith('.spec.ts')), ['tests/e2e/quality/agent-collaboration.spec.ts']);
+      assert.ok(args.includes('--headed'));
+      assert.equal(SEQUENCES[sequence].blocking, true);
+      for (const profile of ['pr', 'full']) assert.ok(PROFILES[profile].includes(sequence));
+      const workflow = readFileSync(join(root, '.github/workflows/ci.yml'), 'utf8');
+      assert.equal(workflow.split('run: xvfb-run --auto-servernum node tests/run-unified.mjs --sequence agent-connection --out test-artifacts/ci-agent-connection').length, 2);
     }
     if (sequence === 'inspector-readability') {
       assert.deepEqual(args.filter(arg => arg.endsWith('.spec.ts')), ['tests/e2e/graph/inspector-readability.spec.ts']);
@@ -99,7 +107,7 @@ for (const sequence of ['new-user', 'inspector-readability', 'semantic-lod', 'ne
   });
 }
 
-for (const sequence of ['new-user', 'inspector-readability']) {
+for (const sequence of ['new-user', 'agent-connection', 'inspector-readability']) {
   test(`${sequence}: failed browser traces and diagnostics survive later Playwright output cleanup`, t => {
     const { dir, run } = fixture(t);
     const original = join(dir, 'test-artifacts/playwright-output');
