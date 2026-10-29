@@ -1,6 +1,23 @@
 import { expect, it } from 'vitest';
 import { placeOverviewBusHint } from './overviewBusHint';
 
+it('leaves the pointer and adjacent wire targets uncovered in an empty canvas', () => {
+  const point = placeOverviewBusHint(
+    { x: 200, y: 100 },
+    800,
+    600,
+    360,
+    138,
+    []
+  );
+  expect(
+    point.x >= 212 ||
+      point.x + 360 <= 188 ||
+      point.y >= 112 ||
+      point.y + 138 <= 88
+  ).toBe(true);
+});
+
 it('keeps a hover caption off nearby cards and controls when a free strip exists', () => {
   const obstacles = [
     { id: 'control', x: 12, y: 12, width: 500, height: 60 },

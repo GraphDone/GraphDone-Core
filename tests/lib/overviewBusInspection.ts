@@ -40,6 +40,33 @@ export async function inspectOverviewBus(
   await priority.selectOption('all');
   await paint();
   const target = await page.locator('[data-lod-bus-hit]').evaluateAll(paths => {
+    const distance = (path: Element, point: { x: number; y: number }) => {
+      const values = path
+        .getAttribute('d')!
+        .replace(/[ML]/g, ' ')
+        .trim()
+        .split(/[ ,]+/)
+        .map(Number);
+      let best = Infinity;
+      for (let index = 2; index < values.length; index += 2) {
+        const x = values[index - 2],
+          y = values[index - 1],
+          dx = values[index] - x,
+          dy = values[index + 1] - y;
+        const fraction = Math.max(
+          0,
+          Math.min(
+            1,
+            ((point.x - x) * dx + (point.y - y) * dy) / (dx * dx + dy * dy)
+          )
+        );
+        best = Math.min(
+          best,
+          Math.hypot(point.x - x - fraction * dx, point.y - y - fraction * dy)
+        );
+      }
+      return best;
+    };
     for (const path of paths as SVGPathElement[]) {
       const id = path.getAttribute('data-lod-bus-hit')!;
       const [source, target] = JSON.parse(id) as string[];
@@ -58,6 +85,12 @@ export async function inspectOverviewBus(
           point.x + (next.x === point.x ? 6 : 0),
           point.y + (next.y === point.y ? 6 : 0)
         ).matrixTransform(path.getScreenCTM()!);
+        const local = new DOMPoint(offset.x, offset.y).matrixTransform(
+          path.getScreenCTM()!.inverse()
+        );
+        const ownDistance = distance(path, local);
+        if (paths.some(other => distance(other, local) < ownDistance - 1e-6))
+          continue;
         if (document.elementFromPoint(offset.x, offset.y) === path)
           return {
             id,
@@ -155,6 +188,62 @@ export async function inspectOverviewBus(
     path: screenshot,
     contentType: 'image/png',
   });
+  if (page.viewportSize()!.width >= 1024) {
+    const targets = page.locator('[data-lod-bus-hit]');
+    const count = await targets.count();
+    expect(count).toBeGreaterThan(1);
+    const index = await targets.evaluateAll(
+      (paths, id) =>
+        paths.findIndex(path => path.getAttribute('data-lod-bus-hit') === id),
+      target.id
+    );
+    const next = targets.nth(index < count - 1 ? index + 1 : index - 1);
+    await hit.focus();
+    await page.keyboard.press(index < count - 1 ? 'Tab' : 'Shift+Tab');
+    await expect(next).toBeFocused();
+    const nextId = (await next.getAttribute('data-lod-bus-hit'))!;
+    await expect(next).toHaveAttribute(
+      'aria-describedby',
+      (await page.getByRole('tooltip').getAttribute('id'))!
+    );
+    expect(
+      await page
+        .locator('[data-bus-highlighted="true"]')
+        .evaluateAll(elements =>
+          elements.map(element => element.getAttribute('data-lod-group')).sort()
+        )
+    ).toEqual(JSON.parse(nextId).sort());
+    await paint();
+    const mixed = info.outputPath('overview-bus-keyboard-after-hover.png');
+    await page.screenshot({ path: mixed });
+    await info.attach('overview-bus-keyboard-after-hover', {
+      path: mixed,
+      contentType: 'image/png',
+    });
+    await page.mouse.move(0, 0);
+    await page.mouse.move(target.x, target.y);
+    await expect(next).toBeFocused();
+    expect(
+      await page.locator('[data-bus-focused="true"]').evaluateAll(elements =>
+        elements.map(element => ({
+          source: element.getAttribute('data-lod-bus-source'),
+          target: element.getAttribute('data-lod-bus-target'),
+          width: Number(
+            getComputedStyle(element).strokeWidth.replace('px', '')
+          ),
+          opacity: Number(getComputedStyle(element).opacity),
+        }))
+      )
+    ).toEqual([
+      {
+        source: JSON.parse(nextId)[0],
+        target: JSON.parse(nextId)[1],
+        width: 5,
+        opacity: 1,
+      },
+    ]);
+    await hit.focus();
+  }
   await page.mouse.click(target.x, target.y);
   const browser = page.getByRole('region', {
     name: 'Graph relationships',

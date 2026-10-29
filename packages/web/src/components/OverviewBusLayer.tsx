@@ -1,4 +1,15 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import {
+  indexOverviewBusHits,
+  nearestOverviewBus,
+} from '../lib/overviewBusHit';
 import { placeOverviewBusHint } from '../lib/overviewBusHint';
 import type { SchematicCard, SchematicRoute } from '../lib/schematicRouting';
 
@@ -110,8 +121,35 @@ export function OverviewBusLayer({
       )
     );
   }, [anchor, width, height, visibleHint, active, obstacles]);
+  const hitGeometry = useMemo(() => indexOverviewBusHits(routes), [routes]);
+  const pointerRoute = (
+    fallback: SchematicRoute,
+    event: { clientX: number; clientY: number; currentTarget: SVGPathElement }
+  ) => {
+    const bounds = event.currentTarget.ownerSVGElement!.getBoundingClientRect();
+    const point = {
+      x: event.clientX - bounds.left,
+      y: event.clientY - bounds.top,
+    };
+    const route =
+      nearestOverviewBus(hitGeometry, point, hovered ?? fallback.id) ??
+      fallback;
+    return {
+      route,
+      point:
+        Number.isFinite(point.x) && Number.isFinite(point.y)
+          ? point
+          : route.points[0],
+    };
+  };
+  const pointerTarget = (route: SchematicRoute, fallback: SVGPathElement) =>
+    Array.from(
+      fallback.ownerSVGElement!.querySelectorAll<SVGPathElement>(
+        '[data-lod-bus-hit]'
+      )
+    ).find(element => element.dataset.lodBusHit === route.id) ?? fallback;
   const describe = (route: SchematicRoute) =>
-    `${label(route.source)} → ${label(route.target)}: ${route.edgeIds.length} relationships`;
+    `${label(route.source)} → ${label(route.target)}: ${route.edgeIds.length} ${route.edgeIds.length === 1 ? 'relationship' : 'relationships'}`;
   return (
     <>
       <svg
@@ -144,15 +182,26 @@ export function OverviewBusLayer({
             data-lod-bus-id={route.bus}
             data-count={route.edgeIds.length}
             data-highlighted={active?.id === route.id}
+            data-bus-focused={focused === route.id}
             d={route.points
               .map(
                 (point, index) => `${index ? 'L' : 'M'}${point.x},${point.y}`
               )
               .join(' ')}
             fill="none"
-            stroke={active?.id === route.id ? '#f8fafc' : color(route.bus)}
-            strokeWidth={active?.id === route.id ? 5 : 3.5}
-            opacity={active && active.id !== route.id ? 0.45 : 1}
+            stroke={
+              active?.id === route.id || focused === route.id
+                ? '#f8fafc'
+                : color(route.bus)
+            }
+            strokeWidth={
+              active?.id === route.id || focused === route.id ? 5 : 3.5
+            }
+            opacity={
+              active && active.id !== route.id && focused !== route.id
+                ? 0.45
+                : 1
+            }
             strokeLinejoin="round"
             strokeLinecap="round"
             markerEnd={`url(#${marker})`}
@@ -196,17 +245,31 @@ export function OverviewBusLayer({
               cursor: 'pointer',
               outline: 'none',
             }}
-            onPointerDown={event => event.stopPropagation()}
+            onPointerDown={event => {
+              event.stopPropagation();
+              if (event.button === 0) {
+                event.preventDefault();
+                const selected = pointerRoute(route, event).route;
+                pointerTarget(selected, event.currentTarget).focus({
+                  preventScroll: true,
+                });
+              }
+            }}
             onPointerEnter={event => {
               cancelExit();
-              setHovered(route.id);
+              const selected = pointerRoute(route, event);
+              setHovered(selected.route.id);
               setDismissed(null);
-              const bounds =
-                event.currentTarget.ownerSVGElement!.getBoundingClientRect();
-              setAnchor({
-                x: event.clientX - bounds.left,
-                y: event.clientY - bounds.top,
-              });
+              setAnchor(selected.point);
+            }}
+            onPointerMove={event => {
+              cancelExit();
+              const selected = pointerRoute(route, event);
+              if (selected.route.id !== hovered) {
+                setHovered(selected.route.id);
+                setDismissed(null);
+                setAnchor(selected.point);
+              }
             }}
             onPointerLeave={leave}
             onFocus={event => {
@@ -215,6 +278,7 @@ export function OverviewBusLayer({
                 source: route.source,
               };
               cancelExit();
+              setHovered(null);
               setFocused(route.id);
               setDismissed(null);
               const segments = route.points
@@ -239,7 +303,11 @@ export function OverviewBusLayer({
             onClick={event => {
               event.stopPropagation();
               setHovered(null);
-              onInspect(route, event.currentTarget);
+              const selected =
+                event.detail === 0 ? route : pointerRoute(route, event).route;
+              const trigger = pointerTarget(selected, event.currentTarget);
+              trigger.focus({ preventScroll: true });
+              onInspect(selected, trigger);
             }}
             onKeyDown={event => {
               if (event.key === 'Escape') {
@@ -277,11 +345,17 @@ export function OverviewBusLayer({
             {label(active.source)} → {label(active.target)}
           </p>
           <p className="mt-2">
-            {active.edgeIds.length} relationships ·{' '}
+            {active.edgeIds.length}{' '}
+            {active.edgeIds.length === 1 ? 'relationship' : 'relationships'} ·{' '}
             {active.connections
               .map(
                 connection =>
-                  `${connection.edgeIds.length} ${connection.type.replace(/_/g, ' ').toLowerCase()}`
+                  `${connection.type
+                    .replace(/_/g, ' ')
+                    .toLowerCase()
+                    .replace(/^./, letter =>
+                      letter.toUpperCase()
+                    )} × ${connection.edgeIds.length}`
               )
               .join(' · ')}
           </p>
