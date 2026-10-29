@@ -52,6 +52,7 @@ import { NodeQuickEdit, type QuickEditCommit } from './NodeQuickEdit';
 import { WorkItem, WorkItemEdge } from '../types/graph';
 import { RelationshipType, RELATIONSHIP_OPTIONS, getRelationshipConfig } from '../constants/workItemConstants';
 import { useAdaptiveQuality } from '../hooks/useAdaptiveQuality';
+import { useItemPresentation } from '../hooks/useItemPresentation';
 import { nodeLifeClasses, nodeGlowFilter, isActiveStatus, isCompletedStatus, edgeFlowClass } from '../lib/nodeAnimations';
 import { mergeSimulationNodes, mergeSimulationEdges } from '../lib/graphDataMerge';
 import type { ObstacleBox } from '../lib/edgeLabelLayout';
@@ -1381,12 +1382,15 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
   // A graph owns one simulation. Detached simulations otherwise keep mutating
   // shared node objects after a rebuild and can fight the visible simulation.
+  const [semanticOverviewActive, setSemanticOverviewActive] = useState(false);
+  const itemPresentation = useItemPresentation(semanticOverviewActive);
   const stopActiveSimulation = useCallback(() => {
+    itemPresentation.clear();
     simulationRef.current?.on('tick', null).on('end.persist', null).alphaTarget(0).stop();
     simulationRef.current = null;
     simulationLayoutScopeRef.current = null;
     delete (window as any).__graphPerf;
-  }, []);
+  }, [itemPresentation]);
 
   // Initialize empty visualization canvas
   const initializeEmptyVisualization = useCallback(() => {
@@ -3453,7 +3457,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       element.select('.long-press-feedback').remove();
     });
 
-    const nodePresentationScales = new WeakMap<WorkItem, number>();
+    let nodePresentationScales = new WeakMap<WorkItem, number>();
     const updateNodePresentationFor = (element: SVGGElement, d: WorkItem) => {
       const presentedScale = itemPresentationScaleRef.current;
       if (nodePresentationScales.get(d) === presentedScale) return;
@@ -3515,6 +3519,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     };
     let displayedPriority: typeof priorityProjection | null = null;
     const updateEdgePositions = (forceAvoid = false) => {
+      if (itemPresentation.isOverview()) return;
       if (dotModeRef.current && !forceAvoid) return;
       const priority = relationshipPriorityRef.current;
       if (displayedPriority !== priority) {
@@ -3705,6 +3710,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       applyEdgeDisplays();
     };
     const applyViewportCull = () => {
+      if (itemPresentation.isOverview()) return;
       const svgEl = svg.node();
       if (!svgEl) return;
       const t = d3.zoomTransform(svgEl);
@@ -3794,6 +3800,44 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
     // Update zoom with LOD updates
     let labelsShownAtScale = liveScale >= 0.6;
+    const updateZoomPresentation = (scale: number) => {
+      if (itemPresentation.isOverview()) return;
+      // Smooth opacity transitions based on zoom level
+      const getSmoothedOpacity = (threshold: number, fadeRange: number = 0.2) => {
+        if (scale >= threshold + fadeRange) return 1;
+        if (scale <= threshold - fadeRange) return 0;
+        return (scale - (threshold - fadeRange)) / (fadeRange * 2);
+      };
+
+      // Update text opacities with smooth transitions
+      const activeNodes = nodeElements.filter((d: any) => !cullActive || !d._culled);
+      activeNodes.selectAll('.node-type-text' as any)
+        .style('opacity', getSmoothedOpacity(LOD_THRESHOLDS.FAR));
+      // Title appears across the working band (not only when zoomed all the way
+      // in) and is counter-scaled to a legibility floor so it stays readable. The
+      // group transform is updated live here (the only path that runs on zoom).
+      activeNodes.selectAll('.node-title-text' as any)
+        .style('opacity', scale >= 0.3 ? 1 : 0);
+      activeNodes.selectAll('.node-description-text' as any)
+        .style('opacity', getSmoothedOpacity(LOD_THRESHOLDS.CLOSE));
+      // Edge labels + arrows follow the edge LOD module (zoom-aware, crowd-aware).
+      if (labelsShownAtScale !== (scale >= 0.6)) {
+        labelsShownAtScale = scale >= 0.6;
+        edgeLabelGroups.style('opacity', labelsShownAtScale ? 1 : 0).style('pointer-events', labelsShownAtScale ? 'all' : 'none');
+      }
+      arrowElements.filter((d: any) => edgeDisplay(d) !== 'none')
+        .style('opacity', (d: any) =>
+          directionStrategy(scale) === 'hidden' ? 0 : arrowVisibility(scale, d?._pTotal || 1).opacity);
+      linkElements.filter((d: any) => edgeDisplay(d) !== 'none')
+        .style('opacity', Math.max(0.1, getSmoothedOpacity(LOD_THRESHOLDS.VERY_FAR, 0.1)))
+        .attr('stroke-width', function(d: any) {
+          // Don't override stroke width if this edge has an active dialog
+          if (editingEdge && editingEdge.edge && editingEdge.edge.id === d.id) {
+            return 10; // Keep thick for active dialog
+          }
+          return ITEM_WIRE_WIDTH;
+        });
+    };
     zoom.on('zoom', (event) => {
       // D3 sets sourceEvent only for direct wheel/pointer gestures. Programmatic
       // fit/restore transforms must remain distinguishable so an automatic fit
@@ -3843,51 +3887,11 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         (window as any).updateMiniMapViewport(viewportUpdate);
       }
       
-      // Update LOD based on zoom level
-      const scale = event.transform.k;
-      
-      // Smooth opacity transitions based on zoom level
-      const getSmoothedOpacity = (threshold: number, fadeRange: number = 0.2) => {
-        if (scale >= threshold + fadeRange) return 1;
-        if (scale <= threshold - fadeRange) return 0;
-        return (scale - (threshold - fadeRange)) / (fadeRange * 2);
-      };
-      
-      // Update text opacities with smooth transitions
-      const activeNodes = nodeElements.filter((d: any) => !cullActive || !d._culled);
-      activeNodes.selectAll('.node-type-text' as any)
-        .style('opacity', getSmoothedOpacity(LOD_THRESHOLDS.FAR));
-      // Title appears across the working band (not only when zoomed all the way
-      // in) and is counter-scaled to a legibility floor so it stays readable. The
-      // group transform is updated live here (the only path that runs on zoom).
-      activeNodes.selectAll('.node-title-text' as any)
-        .style('opacity', scale >= 0.3 ? 1 : 0);
-      activeNodes.selectAll('.node-description-text' as any)
-        .style('opacity', getSmoothedOpacity(LOD_THRESHOLDS.CLOSE));
-      // Edge labels + arrows follow the edge LOD module (zoom-aware, crowd-aware).
-      if (labelsShownAtScale !== (scale >= 0.6)) {
-        labelsShownAtScale = scale >= 0.6;
-        edgeLabelGroups.style('opacity', labelsShownAtScale ? 1 : 0).style('pointer-events', labelsShownAtScale ? 'all' : 'none');
-      }
-      arrowElements.filter((d: any) => edgeDisplay(d) !== 'none')
-        .style('opacity', (d: any) =>
-          directionStrategy(scale) === 'hidden' ? 0 : arrowVisibility(scale, d?._pTotal || 1).opacity);
-      linkElements.filter((d: any) => edgeDisplay(d) !== 'none')
-        .style('opacity', Math.max(0.1, getSmoothedOpacity(LOD_THRESHOLDS.VERY_FAR, 0.1)))
-        .attr('stroke-width', function(d: any) {
-          // Don't override stroke width if this edge has an active dialog
-          if (editingEdge && editingEdge.edge && editingEdge.edge.id === d.id) {
-            return 10; // Keep thick for active dialog
-          }
-          return ITEM_WIRE_WIDTH;
-        });
+      updateZoomPresentation(event.transform.k);
     });
 
-    zoom.on('end.labels', event => {
-      if (simulationRef.current !== simulation) return;
-      itemPresentationScaleRef.current = event.transform.k;
-      updateNodePresentation();
-      updateEdgePositions(true);
+    zoom.on('end.labels', () => {
+      if (simulationRef.current === simulation) itemPresentation.schedule();
     });
 
     // Configure simulation for stability. Start hot only if there are
@@ -3931,10 +3935,28 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // Fully-pinned graphs don't tick, so without this their labels would stay at
     // the default midpoint and could overlap → clean starting positions need it.
     runLabelAvoidanceRef.current = () => updateEdgePositions(true);
-    itemPresentationScaleRef.current = svg.node() ? d3.zoomTransform(svg.node()!).k : 1;
-    if (cullEnabled) applyViewportCull();
-    updateNodePresentation();
-    updateEdgePositions(true);
+    let itemPresentationPasses = 0;
+    itemPresentation.bind({
+      isCurrent: () => simulationRef.current === simulation,
+      renderItems: resuming => {
+        if (resuming) nodePresentationScales = new WeakMap();
+        const scale = d3.zoomTransform(svg.node()!).k;
+        itemPresentationScaleRef.current = scale;
+        if (cullEnabled) applyViewportCull();
+        updateNodePresentation();
+        updateEdgePositions(true);
+        updateZoomPresentation(scale);
+        g.attr('data-presentation-kind', 'items');
+        g.attr('data-item-presentation-scale', scale);
+        g.attr('data-item-presentation-passes', ++itemPresentationPasses);
+      },
+      presentOverview: () => {
+        itemPresentationScaleRef.current = d3.zoomTransform(svg.node()!).k;
+        g.attr('data-presentation-kind', 'overview');
+        g.attr('data-presentation-scale', d3.zoomTransform(svg.node()!).k);
+      },
+    });
+    itemPresentation.refresh();
     setTimeout(() => { if (simulationRef.current === simulation) updateEdgePositions(true); }, 500);
   }, [nodes, validatedEdges, handleNodeClick, initializeEmptyVisualization]); // Include handleNodeClick to get fresh connection state
 
@@ -3949,10 +3971,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const simulationRef = useRef<d3.Simulation<any, any> | null>(null);
   useLayoutEffect(() => () => stopActiveSimulation(), [layoutScope, stopActiveSimulation]);
   const zoomBehaviorRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
-  const [semanticOverviewActive, setSemanticOverviewActive] = useState(false);
   useLayoutEffect(() => {
-    if (!semanticOverviewActive) runLabelAvoidanceRef.current?.();
-  }, [priorityProjection, semanticOverviewActive, itemRelationshipScope]);
+    itemPresentation.refresh();
+  }, [priorityProjection, itemRelationshipScope, itemPresentation]);
   const handleOverviewActive = useCallback((active: boolean) => {
     setSemanticOverviewActive(active);
     if (active) setSelectedNode(null);
