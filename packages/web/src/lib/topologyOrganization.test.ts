@@ -1,4 +1,5 @@
 import { expect, it } from 'vitest';
+import { graphItemLayout } from './graphSymbolLayout';
 import {
   organizeTopology,
   organizationAdjacency,
@@ -167,4 +168,125 @@ it('keeps a small phone hub and every neighbor within a readable viewport with w
       height: 684,
     }).positions
   ).toEqual(result.positions);
+});
+
+it('keeps heterogeneous phone cards clear when cross-links refine their ring order', () => {
+  const nodes = [
+    { id: 'hub', width: 280, height: 128 },
+    { id: 'leaf-1', width: 280, height: 176 },
+    { id: 'leaf-2', width: 210, height: 128 },
+    { id: 'leaf-3', width: 320, height: 104 },
+    { id: 'leaf-4', width: 240, height: 200 },
+    { id: 'leaf-5', width: 240, height: 128 },
+  ];
+  const edges = [
+    { source: 'hub', target: 'leaf-1' },
+    { source: 'hub', target: 'leaf-2' },
+    { source: 'hub', target: 'leaf-3' },
+    { source: 'hub', target: 'leaf-4' },
+    { source: 'hub', target: 'leaf-5' },
+    { source: 'leaf-1', target: 'leaf-4' },
+    { source: 'leaf-2', target: 'leaf-3' },
+    { source: 'leaf-2', target: 'leaf-5' },
+    { source: 'leaf-3', target: 'leaf-5' },
+  ];
+  const result = organizeTopology(nodes, edges, node => node, {
+    width: 390,
+    height: 660,
+  });
+  expect(result.work.pairCandidates).toBeGreaterThan(0);
+  expect(result.work.clearanceRejections).toBeGreaterThan(0);
+  expect(result.work.rectangleEvaluations).toBeLessThanOrEqual(
+    result.work.maxRectangleEvaluations
+  );
+  for (let i = 0; i < nodes.length; i++)
+    for (let j = 0; j < i; j++) {
+      const a = result.positions.get(nodes[i].id)!,
+        b = result.positions.get(nodes[j].id)!;
+      const dx = Math.max(
+        0,
+        Math.abs(a.x - b.x) - (nodes[i].width + nodes[j].width) / 2
+      );
+      const dy = Math.max(
+        0,
+        Math.abs(a.y - b.y) - (nodes[i].height + nodes[j].height) / 2
+      );
+      expect(Math.hypot(dx, dy)).toBeGreaterThanOrEqual(63.99);
+    }
+});
+
+it('preserves measured long-title and nested-card clearance across phone refinement', () => {
+  const nodes = [
+    {
+      id: 'hub',
+      type: 'TASK',
+      title:
+        'Extremely long subsystem title for dependencies and worker runtime configuration',
+      description: 'Description text',
+      subgraphId: null,
+    },
+    {
+      id: 'leaf-1',
+      type: 'TASK',
+      title: 'Long subsystem coordination and reliability manager',
+      description: null,
+      subgraphId: 'nested',
+    },
+    {
+      id: 'leaf-2',
+      type: 'TASK',
+      title: 'Billing API',
+      description: null,
+      subgraphId: null,
+    },
+    {
+      id: 'leaf-3',
+      type: 'TASK',
+      title: 'Long subsystem coordination and reliability manager',
+      description: null,
+      subgraphId: 'nested',
+    },
+    {
+      id: 'leaf-4',
+      type: 'TASK',
+      title: 'Billing API',
+      description: 'Description text',
+      subgraphId: null,
+    },
+  ];
+  const edges = [
+    { source: 'hub', target: 'leaf-1' },
+    { source: 'hub', target: 'leaf-2' },
+    { source: 'hub', target: 'leaf-3' },
+    { source: 'hub', target: 'leaf-4' },
+    { source: 'leaf-1', target: 'leaf-2' },
+    { source: 'leaf-1', target: 'leaf-3' },
+    { source: 'leaf-3', target: 'leaf-4' },
+  ];
+  const measure = (text: string, size: number) =>
+    Array.from(text).length * size * 0.65;
+  const result = organizeTopology(
+    nodes,
+    edges,
+    node => graphItemLayout(node, measure),
+    { width: 390, height: 660 }
+  );
+  const sizes = nodes.map(node => graphItemLayout(node, measure));
+  expect(result.work.pairCandidates).toBeGreaterThan(0);
+  expect(result.work.clearanceRejections).toBeGreaterThan(0);
+  expect(result.work.rectangleEvaluations).toBeLessThanOrEqual(40000);
+  for (let i = 0; i < nodes.length; i++)
+    for (let j = 0; j < i; j++) {
+      const a = result.positions.get(nodes[i].id)!,
+        b = result.positions.get(nodes[j].id)!;
+      const dx = Math.max(
+        0,
+        Math.abs(a.x - b.x) - (sizes[i].width + sizes[j].width) / 2
+      );
+      const dy = Math.max(
+        0,
+        Math.abs(a.y - b.y) - (sizes[i].height + sizes[j].height) / 2
+      );
+      expect(Math.hypot(dx, dy)).toBeGreaterThanOrEqual(63.99);
+    }
 });

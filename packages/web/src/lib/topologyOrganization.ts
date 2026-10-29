@@ -155,6 +155,9 @@ export function organizeTopology<T extends OrganizationNode>(
     pairCandidates: 0,
     edgeEvaluations: 0,
     maxEdgeEvaluations: 40000,
+    rectangleEvaluations: 0,
+    maxRectangleEvaluations: 40000,
+    clearanceRejections: 0,
   };
   for (const start of adjacency.keys()) {
     if (visited.has(start)) continue;
@@ -278,12 +281,12 @@ export function organizeTopology<T extends OrganizationNode>(
         previousRadius = radius;
         previousDiameter = diameter;
       }
-      if (
+      const compactRing =
         viewport.width < 600 &&
         kind === 'hub' &&
         levels.length === 2 &&
-        levels[1].length <= 8
-      ) {
+        levels[1].length <= 8;
+      if (compactRing) {
         for (const [id, point] of compactHubRing(
           root,
           levels[1],
@@ -326,7 +329,31 @@ export function organizeTopology<T extends OrganizationNode>(
               pb = points.get(b)!;
             points.set(a, pb);
             points.set(b, pa);
-            if (score() + 0.01 < before) {
+            const clear =
+              !compactRing ||
+              [a, b].every(id =>
+                ids.every(other => {
+                  if (id === other) return true;
+                  if (work.rectangleEvaluations >= work.maxRectangleEvaluations)
+                    return false;
+                  work.rectangleEvaluations++;
+                  const from = points.get(id)!,
+                    to = points.get(other)!;
+                  const first = sizes.get(id)!,
+                    second = sizes.get(other)!;
+                  const dx = Math.max(
+                    0,
+                    Math.abs(from.x - to.x) - (first.width + second.width) / 2
+                  );
+                  const dy = Math.max(
+                    0,
+                    Math.abs(from.y - to.y) - (first.height + second.height) / 2
+                  );
+                  return Math.hypot(dx, dy) >= spacing;
+                })
+              );
+            if (!clear) work.clearanceRejections++;
+            if (clear && score() + 0.01 < before) {
               ring[index] = b;
               ring[(index + 1) % ring.length] = a;
               improved = true;
