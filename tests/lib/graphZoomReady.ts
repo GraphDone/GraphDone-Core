@@ -22,7 +22,7 @@ export async function measureGraphZoom({
     b.right <= a.right + 0.5 &&
     b.top >= a.top - 0.5 &&
     b.bottom <= a.bottom + 0.5;
-  const visible = (element: Element) => {
+  const visible = (element: Element, stroked = false) => {
     for (
       let current: Element | null = element;
       current;
@@ -38,8 +38,9 @@ export async function measureGraphZoom({
     }
     const box = element.getBoundingClientRect();
     return (
-      box.width > 0 &&
-      box.height > 0 &&
+      (stroked
+        ? box.width > 0 || box.height > 0
+        : box.width > 0 && box.height > 0) &&
       box.right > viewport.left &&
       box.left < viewport.right &&
       box.bottom > viewport.top &&
@@ -104,7 +105,7 @@ export async function measureGraphZoom({
         wires.length > 0 &&
         wires.every(
           wire =>
-            visible(wire) &&
+            visible(wire, true) &&
             getComputedStyle(wire).stroke !== 'none' &&
             Number(getComputedStyle(wire).strokeOpacity) > 0
         )

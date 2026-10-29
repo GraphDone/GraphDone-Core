@@ -2,6 +2,7 @@ import { test as base, expect } from '@playwright/test';
 import { writeFile } from 'node:fs/promises';
 import { login, TEST_USERS } from '../../lib/auth';
 import { gql } from '../../lib/graphRequest';
+import { inspectItemSymbols } from '../../lib/itemSymbolVisual';
 import {
   ownedGraphIdsFixture,
   type OwnedGraphs,
@@ -604,12 +605,38 @@ test('organizing after a low-zoom title edit retains and saves offscreen items @
   expect(saved.edges).toHaveLength(seeded.edgeCount);
   expect(saved.edges[0].source.id).toBe(seeded.nodeIds[0]);
   expect(saved.edges[0].target.id).toBe(seeded.nodeIds[1]);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (
+            window as unknown as {
+              __layoutMetrics: () => { cameraReady: boolean };
+            }
+          ).__layoutMetrics().cameraReady
+      )
+    )
+    .toBe(true);
+  const painted = await inspectItemSymbols(
+    page,
+    info,
+    'offscreen-organization-painted'
+  );
+  expect(painted.cards.map(card => card.id).sort()).toEqual(
+    [...seeded.nodeIds].sort()
+  );
+  expect(
+    painted.cards.every(
+      card => card.detail === 'full' && card.titles.length > 0
+    )
+  ).toBe(true);
   const receipt = info.outputPath('offscreen-organization.json');
   await writeFile(
     receipt,
     JSON.stringify({
       ids: seeded.nodeIds,
       saved,
+      painted,
       metrics: await page.evaluate(() =>
         (
           window as unknown as { __layoutMetrics: () => unknown }

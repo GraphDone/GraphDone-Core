@@ -2,7 +2,11 @@ import { test as base, expect, type Page } from '@playwright/test';
 import { writeFile } from 'node:fs/promises';
 import { login, TEST_USERS } from '../../lib/auth';
 import { gql } from '../../lib/graphRequest';
-import { inspectLocalItemNeighborhood } from '../../lib/localItemNeighborhood';
+import { measureGraphZoom } from '../../lib/graphZoomReady';
+import {
+  inspectLocalItemNeighborhood,
+  readCanonicalItemPositions,
+} from '../../lib/localItemNeighborhood';
 import {
   ownedGraphIdsFixture,
   type OwnedGraphs,
@@ -193,15 +197,34 @@ for (const [width, height] of [
           )
         )
         .toBe('function');
-      await page.evaluate(
-        ({ x, y }) =>
-          (
-            window as unknown as {
-              miniMapZoom: (x: number, y: number, k: number) => void;
-            }
-          ).miniMapZoom(x, y, 1.2),
-        { x: root.positionX, y: root.positionY }
+      const canonicalBefore = await readCanonicalItemPositions(page);
+      expect(canonicalBefore).toHaveLength(108);
+      expect(canonicalBefore).toEqual(
+        before.workItems.map(item => ({
+          id: item.id,
+          x: item.positionX,
+          y: item.positionY,
+          fx: item.positionX,
+          fy: item.positionY,
+        }))
       );
+      const canonicalChecks: {
+        stage: string;
+        positions: Awaited<ReturnType<typeof readCanonicalItemPositions>>;
+      }[] = [];
+      const expectCanonicalStable = async (stage: string) => {
+        const positions = await readCanonicalItemPositions(page);
+        expect(
+          positions,
+          `Canonical D3 positions must remain unchanged after ${stage}`
+        ).toEqual(canonicalBefore);
+        canonicalChecks.push({ stage, positions });
+      };
+      const initialZoomMs = await page.evaluate(measureGraphZoom, {
+        x: root.positionX,
+        y: root.positionY,
+        scale: 1.2,
+      });
       const layer = page.locator(
         '.local-item-neighborhood[data-active="true"]'
       );
@@ -225,21 +248,148 @@ for (const [width, height] of [
       expect(await snapshot(page, graphId)).toEqual(before);
       expect(blockedWrites).toEqual([]);
 
+      const nativeExposureControls: unknown[] = [];
+      for (const family of ['edge-clickable', 'arrow']) {
+        const exposure = await page.evaluate(family => {
+          const container = document.querySelector('.graph-container')!;
+          const target = container.querySelector<SVGElement>(
+            `.main-graph-group .${family}`
+          )!;
+          if (!target)
+            throw new Error(`No actual native ${family} target to expose`);
+          const originalStyles = new Map<Element, string | null>();
+          const change = (
+            element: Element,
+            property: string,
+            value: string
+          ) => {
+            if (!originalStyles.has(element))
+              originalStyles.set(element, element.getAttribute('style'));
+            (element as SVGElement).style.setProperty(
+              property,
+              value,
+              'important'
+            );
+          };
+          const nativeElements = [
+            ...container.querySelectorAll(
+              '.main-graph-group .node,.main-graph-group .edge,.main-graph-group .edge-clickable,.main-graph-group .arrow,.main-graph-group .edge-label-group'
+            ),
+          ];
+          for (const element of nativeElements)
+            change(element, 'display', 'none');
+          for (
+            let element: Element | null = target;
+            element && element !== container;
+            element = element.parentElement
+          ) {
+            const style = getComputedStyle(element);
+            if (style.display === 'none') change(element, 'display', 'inline');
+            if (style.visibility !== 'visible')
+              change(element, 'visibility', 'visible');
+            if (Number(style.opacity) <= 0) change(element, 'opacity', '1');
+          }
+          (
+            window as unknown as { __restoreLocalNativeExposure?: () => void }
+          ).__restoreLocalNativeExposure = () => {
+            for (const [element, style] of originalStyles) {
+              if (style === null) element.removeAttribute('style');
+              else element.setAttribute('style', style);
+            }
+          };
+          const painted = (element: Element) => {
+            for (
+              let current: Element | null = element;
+              current;
+              current = current.parentElement
+            ) {
+              const style = getComputedStyle(current);
+              if (
+                style.display === 'none' ||
+                style.visibility !== 'visible' ||
+                Number(style.opacity) <= 0
+              )
+                return false;
+            }
+            return true;
+          };
+          const legacyElements = [
+            ...container.querySelectorAll(
+              '.main-graph-group .node,.main-graph-group .edge,.main-graph-group .clickable-edge,.main-graph-group .edge-arrow,.main-graph-group .edge-label-group'
+            ),
+          ];
+          return {
+            family,
+            legacyPainted: legacyElements.filter(painted).length,
+            actualPainted: nativeElements.filter(painted).length,
+            targetClass: target.getAttribute('class'),
+          };
+        }, family);
+        try {
+          expect(
+            exposure.legacyPainted,
+            'The previous selectors miss this isolated native exposure'
+          ).toBe(0);
+          expect(
+            exposure.actualPainted,
+            'Exactly the actual native target must be exposed'
+          ).toBe(1);
+          await expect(
+            inspectLocalItemNeighborhood(
+              page,
+              info,
+              before.edges,
+              `local-${width}-${family}-exposed-negative`
+            )
+          ).rejects.toThrow(
+            'Replaced native cards, wires and input targets must stay hidden'
+          );
+          nativeExposureControls.push({
+            ...exposure,
+            correctedHelperRejected: true,
+          });
+        } finally {
+          await page.evaluate(() => {
+            const host = window as unknown as {
+              __restoreLocalNativeExposure?: () => void;
+            };
+            host.__restoreLocalNativeExposure?.();
+            delete host.__restoreLocalNativeExposure;
+          });
+        }
+      }
+      const negativeReceipt = info.outputPath(
+        `local-${width}-native-exposure-controls.json`
+      );
+      await writeFile(
+        negativeReceipt,
+        JSON.stringify(nativeExposureControls, null, 2)
+      );
+      await info.attach(`local-${width}-native-exposure-controls`, {
+        path: negativeReceipt,
+        contentType: 'application/json',
+      });
+
       const hiddenWire = layer.locator('[data-lod-bundle]').first();
-      await hiddenWire.evaluate(
-        path => ((path as SVGElement).style.opacity = '0')
-      );
-      await expect(
-        inspectLocalItemNeighborhood(
-          page,
-          info,
-          before.edges,
-          `local-${width}-hidden-negative`
-        )
-      ).rejects.toThrow('Local wire must actually be painted');
-      await hiddenWire.evaluate(path =>
-        (path as SVGElement).style.removeProperty('opacity')
-      );
+      const originalWireStyle = await hiddenWire.getAttribute('style');
+      try {
+        await hiddenWire.evaluate(
+          path => ((path as SVGElement).style.opacity = '0')
+        );
+        await expect(
+          inspectLocalItemNeighborhood(
+            page,
+            info,
+            before.edges,
+            `local-${width}-hidden-negative`
+          )
+        ).rejects.toThrow('Local wire must actually be painted');
+      } finally {
+        await hiddenWire.evaluate((path, style) => {
+          if (style === null) path.removeAttribute('style');
+          else path.setAttribute('style', style);
+        }, originalWireStyle);
+      }
 
       const target = layer.locator('[data-lod-bus-hit]').first();
       const targetId = (await target.getAttribute('data-lod-bus-hit'))!;
@@ -301,6 +451,7 @@ for (const [width, height] of [
         .getByRole('button', { name: 'Next linked items', exact: true })
         .click();
       await expect.poll(() => originalCards(page)).not.toEqual(initialIds);
+      await expectCanonicalStable('paging');
       const pagedIds = await originalCards(page);
       const previousCamera = await camera(page);
       const neighborId = pagedIds.find(id => id !== root.id)!;
@@ -312,6 +463,7 @@ for (const [width, height] of [
         })
         .click();
       await expect(layer).toHaveAttribute('data-local-focus', neighbor.id);
+      await expectCanonicalStable('focusing a neighbor');
       await expect(
         page.getByRole('button', { name: 'Back to previous item', exact: true })
       ).toBeEnabled();
@@ -321,6 +473,7 @@ for (const [width, height] of [
       await expect(layer).toHaveAttribute('data-local-focus', root.id);
       await expect.poll(() => originalCards(page)).toEqual(pagedIds);
       await expect.poll(() => camera(page)).toEqual(previousCamera);
+      await expectCanonicalStable('returning to the previous focus');
 
       const group = page.getByRole('combobox', {
         name: 'Linked item group',
@@ -348,6 +501,7 @@ for (const [width, height] of [
       await page.mouse.up();
       await expect.poll(() => camera(page)).not.toEqual(panBefore);
       expect(await originalCards(page)).toEqual(retainedIds);
+      await expectCanonicalStable('panning');
       await inspectLocalItemNeighborhood(
         page,
         info,
@@ -371,6 +525,7 @@ for (const [width, height] of [
       await expect(layer).toHaveAttribute('data-local-focus', root.id);
       await expect.poll(() => originalCards(page)).toEqual(retainedIds);
       await expect.poll(() => camera(page)).toEqual(retainedCamera);
+      await expectCanonicalStable('reload');
       await inspectLocalItemNeighborhood(
         page,
         info,
@@ -422,6 +577,8 @@ for (const [width, height] of [
       const editedTrigger = layer.locator(`[data-local-open="${editable.id}"]`);
       await expect(editedTrigger).toHaveAttribute('title', allowedEdit.title);
       await expect(editedTrigger).toBeFocused();
+      await expectCanonicalStable('editing an original item');
+      const canonicalAfter = await readCanonicalItemPositions(page);
       const after = await snapshot(page, graphId);
       expect(after.edges).toEqual(before.edges);
       expect(after.workItems).toEqual(
@@ -505,8 +662,13 @@ for (const [width, height] of [
           {
             graphId,
             rootId: root.id,
+            initialZoomMs,
             before,
             after,
+            canonicalBefore,
+            canonicalAfter,
+            canonicalChecks,
+            nativeExposureControls,
             initialIds,
             pagedIds,
             retainedIds,
