@@ -4,7 +4,7 @@ export function LayoutSaveStatus({ queue }: { queue: ReturnType<typeof usePositi
   const { state, error } = queue;
   if (!error && (!state || !(state.pending || state.acknowledged || state.storageError || state.cleanupError || state.sendError))) return null;
   return (
-    <div data-graph-fit-obstacle="true" data-testid="layout-save-status" role="status" className="max-w-full rounded-lg bg-gray-950/90 px-3 py-2 text-xs text-gray-100 shadow">
+    <div data-graph-fit-obstacle="true" data-testid="layout-save-status" data-layout-save-progress={!!state?.pending && !error && !state.storageError && !state.cleanupError && !state.sendError} role="status" className="max-w-full rounded-lg bg-gray-950/90 px-3 py-2 text-xs text-gray-100 shadow">
       {error && <p>{error}</p>}
       {state && <>
         {state.pending > 0 && <p>{state.local} saved on this device; {state.pending - state.local} pending only in this tab.</p>}

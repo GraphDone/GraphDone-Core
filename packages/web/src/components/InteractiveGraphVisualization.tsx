@@ -4049,6 +4049,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     const containerRect = container.getBoundingClientRect();
     const gap = 12;
     const obstacles = Array.from(document.querySelectorAll<HTMLElement>('[data-graph-fit-obstacle="true"]'))
+      .filter(element => !(minimumScale > 0 && element.dataset.layoutSaveProgress === 'true'))
       .map(element => {
         const rect = element.getBoundingClientRect();
         return {
@@ -4350,7 +4351,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     const simulation = simulationRef.current, container = containerRef.current;
     if (!simulation || !container || simulationLayoutScopeRef.current !== activeLayoutScopeRef.current) return;
     layoutModeRef.current = 'force';
-    try { window.localStorage.setItem(LAYOUT_MODE_STORAGE_KEY, 'force'); } catch {}
+    try { window.localStorage.setItem(LAYOUT_MODE_STORAGE_KEY, 'force'); } catch (error) { console.warn('Unable to save layout mode', error); }
     window.dispatchEvent(new CustomEvent('graphdone-layout-mode-change', { detail: 'force' }));
     const arranged = organizeTopology(simulation.nodes() as WorkItem[], validatedEdges as any[], node => graphItemLayout(node, measureGraphText), {width:container.clientWidth,height:container.clientHeight});
     for (const node of simulation.nodes() as any[]) {
@@ -4370,6 +4371,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     organizationZoomFloorRef.current = 0.65;
     organizationFocusRef.current = arranged.components[0]?.center ?? arranged.components[0]?.ids[0];
     cameraManuallyPositionedRef.current = true;
+    if (currentGraphIdRef.current) fittedGraphsRef.current.add(currentGraphIdRef.current);
     simulation.alpha(0).restart();
     persistAllPositions();
     requestAnimationFrame(() => {
@@ -4482,6 +4484,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           && cameraViewportRef.current.h === containerRef.current?.clientHeight
           && cameraResizeFrameRef.current === null
           && !(svgRef.current as (SVGSVGElement & { __transition?: unknown }) | null)?.__transition,
+        cameraFramed: !!currentGraphIdRef.current && fittedGraphsRef.current.has(currentGraphIdRef.current),
         cameraViewport: cameraViewportRef.current,
         alpha: Math.round(alpha * 10000) / 10000,
         lastSettleMs: lastSettleMsRef.current,
