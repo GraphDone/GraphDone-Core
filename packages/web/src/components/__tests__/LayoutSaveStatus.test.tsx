@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { LayoutSaveStatus } from '../LayoutSaveStatus';
 import type { usePositionSaveQueue } from '../../hooks/usePositionSaveQueue';
@@ -43,4 +43,19 @@ describe('layout save status', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Waiting to send 2 layout changes');
     expect(screen.getByRole('button', { name: 'Discard unsent layout' })).toBeEnabled();
   });
+});
+
+
+it('releases canvas space after a completed acknowledgment but keeps save failures visible', () => {
+  vi.useFakeTimers();
+  try {
+    const {rerender}=render(<LayoutSaveStatus queue={queue({acknowledged:true})}/>);
+    expect(screen.getByRole('status')).toHaveTextContent('Layout saved to the server.');
+    act(()=>vi.advanceTimersByTime(3500));
+    expect(screen.queryByRole('status')).toBeNull();
+    rerender(<LayoutSaveStatus queue={queue({acknowledged:true,pending:1,unsent:1,sendError:'Offline during save'})}/>);
+    act(()=>vi.advanceTimersByTime(10000));
+    expect(screen.getByRole('status')).toHaveTextContent('Offline during save');
+    expect(screen.getByRole('button',{name:'Retry layout save'})).toBeEnabled();
+  }finally{vi.useRealTimers();}
 });
