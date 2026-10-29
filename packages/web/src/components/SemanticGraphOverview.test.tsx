@@ -221,3 +221,50 @@ it('keeps original member-pair fallback inside a directional trace and restores 
   expect(JSON.stringify({ source, relationships })).toBe(original);
   route.mockRestore();
 });
+
+it('inspects a visible bus with endpoint emphasis, exact originals and keyboard return', () => {
+  const source = items.map((item, index) => ({ ...item, metadata: { lod: { groupPath: [index < 2 ? 'Left' : 'Right'] } } }));
+  const relationships = [
+    { id: 'first', source: 'n0', target: 'n2', type: 'BLOCKS' },
+    { id: 'parallel', source: 'n0', target: 'n2', type: 'BLOCKS' },
+    { id: 'other-type', source: 'n1', target: 'n3', type: 'FUTURE_LINK' },
+    { id: 'reverse', source: 'n2', target: 'n0', type: 'DEPENDS_ON' },
+  ];
+  const inspected = vi.fn();
+  const input = JSON.stringify({ source, relationships });
+  const { container, rerender } = render(<SemanticGraphOverview items={source} edges={relationships} camera={{x:0,y:0,scale:0.2}} readPositions={positions} onActiveChange={noop} onBrowse={noop} onInspect={inspected} onBack={noop} />);
+  const bus = screen.getByRole('button', { name: 'Inspect Left → Right: 3 relationships' });
+  fireEvent.pointerEnter(bus, { clientX: 400, clientY: 300 });
+  expect(container.querySelectorAll('[data-bus-highlighted="true"]')).toHaveLength(2);
+  expect(screen.getByRole('tooltip').textContent).toContain('3 relationships');
+  fireEvent.click(bus);
+  expect([...container.querySelectorAll('[data-lod-edge-id]')].map(element => element.getAttribute('data-lod-edge-id'))).toEqual(['first','other-type','parallel']);
+  fireEvent.click(screen.getByRole('button', { name: 'Back to overview' }));
+  expect(document.activeElement).toBe(bus);
+  fireEvent.keyDown(bus, { key: 'Escape' });
+  expect(screen.queryByRole('tooltip')).toBeNull();
+  fireEvent.keyDown(bus, { key: ' ' });
+  expect(screen.getByRole('region', { name: 'Graph relationships' })).toBeVisible();
+  fireEvent.click(screen.getByRole('button', { name: 'Back to overview' }));
+  expect(inspected).not.toHaveBeenCalled();
+  expect(JSON.stringify({ source, relationships })).toBe(input);
+  rerender(<SemanticGraphOverview items={source} edges={[]} camera={{x:0,y:0,scale:0.2}} readPositions={positions} onActiveChange={noop} onBrowse={noop} onInspect={inspected} onBack={noop} />);
+  expect(screen.queryByRole('tooltip')).toBeNull();
+  expect(container.querySelectorAll('[data-bus-highlighted="true"]')).toHaveLength(0);
+  expect(screen.getByRole('button', { name:'Left, 2 items, 0 blocked' })).toHaveFocus();
+});
+
+it('returns keyboard focus to overview controls when zoom removes the entire bus layer', () => {
+  const frames: ((time: number) => void)[] = [];
+  vi.stubGlobal('requestAnimationFrame', (callback: ((time: number) => void)) => { frames.push(callback); return frames.length; });
+  const source = items.map((item, index) => ({ ...item, metadata: { lod: { groupPath: [index < 2 ? 'Left' : 'Right'] } } }));
+  const relationships = [{ id: 'link', source: 'n0', target: 'n2', type:'BLOCKS' }];
+  const fixture = (scale: number) => <SemanticGraphOverview items={source} edges={relationships} camera={{x:0,y:0,scale}} readPositions={positions} onActiveChange={noop} onBrowse={noop} onInspect={noop} onBack={noop} />;
+  const { rerender } = render(fixture(0.2));
+  const bus = screen.getByRole('button', { name: 'Inspect Left → Right: 1 relationship' });
+  act(() => bus.focus());
+  rerender(fixture(1.5));
+  act(() => { for(const frame of frames.splice(0)) frame(0); });
+  expect(screen.getByRole('button', { name: '2 groups · 4 items' })).toHaveFocus();
+  expect(screen.queryByRole('tooltip')).toBeNull();
+});
