@@ -61,6 +61,7 @@ import { graphItemLayout, measureGraphText, edgeLabelDimensions, GRAPH_FONT_FAMI
 import { placeItemLabels } from '../lib/edgeLabelPlacement';
 import { separateCards } from '../lib/separateCards';
 import { organizeTopology } from '../lib/topologyOrganization';
+import { LocalItemNeighborhood } from './LocalItemNeighborhood';
 import { frameOrganizedNeighborhood } from '../lib/organizationCamera';
 import { DEFAULT_PHYSICS, collisionRadius, linkDistance, linkMaxDistance, linkStrength } from '../lib/physicsConfig';
 import { computeCompactLayout, isHierarchicalLayout, parseLayoutMode, LAYOUT_MODE_STORAGE_KEY, type LayoutMode } from '../lib/layoutAlgorithms';
@@ -462,7 +463,35 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const [itemLabelCount, setItemLabelCount] = useState(0);
   const [itemRelationshipScope, setItemRelationshipScope] = useState<RelationshipScope | null>(null);
   const itemRelationshipTriggerRef = useRef<HTMLButtonElement>(null);
-  const itemPairTriggerRef = useRef<SVGGElement | null>(null);
+  const itemPairTriggerRef = useRef<HTMLElement | SVGElement | null>(null);
+  const [localItemActive, setLocalItemActive] = useState(false);
+  const localItemActiveRef = useRef(false);
+  const handleLocalActive = useCallback((active: boolean) => {localItemActiveRef.current=active;setLocalItemActive(active);},[]);
+  const localItemBoardRef = useRef(false);
+  const handleLocalBoard = useCallback((active: boolean) => { localItemBoardRef.current = active; }, []);
+  const [localItemControls, setLocalItemControls] = useState<React.ReactNode>(null);
+  const [localItemFooter, setLocalItemFooter] = useState<React.ReactNode>(null);
+  const browseLocalRelationships = useCallback((scope: RelationshipScope, trigger: HTMLElement | SVGElement) => {
+    itemPairTriggerRef.current = trigger;
+    setItemRelationshipScope(scope);
+  }, []);
+  const inspectLocalItem = useCallback((id: string) => {
+    const item = simulationRef.current?.nodes().find(node => node.id === id);
+    if (!item) return;
+    setSelectedNode({ ...item });
+    setSelectedNodes(new Set([id]));
+    setEditingEdge(null);
+  }, []);
+  const navigateLocalItem = useCallback((id: string, saved?: {x:number;y:number;scale:number}) => {
+    const item = simulationRef.current?.nodes().find(node => node.id === id);
+    const svg = svgRef.current, container = containerRef.current, zoom = zoomBehaviorRef.current;
+    if (!item || !svg || !container || !zoom) return;
+    cameraManuallyPositionedRef.current = true;
+    if (currentGraphIdRef.current) fittedGraphsRef.current.add(currentGraphIdRef.current);
+    const k = saved?.scale ?? Math.max(0.65, d3.zoomTransform(svg).k);
+    const transform = d3.zoomIdentity.translate(saved?.x ?? container.clientWidth / 2 - item.x * k, saved?.y ?? container.clientHeight / 2 - item.y * k).scale(k);
+    d3.select(svg).interrupt().transition().duration(450).call(zoom.transform, transform);
+  }, []);
   const closeItemRelationships = useCallback(() => {
     const trigger = itemPairTriggerRef.current;
     itemPairTriggerRef.current = null;
@@ -1427,7 +1456,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     
     // Create zoom behavior for empty canvas with reversed wheel direction
     const zoom = d3.zoom<SVGSVGElement, unknown>()
-      .filter(event => !(event.target as Element)?.closest('[data-lod-controls]') && (!event.ctrlKey || event.type === 'wheel') && !event.button)
+      .filter(event => !(event.target as Element)?.closest('[data-lod-controls]') && (event.type === 'wheel' || !(event.target as Element)?.closest('[data-local-item-card]')) && (!event.ctrlKey || event.type === 'wheel') && !event.button)
       .scaleExtent([0.1, 3])
       .wheelDelta((event: WheelEvent) => {
         // Standard direction (like maps/most apps): scroll UP (deltaY<0) zooms IN.
@@ -1771,7 +1800,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     
     // Create or reuse zoom behavior with reversed wheel direction
     const zoom = d3.zoom<SVGSVGElement, unknown>()
-      .filter(event => !(event.target as Element)?.closest('[data-lod-controls]') && (!event.ctrlKey || event.type === 'wheel') && !event.button)
+      .filter(event => !(event.target as Element)?.closest('[data-lod-controls]') && (event.type === 'wheel' || !(event.target as Element)?.closest('[data-local-item-card]')) && (!event.ctrlKey || event.type === 'wheel') && !event.button)
       .scaleExtent([0.1, 4])
       .wheelDelta((event: WheelEvent) => {
         // Standard direction (like maps/most apps): scroll UP (deltaY<0) zooms IN.
@@ -3691,7 +3720,15 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     const CULL_MIN_SCALE = 0.5;
     let cullCounter = 0;
     let cullActive = false;
-    const edgeDisplay = (d: any) => d._priorityVisible === false || !d._route || (cullActive && d.source?._culled && d.target?._culled) ? 'none' : null;
+    const edgeDisplay = (d: any) => {
+      if (d._priorityVisible === false || !d._route || (cullActive && d.source?._culled && d.target?._culled)) return 'none';
+      if (localItemBoardRef.current) {
+        const camera = d3.zoomTransform(svg.node()!);
+        const visible = (node: any) => node.x * camera.k + camera.x >= 0 && node.x * camera.k + camera.x <= width && node.y * camera.k + camera.y >= 0 && node.y * camera.k + camera.y <= height;
+        if (!visible(d.source) || !visible(d.target)) return 'none';
+      }
+      return null;
+    };
     const applyEdgeDisplays = () => {
       linkElements.style('display', edgeDisplay);
       clickableEdges.style('display', edgeDisplay);
@@ -3882,6 +3919,12 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         });
     });
 
+    zoom.on('start.local-item', event => {
+      window.dispatchEvent(new CustomEvent('graphdone:camera-start', { detail: { manual: !!event.sourceEvent } }));
+    });
+    zoom.on('end.local-item', event => {
+      window.dispatchEvent(new CustomEvent('graphdone:camera-settled', { detail: { x: event.transform.x, y: event.transform.y, scale: event.transform.k, manual: !!event.sourceEvent } }));
+    });
     zoom.on('end.labels', event => {
       if (simulationRef.current !== simulation) return;
       itemPresentationScaleRef.current = event.transform.k;
@@ -3950,8 +3993,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const zoomBehaviorRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
   const [semanticOverviewActive, setSemanticOverviewActive] = useState(false);
   useLayoutEffect(() => {
-    if (!semanticOverviewActive) runLabelAvoidanceRef.current?.();
-  }, [priorityProjection, semanticOverviewActive, itemRelationshipScope]);
+    if (!semanticOverviewActive && !localItemActive) runLabelAvoidanceRef.current?.();
+  }, [priorityProjection, semanticOverviewActive, localItemActive, itemRelationshipScope]);
   const handleOverviewActive = useCallback((active: boolean) => {
     setSemanticOverviewActive(active);
     if (active) setSelectedNode(null);
@@ -4629,6 +4672,12 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       const frame = containerRef.current?.getBoundingClientRect();
       const svg = svgRef.current;
       if (!frame || !svg) return false;
+      if (localItemActiveRef.current) {
+        const focusId = containerRef.current?.querySelector<HTMLElement>('[data-local-focus]')?.dataset.localFocus;
+        const focus = simulationRef.current?.nodes().find(node => node.id === focusId);
+        const transform = d3.zoomTransform(svg);
+        return !!focus && focus.x * transform.k + transform.x >= 0 && focus.x * transform.k + transform.x <= frame.width && focus.y * transform.k + transform.y >= 0 && focus.y * transform.k + transform.y <= frame.height;
+      }
       const cards = Array.from(svg.querySelectorAll<SVGGraphicsElement>('.node-bg'))
         .map(node => node.getBoundingClientRect());
       const showsANode = cards.some(card => card.width > 0 && card.height > 0
@@ -5213,13 +5262,13 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
 
   return (
-    <div ref={containerRef} className="graph-container relative w-full h-full overflow-hidden select-none" data-overview={semanticOverviewActive || undefined} data-quality={qualityTier} data-dense={isDenseGraph ? 'true' : undefined} data-simplify={isSimplified ? 'true' : undefined} data-dots={isDotMode ? 'true' : undefined}
+    <div ref={containerRef} className="graph-container relative w-full h-full overflow-hidden select-none" data-overview={semanticOverviewActive || localItemActive || undefined} data-local-item-lod={localItemActive || undefined} data-quality={qualityTier} data-dense={isDenseGraph ? 'true' : undefined} data-simplify={isSimplified ? 'true' : undefined} data-dots={isDotMode ? 'true' : undefined}
       data-relationship-priority={relationshipLevel} data-relationship-total={workItemEdges.length}
       data-priority-summarized={priorityProjection.summarized.length} data-priority-represented={priorityProjection.represented.length} data-priority-pending={priorityProjection.pending.length}>
-      {workItems.length < 40 && <div data-graph-fit-obstacle="true" className="absolute left-3 right-16 top-16 md:left-16 md:right-40 md:top-3 z-20 flex flex-wrap gap-3">{priorityControl}</div>}
+      {workItems.length < 40 && <div data-graph-fit-obstacle="true" className="absolute left-3 right-16 top-16 md:left-16 md:right-40 md:top-3 z-20 flex flex-wrap gap-3">{priorityControl}{localItemControls}</div>}
       {!semanticOverviewActive && <GraphStatusDock>
       <LayoutSaveStatus queue={positionSaveQueue} />
-      {workItemEdges.length > 0 && <button
+      {localItemActive ? localItemFooter : workItemEdges.length > 0 && <button
         ref={itemRelationshipTriggerRef}
         data-graph-fit-obstacle="true"
         className="max-w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 shadow-lg"
@@ -5232,7 +5281,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         scope={itemRelationshipScope}
         contextFor={id => itemRelationshipIndex.hierarchy.paths.get(id)?.map(key => itemRelationshipIndex.hierarchy.groups.get(key)?.label).filter(Boolean).join(' / ') || 'Ungrouped'}
         onScope={setItemRelationshipScope}
-        onInspect={id => { setItemRelationshipScope(null); inspectOverviewItem(id, true); }}
+        onInspect={id => { setItemRelationshipScope(null); if (localItemActive) inspectLocalItem(id); else inspectOverviewItem(id, true); }}
         onBack={closeItemRelationships}
         backLabel="Back to graph"
         visible={true}
@@ -5258,11 +5307,13 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       >
         <foreignObject className="semantic-overview-host" width="100%" height="100%" style={{ pointerEvents: 'none' }}>
       {currentGraph && workItems.length >= 40 && <SemanticGraphOverview
-        key={currentGraph.id}
+        key={layoutScope ?? currentGraph.id}
+        viewScope={layoutScope}
         items={workItems}
         edges={workItemEdges}
         relationshipPriority={priorityProjection}
         relationshipControl={priorityControl}
+        itemDetailControl={localItemControls}
         camera={currentTransform}
         readPositions={readOverviewPositions}
         onActiveChange={handleOverviewActive}
@@ -5271,6 +5322,24 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         onBrowse={closeOverviewInspector}
         onInspect={inspectOverviewItem}
         onBack={returnToOverview}
+      />}
+      {currentGraph && <LocalItemNeighborhood
+        key={`local-${layoutScope ?? currentGraph.id}`}
+        graphId={currentGraph.id}
+        viewScope={layoutScope}
+        index={itemRelationshipIndex}
+        representedIds={priorityProjection.representedIds}
+        camera={currentTransform}
+        selectedId={Array.from(selectedNodes).slice(-1)[0]}
+        enabled={!semanticOverviewActive}
+        readPositions={readOverviewPositions}
+        onActive={handleLocalActive}
+        onControls={setLocalItemControls}
+        onFooter={setLocalItemFooter}
+        onInspect={inspectLocalItem}
+        onNavigate={navigateLocalItem}
+        onBoard={handleLocalBoard}
+        onBrowse={browseLocalRelationships}
       />}
         </foreignObject>
       </svg>

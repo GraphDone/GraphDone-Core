@@ -57,6 +57,8 @@ interface Props {
     representedIds: ReadonlySet<string>;
   };
   relationshipControl?: ReactNode;
+  itemDetailControl?: ReactNode;
+  viewScope?: string|null;
 }
 
 export function SemanticGraphOverview({
@@ -72,6 +74,8 @@ export function SemanticGraphOverview({
   layoutStatus,
   relationshipPriority,
   relationshipControl,
+  itemDetailControl,
+  viewScope,
 }: Props) {
   const hierarchy = useMemo(
     () => buildSemanticHierarchy(items, edges),
@@ -121,7 +125,10 @@ export function SemanticGraphOverview({
     );
   });
   const obstacleKey = JSON.stringify(obstacles);
-  const [mode, setMode] = useState<'auto' | 'overview' | 'items'>('auto');
+  const [mode, setMode] = useState<'auto' | 'overview' | 'items'>(() => {
+    try {const value=viewScope?localStorage.getItem(`graphdone:detail:${viewScope}`):null;return value==='items'||value==='overview'?value:'auto';}catch{return 'auto';}
+  });
+  useEffect(()=>{if(!viewScope)return;try{localStorage.setItem(`graphdone:detail:${viewScope}`,mode);}catch{return;}},[viewScope,mode]);
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(
     () => new Set()
   );
@@ -566,6 +573,7 @@ export function SemanticGraphOverview({
           </select>
         </label>
         {relationshipControl}
+        {!active && itemDetailControl ? itemDetailControl : <>
         <button
           ref={groupListButton}
           aria-label={`${projection.groups.length} groups · ${items.length} items`}
@@ -583,6 +591,7 @@ export function SemanticGraphOverview({
           </span>
           <span className="md:block">{items.length} items</span>
         </button>
+        </>}
         {mode === 'overview' && effectiveExpanded.size > 0 && (
           <button
             className="rounded bg-gray-950/95 border border-gray-600 px-3 py-2 min-h-11 text-gray-100"
