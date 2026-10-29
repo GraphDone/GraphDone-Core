@@ -95,6 +95,25 @@ for (const [width, height, size] of [
             ).getBBox();
             return {
               id: node.id,
+              painted: [
+                element,
+                ...Array.from(element.querySelectorAll('.node-title-text')),
+              ].every(target => {
+                for (
+                  let current: Element | null = target;
+                  current && current !== host;
+                  current = current.parentElement
+                ) {
+                  const style = getComputedStyle(current);
+                  if (
+                    style.display === 'none' ||
+                    style.visibility !== 'visible' ||
+                    Number(style.opacity) < 0.99
+                  )
+                    return false;
+                }
+                return true;
+              }),
               x: node.x,
               y: node.y,
               width: bounds.width,
@@ -217,41 +236,71 @@ for (const [width, height, size] of [
         )
     );
     const organized = await read();
-    const hub = organized.cards.find(card => card.id === seeded.nodeIds[0])!;
-    expect(hub.screenWidth).toBeGreaterThanOrEqual(132);
-    for (const card of organized.cards)
-      expect(card.title).toBe(
-        before.workItems.find((item: { id: string }) => item.id === card.id)
-          .title
+    const checkReadability = async (
+      scene: Awaited<ReturnType<typeof read>>
+    ) => {
+      const hub = scene.cards.find(card => card.id === seeded.nodeIds[0])!;
+      expect(
+        scene.cards.every(card => card.painted),
+        'Cards and titles must actually be visible'
+      ).toBe(true);
+      expect(hub.screenWidth).toBeGreaterThanOrEqual(132);
+      for (const card of scene.cards)
+        expect(card.title).toBe(
+          before.workItems.find((item: { id: string }) => item.id === card.id)
+            .title
+        );
+      expect(
+        Math.abs((hub.screen.left + hub.screen.right) / 2 - width / 2)
+      ).toBeLessThan(48);
+      const fullCards = scene.cards.filter(
+        card =>
+          card.screen.left >= 12 &&
+          card.screen.right <= width - 12 &&
+          card.screen.top >= 12 &&
+          card.screen.bottom <= height - 12
       );
-    expect(
-      Math.abs((hub.screen.left + hub.screen.right) / 2 - width / 2)
-    ).toBeLessThan(48);
-    const fullCards = organized.cards.filter(
-      card =>
-        card.screen.left >= 0 &&
-        card.screen.right <= width &&
-        card.screen.top >= 0 &&
-        card.screen.bottom <= height
-    );
-    expect(fullCards.length).toBeGreaterThanOrEqual(width < 600 ? 3 : size);
-    const controls = await page
-      .locator('[data-graph-fit-obstacle="true"]')
-      .evaluateAll(elements =>
-        elements.map(el => {
-          const r = el.getBoundingClientRect();
-          return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
-        })
-      );
-    for (const card of fullCards)
-      for (const control of controls)
-        expect(
-          card.screen.left < control.right &&
-            card.screen.right > control.left &&
-            card.screen.top < control.bottom &&
-            card.screen.bottom > control.top,
-          'Visible organized cards must clear controls'
-        ).toBe(false);
+      expect(fullCards.length).toBe(size);
+      const controls = await page
+        .locator('[data-graph-fit-obstacle="true"]')
+        .evaluateAll(elements =>
+          elements.map(el => {
+            const r = el.getBoundingClientRect();
+            return {
+              left: r.left,
+              right: r.right,
+              top: r.top,
+              bottom: r.bottom,
+            };
+          })
+        );
+      for (const card of fullCards)
+        for (const control of controls) {
+          const dx = Math.max(
+            0,
+            control.left - card.screen.right,
+            card.screen.left - control.right
+          );
+          const dy = Math.max(
+            0,
+            control.top - card.screen.bottom,
+            card.screen.top - control.bottom
+          );
+          expect(
+            Math.hypot(dx, dy),
+            'Painted cards need a visible margin from controls'
+          ).toBeGreaterThanOrEqual(11.9);
+          expect(
+            card.screen.left < control.right &&
+              card.screen.right > control.left &&
+              card.screen.top < control.bottom &&
+              card.screen.bottom > control.top,
+            'Visible organized cards must clear controls'
+          ).toBe(false);
+        }
+      return hub;
+    };
+    const hub = await checkReadability(organized);
     const leaves = organized.cards.filter(card => card.id !== hub.id);
     expect(
       leaves.reduce((sum, card) => sum + card.x, 0) / leaves.length
@@ -311,6 +360,28 @@ for (const [width, height, size] of [
     const png = info.outputPath(`organized-hub-${width}.png`);
     await page.screenshot({ path: png });
     await info.attach('organized-hub', { path: png, contentType: 'image/png' });
+    await expect
+      .poll(() =>
+        page.evaluate(id => {
+          const saved = JSON.parse(
+            localStorage.getItem(`graphdone:camera:${id}`) || 'null'
+          );
+          const transform = (
+            document.querySelector('.graph-container svg') as SVGSVGElement & {
+              __zoom?: { x: number; y: number; k: number };
+            }
+          )?.__zoom;
+          return (
+            !!saved &&
+            !!transform &&
+            saved.manual === true &&
+            Math.abs(saved.x - transform.x) < 0.01 &&
+            Math.abs(saved.y - transform.y) < 0.01 &&
+            Math.abs(saved.k - transform.k) < 0.001
+          );
+        }, seeded.graphId)
+      )
+      .toBe(true);
     await page.reload();
     await expect(page.locator('.graph-container .node')).toHaveCount(size);
     await expect(
@@ -335,6 +406,44 @@ for (const [width, height, size] of [
           (await read()).cards.find(card => card.id === hub.id)!.screenWidth
       )
       .toBeGreaterThanOrEqual(132);
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const metrics = (
+            window as unknown as {
+              __layoutMetrics?: () => {
+                cameraReady: boolean;
+                cameraFramed: boolean;
+              };
+            }
+          ).__layoutMetrics?.();
+          return metrics?.cameraReady && metrics?.cameraFramed;
+        })
+      )
+      .toBe(true);
+    await expect
+      .poll(async () => (await read()).cards.every(card => card.painted))
+      .toBe(true);
+    await page.evaluate(
+      () =>
+        new Promise<void>(resolve =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+        )
+    );
+    const reloaded = await read();
+    await checkReadability(reloaded);
+    for (const card of reloaded.cards) {
+      const previous = organized.cards.find(item => item.id === card.id)!;
+      expect(card.screen.left).toBeCloseTo(previous.screen.left, 0);
+      expect(card.screen.top).toBeCloseTo(previous.screen.top, 0);
+      expect(card.screenWidth).toBeCloseTo(previous.screenWidth, 0);
+    }
+    const reloadedPng = info.outputPath(`organized-hub-reloaded-${width}.png`);
+    await page.screenshot({ path: reloadedPng });
+    await info.attach('organized-hub-reloaded', {
+      path: reloadedPng,
+      contentType: 'image/png',
+    });
     expect(errors).toEqual([]);
     const receipt = info.outputPath(`organized-hub-${width}.json`);
     await writeFile(
@@ -343,7 +452,7 @@ for (const [width, height, size] of [
         crowded,
         organized,
         saved,
-        reloaded: await read(),
+        reloaded,
         errors,
       })
     );

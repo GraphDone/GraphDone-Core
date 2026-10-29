@@ -35,6 +35,92 @@ export function organizationAdjacency(
   );
 }
 
+function compactHubRing(
+  root: string,
+  ring: readonly string[],
+  sizes: ReadonlyMap<string, Size>,
+  viewport: Size,
+  spacing: number
+) {
+  const ids = [root, ...ring];
+  let best: Map<string, Point> | undefined;
+  let bestOverflow = Infinity,
+    bestArea = Infinity;
+  for (const aspect of [0.35, 0.5, 0.65, 0.8, 1, 1.25]) {
+    for (let turn = 0; turn <= 8; turn++) {
+      if (ring.length === 4 && turn !== 8) continue;
+      const units = [
+        { x: 0, y: 0 },
+        ...ring.map((_, index) => {
+          const angle =
+            (index * 2 * Math.PI) / ring.length -
+            Math.PI / 2 +
+            (turn * Math.PI) / (ring.length * 8);
+          return { x: Math.cos(angle) * aspect, y: Math.sin(angle) };
+        }),
+      ];
+      const clear = (radius: number) => {
+        for (let i = 0; i < ids.length; i++)
+          for (let j = 0; j < i; j++) {
+            const a = sizes.get(ids[i])!,
+              b = sizes.get(ids[j])!;
+            const dx = Math.max(
+              0,
+              Math.abs(units[i].x - units[j].x) * radius -
+                (a.width + b.width) / 2
+            );
+            const dy = Math.max(
+              0,
+              Math.abs(units[i].y - units[j].y) * radius -
+                (a.height + b.height) / 2
+            );
+            if (Math.hypot(dx, dy) < spacing) return false;
+          }
+        return true;
+      };
+      let low = 0,
+        high = 1;
+      while (!clear(high)) high *= 2;
+      for (let step = 0; step < 24; step++) {
+        const middle = (low + high) / 2;
+        if (clear(middle)) high = middle;
+        else low = middle;
+      }
+      const points = new Map(
+        ids.map((id, i) => [id, { x: units[i].x * high, y: units[i].y * high }])
+      );
+      const width =
+        Math.max(
+          ...ids.map(id => points.get(id)!.x + sizes.get(id)!.width / 2)
+        ) -
+        Math.min(
+          ...ids.map(id => points.get(id)!.x - sizes.get(id)!.width / 2)
+        );
+      const height =
+        Math.max(
+          ...ids.map(id => points.get(id)!.y + sizes.get(id)!.height / 2)
+        ) -
+        Math.min(
+          ...ids.map(id => points.get(id)!.y - sizes.get(id)!.height / 2)
+        );
+      const overflow = Math.max(
+        (width * 0.65) / Math.max(1, viewport.width - 40),
+        (height * 0.65) / Math.max(1, viewport.height - 200)
+      );
+      const area = width * height;
+      if (
+        overflow < bestOverflow - 0.0001 ||
+        (Math.abs(overflow - bestOverflow) <= 0.0001 && area < bestArea)
+      ) {
+        best = points;
+        bestOverflow = overflow;
+        bestArea = area;
+      }
+    }
+  }
+  return best!;
+}
+
 export function organizeTopology<T extends OrganizationNode>(
   nodes: readonly T[],
   edges: readonly OrganizationEdge[],
@@ -191,6 +277,21 @@ export function organizeTopology<T extends OrganizationNode>(
         );
         previousRadius = radius;
         previousDiameter = diameter;
+      }
+      if (
+        viewport.width < 600 &&
+        kind === 'hub' &&
+        levels.length === 2 &&
+        levels[1].length <= 8
+      ) {
+        for (const [id, point] of compactHubRing(
+          root,
+          levels[1],
+          sizes,
+          viewport,
+          spacing
+        ))
+          points.set(id, point);
       }
       for (
         let pass = 0;

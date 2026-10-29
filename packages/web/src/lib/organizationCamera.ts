@@ -27,14 +27,8 @@ export function frameOrganizedNeighborhood(
   }));
   const minX = 20 + (center.width * scale) / 2,
     maxX = viewport.width - 20 - (center.width * scale) / 2;
-  const minY = Math.max(
-      20 + (center.height * scale) / 2,
-      preferred.y - viewport.height / 4
-    ),
-    maxY = Math.min(
-      viewport.height - 20 - (center.height * scale) / 2,
-      preferred.y + viewport.height / 4
-    );
+  const minY = 20 + (center.height * scale) / 2,
+    maxY = viewport.height - 20 - (center.height * scale) / 2;
   const x = Math.max(minX, Math.min(preferred.x, maxX));
   const ys = [preferred.y, viewport.height / 2, minY, maxY];
   for (const card of projected)
@@ -57,11 +51,13 @@ export function frameOrganizedNeighborhood(
       )
       .slice(0, 16);
   let best = { x, y: preferred.y },
+    bestFocusCovered = Infinity,
     bestWhole = -1,
     bestCovered = Infinity,
     bestDistance = Infinity;
   for (const y of candidates(ys, minY, maxY, preferred.y)) {
     let covered = 0,
+      focusCovered = 0,
       whole = 0;
     for (const card of projected) {
       const left = x + card.x - card.width / 2,
@@ -87,16 +83,20 @@ export function frameOrganizedNeighborhood(
             Math.min(bottom, obstacle.y + obstacle.height + 12) -
               Math.max(top, obstacle.y - 12)
           );
-        covered += overlap * (card.id === focus ? 10 : 1);
+        covered += overlap;
+        if (card.id === focus) focusCovered += overlap;
       }
     }
     const distance = Math.abs(y - preferred.y);
     if (
-      whole > bestWhole ||
-      (whole === bestWhole &&
-        (covered < bestCovered ||
-          (covered === bestCovered && distance < bestDistance)))
+      focusCovered < bestFocusCovered ||
+      (focusCovered === bestFocusCovered &&
+        (whole > bestWhole ||
+          (whole === bestWhole &&
+            (covered < bestCovered ||
+              (covered === bestCovered && distance < bestDistance)))))
     ) {
+      bestFocusCovered = focusCovered;
       bestWhole = whole;
       bestCovered = covered;
       bestDistance = distance;

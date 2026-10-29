@@ -133,3 +133,38 @@ it('bounds iterative network work at two thousand items and five thousand relati
       .positions
   ).toEqual(result.positions);
 });
+
+it('keeps a small phone hub and every neighbor within a readable viewport with wiring clearance', () => {
+  const nodes = ['hub', 'a', 'b', 'c', 'd'].map(id => ({ id }));
+  const dimensions = () => ({ width: 220, height: 104 });
+  const edges = nodes.slice(1).map(node => edge('hub', node.id));
+  const result = organizeTopology(nodes, edges, dimensions, {
+    width: 390,
+    height: 684,
+  });
+  const points = [...result.positions.values()];
+  const width =
+    Math.max(...points.map(p => p.x + 110)) -
+    Math.min(...points.map(p => p.x - 110));
+  const height =
+    Math.max(...points.map(p => p.y + 52)) -
+    Math.min(...points.map(p => p.y - 52));
+  expect(width * 0.65).toBeLessThanOrEqual(350);
+  expect(height * 0.65).toBeLessThanOrEqual(484);
+  for (let i = 0; i < points.length; i++)
+    for (let j = 0; j < i; j++) {
+      const dx = Math.max(0, Math.abs(points[i].x - points[j].x) - 220);
+      const dy = Math.max(0, Math.abs(points[i].y - points[j].y) - 104);
+      expect(Math.hypot(dx, dy)).toBeGreaterThanOrEqual(64);
+    }
+  const hub = result.positions.get('hub')!;
+  const leaves = nodes.slice(1).map(node => result.positions.get(node.id)!);
+  expect(leaves.reduce((sum, p) => sum + p.x, 0) / 4).toBeCloseTo(hub.x, 5);
+  expect(leaves.reduce((sum, p) => sum + p.y, 0) / 4).toBeCloseTo(hub.y, 5);
+  expect(
+    organizeTopology([...nodes].reverse(), [...edges].reverse(), dimensions, {
+      width: 390,
+      height: 684,
+    }).positions
+  ).toEqual(result.positions);
+});

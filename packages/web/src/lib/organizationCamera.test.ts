@@ -85,7 +85,7 @@ it('keeps a desktop hub centered and all neighbors visible instead of hiding car
     cards,
     'hub',
     viewport,
-    [...obstacles, { x: 200, y: 90, width: 970, height: 540 }],
+    [...obstacles, { x: 200, y: 90, width: 350, height: 150 }],
     0.65,
     { x: 688, y: 375 }
   );
@@ -98,4 +98,18 @@ it('keeps a desktop hub centered and all neighbors visible instead of hiding car
       viewport.height
     );
   }
+});
+
+it('keeps the focused hub clear when a tall overlay leaves room only at the top', () => {
+  const at = frameOrganizedNeighborhood(
+    [{ id: 'hub', x: 0, y: 0, width: 220, height: 84 }],
+    'hub',
+    { width: 390, height: 684 },
+    [{ x: 12, y: 190, width: 366, height: 490 }],
+    0.65,
+    { x: 195, y: 342 }
+  );
+  expect(at.x).toBe(195);
+  expect(at.y + (84 * 0.65) / 2).toBeLessThanOrEqual(178);
+  expect(at.y - (84 * 0.65) / 2).toBeGreaterThanOrEqual(20);
 });

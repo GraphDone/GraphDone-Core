@@ -20,6 +20,15 @@ describe('layout save status', () => {
     expect(screen.getByRole('button', { name: 'Retry layout save' })).toBeEnabled();
   });
 
+  it('marks normal pending progress without disguising an attention error', () => {
+    const {rerender}=render(<LayoutSaveStatus queue={queue({pending:2,local:2,unsent:2})} />);
+    expect(screen.getByRole('status')).toHaveAttribute('data-layout-save-progress','true');
+    rerender(<LayoutSaveStatus queue={queue({pending:2,local:2,unsent:2,sendError:'Network failed'})} />);
+    expect(screen.getByRole('status')).toHaveAttribute('data-layout-save-progress','false');
+    expect(screen.getByRole('status')).toHaveTextContent('Network failed');
+    expect(screen.getByRole('button',{name:'Retry layout save'})).toBeEnabled();
+  });
+
   it('offers cleanup alone for accepted changes and never describes them as unsent', () => {
     render(<LayoutSaveStatus queue={queue({ pending: 1, local: 1, cleanupPending: 1, acknowledged: true })} />);
     expect(screen.getByRole('status')).toHaveTextContent('The server accepted 1 layout change');
