@@ -39,6 +39,21 @@ export function OverviewBusLayer({
   const focusOwner = useRef<{ element: SVGPathElement; source: string } | null>(
     null
   );
+  const focusFallback = useRef(onFocusLost);
+  useLayoutEffect(() => {
+    focusFallback.current = onFocusLost;
+  });
+  useLayoutEffect(
+    () => () => {
+      const owned = focusOwner.current;
+      if (owned && document.activeElement === owned.element)
+        requestAnimationFrame(() => {
+          if (document.activeElement === document.body)
+            focusFallback.current(owned.source);
+        });
+    },
+    []
+  );
   const exitTimer = useRef<ReturnType<typeof setTimeout>>();
   const active = routes.find(route => route.id === (hovered ?? focused));
   const visibleHint = active && dismissed !== active.id;
