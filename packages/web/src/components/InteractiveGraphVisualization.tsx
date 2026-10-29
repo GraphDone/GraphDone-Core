@@ -4257,9 +4257,14 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       });
     };
     window.addEventListener('graphdone:minimap-open', snapshot);
+    window.addEventListener('graphdone:layout-organized', publish);
     const id = setInterval(() => { publish(); if (++n >= 5) clearInterval(id); }, 800);
     publish();
-    return () => { clearInterval(id); window.removeEventListener('graphdone:minimap-open', snapshot); };
+    return () => {
+      clearInterval(id);
+      window.removeEventListener('graphdone:minimap-open', snapshot);
+      window.removeEventListener('graphdone:layout-organized', publish);
+    };
   }, [currentGraph?.id, workItemsData?.workItems?.length]);
 
   // Center on specific node
@@ -4373,6 +4378,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     cameraManuallyPositionedRef.current = true;
     if (currentGraphIdRef.current) fittedGraphsRef.current.add(currentGraphIdRef.current);
     simulation.alpha(0).restart();
+    window.dispatchEvent(new CustomEvent('graphdone:layout-organized'));
     persistAllPositions();
     requestAnimationFrame(() => {
       if (simulationRef.current !== simulation) return;
