@@ -39,6 +39,14 @@ const ids = (value: readonly SemanticEdge[]) =>
   value.map(edge => edge.id).sort();
 
 describe('semantic relationship exploration', () => {
+  it('opens exactly the represented bus originals without dropping parallel or unknown types', () => {
+    const originals = [...edges, { id: 'future', source: 'n0', target: 'n1', type: 'FUTURE_LINK' }];
+    const index = indexSemanticRelationships(items, originals);
+    const group = { id: 'unused-label', direct: false };
+    const selected = scopedRelationships(index, { kind: 'bus', source: group, target: group, edgeIds: ['hub-n1', 'parallel', 'future', 'parallel', 'deleted'] });
+    expect(ids(selected)).toEqual(['future', 'hub-n1', 'parallel']);
+    expect(selected.every(edge => originals.includes(edge))).toBe(true);
+  });
   it('opens every original between a pair, including reverse links, while excluding unrelated neighbors', () => {
     const index = indexSemanticRelationships(items, edges);
     expect(ids(scopedRelationships(index, { kind: 'pair', endpoints: ['n0', 'n1'] }))).toEqual(['hub-n1', 'parallel', 'reverse']);
