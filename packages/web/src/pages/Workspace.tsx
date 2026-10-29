@@ -51,6 +51,11 @@ export function Workspace() {
   const [layoutMode, setLayoutMode] = useState<LayoutMode>(() =>
     parseLayoutMode(typeof window !== 'undefined' ? window.localStorage.getItem(LAYOUT_MODE_STORAGE_KEY) : null)
   );
+  useEffect(() => {
+    const update = (event: Event) => setLayoutMode(parseLayoutMode((event as CustomEvent<string>).detail));
+    window.addEventListener('graphdone-layout-mode-change', update);
+    return () => window.removeEventListener('graphdone-layout-mode-change', update);
+  }, []);
   const toggleLayoutMode = () => {
     const next: LayoutMode = layoutMode === 'hierarchical' ? 'force' : 'hierarchical';
     setLayoutMode(next);

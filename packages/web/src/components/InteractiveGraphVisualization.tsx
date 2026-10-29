@@ -61,6 +61,7 @@ import { graphItemLayout, measureGraphText, edgeLabelDimensions, GRAPH_FONT_FAMI
 import { placeItemLabels } from '../lib/edgeLabelPlacement';
 import { separateCards } from '../lib/separateCards';
 import { organizeTopology } from '../lib/topologyOrganization';
+import { frameOrganizedNeighborhood } from '../lib/organizationCamera';
 import { DEFAULT_PHYSICS, collisionRadius, linkDistance, linkMaxDistance, linkStrength } from '../lib/physicsConfig';
 import { computeCompactLayout, isHierarchicalLayout, parseLayoutMode, LAYOUT_MODE_STORAGE_KEY, type LayoutMode } from '../lib/layoutAlgorithms';
 import { edgeBorderEndpoints, minEdgeLength, clampToMinNeighbors } from '../lib/edgeGeometry';
@@ -1950,16 +1951,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       }
     });
 
-    // Viewport culling - only render visible nodes for performance
-    const margin = 200;
-    const visibleNodes = (currentTransform?.k || 1) < LOD_THRESHOLDS.VERY_FAR ? 
-      nodes.filter((node: WorkItem) => {
-        const nodeX = (node.positionX || 0) * (currentTransform?.k || 1) + (currentTransform?.x || 0);
-        const nodeY = (node.positionY || 0) * (currentTransform?.k || 1) + (currentTransform?.y || 0);
-        return nodeX >= -margin && nodeX <= width + margin && 
-               nodeY >= -margin && nodeY <= height + margin;
-      }) : nodes;
-    
+    const visibleNodes = nodes;
+
     // Simple 2D force simulation
     const simulation = d3.forceSimulation(visibleNodes as any);
     simulationLayoutScopeRef.current = activeLayoutScopeRef.current;
@@ -4005,12 +3998,18 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   }, [semanticOverviewActive, currentGraph?.id]);
 
   const mousedownNodeRef = useRef<any>(null);
+  const organizationZoomFloorRef = useRef(0);
+  const organizationFocusRef = useRef<string>();
+  useEffect(() => {
+    organizationZoomFloorRef.current = 0;
+    organizationFocusRef.current = undefined;
+  }, [layoutScope]);
 
   // Fit view to show all nodes. Returns true if a fit transform was applied,
   // false if it couldn't yet (no svg/container, or the simulation has no
   // positioned nodes) — the once-per-graph framing polls on this so a slow data
   // load doesn't leave the graph pinned off-screen (the live-guest bug).
-  const fitViewToNodes = useCallback((animate = true, minimumScale = 0): boolean => {
+  const fitViewToNodes = useCallback((animate = true, minimumScale = organizationZoomFloorRef.current): boolean => {
     if (!svgRef.current || !containerRef.current) return false;
     // Bounds must come from the LIVE simulation objects (the React-state
     // nodes are different objects since the identity merge and may hold
@@ -4098,8 +4097,21 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     // Fit, but never zoom IN past 1.25 (a 3-node graph shouldn't fill the screen)
     const scale = Math.max(minimumScale, Math.min(fitRegion.width / boundsWidth, fitRegion.height / boundsHeight, 1.25));
 
-    const translateX = fitRegion.x + fitRegion.width / 2 - ((minX + maxX) / 2) * scale;
-    const translateY = fitRegion.y + fitRegion.height / 2 - ((minY + maxY) / 2) * scale;
+    let translateX = fitRegion.x + fitRegion.width / 2 - ((minX + maxX) / 2) * scale;
+    let translateY = fitRegion.y + fitRegion.height / 2 - ((minY + maxY) / 2) * scale;
+    const focus = organizationFocusRef.current && simNodes.find(node => node.id === organizationFocusRef.current);
+    if (minimumScale > 0 && focus) {
+      const at = frameOrganizedNeighborhood(
+        simNodes.map(node => ({ id: node.id, x: node.x, y: node.y, ...graphItemLayout(node, measureGraphText, scale) })),
+        focus.id,
+        { width, height },
+        obstacles.map(rect => ({ x: rect.left, y: rect.top, width: rect.right - rect.left, height: rect.bottom - rect.top })),
+        scale,
+        { x: width / 2, y: height / 2 }
+      );
+      translateX = at.x - focus.x * scale;
+      translateY = at.y - focus.y * scale;
+    }
     const transform = d3.zoomIdentity.translate(translateX, translateY).scale(scale);
 
     // Use the component's own zoom behavior so handlers fire and state stays
@@ -4337,6 +4349,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const resetLayout = useCallback(() => {
     const simulation = simulationRef.current, container = containerRef.current;
     if (!simulation || !container || simulationLayoutScopeRef.current !== activeLayoutScopeRef.current) return;
+    layoutModeRef.current = 'force';
+    try { window.localStorage.setItem(LAYOUT_MODE_STORAGE_KEY, 'force'); } catch {}
+    window.dispatchEvent(new CustomEvent('graphdone-layout-mode-change', { detail: 'force' }));
     const arranged = organizeTopology(simulation.nodes() as WorkItem[], validatedEdges as any[], node => graphItemLayout(node, measureGraphText), {width:container.clientWidth,height:container.clientHeight});
     for (const node of simulation.nodes() as any[]) {
       const point = arranged.positions.get(node.id);
@@ -4352,12 +4367,15 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       node.userPreferenceVector = null;
     }
     (window as any).__graphOrganization = {components:arranged.components,work:arranged.work};
+    organizationZoomFloorRef.current = 0.65;
+    organizationFocusRef.current = arranged.components[0]?.center ?? arranged.components[0]?.ids[0];
+    cameraManuallyPositionedRef.current = true;
     simulation.alpha(0).restart();
     persistAllPositions();
     requestAnimationFrame(() => {
       if (simulationRef.current !== simulation) return;
       runLabelAvoidanceRef.current?.();
-      fitViewToNodes(true, container.clientWidth < 600 ? 0.65 : 0);
+      fitViewToNodes();
     });
   }, [validatedEdges, fitViewToNodes, persistAllPositions]);
 
@@ -4370,6 +4388,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const applyLayoutMode = useCallback((mode: LayoutMode) => {
     layoutModeRef.current = mode;
     try { window.localStorage?.setItem(LAYOUT_MODE_STORAGE_KEY, mode); } catch { /* storage unavailable */ }
+    window.dispatchEvent(new CustomEvent('graphdone-layout-mode-change', { detail: mode }));
     const sim = simulationRef.current;
     const container = containerRef.current;
     if (!sim || !container) return;
@@ -4771,7 +4790,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   // every node without touching the camera-restore state. Calls through the ref so
   // the latest fit fn is used regardless of when the button mounts.
   useEffect(() => {
-    (window as any).triggerZoomToFit = () => fitViewRef.current();
+    (window as any).triggerZoomToFit = () => {
+      organizationZoomFloorRef.current = 0;
+      return fitViewRef.current();
+    };
     return () => {
       delete (window as any).triggerZoomToFit;
     };
@@ -4794,7 +4816,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   useEffect(() => {
     if (!hasNodes) return undefined;
     if (!isHierarchicalLayout(layoutModeRef.current)) return undefined;
-    const timer = setTimeout(() => applyLayoutModeRef.current('hierarchical'), 1600);
+    const timer = setTimeout(() => {
+      if (isHierarchicalLayout(layoutModeRef.current)) applyLayoutModeRef.current('hierarchical');
+    }, 1600);
     return () => clearTimeout(timer);
   }, [hasNodes, currentGraphId]);
 

@@ -11,6 +11,8 @@ const test = base.extend<{ ownedGraphIds: OwnedGraphs }>({
   ownedGraphIds: [ownedGraphIdsFixture, { timeout: 60000 }],
 });
 
+test.use({ actionTimeout: 10000 });
+
 for (const [width, height, size] of [
   [1440, 900, 9],
   [390, 844, 5],
@@ -71,7 +73,7 @@ for (const [width, height, size] of [
     await page.evaluate(id => {
       localStorage.setItem('currentGraphId', id);
       localStorage.setItem('graphdone:viewMode', 'graph');
-      localStorage.setItem('graphdone:layoutMode', 'force');
+      localStorage.setItem('graphdone:layoutMode', 'hierarchical');
       localStorage.setItem('graphdone:relationship-priority', 'all');
     }, seeded.graphId);
     await page.goto('/');
@@ -100,6 +102,17 @@ for (const [width, height, size] of [
               title: Array.from(element.querySelectorAll('.node-title-text'))
                 .map(line => line.textContent)
                 .join(' '),
+              screen: (() => {
+                const r = (
+                  element.querySelector('.node-bg') as SVGRectElement
+                ).getBoundingClientRect();
+                return {
+                  left: r.left,
+                  right: r.right,
+                  top: r.top,
+                  bottom: r.bottom,
+                };
+              })(),
               screenWidth: (
                 element.querySelector('.node-bg') as SVGRectElement
               ).getBoundingClientRect().width,
@@ -149,6 +162,9 @@ for (const [width, height, size] of [
     expect(target!.width).toBeGreaterThanOrEqual(44);
     expect(target!.height).toBeGreaterThanOrEqual(44);
     await button.click();
+    expect(
+      await page.evaluate(() => localStorage.getItem('graphdone:layoutMode'))
+    ).toBe('force');
     await expect
       .poll(() =>
         page.evaluate(
@@ -190,6 +206,16 @@ for (const [width, height, size] of [
         )
       )
       .toBe(true);
+    await expect(page.getByTestId('layout-save-status')).toContainText(
+      'Layout saved to the server.',
+      { timeout: 20000 }
+    );
+    await page.evaluate(
+      () =>
+        new Promise<void>(resolve =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+        )
+    );
     const organized = await read();
     const hub = organized.cards.find(card => card.id === seeded.nodeIds[0])!;
     expect(hub.screenWidth).toBeGreaterThanOrEqual(132);
@@ -198,6 +224,34 @@ for (const [width, height, size] of [
         before.workItems.find((item: { id: string }) => item.id === card.id)
           .title
       );
+    expect(
+      Math.abs((hub.screen.left + hub.screen.right) / 2 - width / 2)
+    ).toBeLessThan(48);
+    const fullCards = organized.cards.filter(
+      card =>
+        card.screen.left >= 0 &&
+        card.screen.right <= width &&
+        card.screen.top >= 0 &&
+        card.screen.bottom <= height
+    );
+    expect(fullCards.length).toBeGreaterThanOrEqual(width < 600 ? 3 : size);
+    const controls = await page
+      .locator('[data-graph-fit-obstacle="true"]')
+      .evaluateAll(elements =>
+        elements.map(el => {
+          const r = el.getBoundingClientRect();
+          return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
+        })
+      );
+    for (const card of fullCards)
+      for (const control of controls)
+        expect(
+          card.screen.left < control.right &&
+            card.screen.right > control.left &&
+            card.screen.top < control.bottom &&
+            card.screen.bottom > control.top,
+          'Visible organized cards must clear controls'
+        ).toBe(false);
     const leaves = organized.cards.filter(card => card.id !== hub.id);
     expect(
       leaves.reduce((sum, card) => sum + card.x, 0) / leaves.length
@@ -275,6 +329,12 @@ for (const [width, height, size] of [
       })
       .toBe(true);
     expect((await snapshot()).edges).toEqual(before.edges);
+    await expect
+      .poll(
+        async () =>
+          (await read()).cards.find(card => card.id === hub.id)!.screenWidth
+      )
+      .toBeGreaterThanOrEqual(132);
     expect(errors).toEqual([]);
     const receipt = info.outputPath(`organized-hub-${width}.json`);
     await writeFile(
@@ -292,3 +352,246 @@ for (const [width, height, size] of [
       contentType: 'application/json',
     });
   });
+
+test('organizing after a low-zoom title edit retains and saves offscreen items @item-wires', async ({
+  page,
+  ownedGraphIds,
+}, info) => {
+  test.setTimeout(90000);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await login(page, TEST_USERS.ADMIN);
+  const seeded = await ownedGraphIds.seed({
+    size: 2,
+    spacing: 20000,
+    namePrefix: 'Offscreen organization',
+    titleForIndex: i => (i ? 'Far item' : 'Near item'),
+  });
+  for (const [index, id] of seeded.nodeIds.entries())
+    await gql(
+      page,
+      'mutation($id:ID!,$x:Float!){updateWorkItems(where:{id:$id},update:{positionX:$x,positionY:100}){workItems{id}}}',
+      { id, x: index ? 20000 : 1 }
+    );
+  await page.evaluate(id => {
+    localStorage.setItem('currentGraphId', id);
+    localStorage.setItem('graphdone:viewMode', 'graph');
+    localStorage.setItem('graphdone:layoutMode', 'force');
+  }, seeded.graphId);
+  const errors: string[] = [];
+  page.on('pageerror', e => errors.push(e.message));
+  await page.goto('/');
+  await expect(page.locator('.graph-container .node')).toHaveCount(2);
+  await page.evaluate(() =>
+    (
+      window as unknown as {
+        miniMapZoom: (x: number, y: number, k: number) => void;
+      }
+    ).miniMapZoom(1, 100, 0.1)
+  );
+  const near = page
+    .locator('.node')
+    .filter({ has: page.locator(`[data-node-id="${seeded.nodeIds[0]}"]`) });
+  await expect(near).toHaveAttribute('data-detail', 'compact');
+  await expect(near).toHaveAttribute('role', 'button');
+  await near.focus();
+  await page.keyboard.press('Enter');
+  await expect(
+    page.getByRole('dialog', { name: 'Edit work item', exact: true })
+  ).toBeVisible();
+  await page.getByTestId('quick-title').fill('Edited near item');
+  await page.getByTestId('quick-title').press('Enter');
+  await expect(
+    page
+      .locator('.node-title-group > title')
+      .filter({ hasText: 'Edited near item' })
+  ).toHaveCount(1);
+  await page
+    .getByRole('button', { name: 'Close quick edit', exact: true })
+    .click();
+  await expect(page.locator('.graph-container .node')).toHaveCount(2);
+  expect(
+    await page.evaluate(
+      () =>
+        (
+          window as unknown as { __layoutMetrics: () => { nodeCount: number } }
+        ).__layoutMetrics().nodeCount
+    )
+  ).toBe(2);
+  await page
+    .getByRole('button', { name: 'Organize around connections', exact: true })
+    .click();
+  await expect
+    .poll(
+      async () => {
+        const result = await gql(
+          page,
+          'query($id:ID!){workItems(where:{graph:{id:$id}}){id positionX positionY}edges(where:{source:{graph:{id:$id}}}){id source{id}target{id}}}',
+          { id: seeded.graphId }
+        );
+        return result.workItems.every(
+          (n: { positionX: number; positionY: number }) =>
+            Math.abs(n.positionX) < 2000 && Math.abs(n.positionY) < 2000
+        );
+      },
+      { timeout: 20000 }
+    )
+    .toBe(true);
+  expect(errors).toEqual([]);
+  const saved = await gql(
+    page,
+    'query($id:ID!){workItems(where:{graph:{id:$id}}){id positionX positionY}edges(where:{source:{graph:{id:$id}}}){id source{id}target{id}}}',
+    { id: seeded.graphId }
+  );
+  expect(saved.workItems.map((item: { id: string }) => item.id).sort()).toEqual(
+    [...seeded.nodeIds].sort()
+  );
+  expect(saved.edges).toHaveLength(seeded.edgeCount);
+  expect(saved.edges[0].source.id).toBe(seeded.nodeIds[0]);
+  expect(saved.edges[0].target.id).toBe(seeded.nodeIds[1]);
+  const receipt = info.outputPath('offscreen-organization.json');
+  await writeFile(
+    receipt,
+    JSON.stringify({
+      ids: seeded.nodeIds,
+      saved,
+      metrics: await page.evaluate(() =>
+        (
+          window as unknown as { __layoutMetrics: () => unknown }
+        ).__layoutMetrics()
+      ),
+      errors,
+    })
+  );
+  await info.attach('offscreen-organization', {
+    path: receipt,
+    contentType: 'application/json',
+  });
+  const png = info.outputPath('offscreen-organization.png');
+  await page.screenshot({ path: png });
+  await info.attach('offscreen-organization', {
+    path: png,
+    contentType: 'image/png',
+  });
+});
+
+test('fresh unplaced items wait for authoritative connections before automatic organization @item-wires', async ({
+  page,
+  ownedGraphIds,
+}, info) => {
+  test.setTimeout(90000);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await login(page, TEST_USERS.ADMIN);
+  const seeded = await ownedGraphIds.seed({
+    size: 5,
+    namePrefix: 'Fresh topology',
+    titleForIndex: i => (i ? 'New subsystem ' + i : 'New system coordinator'),
+  });
+  await gql(
+    page,
+    'mutation($id:ID!){deleteEdges(where:{source:{graph:{id:$id}}}){nodesDeleted}updateWorkItems(where:{graph:{id:$id}},update:{positionX:0,positionY:0}){workItems{id}}}',
+    { id: seeded.graphId }
+  );
+  const created = await gql(
+    page,
+    'mutation($input:[EdgeCreateInput!]!){createEdges(input:$input){edges{id}}}',
+    {
+      input: seeded.nodeIds.slice(1).map(id => ({
+        type: 'BLOCKS',
+        weight: 1,
+        source: { connect: { where: { node: { id: seeded.nodeIds[0] } } } },
+        target: { connect: { where: { node: { id } } } },
+      })),
+    }
+  );
+  const snapshot = () =>
+    gql(
+      page,
+      'query($id:ID!){workItems(where:{graph:{id:$id}}){id positionX positionY}edges(where:{source:{graph:{id:$id}}}){id}}',
+      { id: seeded.graphId }
+    );
+  let held = 0,
+    release!: () => void;
+  const gate = new Promise<void>(resolve => {
+    release = resolve;
+  });
+  await page.route('**/api/graphql', async route => {
+    const body = route.request().postDataJSON();
+    if (
+      body.operationName === 'GetEdges' &&
+      JSON.stringify(body.variables).includes(seeded.graphId)
+    ) {
+      held++;
+      await gate;
+    }
+    await route.continue();
+  });
+  const errors: string[] = [];
+  page.on('pageerror', e => errors.push(e.message));
+  try {
+    await page.evaluate(id => {
+      localStorage.setItem('currentGraphId', id);
+      localStorage.setItem('graphdone:viewMode', 'graph');
+      localStorage.setItem('graphdone:layoutMode', 'force');
+    }, seeded.graphId);
+    await page.goto('/');
+    await expect.poll(() => held).toBeGreaterThan(0);
+    await expect(
+      page.getByText('Loading graph data...', { exact: true })
+    ).toBeVisible();
+    await expect(page.locator('.graph-container .node')).toHaveCount(0);
+    const pending = await snapshot();
+    expect(
+      pending.workItems.every(
+        (n: { positionX: number; positionY: number }) =>
+          n.positionX === 0 && n.positionY === 0
+      )
+    ).toBe(true);
+    release();
+    await expect(page.locator('.graph-container .node')).toHaveCount(5);
+    await expect
+      .poll(
+        async () => {
+          const saved = await snapshot(),
+            hub = saved.workItems.find(
+              (n: { id: string }) => n.id === seeded.nodeIds[0]
+            );
+          const leaves = saved.workItems.filter(
+            (n: { id: string }) => n.id !== hub.id
+          );
+          const radii = leaves.map(
+            (n: { positionX: number; positionY: number }) =>
+              Math.hypot(
+                n.positionX - hub.positionX,
+                n.positionY - hub.positionY
+              )
+          );
+          return (
+            Math.min(...radii) > 200 &&
+            Math.max(...radii) - Math.min(...radii) < 0.01
+          );
+        },
+        { timeout: 20000 }
+      )
+      .toBe(true);
+    const saved = await snapshot();
+    expect(saved.edges.map((e: { id: string }) => e.id).sort()).toEqual(
+      created.createEdges.edges.map((e: { id: string }) => e.id).sort()
+    );
+    expect(errors).toEqual([]);
+    const receipt = info.outputPath('fresh-topology.json');
+    await writeFile(receipt, JSON.stringify({ pending, saved, held, errors }));
+    await info.attach('fresh-topology', {
+      path: receipt,
+      contentType: 'application/json',
+    });
+    const png = info.outputPath('fresh-topology.png');
+    await page.screenshot({ path: png });
+    await info.attach('fresh-topology', {
+      path: png,
+      contentType: 'image/png',
+    });
+  } finally {
+    release();
+    await page.unroute('**/api/graphql');
+  }
+});
