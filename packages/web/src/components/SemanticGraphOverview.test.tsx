@@ -261,7 +261,7 @@ it('returns keyboard focus to overview controls when zoom removes the entire bus
   const relationships = [{ id: 'link', source: 'n0', target: 'n2', type:'BLOCKS' }];
   const fixture = (scale: number) => <SemanticGraphOverview items={source} edges={relationships} camera={{x:0,y:0,scale}} readPositions={positions} onActiveChange={noop} onBrowse={noop} onInspect={noop} onBack={noop} />;
   const { rerender } = render(fixture(0.2));
-  const bus = screen.getByRole('button', { name: 'Inspect Left → Right: 1 relationships' });
+  const bus = screen.getByRole('button', { name: 'Inspect Left → Right: 1 relationship' });
   act(() => bus.focus());
   rerender(fixture(1.5));
   act(() => { for(const frame of frames.splice(0)) frame(0); });

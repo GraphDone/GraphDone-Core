@@ -17,8 +17,8 @@ export function placeOverviewBusHint(
       [
         12,
         maxX,
-        anchor.x + 16,
-        anchor.x - hintWidth - 16,
+        anchor.x + 28,
+        anchor.x - hintWidth - 28,
         ...obstacles.flatMap(rect => [
           rect.x - hintWidth - 12,
           rect.x + rect.width + 12,
@@ -31,8 +31,8 @@ export function placeOverviewBusHint(
       [
         12,
         maxY,
-        anchor.y + 16,
-        anchor.y - hintHeight - 16,
+        anchor.y + 28,
+        anchor.y - hintHeight - 28,
         ...obstacles.flatMap(rect => [
           rect.y - hintHeight - 12,
           rect.y + rect.height + 12,
@@ -68,8 +68,18 @@ export function placeOverviewBusHint(
   ];
   let best = { x: clampX(anchor.x + 16), y: clampY(anchor.y + 16) };
   let bestScore = Infinity;
+  let bestPointerOverlap = Infinity;
   for (const x of xs)
     for (const y of ys) {
+      const pointerOverlap =
+        Math.max(
+          0,
+          Math.min(x + hintWidth, anchor.x + 12) - Math.max(x, anchor.x - 12)
+        ) *
+        Math.max(
+          0,
+          Math.min(y + hintHeight, anchor.y + 12) - Math.max(y, anchor.y - 12)
+        );
       const overlap = obstacles.reduce(
         (area, rect) =>
           area +
@@ -89,9 +99,13 @@ export function placeOverviewBusHint(
         Math.abs(x + hintWidth / 2 - anchor.x) +
         Math.abs(y + hintHeight / 2 - anchor.y);
       const score = overlap * (width + height + 1) + distance;
-      if (score < bestScore) {
+      if (
+        pointerOverlap < bestPointerOverlap ||
+        (pointerOverlap === bestPointerOverlap && score < bestScore)
+      ) {
         best = { x, y };
         bestScore = score;
+        bestPointerOverlap = pointerOverlap;
       }
     }
   return best;
