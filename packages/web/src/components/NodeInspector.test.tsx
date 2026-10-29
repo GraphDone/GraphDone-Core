@@ -56,8 +56,8 @@ it('keeps one tooltip, clears it on scrolling and resets it for another inspecte
 });
 
 it('returns keyboard focus to the original item trigger when the inspector closes', () => {
-  const frames: FrameRequestCallback[] = [];
-  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+  const frames: ((time: number) => void)[] = [];
+  vi.stubGlobal('requestAnimationFrame', (callback: (time: number) => void) => {
     frames.push(callback);
     return frames.length;
   });
