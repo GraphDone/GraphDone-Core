@@ -43,3 +43,39 @@ to #231/#193. It does not claim to fix placement/routing spacing (#220/#233/#234
 change source layout ownership, or establish a timing improvement before new
 measurements. Initial failed-run fingerprint:
 `34c6cda2542943a3e65e610b3c92dd9f94e0f837e7f418f42f3dcb8a617337b5`.
+
+## Correction and local controls — 2026-10-29 UTC
+
+`useItemPresentation` coalesces terminal zoom work into one animation frame after
+React commits the active presentation. Overview activation/deactivation is
+reported in layout effects. Hidden source culling, item opacity and original-edge
+routing/label work are skipped. Source simulation and camera ownership are
+unchanged; the geometry scale still follows the terminal camera. Returning to
+Items clears the item presentation cache and refreshes current cards, opacity,
+culling and routes before paint, including manual Items without a camera event.
+The scheduler cancels detached work and checks the current simulation.
+
+Local commands, run serially with Node 22 and one Vitest worker:
+
+- `npm run test --workspace=@graphdone/web -- --maxWorkers=1 src/hooks/useItemPresentation.test.tsx src/components/SemanticGraphOverview.test.tsx src/components/OverviewBusLayer.test.tsx src/lib/overviewBusHit.test.ts`: **16 passed / 4.86 s**.
+- `npm run typecheck --workspace=@graphdone/web`: passed. The first local check
+  caught a D3 selection union on chained `attr`; individual attribute writes
+  corrected it before publication.
+- Scoped ESLint on both presentation components and the new hook/test: **0 errors**,
+  302 existing-style warnings in the large graph component.
+- Playwright discovery finds the existing three 301-item desktop/phone and 2k
+  cases. No local browser or large fixture was launched.
+
+Two retained local negative controls establish the regressions: replacing the
+hidden branch with unconditional item rendering fails two tests (hidden work
+appears); suppressing the Items-return refresh also fails two tests (the displayed
+card remains at scale 1.2/revision 0 instead of scale 0.2/revision 1). Corrected
+source passes both. The hook test includes the actual `SemanticGraphOverview`
+mode selector and automatic exit, and asserts current SVG text/path plus visible
+host ownership. This small control is not a full-application timing measurement.
+
+Existing browser journeys now capture actual item-presentation pass/scale
+attributes, require zero item passes during the 2k overview zoom, and check real
+cards and paths after manual Items selection. These are additional assertions,
+not substituted readiness or timing gates. Hosted exact-source acceptance and
+independent review remain required before claiming the performance issue solved.

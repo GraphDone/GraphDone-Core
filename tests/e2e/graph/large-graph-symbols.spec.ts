@@ -178,7 +178,13 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
     paintedCards?: number;
     labels?: number;
   }[] = [];
+  const presentation = () => page.locator('.main-graph-group').evaluate(element => ({
+    kind: element.getAttribute('data-presentation-kind'),
+    itemScale: Number(element.getAttribute('data-item-presentation-scale')),
+    passes: Number(element.getAttribute('data-item-presentation-passes')),
+  }));
   for (const scale of [1.2, 0.1, 1.2]) {
+    const priorPresentation = await presentation();
     const start = Date.now();
     const elapsed = await page.evaluate(measureGraphZoom, {
       x: target.positionX,
@@ -186,6 +192,7 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
       scale,
     });
     const wallMs = Date.now() - start;
+    const settledPresentation = await presentation();
     const timingPath = info.outputPath(`zoom-${timings.length}-timing.json`);
     await writeFile(
       timingPath,
@@ -196,6 +203,8 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
         scale,
         elapsed,
         wallMs,
+        priorPresentation,
+        settledPresentation,
       })
     );
     await info.attach(`zoom-${timings.length}-timing.json`, {
@@ -207,6 +216,9 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
       'Zoom must finish within five seconds on the CI runner'
     ).toBeLessThan(5000);
     if (scale > 1) {
+      expect(settledPresentation.kind).toBe('items');
+      expect(settledPresentation.itemScale).toBe(scale);
+      expect(settledPresentation.passes).toBeGreaterThan(priorPresentation.passes);
       const geometry = await inspectItemSymbols(
         page,
         info,
@@ -239,6 +251,9 @@ test('2000 loaded items and 5000 relationships survive overview and detail zoom 
         labels: geometry.labels.length,
       });
     } else {
+      expect(settledPresentation.kind).toBe('overview');
+      expect(settledPresentation.itemScale).toBe(priorPresentation.itemScale);
+      expect(settledPresentation.passes).toBe(priorPresentation.passes);
       await inspectSchematicOverview(
         overview,
         info,
