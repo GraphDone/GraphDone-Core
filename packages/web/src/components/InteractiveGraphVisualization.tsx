@@ -1617,12 +1617,15 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     return layout;
   }, []);
   // Card geometry at an arbitrary scale (camera fitting measures the scale it is
-  // about to present, not the current one). Layout depends on scale only through
-  // the compact title scale, so cache by that key per item.
+  // about to present, not the current one). Geometry depends on scale only
+  // through full/compact and the compact title scale, so any scale with the
+  // same key as the presented one reuses the presented layout, and other keys
+  // keep a small bounded per-item cache (a live resize refits every frame).
   const itemLayoutAtCache = useRef(new WeakMap<object, { title: string; type: string; description: unknown; subgraphId: unknown; layouts: Map<number, ReturnType<typeof graphItemLayout>> }>());
   const getNodeDimensionsAt = useCallback((d: WorkItem, scale: number) => {
-    if (scale === itemPresentationScaleRef.current) return getNodeDimensions(d);
-    const key = scale >= 1 ? 0 : itemTitleScale(scale);
+    const layoutKey = (value: number) => value >= 1 ? 0 : itemTitleScale(value);
+    const key = layoutKey(scale);
+    if (key === layoutKey(itemPresentationScaleRef.current)) return getNodeDimensions(d);
     let entry = itemLayoutAtCache.current.get(d);
     if (!entry || entry.title !== d.title || entry.type !== d.type || entry.description !== d.description || entry.subgraphId !== d.subgraphId) {
       entry = { title: d.title, type: d.type, description: d.description, subgraphId: d.subgraphId, layouts: new Map() };
@@ -1631,6 +1634,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     let layout = entry.layouts.get(key);
     if (!layout) {
       layout = graphItemLayout(d, measureGraphText, scale);
+      if (entry.layouts.size >= 4) entry.layouts.delete(entry.layouts.keys().next().value!);
       entry.layouts.set(key, layout);
     }
     return layout;
@@ -3481,6 +3485,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     });
 
     let nodePresentationScales = new WeakMap<WorkItem, number>();
+    const compactFocusOrigins = new WeakMap<SVGGElement, string>();
     const updateNodePresentationFor = (element: SVGGElement, d: WorkItem) => {
       const presentedScale = itemPresentationScaleRef.current;
       if (nodePresentationScales.get(d) === presentedScale) return;
@@ -3489,10 +3494,15 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         // Changing detail hides one keyboard control and reveals another: the
         // header icons exist only on full cards, the card itself is the control
         // when compact. Move focus with it so it never falls back to <body>.
+        // Only keyboard focus moves: a mouse user who clicked a card is not
+        // handed a highlighted header icon. The compact card remembers which
+        // icon it stood in for, so zooming back returns to that icon.
         const active = document.activeElement;
-        const focusedHeaderControl = active instanceof Element && active !== element && element.contains(active)
-          && !!active.closest('.node-edit-icon, .node-relationship-icon, .node-expand-icon, .node-descend-icon');
-        const focusedCard = active === element;
+        const keyboardFocus = active instanceof Element && element.contains(active) && active.matches(':focus-visible');
+        const focusedHeaderControl = keyboardFocus && active !== element
+          ? active.closest<SVGGElement>('.node-edit-icon, .node-relationship-icon, .node-expand-icon, .node-descend-icon')
+          : null;
+        const focusedCard = keyboardFocus && active === element;
         node.attr('data-detail', layout.compact ? 'compact' : 'full').attr('role', layout.compact ? 'button' : 'group').attr('tabindex', layout.compact ? 0 : null).attr('aria-label', `${d.title}, ${getTypeConfig(d.type as WorkItemType).label}`);
         node.on('keydown.compact', (event: KeyboardEvent) => {
           if (layout.compact && event.target === element && (event.key === 'Enter' || event.key === ' ')) openQuickEdit(event, d);
@@ -3512,8 +3522,14 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         renderItemMetadata(element, d, layout);
         node.selectAll('.node-title-bar, .node-type-text, .node-edit-icon, .node-relationship-icon, .node-expand-icon, .node-descend-icon, .node-description-text, .node-meta, .node-subgraph-count, .node-subgraph-stack')
           .style('display', () => layout.compact ? 'none' : null);
-        if (layout.compact && focusedHeaderControl) element.focus({ preventScroll: true });
-        else if (!layout.compact && focusedCard) element.querySelector<SVGGElement>('.node-edit-icon')?.focus({ preventScroll: true });
+        if (layout.compact && focusedHeaderControl) {
+          compactFocusOrigins.set(element, focusedHeaderControl.getAttribute('class') ?? 'node-edit-icon');
+          element.focus({ preventScroll: true });
+        } else if (!layout.compact && focusedCard) {
+          const origin = compactFocusOrigins.get(element) ?? 'node-edit-icon';
+          compactFocusOrigins.delete(element);
+          (element.querySelector<SVGGElement>(`.${origin}`) ?? element.querySelector<SVGGElement>('.node-edit-icon'))?.focus({ preventScroll: true });
+        }
     };
     const updateNodePresentation = () => {
       g.attr('data-presentation-scale', itemPresentationScaleRef.current);

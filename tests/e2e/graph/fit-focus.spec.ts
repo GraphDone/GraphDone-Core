@@ -69,7 +69,13 @@ for (const { width, height, title, detail } of [
     await expect(editor).toBeHidden();
     await expect(control).toBeFocused();
 
-    // Changing detail swaps which control exists; focus moves with it.
+    // Changing detail swaps which control exists; keyboard focus moves with it
+    // (a mouse-focused card is left alone). Re-focus from the keyboard.
+    await control.blur();
+    await page.keyboard.press('Shift');
+    await control.focus();
+    await expect(control).toBeFocused();
+    expect(await control.evaluate(element => element.matches(':focus-visible'))).toBe(true);
     const center = await card.evaluate(element => {
       const data = (element as any).__data__;
       return { x: data.x as number, y: data.y as number };
@@ -90,5 +96,12 @@ for (const { width, height, title, detail } of [
     await page.evaluate(({ x, y }) => (window as any).miniMapZoom(x, y, 1.2), center);
     await expect(card).toHaveAttribute('data-detail', 'full');
     await expect(gear).toBeFocused();
+    // The card remembers which header icon it stood in for.
+    const expand = card.locator('.node-expand-icon');
+    await expand.focus();
+    await page.evaluate(({ x, y }) => (window as any).miniMapZoom(x, y, 0.6), center);
+    await expect(card).toBeFocused();
+    await page.evaluate(({ x, y }) => (window as any).miniMapZoom(x, y, 1.2), center);
+    await expect(expand).toBeFocused();
     expect(errors).toEqual([]);
   });

@@ -22,7 +22,9 @@ function legacyFit(cards: Card[], width: number, height: number, currentScale: n
 }
 
 describe('graph camera fit', () => {
-  it('reproduces the compact/full alternation of fitting with the current geometry', () => {
+  // Documents the failure mode only (it runs a copy of the old algorithm); the
+  // production guard is fit-focus.spec.ts, which fails on the old camera code.
+  it('documents why fitting the current zoom geometry cannot settle', () => {
     const cards = [card(phoneTitle)];
     const first = legacyFit(cards, 390, 738, 1);
     const second = legacyFit(cards, 390, 738, first);
