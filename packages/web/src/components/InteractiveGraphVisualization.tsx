@@ -4011,6 +4011,24 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         g.attr('data-presentation-scale', d3.zoomTransform(svg.node()!).k);
       },
     });
+    // A first-load organization places every card inside the viewport at the
+    // identity camera. Frame it before the first paint: otherwise the cards are
+    // visible and tappable at scale 1, then the delayed framing loop jumps the
+    // camera under a person's first touch.
+    if (initialOrganization) {
+      const gid = currentGraphIdRef.current;
+      let savedCamera = false;
+      try { savedCamera = !!gid && localStorage.getItem(`graphdone:camera:${gid}`) !== null; } catch { /* storage unavailable */ }
+      if (gid && !fittedGraphsRef.current.has(gid) && !savedCamera) {
+        // Card size depends on the presented scale, so converge on the camera
+        // whose cards it frames instead of letting the framing loop creep there.
+        for (let pass = 0; pass < 6 && fitViewRef.current(false); pass++) {
+          const k = d3.zoomTransform(svg.node()!).k;
+          if (Math.abs(k - itemPresentationScaleRef.current) < 0.0005) break;
+          itemPresentationScaleRef.current = k;
+        }
+      }
+    }
     itemPresentation.refresh();
     setTimeout(() => { if (simulationRef.current === simulation) updateEdgePositions(true); }, 500);
   }, [nodes, validatedEdges, handleNodeClick, initializeEmptyVisualization]); // Include handleNodeClick to get fresh connection state
@@ -4127,7 +4145,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     const containerRect = container.getBoundingClientRect();
     const gap = 12;
     const obstacles = Array.from(document.querySelectorAll<HTMLElement>('[data-graph-fit-obstacle="true"]'))
-      .filter(element => !(minimumScale > 0 && element.dataset.layoutSaveProgress === 'true'))
+      // A passive save note lets taps through and disappears on its own; it
+      // must not reframe the camera under a person's first touch.
+      .filter(element => element.dataset.layoutSavePassive !== 'true' && !(minimumScale > 0 && element.dataset.layoutSaveProgress === 'true'))
       .map(element => {
         const rect = element.getBoundingClientRect();
         return {

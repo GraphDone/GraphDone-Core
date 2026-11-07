@@ -778,3 +778,129 @@ test('fresh unplaced items wait for authoritative connections before automatic o
     await page.unroute('**/api/graphql');
   }
 });
+
+// Review r4409439572: a fresh unplaced graph was painted inside the viewport at
+// the identity camera, then the delayed framing loop moved it during the first
+// touch, and a healthy save note covered the target at 320px. The camera must be
+// framed before cards are presented and the first tap must open the editor once.
+for (const [width, height] of [
+  [320, 568],
+  [390, 844],
+])
+  test.describe(`first phone tap ${width}×${height}`, () => {
+    test.use({ hasTouch: true });
+    test(`fresh organized items keep the first phone tap at ${width}px @item-wires`, async ({
+      page,
+      ownedGraphIds,
+    }, info) => {
+      test.setTimeout(90000);
+      await page.setViewportSize({ width, height });
+      await login(page, TEST_USERS.ADMIN);
+      // Two fresh graphs: one loaded untouched, one for the single tap.
+      const fresh = async (phase: string) => {
+        const seeded = await ownedGraphIds.seed({
+          size: 2,
+          namePrefix: `First tap ${width} ${phase}`,
+          titleForIndex: i => (i ? 'Celebrate progress' : 'Ship the first idea'),
+        });
+        await gql(
+          page,
+          'mutation($id:ID!){deleteEdges(where:{source:{graph:{id:$id}}}){nodesDeleted}updateWorkItems(where:{graph:{id:$id}},update:{positionX:0,positionY:0}){workItems{id}}}',
+          { id: seeded.graphId }
+        );
+        return seeded.graphId;
+      };
+      const untouchedGraph = await fresh('untouched');
+      const tappedGraph = await fresh('tap');
+      const open = (id: string) =>
+        page.evaluate(id => {
+          localStorage.setItem('currentGraphId', id);
+          localStorage.setItem('graphdone:viewMode', 'graph');
+          localStorage.setItem('graphdone:layoutMode', 'force');
+        }, id);
+      await open(untouchedGraph);
+      // Record the camera of every frame from the first painted card onward.
+      await page.addInitScript(() => {
+        const frames: { k: number; x: number; y: number }[] = [];
+        (window as unknown as { __firstTapCamera: typeof frames }).__firstTapCamera = frames;
+        const sample = () => {
+          const svg = document.querySelector('.graph-container svg') as
+            | (SVGSVGElement & { __zoom?: { k: number; x: number; y: number } })
+            | null;
+          if (svg?.querySelector('.node') && svg.__zoom) {
+            const { k, x, y } = svg.__zoom;
+            const last = frames[frames.length - 1];
+            if (!last || last.k !== k || last.x !== x || last.y !== y) frames.push({ k, x, y });
+          }
+          requestAnimationFrame(sample);
+        };
+        requestAnimationFrame(sample);
+      });
+      const errors: string[] = [];
+      page.on('pageerror', e => errors.push(e.message));
+      const readFrames = () =>
+        page.evaluate(
+          () => (window as unknown as { __firstTapCamera: { k: number; x: number; y: number }[] }).__firstTapCamera
+        );
+      const expectOneCamera = (frames: { k: number; x: number; y: number }[]) => {
+        expect(frames.length).toBeGreaterThan(0);
+        for (const frame of frames) {
+          expect(Math.abs(frame.k - frames[0].k)).toBeLessThan(0.001);
+          expect(Math.abs(frame.x - frames[0].x)).toBeLessThan(0.5);
+          expect(Math.abs(frame.y - frames[0].y)).toBeLessThan(0.5);
+        }
+      };
+      // Untouched first load: the camera that first presents a card is already
+      // the framed camera, and it stays put while automatic framing completes.
+      await page.goto('/');
+      await expect
+        .poll(() =>
+          page.evaluate(() => {
+            const metrics = (
+              window as unknown as { __layoutMetrics?: () => { cameraReady: boolean; cameraFramed: boolean } }
+            ).__layoutMetrics?.();
+            return !!metrics?.cameraReady && !!metrics?.cameraFramed;
+          }), { timeout: 20000 })
+        .toBe(true);
+      const untouched = await readFrames();
+      expectOneCamera(untouched);
+      // Touch phase: a second fresh, unplaced graph.
+      await open(tappedGraph);
+      await page.reload();
+      const target = page
+        .locator('.graph-container svg .node')
+        .filter({ hasText: 'Ship the first idea' })
+        .first();
+      await expect(target).toBeVisible({ timeout: 15000 });
+      // Tap as soon as the card is fully on screen; do not wait for settling.
+      await expect
+        .poll(async () => {
+          const box = await target.boundingBox();
+          return !!box && box.x >= 0 && box.y >= 0 && box.x + box.width <= width && box.y + box.height <= height;
+        }, { timeout: 15000 })
+        .toBe(true);
+      const box = (await target.boundingBox())!;
+      const point = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+      const hit = await page.evaluate(({ x, y }) => {
+        const element = document.elementFromPoint(x, y);
+        return {
+          title: element?.closest('.node')?.textContent ?? null,
+          status: !!element?.closest('[data-testid="layout-save-status"]'),
+        };
+      }, point);
+      expect(hit.status).toBe(false);
+      expect(hit.title).toContain('Ship the first idea');
+      await page.touchscreen.tap(point.x, point.y);
+      // Exactly one opening action; a retry would hide a lost first touch.
+      await expect(page.getByTestId('quick-edit-surface')).toBeVisible({ timeout: 5000 });
+      await expect(page.getByTestId('quick-title')).toHaveValue('Ship the first idea');
+      // The camera did not move between the first presented card and the tap.
+      const frames = await readFrames();
+      expectOneCamera(frames);
+      expect(errors).toEqual([]);
+      const receipt = info.outputPath(`first-phone-tap-${width}.json`);
+      await writeFile(receipt, JSON.stringify({ width, height, untouched, point, hit, frames, errors }));
+      await info.attach(`first-phone-tap-${width}`, { path: receipt, contentType: 'application/json' });
+      await page.screenshot({ path: info.outputPath(`first-phone-tap-${width}.png`) });
+    });
+  });

@@ -59,3 +59,25 @@ it('releases canvas space after a completed acknowledgment but keeps save failur
     expect(screen.getByRole('button',{name:'Retry layout save'})).toBeEnabled();
   }finally{vi.useRealTimers();}
 });
+
+it('keeps a healthy in-flight save passive so it never takes a tap or reframes the camera', () => {
+  const saving = { ...queue({ pending: 2, local: 2, unsent: 2 }), saving: true };
+  const { rerender } = render(<LayoutSaveStatus queue={saving} />);
+  const status = screen.getByRole('status');
+  expect(status).toHaveTextContent('2 saved on this device; 0 pending only in this tab');
+  expect(status).toHaveAttribute('data-layout-save-passive', 'true');
+  expect(status.style.pointerEvents).toBe('none');
+  expect(screen.queryByRole('button')).toBeNull();
+  // A failed save during a retry stays actionable.
+  rerender(<LayoutSaveStatus queue={{ ...queue({ pending: 2, local: 2, unsent: 2, sendError: 'Network failed' }), saving: true }} />);
+  expect(screen.getByRole('status')).toHaveAttribute('data-layout-save-passive', 'false');
+  expect(screen.getByRole('status').style.pointerEvents).toBe('');
+  expect(screen.getByRole('button', { name: 'Retry layout save' })).toBeDisabled();
+  // Pending work that is not being sent keeps its actions.
+  rerender(<LayoutSaveStatus queue={queue({ pending: 2, local: 2, unsent: 2 })} />);
+  expect(screen.getByRole('status')).toHaveAttribute('data-layout-save-passive', 'false');
+  expect(screen.getByRole('button', { name: 'Retry layout save' })).toBeEnabled();
+  // A completed acknowledgment is information only.
+  rerender(<LayoutSaveStatus queue={queue({ acknowledged: true })} />);
+  expect(screen.getByRole('status')).toHaveAttribute('data-layout-save-passive', 'true');
+});
