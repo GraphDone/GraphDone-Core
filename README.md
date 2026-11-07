@@ -1,3 +1,8 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/img/hero/graphdone-dark.svg">
+  <img src="docs/img/hero/graphdone-light.svg" width="100%" alt="GraphDone: relationship management for agents. Work items owned by people and AI agents complete in dependency order and flow into an outcome.">
+</picture>
+
 # GraphDone
 
 > Management for teams who think differently. Coordinate through dependencies and outcomes, not hierarchies and top-down control.
