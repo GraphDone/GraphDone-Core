@@ -153,7 +153,7 @@
 #   Component 7: Success UI & Command Handler (Lines 3601-3700)
 #   ├─ Beautiful success message with URLs
 #   ├─ Management commands display
-#   └─ CLI argument processing (install/stop/remove)
+#   └─ CLI argument processing (install/stop/remove/sources)
 #
 # ⌨️  COMMAND REFERENCE
 # ============================================================================
@@ -166,6 +166,12 @@
 #
 #   Complete cleanup (removes containers, volumes, images):
 #     sh install.sh remove
+#
+#   Show the repository, ref and setup-script URLs the installer uses:
+#     sh install.sh sources
+#
+#   Install a branch or release tag other than main:
+#     GRAPHDONE_REF=dev sh install.sh
 #
 # 📊 EXIT CODES
 # ============================================================================
@@ -280,9 +286,44 @@ cleanup() {
 trap 'cleanup; exit 130' INT TERM
 trap 'cleanup' EXIT
 
-# GitHub repository details
+# GitHub repository details.
+# GRAPHDONE_REF is the single source of truth for what gets installed: the
+# fresh clone, the update of an installer-managed checkout and the fallback
+# downloads of scripts/setup_*.sh all use it. It defaults to main because the
+# one-line installer is served from main; set GRAPHDONE_REF to another branch
+# or release tag to install that instead (tests point it at a branch).
 GITHUB_REPO="GraphDone/GraphDone-Core"
-GITHUB_BRANCH="fix/first-start"
+GITHUB_REPO_URL="https://github.com/${GITHUB_REPO}.git"
+GRAPHDONE_REF="${GRAPHDONE_REF:-main}"
+# Prerequisite installers fetched from GitHub when not run from a checkout.
+SETUP_SCRIPTS="setup_git.sh setup_nodejs.sh setup_docker.sh"
+
+# Raw URL of a setup script at the configured ref
+setup_script_url() {
+    printf 'https://raw.githubusercontent.com/%s/%s/scripts/%s\n' "$GITHUB_REPO" "$GRAPHDONE_REF" "$1"
+}
+
+# Print where this installer gets its code from (the `sources` command)
+print_sources() {
+    printf 'repository %s\n' "$GITHUB_REPO_URL"
+    printf 'ref %s\n' "$GRAPHDONE_REF"
+    for script_name in $SETUP_SCRIPTS; do
+        printf 'setup-script %s\n' "$(setup_script_url "$script_name")"
+    done
+}
+
+# Bring an installer-managed checkout to the configured ref. Old installs may
+# sit on a branch that no longer exists upstream, so fetch the ref explicitly
+# instead of pulling the current branch's upstream.
+update_checkout_to_ref() {
+    git fetch --quiet --tags origin "$GRAPHDONE_REF" || return 1
+    if git show-ref --verify --quiet "refs/tags/$GRAPHDONE_REF"; then
+        git checkout --quiet --detach FETCH_HEAD || return 1
+    else
+        git checkout --quiet "$GRAPHDONE_REF" || return 1
+        git merge --ff-only --quiet FETCH_HEAD || return 1
+    fi
+}
 
 # Helper function to run setup scripts (local or download from GitHub)
 run_setup_script() {
@@ -296,7 +337,7 @@ run_setup_script() {
         sh "scripts/$script_name" $script_args
     else
         # Download from GitHub and run
-        local github_url="https://raw.githubusercontent.com/${GITHUB_REPO}/${GITHUB_BRANCH}/scripts/${script_name}"
+        local github_url="$(setup_script_url "$script_name")"
         local temp_script="/tmp/${script_name}.$$"
 
         if command -v curl >/dev/null 2>&1; then
@@ -3272,8 +3313,17 @@ install_graphdone() {
 
         cd "$INSTALL_DIR"
 
-        # Run git pull in background to show progress
-        git pull --quiet >/dev/null 2>&1 &
+        # Update in background to show progress. An installer-managed checkout
+        # follows GRAPHDONE_REF; a developer checkout the installer was run
+        # from keeps its current branch and pulls that branch's upstream.
+        update_log="$LOG_DIR/git-update-${INSTALL_TIMESTAMP}.log"
+        if [ "$FRESH_INSTALL" = true ]; then
+            update_target="$GRAPHDONE_REF"
+            update_checkout_to_ref >"$update_log" 2>&1 &
+        else
+            update_target="current branch"
+            git pull --quiet >"$update_log" 2>&1 &
+        fi
         pull_pid=$!
 
         # Add pink color for the circle
@@ -3338,7 +3388,18 @@ install_graphdone() {
         # Smooth transition: show completion state briefly
         printf " ${GREEN}●${NC}"
         sleep 0.3
-        wait $pull_pid
+        pull_result=0
+        wait $pull_pid || pull_result=$?
+
+        if [ $pull_result -ne 0 ]; then
+            printf "\r\033[K"
+            printf "  ${RED}✗${NC} ${BOLD}Failed to update GraphDone to ${update_target}${NC}\n"
+            if [ -f "$update_log" ]; then
+                printf "\n${BOLD}Last 20 lines from update log:${NC}\n"
+                tail -20 "$update_log"
+            fi
+            error "Git update failed in $INSTALL_DIR - commit or stash local changes, or remove the directory to reinstall"
+        fi
 
         # Success line with exact 88-character content area
         success_content="${GREEN}✓${NC} ${BOLD}Updated${NC} ${GREEN}to latest version${NC}"
@@ -3368,7 +3429,7 @@ install_graphdone() {
 
         # Clone with progress - redirect to log file to capture any errors
         local clone_log="$LOG_DIR/git-clone-${INSTALL_TIMESTAMP}.log"
-        git clone --progress --branch fix/first-start https://github.com/GraphDone/GraphDone-Core.git "$INSTALL_DIR" >"$clone_log" 2>&1 &
+        git clone --progress --branch "$GRAPHDONE_REF" "$GITHUB_REPO_URL" "$INSTALL_DIR" >"$clone_log" 2>&1 &
         clone_pid=$!
 
         # Single loop with timeout (no nested loops to avoid race conditions)
@@ -3400,8 +3461,8 @@ install_graphdone() {
             elapsed=$((elapsed + 1))
         done
 
-        wait $clone_pid
-        clone_result=$?
+        clone_result=0
+        wait $clone_pid || clone_result=$?
 
         # Clear the line completely to prevent spinner artifacts
         printf "\r\033[K"
@@ -3428,6 +3489,13 @@ install_graphdone() {
     fi
 
     cd "$INSTALL_DIR"
+
+    # Test hook: stop once the code is in place. The installer's container
+    # test uses it; nothing is installed or started past this point.
+    if [ "${GRAPHDONE_INSTALL_STOP_AFTER:-}" = "clone" ]; then
+        printf "  ${GREEN}✓${NC} GraphDone ${BOLD}%s${NC} is at %s; stopping (GRAPHDONE_INSTALL_STOP_AFTER=clone)\n" "$GRAPHDONE_REF" "$INSTALL_DIR"
+        exit 0
+    fi
 
     # Project dependencies check and install (after code is downloaded)
     # First show checking animation
@@ -3999,7 +4067,17 @@ show_success() {
 # Handle command line arguments
 COMMAND="${1:-install}"
 
+# GRAPHDONE_REF is passed to git; accept only plain branch or tag names.
+case "$GRAPHDONE_REF" in
+    ""|-*|*[!A-Za-z0-9._/-]*|*..*)
+        error "Invalid GRAPHDONE_REF '$GRAPHDONE_REF': use a branch or tag name such as main"
+        ;;
+esac
+
 case "$COMMAND" in
+    sources)
+        print_sources
+        ;;
     stop)
         stop_services
         ;;
@@ -4010,6 +4088,6 @@ case "$COMMAND" in
         install_graphdone
         ;;
     *)
-        error "Unknown command: $COMMAND. Use: install, stop, or remove"
+        error "Unknown command: $COMMAND. Use: install, stop, remove, or sources"
         ;;
 esac
