@@ -36,6 +36,6 @@ Native Codex, Claude and Hermes can use the same operator contract through their
 - `npx tsx scripts/test-admin-bootstrap.mts` — generated production credentials, permissions, login and restart.
 - Deep adversarial contracts and the cross-edition security suite are maintained in GraphDone-Cloud under `tests/security`; Core retains functional smoke tests.
 - `tests/e2e/quality/operations.spec.ts` — headed user→admin→operator→public-notice workflow at six viewport sizes, using the local Cloud fixture.
-- `GRAPHDONE_GATEWAY_SMOKE=1 node scripts/test-gateway-triage.mjs` — explicit one-call real gateway experiment, synthetic loopback reports only. Never include this in bulk CI.
+- `GRAPHDONE_GATEWAY_SMOKE=1 LLM_BASE_URL=… LLM_API_KEY=… LLM_MODEL=… node scripts/test-gateway-triage.mjs` — explicit one-call experiment against any OpenAI-compatible HTTPS gateway, synthetic loopback reports only. Never include this in bulk CI.
 - `node scripts/test-codex-connection.mjs` — real installed Codex JSON-RPC initialization, without starting a model turn.
 - `TEST_URL=http://localhost:8540 OPERATOR_CREDENTIAL_FILE=deployment/self-host/.env npm run qc:operator-login` — opt-in real password login, report submission/resolution, scoped read, forbidden write, revocation and four viewport sizes. A private hosted JSON credential file can exercise the same sequence on a deployed site. Traces and videos are disabled for this credential-bearing test.

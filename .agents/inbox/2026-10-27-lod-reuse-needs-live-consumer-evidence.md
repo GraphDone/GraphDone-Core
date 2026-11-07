@@ -10,7 +10,7 @@ comments describe broader sharing than its consumers establish.
 
 ## Receipt
 
-At Graphlings source `c5fb0089f4672d1d33c4fbf6c54bef63feab2636`:
+At the reviewed CodeGraph source revision:
 
 ```text
 node tools/codegraph/src/codegraph/assets/lib/lod.js --test
