@@ -411,7 +411,6 @@ export function organizeTopology<T extends OrganizationNode>(
   components.sort(
     (a, b) => b.ids.length - a.ids.length || a.ids[0].localeCompare(b.ids[0])
   );
-  const positions = new Map<string, Point>();
   const area = components.reduce(
     (sum, component) =>
       sum +
@@ -419,27 +418,46 @@ export function organizeTopology<T extends OrganizationNode>(
         (component.bounds.height + spacing * 2),
     0
   );
-  const rowWidth = Math.max(
+  const widest = Math.max(
     1,
-    ...components.map(component => component.bounds.width),
-    Math.sqrt(area * 1.5)
+    ...components.map(component => component.bounds.width)
   );
-  let x = 0,
-    y = 0,
-    rowHeight = 0,
-    right = 0;
-  for (const component of components) {
-    if (x && x + component.bounds.width > rowWidth) {
-      x = 0;
-      y += rowHeight + spacing * 2;
-      rowHeight = 0;
+  const pack = (aspect: number) => {
+    const rowWidth = Math.max(widest, Math.sqrt(area * aspect));
+    const positions = new Map<string, Point>();
+    let x = 0,
+      y = 0,
+      rowHeight = 0,
+      right = 0;
+    for (const component of components) {
+      if (x && x + component.bounds.width > rowWidth) {
+        x = 0;
+        y += rowHeight + spacing * 2;
+        rowHeight = 0;
+      }
+      for (const [id, point] of component.points)
+        positions.set(id, { x: point.x + x, y: point.y + y });
+      right = Math.max(right, x + component.bounds.width);
+      rowHeight = Math.max(rowHeight, component.bounds.height);
+      x += component.bounds.width + spacing * 2;
     }
-    for (const [id, point] of component.points)
-      positions.set(id, { x: point.x + x, y: point.y + y });
-    right = Math.max(right, x + component.bounds.width);
-    rowHeight = Math.max(rowHeight, component.bounds.height);
-    x += component.bounds.width + spacing * 2;
+    return { positions, right, y, rowHeight };
+  };
+  // Rows follow a 3:2 page by default. When the actual viewport's own aspect
+  // packs the components at a strictly more readable fit scale (two loose
+  // cards side by side on a landscape phone instead of stacked and shrunk),
+  // use it instead.
+  let packed = pack(1.5);
+  if (viewport.width > 0 && viewport.height > 0 && components.length > 1) {
+    const fit = (layout: ReturnType<typeof pack>) =>
+      Math.min(
+        viewport.width / Math.max(1, layout.right),
+        viewport.height / Math.max(1, layout.y + layout.rowHeight)
+      );
+    const fitted = pack(viewport.width / viewport.height);
+    if (fit(fitted) > fit(packed) + 1e-9) packed = fitted;
   }
+  const { positions, right, y, rowHeight } = packed;
   const offsetX = (viewport.width - right) / 2,
     offsetY = (viewport.height - y - rowHeight) / 2;
   for (const point of positions.values()) {

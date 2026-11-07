@@ -327,3 +327,21 @@ it('snakes short chains to the phone viewport and frames a chain from its middle
   expect(new Set([...row.positions.values()].map(p => p.y)).size).toBe(1);
   expect(row.components[0].focus).toBe('b');
 });
+
+it('packs loose cards side by side on a landscape phone instead of stacking them', () => {
+  const nodes = [{ id: 'scheduled' }, { id: 'finished' }];
+  const size = () => ({ width: 210, height: 103 });
+  const extent = (viewport: { width: number; height: number }) => {
+    const { positions } = organizeTopology(nodes, [], size, viewport);
+    const points = [...positions.values()];
+    return {
+      rows: new Set(points.map(point => Math.round(point.y))).size,
+      columns: new Set(points.map(point => Math.round(point.x))).size,
+    };
+  };
+  // 844×390 landscape: one row, so both cards fit at full readable scale.
+  expect(extent({ width: 792, height: 340 })).toEqual({ rows: 1, columns: 2 });
+  // Portrait phone keeps them stacked; desktop keeps the 3:2 default packing.
+  expect(extent({ width: 320, height: 568 })).toEqual({ rows: 2, columns: 1 });
+  expect(extent({ width: 1440, height: 900 }).rows).toBe(2);
+});
