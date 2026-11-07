@@ -290,3 +290,40 @@ it('preserves measured long-title and nested-card clearance across phone refinem
       expect(Math.hypot(dx, dy)).toBeGreaterThanOrEqual(63.99);
     }
 });
+
+it('snakes short chains to the phone viewport and frames a chain from its middle', () => {
+  const phone = { width: 390, height: 600 };
+  const card = () => ({ width: 240, height: 140 });
+  const extentScale = (result: ReturnType<typeof organizeTopology>) => {
+    const points = [...result.positions.values()];
+    const width = Math.max(...points.map(p => p.x)) - Math.min(...points.map(p => p.x)) + 240;
+    const height = Math.max(...points.map(p => p.y)) - Math.min(...points.map(p => p.y)) + 140;
+    return Math.min(phone.width / width, phone.height / height);
+  };
+  for (const length of [3, 4, 6, 7]) {
+    const nodes = Array.from({ length }, (_, i) => ({ id: `step-${i}` }));
+    // Chain order runs from the largest id, so the smallest id is an end card.
+    const order = [...nodes].reverse();
+    const path = order.slice(1).map((n, i) => edge(order[i].id, n.id));
+    const result = organizeTopology(nodes, path, card, phone);
+    expect(result.components[0].kind).toBe('chain');
+    // Previously 3–6 item chains were one row (scale 0.40 → 0.21 at 6 items).
+    expect(extentScale(result)).toBeGreaterThanOrEqual(0.5);
+    for (const link of path) {
+      const a = result.positions.get(link.source)!,
+        b = result.positions.get(link.target)!;
+      expect(a.x === b.x || a.y === b.y).toBe(true);
+      expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeLessThanOrEqual(240 + 64 + 0.01);
+    }
+    const focus = result.components[0].focus;
+    const index = order.findIndex(node => node.id === focus);
+    // Either end may start the snake; the focus is its middle card.
+    expect([Math.floor((length - 1) / 2), length - 1 - Math.floor((length - 1) / 2)]).toContain(index);
+    expect(focus).not.toBe('step-0');
+  }
+  // A wide desktop keeps a short chain on one reading row.
+  const nodes = ['a', 'b', 'c'].map(id => ({ id }));
+  const row = organizeTopology(nodes, [edge('a', 'b'), edge('b', 'c')], card, view);
+  expect(new Set([...row.positions.values()].map(p => p.y)).size).toBe(1);
+  expect(row.components[0].focus).toBe('b');
+});

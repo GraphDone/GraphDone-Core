@@ -4472,7 +4472,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     }
     (window as any).__graphOrganization = {components:arranged.components,work:arranged.work};
     organizationZoomFloorRef.current = 0.65;
-    organizationFocusRef.current = arranged.components[0]?.center ?? arranged.components[0]?.ids[0];
+    organizationFocusRef.current = arranged.components[0]?.focus;
     cameraManuallyPositionedRef.current = true;
     if (currentGraphIdRef.current) fittedGraphsRef.current.add(currentGraphIdRef.current);
     simulation.alpha(0).restart();

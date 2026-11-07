@@ -147,6 +147,7 @@ export function organizeTopology<T extends OrganizationNode>(
     ids: string[];
     kind: 'hub' | 'network' | 'chain' | 'cycle' | 'isolated';
     center?: string;
+    focus: string;
     points: Map<string, Point>;
     bounds: Size;
   }[] = [];
@@ -187,6 +188,9 @@ export function organizeTopology<T extends OrganizationNode>(
             ? 'hub'
             : 'network';
     const points = new Map<string, Point>();
+    // The card a camera should frame first: the hub, the middle of a chain,
+    // or the top of a cycle.
+    let focus = root;
     if (kind === 'isolated') points.set(root, { x: 0, y: 0 });
     else if (kind === 'chain' || kind === 'cycle') {
       const first =
@@ -204,16 +208,28 @@ export function organizeTopology<T extends OrganizationNode>(
       const maxWidth = Math.max(...ids.map(id => sizes.get(id)!.width));
       const maxHeight = Math.max(...ids.map(id => sizes.get(id)!.height));
       if (kind === 'chain') {
-        const columns =
-          ids.length <= 6
-            ? ids.length
-            : Math.ceil(
-                Math.sqrt(
-                  ((ids.length * (maxHeight + spacing)) /
-                    (maxWidth + spacing)) *
-                    1.5
-                )
-              );
+        // Snake the chain into the column count whose extent the viewport can
+        // show at the largest (capped) scale, so a short chain on a phone does
+        // not become one unreadably wide row. Ties keep the wider reading row.
+        const cellWidth = maxWidth + spacing,
+          cellHeight = maxHeight + spacing;
+        const readableScale = (count: number) =>
+          Math.min(
+            1.25,
+            viewport.width / (count * cellWidth - spacing),
+            viewport.height /
+              (Math.ceil(ids.length / count) * cellHeight - spacing)
+          );
+        let columns = Math.ceil(
+          Math.sqrt(((ids.length * cellHeight) / cellWidth) * 1.5)
+        );
+        if (viewport.width > 0 && viewport.height > 0) {
+          columns = ids.length;
+          for (let count = ids.length - 1; count >= 1; count--)
+            if (readableScale(count) > readableScale(columns) + 1e-9)
+              columns = count;
+        }
+        focus = order[Math.floor((order.length - 1) / 2)];
         order.forEach((id, index) => {
           const row = Math.floor(index / columns),
             col = index % columns;
@@ -223,6 +239,7 @@ export function organizeTopology<T extends OrganizationNode>(
           });
         });
       } else {
+        focus = order[0];
         const radius =
           (Math.hypot(maxWidth, maxHeight) + spacing) /
           (2 * Math.sin(Math.PI / ids.length));
@@ -386,6 +403,7 @@ export function organizeTopology<T extends OrganizationNode>(
       ids,
       kind,
       center: kind === 'hub' || kind === 'network' ? root : undefined,
+      focus,
       points,
       bounds: { width: right - left, height: bottom - top },
     });
@@ -430,10 +448,11 @@ export function organizeTopology<T extends OrganizationNode>(
   }
   return {
     positions,
-    components: components.map(({ ids, kind, center }) => ({
+    components: components.map(({ ids, kind, center, focus }) => ({
       ids,
       kind,
       center,
+      focus,
     })),
     work,
   };
