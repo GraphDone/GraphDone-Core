@@ -17,6 +17,39 @@ local stack with test accounts and seeded data. `TEST_URL` selects an existing
 stack; it does not make that stack disposable. `npm test` runs package unit tests,
 not these browser workflows.
 
+## Disposable production stack
+
+With Node 22 dependencies, Chromium, Docker Compose, OpenSSL and Xvfb installed,
+run from a clean committed checkout:
+
+```sh
+xvfb-run -a node scripts/test-production-stack.mjs --out test-artifacts/prod-stack
+```
+
+This builds the production API and nginx/web images, provisions a unique Compose
+project with private generated credentials and certificates, and exposes only a
+random loopback HTTPS port. It requires API/Neo4j health, authenticated owned
+graph creation/readback, account identity across API recreation, all six existing
+smoke cases (headed, one worker, zero retries/skips), and the separate SQLite
+container persistence regression. It never uses an existing Neo4j instance or
+the broad demo seed. Empty frontend URL build arguments select the application's
+existing same-origin nginx proxy fallback for the randomly assigned port.
+
+Each invocation creates a fresh `run-*` evidence directory with stage logs,
+source fingerprints, image IDs, and a unified browser report. Certificates and
+resolved Compose secrets stay in a private temporary directory. The runner
+removes its containers, volumes and networks even on failure and verifies their
+absence; local image tags remain available for cache/evidence. Nonzero stages,
+timeouts, source changes and cleanup failures make the run fail. Raw failure
+traces may include disposable credentials and request bodies; review them before
+sharing. This validates an isolated local production stack, not a deployment or
+multiarchitecture registry publication.
+
+The shared browser auth helper accepts paired `TEST_ADMIN_USERNAME` and
+`TEST_ADMIN_PASSWORD` overrides. Missing/empty halves fail; without overrides the
+existing development credentials remain unchanged. The production runner supplies
+its generated values automatically and does not print them.
+
 ## Dual output (one run, two artifacts)
 The harness writes to `test-artifacts/unified/`:
 - **`report.html`** — human-readable: per-sequence pass/warn/fail with embedded
@@ -170,3 +203,8 @@ import { login, navigateToWorkspace, TEST_USERS } from '../../lib/auth';
 > Retired/legacy test files (and the previous `run-all-tests.js` / `run-pr-tests.js`
 > runners these guides used to describe) are preserved under
 > `archive/2026-06-test-cleanup/` with a MANIFEST — mine them before deleting.
+
+Public CI uploads only each production run's top-level `report.json` and redacted
+stage `.log` files. Raw browser traces and nested smoke reports are excluded;
+retain them locally as private diagnostic evidence. The public logs retain
+failure outcomes and aggregate counts, not full per-case trace diagnostics.
