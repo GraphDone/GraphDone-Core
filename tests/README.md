@@ -8,6 +8,7 @@ evidence format, and their limits.
 | --- | --- |
 | `npm test` | Package unit suites through Turbo; does not run browser acceptance. |
 | `npm run test:unified:lib` | Report adapters, process outcomes, CLI safety, source provenance, and dashboard helpers. No browser or database required. |
+| `npm run test:installer` | One-line installer: every ref it uses is `main` or the `GRAPHDONE_REF` override, image tags are `latest` or versions, and in a disposable container it clones, updates and reaches its setup-script URLs. Needs Docker. |
 | `TEST_URL=http://localhost:3127 npm run test:smoke` | Focused user smoke against an already-running disposable stack. |
 | `TEST_URL=http://localhost:3127 npm run test:unified:smoke` | Web unit tests, user smoke, and focused authentication acceptance, with one combined report. |
 | `TEST_URL=http://localhost:3127 npm run test:pr` | Broader graph, mobile, and performance sequences. |
