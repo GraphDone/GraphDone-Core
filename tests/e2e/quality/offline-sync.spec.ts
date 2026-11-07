@@ -87,7 +87,7 @@ test('student team: offline reload, drag, quota pause, reconnect, no duplicates 
  await expect(page.getByRole('button',{name:'Create agent token',exact:true})).toBeDisabled();
  await page.getByLabel('Note for your agent').fill('Offline human handoff: check the experiment');
  await page.getByRole('button',{name:'Leave note',exact:true}).click();
- await expect(page.getByLabel('Shared notes')).toContainText('Offline human handoff');
+ await expect(page.getByRole('list',{name:'Shared notes',exact:true})).toContainText('Offline human handoff');
  await page.getByRole('button',{name:'Close agent connection',exact:true}).click();
  const editedIndex=await page.locator('.graph-container .node').evaluateAll((els,id)=>els.findIndex(el=>(el as any).__data__.id===id),position.id);
  await page.locator('.graph-container .node').nth(editedIndex).click();
