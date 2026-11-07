@@ -89,7 +89,7 @@ sudo snap install multipass
 To run comprehensive E2E tests in a VM:
 
 ```bash
-./tools/test-vm-e2e.sh <branch-name>
+./scripts/vm/test-vm-e2e.sh <branch-name>
 ```
 
 This will:
@@ -103,7 +103,7 @@ This will:
 
 ### Configuration
 
-Edit `vm.config.yml` to change default settings:
+Edit `scripts/vm/vm.config.yml` to change default settings:
 
 ```yaml
 vm:
@@ -208,7 +208,7 @@ multipass exec <vm-name> -- sudo tailscale up \
 
 ### Disabling Tailscale
 
-If you don't need Tailscale, disable it in `vm.config.yml`:
+If you don't need Tailscale, disable it in `scripts/vm/vm.config.yml`:
 
 ```yaml
 tailscale:
@@ -276,12 +276,12 @@ This section outlines strategies to speed up E2E testing with Multipass VMs.
 **Implementation:**
 ```bash
 # Create base images for common branches
-./tools/create-base-image.sh main
-./tools/create-base-image.sh develop  
-./tools/create-base-image.sh vm_multi-pass
+./scripts/vm/create-base-image.sh main
+./scripts/vm/create-base-image.sh develop  
+./scripts/vm/create-base-image.sh vm_multi-pass
 
 # Use cached image for testing
-./tools/test-vm-e2e.sh main --use-cache
+./scripts/vm/test-vm-e2e.sh main --use-cache
 ```
 
 **Cache Invalidation:**

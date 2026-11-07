@@ -141,7 +141,8 @@ for diagnosis rather than detaching children. See the
   `inspector`, `physics`, `perf`, `ui` (the `geometry` project; report-only).
 - `tests/perf/` — ADAPT-8 budget gate + the large-scale sweep.
 - `tests/integration/` — infra specs (TLS, installation), out of the default project.
-- One canonical `playwright.config.ts` at the repo root.
+- One default `playwright.config.ts` at the repo root; single-purpose configs
+  (schematic, captcha) sit beside their specs in `tests/visual/` and `tests/integration/`.
 
 ## Adding tests
 - **A new e2e spec:** drop it in the right `tests/e2e/<domain>/` folder; import
@@ -168,5 +169,5 @@ import { login, navigateToWorkspace, TEST_USERS } from '../../lib/auth';
 ```
 
 > Retired/legacy test files (and the previous `run-all-tests.js` / `run-pr-tests.js`
-> runners these guides used to describe) are preserved under
-> `archive/2026-06-test-cleanup/` with a MANIFEST — mine them before deleting.
+> runners these guides used to describe) were removed from the tree; recover them
+> from git history with `git show fb83fec:archive/2026-06-test-cleanup/MANIFEST.md`.

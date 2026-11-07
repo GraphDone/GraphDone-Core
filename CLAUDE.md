@@ -205,8 +205,9 @@ each segment's audio synced to its chart/video/screenshot. See
 The unified harness (`tests/run-unified.mjs` + `tests/sequences/unified.config.mjs`)
 is the single entry; profiles are `smoke|pr|full|report`. The test tree is organised
 as `tests/e2e/<domain>/`, `tests/diagnostics/<concern>/`, `tests/integration/`, with
-all reusable helpers + harness modules under `tests/lib/`. Retired/legacy specs are
-parked (not deleted) under `archive/2026-06-test-cleanup/` — see its MANIFEST.md.
+all reusable helpers + harness modules under `tests/lib/`. Retired/legacy specs from the
+2026-06 cleanup were removed from the tree; recover any of them from git history with
+`git show fb83fec:archive/2026-06-test-cleanup/MANIFEST.md`.
 
 **🔐 HTTPS/TLS Testing Setup (for next developer):**
 ```bash
@@ -444,15 +445,12 @@ Development is driven by **[docs/USER_STORIES.md](./docs/USER_STORIES.md)**. The
 - [ ] **Admin page**: Apply workspace visual language consistently  
 - [ ] **Backend Status page**: Add top bar with right-aligned status indicators
 
-## File Organization (Recently Cleaned)
+## File Organization
 
-**Organized Structure:**
+The top-level map and where each kind of file goes live in [AGENTS.md](AGENTS.md#repository-map).
+
+**Test tree:**
 ```
-artifacts/
-├── screenshots/     # All .png files moved here
-├── test-reports/    # Playwright reports and test artifacts  
-└── certificates/    # Test certificates
-
 tests/
 ├── run-unified.mjs        # single entry — npm run test:unified
 ├── sequences/             # unified.config.mjs — declarative sequences + profiles
@@ -464,11 +462,11 @@ tests/
 ```
 
 **Clean Patterns:**
-- One canonical `playwright.config.ts` at the repo root; the unified harness is the single test entry.
+- One default `playwright.config.ts` at the repo root (auto-discovered); single-purpose configs sit beside their specs (`tests/visual/`, `tests/integration/`). The unified harness is the single test entry.
 - All reusable helpers + harness modules live under `tests/lib/`; specs import `../../lib/<x>` (depth-2 domain folders).
 - Capture-heavy report-only specs live in `tests/e2e/reports/` (own Playwright projects), excluded from the fast default project.
-- Retired/legacy specs are archived (not deleted) in `archive/2026-06-test-cleanup/` with a MANIFEST — mine before deleting.
-- No loose files at repository root.
+- Retired specs are deleted, not parked; git history keeps them (the 2026-06 set: `git show fb83fec:archive/2026-06-test-cleanup/MANIFEST.md`).
+- No loose files at repository root: `tests/toolchain/repo-root-contract.mjs` allowlists every root entry.
 
 ## Key Implementation Guidelines
 

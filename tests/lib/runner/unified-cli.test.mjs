@@ -86,7 +86,7 @@ for (const sequence of ['new-user', 'agent-connection', 'inspector-readability',
       assert.equal(workflow.split('run: node tests/run-unified.mjs --sequence large-symbols --out test-artifacts/ci-large-symbols').length, 2);
     }
     if (sequence === 'schematic-visual') {
-      assert.ok(args.includes('--config=playwright.schematic.config.ts'));
+      assert.ok(args.includes('--config=tests/visual/playwright.schematic.config.ts'));
       assert.equal(SEQUENCES[sequence].blocking, true);
       for (const profile of ['pr', 'full']) assert.ok(PROFILES[profile].includes(sequence));
       const workflow = readFileSync(join(root, '.github/workflows/ci.yml'), 'utf8');
