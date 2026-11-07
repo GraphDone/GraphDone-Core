@@ -1,225 +1,174 @@
 name: Release
 
-on:
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Release version (e.g., 1.0.0)'
-        required: true
-        type: string
-      prerelease:
-        description: 'Is this a pre-release?'
-        required: false
-        type: boolean
-        default: false
+# Publishing a release: merge dev → main, wait for main's CI to go green, then
+# tag that main merge commit (see docs/quality/RELEASE_GATES.md):
+#   git tag -a v0.4.0-alpha <main sha> -m "GraphDone v0.4.0-alpha" && git push origin v0.4.0-alpha
+# Only admins can create v* tags (repository tag ruleset). This workflow refuses
+# to publish unless the tag is a commit main was at, whose main-push checks
+# passed and whose package versions equal the tag.
+# graphdone.com is deployed from GraphDone-Cloud, not from this repository.
 
-env:
-  NODE_VERSION: '22'
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions: {}
+
+# One run per tag; never cancel a release that has started publishing.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  validate:
-    name: Validate Release
+  verify:
+    name: Verify validated source
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Validate version format
-        run: |
-          if [[ ! "${{ github.event.inputs.version }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+.*$ ]]; then
-            echo "❌ Invalid version format: ${{ github.event.inputs.version }}"
-            echo "Expected format: X.Y.Z or X.Y.Z-suffix"
-            exit 1
-          fi
-
-      - name: Check if tag exists
-        run: |
-          if git rev-parse "v${{ github.event.inputs.version }}" >/dev/null 2>&1; then
-            echo "❌ Tag v${{ github.event.inputs.version }} already exists"
-            exit 1
-          fi
-
-  test:
-    name: Run Full Test Suite
-    runs-on: ubuntu-latest
-    needs: validate
-    services:
-      postgres:
-        image: postgres:15-alpine
-        env:
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: graphdone_test
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm install --legacy-peer-deps
-
-      - name: Run linting
-        run: npm run lint
-
-      - name: Run type checking
-        run: npm run typecheck
-
-      - name: Run tests
-        run: npm run test
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/graphdone_test
-
-      - name: Build packages
-        run: npm run build
-
-  create-release:
-    name: Create Release
-    runs-on: ubuntu-latest
-    needs: test
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
     outputs:
-      release-id: ${{ steps.create-release.outputs.id }}
+      sha: ${{ steps.gate.outputs.sha }}
+      version: ${{ steps.gate.outputs.version }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
+          ref: ${{ github.sha }}
           fetch-depth: 0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
+          node-version: '22'
+      - name: Require a main commit with passing main-push checks and matching versions
+        id: gate
+        run: node scripts/verify-release.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
 
-      - name: Install dependencies
-        run: npm install --legacy-peer-deps
-
-      - name: Update version in package.json files
+  images:
+    name: Publish ${{ matrix.image }} image
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          # Build arguments match the stack the production gate validated
+          # (deployment/docker-compose.yml).
+          - image: web
+            dockerfile: packages/web/Dockerfile
+            build-args: |
+              VITE_GRAPHQL_URL=https://localhost:3128/api/graphql
+              VITE_GRAPHQL_WS_URL=wss://localhost:3128/api/graphql
+          - image: api
+            dockerfile: packages/server/Dockerfile
+            build-args: ''
+          - image: neo4j
+            dockerfile: deployment/neo4j.Dockerfile
+            build-args: ''
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.verify.outputs.sha }}
+          persist-credentials: false
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      # Only the version tag here; `latest` moves for all images together in
+      # github-release, after every image has been published.
+      - name: Build and push (amd64 + arm64)
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          build-args: ${{ matrix.build-args }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ghcr.io/graphdone/graphdone-${{ matrix.image }}:${{ needs.verify.outputs.version }}
+          provenance: mode=max
+          sbom: true
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ needs.verify.outputs.sha }}
+            org.opencontainers.image.version=${{ needs.verify.outputs.version }}
+            org.opencontainers.image.licenses=MIT
+      - name: Record digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
         run: |
-          # Update root package.json
-          npm version ${{ github.event.inputs.version }} --no-git-tag-version
-          
-          # Update package versions in all packages
-          for package in packages/*/package.json; do
-            npm version ${{ github.event.inputs.version }} --no-git-tag-version --prefix $(dirname $package)
+          mkdir -p digests
+          echo "ghcr.io/graphdone/graphdone-${{ matrix.image }}@$DIGEST" > "digests/${{ matrix.image }}.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ matrix.image }}
+          path: digests/
+          if-no-files-found: error
+
+  github-release:
+    name: Create GitHub release
+    needs: [verify, images]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.verify.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      # Decided now, from published releases, so a re-run cannot reuse a stale
+      # answer and move `latest` back to an older version.
+      - name: Decide whether this release becomes latest
+        id: latest
+        run: node scripts/verify-release.mjs --latest
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - uses: docker/login-action@v3
+        if: steps.latest.outputs.latest == 'true'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Move latest on all images together
+        if: steps.latest.outputs.latest == 'true'
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          for image in web api neo4j; do
+            docker buildx imagetools create -t "ghcr.io/graphdone/graphdone-$image:latest" "ghcr.io/graphdone/graphdone-$image:$VERSION"
           done
-
-      - name: Generate changelog
-        id: changelog
-        run: |
-          # Simple changelog generation - in practice, you might use conventional-changelog
-          echo "## What's Changed" > RELEASE_NOTES.md
-          echo "" >> RELEASE_NOTES.md
-          
-          # Get commits since last tag
-          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-          if [ -n "$LAST_TAG" ]; then
-            git log --pretty=format:"* %s (%an)" $LAST_TAG..HEAD >> RELEASE_NOTES.md
-          else
-            git log --pretty=format:"* %s (%an)" >> RELEASE_NOTES.md
-          fi
-          
-          echo "" >> RELEASE_NOTES.md
-          echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/$LAST_TAG...v${{ github.event.inputs.version }}" >> RELEASE_NOTES.md
-
-      - name: Build release artifacts
-        run: npm run build
-
-      - name: Create distribution packages
-        run: |
-          mkdir -p dist
-          
-          # Create source archive
-          git archive --format=tar.gz --prefix=graphdone-${{ github.event.inputs.version }}/ HEAD > dist/graphdone-${{ github.event.inputs.version }}-source.tar.gz
-          
-          # Package built artifacts
-          tar -czf dist/graphdone-${{ github.event.inputs.version }}-dist.tar.gz packages/*/dist
-
-      - name: Commit version changes
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add package.json packages/*/package.json
-          git commit -m "chore: bump version to ${{ github.event.inputs.version }}"
-          git tag -a "v${{ github.event.inputs.version }}" -m "Release v${{ github.event.inputs.version }}"
-
-      - name: Push changes
-        uses: ad-m/github-push-action@master
+      - uses: actions/download-artifact@v4
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          tags: true
-
-      - name: Create GitHub Release
-        id: create-release
-        uses: actions/create-release@v1
+          pattern: digest-*
+          merge-multiple: true
+          path: digests
+      - name: Publish release notes with image digests
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: v${{ github.event.inputs.version }}
-          release_name: Release v${{ github.event.inputs.version }}
-          body_path: RELEASE_NOTES.md
-          draft: false
-          prerelease: ${{ github.event.inputs.prerelease }}
-
-      - name: Upload source archive
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create-release.outputs.upload_url }}
-          asset_path: ./dist/graphdone-${{ github.event.inputs.version }}-source.tar.gz
-          asset_name: graphdone-${{ github.event.inputs.version }}-source.tar.gz
-          asset_content_type: application/gzip
-
-      - name: Upload distribution archive
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create-release.outputs.upload_url }}
-          asset_path: ./dist/graphdone-${{ github.event.inputs.version }}-dist.tar.gz
-          asset_name: graphdone-${{ github.event.inputs.version }}-dist.tar.gz
-          asset_content_type: application/gzip
-
-  deploy-release:
-    name: Deploy Release
-    runs-on: ubuntu-latest
-    needs: create-release
-    environment:
-      name: production
-      url: https://graphdone.app
-    steps:
-      - name: Trigger production deployment
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          SHA: ${{ needs.verify.outputs.sha }}
+          LATEST: ${{ steps.latest.outputs.latest }}
         run: |
-          echo "🚀 Triggering production deployment for v${{ github.event.inputs.version }}"
-          # This would trigger your production deployment pipeline
-          # For example, dispatching to your CD system or cloud provider
-
-  notify-release:
-    name: Notify Release
-    runs-on: ubuntu-latest
-    needs: [create-release, deploy-release]
-    if: always()
-    steps:
-      - name: Notify success
-        if: needs.create-release.result == 'success' && needs.deploy-release.result == 'success'
-        run: |
-          echo "🎉 Release v${{ github.event.inputs.version }} created and deployed successfully!"
-          # Add notification logic here (Slack, Discord, email, etc.)
-
-      - name: Notify failure
-        if: needs.create-release.result == 'failure' || needs.deploy-release.result == 'failure'
-        run: |
-          echo "❌ Release v${{ github.event.inputs.version }} failed!"
-          # Add failure notification logic here
+          {
+            echo "Source: \`$SHA\`"
+            echo
+            echo "**Container images** (linux/amd64 + linux/arm64, with SBOM and provenance):"
+            echo
+            for f in digests/*.txt; do echo "- \`$(cat "$f")\`"; done
+            echo
+          } > notes.md
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag \
+            --title "GraphDone $TAG" --notes-file notes.md --generate-notes \
+            --latest="$LATEST"
