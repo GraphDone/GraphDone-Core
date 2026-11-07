@@ -9,7 +9,7 @@ admin merge authority is not a non-author review approval.
 
 ## Project Overview
 
-GraphDone is a graph-native management system that reimagines work coordination through dependencies and democratic prioritization rather than hierarchical assignments. Currently in active development (v0.3.1-alpha) with TLS/SSL production readiness.
+GraphDone is a graph-native management system that reimagines work coordination through dependencies and democratic prioritization rather than hierarchical assignments. Currently in active alpha development (version: root `package.json`) with TLS/SSL production readiness.
 
 ## Core Philosophy
 
