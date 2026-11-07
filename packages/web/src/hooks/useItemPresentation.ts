@@ -48,7 +48,7 @@ export function useItemPresentation(overviewActive: boolean, zooming?: () => boo
   }, [cancel, refresh]);
   useLayoutEffect(() => {
     overview.current = overviewActive;
-    // Leaving the overview while a zoom is still moving: an item pass now
+    // Leaving the overview while a programmatic zoom is still moving: an item pass now
     // would render every card at an intermediate scale and then again when the
     // zoom ends. The zoom's terminal schedule() renders them once instead.
     if (!overviewActive && zoomingRef.current?.()) return;

@@ -1427,8 +1427,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   // A graph owns one simulation. Detached simulations otherwise keep mutating
   // shared node objects after a rebuild and can fight the visible simulation.
   const [semanticOverviewActive, setSemanticOverviewActive] = useState(false);
-  // True between a zoom's start and end, so leaving the overview mid-zoom can
-  // leave item presentation to the zoom's single terminal pass.
+  // True between a programmatic zoom transition's start and end, so leaving
+  // the overview mid-transition can leave item presentation to the zoom's
+  // single terminal pass. User gestures (wheel, pinch, drag) never set it: a
+  // held pinch must re-render cards as soon as it crosses the threshold.
   const zoomingRef = useRef(false);
   const isZooming = useCallback(() => zoomingRef.current, []);
   const itemPresentation = useItemPresentation(semanticOverviewActive || localItemActive, isZooming);
@@ -3950,7 +3952,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       window.dispatchEvent(new CustomEvent('graphdone:camera-settled', { detail: { x: event.transform.x, y: event.transform.y, scale: event.transform.k, manual: !!event.sourceEvent } }));
     });
     zoomingRef.current = false;
-    zoom.on('start.presentation', () => { zoomingRef.current = true; });
+    zoom.on('start.presentation', event => { zoomingRef.current = !event.sourceEvent; });
     zoom.on('end.labels', () => {
       zoomingRef.current = false;
       if (simulationRef.current === simulation) itemPresentation.schedule();
