@@ -2,7 +2,7 @@
 
 Date: 2026-10-23. Searched the Core testing guide, MCP contract suite,
 `.agents/inbox/`, and symptom index before adding this incident. The writing
-procedure was read from Graphlings' `.agents/WRITING-IT-DOWN.md`; Core does not
+procedure was read from a sibling project's `.agents/WRITING-IT-DOWN.md`; Core does not
 currently carry that file.
 
 A compiled-server probe on `b843a1b` (SDK 1.32.2, Zod 4.6.7) initialized,
