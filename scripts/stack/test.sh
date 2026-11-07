@@ -206,7 +206,7 @@ if [ "$RUN_E2E" = true ]; then
     fi
     
     echo "🌐 Running end-to-end tests..."
-    if ! npx playwright test --config=tests/playwright.config.ts; then
+    if ! npx playwright test; then
         TEST_FAILED=true
         echo "❌ E2E tests failed"
     fi

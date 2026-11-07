@@ -7,18 +7,18 @@
 
 ### 1. ✅ Multipass Passphrase Configuration
 - Added `MULTIPASS_PASSPHRASE` to `.env` (value: matt312)
-- Updated `tools/multipass.sh` to automatically load environment variables from `.env`
+- Updated `scripts/vm/multipass.sh` to automatically load environment variables from `.env`
 - Passphrase is now securely stored and auto-loaded
 
 ### 2. ✅ VM Tools Setup
 - Installed `yq` (YAML processor) to `~/.local/bin/`
-- Created `tools/setup-vm-tools.sh` for automated prerequisite installation
+- Created `scripts/vm/setup-vm-tools.sh` for automated prerequisite installation
 - Verified Multipass authentication and functionality
 
 ### 3. ✅ Fixed Cloud-Init Generation
 - **Original Issue:** Template-based replacement with sed/perl was failing due to special characters
 - **Solution:** Rewrote `generate_cloud_init()` to build files directly using heredocs
-- **Location:** `tools/multipass.sh:163-366`
+- **Location:** `scripts/vm/multipass.sh:163-366`
 
 ### 4. ✅ Fixed Cloud-Init File Permissions
 - **Original Issue:** Multipass couldn't read files from `/tmp/`
@@ -34,7 +34,7 @@
   - Removed empty `ssh_authorized_keys` field
 
 ### 6. ✅ Created E2E Testing Script
-- **File:** `tools/test-vm-e2e.sh`
+- **File:** `scripts/vm/test-vm-e2e.sh`
 - **Features:**
   - Automated VM launch with GraphDone setup
   - Comprehensive test execution (lint, typecheck, build, unit tests, E2E tests)
@@ -45,27 +45,27 @@
 
 ### Scripts Created
 
-1. **`tools/multipass.sh`** - Main VM management script
+1. **`scripts/vm/multipass.sh`** - Main VM management script
    ```bash
-   ./tools/multipass.sh launch          # Launch new VM
-   ./tools/multipass.sh list             # List all VMs
-   ./tools/multipass.sh shell --name <vm>  # Connect to VM
-   ./tools/multipass.sh delete --name <vm> # Delete VM
+   ./scripts/vm/multipass.sh launch          # Launch new VM
+   ./scripts/vm/multipass.sh list             # List all VMs
+   ./scripts/vm/multipass.sh shell --name <vm>  # Connect to VM
+   ./scripts/vm/multipass.sh delete --name <vm> # Delete VM
    ```
 
-2. **`tools/test-vm-e2e.sh`** - Automated E2E testing
+2. **`scripts/vm/test-vm-e2e.sh`** - Automated E2E testing
    ```bash
-   ./tools/test-vm-e2e.sh <branch-name>
+   ./scripts/vm/test-vm-e2e.sh <branch-name>
    ```
 
-3. **`tools/setup-vm-tools.sh`** - Install prerequisites
+3. **`scripts/vm/setup-vm-tools.sh`** - Install prerequisites
    ```bash
-   ./tools/setup-vm-tools.sh
+   ./scripts/vm/setup-vm-tools.sh
    ```
 
 ### Configuration Files
 
-- **`vm.config.yml`** - VM resource and setup configuration
+- **`scripts/vm/vm.config.yml`** - VM resource and setup configuration
 - **`.env`** - Environment variables including:
   - `MULTIPASS_PASSPHRASE` - Passphrase for Multipass authentication
   - `TAILSCALE_AUTH_KEY` - Optional Tailscale auth key for VM mesh networking
@@ -103,7 +103,7 @@ The VM provisioning times out during initialization, despite cloud-init completi
 
 2. **Test with Main Branch:**
    ```bash
-   ./tools/multipass.sh launch --name test-main --branch main
+   ./scripts/vm/multipass.sh launch --name test-main --branch main
    ```
 
 3. **Manual VM Test:**
@@ -134,9 +134,9 @@ Test reports are automatically generated in `test-reports/` directory:
 
 ## Files Modified
 
-- ✅ `tools/multipass.sh` - Complete rewrite of cloud-init generation
-- ✅ `tools/setup-vm-tools.sh` - Created (new file)
-- ✅ `tools/test-vm-e2e.sh` - Created (new file)
+- ✅ `scripts/vm/multipass.sh` - Complete rewrite of cloud-init generation
+- ✅ `scripts/vm/setup-vm-tools.sh` - Created (new file)
+- ✅ `scripts/vm/test-vm-e2e.sh` - Created (new file)
 - ✅ `.env` - Added MULTIPASS_PASSPHRASE
 - ✅ `.env.example` - Added MULTIPASS_PASSPHRASE field
 - ✅ `.gitignore` - Added .graphdone-cloud-init.yml
@@ -146,16 +146,16 @@ Test reports are automatically generated in `test-reports/` directory:
 ### Quick Test
 ```bash
 # Setup tools (one-time)
-./tools/setup-vm-tools.sh
+./scripts/vm/setup-vm-tools.sh
 
 # Run E2E tests
-./tools/test-vm-e2e.sh main
+./scripts/vm/test-vm-e2e.sh main
 ```
 
 ### Manual VM Management
 ```bash
 # Launch VM
-./tools/multipass.sh launch --name my-vm --branch main --cpus 4 --memory 8G
+./scripts/vm/multipass.sh launch --name my-vm --branch main --cpus 4 --memory 8G
 
 # Check status
 multipass list
@@ -164,7 +164,7 @@ multipass list
 multipass shell my-vm
 
 # Delete
-./tools/multipass.sh delete --name my-vm
+./scripts/vm/multipass.sh delete --name my-vm
 ```
 
 ### Debugging
@@ -196,6 +196,6 @@ The remaining work is to debug why the runcmd commands aren't executing as expec
 ---
 
 **For Support:**
-- Check `tools/multipass.sh --help`
+- Check `scripts/vm/multipass.sh --help`
 - Review logs in `test-reports/`
 - Consult `docs/guides/vm-setup.md` for detailed setup instructions

@@ -54,12 +54,12 @@ Use the [self-hosting guide](docs/deployment/SELF_HOSTING.md) and `./scripts/sel
 ### 🚀 One-Line Install (Like Ollama!)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/scripts/install.sh | sh
 ```
 
 Or with wget:
 ```bash
-wget -qO- https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/install.sh | sh
+wget -qO- https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/scripts/install.sh | sh
 ```
 
 **What the installer does:**
@@ -84,16 +84,16 @@ wget -qO- https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public
 
 ```bash
 # Option 1: Review the script first
-curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/install.sh | less
+curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/scripts/install.sh | less
 
 # Option 2: Download, inspect, then run
-curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/install.sh -o install.sh
+curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/scripts/install.sh -o install.sh
 cat install.sh  # Review the contents
 sh install.sh   # Run after verification
 
 # Option 3: Verify with checksums (for paranoid users)
-curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/install.sh.sha256 -o install.sh.sha256
-curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/install.sh -o install.sh
+curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/scripts/install.sh.sha256 -o install.sh.sha256
+curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/scripts/install.sh -o install.sh
 sha256sum -c install.sh.sha256  # Verify integrity
 sh install.sh
 ```
@@ -166,8 +166,8 @@ Visit **http://localhost:3127** when you see the "GraphDone is Ready!" message.
 ./start quick
 
 # Manual control (advanced users)
-./tools/setup.sh  # One-time setup
-./tools/run.sh    # Start development servers
+./scripts/stack/setup.sh  # One-time setup
+./scripts/stack/run.sh    # Start development servers
 
 # Other commands
 ./start clean     # Clean and restart fresh
@@ -194,7 +194,7 @@ newgrp docker
 
 **Port Already in Use?**
 ```bash
-./tools/cleanup.sh  # Kill any hanging processes
+./scripts/stack/cleanup.sh  # Kill any hanging processes
 ./start             # Try starting again
 ```
 

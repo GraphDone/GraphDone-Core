@@ -57,22 +57,22 @@ Welcome to the GraphDone documentation! This directory contains comprehensive gu
 
 1. **Setup Development Environment**
    ```bash
-   ./tools/setup.sh
+   ./scripts/stack/setup.sh
    ```
 
 2. **Start Development Servers**
    ```bash
-   ./tools/run.sh
+   ./scripts/stack/run.sh
    ```
 
 3. **Run Tests**
    ```bash
-   ./tools/test.sh
+   ./scripts/stack/test.sh
    ```
 
 4. **Build for Production**
    ```bash
-   ./tools/build.sh --production
+   ./scripts/stack/build.sh --production
    ```
 
 ## 📖 Key Concepts

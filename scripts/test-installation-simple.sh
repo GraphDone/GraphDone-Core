@@ -15,7 +15,7 @@ NC='\033[0m'
 # Setup
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-INSTALL_SCRIPT="$PROJECT_ROOT/public/install.sh"
+INSTALL_SCRIPT="$PROJECT_ROOT/scripts/install.sh"
 REPORT_DIR="$PROJECT_ROOT/test-results/installation"
 TIMESTAMP=$(date '+%Y%m%d_%H%M%S')
 

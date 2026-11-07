@@ -3982,8 +3982,8 @@ show_success_in_box() {
         PAD_COUNT=$((PAD_COUNT - 1))
     done
     printf "${TEAL}║  ${TEAL}│  ${GRAY}%s${NC}%s${TEAL}│${NC}  ${TEAL}║${NC}\n" "$CD_CMD" "$CD_PADDING"
-    printf "${TEAL}║  ${TEAL}│  ${GRAY}sh public/install.sh stop     ${NC}${GRAY}# Stop services${NC}                                             ${TEAL}│${NC}  ${TEAL}║${NC}\n"
-    printf "${TEAL}║  ${TEAL}│  ${GRAY}sh public/install.sh remove   ${NC}${GRAY}# Complete reset${NC}                                            ${TEAL}│${NC}  ${TEAL}║${NC}\n"
+    printf "${TEAL}║  ${TEAL}│  ${GRAY}sh scripts/install.sh stop    ${NC}${GRAY}# Stop services${NC}                                             ${TEAL}│${NC}  ${TEAL}║${NC}\n"
+    printf "${TEAL}║  ${TEAL}│  ${GRAY}sh scripts/install.sh remove  ${NC}${GRAY}# Complete reset${NC}                                            ${TEAL}│${NC}  ${TEAL}║${NC}\n"
     printf "${TEAL}║  ${TEAL}└────────────────────────────────────────────────────────────────────────────────────────────┘${TEAL}  ║${NC}\n"
     printf "${TEAL}║                                                                                                  ║${NC}\n"
 

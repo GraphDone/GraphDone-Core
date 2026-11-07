@@ -17,7 +17,7 @@ NC='\033[0m'
 
 # Get script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 # Load environment variables from .env if it exists
 if [ -f "$PROJECT_ROOT/.env" ]; then
@@ -27,8 +27,7 @@ if [ -f "$PROJECT_ROOT/.env" ]; then
 fi
 
 # Default values
-CONFIG_FILE="$PROJECT_ROOT/vm.config.yml"
-CLOUD_INIT_TEMPLATE="$PROJECT_ROOT/cloud-init.template.yml"
+CONFIG_FILE="$SCRIPT_DIR/vm.config.yml"
 CLOUD_INIT_OUTPUT="$PROJECT_ROOT/.graphdone-cloud-init.yml"
 COMMAND=""
 VM_NAME=""
@@ -101,11 +100,11 @@ check_yq() {
         log_error "❌ yq (YAML processor) is not installed"
         echo ""
         echo "Please run the setup script first:"
-        echo -e "  ${GREEN}./tools/setup-vm-tools.sh${NC}"
+        echo -e "  ${GREEN}./scripts/vm/setup-vm-tools.sh${NC}"
         echo ""
         echo "Or install yq manually:"
         echo -e "  ${GREEN}macOS:${NC}   brew install yq"
-        echo -e "  ${GREEN}Ubuntu:${NC}  See ./tools/setup-vm-tools.sh for non-sudo installation"
+        echo -e "  ${GREEN}Ubuntu:${NC}  See ./scripts/vm/setup-vm-tools.sh for non-sudo installation"
         echo ""
         exit 1
     fi
@@ -578,7 +577,7 @@ show_help() {
     echo -e "${BOLD}GraphDone Multipass VM Management${NC}"
     echo ""
     echo -e "${BOLD}USAGE:${NC}"
-    echo "  ./tools/multipass.sh [COMMAND] [OPTIONS]"
+    echo "  ./scripts/vm/multipass.sh [COMMAND] [OPTIONS]"
     echo ""
     echo -e "${BOLD}COMMANDS:${NC}"
     echo -e "  ${CYAN}launch${NC}        Launch a new VM"
@@ -597,14 +596,14 @@ show_help() {
     echo -e "  ${YELLOW}--disk SIZE${NC}     Disk size (e.g., 20G, 50G)"
     echo ""
     echo -e "${BOLD}EXAMPLES:${NC}"
-    echo -e "  ${GREEN}./tools/multipass.sh launch${NC}"
-    echo -e "  ${GREEN}./tools/multipass.sh launch --name my-vm --branch develop${NC}"
-    echo -e "  ${GREEN}./tools/multipass.sh launch --cpus 8 --memory 16G${NC}"
-    echo -e "  ${GREEN}./tools/multipass.sh shell --name my-vm${NC}"
-    echo -e "  ${GREEN}./tools/multipass.sh delete --name my-vm${NC}"
+    echo -e "  ${GREEN}./scripts/vm/multipass.sh launch${NC}"
+    echo -e "  ${GREEN}./scripts/vm/multipass.sh launch --name my-vm --branch develop${NC}"
+    echo -e "  ${GREEN}./scripts/vm/multipass.sh launch --cpus 8 --memory 16G${NC}"
+    echo -e "  ${GREEN}./scripts/vm/multipass.sh shell --name my-vm${NC}"
+    echo -e "  ${GREEN}./scripts/vm/multipass.sh delete --name my-vm${NC}"
     echo ""
     echo -e "${BOLD}CONFIGURATION:${NC}"
-    echo -e "  Edit ${CYAN}vm.config.yml${NC} to change default settings"
+    echo -e "  Edit ${CYAN}scripts/vm/vm.config.yml${NC} to change default settings"
 }
 
 # Parse arguments

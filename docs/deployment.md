@@ -7,13 +7,13 @@ GraphDone can be installed with a single command on macOS and Linux:
 ### Using GitHub (Recommended)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/scripts/install.sh | sh
 ```
 
 or using wget:
 
 ```bash
-wget -qO- https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/install.sh | sh
+wget -qO- https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/scripts/install.sh | sh
 ```
 
 ### Using Custom Domain (Future)
@@ -124,13 +124,13 @@ Your GraphDone instance will be available at:
 
 ```bash
 # Stop all GraphDone services
-sh ~/graphdone/public/install.sh stop
+sh ~/graphdone/scripts/install.sh stop
 
 # Complete cleanup (removes containers, volumes)
-sh ~/graphdone/public/install.sh remove
+sh ~/graphdone/scripts/install.sh remove
 
 # Reinstall/update GraphDone
-sh ~/graphdone/public/install.sh install
+sh ~/graphdone/scripts/install.sh install
 ```
 
 ## 📊 System Requirements
@@ -297,16 +297,16 @@ rm -rf ~/.graphdone
 
 ```bash
 # Option 1: Review before running
-curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/install.sh | less
+curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/scripts/install.sh | less
 
 # Option 2: Download, inspect, then execute
-curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/install.sh -o install.sh
+curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/scripts/install.sh -o install.sh
 cat install.sh  # Review contents
 sh install.sh
 
 # Option 3: Verify with checksums (recommended for production)
-curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/install.sh.sha256 -o install.sh.sha256
-curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/public/install.sh -o install.sh
+curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/scripts/install.sh.sha256 -o install.sh.sha256
+curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/scripts/install.sh -o install.sh
 sha256sum -c install.sh.sha256  # Verify integrity
 sh install.sh
 ```

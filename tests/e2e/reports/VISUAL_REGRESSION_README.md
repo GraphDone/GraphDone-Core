@@ -74,12 +74,12 @@ npm run test:e2e:visual
 ```bash
 npm run test:e2e
 # Or in VM:
-./tools/test-vm-e2e.sh
+./scripts/vm/test-vm-e2e.sh
 ```
 
 ### Disable Visual Regression in E2E Suite
 ```bash
-RUN_VISUAL_REGRESSION=false ./tools/test-vm-e2e.sh
+RUN_VISUAL_REGRESSION=false ./scripts/vm/test-vm-e2e.sh
 ```
 
 ## Output Structure
@@ -211,6 +211,6 @@ const SCREENS = [
 ## Related Documentation
 
 - E2E Test Suite: `tests/e2e/`
-- Test VM Setup: `tools/test-vm-e2e.sh`
+- Test VM Setup: `scripts/vm/test-vm-e2e.sh`
 - Playwright Config: `playwright.config.ts`
 - DevOps Integration: (See GraphDone-DevOps repository)

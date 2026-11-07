@@ -58,7 +58,7 @@ The error handler now recognizes and provides specific guidance for:
 - Added `safe_docker()` wrapper for Docker commands
 - Enhanced `cmd_stop()` with better error handling
 
-#### `tools/run.sh` Script
+#### `scripts/stack/run.sh` Script
 - Removed `set -e` to allow graceful error handling
 - Added `handle_docker_error()` function
 - Wrapped critical docker-compose commands with error detection
@@ -161,7 +161,7 @@ Potential improvements for future versions:
 
 To add detection for a new error pattern:
 
-1. Update `handle_docker_error()` in both `start` and `tools/run.sh`
+1. Update `handle_docker_error()` in both `start` and `scripts/stack/run.sh`
 2. Add a new `elif` clause with the error pattern
 3. Provide clear issue description and solution steps
 4. Update `docs/troubleshooting-docker.md`

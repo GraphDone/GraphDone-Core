@@ -63,7 +63,7 @@ check_nodejs() {
             echo "   • macOS (Homebrew): brew install node"
             echo "   • Windows (Chocolatey): choco install nodejs"
             echo ""
-            echo "Then run this setup script again: ./tools/setup.sh"
+            echo "Then run this setup script again: ./scripts/stack/setup.sh"
             exit 1
         fi
     fi
@@ -143,7 +143,7 @@ check_docker_permissions() {
             echo "Please fix Docker permissions and run setup again:"
             echo "  sudo usermod -aG docker \$USER"
             echo "  newgrp docker"
-            echo "  ./tools/setup.sh"
+            echo "  ./scripts/stack/setup.sh"
             exit 1
         fi
     fi

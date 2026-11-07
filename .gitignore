@@ -80,7 +80,6 @@ lerna-debug.log*
 # VM configuration
 /tmp/graphdone-cloud-init.yml
 cloud-init.*.yml
-!cloud-init.template.yml
 .graphdone-cloud-init.yml
 
 # IDE

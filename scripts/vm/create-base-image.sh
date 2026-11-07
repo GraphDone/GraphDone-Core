@@ -10,7 +10,7 @@ SNAPSHOT_NAME="graphdone-snapshot-${BRANCH}"
 echo "=== Creating base image for branch: $BRANCH ==="
 
 # Launch VM without Tailscale, without auto-start
-./tools/multipass.sh launch \
+./scripts/vm/multipass.sh launch \
   --name "$BASE_NAME" \
   --branch "$BRANCH" \
   --no-tailscale \

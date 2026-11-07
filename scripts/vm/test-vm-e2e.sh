@@ -16,7 +16,7 @@ NC='\033[0m'
 
 # Get script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 # Load environment variables
 if [ -f "$PROJECT_ROOT/.env" ]; then
@@ -95,7 +95,7 @@ cleanup() {
     fi
 
     log_info "Cleaning up VM: $VM_NAME"
-    "$PROJECT_ROOT/tools/multipass.sh" delete --name "$VM_NAME" || true
+    "$PROJECT_ROOT/scripts/vm/multipass.sh" delete --name "$VM_NAME" || true
 
     log_info "Test report saved to: $REPORT_FILE"
     cat "$REPORT_FILE"
@@ -143,7 +143,7 @@ main() {
     log_info "Auto-generating VM name with fun naming scheme..."
 
     # Launch VM and capture the generated name
-    LAUNCH_OUTPUT=$("$PROJECT_ROOT/tools/multipass.sh" launch --branch "$BRANCH" 2>&1 | tee -a "$REPORT_DIR/vm-launch.log")
+    LAUNCH_OUTPUT=$("$PROJECT_ROOT/scripts/vm/multipass.sh" launch --branch "$BRANCH" 2>&1 | tee -a "$REPORT_DIR/vm-launch.log")
     LAUNCH_EXIT=$?
 
     # Extract VM name from launch output

@@ -151,7 +151,7 @@ ensure_nodejs() {
             echo "❌ Node.js not found and nvm not available."
             echo "Please restart your terminal or run:"
             echo "  source ~/.bashrc  # or ~/.zshrc"
-            echo "  ./tools/run.sh"
+            echo "  ./scripts/stack/run.sh"
             exit 1
         fi
     fi
@@ -242,7 +242,7 @@ case $MODE in
         # Check if environment files exist
         if [ ! -f "packages/server/.env" ] || [ ! -f "packages/web/.env" ]; then
             echo "⚠️  Environment files missing. Running setup first..."
-            ./tools/setup.sh
+            ./scripts/stack/setup.sh
         fi
         
         # Check if we need sudo for Docker (detect from previous setup)

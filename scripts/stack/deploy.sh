@@ -61,7 +61,7 @@ fi
 # Build if requested
 if [ "$BUILD" = true ]; then
     echo "🏗️  Building for deployment..."
-    cd .. && ./start build && cd tools
+    (cd "$(dirname "$0")/../.." && ./start build)
 fi
 
 # Run database migrations if requested
