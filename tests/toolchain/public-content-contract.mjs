@@ -32,8 +32,9 @@ test('rules catch real leaks and allow the documented placeholders', () => {
   assert.deepEqual(findForbidden('a', '/home/user/app 100.x.y.z /Users/user /home/runner 10.0.0.1 100.1.2.3 100.128.0.1'), []);
 });
 
+// This file is excluded: its rules and samples are the only intended matches.
 test('tracked files contain no private repository paths, home directories or private-network addresses', () => {
-  const listed = spawnSync('git', ['grep', '-nIE', '--', 'Valpatel/|100\\.|/home/|/Users/', '--', '.', ':!package-lock.json'], { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  const listed = spawnSync('git', ['grep', '-nIE', '--', 'Valpatel/|100\\.|/home/|/Users/', '--', '.', ':!package-lock.json', ':!tests/toolchain/public-content-contract.mjs'], { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
   assert.ok(listed.status === 0 || listed.status === 1, `git grep failed: ${listed.stderr}`);
   const hits = [];
   for (const row of listed.stdout.split('\n').filter(Boolean)) {
