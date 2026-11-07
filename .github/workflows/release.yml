@@ -1,16 +1,144 @@
-name: Release (disabled)
+name: Release
+
+# Publishing a release: merge dev → main, wait for main's CI to go green, then
+# push a tag on that main commit (see docs/quality/RELEASE_GATES.md):
+#   git tag -a v0.4.0-alpha <main sha> -m "GraphDone v0.4.0-alpha" && git push origin v0.4.0-alpha
+# This workflow refuses to publish unless the tag points at a main commit whose
+# required checks passed and whose package versions equal the tag.
+# graphdone.com is deployed from GraphDone-Cloud, not from this repository.
 
 on:
-  workflow_dispatch:
+  push:
+    tags: ['v*.*.*']
 
 permissions: {}
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
-  unavailable:
-    name: Release is not configured
+  verify:
+    name: Verify validated source
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      checks: read
+    outputs:
+      sha: ${{ steps.gate.outputs.sha }}
+      version: ${{ steps.gate.outputs.version }}
+      latest: ${{ steps.gate.outputs.latest }}
     steps:
-      - name: Reject unimplemented release operation
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Require a main commit with passing checks and matching versions
+        id: gate
+        run: node scripts/verify-release.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+  images:
+    name: Publish ${{ matrix.image }} image
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - image: web
+            dockerfile: packages/web/Dockerfile
+          - image: api
+            dockerfile: packages/server/Dockerfile
+          - image: neo4j
+            dockerfile: deployment/neo4j.Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.verify.outputs.sha }}
+          persist-credentials: false
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Image tags
+        id: tags
+        env:
+          IMAGE: ghcr.io/graphdone/graphdone-${{ matrix.image }}
+          VERSION: ${{ needs.verify.outputs.version }}
+          LATEST: ${{ needs.verify.outputs.latest }}
         run: |
-          echo "::error::Release is disabled. See docs/quality/RELEASE_GATES.md for the required validated-SHA release process."
-          exit 1
+          tags="$IMAGE:$VERSION"
+          if [[ "$LATEST" == "true" ]]; then tags="$tags,$IMAGE:latest"; fi
+          echo "tags=$tags" >> "$GITHUB_OUTPUT"
+      - name: Build and push (amd64 + arm64)
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
+          provenance: mode=max
+          sbom: true
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ needs.verify.outputs.sha }}
+            org.opencontainers.image.version=${{ needs.verify.outputs.version }}
+            org.opencontainers.image.licenses=MIT
+      - name: Record digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          mkdir -p digests
+          echo "ghcr.io/graphdone/graphdone-${{ matrix.image }}@$DIGEST" > "digests/${{ matrix.image }}.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ matrix.image }}
+          path: digests/
+          if-no-files-found: error
+
+  github-release:
+    name: Create GitHub release
+    needs: [verify, images]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: digest-*
+          merge-multiple: true
+          path: digests
+      - name: Publish release notes with image digests
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          SHA: ${{ needs.verify.outputs.sha }}
+          LATEST: ${{ needs.verify.outputs.latest }}
+        run: |
+          {
+            echo "Source: \`$SHA\`"
+            echo
+            echo "**Container images** (linux/amd64 + linux/arm64, with SBOM and provenance):"
+            echo
+            for f in digests/*.txt; do echo "- \`$(cat "$f")\`"; done
+            echo
+          } > notes.md
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag \
+            --title "GraphDone $TAG" --notes-file notes.md --generate-notes \
+            --latest="$LATEST"

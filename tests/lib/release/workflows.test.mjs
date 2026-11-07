@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { runInNewContext } from 'node:vm';
@@ -22,20 +22,37 @@ test('Docker builds cannot write registry images, manifests or release tags', ()
   }
 });
 
-for (const name of ['deploy', 'release']) {
-  test(`${name} remains explicitly unavailable without publication or deployment side effects`, () => {
-    const doc = workflow(name);
-    assert.deepEqual(Object.keys(doc.on), ['workflow_dispatch']);
-    assert.deepEqual(doc.permissions, {});
-    assert.equal(Object.keys(doc.jobs).length, 1);
-    const steps = Object.values(doc.jobs)[0].steps;
-    assert.equal(steps.length, 1);
-    assert.equal(steps[0].uses, undefined);
-    const result = spawnSync('bash', ['-e', '-c', steps[0].run], { encoding: 'utf8' });
-    assert.equal(result.status, 1);
-    assert.match(result.stdout, /disabled/i);
-  });
-}
+test('this repository has no deploy workflow; graphdone.com deploys from GraphDone-Cloud', () => {
+  assert.equal(existsSync(new URL('../../../.github/workflows/deploy.yml', import.meta.url)), false);
+});
+
+test('release runs only for version tags, one at a time, with no default permissions', () => {
+  const doc = workflow('release');
+  assert.deepEqual(Object.keys(doc.on), ['push']);
+  assert.deepEqual(doc.on.push, { tags: ['v*.*.*'] });
+  assert.deepEqual(doc.permissions, {});
+  assert.deepEqual(doc.concurrency, { group: 'release', 'cancel-in-progress': false });
+});
+
+test('release writes happen only after the source gate, from the verified commit', () => {
+  const { jobs } = workflow('release');
+  assert.deepEqual(jobs.verify.permissions, { contents: 'read', checks: 'read' });
+  assert.ok(jobs.verify.steps.some(step => step.run === 'node scripts/verify-release.mjs'));
+  assert.deepEqual(jobs.images.permissions, { contents: 'read', packages: 'write' });
+  assert.deepEqual(jobs['github-release'].permissions, { contents: 'write' });
+  assert.equal(jobs.images.needs, 'verify');
+  assert.deepEqual(jobs['github-release'].needs, ['verify', 'images']);
+  for (const [name, job] of Object.entries(jobs)) {
+    for (const step of job.steps) {
+      if (step.uses?.startsWith('actions/checkout')) {
+        const expected = name === 'verify' ? '${{ github.sha }}' : '${{ needs.verify.outputs.sha }}';
+        assert.equal(step.with.ref, expected, `${name} checks out the verified commit`);
+      }
+      if (step.uses?.startsWith('docker/build-push-action')) assert.equal(name, 'images');
+      if (/gh\s+release/.test(step.run || '')) assert.equal(name, 'github-release');
+    }
+  }
+});
 
 const ci = workflow('ci');
 const required = ['quality', 'unit-tests', 'mcp-contract', 'build', 'security-scan', 'smoke-gate', 'runtime-images'];
