@@ -46,8 +46,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Installation script present and executable
         run: |
-          test -f public/install.sh || { echo "::error::public/install.sh missing"; exit 1; }
-          test -x public/install.sh || echo "::warning::public/install.sh is not marked executable"
+          test -f scripts/install.sh || { echo "::error::scripts/install.sh missing"; exit 1; }
+          test -x scripts/install.sh || echo "::warning::scripts/install.sh is not marked executable"
           echo "✅ installer present"
       - name: Production docker compose config is valid
         run: |

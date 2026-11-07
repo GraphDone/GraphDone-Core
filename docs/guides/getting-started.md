@@ -24,7 +24,7 @@ cd GraphDone-Core
 ./start
 
 # OR run setup script directly
-./tools/setup.sh
+./scripts/stack/setup.sh
 ```
 
 The setup script will:
@@ -64,7 +64,7 @@ Start the development servers:
 ./start
 
 # OR start servers directly
-./tools/run.sh
+./scripts/stack/run.sh
 ```
 
 This will start:

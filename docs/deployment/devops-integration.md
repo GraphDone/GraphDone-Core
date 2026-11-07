@@ -219,7 +219,7 @@ fi
 
 ```bash
 # After test run completes
-./tools/generate-test-manifest.sh test-reports artifacts-20251113_220000
+./scripts/vm/generate-test-manifest.sh test-reports artifacts-20251113_220000
 
 # Output: test-reports/artifacts-20251113_220000/test-manifest.json
 ```
@@ -273,10 +273,10 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Run E2E Tests
-        run: ./tools/test-vm-e2e.sh
+        run: ./scripts/vm/test-vm-e2e.sh
 
       - name: Generate Manifest
-        run: ./tools/generate-test-manifest.sh
+        run: ./scripts/vm/generate-test-manifest.sh
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v3

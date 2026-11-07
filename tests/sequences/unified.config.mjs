@@ -48,7 +48,7 @@ export const SEQUENCES = {
     'tests/e2e/graph/large-graph-symbols.spec.ts', `--project=${PW}`, '--workers=1', '--retries=0', '--trace=retain-on-failure',
   ], blocking: true },
   'schematic-visual': { adapter: 'playwright', title: 'Schematic fixture visual acceptance', args: [
-    '--config=playwright.schematic.config.ts', '--workers=1', '--retries=0', '--trace=retain-on-failure',
+    '--config=tests/visual/playwright.schematic.config.ts', '--workers=1', '--retries=0', '--trace=retain-on-failure',
   ], blocking: true },
   'layout-recovery': { adapter: 'playwright', title: 'Durable layout recovery acceptance', args: [
     'tests/e2e/graph/layout-recovery.spec.ts', `--project=${PW}`, '--headed', '--workers=1', '--retries=0', '--trace=retain-on-failure',

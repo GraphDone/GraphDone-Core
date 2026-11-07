@@ -556,7 +556,7 @@ cmd_dev() {
             exit 1
         fi
 
-        ./tools/setup.sh
+        ./scripts/stack/setup.sh
         log_success "✅ Setup complete!"
         
     elif [ "$workspace_repair_needed" = true ] || [ "$dependencies_needed" = true ]; then
@@ -577,28 +577,28 @@ cmd_dev() {
             log_success "✅ Workspace repair complete!"
         else
             log_error "❌ Workspace repair failed. Running full setup..."
-            ./tools/setup.sh
+            ./scripts/stack/setup.sh
         fi
     fi
     
     log_info "🚀 Starting GraphDone development environment..."
-    ./tools/run.sh
+    ./scripts/stack/run.sh
 }
 
 cmd_quick() {
     show_banner
     log_info "🏃 Quick start - minimal checks..."
     ensure_nodejs || return 1
-    ./tools/run.sh
+    ./scripts/stack/run.sh
 }
 
 cmd_clean() {
     show_banner
     log_info "🧹 Cleaning build artifacts and restarting fresh..."
     ensure_nodejs || return 1
-    ./tools/cleanup.sh
-    ./tools/setup.sh
-    ./tools/run.sh
+    ./scripts/stack/cleanup.sh
+    ./scripts/stack/setup.sh
+    ./scripts/stack/run.sh
 }
 
 cmd_setup() {
@@ -613,7 +613,7 @@ cmd_setup() {
         exit 1
     fi
 
-    ./tools/setup.sh
+    ./scripts/stack/setup.sh
     log_success "✅ Setup complete! Run './start' to start development environment."
 }
 
@@ -623,14 +623,14 @@ cmd_test() {
     ensure_nodejs || return 1
     
     # Pass all remaining arguments to test.sh
-    ./tools/test.sh "${REMAINING_ARGS[@]}"
+    ./scripts/stack/test.sh "${REMAINING_ARGS[@]}"
 }
 
 cmd_build() {
     show_banner
     log_info "🏗️  Building all packages..."
     ensure_nodejs || return 1
-    ./tools/build.sh
+    ./scripts/stack/build.sh
 }
 
 cmd_deploy() {
@@ -651,7 +651,7 @@ cmd_deploy() {
     log_info "  • Auto-generated SSL certificates"
     log_info "  • Secure WebSocket connections (WSS)"
     log_info "  • Production-optimized containers"
-    ./tools/run.sh
+    ./scripts/stack/run.sh
 }
 
 cmd_remove() {
@@ -908,7 +908,7 @@ cmd_vm() {
     fi
 
     # Pass all arguments to multipass.sh
-    ./tools/multipass.sh "${REMAINING_ARGS[@]}"
+    ./scripts/vm/multipass.sh "${REMAINING_ARGS[@]}"
 }
 
 # Execute the command
