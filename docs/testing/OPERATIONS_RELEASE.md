@@ -19,7 +19,7 @@ Commands and private credential handling: [operations API](../api/OPERATIONS.md)
 
 ## Bounded gateway experiment
 
-Exactly two serial calls used the existing `graphling-small` alias at gateway.graphlings.net, with synthetic local reports and temporary local triage tokens revoked afterward. No production reports or D1 writes were used for inference. First call: 8,769 ms, 544 tokens. Second call: 1,009 ms, 685 tokens. The second run required structured proposed steps, impact and expected behavior instead of accepting a generic finding.
+Exactly two serial calls used a small model behind the maintainers' OpenAI-compatible gateway, with synthetic local reports and temporary local triage tokens revoked afterward. No production reports or D1 writes were used for inference. First call: 8,769 ms, 544 tokens. Second call: 1,009 ms, 685 tokens. The second run required structured proposed steps, impact and expected behavior instead of accepting a generic finding.
 
 Both calls passed action validation and local write-back. Semantic quality did not justify autonomous remediation: the first mostly repeated the report; the second proposed unclear steps involving a “phone button.” The resulting note explicitly says it is not reproduced or fixed. Keep a human review gate; do not treat structurally valid output as a useful investigation. The gateway alias does not identify the underlying provider. No cron, managed sandbox or recurring inference has been enabled.
 

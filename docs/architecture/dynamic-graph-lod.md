@@ -62,7 +62,7 @@ as “#22” in old PR prose are not a current LOD tracking issue.
 
 ### Fresh localhost observation
 
-The existing read-only capture suite ran against **Graphlings Release** and
+The existing read-only capture suite ran against a real localhost release-planning graph and
 finished all 18 desktop/laptop/phone captures at `2026-10-27T14:56:23.996Z`.
 The graph now has **301 nodes / 370 edges**, versus 299 / 370 in the October 24
 review. Compare identity sets, not just the two-node net increase.
