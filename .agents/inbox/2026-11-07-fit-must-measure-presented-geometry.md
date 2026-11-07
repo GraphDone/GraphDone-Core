@@ -33,9 +33,16 @@ searched first; this concerns camera fitting across the compact-card threshold.
   (`lib/graphFit.ts`): keep full cards at 100% when they fit with a 12px margin;
   otherwise fit compact geometry and stay below the threshold. The result must
   not depend on the current zoom, so framing retries and resizes settle.
-- When detail changes hide the focused control, move focus to the control that
-  replaces it (header icon <-> compact card). Dialog close returns focus to the
-  visible equivalent of the invoking control.
+- When detail changes hide the keyboard-focused (`:focus-visible`) control,
+  move focus to the control that replaces it (header icon <-> compact card) and
+  return to the same icon afterwards; never hand a mouse user a focus ring.
+  Dialog close returns focus to the visible equivalent of the invoking control.
+- Geometry probes for "what if" scales must reuse the presented layout when the
+  layout key matches and keep any extra cache bounded: a live resize refits
+  every frame.
+- A state change that replaces the focused buttons (approve/reject) shows its
+  result above requester-supplied text and moves focus there; shrinking copy to
+  fit one fixture does not survive a longer user-written field.
 - Check text-heavy phone layouts with the CI runner's wider default font, not
   only the workstation's (`FONTCONFIG_FILE` pointing at DejaVu Sans reproduces).
 - Prefer role-based or exact locators: `getByLabel('Shared notes')` also matched
