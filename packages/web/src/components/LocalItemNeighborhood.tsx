@@ -150,8 +150,15 @@ export function LocalItemNeighborhood({
   const [highlight, setHighlight] = useState<string | null>(null);
   const origin = useRef<LocalCamera>();
   const worldAnchor = useRef<{ x: number; y: number }>();
+  // Latest known camera. The prop can lag a programmatic camera change by a
+  // render on a slow device, so a settled event also updates it; a deferred
+  // rebase must never re-read the pre-restore camera after that.
   const cameraRef = useRef(camera);
-  cameraRef.current = camera;
+  const cameraProp = useRef(camera);
+  if (cameraProp.current !== camera) {
+    cameraProp.current = camera;
+    cameraRef.current = camera;
+  }
   const rebasePending = useRef(false);
   const readPoint = useCallback(
     (id?: string) => {
@@ -296,6 +303,7 @@ export function LocalItemNeighborhood({
     const settled = (event: Event) => {
       const next = (event as CustomEvent<LocalCamera & { manual: boolean }>)
         .detail;
+      cameraRef.current = { x: next.x, y: next.y, scale: next.scale };
       const point = readPoint(focusId);
       if (
         point &&

@@ -301,3 +301,26 @@ it('reserves full title height for the actual narrow-screen page rather than a d
         )
       ).toBeGreaterThanOrEqual(64);
 });
+
+it('keeps cards in place when a restored camera settles before its prop re-renders', () => {
+  // Reload on a slow device: the layer activates at the initial identity
+  // camera, the saved camera is restored and settles, and a deferred rebase
+  // frame runs before React re-renders the layer with the restored prop.
+  const frames: FrameRequestCallback[] = [];
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => frames.push(callback));
+  vi.stubGlobal('cancelAnimationFrame', () => {});
+  const flush = () => act(() => { while (frames.length) frames.shift()!(0); });
+  const props = propsFor(),
+    view = render(<View {...props} />);
+  expect(focus(view.container)).toBe('A');
+  const restored = { x: -500, y: -200, scale: 1.2 };
+  act(() => {
+    window.dispatchEvent(new CustomEvent('graphdone:camera-start', { detail: { manual: false } }));
+    window.dispatchEvent(new CustomEvent('graphdone:camera-settled', { detail: { ...restored, manual: false } }));
+  });
+  flush();
+  view.rerender(<View {...props} camera={restored} />);
+  flush();
+  const shifted = view.container.querySelector<HTMLElement>('.local-item-neighborhood [style*="translate"]');
+  expect(shifted?.style.transform).toBe('translate(0px, 0px)');
+});
