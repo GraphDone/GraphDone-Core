@@ -27,7 +27,7 @@ test.describe.configure({
 
 test.describe('Installation Script Validation', () => {
   const projectRoot = path.resolve(__dirname, '../..');
-  const installScript = path.join(projectRoot, 'public/install.sh');
+  const installScript = path.join(projectRoot, 'scripts/install.sh');
   const resultsDir = path.join(projectRoot, 'test-results/installation');
 
   test.beforeAll(() => {
@@ -91,7 +91,7 @@ RUN if command -v dnf; then dnf install -y curl wget sudo; fi
 RUN if command -v apk; then apk add --no-cache curl wget sudo bash; fi
 
 # Copy installation script
-COPY public/install.sh /tmp/install.sh
+COPY scripts/install.sh /tmp/install.sh
 RUN chmod +x /tmp/install.sh
 
 # Test the installation script

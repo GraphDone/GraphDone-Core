@@ -489,7 +489,7 @@ GraphDone includes a comprehensive setup script that handles all prerequisites a
 # Clone and setup
 git clone https://github.com/GraphDone/GraphDone-Core.git
 cd graphdone
-./tools/setup.sh
+./scripts/stack/setup.sh
 ```
 
 The setup script will:
@@ -504,19 +504,19 @@ The setup script will:
 
 ```mermaid
 graph LR
-    START[./tools/setup.sh] --> DEV[./tools/run.sh]
-    DEV --> TEST[./tools/test.sh]
-    TEST --> BUILD[./tools/build.sh]
-    BUILD --> DEPLOY[./tools/deploy.sh]
+    START[./scripts/stack/setup.sh] --> DEV[./scripts/stack/run.sh]
+    DEV --> TEST[./scripts/stack/test.sh]
+    TEST --> BUILD[./scripts/stack/build.sh]
+    BUILD --> DEPLOY[./scripts/stack/deploy.sh]
     
     DEV -.-> CODE[Code Changes]
     CODE -.-> DEV
     
     subgraph "Available Commands"
-        RUN1[./tools/run.sh --docker-dev]
-        RUN2[./tools/test.sh --coverage]
-        RUN3[./tools/test.sh --package core]
-        BUILD1[./tools/build.sh --production]
+        RUN1[./scripts/stack/run.sh --docker-dev]
+        RUN2[./scripts/stack/test.sh --coverage]
+        RUN3[./scripts/stack/test.sh --package core]
+        BUILD1[./scripts/stack/build.sh --production]
     end
 ```
 
@@ -524,7 +524,7 @@ graph LR
 
 Start all development servers:
 ```bash
-./tools/run.sh
+./scripts/stack/run.sh
 ```
 
 This provides:
@@ -559,10 +559,10 @@ For containerized development:
 
 ```bash
 # Full Docker development environment
-./tools/run.sh --docker-dev
+./scripts/stack/run.sh --docker-dev
 
 # Production-like environment
-./tools/run.sh --docker
+./scripts/stack/run.sh --docker
 
 # Individual service testing
 docker compose up -d postgres  # Database only
@@ -675,8 +675,8 @@ agent.subscribe('node.priorityChanged', async (node) => {
 # Get started in 30 seconds
 git clone https://github.com/GraphDone/GraphDone-Core.git
 cd GraphDone-Core
-./tools/setup.sh
-./tools/run.sh
+./scripts/stack/setup.sh
+./scripts/stack/run.sh
 ```
 
 Visit http://localhost:3000 to see the working application!
@@ -720,16 +720,16 @@ GraphDone is built for and by teams who think differently. We welcome contributi
 ### 🔧 **Development Workflow**
 ```bash
 # Set up development environment
-./tools/setup.sh
+./scripts/stack/setup.sh
 
 # Make your changes
 git checkout -b feature/your-improvement
 
 # Test your changes
-./tools/test.sh --coverage
+./scripts/stack/test.sh --coverage
 
 # Build and verify
-./tools/build.sh
+./scripts/stack/build.sh
 
 # Submit your contribution
 git push origin feature/your-improvement
@@ -741,10 +741,7 @@ git push origin feature/your-improvement
 ### Self-Hosted
 ```bash
 # Using Docker Compose
-docker compose -f docker-compose.prod.yml up -d
-
-# Using Kubernetes
-kubectl apply -f tools/deployment/k8s/
+docker compose -f deployment/docker-compose.yml up -d
 ```
 
 ### Cloud Hosting

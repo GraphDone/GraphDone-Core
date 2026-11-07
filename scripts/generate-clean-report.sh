@@ -16,7 +16,7 @@ GIT_COMMIT_SHORT=$(cd "$PROJECT_ROOT" && git rev-parse --short HEAD 2>/dev/null 
 GIT_BRANCH=$(cd "$PROJECT_ROOT" && git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
 
 # Get install script CRC
-INSTALL_SCRIPT="$PROJECT_ROOT/public/install.sh"
+INSTALL_SCRIPT="$PROJECT_ROOT/scripts/install.sh"
 if command -v cksum > /dev/null 2>&1; then
     INSTALL_SCRIPT_CRC=$(cksum "$INSTALL_SCRIPT" 2>/dev/null | awk '{print $1}' || echo "unknown")
 else
