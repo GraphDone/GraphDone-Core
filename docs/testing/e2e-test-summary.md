@@ -6,7 +6,7 @@
 ## What Was Accomplished
 
 ### 1. ✅ Multipass Passphrase Configuration
-- Added `MULTIPASS_PASSPHRASE` to `.env` (value: matt312)
+- Added `MULTIPASS_PASSPHRASE` to the gitignored `.env`
 - Updated `scripts/vm/multipass.sh` to automatically load environment variables from `.env`
 - Passphrase is now securely stored and auto-loaded
 

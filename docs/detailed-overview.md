@@ -741,10 +741,7 @@ git push origin feature/your-improvement
 ### Self-Hosted
 ```bash
 # Using Docker Compose
-docker compose -f docker-compose.prod.yml up -d
-
-# Using Kubernetes
-kubectl apply -f tools/deployment/k8s/
+docker compose -f deployment/docker-compose.yml up -d
 ```
 
 ### Cloud Hosting

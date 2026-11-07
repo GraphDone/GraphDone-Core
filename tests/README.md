@@ -27,6 +27,9 @@ The test tree is organized as follows:
 - `sequences/unified.config.mjs`: profile and sequence definitions.
 - `diagnostics/` and `perf/`: specialized geometry and performance checks.
 - `integration/`: infrastructure checks outside the default browser project.
+- Single-purpose Playwright configs sit beside their specs
+  (`visual/playwright.schematic.config.ts`, `integration/playwright.captcha.config.ts`);
+  the default `playwright.config.ts` stays at the repo root.
 
 An authenticated test under `tests/e2e/<domain>/` imports helpers with:
 

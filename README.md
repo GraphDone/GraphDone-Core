@@ -91,11 +91,6 @@ curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/scrip
 cat install.sh  # Review the contents
 sh install.sh   # Run after verification
 
-# Option 3: Verify with checksums (for paranoid users)
-curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/scripts/install.sh.sha256 -o install.sh.sha256
-curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/scripts/install.sh -o install.sh
-sha256sum -c install.sh.sha256  # Verify integrity
-sh install.sh
 ```
 
 **What the installation script does:**

@@ -256,7 +256,7 @@ graph TB
     
     subgraph GitHub ["GitHub Ecosystem"]
         Repo[GraphDone-Core Repository]
-        Script[public/start.sh]
+        Script[scripts/install.sh]
         Registry[ghcr.io Registry]
     end
     
@@ -495,12 +495,6 @@ curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/scrip
 # Option 2: Download, inspect, then execute
 curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/scripts/install.sh -o install.sh
 cat install.sh
-sh install.sh
-
-# Option 3: Verify with checksums (production environments)
-curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/scripts/install.sh.sha256 -o install.sh.sha256
-curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/scripts/install.sh -o install.sh
-sha256sum -c install.sh.sha256
 sh install.sh
 ```
 

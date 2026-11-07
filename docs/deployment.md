@@ -180,16 +180,16 @@ To host the installation script on graphdone.com:
 
 ### 1. Copy Script to Web Server
 
-Place `public/start.sh` in your web server's document root:
+Place `scripts/install.sh` in your web server's document root:
 
 ```bash
 # Example for nginx
-sudo cp public/start.sh /var/www/graphdone.com/start.sh
-sudo chmod 644 /var/www/graphdone.com/start.sh
+sudo cp scripts/install.sh /var/www/graphdone.com/install.sh
+sudo chmod 644 /var/www/graphdone.com/install.sh
 
 # Example for Apache
-sudo cp public/start.sh /var/www/html/start.sh
-sudo chmod 644 /var/www/html/start.sh
+sudo cp scripts/install.sh /var/www/html/install.sh
+sudo chmod 644 /var/www/html/install.sh
 ```
 
 ### 2. Configure Web Server
@@ -251,7 +251,7 @@ If using GitHub Pages for graphdone.com:
 
 ```bash
 # Test the script locally
-sh public/start.sh
+sh scripts/install.sh
 
 # Test from remote URL (once deployed)
 curl -fsSL https://graphdone.com/start.sh | sh
@@ -302,12 +302,6 @@ curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/scrip
 # Option 2: Download, inspect, then execute
 curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/scripts/install.sh -o install.sh
 cat install.sh  # Review contents
-sh install.sh
-
-# Option 3: Verify with checksums (recommended for production)
-curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/scripts/install.sh.sha256 -o install.sh.sha256
-curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/scripts/install.sh -o install.sh
-sha256sum -c install.sh.sha256  # Verify integrity
 sh install.sh
 ```
 

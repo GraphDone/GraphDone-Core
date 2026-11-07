@@ -82,6 +82,12 @@ lerna-debug.log*
 cloud-init.*.yml
 .graphdone-cloud-init.yml
 
+# Local agent tooling
+.codex/
+.openai/
+.playwright-mcp/
+.worktrees/
+
 # IDE
 .vscode/*
 !.vscode/extensions.json

@@ -3,6 +3,8 @@
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 BRANCH="${1:-main}"
 BASE_NAME="graphdone-base-${BRANCH}"
 SNAPSHOT_NAME="graphdone-snapshot-${BRANCH}"
@@ -10,7 +12,7 @@ SNAPSHOT_NAME="graphdone-snapshot-${BRANCH}"
 echo "=== Creating base image for branch: $BRANCH ==="
 
 # Launch VM without Tailscale, without auto-start
-./scripts/vm/multipass.sh launch \
+"$SCRIPT_DIR/multipass.sh" launch \
   --name "$BASE_NAME" \
   --branch "$BRANCH" \
   --no-tailscale \

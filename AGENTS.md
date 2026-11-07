@@ -33,6 +33,7 @@ through review. Local notes alone are not published knowledge.
 | `deployment/` | Dockerfiles and compose stacks ([map](deployment/README.md)). |
 | `.agents/` | Agent knowledge: incident lessons (`inbox/`), symptom indexes (`issues/`), playbooks. |
 | `.github/`, `.githooks/` | CI workflows and PR template; local git hooks. |
+| `README.md`, `AGENTS.md`, `CLAUDE.md`, `LICENSE` | The only root docs: overview, agent rules, project and testing conventions, licence. |
 | `start`, `Makefile` | The one-command launcher and its make shortcuts. |
 | root config | `package.json`, lockfile, `turbo.json`, `tsconfig.json`, `playwright.config.ts`, lint/format/ignore files, `.env*.example`. Only what a tool must find at the root. |
 
