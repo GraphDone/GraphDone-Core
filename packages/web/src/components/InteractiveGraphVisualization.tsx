@@ -58,7 +58,8 @@ import { mergeSimulationNodes, mergeSimulationEdges } from '../lib/graphDataMerg
 import type { ObstacleBox } from '../lib/edgeLabelLayout';
 import { createParallelEdgeRoute, edgeRouteLabel, edgeRouteArrowBounds, edgeSegmentHitsBox, projectEdgeRoutePointer, type EdgeRouteGeometry, type EdgeRouteLabel } from '../lib/edgeRouteGeometry';
 import { PerfMeter, DriftMeter } from '../lib/perfMeter';
-import { graphItemLayout, measureGraphText, edgeLabelDimensions, GRAPH_FONT_FAMILY, ITEM_TITLE_SIZE, ITEM_TITLE_LINE, ITEM_HEADER_HEIGHT, EDGE_LABEL_SIZE, ITEM_WIRE_WIDTH } from '../lib/graphSymbolLayout';
+import { computeGraphFit } from '../lib/graphFit';
+import { graphItemLayout, itemTitleScale, measureGraphText, edgeLabelDimensions, GRAPH_FONT_FAMILY, ITEM_TITLE_SIZE, ITEM_TITLE_LINE, ITEM_HEADER_HEIGHT, EDGE_LABEL_SIZE, ITEM_WIRE_WIDTH } from '../lib/graphSymbolLayout';
 import { placeItemLabels } from '../lib/edgeLabelPlacement';
 import { separateCards } from '../lib/separateCards';
 import { DEFAULT_PHYSICS, collisionRadius, linkDistance, linkMaxDistance, linkStrength } from '../lib/physicsConfig';
@@ -253,6 +254,17 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const expandedNodeIdRef = useRef<string | null>(null);
   const expandedReturnFocusIdRef = useRef<string | null>(null);
   expandedNodeIdRef.current = expandedNode?.id ?? null;
+  // Return focus to a card's header control after its dialog closes. Compact
+  // cards hide their header controls and are themselves the keyboard control,
+  // so focus the card then instead of losing focus to <body>.
+  const focusNodeControl = useCallback((nodeId: string, selector: string) => {
+    const trigger = Array.from(
+      containerRef.current?.querySelectorAll<SVGGElement>(selector) ?? []
+    ).find(element => element.dataset.nodeId === nodeId);
+    const card = trigger?.closest<SVGGElement>('.node');
+    (card?.getAttribute('data-detail') === 'compact' ? card : trigger)?.focus({ preventScroll: true });
+    return trigger;
+  }, []);
   const closeExpandedNode = useCallback(() => {
     const returnFocusId = expandedReturnFocusIdRef.current;
     expandedReturnFocusIdRef.current = null;
@@ -261,14 +273,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     requestAnimationFrame(() => {
       const active = document.activeElement;
       if (active && active !== document.body) return;
-      const trigger = Array.from(
-        containerRef.current?.querySelectorAll<SVGGElement>('.node-expand-icon') ?? []
-      ).find(element => element.dataset.nodeId === returnFocusId);
-      trigger?.setAttribute('aria-expanded', 'false');
-      const card = trigger?.closest<SVGGElement>('.node');
-      (card?.getAttribute('data-detail') === 'compact' ? card : trigger)?.focus({ preventScroll: true });
+      focusNodeControl(returnFocusId, '.node-expand-icon')?.setAttribute('aria-expanded', 'false');
     });
-  }, []);
+  }, [focusNodeControl]);
   const toggleExpandedNode = useCallback((n: WorkItem) => {
     setExpandedNode((prev) => (prev?.id === n.id ? null : n));
   }, []);
@@ -501,12 +508,9 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     requestAnimationFrame(() => {
       const active = document.activeElement;
       if (active && active !== document.body) return;
-      const trigger = Array.from(
-        containerRef.current?.querySelectorAll<SVGGElement>('.node-edit-icon') ?? []
-      ).find(element => element.dataset.nodeId === returnFocusId);
-      trigger?.focus({ preventScroll: true });
+      focusNodeControl(returnFocusId, '.node-edit-icon');
     });
-  }, []);
+  }, [focusNodeControl]);
   useEffect(() => {
     if (!quickEditRequest) return;
     setInlineEdit(null);
@@ -1612,6 +1616,29 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     itemLayoutCache.current.set(d, { title: d.title, type: d.type, description: d.description, subgraphId: d.subgraphId, scale: itemPresentationScaleRef.current, layout });
     return layout;
   }, []);
+  // Card geometry at an arbitrary scale (camera fitting measures the scale it is
+  // about to present, not the current one). Geometry depends on scale only
+  // through full/compact and the compact title scale, so any scale with the
+  // same key as the presented one reuses the presented layout, and other keys
+  // keep a small bounded per-item cache (a live resize refits every frame).
+  const itemLayoutAtCache = useRef(new WeakMap<object, { title: string; type: string; description: unknown; subgraphId: unknown; layouts: Map<number, ReturnType<typeof graphItemLayout>> }>());
+  const getNodeDimensionsAt = useCallback((d: WorkItem, scale: number) => {
+    const layoutKey = (value: number) => value >= 1 ? 0 : itemTitleScale(value);
+    const key = layoutKey(scale);
+    if (key === layoutKey(itemPresentationScaleRef.current)) return getNodeDimensions(d);
+    let entry = itemLayoutAtCache.current.get(d);
+    if (!entry || entry.title !== d.title || entry.type !== d.type || entry.description !== d.description || entry.subgraphId !== d.subgraphId) {
+      entry = { title: d.title, type: d.type, description: d.description, subgraphId: d.subgraphId, layouts: new Map() };
+      itemLayoutAtCache.current.set(d, entry);
+    }
+    let layout = entry.layouts.get(key);
+    if (!layout) {
+      layout = graphItemLayout(d, measureGraphText, scale);
+      if (entry.layouts.size >= 4) entry.layouts.delete(entry.layouts.keys().next().value!);
+      entry.layouts.set(key, layout);
+    }
+    return layout;
+  }, [getNodeDimensions]);
 
   // Smart data update function - only reinitializes when necessary, preserves camera position
   const updateVisualizationData = useCallback(() => {
@@ -3458,11 +3485,24 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     });
 
     let nodePresentationScales = new WeakMap<WorkItem, number>();
+    const compactFocusOrigins = new WeakMap<SVGGElement, string>();
     const updateNodePresentationFor = (element: SVGGElement, d: WorkItem) => {
       const presentedScale = itemPresentationScaleRef.current;
       if (nodePresentationScales.get(d) === presentedScale) return;
       nodePresentationScales.set(d, presentedScale);
         const node = d3.select(element), layout = getNodeDimensions(d);
+        // Changing detail hides one keyboard control and reveals another: the
+        // header icons exist only on full cards, the card itself is the control
+        // when compact. Move focus with it so it never falls back to <body>.
+        // Only keyboard focus moves: a mouse user who clicked a card is not
+        // handed a highlighted header icon. The compact card remembers which
+        // icon it stood in for, so zooming back returns to that icon.
+        const active = document.activeElement;
+        const keyboardFocus = active instanceof Element && element.contains(active) && active.matches(':focus-visible');
+        const focusedHeaderControl = keyboardFocus && active !== element
+          ? active.closest<SVGGElement>('.node-edit-icon, .node-relationship-icon, .node-expand-icon, .node-descend-icon')
+          : null;
+        const focusedCard = keyboardFocus && active === element;
         node.attr('data-detail', layout.compact ? 'compact' : 'full').attr('role', layout.compact ? 'button' : 'group').attr('tabindex', layout.compact ? 0 : null).attr('aria-label', `${d.title}, ${getTypeConfig(d.type as WorkItemType).label}`);
         node.on('keydown.compact', (event: KeyboardEvent) => {
           if (layout.compact && event.target === element && (event.key === 'Enter' || event.key === ' ')) openQuickEdit(event, d);
@@ -3482,6 +3522,14 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         renderItemMetadata(element, d, layout);
         node.selectAll('.node-title-bar, .node-type-text, .node-edit-icon, .node-relationship-icon, .node-expand-icon, .node-descend-icon, .node-description-text, .node-meta, .node-subgraph-count, .node-subgraph-stack')
           .style('display', () => layout.compact ? 'none' : null);
+        if (layout.compact && focusedHeaderControl) {
+          compactFocusOrigins.set(element, focusedHeaderControl.getAttribute('class') ?? 'node-edit-icon');
+          element.focus({ preventScroll: true });
+        } else if (!layout.compact && focusedCard) {
+          const origin = compactFocusOrigins.get(element) ?? 'node-edit-icon';
+          compactFocusOrigins.delete(element);
+          (element.querySelector<SVGGElement>(`.${origin}`) ?? element.querySelector<SVGGElement>('.node-edit-icon'))?.focus({ preventScroll: true });
+        }
     };
     const updateNodePresentation = () => {
       g.attr('data-presentation-scale', itemPresentationScaleRef.current);
@@ -4040,30 +4088,10 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     const width = container.clientWidth;
     const height = container.clientHeight;
 
-    // Bounding box of the actual cards, not just their centers
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    simNodes.forEach((node: any) => {
-      if (typeof node.x !== 'number' || typeof node.y !== 'number') return;
-      const dims = getNodeDimensions(node);
-      minX = Math.min(minX, node.x - dims.width / 2);
-      maxX = Math.max(maxX, node.x + dims.width / 2);
-      minY = Math.min(minY, node.y - dims.height / 2);
-      maxY = Math.max(maxY, node.y + dims.height / 2);
-    });
-
-    if (!isFinite(minX)) return false; // No valid positions yet
-
-    const padding = 60;
-    minX -= padding; maxX += padding; minY -= padding; maxY += padding;
-
-    const boundsWidth = Math.max(1, maxX - minX);
-    const boundsHeight = Math.max(1, maxY - minY);
-
-    // Fixed graph controls can cover an otherwise correctly fitted card. Find
-    // the largest useful rectangle that avoids every control and the MiniMap,
-    // then fit the cards inside it. This keeps fitted cards readable and
-    // clickable in phone landscape as well as on desktop.
-    let fitRegion = { x: 0, y: 0, width, height };
+    // Fixed graph controls can cover an otherwise correctly fitted card. Fit
+    // the cards inside the largest rectangle that avoids every control and the
+    // MiniMap, measuring each card with the geometry it will have at the fitted
+    // scale (full at 100% and above, compact below) so repeated fits settle.
     const containerRect = container.getBoundingClientRect();
     const gap = 12;
     const obstacles = Array.from(document.querySelectorAll<HTMLElement>('[data-graph-fit-obstacle="true"]'))
@@ -4075,48 +4103,16 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           right: Math.max(0, Math.min(width, rect.right - containerRect.left + gap)),
           bottom: Math.max(0, Math.min(height, rect.bottom - containerRect.top + gap)),
         };
-      })
-      .filter(obstacle => obstacle.right > obstacle.left && obstacle.bottom > obstacle.top);
-    if (obstacles.length > 0) {
-      const xs = Array.from(new Set([0, width, ...obstacles.flatMap(obstacle => [obstacle.left, obstacle.right])])).sort((a, b) => a - b);
-      const ys = Array.from(new Set([0, height, ...obstacles.flatMap(obstacle => [obstacle.top, obstacle.bottom])])).sort((a, b) => a - b);
-      const candidates: typeof fitRegion[] = [];
-      for (let leftIndex = 0; leftIndex < xs.length - 1; leftIndex += 1) {
-        for (let rightIndex = leftIndex + 1; rightIndex < xs.length; rightIndex += 1) {
-          for (let topIndex = 0; topIndex < ys.length - 1; topIndex += 1) {
-            for (let bottomIndex = topIndex + 1; bottomIndex < ys.length; bottomIndex += 1) {
-              const region = {
-                x: xs[leftIndex],
-                y: ys[topIndex],
-                width: xs[rightIndex] - xs[leftIndex],
-                height: ys[bottomIndex] - ys[topIndex],
-              };
-              const overlapsObstacle = obstacles.some(obstacle =>
-                region.x < obstacle.right && region.x + region.width > obstacle.left
-                && region.y < obstacle.bottom && region.y + region.height > obstacle.top
-              );
-              if (!overlapsObstacle && region.width > 0 && region.height > 0) candidates.push(region);
-            }
-          }
-        }
-      }
-      const fitScale = (region: typeof fitRegion) =>
-        Math.min(region.width / boundsWidth, region.height / boundsHeight, 1.25);
-      if (candidates.length > 0) {
-        fitRegion = candidates.reduce((best, region) => {
-          const bestScale = fitScale(best);
-          const nextScale = fitScale(region);
-          if (nextScale !== bestScale) return nextScale > bestScale ? region : best;
-          return region.width * region.height > best.width * best.height ? region : best;
-        });
-      }
-    }
-
-    // Fit, but never zoom IN past 1.25 (a 3-node graph shouldn't fill the screen)
-    const scale = Math.min(fitRegion.width / boundsWidth, fitRegion.height / boundsHeight, 1.25);
-
-    const translateX = fitRegion.x + fitRegion.width / 2 - ((minX + maxX) / 2) * scale;
-    const translateY = fitRegion.y + fitRegion.height / 2 - ((minY + maxY) / 2) * scale;
+      });
+    const fit = computeGraphFit({
+      width,
+      height,
+      obstacles,
+      cards: simNodes.filter((node: any) => typeof node.x === 'number' && typeof node.y === 'number'),
+      dimensionsAt: getNodeDimensionsAt,
+    });
+    if (!fit) return false; // No valid positions yet
+    const { scale, translateX, translateY } = fit;
     const transform = d3.zoomIdentity.translate(translateX, translateY).scale(scale);
 
     // Use the component's own zoom behavior so handlers fire and state stays
@@ -4128,7 +4124,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       svg.call(d3.zoom<SVGSVGElement, unknown>().transform as any, transform);
     }
     return true;
-  }, [getNodeDimensions]);
+  }, [getNodeDimensionsAt]);
   // Latest fit fn in a ref so the once-per-graph camera effect can call it WITHOUT
   // listing it as a dep — its identity churns during settle, which would otherwise
   // cancel the fit timer before it fires (the bug that left graphs off-screen).

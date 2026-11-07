@@ -57,6 +57,16 @@ export function fitGraphText(
   };
 }
 
+/**
+ * Compact cards (below 100%) enlarge their title so it stays readable on
+ * screen. Card geometry depends on scale only through this value.
+ */
+export function itemTitleScale(scale: number) {
+  return scale < 1
+    ? Math.max(1, 14 / (ITEM_TITLE_SIZE * Math.max(0.3, scale)))
+    : 1;
+}
+
 export function graphItemLayout(
   item: {
     title: string;
@@ -68,9 +78,7 @@ export function graphItemLayout(
   scale = 1
 ) {
   const compact = scale < 1;
-  const titleScale = compact
-    ? Math.max(1, 14 / (ITEM_TITLE_SIZE * Math.max(0.3, scale)))
-    : 1;
+  const titleScale = itemTitleScale(scale);
   const width = Math.min(
     compact ? 240 : 320,
     Math.max(

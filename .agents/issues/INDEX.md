@@ -2,6 +2,7 @@
 
 | Symptom | Canonical lesson and regression |
 | --- | --- |
+| Zoom to fit alternates compact/full cards on phones; focus returned after quick edit or expand lands on `<body>` | [Fit the presented geometry; focus follows detail](../inbox/2026-11-07-fit-must-measure-presented-geometry.md); `graphFit.test.ts`, `fit-focus.spec.ts`, `agent-approval.spec.ts` |
 | Overview zoom exceeds five seconds while original item groups are hidden | [Hidden items must not delay overview](../inbox/2026-10-29-hidden-items-must-not-delay-overview.md); issue #235, retained actual-dev 2k failure |
 | Overview wires cannot be hovered, do not light endpoints, or lose focus when their route disappears | [Interaction geometry and original-edge inspection](../inbox/2026-10-28-overview-wires-need-interaction-geometry.md); `OverviewBusLayer`, semantic LOD and 2k bus inspection journeys |
 | Your agent mixes setup, existing access and notes; narrow permission text clips, or unavailable access looks empty | [Separate task regions and honest availability](../inbox/2026-10-28-agent-setup-needs-separate-task-regions.md); `agent-connection` browser sequence and `AgentConnection.test.tsx` |
