@@ -306,8 +306,8 @@ it('keeps cards in place when a restored camera settles before its prop re-rende
   // Reload on a slow device: the layer activates at the initial identity
   // camera, the saved camera is restored and settles, and a deferred rebase
   // frame runs before React re-renders the layer with the restored prop.
-  const frames: FrameRequestCallback[] = [];
-  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => frames.push(callback));
+  const frames: ((time: number) => void)[] = [];
+  vi.stubGlobal('requestAnimationFrame', (callback: (time: number) => void) => frames.push(callback));
   vi.stubGlobal('cancelAnimationFrame', () => {});
   const flush = () => act(() => { while (frames.length) frames.shift()!(0); });
   const props = propsFor(),
