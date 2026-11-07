@@ -13,12 +13,12 @@ for (const [width,height] of [[390,844],[844,390],[1440,900]]) test(`human and a
   const geometry=await panel.evaluate(el=>{
    const box=(target:Element)=>{const r=target.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom};};
    const sections=[...el.querySelectorAll('section')].map(section=>({heading:section.querySelector('h3')?.textContent,box:box(section),overflow:section.scrollWidth-section.clientWidth}));
-   const controls=[...el.querySelectorAll('input,select,textarea,button')].filter(x=>x.getClientRects().length).map(x=>({box:box(x),font:Number.parseFloat(getComputedStyle(x).fontSize),weight:Number.parseInt(getComputedStyle(x).fontWeight)}));
+   const controls=[...el.querySelectorAll('input,select,textarea,button')].filter(x=>x.getClientRects().length).map(x=>({tag:x.tagName,box:box(x),font:Number.parseFloat(getComputedStyle(x).fontSize),weight:Number.parseInt(getComputedStyle(x).fontWeight)}));
    return {panel:box(el),overflow:el.scrollWidth-el.clientWidth,sections,controls};
   });
   expect(geometry.overflow).toBeLessThanOrEqual(1);
   for(const section of geometry.sections)expect(section.overflow).toBeLessThanOrEqual(1);
-  for(const control of geometry.controls){expect(control.box.height).toBeGreaterThanOrEqual(44);expect(control.box.x).toBeGreaterThanOrEqual(geometry.panel.x);expect(control.box.right).toBeLessThanOrEqual(geometry.panel.right);expect(control.font).toBeGreaterThanOrEqual(14);expect(control.weight).toBeGreaterThanOrEqual(500);}
+  for(const control of geometry.controls){expect(control.box.height).toBeGreaterThanOrEqual(44);expect(control.box.x).toBeGreaterThanOrEqual(geometry.panel.x);expect(control.box.right).toBeLessThanOrEqual(geometry.panel.right);expect(control.font).toBeGreaterThanOrEqual(14);expect(control.weight).toBeGreaterThanOrEqual(500);if(control.tag==='SELECT')expect(control.box.width,'short choice lists stay compact').toBeLessThanOrEqual(384);}
   if(label==='initial'){
    const [setup,access,notes]=geometry.sections;
    if(width>=1024){expect(notes.box.x-setup.box.right).toBeGreaterThanOrEqual(16);expect(Math.abs(notes.box.y-setup.box.y)).toBeLessThanOrEqual(1);}
