@@ -14,6 +14,7 @@ export const SEQUENCES = {
   // Blocking signal
   'unit-web': { adapter: 'vitest', title: 'Web unit tests', cwd: 'packages/web', blocking: true },
   'smoke': { adapter: 'playwright', title: 'Smoke gate (THE GATE)', args: ['tests/e2e/smoke/user-smoke.spec.ts', `--project=${PW}`], blocking: true },
+  'prod-smoke': { adapter: 'playwright', title: 'Production stack smoke gate', args: ['tests/e2e/smoke/user-smoke.spec.ts', `--project=${PW}`, '--headed', '--workers=1', '--retries=0', '--trace=retain-on-failure'], blocking: true },
   'new-user': { adapter: 'playwright', title: 'Headed new-user acceptance', args: [
     'tests/e2e/quality/new-user-modes.spec.ts',
     'tests/e2e/quality/button-content.spec.ts',

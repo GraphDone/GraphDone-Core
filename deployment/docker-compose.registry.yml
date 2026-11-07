@@ -3,7 +3,7 @@ name: graphdone
 services:
   graphdone-neo4j:
     container_name: graphdone-neo4j
-    image: ghcr.io/graphdone/graphdone-neo4j:fix-first-start
+    image: ghcr.io/graphdone/graphdone-neo4j:latest
     pull_policy: always
     privileged: true
     environment:
@@ -39,7 +39,7 @@ services:
 
   graphdone-api:
     container_name: graphdone-api
-    image: ghcr.io/graphdone/graphdone-api:fix-first-start
+    image: ghcr.io/graphdone/graphdone-api:latest
     pull_policy: always
     privileged: true
     environment:
@@ -74,7 +74,7 @@ services:
 
   graphdone-web:
     container_name: graphdone-web
-    image: ghcr.io/graphdone/graphdone-web:fix-first-start
+    image: ghcr.io/graphdone/graphdone-web:latest
     pull_policy: always
     privileged: true
     environment:
