@@ -38,12 +38,21 @@ jobs:
       - name: Run all unit suites (core, web, server, mcp-server)
         run: npm run test:coverage && npm run test:unified:lib
 
-  # Genuinely-real checks: the installer exists, deployment compose parses
+  # Genuinely-real checks: the installer installs a ref that exists and can
+  # fetch its code, and the deployment compose files parse
   installer-and-deploy-config:
     name: Installer & Deploy Config
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.18.0'
+      - name: Installer ref and image-tag contract
+        run: node --test tests/toolchain/installer-contract.mjs
+      - name: Installer end to end in a container (clone, update, setup-script URLs)
+        run: sh tests/integration/installer-container.sh
       - name: Installation script present and executable
         run: |
           test -f scripts/install.sh || { echo "::error::scripts/install.sh missing"; exit 1; }
@@ -51,9 +60,11 @@ jobs:
           echo "✅ installer present"
       - name: Production docker compose config is valid
         run: |
-          docker compose -f deployment/docker-compose.yml config > /dev/null \
-            && echo "✅ deployment/docker-compose.yml is valid" \
-            || { echo "::error::deployment/docker-compose.yml failed to parse"; exit 1; }
+          for file in deployment/docker-compose.yml deployment/docker-compose.registry.yml; do
+            docker compose -f "$file" config > /dev/null \
+              && echo "✅ $file is valid" \
+              || { echo "::error::$file failed to parse"; exit 1; }
+          done
 
   # Honest PR comment derived from real job outcomes (no fabricated numbers)
   report:

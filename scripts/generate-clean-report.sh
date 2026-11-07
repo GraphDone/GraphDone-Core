@@ -666,7 +666,7 @@ cat > "$HTML_REPORT" << 'HTMLEOF'
         <!-- Footer -->
         <div class="footer">
             <p><strong>Test Report Generated:</strong> REPLACE_TIMESTAMP</p>
-            <p>GraphDone v0.3.1-alpha | Test Infrastructure v1.0.0</p>
+            <p>GraphDone | Test Infrastructure v1.0.0</p>
             <p>Test Run ID: REPLACE_UUID | Git Commit: REPLACE_COMMIT</p>
         </div>
     </div>

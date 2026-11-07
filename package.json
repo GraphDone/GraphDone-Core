@@ -1,6 +1,6 @@
 {
   "name": "graphdone",
-  "version": "0.3.1-alpha",
+  "version": "0.4.0-alpha",
   "description": "Management for teams who think differently",
   "private": true,
   "workspaces": [
@@ -33,6 +33,7 @@
     "dashboard:open": "node tests/lib/dashboard/server.mjs --open",
     "dashboard:narrate": "node scripts/narrate-report.mjs",
     "test:installation": "./scripts/test-installation-simple.sh",
+    "test:installer": "node --test tests/toolchain/installer-contract.mjs && sh tests/integration/installer-container.sh",
     "test:https": "node tests/integration/ssl-certificate-analysis.js && node tests/integration/mobile-https-compatibility-test.js",
     "test:report": "open test-artifacts/unified/report.html",
     "lint": "turbo run lint",

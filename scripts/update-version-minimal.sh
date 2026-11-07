@@ -1,62 +1,63 @@
 #!/bin/bash
+# Set the release version everywhere it is recorded.
+#
+#   scripts/update-version-minimal.sh 0.4.0-alpha
+#
+# Manifests and their package-lock.json entries are edited in place (no
+# re-resolution); the remaining copies (runtime-reported versions, local image
+# tags, installer fallback, README badge) are listed in
+# tests/toolchain/version-contract.mjs, which fails CI if any of them is missed.
+set -euo pipefail
 
-# Minimal version update script
-# Only updates what absolutely cannot read from root package.json
-
-set -e
-
-NEW_VERSION="$1"
-
-if [ -z "$NEW_VERSION" ]; then
-    echo "Usage: $0 <version>"
-    echo "Example: $0 0.3.2-alpha"
+NEW_VERSION="${1:-}"
+if ! [[ "$NEW_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$ ]]; then
+    echo "Usage: $0 <MAJOR.MINOR.PATCH[-suffix]>   e.g. $0 0.4.0-alpha" >&2
     exit 1
 fi
+cd "$(dirname "$0")/.."
 
-echo "Updating version to $NEW_VERSION..."
+OLD_VERSION="$(node -p "require('./package.json').version")"
+echo "Updating version $OLD_VERSION -> $NEW_VERSION"
 
-# 1. Update root package.json (THE single source of truth)
-echo "✓ Updating root package.json..."
-sed -i.bak "s/\"version\": \"[0-9]*\.[0-9]*\.[0-9]*-alpha\"/\"version\": \"$NEW_VERSION\"/" package.json
-rm package.json.bak
+# 1. Root and workspace manifests, plus their entries in package-lock.json.
+#    Only the version fields change: re-resolving the lockfile (npm version,
+#    npm install) would also rewrite unrelated dev/peer flags.
+NEW_VERSION="$NEW_VERSION" node - <<'NODE'
+const fs = require('fs');
+const version = process.env.NEW_VERSION;
+const edit = (file, change) => {
+  const json = JSON.parse(fs.readFileSync(file, 'utf8'));
+  change(json);
+  fs.writeFileSync(file, `${JSON.stringify(json, null, 2)}\n`);
+};
+const workspaces = fs.readdirSync('packages').filter(dir => fs.existsSync(`packages/${dir}/package.json`));
+edit('package.json', json => { json.version = version; });
+for (const dir of workspaces) edit(`packages/${dir}/package.json`, json => { json.version = version; });
+edit('package-lock.json', lock => {
+  lock.version = version;
+  lock.packages[''].version = version;
+  for (const dir of workspaces) if (lock.packages[`packages/${dir}`]) lock.packages[`packages/${dir}`].version = version;
+});
+NODE
 
-# 2. Update Docker image tags (cannot read package.json at build time)
-echo "✓ Updating Docker image tags..."
-for compose in deployment/docker-compose*.yml; do
-    if [ -f "$compose" ]; then
-        sed -i.bak "s/gd-core-[^:]*:[0-9]*\.[0-9]*\.[0-9]*-alpha/&/g; s/:[0-9]*\.[0-9]*\.[0-9]*-alpha/:$NEW_VERSION/g" "$compose"
-        rm "$compose.bak"
-    fi
+# 2. Every other recorded copy of the old version (exact-string replacement).
+replace() { # file old new
+    OLD="$2" NEW="$3" perl -0pi -e 's/\Q$ENV{OLD}\E/$ENV{NEW}/g' "$1"
+}
+for file in \
+    packages/web/src/utils/version.ts \
+    packages/web/.env.example \
+    packages/mcp-server/src/index.ts \
+    packages/mcp-server/src/health-server.ts \
+    packages/mcp-server/tests/health-server.test.ts \
+    packages/mcp-server/tests/neo4j-contract.test.ts \
+    packages/server/src/index.ts \
+    scripts/install.sh \
+    deployment/docker-compose.yml \
+    deployment/docker-compose.http.yml; do
+    replace "$file" "$OLD_VERSION" "$NEW_VERSION"
 done
+replace README.md "badge/version-${OLD_VERSION//-/--}-" "badge/version-${NEW_VERSION//-/--}-"
 
-# 3. Update web version utility
-echo "✓ Updating web version utility..."
-sed -i.bak "s/APP_VERSION = '[0-9]*\.[0-9]*\.[0-9]*-alpha'/APP_VERSION = '$NEW_VERSION'/g" packages/web/src/utils/version.ts
-rm packages/web/src/utils/version.ts.bak
-
-# 4. Update README badge
-echo "✓ Updating README version badge..."
-sed -i.bak "s/version-[0-9]*\.[0-9]*\.[0-9]*--alpha/version-${NEW_VERSION//./-}/g" README.md
-rm README.md.bak
-
-# 5. Update MCP server hardcoded versions
-echo "✓ Updating MCP server versions..."
-sed -i.bak "s/version: '[0-9]*\.[0-9]*\.[0-9]*-alpha'/version: '$NEW_VERSION'/g" packages/mcp-server/src/index.ts
-sed -i.bak "s/version: '[0-9]*\.[0-9]*\.[0-9]*-alpha'/version: '$NEW_VERSION'/g" packages/mcp-server/src/health-server.ts
-sed -i.bak "s/toBe('[0-9]*\.[0-9]*\.[0-9]*-alpha')/toBe('$NEW_VERSION')/g" packages/mcp-server/tests/health-server.test.ts
-rm packages/mcp-server/src/index.ts.bak packages/mcp-server/src/health-server.ts.bak packages/mcp-server/tests/health-server.test.ts.bak
-
-
-echo
-echo "🎉 Version updated to $NEW_VERSION"
-echo
-echo "📝 What was updated:"
-echo "   • Root package.json (source of truth)"
-echo "   • Docker image tags (can't import from package.json)"  
-echo "   • README.md version badge"
-echo "   • MCP server hardcoded versions"
-echo "   • Web version utility constant"
-echo
-echo "📦 Everything else imports automatically from root package.json!"
-echo
-echo "🚀 Next: npm install && git add . && git commit -m \"Update version to v$NEW_VERSION\""
+node --test tests/toolchain/version-contract.mjs >/dev/null
+echo "Version $NEW_VERSION recorded everywhere (tests/toolchain/version-contract.mjs passes)."

@@ -107,7 +107,7 @@ const PORT = Number(process.env.PORT) || 4127;
 async function startServer() {
   // Use the start time from ./start command if available, otherwise use current time
   const startTime = process.env.GRAPHDONE_START_TIME ? parseInt(process.env.GRAPHDONE_START_TIME) : Date.now();
-  console.log('🚀 GraphDone Server v0.3.1-alpha starting...'); // eslint-disable-line no-console
+  console.log('🚀 GraphDone Server v0.4.0-alpha starting...'); // eslint-disable-line no-console
   if (process.env.GRAPHDONE_START_TIME) {
     console.log(`🕰️ Using ./start command timing: ${process.env.GRAPHDONE_START_TIME}`); // eslint-disable-line no-console
   }

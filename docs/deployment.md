@@ -269,6 +269,15 @@ GRAPHDONE_HOME=/opt/graphdone curl -fsSL https://graphdone.com/start.sh | sh
 GRAPHDONE_NO_START=1 curl -fsSL https://graphdone.com/start.sh | sh
 ```
 
+`scripts/install.sh` installs `main`, the branch it is served from. To install
+a release tag or another branch, set `GRAPHDONE_REF` for the shell that runs it
+(the clone, updates of `~/graphdone` and the setup-script downloads all follow
+it). `sh install.sh sources` prints the repository, ref and URLs it will use:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/GraphDone/GraphDone-Core/main/scripts/install.sh | GRAPHDONE_REF=dev sh
+```
+
 ## Updating GraphDone
 
 Users can update their installation by running the same command:

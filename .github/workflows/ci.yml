@@ -36,7 +36,7 @@ jobs:
       - name: Test evidence and runner regressions
         run: npm run test:unified:lib
       - name: Repository root allowlist and public-content guard
-        run: node --test tests/toolchain/repo-root-contract.mjs tests/toolchain/public-content-contract.mjs
+        run: node --test tests/toolchain/repo-root-contract.mjs tests/toolchain/public-content-contract.mjs tests/toolchain/version-contract.mjs
       - name: Schematic routing visual gate
         run: |
           npm run report:schematic -- --out test-artifacts/ci-schematic-routing
