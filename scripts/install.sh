@@ -2929,7 +2929,7 @@ install_graphdone() {
     printf "\n\n"
 
     # Fetch latest version from GitHub releases
-    GRAPHDONE_VERSION="v0.3.1-alpha"  # Fallback version
+    GRAPHDONE_VERSION="v0.4.0-alpha"  # Fallback version
     if command -v curl >/dev/null 2>&1; then
         LATEST_VERSION=$(curl -sf --max-time 3 https://api.github.com/repos/GraphDone/GraphDone-Core/releases/latest 2>/dev/null | grep -o '"tag_name": *"[^"]*"' | sed 's/"tag_name": *"\(.*\)"/\1/' 2>/dev/null)
         if [ -n "$LATEST_VERSION" ]; then
