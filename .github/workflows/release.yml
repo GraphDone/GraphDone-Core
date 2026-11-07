@@ -1,10 +1,11 @@
 name: Release
 
 # Publishing a release: merge dev → main, wait for main's CI to go green, then
-# push a tag on that main commit (see docs/quality/RELEASE_GATES.md):
+# tag that main merge commit (see docs/quality/RELEASE_GATES.md):
 #   git tag -a v0.4.0-alpha <main sha> -m "GraphDone v0.4.0-alpha" && git push origin v0.4.0-alpha
-# This workflow refuses to publish unless the tag points at a main commit whose
-# required checks passed and whose package versions equal the tag.
+# Only admins can create v* tags (repository tag ruleset). This workflow refuses
+# to publish unless the tag is a commit main was at, whose main-push checks
+# passed and whose package versions equal the tag.
 # graphdone.com is deployed from GraphDone-Cloud, not from this repository.
 
 on:
@@ -13,8 +14,9 @@ on:
 
 permissions: {}
 
+# One run per tag; never cancel a release that has started publishing.
 concurrency:
-  group: release
+  group: release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -24,11 +26,10 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
-      checks: read
+      actions: read
     outputs:
       sha: ${{ steps.gate.outputs.sha }}
       version: ${{ steps.gate.outputs.version }}
-      latest: ${{ steps.gate.outputs.latest }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -37,7 +38,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Require a main commit with passing checks and matching versions
+      - name: Require a main commit with passing main-push checks and matching versions
         id: gate
         run: node scripts/verify-release.mjs
         env:
@@ -55,12 +56,19 @@ jobs:
       fail-fast: true
       matrix:
         include:
+          # Build arguments match the stack the production gate validated
+          # (deployment/docker-compose.yml).
           - image: web
             dockerfile: packages/web/Dockerfile
+            build-args: |
+              VITE_GRAPHQL_URL=https://localhost:3128/api/graphql
+              VITE_GRAPHQL_WS_URL=wss://localhost:3128/api/graphql
           - image: api
             dockerfile: packages/server/Dockerfile
+            build-args: ''
           - image: neo4j
             dockerfile: deployment/neo4j.Dockerfile
+            build-args: ''
     steps:
       - uses: actions/checkout@v4
         with:
@@ -73,25 +81,18 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ github.token }}
-      - name: Image tags
-        id: tags
-        env:
-          IMAGE: ghcr.io/graphdone/graphdone-${{ matrix.image }}
-          VERSION: ${{ needs.verify.outputs.version }}
-          LATEST: ${{ needs.verify.outputs.latest }}
-        run: |
-          tags="$IMAGE:$VERSION"
-          if [[ "$LATEST" == "true" ]]; then tags="$tags,$IMAGE:latest"; fi
-          echo "tags=$tags" >> "$GITHUB_OUTPUT"
+      # Only the version tag here; `latest` moves for all images together in
+      # github-release, after every image has been published.
       - name: Build and push (amd64 + arm64)
         id: build
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ${{ matrix.dockerfile }}
+          build-args: ${{ matrix.build-args }}
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ steps.tags.outputs.tags }}
+          tags: ghcr.io/graphdone/graphdone-${{ matrix.image }}:${{ needs.verify.outputs.version }}
           provenance: mode=max
           sbom: true
           labels: |
@@ -115,10 +116,39 @@ jobs:
     name: Create GitHub release
     needs: [verify, images]
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     permissions:
       contents: write
+      packages: write
     steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.verify.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      # Decided now, from published releases, so a re-run cannot reuse a stale
+      # answer and move `latest` back to an older version.
+      - name: Decide whether this release becomes latest
+        id: latest
+        run: node scripts/verify-release.mjs --latest
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - uses: docker/login-action@v3
+        if: steps.latest.outputs.latest == 'true'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Move latest on all images together
+        if: steps.latest.outputs.latest == 'true'
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          for image in web api neo4j; do
+            docker buildx imagetools create -t "ghcr.io/graphdone/graphdone-$image:latest" "ghcr.io/graphdone/graphdone-$image:$VERSION"
+          done
       - uses: actions/download-artifact@v4
         with:
           pattern: digest-*
@@ -129,7 +159,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
           SHA: ${{ needs.verify.outputs.sha }}
-          LATEST: ${{ needs.verify.outputs.latest }}
+          LATEST: ${{ steps.latest.outputs.latest }}
         run: |
           {
             echo "Source: \`$SHA\`"

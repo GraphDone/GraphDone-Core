@@ -31,15 +31,28 @@ test('release runs only for version tags, one at a time, with no default permiss
   assert.deepEqual(Object.keys(doc.on), ['push']);
   assert.deepEqual(doc.on.push, { tags: ['v*.*.*'] });
   assert.deepEqual(doc.permissions, {});
-  assert.deepEqual(doc.concurrency, { group: 'release', 'cancel-in-progress': false });
+  assert.deepEqual(doc.concurrency, { group: 'release-${{ github.ref }}', 'cancel-in-progress': false });
+});
+
+test('images push only their version tag; latest moves for all images after every image published', () => {
+  const { jobs } = workflow('release');
+  const build = jobs.images.steps.find(step => step.uses?.startsWith('docker/build-push-action'));
+  assert.equal(build.with.tags, 'ghcr.io/graphdone/graphdone-${{ matrix.image }}:${{ needs.verify.outputs.version }}');
+  assert.equal(jobs.images.strategy['fail-fast'], true);
+  const decide = jobs['github-release'].steps.findIndex(step => step.run === 'node scripts/verify-release.mjs --latest');
+  const move = jobs['github-release'].steps.findIndex(step => /imagetools create/.test(step.run || ''));
+  assert.ok(decide >= 0 && move > decide, 'latest is decided in the final job, then moved');
+  assert.equal(jobs['github-release'].steps[move].if, "steps.latest.outputs.latest == 'true'");
+  const web = jobs.images.strategy.matrix.include.find(item => item.image === 'web');
+  assert.match(web['build-args'], /VITE_GRAPHQL_URL=https:\/\/localhost:3128\/api\/graphql/);
 });
 
 test('release writes happen only after the source gate, from the verified commit', () => {
   const { jobs } = workflow('release');
-  assert.deepEqual(jobs.verify.permissions, { contents: 'read', checks: 'read' });
+  assert.deepEqual(jobs.verify.permissions, { contents: 'read', actions: 'read' });
   assert.ok(jobs.verify.steps.some(step => step.run === 'node scripts/verify-release.mjs'));
   assert.deepEqual(jobs.images.permissions, { contents: 'read', packages: 'write' });
-  assert.deepEqual(jobs['github-release'].permissions, { contents: 'write' });
+  assert.deepEqual(jobs['github-release'].permissions, { contents: 'write', packages: 'write' });
   assert.equal(jobs.images.needs, 'verify');
   assert.deepEqual(jobs['github-release'].needs, ['verify', 'images']);
   for (const [name, job] of Object.entries(jobs)) {
@@ -49,7 +62,7 @@ test('release writes happen only after the source gate, from the verified commit
         assert.equal(step.with.ref, expected, `${name} checks out the verified commit`);
       }
       if (step.uses?.startsWith('docker/build-push-action')) assert.equal(name, 'images');
-      if (/gh\s+release/.test(step.run || '')) assert.equal(name, 'github-release');
+      if (/gh\s+release|imagetools/.test(step.run || '')) assert.equal(name, 'github-release');
     }
   }
 });

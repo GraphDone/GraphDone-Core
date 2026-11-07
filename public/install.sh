@@ -3732,7 +3732,7 @@ EOF
 
     # Smart deployment detection with animated progress
     # Test for pre-built containers in background
-    docker pull ghcr.io/graphdone/graphdone-web:fix-first-start >/dev/null 2>&1 &
+    docker pull ghcr.io/graphdone/graphdone-web:latest >/dev/null 2>&1 &
     check_pid=$!
 
     # Add pink color for the circle
