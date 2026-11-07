@@ -344,4 +344,8 @@ it('packs loose cards side by side on a landscape phone instead of stacking them
   // Portrait phone keeps them stacked; desktop keeps the 3:2 default packing.
   expect(extent({ width: 320, height: 568 })).toEqual({ rows: 2, columns: 1 });
   expect(extent({ width: 1440, height: 900 }).rows).toBe(2);
+  // Three or more loose cards on a portrait phone now form one readable
+  // column (the 3:2 rows put two side by side and shrank both to ~0.5).
+  const three = organizeTopology([...nodes, { id: 'third' }], [], () => ({ width: 240, height: 140 }), { width: 390, height: 844 });
+  expect(new Set([...three.positions.values()].map(point => Math.round(point.x))).size).toBe(1);
 });
