@@ -19,3 +19,4 @@
 Runtime image pruning and actual OS/npm inventories: [2026-10-27 consumer/persistence lesson](../inbox/2026-10-27-runtime-images-need-installed-consumer-proof.md), [image provenance and residuals](../../docs/quality/RUNTIME_IMAGE_PACKAGING_2026-10-27.md).
 
 | A fresh unchanged-source audit reports GraphQL Scalars or Hono node-server | [Remove unused code and validate the actual installed consumer](../inbox/2026-10-28-advisories-follow-installed-consumers.md); isolated static-path negative and Neo4j scalar contract |
+| Production audit reports glob/minimatch under Tailwind's sucrase | Lock sucrase 3.35.1 (drops glob, inside Tailwind's range, no override); `tests/lib/dependencies/sucrase.test.mjs` executes Tailwind's config loader |
