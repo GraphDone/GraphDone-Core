@@ -508,3 +508,25 @@ it('shifts phone rows below measured controls instead of wasting a viable third 
     }
   }
 });
+
+it('keeps the regular desktop grid when it already holds every overview card', () => {
+  // Hosted 1440px geometry: the control bar blocks the first row and the
+  // MiniMap one bottom slot. A phase shift would gain unused slots but spread
+  // eight groups over four rows and halve the clear routing lanes.
+  const obstacles = [
+    { left: 64, right: 1216, top: 12, bottom: 68 },
+    { left: 64, right: 308, top: 680, bottom: 738 },
+    { left: 12, right: 56, top: 12, bottom: 56 },
+    { left: 12, right: 56, top: 112, bottom: 156 },
+    { left: 12, right: 52, top: 64, bottom: 104 },
+    { left: 1104, right: 1360, top: 542, bottom: 734 },
+  ];
+  const anchors = Array.from({ length: 8 }, (_, i) => ({ id: String(i), x: 688, y: 375 }));
+  const layout = placeOverviewLabels(anchors, 1376, 750, obstacles);
+  expect(layout.placed).toHaveLength(8);
+  expect(layout.hidden).toHaveLength(0);
+  for (const card of layout.placed) expect((card.y - 64) % 160).toBe(0);
+  expect(new Set(layout.placed.map(card => card.y)).size).toBe(3);
+  // Capacity still reports the best phase for deciding how many fit.
+  expect(overviewLabelCapacity(1376, 750, obstacles)).toBeGreaterThanOrEqual(11);
+});

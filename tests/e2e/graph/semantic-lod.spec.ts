@@ -175,13 +175,12 @@ for (const width of [1440, 390])
       const initialGeometry = await overviewGeometry();
       const visual = await inspectSchematicOverview(overview, info, originalEdges.length, '301-overview', width === 390 ? 3 : 8);
       expect(visual.coverage.connectedDrawnGroups).toBe(width === 390 ? 3 : 8);
-      // Observed floor for this fixture's geometry. The desktop 13 recorded when
-      // this check was added never reproduced in the hosted runner: that commit,
-      // the current head and hosted CI all draw 11 of 38 directed pairs, and an
-      // unbudgeted replay of the captured router input reaches only 12 because
-      // each card side has a single port. More pairs need multi-port schematic
-      // routing (#220), not a looser layout.
-      expect(visual.coverage.drawnPairs).toBeGreaterThanOrEqual(width === 390 ? 4 : 11);
+      expect(visual.coverage.drawnPairs).toBeGreaterThanOrEqual(width === 390 ? 4 : 13);
+      // Drawn original links, not just pairs: a spread-out layout can keep the
+      // pair count while dropping the heavy buses.
+      expect(
+        visual.coverage.external - visual.coverage.deferred - visual.coverage.summarized
+      ).toBeGreaterThanOrEqual(width === 390 ? 45 : 101);
       await inspectOverviewBus(page, info, originalEdges, Object.fromEntries(seeded.nodeIds.map((id, index) => [id, `Subsystem ${index % 8}`])), ms => page.clock.runFor(ms));
       const longTitleItem = before.find(
         (item: { id: string }) => item.id === seeded.nodeIds[8]

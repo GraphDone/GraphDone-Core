@@ -778,7 +778,7 @@ export function SemanticGraphOverview({
               closeBrowser();
             }
           }}
-          className="absolute inset-x-3 top-28 bottom-3 sm:top-16 sm:inset-x-auto sm:left-16 sm:w-96 pointer-events-auto overflow-auto rounded-xl border border-gray-600 bg-gray-950 p-4 text-gray-100 shadow-xl"
+          className="absolute z-30 inset-x-3 top-28 bottom-3 sm:top-16 sm:inset-x-auto sm:left-16 sm:w-96 pointer-events-auto overflow-auto rounded-xl border border-gray-600 bg-gray-950 p-4 text-gray-100 shadow-xl"
           data-graph-fit-obstacle="true"
         >
           <div className="flex gap-2 items-start justify-between mb-3">

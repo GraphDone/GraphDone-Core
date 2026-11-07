@@ -377,7 +377,8 @@ type OverviewObstacle = {
 function overviewSlots(
   width: number,
   height: number,
-  obstacles: readonly OverviewObstacle[]
+  obstacles: readonly OverviewObstacle[],
+  needed = Infinity
 ) {
   const cardWidth = Math.min(240, Math.max(160, width - 32)),
     cardHeight = 96;
@@ -418,6 +419,10 @@ function overviewSlots(
         )
           candidate.push(slot);
       }
+    // Keep the regular grid whenever it already holds every card being
+    // placed: shifting rows only to gain unused slots spreads a desktop
+    // overview over more rows and leaves fewer clear routing lanes.
+    if (offset === 64 && candidate.length >= needed) return { slots: candidate, cardWidth, cardHeight };
     if (candidate.length > slots.length) slots = candidate;
   }
   return { slots, cardWidth, cardHeight };
@@ -449,7 +454,8 @@ export function placeOverviewLabels(
   const { slots, cardWidth, cardHeight } = overviewSlots(
     width,
     height,
-    obstacles
+    obstacles,
+    anchors.length
   );
   const placed: (OverviewAnchor & {
     anchorX: number;
