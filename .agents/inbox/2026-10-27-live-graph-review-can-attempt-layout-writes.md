@@ -9,7 +9,7 @@ read-only capture lessons before recording this finding.
 The existing harness at `01f0c4df1ba82eaaca9769d366886c76b99f0e6b` ran:
 
 ```text
-TEST_URL=http://127.0.0.1:8540 GRAPH_REVIEW_NAME='Graphlings Release' \
+TEST_URL=http://127.0.0.1:8540 GRAPH_REVIEW_NAME='<existing graph name>' \
 OPERATOR_CREDENTIAL_FILE=<existing private operator file> \
 PLAYWRIGHT_CHANNEL=chrome \
 GRAPH_REVIEW_OUT=test-artifacts/graph-lod-review/continuation-20261027 \
