@@ -1,5 +1,6 @@
 import { Page, expect } from '@playwright/test';
 import { testAdminCredentials } from './auth-credentials.mjs';
+import { completeAuthCaptcha } from './completeAuthCaptcha';
 
 /**
  * CRITICAL AUTHENTICATION HELPER
@@ -370,7 +371,16 @@ async function performFormLogin(page: Page, credentials: LoginCredentials, timeo
   
   // Wait for form validation
   await page.waitForTimeout(500);
-  
+
+  // Complete the verification the backend advertises (/config), like a user.
+  // Production requires it for sign-in; development stacks may not show one.
+  await expect(page.getByText('Loading verification…')).toHaveCount(0, { timeout });
+  const verification = page.getByTestId('server-captcha').or(page.getByLabel('Verification answer'));
+  if (await verification.first().isVisible()) {
+    console.log('   🧩 Completing sign-in verification...');
+    await completeAuthCaptcha(page);
+  }
+
   // Find and click submit button
   const submitSelectors = [
     'button:has-text("Sign In")',
