@@ -34,17 +34,61 @@ test('release runs only for version tags, one at a time, with no default permiss
   assert.deepEqual(doc.concurrency, { group: 'release-${{ github.ref }}', 'cancel-in-progress': false });
 });
 
-test('images push only their version tag; latest moves for all images after every image published', () => {
+const NATIVE = { amd64: 'ubuntu-24.04', arm64: 'ubuntu-24.04-arm' };
+
+function expandMatrix(matrix) {
+  // GitHub semantics for the forms used here: the cross product of the list
+  // keys, then each include entry adds its keys to every matching combination.
+  const keys = Object.keys(matrix).filter(key => key !== 'include');
+  let combos = [{}];
+  for (const key of keys) combos = combos.flatMap(combo => matrix[key].map(value => ({ ...combo, [key]: value })));
+  for (const extra of matrix.include ?? []) {
+    for (const combo of combos) {
+      if (keys.every(key => !(key in extra) || extra[key] === combo[key])) {
+        for (const [key, value] of Object.entries(extra)) if (!keys.includes(key)) combo[key] = value;
+      }
+    }
+  }
+  return combos;
+}
+
+for (const name of ['release', 'docker-publish']) {
+  test(`${name} builds every image natively for both architectures, without QEMU`, () => {
+    const { jobs } = workflow(name);
+    const job = jobs[name === 'release' ? 'images' : 'build'];
+    assert.equal(job['runs-on'], '${{ matrix.runner }}');
+    const combos = expandMatrix(job.strategy.matrix);
+    assert.equal(combos.length, 6);
+    for (const combo of combos) {
+      assert.equal(combo.runner, NATIVE[combo.arch], `${combo.image}/${combo.arch} runner`);
+      assert.ok(combo.dockerfile, `${combo.image}/${combo.arch} dockerfile`);
+    }
+    const build = job.steps.find(step => step.uses?.startsWith('docker/build-push-action'));
+    assert.equal(build.with.platforms, 'linux/${{ matrix.arch }}');
+    for (const each of Object.values(jobs)) for (const step of each.steps ?? []) assert.ok(!step.uses?.startsWith('docker/setup-qemu-action'));
+  });
+}
+
+test('platform builds push by digest only; version tags join both digests; latest moves after every image', () => {
   const { jobs } = workflow('release');
   const build = jobs.images.steps.find(step => step.uses?.startsWith('docker/build-push-action'));
-  assert.equal(build.with.tags, 'ghcr.io/graphdone/graphdone-${{ matrix.image }}:${{ needs.verify.outputs.version }}');
+  assert.equal(build.with.tags, undefined, 'platform builds push no tag');
+  assert.equal(build.with.push, undefined);
+  assert.equal(build.with.outputs, 'type=image,name=ghcr.io/graphdone/graphdone-${{ matrix.image }},push-by-digest=true,name-canonical=true,push=true');
   assert.equal(jobs.images.strategy['fail-fast'], true);
+  const web = expandMatrix(jobs.images.strategy.matrix).find(item => item.image === 'web');
+  assert.match(web['build-args'], /VITE_GRAPHQL_URL=https:\/\/localhost:3128\/api\/graphql/);
+
+  const join = jobs.manifests.steps.find(step => /imagetools create/.test(step.run || ''));
+  assert.match(join.run, /imagetools create -t "\$IMAGE:\$VERSION" "\$\{refs\[@\]\}"/);
+  assert.doesNotMatch(join.run, /latest/);
+  assert.match(join.run, /linux\/amd64,linux\/arm64/, 'the published index must hold both architectures');
+  assert.deepEqual(expandMatrix(jobs.manifests.strategy.matrix).map(item => item.image), ['web', 'api', 'neo4j']);
+
   const decide = jobs['github-release'].steps.findIndex(step => step.run === 'node scripts/verify-release.mjs --latest');
   const move = jobs['github-release'].steps.findIndex(step => /imagetools create/.test(step.run || ''));
   assert.ok(decide >= 0 && move > decide, 'latest is decided in the final job, then moved');
   assert.equal(jobs['github-release'].steps[move].if, "steps.latest.outputs.latest == 'true'");
-  const web = jobs.images.strategy.matrix.include.find(item => item.image === 'web');
-  assert.match(web['build-args'], /VITE_GRAPHQL_URL=https:\/\/localhost:3128\/api\/graphql/);
 });
 
 test('release writes happen only after the source gate, from the verified commit', () => {
@@ -52,9 +96,11 @@ test('release writes happen only after the source gate, from the verified commit
   assert.deepEqual(jobs.verify.permissions, { contents: 'read', actions: 'read' });
   assert.ok(jobs.verify.steps.some(step => step.run === 'node scripts/verify-release.mjs'));
   assert.deepEqual(jobs.images.permissions, { contents: 'read', packages: 'write' });
+  assert.deepEqual(jobs.manifests.permissions, { contents: 'read', packages: 'write' });
   assert.deepEqual(jobs['github-release'].permissions, { contents: 'write', packages: 'write' });
   assert.equal(jobs.images.needs, 'verify');
-  assert.deepEqual(jobs['github-release'].needs, ['verify', 'images']);
+  assert.deepEqual(jobs.manifests.needs, ['verify', 'images']);
+  assert.deepEqual(jobs['github-release'].needs, ['verify', 'manifests']);
   for (const [name, job] of Object.entries(jobs)) {
     for (const step of job.steps) {
       if (step.uses?.startsWith('actions/checkout')) {
@@ -62,7 +108,8 @@ test('release writes happen only after the source gate, from the verified commit
         assert.equal(step.with.ref, expected, `${name} checks out the verified commit`);
       }
       if (step.uses?.startsWith('docker/build-push-action')) assert.equal(name, 'images');
-      if (/gh\s+release|imagetools/.test(step.run || '')) assert.equal(name, 'github-release');
+      if (/imagetools create/.test(step.run || '')) assert.ok(['manifests', 'github-release'].includes(name), name);
+      if (/gh\s+release/.test(step.run || '')) assert.equal(name, 'github-release');
     }
   }
 });
