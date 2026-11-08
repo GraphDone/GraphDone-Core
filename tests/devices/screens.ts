@@ -132,10 +132,37 @@ export const UI_FIT_SCREENS: UiFitScreen[] = [
     },
   },
   {
+    // Tapping (or clicking) a card selects it and previews it: a peek sheet on
+    // a phone, the docked inspector elsewhere. Editing is one more tap.
+    id: 'graph-card-peek',
+    async open(page) {
+      await openView(page, 'graph');
+      const card = page.locator('.graph-container svg g.node .node-bg').first();
+      if (await page.evaluate(() => navigator.maxTouchPoints > 0)) await card.tap();
+      else await card.click();
+      await expect(page.getByTestId('node-inspector')).toBeVisible();
+      await settle(page, 800);
+    },
+  },
+  {
+    // Phones keep "which connections to draw" and Organize in a View sheet;
+    // larger screens show those controls on the canvas (graph-connections).
+    id: 'graph-view-options',
+    async open(page) {
+      await openConnections(page);
+      const view = page.getByRole('button', { name: 'View options', exact: true });
+      if (await view.isVisible()) {
+        await view.click();
+        await expect(page.getByTestId('graph-view-sheet')).toBeVisible();
+        await settle(page, 800);
+      }
+    },
+  },
+  {
     id: 'graph-grow',
     async open(page) {
       await useCardControl(page, '.node-relationship-icon');
-      await expect(page.getByText(/Click empty space to grow/i)).toBeVisible();
+      await expect(page.getByText(/Click empty space to grow|Tap empty space for a new item/i)).toBeVisible();
       await settle(page, 800);
     },
   },

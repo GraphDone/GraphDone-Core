@@ -23,7 +23,7 @@ for(const [width,height] of [[390,844],[844,390],[1440,900]])test(`studio visual
   await gql(page,'mutation($input:[EdgeCreateInput!]!){createEdges(input:$input){edges{id}}}',{input:[[0,1],[1,2],[2,4],[3,4],[4,5]].map(([a,b])=>({source:link(items[a].id),target:link(items[b].id),type:'DEPENDS_ON'}))});
   await page.evaluate(id=>{localStorage.setItem('currentGraphId',id);localStorage.setItem('graphdone:viewMode','graph');},graph);
   await page.goto('/');await expect(page.locator('.graph-container .node')).toHaveCount(6);
-  await page.getByRole('button',{name:'Zoom to fit — frame all nodes'}).click();await page.waitForTimeout(650);
+  await page.getByTestId('graph-zoom-extents').click();await page.waitForTimeout(650);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   const escapedTitles=await page.locator('.graph-container .node').evaluateAll(nodes=>nodes.filter(node=>{
    const card=node.querySelector('.node-bg')!.getBoundingClientRect();const title=node.querySelector('.node-title-group')!.getBoundingClientRect();

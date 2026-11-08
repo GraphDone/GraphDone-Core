@@ -117,7 +117,9 @@ const CardView: React.FC<CardViewProps> = ({ filteredNodes, handleEditNode, edge
         <span className="truncate min-w-0 flex-1">{node.assignedTo?.name||'Unassigned'}</span>
         {node.dueDate&&<span className="shrink-0">{new Date(node.dueDate).toLocaleDateString(undefined,{month:'short',day:'numeric'})}</span>}
         <span className="shrink-0" aria-label={`Priority ${Math.round(getNodePriority(node)*100)} percent`}>{getNodePriority(node)>=.8?'Critical':getNodePriority(node)>=.6?'High':getNodePriority(node)>=.4?'Normal':'Low'}</span>
-        <span className="shrink-0 text-emerald-200">{getStatusConfig(node.status as WorkItemStatus).label}</span>
+        {/* Each status keeps its own colour (as on graph cards); the dot carries
+            it so the label stays readable on any status. */}
+        <span className="shrink-0 inline-flex items-center gap-1.5 text-gray-200"><span aria-hidden="true" className="h-2 w-2 rounded-full" style={{background:getStatusConfig(node.status as WorkItemStatus).hexColor}}/>{getStatusConfig(node.status as WorkItemStatus).label}</span>
       </div>
     </button>)}
   </div>;

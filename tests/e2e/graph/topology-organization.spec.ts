@@ -190,9 +190,10 @@ for (const [width, height, size] of [
       path: beforePng,
       contentType: 'image/png',
     });
+    // On a phone, Organize lives in the View sheet (bottom-right controls).
+    if (width === 390) await page.getByRole('button', { name: 'View options', exact: true }).click();
     const button = page.getByRole('button', {
-      name: 'Organize around connections',
-      exact: true,
+      name: /^Organize around connections/,
     });
     await expect(button).toBeEnabled();
     const target = await button.boundingBox();
@@ -891,9 +892,8 @@ for (const [width, height] of [
       expect(hit.status).toBe(false);
       expect(hit.title).toContain('Ship the first idea');
       await page.touchscreen.tap(point.x, point.y);
-      // Exactly one opening action; a retry would hide a lost first touch.
-      await expect(page.getByTestId('quick-edit-surface')).toBeVisible({ timeout: 5000 });
-      await expect(page.getByTestId('quick-title')).toHaveValue('Ship the first idea');
+      // Exactly one action previews the card; a retry would hide a lost first touch.
+      await expect(page.getByTestId('node-inspector')).toContainText('Ship the first idea', { timeout: 5000 });
       // The camera did not move between the first presented card and the tap.
       const frames = await readFrames();
       expectOneCamera(frames);

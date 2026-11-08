@@ -61,10 +61,11 @@ test.describe('mobile experience @mobile', () => {
     await nav.getByText('Graph', { exact: true }).click();
     await page.waitForTimeout(3000);
 
-    // The lock toggle defaults to "Locked" so panning never drags a node/edge.
+    // "Move cards" starts off so panning never drags a node/edge.
     const lock = page.getByTestId('graph-lock-toggle');
     await expect(lock, 'graph lock toggle present on mobile').toBeVisible();
-    await expect(lock).toContainText('Locked');
+    await expect(lock).toHaveAccessibleName('Move cards');
+    await expect(lock).toHaveAttribute('aria-pressed', 'false');
 
     // Minimap is hidden on mobile; no connection banner while GraphQL is healthy.
     await expect(page.getByText('Mini-Map', { exact: true })).toHaveCount(0);

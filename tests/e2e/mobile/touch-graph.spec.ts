@@ -6,7 +6,7 @@ import { gql } from '../../lib/graphRequest';
 test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
 
 test.describe('mobile graph touch @mobile @touch', () => {
-  test('a locked-node touch opens its editor and persists the edited task', async ({ page }, info) => {
+  test('a locked-node touch previews the task, Edit opens its editor and the edit persists', async ({ page }, info) => {
     test.setTimeout(90000);
     await login(page, TEST_USERS.ADMIN);
     const owner = (await gql(page, '{me{id}}')).me.id;
@@ -46,16 +46,22 @@ test.describe('mobile graph touch @mobile @touch', () => {
 
       const lock = page.getByTestId('graph-lock-toggle');
       await expect(lock).toBeVisible();
-      await expect(lock).toHaveText('Locked');
+      await expect(lock).toHaveAttribute('aria-pressed', 'false');
       const touchPoints = await page.evaluate(() => navigator.maxTouchPoints);
       expect(touchPoints, 'the browser context supports touch events').toBeGreaterThan(0);
       const editor = page.getByRole('dialog', { name: 'Edit work item', exact: true });
       await expect(editor).toHaveCount(0);
+      // A tap previews the card in a peek sheet; editing is one more tap.
+      const peek = page.getByTestId('node-inspector');
       await node.locator('.node-bg').tap();
+      await expect(peek).toBeVisible({ timeout: 8000 });
+      await expect(peek).toContainText(title);
+      await expect(editor).toHaveCount(0);
+      await peek.getByRole('button', { name: 'Edit', exact: true }).tap();
       await expect(editor).toBeVisible({ timeout: 8000 });
       await expect(editor.getByTestId('quick-title')).toHaveValue(title);
       await expect(editor.getByRole('button', { name: 'Details & connections', exact: true })).toBeVisible();
-      await expect(lock).toHaveText('Locked');
+      await expect(lock).toHaveAttribute('aria-pressed', 'false');
 
       await editor.getByTestId('quick-title').fill(savedTitle);
       const acknowledgement = page.waitForResponse(response => {
@@ -76,14 +82,16 @@ test.describe('mobile graph touch @mobile @touch', () => {
       expect(await readSaved()).toEqual([expectedSaved]);
       await editor.getByRole('button', { name: 'Close quick edit', exact: true }).tap();
       await expect(editor).toHaveCount(0);
-      await expect(lock).toHaveText('Locked');
+      await expect(lock).toHaveAttribute('aria-pressed', 'false');
 
       await page.reload({ waitUntil: 'domcontentloaded' });
       await expect(node).toHaveCount(1);
       await expect.poll(async () => (await node.locator('.node-title-text').allTextContents()).join(' ')).toBe(savedTitle);
       expect(await node.evaluate(element => (element as any).__data__.id)).toBe(id);
-      await expect(lock).toHaveText('Locked');
+      await expect(lock).toHaveAttribute('aria-pressed', 'false');
       await node.locator('.node-bg').tap();
+      await expect(peek).toContainText(savedTitle, { timeout: 8000 });
+      await peek.getByRole('button', { name: 'Edit', exact: true }).tap();
       await expect(editor).toBeVisible({ timeout: 8000 });
       await expect(editor.getByTestId('quick-title')).toHaveValue(savedTitle);
       const persisted = await readSaved();

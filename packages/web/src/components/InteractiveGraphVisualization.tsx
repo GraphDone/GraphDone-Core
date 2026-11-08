@@ -1,10 +1,11 @@
+import { COMPACT_WORKSPACE_QUERY, useCompactWorkspace } from '../hooks/useCompactWorkspace';
 import { skipBackgroundPoll } from '../lib/hostedUsage';
 import { QuickEditSurface } from './QuickEditSurface';
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { SemanticGraphOverview } from './SemanticGraphOverview';
 import { SemanticRelationshipBrowser } from './SemanticRelationshipBrowser';
 import { RelationshipPriorityControl } from './RelationshipPriorityControl';
-import { projectRelationshipPriority, relationshipPriorityLevel, relationshipPriorityTier, type RelationshipPriorityLevel } from '../lib/relationshipPriority';
+import { GRAPH_OBSTACLES_EVENT, projectRelationshipPriority, RELATIONSHIP_PRIORITY_EVENT, relationshipPriorityLevel, relationshipPriorityTier, type RelationshipPriorityLevel } from '../lib/relationshipPriority';
 import { indexSemanticRelationships, type RelationshipScope } from '../lib/semanticRelationships';
 import { LayoutSaveStatus } from './LayoutSaveStatus';
 import { GraphStatusDock } from './GraphStatusDock';
@@ -105,6 +106,10 @@ const SIMPLIFY_SCALE = 0.45;
 // helps the paint-bound whole-graph pan/zoom. Edges return when you zoom past it.
 const DOT_SCALE = 0.2;
 
+// The smallest zoom a phone frames the graph at: small cards still show their
+// title (kept at 14 px on screen) and status stripe.
+const PHONE_READABLE_SCALE = 0.5;
+
 // Utility functions
 const getSmoothedOpacity = (scale: number, threshold: number, fadeRange: number = 0.2) => {
   if (scale >= threshold + fadeRange) return 1;
@@ -134,7 +139,13 @@ function renderItemTitle(element: SVGGElement, item: WorkItem, layout: ReturnTyp
 
 function renderItemMetadata(element: SVGGElement, item: WorkItem, layout: ReturnType<typeof graphItemLayout>) {
   const group = d3.select(element);
-  group.selectAll('.node-meta').remove();
+  group.selectAll('.node-meta, .node-compact-status').remove();
+  // A small card keeps only its title, so a stripe down its left edge carries
+  // the status colour; it stays a few pixels wide at any zoom.
+  if (layout.compact) group.append('rect').attr('class', 'node-compact-status').attr('aria-hidden', 'true')
+    .attr('x', -layout.width / 2 + 4).attr('y', -layout.height / 2 + 6)
+    .attr('width', Math.min(9, 5 * layout.titleScale)).attr('height', Math.max(0, layout.height - 12)).attr('rx', Math.min(4.5, 2.5 * layout.titleScale))
+    .attr('fill', getStatusConfig(item.status as WorkItemStatus).hexColor).style('pointer-events', 'none');
   const meta = group.append('g').attr('class', 'node-meta').style('pointer-events', 'none').style('display', () => layout.compact ? 'none' : null);
   const status = getStatusConfig(item.status as WorkItemStatus);
   const priority = Math.round((item.priority || 0) * 100);
@@ -1178,6 +1189,21 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     }
   }, [isConnecting, connectionSource, selectedRelationType]);
 
+  // A tap on a touch screen selects just that card. The host shows the
+  // selected card's inspector as a peek sheet (title, status, contents and
+  // Edit), so looking at an item never jumps straight into editing it.
+  const selectNodeFromTap = (node: WorkItem) => {
+    setInlineEdit(null);
+    setExpandedNode(null);
+    setQuickEditNode(null);
+    setSelectedNodes(new Set([node.id]));
+    setSelectedNode(node);
+    setEditingEdge(null);
+    applyNodeGlowImmediately(node);
+  };
+  const selectNodeFromTapRef = useRef(selectNodeFromTap);
+  selectNodeFromTapRef.current = selectNodeFromTap;
+
   // Remove unused handleEdgeClick to fix TypeScript warning
 
   const layoutRecoveryReady = !currentUser || !currentGraph || !!positionSaveQueue.state?.recovered || !!positionSaveQueue.error;
@@ -1279,6 +1305,13 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     try { localStorage.setItem('graphdone:relationship-priority', relationshipLevel); }
     catch { return; }
   }, [relationshipLevel]);
+  // On a phone the choice lives in the workspace's View sheet, which announces it.
+  useEffect(() => {
+    const update = (event: Event) => setRelationshipLevel(relationshipPriorityLevel((event as CustomEvent<string>).detail));
+    window.addEventListener(RELATIONSHIP_PRIORITY_EVENT, update);
+    return () => window.removeEventListener(RELATIONSHIP_PRIORITY_EVENT, update);
+  }, []);
+  const compactWorkspace = useCompactWorkspace();
   const priorityProjection = useMemo(() => projectRelationshipPriority(workItems, workItemEdges, relationshipLevel), [workItems, workItemEdges, relationshipLevel]);
   const relationshipPriorityRef = useRef(priorityProjection);
   relationshipPriorityRef.current = priorityProjection;
@@ -3350,9 +3383,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       const pointer = event as MouseEvent & { pointerType?: string; sourceCapabilities?: { firesTouchEvents?: boolean } };
       if ((pointer.pointerType === 'touch' || pointer.sourceCapabilities?.firesTouchEvents) && !isConnectingRef.current && !mousedownNodeRef.current) {
         event.stopPropagation();
-        setInlineEdit(null);
-        setExpandedNode(null);
-        setQuickEditNode(d);
+        selectNodeFromTapRef.current(d);
         return;
       }
       // Regular mouse selection.
@@ -3515,9 +3546,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
           } else if (isConnectingRef.current) {
             handleNodeClick(event as unknown as MouseEvent, d);
           } else {
-            setInlineEdit(null);
-            setExpandedNode(null);
-            setQuickEditNode(d);
+            selectNodeFromTapRef.current(d);
           }
         }
         delete (element.node() as any).__touchData;
@@ -4104,6 +4133,11 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
   const layoutStartRef = useRef<number | null>(null);
   const lastSettleMsRef = useRef<number | null>(null);
   const runLabelAvoidanceRef = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    const replace = () => requestAnimationFrame(() => runLabelAvoidanceRef.current?.());
+    window.addEventListener(GRAPH_OBSTACLES_EVENT, replace);
+    return () => window.removeEventListener(GRAPH_OBSTACLES_EVENT, replace);
+  }, []);
   const cameraViewportRef = useRef<{ w: number; h: number } | null>(null);
   const cameraResizeFrameRef = useRef<number | null>(null);
 
@@ -4214,6 +4248,14 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     });
     if (!fit) return false; // No valid positions yet
     let { scale, translateX, translateY } = fit;
+    // On a phone, fitting every card can shrink them to blank boxes. Hold a
+    // scale where each card shows its title and status stripe, centred on the
+    // most important item; the rest is a pan away.
+    // (Graphs of 40+ items open as a group overview, and a focused item has
+    // its own camera; both zoom out on purpose and are left alone.)
+    const phoneFloor = window.matchMedia(COMPACT_WORKSPACE_QUERY).matches && cards.length < 40 && !localItemActiveRef.current
+      && PHONE_READABLE_SCALE > Math.max(scale, minimumScale);
+    if (phoneFloor) minimumScale = PHONE_READABLE_SCALE;
     if (minimumScale > scale) {
       // A freshly organized graph keeps a readable floor instead of shrinking
       // every card to fit: stay centred on the same cards at that scale.
@@ -4223,7 +4265,8 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
       translateX = fit.region.x + fit.region.width / 2 - centerX * scale;
       translateY = fit.region.y + fit.region.height / 2 - centerY * scale;
     }
-    const focus = organizationFocusRef.current && cards.find(node => node.id === organizationFocusRef.current);
+    const focus = (organizationFocusRef.current && cards.find(node => node.id === organizationFocusRef.current))
+      || (phoneFloor ? [...cards].sort((a, b) => ((b as WorkItem).priority ?? 0) - ((a as WorkItem).priority ?? 0))[0] : undefined);
     if (minimumScale > 0 && focus) {
       const at = frameOrganizedNeighborhood(
         cards.map(node => ({ id: node.id, x: node.x, y: node.y, ...getNodeDimensionsAt(node, scale) })),
@@ -5345,8 +5388,15 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
     <div ref={containerRef} className="graph-container relative w-full h-full overflow-hidden select-none" data-overview={semanticOverviewActive || localItemActive || undefined} data-local-item-lod={localItemActive || undefined} data-quality={qualityTier} data-dense={isDenseGraph ? 'true' : undefined} data-simplify={isSimplified ? 'true' : undefined} data-dots={isDotMode ? 'true' : undefined}
       data-relationship-priority={relationshipLevel} data-relationship-total={workItemEdges.length}
       data-priority-summarized={priorityProjection.summarized.length} data-priority-represented={priorityProjection.represented.length} data-priority-pending={priorityProjection.pending.length}>
-      {workItems.length < 40 && <div data-graph-fit-obstacle="true" className="absolute left-3 right-16 top-16 md:left-16 md:right-40 md:top-3 z-20 flex flex-wrap gap-3">{priorityControl}{localItemControls}</div>}
+      {workItems.length < 40 && (!compactWorkspace || localItemControls) && <div data-graph-fit-obstacle="true" className="absolute left-3 right-16 top-3 md:left-16 md:right-40 z-20 flex flex-wrap gap-3">{!compactWorkspace && priorityControl}{localItemControls}</div>}
       {!semanticOverviewActive && <GraphStatusDock>
+      {/* Phone: the grow hint joins the bottom bar (a top banner would sit on
+          the card being grown) and offers Cancel, since there is no Esc key. */}
+      {isConnecting && compactWorkspace && <div role="status" data-testid="grow-hint" className="flex items-center gap-3 rounded-lg border border-emerald-500/40 bg-gray-900 px-3 py-1 text-sm text-emerald-100">
+        <Link2 aria-hidden="true" className="h-4 w-4 shrink-0 text-emerald-400" />
+        <span className="min-w-0 flex-1">Tap empty space for a new item, or a card to connect it</span>
+        <button type="button" onClick={() => { setIsConnecting(false); setConnectionSource(null); }} className="min-h-11 shrink-0 rounded-lg px-3 font-medium text-white hover:bg-gray-800">Cancel</button>
+      </div>}
       <LayoutSaveStatus queue={positionSaveQueue} />
       {localItemActive ? localItemFooter : workItemEdges.length > 0 && <button
         ref={itemRelationshipTriggerRef}
@@ -5354,7 +5404,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
         className="max-w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 shadow-lg"
         onClick={() => { itemPairTriggerRef.current = null; setItemRelationshipScope({ kind: 'all' }); }}
         aria-label={`${workItemEdges.length} relationships, ${itemLabelCount} labels shown, ${priorityProjection.summarized.length} summarized by priority. Browse all relationships`}
-      ><span className="block">{workItemEdges.length} connections · Browse</span><span className="block text-slate-300">{priorityProjection.summarized.length} summarized · {itemLabelCount} labels</span></button>}
+      ><span className="block">{workItemEdges.length} connections · Browse</span>{!compactWorkspace && <span className="block text-slate-300">{priorityProjection.summarized.length} summarized · {itemLabelCount} labels</span>}</button>}
       </GraphStatusDock>}
       {itemRelationshipScope && !semanticOverviewActive && <SemanticRelationshipBrowser
         index={itemRelationshipIndex}
@@ -5491,7 +5541,7 @@ export function InteractiveGraphVisualization({ onResetLayout, onNodeSelected, i
 
       {/* Grow mode: one friendly hint, no instructions-as-UI, no dropdown.
           The edge type can be retyped later by clicking its label. */}
-      {isConnecting && (
+      {isConnecting && !compactWorkspace && (
         <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-gray-900/90 backdrop-blur-sm border border-emerald-500/40 text-emerald-100 px-4 py-2 rounded-xl shadow-lg pointer-events-none">
           <div className="flex items-center space-x-2 text-sm">
             <Link2 className="h-4 w-4 text-emerald-400" />

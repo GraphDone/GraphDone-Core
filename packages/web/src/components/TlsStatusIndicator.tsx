@@ -87,7 +87,11 @@ export function InsecureConnectionBanner({ fixed = false, onDismiss, className =
       className={`${position} flex items-center justify-center gap-2 border-b px-4 py-1.5 text-xs sm:text-sm backdrop-blur-sm ${tone} ${className}`}
     >
       {isLocalhost ? <AlertTriangle size={14} className="flex-shrink-0" /> : <ShieldOff size={14} className="flex-shrink-0" />}
-      <span className="text-center">
+      {/* One line on a phone; the full sentence where there is room. */}
+      <span className="text-center sm:hidden">
+        {isLocalhost ? 'Development mode — not encrypted (HTTP)' : 'Insecure connection (HTTP, not HTTPS)'}
+      </span>
+      <span className="hidden text-center sm:inline">
         {isLocalhost
           ? 'Development mode — this connection is not encrypted (HTTP).'
           : 'Insecure connection — this site is served over HTTP, not HTTPS.'}
